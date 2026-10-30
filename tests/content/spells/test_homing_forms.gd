@@ -130,7 +130,7 @@ func _check_move(form: FormBase, at: Vector2) -> void:
 		var to: Vector2 = _moves[0][2]
 		check(absf(to.angle_to(at)) < 0.01, "a homing %s blinks straight at a target %s px off at %s degrees: %s" % [form.id, roundi(at.length()), OFF_AIM, to])
 	else:
-		var homing: Homing = _spells.dashes().move_homing(1)
+		var homing: Homing = CarrierDash.of(_spells).move_homing(1)
 		check(homing.homes() and homing.reach >= at.length(), "a homing %s turns the wizard toward a target %s px off (reach %s)" % [form.id, roundi(at.length()), homing.reach])
 
 

@@ -83,7 +83,7 @@ func last_form(player: int, staff: int) -> StringName:
 ## The staff animations a test set (`staff_poses`), handed out as the runtime hands out its own.
 func poses() -> StaffPoses:
 	if _poses_set == null:
-		_poses_set = SetPoses.new(self)
+		_poses_set = SetPoses.new(CarrierKit.new(self))
 		_poses_set.fake = self
 	return _poses_set
 

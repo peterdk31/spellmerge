@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: A carrier knows the runtime only through its kit; the runtime names no carrier (owner)
+
+- **The kit** (owner, in the review of the carriers PR: the carriers reached into about 34 of the runtime's own members, so a new carrier had to read `spells.gd`): a carrier, `CasterMoves` and `StaffPoses` ask the runtime only through `CarrierKit` (`core/spells/carrier_kit.gd`), one short file of named, documented calls (the cast under way, the aim, the shot kit, the hit path, payloads, live carriers, moves, entities). Each forwards to the runtime's one rule for it; nothing moved or changed in what it does. Something a carrier needs that the kit lacks is added to the kit, never reached around it.
+- **No carrier named in `spells.gd`:** the beam, swing and slam fields and the `beams()`, `swings()`, `slams()`, `dashes()`, `decoys()` getters are gone for one `Spells.carrier(id)`; whoever reads a carrier's own getters asks its class (`CarrierBeam.of(spells)`). A live carrier on a row is `LC_ROW`, placed by its carrier's `tip_of` (was `LC_BEAM`, `LC_SWING`); a live beam's magnet pull runs in the beam's own `step` (so a beam that another part of the same step starts pulls from the next step, not that one); a block's form is the blocking carrier's `id()` (a dash or teleport only deflects, so theirs is never seen). A ray the runtime sends itself (a jump, a zap) still looks like a beam (`RAY_FORM`). `tests/core/test_carriers.gd` reads the scripts and fails on a way around the kit or a carrier named in `spells.gd`.
+
 ## 2026-10-30: An explosion hits as `burst` (owner)
 
 - **A blast's strikes are `burst` again** (owner, after the merge of R4 F2 with the carriers): what a blast strikes is still its carrier's hit (cards, triggers, chain, relay: rules R4 F2), but with kind `burst`, so it has the explosion's hit-stop, shake and sound and a wizard caught in their own reads "downed by your own Blast", not "Shot" or "Beam". The cards that land on a point strike as `burst` too, as the area hit did before F2. The compiler makes the copy once (`CompiledSpell.blast_hit`, `echo_blast_hit`; `StaffCompiler.blast_hit`); a hit that relay changed is copied per blast. The kind is a feel-and-text label only: no rule reads it.

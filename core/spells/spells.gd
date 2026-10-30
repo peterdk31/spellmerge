@@ -137,6 +137,9 @@ const ACTORS: int = ActorsScript.ACTORS
 const HITS: int = ProjectilesScript.ACTOR_LAYERS
 ## A wall's pierce (rules R4 F6): a pierce no hit spends, so it stands through every hit.
 const PIERCE_ALL: int = 1 << 30
+## How a ray this runtime sends itself looks and blocks (a chain jump, a zap: `form_shown`,
+## `block_shot`): as a beam's line. A look, not a carrier: it runs no carrier.
+const RAY_FORM: StringName = &"beam"
 
 
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
@@ -230,18 +233,17 @@ var _rec_chain: PackedInt32Array = PackedInt32Array()
 var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
-## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a beam's tip, a swing's
-## tip, an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
+## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
+## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
 ## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
 ## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
 ## entity that ended, a rain whose landing was dropped). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
 ## `_lc_way` its way where nothing else gives one.
 const LC_SLOT: int = 0
-const LC_BEAM: int = 1
-const LC_SWING: int = 2
-const LC_ACTOR: int = 3
-const LC_POINT: int = 4
+const LC_ROW: int = 1
+const LC_ACTOR: int = 2
+const LC_POINT: int = 3
 var _lc_tag: PackedInt64Array = PackedInt64Array()
 var _lc_kind: PackedInt32Array = PackedInt32Array()
 var _lc_ref: PackedInt32Array = PackedInt32Array()
@@ -349,14 +351,12 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
-## This runtime's carriers, by id (`Carriers.make_all`, bound to it), and the three
-## that keep rows of their own, which the looks read (`beams`, `swings`, `slams`).
+## This runtime's carriers, by id (`Carriers.make_all`, bound to it through `_kit`).
 var _carriers: Dictionary = {}
 ## The carrier that runs nothing (id &""), for a spell whose carrier id no carrier has.
 var _no_carrier: Carrier = Carrier.new()
-var _beams: CarrierBeam = null
-var _swings: CarrierSwing = null
-var _slams: CarrierSlam = null
+## What the carriers (and `_poses`, `_moves`) may ask of this runtime: all they use of it.
+var _kit: CarrierKit = null
 ## Each actor's staff animation, for any carrier with a `staff_pose`.
 var _poses: StaffPoses = null
 ## The moves carriers make of their caster or of the shot that cast them (dash, teleport, pull,
@@ -365,14 +365,12 @@ var _moves: CasterMoves = null
 
 
 func _init() -> void:
-	_poses = StaffPoses.new(self)
-	_moves = CasterMoves.new(self)
+	_kit = CarrierKit.new(self)
+	_poses = StaffPoses.new(_kit)
+	_moves = CasterMoves.new(_kit)
 	_carriers = Carriers.make_all()
 	for carrier: Carrier in _carriers.values():
-		carrier.bind(self, _poses)
-	_beams = _carriers[&"beam"] as CarrierBeam
-	_swings = _carriers[&"swing"] as CarrierSwing
-	_slams = _carriers[&"slam"] as CarrierSlam
+		carrier.bind(_kit, _poses)
 	_current.resize(ACTORS * SpellLimits.STAFFS)
 	_current.fill(-1)
 	_installed.resize(ACTORS * SpellLimits.STAFFS)
@@ -1406,9 +1404,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 				var from: Vector2 = projectiles.ray_path[n]
 				var to: Vector2 = projectiles.ray_path[n + 1]
 				if not from.is_equal_approx(to):
-					events.form_shown.emit(actor, &"beam", from, from.direction_to(to), from.distance_to(to), spell.tint, spell.look)
+					events.form_shown.emit(actor, RAY_FORM, from, from.direction_to(to), from.distance_to(to), spell.tint, spell.look)
 	elif got > 0.0 and events != null:
-		events.form_shown.emit(actor, &"beam", origin, heading, got, spell.tint, spell.look)
+		events.form_shown.emit(actor, RAY_FORM, origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
 		_blast(spell, tag, actor, end)
@@ -1435,7 +1433,7 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 		if walked + piece > reach:
 			b = a.move_toward(b, reach - walked)
 		var found: int = projectiles.shots_on_segment(actor, a, b, width)
-		charges = _guard(found, actor, tag, deflects, charges, a, b)
+		charges = _guard(found, actor, tag, deflects, charges, a, b, RAY_FORM)
 		walked += piece
 		if walked >= reach or (not deflects and charges <= 0):
 			break
@@ -1445,9 +1443,9 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when
 ## `b` is INF (a swing's hand), else off the segment from `a` to `b` (a beam's line);
-## a block is sent with that form (`block_shot`). Returns the charges left.
-## The list is copied first: what a deflect sets off can run another guard.
-func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, form: StringName = &"") -> int:
+## a block is sent as `form`'s, the carrier's id (`block_shot`: Feel tells a swing's parry by it).
+## Returns the charges left. The list is copied first: what a deflect sets off can run another guard.
+func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2, form: StringName) -> int:
 	if found == 0:
 		return charges
 	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
@@ -1463,9 +1461,6 @@ func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: V
 			projectiles.deflect_shot(slot, actor, normal, tag)
 		elif charges > 0:
 			charges -= 1
-			# A swing's block is a parry; Feel tells them apart by the form.
-			if form == &"":
-				form = &"swing" if not b.is_finite() else &"beam"
 			projectiles.block_shot(slot, actor, tag, form)
 	return charges
 
@@ -1753,10 +1748,9 @@ func _lc_where(i: int) -> Vector2:
 	match _lc_kind[i]:
 		LC_SLOT:
 			return projectiles.get_position_of(ref) if projectiles.get_seq_of(ref) == _lc_seq[i] else Vector2.INF
-		LC_BEAM:
-			return _beams.tip_of(ref, _lc_seq[i])
-		LC_SWING:
-			return _swings.tip_of(ref, _lc_seq[i])
+		LC_ROW:
+			var spell: CompiledSpell = _profiles.get(_lc_tag[i])
+			return _carrier_of(spell).tip_of(ref, _lc_seq[i]) if spell != null else Vector2.INF
 		LC_ACTOR:
 			return projectiles.get_anchor(ref)
 	return _lc_at[i]
@@ -1823,12 +1817,10 @@ func _step_arcs(delta: float) -> void:
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
-## (`pull_requested`; combat keeps the pull as a push that the next pull replaces), and every
-## live `magnet` beam toward its line (`_beam_pull`). At most `SpellLimits.MAX_PULLS_PER_STEP`
-## shots pull in a step; which ones rotates, so none starves.
+## (`pull_requested`; combat keeps the pull as a push that the next pull replaces); a carrier with
+## rows of its own pulls with them in its `step` (a live beam toward its line). At most
+## `SpellLimits.MAX_PULLS_PER_STEP` shots pull in a step; which ones rotates, so none starves.
 func _step_magnets() -> void:
-	# A live beam with magnet pulls toward its line every step it is on (rules R4f).
-	_beams.pull_magnets()
 	var i: int = 0
 	while i < _magnet_count:
 		var slot: int = _magnets[i]
@@ -1879,7 +1871,7 @@ func _zap(slot: int) -> void:
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_end()
 	if got > 0.0 and events != null:
-		events.form_shown.emit(actor, &"beam", at, way, got, spell.tint, spell.look)
+		events.form_shown.emit(actor, RAY_FORM, at, way, got, spell.tint, spell.look)
 	_cast_jumps()
 
 
@@ -2550,34 +2542,17 @@ func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int)
 	if carrier != null:
 		carrier.entity_ended(actor, position, tag)
 
-# The carriers' rows and the staff animations, for their looks (`gameplay/feel`, the actor's look)
-# and the tests: each is read from the object that keeps it.
+# The carriers and the staff animations, for their looks (`gameplay/feel`, the actor's look), `ai`,
+# the actor's mover and the tests: each is read from the object that keeps it.
 
-## The beams' rows (`CarrierBeam`: `beam_slots()` rows, each on or off, with where it is and how it looks).
-func beams() -> CarrierBeam:
-	return _beams
-
-
-## The swings' rows (`CarrierSwing`: `swing_slots()` rows, each on or off, with its sweep and look).
-func swings() -> CarrierSwing:
-	return _swings
-
-
-## The slams' rows (`CarrierSlam`: `slam_slots()` rows, each on or off, with its impact).
-func slams() -> CarrierSlam:
-	return _slams
+## This runtime's carrier `id` (bound, with the rows it keeps), or the one that runs nothing for
+## an id no carrier has. A reader that wants one carrier's own getters asks that carrier's class
+## (`CarrierBeam.of(spells)`), so this runtime names none.
+func carrier(id: StringName) -> Carrier:
+	var found: Carrier = _carriers.get(id)
+	return found if found != null else _no_carrier
 
 
 ## Each actor's staff animation (`StaffPoses`: where each actor's staff is now).
 func poses() -> StaffPoses:
 	return _poses
-
-
-## The dash, for the body that makes it (`gameplay/actor`): its homing (`CarrierDash.move_homing`).
-func dashes() -> CarrierDash:
-	return _carriers[&"dash"] as CarrierDash
-
-
-## The decoys, for `ai` that keeps their bodies: their shield and guard (`CarrierDecoy`).
-func decoys() -> CarrierDecoy:
-	return _carriers[&"decoy"] as CarrierDecoy

@@ -2004,7 +2004,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 
 
 ## Stops the shot in `slot` as a shield charge does (`shot_blocked(by, where, by_tag)`), for a
-## carrier that is no shot (a swing, a beam). `form` is that carrier's (`&"swing"`, `&"beam"`),
+## carrier that is no shot (a swing, a beam, a slam, a decoy). `form` is that carrier's id,
 ## told to looks as `impact_form` while the event is sent: a swing's block is a parry (melee I5).
 ## The blocker is no shot, so the event's `shot` is -1, whatever event it is sent inside of.
 ## False when there is no such shot.

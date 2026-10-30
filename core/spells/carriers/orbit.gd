@@ -25,8 +25,8 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 	if spell.speed > 0.0 and spell.orbit_radius > 0.0:
 		turn = spell.speed / spell.orbit_radius
 	var centre: Vector2 = Vector2.INF
-	if rt._caster != SpellRuntime.CASTER_WIZARD:
-		var shot: int = rt._caster_shot()
-		centre = rt.projectiles.get_position_of(shot) if shot >= 0 else origin
-	var slot: int = rt.projectiles.spawn_orbit(actor, spell.orbit_radius, direction.angle() + TAU * n / count, turn, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, centre)
-	return rt._land_shot(slot, spell, tag, source, chain, prev)
+	if kit.caster() != SpellRuntime.CASTER_WIZARD:
+		var shot: int = kit.caster_shot()
+		centre = kit.projectiles.get_position_of(shot) if shot >= 0 else origin
+	var slot: int = kit.projectiles.spawn_orbit(actor, spell.orbit_radius, direction.angle() + TAU * n / count, turn, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, centre)
+	return kit.land_shot(slot, spell, tag, source, chain, prev)

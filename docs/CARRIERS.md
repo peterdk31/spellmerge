@@ -68,8 +68,8 @@ beam's `ray_length`); the spell validator checks them.
 ## What a carrier runs
 
 At runtime `Spells` makes its own carriers (`Carriers.make_all`), binds them and hands every launch
-to its carrier. Nothing in `spells.gd` asks which carrier a spell has. A carrier overrides what is
-its own:
+to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names one
+(`tests/core/test_carriers.gd` checks it). A carrier overrides what is its own:
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
@@ -81,15 +81,42 @@ its own:
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | bolt, beam, swing, slam, rain (for an enemy's telegraph) |
+| `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 
 Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the
 launch both make, with `_aim_move`, `_move_body` and `_moved_shot` for their own part), decoy and
 familiar extend `CarrierEntity` (a body `ai` makes, ended by `entity_ended`), and every move of a
 caster or of the shot that cast it (dash, teleport, hook, swap, recoil) goes through `CasterMoves`
-(`core/spells/caster_moves.gd`), whose end point runs the carrier's `on_move_end`. A carrier asks the
-runtime for the rest of the shared path through `rt`: the shot kit (`_land_shot`) and the hit path. A hit with no shot slot (a beam's,
-a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
-(`_ray_begin`/`_ray_end`), so cards, payloads and chains work the same on every carrier.
+(`core/spells/caster_moves.gd`), whose end point runs the carrier's `on_move_end`.
+
+### What a carrier may ask of the runtime: `CarrierKit`
+
+A carrier sees the runtime only as `kit` (`core/spells/carrier_kit.gd`, `CarrierKit`), never as
+`Spells`: that one short file is all a new carrier needs to learn of the runtime. Each call is the
+runtime's one rule for it, shared by every carrier:
+
+| Group | Calls |
+| --- | --- |
+| The world | `projectiles`, `events`, `clock()` |
+| The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()`, `caster_seq()`, `caster_shot()`, `is_echo(spell)`, `shot_started`, `shot_ended` |
+| The aim | `aim_origin`, `aim_dir`, `aim_pivot`, `aim_seen`, `walk_turn` (by actor) |
+| Shots | `fan_angle`, `staff_spread`, `placed_at`, `land_shot` (or `apply_travel` then `register`) |
+| Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as its block form), `guard_path`, `bounces`, `ghost` |
+| What it leaves behind | `blast`, `fire_payload`, `fire`, `delay` |
+| Live carriers | `live_join` (`SpellRuntime.LC_SLOT`, `LC_ROW`, `LC_ACTOR`, `LC_POINT`), `live_leave` |
+| Moves and entities | `moves()` (`CasterMoves`), `request_entity` |
+
+A hit with no shot slot (a beam's, a sweep's, a strike's, a zap, a jump) goes back through the
+runtime as one `RayHit` (`ray_begin`/`ray_end`), so cards, payloads and chains work the same on
+every carrier. If a carrier needs something the kit does not give, add it to the kit (one rule for
+every carrier), never a back door into `Spells`.
+
+### Reading a carrier's own rows
+
+The looks, `ai` and the tests read a carrier's own getters from that carrier's class:
+`CarrierBeam.of(spells)`, `CarrierSwing.of(spells)`, `CarrierSlam.of(spells)`,
+`CarrierDash.of(spells)`, `CarrierDecoy.of(spells)` (each is `Spells.carrier(id)`, typed). A new
+carrier with rows others read adds the same `static func of`.
 
 ## Adding a carrier
 
@@ -97,7 +124,8 @@ a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
    answer the questions in `traits()` and `required_fields()`. `Carriers.make_all` finds it in the
    folder by its `class_name`; give it a `step_order()` only if its rows must step before or after
    another carrier's.
-2. Override the hooks it needs (at least `launch` or `shoot`).
+2. Override the hooks it needs (at least `launch` or `shoot`), asking the runtime only through
+   `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
 3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`.
 
 Removing a carrier is deleting its script. A form card that still names

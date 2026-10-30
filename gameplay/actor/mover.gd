@@ -11,7 +11,7 @@ extends ActorComponent
 ## over at once: the actor jumps by its `move`, stopping TELEPORT_CLEARANCE short of the first
 ## wall, then backing off until the body (`body_radius`) is clear of walls and inside the room.
 ## Every other move (`dash`, `pull`, `swap`, `recoil`) is a velocity for its time; a `dash` turns
-## toward a target as it goes when its card homes (`Spells.dashes().move_homing`). Each move answers
+## toward a target as it goes when its card homes (`CarrierDash.move_homing`). Each move answers
 ## `caster_move_finished` where it ended: a teleport at once, the others the step after their
 ## last, once the body has walked it (the last step is shortened, so a move goes exactly its
 ## distance). A card's move is the actor's own when the card's tag names the actor's caster
@@ -144,7 +144,7 @@ func _on_caster_move_requested(_player: int, mode: StringName, move: Vector2, se
 	_velocities[_count] = move / time
 	_lefts[_count] = time
 	_tags[_count] = tag
-	_homings[_count] = actor.spells.dashes().move_homing(_caster_number()) if mode == &"dash" and actor.spells != null else null
+	_homings[_count] = CarrierDash.of(actor.spells).move_homing(_caster_number()) if mode == &"dash" and actor.spells != null else null
 	_count += 1
 
 

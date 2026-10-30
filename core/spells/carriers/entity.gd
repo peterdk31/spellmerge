@@ -12,7 +12,7 @@ var _entities: Dictionary = {}
 
 ## Asks `ai` for one a step ahead along `heading`.
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, _source: Node, lifetime: float, _chain: int, _prev: int) -> int:
-	return _spawn(spell, tag, actor, rt._placed_at(spell, origin, heading), heading, lifetime)
+	return _spawn(spell, tag, actor, kit.placed_at(spell, origin, heading), heading, lifetime)
 
 
 func step_order() -> int:
@@ -21,8 +21,8 @@ func step_order() -> int:
 
 ## A held one is switched off: `ai` is asked to end it, and it ends as any.
 func switch_off(tag: int) -> void:
-	if _entities.has(tag) and rt.events != null:
-		rt.events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
+	if _entities.has(tag) and kit.events != null:
+		kit.events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
 
 func clear() -> void:
@@ -34,28 +34,25 @@ func clear() -> void:
 ## so its build stays known while it lives; its timer fires along `heading`. Returns 1 when asked for.
 func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2, lifetime: float) -> int:
 	var kind: StringName = id()
-	if rt.events == null or not rt._profiles.has(tag):
+	if kit.events == null or kit.spell_of(tag) == null:
 		return 0
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
 	var anchor: int = _entity_caster()
 	_entities[tag] = _entities.get(tag, 0) + 1
-	rt.shot_started(tag)
+	kit.shot_started(tag)
 	# Where it is: a point, where it was made; Entities moves a familiar's along with its orb
 	# (`Spells.familiar_at`, by its key), so the familiar casts from its orb (rules R4 F8).
-	rt._entity_keys += 1
-	rt.entity_key = rt._entity_keys
-	rt.events.entity_spawn_requested.emit(actor, kind, at, seconds, tag, anchor)
-	rt.entity_key = 0
-	rt._lc_join(spell, tag, SpellRuntime.LC_POINT, -1, rt._entity_keys, false, seconds, at, heading)
+	var key: int = kit.request_entity(actor, kind, at, seconds, tag, anchor)
+	kit.live_join(spell, tag, SpellRuntime.LC_POINT, -1, key, false, seconds, at, heading)
 	return 1
 
 
 ## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
 ## cast it, or nothing (-2: it stays where it was made).
 func _entity_caster() -> int:
-	if rt._caster == SpellRuntime.CASTER_WIZARD:
+	if kit.caster() == SpellRuntime.CASTER_WIZARD:
 		return -1
-	var shot: int = rt._caster_shot()
+	var shot: int = kit.caster_shot()
 	return shot if shot >= 0 else -2
 
 
@@ -71,17 +68,17 @@ func entity_ended(actor: int, position: Vector2, tag: int) -> void:
 		_entities.erase(tag)
 	else:
 		_entities[tag] = count - 1
-	rt._lc_leave(tag, false)
-	var spell: CompiledSpell = rt._profiles.get(tag)
+	kit.live_leave(tag, false)
+	var spell: CompiledSpell = kit.spell_of(tag)
 	if spell != null and position.is_finite():
-		rt._blast(spell, tag, actor, position)
+		kit.blast(spell, tag, actor, position)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			rt._fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, SpellRuntime.CASTER_POINT)
-	rt.shot_ended(tag)
+			kit.fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, SpellRuntime.CASTER_POINT)
+	kit.shot_ended(tag)
 
 
 ## A revoked build's entities are told to end, and forgotten (their `entity_ended` is then ignored).
 func end_of(tag: int) -> void:
-	rt._lc_leave(tag, true)
-	if _entities.erase(tag) and rt.events != null:
-		rt.events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
+	kit.live_leave(tag, true)
+	if _entities.erase(tag) and kit.events != null:
+		kit.events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)

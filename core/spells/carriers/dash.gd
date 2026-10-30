@@ -35,6 +35,13 @@ func id() -> StringName:
 	return &"dash"
 
 
+
+## The dash of the runtime `spells` (its bound `dash` carrier, `Spells.carrier`), for what reads
+## its own getters (the looks, `ai`, the actor's mover, the tests).
+static func of(spells: SpellRuntime) -> CarrierDash:
+	return spells.carrier(&"dash") as CarrierDash
+
+
 func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
 
@@ -43,8 +50,8 @@ func step_order() -> int:
 	return 1
 
 
-func bind(runtime: SpellRuntime, staff_poses: StaffPoses) -> void:
-	super(runtime, staff_poses)
+func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
+	super(runtime_kit, staff_poses)
 	for i in SpellRuntime.ACTORS:
 		_dash_homing.append(Homing.new())
 
@@ -71,12 +78,12 @@ func _move_seconds(spell: CompiledSpell) -> float:
 ## where it really goes, and it strikes every body it passes (`_start_pass`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[actor].start(spell, hash(Vector2i(actor, tag)))
-	rt.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
-	var reach: float = origin.distance_to(rt.projectiles.clip_to_walls(origin, origin + offset))
-	rt.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
-	rt.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
+	kit.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
+	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
+	kit.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
+	kit.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
 	_start_pass(spell, tag, actor, -1, seconds, chain, prev)
-	rt._lc_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
+	kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
 
 
 func _moved_shot(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:
@@ -98,15 +105,15 @@ func _start_pass(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds:
 	dash.spell = spell
 	dash.actor = actor
 	dash.shot = shot
-	dash.seq = rt.projectiles.get_seq_of(shot) if shot >= 0 else 0
-	dash.last = rt.projectiles.get_anchor(actor) if shot < 0 else rt.projectiles.get_position_of(shot)
+	dash.seq = kit.projectiles.get_seq_of(shot) if shot >= 0 else 0
+	dash.last = kit.projectiles.get_anchor(actor) if shot < 0 else kit.projectiles.get_position_of(shot)
 	dash.left = seconds + SpellLimits.PASS_GRACE
 	dash.chain = chain
 	dash.prev = prev
-	dash.hit = spell.echo_hit if rt._echo_spell == spell else null
+	dash.hit = spell.echo_hit if kit.is_echo(spell) else null
 	dash.struck.clear()
 	_passes.append(dash)
-	rt.shot_started(tag)
+	kit.shot_started(tag)
 
 
 ## Runs the dashes under way on by `delta` (`Spells.step`): each strikes what its mover passed since the last step
@@ -118,10 +125,10 @@ func step(delta: float) -> void:
 		var dash: MovePass = _passes[i]
 		var at: Vector2 = Vector2.INF
 		if dash.shot < 0:
-			at = rt.projectiles.get_anchor(dash.actor)
-		elif rt.projectiles.is_alive(dash.shot) and rt.projectiles.get_seq_of(dash.shot) == dash.seq:
-			at = rt.projectiles.get_position_of(dash.shot)
-		if dash.left > 0.0 and at.is_finite() and rt._profiles.get(dash.tag) == dash.spell:
+			at = kit.projectiles.get_anchor(dash.actor)
+		elif kit.projectiles.is_alive(dash.shot) and kit.projectiles.get_seq_of(dash.shot) == dash.seq:
+			at = kit.projectiles.get_position_of(dash.shot)
+		if dash.left > 0.0 and at.is_finite() and kit.spell_of(dash.tag) == dash.spell:
 			_pass_step(dash, dash.last if dash.last.is_finite() else at, at)
 			dash.last = at
 			dash.left -= delta
@@ -136,7 +143,7 @@ func step(delta: float) -> void:
 		dash.hit = null
 		dash.struck.clear()
 		_passes_free.append(dash)
-		rt.shot_ended(tag)
+		kit.shot_ended(tag)
 
 
 ## The dash `dash` moved from `from` to `to`: it strikes each body within SpellLimits.PASS_REACH of that
@@ -145,15 +152,15 @@ func step(delta: float) -> void:
 func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	var spell: CompiledSpell = dash.spell
 	var reach: float = SpellLimits.PASS_REACH
-	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else rt._moves.move_heading[dash.actor]
+	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else kit.moves().move_heading[dash.actor]
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-		rt._guard(rt.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to)
+		kit.guard(kit.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to, id())
 	var samples: int = maxi(ceili(from.distance_to(to) / reach), 1)
 	for n in samples:
 		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
-		var found: int = rt.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS)
+		var found: int = kit.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS)
 		if found > 0:
-			var took: HitProfile = rt._strike(spell, dash.tag, dash.actor, found, dash.struck, point, dash.chain, dash.prev, dash.hit)
+			var took: HitProfile = kit.strike(spell, dash.tag, dash.actor, found, dash.struck, point, dash.chain, dash.prev, dash.hit)
 			if dash.left <= 0.0 or dash.spell != spell:
 				return
 			dash.hit = took

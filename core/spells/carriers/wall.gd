@@ -18,13 +18,13 @@ func traits() -> int:
 ## and that its hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.WALL_REACH
-	var centre: Vector2 = rt.projectiles.clip_to_walls(origin, origin + direction * reach)
-	var slot: int = rt.projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
+	var centre: Vector2 = kit.projectiles.clip_to_walls(origin, origin + direction * reach)
+	var slot: int = kit.projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
 	if slot < 0:
 		return 0
-	rt._apply_travel(slot, spell)
-	rt.projectiles.set_solid(slot, direction.orthogonal(), spell.shots, spell.spread if spell.spread > 0.0 else spell.radius * 2.0)
-	rt._register(slot, tag, spell, carried, prev)
+	kit.apply_travel(slot, spell)
+	kit.projectiles.set_solid(slot, direction.orthogonal(), spell.shots, spell.spread if spell.spread > 0.0 else spell.radius * 2.0)
+	kit.register(slot, tag, spell, carried, prev)
 	if source != null:
-		rt.projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+		kit.projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return 1

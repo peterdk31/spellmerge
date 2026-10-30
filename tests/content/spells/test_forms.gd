@@ -175,11 +175,11 @@ func test_one_beam_hits_at_once_and_every_tick_of_its_life() -> void:
 	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
 	_cast(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 1, "a hit at once")
-	check_equal(_spells.beams().beam_count(), 1, "and the beam stays on")
+	check_equal(CarrierBeam.of(_spells).beam_count(), 1, "and the beam stays on")
 	_tick(60)
 	var hits: int = Carriers.of(&"beam").hits_per_target(spell.lifetime)
 	check_equal(_hits.size(), hits, "then one hit every %s s of its %s s life" % [SpellLimits.BEAM_TICK, spell.lifetime])
-	check_equal(_spells.beams().beam_count(), 0, "then it is gone")
+	check_equal(CarrierBeam.of(_spells).beam_count(), 0, "then it is gone")
 	check_equal(spell.damage, 2, "a hit does 2 damage")
 
 
@@ -198,7 +198,7 @@ func test_a_held_beam_stays_on_and_drains_mana_steadily() -> void:
 		if taken != SpellsScript.REFUSED:
 			mana -= taken
 			casts += 1
-		if _spells.beams().beam_count() == 0:
+		if CarrierBeam.of(_spells).beam_count() == 0:
 			dark += 1
 		_tick(1)
 	check_equal(dark, 0, "a beam is on in every step")

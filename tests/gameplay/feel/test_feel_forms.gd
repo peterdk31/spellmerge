@@ -212,9 +212,9 @@ class FakeBeams:
 	var on_again: bool = false
 	var caster: int = 1
 
-	## As the runtime hands Feel its beams (`Spells.beams`): itself.
-	func beams() -> Object:
-		return self
+	## As the runtime hands Feel its beams (`Spells.carrier(&"beam")`): itself.
+	func carrier(id: StringName) -> Object:
+		return self if id == &"beam" else null
 
 	func beam_point_count(_at: int) -> int:
 		return 17 if on_again else 9

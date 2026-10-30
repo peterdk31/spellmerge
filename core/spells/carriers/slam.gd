@@ -6,7 +6,7 @@ extends Carrier
 ## Its rows: the live slams, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`, `clear`). Its strikes go through the runtime as rays
 ## (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read the
-## `slam_*` getters (`Spells.slams()`).
+## `slam_*` getters (`CarrierSlam.of(spells)`).
 
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
@@ -41,6 +41,13 @@ func id() -> StringName:
 	return &"slam"
 
 
+
+## The slams of the runtime `spells` (its bound `slam` carrier, `Spells.carrier`), for what reads
+## its own getters (the looks, `ai`, the actor's mover, the tests).
+static func of(spells: SpellRuntime) -> CarrierSlam:
+	return spells.carrier(&"slam") as CarrierSlam
+
+
 func traits() -> int:
 	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS
 
@@ -60,8 +67,8 @@ func hit_kind() -> StringName:
 
 
 ## Makes this carrier's rows for `runtime`, which casts it.
-func bind(runtime: SpellRuntime, staff_poses: StaffPoses) -> void:
-	super(runtime, staff_poses)
+func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
+	super(runtime_kit, staff_poses)
 	poses = staff_poses
 	_grow_slams(SpellLimits.SLAM_ROWS_START)
 
@@ -106,16 +113,16 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sl_struck[at].clear()
 	var mine: bool = actor >= 0 and actor < SpellRuntime.ACTORS
 	if caster == SpellRuntime.CASTER_WIZARD:
-		if mine and rt._aim_pivot[actor].is_finite():
-			_sl_origin[at] = rt._aim_pivot[actor]
-		if mine and poses.started_at(actor) != rt._clock:
+		if mine and kit.aim_pivot(actor).is_finite():
+			_sl_origin[at] = kit.aim_pivot(actor)
+		if mine and poses.started_at(actor) != kit.clock():
 			poses.start(actor, spell, tag, _sl_wind[at], maxf(spell.lifetime, 0.001), _sl_dir[at], StaffPoses.up_side(_sl_dir[at]), true)
-	elif rt.live_caster_shot(caster, caster_seq) < 0:
+	elif kit.live_caster_shot(caster, caster_seq) < 0:
 		_sl_caster[at] = SpellRuntime.CASTER_POINT
-	rt.shot_started(tag)
-	if rt.events != null and _sl_wind[at] > 0.0:
-		var mark: Vector2 = rt.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
-		rt.events.form_shown.emit(actor, &"slam_mark", mark, _sl_dir[at], _sl_wind[at], spell.tint, spell.look)
+	kit.shot_started(tag)
+	if kit.events != null and _sl_wind[at] > 0.0:
+		var mark: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
+		kit.events.form_shown.emit(actor, &"slam_mark", mark, _sl_dir[at], _sl_wind[at], spell.tint, spell.look)
 	_slam_step(at, 0.0)
 	return true
 
@@ -129,10 +136,10 @@ func _slam_step(at: int, delta: float) -> void:
 		_slam_follow(at)
 		if _sl_on[at] == 0 or _sl_age[at] < _sl_wind[at]:
 			return
-		var impact: Vector2 = rt.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
+		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
 		_sl_impact[at] = impact
-		if rt.events != null:
-			rt.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
+		if kit.events != null:
+			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 	var into: float = _sl_age[at] - _sl_wind[at]
 	var life: float = maxf(spell.lifetime, 0.001)
 	var reach: float = spell.radius * clampf(into / (life * SpellLimits.SLAM_GROW), 0.0, 1.0)
@@ -151,13 +158,13 @@ func _slam_follow(at: int) -> void:
 		var actor: int = _sl_actor[at]
 		if actor < 0 or actor >= SpellRuntime.ACTORS:
 			return
-		if rt._aim_origin[actor].is_finite():
-			_sl_origin[at] = rt._aim_pivot[actor] if rt._aim_pivot[actor].is_finite() else rt._aim_origin[actor]
-		elif rt._aim_seen[actor] != 0:
+		if kit.aim_origin(actor).is_finite():
+			_sl_origin[at] = kit.aim_pivot(actor) if kit.aim_pivot(actor).is_finite() else kit.aim_origin(actor)
+		elif kit.aim_seen(actor):
 			_end_slam(at, false)
 	elif caster >= 0:
-		if rt.projectiles.is_alive(caster) and rt.projectiles.get_seq_of(caster) == _sl_caster_seq[at]:
-			_sl_origin[at] = rt.projectiles.get_position_of(caster)
+		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _sl_caster_seq[at]:
+			_sl_origin[at] = kit.projectiles.get_position_of(caster)
 		else:
 			_sl_caster[at] = SpellRuntime.CASTER_POINT
 
@@ -170,8 +177,8 @@ func _slam_guard(at: int, reach: float) -> void:
 	if (not deflects and _sl_shield[at] <= 0) or reach <= 0.0:
 		return
 	var impact: Vector2 = _sl_impact[at]
-	var found: int = rt.projectiles.shots_in_wedge(_sl_actor[at], impact, _sl_dir[at], 1, -PI, PI, reach)
-	_sl_shield[at] = rt._guard(found, _sl_actor[at], _sl_tag[at], deflects, _sl_shield[at], impact, Vector2.INF, &"slam")
+	var found: int = kit.projectiles.shots_in_wedge(_sl_actor[at], impact, _sl_dir[at], 1, -PI, PI, reach)
+	_sl_shield[at] = kit.guard(found, _sl_actor[at], _sl_tag[at], deflects, _sl_shield[at], impact, Vector2.INF, id())
 
 
 ## Slam `at`'s ring, `reach` across now: it strikes each body in it it has not struck yet, outward
@@ -182,10 +189,10 @@ func _slam_cast(at: int, reach: float) -> void:
 	var spell: CompiledSpell = _sl_spell[at]
 	var tag: int = _sl_tag[at]
 	var source: Node = _sl_source[at] if is_instance_valid(_sl_source[at]) else null
-	var found: int = rt.projectiles.sweep(_sl_actor[at], _sl_impact[at], _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
+	var found: int = kit.projectiles.sweep(_sl_actor[at], _sl_impact[at], _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
 	if found == 0:
 		return
-	var took: HitProfile = rt._strike(spell, tag, _sl_actor[at], found, _sl_struck[at], _sl_impact[at], _sl_chain[at], _sl_prev[at], _sl_hit[at])
+	var took: HitProfile = kit.strike(spell, tag, _sl_actor[at], found, _sl_struck[at], _sl_impact[at], _sl_chain[at], _sl_prev[at], _sl_hit[at])
 	if _sl_on[at] != 0 and _sl_spell[at] == spell and _sl_tag[at] == tag:
 		_sl_hit[at] = took
 
@@ -205,10 +212,10 @@ func _end_slam(at: int, finished: bool) -> void:
 	_sl_hit[at] = null
 	_sl_struck[at].clear()
 	if finished and spell != null and impact.is_finite():
-		rt._blast(spell, tag, actor, impact)
+		kit.blast(spell, tag, actor, impact)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			rt._fire_payload(spell, tag, actor, impact, _sl_dir[at], null)
-	rt.shot_ended(tag)
+			kit.fire_payload(spell, tag, actor, impact, _sl_dir[at], null)
+	kit.shot_ended(tag)
 
 
 ## Makes room for `size` slam rows (the new ones off, each with its own struck list).
@@ -286,7 +293,7 @@ func slam_impact(at: int) -> Vector2:
 
 ## A slam of its own along `heading`, cast by whoever casts this launch (`Spells._caster`).
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, _lifetime: float, chain: int, prev: int) -> int:
-	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, rt._caster, rt._caster_seq, rt._echo_spell == spell) else 0
+	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, kit.caster(), kit.caster_seq(), kit.is_echo(spell)) else 0
 
 
 func reach_of(spell: CompiledSpell) -> float:

@@ -106,9 +106,9 @@ func test_spread_also_turns_a_beam() -> void:
 	for player in 4:
 		_spells.install_staff(player, 0, _spells.compile_staff([&"beam"] as Array[StringName], _staff(30.0)))
 		_spells.cast_staff(player, 0, Vector2.ZERO, AIM, 100.0)
-	for at in _spells.beams().beam_slots():
-		if _spells.beams().beam_on(at):
-			off = off or absf(AIM.angle_to(_spells.beams().beam_end(at) - _spells.beams().beam_origin(at))) > 0.001
+	for at in CarrierBeam.of(_spells).beam_slots():
+		if CarrierBeam.of(_spells).beam_on(at):
+			off = off or absf(AIM.angle_to(CarrierBeam.of(_spells).beam_end(at) - CarrierBeam.of(_spells).beam_origin(at))) > 0.001
 	check(off, "four players' beams on a 30 degree staff are not all on the aim")
 
 

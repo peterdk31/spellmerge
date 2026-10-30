@@ -345,7 +345,7 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
-## The live beams (`Spells.beams`), one beam mesh each (`beam_mesh`), made once, and each one's
+## The live beams (`Spells.carrier(&"beam")`), one beam mesh each (`beam_mesh`), made once, and each one's
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
@@ -602,7 +602,7 @@ func step(real_delta: float) -> void:
 	_step_effects(real_delta)
 	_draw_live_beams()
 	if _swing_trails != null:
-		_swing_trails.step(spells.call("swings") if spells != null and spells.has_method("swings") else null, _clock, _swing_ramp, preset.beam_alpha)
+		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1788,8 +1788,8 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 
 func _draw_live_beams() -> void:
 	var count: int = 0
-	# The beams' rows (`Spells.beams`, a `CarrierBeam`).
-	var beams: Object = spells.call("beams") if spells != null and spells.has_method("beams") else null
+	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
+	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
 	if beams != null:
 		count = int(beams.call("beam_slots"))
 	while _live_beams.size() < count:

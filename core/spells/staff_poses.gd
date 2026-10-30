@@ -30,12 +30,12 @@ var _pose_out_clock: float = -1.0
 ## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake).
 const POSE_CHANNELS: int = 6
 
-## The runtime this belongs to: its clock and its actors' aims.
-var rt: SpellRuntime = null
+## The runtime this belongs to (`CarrierKit`): its clock and its actors' aims.
+var kit: CarrierKit = null
 
 
-func _init(runtime: SpellRuntime) -> void:
-	rt = runtime
+func _init(runtime_kit: CarrierKit) -> void:
+	kit = runtime_kit
 	_pose_start.resize(SpellRuntime.ACTORS)
 	_pose_wind.resize(SpellRuntime.ACTORS)
 	_pose_strike.resize(SpellRuntime.ACTORS)
@@ -91,7 +91,7 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 	if spell.staff_pose.is_empty():
 		_pose_start[actor] = INF
 		return
-	_pose_start[actor] = rt._clock
+	_pose_start[actor] = kit.clock()
 	_pose_wind[actor] = wind
 	_pose_strike[actor] = strike
 	_pose_tag[actor] = tag
@@ -107,7 +107,7 @@ func end_strike(tag: int) -> void:
 	var actor: int = SpellTag.caster_of(tag)
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]) or _pose_tag[actor] != tag:
 		return
-	var into: float = maxf(rt._clock - _pose_start[actor] - _pose_wind[actor], 0.0)
+	var into: float = maxf(kit.clock() - _pose_start[actor] - _pose_wind[actor], 0.0)
 	if into < _pose_strike[actor]:
 		_pose_strike[actor] = into
 		_pose_out_actor = -1
@@ -155,8 +155,8 @@ func staff_mood(actor: int) -> StringName:
 func staff_pose_dir(actor: int) -> Vector2:
 	if not _pose_now(actor):
 		return Vector2.ZERO
-	if _pose_lock[actor] == 0 and rt._aim_dir[actor].is_finite() and not rt._aim_dir[actor].is_zero_approx():
-		return rt._aim_dir[actor]
+	if _pose_lock[actor] == 0 and kit.aim_dir(actor).is_finite() and not kit.aim_dir(actor).is_zero_approx():
+		return kit.aim_dir(actor)
 	return _pose_dir[actor]
 
 
@@ -167,12 +167,12 @@ func staff_pose_dir(actor: int) -> Vector2:
 func _pose_now(actor: int) -> bool:
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]):
 		return false
-	if _pose_out_actor == actor and _pose_out_clock == rt._clock:
+	if _pose_out_actor == actor and _pose_out_clock == kit.clock():
 		return _pose_out_mood >= 0
 	_pose_out_actor = actor
-	_pose_out_clock = rt._clock
+	_pose_out_clock = kit.clock()
 	var keys: PackedFloat32Array = _pose_keys[actor]
-	var s: float = rt._clock - _pose_start[actor]
+	var s: float = kit.clock() - _pose_start[actor]
 	var wind: float = _pose_wind[actor]
 	var strike: float = _pose_strike[actor]
 	var stride: int = FormBase.POSE_STRIDE

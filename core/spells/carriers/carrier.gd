@@ -163,16 +163,17 @@ func homing_range(ray_length: float, reach: float) -> float:
 
 # The runtime side. The compiler's carriers (`Carriers.of`) are never bound; the spell runtime
 # makes its own (`Carriers.make_all`) and binds them, and each runs what it fires. A carrier asks
-# the runtime for the shared path (the shot kit, the hit path, moves, entities) through `rt`.
+# the runtime for everything else only through `kit` (`CarrierKit`: the cast under way, the aim,
+# the shot kit, the hit path, payloads, moves, entities), never through the runtime itself.
 
-## The runtime that casts this carrier (null for the compiler's, which only reads the tables).
-var rt: SpellRuntime = null
+## What it may ask of the runtime that casts it (null for the compiler's, which only reads the tables).
+var kit: CarrierKit = null
 
 
-## Binds this carrier to `runtime`, which casts it, and the staff animations its casts play. A
-## carrier with rows of its own makes them here.
-func bind(runtime: SpellRuntime, _staff_poses: StaffPoses) -> void:
-	rt = runtime
+## Binds this carrier to the runtime that casts it, through `runtime_kit`, and the staff animations
+## its casts play. A carrier with rows of its own makes them here.
+func bind(runtime_kit: CarrierKit, _staff_poses: StaffPoses) -> void:
+	kit = runtime_kit
 
 
 ## One launch of `spell` from `origin` along `direction` (`Spells._launch`): how many shots, rows or
@@ -186,7 +187,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var made: int = 0
 	var count: int = spell.shots
 	for n in count:
-		var angle: float = direction.angle() + rt._fan_angle(n, count, spell) + rt._staff_spread(tag, spell)
+		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
 		made += shoot(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, source, lifetime, chain, prev)
 	return made
 
@@ -196,8 +197,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
 	if id() == &"":
 		return 0
-	var slot: int = rt.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
-	return rt._land_shot(slot, spell, tag, source, chain, prev)
+	var slot: int = kit.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
+	return kit.land_shot(slot, spell, tag, source, chain, prev)
 
 
 ## What a hit of this carrier does of its own, besides the shared hit path (`Spells._on_hit_effects`):
@@ -257,3 +258,10 @@ func land(_spell: CompiledSpell, _group: CompiledGroup, _actor: int, _staff: int
 ## 0 for one that is not aimed.
 func reach_of(_spell: CompiledSpell) -> float:
 	return 0.0
+
+
+## Where its row `row` is now while it is the row born `born` (`CarrierKit.live_join` with
+## `SpellRuntime.LC_ROW`: a live carrier's place, for its timer and `on hurt` payloads); INF once
+## it has ended. Only a carrier with rows of its own (a beam, a swing) lists one.
+func tip_of(_row: int, _born: int) -> Vector2:
+	return Vector2.INF

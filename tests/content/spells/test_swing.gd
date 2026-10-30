@@ -124,9 +124,9 @@ func test_two_presses_swing_forehand_then_backhand() -> void:
 
 ## The way the one live swing turns, or 0 for none.
 func _live_side(arena: ArenaScript) -> int:
-	for at in arena.spells.swings().swing_slots():
-		if arena.spells.swings().swing_on(at):
-			return arena.spells.swings().swing_side(at)
+	for at in CarrierSwing.of(arena.spells).swing_slots():
+		if CarrierSwing.of(arena.spells).swing_on(at):
+			return CarrierSwing.of(arena.spells).swing_side(at)
 	return 0
 
 

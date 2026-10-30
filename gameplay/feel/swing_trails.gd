@@ -34,7 +34,7 @@ const SWING_QUADS: Array[Vector3i] = [
 ## Swings draw where beams do: above the room, under the shots and the flashes.
 const SWING_Z: int = 18
 
-## The trail nodes, and for each: the swing it shows (`Spells.swings().swing_born`; -1 for none) and the
+## The trail nodes, and for each: the swing it shows (`CarrierSwing.swing_born`; -1 for none) and the
 ## clock time it goes (its sweep's end plus TRAIL_SECONDS; it is off once the clock is past it).
 var _nodes: Array[MeshInstance2D] = []
 var _born: PackedInt64Array = PackedInt64Array()
@@ -52,7 +52,7 @@ func _init(mesh: ArrayMesh) -> void:
 		_add_trail()
 
 
-## Draws the live swings of `swings` (`Spells.swings`, a `CarrierSwing`; none when null) at Feel's
+## Draws the live swings of `swings` (`Spells.carrier(&"swing")`, a `CarrierSwing`; none when null) at Feel's
 ## clock `now`: a new one takes a free trail, a live one moves its trail to its hand, and a trail
 ## past its time is hidden. `ramp_of` gives the shader's player for an actor (0-3 a hat ramp, -1
 ## the enemy ramp); `glow` is how strongly it glows.
@@ -90,7 +90,7 @@ func live() -> int:
 	return count
 
 
-## The shader parameter `name` of the trail showing swing `born` (`Spells.swings().swing_born`), or null
+## The shader parameter `name` of the trail showing swing `born` (`CarrierSwing.swing_born`), or null
 ## when none shows it (for tests).
 func parameter_of(born: int, name: StringName) -> Variant:
 	var slot: int = _born.find(born)

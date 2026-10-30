@@ -22,8 +22,8 @@ func required_fields() -> Dictionary:
 ## A fan of flying shots; a nova (a fan all the way round) shows its ring once, when a shot flew.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
 	var made: int = super(spell, tag, actor, origin, direction, source, lifetime, chain, prev)
-	if rt.events != null and made > 0 and spell.shots > 1 and spell.spread >= 360.0:
-		rt.events.form_shown.emit(actor, &"nova", origin, direction, 0.0, spell.tint, spell.look)
+	if kit.events != null and made > 0 and spell.shots > 1 and spell.spread >= 360.0:
+		kit.events.form_shown.emit(actor, &"nova", origin, direction, 0.0, spell.tint, spell.look)
 	return made
 
 

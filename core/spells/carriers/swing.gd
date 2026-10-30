@@ -6,7 +6,7 @@ extends Carrier
 ## Its rows: the live swings, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`). Its strikes go through the runtime as
 ## rays (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read
-## the `swing_*` getters (`Spells.swings()`).
+## the `swing_*` getters (`CarrierSwing.of(spells)`).
 
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
@@ -53,6 +53,13 @@ func id() -> StringName:
 	return &"swing"
 
 
+
+## The swings of the runtime `spells` (its bound `swing` carrier, `Spells.carrier`), for what reads
+## its own getters (the looks, `ai`, the actor's mover, the tests).
+static func of(spells: SpellRuntime) -> CarrierSwing:
+	return spells.carrier(&"swing") as CarrierSwing
+
+
 func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS
 
@@ -73,8 +80,8 @@ func hit_kind() -> StringName:
 
 
 ## Makes this carrier's rows for `runtime`, which casts it.
-func bind(runtime: SpellRuntime, staff_poses: StaffPoses) -> void:
-	super(runtime, staff_poses)
+func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
+	super(runtime_kit, staff_poses)
 	poses = staff_poses
 	_sw_last_side.resize(SpellRuntime.ACTORS)
 	_sw_last_end.resize(SpellRuntime.ACTORS)
@@ -141,11 +148,11 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	# the same way and move no body of their own.
 	var first: bool = true
 	if mine:
-		first = _sw_last_start[actor] != rt._clock
+		first = _sw_last_start[actor] != kit.clock()
 		side = -_sw_last_side[actor] if first else _sw_last_side[actor]
 		_sw_last_side[actor] = side
-		_sw_last_start[actor] = rt._clock
-		if rt._clock - _sw_last_end[actor] <= SpellLimits.SWING_CHAIN:
+		_sw_last_start[actor] = kit.clock()
+		if kit.clock() - _sw_last_end[actor] <= SpellLimits.SWING_CHAIN:
 			wind = 0.0
 	var half: float = deg_to_rad(spell.arc) * 0.5
 	_sw_on[at] = 1
@@ -169,16 +176,16 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sw_struck[at].clear()
 	if caster == SpellRuntime.CASTER_WIZARD:
-		if mine and rt._aim_pivot[actor].is_finite():
-			_sw_origin[at] = rt._aim_pivot[actor]
+		if mine and kit.aim_pivot(actor).is_finite():
+			_sw_origin[at] = kit.aim_pivot(actor)
 		if mine and first:
 			poses.start(actor, spell, tag, wind, maxf(spell.lifetime, 0.001), _sw_dir[at], side, true)
-	elif rt.live_caster_shot(caster, caster_seq) < 0:
+	elif kit.live_caster_shot(caster, caster_seq) < 0:
 		_sw_caster[at] = SpellRuntime.CASTER_POINT
-	rt.shot_started(tag)
+	kit.shot_started(tag)
 	_swing_step(at, 0.0)
 	if _sw_on[at] != 0:
-		rt._lc_join(spell, tag, SpellRuntime.LC_SWING, at, _sw_born[at], true, wind + spell.lifetime, swing_tip(at), _sw_dir[at])
+		kit.live_join(spell, tag, SpellRuntime.LC_ROW, at, _sw_born[at], true, wind + spell.lifetime, swing_tip(at), _sw_dir[at])
 	return true
 
 
@@ -222,13 +229,13 @@ func _swing_follow(at: int) -> void:
 		var actor: int = _sw_actor[at]
 		if actor < 0 or actor >= SpellRuntime.ACTORS:
 			return
-		if rt._aim_origin[actor].is_finite():
-			_sw_origin[at] = rt._aim_pivot[actor] if rt._aim_pivot[actor].is_finite() else rt._aim_origin[actor]
-		elif rt._aim_seen[actor] != 0:
+		if kit.aim_origin(actor).is_finite():
+			_sw_origin[at] = kit.aim_pivot(actor) if kit.aim_pivot(actor).is_finite() else kit.aim_origin(actor)
+		elif kit.aim_seen(actor):
 			_end_swing(at, false)
 	elif caster >= 0:
-		if rt.projectiles.is_alive(caster) and rt.projectiles.get_seq_of(caster) == _sw_caster_seq[at]:
-			_sw_origin[at] = rt.projectiles.get_position_of(caster)
+		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _sw_caster_seq[at]:
+			_sw_origin[at] = kit.projectiles.get_position_of(caster)
 		else:
 			_sw_caster[at] = SpellRuntime.CASTER_POINT
 
@@ -242,8 +249,8 @@ func _swing_guard(at: int, from: float, to: float) -> void:
 	if not deflects and _sw_shield[at] <= 0:
 		return
 	var origin: Vector2 = _sw_origin[at]
-	var found: int = rt.projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length)
-	_sw_shield[at] = rt._guard(found, _sw_actor[at], _sw_tag[at], deflects, _sw_shield[at], origin, Vector2.INF)
+	var found: int = kit.projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length)
+	_sw_shield[at] = kit.guard(found, _sw_actor[at], _sw_tag[at], deflects, _sw_shield[at], origin, Vector2.INF, id())
 
 
 ## Swing `at` turned from `from` to `to` radians off its aim: it strikes each body in that wedge it
@@ -252,10 +259,10 @@ func _swing_cast(at: int, from: float, to: float) -> void:
 	var spell: CompiledSpell = _sw_spell[at]
 	var tag: int = _sw_tag[at]
 	var source: Node = _sw_source[at] if is_instance_valid(_sw_source[at]) else null
-	var found: int = rt.projectiles.sweep(_sw_actor[at], _sw_origin[at], _sw_dir[at], _sw_side[at], from, to, spell.ray_length, SpellRuntime.HITS, source)
+	var found: int = kit.projectiles.sweep(_sw_actor[at], _sw_origin[at], _sw_dir[at], _sw_side[at], from, to, spell.ray_length, SpellRuntime.HITS, source)
 	if found == 0:
 		return
-	var took: HitProfile = rt._strike(spell, tag, _sw_actor[at], found, _sw_struck[at], _sw_origin[at], _sw_chain[at], _sw_prev[at], _sw_hit[at])
+	var took: HitProfile = kit.strike(spell, tag, _sw_actor[at], found, _sw_struck[at], _sw_origin[at], _sw_chain[at], _sw_prev[at], _sw_hit[at])
 	# A hit handler may have ended this swing (a rebuild) or reused its row.
 	if _sw_on[at] != 0 and _sw_spell[at] == spell and _sw_tag[at] == tag:
 		_sw_hit[at] = took
@@ -277,13 +284,13 @@ func _end_swing(at: int, finished: bool) -> void:
 	_sw_struck[at].clear()
 	if finished and spell != null:
 		if actor >= 0 and actor < SpellRuntime.ACTORS:
-			_sw_last_end[actor] = rt._clock
+			_sw_last_end[actor] = kit.clock()
 		var end: Vector2 = swing_end_point(_sw_origin[at], _sw_dir[at], _sw_side[at], spell.arc, spell.ray_length)
-		end = rt.projectiles.clip_to_walls(_sw_origin[at], end)
-		rt._blast(spell, tag, actor, end)
+		end = kit.projectiles.clip_to_walls(_sw_origin[at], end)
+		kit.blast(spell, tag, actor, end)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			rt._fire_payload(spell, tag, actor, end, _sw_dir[at], null)
-	rt.shot_ended(tag)
+			kit.fire_payload(spell, tag, actor, end, _sw_dir[at], null)
+	kit.shot_ended(tag)
 
 
 ## The end point of a swing round `origin` aimed along `direction`, turning `side` through `arc`
@@ -420,7 +427,7 @@ func swing_count() -> int:
 
 ## A swing of its own along `heading`, cast by whoever casts this launch (`Spells._caster`).
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, _lifetime: float, chain: int, prev: int) -> int:
-	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, rt._caster, rt._caster_seq, rt._echo_spell == spell) else 0
+	return 1 if start(spell, tag, actor, origin, heading, chain, prev, source, kit.caster(), kit.caster_seq(), kit.is_echo(spell)) else 0
 
 
 func reach_of(spell: CompiledSpell) -> float:

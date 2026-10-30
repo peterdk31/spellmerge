@@ -120,3 +120,45 @@ func test_asking_about_one_card_says_what_a_compile_says() -> void:
 			asked += 1
 	arena.free_all()
 	check(asked > 100, "every card on every carrier was asked: %d" % asked)
+
+
+func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_none() -> void:
+	# A carrier knows the runtime only as `CarrierKit` (docs/CARRIERS.md), so the kit is all a new
+	# carrier has to learn; the runtime hands launches, rows and looks to carriers by id, so a new
+	# carrier never edits it. Read from the scripts: what typing cannot see (a kit's own `_rt`, a
+	# static private of `SpellRuntime`, a carrier's name or class in spells.gd).
+	var users: PackedStringArray = ["res://core/spells/caster_moves.gd", "res://core/spells/staff_poses.gd"]
+	for file_name in DirAccess.get_files_at("res://core/spells/carriers/"):
+		if file_name.get_extension() == "gd":
+			users.append("res://core/spells/carriers/" + file_name)
+	check(users.size() > 10, "the carrier scripts are read: %d" % users.size())
+	for path in users:
+		var number: int = 0
+		for line in FileAccess.get_file_as_string(path).split("\n"):
+			number += 1
+			check(not line.contains("._rt") and not line.contains("SpellRuntime._"), "%s:%d asks the runtime only through the kit: %s" % [path, number, line.strip_edges()])
+	var names: PackedStringArray = []
+	for id: StringName in Carriers.ids():
+		names.append('&"%s"' % id)
+		names.append(String(Carriers.of(id).get_script().get_global_name()))
+	var number: int = 0
+	for line in FileAccess.get_file_as_string("res://core/spells/spells.gd").split("\n"):
+		number += 1
+		var code: String = line.get_slice("#", 0)
+		if code.contains("const RAY_FORM"):
+			continue
+		for name in names:
+			check(not code.contains(name) if name.begins_with("&") else not _names_class(code, name), "spells.gd:%d names the carrier %s: %s" % [number, name, line.strip_edges()])
+
+
+## True when `code` names the class `name` as a whole word.
+static func _names_class(code: String, name: String) -> bool:
+	var at: int = code.find(name)
+	while at >= 0:
+		var after: int = at + name.length()
+		var before_ok: bool = at == 0 or not (code[at - 1].is_valid_identifier() or code[at - 1].is_valid_int())
+		var after_ok: bool = after >= code.length() or not (code[after].is_valid_identifier() or code[after].is_valid_int())
+		if before_ok and after_ok:
+			return true
+		at = code.find(name, after)
+	return false

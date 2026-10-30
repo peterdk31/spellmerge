@@ -28,16 +28,16 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
 	for n in spell.shots:
-		var along: Vector2 = heading.rotated(rt._fan_angle(n, spell.shots, spell))
-		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, rt.projectiles.clip_to_walls(origin, origin + along * reach))
+		var along: Vector2 = heading.rotated(kit.fan_angle(n, spell.shots, spell))
+		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, kit.projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
-		var launch: SpellRuntime.PendingLaunch = rt._delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
+		var launch: SpellRuntime.PendingLaunch = kit.delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
-		launch.echoed = rt._echo_spell == spell
-		rt._lc_join(spell, tag, SpellRuntime.LC_POINT, -1, 0, false, spell.lifetime, point, along)
+		launch.echoed = kit.is_echo(spell)
+		kit.live_join(spell, tag, SpellRuntime.LC_POINT, -1, 0, false, spell.lifetime, point, along)
 		placed += 1
-		if rt.events != null:
-			rt.events.form_shown.emit(actor, &"rain", point, along, spell.lifetime, spell.tint, spell.look)
+		if kit.events != null:
+			kit.events.form_shown.emit(actor, &"rain", point, along, spell.lifetime, spell.tint, spell.look)
 	return placed
 
 
@@ -47,12 +47,12 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 ## at the aim point (its end point, rules R1d and R4g).
 func land(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, generation: int, point: Vector2, heading: Vector2, echoed: bool = false) -> void:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
-	rt._strike_round(spell, tag, actor, point, heading, maxf(spell.radius, SpellLimits.RAIN_SPLASH), spell.echo_hit if echoed else null)
-	rt._blast(spell, tag, actor, point)
+	kit.strike_round(spell, tag, actor, point, heading, maxf(spell.radius, SpellLimits.RAIN_SPLASH), spell.echo_hit if echoed else null)
+	kit.blast(spell, tag, actor, point)
 	if group != null and not group.is_empty():
-		rt._fire(group, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
+		kit.fire(group, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-		rt._fire(spell.payload, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
+		kit.fire(spell.payload, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
 
 
 ## Where a carrier placed at `point` ahead of its caster at `origin` (a rain) goes when it
@@ -61,5 +61,5 @@ func land(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, ge
 func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:
 	if spell.homing_range <= 0.0:
 		return point
-	var goal: Vector2 = rt.projectiles.homing_point(actor, point, Vector2.RIGHT, PI, SpellRuntime.ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(rt._clock * 1000.0))))
-	return point if not goal.is_finite() else rt.projectiles.clip_to_walls(origin, goal)
+	var goal: Vector2 = kit.projectiles.homing_point(actor, point, Vector2.RIGHT, PI, SpellRuntime.ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(kit.clock() * 1000.0))))
+	return point if not goal.is_finite() else kit.projectiles.clip_to_walls(origin, goal)

@@ -17,13 +17,13 @@ extends Carrier
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, _source: Node, _lifetime: float, chain: int, prev: int) -> int:
 	var distance: float = CasterMoves.move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	var way: Vector2 = direction
-	var shot: int = rt._caster_shot()
-	var wizard: bool = rt._caster == SpellRuntime.CASTER_WIZARD
+	var shot: int = kit.caster_shot()
+	var wizard: bool = kit.caster() == SpellRuntime.CASTER_WIZARD
 	if wizard and _walks():
 		# Turned as far as the walk is off the aim (staffs A6a), so a mirrored one goes the other way.
-		way = way.rotated(rt._walk_turn[actor])
+		way = way.rotated(kit.walk_turn(actor))
 	if not wizard and shot < 0:
-		var anchor: Vector2 = rt.projectiles.get_anchor(actor)
+		var anchor: Vector2 = kit.projectiles.get_anchor(actor)
 		if not anchor.is_finite() or anchor.is_equal_approx(origin):
 			return 0
 		# Its wizard goes to the point, from where its body is.
@@ -37,18 +37,18 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var offset: Vector2 = way * distance
 	var seconds: float = _move_seconds(spell)
 	if wizard:
-		if rt.events != null:
-			rt._moves.move_heading[actor] = way
+		if kit.events != null:
+			kit.moves().move_heading[actor] = way
 			_move_body(spell, tag, actor, origin, way, offset, seconds, chain, prev)
-			rt._moves.shield(spell, tag, actor, -1, seconds)
+			kit.moves().shield(spell, tag, actor, -1, seconds)
 		return 1
 	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
-	if not rt.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
+	if not kit.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
 		return 0
-	rt._moves.shield(spell, tag, actor, shot, seconds)
+	kit.moves().shield(spell, tag, actor, shot, seconds)
 	_moved_shot(spell, tag, actor, shot, seconds, chain, prev)
-	rt._moves.track(shot, tag, seconds, way)
-	rt._lc_join(spell, tag, SpellRuntime.LC_SLOT, shot, rt.projectiles.get_seq_of(shot), false, seconds, rt.projectiles.get_position_of(shot), way)
+	kit.moves().track(shot, tag, seconds, way)
+	kit.live_join(spell, tag, SpellRuntime.LC_SLOT, shot, kit.projectiles.get_seq_of(shot), false, seconds, kit.projectiles.get_position_of(shot), way)
 	return 1
 
 

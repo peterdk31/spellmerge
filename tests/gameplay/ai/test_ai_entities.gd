@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Decoys and familiars for enemies (staffs F8d, docs/milestones/M2-staffs.md, "Enemy staffs"):
 ## an enemy's decoy copies the enemy, is a target every shot but its enemy's hits and wears down,
-## and enemies never chase it; an enemy's familiar circles the enemy and casts at the nearest wizard,
-## in the enemy's own spell; each enemy keeps PER_ENEMY of a kind, enemies share rows of their own
+## and enemies never chase it; an enemy's familiar circles the enemy and casts what its triggers
+## give it (rules R4 F3), in the enemy's own spell; each enemy keeps PER_ENEMY of a kind, enemies share rows of their own
 ## so a crowd never takes a wizard's, and an enemy's entities end with it. Every entity is its
 ## owner's actor id (actors G3b): the enemy's `caster`, the wizard's `id`, and whether a seat
 ## drives the owner sorts it into the seats' rows or the others'. The same world as
@@ -40,8 +40,7 @@ var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: Actor
 var _enemies: Array[Actor] = []
-## Every familiar_cast_requested as [caster, tag], and entity_ended as [caster, kind, tag].
-var _casts: Array = []
+## Every entity_ended as [caster, kind, tag].
 var _ended: Array = []
 
 
@@ -80,14 +79,16 @@ func before_each() -> void:
 	familiar.lifetime = 6.0
 	familiar.mana_cost = 2.0
 	_put(familiar, &"familiar")
+	var timer := TriggerBase.new()
+	timer.event = TriggerBase.Event.TIMER
+	timer.interval = 0.25
+	_put(timer, &"timer")
 	var decoy := FormBase.new()
 	decoy.motion = FormBase.Motion.DECOY
 	decoy.lifetime = 4.0
 	decoy.mana_cost = 2.0
 	_put(decoy, &"decoy")
-	_casts.clear()
 	_ended.clear()
-	_bus.familiar_cast_requested.connect(func(player: int, _at: Vector2, _direction: Vector2, tag: int) -> void: _casts.append([player, tag]))
 	_bus.entity_ended.connect(func(player: int, kind: StringName, _at: Vector2, tag: int) -> void: _ended.append([player, kind, tag]))
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor
@@ -193,8 +194,8 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
 
-func test_an_enemys_familiar_circles_it_and_casts_at_the_wizard() -> void:
-	var enemy := _enemy(_data([&"familiar", &"bolt"]))
+func test_an_enemys_familiar_circles_it_and_its_timer_casts_at_the_wizard() -> void:
+	var enemy := _enemy(_data([&"timer", &"familiar", &"bolt"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
 	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, enemy.id), 1, "its familiar card makes one familiar")
@@ -208,18 +209,20 @@ func test_an_enemys_familiar_circles_it_and_casts_at_the_wizard() -> void:
 	for i in 12:
 		_run(STEP)
 		peak = maxi(peak, _projectiles.get_count())
-	check(_casts.size() >= 1 and _casts[0][0] == enemy.id and _casts[0][1] == tag, "it casts at the wizard, under the enemy's actor id with its tag")
-	check(peak >= 1, "the enemy's spell (its bolt) leaves it")
+	check(peak >= 1, "its timer casts the enemy's spell (its bolt), along the enemy's aim")
 	check(hits.size() >= 1 and hits[0][0] == enemy.id and hits[0][1] == _wizard, "and hits the wizard as the enemy's")
 	check_equal(_entities.drawn_familiars(), 1, "drawn with the others")
 
 
-func test_an_enemys_familiar_waits_without_a_wizard_in_range() -> void:
-	var enemy := _enemy(_data([&"familiar", &"bolt"]))
+func test_an_enemys_familiar_without_a_trigger_casts_nothing() -> void:
+	var enemy := _enemy(_data([&"familiar"]))
 	_run(_ai(enemy).windup_time + 2.0 * STEP)
-	_wizard.position = Vector2(2000.0, 0.0)
-	_run(EntitiesScript.FAMILIAR_FIRST + 1.0)
-	check(_casts.is_empty(), "no wizard within its range: it does not cast (enemies are never its targets)")
+	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, enemy.id), 1, "its familiar card makes one familiar")
+	var peak: int = 0
+	for i in 24:
+		_run(STEP)
+		peak = maxi(peak, _projectiles.get_count())
+	check_equal(peak, 0, "with no trigger it casts nothing (no payload of its own, rules R4 F3)")
 
 
 func test_an_enemys_entities_end_with_it() -> void:

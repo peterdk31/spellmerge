@@ -127,8 +127,8 @@ func test_wasted_cells_say_why() -> void:
 	]
 	for cell: Array in cells:
 		var cards: Array[StringName] = [cell[0], cell[1], &"straight"]
-		if cell[1] == &"rain" or cell[1] == &"familiar":
-			# A rain and a familiar read a payload of their own first.
+		if cell[1] == &"rain":
+			# A rain reads a payload of its own first.
 			cards.append(&"straight")
 		var built: CompiledStaff = _compile(cards)
 		var why: String = str(built.wasted.get(0, ""))

@@ -164,9 +164,10 @@ static func pack_pose(keys: Array[Dictionary]) -> PackedFloat32Array:
 	return out
 
 
-## True for the carriers that read a payload of their own, as a trigger does (rain, familiar).
+## True for the carriers that read a payload of their own, as a trigger does (a rain; a familiar
+## casts only what its triggers give it, rules R4 F3).
 func carries_payload() -> bool:
-	return motion == Motion.RAIN or motion == Motion.FAMILIAR
+	return motion == Motion.RAIN
 
 
 func ranges() -> Dictionary:

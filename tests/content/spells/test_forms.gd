@@ -244,10 +244,12 @@ func test_the_rune_stays_where_it_was_cast_and_hits_what_walks_in() -> void:
 	var tag: int = _cast(&"rune", 0, Vector2(50.0, 50.0))
 	check_equal(_slots(tag).size(), 1, "one rune")
 	_tick(90)
-	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2(50.0, 50.0), "it did not move")
+	# Placed a step ahead along the aim, twice its size (rules R4 F3).
+	var placed: Vector2 = Vector2(50.0 + _form(&"rune").radius * 2.0, 50.0)
+	check_equal(_mgr.get_position_of(_slots(tag)[0]), placed, "it did not move")
 	check_equal(_hits.size(), 0, "nobody was near")
 	var imp := _target(Vector2(300.0, 300.0))
-	imp.global_position = Vector2(55.0, 50.0)
+	imp.global_position = placed + Vector2(5.0, 0.0)
 	_tick(4)
 	check_equal(_hit_targets(), [imp] as Array, "an imp that walks in is hit")
 
@@ -258,7 +260,7 @@ func test_the_rune_stays_when_the_caster_and_a_target_move_away() -> void:
 	_tick(30, {0: Vector2(200.0, 0.0)})
 	imp.global_position = Vector2(400.0, 0.0)
 	_tick(30, {0: Vector2(200.0, 0.0)})
-	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2.ZERO, "the rune stays at the cast point")
+	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2(_form(&"rune").radius * 2.0, 0.0), "the rune stays where it was placed, a step ahead of the cast point")
 	check_equal(_hits.size(), 0, "nobody was near it")
 
 

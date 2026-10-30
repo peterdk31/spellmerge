@@ -38,26 +38,20 @@ func test_cards_that_did_nothing_silently_are_listed() -> void:
 
 
 func test_cards_that_work_are_not_listed() -> void:
-	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "rain"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "hook"], ["mirror", "wall"], ["mirror", "rain"], ["mirror", "decoy"], ["heavy", "rain"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"]]:
+	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "rain"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "hook"], ["mirror", "wall"], ["mirror", "rain"], ["mirror", "decoy"], ["sniper", "rune"], ["sniper", "decoy"], ["heavy", "rain"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 
 
-func test_a_familiar_hands_its_hit_cards_to_what_it_casts() -> void:
-	# Rules R4g: its infusions and hit cards ride on every carrier it casts, as if they were on it.
-	var staff: CompiledStaff = _staff(["fire", "heavy", "chain", "familiar", "bolt"])
-	check(not staff.wasted.has(0) and not staff.wasted.has(1) and not staff.wasted.has(2), "none wasted: %s" % staff.wasted)
+func test_a_familiar_hands_nothing_on() -> void:
+	# Rules R4 F3: a familiar has no payload of its own; its hit cards are wasted as on any body
+	# that hits nothing, and the carrier after it is the next carrier, not its payload.
+	var staff: CompiledStaff = _staff(["heavy", "familiar", "bolt"])
+	check(str(staff.wasted.get(0, "")).contains("a familiar is a body that hits nothing"), "heavy on a familiar is wasted: %s" % staff.wasted)
 	var familiar: CompiledSpell = staff.casts[0].group.spells[0]
-	var bolt: CompiledSpell = familiar.own_payload.spells[0] if familiar.own_payload != null and not familiar.own_payload.is_empty() else null
-	check(bolt != null, "it casts a bolt")
-	if bolt != null:
-		check(bolt.element_ids.has(&"fire"), "the bolt burns: %s" % [bolt.element_ids])
-		check(bolt.behaviour(ModifierBase.Behaviour.HEAVY) > 0.0 and bolt.hit.slam > 0, "the bolt is heavy")
-		check_equal(bolt.chain_jumps, _staff(["chain", "bolt"]).casts[0].group.spells[0].chain_jumps, "and chains as a chain bolt does")
-	var alone: CompiledStaff = _staff(["heavy", "familiar"])
-	check(alone.wasted.has(0), "with nothing to cast it is wasted: %s" % alone.wasted)
-	check(_staff(["heavy", "familiar", "decoy"]).wasted.has(0), "and on a decoy it casts, which hits nothing")
-	check(_staff(["homing", "familiar", "bolt"]).wasted.has(0), "a card that steers is not handed on")
+	check(familiar.own_payload == null, "it reads no payload of its own")
+	check(familiar.payload == null, "and has none without a trigger")
+	check(staff.casts.size() == 2, "the bolt is the next cast: %d casts" % staff.casts.size())
 
 
 func test_heavy_counts_on_a_decoy_with_a_blast() -> void:
@@ -78,7 +72,7 @@ func test_a_wasted_card_changes_nothing_else() -> void:
 
 func test_infusions_and_numbers_that_mean_nothing_are_listed() -> void:
 	# Found by tests/core/test_card_rules.gd: silent on main before R2.
-	for cards: Array in [["fire", "decoy"], ["frost", "decoy"], ["overcharge", "decoy"], ["pierce", "dash"], ["sniper", "rune"], ["split", "dash"], ["slow", "teleport"], ["pierce", "swing"]]:
+	for cards: Array in [["fire", "decoy"], ["frost", "decoy"], ["overcharge", "decoy"], ["pierce", "dash"], ["split", "dash"], ["slow", "teleport"], ["pierce", "swing"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
 	for cards: Array in [["fire", "blast", "dash"], ["overcharge", "blast", "teleport"], ["fire", "dash"], ["overcharge", "teleport"], ["mend", "teleport"], ["sniper", "bolt"], ["pierce", "rune"], ["timer", "bolt", "nova"], ["arc", "bolt"], ["slow", "bolt"], ["timer", "hook", "nova"], ["arc", "nova"], ["mend", "rain"], ["overcharge", "rain"]]:

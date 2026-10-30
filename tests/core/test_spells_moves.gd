@@ -32,7 +32,7 @@ var _bus: EventsScript
 var _moves: Array = []
 ## Every target_move_requested as [player, target, to].
 var _target_moves: Array = []
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 ## Every mana_refund_requested as [player, amount].
 var _refunds: Array = []
@@ -58,8 +58,7 @@ func before_each() -> void:
 		_moves.append([player, mode, to, seconds, tag]))
 	_bus.target_move_requested.connect(func(player: int, target: Node, to: Vector2) -> void:
 		_target_moves.append([player, target, to]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
-		_areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.mana_refund_requested.connect(func(player: int, amount: float) -> void:
 		_refunds.append([player, amount]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
@@ -170,7 +169,7 @@ func test_a_blast_teleport_explodes_on_arrival() -> void:
 	check_equal(_areas.size(), 0, "nothing before the player has arrived")
 	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
 	check_equal(_areas.size(), 1, "one explosion")
-	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(90, 5)) and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "where the wizard arrived, as wide as the blast: %s" % [_areas])
+	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(90, 5)) and is_equal_approx(_areas[0][2], 30.0), "where the wizard arrived, as wide as the blast: %s" % [_areas])
 
 
 func test_an_on_expire_teleport_fires_its_payload_on_arrival() -> void:
@@ -296,7 +295,7 @@ func test_a_blast_shot_explodes_where_it_hits() -> void:
 	_cast()
 	_tick(30)
 	check_equal(_areas.size(), 1, "one explosion")
-	check(_areas.size() == 1 and absf(_areas[0][1].x - 50.0) < 12.0 and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "at the hit: %s" % [_areas])
+	check(_areas.size() == 1 and absf(_areas[0][1].x - 50.0) < 12.0 and is_equal_approx(_areas[0][2], 30.0), "at the hit: %s" % [_areas])
 
 
 func test_a_blast_shot_explodes_where_it_expires() -> void:
@@ -362,7 +361,9 @@ func test_a_chain_shot_blasts_where_each_jump_ends() -> void:
 	_target(Vector2(60, 40))
 	_cast()
 	_tick(60)
-	check_equal(_areas.size(), 2, "the first shot is spent on its hit and so is the jump shot: %s" % [_areas])
+	# The bolt's hit jumps on, and so does its blast's hit on the same body (rules R4 F2): the jump
+	# shot and the jump of the blast each blast where they end.
+	check_equal(_areas.size(), 3, "the bolt, its jump shot and its blast's jump: %s" % [_areas])
 
 
 func test_a_wall_blasts_once_when_it_expires() -> void:

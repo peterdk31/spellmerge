@@ -29,7 +29,7 @@ var _sl_age: PackedFloat32Array = PackedFloat32Array()
 var _sl_wind: PackedFloat32Array = PackedFloat32Array()
 var _sl_chain: PackedInt32Array = PackedInt32Array()
 var _sl_prev: PackedInt64Array = PackedInt64Array()
-var _sl_echo: PackedByteArray = PackedByteArray()
+var _sl_hit: Array[HitProfile] = []
 var _sl_shield: PackedInt32Array = PackedInt32Array()
 var _sl_struck: Array[Array] = []
 
@@ -101,7 +101,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sl_wind[at] = maxf(spell.wind_up, 0.0)
 	_sl_chain[at] = chain
 	_sl_prev[at] = prev
-	_sl_echo[at] = 1 if echoed else 0
+	_sl_hit[at] = spell.echo_hit if echoed else null
 	_sl_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sl_struck[at].clear()
 	var mine: bool = actor >= 0 and actor < SpellRuntime.ACTORS
@@ -175,45 +175,19 @@ func _slam_guard(at: int, reach: float) -> void:
 
 
 ## Slam `at`'s ring, `reach` across now: it strikes each body in it it has not struck yet, outward
-## from the impact, as a ray (`_ray_begin`) that `_on_hit` reads (as `_swing_cast`).
+## from the impact (`Spells._strike`), and keeps what it hit with.
 func _slam_cast(at: int, reach: float) -> void:
 	if reach <= 0.0:
 		return
 	var spell: CompiledSpell = _sl_spell[at]
 	var tag: int = _sl_tag[at]
-	var actor: int = _sl_actor[at]
 	var source: Node = _sl_source[at] if is_instance_valid(_sl_source[at]) else null
-	var impact: Vector2 = _sl_impact[at]
-	var found: int = rt.projectiles.sweep(actor, impact, _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
+	var found: int = rt.projectiles.sweep(_sl_actor[at], _sl_impact[at], _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
 	if found == 0:
 		return
-	var struck: Array = _sl_struck[at]
-	var first: int = struck.size()
-	for i in found:
-		var node: Node = rt.projectiles.sweep_nodes[i]
-		if not struck.has(node):
-			struck.append(node)
-	var last: int = struck.size()
-	if last == first:
-		return
-	var ray: RayHit = rt._ray_begin(tag, rt._ray.dir, _sl_chain[at], _sl_prev[at], null, rt._ray.arc_slot)
-	var saved_echo: CompiledSpell = rt._echo_spell
-	rt._echo_spell = spell if _sl_echo[at] != 0 else null
-	for row in range(first, last):
-		# A hit handler may have ended this slam (a rebuild) or reused its row.
-		if _sl_on[at] == 0 or _sl_tag[at] != tag:
-			break
-		var node: Node = struck[row]
-		if not is_instance_valid(node) or not (node is Node2D):
-			continue
-		var body: Vector2 = (node as Node2D).global_position
-		var out: Vector2 = impact.direction_to(body) if not impact.is_equal_approx(body) else _sl_dir[at]
-		ray.dir = out
-		# Struck at the impact, so the hit's push throws it outward from there.
-		rt.projectiles.strike(actor, node, impact, out, tag, &"slam")
-	rt._ray_end()
-	rt._echo_spell = saved_echo
-	rt._cast_jumps()
+	var took: HitProfile = rt._strike(spell, tag, _sl_actor[at], found, _sl_struck[at], _sl_impact[at], _sl_chain[at], _sl_prev[at], _sl_hit[at])
+	if _sl_on[at] != 0 and _sl_spell[at] == spell and _sl_tag[at] == tag:
+		_sl_hit[at] = took
 
 
 ## Slam `at` is over. With `finished` (its ring is done), its `blast` and `on expire` payload happen
@@ -228,6 +202,7 @@ func _end_slam(at: int, finished: bool) -> void:
 	var impact: Vector2 = _sl_impact[at]
 	_sl_spell[at] = null
 	_sl_source[at] = null
+	_sl_hit[at] = null
 	_sl_struck[at].clear()
 	if finished and spell != null and impact.is_finite():
 		rt._blast(spell, tag, actor, impact)
@@ -254,7 +229,7 @@ func _grow_slams(size: int) -> void:
 	_sl_wind.resize(size)
 	_sl_chain.resize(size)
 	_sl_prev.resize(size)
-	_sl_echo.resize(size)
+	_sl_hit.resize(size)
 	_sl_shield.resize(size)
 	for i in range(old, size):
 		_sl_struck.append([])
@@ -272,6 +247,7 @@ func clear() -> void:
 	_sl_on.fill(0)
 	_sl_spell.fill(null)
 	_sl_source.fill(null)
+	_sl_hit.fill(null)
 	for at in _sl_struck.size():
 		_sl_struck[at].clear()
 

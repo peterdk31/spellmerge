@@ -15,11 +15,6 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 	return _spawn(spell, tag, actor, rt._placed_at(spell, origin, heading), heading, lifetime)
 
 
-## True when it circles its caster (a familiar); else it stays where it was made.
-func _follows_caster() -> bool:
-	return false
-
-
 func step_order() -> int:
 	return 3
 
@@ -43,15 +38,15 @@ func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Ve
 		return 0
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
 	var anchor: int = _entity_caster()
-	# Where it is: a decoy stays where it was made, a familiar circles its caster.
-	var where: int = SpellRuntime.LC_POINT
-	if _follows_caster() and anchor != -2:
-		where = SpellRuntime.LC_ACTOR if anchor == -1 else SpellRuntime.LC_SLOT
-	var ref: int = actor if where == SpellRuntime.LC_ACTOR else anchor
 	_entities[tag] = _entities.get(tag, 0) + 1
 	rt.shot_started(tag)
+	# Where it is: a point, where it was made; Entities moves a familiar's along with its orb
+	# (`Spells.familiar_at`, by its key), so the familiar casts from its orb (rules R4 F8).
+	rt._entity_keys += 1
+	rt.entity_key = rt._entity_keys
 	rt.events.entity_spawn_requested.emit(actor, kind, at, seconds, tag, anchor)
-	rt._lc_join(spell, tag, where, ref, rt.projectiles.get_seq_of(ref) if where == SpellRuntime.LC_SLOT else 0, false, seconds, at, heading)
+	rt.entity_key = 0
+	rt._lc_join(spell, tag, SpellRuntime.LC_POINT, -1, rt._entity_keys, false, seconds, at, heading)
 	return 1
 
 

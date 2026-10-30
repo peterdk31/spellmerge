@@ -267,9 +267,10 @@ func _dashing_wizard(action: StringName) -> Actor:
 	var wizard: Actor = _players[0]
 	_input.send_virtual(0, action, 1.0)
 	_run(1)
-	# What a dash card sends (staffs A6a): 55 px over a quarter of a second, tagged with the
-	# wizard's own caster number (the Mover acts only on its own cards).
-	_world.bus.caster_move_requested.emit(0, &"dash", wizard.muzzle_position() + Vector2(55.0, 0.0), 0.25, SpellTag.make(wizard.id, 0, 0, 0))
+	# What a dash card sends: 55 px the way the wizard walks over a quarter of a second, tagged
+	# with the wizard's own caster number (the Mover acts only on its own cards).
+	var ways: Dictionary = {&"move_right": Vector2.RIGHT, &"move_left": Vector2.LEFT, &"move_up": Vector2.UP, &"move_down": Vector2.DOWN}
+	_world.bus.caster_move_requested.emit(0, &"dash", ways[action] * 55.0, 0.25, SpellTag.make(wizard.id, 0, 0, 0))
 	_run(1)
 	return wizard
 

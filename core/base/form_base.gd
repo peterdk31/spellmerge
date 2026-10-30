@@ -45,7 +45,7 @@ const POSE_RANGES: Dictionary = {
 ## Angle in degrees the shots are spread over (360 for a full ring).
 @export_range(0.0, 360.0) var spread: float = 0.0
 ## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"bolt", &"rune",
-## &"orbit", &"beam", &"dash", &"teleport", &"hook", &"swap", &"wall", &"rain", &"decoy",
+## &"orbit", &"beam", &"dash", &"teleport", &"swap", &"wall", &"rain", &"decoy",
 ## &"familiar", &"swing" or &"slam". The carrier decides what every other card does on it.
 @export var carrier: StringName = &"bolt"
 ## Extra targets each shot passes through before it ends.

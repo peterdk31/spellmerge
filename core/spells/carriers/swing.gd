@@ -32,12 +32,12 @@ var _sw_wind: PackedFloat32Array = PackedFloat32Array()
 var _sw_turned: PackedFloat32Array = PackedFloat32Array()
 var _sw_chain: PackedInt32Array = PackedInt32Array()
 var _sw_prev: PackedInt64Array = PackedInt64Array()
-var _sw_echo: PackedByteArray = PackedByteArray()
+## What swing `at` hits with when not its spell's own (an echo's, or what relay took on: it keeps
+## it, as a live beam does).
+var _sw_hit: Array[HitProfile] = []
 ## Shield charges swing `at` has left for shots its sweep touches (melee I3, `_swing_guard`).
 var _sw_shield: PackedInt32Array = PackedInt32Array()
 var _sw_struck: Array[Array] = []
-var _sw_points: Array[Array] = []
-var _sw_heads: Array[Array] = []
 ## actor -> which way its last swing turned (the next turns the other way) and when its last sweep
 ## ended (a swing within SWING_CHAIN of it has no wind-up).
 var _sw_last_side: PackedInt32Array = PackedInt32Array()
@@ -88,6 +88,7 @@ func clear() -> void:
 	_sw_on.fill(0)
 	_sw_spell.fill(null)
 	_sw_source.fill(null)
+	_sw_hit.fill(null)
 	for at in _sw_struck.size():
 		_sw_struck[at].clear()
 	_sw_last_side.fill(-1)
@@ -164,11 +165,9 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sw_turned[at] = -(half + deg_to_rad(SpellLimits.SWING_LEAN))
 	_sw_chain[at] = chain
 	_sw_prev[at] = prev
-	_sw_echo[at] = 1 if echoed else 0
+	_sw_hit[at] = spell.echo_hit if echoed else null
 	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sw_struck[at].clear()
-	_sw_points[at].clear()
-	_sw_heads[at].clear()
 	if caster == SpellRuntime.CASTER_WIZARD:
 		if mine and rt._aim_pivot[actor].is_finite():
 			_sw_origin[at] = rt._aim_pivot[actor]
@@ -248,40 +247,18 @@ func _swing_guard(at: int, from: float, to: float) -> void:
 
 
 ## Swing `at` turned from `from` to `to` radians off its aim: it strikes each body in that wedge it
-## has not struck yet (as a ray (`_ray_begin`) that `_on_hit` reads), outward from its hand.
+## has not struck yet (`Spells._strike`), outward from its hand, and keeps what it hit with.
 func _swing_cast(at: int, from: float, to: float) -> void:
 	var spell: CompiledSpell = _sw_spell[at]
 	var tag: int = _sw_tag[at]
-	var actor: int = _sw_actor[at]
 	var source: Node = _sw_source[at] if is_instance_valid(_sw_source[at]) else null
-	var origin: Vector2 = _sw_origin[at]
-	var found: int = rt.projectiles.sweep(actor, origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length, SpellRuntime.HITS, source)
+	var found: int = rt.projectiles.sweep(_sw_actor[at], _sw_origin[at], _sw_dir[at], _sw_side[at], from, to, spell.ray_length, SpellRuntime.HITS, source)
 	if found == 0:
 		return
-	var struck: Array = _sw_struck[at]
-	var points: Array = _sw_points[at]
-	var heads: Array = _sw_heads[at]
-	var first: int = struck.size()
-	for i in found:
-		var node: Node = rt.projectiles.sweep_nodes[i]
-		if struck.has(node):
-			continue
-		struck.append(node)
-		points.append(rt.projectiles.sweep_points[i])
-		heads.append(rt.projectiles.sweep_heads[i])
-	var last: int = struck.size()
-	if last == first:
-		return
-	var ray: RayHit = rt._ray_begin(tag, rt._ray.dir, _sw_chain[at], _sw_prev[at], spell.echo_hit if _sw_echo[at] != 0 else null, -1)
-	for row in range(first, last):
-		# A hit handler may have ended this swing (a rebuild) or reused its row.
-		if _sw_on[at] == 0 or _sw_tag[at] != tag:
-			break
-		var point: Vector2 = points[row]
-		ray.dir = origin.direction_to(point) if not origin.is_equal_approx(point) else _sw_dir[at]
-		rt.projectiles.strike(actor, struck[row], point, heads[row], tag, &"swing")
-	rt._ray_end()
-	rt._cast_jumps()
+	var took: HitProfile = rt._strike(spell, tag, _sw_actor[at], found, _sw_struck[at], _sw_origin[at], _sw_chain[at], _sw_prev[at], _sw_hit[at])
+	# A hit handler may have ended this swing (a rebuild) or reused its row.
+	if _sw_on[at] != 0 and _sw_spell[at] == spell and _sw_tag[at] == tag:
+		_sw_hit[at] = took
 
 
 ## Swing `at` is over. With `finished` (its sweep is done), its `blast` and `on expire` payload
@@ -296,6 +273,7 @@ func _end_swing(at: int, finished: bool) -> void:
 	var actor: int = _sw_actor[at]
 	_sw_spell[at] = null
 	_sw_source[at] = null
+	_sw_hit[at] = null
 	_sw_struck[at].clear()
 	if finished and spell != null:
 		if actor >= 0 and actor < SpellRuntime.ACTORS:
@@ -341,12 +319,10 @@ func _grow_swings(size: int) -> void:
 	_sw_turned.resize(size)
 	_sw_chain.resize(size)
 	_sw_prev.resize(size)
-	_sw_echo.resize(size)
+	_sw_hit.resize(size)
 	_sw_shield.resize(size)
 	for i in range(old, size):
 		_sw_struck.append([])
-		_sw_points.append([])
-		_sw_heads.append([])
 
 
 ## Ends the swings of `tag` quietly (a revoked build, a hold switched off).

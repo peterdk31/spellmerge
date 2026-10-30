@@ -16,7 +16,7 @@ extends Node
 ## a fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
 ## compiler; homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
 ## its line, at random (`_staff_spread`). Cards that landed on the caster (or a payload's origin)
-## ask combat for an area hit there (`area_hit_requested`); a dash card asks the caster's body to move
+## strike everything there (`_strike_round`); a dash card asks the caster's body to move
 ## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
 ##
 ## Payloads: a trigger's payload (a group) is fired by its shot's `projectile_hit` (on hit),
@@ -27,7 +27,7 @@ extends Node
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
 ## ray) and cannot hit the target that fired it
 ## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). A payload is cast by the
-## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, hook,
+## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, pull,
 ## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
@@ -38,10 +38,11 @@ extends Node
 ## Carriers (docs/CARRIERS.md): each form names its `Carrier` (core/spells/carriers/) that this
 ## script makes and binds (`Carriers.make_all`) and hands each launch to (`_launch` ->
 ## `Carrier.launch`); nothing here asks which carrier a spell has. A carrier runs what is its own (a
-## hook's pull, a beam's rows, a teleport's landing) and asks this script for the shared path: the
-## shot kit (`_land_shot`, `_apply_travel`), moves (`CasterMoves`: dash, teleport, hook, swap and
-## recoil move a caster through it) and the hit path, which every hit with no shot slot goes back through as a ray (`_ray_begin`,
-## `RayHit`), so cards, payloads and chains are one path for every carrier. The beam, the swing and
+## swap's trade, a beam's rows, a teleport's landing) and asks this script for the shared path: the
+## shot kit (`_land_shot`, `_apply_travel`), moves (`CasterMoves`: dash, teleport, pull, swap and
+## recoil move a caster through it) and the hit path, which every hit with no shot slot goes back
+## through as a ray (`_ray_begin`, `RayHit`; every area strikes through `_strike`, rules R4 F2), so
+## cards, payloads and chains are one path for every carrier. The beam, the swing and
 ## the slam keep rows of their own; `StaffPoses` plays every carrier's staff animation. The looks read
 ## them from the objects that keep them (`beams`, `swings`, `slams`, `poses`, at the end of this script).
 ##
@@ -71,7 +72,8 @@ extends Node
 ## second firing, wait in a queue (it grows as needed, nothing is dropped for room) and are
 ## dropped only if the staff was rebuilt or switched off meanwhile. A cast's
 ## own later firings start from where the caster has moved to. `mirror` fires the carrier again
-## with its aim reversed (every carrier but a move, rules R4g); an echo hits at half damage.
+## with its aim reversed (a move back the other way: the two add up to none, rules R4 F1); an echo
+## hits at half damage.
 ##
 ## Payload and line carriers (B2c): `rain` strikes the aim point after its `lifetime` with its own
 ## hit and cards and drops its payload there (a `form_shown` cue `&"rain"` says where and when; an
@@ -82,17 +84,17 @@ extends Node
 ## point. A familiar casts only what its triggers give it (rules R4 F3), as any carrier that lasts; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
 ## is one solid still shot across the aim, a short-lived wall (`CarrierWall.launch`).
 ##
-## Moves, areas and refunds (B2d): a `teleport` asks the caster's body to blink along the aim
-## (`caster_move_requested`, cut short at the first wall); a `hook` shot that hits asks the body
-## to move to the hit point; a `swap` shot that hits moves its target to where the caster stands
-## (`target_move_requested`) and the caster to the target; `recoil` pushes the caster back from
-## each firing of its cast (so `mirror` cancels it; a teleport's is taken off its distance). A dash
-## strikes every body it passes once and a teleport the bodies where it lands, so the hit cards
-## work on them; a move's `shield` guards what it moves; a move cast by a point moves the wizard
-## (rules R4c). Where a dash, teleport or hook ends
-## (`caster_move_finished`) is the carrier's end point: its `blast` and its `on expire` payload
-## happen there. A shot or beam with `blast` asks combat for an area hit where it ends (a hook's
-## blast waits for the arrival); `siphon` sends `mana_refund_requested` for each hit; `possess`
+## Moves, areas and refunds (B2d): a `dash` or `teleport` asks the caster's body to move along
+## the aim (`caster_move_requested` carries the way and the distance; a teleport is cut short at
+## the first wall); `pull` asks the body to move to whatever its carrier hits; a `swap` shot that
+## hits moves its target to where the caster stands (`target_move_requested`) and the caster to
+## the target; `recoil` pushes the caster back from each firing of its cast (so `mirror` cancels
+## it). Every move adds up (rules R4 F1). A dash strikes every body it passes once and a teleport
+## the bodies where it lands, so the hit cards work on them; a move's `shield` guards what it
+## moves; a move cast by a point moves the wizard (rules R4c). Where a dash or teleport ends, or a
+## pull whose hit spent its shot (`caster_move_finished`), is the carrier's end point: its `blast`
+## and its `on expire` payload happen there. A shot or beam with `blast` strikes everything round
+## where it ends (`_blast`; a pulling shot's waits for the arrival); `siphon` sends `mana_refund_requested` for each hit; `possess`
 ## sends `possess_requested` for every actor a carrier with it hits (actors G9; owner, 2026-10-29).
 ##
 ## Tags (`SpellTag`): the caster's actor id, staff, generation and node. `begin_generation(actor, staff,
@@ -229,8 +231,9 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a beam's tip, a swing's
-## tip, an actor's body (a wizard's dash, a familiar round its wizard) or a fixed point (a rain's
-## spot, a decoy). One `_lc_tied` to its row ends with it (a shot, a beam, a swing); the others
+## tip, an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
+## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
+## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
 ## entity that ended, a rain whose landing was dropped). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
 ## `_lc_way` its way where nothing else gives one.
@@ -286,7 +289,7 @@ var _echo_spell: CompiledSpell = null
 ## Who casts the launch being fired: the actor's body (CASTER_WIZARD, a staff's own cast), the
 ## point it starts from (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or an
 ## entity fired), or the slot of the shot that fired the payload, while it is the shot with
-## `_caster_seq`. One rule for every card that names the caster: dash, teleport, hook, swap and
+## `_caster_seq`. One rule for every card that names the caster: dash, teleport, pull, swap and
 ## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
 const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
@@ -300,6 +303,19 @@ var _caster_seq: int = 0
 var _rays: Array[RayHit] = [RayHit.new()]
 var _ray_depth: int = 0
 var _ray: RayHit = _rays[0]
+## The bodies the strikes under way are striking (`_strike`), and where and which way each is met
+## (two points a body): a stack, as a hit a strike sends can strike again.
+var _strike_bodies: Array[Node] = []
+var _strike_marks: PackedVector2Array = PackedVector2Array()
+## True while a `blast` strikes (`_blast`): its hits pull and swap nothing (rules R4 F2).
+var _blasting: bool = false
+## caster -> the angle from its aim to the way its body walked at its last cast (0 standing;
+## `cast_staff`'s `walk`): a dash it casts itself is turned by it.
+var _walk_turn: PackedFloat32Array = PackedFloat32Array()
+## While `entity_spawn_requested` is sent, the key of the entity it asks for (0 at other times):
+## Entities keeps it and hands it back with `familiar_at`. `_entity_keys` counts them out.
+var entity_key: int = 0
+var _entity_keys: int = 0
 ## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
 ## would recurse as deep as it jumps). The outermost beam casts them, first in first out, once
@@ -343,7 +359,7 @@ var _swings: CarrierSwing = null
 var _slams: CarrierSlam = null
 ## Each actor's staff animation, for any carrier with a `staff_pose`.
 var _poses: StaffPoses = null
-## The moves carriers make of their caster or of the shot that cast them (dash, teleport, hook,
+## The moves carriers make of their caster or of the shot that cast them (dash, teleport, pull,
 ## swap, recoil): `CasterMoves`.
 var _moves: CasterMoves = null
 
@@ -370,6 +386,7 @@ func _init() -> void:
 		_last_infused.append(null)
 	_aim_origin.resize(ACTORS)
 	_aim_origin.fill(Vector2.INF)
+	_walk_turn.resize(ACTORS)
 	_aim_dir.resize(ACTORS)
 	_aim_dir.fill(Vector2.INF)
 	_aim_seen.resize(ACTORS)
@@ -778,7 +795,10 @@ func is_holding(actor: int, staff: int) -> bool:
 ## While the staff has sustained (`hold`) carriers on, a cast switches them all off instead,
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
 ## held button should not switch on and off again and again).
-func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float) -> float:
+##
+## `walk` is the way the caster's body walks (zero when it stands): a dash it casts itself takes
+## that way in place of `direction` (`CarrierMove`; staffs A6a, kept by the owner in R4 F1).
+func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float, walk: Vector2 = Vector2.ZERO) -> float:
 	if projectiles == null or not _in_range(actor, staff) or not origin.is_finite():
 		return REFUSED
 	if not direction.is_finite() or direction.is_zero_approx():
@@ -795,6 +815,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if mana < cast.mana:
 		return REFUSED
 	var aim: Vector2 = direction.normalized()
+	_walk_turn[actor] = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
@@ -894,29 +915,50 @@ func _ray_end() -> void:
 	_ray = _rays[_ray_depth]
 
 
-## Strikes the first `found` bodies of `Projectiles.sweep` that are not in `struck` yet (and adds
-## them), each pushed outward from `centre` (along `way` when it is on it), as a ray
-## (`_ray_begin`) that `_on_hit` reads, as a swing's and a slam's: its hits carry its cards, payloads
-## and chains. `hit` is what it hits with when not its spell's own (an echo's), else null.
-func _strike_bodies(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Array[Node], centre: Vector2, way: Vector2, chain: int, prev: int, hit: HitProfile) -> void:
-	var first: int = struck.size()
+## The one strike (rules R4 F2): the carrier `spell` with `tag` hits each of the first `found`
+## bodies of the last `Projectiles.sweep` round `centre` that is not in `struck` yet (and adds it),
+## where the sweep met it, as a ray (`_ray_begin`) that `_on_hit` reads: its infusions, heavy,
+## chain (`chain` jumps left, `prev` the body before), siphon, possess, relay and `on hit` go with
+## it, and the hit's push throws the body outward from `centre` (a whole circle strikes from
+## `centre`, `Projectiles.sweep`). `hit` is what it hits with when not its spell's own (an echo's),
+## else null. A swing, a slam, a dash, a teleport, a rain and a blast all strike through here. The
+## bodies are copied out first (onto `_strike_bodies`): what a hit sets off can sweep. Returns what
+## it hit with at the end (relay may have taken an element on), for a carrier that strikes again
+## to keep, as a live beam does.
+func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Array, centre: Vector2, chain: int, prev: int, hit: HitProfile) -> HitProfile:
+	var first: int = _strike_bodies.size()
 	for i in found:
 		var node: Node = projectiles.sweep_nodes[i]
 		if not struck.has(node):
 			struck.append(node)
-	var last: int = struck.size()
+			_strike_bodies.append(node)
+			_strike_marks.append(projectiles.sweep_points[i])
+			_strike_marks.append(projectiles.sweep_heads[i])
+	var last: int = _strike_bodies.size()
 	if last == first:
-		return
-	var ray: RayHit = _ray_begin(tag, way, chain, prev, hit, -1)
-	for row in range(first, last):
-		var node: Node = struck[row]
-		if not is_instance_valid(node) or not (node is Node2D):
-			continue
-		var body: Vector2 = (node as Node2D).global_position
-		var out: Vector2 = centre.direction_to(body) if not centre.is_equal_approx(body) else way
-		projectiles.strike(actor, node, centre, out, tag, spell.form_id)
+		return hit
+	var ray: RayHit = _ray_begin(tag, Vector2.RIGHT, chain, prev, hit, -1)
+	for n in range(first, last):
+		var point: Vector2 = _strike_marks[n * 2]
+		var head: Vector2 = _strike_marks[n * 2 + 1]
+		ray.dir = centre.direction_to(point) if not centre.is_equal_approx(point) else head
+		projectiles.strike(actor, _strike_bodies[n], point, head, tag, spell.form_id)
+	var took: HitProfile = ray.hit
 	_ray_end()
+	_strike_bodies.resize(first)
+	_strike_marks.resize(first * 2)
 	_cast_jumps()
+	return took
+
+
+## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once (`_strike`),
+## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. With
+## `everyone` (a blast, the cards that land on a point) its caster's own body is struck too, and a
+## wall hides no body: an explosion at a shot's end on a wall is in the wall.
+func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, everyone: bool = false, chain: int = -1, prev: int = 0) -> void:
+	var found: int = projectiles.sweep(ActorsScript.NONE if everyone else actor, at, way, 1, -PI, PI, reach, HITS, null, not everyone)
+	if found > 0:
+		_strike(spell, tag, actor, found, [], at, spell.chain_jumps if chain < 0 else chain, prev, hit)
 
 
 ## The live shot casting the launch being fired, or -1 when the caster is the wizard, a point,
@@ -1032,8 +1074,8 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 
 ## One carrier of a group, launched; returns the shots made. `mirror` fires it once more with its
 ## aim reversed (a wall behind, a rain at the point mirrored through the caster, an orbit starting
-## on the other side of its circle; a dash or teleport has its mirror wasted), and `echo` schedules
-## it once more. `echoed` is true for that second firing, which hits at half damage and does not
+## on the other side of its circle, a dash or teleport back the other way: the two moves add up
+## to none, rules R4 F1), and `echo` schedules it once more. `echoed` is true for that second firing, which hits at half damage and does not
 ## echo again; on a held carrier it is a second held copy. `again` is a held carrier cast again
 ## (`_repeats`): it echoes no more.
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
@@ -1043,13 +1085,12 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	_echo_spell = spell if echoed else null
 	var launched: int = _launch(spell, tag, actor, origin, heading, source)
 	if launched > 0:
-		_recoil(spell, tag, actor, origin, heading)
-	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.MIRROR):
+		_recoil(spell, tag, actor, heading)
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
-			_recoil(spell, tag, actor, origin, -heading)
+			_recoil(spell, tag, actor, -heading)
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
@@ -1070,11 +1111,11 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
-## pushes the other way, so `mirror` cancels it). Moves add up: a dash's push runs with the dash,
-## and a teleport, over at once, has it taken off its distance instead (`CarrierTeleport.handles_recoil`).
-func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> void:
+## pushes the other way, so `mirror` cancels it). It is one more move, and every move adds up (a
+## dash's or a teleport's too: a recoil longer than a teleport takes it back past its start).
+func _recoil(spell: CompiledSpell, tag: int, actor: int, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or _carrier_of(spell).handles_recoil():
+	if push <= 0.0:
 		return
 	if _caster != CASTER_WIZARD:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
@@ -1083,17 +1124,31 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 			projectiles.move_shot(shot, -heading * push, SpellLimits.RECOIL_SECONDS)
 		return
 	if events != null:
-		events.caster_move_requested.emit(actor, &"recoil", origin - heading * push, SpellLimits.RECOIL_SECONDS, tag)
+		events.caster_move_requested.emit(actor, &"recoil", -heading * push, SpellLimits.RECOIL_SECONDS, tag)
 
 
-## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
-## strength, with the hit profile of its tag, and its explosion (`cue_shown`, the cue its blast card
-## names). Nothing without a blast.
+## A `blast` at the end point `at` of the carrier with `tag`: its explosion (`cue_shown`, the cue
+## its blast card names) and a strike of everything within its strength (`_strike_round`,
+## `everyone`): each body it catches is a hit of the carrier (rules R4 F2), with what the carrier
+## hits with now and the chain jumps it has left (the ray's being sent, else the shot `shot`'s),
+## so a jump's blast jumps no further than the jump. Its hits blast no more. Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int = -1) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
-	if radius > 0.0 and events != null and at.is_finite():
-		events.area_hit_requested.emit(actor, at, radius, tag, shot)
-		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
+	if radius <= 0.0 or events == null or not at.is_finite():
+		return
+	events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
+	var chain: int = spell.chain_jumps
+	var prev: int = 0
+	if tag == _ray.tag:
+		chain = _ray.chain
+		prev = _ray.prev
+	elif shot >= 0 and _same(shot) and projectiles.get_tag_of(shot) == tag:
+		chain = _rec_chain[shot]
+		prev = _rec_prev[shot]
+	var was: bool = _blasting
+	_blasting = true
+	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, hit_profile(tag, shot), true, chain, prev)
+	_blasting = was
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
@@ -1231,16 +1286,15 @@ func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 	return false
 
 
-## The cards that landed on the caster or on a payload's origin: an area hit there with the
-## spell's profile (a blast is as wide as its strength, and explodes). Combat decides what it does
-## (staffs B3).
+## The cards that landed on the caster or on a payload's origin: a strike of everything there
+## (`_strike_round`, `everyone`; a blast is as wide as its strength, and explodes).
 func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
-	if events != null:
-		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
-		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag, -1)
-		if blast > 0.0 and at.is_finite():
-			events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
-	# After the area hit, which can reach the caster itself and would spend the barrier.
+	var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
+	if blast > 0.0 and events != null and at.is_finite():
+		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
+	if at.is_finite():
+		_strike_round(spell, tag, actor, at, Vector2.RIGHT, maxf(spell.radius, blast), null, true)
+	# After the strike, which can reach the caster itself and would spend the barrier.
 	if _caster == CASTER_WIZARD:
 		_moves.shield_caster(spell, tag, actor, 0.0)
 	return 1
@@ -1628,7 +1682,7 @@ func _heading(spell: CompiledSpell, slot: int, at: Vector2, actor: int) -> Vecto
 
 ## When a carrier that lives `life` seconds first does what it does every `interval` (a timer's
 ## tick, an arc's zap): after the interval, or half its life when that is shorter, so a short
-## carrier (a hook, a swap, a nova, a beam) does it once before it ends (owner, 2026-10-29).
+## carrier (a swap, a nova, a beam) does it once before it ends (owner, 2026-10-29).
 static func first_tick(interval: float, life: float) -> float:
 	return minf(interval, life * 0.5)
 
@@ -1873,8 +1927,10 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 
 
 ## What a hit of a carrier does besides its payload and chain: siphon refunds mana, possess takes
-## the target, the carrier's own part runs (`Carrier.on_hit`: a hook's pull, a swap's trade), and a
-## spent shot's `blast` goes off (a beam's waits for its end, a hook's for the arrival).
+## the target, `pull` pulls its caster to the hit (`CasterMoves.pull`), the carrier's own part runs
+## (`Carrier.on_hit`: a swap's trade), and a spent shot's `blast` goes off (a beam's waits for its
+## end, a pulling shot's for the arrival). What a blast strikes moves nothing (that would move
+## again at every arrival, rules R4 F2): only the carrier's own hits do (`_blasting`).
 func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, position: Vector2, slot: int) -> void:
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
@@ -1882,10 +1938,14 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var possess: float = spell.behaviour(ModifierBase.Behaviour.POSSESS)
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
-	# What the carrier does of its own: a hook pulls its caster, a swap trades places (`Carrier.on_hit`).
-	var pulled: bool = _carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
-	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
-	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
+	var spent: bool = slot >= 0 and not projectiles.is_alive(slot)
+	var pulled: bool = false
+	if not _blasting:
+		if spell.behaviour(ModifierBase.Behaviour.PULL) > 0.0:
+			pulled = _moves.pull(spell, tag, actor, position, slot, spent)
+		_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
+	# A spent shot's blast goes off where it hit; a pulling one's waits for the arrival.
+	if spent and not pulled:
 		_blast(spell, tag, actor, position, slot)
 
 
@@ -1953,7 +2013,7 @@ func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
 		event = TriggerBase.Event.WALL
-	# Every carrier blasts at its end point (rules R1d): a hook that missed, where it ended.
+	# Every carrier blasts at its end point (rules R1d): a pulling shot that missed, where it ended.
 	if spell != null:
 		_blast(spell, tag, actor, position, shot)
 	_fire_event(event, actor, position, tag, null, shot, true)
@@ -2459,6 +2519,17 @@ func _component(id: StringName) -> SpellComponent:
 func _name_of(component: SpellComponent) -> String:
 	return component.display_name if not component.display_name.is_empty() else String(component.id)
 
+
+
+## Where the familiar with `key` (`entity_key`) is now, told by Entities every step: what its
+## triggers cast comes from there.
+func familiar_at(key: int, at: Vector2) -> void:
+	if key == 0 or not at.is_finite():
+		return
+	for i in _lc_count:
+		if _lc_seq[i] == key and _lc_kind[i] == LC_POINT:
+			_lc_at[i] = at
+			return
 
 
 ## An entity `ai` made for a carrier ended where it stood: the carrier its kind names (a decoy, a

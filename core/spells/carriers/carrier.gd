@@ -153,11 +153,6 @@ func takes_infusion(blasts: bool) -> bool:
 	return hits() or blasts
 
 
-## True when it takes `recoil` off its own move (a teleport), so the cast's push leaves it alone.
-func handles_recoil() -> bool:
-	return false
-
-
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`
 ## (`CompiledSpell.homing_range`); 0 where homing cannot steer it.
 func homing_range(ray_length: float, reach: float) -> float:
@@ -206,9 +201,9 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 
 
 ## What a hit of this carrier does of its own, besides the shared hit path (`Spells._on_hit_effects`):
-## a hook's pull, a swap's trade. True when it moves what cast it, so its blast waits for the arrival.
-func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _position: Vector2, _slot: int) -> bool:
-	return false
+## a swap's trade. Not for a blast's hits, which move nothing (rules R4 F2).
+func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _position: Vector2, _slot: int) -> void:
+	pass
 
 
 ## A move of this carrier ended at `at` (`CasterMoves.end`), before its blast and `on expire`.

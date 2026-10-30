@@ -31,7 +31,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
-| Carrier (13) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30) |
+| Carrier (12) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30; the hook carrier became the `pull` modifier, owner 2026-10-30) |
 | Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (9) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction** |
@@ -41,7 +41,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 `complexity` stays on `SpellComponent` for the validator's range check but nothing reads it any more; part A4 removes the budget. Ids stay unique across all kinds.
 
-**Every card has an end point:** where its effects happen once it is done. A shot's end point is where it hits or expires; a dash's, teleport's and hook's is where the wizard arrives; a decoy's where it dies; the caster's is the caster. `blast`, `on expire` and the look of an ending all use it.
+**Every card has an end point:** where its effects happen once it is done. A shot's end point is where it hits or expires; a dash's and teleport's is where the wizard arrives (a pulling shot's, when its hit spent it); a decoy's where it dies; the caster's is the caster. `blast`, `on expire` and the look of an ending all use it.
 
 **Who casts a card** (owner, 2026-10-27: "this should not be a special case, but follow the core spell logic"): a staff's own cast is cast by the wizard; a payload is cast by the shot whose trigger fired it, while that shot still flies, and otherwise by the point it fired from (a shot spent on its hit, an expiry, a beam, a rain, an entity); an `on cast` payload by its carrier's caster. Every card that names the caster follows this one rule: dash, teleport, hook, swap and recoil move it (a payload dash makes its shot lunge forward; with only a point there is nothing to move), and orbit, familiar and a returning shot circle it or come back to it (`timer · bolt · orbit` is a ring round the flying bolt, `on expire · bolt · orbit` one round where it ended).
 
@@ -59,7 +59,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | --- | --- | --- |
 | dash | The wizard dashes along the move direction (today's dodge, **without** the invulnerable window) a fixed 80 px (`ray_length`; `reach · dash` 128, owner 2026-10-30: one Dash and a Reach card); its speed only sets how long that takes, so `faster` arrives sooner, never farther (owner, 2026-10-27). 2 s delay. End point: where the dash ends | `shield · dash` blocks one hit during the dash; `blast · dash` explodes at the end |
 | teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
-| hook | A shot that pulls the caster to where it hits | `shield · hook` is a safe gap-closer; `blast · hook` charges in with a bang |
+| ~~hook~~ | Became the `pull` modifier (rules R4 F1, owner 2026-10-30): the old hook is `pull · bolt` | |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
 | wall | A short-lived solid wall across the aim: bodies and shots stop at it, touching it hurts | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
 | rain | Its payload falls on the aim point after a telegraphed delay | `rain · nova`; `rain · frost · nova` freezes an area from above |
@@ -95,6 +95,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | slow | A third of the speed for three times the life, so it crawls about as far (`lifetime_mult`, owner 2026-10-27) | `slow · lightning · arc · bolt`, the lightning orb; `slow · growth · bolt` grows three times as long |
 | arc | While the shot lives it zaps the nearest enemy within 60 px twice a second, at half its damage, with its infusions. A zap is a hit: it sets off `on hit` and chains (owner, 2026-10-27; see BACKLOG for making that a staff mod or relic later). Wasted on a carrier that is not a shot in the air (beam, dash) | `slow · lightning · arc · bolt` is a lightning orb; `arc · orbit` a ring of zappers; `arc · on hit · rune · nova` a trap that rings out at whatever comes near |
 | deflect | Shots of another team that touch the carrier turn around and become its caster's (owner, 2026-10-29; see "Phase I"). Works on every carrier | `deflect · swing` bats shots back; `deflect · orbit` is a reflecting ring; `deflect · wall` a mirror wall |
+| pull | Whatever the carrier hits, its caster is pulled to (rules R4 F1, owner 2026-10-30: was the Hook carrier); several hits make several pulls, and they add | `shield · pull · bolt` is a safe gap-closer; `blast · pull · bolt` charges in with a bang; `pull · swing` drags you through a crowd |
 
 **Infusion:** mend: hits heal wizards (whatever the friendly-fire setting) and do almost nothing to enemies. `mend · blast` is a self-heal burst; `mend · chain · bolt` jumps a heal through the party.
 
@@ -182,7 +183,7 @@ These are not build rules: they keep a frame from running away, never refuse or 
 - Every hit, the caster's own included, goes through `gameplay/combat`. Today a wizard is never hit by their own shot (`core/projectiles`); part B1 changes that: a shot may hit its caster **once it has left the caster's hitbox** (a per-shot flag, set the first step the shot no longer overlaps the caster). Anything centred on the caster (blast or a nova on the caster, reactions) hits at once.
 - **Statuses on wizards** are new: burn, chill and freeze, shock, hex and static get a version for wizards in `combat`. A downed wizard takes none.
 - **Hit kinds:** every hit carries a kind: `shot`, `ray`, `burst`, `reaction`, `status`, `heal`. A relic (M3) such as "explosion immunity" matches a kind.
-- **Area hits:** `blast`, the payload fallback and later relics ask combat for an area hit with `area_hit_requested`; combat applies it to every enemy and wizard in the circle (the caster included).
+- **Area hits:** `blast` and the payload fallback strike every enemy and wizard in the circle (the caster included); since card rules R4 F2 each body is a `projectile_hit` of the carrier (`area_hit_requested` is gone).
 - **Fairness** (DESIGN.md, "every death is understandable"): a self-hit has its own flash, shown on the hit's frame, and a wizard downed by their own spell is told so ("downed by your own Blast").
 - **Shield charges** are per carrier: a shot with three shields blocks three enemy shots, a dash with one blocks one hit on the wizard.
 - **Feel:** every hit kind has a default flash, hit-stop and sound in Feel (B3), so a new card feels like something before it has its own sound. A card's own sound is an id (`<card id>`), silent until its `.ogg` exists, like the reactions.
@@ -254,10 +255,9 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `staff_cards_requested(player, staff, cards)` (the whole staff at once; the radial builder) | hud | player |
 | `staff_changed(player, staff, plan: Dictionary)` | player | hud |
 | `staff_cast(player, staff, origin, direction)` | player | feel |
-| `caster_move_requested(player, mode: StringName, to: Vector2, seconds: float, tag: int)` (dash, teleport, hook, swap, recoil) | spells | player, ai (an enemy's own row, F8c) |
-| `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player, ai (an enemy's, F8c) | spells (the end point of dash, teleport, hook) |
+| `caster_move_requested(player, mode: StringName, move: Vector2, seconds: float, tag: int)` (dash, teleport, pull, swap, recoil; each adds up, rules R4 F1) | spells | player, ai (an enemy's own row, F8c) |
+| `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player, ai (an enemy's, F8c) | spells (the end point of dash, teleport, pull) |
 | `target_move_requested(target: Node, to: Vector2)` (swap) | spells | ai |
-| `area_hit_requested(player, position: Vector2, radius: float, tag: int)` | spells | combat |
 | `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)` (decoy, familiar; `caster` -1 the wizard, a projectile slot, or -2 the point) | spells | ai |
 | `entity_end_requested(player, tag: int)` (a `hold` switched off; added in B5) | spells | ai |
 | `entity_ended(player, kind: StringName, position: Vector2, tag: int)` | ai | spells (a decoy's end point) |

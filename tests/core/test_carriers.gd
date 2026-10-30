@@ -25,7 +25,7 @@ func test_every_carrier_is_found_by_its_name() -> void:
 	check(not Carriers.of(&"fissure").works(BEHAVIOURS.NONE), "and no card works on it")
 	check(not Carriers.exists(&"fissure") and not Carriers.exists(&""), "and neither is a carrier")
 	check(Carriers.exists(&"bolt"), "a bolt is")
-	check_equal(Carriers.ids().size(), 14, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
+	check_equal(Carriers.ids().size(), 13, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
 	var ids: Array[StringName] = Carriers.ids()
 	check(ids.find(&"dash") < ids.find(&"beam") and ids.find(&"beam") < ids.find(&"decoy") and ids.find(&"decoy") < ids.find(&"swing") and ids.find(&"swing") < ids.find(&"slam"), "the runtime steps a dash's strikes, then beams, entities, swings and slams: %s" % [ids])
 
@@ -59,21 +59,23 @@ func test_every_form_card_names_a_carrier_and_every_carrier_has_one() -> void:
 func test_what_works_follows_the_traits() -> void:
 	for carrier in _carriers():
 		var name: StringName = carrier.id()
-		check_equal(carrier.fires(EVENTS.HIT), carrier.hits(), "on hit fires on a %s exactly when it hits" % name)
+		check_equal(carrier.fires_with(EVENTS.HIT, {}, false), carrier.hits(), "on hit fires on a bare %s exactly when it hits" % name)
+		check(carrier.fires_with(EVENTS.HIT, {BEHAVIOURS.BLAST: true}, false), "and with a blast on a %s too: its strikes are its hits" % name)
 		check_equal(carrier.fires(EVENTS.TIMER), carrier.lasts(), "a timer ticks on a %s exactly when it lasts" % name)
 		check_equal(carrier.works(BEHAVIOURS.HOMING), carrier.steers(), "homing works on a %s exactly when it steers" % name)
 		check_equal(carrier.works(BEHAVIOURS.RETURN), carrier.flies(), "return works on a %s exactly when it flies" % name)
-		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY]:
+		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY, BEHAVIOURS.PULL]:
 			check_equal(carrier.works(behaviour), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
-		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL]:
+		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL, BEHAVIOURS.MIRROR]:
 			check(carrier.works(behaviour), "%s works on every carrier, a %s too" % [BEHAVIOURS.keys()[behaviour], name])
 
 
-func test_a_blast_carries_heavy_and_infusions_on_a_carrier_that_hits_nothing() -> void:
+func test_a_blast_hits_for_a_carrier_that_hits_nothing() -> void:
+	# What a blast strikes is the carrier's hit (rules R4 F2), but a blast's hits move nothing.
 	var decoy: Carrier = Carriers.of(&"decoy")
 	check(not decoy.works(BEHAVIOURS.HEAVY), "heavy does nothing on a bare decoy")
-	check(decoy.works(BEHAVIOURS.HEAVY, true), "a blast carries it")
-	check(not decoy.works(BEHAVIOURS.SIPHON, true), "but not siphon: a blast is no shot hit")
+	check(decoy.works(BEHAVIOURS.HEAVY, true) and decoy.works(BEHAVIOURS.SIPHON, true), "a blast carries it, and siphon")
+	check(not decoy.works(BEHAVIOURS.PULL, true), "but not pull")
 	check(not decoy.takes_infusion(false) and decoy.takes_infusion(true), "nor an infusion without a blast")
 	check(Carriers.of(&"bolt").takes_infusion(false), "a bolt takes one on its own hits")
 

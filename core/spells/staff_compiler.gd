@@ -26,6 +26,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
+	ModifierBase.Behaviour.PULL,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.

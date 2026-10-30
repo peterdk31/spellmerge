@@ -111,7 +111,7 @@ func test_a_spell_kill_on_a_kit_actor_is_the_spells() -> void:
 
 func test_what_a_hit_sets_off_names_the_shot_that_hit() -> void:
 	# The shot travels with the events (no "current shot" on the manager): a kill by the hit of
-	# shot 7 names shot 7, and one by an area hit names the shot the area hit came from.
+	# shot 7 names shot 7.
 	var shots: Array = []
 	_world.bus.kill_landed.connect(func(_caster: int, _body: Node, _at: Vector2, _tag: int, shot: int) -> void: shots.append(shot))
 	_world.bus.enemy_died.connect(func(_killer: int, _body: Node, _at: Vector2, shot: int) -> void: shots.append(shot))
@@ -124,10 +124,6 @@ func test_what_a_hit_sets_off_names_the_shot_that_hit() -> void:
 	var imp: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_ENEMIES, 0, 4)
 	_world.bus.projectile_hit.emit(0, imp, Vector2(-5.0, -12.0), tag, 7)
 	check_equal(shots, [7, 7], "the kill and the death name shot 7")
-	shots.clear()
-	var other: Actor = _actor(Vector2(200.0, 0.0), ActorsScript.TEAM_ENEMIES, 0, 4)
-	_world.bus.area_hit_requested.emit(0, other.global_position, 30.0, tag, 3)
-	check_equal(shots, [3, 3], "an area hit's kill names the shot it came from")
 
 
 func test_a_body_without_an_id_gets_one_and_gives_it_back() -> void:

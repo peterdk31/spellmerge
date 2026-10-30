@@ -24,8 +24,8 @@ extends ActorLook
 ## staff starts the poof again, so the change is at the newest cloud's biggest. The same staff
 ## again changes nothing.
 ##
-## A dash, hook or swap stretches and leans the sprite along its way (`Mover.move_direction`; a
-## standing actor dashes the way it aims) and leaves three ghosts where the staff was: solid copies
+## A dash, pull or swap stretches and leans the sprite along its way (`Mover.move_direction`, what
+## its moves add up to) and leaves three ghosts where the staff was: solid copies
 ## drawn by the shots' sprite shader (the glow look, 2026-10-27), turned to the ramp's light colour and
 ## falling apart pixel by pixel, the older the more (GHOST_DISSOLVE), never see-through.
 ##

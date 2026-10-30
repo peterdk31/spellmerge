@@ -177,11 +177,12 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		if rt._aim_dir[actor].is_finite():
 			_bm_turn[at] = rt._aim_dir[actor].angle_to(heading)
 	else:
+		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = rt.live_caster_shot(caster, caster_seq)
 		var way: Vector2 = rt.projectiles.get_velocity_of(shot) if shot >= 0 else Vector2.ZERO
-		if way.is_zero_approx():
+		if shot < 0:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
-		else:
+		elif not way.is_zero_approx():
 			_bm_turn[at] = way.angle_to(heading)
 	rt.shot_started(tag)
 	_beam_step(at, 0.0)
@@ -390,6 +391,9 @@ func _beam_cast(at: int, hit: bool) -> void:
 	# A homing or spiral beam that turns at a wall homes and waves again from there (`_beam_steer`).
 	var steer: Callable = _steer_call if bounces > 0 and (spell.homing_range > 0.0 or spell.behaviour(ModifierBase.Behaviour.SPIRAL) > 0.0) else Callable()
 	_steer_row = at
+	# What a shot casts leaves it: a wall's beam walks out of its wall (rules R4 F8).
+	if _bm_caster[at] >= 0:
+		rt.projectiles.ray_cast_by(_bm_caster[at])
 	if not hit:
 		_bm_reach[at] = rt.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, SpellRuntime.HITS, tag, width, source, false, bounces, steer, ghost)
 		_bm_tip[at] = rt.projectiles.ray_end

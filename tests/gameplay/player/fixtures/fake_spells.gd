@@ -64,7 +64,7 @@ func install_staff(player: int, staff: int, compiled: CompiledStaff) -> int:
 	return 0 if compiled.is_empty() else 1
 
 
-func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, mana: float) -> float:
+func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, mana: float, _walk: Vector2 = Vector2.ZERO) -> float:
 	var at: int = player * 4 + staff
 	if _has[at] == 0 or _left[at] > 0.0 or mana < cost:
 		return REFUSED

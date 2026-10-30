@@ -25,7 +25,7 @@ extends Node
 ## Downed). A plain body without the kit (tests' stand-ins) has its health in Combat's row. A
 ## kit Actor is not hurt while down, dying or protected.
 ##
-## A spell's hit (`projectile_hit`, `area_hit_requested`) is looked up in Spells' hit profiles
+## A spell's hit (`projectile_hit`; a blast's too, rules R4 F2) is looked up in Spells' hit profiles
 ## (`Spells.hit_profile(tag, shot)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
 ## else damage and a push (a pull while hexed), the shock jump, the static discharge, then
 ## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
@@ -74,7 +74,7 @@ const STATIC: StringName = &"static"
 const DISCHARGE: StringName = &"discharge"
 
 ## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, an
-## area hit (blast, a fallback), a reaction's damage, damage over time, and a heal.
+## area hit (a slam's ring), a reaction's damage, damage over time, and a heal.
 const KIND_SHOT: StringName = &"shot"
 const KIND_RAY: StringName = &"ray"
 const KIND_SWING: StringName = &"swing"
@@ -92,8 +92,6 @@ const KIND_NAMES: Dictionary = {
 	KIND_REACTION: "Reaction",
 	KIND_STATUS: "Burn",
 }
-## Area hits started inside area hits go this deep and no further (a safeguard against a runaway chain).
-const AREA_DEPTH: int = 8
 
 ## How many rows there are: one per actor id.
 const ACTORS: int = ActorsScript.ACTORS
@@ -225,10 +223,9 @@ var _discharged: bool = false
 ## The tag of the spell hit being dealt now (0 for none): `kill_landed`, `reaction_landed` and
 ## `actor_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
 var _tag: int = 0
-## The shot that hit (the projectile manager's slot from `projectile_hit`, or the one an area hit
-## came from), -1 for none: what the hit sets off names it as its `shot`, as `_tag` its tag.
+## The shot that hit (the projectile manager's slot from `projectile_hit`), -1 for none: what the
+## hit sets off names it as its `shot`, as `_tag` its tag.
 var _slot: int = -1
-var _area_depth: int = 0
 
 # Burn damage due this step, sent after the status loop (hits can free rows): body, who, points.
 var _due_node: Array[Node2D] = []
@@ -337,8 +334,6 @@ func setup() -> void:
 		events.player_downed.connect(_on_player_downed)
 	if not events.player_revived.is_connected(_on_player_revived):
 		events.player_revived.connect(_on_player_revived)
-	if not events.area_hit_requested.is_connected(_on_area_hit_requested):
-		events.area_hit_requested.connect(_on_area_hit_requested)
 	if not events.wizard_shield_requested.is_connected(_on_wizard_shield_requested):
 		events.wizard_shield_requested.connect(_on_wizard_shield_requested)
 	if not events.pull_requested.is_connected(_on_pull_requested):
@@ -1079,35 +1074,7 @@ func _remove_status(row: int, status_id: StringName) -> void:
 			_static_share[row] = 0.0
 
 
-# --- Area hits and requests --------------------------------------------------
-
-## Area hits (`area_hit_requested`, from blast and a payload's fallback): the spell's hit lands
-## on every actor whose hurt circle is in the circle, the caster included, whoever cast it, with
-## kind `burst` (everything hurts everything). A mend heals the caster's team in it. Nested area
-## hits (on kill, on hit chains) are cut at AREA_DEPTH.
-func _on_area_hit_requested(caster: int, position: Vector2, radius: float, tag: int, shot: int) -> void:
-	var profile: HitProfile = spells.hit_profile(tag, shot) if spells != null else null
-	if profile == null or _area_depth >= AREA_DEPTH or projectiles == null:
-		return
-	_area_depth += 1
-	var saved_tag: int = _tag
-	var saved_slot: int = _slot
-	_tag = tag
-	_slot = shot
-	# The targets are copied out first: what the hits do can change the grid's answer.
-	var near: Array[Node2D] = _take_scratch()
-	var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.ACTOR_LAYERS, near)
-	for i in count:
-		if not is_instance_valid(near[i]):
-			continue
-		var row: int = _row_of_node(near[i])
-		if row != ActorsScript.NONE and not _is_down(row):
-			_apply_spell(caster, row, position, profile, KIND_BURST)
-	_give_scratch()
-	_tag = saved_tag
-	_slot = saved_slot
-	_area_depth -= 1
-
+# --- Requests ---
 
 ## A barrier for the caster's own actor (`wizard_shield_requested`), whoever it is.
 func _on_wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int) -> void:

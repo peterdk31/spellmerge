@@ -23,6 +23,6 @@ move_speed = 40.0
 contact_damage = 0
 scene = ExtResource("2_scene")
 staff = SubResource("Resource_staff")
-cards = Array[StringName]([&"frost", &"hook"])
+cards = Array[StringName]([&"frost", &"pull", &"bolt"])
 max_mana = 20.0
 mana_regen = 3.0

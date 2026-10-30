@@ -79,6 +79,16 @@ func test_its_own_payload_leaves_it() -> void:
 	check(not mgr.is_alive(stranger), "a shot it did not cast ends on it")
 
 
+func test_a_beam_it_casts_leaves_it() -> void:
+	# Rules R4 F8: the same rule for a ray: one its wall casts walks out through it.
+	var wall: int = _wall(Vector2(200.0, 100.0))
+	check_equal(mgr.ray(0, Vector2(200.0, 100.0), Vector2.RIGHT, 100.0), 0.0, "a ray born in a wall it was not cast by gets nowhere")
+	mgr.ray_cast_by(wall)
+	check_equal(mgr.ray(0, Vector2(200.0, 100.0), Vector2.RIGHT, 100.0), 100.0, "the wall's own ray walks out of it")
+	check_equal(mgr.ray(0, Vector2(200.0, 100.0), Vector2.RIGHT, 100.0), 0.0, "for that ray only")
+	check(mgr.clip_to_walls(Vector2(150.0, 100.0), Vector2(250.0, 100.0)) != Vector2(250.0, 100.0), "the wall stands after it")
+
+
 func test_the_room_walls_stay_when_it_ends() -> void:
 	mgr.set_walls([Rect2(192.0, 0.0, 16.0, 96.0)] as Array[Rect2])
 	_wall(Vector2(200.0, 100.0), 0.2)

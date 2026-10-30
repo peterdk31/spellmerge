@@ -59,15 +59,19 @@ func clear() -> void:
 	_passes.clear()
 
 
+func _walks() -> bool:
+	return true
+
+
 func _move_seconds(spell: CompiledSpell) -> float:
 	return CasterMoves.move_seconds(spell.ray_length, spell.speed, spell.lifetime)
 
 
-## The body dashes: its owner picks the way (where it walks) and may home with `move_homing`; its
-## way is drawn where it really goes, and it strikes every body it passes (`_start_pass`).
+## The body dashes: it may home with `move_homing`, and other moves add to it; its way is drawn
+## where it really goes, and it strikes every body it passes (`_start_pass`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[actor].start(spell, hash(Vector2i(actor, tag)))
-	rt.events.caster_move_requested.emit(actor, &"dash", origin + offset, seconds, tag)
+	rt.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
 	var reach: float = origin.distance_to(rt.projectiles.clip_to_walls(origin, origin + offset))
 	rt.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	rt.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
@@ -149,9 +153,10 @@ func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
 		var found: int = rt.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS)
 		if found > 0:
-			rt._strike_bodies(spell, dash.tag, dash.actor, found, dash.struck, point, way, dash.chain, dash.prev, dash.hit)
-		if dash.left <= 0.0 or rt._profiles.get(dash.tag) != spell:
-			return
+			var took: HitProfile = rt._strike(spell, dash.tag, dash.actor, found, dash.struck, point, dash.chain, dash.prev, dash.hit)
+			if dash.left <= 0.0 or dash.spell != spell:
+				return
+			dash.hit = took
 
 
 ## The homing of `actor`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one

@@ -33,7 +33,7 @@ var _hits: Array = []
 var _spawns: Array = []
 ## Every entity_end_requested as [player, tag].
 var _end_requests: Array = []
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
@@ -64,8 +64,7 @@ func before_each() -> void:
 		_spawns.append([player, kind, at, seconds, tag, caster]))
 	_bus.entity_end_requested.connect(func(player: int, tag: int) -> void:
 		_end_requests.append([player, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
-		_areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, form, at, direction, length]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
@@ -462,7 +461,7 @@ func test_a_blast_decoy_explodes_where_it_ends() -> void:
 	_cast()
 	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
 	check_equal(_areas.size(), 1, "one area hit")
-	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "at the end point, as wide as the blast: %s" % [_areas])
+	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_areas[0][2], 30.0), "at the end point, as wide as the blast: %s" % [_areas])
 
 
 func test_a_blast_shows_its_explosion_where_it_goes_off() -> void:
@@ -573,6 +572,16 @@ func test_an_enemy_touching_the_wall_anywhere_along_it_is_hit_once_while_it_stay
 	check_equal(_hits.size(), 1, "hit once at the row's end, and the wall stands on")
 	check(not _hits.is_empty() and _hits[0][1] == target, "it is the enemy")
 	check_equal(_mgr.get_count(), 1, "the hit did not spend the wall")
+
+
+func test_a_beam_the_wall_casts_comes_out_of_it() -> void:
+	# Rules R4 F8: what a wall casts leaves it, beams too (as its flying payloads do).
+	_build(0, [&"timer", &"wall", &"beam"])
+	var target: Node2D = _target(Vector2(SpellLimits.WALL_REACH + 80.0, 0.0))
+	_cast()
+	_tick(32)
+	check(_hits.any(func(hit: Array) -> bool: return hit[1] == target), "the wall's beam reached the enemy beyond it: %s" % [_hits])
+	check(_blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "the wall still stops everything else")
 
 
 func test_wall_shots_stay_out_of_a_wall() -> void:

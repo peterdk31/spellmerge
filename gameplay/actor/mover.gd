@@ -3,33 +3,28 @@ extends ActorComponent
 ## The mover (actors G4, docs/milestones/M2-actors.md, "The components"): everything that sets
 ## an actor's `velocity`. It walks where the intent says (`speed` × the intent's `move`), and it
 ## is the one caster kit: the moves an actor's own cards ask for (staffs B4 for wizards, F8c for
-## enemies; one implementation since actors G4, docs/DECISIONS.md "The actor kit"):
+## enemies; one implementation since actors G4, docs/DECISIONS.md "The actor kit").
 ##
-## - `dash`: goes the way the intent walks (the way the actor aims when it stands), as far and as
-##   long as the card asks (`to` is measured from the staff tip); it turns toward a target as it
-##   goes when the card homes (`Spells.dashes().move_homing`).
-## - `teleport`: jumps at once along the card's line (`to` measured from the staff tip), stopping
-##   TELEPORT_CLEARANCE short of the first wall, then backing off until the body (`body_radius`)
-##   is clear of walls and inside the room.
-## - `hook` and `swap`: pull the actor to the world point `to` over the time asked.
-## - `recoil`: a push back. The recoils asked in one step are added up first (so `mirror ·
-##   recoil` cancels) and become one push over the longest time asked, which then runs on its
-##   own time (any number at once: the list of running pushes grows when full).
-##
-## A dash, teleport, hook or swap replaces the move in progress, which is answered where the
-## actor is. A dash, hook or teleport answers `caster_move_finished` where it ended (a swap sends
-## nothing: its blast went off at the target): a teleport at once, the others the step after
-## their last, once the body has walked it (the last step is shortened, so a move goes exactly
-## its distance). A card's move is the actor's own when the card's tag names the actor's caster
+## Every move adds up (rules R4 F1, as shots' moves do, `Projectiles.move_shot`): each request
+## carries its own `move` (the way and the distance) and its time, and runs on its own, so two
+## dashes cast close together stack, two pulls add and a dash and its recoil add. A `teleport` is
+## over at once: the actor jumps by its `move`, stopping TELEPORT_CLEARANCE short of the first
+## wall, then backing off until the body (`body_radius`) is clear of walls and inside the room.
+## Every other move (`dash`, `pull`, `swap`, `recoil`) is a velocity for its time; a `dash` turns
+## toward a target as it goes when its card homes (`Spells.dashes().move_homing`). Each move answers
+## `caster_move_finished` where it ended: a teleport at once, the others the step after their
+## last, once the body has walked it (the last step is shortened, so a move goes exactly its
+## distance). A card's move is the actor's own when the card's tag names the actor's caster
 ## number (`Actor.caster_number`, its actor id), which is also the event's `caster`.
 ##
-## Statuses (`Combat.pace`: chill slows, freeze stops) scale walking and dashing (the actor's
-## own legs), not a hook, a swap or a recoil (the spell moves it). Combat's push on the actor
+## A dash is the actor's own legs: it walks instead of the intent while it runs, and statuses
+## (`Combat.pace`: chill slows, freeze stops) scale it as they scale walking. The other moves are
+## done to the actor (the spell moves it): added on top, not slowed. Combat's push on the actor
 ## (`Combat.consume_knockback`) is added every step. A swap card that names the actor as its
-## target (`target_move_requested`) puts it there at once. While the actor is down it stands: a
-## move in progress ends unanswered, the recoil is dropped and new requests are ignored.
+## target (`target_move_requested`) puts it there at once. While the actor is down it stands: its
+## moves end unanswered and new requests are ignored.
 ##
-## Nothing here allocates in `step` (but the recoil list growing when full).
+## Nothing here allocates in `step` (but the list of moves growing when full).
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
@@ -37,9 +32,9 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## steps of TELEPORT_BACKOFF until the body is clear.
 const TELEPORT_CLEARANCE: float = 8.0
 const TELEPORT_BACKOFF: float = 4.0
-## Room for this many running recoil pushes at first; the list doubles when it is full.
-const RECOIL_ROOM: int = 8
-## The shortest time a move or push takes.
+## Room for this many running moves at first; the list doubles when it is full.
+const MOVE_ROOM: int = 8
+## The shortest time a move takes.
 const MIN_SECONDS: float = 0.01
 
 ## Walking speed in pixels per second at full tilt (an enemy's from `EnemyBase.move_speed`).
@@ -47,29 +42,20 @@ const MIN_SECONDS: float = 0.01
 ## The body's radius for a teleport's landing (about the hurt circle's).
 @export var body_radius: float = 6.0
 
-## The move in progress: &"dash", &"hook", &"swap", or &"" for none. Its seconds left, its way
-## (unit length), speed and the tag of its card.
-var _mode: StringName = &""
-var _left: float = 0.0
-var _direction: Vector2 = Vector2.ZERO
-var _speed: float = 0.0
-## The homing of the dash in progress (`Spells.dashes().move_homing`), or null.
-var _homing: Homing = null
-var _tag: int = 0
-## True when the move's time ran out in the last step: the next step answers it.
-var _done: bool = false
-## Recoil asked for since the last step (pixels, the longest time asked), and the pushes being
-## applied, each with its own velocity and seconds left (the first `_recoil_count` count).
-var _recoil_pending: Vector2 = Vector2.ZERO
-var _recoil_pending_seconds: float = 0.0
-var _recoil_velocities: PackedVector2Array = PackedVector2Array()
-var _recoil_lefts: PackedFloat32Array = PackedFloat32Array()
-var _recoil_count: int = 0
+## The moves running (the first `_count`): each one's mode, velocity, seconds left (0 or less:
+## done, answered next step), its card's tag and its homing (a dash's, or null).
+var _modes: Array[StringName] = []
+var _velocities: PackedVector2Array = PackedVector2Array()
+var _lefts: PackedFloat32Array = PackedFloat32Array()
+var _tags: PackedInt64Array = PackedInt64Array()
+var _homings: Array[Homing] = []
+var _count: int = 0
+## What the moves added in the last step (pixels per second), for the looks.
+var _moved: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
-	_recoil_velocities.resize(RECOIL_ROOM)
-	_recoil_lefts.resize(RECOIL_ROOM)
+	_grow(MOVE_ROOM)
 
 
 func attach() -> void:
@@ -90,91 +76,84 @@ func detach() -> void:
 		actor.events.target_move_requested.disconnect(_on_target_move_requested)
 
 
-## Set the actor's `velocity` for this step: the walk or the move in progress, the recoil
-## pushes and Combat's push. The actor moves the body afterwards (`move_and_slide`).
+## Set the actor's `velocity` for this step: the walk (or its dashes), every other move and
+## Combat's push. The actor moves the body afterwards (`move_and_slide`).
 func step(delta: float) -> void:
 	if actor.is_down():
-		_cancel()
+		_count = 0
+		_homings.fill(null)
+		_moved = Vector2.ZERO
 		actor.velocity = Vector2.ZERO
 		return
-	if _done:
-		# The last step of the move has been walked (the body moved after the last step).
-		_finish()
+	# The moves whose last step has been walked (the body moved after it) say where they ended.
+	_answer()
 	# Combat's pace (chill slows, freeze stops) and its push on the actor, asked by its own id.
 	var pace: float = actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
-	var velocity: Vector2 = Vector2.ZERO
-	if _left > 0.0:
-		var dash: bool = _mode == &"dash"
-		if dash and _homing != null:
+	var legs: bool = false
+	_moved = Vector2.ZERO
+	for at in _count:
+		var velocity: Vector2 = _velocities[at]
+		if _homings[at] != null:
 			# A homing dash turns toward a target as it goes, as a homing shot does.
-			_direction = _homing.steer(actor.projectiles, _caster_number(), actor.global_position, _direction, delta)
+			velocity = _homings[at].steer(actor.projectiles, _caster_number(), actor.global_position, velocity, delta)
+			_velocities[at] = velocity
 		# The last step is shortened, so a move goes exactly its distance.
-		velocity = _direction * _speed * minf(delta, _left) / maxf(delta, 0.0001)
-		if dash:
-			velocity *= pace
-		_left = maxf(_left - delta, 0.0)
-		_done = _left <= 0.0
-	else:
-		velocity = actor.intent.move.limit_length(1.0) * speed * pace
-	if _recoil_count > 0 or _recoil_pending_seconds > 0.0:
-		# Only with a push asked or running (a step without one adds nothing).
-		velocity += _recoil_step(delta)
+		var share: Vector2 = velocity * minf(delta, _lefts[at]) / maxf(delta, 0.0001)
+		if _modes[at] == &"dash":
+			legs = true
+			share *= pace
+		_moved += share
+		_lefts[at] -= delta
+	var velocity: Vector2 = _moved
+	if not legs:
+		velocity += actor.intent.move.limit_length(1.0) * speed * pace
 	if actor.combat != null:
 		velocity += actor.combat.own_knockback(actor, actor.id, delta)
 	actor.velocity = velocity
 
 
-## True while a dash, hook or swap moves the actor.
+## True while a move carries the actor.
 func is_moving() -> bool:
-	return _left > 0.0
+	return _count > 0
 
 
-## The move in progress (&"dash", &"hook", &"swap"), or &"".
-func move_mode() -> StringName:
-	return _mode if _left > 0.0 else &""
-
-
-## The way the move in progress goes (unit length), for the looks.
+## The way the moves went in the last step (unit length, or zero when they cancel), for the looks.
 func move_direction() -> Vector2:
-	return _direction
+	return _moved.normalized()
 
 
-## End the move in progress now and answer it where the actor is (an overlay opened).
+## End every move now and answer each where the actor is (an overlay opened).
 func stop() -> void:
-	if _left > 0.0 or _done:
-		_finish()
+	for at in _count:
+		_lefts[at] = 0.0
+	_answer()
 
 
-## A card of this actor asked to move it (see the class doc).
-func _on_caster_move_requested(_player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-	if not _owns(tag) or actor.is_down() or not to.is_finite():
+## A card of this actor asked to move it by `move` over `seconds` (see the class doc).
+func _on_caster_move_requested(_player: int, mode: StringName, move: Vector2, seconds: float, tag: int) -> void:
+	if not _owns(tag) or actor.is_down() or not move.is_finite():
 		return
-	if mode == &"recoil":
-		_recoil_pending += to - actor.muzzle_position()
-		_recoil_pending_seconds = maxf(_recoil_pending_seconds, maxf(seconds, MIN_SECONDS))
-		return
-	if mode != &"dash" and mode != &"teleport" and mode != &"hook" and mode != &"swap":
-		return
-	if _left > 0.0 or _done:
-		_finish()
 	if mode == &"teleport":
-		_teleport(to, tag)
+		_teleport(move, tag)
 		return
+	if _count == _lefts.size():
+		# Full: grow (rare; the steady state allocates nothing).
+		_grow(_count * 2)
 	var time: float = maxf(seconds, MIN_SECONDS)
-	_mode = mode
-	_homing = null
-	if mode == &"dash":
-		var walk: Vector2 = actor.intent.move
-		_direction = walk.normalized() if walk != Vector2.ZERO else actor.aim
-		_speed = (to - actor.muzzle_position()).length() / time
-		if actor.spells != null:
-			_homing = actor.spells.dashes().move_homing(_caster_number())
-	else:
-		var pull: Vector2 = to - actor.global_position
-		_direction = pull.normalized()
-		_speed = pull.length() / time
-	_left = time
-	_tag = tag
+	_modes[_count] = mode
+	_velocities[_count] = move / time
+	_lefts[_count] = time
+	_tags[_count] = tag
+	_homings[_count] = actor.spells.dashes().move_homing(_caster_number()) if mode == &"dash" and actor.spells != null else null
+	_count += 1
+
+
+func _grow(size: int) -> void:
+	_modes.resize(size)
+	_velocities.resize(size)
+	_lefts.resize(size)
+	_tags.resize(size)
+	_homings.resize(size)
 
 
 ## True when `tag` is a spell of this actor's caster number.
@@ -187,12 +166,12 @@ func _caster_number() -> int:
 	return actor.caster_number()
 
 
-## Jump to where a teleport card aimed (`to` is measured from the staff tip), stopping short of
-## the first wall, then backing off along the path until the whole body is clear of walls and
-## inside the room (or staying put), and say where the actor landed.
-func _teleport(to: Vector2, tag: int) -> void:
+## Jump by `move` at once, stopping short of the first wall, then backing off along the path
+## until the whole body is clear of walls and inside the room (or staying put), and say where the
+## actor landed.
+func _teleport(move: Vector2, tag: int) -> void:
 	var start: Vector2 = actor.global_position
-	var goal: Vector2 = start + (to - actor.muzzle_position())
+	var goal: Vector2 = start + move
 	if actor.projectiles != null:
 		var reached: Vector2 = actor.projectiles.clip_to_walls(start, goal)
 		if reached != goal:
@@ -205,58 +184,26 @@ func _teleport(to: Vector2, tag: int) -> void:
 		actor.events.caster_move_finished.emit(_caster_number(), &"teleport", goal, tag)
 
 
-## The move ended: say where, so its card can go off there (blast, a trigger). A swap sends
-## nothing (its blast goes off at the target).
-func _finish() -> void:
-	var mode: StringName = _mode
-	_left = 0.0
-	_done = false
-	_mode = &""
-	_homing = null
-	if actor.events != null and mode != &"swap" and mode != &"":
-		actor.events.caster_move_finished.emit(_caster_number(), mode, actor.global_position, _tag)
-
-
-## The move and the pushes end unanswered (the actor went down).
-func _cancel() -> void:
-	_left = 0.0
-	_done = false
-	_mode = &""
-	_homing = null
-	_recoil_pending = Vector2.ZERO
-	_recoil_pending_seconds = 0.0
-	_recoil_count = 0
-
-
-## The recoil asked for since the last step becomes a push of that distance over the time asked,
-## which ends on its own time; returns the velocity of all pushes to add now (a push's last step
-## is shortened, so each moves exactly its distance).
-func _recoil_step(delta: float) -> Vector2:
-	if _recoil_pending != Vector2.ZERO:
-		if _recoil_count == _recoil_velocities.size():
-			# Full: grow (rare; the steady state allocates nothing).
-			_recoil_velocities.resize(_recoil_count * 2)
-			_recoil_lefts.resize(_recoil_count * 2)
-		_recoil_velocities[_recoil_count] = _recoil_pending / _recoil_pending_seconds
-		_recoil_lefts[_recoil_count] = _recoil_pending_seconds
-		_recoil_count += 1
-	_recoil_pending = Vector2.ZERO
-	_recoil_pending_seconds = 0.0
-	var total: Vector2 = Vector2.ZERO
+## Answers the moves that are done where the actor is, so their cards go off there (blast, a
+## trigger), and takes them off the list. A move asked while answering (a payload that moves
+## again) is added at the end and runs.
+func _answer() -> void:
 	var at: int = 0
-	while at < _recoil_count:
-		var left: float = _recoil_lefts[at]
-		total += _recoil_velocities[at] * minf(left, delta) / maxf(delta, 0.0001)
-		left -= delta
-		if left <= 0.0:
-			# Done: the last push takes its place.
-			_recoil_count -= 1
-			_recoil_velocities[at] = _recoil_velocities[_recoil_count]
-			_recoil_lefts[at] = _recoil_lefts[_recoil_count]
+	while at < _count:
+		if _lefts[at] > 0.0:
+			at += 1
 			continue
-		_recoil_lefts[at] = left
-		at += 1
-	return total
+		var mode: StringName = _modes[at]
+		var tag: int = _tags[at]
+		_count -= 1
+		_modes[at] = _modes[_count]
+		_velocities[at] = _velocities[_count]
+		_lefts[at] = _lefts[_count]
+		_tags[at] = _tags[_count]
+		_homings[at] = _homings[_count]
+		_homings[_count] = null
+		if actor.events != null:
+			actor.events.caster_move_finished.emit(_caster_number(), mode, actor.global_position, tag)
 
 
 ## A swap card moved this actor (it was the target): it is there at once, its move and aim kept.

@@ -67,25 +67,31 @@ enum Behaviour {
 	## that touches shots (a shot, a swing's sweep, a beam's line). It turns as many as touch it, goes
 	## before a shield (which keeps its charge) and sets off `on block`. Strength unused (1).
 	DEFLECT,
+	## Whatever the carrier hits, its caster is pulled to, over `SpellLimits.PULL_SECONDS` (rules R4
+	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
+	## cast it. Several hits make several pulls, and they add. Strength unused (1).
+	PULL,
 }
 
 ## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
 ## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these; "or_cards":
-## a card with one of these behaviours on the carrier does instead (a blast's area hit carries
-## heavy's knockback and slam). A behaviour not here works on every carrier (numbers, blast, echo,
-## recoil). A new behaviour adds its line here, never per carrier; the compiler checks it every
+## a card with one of these behaviours on the carrier does instead (what a blast strikes is the
+## carrier's hit, rules R4 F2). A behaviour not here works on every carrier (numbers, blast, echo,
+## recoil, mirror: a move and its mirror add up to none, rules R4 F1). A new behaviour adds its line here, never per carrier; the compiler checks it every
 ## time a staff is built (`Carrier.works`).
 const NEEDS: Dictionary = {
 	Behaviour.HOMING: {"any": CarrierTraits.STEERS},
-	Behaviour.CHAIN: {"any": CarrierTraits.HITS},
-	Behaviour.SIPHON: {"any": CarrierTraits.HITS},
-	Behaviour.POSSESS: {"any": CarrierTraits.HITS},
+	# What a blast strikes is the carrier's hit (rules R4 F2), so these work with one too.
+	Behaviour.CHAIN: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.SIPHON: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.POSSESS: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
 	Behaviour.HEAVY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
-	Behaviour.RELAY: {"any": CarrierTraits.HITS},
+	Behaviour.RELAY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
+	Behaviour.PULL: {"any": CarrierTraits.HITS},
 	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS},
 	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS},
 	Behaviour.HOLD: {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER},
-	Behaviour.MIRROR: {"not": CarrierTraits.MOVES_CASTER},
 	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.RETURN: {"any": CarrierTraits.FLIES},

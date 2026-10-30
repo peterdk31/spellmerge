@@ -59,7 +59,7 @@ func before_each() -> void:
 		_moves.append([caster, mode, to, seconds, tag]))
 	_bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_barriers.append([caster, charges, seconds, tag]))
-	# A dash of 48 px over 0.2 s, a teleport of 100 px, a bolt of 300 px over 1 s, a hook and a swap.
+	# A dash of 48 px over 0.2 s, a teleport of 100 px, a bolt of 300 px over 1 s, pull and a swap.
 	var dash: FormBase = _form(&"dash", 240.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 48.0
@@ -67,8 +67,7 @@ func before_each() -> void:
 	teleport.carrier = &"teleport"
 	teleport.ray_length = 100.0
 	_form(&"bolt", 300.0, 1.0)
-	var hook: FormBase = _form(&"hook", 300.0, 1.0)
-	hook.carrier = &"hook"
+	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var swap: FormBase = _form(&"swap", 300.0, 1.0)
 	swap.carrier = &"swap"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
@@ -208,17 +207,26 @@ func test_pierce_is_wasted_on_a_dash_that_hits_everything_it_passes() -> void:
 
 # --- Recoil adds to a move ----------------------------------------------------------------------
 
+## The moves asked, added up.
+func _moved() -> Vector2:
+	var sum: Vector2 = Vector2.ZERO
+	for move: Array in _moves:
+		sum += move[2]
+	return sum
+
+
 func test_recoil_shortens_a_teleport() -> void:
+	# Rules R4 F1: every move adds up, so the recoil is a push of its own beside the blink.
 	_build([&"recoil", &"teleport"])
 	_cast()
-	check_equal(_moves.size(), 1, "one move, no separate push")
-	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].is_equal_approx(Vector2(80.0, 0.0)), "100 px less 20: %s" % [_moves])
+	check_equal(_moves.size(), 2, "the blink and its push back")
+	check(_moved().is_equal_approx(Vector2(80.0, 0.0)), "100 px less 20: %s" % [_moves])
 
 
 func test_a_recoil_longer_than_the_teleport_sends_it_backwards() -> void:
 	_build([&"kick", &"teleport"])
 	_cast()
-	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(-30.0, 0.0)), "100 px less 130 is 30 back: %s" % [_moves])
+	check(_moved().is_equal_approx(Vector2(-30.0, 0.0)), "100 px less 130 is 30 back: %s" % [_moves])
 
 
 func test_recoil_on_a_dash_is_a_push_that_runs_with_it() -> void:
@@ -228,6 +236,38 @@ func test_recoil_on_a_dash_is_a_push_that_runs_with_it() -> void:
 	for move: Array in _moves:
 		modes.append(move[1])
 	check(modes.has(&"dash") and modes.has(&"recoil"), "the dash and its push back, which the body adds up: %s" % [modes])
+
+
+# --- A wizard's own dash goes the way it walks (owner, R4 F1 option b) --------------------------
+
+func test_a_dash_the_wizard_casts_goes_the_way_it_walks() -> void:
+	_build([&"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2(0.0, -3.0))
+	check(_moves.size() == 1 and _moves[0][1] == &"dash" and _moves[0][2].is_equal_approx(Vector2(0.0, -48.0)), "the walk's way, the card's distance: %s" % [_moves])
+
+
+func test_a_dash_the_wizard_casts_standing_goes_along_the_aim() -> void:
+	_build([&"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0)
+	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(0.0, 48.0)), "no walk: along the aim: %s" % [_moves])
+
+
+func test_a_mirrored_dash_of_the_wizard_goes_the_walk_way_and_back() -> void:
+	# Owner, R4 F1: mirror fires the carrier again with its way reversed, whatever that way is; a
+	# wizard's own dash takes the walk's way, so its mirror goes back against the walk. Both run.
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_build([&"mirror", &"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2.UP)
+	check(_moves.size() == 2 and _moves[0][2].is_equal_approx(Vector2(0.0, -48.0)) and _moves[1][2].is_equal_approx(Vector2(0.0, 48.0)), "one dash up, the walk's way, and one down: %s" % [_moves])
+	check(_moved().is_zero_approx(), "they add up to nothing: %s" % [_moves])
+
+
+func test_a_mirrored_teleport_blinks_out_and_back() -> void:
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_build([&"mirror", &"teleport"])
+	_cast()
+	check(_moves.size() == 2 and _moves[0][1] == &"teleport" and _moves[1][1] == &"teleport", "two blinks: %s" % [_moves])
+	check(_moved().is_zero_approx(), "out and back: %s" % [_moves])
 
 
 # --- One shield rule for every move -------------------------------------------------------------
@@ -264,13 +304,25 @@ func test_a_teleport_cast_by_a_point_blinks_the_wizard_to_it() -> void:
 	# The bolt flies 300 px and ends; its teleport is cast by that point.
 	_tick(65)
 	check_equal(_moves.size(), 1, "the wizard is asked to move")
-	# Measured from its staff tip (10, 0), as every teleport: the body goes the 300 px to the point.
-	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].distance_to(Vector2(310.0, 0.0)) < 6.0, "to the point: %s" % [_moves])
+	# The way from its body (0, 0) to the point.
+	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].distance_to(Vector2(300.0, 0.0)) < 6.0, "to the point: %s" % [_moves])
 
 
-func test_a_hook_cast_by_a_point_pulls_the_wizard() -> void:
-	_build([&"on_expire", &"bolt", &"hook"])
+func test_a_dash_cast_by_a_point_dashes_the_wizard_to_it() -> void:
+	# Rules R4 F1 (decision 14, left open in R4c): the request carries its way, so a point that
+	# cannot move sends its wizard dashing toward it, over the dash's time.
+	_mgr.set_anchor(0, Vector2(0.0, 40.0))
+	_build([&"on_expire", &"bolt", &"dash"])
+	_cast()
+	_tick(65)
+	check(_moves.size() == 1 and _moves[0][1] == &"dash", "the wizard dashes: %s" % [_moves])
+	check(_moves.size() == 1 and _moves[0][2].distance_to(Vector2(300.0, -40.0)) < 6.0, "from its body to the point: %s" % [_moves])
+	check(_moves.size() == 1 and is_equal_approx(_moves[0][3], 0.2), "over the dash's time: %s" % [_moves])
+
+
+func test_a_pull_cast_by_a_point_pulls_the_wizard() -> void:
+	_build([&"on_expire", &"bolt", &"pull", &"bolt"])
 	_target(Vector2(360.0, 0.0))
 	_cast()
 	_tick(90)
-	check(_moves.size() == 1 and _moves[0][1] == &"hook" and _moves[0][2].x > 340.0, "the wizard is pulled to the hit: %s" % [_moves])
+	check(_moves.size() == 1 and _moves[0][1] == &"pull" and _moves[0][2].x > 340.0, "the wizard is pulled to the hit: %s" % [_moves])

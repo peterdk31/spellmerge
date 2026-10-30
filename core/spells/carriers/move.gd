@@ -5,8 +5,9 @@ extends Carrier
 ## arrives sooner, not farther. The body is asked through its owner (`caster_move_requested`: a
 ## wizard's player picks a dash's way, the way it walks, and answers where it stops, staffs A6a); a
 ## shot that cast it is moved along `direction` itself, and its end point comes when the move is
-## over (`CasterMoves.track`). A point cannot move: a carrier that `moves_from_a_point` blinks the
-## wizard to it instead (rules R4c); any other, cast by a point, does nothing. Its `shield` guards
+## over (`CasterMoves.track`). A dash the wizard casts itself takes the way its body walks in place
+## of the aim (`Spells.cast_staff`'s `walk`), so a mirrored one goes back the other way. A point
+## cannot move, so a move cast by one moves the wizard to it (rules R4c, F1). Its `shield` guards
 ## what it moves (`CasterMoves.shield`). The subclasses say what is their own: the way and distance
 ## (`_aim_move`), how long it takes (`_move_seconds`) and what starts with it (`_move_body`,
 ## `_moved_shot`). A move's way and distance are its launch's own: what it emits may launch another
@@ -18,14 +19,17 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var way: Vector2 = direction
 	var shot: int = rt._caster_shot()
 	var wizard: bool = rt._caster == SpellRuntime.CASTER_WIZARD
+	if wizard and _walks():
+		# Turned as far as the walk is off the aim (staffs A6a), so a mirrored one goes the other way.
+		way = way.rotated(rt._walk_turn[actor])
 	if not wizard and shot < 0:
 		var anchor: Vector2 = rt.projectiles.get_anchor(actor)
-		if not _moves_from_a_point() or not anchor.is_finite() or not rt._aim_origin[actor].is_finite() or anchor.is_equal_approx(origin):
+		if not anchor.is_finite() or anchor.is_equal_approx(origin):
 			return 0
-		# Its wizard blinks to the point: from its staff tip, as far as its body is from the point.
+		# Its wizard goes to the point, from where its body is.
 		way = anchor.direction_to(origin)
 		distance = anchor.distance_to(origin)
-		origin = rt._aim_origin[actor]
+		origin = anchor
 		wizard = true
 	var aimed: Vector3 = _aim_move(spell, tag, actor, origin, way, distance)
 	way = Vector2(aimed.x, aimed.y)
@@ -48,8 +52,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	return 1
 
 
-## True when, cast by a point, it moves the wizard to that point (a teleport).
-func _moves_from_a_point() -> bool:
+## True when the wizard's own cast of it goes the way its body walks (a dash).
+func _walks() -> bool:
 	return false
 
 
@@ -64,7 +68,8 @@ func _move_seconds(_spell: CompiledSpell) -> float:
 	return 0.0
 
 
-## Asks `actor`'s body to make the move along `way` (`caster_move_requested`), and starts what goes with it.
+## Asks `actor`'s body to make the move `offset` along `way` (`caster_move_requested`), and starts
+## what goes with it.
 func _move_body(_spell: CompiledSpell, _tag: int, _actor: int, _origin: Vector2, _way: Vector2, _offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
 	pass
 

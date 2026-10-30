@@ -41,7 +41,7 @@ const CARRIES_PAYLOAD: int = 1 << 16
 ## The staff keeps working through its `lifetime` (a beam, a rain, a dash): its staff animation's
 ## strike lasts that long.
 const HOLDS_STAFF: int = 1 << 17
-## Does it travel along a path through the world (a bolt, a hook, a swap, an orbit)? Linger, sticky
+## Does it travel along a path through the world (a bolt, a swap, an orbit)? Linger, sticky
 ## and spiral change that path.
 const MOVES: int = 1 << 18
 ## Is it a line that is there at once (a beam)? It turns at walls, waves, grows and pulls as a line.

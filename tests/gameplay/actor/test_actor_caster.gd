@@ -166,7 +166,7 @@ func test_a_dash_card_dashes_the_actor_and_its_blast_goes_off_where_it_ends() ->
 	var finished: Array = []
 	var areas: Array = []
 	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: finished.append([player, mode, at, tag]))
-	_world.bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int, _shot: int) -> void: areas.append([player, at, tag]))
+	_world.bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: areas.append([player, at, radius]))
 	var imp: Actor = _creature([[&"blast", &"dash"]])
 	(imp.controller as Fixture.Scripted).aim = Vector2.RIGHT
 	_world.run(1)
@@ -179,6 +179,39 @@ func test_a_dash_card_dashes_the_actor_and_its_blast_goes_off_where_it_ends() ->
 	check(is_equal_approx(imp.position.x, 60.0), "the card's distance along its aim (%.2f)" % imp.position.x)
 	check(finished.size() == 1 and finished[0][0] == imp.id and finished[0][1] == &"dash" and finished[0][3] == tag, "it says where it ended, under its actor id: %s" % [finished])
 	check(areas.size() == 1 and (areas[0][1] as Vector2).is_equal_approx(imp.position), "the card's blast goes off there")
+
+
+func test_a_dash_the_actor_casts_goes_the_way_it_walks_not_the_way_it_aims() -> void:
+	# Owner, R4 F1 option (b): a dash its own body casts goes the way it walks (staffs A6a);
+	# with no walk, along the aim.
+	_world = Fixture.new(root, _move_cards())
+	var walker: Actor = _creature([[&"dash"]])
+	(walker.controller as Fixture.Scripted).aim = Vector2.RIGHT
+	(walker.controller as Fixture.Scripted).move = Vector2.UP
+	var stander: Actor = _creature([[&"dash"]], Vector2(0.0, 200.0))
+	(stander.controller as Fixture.Scripted).aim = Vector2.RIGHT
+	_world.run(1)
+	_press(walker)
+	_press(stander)
+	var from: Vector2 = walker.position
+	_world.run(9)
+	check(absf(walker.position.x) < 0.01 and from.y - walker.position.y > 59.0, "the walker dashes up, the way it walks (%s)" % walker.position)
+	check(is_equal_approx(stander.position.x, 60.0), "the stander dashes along its aim (%s)" % stander.position)
+
+
+func test_a_mirrored_dash_goes_the_walk_way_and_back_and_ends_where_it_started() -> void:
+	_world = Fixture.new(root, _move_cards())
+	var walker: Actor = _creature([[&"mirror", &"dash"]])
+	(walker.controller as Fixture.Scripted).aim = Vector2.RIGHT
+	_world.run(1)
+	var from: Vector2 = walker.position
+	(walker.controller as Fixture.Scripted).move = Vector2.UP
+	_press(walker)
+	_world.run(1)
+	(walker.controller as Fixture.Scripted).move = Vector2.ZERO
+	_world.run(9)
+	check(absf(walker.position.x - from.x) < 0.01, "nothing along the aim (%s)" % walker.position)
+	check(absf(walker.position.y - from.y) < 8.0, "the two dashes cancel, give or take the step it walked (%s from %s)" % [walker.position, from])
 
 
 func test_a_teleport_card_jumps_and_a_recoil_card_pushes_back() -> void:
@@ -221,6 +254,10 @@ func _move_cards() -> Fixture.FakeRegistry:
 	recoil.behaviour = ModifierBase.Behaviour.RECOIL
 	recoil.behaviour_strength = 30.0
 	_put(fake, recoil, &"recoil")
+	var mirror := ModifierBase.new()
+	mirror.behaviour = ModifierBase.Behaviour.MIRROR
+	mirror.behaviour_strength = 1.0
+	_put(fake, mirror, &"mirror")
 	var blast := ModifierBase.new()
 	blast.behaviour = ModifierBase.Behaviour.BLAST
 	blast.behaviour_strength = 20.0

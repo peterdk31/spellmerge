@@ -12,10 +12,9 @@ const E := TriggerBase.Event
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the carriers it can
 ## fire on. Every carrier not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
-const SHOTS: Array = [&"bolt", &"rune", &"orbit", &"hook", &"swap", &"wall"]
+const SHOTS: Array = [&"bolt", &"rune", &"orbit", &"swap", &"wall"]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [&"slam", &"teleport"]
-const HITTERS: Array = [&"bolt", &"rune", &"orbit", &"hook", &"swap", &"wall", &"beam", &"swing", &"slam", &"rain", &"dash", &"teleport"]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -62,15 +61,13 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 func _expected(event: int, carrier: StringName) -> bool:
 	match event:
-		E.HIT:
-			return HITTERS.has(carrier)
 		E.TIMER, E.HURT:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
 			return carrier != &"rain" and carrier != &"familiar"
 		E.WALL:
-			return [&"bolt", &"hook", &"swap", &"beam"].has(carrier)
+			return [&"bolt", &"swap", &"beam"].has(carrier)
 	return true
 
 
@@ -133,7 +130,7 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"bolt"], [&"on_timer", &"bolt"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
-		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"hook"],
+		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"],
 		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
 		[&"on_timer", &"beam"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"beam"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
@@ -154,7 +151,9 @@ func test_the_cards_an_event_needs() -> void:
 	check(_compile([&"on_block", &"shield", &"bolt", &"bolt"]).wasted.is_empty(), "with a shield it fires")
 	check(_compile([&"on_block", &"deflect", &"swing", &"bolt"]).wasted.is_empty(), "with a deflect on a swing it fires")
 	check(_compile([&"on_block", &"shield", &"dash", &"bolt"]).wasted.is_empty(), "a dash's barrier blocks")
-	# A kill or reaction of a carrier that hits nothing itself comes from its blast.
+	# A hit, kill or reaction of a carrier that hits nothing itself comes from its blast (rules R4 F2).
+	check(_compile([&"on_hit", &"blast", &"decoy", &"bolt"]).wasted.is_empty(), "a decoy with a blast hits")
+	check(_compile([&"on_hit", &"decoy", &"bolt", &"bolt"]).wasted.has(0), "without one it does not")
 	check(_compile([&"on_kill", &"rain", &"bolt", &"bolt"]).wasted.is_empty(), "a rain kills by its own strike")
 	check(_compile([&"on_kill", &"blast", &"decoy", &"bolt"]).wasted.is_empty(), "a decoy with a blast can kill")
 	check(_compile([&"on_kill", &"blast", &"dash", &"bolt"]).wasted.is_empty(), "so can a dash with a blast")

@@ -1,0 +1,11 @@
+{
+	"id": "shield_pull",
+	"name": "Shielded pull",
+	"does": "A shielded pull bolt pulls its caster to the imp it hits and puts a shield on them, which stops the enemy shot flying at the caster.",
+	"casts": [{"staff": 0, "cards": ["shield", "pull", "bolt"]}],
+	"imps": [[100, 0]],
+	"guard": true,
+	"foes": [[90, 90]],
+	"seconds": 2.5,
+	"checks": [{"kind": "caster_moved", "mode": "pull"}, {"kind": "blocked", "min": 1}]
+}

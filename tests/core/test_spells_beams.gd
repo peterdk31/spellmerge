@@ -29,7 +29,7 @@ var _mgr: ManagerScript
 var _bus: EventsScript
 ## Every projectile_hit as [player, target, position, tag].
 var _hits: Array = []
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 
 
@@ -47,8 +47,7 @@ func before_each() -> void:
 	_areas.clear()
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
-		_areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0

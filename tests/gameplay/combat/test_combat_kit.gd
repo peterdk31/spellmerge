@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The combat kit of the staffs (B3, docs/milestones/M2-staffs.md, "Self-harm and hits"): self-harm,
-## hit kinds, area hits, several elements per hit, statuses and barriers on wizards, heal hits,
+## hit kinds, several elements per hit, statuses and barriers on wizards, heal hits,
 ## pulls, the heavy slam, and the events cards listen to (`kill_landed`, `reaction_landed`,
-## `actor_hurt`, `shield_blocked`). Hits arrive as `projectile_hit` and `area_hit_requested` on a
+## `actor_hurt`, `shield_blocked`). Hits arrive as `projectile_hit` on a
 ## test bus, with hand-made hit profiles; time moves by `Combat.step` with a fixed delta. Hits name
 ## actor ids (actors G3b): the test's actor table seats the wizards 0-3 at the ids 0-3 and opens
 ## one unseated enemy actor for the enemies' spells.
@@ -175,52 +175,6 @@ func test_a_burn_that_kills_is_kind_status_and_reaction_damage_is_kind_reaction(
 		kinds.append(row[3] as StringName)
 	check_equal(kinds[0], &"shot", "the shot first")
 	check(&"reaction" in kinds, "the thaw's burst is kind reaction")
-
-
-# --- Area hits ---
-
-
-func test_an_area_hit_reaches_enemies_the_caster_and_a_teammate() -> void:
-	var caster := _wizard(0, Vector2.ZERO)
-	var mate := _wizard(1, Vector2(10.0, 0.0))
-	var near := _enemy(Vector2(15.0, 0.0))
-	var far := _enemy(Vector2(100.0, 0.0))
-	_projectiles.step(STEP)
-	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(_profile(5)), -1)
-	check_equal(caster.health.health, caster.health.max_health - 5, "the caster is inside their own blast")
-	check_equal(mate.health.health, mate.health.max_health - 5, "and so is the teammate: friendly fire is always on (G3c)")
-	check_equal(_combat.health_of(near), 95, "the enemy in the circle was hit")
-	check_equal(_combat.health_of(far), 100, "the enemy outside was not")
-	for row: Array in _landed:
-		check_equal(row[3], &"burst", "an area hit is kind burst")
-
-
-func test_an_area_hit_centred_on_the_caster_hits_at_once_and_pushes_nobody() -> void:
-	var caster := _wizard(0, Vector2(50.0, 50.0))
-	var profile := _profile(3)
-	profile.knockback = 100.0
-	_bus.area_hit_requested.emit(0, Vector2(50.0, 50.0), 12.0, _tag(profile), -1)
-	check_equal(caster.health.health, caster.health.max_health - 3, "hit at once")
-	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2.ZERO, "centred: no direction to push")
-
-
-func test_an_area_hit_without_a_profile_does_nothing() -> void:
-	var caster := _wizard(0, Vector2.ZERO)
-	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, SpellTag.make(0, 0, 99, 1), -1)
-	check_equal(caster.health.health, caster.health.max_health, "unknown tag, no hit")
-
-
-func test_area_hits_started_by_a_kill_are_cut_at_the_depth_limit() -> void:
-	var caster := _wizard(0, Vector2.ZERO)
-	var tag: int = _tag(_profile(1))
-	var count: Array = [0]
-	_bus.hit_landed.connect(func(_p: int, _t: Node, _a: int, _at: Vector2, _k: StringName, _shot: int) -> void:
-		count[0] += 1
-		if count[0] < 100:
-			_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, tag, -1))
-	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, tag, -1)
-	check(count[0] <= CombatScript.AREA_DEPTH + 1, "a chain of area hits stops at AREA_DEPTH")
-	check(caster.health.health > 0, "and the game goes on")
 
 
 # --- Several elements ---
@@ -528,13 +482,13 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 	check(_healed.is_empty(), "a downed wizard is not healed")
 
 
-func test_a_heal_area_reaches_teammates() -> void:
+func test_a_heal_hit_heals_a_teammate() -> void:
 	_wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))
 	mate.health.take(20)
 	var profile := _profile(1)
 	profile.heal = 8
-	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(profile), -1)
+	_bus.projectile_hit.emit(0, mate, Vector2.ZERO, _tag(profile), -1)
 	check_equal(mate.health.health, mate.health.max_health - 12, "the teammate was healed")
 
 
@@ -685,7 +639,7 @@ func test_the_note_tells_who_downed_the_wizard() -> void:
 	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(_combat.downed_note_of(0), "downed by your own Twice-Thawing Blast", "their own spell, by name")
 	var plain := _wizard(2, Vector2(900.0, 0.0))
-	_bus.area_hit_requested.emit(2, Vector2(900.0, 0.0), 20.0, _tag(_profile(1000, &"burst")), -1)
+	_bus.projectile_hit.emit(2, plain, Vector2(895.0, 0.0), _tag(_profile(1000, &"burst")), -1)
 	check(plain.is_down(), "downed")
 	check_equal(_combat.downed_note_of(2), "downed by your own Blast", "no name: the kind's word")
 

@@ -2,11 +2,11 @@ extends "res://tests/support/suite.gd"
 ## Enemy spells in combat (staffs F6, docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy's
 ## spell hit on a wizard does what a spell does (damage, push, statuses) and wizards take
 ## reactions from the same table as enemies, for every spell (CONSUME, BURST, EXTEND, SPREAD, the
-## reaction wait); `actor_hurt` and `reaction_landed` carry the enemy's tag; an enemy's area hit
-## hurts everything in it (wizards, the other enemies and the enemy that cast it; actors G3c).
+## reaction wait); `actor_hurt` and `reaction_landed` carry the enemy's tag (a blast's hits are
+## its carrier's, tests/core/test_blast_strikes.gd).
 ## The enemy is an unseated actor of the test's actor table (actors G3b: hits name actor ids);
 ## the wizards are seated 0-3 at the actor ids 0-3.
-## Hits arrive as `projectile_hit` and `area_hit_requested` on a test bus, with hand-made hit
+## Hits arrive as `projectile_hit` on a test bus, with hand-made hit
 ## profiles; time moves by `Combat.step` with a fixed delta.
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_enemy_spells.gd
@@ -187,20 +187,6 @@ func test_a_wizard_waits_before_reacting_again() -> void:
 	check_equal(_triggered.size(), 2, "after the wait it reacts again")
 
 
-func test_an_enemys_area_hit_hurts_everything_in_it() -> void:
-	var wizard := _wizard(2, Vector2(10.0, 0.0))
-	var other := _enemy(Vector2(-10.0, 0.0))
-	var caster := _enemy(Vector2(0.0, 10.0))
-	_projectiles.set_target_owner(caster, _caster)
-	var blast := HitProfile.new()
-	blast.damage = 4
-	var tag: int = _enemy_tag(blast)
-	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, tag, -1)
-	check_equal(wizard.health.health, wizard.health.max_health - 4, "an enemy's blast hurts the wizard")
-	check_equal(_combat.health_of(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
-	check_equal(_combat.health_of(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
-
-
 func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	wizard.health.health = 50
@@ -209,6 +195,8 @@ func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
 	var profile := HitProfile.new()
 	profile.damage = 2
 	profile.heal = 10
-	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, _enemy_tag(profile), -1)
+	var tag: int = _enemy_tag(profile)
+	_bus.projectile_hit.emit(_caster, wizard, Vector2.ZERO, tag, -1)
+	_bus.projectile_hit.emit(_caster, imp, Vector2.ZERO, tag, -1)
 	check_equal(wizard.health.health, 48, "an enemy's mend is not the wizards': they take its damage")
 	check_equal(_combat.health_of(imp), 80, "it heals its caster's team (actors G5: a mend is for friends)")

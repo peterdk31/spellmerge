@@ -1,0 +1,12 @@
+{
+	"id": "pull_and_fire",
+	"name": "Pull and fire",
+	"does": "Pull in close with one staff, then a fire bolt from another: the imp burns.",
+	"casts": [
+		{"staff": 0, "cards": ["pull", "bolt"]},
+		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.3}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "caster_moved", "mode": "pull"}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

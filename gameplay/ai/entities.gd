@@ -22,8 +22,10 @@ extends Node2D
 ## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
 ## familiar a trigger made the shot that fired it (a `core/projectiles` slot, followed while it
 ## flies) or the point it was made at, starting on the side where the card put it. It casts
-## nothing itself: core/spells fires what its triggers give it (rules R4 F3). With its wizard
-## gone it stays where it was; with its shot gone it circles where the shot was last.
+## nothing itself: core/spells fires what its triggers give it (rules R4 F3), from the orb: every
+## step Entities tells Spells where it is (`Spells.familiar_at`, by the key Spells gave it, rules
+## R4 F8). With its wizard gone it stays where it was; with its shot gone it circles where the
+## shot was last.
 ##
 ## An **enemy's** decoy and familiar (staffs F8d: an enemy that casts a staff with those cards)
 ## are the same in the enemy ramp: the decoy copies the enemy's `Sprite` and the familiar circles
@@ -107,7 +109,7 @@ const DRAW_Z: int = 40
 ## otherwise the "Events" and "Projectiles" autoloads.
 var events: EventsScript = null
 var projectiles: ProjectileManagerScript = null
-## Spells, for a decoy's guard. Only tests set it; otherwise the "Spells" autoload.
+## Spells, for a decoy's guard and where a familiar is. Only tests set it; otherwise the "Spells" autoload.
 var spells: SpellsScript = null
 ## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
 ## autoload.
@@ -128,6 +130,8 @@ var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
 ## Spawn order, to find an owner's oldest.
 var _born: PackedInt64Array = PackedInt64Array()
+## A familiar's key from Spells (`Spells.entity_key`, 0 for none): where it is goes back by it.
+var _key: PackedInt64Array = PackedInt64Array()
 ## The familiar's wizard or enemy, or null.
 var _caster: Array[Node2D] = []
 ## The enemy of each actor id (`set_enemy`), or null.
@@ -241,6 +245,7 @@ func _init() -> void:
 	_hits.resize(POOL_SIZE)
 	_shield.resize(POOL_SIZE)
 	_deflect.resize(POOL_SIZE)
+	_key.resize(POOL_SIZE)
 	_angle.resize(POOL_SIZE)
 	_position.resize(POOL_SIZE)
 	_born.resize(POOL_SIZE)
@@ -283,6 +288,8 @@ func step(delta: float) -> void:
 			continue
 		if _kind[row] == FAMILIAR:
 			_step_familiar(row, delta)
+			if _key[row] != 0 and spells != null:
+				spells.familiar_at(_key[row], _position[row])
 		elif (_shield[row] > 0 or _deflect[row] != 0) and spells != null:
 			_shield[row] = spells.decoys().guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
 	queue_redraw()
@@ -386,6 +393,7 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_deflect[row] = 1 if kind == DECOY and spells != null and spells.decoys().decoy_deflects(tag) else 0
 	_angle[row] = 0.0
 	_position[row] = at
+	_key[row] = spells.entity_key if spells != null else 0
 	_born[row] = _spawned
 	_spawned += 1
 	_live += 1

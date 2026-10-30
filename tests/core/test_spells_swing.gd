@@ -31,7 +31,7 @@ var _mgr: ManagerScript
 var _bus: EventsScript
 ## Every projectile_hit as [player, target, position, tag].
 var _hits: Array = []
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 var _swing: FormBase
 
@@ -49,8 +49,7 @@ func before_each() -> void:
 	_areas.clear()
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
-		_areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The playground's numbers (owner, 2026-10-29).
 	_swing = FormBase.new()
 	_swing.carrier = &"swing"

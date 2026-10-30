@@ -328,14 +328,30 @@ func test_mirror_only_mirrors_the_carrier_it_is_on() -> void:
 	check_equal(_mgr.get_count(), 3, "two bolts, and a back shot for the first only")
 
 
-func test_mirror_of_an_orbit_does_nothing_extra() -> void:
+func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
+	# Rules R4g: mirror is one rule, the carrier fired again with its aim reversed.
 	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
 	orbit.motion = FormBase.Motion.ORBIT
 	orbit.orbit_radius = 40.0
 	_mgr.set_anchor(0, Vector2.ZERO)
 	_build(0, [&"mirror", &"orbit"])
 	_cast()
-	check_equal(_mgr.get_count(), 1, "an orbit has no back")
+	var found: Array[Vector2] = []
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			found.append(_mgr.get_position_of(slot))
+	check_equal(found.size(), 2, "two orbit shots")
+	check(found.size() == 2 and found[0].is_equal_approx(-found[1]) and found[0].x > 30.0, "on opposite sides of the circle, the first along the aim: %s" % [found])
+
+
+func test_a_mirrored_hook_flies_both_ways() -> void:
+	var hook: FormBase = _form(&"hook", 300.0, 0.5)
+	hook.motion = FormBase.Motion.HOOK
+	_build(0, [&"mirror", &"hook"])
+	_cast()
+	var headings: Array[Vector2] = _headings()
+	check_equal(headings.size(), 2, "two hooks")
+	check(headings.size() == 2 and headings[0].is_equal_approx(-headings[1]), "opposite ways")
 
 
 func test_echo_and_mirror_together_fire_four_shots() -> void:

@@ -15,6 +15,21 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Still wasted:** slam, dashes and teleport ("it is over at once"; a slam's repeat was not asked for).
 - **Echo on hold** is no longer skipped silently: the echo is a second held copy, N seconds later at half damage, switched off with the hold, reserving no extra mana (its firings share the hold's tag). A repeat does not echo again.
 
+## 2026-10-29: Card rules R4g, bodies and mirror (owner)
+
+- **A rain strikes where it lands** with its own hit and cards (a small splash, `RAIN_SPLASH`), then drops its payload: its infusions, heavy, chain, siphon, possess and on hit/kill/reaction count. One strike for it, in the beam context the slam's ring uses (`_strike_round`).
+- **A familiar is a caster carrying cards:** its infusions and hit cards ride on every carrier it casts, as if placed on each (costs included). Done once, in the compiler (`hands_on`), not at each cast; a handed card nothing it casts takes on is wasted.
+- **A decoy guards itself** with a shield (stops the other teams' shots at it, one charge each) or deflect (turns them), each a block for `on block`: the swing's guard (`_guard`), asked by Entities every step.
+- **Mirror is one rule:** the carrier fired again with its aim reversed, on every carrier (a wall behind, a rain through the caster, an orbit from the other side, hooks and swaps backwards). Dash and teleport stay wasted: a move and its mirror cancel. The per-carrier allow-list is gone.
+- **A move's mirror is not fired (merging R4g with R4b, 2026-10-30):** with the five-motion allow-list gone, a forced mirror on a dash or teleport fired the move again backwards (the mover replaces a move in progress), and R4b's forced check found the cell listed as wasted while it changed the cast. `_fire_spell` skips the mirrored firing of a dash or teleport, as `_recoil` skips them, so "a move and its mirror cancel" stays true.
+
+## 2026-10-29: Card rules R4c: moves (owner)
+
+- **A dash hits what it passes, a teleport where it lands** (docs/milestones/M2-rules.md R4c): every hit card was wasted on them; now they hit once each body with the carrier's damage and cards, through the swing's hit path (no second pipeline). Pierce on a dash is wasted with a reason: a dash already hits everything on its way.
+- **Recoil adds to a move:** a dash's push runs with it; a teleport's is taken off its distance, and a recoil longer than the teleport sends it backwards.
+- **One shield rule for every move:** dash, teleport, hook and swap guard what they move (the wizard by a barrier, a moved shot by shield charges).
+- **A point cannot move, so the wizard does:** a teleport cast by a point blinks the wizard to it; a hook or swap cast by one moves the wizard. A dash cast by a point is left for the owner (the mover picks a dash's way from the walk).
+
 ## 2026-10-29: Staff animations are carrier data (owner)
 
 - **Every carrier says how the staff moves** (`FormBase.staff_pose`), as it says its cast flash and impact (`cast_look`, `impact_look`): the owner asked for staff animations for slam and saw that every carrier could use the same thing for variety. One player of that data (`Spells.staff_pose` and the rest), drawn the same way by every look (`ActorLook`), so the strays play the same animations as the wizards.

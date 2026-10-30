@@ -43,8 +43,12 @@ func test_nothing_falls_before_the_delay() -> void:
 	check(_lost(["rain", "nova"], Vector2(120.0, 0.0), delay + 0.6) > 0, "it lands soon after the card's delay")
 
 
-func test_a_rain_with_no_payload_hurts_nobody() -> void:
-	check_equal(_lost(["rain"], Vector2(120.0, 0.0), 2.0), 0, "an empty rain does nothing")
+func test_a_rain_strikes_where_it_lands() -> void:
+	# Rules R4g: the rain itself hits what is under it as it lands, with its own hit and cards.
+	var card: FormBase = load("res://content/spells/forms/rain/rain.tres") as FormBase
+	check_equal(_lost(["rain"], Vector2(120.0, 0.0), 2.0), card.base_damage, "an empty rain strikes the aim point")
+	check_equal(_lost(["rain"], Vector2(160.0, 0.0), 2.0), 0, "only there")
+	check(_lost(["overcharge", "rain"], Vector2(120.0, 0.0), 2.0) > card.base_damage, "its cards count: more damage")
 
 
 func test_the_payload_costs_its_own_mana() -> void:

@@ -124,5 +124,4 @@ func test_a_hook_that_misses_blasts_where_it_ends() -> void:
 
 func test_a_rain_blasts_where_it_lands() -> void:
 	var at := Vector2(120.0, 0.0)
-	check_equal(_lost_at(["rain"], at, 1.5), 0, "an empty rain hurts nothing")
-	check(_lost_at(["blast", "rain"], at, 1.5) > 0, "its blast where it lands hurts the imp")
+	check(_lost_at(["blast", "rain"], at, 1.5) > _lost_at(["rain"], at, 1.5), "its blast where it lands hurts the imp more than its strike alone")

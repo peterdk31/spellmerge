@@ -388,17 +388,17 @@ func test_a_plain_shot_takes_nothing() -> void:
 
 
 func test_a_carrier_that_hits_nothing_fires_on_kill_from_its_blast() -> void:
-	# A rain hits nothing itself, but its blast's area hit carries its tag, so a kill by it is the
-	# rain's: `on kill` on a rain is kept when it has a blast (rules R2b).
-	var rain: FormBase = _form(&"rain", 0.0, 0.1)
-	rain.motion = FormBase.Motion.RAIN
+	# A decoy hits nothing itself, but its blast's area hit carries its tag, so a kill by it is the
+	# decoy's: `on kill` on a decoy is kept when it has a blast (rules R2b).
+	var decoy: FormBase = _form(&"decoy", 0.0, 0.1)
+	decoy.motion = FormBase.Motion.DECOY
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
-	StaffKit.build(_spells, 0, 0, [&"on_kill", &"blast", &"rain", &"bolt", &"rune"])
+	StaffKit.build(_spells, 0, 0, [&"on_kill", &"blast", &"decoy", &"rune"])
 	var carrier: int = _spells.current_tag(0, 0, 0)
-	var held: int = _spells.current_tag(0, 0, 2)
+	var held: int = _spells.current_tag(0, 0, 1)
 	_bus.kill_landed.emit(0, null, Vector2(40, 0), carrier)
-	check_equal(_slots(held).size(), 1, "a kill under the rain's tag fires its payload")
-	var bare: CompiledStaff = _spells.compile_staff([&"on_kill", &"rain", &"bolt", &"rune"] as Array[StringName], null)
+	check_equal(_slots(held).size(), 1, "a kill under the decoy's tag fires its payload")
+	var bare: CompiledStaff = _spells.compile_staff([&"on_kill", &"decoy", &"rune"] as Array[StringName], null)
 	check(bare.wasted.has(0), "without a blast it is wasted: %s" % bare.wasted)
 
 

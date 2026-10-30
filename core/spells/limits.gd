@@ -91,6 +91,17 @@ const HOMING_DRIFT: float = 24.0
 ## A homing teleport whose target is within its distance lands this far outside the target's
 ## hit circle (a wizard's body radius), not on it.
 const LAND_CLEARANCE: float = 6.0
+## A dash strikes the bodies within this many pixels of its mover's way (about a body: rules
+## R4c), and a teleport those within LAND_REACH of where it lands (a small circle that still
+## reaches the target a homing teleport landed beside).
+const PASS_REACH: float = 8.0
+const LAND_REACH: float = 24.0
+## A dash or teleport with `deflect` turns the shots within this many pixels of its mover: past a
+## wizard's hurt circle and a step of closing speed, so it turns them before they hit the body.
+const MOVE_GUARD_REACH: float = 24.0
+## A dash strikes what its mover passes for this long after its own time: its body is moved,
+## and its place told, a step or two after the cast.
+const PASS_GRACE: float = 0.05
 ## Homing legs a live beam row has room for at first (it grows): a homing beam bends on to a new
 ## target after each hit, as many as its pierce gives (as a homing shot picks a new target after
 ## a hit).

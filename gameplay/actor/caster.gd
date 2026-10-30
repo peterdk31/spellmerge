@@ -210,7 +210,8 @@ func cast(at: int) -> bool:
 	_push_place_again()
 	var origin: Vector2 = _origin()
 	var direction: Vector2 = actor.aim
-	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana())
+	# The way the body walks, for a dash it casts (staffs A6a).
+	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana(), actor.intent.move)
 	if spent == SpellsScript.REFUSED:
 		return false
 	mana = maxf(mana - spent, 0.0)

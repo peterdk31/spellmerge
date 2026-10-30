@@ -213,6 +213,9 @@ var _installed: Array[CompiledStaff] = []
 var _cursor: PackedInt32Array = PackedInt32Array()
 ## caster -> the way the wizard's (or enemy's) last asked move goes, for the payload fired where it ends
 var _move_heading: PackedVector2Array = PackedVector2Array()
+## caster -> the angle from its aim to the way its body walked at its last cast (0 standing;
+## `cast_staff`'s `walk`): a dash it casts itself is turned by it.
+var _walk_turn: PackedFloat32Array = PackedFloat32Array()
 ## tag -> the pulls of the wizard under way whose hit spent their shot, so the arrival is the
 ## carrier's end point; a shot that flies on ends by itself (rules R4a).
 var _pull_ends: Dictionary = {}
@@ -521,6 +524,7 @@ func _init() -> void:
 		_last_infused.append(null)
 	_move_heading.resize(ACTORS)
 	_move_heading.fill(Vector2.RIGHT)
+	_walk_turn.resize(ACTORS)
 	_landed_at.resize(ACTORS)
 	_aim_origin.resize(ACTORS)
 	_aim_origin.fill(Vector2.INF)
@@ -990,7 +994,10 @@ func is_holding(actor: int, staff: int) -> bool:
 ## While the staff has sustained (`hold`) carriers on, a cast switches them all off instead,
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
 ## held button should not switch on and off again and again).
-func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float) -> float:
+##
+## `walk` is the way the caster's body walks (zero when it stands): a dash it casts itself takes
+## that way in place of `direction` (`_move_caster`; staffs A6a, kept by the owner in R4 F1).
+func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float, walk: Vector2 = Vector2.ZERO) -> float:
 	if projectiles == null or not _in_range(actor, staff) or not origin.is_finite():
 		return REFUSED
 	if not direction.is_finite() or direction.is_zero_approx():
@@ -1007,6 +1014,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if mana < cast.mana:
 		return REFUSED
 	var aim: Vector2 = direction.normalized()
+	_walk_turn[actor] = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
@@ -1131,6 +1139,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 ## `move_homing`, a shot's in `move_shot`) and bends a teleport's way at once, landing it at its
 ## target's edge when that is nearer than its distance. A teleport's payload is cast by the
 ## wizard where it lands, so teleports in payloads hop on from there.
+## A dash the wizard casts itself takes the way its body walks in place of the aim (`cast_staff`'s
+## `walk`), so a mirrored one goes back the other way.
 ## A dash strikes every body its mover passes (`_start_pass`) and a teleport the bodies where it
 ## lands (`_land_strike`), with its hit (rules R4c). Every move adds up (rules R4 F1): its
 ## `recoil` is one more move (`_recoil`), and its `shield` guards what it moves (`_shield_move`).
@@ -1141,6 +1151,10 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 	var distance: float = move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	var shot: int = _caster_shot()
 	var wizard: bool = _caster == CASTER_WIZARD
+	if wizard and dash:
+		# A dash the wizard casts itself takes the way its body walks in place of the aim (staffs
+		# A6a): turned as far as the walk is off the aim, so a mirrored one goes the other way.
+		direction = direction.rotated(_walk_turn[actor])
 	if not wizard and shot < 0:
 		var anchor: Vector2 = projectiles.get_anchor(actor)
 		if not anchor.is_finite() or anchor.is_equal_approx(origin):
@@ -1696,8 +1710,8 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 
 ## One carrier of a group, launched; returns the shots made. `mirror` fires it once more with its
 ## aim reversed (a wall behind, a rain at the point mirrored through the caster, an orbit starting
-## on the other side of its circle; a dash or teleport has its mirror wasted), and `echo` schedules
-## it once more. `echoed` is true for that second firing, which hits at half damage and does not
+## on the other side of its circle, a dash or teleport back the other way: the two moves add up
+## to none, rules R4 F1), and `echo` schedules it once more. `echoed` is true for that second firing, which hits at half damage and does not
 ## echo again; on a held carrier it is a second held copy. `again` is a held carrier cast again
 ## (`_repeats`): it echoes no more.
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
@@ -1708,8 +1722,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	var launched: int = _launch(spell, tag, actor, origin, heading, source)
 	if launched > 0:
 		_recoil(spell, tag, actor, heading)
-	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:

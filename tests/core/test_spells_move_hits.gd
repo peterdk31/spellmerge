@@ -238,6 +238,38 @@ func test_recoil_on_a_dash_is_a_push_that_runs_with_it() -> void:
 	check(modes.has(&"dash") and modes.has(&"recoil"), "the dash and its push back, which the body adds up: %s" % [modes])
 
 
+# --- A wizard's own dash goes the way it walks (owner, R4 F1 option b) --------------------------
+
+func test_a_dash_the_wizard_casts_goes_the_way_it_walks() -> void:
+	_build([&"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2(0.0, -3.0))
+	check(_moves.size() == 1 and _moves[0][1] == &"dash" and _moves[0][2].is_equal_approx(Vector2(0.0, -48.0)), "the walk's way, the card's distance: %s" % [_moves])
+
+
+func test_a_dash_the_wizard_casts_standing_goes_along_the_aim() -> void:
+	_build([&"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0)
+	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(0.0, 48.0)), "no walk: along the aim: %s" % [_moves])
+
+
+func test_a_mirrored_dash_of_the_wizard_goes_the_walk_way_and_back() -> void:
+	# Owner, R4 F1: mirror fires the carrier again with its way reversed, whatever that way is; a
+	# wizard's own dash takes the walk's way, so its mirror goes back against the walk. Both run.
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_build([&"mirror", &"dash"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2.UP)
+	check(_moves.size() == 2 and _moves[0][2].is_equal_approx(Vector2(0.0, -48.0)) and _moves[1][2].is_equal_approx(Vector2(0.0, 48.0)), "one dash up, the walk's way, and one down: %s" % [_moves])
+	check(_moved().is_zero_approx(), "they add up to nothing: %s" % [_moves])
+
+
+func test_a_mirrored_teleport_blinks_out_and_back() -> void:
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_build([&"mirror", &"teleport"])
+	_cast()
+	check(_moves.size() == 2 and _moves[0][1] == &"teleport" and _moves[1][1] == &"teleport", "two blinks: %s" % [_moves])
+	check(_moved().is_zero_approx(), "out and back: %s" % [_moves])
+
+
 # --- One shield rule for every move -------------------------------------------------------------
 
 func test_a_swap_guards_the_wizard_for_the_move() -> void:

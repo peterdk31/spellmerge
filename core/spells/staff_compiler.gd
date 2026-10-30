@@ -559,10 +559,6 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			match motion:
 				FormBase.Motion.RAIN, FormBase.Motion.FAMILIAR:
 					return "it blocks shots that touch the carrier or guards the caster on a move, and %s" % _what(motion)
-		ModifierBase.Behaviour.MIRROR:
-			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-					return "a move and its mirror cancel"
 		ModifierBase.Behaviour.HOLD:
 			match motion:
 				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.SLAM:

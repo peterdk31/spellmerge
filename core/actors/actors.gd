@@ -131,6 +131,15 @@ func team_of(id: int) -> int:
 	return _team[id] if is_open(id) else NONE
 
 
+## Every actor's team by id (ACTORS of them), NONE for an id not open: `team_of` of every id at
+## once, for a system that reads the teams of hundreds of actors each step (the projectile target
+## grid and Combat's step, Horde swarm S5: a call per actor cost more than the rest of their work).
+## It is the table's own array, not a copy (packed arrays are passed by reference): it always shows
+## the teams as they are, and it is read only: never write to it.
+func teams() -> PackedInt32Array:
+	return _team
+
+
 ## The colour ramp its spells are drawn in (0-3 the hat colours, RAMP_ENEMY); NONE for no actor.
 func ramp_of(id: int) -> int:
 	return _ramp[id] if is_open(id) else NONE

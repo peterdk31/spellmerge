@@ -686,9 +686,14 @@ var _grid_w: int = 1
 var _grid_h: int = 1
 var _cell_head: PackedInt32Array = PackedInt32Array()
 ## How many targets each cell holds, and the box round their hit circles (min x, min y, max x,
-## max y), so a hit test passes a cell its path cannot touch without a look at each target.
+## max y), so a hit test passes a cell its path cannot touch without a look at each target. Taken
+## for a cell only when a hit test first reaches it after a filling (`_cell_info`; most cells of a
+## big room are never tested in a step): valid while `_cell_filled` holds `_grid_fill`.
 var _cell_count: PackedInt32Array = PackedInt32Array()
 var _cell_box: PackedVector4Array = PackedVector4Array()
+var _cell_filled: PackedInt32Array = PackedInt32Array()
+## Counts the grid's fillings (`_refresh_targets`).
+var _grid_fill: int = 0
 var _target_next: PackedInt32Array = PackedInt32Array()
 ## The largest radius of any registered target; sets how far hits are searched.
 var _max_target_radius: float = 0.0
@@ -1082,6 +1087,8 @@ func set_bounds(rect: Rect2) -> void:
 	_cell_count.resize(_grid_w * _grid_h)
 	_cell_count.fill(0)
 	_cell_box.resize(_grid_w * _grid_h)
+	_cell_filled.resize(_grid_w * _grid_h)
+	_cell_filled.fill(-1)
 	_shot_head.resize(_grid_w * _grid_h)
 	_scan_step = -1
 	_grid_stale = true
@@ -4164,49 +4171,49 @@ func _remove_target_at(at: int) -> void:
 
 ## Drop freed targets, read the positions of the rest and fill the grid.
 func _refresh_targets() -> void:
-	if _targets.is_empty():
-		_cell_head.fill(-1)
-		_cell_count.fill(0)
-		_grid_stale = false
-		return
-	var at: int = 0
-	while at < _targets.size():
-		var node: Variant = _targets[at]
-		if not is_instance_valid(node) or _target_layer[at] == 0:
-			_remove_target_at(at)
-			continue
-		at += 1
 	_cell_head.fill(-1)
-	_cell_count.fill(0)
 	_grid_stale = false
+	# A new filling: every cell's count and box are taken again when first needed (`_cell_info`).
+	_grid_fill += 1
 	# The table once for every target (this runs every step for every body).
 	var table: ActorsScript = actor_table()
-	for i in _targets.size():
-		var node: Node2D = _targets[i]
-		_target_next[i] = -1
+	var grid_x: float = _grid_x
+	var grid_y: float = _grid_y
+	var last_x: int = _grid_w - 1
+	var last_y: int = _grid_h - 1
+	var width: int = _grid_w
+	# Every actor's team at once (the table's own array, read only): a call per target cost more
+	# than the rest of its filling.
+	var teams: PackedInt32Array = table.teams() if table != null else PackedInt32Array()
+	var team_rows: int = teams.size()
+	# One pass: a freed or removed target is dropped where it is found (the last one takes its
+	# index and is read next), so the indices and the chains come out as a drop pass and then a
+	# fill pass would leave them. Written out: every target, every step (Horde swarm S5).
+	var i: int = 0
+	while i < _targets.size():
+		var held: Variant = _targets[i]
+		if _target_layer[i] == 0 or not is_instance_valid(held):
+			_remove_target_at(i)
+			continue
+		var node: Node2D = held
 		# A possession may have moved the owner to another team since the last step
-		# (`_team_of_target`, written out).
+		# (`_team_of_target`, written out: `teams` is `team_of` for every id).
 		var owner: int = _target_owner[i]
-		var team: int = table.team_of(owner) if owner >= 0 and table != null else ActorsScript.NONE
+		var team: int = teams[owner] if owner >= 0 and owner < team_rows else ActorsScript.NONE
 		if team == ActorsScript.NONE:
 			team = ActorsScript.TEAM_WIZARDS if (_target_layer[i] & LAYER_PLAYER) != 0 else ActorsScript.TEAM_ENEMIES
 		_target_team[i] = team
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
+			_target_next[i] = -1
+			i += 1
 			continue
 		var centre: Vector2 = node.global_position + _target_offset[i]
 		_target_pos[i] = centre
-		# Its grid cell (written out: every target, every step).
-		var cell: int = clampi(floori((centre.y - _grid_y) / GRID_CELL), 0, _grid_h - 1) * _grid_w + clampi(floori((centre.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+		var cell: int = clampi(floori((centre.y - grid_y) / GRID_CELL), 0, last_y) * width + clampi(floori((centre.x - grid_x) / GRID_CELL), 0, last_x)
 		_target_next[i] = _cell_head[cell]
 		_cell_head[cell] = i
-		var r: float = _target_radius[i]
-		var box: Vector4 = Vector4(centre.x - r, centre.y - r, centre.x + r, centre.y + r)
-		if _cell_count[cell] > 0:
-			var had: Vector4 = _cell_box[cell]
-			box = Vector4(minf(box.x, had.x), minf(box.y, had.y), maxf(box.z, had.z), maxf(box.w, had.w))
-		_cell_box[cell] = box
-		_cell_count[cell] += 1
+		i += 1
 
 
 ## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
@@ -4318,23 +4325,26 @@ func _hit_test(slot: int) -> bool:
 	var margin: Vector2 = Vector2.ONE * (radius + 0.05)
 	var near_low: Vector2 = lowest - margin
 	var near_high: Vector2 = highest + margin
-	var path: Vector2 = to - from
-	var path_sq: float = path.length_squared()
-	# A target farther from the path's middle than half the path plus both radii misses: that one
-	# distance turns most of the targets in the cells away before anything else is read of them
-	# (a target the shot is inside of is never that far either).
-	var middle: Vector2 = (from + to) * 0.5
-	var half: float = sqrt(path_sq) * 0.5 + 0.01
-	var layers: int = _layers[slot]
-	var shooter: int = _actor[slot]
+	# The rest is read only once a cell's box lets the path in: most tests in a crowd end at the
+	# boxes (Horde swarm S5). A test that looks at no target leaves the shot's memory unmarked, and
+	# `_forget_left` then forgets every entry, as it would after marking them and seeing none.
+	var looking: bool = false
+	var path: Vector2 = Vector2.ZERO
+	var path_sq: float = 0.0
+	var middle: Vector2 = Vector2.ZERO
+	var half: float = 0.0
+	var layers: int = 0
+	var shooter: int = 0
 	var flags: int = _flags[slot]
-	var skip_left: bool = _skip_left[slot] > 0.0
-	var stamp: int = _mark_memory(slot)
+	var skip_left: bool = false
+	var stamp: int = 0
 	var found: int = 0
 	var inside: bool = false
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
 			var cell: int = y * _grid_w + x
+			if _cell_filled[cell] != _grid_fill:
+				_cell_info(cell)
 			var in_cell: int = _cell_count[cell]
 			if in_cell == 0:
 				continue
@@ -4345,6 +4355,19 @@ func _hit_test(slot: int) -> bool:
 			var box: Vector4 = _cell_box[cell]
 			if box.x > near_high.x or box.y > near_high.y or box.z < near_low.x or box.w < near_low.y:
 				continue
+			if not looking:
+				looking = true
+				path = to - from
+				path_sq = path.length_squared()
+				# A target farther from the path's middle than half the path plus both radii misses:
+				# that one distance turns most of the targets in the cells away before anything else
+				# is read of them (a target the shot is inside of is never that far either).
+				middle = (from + to) * 0.5
+				half = sqrt(path_sq) * 0.5 + 0.01
+				layers = _layers[slot]
+				shooter = _actor[slot]
+				skip_left = _skip_left[slot] > 0.0
+				stamp = _mark_memory(slot)
 			var t: int = _cell_head[cell]
 			while t >= 0:
 				var centre: Vector2 = _target_pos[t]
@@ -4398,6 +4421,29 @@ func _hit_test(slot: int) -> bool:
 		hit = true
 		_register_hit(slot, t, _cand_point[n])
 	return hit
+
+
+## Take the count of `cell` and the box round its targets' hit circles from its chain (see
+## `_cell_count`). The positions only change when the grid is filled, so this is what a filling
+## would have written.
+func _cell_info(cell: int) -> void:
+	_cell_filled[cell] = _grid_fill
+	var count: int = 0
+	var t: int = _cell_head[cell]
+	if t < 0:
+		_cell_count[cell] = 0
+		return
+	var low: Vector2 = Vector2.INF
+	var high: Vector2 = -Vector2.INF
+	while t >= 0:
+		var centre: Vector2 = _target_pos[t]
+		var r: float = _target_radius[t]
+		low = low.min(centre - Vector2(r, r))
+		high = high.max(centre + Vector2(r, r))
+		count += 1
+		t = _target_next[t]
+	_cell_count[cell] = count
+	_cell_box[cell] = Vector4(low.x, low.y, high.x, high.y)
 
 
 ## Put target `t` (`along` its path, 0 to 1, nearest point `closest`) into the sorted candidates

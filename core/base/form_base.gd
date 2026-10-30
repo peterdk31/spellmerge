@@ -158,6 +158,6 @@ func ranges() -> Dictionary:
 ## The ranges, and a carrier id that names no carrier.
 func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
-	if Carriers.of(carrier).id() != carrier:
+	if not Carriers.exists(carrier):
 		problems.append("carrier: %s is no carrier (one of %s)" % [carrier, ", ".join(Carriers.ids())])
 	return problems

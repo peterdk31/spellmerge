@@ -178,6 +178,16 @@ func test_a_form_needs_what_its_carrier_uses() -> void:
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a rune needs nothing more")
 
 
+func test_a_form_that_names_no_carrier_is_refused() -> void:
+	var form := _fine(FormBase.new()) as FormBase
+	form.carrier = &"fissure"
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "unknown-carrier"), "a name no carrier has")
+	# The carrier that runs nothing has the id &"", so an empty name once passed as its own.
+	form.carrier = &""
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "unknown-carrier"), "an empty name")
+	check(not form.range_problems().is_empty(), "and its ranges say so too")
+
+
 func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
 	var form := _fine(FormBase.new()) as FormBase
 	form.carrier = &"rune"

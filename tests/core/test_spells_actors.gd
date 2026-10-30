@@ -230,12 +230,12 @@ func test_close_caster_ends_its_beams_only() -> void:
 		_build(caster, [&"beam"])
 		_spells.set_aim(caster, Vector2(0.0, 50.0 * caster), Vector2.RIGHT)
 		_cast(caster, Vector2(0.0, 50.0 * caster))
-	check_equal(_spells.beam_count(), 2, "two beams on")
+	check_equal(_spells.beams().beam_count(), 2, "two beams on")
 	_spells.close_caster(imp)
-	check_equal(_spells.beam_count(), 1, "the closed caster's beam ends")
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at):
-			check_equal(_spells.beam_caster(at), W0, "the wizard's stays")
+	check_equal(_spells.beams().beam_count(), 1, "the closed caster's beam ends")
+	for at in _spells.beams().beam_slots():
+		if _spells.beams().beam_on(at):
+			check_equal(_spells.beams().beam_caster(at), W0, "the wizard's stays")
 
 
 func test_close_caster_lets_its_shots_fly_on_with_their_numbers() -> void:
@@ -333,10 +333,10 @@ func test_no_beam_ends_another_however_many_are_on() -> void:
 		_build(imp, [&"beam"])
 		_spells.set_aim(imp, Vector2(0.0, 10.0 * i), Vector2.RIGHT)
 		_cast(imp, Vector2(0.0, 10.0 * i))
-	check_equal(_spells.beam_count(), SpellLimits.BEAM_ROWS_START + 5, "every beam is on: the rows grew")
+	check_equal(_spells.beams().beam_count(), SpellLimits.BEAM_ROWS_START + 5, "every beam is on: the rows grew")
 	var seated: int = 0
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at) and _spells.beam_caster(at) == W0:
+	for at in _spells.beams().beam_slots():
+		if _spells.beams().beam_on(at) and _spells.beams().beam_caster(at) == W0:
 			seated += 1
 	check_equal(seated, 1, "and the wizard's beam was never ended by another")
 

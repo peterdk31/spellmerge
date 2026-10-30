@@ -35,15 +35,15 @@ extends Node
 ## (`fires_waited` counts them). A beam fires an on-expire payload where it ends when its
 ## life is over, and a timer from its tip while it is on.
 ##
-## Carriers (docs/CARRIERS.md): each form's motion has a `Carrier` (core/spells/carriers/) that this
+## Carriers (docs/CARRIERS.md): each form names its `Carrier` (core/spells/carriers/) that this
 ## script makes and binds (`Carriers.make_all`) and hands each launch to (`_launch` ->
-## `Carrier.launch`); nothing here asks which motion a spell has. A carrier runs what is its own (a
+## `Carrier.launch`); nothing here asks which carrier a spell has. A carrier runs what is its own (a
 ## hook's pull, a beam's rows, a teleport's landing) and asks this script for the shared path: the
 ## shot kit (`_land_shot`, `_apply_travel`), moves (`CasterMoves`: dash, teleport, hook, swap and
 ## recoil move a caster through it) and the hit path, which every hit with no shot slot goes back through as a ray (`_ray_begin`,
 ## `RayHit`), so cards, payloads and chains are one path for every carrier. The beam, the swing and
-## the slam keep rows of their own; `StaffPoses` plays every carrier's staff animation. The `beam_*`,
-## `swing_*`, `slam_*` and `staff_*` getters at the end of this script hand the looks' questions on.
+## the slam keep rows of their own; `StaffPoses` plays every carrier's staff animation. The looks read
+## them from the objects that keep them (`beams`, `swings`, `slams`, `poses`, at the end of this script).
 ##
 ## Beams: a beam lives its `lifetime` (`CarrierBeam.start`), held by its caster (the wizard's aim from
 ## `set_aim`, or its shot), hits at once and every `SpellLimits.BEAM_TICK`, and a homing one bends
@@ -334,8 +334,10 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
 ## This runtime's carriers, by id (`Carriers.make_all`, bound to it), and the three
-## that keep rows of their own, for their looks' getters.
+## that keep rows of their own, which the looks read (`beams`, `swings`, `slams`).
 var _carriers: Dictionary = {}
+## The carrier that runs nothing (id &""), for a spell whose carrier id no carrier has.
+var _no_carrier: Carrier = Carrier.new()
 var _beams: CarrierBeam = null
 var _swings: CarrierSwing = null
 var _slams: CarrierSlam = null
@@ -500,7 +502,7 @@ static func _cast_damage(cast: CompiledCast) -> int:
 		return 0
 	var total: int = 0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * CarrierBeam.beam_hits(spell.carrier, spell.lifetime)
+		total += spell.damage * maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime)
 	return total * maxi(cast.group.repeats, 1)
 
 
@@ -527,7 +529,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	var component: SpellComponent = _component(id)
 	if component is FormBase:
 		var form: FormBase = component
-		var hits: int = maxi(form.shots, 1) * CarrierBeam.beam_hits(form.carrier, form.lifetime)
+		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
 		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
@@ -848,7 +850,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if held and not _repeats(spell) else spell.lifetime
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
-	if not spell.staff_pose.is_empty() and not carrier.has(Carrier.OWN_POSE):
+	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):
 		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
 			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
@@ -856,7 +858,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 
 ## The carrier that runs `spell` (`Carrier`, by its id; one that runs nothing for a fallback).
 func _carrier_of(spell: CompiledSpell) -> Carrier:
-	return _carriers.get(spell.carrier, Carriers.of(&"")) as Carrier
+	var carrier: Carrier = _carriers.get(spell.carrier)
+	return carrier if carrier != null else _no_carrier
 
 
 ## A shot a carrier spawned in `slot` (-1 when the manager refused it) takes its cards (`_apply_travel`)
@@ -1169,7 +1172,7 @@ func _run_pending() -> void:
 		_caster = caster
 		_caster_seq = caster_seq
 		if landing != null:
-			(_carrier_of(landing) as CarrierRain).land(landing, group, actor, staff, generation, origin, heading, echoed)
+			_carrier_of(landing).land(landing, group, actor, staff, generation, origin, heading, echoed)
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
 		elif not again:
@@ -1246,7 +1249,7 @@ func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> i
 ## Degrees (as radians) off the aim of shot `n` of `count`: none for one shot, an even ring
 ## for a 360 degree spread, otherwise an even fan centred on the aim.
 func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
-	if count <= 1 or _carrier_of(spell).has(Carrier.RING):
+	if count <= 1 or spell.has_trait(Carrier.RING):
 		return 0.0
 	if spell.spread >= 360.0:
 		return TAU * n / count
@@ -1616,7 +1619,7 @@ func _knows(slot: int) -> bool:
 ## through the shot for an orbit or still one (or one with no velocity).
 func _heading(spell: CompiledSpell, slot: int, at: Vector2, actor: int) -> Vector2:
 	var velocity: Vector2 = projectiles.get_velocity_of(slot)
-	if _carrier_of(spell).has(Carrier.OUTWARD) or velocity.is_zero_approx():
+	if spell.has_trait(Carrier.OUTWARD) or velocity.is_zero_approx():
 		var anchor: Vector2 = projectiles.get_caster_of(slot) if slot >= 0 else projectiles.get_anchor(actor)
 		if anchor.is_finite() and not (at - anchor).is_zero_approx():
 			return (at - anchor).normalized()
@@ -2349,7 +2352,7 @@ func _holds(spell: CompiledSpell, tag: int) -> bool:
 ## so while held each is cast anew every wind-up and lifetime (a rain falls again, a swing sweeps
 ## back), until switched off. Its hold ends only then, not between two of them.
 static func _repeats(spell: CompiledSpell) -> bool:
-	return spell != null and Carriers.of(spell.carrier).has(Carrier.REPEATS_HELD)
+	return spell != null and spell.has_trait(Carrier.REPEATS_HELD)
 
 
 ## A sustained (`hold`) carrier made shots: it stays on and its staff reserves the mana of the
@@ -2466,229 +2469,33 @@ func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int)
 		carrier.entity_ended(actor, position, tag)
 
 # The carriers' rows and the staff animations, for their looks (`gameplay/feel`, the actor's look)
-# and the tests: each getter hands the question to the carrier that keeps those rows.
+# and the tests: each is read from the object that keeps it.
 
-## Beams (`CarrierBeam`): `beam_slots()` rows, each on or off, with where it is and how it looks.
-static func beam_hits(carrier: StringName, lifetime: float) -> int:
-	return CarrierBeam.beam_hits(carrier, lifetime)
+## The beams' rows (`CarrierBeam`: `beam_slots()` rows, each on or off, with where it is and how it looks).
+func beams() -> CarrierBeam:
+	return _beams
 
 
-func beam_slots() -> int:
-	return _beams.beam_slots()
+## The swings' rows (`CarrierSwing`: `swing_slots()` rows, each on or off, with its sweep and look).
+func swings() -> CarrierSwing:
+	return _swings
 
 
-func beam_on(at: int) -> bool:
-	return _beams.beam_on(at)
+## The slams' rows (`CarrierSlam`: `slam_slots()` rows, each on or off, with its impact).
+func slams() -> CarrierSlam:
+	return _slams
 
 
-func beam_caster(at: int) -> int:
-	return _beams.beam_caster(at)
+## Each actor's staff animation (`StaffPoses`: where each actor's staff is now).
+func poses() -> StaffPoses:
+	return _poses
 
 
-func beam_origin(at: int) -> Vector2:
-	return _beams.beam_origin(at)
+## The dash, for the body that makes it (`gameplay/actor`): its homing (`CarrierDash.move_homing`).
+func dashes() -> CarrierDash:
+	return _carriers[&"dash"] as CarrierDash
 
 
-func beam_point_count(at: int) -> int:
-	return _beams.beam_point_count(at)
-
-
-func beam_point(at: int, n: int) -> Vector2:
-	return _beams.beam_point(at, n)
-
-
-func beam_bend(at: int) -> Vector2:
-	return _beams.beam_bend(at)
-
-
-func beam_end(at: int) -> Vector2:
-	return _beams.beam_end(at)
-
-
-func beam_reach(at: int) -> float:
-	return _beams.beam_reach(at)
-
-
-func beam_growth(at: int) -> float:
-	return _beams.beam_growth(at)
-
-
-func beam_tint(at: int) -> Color:
-	return _beams.beam_tint(at)
-
-
-func beam_look(at: int) -> int:
-	return _beams.beam_look(at)
-
-
-func beam_since_hit(at: int) -> float:
-	return _beams.beam_since_hit(at)
-
-
-func beam_left(at: int) -> float:
-	return _beams.beam_left(at)
-
-
-func beam_count() -> int:
-	return _beams.beam_count()
-
-
-## Swings (`CarrierSwing`): `swing_slots()` rows, each on or off, with its sweep and look.
-static func swing_ease(x: float) -> float:
-	return CarrierSwing.swing_ease(x)
-
-
-static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
-	return CarrierSwing.swing_end_point(origin, direction, side, arc, reach)
-
-
-func swing_tip(at: int) -> Vector2:
-	return _swings.swing_tip(at)
-
-
-func swing_slots() -> int:
-	return _swings.swing_slots()
-
-
-func swing_on(at: int) -> bool:
-	return _swings.swing_on(at)
-
-
-func swing_actor(at: int) -> int:
-	return _swings.swing_actor(at)
-
-
-func swing_tag(at: int) -> int:
-	return _swings.swing_tag(at)
-
-
-func swing_origin(at: int) -> Vector2:
-	return _swings.swing_origin(at)
-
-
-func swing_dir(at: int) -> Vector2:
-	return _swings.swing_dir(at)
-
-
-func swing_side(at: int) -> int:
-	return _swings.swing_side(at)
-
-
-func swing_turned(at: int) -> float:
-	return _swings.swing_turned(at)
-
-
-func swing_arc(at: int) -> float:
-	return _swings.swing_arc(at)
-
-
-func swing_reach(at: int) -> float:
-	return _swings.swing_reach(at)
-
-
-func swing_born(at: int) -> int:
-	return _swings.swing_born(at)
-
-
-func swing_age(at: int) -> float:
-	return _swings.swing_age(at)
-
-
-func swing_wind(at: int) -> float:
-	return _swings.swing_wind(at)
-
-
-func swing_sweep(at: int) -> float:
-	return _swings.swing_sweep(at)
-
-
-func swing_tint(at: int) -> Color:
-	return _swings.swing_tint(at)
-
-
-func swing_look(at: int) -> int:
-	return _swings.swing_look(at)
-
-
-func swing_count() -> int:
-	return _swings.swing_count()
-
-
-## Slams (`CarrierSlam`): `slam_slots()` rows, each on or off, with its impact.
-func slam_count() -> int:
-	return _slams.slam_count()
-
-
-func slam_slots() -> int:
-	return _slams.slam_slots()
-
-
-func slam_on(at: int) -> bool:
-	return _slams.slam_on(at)
-
-
-func slam_impact(at: int) -> Vector2:
-	return _slams.slam_impact(at)
-
-
-## Staff animations (`StaffPoses`): where each actor's staff is now.
-func staff_pose(actor: int) -> Vector3:
-	return _poses.staff_pose(actor)
-
-
-func staff_glow(actor: int) -> float:
-	return _poses.staff_glow(actor)
-
-
-func staff_glow_tint(actor: int) -> Color:
-	return _poses.staff_glow_tint(actor)
-
-
-func staff_stretch(actor: int) -> float:
-	return _poses.staff_stretch(actor)
-
-
-func staff_shake(actor: int) -> float:
-	return _poses.staff_shake(actor)
-
-
-func staff_mood(actor: int) -> StringName:
-	return _poses.staff_mood(actor)
-
-
-func staff_pose_dir(actor: int) -> Vector2:
-	return _poses.staff_pose_dir(actor)
-
-
-static func up_side(aim: Vector2) -> int:
-	return StaffPoses.up_side(aim)
-
-
-static func pose_ease(x: float, ease: int) -> float:
-	return StaffPoses.pose_ease(x, ease)
-
-
-## Moves (`CasterMoves`) and the dash's homing, for the body that makes them (`gameplay/actor`).
-func move_homing(actor: int) -> Homing:
-	return (_carriers[&"dash"] as CarrierDash).move_homing(actor)
-
-
-static func move_distance(length: float, speed: float, lifetime: float) -> float:
-	return CasterMoves.move_distance(length, speed, lifetime)
-
-
-static func move_seconds(length: float, speed: float, lifetime: float) -> float:
-	return CasterMoves.move_seconds(length, speed, lifetime)
-
-
-## A decoy's shield and guard, for `ai` that keeps its body (`CarrierDecoy`).
-func decoy_shield(tag: int) -> int:
-	return (_carriers[&"decoy"] as CarrierDecoy).decoy_shield(tag)
-
-
-func decoy_deflects(tag: int) -> bool:
-	return (_carriers[&"decoy"] as CarrierDecoy).decoy_deflects(tag)
-
-
-func guard_decoy(actor: int, tag: int, at: Vector2, reach: float, charges: int) -> int:
-	return (_carriers[&"decoy"] as CarrierDecoy).guard_decoy(actor, tag, at, reach, charges)
+## The decoys, for `ai` that keeps their bodies: their shield and guard (`CarrierDecoy`).
+func decoys() -> CarrierDecoy:
+	return _carriers[&"decoy"] as CarrierDecoy

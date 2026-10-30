@@ -202,8 +202,8 @@ func test_pierce_is_wasted_on_a_dash_that_hits_everything_it_passes() -> void:
 	var staff: CompiledStaff = StaffKit.compile(_spells, [&"pierce", &"dash"])
 	check(staff.wasted.has(0), "pierce is wasted on a dash: %s" % staff.wasted)
 	check(staff.wasted.has(0), "it hits what it passes already: %s" % staff.wasted)
-	check(StaffCompiler.trigger_runs(TriggerBase.Event.HIT, &"dash"), "on hit fires on a dash")
-	check(StaffCompiler.behaviour_runs(ModifierBase.Behaviour.HEAVY, &"teleport"), "heavy works on a teleport")
+	check(Carriers.of(&"dash").fires(TriggerBase.Event.HIT), "on hit fires on a dash")
+	check(Carriers.of(&"teleport").works(ModifierBase.Behaviour.HEAVY), "heavy works on a teleport")
 
 
 # --- Recoil adds to a move ----------------------------------------------------------------------

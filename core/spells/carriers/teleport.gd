@@ -48,20 +48,21 @@ func _moves_from_a_point() -> bool:
 ## A teleport is over at once: like a beam it bends its way toward a target, and like a beam it
 ## ends there when the target is within its distance, at the target's edge. Its recoil is taken
 ## off its distance (past it, it goes backwards).
-func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2) -> void:
+func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, distance: float) -> Vector3:
 	_teleport_homing.start(spell, hash(Vector3i(actor, tag, roundi(rt._clock * 1000.0))))
 	_teleport_homing.avoid = _landed_at[actor] if actor >= 0 and actor < _landed_at.size() else 0
-	var goal: Vector2 = _teleport_homing.point(rt.projectiles, actor, origin, _way)
+	var goal: Vector2 = _teleport_homing.point(rt.projectiles, actor, origin, way)
 	if goal.is_finite() and not goal.is_equal_approx(origin):
-		_way = origin.direction_to(goal)
+		way = origin.direction_to(goal)
 		var gap: float = origin.distance_to(goal) - _teleport_homing.target_radius - SpellLimits.LAND_CLEARANCE
-		if gap <= _distance and actor >= 0 and actor < _landed_at.size():
+		if gap <= distance and actor >= 0 and actor < _landed_at.size():
 			_landed_at[actor] = _teleport_homing.keep
-		_distance = minf(_distance, maxf(gap, 0.0))
-	_distance -= spell.behaviour(ModifierBase.Behaviour.RECOIL)
+		distance = minf(distance, maxf(gap, 0.0))
+	distance -= spell.behaviour(ModifierBase.Behaviour.RECOIL)
+	return Vector3(way.x, way.y, distance)
 
 
-func _move_body(_spell: CompiledSpell, tag: int, actor: int, origin: Vector2, offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
+func _move_body(_spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _way: Vector2, offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
 	rt.events.caster_move_requested.emit(actor, &"teleport", rt.projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 
 

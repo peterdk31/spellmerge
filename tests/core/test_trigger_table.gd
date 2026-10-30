@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The compiler lists triggers that cannot fire (rules R2b, docs/milestones/M2-rules.md):
-## `StaffCompiler.trigger_runs` over every event x every carrier; a trigger that never fires on its
+## `Carrier.fires` over every event x every carrier; a trigger that never fires on its
 ## carrier is wasted, and the payload it
 ## would cast is still read (the reading order does not change) but wasted and not attached.
 ## Cards are built in code.
@@ -60,25 +60,25 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 	return _compiler.compile(cards, _staff)
 
 
-func _expected(event: int, motion: StringName) -> bool:
+func _expected(event: int, carrier: StringName) -> bool:
 	match event:
 		E.HIT:
-			return HITTERS.has(motion)
+			return HITTERS.has(carrier)
 		E.TIMER, E.HURT:
-			return not AT_ONCE.has(motion)
+			return not AT_ONCE.has(carrier)
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
-			return motion != &"rain" and motion != &"familiar"
+			return carrier != &"rain" and carrier != &"familiar"
 		E.WALL:
-			return [&"bolt", &"hook", &"swap", &"beam"].has(motion)
+			return [&"bolt", &"hook", &"swap", &"beam"].has(carrier)
 	return true
 
 
 func test_every_event_on_every_carrier_runs_as_the_runtime_does() -> void:
 	for event: int in E.size():
-		for motion: StringName in Carriers.ids():
-			var cell: String = "%s on %s" % [E.keys()[event], motion]
-			check_equal(StaffCompiler.trigger_runs(event, motion), _expected(event, motion), "%s runs as the runtime does" % cell)
+		for carrier: StringName in Carriers.ids():
+			var cell: String = "%s on %s" % [E.keys()[event], carrier]
+			check_equal(Carriers.of(carrier).fires(event), _expected(event, carrier), "%s runs as the runtime does" % cell)
 
 
 func test_a_timer_on_a_slam_is_wasted_with_its_payload() -> void:

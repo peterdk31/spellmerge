@@ -27,13 +27,20 @@ enum Event {
 	REACTION,
 }
 
-## What each trigger needs from its carrier for it ever to go off (`Carrier.fires`).
+## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
+## `ModifierBase.NEEDS`: from its carrier "any" (one of these traits) and "not" (none of them), or
+## "or_cards" (a card with one of these behaviours on it does instead: a blast's area hit carries
+## the carrier's tag); from the cards on it "cards" (one of these behaviours, or an infusion where
+## "or_infused") and "not_cards" (none of these where they work). A trigger not here goes off on
+## every carrier. A new trigger adds its line here, never per carrier or in the compiler.
 const NEEDS: Dictionary = {
 	Event.HIT: {"any": CarrierTraits.HITS},
 	Event.TIMER: {"any": CarrierTraits.LASTS},
 	Event.HURT: {"any": CarrierTraits.LASTS},
-	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS},
-	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
+	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
+	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
+	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},
+	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "not_cards": [ModifierBase.Behaviour.GHOST]},
 }
 
 @export var event: Event = Event.HIT

@@ -149,6 +149,21 @@ func test_a_ray_inside_a_handler_does_not_inherit_its_slot() -> void:
 	check_equal(inner, [-1, 0] as Array[int], "the ray's hit named -1, the outer hit its own shot, 0")
 
 
+func test_a_block_by_no_shot_inside_a_handler_does_not_name_the_handlers_shot() -> void:
+	# A swing, beam or decoy blocks with `block_shot` (an on-hit beam with shield, say): the blocker
+	# is no shot, so its `shot_blocked` names none, not the shot whose hit is being sent.
+	_target(Vector2(30, 0))
+	var blocked: Array[int] = []
+	_bus.shot_blocked.connect(func(_c: int, _at: Vector2, _tag: int, shot: int) -> void: blocked.append(shot))
+	var victim: int = _mgr.spawn(1, Vector2(200, 200), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0)
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, _at: Vector2, tag: int, _shot: int) -> void:
+		if tag == TAG:
+			check(_mgr.block_shot(victim, 0, TAG + 1, &"beam"), "the beam's shield stops the shot"))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(300, 0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
+	_step(20)
+	check_equal(blocked, [-1] as Array[int], "the block names no shot")
+
+
 func test_the_readers_follow_a_slot() -> void:
 	var slot: int = _mgr.spawn(0, Vector2(5, 5), Vector2(10, 20), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
 	var seq: int = _mgr.get_seq_of(slot)

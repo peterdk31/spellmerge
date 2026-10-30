@@ -278,7 +278,7 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or spells.beam_count() > 0 or spells.swing_count() > 0 or spells.slam_count() > 0:
+	if projectiles.get_count() > 0 or spells.beams().beam_count() > 0 or spells.swings().swing_count() > 0 or spells.slams().slam_count() > 0:
 		return false
 	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false
@@ -393,20 +393,20 @@ func _sample() -> void:
 		if projectiles.is_alive(slot):
 			var tag: int = projectiles.get_tag_of(slot)
 			_put("shot %s %s at %s r%d" % [_who(projectiles.get_actor_of(slot)), _node(tag), _at(projectiles.get_position_of(slot)), roundi(projectiles._radius[slot])])
-	for at in spells.beam_slots():
-		if spells.beam_on(at):
+	for at in spells.beams().beam_slots():
+		if spells.beams().beam_on(at):
 			var points: PackedStringArray = PackedStringArray()
-			for n in spells.beam_point_count(at):
-				points.append(_at(spells.beam_point(at, n)))
+			for n in spells.beams().beam_point_count(at):
+				points.append(_at(spells.beams().beam_point(at, n)))
 			# How wide it hits (growth) as well as where.
-			_put("beam %s w%d %s" % [_who(spells.beam_caster(at)), roundi(spells.beam_growth(at) * 100.0), " ".join(points)])
-	for at in spells.slam_slots():
-		if spells.slam_on(at):
+			_put("beam %s w%d %s" % [_who(spells.beams().beam_caster(at)), roundi(spells.beams().beam_growth(at) * 100.0), " ".join(points)])
+	for at in spells.slams().slam_slots():
+		if spells.slams().slam_on(at):
 			# A slam's row is read directly: Spells has no getter for its caster and aim.
-			_put("slam %s %s from %s way %s impact %s" % [_who(spells._slams._sl_actor[at]), _node(spells._slams._sl_tag[at]), _at(spells._slams._sl_origin[at]), _at(spells._slams._sl_dir[at] * 100.0), _at(spells.slam_impact(at)) if spells.slam_impact(at).is_finite() else "-"])
-	for at in spells.swing_slots():
-		if spells.swing_on(at):
-			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(spells.swing_actor(at)), _node(spells.swing_tag(at)), _at(spells.swing_origin(at)), _at(spells.swing_dir(at) * 100.0), spells.swing_side(at), roundi(rad_to_deg(spells.swing_turned(at))), roundi(spells.swing_reach(at))])
+			_put("slam %s %s from %s way %s impact %s" % [_who(spells._slams._sl_actor[at]), _node(spells._slams._sl_tag[at]), _at(spells._slams._sl_origin[at]), _at(spells._slams._sl_dir[at] * 100.0), _at(spells.slams().slam_impact(at)) if spells.slams().slam_impact(at).is_finite() else "-"])
+	for at in spells.swings().swing_slots():
+		if spells.swings().swing_on(at):
+			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(spells.swings().swing_actor(at)), _node(spells.swings().swing_tag(at)), _at(spells.swings().swing_origin(at)), _at(spells.swings().swing_dir(at) * 100.0), spells.swings().swing_side(at), roundi(rad_to_deg(spells.swings().swing_turned(at))), roundi(spells.swings().swing_reach(at))])
 	for body in _bodies:
 		var seen: String = "gone"
 		if is_instance_valid(body) and not body.is_dying():

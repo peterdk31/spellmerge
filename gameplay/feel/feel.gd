@@ -345,7 +345,7 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
-## The live beams (`Spells.beam_*`), one beam mesh each (`beam_mesh`), made once, and each one's
+## The live beams (`Spells.beams`), one beam mesh each (`beam_mesh`), made once, and each one's
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
@@ -602,7 +602,7 @@ func step(real_delta: float) -> void:
 	_step_effects(real_delta)
 	_draw_live_beams()
 	if _swing_trails != null:
-		_swing_trails.step(spells, _clock, _swing_ramp, preset.beam_alpha)
+		_swing_trails.step(spells.call("swings") if spells != null and spells.has_method("swings") else null, _clock, _swing_ramp, preset.beam_alpha)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1749,14 +1749,14 @@ func _step_forms(real_delta: float) -> void:
 ## the first of equal ones; the points of its gentlest curves are dropped. Only a path that long
 ## (many pierce cards on a homing beam, many bounces) comes here; its scratch grows to the
 ## longest path seen.
-func _thin_beam(i: int, all: int) -> void:
+func _thin_beam(beams: Object, i: int, all: int) -> void:
 	if _thin_keep.size() < all:
 		_thin_keep.resize(all)
 		_thin_turn.resize(all)
 		_thin_points.resize(all)
 	_thin_sorted.resize(all - 2)
 	for n in all:
-		_thin_points[n] = spells.call("beam_point", i, n)
+		_thin_points[n] = beams.call("beam_point", i, n)
 	var prev: Vector2 = _thin_points[0]
 	var here: Vector2 = _thin_points[1]
 	for n in range(1, all - 1):
@@ -1788,25 +1788,27 @@ func _thin_beam(i: int, all: int) -> void:
 
 func _draw_live_beams() -> void:
 	var count: int = 0
-	if spells != null and spells.has_method("beam_slots"):
-		count = int(spells.call("beam_slots"))
+	# The beams' rows (`Spells.beams`, a `CarrierBeam`).
+	var beams: Object = spells.call("beams") if spells != null and spells.has_method("beams") else null
+	if beams != null:
+		count = int(beams.call("beam_slots"))
 	while _live_beams.size() < count:
 		_live_beams.append(_make_beam())
 		_live_paths.append(_make_beam_path())
 	for i in _live_beams.size():
 		var node: MeshInstance2D = _live_beams[i]
-		if i >= count or not bool(spells.call("beam_on", i)):
+		if i >= count or not bool(beams.call("beam_on", i)):
 			if node.visible:
 				node.visible = false
 			continue
-		var all: int = int(spells.call("beam_point_count", i))
+		var all: int = int(beams.call("beam_point_count", i))
 		var points: int = mini(all, LIVE_BEAM_POINTS)
 		# A longer path keeps the points that shape it most (`_thin_beam`).
 		var thin: bool = all > LIVE_BEAM_POINTS
 		if thin:
-			_thin_beam(i, all)
-		var reach: float = spells.call("beam_reach", i)
-		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
+			_thin_beam(beams, i, all)
+		var reach: float = beams.call("beam_reach", i)
+		var origin: Vector2 = beams.call("beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():
 			node.visible = false
 			continue
@@ -1824,7 +1826,7 @@ func _draw_live_beams() -> void:
 				break
 			if thin and _thin_keep[n] == 0:
 				continue
-			var point: Vector2 = _thin_points[n] if thin else spells.call("beam_point", i, n)
+			var point: Vector2 = _thin_points[n] if thin else beams.call("beam_point", i, n)
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
 				end_at = prev.move_toward(point, reach - walked)
@@ -1839,18 +1841,18 @@ func _draw_live_beams() -> void:
 			prev = point
 		var before: Vector3 = path[used - 2]
 		var end_dir: Vector2 = Vector2(before.x, before.y).direction_to(end_at)
-		var since: float = spells.call("beam_since_hit", i)
-		var left: float = spells.call("beam_left", i)
+		var since: float = beams.call("beam_since_hit", i)
+		var left: float = beams.call("beam_left", i)
 		var fade: float = clampf(left * 4.0, 0.0, 1.0)
 		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
 		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
 		# Drawn across a fixed width; flare, flicker and fade swell and dissolve its pixels instead
 		# of stretching them.
-		var caster: int = spells.call("beam_caster", i)
+		var caster: int = beams.call("beam_caster", i)
 		var body: Color = Color.WHITE
 		if projectiles != null and projectiles.has_method("tint_of"):
 			body = projectiles.call("tint_of", caster) as Color
-		var tint: Color = spells.call("beam_tint", i)
+		var tint: Color = beams.call("beam_tint", i)
 		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
@@ -1863,10 +1865,10 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_end_dir", end_dir)
 		material.set_shader_parameter(&"sim_time", _clock)
 		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
-		var grown: float = float(spells.call("beam_growth", i)) if spells.has_method("beam_growth") else 1.0
+		var grown: float = float(beams.call("beam_growth", i)) if beams.has_method("beam_growth") else 1.0
 		material.set_shader_parameter(&"beam_width", BEAM_WIDTH * grown)
 		material.set_shader_parameter(&"beam_player", _beam_ramp(_ramp_of(caster)))
-		material.set_shader_parameter(&"beam_look", int(spells.call("beam_look", i)) if spells.has_method("beam_look") else 0)
+		material.set_shader_parameter(&"beam_look", int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0)
 		material.set_shader_parameter(&"beam_fade", fade)
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)

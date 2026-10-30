@@ -25,7 +25,14 @@ var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
 ## The id of its carrier (`FormBase.carrier`, `Carriers.of`); &"" for a fallback, which has none.
-var carrier: StringName = &""
+## Setting it reads the carrier's `traits` once.
+var carrier: StringName = &"":
+	set(value):
+		carrier = value
+		traits = Carriers.of(value).traits()
+## Its carrier's yes/no answers (`Carrier.traits`, `CarrierTraits`), kept here so the runtime asks
+## them per shot with no lookup (`has_trait`).
+var traits: int = 0
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
@@ -57,7 +64,7 @@ var homing_turn: float = 0.0
 ## Degrees off its aim a homing beam or teleport still bends to a target: what `homing_turn`
 ## turns in SpellLimits.INSTANT_HOMING_SECONDS, up to all the way round (0 without homing).
 var homing_angle: float = 0.0
-## Pixels away a homing spell looks for its target (`StaffCompiler.homing_range`); 0 when it does
+## Pixels away a homing spell looks for its target (`Carrier.homing_range`); 0 when it does
 ## not home, or its form cannot be steered (its homing cards are then listed as wasted).
 var homing_range: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
@@ -116,3 +123,8 @@ func chain_length() -> int:
 	if payload == null or payload.is_empty():
 		return 1
 	return 1 + payload.spells[0].chain_length()
+
+
+## True when its carrier answers yes to `flag` (a `CarrierTraits` flag).
+func has_trait(flag: int) -> bool:
+	return traits & flag != 0

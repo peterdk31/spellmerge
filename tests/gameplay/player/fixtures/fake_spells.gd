@@ -16,12 +16,13 @@ var directions: Array[Vector2] = []
 ## [player, staff] for every install, in order.
 var installed: Array[Vector2i] = []
 ## actor -> [aim locked at the cast, pose (turn, lift, push)] of its staff's animation, as a test
-## sets it (`staff_pose`, `staff_pose_dir`).
+## sets it (`poses()`: `staff_pose`, `staff_pose_dir`).
 var staff_poses: Dictionary = {}
 
 var _left: PackedFloat32Array = PackedFloat32Array()
 var _has: PackedByteArray = PackedByteArray()
 var _first: Array[StringName] = []
+var _poses_set: SetPoses = null
 
 
 ## Room for every actor id's four staffs.
@@ -79,37 +80,44 @@ func last_form(player: int, staff: int) -> StringName:
 	return _first[player * 4 + staff]
 
 
-func staff_pose(actor: int) -> Vector3:
-	return staff_poses[actor][1] if staff_poses.has(actor) else Vector3.ZERO
+## The staff animations a test set (`staff_poses`), handed out as the runtime hands out its own.
+func poses() -> StaffPoses:
+	if _poses_set == null:
+		_poses_set = SetPoses.new(self)
+		_poses_set.fake = self
+	return _poses_set
 
 
-func staff_glow(actor: int) -> float:
-	return _pose_part(actor, 2, 0.0)
+## Reads the poses a test set on the fake that owns it (`staff_poses`).
+class SetPoses:
+	extends StaffPoses
+	var fake: Object = null
 
+	func staff_pose(actor: int) -> Vector3:
+		return _part(actor, 1, Vector3.ZERO)
 
-func staff_glow_tint(actor: int) -> Color:
-	return _pose_part(actor, 5, Color.WHITE)
+	func staff_glow(actor: int) -> float:
+		return _part(actor, 2, 0.0)
 
+	func staff_glow_tint(actor: int) -> Color:
+		return _part(actor, 5, Color.WHITE)
 
-func staff_stretch(actor: int) -> float:
-	return _pose_part(actor, 3, 0.0)
+	func staff_stretch(actor: int) -> float:
+		return _part(actor, 3, 0.0)
 
+	func staff_shake(_actor: int) -> float:
+		return 0.0
 
-func staff_shake(_actor: int) -> float:
-	return 0.0
+	func staff_mood(actor: int) -> StringName:
+		return _part(actor, 4, &"")
 
+	func staff_pose_dir(actor: int) -> Vector2:
+		return _part(actor, 0, Vector2.ZERO)
 
-func staff_mood(actor: int) -> StringName:
-	return _pose_part(actor, 4, &"")
-
-
-## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint]), or `none`.
-func _pose_part(actor: int, n: int, none: Variant) -> Variant:
-	return staff_poses[actor][n] if staff_poses.has(actor) and staff_poses[actor].size() > n else none
-
-
-func staff_pose_dir(actor: int) -> Vector2:
-	return staff_poses[actor][0] if staff_poses.has(actor) else Vector2.ZERO
+	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint]), or `none`.
+	func _part(actor: int, n: int, none: Variant) -> Variant:
+		var set_poses: Dictionary = fake.get("staff_poses")
+		return set_poses[actor][n] if set_poses.has(actor) and set_poses[actor].size() > n else none
 
 
 func is_holding(_player: int, _staff: int) -> bool:

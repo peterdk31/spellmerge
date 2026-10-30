@@ -30,7 +30,7 @@ extends "res://tests/support/suite.gd"
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
 ## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
-## whose motion has none with "no reach for ...", so a new kind of card or carrier brings its
+## that has none with "no reach for ...", so a new kind of card or carrier brings its
 ## probe in the same PR.
 ##
 ## The other way round (R4b): a W cell is also played with the card forced on, and fails with

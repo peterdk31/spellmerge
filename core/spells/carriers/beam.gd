@@ -7,7 +7,7 @@ extends Carrier
 ## Its rows: the live beams, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`). Its hits go through the runtime as rays
 ## (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read the
-## `beam_*` getters (through `Spells`).
+## `beam_*` getters (`Spells.beams()`).
 
 
 ## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
@@ -73,6 +73,10 @@ func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS
 
 
+func step_order() -> int:
+	return 2
+
+
 func required_fields() -> Dictionary:
 	return {
 		"ray_length": "A beam needs a `ray_length` above 0.",
@@ -121,11 +125,8 @@ func pull_magnets() -> void:
 			_beam_pull(at)
 
 
-## How many times a carrier with `motion` that lives `lifetime` seconds hits one target: a live
-## beam once at once and then every `SpellLimits.BEAM_TICK` seconds of its life; anything else once.
-static func beam_hits(carrier: StringName, lifetime: float) -> int:
-	if carrier != &"beam":
-		return 1
+## A live beam hits one target once at once and then every `SpellLimits.BEAM_TICK` seconds of its life.
+func hits_per_target(lifetime: float) -> int:
 	return maxi(ceili(lifetime / SpellLimits.BEAM_TICK - 0.001), 1)
 
 

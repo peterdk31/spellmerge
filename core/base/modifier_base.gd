@@ -70,15 +70,17 @@ enum Behaviour {
 }
 
 ## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
-## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these. A behaviour not here works on every
-## carrier (numbers, blast, echo, recoil). A new behaviour adds its line here, never per
-## carrier; the compiler checks it every time a staff is built (`Carrier.works`).
+## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these; "or_cards":
+## a card with one of these behaviours on the carrier does instead (a blast's area hit carries
+## heavy's knockback and slam). A behaviour not here works on every carrier (numbers, blast, echo,
+## recoil). A new behaviour adds its line here, never per carrier; the compiler checks it every
+## time a staff is built (`Carrier.works`).
 const NEEDS: Dictionary = {
 	Behaviour.HOMING: {"any": CarrierTraits.STEERS},
 	Behaviour.CHAIN: {"any": CarrierTraits.HITS},
 	Behaviour.SIPHON: {"any": CarrierTraits.HITS},
 	Behaviour.POSSESS: {"any": CarrierTraits.HITS},
-	Behaviour.HEAVY: {"any": CarrierTraits.HITS},
+	Behaviour.HEAVY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
 	Behaviour.RELAY: {"any": CarrierTraits.HITS},
 	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS},
 	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS},
@@ -110,7 +112,7 @@ const NEEDS: Dictionary = {
 @export var behaviour_strength: float = 0.0
 ## Pixels the behaviour reaches. For HOMING, how far a shot looks for a target (one in flight
 ## looks again as it flies; a beam looks at least as far as it is long), on every form homing
-## steers (`StaffCompiler.homing_range`). Unused by the others.
+## steers (`Carrier.homing_range`). Unused by the others.
 @export var behaviour_reach: float = 0.0
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
@@ -141,7 +143,7 @@ const NEEDS: Dictionary = {
 
 ## Factor on how far the carrier goes: a flying shot's `lifetime` (its range is speed x life),
 ## every other carrier's `ray_length` (a beam's, a dash's, a rain's aim point...). Several
-## multiply. Wasted where the carrier has no range (`StaffCompiler.reaches`).
+## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 
 

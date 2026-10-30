@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Homing on every form card in the registry, so a new form (or a change to one, or to the Homing
-## card) cannot get it wrong unseen. `StaffCompiler.homing_steers` and `homing_range` are the one
+## card) cannot get it wrong unseen. `Carrier.steers` and `Carrier.homing_range` are the one
 ## rule: a form homing steers must turn onto a target off its line anywhere it can reach (a
 ## bolt's flight, a beam's length), and on a form it cannot steer the Homing card must be listed
 ## as wasted and change nothing.
@@ -85,7 +85,7 @@ func test_there_are_forms_of_both_kinds() -> void:
 	var steered: int = 0
 	var not_steered: int = 0
 	for form in _forms():
-		if StaffCompiler.homing_steers(form.carrier):
+		if Carriers.of(form.carrier).steers():
 			steered += 1
 		else:
 			not_steered += 1
@@ -94,7 +94,7 @@ func test_there_are_forms_of_both_kinds() -> void:
 
 func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach() -> void:
 	for form in _forms():
-		if not StaffCompiler.homing_steers(form.carrier):
+		if not Carriers.of(form.carrier).steers():
 			continue
 		before_each()
 		var at: Vector2 = Vector2.from_angle(deg_to_rad(OFF_AIM)) * _reach(form) * FAR
@@ -130,7 +130,7 @@ func _check_move(form: FormBase, at: Vector2) -> void:
 		var to: Vector2 = _moves[0][2]
 		check(absf(to.angle_to(at)) < 0.01, "a homing %s blinks straight at a target %s px off at %s degrees: %s" % [form.id, roundi(at.length()), OFF_AIM, to])
 	else:
-		var homing: Homing = _spells.move_homing(1)
+		var homing: Homing = _spells.dashes().move_homing(1)
 		check(homing.homes() and homing.reach >= at.length(), "a homing %s turns the wizard toward a target %s px off (reach %s)" % [form.id, roundi(at.length()), homing.reach])
 
 
@@ -179,7 +179,7 @@ func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 
 func test_homing_on_a_form_it_cannot_steer_is_wasted_and_changes_nothing() -> void:
 	for form in _forms():
-		if StaffCompiler.homing_steers(form.carrier):
+		if Carriers.of(form.carrier).steers():
 			continue
 		var staff: CompiledStaff = StaffKit.compile(_spells, [&"homing", form.id] as Array[StringName])
 		check(staff.wasted.has(0), "homing on a %s is listed as wasted" % form.id)
@@ -194,4 +194,4 @@ func test_the_compiled_range_is_the_rule_for_each_form() -> void:
 	var reach: float = (_registry.call("get_resource", &"spells", &"homing") as ModifierBase).behaviour_reach
 	for form in _forms():
 		var spell: CompiledSpell = StaffKit.first(_spells, [&"homing", form.id] as Array[StringName])
-		check_equal(spell.homing_range, StaffCompiler.homing_range(form.carrier, form.ray_length, reach), "a homing %s looks as far as the rule says" % form.id)
+		check_equal(spell.homing_range, Carriers.of(form.carrier).homing_range(form.ray_length, reach), "a homing %s looks as far as the rule says" % form.id)

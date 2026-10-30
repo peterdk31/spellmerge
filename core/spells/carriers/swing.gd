@@ -6,7 +6,7 @@ extends Carrier
 ## Its rows: the live swings, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`). Its strikes go through the runtime as
 ## rays (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read
-## the `swing_*` getters (through `Spells`).
+## the `swing_*` getters (`Spells.swings()`).
 
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
@@ -55,6 +55,10 @@ func id() -> StringName:
 
 func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS
+
+
+func step_order() -> int:
+	return 4
 
 
 func required_fields() -> Dictionary:

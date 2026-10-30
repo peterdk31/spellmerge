@@ -2,8 +2,8 @@ class_name StaffPoses
 extends RefCounted
 ## The staff animation of each actor's body (`FormBase.staff_pose`), kept by the spell runtime
 ## (`Spells`, which owns it): `start` plays a carrier's keys from its cast, `end_strike` cuts its
-## strike short when the carrier's last shot ends, and `staff_pose` and the other getters (through
-## `Spells`) give the body's look where the staff is now.
+## strike short when the carrier's last shot ends, and `staff_pose` and the other getters (read
+## through `Spells.poses`) give the body's look where the staff is now.
 
 ## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
 ## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
@@ -69,7 +69,7 @@ func started_at(actor: int) -> float:
 ## of a carrier the staff keeps working (a beam's, rain's or dash's `lifetime`, a held one's until its
 ## last shot ends); none for one that leaves the staff (a bolt, a rune, an orbit).
 static func strike_of(spell: CompiledSpell, lifetime: float) -> float:
-	return maxf(lifetime, 0.0) if Carriers.of(spell.carrier).has(Carrier.HOLDS_STAFF) else 0.0
+	return maxf(lifetime, 0.0) if spell.has_trait(Carrier.HOLDS_STAFF) else 0.0
 
 
 ## Starts `actor`'s staff animation for `spell` (its `staff_pose`, cast with `tag`) now: `wind` and

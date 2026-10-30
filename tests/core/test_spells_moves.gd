@@ -502,6 +502,30 @@ func test_a_dash_is_drawn_where_its_caster_goes() -> void:
 	check_equal(_mgr.get_trail_count(), 1, "a teleport opens none")
 
 
+func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:
+	# A dash's request to move may end another dash at once (here wizard 1's, when wizard 0 asks):
+	# that end fires its `on expire` payload, a dash too, before the new one is drawn. The dash
+	# carrier once kept the way of the move it was launching on itself, so the payload's launch
+	# wrote its own way over the new dash's.
+	_distance_cards()
+	_mgr.set_anchor(1, Vector2.ZERO)
+	var first: int = _build(1, [&"on_expire", &"short", &"short"])
+	_build(0, [&"short"])
+	var shown: Array[Vector2] = []
+	var ended: Array[bool] = [false]
+	_bus.form_shown.connect(func(caster: int, form: StringName, _origin: Vector2, direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if form == &"dash" and caster == 0:
+			shown.append(direction))
+	_bus.caster_move_requested.connect(func(player: int, _mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void:
+		if player == 0 and not ended[0]:
+			ended[0] = true
+			_bus.caster_move_finished.emit(1, &"dash", Vector2(48.0, 0.0), first))
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0) >= 0.0, "wizard 0's dash is cast")
+	check(ended[0], "and it ended wizard 1's on the way")
+	check(shown.size() == 1 and shown[0].is_equal_approx(Vector2.DOWN), "wizard 0's dash is drawn along its own way, down: %s" % [shown])
+
+
 func test_a_teleport_blinks_its_card_distance() -> void:
 	_distance_cards()
 	_build(0, [&"blink"])
@@ -525,16 +549,16 @@ func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() 
 	_distance_cards()
 	_build(0, [&"homing", &"short"])
 	_cast(0)
-	var homing: Homing = _spells.move_homing(0)
+	var homing: Homing = _spells.dashes().move_homing(0)
 	check(is_equal_approx(homing.turn, 3.0) and is_equal_approx(homing.reach, 160.0), "the card's turn rate and reach: %s, %s" % [homing.turn, homing.reach])
 	_mgr.set_anchor(1, Vector2.ZERO)
 	_build(1, [&"short"])
 	_cast(1)
-	check(not _spells.move_homing(1).homes(), "a plain dash does not home")
+	check(not _spells.dashes().move_homing(1).homes(), "a plain dash does not home")
 	_build(0, [&"short"])
 	_tick(30)
 	_cast(0)
-	check(not _spells.move_homing(0).homes(), "nor does the next plain dash of the same wizard")
+	check(not _spells.dashes().move_homing(0).homes(), "nor does the next plain dash of the same wizard")
 
 
 func test_a_homing_teleport_bends_its_way_toward_a_target_and_blinks_its_distance() -> void:

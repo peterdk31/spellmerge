@@ -270,16 +270,16 @@ func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	_cast(2, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
 	# A beam lives on for its lifetime, so it is shown from the live beams, not announced.
 	check_equal(seen.size(), 0, "a beam is no announcement")
-	check_equal(_spells.beam_count(), 1, "one live beam")
+	check_equal(_spells.beams().beam_count(), 1, "one live beam")
 	var at: int = -1
-	for i in _spells.beam_slots():
-		if _spells.beam_on(i):
+	for i in _spells.beams().beam_slots():
+		if _spells.beams().beam_on(i):
 			at = i
-	check_equal(_spells.beam_caster(at), 2, "from the caster")
-	check_equal(_spells.beam_origin(at), Vector2(5, 6), "from the staff")
-	check(_spells.beam_origin(at).direction_to(_spells.beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
-	check(is_equal_approx(_spells.beam_reach(at), 200.0), "as long as it got (%s)" % str(_spells.beam_reach(at)))
-	check_equal(_spells.beam_tint(at), Color(0.88, 0.35, 0.18), "in the element's colour")
+	check_equal(_spells.beams().beam_caster(at), 2, "from the caster")
+	check_equal(_spells.beams().beam_origin(at), Vector2(5, 6), "from the staff")
+	check(_spells.beams().beam_origin(at).direction_to(_spells.beams().beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
+	check(is_equal_approx(_spells.beams().beam_reach(at), 200.0), "as long as it got (%s)" % str(_spells.beams().beam_reach(at)))
+	check_equal(_spells.beams().beam_tint(at), Color(0.88, 0.35, 0.18), "in the element's colour")
 	_build(1, 0, {"form": &"nova"})
 	_cast(1)
 	check_equal(seen.size(), 1, "one nova, one announcement, not one per shot")

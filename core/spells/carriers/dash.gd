@@ -39,6 +39,10 @@ func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
 
 
+func step_order() -> int:
+	return 1
+
+
 func bind(runtime: SpellRuntime, staff_poses: StaffPoses) -> void:
 	super(runtime, staff_poses)
 	for i in SpellRuntime.ACTORS:
@@ -61,14 +65,14 @@ func _move_seconds(spell: CompiledSpell) -> float:
 
 ## The body dashes: its owner picks the way (where it walks) and may home with `move_homing`; its
 ## way is drawn where it really goes, and it strikes every body it passes (`_start_pass`).
-func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
+func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[actor].start(spell, hash(Vector2i(actor, tag)))
 	rt.events.caster_move_requested.emit(actor, &"dash", origin + offset, seconds, tag)
 	var reach: float = origin.distance_to(rt.projectiles.clip_to_walls(origin, origin + offset))
-	rt.events.form_shown.emit(actor, &"dash", origin, _way, reach, spell.tint, spell.look)
+	rt.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	rt.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
 	_start_pass(spell, tag, actor, -1, seconds, chain, prev)
-	rt._lc_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, _way)
+	rt._lc_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
 
 
 func _moved_shot(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:

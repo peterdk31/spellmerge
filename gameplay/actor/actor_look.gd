@@ -6,7 +6,7 @@ extends Node2D
 ## and `step` last in every step, after the body's velocity is set; a look has no process
 ## callback of its own.
 
-## The staff animations (`Spells.staff_pose` and the rest: the carrier card's `staff_pose`, played
+## The staff animations (`Spells.poses().staff_pose` and the rest: the carrier card's `staff_pose`, played
 ## for the actor's own cast) every look shows the same way through `apply_pose` and `pose_offset`:
 ## the body lifted, pushed along the aim and shaking, stretched along the aim, glowing in the
 ## infusion's colour (else the ramp's) and the face's brows in the animation's mood. Only the turn
@@ -15,11 +15,11 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## The shots' sprite shader (core/README.md, "The shot shaders"): the body's glow keeps the
 ## sprite's own colours (`core_override` alpha 0) and adds light round it.
 const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
-## How bright the body's glow is at an animation's full glow (`Spells.staff_glow` 1).
+## How bright the body's glow is at an animation's full glow (`Spells.poses().staff_glow` 1).
 const POSE_GLOW: float = 1.6
 ## How fast a shaking body jitters (radians a second on each axis, out of step).
 const SHAKE_RATE: Vector2 = Vector2(97.0, 83.0)
-## The brows an animation's mood (`Spells.staff_mood`) shows, by its name, renewed each step for
+## The brows an animation's mood (`Spells.poses().staff_mood`) shows, by its name, renewed each step for
 ## this long while the animation says so (it fades right after).
 const POSE_MOODS: Dictionary = {&"raised": Face.Mood.RAISED, &"angry": Face.Mood.ANGRY, &"furious": Face.Mood.FURIOUS, &"worried": Face.Mood.WORRIED}
 const POSE_MOOD_SECONDS: float = 0.08
@@ -45,7 +45,7 @@ func step(_delta: float) -> void:
 func pose_dir() -> Vector2:
 	if actor == null or actor.spells == null or actor.is_down():
 		return Vector2.ZERO
-	return actor.spells.staff_pose_dir(actor.id)
+	return actor.spells.poses().staff_pose_dir(actor.id)
 
 
 ## How far the animation moves the body now: up by its lift, along the aim by its push and about by
@@ -54,8 +54,8 @@ func pose_offset(time: float) -> Vector2:
 	var dir: Vector2 = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ZERO
-	var pose: Vector3 = actor.spells.staff_pose(actor.id)
-	var shake: float = actor.spells.staff_shake(actor.id)
+	var pose: Vector3 = actor.spells.poses().staff_pose(actor.id)
+	var shake: float = actor.spells.poses().staff_shake(actor.id)
 	var jitter: Vector2 = Vector2(sin(time * SHAKE_RATE.x), cos(time * SHAKE_RATE.y)) * shake
 	return (Vector2(0.0, -pose.y) + dir * pose.z + jitter).round()
 
@@ -66,7 +66,7 @@ func pose_scale() -> Vector2:
 	var dir: Vector2 = pose_dir()
 	if dir.is_zero_approx():
 		return Vector2.ONE
-	var along: float = maxf(1.0 + actor.spells.staff_stretch(actor.id), 0.2)
+	var along: float = maxf(1.0 + actor.spells.poses().staff_stretch(actor.id), 0.2)
 	if absf(dir.x) >= absf(dir.y):
 		return Vector2(along, 1.0 / along)
 	return Vector2(1.0 / along, along)
@@ -83,9 +83,9 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool) -> void:
 			_pose_stretched = scale_now != Vector2.ONE
 			sprite.scale = scale_now
 	if sprite != null:
-		_apply_glow(sprite, actor.spells.staff_glow(actor.id) if posing else 0.0)
+		_apply_glow(sprite, actor.spells.poses().staff_glow(actor.id) if posing else 0.0)
 	if face != null and posing:
-		var mood: StringName = actor.spells.staff_mood(actor.id)
+		var mood: StringName = actor.spells.poses().staff_mood(actor.id)
 		if POSE_MOODS.has(mood):
 			face.show_mood(POSE_MOODS[mood] as Face.Mood, POSE_MOOD_SECONDS)
 
@@ -107,7 +107,7 @@ func _apply_glow(sprite: Sprite2D, glow: float) -> void:
 		_glow_material.shader = SPRITE_SHADER
 		_glow_material.set_shader_parameter(&"core_override", Color(0.0, 0.0, 0.0, 0.0))
 	# The infusion's colour when it has one, else the actor's ramp's.
-	var tint: Color = actor.spells.staff_glow_tint(actor.id)
+	var tint: Color = actor.spells.poses().staff_glow_tint(actor.id)
 	var colour: Color = ProjectilesScript.ramp_light(actor.ramp) if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
 	_glow_material.set_shader_parameter(&"glow_color", colour)
 	_glow_material.set_shader_parameter(&"sprite_glow", glow * POSE_GLOW)

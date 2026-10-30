@@ -20,6 +20,10 @@ func _follows_caster() -> bool:
 	return false
 
 
+func step_order() -> int:
+	return 3
+
+
 ## A held one is switched off: `ai` is asked to end it, and it ends as any.
 func switch_off(tag: int) -> void:
 	if _entities.has(tag) and rt.events != null:

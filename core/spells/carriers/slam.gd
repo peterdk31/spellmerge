@@ -6,7 +6,7 @@ extends Carrier
 ## Its rows: the live slams, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`, `clear`). Its strikes go through the runtime as rays
 ## (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read the
-## `slam_*` getters (through `Spells`).
+## `slam_*` getters (`Spells.slams()`).
 
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
@@ -43,6 +43,10 @@ func id() -> StringName:
 
 func traits() -> int:
 	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS
+
+
+func step_order() -> int:
+	return 5
 
 
 func required_fields() -> Dictionary:

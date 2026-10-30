@@ -122,8 +122,8 @@ func _tick(steps: int) -> void:
 
 ## The row of the one live beam, or -1.
 func _beam() -> int:
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at):
+	for at in _spells.beams().beam_slots():
+		if _spells.beams().beam_on(at):
 			return at
 	return -1
 
@@ -186,7 +186,7 @@ func test_a_ghost_beam_is_drawn_through_the_wall_for_its_whole_length() -> void:
 	var at: int = _beam()
 	check(at >= 0, "the beam is on")
 	if at >= 0:
-		check(absf(_spells.beam_reach(at) - 200.0) < 0.01, "its whole 200 px (%s)" % str(_spells.beam_reach(at)))
+		check(absf(_spells.beams().beam_reach(at) - 200.0) < 0.01, "its whole 200 px (%s)" % str(_spells.beams().beam_reach(at)))
 
 
 func test_a_magnet_beam_pulls_toward_its_line_every_step() -> void:
@@ -232,9 +232,9 @@ func test_a_growing_beam_widens_every_second_it_is_on() -> void:
 	check(at >= 0, "the beam is on")
 	if at < 0:
 		return
-	check(is_equal_approx(_spells.beam_growth(at), 1.0), "as wide as its carrier at first")
+	check(is_equal_approx(_spells.beams().beam_growth(at), 1.0), "as wide as its carrier at first")
 	_tick(60)
-	check(absf(_spells.beam_growth(at) - 2.0) < 0.1, "twice as wide after a second (%s)" % str(_spells.beam_growth(at)))
+	check(absf(_spells.beams().beam_growth(at) - 2.0) < 0.1, "twice as wide after a second (%s)" % str(_spells.beams().beam_growth(at)))
 	_tick(90)
 	check(_hits_on(off) > 0, "and wide enough to hit the target off its line")
 
@@ -254,11 +254,11 @@ func test_a_spiral_beam_waves_and_hits_along_the_wave() -> void:
 	check(at >= 0, "the beam is on")
 	if at < 0:
 		return
-	var count: int = _spells.beam_point_count(at)
+	var count: int = _spells.beams().beam_point_count(at)
 	check(count > 2 and count <= 80, "its path is drawn along the wave, inside the shader's 80 points (%d)" % count)
 	var widest: float = 0.0
 	for n in count:
-		widest = maxf(widest, absf(_spells.beam_point(at, n).y))
+		widest = maxf(widest, absf(_spells.beams().beam_point(at, n).y))
 	check(absf(widest - 12.0) < 0.5, "12 px either side, half the card's 24 (%s)" % str(widest))
 
 
@@ -270,12 +270,12 @@ func test_a_spiral_beam_waves_on_after_it_turns_at_a_wall() -> void:
 	check(at >= 0, "the beam is on")
 	if at < 0:
 		return
-	var count: int = _spells.beam_point_count(at)
+	var count: int = _spells.beams().beam_point_count(at)
 	var turn: int = 0
 	for n in count:
-		if _spells.beam_point(at, n).x > _spells.beam_point(at, turn).x:
+		if _spells.beams().beam_point(at, n).x > _spells.beams().beam_point(at, turn).x:
 			turn = n
-	check(_spells.beam_point(at, turn).x > 78.0, "it turned at the wall (%s)" % str(_spells.beam_point(at, turn)))
+	check(_spells.beams().beam_point(at, turn).x > 78.0, "it turned at the wall (%s)" % str(_spells.beams().beam_point(at, turn)))
 	check(count - 1 - turn >= 3, "and goes on waving, not straight (%d points past the turn)" % (count - 1 - turn))
 
 

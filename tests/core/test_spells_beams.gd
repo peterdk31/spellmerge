@@ -121,8 +121,8 @@ func _tick(steps: int) -> void:
 
 ## The row of the one live beam, or -1.
 func _beam() -> int:
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at):
+	for at in _spells.beams().beam_slots():
+		if _spells.beams().beam_on(at):
 			return at
 	return -1
 
@@ -132,10 +132,10 @@ func test_a_beam_hits_at_once_then_every_tick_until_its_life_is_over() -> void:
 	var tag: int = _build([&"beam"])
 	_cast()
 	check_equal(_hits.size(), 1, "a hit at once")
-	check_equal(_spells.beam_count(), 1, "the beam stays on")
+	check_equal(_spells.beams().beam_count(), 1, "the beam stays on")
 	_tick(60)
-	check_equal(_hits.size(), SpellsScript.beam_hits(&"beam", 0.3), "one hit every tick of its 0.3 s life")
-	check_equal(_spells.beam_count(), 0, "then it is gone")
+	check_equal(_hits.size(), Carriers.of(&"beam").hits_per_target(0.3), "one hit every tick of its 0.3 s life")
+	check_equal(_spells.beams().beam_count(), 0, "then it is gone")
 	check_equal(_spells.live_shots(tag), 0, "and no longer counted")
 
 
@@ -146,8 +146,8 @@ func test_a_beam_follows_the_wizards_aim_while_it_lives() -> void:
 	_spells.set_aim(0, Vector2(10, 5), Vector2.DOWN)
 	_tick(1)
 	var at: int = _beam()
-	check_equal(_spells.beam_origin(at), Vector2(10, 5), "from the staff tip where it is now")
-	check(_spells.beam_origin(at).direction_to(_spells.beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim as it is now")
+	check_equal(_spells.beams().beam_origin(at), Vector2(10, 5), "from the staff tip where it is now")
+	check(_spells.beams().beam_origin(at).direction_to(_spells.beams().beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim as it is now")
 
 
 func test_a_downed_wizards_beam_ends() -> void:
@@ -156,7 +156,7 @@ func test_a_downed_wizards_beam_ends() -> void:
 	_cast()
 	_spells.clear_aim(0)
 	_tick(1)
-	check_equal(_spells.beam_count(), 0, "a wizard with no aim holds no beam")
+	check_equal(_spells.beams().beam_count(), 0, "a wizard with no aim holds no beam")
 
 
 func test_a_homing_beam_bends_onto_a_target_off_its_line() -> void:
@@ -169,8 +169,8 @@ func test_a_homing_beam_bends_onto_a_target_off_its_line() -> void:
 	_build([&"homing", &"beam"])
 	_cast()
 	var at: int = _beam()
-	check(_spells.beam_end(at).is_equal_approx(off.global_position), "it ends on the target: %s" % _spells.beam_end(at))
-	check(is_equal_approx(_spells.beam_bend(at).y, 0.0) and _spells.beam_bend(at).x > 0.0, "it leaves along the aim and bends: %s" % _spells.beam_bend(at))
+	check(_spells.beams().beam_end(at).is_equal_approx(off.global_position), "it ends on the target: %s" % _spells.beams().beam_end(at))
+	check(is_equal_approx(_spells.beams().beam_bend(at).y, 0.0) and _spells.beams().beam_bend(at).x > 0.0, "it leaves along the aim and bends: %s" % _spells.beams().beam_bend(at))
 	check(_hits.size() == 1 and _hits[0][1] == off, "and hits it")
 
 
@@ -180,9 +180,9 @@ func test_a_homing_beam_never_reaches_past_its_length() -> void:
 	_build([&"far_homing", &"beam"])
 	_cast()
 	var at: int = _beam()
-	check(_spells.beam_end(at).is_equal_approx(far.global_position), "it bends toward a target past its end")
+	check(_spells.beams().beam_end(at).is_equal_approx(far.global_position), "it bends toward a target past its end")
 	check(_hits.is_empty(), "but does not hit it")
-	check(_spells.beam_reach(at) <= 200.0 + 0.01, "it is cut at its 200 px: %s" % _spells.beam_reach(at))
+	check(_spells.beams().beam_reach(at) <= 200.0 + 0.01, "it is cut at its 200 px: %s" % _spells.beams().beam_reach(at))
 
 
 func test_a_homing_beam_with_pierce_bends_on_to_another_target_after_a_hit() -> void:
@@ -201,18 +201,18 @@ func test_a_homing_beam_with_pierce_bends_on_to_another_target_after_a_hit() -> 
 		hit.append(h[1])
 	check(hit.has(first) and hit.has(second), "with pierce it hits one, then bends on to the other: %s" % [hit])
 	var at: int = _beam()
-	check(_spells.beam_point_count(at) > ManagerScript.RAY_SEGMENTS + 1, "its path has a second bend (%d points)" % _spells.beam_point_count(at))
+	check(_spells.beams().beam_point_count(at) > ManagerScript.RAY_SEGMENTS + 1, "its path has a second bend (%d points)" % _spells.beams().beam_point_count(at))
 
 
 func test_a_held_beam_stays_on_until_its_staff_is_cast_again() -> void:
 	var tag: int = _build([&"hold", &"beam"])
 	_cast()
 	_tick(300)
-	check_equal(_spells.beam_count(), 1, "on after five seconds")
+	check_equal(_spells.beams().beam_count(), 1, "on after five seconds")
 	check(_spells.is_holding(0, 0), "the staff holds it")
 	_tick(30)
 	_cast()
-	check_equal(_spells.beam_count(), 0, "a second cast switches it off")
+	check_equal(_spells.beams().beam_count(), 0, "a second cast switches it off")
 	check_equal(_spells.live_shots(tag), 0, "and it is no longer counted")
 
 
@@ -235,8 +235,8 @@ func test_a_beam_in_a_payload_follows_the_shot_that_fired_it() -> void:
 	var beam: int = _beam()
 	check(beam >= 0, "the timer cast a beam")
 	_tick(5)
-	check(_spells.beam_origin(beam).is_equal_approx(_mgr.get_position_of(bolt)), "it leaves from the bolt as it flies: %s, %s" % [_spells.beam_origin(beam), _mgr.get_position_of(bolt)])
-	check(_spells.beam_origin(beam).direction_to(_spells.beam_end(beam)).is_equal_approx(Vector2.RIGHT), "along the bolt's way")
+	check(_spells.beams().beam_origin(beam).is_equal_approx(_mgr.get_position_of(bolt)), "it leaves from the bolt as it flies: %s, %s" % [_spells.beams().beam_origin(beam), _mgr.get_position_of(bolt)])
+	check(_spells.beams().beam_origin(beam).direction_to(_spells.beams().beam_end(beam)).is_equal_approx(Vector2.RIGHT), "along the bolt's way")
 
 
 func test_a_curved_ray_hits_a_target_on_its_curve_once() -> void:
@@ -270,11 +270,11 @@ func test_two_homing_cards_bend_a_beam_onto_a_target_one_cannot_reach() -> void:
 	var off: Node2D = _target(Vector2.from_angle(deg_to_rad(60.0)) * 100.0)
 	_build([&"homing", &"beam"])
 	_cast()
-	check(not _spells.beam_end(_beam()).is_equal_approx(off.global_position), "one homing card does not reach it")
+	check(not _spells.beams().beam_end(_beam()).is_equal_approx(off.global_position), "one homing card does not reach it")
 	_tick(30)
 	_build([&"homing", &"homing", &"beam"])
 	_cast()
-	check(_spells.beam_end(_beam()).is_equal_approx(off.global_position), "two do: %s" % _spells.beam_end(_beam()))
+	check(_spells.beams().beam_end(_beam()).is_equal_approx(off.global_position), "two do: %s" % _spells.beams().beam_end(_beam()))
 
 
 ## A wall the beam meets on its way down to the right, at x = 80: a beam that turns off it comes
@@ -299,12 +299,12 @@ func test_a_bouncing_beam_turns_at_a_wall_and_hits_what_is_past_the_turn() -> vo
 	check(at >= 0, "the beam is on")
 	if at < 0:
 		return
-	check(_spells.beam_reach(at) > 114.0, "it got past the turn, to the target that spends it (%s)" % str(_spells.beam_reach(at)))
-	check(_spells.beam_point_count(at) >= 3, "its path has the turn, so it is drawn along it")
-	var turn: Vector2 = _spells.beam_point(at, 1)
+	check(_spells.beams().beam_reach(at) > 114.0, "it got past the turn, to the target that spends it (%s)" % str(_spells.beams().beam_reach(at)))
+	check(_spells.beams().beam_point_count(at) >= 3, "its path has the turn, so it is drawn along it")
+	var turn: Vector2 = _spells.beams().beam_point(at, 1)
 	check(turn.x > 79.0 and turn.x < 80.0, "the turn is at the wall (%s)" % str(turn))
 	_tick(30)
-	check_equal(_hits.size(), SpellsScript.beam_hits(&"beam", 0.3), "it hits it every tick of its life, along the same turn")
+	check_equal(_hits.size(), Carriers.of(&"beam").hits_per_target(0.3), "it hits it every tick of its life, along the same turn")
 
 
 func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
@@ -340,4 +340,4 @@ func test_a_homing_beam_homes_again_after_it_turns_at_a_wall() -> void:
 		check(_hits[0][1] == behind, "the target past the turn")
 	var at: int = _beam()
 	if at >= 0:
-		check(_spells.beam_point_count(at) > 3, "its drawn path bends after the turn (%d points)" % _spells.beam_point_count(at))
+		check(_spells.beams().beam_point_count(at) > 3, "its drawn path bends after the turn (%d points)" % _spells.beams().beam_point_count(at))

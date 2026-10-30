@@ -37,14 +37,21 @@ are `CarrierTraits`):
 B.RETURN: {"any": FLIES},
 B.CHAIN:  {"any": HITS},
 B.HOLD:   {"any": LASTS, "not": MOVES_CASTER},
+B.HEAVY:  {"any": HITS, "or_cards": [B.BLAST]},
+E.BLOCK:  {"any": MEETS_SHOTS, "cards": [B.SHIELD, B.DEFLECT]},
+E.WALL:   {"any": FLIES | LINE, "not_cards": [B.GHOST]},
 ```
+
+A need may also name cards: `"or_cards"` stand in for the traits (a blast's area hit carries the
+carrier's tag), `"cards"` must be on the carrier (or an infusion, where `"or_infused"`), and
+`"not_cards"` stop it where they work. The compiler has no case per behaviour or trigger.
 
 From those two the compiler works out, every time a staff is built, whether a card does anything
 on a carrier: yes or no (Return needs `FLIES`; a decoy does not fly, so Return does nothing on a
 decoy). A card that does nothing is marked in the builder; no text explains it (owner, 2026-10-30:
 the visuals are enough). A card not in `NEEDS` works on every carrier
 (numbers, blast, echo, recoil). On a carrier that hits nothing, a blast carries an infusion and
-heavy (`takes_infusion`, `BLAST_CARRIES`).
+heavy (`takes_infusion`, and heavy's `"or_cards"` in `ModifierBase.NEEDS`).
 
 `tests/core/test_card_rules.gd` plays every card on every carrier in a small world and fails where
 the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
@@ -87,15 +94,17 @@ a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
 ## Adding a carrier
 
 1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, and
-   answer the questions in `traits()` and `required_fields()`; list it in `Carriers.make_all`.
+   answer the questions in `traits()` and `required_fields()`. `Carriers.make_all` finds it in the
+   folder by its `class_name`; give it a `step_order()` only if its rows must step before or after
+   another carrier's.
 2. Override the hooks it needs (at least `launch` or `shoot`).
 3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`.
 
-Removing a carrier is deleting its script and its line in `make_all`. A form card that still names
+Removing a carrier is deleting its script. A form card that still names
 it is refused by the validator.
 
 ## Adding a modifier behaviour or a trigger
 
 Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`), implement it, and,
-if it does not work on every carrier, say what it needs in `ModifierBase.NEEDS` (or `TriggerBase.NEEDS`). If it
+if it does not work on every carrier, say what it needs in `ModifierBase.NEEDS` (or `TriggerBase.NEEDS`), traits and cards alike. If it
 needs something no flag asks yet, add the flag and answer it on each carrier.

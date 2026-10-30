@@ -150,22 +150,23 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				trigger_slot = slot
 		elif card is FormBase:
 			var form := card as FormBase
+			var on: Carrier = Carriers.of(form.carrier)
 			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
 			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
 			var deflects: bool = false
 			var blasts: bool = false
 			for modifier in modifiers:
-				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.carrier))
-				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and behaviour_runs(modifier.behaviour, form.carrier))
+				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
+				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
 			for modifier in modifiers:
 				# A deflect turns every shot that touches it first, so a shield with it never blocks.
-				var works: bool = not (deflects and _shield_outrun(modifier, form.carrier)) and behaviour_runs(modifier.behaviour, form.carrier, blasts) and _numbers_count(modifier, form.carrier, blasts)
+				var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts)
 				if works or keep_wasted:
 					kept_modifiers.append(modifier)
 			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
 			var kept_elements: Array[ElementBase] = []
-			if Carriers.of(form.carrier).takes_infusion(blasts) or keep_wasted:
+			if on.takes_infusion(blasts) or keep_wasted:
 				kept_elements = elements
 			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -259,59 +260,38 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 	return not is_equal_approx(modifier.damage_mult, 1.0) or not is_equal_approx(modifier.radius_mult, 1.0)
 
 
-## True when `trigger` can fire on `form` with these infusions and kept modifiers (`trigger_fires`).
+## True when `trigger` can fire on `form` with these infusions and kept modifiers: all the trigger
+## needs (`TriggerBase.NEEDS`, `Carrier.fires_with`), the one rule for the compiler and `card_works`.
 func _trigger_fires(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
 	var has: Dictionary = {}
 	for modifier in modifiers:
 		has[modifier.behaviour] = true
-	return trigger_fires(trigger.event, form.carrier, has, not elements.is_empty())
-
-
-## True when a trigger of `event` can fire on the carrier `carrier` with the modifier behaviours in
-## `has` (behaviour -> true) and an infusion when `infused`: the carrier must be able to set it off
-## (`trigger_runs`), and the cards the event needs must be on it: a block needs a shield or
-## deflect, a kill or reaction on a carrier that hits nothing a blast (whose area hit carries the
-## carrier's tag), a reaction an infusion (or relay); a ghost never meets a wall. One rule for the
-## compiler and `card_works`.
-static func trigger_fires(event: int, carrier: StringName, has: Dictionary, infused: bool) -> bool:
-	if not trigger_runs(event, carrier):
-		return false
-	match event:
-		TriggerBase.Event.BLOCK:
-			return has.has(ModifierBase.Behaviour.SHIELD) or has.has(ModifierBase.Behaviour.DEFLECT)
-		TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
-			if not hits(carrier) and not has.has(ModifierBase.Behaviour.BLAST):
-				return false
-			if event == TriggerBase.Event.REACTION and not infused and not has.has(ModifierBase.Behaviour.RELAY):
-				return false
-		TriggerBase.Event.WALL:
-			return not (has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, carrier))
-	return true
+	return Carriers.of(form.carrier).fires_with(trigger.event, has, not elements.is_empty())
 
 
 ## True when `card` does something on the carrier `carrier` when it is the only other card there:
 ## what the builder, a reward screen or a bot asks before a card is placed. The same rules as a
 ## compile of `[card, carrier]` (a trigger with a payload after it); a form or a multicast always.
 static func card_works(card: SpellComponent, carrier: StringName) -> bool:
+	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return behaviour_runs(modifier.behaviour, carrier) and _numbers_count(modifier, carrier, false)
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false)
 	if card is ElementBase:
-		return Carriers.of(carrier).takes_infusion(false)
+		return on.takes_infusion(false)
 	if card is TriggerBase:
-		return trigger_fires((card as TriggerBase).event, carrier, {}, false)
+		return on.fires_with((card as TriggerBase).event, {}, false)
 	return true
 
 
-## True when one of a modifier's numbers counts on the carrier `carrier` (or it has a behaviour). Its
+## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: damage where it hits (or blasts), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
-## behaviour (`behaviour_runs`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, carrier: StringName, blasts: bool) -> bool:
+## behaviour (`Carrier.works`), its numbers ride with it.
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
-	var on: Carrier = Carriers.of(carrier)
 	var any: bool = false
 	if modifier.cooldown_mult < 1.0 or not is_equal_approx(modifier.radius_mult, 1.0):
 		return true
@@ -364,6 +344,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	spell.lifetime = SpellLimits.MIN_LIFETIME
+	var carrier: Carrier = Carriers.of(form.carrier if form != null else &"")
 	if form != null:
 		spell.form_id = form.id
 		spell.form_name = _name(form)
@@ -408,7 +389,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
 		spell.lifetime *= modifier.lifetime_mult
-		if flies(spell.carrier):
+		if carrier.flies():
 			spell.lifetime *= modifier.reach_mult
 		else:
 			spell.ray_length *= modifier.reach_mult
@@ -437,7 +418,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.shots = shots
 	spell.shots_requested = shots
 	spell.pierce = pierce
-	var carrier: Carrier = Carriers.of(spell.carrier)
 	if spell.shots > 1 and spell.spread <= 0.0 and not carrier.has(Carrier.RING):
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
@@ -455,7 +435,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
 	if spell.homing_turn > 0.0:
-		spell.homing_range = homing_range(spell.carrier, spell.ray_length, homing_reach)
+		spell.homing_range = carrier.homing_range(spell.ray_length, homing_reach)
 		# Past 180 degrees it would be bending back the other way: that is all the way round.
 		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), 180.0)
 	if heals:
@@ -502,71 +482,11 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 	return before + strength
 
 
-## Whether homing can steer the carrier `carrier` (`Carrier.STEERS`): what it moves turns toward a
-## target, a still shot creeps toward one, what is over at once bends its way, and a rain or wall is
-## placed on one (rules R4i). The homing test of every form card (tests/content/spells/
-## test_homing_forms.gd) checks it reaches.
-static func homing_steers(carrier: StringName) -> bool:
-	return Carriers.of(carrier).steers()
-
-
-## True when the carrier `carrier` can run `behaviour` (with a blast on it, when `blasts`): its
-## yes/no answers (`CarrierTraits`) meet what the behaviour needs (`ModifierBase.NEEDS`). A card
-## whose behaviour cannot run is wasted, and changes nothing else either. tests/core/test_card_rules.gd
-## plays every card on every carrier and fails where this is wrong.
-static func behaviour_runs(behaviour: int, carrier: StringName, blasts: bool = false) -> bool:
-	return Carriers.of(carrier).works(behaviour, blasts)
-
-
-## True for the carriers that are a shot flying out on its own (a bolt, a hook, a swap).
-static func flies(carrier: StringName) -> bool:
-	return Carriers.of(carrier).flies()
-
-
-## True for the carriers that go a distance `reach` stretches (`Carrier.REACHES`).
-static func reaches(carrier: StringName) -> bool:
-	return Carriers.of(carrier).reaches()
-
-
-## True for the carriers that are shots staying in the world for a while (`Carrier.STAYS`).
-static func stays(carrier: StringName) -> bool:
-	return Carriers.of(carrier).stays()
-
-
-## True for the carriers that last a while (`Carrier.LASTS`, rules R4d).
-static func lasts(carrier: StringName) -> bool:
-	return Carriers.of(carrier).lasts()
-
-
-## True for the carriers that hit under their own tag (`Carrier.HITS`, rules R4c, R4g).
-static func hits(carrier: StringName) -> bool:
-	return Carriers.of(carrier).hits()
-
-
-## True for the carriers whose shield only stops shots that touch them (`Carrier.GUARDS`): on these
-## a deflect turns every such shot first (owner, 2026-10-29), so a shield with it never blocks.
-static func guards(carrier: StringName) -> bool:
-	return Carriers.of(carrier).guards()
-
-
-## True when `modifier` is a shield that a deflect on the carrier `carrier` leaves with nothing to do.
-static func _shield_outrun(modifier: ModifierBase, carrier: StringName) -> bool:
-	return modifier.behaviour == ModifierBase.Behaviour.SHIELD and guards(carrier)
-
-
-## True when a trigger of `event` (`TriggerBase.Event`) can fire on the carrier `carrier`: its
-## carrier's table (`Carrier.events`); `_trigger_never` adds the cards the event needs. Where it
-## cannot, the trigger and its payload are wasted (rules R2b, docs/milestones/M2-rules.md).
-static func trigger_runs(event: int, carrier: StringName) -> bool:
-	return Carriers.of(carrier).fires(event)
-
-
-## How far a homing carrier looks for its target, the one rule for every form: as far as its
-## homing cards reach (`ModifierBase.behaviour_reach`, the largest), and one that is over at
-## once (a beam, a teleport: `Carrier.INSTANT_HOMING`) at least as far as it goes, so its far end
-## homes too. 0 where homing cannot steer.
-static func homing_range(carrier: StringName, ray_length: float, reach: float) -> float:
-	return Carriers.of(carrier).homing_range(ray_length, reach)
+## True when `modifier` is a shield that a deflect on the carrier `on` leaves with nothing to do: on
+## a carrier whose shield only stops shots that touch it (`Carrier.GUARDS`) a deflect turns every
+## such shot first (owner, 2026-10-29), so a shield with it never blocks.
+static func _shield_outrun(modifier: ModifierBase, on: Carrier) -> bool:
+	return modifier.behaviour == ModifierBase.Behaviour.SHIELD and on.guards()
 
 
 ## The look of a carrier's shots (docs/milestones/M2-staffs.md, "The look of a shot"): the

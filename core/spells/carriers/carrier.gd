@@ -12,13 +12,6 @@ extends RefCounted
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
 ## wrong (a card that does nothing but is not said to, or the other way round).
 
-const B := ModifierBase.Behaviour
-const E := TriggerBase.Event
-
-## The modifier behaviours a blast's area hit carries on a carrier that hits nothing itself (heavy's
-## knockback and slam ride on it), so what they need (`ModifierBase.NEEDS`) stands only without a blast.
-const BLAST_CARRIES: Array[int] = [B.HEAVY]
-
 ## The questions a carrier answers in `traits()` (`CarrierTraits`, where each is explained).
 const FLIES: int = CarrierTraits.FLIES
 const STAYS: int = CarrierTraits.STAYS
@@ -51,6 +44,13 @@ func id() -> StringName:
 
 
 func traits() -> int:
+	return 0
+
+
+## Where it runs among the carriers each step (`step`) and when they are ended or cleared: lower
+## first, then by id. A dash strikes before beams, swings and slams hit (the order the runtime had
+## before carriers had their own scripts); the others keep no rows that meet.
+func step_order() -> int:
 	return 0
 
 
@@ -98,26 +98,54 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits meet
-## what the behaviour needs (`ModifierBase.NEEDS`). The carrier that runs nothing (id &"") runs no card.
+## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or
+## the blast, meet what the behaviour needs (`ModifierBase.NEEDS`). The carrier that runs nothing
+## (id &"") runs no card.
 func works(behaviour: int, blasts: bool = false) -> bool:
 	if id() == &"":
 		return false
-	if blasts and BLAST_CARRIES.has(behaviour):
-		return true
-	return _meets(ModifierBase.NEEDS.get(behaviour, {}))
+	var need: Dictionary = ModifierBase.NEEDS.get(behaviour, {})
+	return _meets(need) or (blasts and (need.get("or_cards", []) as Array).has(ModifierBase.Behaviour.BLAST))
 
 
-## True when a trigger of `event` can ever go off on it: its traits meet what the trigger needs
-## (`TriggerBase.NEEDS`).
+## True when a trigger of `event` can ever go off on it, given the cards it needs: its traits meet
+## what the trigger needs (`TriggerBase.NEEDS`), or a card can stand in for them.
 func fires(event: int) -> bool:
-	return id() != &"" and _meets(TriggerBase.NEEDS.get(event, {}))
+	if id() == &"":
+		return false
+	var need: Dictionary = TriggerBase.NEEDS.get(event, {})
+	return _meets(need) or not (need.get("or_cards", []) as Array).is_empty()
+
+
+## True when a trigger of `event` goes off on it with the modifier behaviours in `has` (behaviour ->
+## true) on it, and an infusion when `infused`: all that the trigger needs (`TriggerBase.NEEDS`).
+func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
+	if id() == &"":
+		return false
+	var need: Dictionary = TriggerBase.NEEDS.get(event, {})
+	if not _meets(need) and not _has_one(has, need.get("or_cards", [])):
+		return false
+	var cards: Array = need.get("cards", [])
+	if not cards.is_empty() and not _has_one(has, cards) and not (infused and bool(need.get("or_infused", false))):
+		return false
+	for behaviour: int in need.get("not_cards", []):
+		if has.has(behaviour) and works(behaviour):
+			return false
+	return true
 
 
 ## True when its traits meet `need` (a `NEEDS` row; empty: always).
 func _meets(need: Dictionary) -> bool:
 	var any: int = int(need.get("any", 0))
 	return (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0
+
+
+## True when one of `behaviours` is in `has`.
+static func _has_one(has: Dictionary, behaviours: Array) -> bool:
+	for behaviour: int in behaviours:
+		if has.has(behaviour):
+			return true
+	return false
 
 
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.
@@ -131,7 +159,7 @@ func handles_recoil() -> bool:
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`
-## (`StaffCompiler.homing_range`); 0 where homing cannot steer it.
+## (`CompiledSpell.homing_range`); 0 where homing cannot steer it.
 func homing_range(ray_length: float, reach: float) -> float:
 	if not steers():
 		return 0.0
@@ -155,8 +183,11 @@ func bind(runtime: SpellRuntime, _staff_poses: StaffPoses) -> void:
 ## One launch of `spell` from `origin` along `direction` (`Spells._launch`): how many shots, rows or
 ## moves it made (0 when none could start). `lifetime` is the carrier's (a held one's is longer),
 ## `chain` the jumps its hits carry and `prev` the target they jump from. By default `spell.shots`
-## leave in a fan (or round a ring), each made by `shoot`.
+## leave in a fan (or round a ring), each made by `shoot`. The carrier that runs nothing (id &"")
+## makes none: the runtime falls back to it, unbound, for a carrier id no carrier has.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	if id() == &"":
+		return 0
 	var made: int = 0
 	var count: int = spell.shots
 	for n in count:
@@ -168,6 +199,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 ## Shot `n` of `count` of one launch, along `heading` (`direction` is the launch's aim): 1 when it
 ## was made. By default a shot flying along `heading`.
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	if id() == &"":
+		return 0
 	var slot: int = rt.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
 	return rt._land_shot(slot, spell, tag, source, chain, prev)
 
@@ -211,6 +244,17 @@ func reset_actor(_actor: int) -> void:
 ## A held (`hold`) carrier of `tag` is switched off (its staff cast again or edited): what is still
 ## on ends. Its shots in the manager are removed by the runtime.
 func switch_off(_tag: int) -> void:
+	pass
+
+
+## How many times one cast that lives `lifetime` seconds hits one target (a beam ticks): once.
+func hits_per_target(_lifetime: float) -> int:
+	return 1
+
+
+## A carrier that reads a payload of its own (`CARRIES_PAYLOAD`, a rain) lands it when its waiting
+## launch is due (`Spells._run_pending`): `group` falls at `point`.
+func land(_spell: CompiledSpell, _group: CompiledGroup, _actor: int, _staff: int, _generation: int, _point: Vector2, _heading: Vector2, _echoed: bool = false) -> void:
 	pass
 
 

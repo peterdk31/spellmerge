@@ -7,7 +7,7 @@ extends ActorComponent
 ##
 ## - `dash`: goes the way the intent walks (the way the actor aims when it stands), as far and as
 ##   long as the card asks (`to` is measured from the staff tip); it turns toward a target as it
-##   goes when the card homes (`Spells.move_homing`).
+##   goes when the card homes (`Spells.dashes().move_homing`).
 ## - `teleport`: jumps at once along the card's line (`to` measured from the staff tip), stopping
 ##   TELEPORT_CLEARANCE short of the first wall, then backing off until the body (`body_radius`)
 ##   is clear of walls and inside the room.
@@ -53,7 +53,7 @@ var _mode: StringName = &""
 var _left: float = 0.0
 var _direction: Vector2 = Vector2.ZERO
 var _speed: float = 0.0
-## The homing of the dash in progress (`Spells.move_homing`), or null.
+## The homing of the dash in progress (`Spells.dashes().move_homing`), or null.
 var _homing: Homing = null
 var _tag: int = 0
 ## True when the move's time ran out in the last step: the next step answers it.
@@ -168,7 +168,7 @@ func _on_caster_move_requested(_player: int, mode: StringName, to: Vector2, seco
 		_direction = walk.normalized() if walk != Vector2.ZERO else actor.aim
 		_speed = (to - actor.muzzle_position()).length() / time
 		if actor.spells != null:
-			_homing = actor.spells.move_homing(_caster_number())
+			_homing = actor.spells.dashes().move_homing(_caster_number())
 	else:
 		var pull: Vector2 = to - actor.global_position
 		_direction = pull.normalized()

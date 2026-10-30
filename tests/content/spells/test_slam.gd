@@ -44,7 +44,7 @@ func test_nothing_is_hit_before_it_strikes_then_the_ring_hits_round_the_impact()
 	check_equal(arena.lost(side), _card().base_damage, "and the one beside it")
 	check_equal(arena.lost(behind), 0, "not the one behind the caster")
 	check_equal(arena.lost(far), 0, "nor one outside the ring")
-	check_equal(arena.spells.slam_count(), 0, "the slam is over")
+	check_equal(arena.spells.slams().slam_count(), 0, "the slam is over")
 	arena.free_all()
 
 
@@ -122,7 +122,7 @@ func test_a_payload_slam_ends_a_sweep() -> void:
 	check_equal(slams.size(), 1, "one slam after the sweep")
 	if slams.size() == 1:
 		check(slams[0].length() > 30.0, "struck ahead of the arc's end, not of the hand: %s" % slams[0])
-	check_equal(arena.spells.slam_count(), 0, "and it is over")
+	check_equal(arena.spells.slams().slam_count(), 0, "and it is over")
 	arena.free_all()
 
 
@@ -149,15 +149,15 @@ func test_its_staff_rises_glowing_drops_and_settles() -> void:
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	arena.cast(0, 0)
 	arena.run(0.18)
-	var risen: Vector3 = arena.spells.staff_pose(0)
+	var risen: Vector3 = arena.spells.poses().staff_pose(0)
 	check(risen.y > 4.0 and risen.z < -2.0 and risen.x < -0.5, "in the wind-up it rises, tilts up and draws back: %s" % risen)
-	check(arena.spells.staff_glow(0) > 0.5, "glowing as it charges: %f" % arena.spells.staff_glow(0))
+	check(arena.spells.poses().staff_glow(0) > 0.5, "glowing as it charges: %f" % arena.spells.poses().staff_glow(0))
 	arena.run(0.1)
-	var struck: Vector3 = arena.spells.staff_pose(0)
+	var struck: Vector3 = arena.spells.poses().staff_pose(0)
 	check(struck.y < 2.0 and struck.z > 3.0 and struck.x > 0.3, "at the impact it is down, tilted at the floor and thrust ahead: %s" % struck)
 	arena.run(0.8)
-	check_equal(arena.spells.staff_pose_dir(0), Vector2.ZERO, "then back on the aim")
-	check_equal(arena.spells.staff_glow(0), 0.0, "and dark")
+	check_equal(arena.spells.poses().staff_pose_dir(0), Vector2.ZERO, "then back on the aim")
+	check_equal(arena.spells.poses().staff_glow(0), 0.0, "and dark")
 	arena.free_all()
 
 
@@ -168,7 +168,7 @@ func test_a_payload_slam_moves_no_body() -> void:
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	arena.cast(0, 0)
 	arena.run(0.5)
-	check_equal(arena.spells.staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
+	check_equal(arena.spells.poses().staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
 	arena.free_all()
 
 
@@ -180,9 +180,9 @@ func test_clearing_the_runtime_ends_a_slam_in_its_wind_up() -> void:
 	arena.install_cards(0, 0, ["slam"])
 	arena.cast(0, 0)
 	arena.run(0.05)
-	check_equal(arena.spells.slam_count(), 1, "it is winding up")
+	check_equal(arena.spells.slams().slam_count(), 1, "it is winding up")
 	arena.spells.clear()
-	check_equal(arena.spells.slam_count(), 0, "clearing ends it")
+	check_equal(arena.spells.slams().slam_count(), 0, "clearing ends it")
 	arena.run(1.0)
 	check_equal(arena.lost(near), 0, "and it never strikes")
 	arena.free_all()
@@ -196,7 +196,7 @@ func test_closing_its_caster_ends_a_slam_in_its_wind_up() -> void:
 	arena.cast(0, 0)
 	arena.run(0.05)
 	arena.spells.close_caster(0)
-	check_equal(arena.spells.slam_count(), 0, "closing its caster ends it")
+	check_equal(arena.spells.slams().slam_count(), 0, "closing its caster ends it")
 	arena.run(1.0)
 	check_equal(arena.lost(near), 0, "and it never strikes")
 	arena.free_all()

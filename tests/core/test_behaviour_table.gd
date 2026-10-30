@@ -16,15 +16,27 @@ func _staff(cards: Array) -> CompiledStaff:
 	return staff
 
 
-func test_every_cell_is_answered() -> void:
-	for behaviour: int in ModifierBase.Behaviour.values():
-		for motion: StringName in Carriers.ids():
-			check_equal(StaffCompiler.behaviour_runs(behaviour, motion), Carriers.of(motion).works(behaviour), "the compiler asks the carrier for %s on %s" % [ModifierBase.Behaviour.keys()[behaviour], motion])
+func test_every_need_names_known_behaviours_traits_and_fields() -> void:
+	# A typo in a NEEDS row would quietly make a card work or waste everywhere.
+	var fields: Array[String] = ["any", "not", "or_cards", "cards", "or_infused", "not_cards"]
+	var all_traits: int = (CarrierTraits.MOVES_CASTER << 1) - 1
+	for table: Dictionary in [ModifierBase.NEEDS, TriggerBase.NEEDS]:
+		var size: int = ModifierBase.Behaviour.size() if table == ModifierBase.NEEDS else TriggerBase.Event.size()
+		for key: int in table:
+			check(key >= 0 and key < size, "%d is a row the table can have" % key)
+			var need: Dictionary = table[key]
+			for field: String in need:
+				check(fields.has(field), "%s is a field a need has" % field)
+			check_equal(int(need.get("any", 0)) & ~all_traits, 0, "row %d asks only for known traits" % key)
+			check_equal(int(need.get("not", 0)) & ~all_traits, 0, "row %d rules out only known traits" % key)
+			for list: String in ["or_cards", "cards", "not_cards"]:
+				for behaviour: int in need.get(list, []):
+					check(behaviour > 0 and behaviour < ModifierBase.Behaviour.size(), "row %d's %s are behaviours" % [key, list])
 
 
 func test_a_bolt_runs_every_behaviour() -> void:
 	for behaviour: int in ModifierBase.Behaviour.values():
-		check(StaffCompiler.behaviour_runs(behaviour, &"bolt"), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
+		check(Carriers.of(&"bolt").works(behaviour), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
 
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:

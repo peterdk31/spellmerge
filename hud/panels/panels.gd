@@ -23,6 +23,10 @@ extends CanvasLayer
 ## the wizard, so a player always sees their wizard taking hits. The possession itself is drawn
 ## in the world, over the possessed actor (`PossessedLook`).
 ##
+## The horde HUD (`horde/`, node Root/Horde; docs/milestones/horde.md) shows a horde run's status,
+## each seat's level-up pick and ready prompt, who the build break waits for, and the end; it
+## reads its seats' pick and ready buttons itself, and is told when the pause menu is open.
+##
 ## The loading screen (`loading/`, node Root/Loading, over everything) shows from
 ## `loading_started` to `loading_finished`, while flow compiles the shaders before the first room.
 ##
@@ -36,8 +40,10 @@ extends CanvasLayer
 ## `core/ui_focus` (owner, 2026-10-26):
 ## - `back` (B; Tab or E on the keyboard) opens that player's spell builder (`hud/builder/`,
 ##   nodes Root/Builder1 to Root/Builder4) when they have no menu open, are not down and the
-##   game is not paused. It sits beside the corner panel toward the middle of the screen and
-##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
+##   pause menu is not open. It sits beside the corner panel toward the middle of the screen and
+##   never pauses the game; it is the full builder at any time, waves included (staffs A6a), and
+##   in the horde's build break, while the game is paused (this node and the builders run then;
+##   their requests are events the player's controller answers at once).
 ##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
 ##   builder when the player had no menu open at the poll before it too.
 ##   By default `back` opens the radial builder instead (`builder/radial_builder.gd`, nodes
@@ -66,6 +72,7 @@ const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
+const HordePanelScript := preload("res://hud/panels/horde/horde_panel.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -112,6 +119,8 @@ var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
 var _loading: LoadingScript = null
+## The horde HUD (`horde/`, node Root/Horde): status, picks, break and summary of a horde run.
+var _horde: HordePanelScript = null
 ## The strip in the middle of the view that holds the wave line and the break line.
 var _strip: HBoxContainer = null
 var _wave_label: Label = null
@@ -219,6 +228,9 @@ func _ready() -> void:
 		builder.bind(events, ui_focus, spells, input)
 	for radial in _radials:
 		radial.bind(events, ui_focus, spells, input)
+	_horde = get_node("Root/Horde") as HordePanelScript
+	_horde.bind(events, ui_focus, spells, input)
+	_horde.pause_open = _pause_menu.is_open
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
 	if events != null:
@@ -350,6 +362,11 @@ func _on_reload_style_changed(on_button: bool) -> void:
 	var style: StaffRowScript.Style = StaffRowScript.Style.BUTTON if on_button else StaffRowScript.Style.NEXT_CAST
 	for panel in _panels:
 		panel.set_reload_style(style)
+
+
+## The horde HUD (for tests and screenshots).
+func get_horde() -> HordePanelScript:
+	return _horde
 
 
 ## The red vignette (for tests).

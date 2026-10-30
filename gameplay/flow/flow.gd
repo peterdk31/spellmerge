@@ -44,7 +44,7 @@ extends Node
 ## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
 ## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
-## Loading (owner, 2026-10-29): Play and Sandbox first do the work that must be ready before a
+## Loading (owner, 2026-10-29): Play, Sandbox and Horde first do the work that must be ready before a
 ## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
 ## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
 ## then the intro or the run starts. Today that work is the shader warm-up
@@ -62,6 +62,18 @@ extends Node
 ## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
 ## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
 ## keep their staffs, instead of a restart.
+##
+## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX (above) or MODE_HORDE.
+##
+## Horde (docs/milestones/horde.md, H2): `horde_requested` (the main menu's Horde button, in every
+## build) loads like Play (no intro) and starts a run in the room `horde` (HORDE_ROOM_ID): a wizard
+## per joined player, no waves and no dummies; every wizard holds the four plain starter staffs
+## in every build channel (never the dev numbers, so it plays the same everywhere) with
+## HORDE_START_CARDS (a dash staff and a swing staff). `room_entered(&"horde")` is followed by `horde_started(world)`. Flow spawns no
+## enemy here: the director (`gameplay/horde`) does, under its own node. When every wizard is down,
+## after HORDE_RESTART_DELAY (once started, a join does not call it off) a fresh world stands and
+## `horde_started` is sent again. `horde_ended` is sent when a horde run stops (`stop_run`) or
+## a run of another mode replaces it.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -89,10 +101,18 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
+## The cards a horde run starts with instead (owner, 2026-10-31): RB a dash staff, RT a swing staff.
+const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
 ## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
 ## spawn after these stands another of the first, `dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
 const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
+## The horde's room.
+const HORDE_ROOM_ID: StringName = &"horde"
+## The run modes (`mode`): Play's waves, the sandbox, the horde.
+const MODE_WAVES: StringName = &"waves"
+const MODE_SANDBOX: StringName = &"sandbox"
+const MODE_HORDE: StringName = &"horde"
 ## The actions of `sandbox_action_requested`.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
@@ -118,6 +138,8 @@ const WAVE_MAX: int = 24
 const BUILD_BREAK: float = 12.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
+## Seconds from the last wizard going down until a horde run starts over (time to read the summary).
+const HORDE_RESTART_DELAY: float = 5.0
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -164,10 +186,16 @@ var state: State = State.IDLE
 var world: Node2D = null
 ## The id of the room of the run in progress.
 var room_id: StringName = &""
-## The wave in progress (1 for the first of a run; 0 before a run and in the sandbox).
+## The wave in progress (1 for the first of a run; 0 before a run, in the sandbox and the horde).
 var wave: int = 0
-## True while the run is in the sandbox (and for its restarts).
-var sandbox: bool = false
+## The mode of the run in progress, or of the next one (MODE_WAVES when idle).
+var mode: StringName = MODE_WAVES
+## True while the run is in the sandbox (and for its restarts). Read only: set `mode`.
+var sandbox: bool:
+	get:
+		return mode == MODE_SANDBOX
+	set(_value):
+		push_error("Flow: `sandbox` is read only; set `mode`.")
 
 var _starter: int = 0
 var _room: RoomBase = null
@@ -176,6 +204,10 @@ var _wizard_scene: PackedScene = null
 ## The channel's staffs (`staffs_for_channel`) and the channel they were made for.
 var _channel_staffs: Array[StaffBase] = []
 var _channel_staffs_for: String = ""
+## The plain starter staffs (no dev numbers), the horde's in every channel.
+var _plain_staffs: Array[StaffBase] = []
+## True from a horde run's start until `horde_ended` is sent.
+var _horde_on: bool = false
 var _enemies: Array[Node] = []
 ## The sandbox's dummies still standing.
 var _dummies: Array[Node] = []
@@ -212,6 +244,7 @@ func _ready() -> void:
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.sandbox_action_requested.connect(_on_sandbox_action_requested)
+	events.horde_requested.connect(_on_horde_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -237,7 +270,7 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		if sandbox:
+		if mode == MODE_SANDBOX:
 			_stand_everyone_up()
 		elif not start_run(_starter):
 			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
@@ -297,15 +330,17 @@ func _seat_of(wizard: Node) -> int:
 ## Build the world and start the run now, replacing any run in progress. Returns
 ## false (and starts nothing) when content is missing or no player has a device.
 func start_run(requester: int) -> bool:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, SANDBOX_ROOM_ID if sandbox else room_id_to_play) as RoomBase if registry != null else null
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
-	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
+	# The horde's enemies are the director's: it needs no enemy of its own.
+	var needs_enemy: bool = mode != MODE_HORDE
+	if room == null or room.scene == null or (needs_enemy and (enemy_data == null or enemy_data.scene == null)):
 		push_warning("Flow: the room or the enemy is missing from the registry, so no run starts.")
 		return false
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
-	if staffs_for_channel().is_empty():
+	if staffs_for_mode().is_empty():
 		push_warning("Flow: a staff for the %s channel is missing from the registry, so no run starts." % channel)
 		return false
 	if not _is_wizard_scene(wizard_scene):
@@ -326,31 +361,53 @@ func start_run(requester: int) -> bool:
 	if projectiles != null:
 		projectiles.clear()
 	spells.clear()
+	var layout: Node = room.scene.instantiate()
+	var size: Vector2 = room_size(room, layout)
 	if projectiles != null:
-		var bounds := Rect2(Vector2.ZERO, _room_size(room)).grow(PROJECTILE_MARGIN)
+		var bounds := Rect2(Vector2.ZERO, size).grow(PROJECTILE_MARGIN)
 		projectiles.set_bounds(bounds)
 	var new_world := Node2D.new()
 	new_world.name = WORLD_NAME
-	new_world.add_child(room.scene.instantiate())
-	_add_camera(new_world, room)
+	new_world.add_child(layout)
+	_add_camera(new_world, size)
 	_spawn_players(new_world, room, players)
-	if sandbox:
-		wave = 0
-		_spawn_dummies(new_world, room)
-	else:
-		wave = 1
-		_spawn_wave(new_world, room, enemy_data, wave)
+	match mode:
+		MODE_SANDBOX:
+			wave = 0
+			_spawn_dummies(new_world, room)
+		MODE_HORDE:
+			wave = 0
+		_:
+			wave = 1
+			_spawn_wave(new_world, room, enemy_data, wave)
 	world = new_world
 	room_id = room.id
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
+	var horde_before: bool = _horde_on
+	_horde_on = mode == MODE_HORDE
 	if events != null:
+		if horde_before and not _horde_on:
+			events.horde_ended.emit()
 		events.room_entered.emit(room.id)
-		events.sandbox_changed.emit(sandbox)
-		if not sandbox:
-			events.wave_started.emit(wave)
+		events.sandbox_changed.emit(mode == MODE_SANDBOX)
+		match mode:
+			MODE_HORDE:
+				events.horde_started.emit(new_world)
+			MODE_WAVES:
+				events.wave_started.emit(wave)
 	return true
+
+
+## The room the next run of `mode` is in: the sandbox's, the horde's, or `room_id_to_play`.
+func room_id_for_mode() -> StringName:
+	match mode:
+		MODE_SANDBOX:
+			return SANDBOX_ROOM_ID
+		MODE_HORDE:
+			return HORDE_ROOM_ID
+	return room_id_to_play
 
 
 ## End the run in progress and free its world. Flow is idle again, so the next
@@ -368,10 +425,14 @@ func stop_run() -> void:
 	wave = 0
 	_clear_run()
 	state = State.IDLE
-	if sandbox:
-		sandbox = false
+	var was: StringName = mode
+	mode = MODE_WAVES
+	if was == MODE_SANDBOX and events != null:
+		events.sandbox_changed.emit(false)
+	if _horde_on:
+		_horde_on = false
 		if events != null:
-			events.sandbox_changed.emit(false)
+			events.horde_ended.emit()
 
 
 func _on_play_requested(player: int) -> void:
@@ -383,7 +444,7 @@ func _on_play_requested(player: int) -> void:
 
 ## Play, once the work before a room is loaded: the intro first on a new save, else the run.
 func _start_play(player: int) -> void:
-	sandbox = false
+	mode = MODE_WAVES
 	if wants_intro():
 		play_intro(player)
 	else:
@@ -465,15 +526,29 @@ func _on_sandbox_requested(player: int) -> void:
 
 
 func _start_sandbox(player: int) -> void:
-	sandbox = true
+	mode = MODE_SANDBOX
 	if not start_run(player):
-		sandbox = false
+		mode = MODE_WAVES
+
+
+func _on_horde_requested(player: int) -> void:
+	if state != State.IDLE:
+		return
+	if not _load_then(_start_horde.bind(player)):
+		_start_horde(player)
+
+
+## The horde run, once loaded: never the intro.
+func _start_horde(player: int) -> void:
+	mode = MODE_HORDE
+	if not start_run(player):
+		mode = MODE_WAVES
 
 
 ## A sandbox page's action. Ignored out of the sandbox, and an imp wave while WAVE_MAX imps
 ## are up. It changes the room only, never a player's staffs or menus.
 func _on_sandbox_action_requested(player: int, action: StringName) -> void:
-	if not sandbox or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
+	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
 		return
 	match action:
 		ACTION_IMP_WAVE:
@@ -501,7 +576,7 @@ func _on_player_joined(player: int) -> void:
 	if joiner != null:
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
-	if _restart_left >= 0.0 and not _all_down():
+	if _restart_left >= 0.0 and not _all_down() and mode != MODE_HORDE:
 		_restart_left = -1.0
 
 
@@ -520,7 +595,7 @@ func _on_player_left(player: int) -> void:
 		parent.remove_child(wizard)
 	wizard.queue_free()
 	if state == State.RUNNING and _restart_left < 0.0 and _all_down():
-		_restart_left = RESTART_DELAY
+		_restart_left = restart_delay()
 
 
 func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -> void:
@@ -529,7 +604,7 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -
 	if at < 0:
 		return
 	_enemies.remove_at(at)
-	if _enemies.is_empty() and state == State.RUNNING and not sandbox:
+	if _enemies.is_empty() and state == State.RUNNING and mode == MODE_WAVES:
 		state = State.CLEARED
 		_next_wave_left = BUILD_BREAK
 		if events != null:
@@ -577,15 +652,20 @@ func _on_player_downed(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
 	_downed[player] = true
-	if state == State.RUNNING and _all_down():
-		_restart_left = RESTART_DELAY
+	if state == State.RUNNING and _all_down() and _restart_left < 0.0:
+		_restart_left = restart_delay()
+
+
+## Seconds from everyone down until the restart (or, in the sandbox, until everyone stands up).
+func restart_delay() -> float:
+	return HORDE_RESTART_DELAY if mode == MODE_HORDE else RESTART_DELAY
 
 
 func _on_player_revived(player: int, _reviver: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
 	_downed[player] = false
-	if _restart_left >= 0.0 and not _all_down():
+	if _restart_left >= 0.0 and not _all_down() and mode != MODE_HORDE:
 		_restart_left = -1.0
 
 
@@ -631,8 +711,14 @@ func _set_walls(new_world: Node2D) -> void:
 			projectiles.add_wall_body(body)
 
 
-func _room_size(room: RoomBase) -> Vector2:
+## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and
+## the layout's `Floor` sprite (the whole room, under the walls) when `layout` is given.
+static func room_size(room: RoomBase, layout: Node = null) -> Vector2:
 	var size := Vector2(640.0, 360.0)
+	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null
+	if floor_sprite != null and floor_sprite.texture != null:
+		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
+		size = size.max(floor_sprite.position + extent)
 	for point: Vector2 in room.player_spawns:
 		size = size.max(point + Vector2(32.0, 32.0))
 	for point: Vector2 in room.enemy_spawns:
@@ -642,9 +728,8 @@ func _room_size(room: RoomBase) -> Vector2:
 	return size
 
 
-func _add_camera(parent: Node2D, room: RoomBase) -> void:
+func _add_camera(parent: Node2D, size: Vector2) -> void:
 	var camera := Camera2D.new()
-	var size: Vector2 = _room_size(room)
 	camera.position = size * 0.5
 	# `coop` moves and zooms this camera to fit everyone; the limits keep it inside the room.
 	camera.limit_left = 0
@@ -694,18 +779,36 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 	return ok
 
 
-## The staff every wizard's four staffs are: the 20-slot `dev` staff in `dev` and `preview`
-## builds (the sandbox for testing builds), the 4-slot `starter` otherwise. Null when missing.
 ## The four staffs a wizard holds in this build channel (empty when one is missing): the starter
 ## heads, in a test build each a copy with the dev staff's numbers (made once per channel).
 func staffs_for_channel() -> Array[StaffBase]:
 	if not _channel_staffs.is_empty() and _channel_staffs_for == channel:
 		return _channel_staffs
+	var out: Array[StaffBase] = _starter_staffs(DEV_CHANNELS.has(channel))
+	if not out.is_empty():
+		_channel_staffs = out
+		_channel_staffs_for = channel
+	return out
+
+
+## The four staffs a wizard of this run's `mode` holds: the horde's are the plain starter heads in
+## every channel (made once); every other mode's are `staffs_for_channel`.
+func staffs_for_mode() -> Array[StaffBase]:
+	if mode != MODE_HORDE:
+		return staffs_for_channel()
+	if _plain_staffs.is_empty():
+		_plain_staffs = _starter_staffs(false)
+	return _plain_staffs
+
+
+## The starter heads by button, each a copy with the dev staff's numbers when `dev_numbers` (empty
+## when one is missing).
+func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
 	var out: Array[StaffBase] = []
 	if registry == null:
 		return out
-	var dev: StaffBase = registry.get_resource(&"wizard", DEV_STAFF) as StaffBase if DEV_CHANNELS.has(channel) else null
-	if DEV_CHANNELS.has(channel) and dev == null:
+	var dev: StaffBase = registry.get_resource(&"wizard", DEV_STAFF) as StaffBase if dev_numbers else null
+	if dev_numbers and dev == null:
 		return out
 	for id in STARTER_HEADS:
 		var head: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
@@ -717,14 +820,13 @@ func staffs_for_channel() -> Array[StaffBase]:
 			for field: String in ["slots", "draw", "cast_delay", "recharge", "spread"]:
 				head.set(field, dev.get(field))
 		out.append(head)
-	_channel_staffs = out
-	_channel_staffs_for = channel
 	return out
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	PlayerScript.seat_wizard(wizard, index, null, start_cards.duplicate(true), staffs_for_channel())
+	var cards: Array = HORDE_START_CARDS if mode == MODE_HORDE else start_cards
+	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

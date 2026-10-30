@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/enemies/crypt_mite/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (SVG rects written by a small generator from a hand-drawn pixel grid, 2026-10-30)",
+			"prompt": "The Crypt Mite, a horde swarmer: a round knot of dark staff Wood broken out of an old crypt staff, scuttling on four thin root-legs, with a little Bone ferrule. Small and squat (about 10x10 px of body) so hundreds read as a swarm; its one eye floats on the knot. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (eye and brow) is a separate layer. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		}
+	]
+}

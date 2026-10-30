@@ -263,6 +263,27 @@ func test_a_reopened_caster_goes_on_round_the_ring() -> void:
 	check(_spells.profile(old) != null and _spells.profile(old) != _spells.profile(fresh), "with its old numbers")
 
 
+# --- A horde's actor ids (Horde H1) -------------------------------------------------------
+
+## The staffs' cooldowns count down only up to the highest row that cast (Spells._cooldown_rows):
+## an actor past the old 512 still gets its staff back, and so does a low one beside it.
+func test_a_high_actor_ids_cooldown_runs_down() -> void:
+	while _table.open_count() < 1000:
+		ActorSeats.enemy(_table)
+	var high: int = ActorSeats.enemy(_table)
+	check_equal(high, 1000, "actor 1000 is open")
+	_spells.open_caster(high)
+	var tag: int = _build(high, [&"bolt"])
+	check(tag != 0 and SpellTag.caster_of(tag) == high, "it builds, and its tag names it")
+	_build(W0, [&"bolt"])
+	check(_cast(high) > 0.0 and _cast(W0) > 0.0, "both cast")
+	check(_spells.cooldown_left(high, 0) > 0.0 and _spells.cooldown_left(W0, 0) > 0.0, "and wait")
+	_tick(60)
+	check_equal(_spells.cooldown_left(high, 0), 0.0, "actor 1000's staff is ready again")
+	check_equal(_spells.cooldown_left(W0, 0), 0.0, "and the wizard's")
+	check(_cast(high) > 0.0, "actor 1000 casts again")
+
+
 # --- Budgets ------------------------------------------------------------------------------
 
 func test_each_seat_has_its_own_fire_count_a_step() -> void:

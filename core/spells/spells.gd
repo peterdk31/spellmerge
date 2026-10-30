@@ -1362,7 +1362,8 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	var at: Vector2 = projectiles.get_position_of(slot)
 	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
 	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
-		_rec_arc_clock[slot] = first_tick(spell.arc_interval, life)
+		# Ready at once (owner, 2026-10-30): its interval is the wait after a zap, not a fuse.
+		_rec_arc_clock[slot] = 0.0
 		if _rec_arc[slot] == 0:
 			if _arc_count == _arcs.size():
 				_arcs.resize(_arcs.size() * 2)
@@ -1846,7 +1847,8 @@ func _step_magnets() -> void:
 	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
-## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach`, hitting with its
+## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach` but the
+## one its shot hits next (`first_on_path`), hitting with its
 ## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body. With no
 ## body in reach the shot tries again next step.
@@ -1858,7 +1860,13 @@ func _zap(slot: int) -> void:
 		return
 	var at: Vector2 = projectiles.get_position_of(slot)
 	var actor: int = SpellTag.caster_of(tag)
-	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, null, _team(actor))
+	# It never zaps the body its shot hits next, which it hits anyway: an arc reaches beside the
+	# shot's way (owner, 2026-10-30). Its way ahead goes as far as the zap reaches or it flies.
+	var velocity: Vector2 = projectiles.get_velocity_of(slot)
+	var ahead: float = minf(velocity.length() * projectiles.get_life_of(slot), spell.arc_reach)
+	var path_to: Vector2 = at + velocity.normalized() * ahead if not velocity.is_zero_approx() else at
+	var next: Node2D = projectiles.first_on_path(at, path_to, projectiles.get_radius_of(slot), HITS, _team(actor))
+	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, next, _team(actor))
 	var aim: Vector2 = projectiles.nearest_point
 	if target == null or not aim.is_finite():
 		return

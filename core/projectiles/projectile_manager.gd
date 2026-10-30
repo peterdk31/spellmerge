@@ -4166,6 +4166,11 @@ func get_life_of(slot: int) -> float:
 	return _life[slot] if is_alive(slot) else 0.0
 
 
+## The hit radius of the shot in `slot` now (growth included), or 0 for an empty slot.
+func get_radius_of(slot: int) -> float:
+	return _radius[slot] if is_alive(slot) else 0.0
+
+
 ## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
 func get_velocity_of(slot: int) -> Vector2:
 	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
@@ -4303,6 +4308,33 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		return null
 	nearest_point = _target_pos[best]
 	return _targets[best]
+
+
+## The first target on `layers` (not of `team`, as `nearest_target`) along the line from `point`
+## to `to` whose hit circle a circle of `radius` moving along it touches, or null: what a shot
+## there will hit next (an arc's zap skips it, as the shot hits it anyway). A line of no length is
+## the circle at `point`. Allocation-free.
+func first_on_path(point: Vector2, to: Vector2, radius: float, layers: int, team: int = ActorsScript.NONE) -> Node2D:
+	if not point.is_finite() or not to.is_finite() or not is_finite(radius):
+		return null
+	var way: Vector2 = to - point
+	var length: float = way.length()
+	var dir: Vector2 = way / length if length > 0.0 else Vector2.ZERO
+	var best: int = -1
+	var best_along: float = INF
+	_query_ready()
+	var cells: Vector4i = _query_cells((point + to) * 0.5, radius + length * 0.5)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if (team == ActorsScript.NONE or _target_team[t] != team) and _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, to), radius, layers, 0):
+					var along: float = (_target_pos[t] - point).dot(dir)
+					if along < best_along:
+						best_along = along
+						best = t
+				t = _target_next[t]
+	return _targets[best] if best >= 0 else null
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps

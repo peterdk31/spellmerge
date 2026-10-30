@@ -47,7 +47,25 @@ func test_a_zap_hits_for_half() -> void:
 	arena.free_all()
 	check(spell.arc_hit != null and spell.arc_hit.damage == roundi(spell.damage * SpellLimits.ARC_DAMAGE), "half the rune's damage")
 	var lost: int = _lost(["arc", "rune"], [Vector2(0.0, 40.0)] as Array[Vector2], 2.05)[0]
-	check_equal(lost, spell.arc_hit.damage * 4, "four zaps in two seconds (%d)" % lost)
+	# Ready at once, then every half second: at 0, 0.5, 1, 1.5 and 2 s.
+	check_equal(lost, floori(spell.arc_hit.damage * 5.0), "five zaps in two seconds (%d)" % lost)
+
+
+## Its zap is ready when it is cast (owner, 2026-10-30): the interval is the wait after a zap, not
+## a fuse, so a bolt zaps the imp beside its first steps (it waited half a second, 110 px on).
+func test_a_zap_is_ready_at_once() -> void:
+	var lost: Array[int] = _lost(["arc", "bolt"], [Vector2(20.0, 45.0)] as Array[Vector2], 0.3)
+	check(lost[0] > 0, "the imp beside its start is zapped at once (%d)" % lost[0])
+
+
+## It never zaps the body its shot hits next: the shot hits it anyway, so an arc reaches beside its
+## way, not a second hit on its target (owner, 2026-10-30).
+func test_a_zap_skips_what_its_shot_hits_next() -> void:
+	var plain: Array[int] = _lost(["bolt"], [Vector2(50.0, 0.0)] as Array[Vector2], 1.0)
+	var lost: Array[int] = _lost(["arc", "bolt"], [Vector2(50.0, 0.0), Vector2(20.0, 45.0)] as Array[Vector2], 1.0)
+	check(plain[0] > 0, "a bolt hits the imp ahead")
+	check_equal(lost[0], plain[0], "with arc that imp takes the bolt only, not a zap before it")
+	check(lost[1] > 0, "the imp beside the way is zapped")
 
 
 func test_a_zap_sets_off_on_hit() -> void:

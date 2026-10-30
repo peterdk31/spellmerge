@@ -535,20 +535,6 @@ func _costs_of(card: SpellComponent) -> StringName:
 	return id
 
 
-## How far along the aim the target off the line stands: at `r`, or for a shot so fast that an
-## arc's first zap (after its interval or half the shot's life) comes well past `r`, where that
-## zap is (an atom's, 165 px out), so an arc can reach it.
-func _side_at(form: FormBase, r: float) -> float:
-	if not Carriers.of(form.carrier).has(Carrier.FLIES):
-		return r
-	for modifier in _modifiers:
-		if modifier.behaviour == ModifierBase.Behaviour.ARC and modifier.behaviour_strength > 0.0:
-			var zap: float = form.speed * minf(1.0 / modifier.behaviour_strength, form.lifetime * 0.5)
-			if zap > r + modifier.behaviour_reach * 0.5:
-				return zap
-	return r
-
-
 ## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
 func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
@@ -584,7 +570,7 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("second", false):
 		world.add_enemy(&"B", Vector2(r, SECOND))
 	if scene.get("side", false):
-		world.add_enemy(&"S", Vector2(_side_at(form, r), SIDE))
+		world.add_enemy(&"S", Vector2(r, SIDE))
 	if scene.has("wall"):
 		var x: float = r * float(scene["wall"])
 		world.add_wall(Rect2(x, -80.0, 8.0, 160.0))

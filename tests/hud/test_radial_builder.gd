@@ -73,7 +73,7 @@ func before_each() -> void:
 	_hud.spells = _spells
 	root.add_child(_hud)
 	# The pause menu's Sandbox page picked the radial builder, every card on the ring, push.
-	_hud.call("_on_builder_options_changed", true, false, true)
+	_hud.call("_on_builder_options_changed", true, 0, true)
 
 
 ## `count` players with a virtual device and a wizard (the start cards on the dev staff), in a room.

@@ -9,8 +9,9 @@ extends PanelContainer
 ## - **Sandbox** (staffs B7): Imp wave and Reset dummies (each sends
 ##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page); the
 ##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
-##   "Builder: Radial" (the default) or "List", "Ring: Every card" or "One kind" and "Full slot: Push right"
-##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
+##   "Builder: Radial" (the default) or "List", "Ring:" ("Every card", "One kind", or the ring
+##   styles to try, owner 2026-10-30: "Zoom", "Kinds: hold", "Kinds: depth"; `accept` steps to the
+##   next, `Ring`) and "Full slot: Push right" or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
@@ -37,6 +38,9 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 
 const PLAYER_COUNT: int = 4
 enum Page { MAIN, SANDBOX, SETTINGS }
+## The radial builder's ring (see the top): the plain one with every card or one kind at a time,
+## or a ring style from `hud/builder/rings/`.
+enum Ring { EVERY_CARD, ONE_KIND, ZOOM, KINDS_HOLD, KINDS_DEPTH }
 ## The title of each page.
 const TITLES: Dictionary = {
 	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS",
@@ -52,13 +56,14 @@ const BASE_TEXT_META: StringName = &"base_text"
 signal closed_menu(player: int)
 ## A builder switch on the Sandbox page flipped: the radial builder or the list one, the ring by
 ## kind or every card, a full slot pushed right or replaced.
-signal builder_options_changed(radial: bool, ring_by_kind: bool, push: bool)
+signal builder_options_changed(radial: bool, ring: Ring, push: bool)
 ## The reload switch on the Sandbox page flipped: the staff rows show the delay on the button
 ## glyph, or on the next cast.
 signal reload_style_changed(on_button: bool)
 
 const BUILDER_TEXT: String = "Builder: %s"
 const RING_TEXT: String = "Ring: %s"
+const RING_WORDS: Array[String] = ["Every card", "One kind", "Zoom", "Kinds: hold", "Kinds: depth"]
 const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
@@ -83,7 +88,7 @@ var _controls: Array[Control] = []
 var _pages: Dictionary = {}
 ## The builder switches (see the top); the radial builder by default (owner, 2026-10-26).
 var builder_radial: bool = true
-var ring_by_kind: bool = false
+var ring: Ring = Ring.EVERY_CARD
 var put_push: bool = true
 ## The reload switch (see the top); the button glyph by default (owner, 2026-10-27).
 var reload_on_button: bool = true
@@ -328,7 +333,7 @@ func _on_activated(player: int, control: Control) -> void:
 		builder_radial = not builder_radial
 		_show_builder_options()
 	elif control == _ring_style:
-		ring_by_kind = not ring_by_kind
+		ring = ((ring + 1) % Ring.size()) as Ring
 		_show_builder_options()
 	elif control == _put_style:
 		put_push = not put_push
@@ -390,10 +395,10 @@ func _show_fullscreen() -> void:
 ## Write the switches' words and tell `hud/panels`.
 func _show_builder_options() -> void:
 	_builder_style.set_meta(BASE_TEXT_META, BUILDER_TEXT % ("Radial" if builder_radial else "List"))
-	_ring_style.set_meta(BASE_TEXT_META, RING_TEXT % ("One kind" if ring_by_kind else "Every card"))
+	_ring_style.set_meta(BASE_TEXT_META, RING_TEXT % RING_WORDS[ring])
 	_put_style.set_meta(BASE_TEXT_META, PUT_TEXT % ("Push right" if put_push else "Replace"))
 	_mark_focus()
-	builder_options_changed.emit(builder_radial, ring_by_kind, put_push)
+	builder_options_changed.emit(builder_radial, ring, put_push)
 
 
 func _send(action: StringName) -> void:

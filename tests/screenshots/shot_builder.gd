@@ -23,7 +23,7 @@ func take() -> void:
 	var flow: Node = root.get_node("Flow")
 	_input.call("add_virtual_device", 0)
 	# These shots are the list builder's (the radial one is the default).
-	_hud.call("_on_builder_options_changed", false, false, true)
+	_hud.call("_on_builder_options_changed", false, 0, true)
 	flow.call("start_run", 0)
 	await settle(STEP_FRAMES)
 	await _open_builders([0])

@@ -15,6 +15,8 @@ extends Control
 ##   (`Spells.component_stats`). Landing on a card rumbles the pad briefly; a gap rumbles
 ##   nothing. Letting go of the stick lets the card go. The pointed card holds on a little past
 ##   its border (`STICKY_ANGLE`), so a wobbling thumb does not flicker between two cards.
+## - **Ring styles** (owner, 2026-10-30): `ring_picker` swaps in another way to pick and draw the
+##   ring (`rings/`: a zoom fan, a kinds-first ring), each in its own file so it is easy to drop.
 ## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed:
@@ -56,6 +58,7 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
+const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
 
 ## How the ring shows the bag: every card at once, or one kind at a time.
 enum Layout { ALL, KIND }
@@ -181,6 +184,15 @@ var put: Put = Put.PUSH:
 	set(value):
 		put = value
 		_refresh_preview()
+		_changed()
+## A ring style that picks and draws the ring its own way (`rings/`, owner 2026-10-30), or null
+## for the plain ring. Set by `hud/panels` from the pause menu's Sandbox page.
+var ring_picker: RingPickerScript = null:
+	set(value):
+		ring_picker = value
+		_pointed = NONE
+		if ring_picker != null:
+			ring_picker.reset()
 		_changed()
 
 var _events: EventsScript = null
@@ -338,6 +350,8 @@ func open_builder() -> bool:
 		return false
 	_open = true
 	_pointed = NONE
+	if ring_picker != null:
+		ring_picker.reset()
 	_note = ""
 	_result = ""
 	_result_left = 0.0
@@ -402,7 +416,7 @@ func shown_kind() -> StringName:
 func direction_to(id: StringName) -> Vector2:
 	for at in _ring_entry.size():
 		if _ring_entry[at] != NONE and _entries[_ring_entry[at]]["id"] == id:
-			return Vector2(sin(_ring_angle[at]), -cos(_ring_angle[at]))
+			return direction_of(_ring_angle[at])
 	return Vector2.ZERO
 
 
@@ -534,7 +548,7 @@ func step(delta: float) -> void:
 	_clock += delta
 	_poll_buttons()
 	_poll_marker(delta)
-	_poll_pointer()
+	_poll_pointer(delta)
 	_poll_clear(delta)
 	if _note_left > 0.0:
 		_note_left -= delta
@@ -542,7 +556,8 @@ func step(delta: float) -> void:
 	if _result_left > 0.0:
 		_result_left -= delta
 		_dirty = true
-	if not _flyers.is_empty() or not _fading.is_empty() or _clear_held >= 0.0 or _clock - _pointed_at < POP_TIME or _clock - _marker_at < POP_TIME:
+	if not _flyers.is_empty() or not _fading.is_empty() or _clear_held >= 0.0 or _clock - _pointed_at < POP_TIME or _clock - _marker_at < POP_TIME \
+			or (ring_picker != null and ring_picker.is_animating()):
 		_dirty = true
 	if _fading.size() > 0 and _clock - _fade_start >= FADE_TIME:
 		_fading.clear()
@@ -634,8 +649,9 @@ func _move_marker(dir: Vector2i) -> void:
 
 
 ## The right stick (P1's mouse) picks the card it points at; letting go (the mouse leaving the
-## ring) lets the card go too, so the hub shows the staff's numbers again.
-func _poll_pointer() -> void:
+## ring) lets the card go too, so the hub shows the staff's numbers again. A ring style
+## (`ring_picker`) picks in its own way.
+func _poll_pointer(delta: float) -> void:
 	var aim: Vector2 = _input.menu_aim(index) if _input != null else Vector2.ZERO
 	if aim.length() < POINT_THRESHOLD:
 		aim = _mouse_aim()
@@ -644,18 +660,7 @@ func _poll_pointer() -> void:
 		_dirty = true
 	if _ring_entry.is_empty():
 		return
-	var picked: int = NONE
-	if aim != Vector2.ZERO:
-		var angle: float = fposmod(atan2(aim.x, -aim.y), TAU)
-		for at in _ring_entry.size():
-			var off: float = absf(fposmod(angle - _ring_angle[at] + PI, TAU) - PI)
-			var half: float = _ring_width[at] * 0.5
-			if _ring_entry[at] != NONE and _ring_entry[at] == _pointed:
-				half += minf(STICKY_ANGLE, _ring_width[at] * STICKY_SHARE)
-			if off <= half:
-				picked = _ring_entry[at]
-				if picked == _pointed:
-					break
+	var picked: int = ring_picker.pick(self, delta) if ring_picker != null else pick_on_ring(aim)
 	if picked == _pointed:
 		return
 	_pointed = picked
@@ -664,6 +669,53 @@ func _poll_pointer() -> void:
 		_rumble(RUMBLE_POINT)
 	_refresh_preview()
 	_changed()
+
+
+## The entry the plain ring has in direction `aim`, or NONE (zero aims at nothing).
+func pick_on_ring(aim: Vector2) -> int:
+	if aim == Vector2.ZERO:
+		return NONE
+	return pick_among(_ring_entry, _ring_angle, _ring_width, angle_of(aim))
+
+
+## The entry at `angle` among ring places (their entries, NONE for a gap, middles and widths, in
+## radians), or NONE. The pointed entry holds `STICKY_ANGLE` past its border (hysteresis).
+func pick_among(entries: PackedInt32Array, angles: PackedFloat32Array, widths: PackedFloat32Array, angle: float) -> int:
+	var picked: int = NONE
+	for at in entries.size():
+		var off: float = absf(fposmod(angle - angles[at] + PI, TAU) - PI)
+		var half: float = widths[at] * 0.5
+		if entries[at] != NONE and entries[at] == _pointed:
+			half += minf(STICKY_ANGLE, widths[at] * STICKY_SHARE)
+		if off <= half:
+			picked = entries[at]
+			if picked == _pointed:
+				break
+	return picked
+
+
+## The ring's angle of a direction: 0 is up, clockwise, 0 to TAU.
+static func angle_of(aim: Vector2) -> float:
+	return fposmod(atan2(aim.x, -aim.y), TAU)
+
+
+## The direction of a ring angle (the inverse of `angle_of`).
+static func direction_of(angle: float) -> Vector2:
+	return Vector2(sin(angle), -cos(angle))
+
+
+## The right stick with how far it is pushed (0 to 1 past the dead zone), for the ring styles.
+func stick_tilt() -> Vector2:
+	return _input.menu_tilt(index) if _input != null else Vector2.ZERO
+
+
+## P1's mouse from the ring's middle, in ring radii (1 on the ring), or zero (other players, the
+## mouse off the ring and its arcs). For the ring styles, which read how far out it is.
+func mouse_reach() -> Vector2:
+	if not _uses_mouse():
+		return Vector2.ZERO
+	var offset: Vector2 = get_global_mouse_position() - _center
+	return offset / RING_RADIUS if offset.length() < MOUSE_OUTER else Vector2.ZERO
 
 
 ## Hold `extra` (Y) to clear the staff, once per hold.
@@ -1027,6 +1079,8 @@ func _build_ring() -> void:
 		angle += width
 	for at in _ring_angle.size():
 		_ring_angle[at] = fposmod(_ring_angle[at] - first, TAU)
+	if ring_picker != null:
+		ring_picker.reset()
 
 
 ## How wide (px) one card's place on the ring is.
@@ -1344,6 +1398,8 @@ func _draw_numbers() -> void:
 
 func _draw_ring() -> void:
 	if _ring_entry.is_empty():
+		return
+	if ring_picker != null and ring_picker.draw(self):
 		return
 	draw_arc(_center, RING_RADIUS, 0.0, TAU, 64, LINE, 1.0)
 	# The kind arcs, outside the ring.

@@ -390,6 +390,19 @@ func menu_aim(player: int) -> Vector2:
 	return stick.normalized() if stick.length() > DEADZONE else Vector2.ZERO
 
 
+## The right stick of `player` with how far it is pushed: zero in its dead zone, then its
+## length rising from 0 to 1 at full tilt, like get_move(). For a menu that reads the tilt too
+## (the radial builder's zoom and kind rings).
+func menu_tilt(player: int) -> Vector2:
+	if not is_joined(player):
+		return Vector2.ZERO
+	var stick: Vector2 = _aim_stick[player]
+	var length: float = stick.length()
+	if length <= DEADZONE:
+		return Vector2.ZERO
+	return stick / length * minf((length - DEADZONE) / (1.0 - DEADZONE), 1.0)
+
+
 ## Shake the gamepad of `player`: `weak` and `strong` (0 to 1) are the two motors, for
 ## `seconds`. False, and nothing happens, for the keyboard or a free slot. A virtual device
 ## shakes nothing real, but `vibrator` hears it, so tests see the rumble.

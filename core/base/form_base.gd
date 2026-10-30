@@ -50,8 +50,9 @@ enum Motion {
 	WALL,
 	## Reads a payload and drops it on the aim point after `lifetime` seconds (B2).
 	RAIN,
-	## A crack along the ground that hits every target on its line, `ray_length` long (B2).
-	FISSURE,
+	## Was FISSURE, removed 2026-10-30 (owner). The slot stays so the numbers stored in every
+	## other carrier's .tres keep their meaning; no card may use it (`range_problems`).
+	_UNUSED_10,
 	## A still copy of the wizard that enemies target, for `lifetime` seconds (B2, B5).
 	DECOY,
 	## A helper that orbits the caster and casts its payload every `cooldown` seconds (B2, B5).
@@ -88,7 +89,7 @@ enum Motion {
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
 @export var orbit_radius: float = 0.0
-## RAY, FISSURE and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
+## RAY and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
 ## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
 ## SWING: degrees the sweep hits over, centred on the aim.
@@ -191,9 +192,11 @@ func ranges() -> Dictionary:
 	return limits
 
 
-## The ranges, and the empty motion slot a removed carrier left.
+## The ranges, and the empty motion slots removed carriers left.
 func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
 	if motion == Motion._UNUSED_6:
 		problems.append("motion: 6 was hook, removed 2026-10-30")
+	if motion == Motion._UNUSED_10:
+		problems.append("motion: 10 was fissure, removed 2026-10-30")
 	return problems

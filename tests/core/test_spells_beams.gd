@@ -55,10 +55,6 @@ func before_each() -> void:
 	beam.radius = 6.0
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.radius = 2.0
-	var fissure: FormBase = _form(&"fissure", 0.0, 0.3)
-	fissure.motion = FormBase.Motion.FISSURE
-	fissure.ray_length = 200.0
-	fissure.radius = 6.0
 	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 3.0)
 	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 3.0)
 	(_fake.items[&"homing"] as ModifierBase).behaviour_reach = 160.0
@@ -322,24 +318,6 @@ func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
 		check(at.x < 80.0 and at.y > 80.0, "back off the wall, where it got (%s)" % str(at))
 
 
-func test_a_bouncing_fissure_turns_and_shows_every_leg() -> void:
-	_turning_room()
-	var legs: Array = []
-	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
-		if form == &"beam":
-			legs.append([origin, length]))
-	var behind: Node2D = _target(Vector2(40.0, 120.0))
-	_build([&"bounce", &"fissure"])
-	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
-	check_equal(_hits.size(), 1, "the fissure turns and hits it")
-	if not _hits.is_empty():
-		check(_hits[0][1] == behind, "the target past the turn")
-	check_equal(legs.size(), 2, "a cue for each leg")
-	if legs.size() == 2:
-		check((legs[0][0] as Vector2).is_zero_approx(), "the first from the caster")
-		check(absf(float(legs[0][1]) + float(legs[1][1]) - 200.0) < 1.0, "together its whole length")
-
-
 ## The general rule (owner, 2026-10-29): a turn at a wall takes none of a beam's cards away, so a
 ## homing beam homes again from the wall, as a homing shot does after it bounces. The target is
 ## outside the beam's homing cone from the staff (52 degrees off its aim) and inside it from the
@@ -363,4 +341,3 @@ func test_a_homing_beam_homes_again_after_it_turns_at_a_wall() -> void:
 	var at: int = _beam()
 	if at >= 0:
 		check(_spells.beam_point_count(at) > 3, "its drawn path bends after the turn (%d points)" % _spells.beam_point_count(at))
-

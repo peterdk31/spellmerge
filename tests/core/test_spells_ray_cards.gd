@@ -1,9 +1,8 @@
 extends "res://tests/support/suite.gd"
-## Cards on beams and fissures (rules R4f, docs/milestones/M2-rules.md; owner, 2026-10-29): a
-## ray's chain jump pierces as its carrier does (a fissure's every target); ghost takes a beam or
-## a fissure through walls; a beam with magnet pulls toward its line, with growth widens every
-## second it is on, with spiral waves sideways and hits along the wave (after a turn at a wall
-## too); relay on a beam or a fissure takes on the infusions of the actors its line hits, for that
+## Cards on beams (rules R4f, docs/milestones/M2-rules.md; owner, 2026-10-29): a ray's chain
+## jump pierces as its carrier does; ghost takes a beam through walls; a beam with magnet pulls
+## toward its line, with growth widens every second it is on, with spiral waves sideways and hits
+## along the wave (after a turn at a wall too); relay on a beam takes on the infusions of the actors its line hits, for that
 ## hit and every one after while it is on. Cards built in code on a real projectile manager, and
 ## the real cards in the combo arena where combat has to answer.
 ##
@@ -58,10 +57,6 @@ func before_each() -> void:
 	beam.motion = FormBase.Motion.RAY
 	beam.ray_length = 200.0
 	beam.radius = 6.0
-	var fissure: FormBase = _form(&"fissure", 0.0, 0.3)
-	fissure.motion = FormBase.Motion.FISSURE
-	fissure.ray_length = 200.0
-	fissure.radius = 6.0
 	var long: FormBase = _form(&"long_beam", 0.0, 0.3)
 	long.motion = FormBase.Motion.RAY
 	long.ray_length = 300.0
@@ -170,29 +165,18 @@ func test_a_piercing_beams_jump_pierces_too() -> void:
 	check_equal(_hits_on(scene[2]), 1, "and goes on through it, as the beam pierces")
 
 
-func test_a_fissures_jump_pierces_everything_on_its_line() -> void:
-	var scene: Array[Node2D] = _chain_scene()
-	_build([&"chain", &"fissure"])
-	_cast()
-	check_equal(_hits_on(scene[0]), 1, "the fissure hits the first target")
-	check_equal(_hits_on(scene[1]), 1, "its jump the next")
-	check_equal(_hits_on(scene[2]), 1, "and the one past it, as the fissure pierces all")
-
-
 # --- Item 20: ghost, magnet, growth, spiral -----------------------------------------------
 
-func test_ghost_takes_a_beam_and_a_fissure_through_walls() -> void:
+func test_ghost_takes_a_beam_through_walls() -> void:
 	_mgr.set_walls([Rect2(60.0, -40.0, 16.0, 80.0)] as Array[Rect2])
 	var behind: Node2D = _target(Vector2(120.0, 0.0))
-	for form: StringName in [&"beam", &"fissure"]:
-		_build([form])
-		_cast()
-		check_equal(_hits_on(behind), 0, "a plain %s stops at the wall" % form)
-		_settle()
-		_build([&"ghost", form])
-		_cast()
-		check_equal(_hits_on(behind), 1, "a ghost %s passes through it" % form)
-		_settle()
+	_build([&"beam"])
+	_cast()
+	check_equal(_hits_on(behind), 0, "a plain beam stops at the wall")
+	_settle()
+	_build([&"ghost", &"beam"])
+	_cast()
+	check_equal(_hits_on(behind), 1, "a ghost beam passes through it")
 
 
 func test_a_ghost_beam_is_drawn_through_the_wall_for_its_whole_length() -> void:
@@ -295,7 +279,7 @@ func test_a_spiral_beam_waves_on_after_it_turns_at_a_wall() -> void:
 	check(count - 1 - turn >= 3, "and goes on waving, not straight (%d points past the turn)" % (count - 1 - turn))
 
 
-# --- Item 15: relay on a beam and a fissure ---------------------------------------------------
+# --- Item 15: relay on a beam ---------------------------------------------------------------
 
 ## The teammate (seat 1, at 60 px) casts frost, then seat 0 casts `cards` through it at an imp at
 ## 110 px. Returns the arena; the caller frees it.
@@ -340,16 +324,3 @@ func test_a_relay_beam_takes_on_what_it_passes_through_while_it_is_on() -> void:
 			check_equal(frosted, 0, "without relay nothing is taken on")
 			check(not arena.was_given(imp, &"chill"), "and nothing chills")
 		arena.free_all()
-
-
-func test_a_relay_fissure_takes_on_what_it_passes_through() -> void:
-	for relay: bool in [false, true]:
-		var cards: Array = ["fissure"]
-		if relay:
-			cards.push_front("relay")
-		var arena: ArenaScript = _relay_scene(cards)
-		check(arena.cast(0, 0), "the fissure is cast")
-		arena.run(0.2)
-		check_equal(arena.was_given(arena.imps[0], &"chill"), relay, "the imp past the teammate is chilled only with relay")
-		arena.free_all()
-

@@ -2344,8 +2344,9 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 
 
 ## Return (`set_return`): from half its life the shot flies back to its caster at the speed it had
-## (it may hit again on the way), and ends with an expiry when it gets there; it vanishes when its
-## caster's anchor is gone. One whose caster is a shot waits for its turn (see `_pass_orbit`).
+## (it may hit again on the way), and ends with an expiry when it gets there; the way home takes no
+## life, so it always comes home (rules R4 F4), but it vanishes when its caster's anchor is gone.
+## One whose caster is a shot waits for its turn (see `_pass_orbit`).
 func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
@@ -2354,6 +2355,8 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 		if _caster_slot[slot] >= 0 and not _catching_up:
 			_wait(slot, B_RETURN)
 			continue
+		# The way home takes no life: give back what `_pass_common` took this step.
+		_life[slot] += delta
 		var flags: int = _flags[slot]
 		var turned: bool = (flags & F_TURNED) == 0
 		if turned:

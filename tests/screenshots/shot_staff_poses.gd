@@ -66,7 +66,7 @@ func take() -> void:
 		input.call("send_virtual_aim", p, Vector2.RIGHT)
 	await settle(30)
 	var middle: Vector2 = start + Vector2(90.0, -10.0)
-	var rounds: Array = [[&"bolt", &"nova", &"beam", &"rain"], [&"rune", &"swap", &"teleport", &"familiar"], [&"orbit", &"fissure", &"wall", &"decoy"]]
+	var rounds: Array = [[&"bolt", &"nova", &"beam", &"rain"], [&"rune", &"dash", &"teleport", &"familiar"], [&"orbit", &"swap", &"wall", &"decoy"]]
 	for r in rounds.size():
 		for p in 4:
 			row[p].global_position = start + Vector2(60.0 * p, 0.0)

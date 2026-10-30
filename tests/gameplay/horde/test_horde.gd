@@ -282,7 +282,10 @@ func test_a_pick_without_an_offer_or_out_of_range_does_nothing() -> void:
 
 func test_with_every_card_owned_there_is_no_offer() -> void:
 	var run: Fixture = _make()
-	run.registry.folders[&"spells"] = {&"dash": SpellComponent.new(), &"fire": SpellComponent.new()}
+	var owned: Dictionary = {}
+	for id: StringName in HordeScript.START_BAG:
+		owned[id] = SpellComponent.new()
+	run.registry.folders[&"spells"] = owned
 	run.start()
 	run.level_up()
 	check(run.offers.is_empty(), "no card left, no offer")

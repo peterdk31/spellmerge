@@ -69,7 +69,7 @@ extends Node
 ## build) loads like Play (no intro) and starts a run in the room `horde` (HORDE_ROOM_ID): a wizard
 ## per joined player, no waves and no dummies; every wizard holds the four plain starter staffs
 ## in every build channel (never the dev numbers, so it plays the same everywhere) with
-## `start_cards`. `room_entered(&"horde")` is followed by `horde_started(world)`. Flow spawns no
+## HORDE_START_CARDS (a dash staff and a swing staff). `room_entered(&"horde")` is followed by `horde_started(world)`. Flow spawns no
 ## enemy here: the director (`gameplay/horde`) does, under its own node. When every wizard is down,
 ## after HORDE_RESTART_DELAY (once started, a join does not call it off) a fresh world stands and
 ## `horde_started` is sent again. `horde_ended` is sent when a horde run stops (`stop_run`) or
@@ -101,6 +101,8 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
+## The cards a horde run starts with instead (owner, 2026-10-31): RB a dash staff, RT a swing staff.
+const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
 ## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
 ## spawn after these stands another of the first, `dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
@@ -823,7 +825,8 @@ func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	PlayerScript.seat_wizard(wizard, index, null, start_cards.duplicate(true), staffs_for_mode())
+	var cards: Array = HORDE_START_CARDS if mode == MODE_HORDE else start_cards
+	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

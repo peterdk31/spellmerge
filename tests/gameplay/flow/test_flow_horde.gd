@@ -125,7 +125,7 @@ func test_horde_starts_the_horde_room_with_a_wizard_each_and_no_enemies() -> voi
 		_reset()
 
 
-func test_every_channel_gets_the_plain_starter_staffs_and_the_start_cards() -> void:
+func test_every_channel_gets_the_plain_starter_staffs_and_the_horde_cards() -> void:
 	var registry: Node = root.get_node("Registry")
 	for name: String in ["dev", "preview", "nightly", "stable"]:
 		flow.channel = name
@@ -140,8 +140,10 @@ func test_every_channel_gets_the_plain_starter_staffs_and_the_start_cards() -> v
 			var staff: StaffBase = wizard.caster.staff_of(at)
 			check(staff.head == head.head, "%s: button %d has the %s head" % [name, at, FlowScript.STARTER_HEADS[at]])
 			check_equal(staff.slots, head.slots, "%s: button %d has the starter's slots, never the dev staff's" % [name, at])
-		check_equal(wizard.caster.cards_of(0)[0], &"dash", "%s: A starts with dash" % name)
-		check_equal(wizard.caster.cards_of(1).slice(0, 2), [&"fire", &"bolt"] as Array[StringName], "%s: X starts with fire bolt" % name)
+		check_equal(wizard.caster.cards_of(0)[0], &"dash", "%s: RB starts with dash" % name)
+		check_equal(wizard.caster.cards_of(1).slice(0, 1), [&"swing"] as Array[StringName], "%s: RT starts with swing" % name)
+		for empty: int in [2, 3]:
+			check(wizard.caster.cards_of(empty).all(func(id: StringName) -> bool: return id == &""), "%s: staff %d starts empty" % [name, empty])
 		_reset()
 
 

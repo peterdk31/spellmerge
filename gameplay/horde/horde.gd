@@ -40,7 +40,8 @@ const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres"
 
 const SEATS: int = 4
 ## The cards every wizard's bag holds at the start of a horde run (and a joiner's).
-const START_BAG: Array[StringName] = [&"dash", &"fire", &"bolt"]
+## The cards of Flow's HORDE_START_CARDS (owner, 2026-10-31: a dash staff and a swing staff).
+const START_BAG: Array[StringName] = [&"dash", &"swing"]
 ## Cards in one level-up offer.
 const OFFER_SIZE: int = 3
 ## Seconds of the build break a level-up starts.

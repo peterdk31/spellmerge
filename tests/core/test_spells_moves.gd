@@ -450,7 +450,7 @@ func _distance_cards() -> void:
 	_put(faster, &"faster")
 	var homing := ModifierBase.new()
 	homing.behaviour = ModifierBase.Behaviour.HOMING
-	homing.behaviour_strength = 3.0
+	homing.behaviour_strength = 73.0
 	homing.behaviour_reach = 160.0
 	_put(homing, &"homing")
 
@@ -543,7 +543,7 @@ func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() 
 	_build(0, [&"homing", &"short"])
 	_cast(0)
 	var homing: Homing = CarrierDash.of(_spells).move_homing(0)
-	check(is_equal_approx(homing.turn, 3.0) and is_equal_approx(homing.reach, 160.0), "the card's turn rate and reach: %s, %s" % [homing.turn, homing.reach])
+	check(is_equal_approx(homing.curve, 73.0) and is_equal_approx(homing.reach, 160.0), "the card's curve and reach: %s, %s" % [homing.curve, homing.reach])
 	_mgr.set_anchor(1, Vector2.ZERO)
 	_build(1, [&"short"])
 	_cast(1)

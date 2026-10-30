@@ -426,6 +426,15 @@ func test_the_builder_view_counts_a_casts_damage() -> void:
 	check_equal(int((payload["casts"] as Array)[0]["damage"]), 5, "a payload is not counted: it depends on what is hit")
 
 
+func test_the_builder_view_keeps_a_specks_damage() -> void:
+	# An atom hits for 0.3: the builder shows that, not 0.
+	var atom: FormBase = _form(&"speck", 1, 1)
+	atom.base_damage = 0.3
+	var view: Dictionary = _spells.call("staff_view", [&"speck"] as Array[StringName], _staff)
+	check(is_equal_approx(float((view["casts"] as Array)[0]["damage"]), 0.3), "a cast of one speck is 0.3")
+	check_equal(_spells.call("component_stats", &"speck")[0], "Dmg 0.3", "and its card says so")
+
+
 func test_reach_stretches_a_carriers_range_and_two_multiply() -> void:
 	var reach: ModifierBase = _modifier(&"reach")
 	reach.reach_mult = 1.6

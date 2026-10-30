@@ -496,13 +496,13 @@ func _reset_all() -> void:
 		_refresh(player)
 
 
-func _on_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float) -> void:
+func _on_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
-		var before: int = _panels[player].health()
+		var before: float = _panels[player].health()
 		_panels[player].set_stats(health, max_health, mana, max_mana)
-		if _in_room and before >= 0 and health < before:
-			_vignette.flash_hit(player, float(before - health) / float(maxi(max_health, 1)), _joined.count(true))
-		if health <= 0:
+		if _in_room and before >= 0.0 and health < before:
+			_vignette.flash_hit(player, (before - health) / maxf(max_health, 1.0), _joined.count(true))
+		if health <= 0.0:
 			_builders[player].close_builder()
 			_radials[player].close_builder()
 

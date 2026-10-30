@@ -11,9 +11,10 @@ extends RefCounted
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
-## Radians a second it turns (`CompiledSpell.homing_turn`), how far it looks
-## (`homing_range`), and how far an instant carrier bends, in radians (`homing_angle`).
-var turn: float = 0.0
+## The radius of the curve it turns on (`CompiledSpell.homing_curve`: at any speed, its speed /
+## this radians a second), how far it looks (`homing_range`), and how far an instant carrier
+## bends, in radians (`homing_angle`).
+var curve: float = 0.0
 var reach: float = 0.0
 var bend: float = 0.0
 ## The instance id of the target it keeps (0 for none yet), and the seed of its random pick.
@@ -30,7 +31,7 @@ func start(spell: CompiledSpell, with_seed: int) -> void:
 	if spell == null or spell.homing_range <= 0.0:
 		stop()
 		return
-	turn = spell.homing_turn
+	curve = spell.homing_curve
 	reach = spell.homing_range
 	bend = deg_to_rad(spell.homing_angle)
 	keep = 0
@@ -39,7 +40,7 @@ func start(spell: CompiledSpell, with_seed: int) -> void:
 
 
 func stop() -> void:
-	turn = 0.0
+	curve = 0.0
 	reach = 0.0
 	bend = 0.0
 	keep = 0
@@ -47,7 +48,7 @@ func stop() -> void:
 
 
 func homes() -> bool:
-	return reach > 0.0 and turn > 0.0
+	return reach > 0.0 and curve > 0.0
 
 
 ## `velocity` at `from` turned toward its target for `delta` seconds (a dash as it goes), or
@@ -55,7 +56,7 @@ func homes() -> bool:
 func steer(projectiles: ProjectilesScript, caster: int, from: Vector2, velocity: Vector2, delta: float) -> Vector2:
 	if not homes() or projectiles == null:
 		return velocity
-	var turned: Vector2 = projectiles.home_velocity(caster, from, velocity, turn, reach, delta, keep, pick_seed)
+	var turned: Vector2 = projectiles.home_velocity(caster, from, velocity, velocity.length() / curve, reach, delta, keep, pick_seed)
 	keep = projectiles.homing_target
 	return turned
 

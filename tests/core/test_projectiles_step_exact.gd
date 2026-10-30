@@ -9,7 +9,9 @@ extends SceneTree
 ## added up, where it showed a finished move's stale numbers; and again in rules R4a, when a
 ## shield's scan stopped spending the hit-work budget: the shots do the same, only the work left
 ## is higher; and again in rules R4 F4, when the way home stopped taking a returning shot's life:
-## the shots do the same, only a returning shot's life stays where it turned).
+## the shots do the same, only a returning shot's life stays where it turned; and again for the
+## atom, when homing became a curve, radians a pixel flown: the same events, the turns differ by
+## float rounding only, at most 0.00004 px).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

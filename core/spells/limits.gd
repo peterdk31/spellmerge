@@ -15,6 +15,9 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## Staffs (A4): the numbers of a fallback, the hit made when cards land on the caster or on a
 ## payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
 const FALLBACK_DAMAGE: float = 4.0
+## The least damage a compiled hit does (a card may go below 1, an atom's speck; health is
+## decimal), so every hit still counts.
+const MIN_DAMAGE: float = 0.01
 const FALLBACK_RADIUS: float = 8.0
 
 ## Engine pacing, never a limit (owner, 2026-10-29: interactions are not limited, they follow
@@ -81,9 +84,9 @@ const DEFLECT_SPEEDUP: float = 1.7
 const SLAM_ROWS_START: int = 16
 const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
-## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
-## radians a second bend it 43 degrees; more homing bends it further, all the way round).
-const INSTANT_HOMING_SECONDS: float = 0.25
+## toward a target as far as a homing shot turns over this many pixels of its flight (the Homing
+## card's curve of 73 px bends it 43 degrees; more homing bends it further, all the way round).
+const INSTANT_HOMING_REACH: float = 55.0
 ## Pixels per second a homing still shot (a rune) creeps toward its target (rules R4i): below the
 ## slowest walking enemy (30), so a rune that homes is a trap that follows, never a chaser one can
 ## not walk away from, and over a rune's 8 s it creeps about the Homing card's reach (160 px).

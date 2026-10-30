@@ -29,7 +29,7 @@ func after_each() -> void:
 
 
 ## A kit actor with Health (`health`), a Hurtbox and a Contact of `touch` damage, on `team`.
-func _actor(at: Vector2, team: int, touch: int = 0, health: int = 50) -> Actor:
+func _actor(at: Vector2, team: int, touch: int = 0, health: float = 50.0) -> Actor:
 	var body := Actor.new()
 	body.idle_team = team
 	var hp := Health.new()
@@ -43,7 +43,7 @@ func _actor(at: Vector2, team: int, touch: int = 0, health: int = 50) -> Actor:
 
 
 ## A plain body (no kit, no id of its own) Combat keeps the health of.
-func _plain(at: Vector2, health: int = 20) -> Node2D:
+func _plain(at: Vector2, health: float = 20.0) -> Node2D:
 	var body := own(Node2D.new()) as Node2D
 	body.position = at
 	root.add_child(body)

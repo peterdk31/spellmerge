@@ -49,7 +49,7 @@ func before_each() -> void:
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
 	# The probe: a shot that does not move marks where a payload fires (a placed rune would
 	# appear a step ahead of it, rules R4 F3).
-	rune.carrier = &"bolt"
+	rune.carrier = &"atom"
 	rune.radius = 6.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.4)
 	beam.carrier = &"beam"

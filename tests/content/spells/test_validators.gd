@@ -165,7 +165,7 @@ func test_the_broken_reaction_table_fails() -> void:
 
 func test_a_form_needs_what_its_carrier_uses() -> void:
 	var form := _fine(FormBase.new()) as FormBase
-	form.carrier = &"bolt"
+	form.carrier = &"atom"
 	form.speed = 100.0
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a straight form with speed is fine")
 	form.speed = 0.0

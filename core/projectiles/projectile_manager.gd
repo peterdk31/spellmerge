@@ -128,7 +128,8 @@ extends Node2D
 ##
 ## Homing: `set_homing(slot, turn_rate, within)` makes a straight shot turn toward a
 ## target no further than `within` pixels from it (picked at random and kept while it can), at most `turn_rate` radians a
-## second, keeping its speed; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
+## second at its speed then (`set_homing_curve(slot, curve, within)`: on a curve of that radius),
+## keeping its speed and its curve whatever its speed later; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
@@ -257,6 +258,8 @@ const RETURN_BEND: float = PI / 3.0
 const HOMING_PERIOD: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
 const RAY_SEGMENTS: int = 8
+## The most points of its last step a swing's or beam's guard tests a shot at (`_guard_samples`).
+const GUARD_PATH_SAMPLES: int = 16
 ## Rows `sweep`'s results hold at first; they grow when a sweep finds more.
 const SWEEP_START: int = 32
 ## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
@@ -355,6 +358,10 @@ const LOOK_GRID: int = 24
 const LOOK_LENGTH: int = 72
 const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
+## A bolt-like shot of hit radius below this is a speck (an atom): its core is one pixel, no
+## cross. It travels as zoom 0 in the look (`look_core_zoom`); every other shape of it, and every
+## shader but the trail's core, reads zoom 1 (`look_from_color` never goes below 1).
+const SPECK_RADIUS: float = 2.0
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
 ## from one pool with a global count, `particle_cap` (a visual budget, under the effect quality
 ## setting once there is one; never a build rule). A shot with `n` emitting kinds asks for
@@ -398,8 +405,9 @@ const TRAIL_Q_TAIL: int = 4
 const TRAIL_Q_JAG: int = 5
 const TRAIL_Q_CORE: int = 6
 ## Slots a trail has for its particles (one per 60th of a second it keeps), its tail pixels (one
-## per pixel of travel; a tail longer than this, a very fast shot's, loses its oldest end) and the
-## steps of lightning's line (a tenth of a second at 4 px a step).
+## per pixel of travel; a shot too fast for that over its tail's life leaves one every 2 to 4
+## pixels, the shader's TAIL_GAP_MAX, so an atom's tail reaches as far, sparser) and the steps of
+## lightning's line (a tenth of a second at 4 px a step).
 const TRAIL_SPARKS: int = int(TRAIL_KEEP * 60.0) + 1
 const TRAIL_TAIL_PIXELS: int = 128
 const TRAIL_JAGS: int = 16
@@ -544,7 +552,8 @@ var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
 var _orbit_speed: PackedFloat32Array = PackedFloat32Array()
 ## Where an orbit shot's caster was at its last step (INF before its first), for `_drawn_at`.
 var _orbit_centre: PackedVector2Array = PackedVector2Array()
-## Homing: turn rate in rad/s (0 for none) and the point last found (INF for none).
+## Homing: how far it turns in radians a pixel flown (the same curve at any speed; 0 for none)
+## and the point last found (INF for none).
 var _turn: PackedFloat32Array = PackedFloat32Array()
 var _home_at: PackedVector2Array = PackedVector2Array()
 var _home_range: PackedFloat32Array = PackedFloat32Array()
@@ -1748,21 +1757,39 @@ func _grow_moves(size: int) -> void:
 		_move_free = at
 
 
+## Make the shot in `slot` home on the curve of radius `curve` pixels (`CompiledSpell.homing_curve`:
+## the same curve at any speed, faster or slower later too). See `set_homing`.
+func set_homing_curve(slot: int, curve: float, within: float) -> bool:
+	if not is_finite(curve) or curve < 0.0:
+		return false
+	return _set_homing(slot, 0.0 if curve == 0.0 else 1.0 / curve, within)
+
+
 ## Make the shot in `slot` home on targets no further than `within` pixels from it: a straight
-## shot turns at most `turn_rate` radians a second, a still one (a rune) creeps toward its
+## shot turns at most `turn_rate` radians a second at the speed it has now, so on that curve
+## whatever its speed later (it keeps the radians a pixel flown, `_turn`), a still one (a rune) creeps toward its
 ## target at SpellLimits.HOMING_DRIFT. Returns false for an empty slot, an orbit shot (held on
 ## its circle), a rate that is negative or not finite, or a `within` that is not above 0 and
 ## finite; true when the rate was applied, 0 included (0 stops homing).
 func set_homing(slot: int, turn_rate: float, within: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not is_finite(turn_rate) or turn_rate < 0.0:
+		return false
+	var pace: float = _vel[slot].length()
+	# (A still shot creeps at HOMING_DRIFT: any bend above 0 homes it.)
+	return _set_homing(slot, turn_rate / pace if pace > 0.0 else turn_rate, within)
+
+
+## Homing of `bend` radians a pixel flown (see `set_homing`).
+func _set_homing(slot: int, bend: float, within: float) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
 		return false
-	if not is_finite(turn_rate) or turn_rate < 0.0 or not is_finite(within) or within <= 0.0:
+	if not is_finite(bend) or bend < 0.0 or not is_finite(within) or within <= 0.0:
 		return false
-	_turn[slot] = turn_rate
+	_turn[slot] = bend
 	_home_range[slot] = within
 	_home_target[slot] = 0
 	_home_at[slot] = Vector2.INF
-	if turn_rate > 0.0:
+	if bend > 0.0:
 		_join(slot, B_HOMING)
 	else:
 		_leave(slot, B_HOMING)
@@ -2027,8 +2054,10 @@ func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool
 ## The shots of another team than the actor `caster`'s (a shot of no actor included, as a shield
 ## has it) whose circle reaches into the wedge round `origin` from `from_angle` to `to_angle`
 ## radians off `direction` (`side` as `sweep`), out to `reach`: a swing's guard (melee I3). Fills
-## `guard_slots` and returns how many. Allocation-free once the list has grown.
-func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float) -> int:
+## `guard_slots` and returns how many. `ahead` seconds: also where each shot will be by then, so a
+## parry meets a fast shot (an atom) that would otherwise go from outside the wedge into the body
+## behind it in one step. Allocation-free once the list has grown.
+func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, ahead: float = 0.0) -> int:
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not (reach > 0.0) or to_angle < from_angle:
 		return 0
 	var mine: int = _team_now(caster)
@@ -2038,15 +2067,23 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 	for slot in _high:
 		if _alive[slot] == 0 or _team[slot] == mine:
 			continue
-		var to: Vector2 = _pos[slot] - origin
-		var distance: float = to.length()
 		var radius: float = _radius[slot]
-		if distance > reach + radius:
-			continue
-		var width: float = PI if distance <= radius else asin(radius / distance)
-		var local: float = angle_difference(base, to.angle()) * turn
-		if local + width >= from_angle and local - width <= to_angle:
-			found = _guard_add(found, slot)
+		# Along its last step (and its next `ahead`), so a small fast shot (an atom) does not slip
+		# past between steps.
+		var flies: bool = ahead > 0.0 and _state[slot] != S_STUCK and _state[slot] != S_FROZEN and _state[slot] != S_HELD
+		var next: Vector2 = _pos[slot] + _vel[slot] * ahead if flies else _pos[slot]
+		var later: int = _guard_samples_on(_pos[slot], next, radius) if next != _pos[slot] else 0
+		var samples: int = _guard_samples(slot)
+		for k in samples + later:
+			var to: Vector2 = (_guard_point(slot, k, samples) if k < samples else _pos[slot].lerp(next, float(k - samples + 1) / float(later))) - origin
+			var distance: float = to.length()
+			if distance > reach + radius:
+				continue
+			var width: float = PI if distance <= radius else asin(radius / distance)
+			var local: float = angle_difference(base, to.angle()) * turn
+			if local + width >= from_angle and local - width <= to_angle:
+				found = _guard_add(found, slot)
+				break
 	return found
 
 
@@ -2062,9 +2099,34 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 		if _alive[slot] == 0 or _team[slot] == mine or _guard_has(found, slot):
 			continue
 		var reach: float = width + _radius[slot]
-		if Geometry2D.get_closest_point_to_segment(_pos[slot], a, b).distance_squared_to(_pos[slot]) <= reach * reach:
-			found = _guard_add(found, slot)
+		var samples: int = _guard_samples(slot)
+		for k in samples:
+			var at: Vector2 = _guard_point(slot, k, samples)
+			if Geometry2D.get_closest_point_to_segment(at, a, b).distance_squared_to(at) <= reach * reach:
+				found = _guard_add(found, slot)
+				break
 	return found
+
+
+## How many points of its last step a guard tests a shot at: one for a shot that moves less than
+## its own width a step, else one every width (at most GUARD_PATH_SAMPLES), so a small fast shot
+## (an atom: 1.5 px, 18 px a step) cannot pass a swing or a beam between two steps.
+func _guard_samples(slot: int) -> int:
+	return maxi(_guard_samples_on(_prev[slot], _pos[slot], _radius[slot]), 1)
+
+
+## The points one every width of a shot of `radius` from `a` to `b` takes (at least 1, at most
+## GUARD_PATH_SAMPLES).
+func _guard_samples_on(a: Vector2, b: Vector2, radius: float) -> int:
+	var step: float = a.distance_to(b)
+	var width: float = maxf(radius * 2.0, 1.0)
+	return 1 if step <= width else mini(ceili(step / width), GUARD_PATH_SAMPLES)
+
+
+## Point `k` of `samples` along the shot's last step, from where it is now (k 0) back toward where
+## it was (that point itself was tested on the step before).
+func _guard_point(slot: int, k: int, samples: int) -> Vector2:
+	return _pos[slot].lerp(_prev[slot], float(k) / float(samples))
 
 
 func _guard_has(found: int, slot: int) -> bool:
@@ -2563,7 +2625,7 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			var want: float = 0.0
 			if goal.is_finite() and not goal.is_equal_approx(here):
 				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
-			heading = heading.rotated(move_toward(bend, want, _turn[slot] * delta))
+			heading = heading.rotated(move_toward(bend, want, _turn[slot] * _speed[slot] * delta))
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
@@ -2599,7 +2661,8 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_pos[slot] = _prev[slot] + want.limit_length(SpellLimits.HOMING_DRIFT * delta)
 			continue
 		# `turned_toward`, written out (this runs for every homing shot every step).
-		var most: float = _turn[slot] * delta
+		# Its bend a pixel times the pixels it flies: the same curve at any speed.
+		var most: float = _turn[slot] * velocity.length() * delta
 		_vel[slot] = velocity.rotated(clampf(velocity.angle_to(want), -most, most))
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
@@ -3447,7 +3510,7 @@ func _fade_row(row: int, slot: int) -> void:
 	_trail_ramp[row] = _ramp[slot]
 	_trail_look[row] = _look[slot]
 	_trail_core[row] = _core[slot]
-	_trail_zoom[row] = look_zoom(_radius[slot])
+	_trail_zoom[row] = look_core_zoom(_radius[slot])
 	_trail_flags[row] = TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0
 	_trail_color[row] = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
 	_let_loose(row, sim_time + TRAIL_KEEP)
@@ -3838,6 +3901,12 @@ static func look_zoom(radius: float) -> int:
 	return clampi(roundi(radius * LOOK_CELL_PER_RADIUS), 1, LOOK_ZOOM_MAX)
 
 
+## The zoom a shot of hit radius `radius` tells its shaders: its `look_zoom`, or 0 for a speck
+## (below SPECK_RADIUS), whose core the trail draws as one pixel.
+static func look_core_zoom(radius: float) -> int:
+	return 0 if radius < SPECK_RADIUS else look_zoom(radius)
+
+
 ## The drawn size in pixels of a shot of hit radius `radius`.
 static func look_size(radius: float) -> float:
 	return float(LOOK_GRID * look_zoom(radius))
@@ -3870,7 +3939,7 @@ static func trace_code(age: float) -> float:
 ## channel: the hat ramp and the zoom in red (`look_red`), the look's bits in green (kinds 1-8),
 ## blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
 func _look_color(slot: int) -> Color:
-	return look_color(_ramp[slot], look_zoom(_radius[slot]), _look[slot])
+	return look_color(_ramp[slot], look_core_zoom(_radius[slot]), _look[slot])
 
 
 ## The instance colour the shot shaders read for a shot or effect in `ramp` (`Actors.
@@ -4097,6 +4166,11 @@ func get_life_of(slot: int) -> float:
 	return _life[slot] if is_alive(slot) else 0.0
 
 
+## The hit radius of the shot in `slot` now (growth included), or 0 for an empty slot.
+func get_radius_of(slot: int) -> float:
+	return _radius[slot] if is_alive(slot) else 0.0
+
+
 ## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
 func get_velocity_of(slot: int) -> Vector2:
 	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
@@ -4234,6 +4308,33 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		return null
 	nearest_point = _target_pos[best]
 	return _targets[best]
+
+
+## The first target on `layers` (not of `team`, as `nearest_target`) along the line from `point`
+## to `to` whose hit circle a circle of `radius` moving along it touches, or null: what a shot
+## there will hit next (an arc's zap skips it, as the shot hits it anyway). A line of no length is
+## the circle at `point`. Allocation-free.
+func first_on_path(point: Vector2, to: Vector2, radius: float, layers: int, team: int = ActorsScript.NONE) -> Node2D:
+	if not point.is_finite() or not to.is_finite() or not is_finite(radius):
+		return null
+	var way: Vector2 = to - point
+	var length: float = way.length()
+	var dir: Vector2 = way / length if length > 0.0 else Vector2.ZERO
+	var best: int = -1
+	var best_along: float = INF
+	_query_ready()
+	var cells: Vector4i = _query_cells((point + to) * 0.5, radius + length * 0.5)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if (team == ActorsScript.NONE or _target_team[t] != team) and _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, to), radius, layers, 0):
+					var along: float = (_target_pos[t] - point).dot(dir)
+					if along < best_along:
+						best_along = along
+						best = t
+				t = _target_next[t]
+	return _targets[best] if best >= 0 else null
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps

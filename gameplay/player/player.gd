@@ -90,7 +90,7 @@ var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _bag_filled: bool = false
 var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
-var _sent_health: int = -1
+var _sent_health: float = -1.0
 var _sent_mana: int = -1
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
@@ -293,8 +293,8 @@ func forget_presses() -> void:
 func announce_stats() -> void:
 	if _home == null or not is_instance_valid(_home) or _home.events == null:
 		return
-	var health: int = _home.health.health if _home.health != null else 0
-	var max_health: int = _home.health.max_health if _home.health != null else 0
+	var health: float = _home.health.health if _home.health != null else 0.0
+	var max_health: float = _home.health.max_health if _home.health != null else 0.0
 	var whole_mana: int = floori(_home.caster.mana) if _home.caster != null else 0
 	if health == _sent_health and whole_mana == _sent_mana:
 		return
@@ -304,7 +304,7 @@ func announce_stats() -> void:
 	_home.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
 
 
-func _on_health_changed(_health: int, _max_health: int) -> void:
+func _on_health_changed(_health: float, _max_health: float) -> void:
 	announce_stats()
 
 

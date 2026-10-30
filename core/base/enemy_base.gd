@@ -7,7 +7,7 @@ extends Resource
 @export var id: StringName = &""
 ## True for content shown in the free web demo.
 @export var demo: bool = false
-@export var max_health: int = 1
+@export var max_health: float = 1.0
 ## Pixels per second.
 @export var move_speed: float = 0.0
 ## Damage a player takes from touching the enemy.

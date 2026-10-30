@@ -36,7 +36,7 @@ func test_an_echo_bolt_has_a_half_damage_second_hit() -> void:
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	check(spell.echo_hit != null, "the carrier has an echo hit")
 	if spell.echo_hit != null:
-		check_equal(spell.echo_hit.damage, roundi(spell.damage * 0.5), "at half damage, rounded")
+		check_equal(spell.echo_hit.damage, spell.damage * 0.5, "at half damage, not rounded")
 	arena.free_all()
 	arena = ArenaScript.new(root)
 	staff = arena.install_cards(0, 0, ["bolt"])
@@ -48,7 +48,7 @@ func test_the_echo_hits_a_moment_after_the_bolt() -> void:
 	var plain: int = _lost(["bolt"], Vector2(100.0, 0.0), 1.5)
 	check(plain > 0, "a plain bolt hurts")
 	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 0.5), plain, "only the bolt has hit by 0.5 s")
-	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 1.5), plain + roundi(plain * 0.5), "the echo adds half again")
+	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 1.5), plain + floori(plain * 0.5), "the echo adds half again (7.5: 7 whole points)")
 
 
 func test_the_timer_nova_is_rung_twice() -> void:
@@ -71,5 +71,5 @@ func test_four_players_echo_at_once() -> void:
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(1.5)
 	for imp in imps:
-		check_equal(arena.lost(imp), plain + roundi(plain * 0.5), "every imp took the bolt and its echo")
+		check_equal(arena.lost(imp), plain + floori(plain * 0.5), "every imp took the bolt and its echo")
 	arena.free_all()

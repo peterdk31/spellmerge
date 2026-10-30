@@ -39,7 +39,7 @@ const COSTLIEST: int = 3
 ## Staffs named on each REPORT line of the emergent combo report.
 const REPORT_TOP: int = 5
 ## Health of the imps in this run: low enough that a good staff kills some within `SECONDS`.
-const IMP_HEALTH: int = 60
+const IMP_HEALTH: float = 60.0
 
 var _log: Logger = ErrorLogScript.new()
 
@@ -202,7 +202,7 @@ func _print_report(rows: Array[Dictionary]) -> void:
 			var title: String = row["name"] if not (row["name"] as String).is_empty() else "(unnamed)"
 			print("%s: %s | %s | %s | %d kills, %d reactions (%d kinds), %d peak shots, %d dropped, %.2f ms" % [view[1], value, title, row["label"], int(row["kills"]), int(row["reactions"]), int(row["kinds"]), int(row["shots"]), int(row["dropped"]), float(row["mean"])])
 	if not rows.is_empty() and int(_top(rows, "kills")[0]["kills"]) == 0:
-		print("REPORT WARNING: no staff killed an imp; the imps' health (%d) may be too high for the cards" % IMP_HEALTH)
+		print("REPORT WARNING: no staff killed an imp; the imps' health (%s) may be too high for the cards" % IMP_HEALTH)
 
 
 ## The same seed gives the same staffs, which is what makes a failure replayable.

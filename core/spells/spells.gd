@@ -511,14 +511,14 @@ func _is_card(id: StringName) -> bool:
 
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
 ## each carrier's hit times its shots, times the group's repeats. Payloads are left out (they
-## depend on what is hit), so it is the builder's "at least" number.
-static func _cast_damage(cast: CompiledCast) -> int:
+## depend on what is hit), so it is the builder's "at least" number; to a tenth (an atom's 0.3).
+static func _cast_damage(cast: CompiledCast) -> float:
 	if cast.group == null:
-		return 0
-	var total: int = 0
+		return 0.0
+	var total: float = 0.0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime)
-	return total * maxi(cast.group.repeats, 1)
+		total += spell.damage * float(maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime))
+	return snappedf(total * float(maxi(cast.group.repeats, 1)), 0.1)
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
@@ -545,7 +545,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	if component is FormBase:
 		var form: FormBase = component
 		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
-		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
+		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
 	elif component is ModifierBase:
@@ -1003,7 +1003,7 @@ func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vect
 ## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	if spell.homing_range > 0.0:
-		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
+		projectiles.set_homing_curve(slot, spell.homing_curve, spell.homing_range)
 	if spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0:
 		projectiles.set_return(slot)
 	if spell.behaviours.is_empty():
@@ -1362,7 +1362,8 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	var at: Vector2 = projectiles.get_position_of(slot)
 	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
 	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
-		_rec_arc_clock[slot] = first_tick(spell.arc_interval, life)
+		# Ready at once (owner, 2026-10-30): its interval is the wait after a zap, not a fuse.
+		_rec_arc_clock[slot] = 0.0
 		if _rec_arc[slot] == 0:
 			if _arc_count == _arcs.size():
 				_arcs.resize(_arcs.size() * 2)
@@ -1846,7 +1847,8 @@ func _step_magnets() -> void:
 	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
-## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach`, hitting with its
+## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach` but the
+## one its shot hits next (`first_on_path`), hitting with its
 ## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body. With no
 ## body in reach the shot tries again next step.
@@ -1858,7 +1860,13 @@ func _zap(slot: int) -> void:
 		return
 	var at: Vector2 = projectiles.get_position_of(slot)
 	var actor: int = SpellTag.caster_of(tag)
-	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, null, _team(actor))
+	# It never zaps the body its shot hits next, which it hits anyway: an arc reaches beside the
+	# shot's way (owner, 2026-10-30). Its way ahead goes as far as the zap reaches or it flies.
+	var velocity: Vector2 = projectiles.get_velocity_of(slot)
+	var ahead: float = minf(velocity.length() * projectiles.get_life_of(slot), spell.arc_reach)
+	var path_to: Vector2 = at + velocity.normalized() * ahead if not velocity.is_zero_approx() else at
+	var next: Node2D = projectiles.first_on_path(at, path_to, projectiles.get_radius_of(slot), HITS, _team(actor))
+	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, next, _team(actor))
 	var aim: Vector2 = projectiles.nearest_point
 	if target == null or not aim.is_finite():
 		return
@@ -2068,7 +2076,7 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
 ## the actor was hurt (a wizard or an enemy alike, actors G3b), whatever the carrier is (a shot, a
 ## beam, a dash, an entity...; `_lc_tag`).
-func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: StringName) -> void:
+func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: StringName) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
 	# Payloads may list more such carriers; they sit past `count` and wait for the next hurt.

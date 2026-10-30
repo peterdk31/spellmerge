@@ -302,7 +302,7 @@ func test_a_held_carriers_echo_hits_at_half_damage() -> void:
 	var damage: Array = []
 	for hit in _hits:
 		damage.append(hit[4])
-	check_equal(damage, [10, 5], "the held shot at full damage, its echo at half")
+	check_equal(damage, [10.0, 5.0], "the held shot at full damage, its echo at half")
 
 
 func test_switching_a_hold_off_before_its_echo_drops_the_echo() -> void:
@@ -375,7 +375,7 @@ func test_an_echoed_chain_keeps_half_damage_on_its_jump() -> void:
 	var damage: Array = []
 	for hit in _hits:
 		damage.append(hit[4])
-	check_equal(damage, [10, 10, 5, 5], "the cast hits twice at full damage, its echo twice at half")
+	check_equal(damage, [10.0, 10.0, 5.0, 5.0], "the cast hits twice at full damage, its echo twice at half")
 
 
 func test_a_mirrored_beam_hits_both_ways() -> void:

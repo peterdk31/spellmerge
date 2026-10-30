@@ -55,9 +55,9 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.radius = 2.0
 	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 3.0)
-	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 3.0)
+	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 73.0)
 	(_fake.items[&"homing"] as ModifierBase).behaviour_reach = 160.0
-	_modifier(&"far_homing", ModifierBase.Behaviour.HOMING, 3.0)
+	_modifier(&"far_homing", ModifierBase.Behaviour.HOMING, 73.0)
 	(_fake.items[&"far_homing"] as ModifierBase).behaviour_reach = 340.0
 	var piercing := ModifierBase.new()
 	piercing.extra_pierce = 1
@@ -255,11 +255,11 @@ func test_homing_cards_stack_by_multiplying() -> void:
 	var one: CompiledSpell = StaffKit.first(_spells, [&"homing", &"bolt"] as Array[StringName])
 	var two: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"bolt"] as Array[StringName])
 	var three: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"homing", &"bolt"] as Array[StringName])
-	check(is_equal_approx(one.homing_turn, 3.0) and is_equal_approx(one.homing_angle, rad_to_deg(3.0 * SpellLimits.INSTANT_HOMING_SECONDS)), "one card: its own turn rate, and the bend that turns in INSTANT_HOMING_SECONDS")
-	check(is_equal_approx(two.homing_turn, 3.0 * SpellLimits.HOMING_STACK), "two turn %s times faster: %s" % [SpellLimits.HOMING_STACK, two.homing_turn])
-	check(is_equal_approx(three.homing_turn, 3.0 * SpellLimits.HOMING_STACK * SpellLimits.HOMING_STACK), "three faster again: %s" % three.homing_turn)
-	check(is_equal_approx(two.homing_angle, rad_to_deg(two.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS)), "a beam bends wider with two, as it turns faster: %s" % two.homing_angle)
-	check(is_equal_approx(three.homing_angle, rad_to_deg(three.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS)), "and wider with three, past 90 degrees: %s" % three.homing_angle)
+	check(is_equal_approx(one.homing_curve, 73.0) and is_equal_approx(one.homing_angle, rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / 73.0)), "one card: its own curve, and the bend it turns over INSTANT_HOMING_REACH")
+	check(is_equal_approx(two.homing_curve, 73.0 / SpellLimits.HOMING_STACK), "two turn on a curve %s times tighter: %s" % [SpellLimits.HOMING_STACK, two.homing_curve])
+	check(is_equal_approx(three.homing_curve, 73.0 / SpellLimits.HOMING_STACK / SpellLimits.HOMING_STACK), "three tighter again: %s" % three.homing_curve)
+	check(is_equal_approx(two.homing_angle, rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / two.homing_curve)), "a beam bends wider with two, as it turns tighter: %s" % two.homing_angle)
+	check(is_equal_approx(three.homing_angle, rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / three.homing_curve)), "and wider with three, past 90 degrees: %s" % three.homing_angle)
 	var many: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"homing", &"homing", &"homing", &"bolt"] as Array[StringName])
 	check(is_equal_approx(many.homing_angle, 180.0), "until it bends all the way round: %s" % many.homing_angle)
 

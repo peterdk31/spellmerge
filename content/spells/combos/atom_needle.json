@@ -1,0 +1,22 @@
+{
+	"id": "atom_needle",
+	"name": "Atom needle",
+	"does": "A stream of piercing atoms threads through the first imp into the one behind it, wearing both down a speck at a time.",
+	"casts": [
+		{"staff": 0, "cards": ["pierce", "atom"]},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.1},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.2},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.3},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.4},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.5},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.6},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.7},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.8},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 0.9},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 1.0},
+		{"staff": 0, "cards": ["pierce", "atom"], "at": 1.1}
+	],
+	"imps": [[80, 0], [140, 0]],
+	"seconds": 1.6,
+	"checks": [{"kind": "lost_at_least", "imps": [0, 1], "min": 2}]
+}

@@ -141,7 +141,7 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	for form in _forms:
-		if form.carrier != &"bolt":
+		if form.carrier != &"atom":
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
@@ -158,7 +158,7 @@ func _discover() -> void:
 ## wall), `back` (a target behind the wizard, on the line), `shooter` (an enemy past the reach shooting along the line at the wizard all the time; the
 ## wizard casts once one of its shots is near),
 ## `donor` (the target on the line cast an infused shot just before), `weak` (that target dies of
-## one hit), `status` (that target has a status the carrier's infusion reacts with), `hurt` (the
+## any one hit: WEAK_HEALTH), `status` (that target has a status the carrier's infusion reacts with), `hurt` (the
 ## wizard is hurt now and then), `repeat` (the wizard keeps casting whenever its staff is ready),
 ## `with` (a modifier of that behaviour joins both casts). `open` is nothing at all.
 const LINE: Dictionary = {"name": "target", "line": true}
@@ -173,6 +173,8 @@ const WALL_TARGET: Dictionary = {"name": "target behind a wall", "wall": 0.4, "b
 const DONOR: Dictionary = {"name": "infused target", "line": true, "donor": true}
 const SHIELDED: Dictionary = {"name": "enemy shooter, shield", "shooter": true, "with": ModifierBase.Behaviour.SHIELD}
 const WEAK: Dictionary = {"name": "target dies", "line": true, "weak": true}
+## The weak target's health: any hit takes it, an atom's speck too.
+const WEAK_HEALTH: float = 0.01
 const HURT: Dictionary = {"name": "wizard hurt", "hurt": true}
 const REACTING: Dictionary = {"name": "target with a status", "line": true, "status": true}
 
@@ -230,7 +232,7 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
 	match form.carrier:
-		&"bolt", &"swap":
+		&"atom", &"swap":
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
 		&"beam":
 			return minf(form.ray_length * 0.5, 90.0)
@@ -553,7 +555,8 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 					break
 			# Its own cast flies off up into a wall.
 			world.add_wall(Rect2(-480.0, -160.0, 960.0, 8.0))
-		var target: Actor = world.add_enemy(&"A", Vector2(r, 0.0), 1 if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
+		# A weak target has 0.01 health: any hit kills it, a speck's too (an atom's 0.3).
+		var target: Actor = world.add_enemy(&"A", Vector2(r, 0.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
 		if scene.get("status", false):
 			var row: ReactionRow = _reaction()
 			if row != null:

@@ -1,12 +1,13 @@
-class_name CarrierBolt
+class_name CarrierAtom
 extends Carrier
-## A shot that flies out on its own along the aim (`&"bolt"`: the bolt, and the nova, a
-## bolt whose shots fan all the way round). The plain carrier: every card runs on it through the
-## shot path (`Spells._apply_travel`, the projectile manager's kit).
+## A shot that flies out on its own along the aim (`&"atom"`: the atom, the smallest; the bolt, a
+## bigger, slower one; and the nova, bolts whose shots fan all the way round). The plain carrier:
+## every card runs on it through the shot path (`Spells._apply_travel`, the projectile manager's
+## kit).
 
 
 func id() -> StringName:
-	return &"bolt"
+	return &"atom"
 
 
 func traits() -> int:
@@ -15,7 +16,7 @@ func traits() -> int:
 
 func required_fields() -> Dictionary:
 	return {
-		"speed": "A bolt needs a `speed` above 0.",
+		"speed": "An atom carrier needs a `speed` above 0.",
 	}
 
 

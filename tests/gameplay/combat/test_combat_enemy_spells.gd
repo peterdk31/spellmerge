@@ -77,7 +77,7 @@ func _wizard(index: int, at: Vector2) -> Actor:
 	return wizard
 
 
-func _enemy(at: Vector2, health: int = 100) -> Node2D:
+func _enemy(at: Vector2, health: float = 100.0) -> Node2D:
 	var enemy := own(Node2D.new()) as Node2D
 	enemy.position = at
 	root.add_child(enemy)

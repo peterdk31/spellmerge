@@ -48,9 +48,9 @@ func is_on() -> bool:
 func _register() -> void:
 	if actor.combat == null:
 		return
-	var health: int = actor.health.health if actor.health != null else 1
+	var health: float = actor.health.health if actor.health != null else 1.0
 	var touch: int = actor.contact.damage if actor.contact != null else 0
-	actor.combat.register_actor(actor, maxi(health, 1), radius, touch, offset)
+	actor.combat.register_actor(actor, health, radius, touch, offset)
 	registered = true
 	if actor.caster != null:
 		actor.caster.own_hurtbox()

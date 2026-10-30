@@ -264,6 +264,6 @@ func _show_strip(strip: Texture2D) -> void:
 
 
 ## A hit on the actor shows the hurt pose at once.
-func _on_damaged(_by: int, _amount: int) -> void:
+func _on_damaged(_by: int, _amount: float) -> void:
 	_hurt_left = HURT_TIME
 	_update_sprite()

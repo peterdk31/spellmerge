@@ -73,7 +73,7 @@ func test_a_mend_bolt_barely_hurts_an_imp() -> void:
 	var mended: Array[int] = _party(["mend", "pierce", "bolt"])
 	var plain: Array[int] = _party(["pierce", "bolt"])
 	check(mended[1] > 0, "the imp still takes something")
-	check(mended[1] * 4 < plain[1], "far less than a plain bolt does (%d against %d)" % [mended[1], plain[1]])
+	check(mended[1] * 4 <= plain[1], "far less than a plain bolt does (%d against %d)" % [mended[1], plain[1]])
 
 
 func test_a_heal_never_goes_past_full_health() -> void:

@@ -12,7 +12,7 @@ const E := TriggerBase.Event
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the carriers it can
 ## fire on. Every carrier not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
-const SHOTS: Array = [&"bolt", &"rune", &"orbit", &"swap", &"wall"]
+const SHOTS: Array = [&"atom", &"rune", &"orbit", &"swap", &"wall"]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [&"slam", &"teleport"]
 
@@ -67,7 +67,7 @@ func _expected(event: int, carrier: StringName) -> bool:
 			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
 			return carrier != &"rain" and carrier != &"familiar"
 		E.WALL:
-			return [&"bolt", &"swap", &"beam"].has(carrier)
+			return [&"atom", &"swap", &"beam"].has(carrier)
 	return true
 
 
@@ -79,7 +79,7 @@ func test_every_event_on_every_carrier_runs_as_the_runtime_does() -> void:
 
 
 func test_a_timer_on_a_slam_is_wasted_with_its_payload() -> void:
-	var built: CompiledStaff = _compile([&"on_timer", &"slam", &"bolt"])
+	var built: CompiledStaff = _compile([&"on_timer", &"slam", &"atom"])
 	var cast: CompiledCast = built.casts[0]
 	check(built.wasted.has(0), "the timer is wasted: %s" % built.wasted)
 	check(built.wasted.has(2), "its payload is wasted too: %s" % built.wasted)
@@ -93,8 +93,8 @@ func test_a_timer_on_a_slam_is_wasted_with_its_payload() -> void:
 
 
 func test_the_same_cards_read_alike_whether_the_trigger_fires_or_not() -> void:
-	var fires: CompiledStaff = _compile([&"on_hit", &"bolt", &"bolt", &"bolt"])
-	var never: CompiledStaff = _compile([&"on_hit", &"decoy", &"bolt", &"bolt"])
+	var fires: CompiledStaff = _compile([&"on_hit", &"atom", &"atom", &"atom"])
+	var never: CompiledStaff = _compile([&"on_hit", &"decoy", &"atom", &"atom"])
 	check_equal(fires.casts.size(), never.casts.size(), "as many casts")
 	for n in fires.casts.size():
 		check_equal(never.casts[n].slots, fires.casts[n].slots, "cast %d reads the same slots" % n)
@@ -119,26 +119,26 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 		[&"on_reaction", &"familiar"],
 	]
 	for cell: Array in cells:
-		var cards: Array[StringName] = [cell[0], cell[1], &"bolt"]
+		var cards: Array[StringName] = [cell[0], cell[1], &"atom"]
 		if cell[1] == &"rain":
 			# A rain reads a payload of its own first.
-			cards.append(&"bolt")
+			cards.append(&"atom")
 		var built: CompiledStaff = _compile(cards)
 		check(built.wasted.has(0), "%s on %s is wasted: %s" % [cell[0], cell[1], built.wasted])
 
 
 func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
-		[&"on_hit", &"bolt"], [&"on_timer", &"bolt"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
+		[&"on_hit", &"atom"], [&"on_timer", &"atom"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
 		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"],
 		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
 		[&"on_timer", &"beam"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"beam"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
 	]
 	for cell: Array in cells:
-		var cards: Array[StringName] = [cell[0], cell[1], &"bolt"]
+		var cards: Array[StringName] = [cell[0], cell[1], &"atom"]
 		if cell[1] == &"rain":
-			cards.append(&"bolt")
+			cards.append(&"atom")
 		var built: CompiledStaff = _compile(cards)
 		check(built.wasted.is_empty(), "%s on %s fires: %s" % [cell[0], cell[1], built.wasted])
 		var spell: CompiledSpell = built.casts[0].group.spells[0]
@@ -147,22 +147,22 @@ func test_triggers_that_fire_are_not_wasted() -> void:
 
 func test_the_cards_an_event_needs() -> void:
 	# A block needs a shield or deflect; a dash's barrier blocks too.
-	check(_compile([&"on_block", &"bolt", &"bolt"]).wasted.has(0), "on block on a bare bolt is wasted")
-	check(_compile([&"on_block", &"shield", &"bolt", &"bolt"]).wasted.is_empty(), "with a shield it fires")
-	check(_compile([&"on_block", &"deflect", &"swing", &"bolt"]).wasted.is_empty(), "with a deflect on a swing it fires")
-	check(_compile([&"on_block", &"shield", &"dash", &"bolt"]).wasted.is_empty(), "a dash's barrier blocks")
+	check(_compile([&"on_block", &"atom", &"atom"]).wasted.has(0), "on block on a bare bolt is wasted")
+	check(_compile([&"on_block", &"shield", &"atom", &"atom"]).wasted.is_empty(), "with a shield it fires")
+	check(_compile([&"on_block", &"deflect", &"swing", &"atom"]).wasted.is_empty(), "with a deflect on a swing it fires")
+	check(_compile([&"on_block", &"shield", &"dash", &"atom"]).wasted.is_empty(), "a dash's barrier blocks")
 	# A hit, kill or reaction of a carrier that hits nothing itself comes from its blast (rules R4 F2).
-	check(_compile([&"on_hit", &"blast", &"decoy", &"bolt"]).wasted.is_empty(), "a decoy with a blast hits")
-	check(_compile([&"on_hit", &"decoy", &"bolt", &"bolt"]).wasted.has(0), "without one it does not")
-	check(_compile([&"on_kill", &"rain", &"bolt", &"bolt"]).wasted.is_empty(), "a rain kills by its own strike")
-	check(_compile([&"on_kill", &"blast", &"decoy", &"bolt"]).wasted.is_empty(), "a decoy with a blast can kill")
-	check(_compile([&"on_kill", &"blast", &"dash", &"bolt"]).wasted.is_empty(), "so can a dash with a blast")
+	check(_compile([&"on_hit", &"blast", &"decoy", &"atom"]).wasted.is_empty(), "a decoy with a blast hits")
+	check(_compile([&"on_hit", &"decoy", &"atom", &"atom"]).wasted.has(0), "without one it does not")
+	check(_compile([&"on_kill", &"rain", &"atom", &"atom"]).wasted.is_empty(), "a rain kills by its own strike")
+	check(_compile([&"on_kill", &"blast", &"decoy", &"atom"]).wasted.is_empty(), "a decoy with a blast can kill")
+	check(_compile([&"on_kill", &"blast", &"dash", &"atom"]).wasted.is_empty(), "so can a dash with a blast")
 	# A reaction needs an element on the hit.
-	check(_compile([&"on_reaction", &"bolt", &"bolt"]).wasted.has(0), "on reaction on a bare bolt is wasted")
-	check(_compile([&"on_reaction", &"fire", &"bolt", &"bolt"]).wasted.is_empty(), "with fire it fires")
-	check(_compile([&"on_reaction", &"relay", &"bolt", &"bolt"]).wasted.is_empty(), "relay takes on elements")
+	check(_compile([&"on_reaction", &"atom", &"atom"]).wasted.has(0), "on reaction on a bare bolt is wasted")
+	check(_compile([&"on_reaction", &"fire", &"atom", &"atom"]).wasted.is_empty(), "with fire it fires")
+	check(_compile([&"on_reaction", &"relay", &"atom", &"atom"]).wasted.is_empty(), "relay takes on elements")
 	# A ghost shot flies through walls.
-	check(_compile([&"on_wall", &"ghost", &"bolt", &"bolt"]).wasted.has(0), "on wall on a ghost bolt is wasted")
+	check(_compile([&"on_wall", &"ghost", &"atom", &"atom"]).wasted.has(0), "on wall on a ghost bolt is wasted")
 	# So does a ghost beam (rules R4f).
-	check(_compile([&"on_wall", &"ghost", &"beam", &"bolt"]).wasted.has(0), "on wall on a ghost beam is wasted")
-	check(not _compile([&"on_wall", &"beam", &"bolt"]).wasted.has(0), "a plain beam meets walls")
+	check(_compile([&"on_wall", &"ghost", &"beam", &"atom"]).wasted.has(0), "on wall on a ghost beam is wasted")
+	check(not _compile([&"on_wall", &"beam", &"atom"]).wasted.has(0), "a plain beam meets walls")

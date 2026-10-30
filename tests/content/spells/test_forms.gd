@@ -113,8 +113,8 @@ func test_the_registry_finds_the_five_forms_and_the_validator_passes_them() -> v
 
 
 func test_each_form_has_the_carrier_its_shape_needs() -> void:
-	check_equal(_form(&"bolt").carrier, &"bolt", "bolt flies")
-	check_equal(_form(&"nova").carrier, &"bolt", "nova flies")
+	check_equal(_form(&"bolt").carrier, &"atom", "bolt flies (a bigger atom)")
+	check_equal(_form(&"nova").carrier, &"atom", "nova flies")
 	check_equal(_form(&"beam").carrier, &"beam", "beam is a ray")
 	check_equal(_form(&"rune").carrier, &"rune", "rune waits")
 	check_equal(_form(&"orbit").carrier, &"orbit", "orbit circles")

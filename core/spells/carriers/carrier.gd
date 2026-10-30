@@ -38,7 +38,7 @@ const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
 
 
-## Its id, the `carrier` a form card names (&"bolt"); &"" for the carrier that runs nothing, which
+## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
 ## `Carriers.of` answers for a name no carrier has.
 func id() -> StringName:
 	return &""

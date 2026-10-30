@@ -35,7 +35,7 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	arena.pushable = bool(combo.get("pushed", false))
 	for at: Array in combo.get("imps", []):
-		arena.add_imp(Vector2(float(at[0]), float(at[1])), int(at[2]) if at.size() > 2 else ArenaScript.IMP_HEALTH)
+		arena.add_imp(Vector2(float(at[0]), float(at[1])), float(at[2]) if at.size() > 2 else ArenaScript.IMP_HEALTH)
 	for mate: Array in combo.get("mates", []):
 		arena.add_mate(Vector2(float(mate[0]), float(mate[1])), int(mate[2]))
 	for rect: Array in combo.get("walls", []):

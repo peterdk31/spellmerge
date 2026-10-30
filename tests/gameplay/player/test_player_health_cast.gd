@@ -129,7 +129,7 @@ func _test_starts_full() -> void:
 
 func _test_damage_event_hurts_only_the_target() -> void:
 	_setup(2)
-	var full: int = _players[0].health.max_health
+	var full: float = _players[0].health.max_health
 	_hit(_players[1], 30)
 	_check(_players[1].health.health == full - 30, "damage_dealt on a wizard takes its health")
 	_check(_players[0].health.health == full, "the other wizard is not hurt")

@@ -48,7 +48,7 @@ func test_an_echo_hit_is_the_whole_hit_at_half() -> void:
 	if echo == null:
 		return
 	check(hit.heal > 0 and hit.slam > 0, "the carrier heals and slams")
-	check_equal(echo.damage, maxi(roundi(hit.damage * SpellLimits.ECHO_DAMAGE), 1), "half the damage")
+	check_equal(echo.damage, hit.damage * SpellLimits.ECHO_DAMAGE, "half the damage, not rounded")
 	check_equal(echo.heal, roundi(hit.heal * SpellLimits.ECHO_DAMAGE), "half the heal")
 	check_equal(echo.slam, roundi(hit.slam * SpellLimits.ECHO_DAMAGE), "half the slam")
 	check(echo.heal > 0 and echo.slam > 0, "an echo still heals and slams")
@@ -72,7 +72,7 @@ func test_an_echoed_mend_bolt_heals_the_teammate_and_never_hurts_it() -> void:
 	check(plain[0] > 0, "a mend bolt heals (%d)" % plain[0])
 	check_equal(echoed[0], plain[0] + roundi(plain[0] * SpellLimits.ECHO_DAMAGE), "the echo heals half again")
 	check_equal(echoed[2], ALLY_HURT - echoed[0], "the teammate was never hurt")
-	check_equal(echoed[1], plain[1] + maxi(roundi(plain[1] * SpellLimits.ECHO_DAMAGE), 1), "the imp takes half the enemy share again")
+	check_equal(echoed[1], plain[1] + floori(plain[1] * SpellLimits.ECHO_DAMAGE), "the imp takes half the enemy share again (1.5: 1 whole point)")
 
 
 func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:
@@ -122,9 +122,9 @@ func test_an_echoed_beams_jumps_hit_at_half_on_every_tick() -> void:
 		hits.append([arena.time, target, profile.damage if profile != null else -1]))
 	check(arena.cast(0, 0), "the beam is cast")
 	arena.run(0.9)
-	var full: int = spell.hit.damage
-	var half: int = spell.echo_hit.damage
-	check(half < full, "the echo is weaker (%d < %d)" % [half, full])
+	var full: float = spell.hit.damage
+	var half: float = spell.echo_hit.damage
+	check(half < full, "the echo is weaker (%.2f < %.2f)" % [half, full])
 	# The beam lives 0.3 s and its echo comes 0.3 s after it; each hits every 0.15 s.
 	var later_jumps: int = 0
 	for row: Array in hits:

@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The loading screen before the first room (owner, 2026-10-29): the first Play of a session
 ## does `Flow.play_tasks` (the shader warm-up) behind it through `Loading` (state LOADING,
 ## `loading_started`, `loading_progressed`, `loading_finished`), then the run starts; a later Play
-## starts at once; Sandbox waits the same way; a run stopped while loading starts nothing. The
+## starts at once; Sandbox and Horde wait the same way (Horde never shows the intro); a run stopped while loading starts nothing. The
 ## HUD's screen shows in between. Uses the real autoloads; `Loading` is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/gameplay/flow/test_loading.gd
@@ -105,6 +105,20 @@ func test_the_sandbox_loads_too() -> void:
 	check_equal(flow.state, FlowScript.State.LOADING, "the sandbox waits for the shaders as well")
 	_load()
 	check(flow.sandbox and flow.state == FlowScript.State.RUNNING, "then it starts")
+
+
+func test_the_horde_loads_too_and_shows_no_intro() -> void:
+	var kept: SaveFile = flow.save
+	flow.intro_enabled = true
+	flow.save = SaveFile.new("user://test_loading_horde.cfg")
+	check(flow.wants_intro(), "a new save would show the intro before Play")
+	events.horde_requested.emit(0)
+	check_equal(flow.state, FlowScript.State.LOADING, "the horde waits for the shaders as well")
+	_load()
+	flow.intro_enabled = false
+	flow.save = kept
+	check_equal(flow.state, FlowScript.State.RUNNING, "then it starts, with no intro on a new save")
+	check_equal(flow.mode, FlowScript.MODE_HORDE, "a horde run")
 
 
 func test_a_run_stopped_while_loading_starts_nothing() -> void:

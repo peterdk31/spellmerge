@@ -41,8 +41,9 @@ enum Motion {
 	DASH,
 	## The wizard blinks `speed` x `lifetime` pixels along the aim, stopping before walls (B2, B4).
 	TELEPORT,
-	## A straight shot that pulls the caster to where it hits (B2, B4).
-	HOOK,
+	## Was HOOK, removed 2026-10-30 (owner: it is the Pull modifier). The slot stays so the numbers
+	## stored in every other carrier's .tres keep their meaning; no card may use it.
+	_UNUSED_6,
 	## A straight shot that trades places with the target it hits (B2, B4, B5).
 	SWAP,
 	## `shots` still shots in a line across the aim, `spread` pixels apart (B2).
@@ -192,9 +193,11 @@ func ranges() -> Dictionary:
 	return limits
 
 
-## The ranges, and the empty motion slot a removed carrier left.
+## The ranges, and the empty motion slots removed carriers left.
 func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
+	if motion == Motion._UNUSED_6:
+		problems.append("motion: 6 was hook, removed 2026-10-30")
 	if motion == Motion._UNUSED_10:
 		problems.append("motion: 10 was fissure, removed 2026-10-30")
 	return problems

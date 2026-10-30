@@ -166,7 +166,7 @@ extends Node2D
 ## Casters: every shot has a caster, its actor's anchor unless `set_caster_shot` (a payload's
 ## shot, cast by the shot whose trigger fired it) or `set_caster_point` says otherwise. An orbit
 ## circles its caster and a returning shot flies back to it; a caster shot that ends leaves the
-## point where it was last. `move_shot` moves a shot by a card (a payload's dash, hook, recoil).
+## point where it was last. `move_shot` moves a shot by a card (a payload's dash, pull, recoil).
 ##
 ## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
 ## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,
@@ -185,7 +185,7 @@ extends Node2D
 ## "Shot behaviours, stepped in passes" below, and core/README.md for how to add a behaviour.
 ## A hit handler sees every shot already moved for this step, also those whose turn in the hit
 ## pass has not come yet (the caster of an orbit or returning shot is the exception: it is read
-## as it was before its turn). So a handler's change to another shot (a hook pulling its carrier,
+## as it was before its turn). So a handler's change to another shot (a pull moving its carrier,
 ## a blink) takes effect from that shot's next step whatever the slot order, where it used to
 ## take effect in this step for a shot in a later slot.
 ##
@@ -1612,7 +1612,7 @@ func get_caster_of(slot: int) -> Vector2:
 
 ## The slot of the live shot that cast the shot in `slot`, or -1 when its caster is the wizard,
 ## a point, or a shot that has ended. It still answers for a shot ended by the hit being sent
-## (a hook's), until its slot is used again.
+## (a pull's), until its slot is used again.
 func caster_shot_of(slot: int) -> int:
 	if slot < 0 or slot >= _cap:
 		return -1
@@ -1645,10 +1645,10 @@ func _caster_position(slot: int) -> Vector2:
 
 
 ## Move the shot in `slot` by `offset` pixels over `seconds` on top of its own motion (a dash,
-## hook or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
+## pull or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
 ## teleport or swap, stopped short at the first wall). Moves add up, as the wizard's pushes do: a
 ## new move runs beside the ones under way, each on its own time (two opposite pushes cancel, a
-## hook after a recoil gets both). A moving shot still hits what it passes and still ends on a
+## pull after a recoil gets both). A moving shot still hits what it passes and still ends on a
 ## wall. A homing move (`turn_rate` above 0) turns toward the nearest
 ## target within `within` pixels as it goes (`home_velocity`), the same distance in all.
 ## Returns false for an empty slot, an orbit shot (its caster holds it), or an offset or time

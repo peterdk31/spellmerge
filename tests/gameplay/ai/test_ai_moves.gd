@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Caster-side cards on enemies (staffs F8c, docs/milestones/M2-staffs.md, "Enemy staffs"): the
 ## moves an enemy's own cards ask for move it as they move a wizard: a dash from its staff tip
-## over the card's time, a teleport at once and short of a wall, a hook and a swap to a point, a
-## recoil back from its shot; a dash, hook or teleport says where it ended, so the card's blast
+## over the card's time, a teleport at once and short of a wall, a pull and a swap to a point, a
+## recoil back from its shot; every move says where it ended, so the card's blast
 ## goes off there. Moves are asked and answered under its actor id (`caster`, actors G3b); moves
 ## for another actor (an enemy or a wizard) are not its own. The same world as test_ai_staff.gd:
 ## bus, an actor table, projectiles, spells with cards built in code, combat, one wizard.
@@ -220,20 +220,20 @@ func test_a_recoil_pushes_the_enemy_back_from_its_shot() -> void:
 	check(is_equal_approx(enemy.position.x, -30.0), "pushed the recoil's distance back from the aim (%.2f)" % enemy.position.x)
 
 
-func test_hooks_and_swaps_pull_the_enemy_and_others_moves_are_not_its_own() -> void:
+func test_pulls_and_swaps_move_the_enemy_and_others_moves_are_not_its_own() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
-	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(40.0, 20.0), 0.25, tag)
+	_bus.caster_move_requested.emit(enemy.id, &"pull", Vector2(40.0, 20.0), 0.25, tag)
 	_run(0.5)
-	check(enemy.position.is_equal_approx(Vector2(40.0, 20.0)), "a hook pulls it to the hit (%s)" % enemy.position)
-	check(_finished.size() == 1 and _finished[0][1] == &"hook", "and says it arrived")
-	_bus.caster_move_requested.emit(enemy.id, &"swap", Vector2(0.0, 0.0), 0.1, tag)
+	check(enemy.position.is_equal_approx(Vector2(40.0, 20.0)), "a pull moves it to the hit (%s)" % enemy.position)
+	check(_finished.size() == 1 and _finished[0][1] == &"pull", "and says it arrived")
+	_bus.caster_move_requested.emit(enemy.id, &"swap", Vector2(-40.0, -20.0), 0.1, tag)
 	_run(0.25)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "a swap takes it to the target's place")
-	check_equal(_finished.size(), 1, "and says nothing (its blast went off at the target)")
+	check(_finished.size() == 2 and _finished[1][1] == &"swap", "and says so too: %s" % [_finished])
 	var other := _enemy(_data([&"bolt"]), Vector2(0.0, 200.0))
 	var other_tag: int = _spells.current_tag(other.id, 0)
-	_bus.caster_move_requested.emit(other.id, &"hook", Vector2(100.0, 0.0), 0.25, other_tag)
-	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.id, 0, 0, 0))
+	_bus.caster_move_requested.emit(other.id, &"pull", Vector2(100.0, 0.0), 0.25, other_tag)
+	_bus.caster_move_requested.emit(enemy.id, &"pull", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.id, 0, 0, 0))
 	_run(0.5)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "another enemy's move, or one with a wizard's tag, do not move it (the tag says whose move it is: the actor kit's rule)")

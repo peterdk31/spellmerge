@@ -26,6 +26,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
+	ModifierBase.Behaviour.PULL,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -323,7 +324,7 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 		any = true
 		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
 		match motion:
-			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true
@@ -506,7 +507,7 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 ## every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.WALL, FormBase.Motion.RAIN:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.WALL, FormBase.Motion.RAIN:
 			return true
 	return false
 
@@ -536,7 +537,7 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 		ModifierBase.Behaviour.DEFLECT:
 			# What hits touches shots too (its shot, line, sweep or ring, a dash's way, a teleport's
 			# landing), and so does a decoy's body; a rain's strike meets bodies only.
-			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT else "it touches no shots"
+			return "" if guards(motion) or motion == FormBase.Motion.SWAP or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT else "it touches no shots"
 		ModifierBase.Behaviour.GROWTH:
 			# A beam widens while it is on (rules R4f).
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it grows a shot in the world or a beam, and %s" % _what(motion)
@@ -555,6 +556,9 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			return "it turns a shot or a beam at walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
 			return "" if hits(motion, blasts) else "it acts on what the carrier hits, and %s (a blast would hit for it)" % _what(motion)
+		ModifierBase.Behaviour.PULL:
+			# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
+			return "" if hits(motion) else "it pulls to what the carrier hits, and %s (a blast's hits move nothing)" % _what(motion)
 		ModifierBase.Behaviour.MAGNET:
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it needs a shot or a beam that stays in the world, and %s" % _what(motion)
 		ModifierBase.Behaviour.RELAY:
@@ -564,10 +568,6 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			match motion:
 				FormBase.Motion.RAIN, FormBase.Motion.FAMILIAR:
 					return "it blocks shots that touch the carrier or guards the caster on a move, and %s" % _what(motion)
-		ModifierBase.Behaviour.MIRROR:
-			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-					return "a move and its mirror cancel"
 		ModifierBase.Behaviour.HOLD:
 			match motion:
 				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.SLAM:
@@ -575,9 +575,9 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 	return ""
 
 
-## True for the carriers that are a shot flying out on its own (a bolt, a hook, a swap).
+## True for the carriers that are a shot flying out on its own (a bolt, a swap).
 static func flies(motion: FormBase.Motion) -> bool:
-	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
+	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.SWAP
 
 
 ## True for the carriers that go a distance `reach` stretches: a flying shot (speed x life) and
@@ -591,10 +591,10 @@ static func reaches(motion: FormBase.Motion) -> bool:
 
 
 ## True for the carriers that are shots staying in the world for a while (a bolt, a rune, an orbit,
-## a wall, a hook, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
+## a wall, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
 static func stays(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.SWAP, FormBase.Motion.WALL:
 			return true
 	return false
 
@@ -650,8 +650,8 @@ static func _what(motion: FormBase.Motion) -> String:
 
 ## True for the carriers whose shield only stops shots that touch them (a shot, a beam's line, a
 ## swing's sweep, a decoy's body): on these a deflect turns every such shot first (owner,
-## 2026-10-29), so a shield with it never blocks. A hook's shield also guards its caster on the
-## pull, a dash's and a teleport's is a barrier on the caster: those keep it.
+## 2026-10-29), so a shield with it never blocks. A swap's shield also guards its caster on the
+## move, a dash's and a teleport's is a barrier on the caster: those keep it.
 static func guards(motion: FormBase.Motion) -> bool:
 	match motion:
 		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.DECOY:
@@ -675,7 +675,7 @@ static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> b
 ## - on block: wherever a shield or deflect runs (`behaviour_waste`): a shot, beam, swing
 ##   or decoy that guards, and a dash's or teleport's barrier; a rain or familiar has
 ##   nothing that blocks.
-## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam at
+## - on wall: a flying shot (bolt, swap) at a wall it bounces off or ends on, and a beam at
 ##   a wall it turns at or ends on.
 static func trigger_runs(event: int, motion: FormBase.Motion) -> bool:
 	return trigger_why_not(event, motion).is_empty()

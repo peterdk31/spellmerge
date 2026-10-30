@@ -75,9 +75,9 @@ signal bag_changed(player: int, bag: Array[StringName])
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
-## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer with `caster_move_finished`. Several requests can come in one step (a scatter, a burst, `mirror`): the body adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
-signal caster_move_requested(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int)
-## Sender: player (a wizard's move) and ai (an enemy's; staffs F8c). The move the actor `caster` was asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells and feel (where a dash lands).
+## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"pull"`, `&"swap"` or `&"recoil"`; `move` is the way and the distance (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer each with `caster_move_finished`. Every move adds up (rules R4 F1): several requests in one step (a scatter, a burst, `mirror`) or while one runs all move the body, each over its own time.
+signal caster_move_requested(caster: int, mode: StringName, move: Vector2, seconds: float, tag: int)
+## Sender: player (a wizard's move) and ai (an enemy's; staffs F8c). A move the actor `caster` was asked for by `caster_move_requested` ended at `position` (every move is answered once). Heard by core/spells (the end point of a dash, teleport or pull) and feel (where a dash lands).
 signal caster_move_finished(caster: int, mode: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (swap) moves `target` to `to`. Heard by ai.
 signal target_move_requested(caster: int, target: Node, to: Vector2)

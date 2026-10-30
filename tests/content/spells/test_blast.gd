@@ -114,12 +114,13 @@ func _lost_at(cards: Array, at: Vector2, seconds: float) -> int:
 	return lost
 
 
-func test_a_hook_that_misses_blasts_where_it_ends() -> void:
-	# Rule 1 (docs/milestones/M2-rules.md, R1d): every carrier blasts at its end point. The hook
-	# flies 150 px and passes the imp by; it ends beside it.
-	var at := Vector2(150.0, 30.0)
-	check_equal(_lost_at(["hook"], at, 1.0), 0, "the hook passes the imp by")
-	check(_lost_at(["blast", "hook"], at, 1.0) > 0, "its blast where it ends reaches the imp")
+func test_a_pulling_shot_that_misses_blasts_where_it_ends() -> void:
+	# Rule 1 (docs/milestones/M2-rules.md, R1d): every carrier blasts at its end point, a pulling
+	# one too (its blast waits for the arrival only when a hit spent it). The bolt flies 264 px
+	# and passes the imp by; it ends beside it.
+	var at := Vector2(264.0, 30.0)
+	check_equal(_lost_at(["pull", "bolt"], at, 2.0), 0, "the pull bolt passes the imp by")
+	check(_lost_at(["blast", "pull", "bolt"], at, 2.0) > 0, "its blast where it ends reaches the imp")
 
 
 func test_a_rain_blasts_where_it_lands() -> void:

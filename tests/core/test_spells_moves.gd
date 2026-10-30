@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Tests for the moves, areas and refunds of the staffs (B2d): teleport, hook, swap and recoil ask
-## the player and ai to move through the events; the end of a dash, teleport or hook is the
-## carrier's end point (blast, on expire); blast asks combat for an area hit where a shot or beam
+## Tests for the moves, areas and refunds of the staffs (B2d): teleport, pull, swap and recoil ask
+## the player and ai to move through the events (the way and the distance); the end of a dash, a
+## teleport or a pull whose hit spent its shot is the carrier's end point (blast, on expire); blast asks combat for an area hit where a shot or beam
 ## ends; siphon refunds mana per hit. It runs a real projectile manager and event bus, stepped by
 ## hand, with cards built in code.
 ##
@@ -28,7 +28,7 @@ var _fake: FakeRegistry
 var _spells: SpellsScript
 var _mgr: ManagerScript
 var _bus: EventsScript
-## Every caster_move_requested as [player, mode, to, seconds, tag].
+## Every caster_move_requested as [player, mode, move, seconds, tag].
 var _moves: Array = []
 ## Every target_move_requested as [player, target, to].
 var _target_moves: Array = []
@@ -67,8 +67,7 @@ func before_each() -> void:
 	teleport.motion = FormBase.Motion.TELEPORT
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
 	dash.motion = FormBase.Motion.DASH
-	var hook: FormBase = _form(&"hook", 300.0, 1.0)
-	hook.motion = FormBase.Motion.HOOK
+	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var swap: FormBase = _form(&"swap", 300.0, 1.0)
 	swap.motion = FormBase.Motion.SWAP
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
@@ -156,13 +155,6 @@ func test_teleport_asks_for_a_blink_along_the_aim() -> void:
 	check_equal(_mgr.get_count(), 0, "no shot leaves the caster")
 
 
-func test_teleport_is_cut_short_at_a_wall() -> void:
-	_mgr.set_walls([Rect2(60.0, -50.0, 20.0, 100.0)])
-	_build(0, [&"teleport"])
-	_cast()
-	check(_moves.size() == 1 and _moves[0][2].x <= 60.5, "it ends at the wall: %s" % [_moves])
-
-
 func test_a_blast_teleport_explodes_on_arrival() -> void:
 	var tag: int = _build(0, [&"blast", &"teleport"])
 	_cast()
@@ -211,32 +203,32 @@ func test_a_move_of_a_forgotten_build_does_nothing() -> void:
 	check_equal(_areas.size(), 0, "its tag means nothing any more")
 
 
-func test_hook_pulls_the_caster_to_where_it_hits() -> void:
-	var tag: int = _build(0, [&"hook"])
+func test_pull_pulls_the_caster_to_where_it_hits() -> void:
+	var tag: int = _build(0, [&"pull", &"bolt"])
 	_target(Vector2(60, 0))
 	_cast()
 	_tick(30)
 	check_equal(_moves.size(), 1, "one pull")
-	check(_moves.size() == 1 and _moves[0][1] == &"hook" and absf(_moves[0][2].x - 50.0) < 12.0 and _moves[0][4] == tag, "to the hit point: %s" % [_moves])
-	check(_moves.size() == 1 and is_equal_approx(_moves[0][3], SpellLimits.HOOK_SECONDS), "over the hook's time")
+	check(_moves.size() == 1 and _moves[0][1] == &"pull" and absf(_moves[0][2].x - 50.0) < 12.0 and _moves[0][4] == tag, "to the hit point: %s" % [_moves])
+	check(_moves.size() == 1 and is_equal_approx(_moves[0][3], SpellLimits.PULL_SECONDS), "over the pull's time")
 
 
-func test_a_hook_that_misses_pulls_nothing() -> void:
-	_build(0, [&"blast", &"hook"])
+func test_a_pull_that_misses_pulls_nothing() -> void:
+	_build(0, [&"blast", &"pull", &"bolt"])
 	_cast()
 	_tick(90)
 	check_equal(_moves.size(), 0, "no pull")
-	# Every carrier blasts at its end point (rules R1d): a hook that misses, where it ended.
-	check_equal(_areas.size(), 1, "one blast, where the hook ended")
+	# Every carrier blasts at its end point (rules R1d): a pulling shot that misses, where it ended.
+	check_equal(_areas.size(), 1, "one blast, where the shot ended")
 
 
-func test_a_blast_hook_explodes_on_arrival_not_at_the_hit() -> void:
-	var tag: int = _build(0, [&"blast", &"hook"])
+func test_a_blast_pull_explodes_on_arrival_not_at_the_hit() -> void:
+	var tag: int = _build(0, [&"blast", &"pull", &"bolt"])
 	_target(Vector2(60, 0))
 	_cast()
 	_tick(30)
-	check_equal(_areas.size(), 0, "not where the hook struck")
-	_bus.caster_move_finished.emit(0, &"hook", Vector2(45, 0), tag)
+	check_equal(_areas.size(), 0, "not where the shot struck")
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag)
 	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(45, 0)), "where the wizard arrived: %s" % [_areas])
 
 
@@ -248,7 +240,7 @@ func test_swap_trades_places_with_the_target() -> void:
 	_tick(30)
 	check_equal(_target_moves.size(), 1, "the target is moved")
 	check(_target_moves.size() == 1 and _target_moves[0][1] == enemy and _target_moves[0][2].is_equal_approx(Vector2(-10, 4)), "to where the caster stood: %s" % [_target_moves])
-	check(_moves.size() == 1 and _moves[0][1] == &"swap" and _moves[0][2].is_equal_approx(Vector2(60, 0)) and _moves[0][4] == tag, "and the caster to the target: %s" % [_moves])
+	check(_moves.size() == 1 and _moves[0][1] == &"swap" and _moves[0][2].is_equal_approx(Vector2(70, -4)) and _moves[0][4] == tag, "and the caster to the target (the way from its anchor): %s" % [_moves])
 
 
 func test_a_swap_with_no_caster_place_moves_nobody() -> void:
@@ -387,14 +379,14 @@ func test_the_move_heading_is_the_last_asked_move() -> void:
 	check(seen > 0, "the payload left")
 
 
-func test_a_hook_works_for_player_two() -> void:
+func test_a_pull_works_for_player_two() -> void:
 	_mgr.set_anchor(2, Vector2(0, 100))
-	var tag: int = _build(2, [&"on_expire", &"hook", &"spark"])
+	var tag: int = _build(2, [&"on_expire", &"pull", &"bolt", &"spark"])
 	_target(Vector2(60, 100))
 	_spells.cast_staff(2, 0, Vector2(0, 100), Vector2.RIGHT, 100.0)
 	_tick(30)
-	check(_moves.size() == 1 and _moves[0][0] == 2 and _moves[0][1] == &"hook" and _moves[0][4] == tag, "the pull is player 2's: %s" % [_moves])
-	_bus.caster_move_finished.emit(2, &"hook", Vector2(45, 100), tag)
+	check(_moves.size() == 1 and _moves[0][0] == 2 and _moves[0][1] == &"pull" and _moves[0][4] == tag, "the pull is player 2's: %s" % [_moves])
+	_bus.caster_move_finished.emit(2, &"pull", Vector2(45, 100), tag)
 	var found: bool = false
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot) and SpellTag.caster_of(_mgr.get_tag_of(slot)) == 2 and _mgr.get_position_of(slot).is_equal_approx(Vector2(45, 100)):
@@ -403,18 +395,18 @@ func test_a_hook_works_for_player_two() -> void:
 
 
 ## Regression (rules R4a): a hook with pierce left fired `on expire` at the arrival and again
-## where the shot ended. Its end is the shot's: the end of its flight.
-func test_a_piercing_hook_ends_once_where_its_shot_ends() -> void:
-	var tag: int = _build(0, [&"on_expire", &"pierce", &"hook", &"spark"])
+## where the shot ended. Its end is the shot's: the end of its flight (a pulling shot's now).
+func test_a_piercing_pull_ends_once_where_its_shot_ends() -> void:
+	var tag: int = _build(0, [&"on_expire", &"pierce", &"pull", &"bolt", &"spark"])
 	var spark: int = _spells.current_tag(0, 0, 1)
 	_target(Vector2(60, 0))
 	_cast()
 	_tick(30)
-	check(_moves.size() == 1 and _moves[0][1] == &"hook", "the hit pulls: %s" % [_moves])
-	_bus.caster_move_finished.emit(0, &"hook", Vector2(45, 0), tag)
+	check(_moves.size() == 1 and _moves[0][1] == &"pull", "the hit pulls: %s" % [_moves])
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(45, 0), tag)
 	check_equal(_spells.live_shots(spark), 0, "nothing goes off where the caster arrives")
 	_tick(35)
-	check_equal(_spells.live_shots(spark), 1, "the payload goes off once, where the hook shot ended")
+	check_equal(_spells.live_shots(spark), 1, "the payload goes off once, where the shot ended")
 
 
 func test_a_swap_reads_the_casters_own_anchor() -> void:
@@ -579,9 +571,10 @@ func test_a_chain_of_homing_teleports_hops_on_to_another_enemy() -> void:
 		check(landed.is_equal_approx(Vector2(50.0 - 10.0 - SpellLimits.LAND_CLEARANCE, 0.0)), "the first hop lands beside the first enemy: %s" % landed)
 		_bus.caster_move_finished.emit(0, &"teleport", landed, tag)
 		check_equal(_moves.size(), 2, "its payload teleports again from where it landed")
-		var hop: Vector2 = _moves[1][2] - landed
+		# A move carries its way and distance (rules R4 F1).
+		var hop: Vector2 = _moves[1][2]
 		check(hop.length() > 1.0 and absf(hop.angle_to(second.global_position - landed)) < 0.01, "cast %d: on toward the other enemy, though the first is nearer: %s" % [cast, hop])
-		check(first.global_position.distance_to(_moves[1][2]) > 20.0, "not staying at the first")
+		check(first.global_position.distance_to(landed + hop) > 20.0, "not staying at the first")
 		# Past the cast's delay (two blinks), so the next cast goes out.
 		_tick(90)
 
@@ -594,7 +587,7 @@ func test_a_homing_teleport_hops_back_to_a_lone_enemy() -> void:
 	var landed: Vector2 = _moves[0][2]
 	_bus.caster_move_finished.emit(0, &"teleport", landed, tag)
 	check_equal(_moves.size(), 2, "a second hop")
-	check(_moves[1][2].distance_to(landed) < 0.01, "with nobody else in reach it stays on the one enemy: %s" % _moves[1][2])
+	check(_moves[1][2].length() < 0.01, "with nobody else in reach it stays on the one enemy: %s" % _moves[1][2])
 	check(lone != null, "the enemy is there")
 
 
@@ -609,12 +602,13 @@ func test_a_homing_dash_in_a_payload_turns_the_shot_toward_a_target() -> void:
 	check(_mgr.get_position_of(bolt).y > 1.0, "its dash turned it toward the target: %s" % _mgr.get_position_of(bolt))
 
 
-func test_a_payload_whose_shot_is_gone_has_nothing_to_dash() -> void:
+func test_a_payload_whose_shot_is_gone_dashes_the_wizard_to_its_point() -> void:
+	# Rules R4 F1: a point cannot move, so its wizard dashes there (before, nothing moved).
 	_distance_cards()
 	_build(0, [&"on_expire", &"bolt", &"short"])
 	_cast(0)
 	_tick(90)
-	check_equal(_moves.size(), 0, "the wizard is not asked to move")
+	check(_moves.size() == 1 and _moves[0][1] == &"dash" and _moves[0][2].x > 250.0, "the wizard dashes to where the bolt ended: %s" % [_moves])
 
 
 func test_an_orbit_in_a_payload_circles_the_shot_that_fired_it() -> void:
@@ -664,22 +658,21 @@ func test_mirror_cancels_the_recoil_of_a_payload_too() -> void:
 	check(absf(_mgr.get_position_of(bolt).x - 250.0) < 1.0, "the pushes cancel: the bolt flew its own way only: %s" % _mgr.get_position_of(bolt))
 
 
-func test_a_hook_after_a_recoil_on_a_shot_gets_both_moves() -> void:
+func test_a_pull_after_a_recoil_on_a_shot_gets_both_moves() -> void:
 	# Rules R1e: the hook ran in place of the recoil before, so the shot lost what was left of its
 	# push back. Player 0's payload has recoil, player 1's the same without it.
 	_distance_cards()
-	var quick: FormBase = _form(&"quick_hook", 900.0, 1.0)
-	quick.motion = FormBase.Motion.HOOK
+	_form(&"quick_bolt", 900.0, 1.0)
 	_mgr.set_anchor(1, Vector2(0.0, 100.0))
 	_target(Vector2(130.0, 0.0))
 	_target(Vector2(130.0, 100.0))
-	_build(0, [&"timer", &"pierce", &"bolt", &"recoil", &"quick_hook"])
-	_build(1, [&"timer", &"pierce", &"bolt", &"quick_hook"])
+	_build(0, [&"timer", &"pierce", &"bolt", &"recoil", &"pull", &"quick_bolt"])
+	_build(1, [&"timer", &"pierce", &"bolt", &"pull", &"quick_bolt"])
 	_cast(0)
 	var pushed: int = _others(-1)[0]
 	_spells.cast_staff(1, 0, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0)
 	var plain: int = _others(pushed)[0]
-	# The timer fires at 0.25 s; the hook hits before the push is over, and both are over before
+	# The timer fires at 0.25 s; the pull bolt hits before the push is over, and both are over before
 	# the next fire.
 	_tick(29)
 	check(_mgr.is_alive(pushed) and _mgr.is_alive(plain), "both bolts still fly")

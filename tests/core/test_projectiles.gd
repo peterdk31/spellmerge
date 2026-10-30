@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_tag_comes_back_with_the_hit()
 	_test_cap_drop_order_after_other_deaths()
 	_test_default_cap_follows_the_platform()
+	_test_a_smaller_cap_with_shots_in_high_slots()
 	_test_bad_arguments()
 	_test_cap_drops_the_oldest_of_the_richest()
 	_test_cap_keeps_every_player_alive()
@@ -341,6 +342,26 @@ func _test_cap_drop_order_after_other_deaths() -> void:
 	for i in 20:
 		_mgr.spawn(i % 2, Vector2(20.0 + i, 0.0), Vector2.ZERO, 5.0)
 	_check(_mgr.get_count() == 6 and _mgr.get_count_for(0) + _mgr.get_count_for(1) == 6, "the lists stay consistent under churn")
+
+
+## Regression (Horde H1): the stress run's horde scenarios go from a cap of 1,000 to 500 with
+## shots alive in slots past 500; set_cap read past its shrunk arrays and broke the manager.
+func _test_a_smaller_cap_with_shots_in_high_slots() -> void:
+	_setup()
+	_mgr.set_cap(40)
+	var ended: Array[int] = []
+	_mgr.shot_ended.connect(func(tag: int) -> void: ended.append(tag))
+	for i in 40:
+		_mgr.spawn(0, Vector2(float(i), 0.0), Vector2.RIGHT, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 1000 + i)
+	_check(_mgr.get_count() == 40, "forty shots fill the cap")
+	_mgr.set_cap(10)
+	_check(_mgr.get_cap() == 10 and _mgr.get_count() == 0, "the smaller cap starts empty")
+	_check(ended.size() == 40, "every shot that was removed ended (got %d)" % ended.size())
+	for i in 12:
+		_mgr.spawn(0, Vector2(float(i), 0.0), Vector2.RIGHT, 5.0)
+	_mgr.step(DT)
+	_mgr.update_draw()
+	_check(_mgr.get_count() == 10, "the smaller cap fills and drops as usual")
 
 
 func _test_default_cap_follows_the_platform() -> void:

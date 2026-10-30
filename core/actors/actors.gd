@@ -26,8 +26,12 @@ extends Node
 ## the changes do nothing. The bodies open their own ids (wizards, enemies that cast, the actor
 ## kit's actors); every system keys its arrays by them (actors G3).
 
-## How many actors there can be at once: four seats, 256 enemies, room to grow.
-const ACTORS: int = 512
+## How many actors there can be at once: four seats and a horde of 500+ enemies with room to
+## spare (Horde H1, docs/milestones/horde.md, "Scale"). It is also the caster field of a spell
+## tag (`SpellTag.CASTER_MASK` + 1, 10 bits). Every system sizes per-actor arrays by it; the
+## largest is the spell runtime's per staff (ACTORS x 4 rows of a few arrays), a few hundred KB
+## in all, allocated once at start.
+const ACTORS: int = 1024
 ## Seats: the humans, 0 to 3.
 const SEATS: int = 4
 ## The budget of every actor no seat drives (`budget_of`); 0-3 are the seats' own.

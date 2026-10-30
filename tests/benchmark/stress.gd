@@ -4,6 +4,11 @@ extends SceneTree
 ## prints `BENCH:` lines and `STRESS OK`, and takes about a minute (four scenarios; three in a web build, longer at its frame rate).
 ##
 ## godot --headless --path . --script res://tests/benchmark/stress.gd
+## godot --headless --path . --script res://tests/benchmark/stress.gd -- --horde
+##
+## With `--horde` it runs only the horde scenarios (500+ enemies, Horde H1; the runner's
+## `HORDE`), which the default run leaves out; so does an exported test build started with
+## `--stress --horde`.
 ##
 ## `test_stress.gd` runs a short version under `build.sh --quick --tests`.
 

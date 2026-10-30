@@ -60,6 +60,24 @@ func test_a_full_table_opens_none_until_one_closes() -> void:
 	check_equal(_actors.open(ActorsScript.TEAM_WIZARDS, 0), 300, "a closed id is free again")
 
 
+## Horde H1 (docs/milestones/horde.md, "Scale"): the table holds four seats and a horde of 1,000,
+## and an id past the old 512 works like any other.
+func test_the_table_holds_a_horde_and_high_ids_work() -> void:
+	check(ActorsScript.ACTORS >= 1024, "room for four seats and a horde of 1,000")
+	_open_enemies(700)
+	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 1, 1)
+	check_equal(wizard, 700, "the next id is past 511")
+	check_equal(_actors.team_of(wizard), ActorsScript.TEAM_WIZARDS, "its team")
+	check_equal(_actors.ramp_of(wizard), 1, "its ramp")
+	check_equal(_actors.actor_of_seat(1), wizard, "its seat drives it")
+	check_equal(_actors.budget_of(wizard), 1, "and spends its seat's budget")
+	_actors.set_node(wizard, _actors)
+	check(_actors.node_of(wizard) == _actors, "its node is found")
+	_actors.close(wizard)
+	check(not _actors.is_open(wizard) and _actors.actor_of_seat(1) == ActorsScript.NONE, "closing it frees id and seat")
+	check_equal(_actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY), 700, "and the id comes back")
+
+
 func test_an_actor_keeps_its_team_ramp_and_seat() -> void:
 	_open_enemies(5)
 	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 2, 2)

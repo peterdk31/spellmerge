@@ -1,8 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The carriers (docs/CARRIERS.md, core/spells/carriers/): every one is found by its name and fired
-## by a form card, and its lists of cards that do nothing on it (`does_nothing`, `never_fires`) are
-## well formed and agree with its traits. Whether a listed card really does nothing, and an unlisted
-## one something, is played out by tests/core/test_card_rules.gd.
+## by a form card, and what is worked out from its traits (which cards do nothing on it, and why)
+## reads well. Whether that is right is played out by tests/core/test_card_rules.gd.
 ##
 ## godot --headless --path . --script res://tests/core/test_carriers.gd
 
@@ -16,14 +15,6 @@ func _carriers() -> Array[Carrier]:
 	for id: StringName in Carriers.ids():
 		all.append(Carriers.of(id))
 	return all
-
-
-func _check_sentences(list: Dictionary, names: Dictionary, what: String, carrier: Carrier) -> void:
-	for key: Variant in list:
-		check(key is int and names.values().has(key), "%s on a %s: %s is a known one" % [what, carrier.noun(), key])
-		var why: Variant = list[key]
-		check(why is String and not String(why).is_empty(), "%s on a %s has its sentence" % [what, carrier.noun()])
-		check(not (why is String) or String(why).length() < 140, "a short sentence: %s" % why)
 
 
 func test_every_carrier_is_found_by_its_name() -> void:
@@ -49,25 +40,30 @@ func test_every_form_card_names_a_carrier_and_every_carrier_has_one() -> void:
 		check(named.has(id), "a form card fires the %s" % id)
 
 
-func test_the_lists_are_well_formed() -> void:
+func test_every_card_a_carrier_cannot_use_says_why() -> void:
 	for carrier in _carriers():
-		_check_sentences(carrier.does_nothing(), BEHAVIOURS, "a modifier", carrier)
-		_check_sentences(carrier.never_fires(), EVENTS, "a trigger", carrier)
+		for behaviour: int in BEHAVIOURS.values():
+			var why: String = carrier.waste(behaviour)
+			check(why.length() < 160, "a short sentence for %s on a %s: %s" % [BEHAVIOURS.keys()[behaviour], carrier.noun(), why])
+		for event: int in EVENTS.values():
+			var why: String = carrier.event_waste(event)
+			check(why.length() < 160, "a short sentence for %s on a %s: %s" % [EVENTS.keys()[event], carrier.noun(), why])
+	check(Carriers.of(&"bolt").waste(BEHAVIOURS.RETURN).is_empty(), "a bolt flies out, so return works on it")
+	check_equal(Carriers.of(&"decoy").waste(BEHAVIOURS.RETURN), "it does not fly out, and a decoy is a body that hits nothing", "a decoy does not, and says why")
+	check_equal(Carriers.of(&"decoy").event_waste(EVENTS.HIT), "a decoy hits nothing", "on hit on a decoy")
 
 
-func test_the_lists_agree_with_the_traits() -> void:
+func test_what_is_worked_out_follows_the_traits() -> void:
 	for carrier in _carriers():
 		var name: String = carrier.noun()
-		var listed: Dictionary = carrier.does_nothing()
 		check_equal(carrier.event_waste(EVENTS.HIT).is_empty(), carrier.hits(), "on hit fires on a %s exactly when it hits" % name)
 		check_equal(carrier.event_waste(EVENTS.TIMER).is_empty(), carrier.lasts(), "a timer ticks on a %s exactly when it lasts" % name)
-		check_equal(carrier.event_waste(EVENTS.HURT).is_empty(), carrier.lasts(), "on hurt listens on a %s exactly when it lasts" % name)
-		var blocks: bool = not listed.has(BEHAVIOURS.SHIELD) or not listed.has(BEHAVIOURS.DEFLECT)
-		check_equal(carrier.event_waste(EVENTS.BLOCK).is_empty(), blocks, "on block fires on a %s exactly where a shield or deflect works" % name)
-		check_equal(not listed.has(BEHAVIOURS.HOMING), carrier.steers(), "homing works on a %s exactly when it steers" % name)
+		check_equal(carrier.waste(BEHAVIOURS.HOMING).is_empty(), carrier.steers(), "homing works on a %s exactly when it steers" % name)
+		check_equal(carrier.waste(BEHAVIOURS.RETURN).is_empty(), carrier.flies(), "return works on a %s exactly when it flies" % name)
 		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY, BEHAVIOURS.HEAVY]:
-			check_equal(not listed.has(behaviour), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
-		check(not listed.has(BEHAVIOURS.NONE), "a card of numbers only is judged by its numbers, not listed")
+			check_equal(carrier.waste(behaviour).is_empty(), carrier.hits(), "%s works on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
+		for behaviour: int in [BEHAVIOURS.NONE, BEHAVIOURS.BLAST, BEHAVIOURS.ECHO, BEHAVIOURS.RECOIL]:
+			check(carrier.waste(behaviour).is_empty(), "%s works on every carrier, a %s too" % [BEHAVIOURS.keys()[behaviour], name])
 
 
 func test_a_blast_carries_heavy_and_infusions_on_a_carrier_that_hits_nothing() -> void:

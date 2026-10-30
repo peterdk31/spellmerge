@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Which cards do nothing on a carrier is worked out (owner)
+
+- **No lists per carrier** (owner: "I don't like that I have to run a test to find out if I should add something to some lists on a new carrier. This sounds like something that can be computed"): a carrier answers yes/no questions about itself (`traits()`, four new: `MOVES`, `LINE`, `MEETS_SHOTS`, `MOVES_CASTER`), and each card says once, for every carrier, what it needs from one (`Carrier.NEEDS`, `EVENT_NEEDS`: "any" of some flags, "not" others, and its "why_not"). The compiler works out from the two, every time a staff is built, whether a card does anything on a carrier and the sentence the builder shows ("<why_not>, and <what the carrier is>"). Every one of the 14 x 32 answers is the same as the lists gave (checked cell by cell); 98 sentences read a little differently, as they are now put together from the card's reason and the carrier's description.
+- `test_card_rules.gd` stays the check that the yes/no answers are true, in CI; nobody has to run it to know what to write.
+
 ## 2026-10-30: A carrier lists only the cards that do nothing on it (owner)
 
 - **The table is cut down** (owner: "I would not be able to fill it out on my own... why is this table even needed?"): the per-carrier table that answered, for every card, whether it works, whose code runs it and how it looks (`Works`, `Shows`, a row per card) is gone. Only the part the game uses stays: `DOES_NOTHING` (modifier behaviour -> the sentence the builder shows) and `NEVER_FIRES` (trigger -> sentence). Every card not listed does something.

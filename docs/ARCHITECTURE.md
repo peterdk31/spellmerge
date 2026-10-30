@@ -23,8 +23,8 @@ hud/       panels and menus (send requests as events, show state from events)
 | I want to ... | Change | Never touch |
 | --- | --- | --- |
 | add a room, enemy or spell | copy the example folder in `content/` (see its README); a new enemy is a sprite, an actor scene and a `.tres`, no code | `flow.gd`, `registry.gd` |
-| add a carrier (a new kind of form: what a form card fires) | a script in `core/spells/carriers/` that runs its own part and lists the cards that do nothing on it, with the builder's sentence (docs/CARRIERS.md; `tests/core/test_card_rules.gd` names any card missing from the list) | `spells.gd`'s launch, `staff_compiler.gd`'s rules |
-| add a modifier behaviour or a trigger | the enum value and its code; `test_card_rules.gd` then names each carrier where it does nothing, for a line in that carrier's list (docs/CARRIERS.md) | the other carriers' code |
+| add a carrier (a new kind of form: what a form card fires) | a script in `core/spells/carriers/` that runs its own part and answers yes/no questions about itself (`traits()`); which cards do nothing on it is worked out (docs/CARRIERS.md) | `spells.gd`'s launch, `staff_compiler.gd`'s rules |
+| add a modifier behaviour or a trigger | the enum value, its code, and what it needs from a carrier in `Carrier.NEEDS` if it does not work everywhere (docs/CARRIERS.md) | the carriers |
 | add a body behaviour (a new kind of part every actor may have) | a new component in `gameplay/actor/` (see its README), put in the scenes that want it | `player.gd`, `ai.gd` |
 | let something else drive a body (an AI teammate, a takeover) | a controller (`ActorController`), handed over with `Actor.drive` | the body's components |
 | use another room or enemy in a run | set `Flow.room_id_to_play`, `enemy_id_to_play` (a room picker does this) | the wave or spawn code |

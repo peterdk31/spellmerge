@@ -5,13 +5,6 @@ extends Carrier
 ## shot path (`Spells._apply_travel`, the projectile manager's kit).
 
 
-## Modifier cards that do nothing on a bolt, with the sentence the builder shows after
-## "<Card> does nothing on a Bolt: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {}
-## Trigger cards that never go off on a bolt, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {}
-
-
 func id() -> StringName:
 	return &"bolt"
 
@@ -25,21 +18,13 @@ func what() -> String:
 
 
 func traits() -> int:
-	return FLIES | STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE
-
+	return FLIES | STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
 
 
 func required_fields() -> Dictionary:
 	return {
 		"speed": "A bolt needs a `speed` above 0.",
 	}
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
 
 
 ## A fan of flying shots; a nova (a fan all the way round) shows its ring once, when a shot flew.

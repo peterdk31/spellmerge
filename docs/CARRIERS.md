@@ -10,48 +10,46 @@ The code is in `core/spells/carriers/`: one script per carrier (`bolt.gd`, `beam
 says `carrier = &"beam"`, and `Carriers.of(&"beam")` (`carriers.gd`) finds it. Carriers are never
 numbered, so adding or removing one never touches another card's file.
 
-## What a carrier writes about the other cards
+## Which cards do nothing on a carrier: worked out, not written
 
-Only the cards that do nothing on it, each with the sentence the builder shows the player. Every
-card not listed does something there.
+A carrier answers yes/no questions about itself, in `traits()`, and nothing about other cards:
+
+| Flag | The question |
+| --- | --- |
+| `FLIES` | Does it fly out on its own, as a shot (a bolt, a hook, a swap)? |
+| `MOVES` | Does it travel along a path through the world (also an orbit)? |
+| `LINE` | Is it a line that is there at once (a beam)? |
+| `STAYS` | Is it a shot that stays in the world a while (a bolt, a rune, an orbit, a wall...)? |
+| `HITS` | Does it hit things itself (not a decoy or a familiar)? |
+| `LASTS` | Does it last a while (not a slam or a teleport, which are over at once)? |
+| `STEERS` | Can homing steer it (turn it, bend it, or place it on a target)? |
+| `MEETS_SHOTS` | Can it stop or turn other shots (not a rain or a familiar)? |
+| `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
+
+(and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
+`carrier.gd`.)
+
+Each card says, once for every carrier, what it needs from a carrier (`Carrier.NEEDS`, and
+`EVENT_NEEDS` for triggers):
 
 ```gdscript
-## Modifier cards that do nothing on a decoy, with the sentence the builder shows after
-## "<Card> does nothing on a Decoy: ".
-const DOES_NOTHING: Dictionary = {
-	B.RETURN: "it does not fly out",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a decoy is a body that hits nothing",
-	...
-}
-## Trigger cards that never go off on a decoy, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.HIT: "a decoy hits nothing",
-}
+B.RETURN: {"any": FLIES, "why_not": "it does not fly out"},
+B.CHAIN:  {"any": HITS, "why_not": "it acts on what the carrier hits"},
+B.HOLD:   {"any": LASTS, "not": MOVES_CASTER, "why_not": "nothing keeps it on"},
 ```
 
-In the game these sentences do two things: the compiler leaves a card that does nothing out of
-the spell, and the builder greys it out and shows why.
+From those two the compiler works out, every time a staff is built, whether a card does anything
+on a carrier, and if not, the sentence the builder shows: "Return does nothing on a Decoy: it does
+not fly out, and a decoy is a body that hits nothing." A card not in `NEEDS` works on every carrier
+(numbers, blast, echo, recoil). On a carrier that hits nothing, a blast carries an infusion and
+heavy (`takes_infusion`, `BLAST_CARRIES`).
 
-**You don't have to work the list out.** `tests/core/test_card_rules.gd` plays every card on every
-carrier in a small world and compares what happens with and without the card. A card that
-changes nothing and is not listed fails it:
+`tests/core/test_card_rules.gd` plays every card on every carrier in a small world and fails where
+the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
+wrong yes/no answer is caught by CI; you don't need to run it to know what to write.
 
-    `return` on `decoy` does nothing and is not listed as wasted
-
-so you add that line with a sentence (or make the card work there). A card that is listed but
-does change something fails it the other way.
-
-Two rules hold for every carrier and are not listed: on a carrier that hits nothing itself (a
-decoy, a familiar), an infusion and heavy count only when a blast on it carries them
-(`Carrier.takes_infusion`, `Carrier.BLAST_CARRIES`).
-
-**Traits**, in `traits()`: the numbers and shared rules it takes (`FLIES`, `STAYS`, `HITS`,
-`LASTS`, `REACHES`, `GUARDS`, `STEERS`, `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `RING`, `OUTWARD`,
-`REPEATS_HELD`, `OWN_POSE`, `INSTANT_HOMING`, `CARRIES_PAYLOAD`, `HOLDS_STAFF`; each is documented
-in `carrier.gd`). The compiler's rules for numbers (does a split count here? does pierce?) read
-these. **Required fields**, in `required_fields()`: what a form card of this carrier must set
-above 0 (a beam's `ray_length`); the spell validator checks them. `tests/core/test_carriers.gd`
-checks the lists against the traits (a carrier that hits nothing must list `on hit`).
+**Required fields**, in `required_fields()`: what a form card of this carrier must set above 0 (a
+beam's `ray_length`); the spell validator checks them.
 
 ## What a carrier runs
 
@@ -81,19 +79,16 @@ a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
 
 ## Adding a carrier
 
-1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, its
-   `traits()` and `required_fields()`, and empty `DOES_NOTHING` and `NEVER_FIRES`; list it in
-   `Carriers.make_all`.
+1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, and
+   answer the questions in `traits()` and `required_fields()`; list it in `Carriers.make_all`.
 2. Override the hooks it needs (at least `launch` or `shoot`).
 3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`.
-4. Run `tests/core/test_card_rules.gd`. For every card it says does nothing on your carrier, add a
-   line with a sentence, or make the card work there. Run `tests/core/test_carriers.gd` too.
 
 Removing a carrier is deleting its script and its line in `make_all`. A form card that still names
 it is refused by the validator.
 
 ## Adding a modifier behaviour or a trigger
 
-Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`) and implement it.
-`test_card_rules.gd` then plays it on every carrier and names each carrier where it does nothing,
-for a line in that carrier's list.
+Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`), implement it, and,
+if it does not work on every carrier, say what it needs in `Carrier.NEEDS` (or `EVENT_NEEDS`). If it
+needs something no flag asks yet, add the flag and answer it on each carrier.

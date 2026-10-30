@@ -4,21 +4,18 @@ extends RefCounted
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler reads its tables, the spell runtime runs it.
 ##
-## A subclass lists the cards that do nothing on it, each with the sentence the builder shows
-## (`does_nothing()`: modifier behaviours; `never_fires()`: triggers). Every card not listed does
-## something there. Nobody has to guess the list: tests/core/test_card_rules.gd plays every card on
-## every carrier and fails on a card that does nothing but is not listed ("`return` on `decoy`
-## does nothing and is not listed as wasted"), and on one that is listed but does something.
-## Two rules hold for every carrier and are not listed: on a carrier that hits nothing itself, an
-## infusion and the cards in BLAST_CARRIES count only when a blast carries them (`takes_infusion`,
-## `waste`). `traits()` says which numbers and shared rules apply to it (the flags below).
+## A subclass answers yes/no questions about itself in `traits()` (the flags below: does it fly?
+## does it hit? does it last? ...), and from those alone the compiler works out which cards do
+## nothing on it, and why (`waste`, `event_waste`): each card says what it needs from a carrier
+## (`NEEDS`, `EVENT_NEEDS`), once for every carrier. A new carrier writes no list of cards.
+## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
+## wrong (a card that does nothing but is not said to, or the other way round).
 
 const B := ModifierBase.Behaviour
 const E := TriggerBase.Event
 
 ## The modifier behaviours a blast's area hit carries on a carrier that hits nothing itself (heavy's
-## knockback and slam ride on it), so a carrier's `does_nothing` sentence for them stands only
-## without a blast.
+## knockback and slam ride on it), so what they need (`NEEDS`) stands only without a blast.
 const BLAST_CARRIES: Array[int] = [B.HEAVY]
 
 ## `traits()` flags.
@@ -59,6 +56,51 @@ const CARRIES_PAYLOAD: int = 1 << 16
 ## The staff keeps working through its `lifetime` (a beam, a rain, a dash): its staff animation's
 ## strike lasts that long.
 const HOLDS_STAFF: int = 1 << 17
+## Does it travel along a path through the world (a bolt, a hook, a swap, an orbit)? Linger, sticky
+## and spiral change that path.
+const MOVES: int = 1 << 18
+## Is it a line that is there at once (a beam)? It turns at walls, waves, grows and pulls as a line.
+const LINE: int = 1 << 19
+## Can it stop or turn other shots (its shot, line, sweep or body touches them, or it moves its
+## caster, whom its shield then guards)? Shield, deflect and `on block` need it.
+const MEETS_SHOTS: int = 1 << 20
+## Does it move its caster (a dash, a teleport)? A mirror would cancel it, and nothing keeps it on.
+const MOVES_CASTER: int = 1 << 21
+
+## What each modifier behaviour needs from a carrier to do anything, and the words the builder shows
+## when it gets none of it ("<Card> does nothing on a <carrier>: <why_not>, and <what()>"):
+## "any": at least one of these flags; "not": none of these. A behaviour not here works on every
+## carrier (numbers, blast, echo, recoil). A new behaviour adds its line here, never per carrier.
+const NEEDS: Dictionary = {
+	B.HOMING: {"any": STEERS, "why_not": "it has nothing to aim"},
+	B.CHAIN: {"any": HITS, "why_not": "it acts on what the carrier hits"},
+	B.SIPHON: {"any": HITS, "why_not": "it acts on what the carrier hits"},
+	B.POSSESS: {"any": HITS, "why_not": "it acts on what the carrier hits"},
+	B.HEAVY: {"any": HITS, "why_not": "it acts on what the carrier hits (a blast would carry it)"},
+	B.RELAY: {"any": HITS, "why_not": "it needs a hit of its own"},
+	B.SHIELD: {"any": MEETS_SHOTS, "why_not": "it blocks shots that touch the carrier or guards the caster on a move"},
+	B.DEFLECT: {"any": MEETS_SHOTS, "why_not": "it touches no shots"},
+	B.HOLD: {"any": LASTS, "not": MOVES_CASTER, "why_not": "nothing keeps it on"},
+	B.MIRROR: {"not": MOVES_CASTER, "why_not": "a move and its mirror cancel"},
+	B.BOUNCE: {"any": FLIES | LINE, "why_not": "it turns a shot or a beam at walls"},
+	B.GHOST: {"any": FLIES | LINE, "why_not": "it only takes a flying shot or a line through walls"},
+	B.RETURN: {"any": FLIES, "why_not": "it does not fly out"},
+	B.LINGER: {"any": MOVES, "why_not": "it only changes a moving shot"},
+	B.STICKY: {"any": MOVES, "why_not": "it only changes a moving shot"},
+	B.SPIRAL: {"any": MOVES | LINE, "why_not": "it only changes a moving shot or a beam"},
+	B.GROWTH: {"any": STAYS | LINE, "why_not": "it grows a shot in the world or a beam"},
+	B.MAGNET: {"any": STAYS | LINE, "why_not": "it needs a shot or a beam that stays in the world"},
+	B.ARC: {"any": STAYS, "why_not": "it is not a shot that stays in the air"},
+}
+
+## The same for each trigger: what the carrier needs for it ever to go off.
+const EVENT_NEEDS: Dictionary = {
+	E.HIT: {"any": HITS, "why_not": "it hits nothing"},
+	E.TIMER: {"any": LASTS, "why_not": "it is over at once"},
+	E.HURT: {"any": LASTS, "why_not": "it is over at once"},
+	E.BLOCK: {"any": MEETS_SHOTS, "why_not": "nothing on it can block a shot"},
+	E.WALL: {"any": FLIES | LINE, "why_not": "it never meets a wall"},
+}
 
 
 ## Its id, the `carrier` a form card names (&"bolt"); &"" for the carrier that runs nothing, which
@@ -79,16 +121,6 @@ func what() -> String:
 
 func traits() -> int:
 	return 0
-
-
-## Modifier behaviours that do nothing on it -> the sentence the builder shows.
-func does_nothing() -> Dictionary:
-	return {}
-
-
-## Triggers that never go off on it -> the sentence the builder shows.
-func never_fires() -> Dictionary:
-	return {}
 
 
 
@@ -141,21 +173,34 @@ func steers() -> bool:
 
 
 ## Why `behaviour` does nothing on it, or "" when it does something (with a blast on it, when
-## `blasts`). The carrier that runs nothing (id &"") says so for every card.
+## `blasts`): worked out from `NEEDS` and its traits. The carrier that runs nothing (id &"") says so
+## for every card.
 func waste(behaviour: int, blasts: bool = false) -> String:
 	if id() == &"":
 		return what()
-	var why: String = str(does_nothing().get(behaviour, ""))
-	if not why.is_empty() and blasts and BLAST_CARRIES.has(behaviour):
+	if blasts and BLAST_CARRIES.has(behaviour):
 		return ""
-	return why
+	return _lacks(NEEDS.get(behaviour, {}))
 
 
-## Why a trigger of `event` never fires on it, or "" when it can.
+## Why a trigger of `event` never fires on it, or "" when it can: from `EVENT_NEEDS`.
 func event_waste(event: int) -> String:
 	if id() == &"":
 		return what()
-	return str(never_fires().get(event, ""))
+	if event == E.HIT and not hits():
+		return hits_nothing()
+	return _lacks(EVENT_NEEDS.get(event, {}), false)
+
+
+## The sentence of a need (a `NEEDS` row) its traits do not meet, else "": its "why_not", and what
+## the carrier is when `say_what`.
+func _lacks(need: Dictionary, say_what: bool = true) -> String:
+	if need.is_empty():
+		return ""
+	var any: int = int(need.get("any", 0))
+	if (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0:
+		return ""
+	return "%s, and %s" % [need["why_not"], what()] if say_what else str(need["why_not"])
 
 
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.

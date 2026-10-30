@@ -112,10 +112,10 @@ func test_wasted_cells_say_why() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy", "a decoy hits nothing"],
 		[&"on_wall", &"rain", "never meets a wall"],
-		[&"on_wall", &"dash", "it stops before walls"],
-		[&"on_wall", &"orbit", "an orbit passes through walls"],
+		[&"on_wall", &"dash", "never meets a wall"],
+		[&"on_wall", &"orbit", "never meets a wall"],
 		[&"on_wall", &"rune", "never meets a wall"],
-		[&"on_wall", &"swing", "a swing's sweep never meets a wall"],
+		[&"on_wall", &"swing", "never meets a wall"],
 		[&"on_hurt", &"slam", "over at once"],
 		[&"on_hurt", &"teleport", "over at once"],
 		[&"on_timer", &"slam", "over at once"],

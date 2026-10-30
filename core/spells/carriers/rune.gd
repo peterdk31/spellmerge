@@ -4,22 +4,6 @@ extends Carrier
 ## (`&"rune"`: the rune). Homing makes it creep toward a target.
 
 
-## Modifier cards that do nothing on a rune, with the sentence the builder shows after
-## "<Card> does nothing on a Rune: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.BOUNCE: "it turns a shot or a beam at walls, and a rune stays where it is",
-	B.LINGER: "it does not move",
-	B.STICKY: "it does not move",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a rune stays where it is",
-	B.SPIRAL: "it does not move",
-	B.RETURN: "it does not fly out",
-}
-## Trigger cards that never go off on a rune, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.WALL: "it stays where it is and never meets a wall",
-}
-
-
 func id() -> StringName:
 	return &"rune"
 
@@ -33,15 +17,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD
-
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
+	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD | MEETS_SHOTS
 
 
 ## A still shot a step ahead along `heading` (`Spells._placed_at`).

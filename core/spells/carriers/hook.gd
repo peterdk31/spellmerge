@@ -4,13 +4,6 @@ extends Carrier
 ## runs on it; its own part is the pull (`on_hit`).
 
 
-## Modifier cards that do nothing on a hook, with the sentence the builder shows after
-## "<Card> does nothing on a Hook: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {}
-## Trigger cards that never go off on a hook, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {}
-
-
 func id() -> StringName:
 	return &"hook"
 
@@ -24,15 +17,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return FLIES | STAYS | HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | SPREAD | PIERCE
-
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
+	return FLIES | STAYS | HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
 
 
 ## A hook pulls its caster to the hit (rules R4a): the body, through its owner, or the shot that

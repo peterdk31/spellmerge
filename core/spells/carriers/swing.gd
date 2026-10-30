@@ -9,26 +9,6 @@ extends Carrier
 ## the `swing_*` getters (through `Spells`).
 
 
-## Modifier cards that do nothing on a swing, with the sentence the builder shows after
-## "<Card> does nothing on a Swing: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.HOMING: "it has nothing to aim, and a swing is a sweep that is over at once",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a swing is a sweep that is over at once",
-	B.LINGER: "it only changes a moving shot, and a swing is a sweep that is over at once",
-	B.STICKY: "it only changes a moving shot, and a swing is a sweep that is over at once",
-	B.MAGNET: "it needs a shot or a beam that stays in the world, and a swing is a sweep that is over at once",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a swing is a sweep that is over at once",
-	B.SPIRAL: "it only changes a moving shot, and a swing is a sweep that is over at once",
-	B.GROWTH: "it grows a shot in the world or a beam, and a swing is a sweep that is over at once",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-}
-## Trigger cards that never go off on a swing, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.WALL: "a swing's sweep never meets a wall",
-}
-
-
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
 ## more when every one is on (no swing ends another); `_sw_on` says which are in use. Each keeps what a beam keeps for its hits (fires, chain, echo, its
 ## caster) and its sweep: the point it turns round (`_sw_origin`, the wizard's hand), the aim
@@ -82,8 +62,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE
-
+	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS
 
 
 func required_fields() -> Dictionary:
@@ -91,13 +70,6 @@ func required_fields() -> Dictionary:
 		"ray_length": "A swing needs a `ray_length` (its reach) above 0.",
 		"arc": "A swing needs an `arc` (degrees it sweeps) above 0.",
 	}
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
 
 
 func hit_kind() -> StringName:

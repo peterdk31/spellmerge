@@ -4,22 +4,6 @@ extends Carrier
 ## stands through every hit (`&"wall"`). Homing makes it creep toward a target, as a rune.
 
 
-## Modifier cards that do nothing on a wall, with the sentence the builder shows after
-## "<Card> does nothing on a Wall: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.BOUNCE: "it turns a shot or a beam at walls, and a wall stands still through every hit",
-	B.LINGER: "it does not move",
-	B.STICKY: "it does not move",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a wall stands still through every hit",
-	B.SPIRAL: "it does not move",
-	B.RETURN: "it does not fly out",
-}
-## Trigger cards that never go off on a wall, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.WALL: "it stays where it is and never meets a wall",
-}
-
-
 func id() -> StringName:
 	return &"wall"
 
@@ -33,15 +17,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS
-
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
+	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | MEETS_SHOTS
 
 
 ## Wall (rules R4 F6): one solid still shot centred its `ray_length` (or `SpellLimits.WALL_REACH`)

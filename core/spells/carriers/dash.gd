@@ -4,27 +4,6 @@ extends CarrierMove
 ## (`&"dash"`). Homing turns it as it goes; its shield guards what it moves.
 
 
-## Modifier cards that do nothing on a dash, with the sentence the builder shows after
-## "<Card> does nothing on a Dash: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.HOLD: "nothing keeps it on: a dash moves its caster and hits what it passes, once each",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a dash moves its caster and hits what it passes, once each",
-	B.LINGER: "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each",
-	B.STICKY: "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each",
-	B.MAGNET: "it needs a shot or a beam that stays in the world, and a dash moves its caster and hits what it passes, once each",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a dash moves its caster and hits what it passes, once each",
-	B.SPIRAL: "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each",
-	B.MIRROR: "a move and its mirror cancel",
-	B.GROWTH: "it grows a shot in the world or a beam, and a dash moves its caster and hits what it passes, once each",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-}
-## Trigger cards that never go off on a dash, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.WALL: "it stops before walls",
-}
-
-
 ## A dash under way (rules R4c, `_start_pass`): it strikes every body its mover passes, once each.
 class MovePass:
 	extends RefCounted
@@ -65,15 +44,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF
-
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
+	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
 
 
 func bind(runtime: SpellRuntime, staff_poses: StaffPoses) -> void:

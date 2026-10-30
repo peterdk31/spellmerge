@@ -10,18 +10,6 @@ extends Carrier
 ## `beam_*` getters (through `Spells`).
 
 
-## Modifier cards that do nothing on a beam, with the sentence the builder shows after
-## "<Card> does nothing on a Beam: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.LINGER: "it only changes a moving shot, and a beam is a line, not a shot",
-	B.STICKY: "it only changes a moving shot, and a beam is a line, not a shot",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-}
-## Trigger cards that never go off on a beam, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {}
-
-
 ## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
 ## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
@@ -90,21 +78,13 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF
-
+	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS
 
 
 func required_fields() -> Dictionary:
 	return {
 		"ray_length": "A beam needs a `ray_length` above 0.",
 	}
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
 
 
 func hit_kind() -> StringName:

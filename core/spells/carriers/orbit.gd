@@ -4,20 +4,6 @@ extends Carrier
 ## the circle. They pass through walls and cannot home.
 
 
-## Modifier cards that do nothing on a orbit, with the sentence the builder shows after
-## "<Card> does nothing on a Orbit: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.HOMING: "it has nothing to aim, and an orbit is held on its circle",
-	B.BOUNCE: "it turns a shot or a beam at walls, and an orbit is held on its circle",
-	B.GHOST: "an orbit already passes walls",
-	B.RETURN: "it does not fly out",
-}
-## Trigger cards that never go off on a orbit, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.WALL: "an orbit passes through walls",
-}
-
-
 func id() -> StringName:
 	return &"orbit"
 
@@ -31,21 +17,13 @@ func what() -> String:
 
 
 func traits() -> int:
-	return STAYS | HITS | LASTS | GUARDS | SPEED | SHOTS | PIERCE | RING | OUTWARD
-
+	return STAYS | HITS | LASTS | GUARDS | SPEED | SHOTS | PIERCE | RING | OUTWARD | MOVES | MEETS_SHOTS
 
 
 func required_fields() -> Dictionary:
 	return {
 		"orbit_radius": "An orbit needs an `orbit_radius` above 0.",
 	}
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
 
 
 ## Shot `n` of `count` evenly round the circle from the aim: it circles its caster, the wizard, or

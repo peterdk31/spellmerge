@@ -9,29 +9,6 @@ extends Carrier
 ## `slam_*` getters (through `Spells`).
 
 
-## Modifier cards that do nothing on a slam, with the sentence the builder shows after
-## "<Card> does nothing on a Slam: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.HOMING: "it has nothing to aim, and a slam is a strike that is over at once",
-	B.HOLD: "nothing keeps it on: a slam is a strike that is over at once",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a slam is a strike that is over at once",
-	B.LINGER: "it only changes a moving shot, and a slam is a strike that is over at once",
-	B.STICKY: "it only changes a moving shot, and a slam is a strike that is over at once",
-	B.MAGNET: "it needs a shot or a beam that stays in the world, and a slam is a strike that is over at once",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a slam is a strike that is over at once",
-	B.SPIRAL: "it only changes a moving shot, and a slam is a strike that is over at once",
-	B.GROWTH: "it grows a shot in the world or a beam, and a slam is a strike that is over at once",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-}
-## Trigger cards that never go off on a slam, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.TIMER: "it is over at once",
-	E.WALL: "a slam strikes short of a wall and its ring never meets one",
-	E.HURT: "it is over at once",
-}
-
-
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
 ## one is on. Each keeps what a swing keeps for its hits, the hand it is held by and the aim locked
 ## at the cast, how long it has run and its wind-up, where it struck (INF before the impact), its
@@ -73,21 +50,13 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE
-
+	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS
 
 
 func required_fields() -> Dictionary:
 	return {
 		"ray_length": "A slam needs a `ray_length` (how far ahead it strikes) above 0.",
 	}
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
 
 
 func hit_kind() -> StringName:
@@ -300,7 +269,6 @@ func end_of(tag: int) -> void:
 	for at in _sl_on.size():
 		if _sl_on[at] != 0 and _sl_tag[at] == tag:
 			_end_slam(at, false)
-
 
 
 ## Every slam gone at once, quietly (`Spells.clear`).

@@ -4,32 +4,10 @@ extends CarrierMove
 ## it lands (`&"teleport"`). Over at once: homing bends its way, recoil shortens it.
 
 
-## Modifier cards that do nothing on a teleport, with the sentence the builder shows after
-## "<Card> does nothing on a Teleport: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.HOLD: "nothing keeps it on: a teleport moves its caster at once and hits where it lands",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a teleport moves its caster at once and hits where it lands",
-	B.LINGER: "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands",
-	B.STICKY: "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands",
-	B.MAGNET: "it needs a shot or a beam that stays in the world, and a teleport moves its caster at once and hits where it lands",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a teleport moves its caster at once and hits where it lands",
-	B.SPIRAL: "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands",
-	B.MIRROR: "a move and its mirror cancel",
-	B.GROWTH: "it grows a shot in the world or a beam, and a teleport moves its caster at once and hits where it lands",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-}
-## Trigger cards that never go off on a teleport, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.TIMER: "it is over at once",
-	E.WALL: "it stops before walls",
-	E.HURT: "it is over at once",
-}
-
-
 ## Its homing, and actor -> the target its last teleport landed at (so the next one picks another).
 var _teleport_homing: Homing = Homing.new()
 var _landed_at: PackedInt64Array = PackedInt64Array()
+
 
 func id() -> StringName:
 	return &"teleport"
@@ -44,16 +22,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | REACHES | STEERS | INSTANT_HOMING
-
-
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
-
+	return HITS | REACHES | STEERS | INSTANT_HOMING | MOVES_CASTER | MEETS_SHOTS
 
 
 ## It strikes what is where it landed (rules R4c): each body within SpellLimits.LAND_REACH, pushed

@@ -4,28 +4,6 @@ extends Carrier
 ## Homing places it on a target near the point; held, it falls again and again.
 
 
-## Modifier cards that do nothing on a rain, with the sentence the builder shows after
-## "<Card> does nothing on a Rain: ". Every card not listed does something here.
-const DOES_NOTHING: Dictionary = {
-	B.SHIELD: "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands",
-	B.BOUNCE: "it turns a shot or a beam at walls, and a rain strikes once where it lands",
-	B.LINGER: "it only changes a moving shot, and a rain strikes once where it lands",
-	B.STICKY: "it only changes a moving shot, and a rain strikes once where it lands",
-	B.MAGNET: "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands",
-	B.GHOST: "it only takes a flying shot or a line through walls, and a rain strikes once where it lands",
-	B.SPIRAL: "it only changes a moving shot, and a rain strikes once where it lands",
-	B.GROWTH: "it grows a shot in the world or a beam, and a rain strikes once where it lands",
-	B.RETURN: "it does not fly out",
-	B.ARC: "it is not a shot that stays in the air",
-	B.DEFLECT: "it touches no shots",
-}
-## Trigger cards that never go off on a rain, with the sentence the builder shows.
-const NEVER_FIRES: Dictionary = {
-	E.BLOCK: "nothing on it can block a shot",
-	E.WALL: "a rain falls from above and never meets a wall",
-}
-
-
 func id() -> StringName:
 	return &"rain"
 
@@ -42,17 +20,8 @@ func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD | CARRIES_PAYLOAD | HOLDS_STAFF
 
 
-func does_nothing() -> Dictionary:
-	return DOES_NOTHING
-
-
-func never_fires() -> Dictionary:
-	return NEVER_FIRES
-
-
 func hit_kind() -> StringName:
 	return &"ray"
-
 
 
 func reach_of(spell: CompiledSpell) -> float:

@@ -17,6 +17,8 @@ const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
+const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 
 var _failures: Array[String] = []
@@ -213,7 +215,7 @@ func _test_the_sandbox_switches_the_reload() -> void:
 func _test_the_sandbox_switches_the_builder() -> void:
 	_setup(1, true)
 	var options: Array = []
-	_menu().builder_options_changed.connect(func(radial: bool, by_kind: bool, push: bool) -> void: options.append([radial, by_kind, push]))
+	_menu().builder_options_changed.connect(func(radial: bool, ring: int, push: bool) -> void: options.append([radial, ring, push]))
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Sandbox")
@@ -226,9 +228,19 @@ func _test_the_sandbox_switches_the_builder() -> void:
 	_press(0, "BuilderStyle")
 	_press(0, "RingStyle")
 	_press(0, "PutStyle")
-	_check(options == [[false, false, true], [true, false, true], [true, true, true], [true, true, false]], "each flip goes out, got %s" % [options])
+	_check(options == [[false, 0, true], [true, 0, true], [true, 1, true], [true, 1, false]], "each flip goes out, got %s" % [options])
 	_check(_hud.get_radial(0).layout == RadialScript.Layout.KIND, "the ring shows one kind at a time")
 	_check(_hud.get_radial(0).put == RadialScript.Put.REPLACE, "a full slot is replaced")
+	# The ring styles to try (owner, 2026-10-30), then round to the first again.
+	var words: Array[String] = []
+	var styles: Array = []
+	for _step in 4:
+		_press(0, "RingStyle")
+		words.append(_menu().button("RingStyle").text.get_slice("Ring: ", 1))
+		styles.append(_hud.get_radial(0).ring_picker.get_script() if _hud.get_radial(0).ring_picker != null else null)
+	_check(words == ["Zoom", "Kinds: hold", "Kinds: depth", "Every card"], "the ring steps through the styles, got %s" % [words])
+	_check(styles == [RingZoomScript, RingKindsScript, RingKindsScript, null], "and the radial gets each style")
+	_check(_hud.get_radial(0).layout == RadialScript.Layout.ALL, "every card again")
 	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
 	_tap(0, &"pause")
 	_frame()

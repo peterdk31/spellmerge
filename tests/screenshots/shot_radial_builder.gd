@@ -31,7 +31,7 @@ func take() -> void:
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
 		fail("the sandbox did not start with four wizards")
 		return
-	_hud.call("_on_builder_options_changed", true, false, true)
+	_hud.call("_on_builder_options_changed", true, 0, true)
 	if not await _open([0]):
 		return
 	var radial: Node = _hud.call("get_radial", 0)
@@ -43,7 +43,7 @@ func take() -> void:
 	tap(0, &"staff_2")
 	await _point(0, &"homing", true)
 	await shot("radial_built")
-	_hud.call("_on_builder_options_changed", true, true, true)
+	_hud.call("_on_builder_options_changed", true, 1, true)
 	tap(0, &"kind_next")
 	await settle(SHEET_FRAMES)
 	await _point(0, &"pierce", true)
@@ -52,7 +52,7 @@ func take() -> void:
 	await create_timer(0.3).timeout
 	await shot("radial_clearing")
 	_input.call("send_virtual", 0, &"extra", 0.0)
-	_hud.call("_on_builder_options_changed", true, false, true)
+	_hud.call("_on_builder_options_changed", true, 0, true)
 	if not await _open([1, 2, 3]):
 		return
 	var cards: Array[StringName] = [&"bolt", &"frost", &"orbit", &"chain"]

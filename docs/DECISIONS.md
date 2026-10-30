@@ -4,7 +4,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 ## 2026-10-30: Card rules R4 F3, placing (owner)
 
-- **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible.
+- **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.
 - **The familiar has no payload of its own** (replaces R4g's hand-on): it is a body that lasts, and casts what its triggers give it, as any lasting carrier (`timer · familiar · bolt` fires a bolt every tick). Gone: `familiar_cast_requested`, Entities' once-a-second foe search, `StaffCompiler.hands_on` and its helpers; `carries_payload` is rain's alone (owner: rain keeps its payload). Its timer fires from its wizard's body along the aim at the cast, not from the orb (the orb's place is Entities'; see the PR for the question).
 - **A rain's timer ends with its landing:** an edit that drops the landing also takes the rain off the live carriers (`_drop_pending`), so a rebuilt staff's rain stops ticking at once.
 

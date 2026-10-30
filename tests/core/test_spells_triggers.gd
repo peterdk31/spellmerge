@@ -48,7 +48,9 @@ func before_each() -> void:
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"short", 300.0, 0.1)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
-	rune.motion = FormBase.Motion.STILL
+	# The probe: a shot that does not move marks where a payload fires (a placed rune would
+	# appear a step ahead of it, rules R4 F3).
+	rune.motion = FormBase.Motion.STRAIGHT
 	rune.radius = 6.0
 	var fire: ElementBase = ElementBase.new()
 	fire.status_id = &"burn"

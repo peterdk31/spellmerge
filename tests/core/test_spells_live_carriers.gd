@@ -47,7 +47,9 @@ func before_each() -> void:
 	# A shot of 0.4 s, as short as a nova's.
 	_form(&"short", 300.0, 0.4)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
-	rune.motion = FormBase.Motion.STILL
+	# The probe: a shot that does not move marks where a payload fires (a placed rune would
+	# appear a step ahead of it, rules R4 F3).
+	rune.motion = FormBase.Motion.STRAIGHT
 	rune.radius = 6.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.4)
 	beam.motion = FormBase.Motion.RAY
@@ -115,7 +117,7 @@ func _runes() -> Array[Vector2]:
 		if not _mgr.is_alive(slot):
 			continue
 		var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
-		if spell != null and spell.motion == FormBase.Motion.STILL:
+		if spell != null and spell.form_id == &"rune":
 			found.append(_mgr.get_position_of(slot))
 	return found
 
@@ -184,7 +186,9 @@ func test_a_timer_on_a_decoy_fires_from_it_until_it_ends() -> void:
 	_tick(31)
 	var runes: Array[Vector2] = _runes()
 	check_equal(runes.size(), 1, "a decoy ticks every 0.5 s")
-	check(runes.size() == 1 and runes[0].is_equal_approx(Vector2(30, 40)), "where it stands (%s)" % [runes])
+	# It stands a step ahead of where it was cast (rules R4 F3).
+	var stands: Vector2 = Vector2(30.0 + (_fake.items[&"decoy"] as FormBase).radius * 2.0, 40.0)
+	check(runes.size() == 1 and runes[0].is_equal_approx(stands), "where it stands (%s)" % [runes])
 	_bus.entity_ended.emit(0, &"decoy", Vector2(30, 40), tag)
 	_tick(60)
 	check_equal(_runes().size(), 1, "an ended decoy ticks no more")

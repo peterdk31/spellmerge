@@ -233,7 +233,7 @@ func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
 	_build(0, 0, {"form": &"rune"})
 	_cast(0, 0, 10.0, Vector2(30, 30))
 	_tick(10)
-	check_equal(_mgr.get_position_of(_slots()[0]), Vector2(30, 30), "a rune stays where it was cast")
+	check_equal(_mgr.get_position_of(_slots()[0]), Vector2(42, 30), "a rune stays where it was placed, twice its size ahead (rules R4 F3)")
 	_build(1, 0, {"form": &"orb"})
 	check_equal(_cast(1), SpellsScript.REFUSED, "an orbit needs the caster's anchor")
 	_mgr.set_anchor(1, Vector2(100, 100))

@@ -317,8 +317,9 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 			return ""
 	if not is_equal_approx(modifier.spread_mult, 1.0):
 		any = true
+		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
 		match motion:
-			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true

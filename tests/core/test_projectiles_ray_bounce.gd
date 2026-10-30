@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## A ray with `bounces` (`bounce · beam`, `bounce · fissure`) turns at a wall as a bouncing shot
+## A ray with `bounces` (`bounce · beam`) turns at a wall as a bouncing shot
 ## does and goes on for the length it has left: it hits what is on its later legs, sends an
 ## impact at every turn, and `ray_path` holds the path it walked. Without bounces it stops at
 ## the wall, as before. The manager is stepped by hand.

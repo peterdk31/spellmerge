@@ -38,7 +38,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
 | `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
-| `entity_ended`, `familiar_cast_requested` | `ai` (Entities) | `core/spells` |
+| `entity_ended` | `ai` (Entities) | `core/spells` |
 | `shot_blocked` | `core/projectiles` | `core/spells` (on block) |
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` (for every actor: `actor_hurt` and `shield_blocked` name the hurt or shielded actor) | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |

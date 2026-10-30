@@ -50,7 +50,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 - `_register_hit`: sticky ends the remaining pierce at the first hit.
 - ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump pierces as its carrier since R4f).
 - `_fire_payload` from a beam hit uses CASTER_POINT: an orbit payload circles the hit point, not the beam.
-- `_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.
+- ~~`_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.~~ (gone in R4 F3: a familiar has no payload of its own.)
 - ~~`_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).~~ (fixed in R4a: blocks spend no budget.)
 - Fissure ends inside its call: `hold · fissure` silently does nothing.
 
@@ -59,6 +59,8 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ works, W listed as wasted, ✗ silent: fails). The table below is the audit's, kept for history.
 
 ✓ works · W listed as wasted · ✗ silently ignored or special-cased · (n) the finding.
+
+Fissure removed 2026-10-30 (owner): its column below is history.
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -84,17 +86,17 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 
 **Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's shield is a barrier on the wizard; since R4c a dash and a teleport hit, and their deflect turns the shots they pass or land by) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
-| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
-| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on block | s | s | s | s | s | s | s | s | s | W | s | s | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
-| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
-| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Decoy | Famil | Swing |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
+| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on block | s | s | s | s | s | s | s | s | s | W | s | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -159,7 +161,9 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 - **R4i homing on placed carriers (done 2026-10-30):** a homing rune creeps toward its target at `SpellLimits.HOMING_DRIFT` (24 px/s, below the slowest walker), with a bolt's pick and reach, and stays put with nothing in reach: one line in `_pass_homing` (a shot with no speed drifts). A rain's aim point moves onto a target within the card's reach of it (`Spells._homed_place`, the one homing search); a wall did too until F6, now it creeps as a rune does. Homing is still wasted on an orbit (it circles its caster: nothing to aim), a fissure, a swing, a slam, a decoy and a familiar.
 - **R4 F6, the wall is solid (done, owner 2026-10-30):** a wall is one solid still shot for its life, not five stones that crumble: a short-lived piece of wall across the aim (`Projectiles.set_solid`) that the wall grid holds (shots end on it or bounce off it and set off `on wall` there, ghost passes, its own payloads leave it), that bodies cannot walk through (a static body on the walls' layer, so a dash, a knock into it and a teleport stop at it too) and that hurts what touches it along its row, each body once while it stays; its hits never spend it, so pierce is wasted on it. Homing makes it creep toward a target as one piece (the R4i guard and the wall's `_homed_place` are gone). A shield or deflect on it guards the whole row (the general rule: it acts on the shots that touch its carrier; one wall, one carrier's charges); mirror raises a second wall behind; more shots make a wider wall, and its blast and `on expire` happen once.
 - **R4f (rays) done:** a beam's chain jump pierces as the beam does, a fissure's everything (item 13); relay on a beam and a fissure, from the actors its line hits, for every hit after while it is on (15); ghost on a beam and a fissure, magnet, growth and spiral on a beam (20). Linger, sticky and return stay wasted on both, magnet, growth and spiral on a fissure (DECISIONS.md, "Card rules R4f").
-- **R4g, bodies and mirror (done, owner decisions 2026-10-29):** a rain strikes every body within `RAIN_SPLASH` of where it lands with its own hit and cards (infusions, heavy, chain, siphon, possess, on hit, on kill, on reaction), then drops its payload. A familiar hands its infusions and hit cards to every carrier it casts (compiled in, costs included; wasted when nothing it casts takes them on). A decoy with a shield stops the other teams' shots that reach it, one charge each; with deflect it turns them; each is a block (`on block`). Mirror is one rule: the carrier fired again with its aim reversed, on every carrier but dash and teleport (wasted: "a move and its mirror cancel"); the allow-list in `_fire_spell` and the MIRROR rows of `behaviour_waste` are gone but for the moves. Left for the owner: a rune, decoy or familiar is made at the caster, so its mirror lands on the same spot; two hook pulls on the wizard replace each other (the mover's rule), they do not add.
+- **F7, fissure removed (owner, 2026-10-30):** the fissure carrier is gone (card, combos, runtime cases, tests); its column left the trigger table. `FormBase.Motion` keeps slot 10 unused so stored numbers keep their meaning.
+- **R4g, bodies and mirror (done, owner decisions 2026-10-29):** a rain strikes every body within `RAIN_SPLASH` of where it lands with its own hit and cards (infusions, heavy, chain, siphon, possess, on hit, on kill, on reaction), then drops its payload. A familiar hands its infusions and hit cards to every carrier it casts (compiled in, costs included; wasted when nothing it casts takes them on; undone in F3: the familiar has no payload of its own). A decoy with a shield stops the other teams' shots that reach it, one charge each; with deflect it turns them; each is a block (`on block`). Mirror is one rule: the carrier fired again with its aim reversed, on every carrier but dash and teleport (wasted: "a move and its mirror cancel"); the allow-list in `_fire_spell` and the MIRROR rows of `behaviour_waste` are gone but for the moves. Left for the owner: a rune, decoy or familiar is made at the caster, so its mirror lands on the same spot; two hook pulls on the wizard replace each other (the mover's rule), they do not add.
+- **R4 F3, placing (done, owner 2026-10-30):** everything a caster places appears a step ahead along its aim, twice the card's size, or where it is cast when a wall is in the way (`Spells._placed_at`): a rune (also when it is the only one; the `count == 1` case is gone), a decoy and a familiar (through `entity_spawn_requested`), so a mirror puts its copy behind. The familiar keeps its card and body but loses its built-in payload: it casts only what its triggers give it (`timer · familiar · bolt` casts a bolt every tick, from its wizard's body along the aim at the cast), so `familiar_cast_requested`, Entities' foe search and the compiler's hand-on (`hands_on`, `_hand_on`, `_settle_handed`) are gone; rain alone reads a payload of its own. A rain whose landing an edit drops leaves the live carriers with it, so its timer ends then (`_drop_pending`).
 
 #### R4c: moves (owner decisions 2026-10-29; DECISIONS.md "Card rules R4c")
 
@@ -167,6 +171,7 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 - **Recoil adds to the move.** A dash's recoil is the usual push, which the body adds to the dash; a teleport, over at once, has it taken off its distance (past it, it goes backwards).
 - **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
 - **A point cannot move:** a teleport cast by a point blinks the wizard to it, and a hook or swap cast by one moves the wizard (to the hit, as the wizard's own). A dash cast by a point still does nothing: the wizard's dash goes the way its body walks (staffs A6a), so the mover would need to take a way from the card (open question).
+- **R4 F4 rules (done, owner 2026-10-30):** a returning shot's way home takes no life, so it always comes home (it still vanishes when its caster's anchor is gone; with homing's 60° bend it always closes in). A closed caster's shots in the air keep their waiting payloads (echoes, fires waiting for room), as after an edit; only its own cast's waiting launches go. DECISIONS "Card rules R4 F4".
 
 ## Notes for the sessions
 

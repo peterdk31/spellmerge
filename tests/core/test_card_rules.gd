@@ -580,6 +580,9 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("shooter", false):
 		# A carrier that leans back first (a swing) is cast that much sooner.
 		world.press_when_shot_within(r + SHOT_NEAR + form.wind_up * _shot.speed)
+	elif scene.get("donor", false):
+		# The donor casts first, so a carrier that hits at once (a fissure) finds what it cast.
+		world.at_step[2] = [world.press]
 	else:
 		world.press(scene.get("repeat", false))
 	world.run(seconds, 0.0 if not scene.get("repeat", false) else seconds)

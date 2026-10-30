@@ -120,8 +120,8 @@ signal actor_hurt(actor: int, amount: int, position: Vector2, tag: int, kind: St
 signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
 ## Sender: core/spells. The actor `caster` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
 signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int)
-## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
-signal pull_requested(caster: int, position: Vector2, radius: float, strength: float, tag: int)
+## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of the line from `position` to `to` toward its nearest point on it at `strength` pixels per second (a shot's: `to` is `position`; a beam's: one piece of its path); the card has `tag`. Heard by combat.
+signal pull_requested(caster: int, position: Vector2, radius: float, strength: float, tag: int, to: Vector2)
 ## Sender: core/spells. A carrier of the actor `caster` with `possess` hit the actor `target` (an actor id): the caster's controller is to possess it for `seconds`; the card has `tag`. One per hit. Heard by actor (the Possession rule).
 signal possess_requested(caster: int, target: int, seconds: float, tag: int)
 ## Sender: actor. A controller now possesses the actor `actor` (it drives it, or a puppet copies it); `caster` is that controller's home body (the body that cast `possess` when it has none). Heard by feel (a ring in the caster's ramp and the sound `possess`).

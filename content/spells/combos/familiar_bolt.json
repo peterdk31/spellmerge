@@ -1,9 +1,9 @@
 {
 	"id": "familiar_bolt",
 	"name": "Familiar bolt",
-	"does": "A cast of familiar, fire and bolt asks for one familiar. The arena has no AI, so this checks the request, not the fire payload.",
+	"does": "A timer on a familiar casts a fire bolt every tick from where the familiar circles (rules R4 F3: a familiar casts only what its triggers give it). The arena has no AI, so this checks the request; the timer's bolt is the card rules test's.",
 	"casts": [
-		{"staff": 0, "cards": ["familiar", "fire", "bolt"]}
+		{"staff": 0, "cards": ["timer", "familiar", "fire", "bolt"]}
 	],
 	"imps": [[100, 0]],
 	"seconds": 1.5,

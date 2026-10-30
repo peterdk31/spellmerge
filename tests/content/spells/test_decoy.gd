@@ -56,14 +56,15 @@ func test_the_combos_exist() -> void:
 		check(not _combo(id).is_empty(), "the combo %s exists" % id)
 
 
-func test_a_cast_asks_for_one_decoy_where_the_caster_stands() -> void:
+func test_a_cast_asks_for_one_decoy_a_step_ahead_of_the_caster() -> void:
 	var spawns: Array = _spawns(["decoy"])
 	check_equal(spawns.size(), 1, "one decoy")
 	if spawns.is_empty():
 		return
 	check_equal(spawns[0][1], &"decoy", "a decoy, not a familiar")
 	var at: Vector2 = spawns[0][2]
-	check(at.distance_to(Vector2(40, 20)) < 1.0, "at the caster's feet (%s)" % [at])
+	# Rules R4 F3: what a caster places appears twice its size ahead along the aim (+x here).
+	check(at.distance_to(Vector2(40.0 + _card().radius * 2.0, 20)) < 1.0, "a step ahead of the caster (%s)" % [at])
 	check_equal(spawns[0][3], _card().lifetime, "for the card's lifetime")
 
 

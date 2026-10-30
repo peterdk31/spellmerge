@@ -1,7 +1,7 @@
 {
 	"id": "deflect_wall_mirror",
 	"name": "Mirror wall",
-	"does": "A deflecting wall rises between the caster and an enemy bolt; the stone it strikes sends it back the way it came, and it hits the imp behind the shooter.",
+	"does": "A deflecting wall rises between the caster and an enemy bolt; the wall sends it back the way it came, and it hits the imp behind the shooter.",
 	"casts": [{"staff": 0, "cards": ["deflect", "wall"]}],
 	"imps": [[120, 0]],
 	"guard": true,

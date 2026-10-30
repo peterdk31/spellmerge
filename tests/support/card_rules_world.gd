@@ -166,7 +166,7 @@ func press(hold_button: bool = false) -> void:
 
 
 ## The wizard presses its staff once, at the first step an enemy shot is within `distance`
-## pixels of its hand (so a carrier that touches shots only briefly, a swing or a fissure, meets one).
+## pixels of its hand (so a carrier that touches shots only briefly, a swing, meets one).
 func press_when_shot_within(distance: float) -> void:
 	_press_within = distance
 
@@ -365,8 +365,6 @@ func _listen() -> void:
 		_put("ended %s %s %s at %s" % [_who(caster), kind, _node(tag), _at(at)]))
 	bus.entity_end_requested.connect(func(caster: int, tag: int) -> void:
 		_put("end %s %s" % [_who(caster), _node(tag)]))
-	bus.familiar_cast_requested.connect(func(caster: int, at: Vector2, direction: Vector2, tag: int) -> void:
-		_put("familiar %s %s at %s to %s" % [_who(caster), _node(tag), _at(at), _at(direction * 100.0)]))
 	bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void:
 		_put("refund %s %s" % [_who(caster), str(snappedf(amount, 0.01))]))
 	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int) -> void:
@@ -383,7 +381,7 @@ func _listen() -> void:
 		_put("possess %s %s %s for %d ms" % [_who(caster), _who(target), _node(tag), roundi(seconds * 1000.0)]))
 	bus.discharge_arc.connect(func(caster: int, from: Vector2, to: Vector2) -> void:
 		_put("arc %s %s -> %s" % [_who(caster), _at(from), _at(to)]))
-	# A carrier's shape as a player sees it (a fissure's line is shown once; its tint and look are left out).
+	# A carrier's shape as a player sees it (so a longer reach shows; its tint and look are left out).
 	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
 	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2) -> void:

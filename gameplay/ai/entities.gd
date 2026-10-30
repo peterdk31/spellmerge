@@ -21,11 +21,9 @@ extends Node2D
 ##
 ## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
 ## familiar a trigger made the shot that fired it (a `core/projectiles` slot, followed while it
-## flies) or the point it was made at. Every FAMILIAR_INTERVAL seconds it looks for the nearest
-## body of another team than its owner's within FAMILIAR_RANGE and, if there is one, sends
-## `familiar_cast_requested` toward it;
-## core/spells casts the familiar's payload. With its wizard gone it stays where it was; with its
-## shot gone it circles where the shot was last.
+## flies) or the point it was made at, starting on the side where the card put it. It casts
+## nothing itself: core/spells fires what its triggers give it (rules R4 F3). With its wizard
+## gone it stays where it was; with its shot gone it circles where the shot was last.
 ##
 ## An **enemy's** decoy and familiar (staffs F8d: an enemy that casts a staff with those cards)
 ## are the same in the enemy ramp: the decoy copies the enemy's `Sprite` and the familiar circles
@@ -89,11 +87,6 @@ const DECOY_GLOW: float = 0.6
 const FAMILIAR_ORBIT: float = 20.0
 const FAMILIAR_TURN: float = 2.5
 const FAMILIAR_CENTRE: Vector2 = Vector2(0.0, -14.0)
-## Seconds between casts, and before the first one.
-const FAMILIAR_INTERVAL: float = 1.0
-const FAMILIAR_FIRST: float = 0.5
-## Enemies further than this are not cast at.
-const FAMILIAR_RANGE: float = 200.0
 ## The orb: radius in pixels, outline and core.
 ## A familiar is drawn as an orbit shot of this hit radius (its zoom, see `look_zoom`).
 const FAMILIAR_SIZE: float = 3.0
@@ -131,7 +124,6 @@ var _hits: PackedInt32Array = PackedInt32Array()
 ## A decoy's shield charges left, and 1 when it deflects (its guard, rules R4g).
 var _shield: PackedInt32Array = PackedInt32Array()
 var _deflect: PackedByteArray = PackedByteArray()
-var _cast_left: PackedFloat32Array = PackedFloat32Array()
 var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
 ## Spawn order, to find an owner's oldest.
@@ -249,7 +241,6 @@ func _init() -> void:
 	_hits.resize(POOL_SIZE)
 	_shield.resize(POOL_SIZE)
 	_deflect.resize(POOL_SIZE)
-	_cast_left.resize(POOL_SIZE)
 	_angle.resize(POOL_SIZE)
 	_position.resize(POOL_SIZE)
 	_born.resize(POOL_SIZE)
@@ -277,7 +268,7 @@ func _physics_process(delta: float) -> void:
 	step(delta)
 
 
-## Move time on: lifetimes, familiar orbits and casts.
+## Move time on: lifetimes and familiar orbits.
 func step(delta: float) -> void:
 	_clock += delta
 	if _live == 0:
@@ -393,7 +384,6 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_hits[row] = DECOY_HITS
 	_shield[row] = spells.decoy_shield(tag) if kind == DECOY and spells != null else 0
 	_deflect[row] = 1 if kind == DECOY and spells != null and spells.decoy_deflects(tag) else 0
-	_cast_left[row] = FAMILIAR_FIRST
 	_angle[row] = 0.0
 	_position[row] = at
 	_born[row] = _spawned
@@ -464,20 +454,6 @@ func _step_familiar(row: int, delta: float) -> void:
 	if not is_instance_valid(_caster[row]):
 		_caster[row] = null
 	_position[row] = _orbit_point(row)
-	_cast_left[row] -= delta
-	if _cast_left[row] > 0.0:
-		return
-	_cast_left[row] = FAMILIAR_INTERVAL
-	if projectiles == null or events == null:
-		return
-	# A familiar casts at the nearest body of another team than its owner's.
-	var foe: Node2D = projectiles.nearest_target(_position[row], FAMILIAR_RANGE, ProjectileManagerScript.ACTOR_LAYERS, null, null, _team_of(_owner[row]))
-	if foe == null:
-		return
-	var direction: Vector2 = _position[row].direction_to(projectiles.nearest_point)
-	if direction == Vector2.ZERO:
-		direction = Vector2.RIGHT
-	events.familiar_cast_requested.emit(_owner[row], _position[row], direction, _tag[row])
 
 
 ## Where familiar `row` is now: on its circle round the wizard, the shot or the point it circles,

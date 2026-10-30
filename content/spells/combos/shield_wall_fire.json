@@ -1,7 +1,7 @@
 {
 	"id": "shield_wall_fire",
 	"name": "Shielded fire wall",
-	"does": "A fire wall whose stones each stop one enemy shot flying at the caster, and still burns the two imps standing at its stones.",
+	"does": "A shielded fire wall stops an enemy shot flying at the caster with a block, and still burns the two imps standing against it.",
 	"casts": [{"staff": 0, "cards": ["shield", "fire", "wall"]}],
 	"imps": [[28, 16], [28, -16]],
 	"guard": true,

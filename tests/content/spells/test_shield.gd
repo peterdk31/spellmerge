@@ -94,8 +94,8 @@ func test_a_shielded_bolt_blocks_from_every_seat() -> void:
 
 
 func test_each_shield_stops_one_shot() -> void:
-	check_equal(_blocked_by(["shield", "wall"], 3), 3, "one shield on each stone of a wall: three shots, three blocks")
-	check_equal(_blocked_by(["wall"], 3), 0, "a plain wall blocks none")
+	check_equal(_blocked_by(["shield", "wall"], 3), 1, "a wall is one carrier with one shield: one block, the other shots end on the wall")
+	check_equal(_blocked_by(["wall"], 3), 0, "a plain wall blocks none: its shots end on it")
 
 
 func test_a_shield_on_a_dash_is_a_barrier_on_the_caster() -> void:

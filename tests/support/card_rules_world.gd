@@ -166,7 +166,7 @@ func press(hold_button: bool = false) -> void:
 
 
 ## The wizard presses its staff once, at the first step an enemy shot is within `distance`
-## pixels of its hand (so a carrier that touches shots only briefly, a swing or a fissure, meets one).
+## pixels of its hand (so a carrier that touches shots only briefly, a swing, meets one).
 func press_when_shot_within(distance: float) -> void:
 	_press_within = distance
 

@@ -79,3 +79,11 @@ func test_every_new_enum_value_is_inside_the_validator_range() -> void:
 	var form := FormBase.new()
 	form.motion = FormBase.Motion.FAMILIAR
 	check(form.range_problems().is_empty(), "the last motion is in range")
+
+
+func test_the_removed_fissure_slot_is_kept_and_refused() -> void:
+	# Fissure removed (owner, 2026-10-30): its number stays so stored motions keep their meaning.
+	check_equal(int(FormBase.Motion.DECOY), 11, "the carriers after it keep their numbers")
+	var form := FormBase.new()
+	form.motion = FormBase.Motion._UNUSED_10
+	check(not form.range_problems().is_empty(), "no card may use the empty slot")

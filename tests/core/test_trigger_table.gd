@@ -16,7 +16,7 @@ const M := FormBase.Motion
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [M.SLAM, M.TELEPORT]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.SWING, M.SLAM, M.RAIN]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.SWING, M.SLAM, M.RAIN, M.DASH, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -122,7 +122,7 @@ func test_wasted_cells_say_why() -> void:
 		[&"on_timer", &"slam", "over at once"],
 		[&"on_timer", &"teleport", "over at once"],
 		[&"on_block", &"rain", "nothing on it can block"],
-		[&"on_kill", &"teleport", "without a blast"],
+		[&"on_kill", &"decoy", "without a blast"],
 		[&"on_reaction", &"familiar", "without a blast"],
 	]
 	for cell: Array in cells:

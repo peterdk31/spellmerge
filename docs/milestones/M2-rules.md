@@ -84,19 +84,19 @@ Fissure removed 2026-10-30 (owner): its column below is history.
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
-**Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
+**Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's shield is a barrier on the wizard; since R4c a dash and a teleport hit, and their deflect turns the shots they pass or land by) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Decoy | Famil | Swing |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
+| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
 | on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | on block | s | s | s | s | s | s | s | s | s | W | s | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 | on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | W | W | W |
 | on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -162,6 +162,13 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 - **R4f (rays) done:** a beam's chain jump pierces as the beam does, a fissure's everything (item 13); relay on a beam and a fissure, from the actors its line hits, for every hit after while it is on (15); ghost on a beam and a fissure, magnet, growth and spiral on a beam (20). Linger, sticky and return stay wasted on both, magnet, growth and spiral on a fissure (DECISIONS.md, "Card rules R4f").
 - **F7, fissure removed (owner, 2026-10-30):** the fissure carrier is gone (card, combos, runtime cases, tests); its column left the trigger table. `FormBase.Motion` keeps slot 10 unused so stored numbers keep their meaning.
 - **R4g, bodies and mirror (done, owner decisions 2026-10-29):** a rain strikes every body within `RAIN_SPLASH` of where it lands with its own hit and cards (infusions, heavy, chain, siphon, possess, on hit, on kill, on reaction), then drops its payload. A familiar hands its infusions and hit cards to every carrier it casts (compiled in, costs included; wasted when nothing it casts takes them on). A decoy with a shield stops the other teams' shots that reach it, one charge each; with deflect it turns them; each is a block (`on block`). Mirror is one rule: the carrier fired again with its aim reversed, on every carrier but dash and teleport (wasted: "a move and its mirror cancel"); the allow-list in `_fire_spell` and the MIRROR rows of `behaviour_waste` are gone but for the moves. Left for the owner: a rune, decoy or familiar is made at the caster, so its mirror lands on the same spot; two hook pulls on the wizard replace each other (the mover's rule), they do not add.
+
+#### R4c: moves (owner decisions 2026-10-29; DECISIONS.md "Card rules R4c")
+
+- **Dash and teleport hit.** A dash strikes every body its mover (the wizard's body, or the shot a payload dash moves) passes, once each, within `PASS_REACH` (8 px) of its way, sampled so a fast dash misses nothing; a teleport strikes the bodies within `LAND_REACH` (24 px) of where it lands. Both go through the swing's path (`Projectiles.sweep`, `strike`, the beam hit context), so every hit card works as on a shot: the six infusions, chain, heavy (the shoulder charge of M2-staffs.md), siphon, possess, overcharge, on hit, on kill, on reaction; deflect turns the shots within `MOVE_GUARD_REACH` (24 px, before they reach the body). Pierce is wasted on a dash ("it hits what it passes, once each": it already hits everything on its way); split and sniper stay wasted (one body, no spread). `hits()` now includes them; their `_hits_nothing` rows and the recoil row are gone, and deflect runs on every carrier that hits.
+- **Recoil adds to the move.** A dash's recoil is the usual push, which the body adds to the dash; a teleport, over at once, has it taken off its distance (past it, it goes backwards).
+- **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
+- **A point cannot move:** a teleport cast by a point blinks the wizard to it, and a hook or swap cast by one moves the wizard (to the hit, as the wizard's own). A dash cast by a point still does nothing: the wizard's dash goes the way its body walks (staffs A6a), so the mover would need to take a way from the card (open question).
 
 ## Notes for the sessions
 

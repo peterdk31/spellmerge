@@ -247,8 +247,12 @@ static func reach(form: FormBase) -> float:
 			return SpellLimits.WALL_REACH
 		FormBase.Motion.RAIN:
 			return form.ray_length if form.ray_length > 0.0 else SpellLimits.RAIN_REACH
-		FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-			return form.ray_length + 24.0
+		FormBase.Motion.DASH:
+			# On its way: a dash strikes what its body passes (rules R4c).
+			return form.ray_length * 0.5
+		FormBase.Motion.TELEPORT:
+			# Where it lands: a teleport strikes what is there (rules R4c).
+			return form.ray_length
 		FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
 			return 60.0
 	return -1.0

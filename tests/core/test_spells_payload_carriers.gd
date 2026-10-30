@@ -575,6 +575,16 @@ func test_an_enemy_touching_the_wall_anywhere_along_it_is_hit_once_while_it_stay
 	check_equal(_mgr.get_count(), 1, "the hit did not spend the wall")
 
 
+func test_a_beam_the_wall_casts_comes_out_of_it() -> void:
+	# Rules R4 F8: what a wall casts leaves it, beams too (as its flying payloads do).
+	_build(0, [&"timer", &"wall", &"beam"])
+	var target: Node2D = _target(Vector2(SpellLimits.WALL_REACH + 80.0, 0.0))
+	_cast()
+	_tick(32)
+	check(_hits.any(func(hit: Array) -> bool: return hit[1] == target), "the wall's beam reached the enemy beyond it: %s" % [_hits])
+	check(_blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "the wall still stops everything else")
+
+
 func test_wall_shots_stay_out_of_a_wall() -> void:
 	_mgr.set_walls([Rect2(14.0, -100.0, 40.0, 200.0)])
 	_build(0, [&"wall"])

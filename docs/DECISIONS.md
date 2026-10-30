@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Card rules R4 F8, walls let out what they cast; the familiar casts from its orb (owner)
+
+- **What a wall casts comes out of it, beams too:** one rule for every payload of a wall: the wall's row does not count for what it cast. A flying shot's step and a beam's ray walk ask the same thing (`_solid_of`; a beam names its caster shot with `Projectiles.ray_cast_by`). A beam cast by a still carrier (a rune, a wall) keeps it as its caster and starts where it is.
+- **The familiar casts from its orb** (replaces F3's "from its wizard's body"): Entities reports each orb's place every step (`Spells.familiar_at`, keyed by `Spells.entity_key`), and the payload flies outward from what the familiar circles through the orb (the existing live-carrier rule: outward from the caster's body through the carrier), so `timer · familiar · bolt` is a rotating sprinkler a player can predict from where the orb is. An enemy's familiar sprays the same way, so it no longer casts at the wizard.
+
 ## 2026-10-30: Card rules R4 F3, placing (owner)
 
 - **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.

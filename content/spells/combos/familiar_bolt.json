@@ -1,7 +1,7 @@
 {
 	"id": "familiar_bolt",
 	"name": "Familiar bolt",
-	"does": "A timer on a familiar casts a fire bolt every tick from where the familiar circles (rules R4 F3: a familiar casts only what its triggers give it). The arena has no AI, so this checks the request; the timer's bolt is the card rules test's.",
+	"does": "A timer on a familiar casts a fire bolt every tick from the familiar's orb, outward, so the bolts go round as it circles (rules R4 F3, F8: a familiar casts only what its triggers give it, from its orb). The arena has no AI, so this checks the request; the timer's bolt is the card rules test's.",
 	"casts": [
 		{"staff": 0, "cards": ["timer", "familiar", "fire", "bolt"]}
 	],

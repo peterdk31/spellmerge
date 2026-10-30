@@ -226,6 +226,10 @@ var _landed_at: PackedInt64Array = PackedInt64Array()
 var _no_homing: Homing = Homing.new()
 ## tag -> entities (decoys, familiars) alive that came from it; each counts as a live shot
 var _entities: Dictionary = {}
+## While `entity_spawn_requested` is sent, the key of the entity it asks for (0 at other times):
+## Entities keeps it and hands it back with `familiar_at`. `_entity_keys` counts them out.
+var entity_key: int = 0
+var _entity_keys: int = 0
 ## actor * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
 var _hold_tags: Array[PackedInt64Array] = []
 ## actor * STAFFS + staff -> the carrier (form id) of its last cast, for the cast's look
@@ -253,8 +257,9 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a beam's tip, a swing's
-## tip, an actor's body (a wizard's dash, a familiar round its wizard) or a fixed point (a rain's
-## spot, a decoy). One `_lc_tied` to its row ends with it (a shot, a beam, a swing); the others
+## tip, an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
+## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
+## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
 ## entity that ended, a rain whose landing was dropped). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
 ## `_lc_way` its way where nothing else gives one.
@@ -1549,16 +1554,27 @@ func _spawn_entity(spell: CompiledSpell, tag: int, actor: int, at: Vector2, head
 	var kind: StringName = &"decoy" if spell.motion == FormBase.Motion.DECOY else &"familiar"
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
 	var anchor: int = _entity_caster()
-	# Where it is: a decoy stays where it was made, a familiar circles its caster.
-	var where: int = LC_POINT
-	if kind == &"familiar" and anchor != -2:
-		where = LC_ACTOR if anchor == -1 else LC_SLOT
-	var ref: int = actor if where == LC_ACTOR else anchor
 	_entities[tag] = _entities.get(tag, 0) + 1
 	shot_started(tag)
+	# Where it is: a point, where it was made; Entities moves a familiar's along with its orb
+	# (`familiar_at`, by its key), so the familiar casts from its orb (rules R4 F8).
+	_entity_keys += 1
+	entity_key = _entity_keys
 	events.entity_spawn_requested.emit(actor, kind, at, seconds, tag, anchor)
-	_lc_join(spell, tag, where, ref, projectiles.get_seq_of(ref) if where == LC_SLOT else 0, false, seconds, at, heading)
+	entity_key = 0
+	_lc_join(spell, tag, LC_POINT, -1, _entity_keys, false, seconds, at, heading)
 	return 1
+
+
+## Where the familiar with `key` (`entity_key`) is now, told by Entities every step: what its
+## triggers cast comes from there.
+func familiar_at(key: int, at: Vector2) -> void:
+	if key == 0 or not at.is_finite():
+		return
+	for i in _lc_count:
+		if _lc_seq[i] == key and _lc_kind[i] == LC_POINT:
+			_lc_at[i] = at
+			return
 
 
 ## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
@@ -2179,11 +2195,12 @@ func _start_beam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, he
 		if _aim_dir[actor].is_finite():
 			_bm_turn[at] = _aim_dir[actor].angle_to(heading)
 	else:
+		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = _caster_shot()
 		var way: Vector2 = projectiles.get_velocity_of(shot) if shot >= 0 else Vector2.ZERO
-		if way.is_zero_approx():
+		if shot < 0:
 			_bm_caster[at] = CASTER_POINT
-		else:
+		elif not way.is_zero_approx():
 			_bm_turn[at] = way.angle_to(heading)
 	shot_started(tag)
 	_beam_step(at, 0.0)
@@ -2392,6 +2409,9 @@ func _beam_cast(at: int, hit: bool) -> void:
 	# A homing or spiral beam that turns at a wall homes and waves again from there (`_beam_steer`).
 	var steer: Callable = _steer_call if bounces > 0 and (spell.homing_range > 0.0 or spell.behaviour(ModifierBase.Behaviour.SPIRAL) > 0.0) else Callable()
 	_steer_row = at
+	# What a shot casts leaves it: a wall's beam walks out of its wall (rules R4 F8).
+	if _bm_caster[at] >= 0:
+		projectiles.ray_cast_by(_bm_caster[at])
 	if not hit:
 		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, false, bounces, steer, ghost)
 		_bm_tip[at] = projectiles.ray_end

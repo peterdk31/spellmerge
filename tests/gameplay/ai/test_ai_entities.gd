@@ -65,6 +65,7 @@ func before_each() -> void:
 	_entities = own(EntitiesScript.new()) as EntitiesScript
 	_entities.events = _bus
 	_entities.projectiles = _projectiles
+	_entities.spells = _spells
 	root.add_child(_entities)
 	_enemies.clear()
 	var bolt := FormBase.new()
@@ -194,7 +195,7 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
 
-func test_an_enemys_familiar_circles_it_and_its_timer_casts_at_the_wizard() -> void:
+func test_an_enemys_familiar_circles_it_and_its_timer_casts_the_enemys_spell() -> void:
 	var enemy := _enemy(_data([&"timer", &"familiar", &"bolt"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
 	_run(_ai(enemy).windup_time + 2.0 * STEP)
@@ -203,15 +204,34 @@ func test_an_enemys_familiar_circles_it_and_its_timer_casts_at_the_wizard() -> v
 	var at: Vector2 = _entities.positions_of(enemy.id, tag)[0]
 	var centre: Vector2 = enemy.global_position + EntitiesScript.FAMILIAR_CENTRE
 	check(is_equal_approx(at.distance_to(centre), EntitiesScript.FAMILIAR_ORBIT), "it circles the enemy (%.2f from it)" % at.distance_to(centre))
-	var hits: Array = []
-	_bus.projectile_hit.connect(func(player: int, target: Node, _hit_at: Vector2, _hit_tag: int) -> void: hits.append([player, target]))
-	var peak: int = 0
+	var casters: Array[int] = []
 	for i in 12:
 		_run(STEP)
-		peak = maxi(peak, _projectiles.get_count())
-	check(peak >= 1, "its timer casts the enemy's spell (its bolt), along the enemy's aim")
-	check(hits.size() >= 1 and hits[0][0] == enemy.id and hits[0][1] == _wizard, "and hits the wizard as the enemy's")
+		for slot in _projectiles.get_cap():
+			if _projectiles.is_alive(slot):
+				casters.append(SpellTag.caster_of(_projectiles.get_tag_of(slot)))
+	check(not casters.is_empty(), "its timer casts the enemy's spell (its bolt)")
+	check(casters.all(func(caster: int) -> bool: return caster == enemy.id), "as the enemy's")
 	check_equal(_entities.drawn_familiars(), 1, "drawn with the others")
+
+
+func test_a_familiar_casts_from_its_orb_outward_like_a_sprinkler() -> void:
+	# Rules R4 F8: what a familiar's timer casts comes from its orb, outward from what it circles,
+	# so as it circles its bolts go round.
+	var enemy := _enemy(_data([&"timer", &"familiar", &"bolt"]))
+	var tag: int = _spells.current_tag(enemy.id, 0)
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
+	var centre: Vector2 = enemy.global_position + EntitiesScript.FAMILIAR_CENTRE
+	var ways: Array[Vector2] = []
+	for i in 24:
+		var orb: Vector2 = _entities.positions_of(enemy.id, tag)[0]
+		_run(STEP)
+		for slot in _projectiles.get_cap():
+			if _projectiles.is_alive(slot) and _projectiles.get_position_of(slot).distance_to(orb) < 0.5:
+				ways.append(_projectiles.get_velocity_of(slot).normalized())
+				check(ways[-1].dot((orb - centre).normalized()) > 0.95, "the bolt flies outward from the enemy through the orb")
+	check(ways.size() >= 2, "its bolts start at the orb (%d of them)" % ways.size())
+	check(ways.size() >= 2 and ways[0].angle_to(ways[1]) > 0.1, "and each goes another way as the orb circles")
 
 
 func test_an_enemys_familiar_without_a_trigger_casts_nothing() -> void:

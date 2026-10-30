@@ -37,7 +37,7 @@ const MEETS_SHOTS: int = CarrierTraits.MEETS_SHOTS
 const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 
 
-## Its id, the `carrier` a form card names (&"bolt"); &"" for the carrier that runs nothing, which
+## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
 ## `Carriers.of` answers for a name no carrier has.
 func id() -> StringName:
 	return &""

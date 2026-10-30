@@ -392,7 +392,8 @@ func _sample() -> void:
 	for slot in projectiles._high:
 		if projectiles.is_alive(slot):
 			var tag: int = projectiles.get_tag_of(slot)
-			_put("shot %s %s at %s r%d" % [_who(projectiles.get_actor_of(slot)), _node(tag), _at(projectiles.get_position_of(slot)), roundi(projectiles._radius[slot])])
+			# (Its radius to a tenth: growth on a speck, an atom of 1.5 px, is a fraction of a pixel.)
+			_put("shot %s %s at %s r%.1f" % [_who(projectiles.get_actor_of(slot)), _node(tag), _at(projectiles.get_position_of(slot)), projectiles._radius[slot]])
 	for at in CarrierBeam.of(spells).beam_slots():
 		if CarrierBeam.of(spells).beam_on(at):
 			var points: PackedStringArray = PackedStringArray()

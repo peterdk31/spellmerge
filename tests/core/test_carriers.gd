@@ -24,7 +24,7 @@ func test_every_carrier_is_found_by_its_name() -> void:
 	check_equal(Carriers.of(&"fissure").id(), &"", "a name no carrier has runs as nothing")
 	check(not Carriers.of(&"fissure").works(BEHAVIOURS.NONE), "and no card works on it")
 	check(not Carriers.exists(&"fissure") and not Carriers.exists(&""), "and neither is a carrier")
-	check(Carriers.exists(&"bolt"), "a bolt is")
+	check(Carriers.exists(&"atom"), "an atom is")
 	check_equal(Carriers.ids().size(), 13, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
 	var ids: Array[StringName] = Carriers.ids()
 	check(ids.find(&"dash") < ids.find(&"beam") and ids.find(&"beam") < ids.find(&"decoy") and ids.find(&"decoy") < ids.find(&"swing") and ids.find(&"swing") < ids.find(&"slam"), "the runtime steps a dash's strikes, then beams, entities, swings and slams: %s" % [ids])
@@ -77,14 +77,14 @@ func test_a_blast_hits_for_a_carrier_that_hits_nothing() -> void:
 	check(decoy.works(BEHAVIOURS.HEAVY, true) and decoy.works(BEHAVIOURS.SIPHON, true), "a blast carries it, and siphon")
 	check(not decoy.works(BEHAVIOURS.PULL, true), "but not pull")
 	check(not decoy.takes_infusion(false) and decoy.takes_infusion(true), "nor an infusion without a blast")
-	check(Carriers.of(&"bolt").takes_infusion(false), "a bolt takes one on its own hits")
+	check(Carriers.of(&"atom").takes_infusion(false), "a bolt takes one on its own hits")
 
 
 func test_what_a_trigger_needs_from_its_cards_is_in_its_need() -> void:
 	# The cards a trigger needs are data (`TriggerBase.NEEDS`), not a case per event in the compiler.
 	var shield: Dictionary = {BEHAVIOURS.SHIELD: true}
 	var blast: Dictionary = {BEHAVIOURS.BLAST: true}
-	var bolt: Carrier = Carriers.of(&"bolt")
+	var bolt: Carrier = Carriers.of(&"atom")
 	var decoy: Carrier = Carriers.of(&"decoy")
 	check(not bolt.fires_with(EVENTS.BLOCK, {}, false) and bolt.fires_with(EVENTS.BLOCK, shield, false), "on block needs a shield")
 	check(bolt.fires_with(EVENTS.BLOCK, {BEHAVIOURS.DEFLECT: true}, false), "or a deflect")

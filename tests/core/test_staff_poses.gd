@@ -46,7 +46,7 @@ func _cast(id: StringName) -> void:
 
 
 func test_every_channel_follows_its_keys_and_it_ends_on_the_aim() -> void:
-	_card(&"posed", &"bolt", [{"phase": "after", "at": 0.1, "turn": -40, "lift": 4, "push": -3, "glow": 0.5, "stretch": 0.3, "shake": 1.0, "ease": "out", "mood": "raised"}, {"phase": "after", "at": 0.3}] as Array[Dictionary])
+	_card(&"posed", &"atom", [{"phase": "after", "at": 0.1, "turn": -40, "lift": 4, "push": -3, "glow": 0.5, "stretch": 0.3, "shake": 1.0, "ease": "out", "mood": "raised"}, {"phase": "after", "at": 0.3}] as Array[Dictionary])
 	_cast(&"posed")
 	arena.run(0.1)
 	var pose: Vector3 = arena.spells.poses().staff_pose(0)
@@ -77,8 +77,8 @@ func test_a_hold_repeats_while_a_held_beam_lasts_and_ends_with_it() -> void:
 
 
 func test_a_new_cast_starts_from_where_the_staff_is() -> void:
-	_card(&"up", &"bolt", [{"phase": "after", "at": 0.1, "lift": 10}, {"phase": "after", "at": 0.5, "lift": 10}, {"phase": "after", "at": 0.6}] as Array[Dictionary])
-	_card(&"down", &"bolt", [{"phase": "after", "at": 0.2, "lift": -4}, {"phase": "after", "at": 0.4}] as Array[Dictionary])
+	_card(&"up", &"atom", [{"phase": "after", "at": 0.1, "lift": 10}, {"phase": "after", "at": 0.5, "lift": 10}, {"phase": "after", "at": 0.6}] as Array[Dictionary])
+	_card(&"down", &"atom", [{"phase": "after", "at": 0.2, "lift": -4}, {"phase": "after", "at": 0.4}] as Array[Dictionary])
 	_cast(&"up")
 	arena.run(0.2)
 	check(absf(arena.spells.poses().staff_pose(0).y - 10.0) < 0.5, "up")
@@ -89,7 +89,7 @@ func test_a_new_cast_starts_from_where_the_staff_is() -> void:
 
 
 func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim() -> void:
-	_card(&"loose", &"bolt", [{"phase": "after", "at": 0.4, "lift": 2}, {"phase": "after", "at": 0.5}] as Array[Dictionary])
+	_card(&"loose", &"atom", [{"phase": "after", "at": 0.4, "lift": 2}, {"phase": "after", "at": 0.5}] as Array[Dictionary])
 	_cast(&"loose")
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
 	arena.run(0.1)

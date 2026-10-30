@@ -141,7 +141,7 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	for form in _forms:
-		if form.carrier != &"bolt":
+		if form.carrier != &"atom":
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
@@ -230,7 +230,7 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
 	match form.carrier:
-		&"bolt", &"swap":
+		&"atom", &"swap":
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
 		&"beam":
 			return minf(form.ray_length * 0.5, 90.0)
@@ -393,6 +393,10 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 ## is kept and the runtime alone decides what it does.
 func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> bool:
 	StaffCompiler.keep_wasted = forced
+	if scene.get("weak", false) and form.base_damage < 1.0:
+		# One hit of a speck (an atom, below a point) kills nothing; its stream does.
+		scene = scene.duplicate()
+		scene["repeat"] = true
 	var casts: Array = _casts(card, form, scene, forced)
 	var with: Array[StringName] = casts[0]
 	var without: Array[StringName] = casts[1]

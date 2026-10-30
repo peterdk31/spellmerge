@@ -45,10 +45,11 @@ const POSE_RANGES: Dictionary = {
 @export var shots: int = 1
 ## Angle in degrees the shots are spread over (360 for a full ring).
 @export_range(0.0, 360.0) var spread: float = 0.0
-## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"bolt", &"rune",
+## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"atom" (the
+## atom, bolt and nova), &"rune",
 ## &"orbit", &"beam", &"dash", &"teleport", &"swap", &"wall", &"rain", &"decoy",
 ## &"familiar", &"swing" or &"slam". The carrier decides what every other card does on it.
-@export var carrier: StringName = &"bolt"
+@export var carrier: StringName = &"atom"
 ## Extra targets each shot passes through before it ends.
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
@@ -140,7 +141,7 @@ func ranges() -> Dictionary:
 	limits.merge({
 		"base_damage": Vector2(0.05, 200),
 		"mana_cost": Vector2(0.0, 100.0),
-		"cooldown": Vector2(0.05, 10.0),
+		"cooldown": Vector2(0.0, 10.0),
 		"speed": Vector2(0.0, 2000.0),
 		"lifetime": Vector2(0.05, 20.0),
 		"radius": Vector2(1.0, 64.0),

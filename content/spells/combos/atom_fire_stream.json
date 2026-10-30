@@ -1,0 +1,20 @@
+{
+	"id": "atom_fire_stream",
+	"name": "Firemote stream",
+	"does": "Ten fire atoms in a second: each speck does 0.3 of a point, so the imp loses whole points as they add up, and every speck keeps its burn going.",
+	"casts": [
+		{"staff": 0, "cards": ["fire", "atom"]},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.1},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.2},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.3},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.4},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.5},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.6},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.7},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.8},
+		{"staff": 0, "cards": ["fire", "atom"], "at": 0.9}
+	],
+	"imps": [[120, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 3}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

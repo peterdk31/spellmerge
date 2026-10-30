@@ -36,7 +36,7 @@ func test_every_need_names_known_behaviours_traits_and_fields() -> void:
 
 func test_a_bolt_runs_every_behaviour() -> void:
 	for behaviour: int in ModifierBase.Behaviour.values():
-		check(Carriers.of(&"bolt").works(behaviour), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
+		check(Carriers.of(&"atom").works(behaviour), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
 
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:

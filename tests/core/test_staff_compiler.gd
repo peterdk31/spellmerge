@@ -249,6 +249,8 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	beam.ray_length = 300.0
 	var rune: FormBase = _form(&"rune", 3, 1)
 	rune.motion = FormBase.Motion.STILL
+	var orbit: FormBase = _form(&"orbit", 3, 1)
+	orbit.motion = FormBase.Motion.ORBIT
 	check_equal((_compile("homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a bolt looks as far as its card reaches")
 	check_equal((_compile("far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "a card that reaches further looks further, with no change to core")
 	check_equal((_compile("homing far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "two cards look as far as the further one")
@@ -256,8 +258,9 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	beam.ray_length = 200.0
 	check_equal((_compile("far_homing beam").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "and as far as its card reaches, past its end")
 	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "no homing card, no homing")
-	var staff: CompiledStaff = _compile("homing rune")
-	check_equal((staff.casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "a rune cannot be steered")
+	check_equal((_compile("homing rune").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a rune homes as far as its card reaches (it creeps, rules R4i)")
+	var staff: CompiledStaff = _compile("homing orbit")
+	check_equal((staff.casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "an orbit has nothing to aim")
 	check(staff.wasted.has(0) and not (staff.casts[0].group.spells[0] as CompiledSpell).modifier_ids.has(&"homing"), "so homing on it is wasted and left off it")
 
 

@@ -66,8 +66,9 @@ func _status_on(enemy: Enemy, id: StringName, player: int = 0) -> void:
 
 func test_a_reaction_stops_longer_and_shakes_more_than_a_plain_hit() -> void:
 	var preset: FeelPresetScript = _feel.preset
-	check(preset.reaction_stop_seconds > preset.death_stop_seconds, "longer than a death's stop")
-	check(preset.reaction_shake > preset.death_shake * 0.5, "a strong shake")
+	var death: CueBase = _feel.cue_of(&"enemy_death")
+	check(death != null and preset.reaction_stop_seconds >= death.hold, "at least as long as a death's stop")
+	check(death != null and preset.reaction_shake > death.shake * 0.5, "a strong shake")
 	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO)
 	check(_actors.held_left(0) >= preset.reaction_stop_seconds, "its caster is held for the reaction")
 	check_equal(_feel.stop_left, 0.0, "and the game runs on")

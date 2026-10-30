@@ -69,6 +69,9 @@ func before_each() -> void:
 	var on_hit := TriggerBase.new()
 	on_hit.event = TriggerBase.Event.HIT
 	_put(on_hit, &"on_hit")
+	var on_wall := TriggerBase.new()
+	on_wall.event = TriggerBase.Event.WALL
+	_put(on_wall, &"on_wall")
 	var lightning := ElementBase.new()
 	lightning.status_id = &"static"
 	lightning.status_duration = 2.0
@@ -237,6 +240,23 @@ func test_a_zap_sets_off_on_hit() -> void:
 			novas += 1
 	check_equal(novas, 8, "the zap fired the nova payload once: eight nova shots")
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
+
+
+## Rules R4a: a zap that ends on a wall is not its shot meeting a wall: `on wall` stays quiet.
+func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
+	var imp: Node2D = _target(Vector2(30.0, 40.0))
+	_mgr.set_walls([Rect2(-100.0, 16.0, 300.0, 8.0)] as Array[Rect2])
+	_build(0, [&"arc", &"on_wall", &"orb", &"nova"])
+	_cast()
+	var walls: Array[int] = [0]
+	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int) -> void: walls[0] += 1)
+	var most: int = 0
+	for _i in 90:
+		_tick(1)
+		most = maxi(most, _mgr.get_count())
+	check(walls[0] > 0, "the zaps ended on the wall between the orb and the imp (%d)" % walls[0])
+	check(_hits_on(imp).is_empty(), "the wall kept the imp from the zaps")
+	check_equal(most, 1, "only the orb: its on wall payload never fired")
 
 
 func test_arc_is_wasted_on_a_beam() -> void:

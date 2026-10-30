@@ -103,7 +103,7 @@ func test_the_pull_ends_with_the_shot() -> void:
 	arena.run(5.0)
 	check_equal(arena.projectiles.get_count(), 0, "the shot is gone")
 	var pulls: Array[int] = [0]
-	arena.bus.pull_requested.connect(func(_c: int, _p: Vector2, _r: float, _s: float, _t: int) -> void: pulls[0] += 1)
+	arena.bus.pull_requested.connect(func(_c: int, _p: Vector2, _r: float, _s: float, _t: int, _to: Vector2) -> void: pulls[0] += 1)
 	arena.run(0.5)
 	check_equal(pulls[0], 0, "a spent shot pulls no more")
 	check(is_instance_valid(imp), "the far imp is untouched")
@@ -131,7 +131,7 @@ func test_only_live_magnet_shots_ask_for_a_pull() -> void:
 	arena.install_cards(0, 0, ["magnet", "bolt"])
 	arena.install_cards(0, 1, ["bolt"])
 	var radii: Array[float] = []
-	arena.bus.pull_requested.connect(func(_c: int, _p: Vector2, r: float, _s: float, _t: int) -> void: radii.append(r))
+	arena.bus.pull_requested.connect(func(_c: int, _p: Vector2, r: float, _s: float, _t: int, _to: Vector2) -> void: radii.append(r))
 	arena.cast(0, 0)
 	arena.run(5.0)
 	arena.cast(0, 1)

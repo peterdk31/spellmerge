@@ -33,6 +33,16 @@ extends "res://tests/support/suite.gd"
 ## whose motion has none with "no reach for ...", so a new kind of card or carrier brings its
 ## probe in the same PR.
 ##
+## The other way round (R4b): a W cell is also played with the card forced on, and fails with
+## "`card` on `carrier` is listed as wasted (reason) but changes the cast" when that trace differs
+## (slam was once wrongly listed, found by hand). The seam is one test-only switch,
+## `StaffCompiler.keep_wasted`: with it the compiler keeps every card its waste table would drop
+## (a behaviour, numbers, an infusion, a trigger that "never fires" and its payload), and the
+## runtime, which does not read the table, alone decides what the card does. Both casts are
+## compiled with it on. A wasted card's costs are no effect: a modifier of numbers only is compared
+## with a copy of it that keeps only its costs (`_costs_of`: mana, a slower cast, less damage), a
+## behaviour modifier with its plain copy as above.
+##
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
 ##
@@ -273,6 +283,34 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 			check(not first.is_empty(), "`%s` in the scene %s writes something" % [form.id, scene["name"]])
 
 
+func test_forcing_keeps_every_wasted_card() -> void:
+	# The seam of the W check: with `keep_wasted` nothing on a carrier is listed as wasted.
+	var forced: int = 0
+	for form in _forms:
+		for modifier in _modifiers:
+			var cards: Array[StringName] = [modifier.id, form.id]
+			if not _compiler.compile_staff(cards, _staff).wasted.has(0):
+				continue
+			StaffCompiler.keep_wasted = true
+			var kept: CompiledStaff = _compiler.compile_staff(cards, _staff)
+			StaffCompiler.keep_wasted = false
+			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [modifier.id, form.id])
+			check(kept.casts[0].group.spells[0].modifier_ids.has(modifier.id), "and rides on it")
+			forced += 1
+		for trigger in _triggers:
+			var cards: Array[StringName] = [trigger.id, form.id, _payload.id]
+			if form.carries_payload():
+				cards.insert(2, _payload.id)
+			if not _compiler.compile_staff(cards, _staff).wasted.has(0):
+				continue
+			StaffCompiler.keep_wasted = true
+			var kept: CompiledStaff = _compiler.compile_staff(cards, _staff)
+			StaffCompiler.keep_wasted = false
+			check(not kept.wasted.has(0), "`%s` on `%s` is kept when forced" % [trigger.id, form.id])
+			forced += 1
+	check(forced > 0, "some card is wasted somewhere (%d)" % forced)
+
+
 func test_every_modifier_works_or_is_wasted_on_every_carrier() -> void:
 	var cards: Array[SpellComponent] = []
 	cards.assign(_modifiers)
@@ -336,37 +374,54 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 	var names: PackedStringArray = PackedStringArray()
 	for scene in scenes:
 		names.append(scene["name"])
-		var casts: Array = _casts(card, form, scene)
-		var with: Array[StringName] = casts[0]
-		var without: Array[StringName] = casts[1]
-		var compiled: CompiledStaff = _compiler.compile_staff(with, _staff)
+		var compiled: CompiledStaff = _compiler.compile_staff(_casts(card, form, scene, false)[0], _staff)
 		if compiled.wasted.has(0):
-			check(not String(compiled.wasted[0]).strip_edges().is_empty(), "`%s` on `%s` is wasted with no reason" % [card.id, form.id])
+			var why: String = String(compiled.wasted[0]).strip_edges()
+			check(not why.is_empty(), "`%s` on `%s` is wasted with no reason" % [card.id, form.id])
+			# The other way round: forced on, a wasted card must still change nothing.
+			for forced in scenes:
+				if _changes(card, form, forced, true):
+					check(false, "`%s` on `%s` is listed as wasted (%s) but changes the cast (scene: %s)" % [card.id, form.id, why, forced["name"]])
+					break
 			return WASTED
-		var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
-		if scene.get("repeat", false):
-			# Long enough for the second cast to land (its delay is every carrier's cooldown).
-			var plain: CompiledStaff = _compiler.compile_staff(without, _staff)
-			var delay: float = plain.casts[0].delay if not plain.is_empty() else 0.0
-			seconds = minf(delay + form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
-		var key: String = "%s|%s|%s|%s" % [form.id, scene["name"], ",".join(PackedStringArray(without)), seconds]
-		var before: PackedStringArray
-		if _baselines.has(key):
-			before = _baselines[key]
-		else:
-			before = _run(without, form, scene, seconds)
-			_baselines[key] = before
-		var after: PackedStringArray = _run(with, form, scene, seconds, before)
-		if after != before:
-			if EXPLAIN:
-				print("%s on %s (%s): %s" % [card.id, form.id, scene["name"], _first_difference(before, after)])
+		if _changes(card, form, scene, false):
 			return WORKS
 	check(false, "`%s` on `%s` does nothing and is not listed as wasted (scene: %s)" % [card.id, form.id, "; ".join(names)])
 	return SILENT
 
 
-## The cards of the cast with `card` and of the same cast without it, as [with, without].
-func _casts(card: SpellComponent, form: FormBase, scene: Dictionary) -> Array:
+## True when the cast with `card` on `form` writes another trace in `scene` than the cast without
+## it. `forced` compiles both with `StaffCompiler.keep_wasted`, so what the waste table would drop
+## is kept and the runtime alone decides what it does.
+func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> bool:
+	StaffCompiler.keep_wasted = forced
+	var casts: Array = _casts(card, form, scene, forced)
+	var with: Array[StringName] = casts[0]
+	var without: Array[StringName] = casts[1]
+	var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
+	if scene.get("repeat", false):
+		# Long enough for the second cast to land (its delay is every carrier's cooldown).
+		var plain: CompiledStaff = _compiler.compile_staff(without, _staff)
+		var delay: float = plain.casts[0].delay if not plain.is_empty() else 0.0
+		seconds = minf(delay + form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
+	var key: String = "%s|%s|%s|%s|%s" % [form.id, scene["name"], ",".join(PackedStringArray(without)), seconds, forced]
+	var before: PackedStringArray
+	if _baselines.has(key):
+		before = _baselines[key]
+	else:
+		before = _run(without, form, scene, seconds)
+		_baselines[key] = before
+	var after: PackedStringArray = _run(with, form, scene, seconds, before)
+	StaffCompiler.keep_wasted = false
+	if after != before and EXPLAIN:
+		print("%s on %s (%s%s): %s" % [card.id, form.id, scene["name"], ", forced" if forced else "", _first_difference(before, after)])
+	return after != before
+
+
+## The cards of the cast with `card` and of the same cast without it, as [with, without]. `forced`
+## (a wasted card forced on): a modifier of numbers only is swapped for a copy of its costs, so
+## both casts pay them (a slower cast is no effect).
+func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> Array:
 	var tail: Array[StringName] = [form.id]
 	if form.carries_payload():
 		tail.append(_payload.id)
@@ -388,7 +443,7 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary) -> Array:
 			without.append_array(tail)
 	else:
 		with.append(card.id)
-		var plain: StringName = _plain_of(card)
+		var plain: StringName = _costs_of(card) if forced else _plain_of(card)
 		if plain != &"":
 			without.append(plain)
 		with.append_array(extra)
@@ -460,6 +515,28 @@ func _plain_of(card: SpellComponent) -> StringName:
 	return id
 
 
+## For a wasted card forced on: the id of a copy of `card` that keeps only what it costs (more
+## mana, a slower cast, less damage) for a modifier of numbers only; `_plain_of` for any other card.
+func _costs_of(card: SpellComponent) -> StringName:
+	var modifier := card as ModifierBase
+	if modifier == null or modifier.behaviour != ModifierBase.Behaviour.NONE:
+		return _plain_of(card)
+	var id: StringName = StringName("%s~costs" % modifier.id)
+	if not _shelf.extra.has(id):
+		var costs := modifier.duplicate() as ModifierBase
+		costs.id = id
+		costs.damage_mult = minf(modifier.damage_mult, 1.0)
+		costs.cooldown_mult = maxf(modifier.cooldown_mult, 1.0)
+		costs.speed_mult = 1.0
+		costs.radius_mult = 1.0
+		costs.lifetime_mult = 1.0
+		costs.spread_mult = 1.0
+		costs.shot_mult = 1
+		costs.extra_pierce = 0
+		_shelf.extra[id] = costs
+	return id
+
+
 ## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
 func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
@@ -507,6 +584,9 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("shooter", false):
 		# A carrier that leans back first (a swing) is cast that much sooner.
 		world.press_when_shot_within(r + SHOT_NEAR + form.wind_up * _shot.speed)
+	elif scene.get("donor", false):
+		# The donor casts first, so a carrier that hits at once (a fissure) finds what it cast.
+		world.at_step[2] = [world.press]
 	else:
 		world.press(scene.get("repeat", false))
 	world.run(seconds, 0.0 if not scene.get("repeat", false) else seconds)

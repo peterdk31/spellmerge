@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"player_downed"
+shake = 0.6
+stop_game = 0.09
+sound = &"player_downed"

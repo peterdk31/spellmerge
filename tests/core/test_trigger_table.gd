@@ -14,7 +14,9 @@ const M := FormBase.Motion
 ## fire on. Every motion not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.DASH, M.TELEPORT]
+## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
+const AT_ONCE: Array = [M.FISSURE, M.SLAM, M.TELEPORT]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.RAIN, M.DASH, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -64,9 +66,10 @@ func _expected(event: int, motion: int) -> bool:
 		E.HIT:
 			return HITTERS.has(motion)
 		E.TIMER, E.HURT:
-			return SHOTS.has(motion)
+			return not AT_ONCE.has(motion)
 		E.BLOCK:
-			return HITTERS.has(motion)
+			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
+			return motion != M.RAIN and motion != M.FAMILIAR
 		E.WALL:
 			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY, M.FISSURE].has(motion)
 	return true
@@ -82,14 +85,14 @@ func test_every_event_on_every_carrier_runs_or_says_why() -> void:
 			check_equal(why.is_empty(), runs, "%s has a reason exactly when it cannot run (%s)" % [cell, why])
 
 
-func test_a_timer_on_a_beam_is_wasted_with_its_payload() -> void:
-	var built: CompiledStaff = _compile([&"on_timer", &"ray", &"straight"])
+func test_a_timer_on_a_fissure_is_wasted_with_its_payload() -> void:
+	var built: CompiledStaff = _compile([&"on_timer", &"fissure", &"straight"])
 	var cast: CompiledCast = built.casts[0]
-	check(str(built.wasted.get(0, "")).contains("only a shot"), "the timer is wasted with its reason: %s" % built.wasted)
+	check(str(built.wasted.get(0, "")).contains("over at once"), "the timer is wasted with its reason: %s" % built.wasted)
 	check(str(built.wasted.get(2, "")).begins_with("Nothing casts it"), "its payload is wasted too: %s" % built.wasted)
-	check(not built.wasted.has(1), "the beam still casts")
+	check(not built.wasted.has(1), "the fissure still casts")
 	check_equal(cast.slots, PackedInt32Array([0, 1, 2]), "the payload is read in this cast, as when it fires")
-	check(cast.group.spells[0].payload == null, "no payload hangs on the beam")
+	check(cast.group.spells[0].payload == null, "no payload hangs on the fissure")
 	check_equal(cast.group.spells[0].trigger_id, &"", "nor a trigger")
 	check(not cast.targets.has(0) and not cast.targets.has(2), "nothing is attached")
 	check_equal(cast.mana, 2.0, "the wasted payload costs no mana")
@@ -109,15 +112,15 @@ func test_the_same_cards_read_alike_whether_the_trigger_fires_or_not() -> void:
 func test_wasted_cells_say_why() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy", "a decoy hits nothing"],
-		[&"on_hit", &"rain", "a rain hits nothing itself"],
+		[&"on_wall", &"rain", "never meets a wall"],
 		[&"on_wall", &"dash", "it stops before walls"],
 		[&"on_wall", &"orbit", "an orbit passes through walls"],
 		[&"on_wall", &"still", "never meets a wall"],
 		[&"on_wall", &"swing", "a swing's sweep never meets a wall"],
-		[&"on_hurt", &"swing", "hears you get hurt"],
-		[&"on_hurt", &"familiar", "hears you get hurt"],
-		[&"on_timer", &"fissure", "keeps a timer"],
-		[&"on_timer", &"teleport", "keeps a timer"],
+		[&"on_hurt", &"slam", "over at once"],
+		[&"on_hurt", &"teleport", "over at once"],
+		[&"on_timer", &"fissure", "over at once"],
+		[&"on_timer", &"teleport", "over at once"],
 		[&"on_block", &"rain", "nothing on it can block"],
 		[&"on_kill", &"decoy", "without a blast"],
 		[&"on_reaction", &"familiar", "without a blast"],
@@ -136,7 +139,9 @@ func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"straight"], [&"on_timer", &"straight"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
 		[&"on_hit", &"ray"], [&"on_hit", &"swing"], [&"on_wall", &"ray"], [&"on_wall", &"hook"],
-		[&"on_expire", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
+		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
+		[&"on_timer", &"ray"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
+		[&"on_hurt", &"ray"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
 	]
 	for cell: Array in cells:
 		var cards: Array[StringName] = [cell[0], cell[1], &"straight"]
@@ -155,7 +160,8 @@ func test_the_cards_an_event_needs() -> void:
 	check(_compile([&"on_block", &"deflect", &"swing", &"straight"]).wasted.is_empty(), "with a deflect on a swing it fires")
 	check(_compile([&"on_block", &"shield", &"dash", &"straight"]).wasted.is_empty(), "a dash's barrier blocks")
 	# A kill or reaction of a carrier that hits nothing itself comes from its blast.
-	check(_compile([&"on_kill", &"blast", &"rain", &"straight", &"straight"]).wasted.is_empty(), "a rain with a blast can kill")
+	check(_compile([&"on_kill", &"rain", &"straight", &"straight"]).wasted.is_empty(), "a rain kills by its own strike")
+	check(_compile([&"on_kill", &"blast", &"decoy", &"straight"]).wasted.is_empty(), "a decoy with a blast can kill")
 	check(_compile([&"on_kill", &"blast", &"dash", &"straight"]).wasted.is_empty(), "so can a dash with a blast")
 	# A reaction needs an element on the hit.
 	var bare: String = str(_compile([&"on_reaction", &"straight", &"straight"]).wasted.get(0, ""))
@@ -165,4 +171,8 @@ func test_the_cards_an_event_needs() -> void:
 	# A ghost shot flies through walls.
 	var ghost: String = str(_compile([&"on_wall", &"ghost", &"straight", &"straight"]).wasted.get(0, ""))
 	check(ghost.contains("passes through walls"), "on wall on a ghost bolt says why: %s" % ghost)
-	check(not _compile([&"on_wall", &"ghost", &"ray", &"straight"]).wasted.has(0), "a ghost beam still meets walls")
+	# So do a ghost beam and a ghost fissure (rules R4f).
+	for form: StringName in [&"ray", &"fissure"]:
+		var ghost_line: String = str(_compile([&"on_wall", &"ghost", form, &"straight"]).wasted.get(0, ""))
+		check(ghost_line.contains("passes through walls"), "on wall on a ghost %s says why: %s" % [form, ghost_line])
+	check(not _compile([&"on_wall", &"ray", &"straight"]).wasted.has(0), "a plain beam meets walls")

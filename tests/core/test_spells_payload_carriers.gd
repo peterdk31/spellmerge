@@ -36,7 +36,7 @@ var _end_requests: Array = []
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
-## Every explosion_shown as [player, at, radius, style].
+## Every cue_shown as [player, at, size, cue].
 var _explosions: Array = []
 
 
@@ -55,8 +55,8 @@ func before_each() -> void:
 	_areas.clear()
 	_shown.clear()
 	_explosions.clear()
-	_bus.explosion_shown.connect(func(player: int, at: Vector2, radius: float, style: StringName, _tint: Color, _look: int) -> void:
-		_explosions.append([player, at, radius, style]))
+	_bus.cue_shown.connect(func(player: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		_explosions.append([player, at, size, cue]))
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
@@ -90,7 +90,11 @@ func before_each() -> void:
 	beam.radius = 6.0
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 2.0)
-	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
+	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0).cue = &"blast"
+	# A barrel's blast: the same behaviour, naming another cue.
+	_modifier(&"barrel", ModifierBase.Behaviour.BLAST, 30.0).cue = &"fireball"
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 0.2)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
@@ -114,11 +118,12 @@ func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
 	return form
 
 
-func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
+func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> ModifierBase:
 	var modifier := ModifierBase.new()
 	modifier.behaviour = behaviour
 	modifier.behaviour_strength = strength
 	_put(modifier, id)
+	return modifier
 
 
 func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
@@ -210,6 +215,65 @@ func test_a_rain_with_nothing_after_it_does_nothing() -> void:
 	check_equal(_mgr.get_count(), 0, "no payload, no shots")
 
 
+func test_a_rain_strikes_what_is_under_it_as_it_lands() -> void:
+	# Rules R4g: the rain hits with its own hit and cards where it lands, then drops its payload.
+	var under: Node2D = _target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	_target(Vector2(SpellLimits.RAIN_REACH + 40.0, 0.0))
+	var tag: int = _build(0, [&"rain"])
+	_cast()
+	_tick(20)
+	check(_hits.is_empty(), "nothing before it lands")
+	_tick(20)
+	check_equal(_hits.size(), 1, "one body under it is struck")
+	check(_hits.size() == 1 and _hits[0][1] == under and _hits[0][3] == tag, "the one on the aim point, by the rain itself")
+
+
+func test_a_landing_rain_fires_its_on_hit() -> void:
+	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	_build(0, [&"on_hit", &"rain", &"bolt"])
+	_cast()
+	_tick(31)
+	check_equal(_mgr.get_count(), 1, "its on-hit payload left from the target")
+
+
+func test_an_echoed_rain_strikes_at_half() -> void:
+	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	var damage: Array[int] = []
+	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int) -> void:
+		damage.append(_spells.hit_profile(tag).damage))
+	_build(0, [&"echo", &"rain"])
+	_cast()
+	_tick(90)
+	check_equal(damage.size(), 2, "the rain and its echo strike")
+	check(damage.size() == 2 and damage[1] < damage[0], "the echo at half: %s" % [damage])
+
+
+func test_a_mirrored_rain_lands_through_the_caster() -> void:
+	_build(0, [&"mirror", &"rain", &"bolt"])
+	_cast()
+	check_equal(_shown.size(), 2, "two cues")
+	check(_shown.size() == 2 and is_equal_approx(_shown[1][2].x, -SpellLimits.RAIN_REACH), "the second behind the caster: %s" % [_shown])
+
+
+func test_a_mirrored_wall_stands_behind() -> void:
+	_build(0, [&"mirror", &"wall"])
+	_cast()
+	var ahead: int = 0
+	var behind: int = 0
+	for at in _positions():
+		if is_equal_approx(at.x, SpellLimits.WALL_REACH):
+			ahead += 1
+		elif is_equal_approx(at.x, -SpellLimits.WALL_REACH):
+			behind += 1
+	check_equal([ahead, behind], [3, 3], "a wall ahead and one behind")
+
+
+func test_a_mirrored_decoy_is_a_second_decoy() -> void:
+	_build(0, [&"mirror", &"decoy"])
+	_cast()
+	check_equal(_spawns.size(), 2, "two decoys")
+
+
 func test_rain_payload_counts_as_live_until_it_ends() -> void:
 	var tag: int = _build(0, [&"rain", &"bolt"])
 	_cast()
@@ -217,12 +281,55 @@ func test_rain_payload_counts_as_live_until_it_ends() -> void:
 	check_equal(_spells.live_shots(tag + (1 << SpellTag.NODE_SHIFT)), 1, "the payload's shot is counted under its own node")
 
 
-func test_a_rain_with_hold_still_falls_on_time_and_is_not_held() -> void:
-	_build(0, [&"hold", &"rain", &"bolt"])
-	_cast()
-	check(not _spells.is_holding(0, 0), "a rain is no sustained carrier")
+func _rain_cues() -> int:
+	var count: int = 0
+	for shown: Array in _shown:
+		if shown[1] == &"rain":
+			count += 1
+	return count
+
+
+func test_a_held_rain_keeps_falling_until_switched_off() -> void:
+	# Rules R4e (owner, 2026-10-29): a held rain used to fall once.
+	_form(&"stone", 0.0, 10.0)
+	_build(0, [&"hold", &"rain", &"stone"])
+	var mana: float = _cast()
+	check(_spells.is_holding(0, 0), "a held rain is on")
+	check_equal(_spells.reserved_mana(0), mana, "and reserves its cast")
+	check_equal(_rain_cues(), 1, "one rain at the cast")
 	_tick(32)
-	check_equal(_mgr.get_count(), 1, "it fell after its own delay, not after the hold lifetime")
+	check_equal(_mgr.get_count(), 1, "the first fell after its own delay")
+	check_equal(_rain_cues(), 2, "and the next began as it fell")
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "the second fell a lifetime later")
+	check_equal(_rain_cues(), 3, "a third is on its way")
+	check(_spells.is_holding(0, 0), "still on between two falls")
+	check_equal(_cast(), 0.0, "the next press switches it off")
+	check(not _spells.is_holding(0, 0), "off")
+	check_equal(_spells.reserved_mana(0), 0.0, "its mana is free")
+	_tick(60)
+	check_equal(_rain_cues(), 3, "no new rain")
+	check_equal(_mgr.get_count(), 2, "and the third never fell")
+
+
+func test_a_held_fissure_stays_open_and_hits_its_whole_line_every_tick() -> void:
+	# Rules R4e (owner, 2026-10-29): a held fissure is a beam that pierces everything.
+	_build(0, [&"hold", &"fissure"])
+	for n in 3:
+		_target(Vector2(40.0 + n * 40.0, 0.0))
+	_cast()
+	check_equal(_hits.size(), 3, "all three at once")
+	check(_spells.is_holding(0, 0), "it stays open")
+	_tick(10)
+	check_equal(_hits.size(), 6, "and all three again a beam tick later")
+	check_equal(_spells.beam_count(), 1, "one live line")
+	_tick(60)
+	check(_hits.size() > 6, "still open past its lifetime")
+	_cast()
+	check_equal(_spells.beam_count(), 0, "the next press closes it")
+	var hits: int = _hits.size()
+	_tick(30)
+	check_equal(_hits.size(), hits, "and it hits no more")
 
 
 func test_familiar_asks_for_an_entity() -> void:
@@ -342,6 +449,27 @@ func test_a_blast_shows_its_explosion_where_it_goes_off() -> void:
 	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
 	check(_explosions.size() == 1 and _explosions[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_explosions[0][2], 30.0), "one explosion at the area hit, as wide: %s" % [_explosions])
 	check(_explosions.size() == 1 and _explosions[0][0] == 0 and _explosions[0][3] == &"blast", "of its caster, in blast's style")
+
+
+func test_a_blast_plays_the_cue_its_card_names_the_first_in_slot_order() -> void:
+	var tag: int = _build(0, [&"barrel", &"decoy"])
+	_cast()
+	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"fireball", "the barrel card's cue: %s" % [_explosions])
+	_explosions.clear()
+	tag = _build(1, [&"barrel", &"blast", &"decoy"])
+	_cast(1)
+	_bus.entity_ended.emit(1, &"decoy", Vector2(50, 20), tag)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"fireball", "two blast cards: the first's cue: %s" % [_explosions])
+	_explosions.clear()
+	_build(2, [&"blast", &"barrel"])
+	_cast(2)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "fallen back on the caster, the first's too: %s" % [_explosions])
+
+
+func test_the_shipped_blast_card_names_the_blast_cue() -> void:
+	var card: ModifierBase = load("res://content/spells/modifiers/blast/blast.tres") as ModifierBase
+	check_equal(card.cue, &"blast", "blast.tres says which cue it plays")
 
 
 func test_a_lone_blast_explodes_on_its_caster_and_a_decoy_without_one_does_not() -> void:

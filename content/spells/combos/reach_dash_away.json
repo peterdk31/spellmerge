@@ -1,0 +1,9 @@
+{
+	"id": "reach_dash_away",
+	"name": "Reach dash away",
+	"does": "Reach stretches the dash from 80 px to 128; nothing else happens.",
+	"casts": [{"staff": 0, "cards": ["reach", "dash"]}],
+	"imps": [[100, 0]],
+	"seconds": 0.8,
+	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "max_shots", "max": 0}]
+}

@@ -268,6 +268,8 @@ const CONTROLS: Dictionary = {
 	"mend_pierce_party": "mend",
 	"deflect_swing_return": "deflect",
 	"deflect_wall_mirror": "deflect",
+	"reach_far_bolt": "reach",
+	"reach_long_beam": "reach",
 }
 
 

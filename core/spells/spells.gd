@@ -763,7 +763,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
 			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
-			["Spread", modifier.spread_mult],
+			["Spread", modifier.spread_mult], ["Reach", modifier.reach_mult],
 		]
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
@@ -1515,12 +1515,13 @@ func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way:
 	_cast_jumps()
 
 
-## Wall (rules R4 F6): one solid still shot centred `SpellLimits.WALL_REACH` ahead of `origin`,
-## a row of `shots` stones across `direction`, `spread` pixels apart (the shot's diameter when the
-## form has none): a wall while it lives (`set_solid`) that hurts what touches it and that its
-## hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
+## Wall (rules R4 F6): one solid still shot centred its `ray_length` (or `SpellLimits.WALL_REACH`)
+## ahead of `origin`, a row of `shots` stones across `direction`, `spread` pixels apart (the shot's
+## diameter when the form has none): a wall while it lives (`set_solid`) that hurts what touches it
+## and that its hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.WALL_REACH
+	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * reach)
 	var slot: int = projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, HITS, PIERCE_ALL, tag, ProjectilesScript.MOTION_STILL)
 	if slot < 0:
 		return 0

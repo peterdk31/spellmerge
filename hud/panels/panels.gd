@@ -42,7 +42,8 @@ extends CanvasLayer
 ##   builder when the player had no menu open at the poll before it too.
 ##   By default `back` opens the radial builder instead (`builder/radial_builder.gd`, nodes
 ##   Root/Radial1 to Root/Radial4, made here; owner, 2026-10-26); the pause menu's Sandbox page
-##   switches back to the list one and sets the radial's ring layout and full-slot choice
+##   switches back to the list one and sets the radial's ring (its layout, or a ring style from
+##   `builder/rings/`) and full-slot choice
 ##   (`builder_options_changed`). The same page switches where every corner panel's staff rows
 ##   show a staff's delay, on the button glyph (the default) or on the next cast
 ##   (`reload_style_changed`; owner, 2026-10-27).
@@ -58,6 +59,8 @@ const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const RingZoomScript := preload("res://hud/builder/rings/ring_zoom.gd")
+const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
@@ -324,11 +327,21 @@ func uses_radial() -> bool:
 
 
 ## The pause menu's builder switches: which builder `back` opens, and the radial's options.
-func _on_builder_options_changed(radial: bool, ring_by_kind: bool, push: bool) -> void:
+func _on_builder_options_changed(radial: bool, ring: PauseMenuScript.Ring, push: bool) -> void:
 	_use_radial = radial
 	for builder in _radials:
-		builder.layout = RadialScript.Layout.KIND if ring_by_kind else RadialScript.Layout.ALL
+		builder.layout = RadialScript.Layout.KIND if ring == PauseMenuScript.Ring.ONE_KIND else RadialScript.Layout.ALL
 		builder.put = RadialScript.Put.PUSH if push else RadialScript.Put.REPLACE
+		# Each radial its own style object: they keep per-player state.
+		match ring:
+			PauseMenuScript.Ring.ZOOM:
+				builder.ring_picker = RingZoomScript.new()
+			PauseMenuScript.Ring.KINDS_HOLD:
+				builder.ring_picker = RingKindsScript.new(RingKindsScript.Enter.HOLD)
+			PauseMenuScript.Ring.KINDS_DEPTH:
+				builder.ring_picker = RingKindsScript.new(RingKindsScript.Enter.DEPTH)
+			_:
+				builder.ring_picker = null
 
 
 ## The pause menu's reload switch: every panel's staff rows show the delay on the button glyph,

@@ -115,6 +115,13 @@ enum Behaviour {
 ## far (slow: speed x0.3, lifetime x3). Several multiply.
 @export var lifetime_mult: float = 1.0
 
+# --- Range (reach) ----------------------------------------------------------------------
+
+## Factor on how far the carrier goes: a flying shot's `lifetime` (its range is speed x life),
+## every other carrier's `ray_length` (a beam's, a dash's, a rain's aim point...). Several
+## multiply. Wasted where the carrier has no range (`StaffCompiler.reaches`).
+@export var reach_mult: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -136,5 +143,6 @@ func ranges() -> Dictionary:
 		"behaviour_reach": Vector2(0.0, 360.0),
 		"spread_mult": Vector2(0.0, 4.0),
 		"lifetime_mult": Vector2(0.1, 4.0),
+		"reach_mult": Vector2(0.1, 4.0),
 	})
 	return limits

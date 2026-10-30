@@ -5,7 +5,9 @@ extends SceneTree
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
 ## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen and Effect slots; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
-## open builder. Input goes through the real input manager's virtual devices.
+## open builder; in the horde's build break (the game paused until every player is ready) the
+## menu opens and closes and leaves the game paused, also when the break ends while it is open
+## (then closing it un-pauses). Input goes through the real input manager's virtual devices.
 ##
 ## godot --headless --path . --script res://tests/hud/test_pause_menu.gd
 
@@ -49,6 +51,7 @@ func _initialize() -> void:
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
+	_test_a_horde_break_keeps_the_game_paused()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -410,3 +413,32 @@ func _test_the_run_ending_closes_it() -> void:
 	_frame()
 	_bus.run_ended.emit(false)
 	_check(not _menu().is_open() and not paused, "a run ending closes the menu and un-pauses")
+
+
+func _test_a_horde_break_keeps_the_game_paused() -> void:
+	_setup(2)
+	# The director starts a build break: the game paused, then the event.
+	paused = true
+	_bus.horde_break_changed.emit(true)
+	for way: StringName in [&"accept", &"back", &"pause"]:
+		_tap(0, &"pause")
+		_frame()
+		_check(_menu().is_open() and _menu().owner_player == 0, "%s: the menu opens in a horde break" % way)
+		_tap(0, way)
+		_frame()
+		_check(not _menu().is_open(), "%s: it closes" % way)
+		_check(paused, "%s: closing it leaves the break's pause" % way)
+	_tap(1, &"pause")
+	_frame()
+	# Every player got ready: the director un-pauses and says the break ended.
+	paused = false
+	_bus.horde_break_changed.emit(false)
+	_check(_menu().is_open() and paused, "a break ending under the open menu keeps the game paused")
+	_tap(1, &"pause")
+	_frame()
+	_check(not _menu().is_open() and not paused, "then closing the menu un-pauses")
+	_tap(0, &"pause")
+	_frame()
+	_tap(0, &"pause")
+	_frame()
+	_check(not paused, "after the break the menu un-pauses as always")

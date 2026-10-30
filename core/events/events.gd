@@ -44,6 +44,9 @@ signal sandbox_action_requested(player: int, action: StringName)
 signal horde_requested(player: int)
 ## `player` picked offer number `choice` (0-2) of their open level-up pick. Heard by horde.
 signal horde_pick_requested(player: int, choice: int)
+## `player` is done picking and building in the horde's level-up break (its picks all taken). Heard by
+## horde, which ends the break once every joined seat is ready.
+signal horde_ready_requested(player: int)
 
 # --- Devices (sender: core/input) -------------------------------------------
 
@@ -192,9 +195,13 @@ signal horde_status(seconds: float, kills: int, alive: int, level: int, xp: int,
 signal horde_picks_offered(player: int, card_ids: Array[StringName])
 ## Sender: horde. The result of a pick: `card_id` went into `player`'s bag (`&""`: the offer was dropped). Heard by hud.
 signal horde_pick_taken(player: int, card_id: StringName)
-## Sender: horde. A level-up build break began and lasts `seconds`; the horde stands frozen until it ends,
-## whoever is still building or picking (`seconds` 0: it ended). Heard by hud.
-signal horde_break_changed(seconds: float)
+## Sender: horde. A level-up build break began (`on` true: the game is paused for everyone) or ended
+## (`on` false: every joined seat was ready, or the run ended). Heard by hud.
+signal horde_break_changed(on: bool)
+## Sender: horde. `player`'s readiness in the build break: false at its start (and for a seat a level-up
+## in the break offers more cards), true once the seat sent `horde_ready_requested` with its picks taken.
+## Heard by hud.
+signal horde_ready_changed(player: int, ready: bool)
 ## Sender: horde. Every wizard of the horde run is down: it lasted `seconds`, with `kills` kills, at party
 ## level `level`. The director stops; flow restarts the run a few seconds later. Heard by hud (the summary).
 signal horde_over(seconds: float, kills: int, level: int)

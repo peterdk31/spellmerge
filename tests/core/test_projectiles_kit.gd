@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_spiral_weaves_round_its_line()
 	_test_return_comes_back_and_hits_twice()
 	_test_a_returning_shot_homes_on_its_way_back()
+	_test_a_returning_shot_always_comes_home()
 	_test_linger_stops_then_goes_on()
 	_test_growth_grows_to_the_room()
 	_test_sticky_follows_its_target()
@@ -241,6 +242,26 @@ func _test_a_returning_shot_homes_on_its_way_back() -> void:
 		steps += 1
 	_check(_hits.size() == 1 and _hits[0][1] == enemy, "it turned to the target near its path (%d hits)" % _hits.size())
 	_check(not _mgr.is_alive(slot) and _expired.size() == 1 and _expired[0][1].distance_to(Vector2(150.0, 100.0)) < 12.0, "and still ended back at its caster (%s)" % [_expired])
+
+
+## Regression (rules R4 F4): the way home took life, so a shot whose caster walked away expired
+## half way home. A boomerang always comes home: the way back takes no life.
+func _test_a_returning_shot_always_comes_home() -> void:
+	_setup()
+	_mgr.set_anchor(0, Vector2(50.0, 100.0))
+	var slot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 7)
+	_mgr.set_return(slot)
+	_run(35)
+	_check(_mgr.is_alive(slot) and _mgr.get_velocity_of(slot).x < 0.0, "it is on its way back")
+	# Its caster walks away: the way home is now twice its whole life's flight.
+	_mgr.set_anchor(0, Vector2(50.0, 340.0))
+	_run(120)
+	_check(_mgr.is_alive(slot), "it is still on its way home long after its life (%s)" % _mgr.get_position_of(slot))
+	var steps: int = 0
+	while _mgr.is_alive(slot) and steps < 600:
+		_mgr.step(DT)
+		steps += 1
+	_check(_expired.size() == 1 and _expired[0][1].distance_to(Vector2(50.0, 340.0)) < 8.0, "and ends at its caster (%s)" % [_expired])
 
 
 func _test_linger_stops_then_goes_on() -> void:

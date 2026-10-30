@@ -13,7 +13,8 @@ extends Control
 ## - **Pointing:** the right stick (P1's mouse) points at a card: it pops out with a double gold
 ##   frame and the middle of the ring (the hub) shows its icon, name, kind and own numbers
 ##   (`Spells.component_stats`). Landing on a card rumbles the pad briefly; a gap rumbles
-##   nothing. Letting go of the stick lets the card go.
+##   nothing. Letting go of the stick lets the card go. The pointed card holds on a little past
+##   its border (`STICKY_ANGLE`), so a wobbling thumb does not flicker between two cards.
 ## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed:
@@ -120,6 +121,11 @@ const POINT_THRESHOLD: float = 0.5
 const MOVE_THRESHOLD: float = 0.5
 const MOVE_DELAY: float = 0.3
 const MOVE_REPEAT: float = 0.11
+## Hysteresis: the pointed card stays pointed until the stick is this far (radians) past its
+## border, so a thumb's wobble does not flicker between neighbours; at most STICKY_SHARE of
+## the card's width, so a neighbour's middle always picks the neighbour.
+const STICKY_ANGLE: float = 0.07
+const STICKY_SHARE: float = 0.4
 ## P1's mouse points when it is this far from the ring's middle, up to the arcs and a margin.
 const MOUSE_INNER: float = 10.0
 const MOUSE_OUTER: float = 90.0
@@ -643,9 +649,13 @@ func _poll_pointer() -> void:
 		var angle: float = fposmod(atan2(aim.x, -aim.y), TAU)
 		for at in _ring_entry.size():
 			var off: float = absf(fposmod(angle - _ring_angle[at] + PI, TAU) - PI)
-			if off <= _ring_width[at] * 0.5:
+			var half: float = _ring_width[at] * 0.5
+			if _ring_entry[at] != NONE and _ring_entry[at] == _pointed:
+				half += minf(STICKY_ANGLE, _ring_width[at] * STICKY_SHARE)
+			if off <= half:
 				picked = _ring_entry[at]
-				break
+				if picked == _pointed:
+					break
 	if picked == _pointed:
 		return
 	_pointed = picked

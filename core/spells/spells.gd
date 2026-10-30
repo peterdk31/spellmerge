@@ -4294,13 +4294,14 @@ func open_caster(actor: int) -> bool:
 	return true
 
 
-## The caster `actor` is gone (its body left or died): its staffs are emptied, its waiting
-## launches, holds and beams end. Its shots in the air fly on with their own numbers until they
-## end. The body closes its actor id in the table itself.
+## The caster `actor` is gone (its body left or died): its staffs are emptied, its own waiting
+## launches (a cast's later firings), holds and beams end. Its shots in the air fly on with their
+## own numbers until they end, and their waiting payloads fire on, as after an edit. The body
+## closes its actor id in the table itself.
 func close_caster(actor: int) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
-	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor)
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.caster == CASTER_WIZARD)
 	for staff in SpellLimits.STAFFS:
 		var index: int = actor * SpellLimits.STAFFS + staff
 		_release_hold(index)

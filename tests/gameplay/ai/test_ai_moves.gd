@@ -37,8 +37,8 @@ var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: Actor
 var _enemies: Array[Actor] = []
-## Every caster_move_finished as [caster, mode, position, tag], and area_hit_requested as
-## [caster, position, tag].
+## Every caster_move_finished as [caster, mode, position, tag], and every blast cue as
+## [caster, position, radius].
 var _finished: Array = []
 var _areas: Array = []
 
@@ -100,7 +100,7 @@ func before_each() -> void:
 	_finished.clear()
 	_areas.clear()
 	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: _finished.append([player, mode, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int) -> void: _areas.append([player, at, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor
 	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
@@ -197,7 +197,7 @@ func test_a_dash_card_dashes_the_enemy_and_its_blast_goes_off_where_it_ends() ->
 	check(not enemy.mover.is_moving(), "for the card's time")
 	check(is_equal_approx(enemy.position.x, 60.0), "the card's distance toward its aim (%.2f)" % enemy.position.x)
 	check(_finished.size() == 1 and _finished[0][0] == enemy.id and _finished[0][1] == &"dash" and _finished[0][3] == tag, "and says where it ended, under its actor id with its tag")
-	check(_areas.size() == 1 and (_areas[0][1] as Vector2).is_equal_approx(enemy.position) and _areas[0][2] == tag, "the card's blast goes off there")
+	check(_areas.size() == 1 and (_areas[0][1] as Vector2).is_equal_approx(enemy.position), "the card's blast goes off there")
 
 
 func test_a_teleport_jumps_at_once_and_stops_short_of_a_wall() -> void:

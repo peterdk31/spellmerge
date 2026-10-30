@@ -32,7 +32,7 @@ var _hits: Array = []
 var _spawns: Array = []
 ## Every entity_end_requested as [player, tag].
 var _end_requests: Array = []
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
@@ -63,8 +63,7 @@ func before_each() -> void:
 		_spawns.append([player, kind, at, seconds, tag, caster]))
 	_bus.entity_end_requested.connect(func(player: int, tag: int) -> void:
 		_end_requests.append([player, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
-		_areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, form, at, direction, length]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
@@ -440,7 +439,7 @@ func test_a_blast_decoy_explodes_where_it_ends() -> void:
 	_cast()
 	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
 	check_equal(_areas.size(), 1, "one area hit")
-	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "at the end point, as wide as the blast: %s" % [_areas])
+	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_areas[0][2], 30.0), "at the end point, as wide as the blast: %s" % [_areas])
 
 
 func test_a_blast_shows_its_explosion_where_it_goes_off() -> void:

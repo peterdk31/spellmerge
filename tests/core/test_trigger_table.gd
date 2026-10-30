@@ -16,7 +16,6 @@ const M := FormBase.Motion
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [M.FISSURE, M.SLAM, M.TELEPORT]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.RAIN, M.DASH, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -63,8 +62,6 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 func _expected(event: int, motion: int) -> bool:
 	match event:
-		E.HIT:
-			return HITTERS.has(motion)
 		E.TIMER, E.HURT:
 			return not AT_ONCE.has(motion)
 		E.BLOCK:
@@ -159,7 +156,9 @@ func test_the_cards_an_event_needs() -> void:
 	check(_compile([&"on_block", &"shield", &"straight", &"straight"]).wasted.is_empty(), "with a shield it fires")
 	check(_compile([&"on_block", &"deflect", &"swing", &"straight"]).wasted.is_empty(), "with a deflect on a swing it fires")
 	check(_compile([&"on_block", &"shield", &"dash", &"straight"]).wasted.is_empty(), "a dash's barrier blocks")
-	# A kill or reaction of a carrier that hits nothing itself comes from its blast.
+	# A hit, kill or reaction of a carrier that hits nothing itself comes from its blast (rules R4 F2).
+	check(_compile([&"on_hit", &"blast", &"decoy", &"straight"]).wasted.is_empty(), "a decoy with a blast hits")
+	check(str(_compile([&"on_hit", &"decoy", &"straight", &"straight"]).wasted.get(0, "")).contains("without a blast"), "without one it does not")
 	check(_compile([&"on_kill", &"rain", &"straight", &"straight"]).wasted.is_empty(), "a rain kills by its own strike")
 	check(_compile([&"on_kill", &"blast", &"decoy", &"straight"]).wasted.is_empty(), "a decoy with a blast can kill")
 	check(_compile([&"on_kill", &"blast", &"dash", &"straight"]).wasted.is_empty(), "so can a dash with a blast")

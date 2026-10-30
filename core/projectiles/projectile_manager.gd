@@ -2838,10 +2838,11 @@ func _ray_level(level: int) -> void:
 ## `to_angle` not below `from_angle`), out to `reach` pixels, with no wall between it and
 ## `origin`. Targets `caster` owns (its body) and `exclude` are skipped. It sends nothing: it
 ## fills `sweep_nodes`, `sweep_points` (where the wedge meets the body, on its line from
-## `origin`) and `sweep_heads` (the way the sweep moves there) and returns how many (every one:
-## the results grow). Each step of a swing asks for the wedge it turned through since the last, so
-## a fast sweep misses nothing between two steps. Allocation-free.
-func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, layers: int = LAYER_ENEMY, exclude: Node = null) -> int:
+## `origin`; for a whole circle `origin` itself, what strikes from there) and `sweep_heads` (the
+## way the sweep moves there: round `origin`, or outward for a whole circle) and returns how many (every one: the results grow). Each step of a swing asks for
+## the wedge it turned through since the last, so a fast sweep misses nothing between two steps.
+## Without `walls` a wall between hides nothing (an explosion). Allocation-free.
+func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, layers: int = LAYER_ENEMY, exclude: Node = null, walls: bool = true) -> int:
 	if not is_caster(caster) or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
 		return 0
 	if not is_finite(reach) or reach <= 0.0 or not is_finite(from_angle) or not is_finite(to_angle) or to_angle < from_angle or _targets.is_empty():
@@ -2850,6 +2851,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 	layers |= ACTOR_LAYERS
 	var base: float = direction.angle()
 	var turn: float = 1.0 if side >= 0 else -1.0
+	var whole: bool = to_angle - from_angle >= TAU
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	var pad: Vector2 = Vector2.ONE * (reach + _max_target_radius)
 	var x0: int = clampi(floori((origin.x - pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
@@ -2869,15 +2871,15 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 						# How far either side of its centre line the body's circle reaches.
 						var width: float = PI if distance <= radius else asin(radius / distance)
 						var local: float = angle_difference(base, to.angle()) * turn
-						if local + width >= from_angle and local - width <= to_angle and not (_has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
 								sweep_points.resize(found * 2)
 								sweep_heads.resize(found * 2)
 							sweep_nodes[found] = _targets[t]
-							sweep_points[found] = origin + way * maxf(distance - radius, 0.0)
-							sweep_heads[found] = Vector2(-way.y, way.x) * turn
+							sweep_points[found] = origin if whole else origin + way * maxf(distance - radius, 0.0)
+							sweep_heads[found] = way if whole else Vector2(-way.y, way.x) * turn
 							found += 1
 				t = _target_next[t]
 	return found

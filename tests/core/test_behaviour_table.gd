@@ -60,12 +60,14 @@ func test_a_familiar_hands_its_hit_cards_to_what_it_casts() -> void:
 	check(_staff(["homing", "familiar", "bolt"]).wasted.has(0), "a card that steers is not handed on")
 
 
-func test_heavy_counts_on_a_decoy_with_a_blast() -> void:
-	# The blast's area hit is the decoy's hit: heavy's knockback and slam ride on it.
+func test_hit_cards_count_on_a_decoy_with_a_blast() -> void:
+	# What the blast strikes is the decoy's hit (rules R4 F2): every hit card rides on it.
 	var staff: CompiledStaff = _staff(["heavy", "blast", "decoy"])
 	check(not staff.wasted.has(0), "heavy counts with a blast: %s" % staff.wasted)
 	check(staff.casts[0].group.spells[0].hit.slam > 0, "the blast slams")
-	check(_staff(["siphon", "blast", "decoy"]).wasted.has(0), "siphon still does not: a blast is no shot hit")
+	for card: String in ["siphon", "chain", "possess", "relay"]:
+		check(not _staff([card, "blast", "decoy"]).wasted.has(0), "%s counts with a blast too" % card)
+	check(_staff(["siphon", "decoy"]).wasted.has(0), "and not without one")
 
 
 func test_a_wasted_card_changes_nothing_else() -> void:

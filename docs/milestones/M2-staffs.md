@@ -183,7 +183,7 @@ These are not build rules: they keep a frame from running away, never refuse or 
 - Every hit, the caster's own included, goes through `gameplay/combat`. Today a wizard is never hit by their own shot (`core/projectiles`); part B1 changes that: a shot may hit its caster **once it has left the caster's hitbox** (a per-shot flag, set the first step the shot no longer overlaps the caster). Anything centred on the caster (blast or a nova on the caster, reactions) hits at once.
 - **Statuses on wizards** are new: burn, chill and freeze, shock, hex and static get a version for wizards in `combat`. A downed wizard takes none.
 - **Hit kinds:** every hit carries a kind: `shot`, `ray`, `burst`, `reaction`, `status`, `heal`. A relic (M3) such as "explosion immunity" matches a kind.
-- **Area hits:** `blast`, the payload fallback and later relics ask combat for an area hit with `area_hit_requested`; combat applies it to every enemy and wizard in the circle (the caster included).
+- **Area hits:** `blast` and the payload fallback strike every enemy and wizard in the circle (the caster included); since card rules R4 F2 each body is a `projectile_hit` of the carrier (`area_hit_requested` is gone).
 - **Fairness** (DESIGN.md, "every death is understandable"): a self-hit has its own flash, shown on the hit's frame, and a wizard downed by their own spell is told so ("downed by your own Blast").
 - **Shield charges** are per carrier: a shot with three shields blocks three enemy shots, a dash with one blocks one hit on the wizard.
 - **Feel:** every hit kind has a default flash, hit-stop and sound in Feel (B3), so a new card feels like something before it has its own sound. A card's own sound is an id (`<card id>`), silent until its `.ogg` exists, like the reactions.
@@ -258,7 +258,6 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `caster_move_requested(player, mode: StringName, to: Vector2, seconds: float, tag: int)` (dash, teleport, hook, swap, recoil) | spells | player, ai (an enemy's own row, F8c) |
 | `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player, ai (an enemy's, F8c) | spells (the end point of dash, teleport, hook) |
 | `target_move_requested(target: Node, to: Vector2)` (swap) | spells | ai |
-| `area_hit_requested(player, position: Vector2, radius: float, tag: int)` | spells | combat |
 | `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)` (decoy, familiar; `caster` -1 the wizard, a projectile slot, or -2 the point) | spells | ai |
 | `entity_end_requested(player, tag: int)` (a `hold` switched off; added in B5) | spells | ai |
 | `entity_ended(player, kind: StringName, position: Vector2, tag: int)` | ai | spells (a decoy's end point) |

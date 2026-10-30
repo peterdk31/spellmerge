@@ -47,7 +47,8 @@ extends CharacterBody2D
 ## leaves the actor without a caster (an enemy that only chases).
 ##
 ## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
-## bodies in a hit), `step` does nothing and the body stands still.
+## bodies in a hit), `step` does nothing and the body stands still; its looks step once at the
+## start (no time passing), so the stop shows the moment of the hit.
 ##
 ## Down and out: `is_down()` is true while a Downed component (gameplay/player, G7) holds the actor
 ## down (`set_down`); `die(killer)` sends the local `died` and frees the actor. When its Health is
@@ -124,6 +125,8 @@ var _caster_number: int = -1
 
 var _components: Array[ActorComponent] = []
 var _looks: Array[ActorLook] = []
+## True once the looks have shown the start of the local stop the body is in (see `step`).
+var _hold_shown: bool = false
 var _is_ready: bool = false
 var _down: bool = false
 var _dying: bool = false
@@ -197,7 +200,14 @@ func step(delta: float) -> void:
 		delta = actors.spend_hold(id, delta)
 		if delta <= 0.0:
 			velocity = Vector2.ZERO
+			if not _hold_shown:
+				# What stopped it (a hit, a slam's impact) came after its own step, so its looks
+				# catch up once: the stop shows that moment, not the step before.
+				_hold_shown = true
+				for look in _looks:
+					look.step(0.0)
 			return
+	_hold_shown = false
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)

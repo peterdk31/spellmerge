@@ -1,7 +1,6 @@
 extends "res://tests/support/suite.gd"
-## A slam's look in gameplay/feel (melee I8): while it winds up, a ring closes on where it will
-## strike for the seconds until then (`form_shown` `slam_mark`, the cue `telegraph`); at the
-## impact (`slam`) the cue its card's impact look names, `slam`: a white-hot star (no expanding
+## A slam's look in gameplay/feel (melee I8): its wind-up shows only on the staff (no ring on the
+## floor: it distracted from the strike, owner 2026-10-30); at the impact (`slam`) the cue its card's impact look names, `slam`: a white-hot star (no expanding
 ## ring: the cracks show its reach) and the ground struck: its mark on the floor (a quake under the
 ## bodies that outlasts the flash), stone chips, the slammer held a moment, and a shake with a
 ## punch down the screen, which the screen shake setting turns off.
@@ -29,21 +28,10 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-func test_its_wind_up_marks_where_it_will_strike_until_it_does() -> void:
-	bus.form_shown.emit(0, &"slam_mark", Vector2(20.0, 0.0), Vector2.RIGHT, 0.25, Color.WHITE, 0)
-	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "a ring closes on the spot")
-	feel.step(0.2)
-	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "still there just before it strikes")
-	feel.step(0.1)
-	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 0, "gone when it strikes")
-
-
-func test_its_card_names_its_impact_cue_and_its_wind_up_is_a_telegraph() -> void:
+func test_its_card_names_its_impact_cue_and_its_wind_up_draws_no_ring() -> void:
 	var card: FormBase = feel.registry.get_resource(&"spells", &"slam") as FormBase
 	check_equal(card.impact_look.get("cue"), &"slam", "slam.tres names the cue `slam`")
-	check_equal(FeelScript.FORM_CUES.get(&"slam_mark"), &"telegraph", "its wind-up is the telegraph")
-	bus.form_shown.emit(0, &"slam_mark", Vector2(20.0, 0.0), Vector2.RIGHT, 0.0, Color.WHITE, 0)
-	check_equal(feel.live_effects(), 0, "no wind-up, no mark")
+	check(not FeelScript.FORM_CUES.has(&"slam_mark"), "no cue for its wind-up")
 
 
 func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:

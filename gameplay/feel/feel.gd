@@ -212,11 +212,11 @@ const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 ## The moments `form_shown` names that are a cue each (`content/cues`), played with its `length`
-## as the cue's size: a nova's ring leaving the caster, and the telegraph of a rain or of a slam
-## winding up (a ring closing on where it falls or strikes for the `length` seconds until then, so
-## nobody is hit by one they could not see coming). A slam's impact (`slam`) plays the cue its
-## card's impact look names.
-const FORM_CUES: Dictionary = {&"nova": &"nova", &"rain": &"telegraph", &"slam_mark": &"telegraph"}
+## as the cue's size: a nova's ring leaving the caster, and the telegraph of a rain (a ring closing
+## on where it falls for the `length` seconds until then, so nobody is hit by one they could not
+## see coming). A slam's impact (`slam`) plays the cue its card's impact look names; its wind-up
+## shows only on the staff (the rising, glowing staff: a ring there distracted from the strike).
+const FORM_CUES: Dictionary = {&"nova": &"nova", &"rain": &"telegraph"}
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
 ## A dash's dust where it left (its way is the caster's trail, drawn by the projectile manager

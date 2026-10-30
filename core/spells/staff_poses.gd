@@ -22,13 +22,18 @@ var _pose_side: PackedInt32Array = PackedInt32Array()
 var _pose_keys: Array[PackedFloat32Array] = []
 var _pose_tint: PackedColorArray = PackedColorArray()
 var _pose_from: PackedFloat32Array = PackedFloat32Array()
+## Where the animation's carrier strikes, as an offset from the hand (`Carrier.strike_point`, short
+## of a wall; INF for nowhere): where its `land` channel puts the drawn tip.
+var _pose_land: PackedVector2Array = PackedVector2Array()
 ## The pose worked out last (`_pose_now`), for whom and when: the channels and the mood.
 var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
 var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
-## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake).
-const POSE_CHANNELS: int = 6
+## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land).
+const POSE_CHANNELS: int = 7
+## Where `land` is among them.
+const LAND: int = 6
 
 ## The runtime this belongs to (`CarrierKit`): its clock and its actors' aims.
 var kit: CarrierKit = null
@@ -45,6 +50,7 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_tag.resize(SpellRuntime.ACTORS)
 	_pose_lock.resize(SpellRuntime.ACTORS)
 	_pose_tint.resize(SpellRuntime.ACTORS)
+	_pose_land.resize(SpellRuntime.ACTORS)
 	_pose_from.resize(SpellRuntime.ACTORS * POSE_CHANNELS)
 	_pose_out.resize(POSE_CHANNELS)
 	clear()
@@ -100,6 +106,33 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 	_pose_side[actor] = side
 	_pose_keys[actor] = spell.staff_pose
 	_pose_tint[actor] = spell.tint
+	_pose_land[actor] = _land_point(actor, spell, dir)
+
+
+## Where `spell`'s carrier strikes from `actor`'s hand along `dir` (`Carrier.strike_point`), stopped
+## at a wall, for the `land` keys of its animation; INF for none, or for an animation that never lands
+## (so no other cast looks for walls).
+func _land_point(actor: int, spell: CompiledSpell, dir: Vector2) -> Vector2:
+	var keys: PackedFloat32Array = spell.staff_pose
+	var lands: bool = false
+	for k in keys.size() / FormBase.POSE_STRIDE:
+		lands = lands or keys[k * FormBase.POSE_STRIDE + FormBase.PK_CHANNELS + LAND] > 0.0
+	if not lands:
+		return Vector2.INF
+	var offset: Vector2 = kit.carrier_of(spell).strike_point(spell, dir)
+	var pivot: Vector2 = kit.aim_pivot(actor)
+	if not offset.is_finite() or not pivot.is_finite() or kit.projectiles == null:
+		return offset
+	return kit.projectiles.clip_to_walls(pivot, pivot + offset) - pivot
+
+
+## The carrier with `tag` struck `offset` from the hand (a slam's impact, where its hand was then):
+## where the `land` channel of the animation it plays puts the staff's tip from now on.
+func land_at(tag: int, offset: Vector2) -> void:
+	var actor: int = SpellTag.caster_of(tag)
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not is_finite(_pose_start[actor]) or _pose_tag[actor] != tag:
+		return
+	_pose_land[actor] = offset
 
 
 ## The carrier with `tag` has no shot left: the strike of the animation it plays ends now.
@@ -141,6 +174,16 @@ func staff_stretch(actor: int) -> float:
 
 func staff_shake(actor: int) -> float:
 	return _pose_out[5] if _pose_now(actor) else 0.0
+
+
+## How far (0 to 1) `actor`'s staff is moved so its tip lies on the point its carrier strikes, and
+## that point as an offset from the hand: 0 and INF while its carrier strikes none.
+func staff_land(actor: int) -> float:
+	return _pose_out[LAND] if _pose_now(actor) and _pose_land[actor].is_finite() else 0.0
+
+
+func staff_land_point(actor: int) -> Vector2:
+	return _pose_land[actor] if actor >= 0 and actor < SpellRuntime.ACTORS and _pose_now(actor) else Vector2.INF
 
 
 ## The mood `actor`'s staff animation shows on its face now (`FormBase.POSE_MOODS`), or empty.

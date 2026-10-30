@@ -35,6 +35,7 @@ const MOVES: int = CarrierTraits.MOVES
 const LINE: int = CarrierTraits.LINE
 const MEETS_SHOTS: int = CarrierTraits.MEETS_SHOTS
 const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
+const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
 
 
 ## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
@@ -258,6 +259,15 @@ func land(_spell: CompiledSpell, _group: CompiledGroup, _actor: int, _staff: int
 ## 0 for one that is not aimed.
 func reach_of(_spell: CompiledSpell) -> float:
 	return 0.0
+
+
+## Where a cast of `spell` aimed along `aim` (unit) strikes, as an offset from the caster's hand
+## before walls (the runtime stops it at one): the point a staff animation's `land` keys put the
+## staff's tip on (`StaffPoses`), and where the carrier's look should be drawn. `ray_length` along
+## the aim for a carrier that `STRIKES_POINT` (a slam), INF for the others; a carrier that strikes
+## off its aim gives its own.
+func strike_point(spell: CompiledSpell, aim: Vector2) -> Vector2:
+	return aim * spell.ray_length if has(STRIKES_POINT) else Vector2.INF
 
 
 ## Where its row `row` is now while it is the row born `born` (`CarrierKit.live_join` with

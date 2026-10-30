@@ -49,7 +49,7 @@ static func of(spells: SpellRuntime) -> CarrierSlam:
 
 
 func traits() -> int:
-	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS
+	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS | STRIKES_POINT
 
 
 func step_order() -> int:
@@ -82,7 +82,8 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 ## knockback throws it outward; its caster's own body is skipped, a teammate is hit. Its hits carry
 ## payloads and chains as a beam's do, and a shield or deflect works on the shots in its ring. Its
 ## `blast` and `on expire` happen at the impact when the ring is done. `form_shown` tells looks of
-## the wind-up (`slam_mark`: where it will strike, for the seconds until then) and the impact.
+## the impact (`slam`), the point it strikes (`STRIKES_POINT`): its staff animation's `land` puts the
+## staff's tip there, told again at the impact (`StaffPoses.land_at`) in case its hand moved.
 ## Returns false when it could not start (no direction). `caster` and `caster_seq` are who casts it (`Spells._caster`:
 ## the wizard, a point or a shot), `echoed` whether it is an echo's firing (half damage).
 func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, caster: int, caster_seq: int, echoed: bool) -> bool:
@@ -120,9 +121,6 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	elif kit.live_caster_shot(caster, caster_seq) < 0:
 		_sl_caster[at] = SpellRuntime.CASTER_POINT
 	kit.shot_started(tag)
-	if kit.events != null and _sl_wind[at] > 0.0:
-		var mark: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
-		kit.events.form_shown.emit(actor, &"slam_mark", mark, _sl_dir[at], _sl_wind[at], spell.tint, spell.look)
 	_slam_step(at, 0.0)
 	return true
 
@@ -138,6 +136,8 @@ func _slam_step(at: int, delta: float) -> void:
 			return
 		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
 		_sl_impact[at] = impact
+		if _sl_caster[at] == SpellRuntime.CASTER_WIZARD:
+			poses.land_at(tag, impact - _sl_origin[at])
 		if kit.events != null:
 			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
 	var into: float = _sl_age[at] - _sl_wind[at]

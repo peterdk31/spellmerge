@@ -259,13 +259,42 @@ func _place_body(time: float) -> void:
 	var at: Vector2 = Vector2(0.0, -DOWN_LIFT)
 	if not actor.is_down():
 		var phase: float = time * HOVER_RATE + float(maxi(actor.ramp, 0)) * HOVER_PHASE
-		at = actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time)
+		at = _landed(actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time))
 	if _sprite != null:
 		_sprite.position = at
 		if _sprite.texture != null:
 			_sprite.frame_coords = Vector2i(direction(), clampi(actor.ramp, 0, RAMPS - 1))
 	if _face != null:
 		_face.body_offset = at - actor.hand_offset
+
+
+## Where the drawn tip of the staff is, in the world: the staff's `tip` (`Actor.reach`) from the grip
+## along the column the sprite shows, as it is placed, stretched and leaned (as last stepped). What an animation's
+## `land` puts on the point its carrier strikes, and what the alignment checks measure
+## (tests/gameplay/player/test_staff_alignment.gd, the screenshot `shot_staff_alignment`).
+func tip_position() -> Vector2:
+	if _sprite == null:
+		return actor.muzzle_position()
+	return _sprite.global_transform * _tip_from_grip(_sprite.frame_coords.x)
+
+
+## The tip from the grip in the sprite's own frame (before its stretch and lean): `reach` along
+## column `column`.
+func _tip_from_grip(column: int) -> Vector2:
+	return Vector2.RIGHT.rotated(column * TAU / DIRECTIONS) * actor.reach()
+
+
+## The body at `at`, moved its animation's `land` of the way to where the drawn tip (`_tip_from_grip`,
+## as stretched) lies on the point its carrier strikes (`Spells.poses().staff_land_point`, from the
+## hand): a slam's staff lands on its impact whichever way it faces. `at` as it is while its carrier
+## strikes no point.
+func _landed(at: Vector2) -> Vector2:
+	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
+	var land: float = poses.staff_land(actor.id) if poses != null else 0.0
+	if land <= 0.0:
+		return at
+	var onto: Vector2 = actor.hand_offset + poses.staff_land_point(actor.id) - _tip_from_grip(direction()) * pose_scale()
+	return at.lerp(onto, land).round()
 
 
 ## Show or hide the invulnerable look when the state changes; while it shows, the closing ring is

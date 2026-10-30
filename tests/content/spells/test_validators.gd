@@ -203,6 +203,11 @@ func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
 	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown channel is reported")
 	form.staff_pose = [{"phase": "after", "at": 0.1, "mood": "sleepy"}] as Array[Dictionary]
 	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown mood is reported")
+	form.staff_pose = [{"phase": "wind", "at": 1.0, "land": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a rune strikes no point, so it has nowhere to land")
+	form.carrier = &"slam"
+	form.ray_length = 20.0
+	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a slam strikes one: land is fine")
 
 
 func test_an_icon_missing_from_the_manifest_is_reported() -> void:

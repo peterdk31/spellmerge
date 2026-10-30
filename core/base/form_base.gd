@@ -11,19 +11,21 @@ extends SpellComponent
 const POSE_PHASES: Dictionary = {"wind": 0, "strike": 1, "hold": 2, "after": 3}
 const POSE_EASES: Dictionary = {"inout": 0, "out": 1, "in": 2}
 const POSE_MOODS: Array[StringName] = [&"raised", &"angry", &"furious", &"worried"]
-const POSE_CHANNELS: Array[String] = ["turn", "lift", "push", "glow", "stretch", "shake"]
+const POSE_CHANNELS: Array[String] = ["turn", "lift", "push", "glow", "stretch", "shake", "land"]
 ## Where each number is in a packed key, and how many a key has.
 const PK_PHASE: int = 0
 const PK_AT: int = 1
 const PK_CHANNELS: int = 2
-const PK_EASE: int = 8
-const PK_MOOD: int = 9
-const POSE_STRIDE: int = 10
+const PK_EASE: int = 9
+const PK_MOOD: int = 10
+const POSE_STRIDE: int = 11
 ## The ranges of the channels a key may set (`turn` in degrees, `lift`, `push` and `shake` in
-## pixels, `glow` 0 to 1, `stretch` as a share: 0.3 is 30% longer along the aim and thinner across).
+## pixels, `glow` and `land` 0 to 1, `stretch` as a share: 0.3 is 30% longer along the aim and thinner
+## across).
 const POSE_RANGES: Dictionary = {
 	"turn": Vector2(-720.0, 720.0), "lift": Vector2(-6.0, 16.0), "push": Vector2(-12.0, 12.0),
 	"glow": Vector2(0.0, 1.0), "stretch": Vector2(-0.5, 1.0), "shake": Vector2(0.0, 4.0),
+	"land": Vector2(0.0, 1.0),
 }
 
 
@@ -77,8 +79,9 @@ const POSE_RANGES: Dictionary = {
 ## negative lifts the head toward the top of the screen whichever way it faces), `lift` (pixels up
 ## off its hover; its shadow stays on the floor), `push` (pixels along the aim; negative draws it
 ## back), `glow` (0 to 1: light round the staff in its infusion's colour, else its player's),
-## `stretch` (longer along the aim and thinner across, negative squashed) and `shake` (pixels of
-## jitter); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
+## `stretch` (longer along the aim and thinner across, negative squashed), `shake` (pixels of
+## jitter) and `land` (0 to 1: how far the staff is moved so its drawn tip lies on the point its
+## carrier strikes, a slam's impact; nothing for a carrier that names none); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
 ## `mood` the face shows from then on (POSE_MOODS). Ranges in POSE_RANGES; the validator checks it.
 ## Example: [{"phase": "after", "at": 0.04, "push": -3, "ease": "out"}, {"phase": "after", "at": 0.2}].
 @export var staff_pose: Array[Dictionary] = []
@@ -102,6 +105,16 @@ var _pose_packed: bool = false
 
 func kind() -> StringName:
 	return &"form"
+
+
+## True when its staff animation lands the staff on the point its carrier strikes (a key with a
+## `land`): what the alignment checks cast (docs/CARRIERS.md, "Lining a staff animation up with its
+## look").
+func lands() -> bool:
+	for key: Dictionary in staff_pose:
+		if float(key.get("land", 0.0)) > 0.0:
+			return true
+	return false
 
 
 ## `staff_pose` as numbers, POSE_STRIDE a key (phase, at, the POSE_CHANNELS, ease, mood: 0 for

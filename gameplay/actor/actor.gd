@@ -73,7 +73,7 @@ signal died(killer: int)
 ## actor's own components and controller (`by` is the attacker's actor id or -1). Listening here
 ## instead of on the bus keeps a hit to this actor's listeners: a bus listener per enemy was
 ## called for every hit on anyone (performance pass, 2026-10-28).
-signal damaged(by: int, amount: int)
+signal damaged(by: int, amount: float)
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY

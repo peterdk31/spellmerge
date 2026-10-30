@@ -366,8 +366,8 @@ func test_a_charged_enemy_discharges_to_every_actor_of_another_team_nearby() -> 
 	_combat.apply_status(0, kin, &"static", 5.0, 60.0)
 	_hit(1, struck, _tag(1, &""))
 	check_equal(_combat.health_of(struck), 96, "the hit itself did its damage")
-	check_equal(_combat.health_of(left), 98, "an actor of another team near took 60% of the hit")
-	check_equal(_combat.health_of(right), 98, "so did the other, whichever side it is on, charged or not")
+	check(is_equal_approx(_combat.health_of(left), 97.6), "an actor of another team near took 60% of the hit (2.4)")
+	check(is_equal_approx(_combat.health_of(right), 97.6), "so did the other, whichever side it is on, charged or not")
 	check_equal(_combat.health_of(kin), 100, "the struck enemy's own team is left alone, charged or not")
 	check_equal(_combat.health_of(far), 100, "and so is anyone out of reach")
 	check(not _combat.has_status(struck, &"static"), "the struck enemy spent its charge")
@@ -423,7 +423,7 @@ func test_a_discharge_is_one_step_not_a_second_jump() -> void:
 	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
 	_combat.apply_status(0, near, &"static", 5.0, 60.0)
 	_hit(0, struck, _tag(0, &""))
-	check_equal(_combat.health_of(near), 98, "the near one was zapped")
+	check(is_equal_approx(_combat.health_of(near), 97.6), "the near one was zapped (60% of 4)")
 	check(_combat.has_status(near, &"static"), "and the zap did not set its own charge off")
 	check_equal(_combat.health_of(beyond), 100, "one in reach of the near one only is not: the discharge does not go on")
 
@@ -503,7 +503,7 @@ func test_a_lightning_hit_that_discharges_does_not_charge_the_struck_enemy_again
 	var other := _foe(Vector2(40.0, 0.0))
 	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
 	_hit(0, struck, _tag(0, &"lightning"))
-	check_equal(_combat.health_of(other), 98, "it discharged")
+	check(is_equal_approx(_combat.health_of(other), 97.6), "it discharged (60% of 4)")
 	check(not _combat.has_status(struck, &"static"), "the discharge replaced the charge")
 
 

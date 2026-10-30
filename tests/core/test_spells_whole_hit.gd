@@ -72,7 +72,7 @@ func test_an_echoed_mend_bolt_heals_the_teammate_and_never_hurts_it() -> void:
 	check(plain[0] > 0, "a mend bolt heals (%d)" % plain[0])
 	check_equal(echoed[0], plain[0] + roundi(plain[0] * SpellLimits.ECHO_DAMAGE), "the echo heals half again")
 	check_equal(echoed[2], ALLY_HURT - echoed[0], "the teammate was never hurt")
-	check_equal(echoed[1], plain[1] + floori(plain[1] * SpellLimits.ECHO_DAMAGE), "the imp takes half the enemy share again (a half point owed)")
+	check_equal(echoed[1], plain[1] + floori(plain[1] * SpellLimits.ECHO_DAMAGE), "the imp takes half the enemy share again (1.5: 1 whole point)")
 
 
 func test_a_relay_mend_bolt_still_heals_after_it_takes_on_frost() -> void:

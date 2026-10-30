@@ -27,7 +27,7 @@ const MENU_TEXT: String = "MENU"
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
 
-var _health: int = -1
+var _health: float = -1.0
 var _mana: int = -1
 var _downed: bool = false
 var _menu_open: bool = false
@@ -59,14 +59,15 @@ func _ready() -> void:
 
 
 ## Show these numbers. A player with no health left is shown as down.
-func set_stats(health: int, max_health: int, mana: float, max_mana: float) -> void:
+func set_stats(health: float, max_health: float, mana: float, max_mana: float) -> void:
 	var whole_mana: int = floori(mana)
 	if health != _health:
 		_health = health
-		_health_bar.max_value = maxi(max_health, 1)
+		_health_bar.max_value = maxf(max_health, 1.0)
 		_health_bar.value = health
-		_health_value.text = str(health)
-		var downed: bool = health <= 0
+		# Rounded up: a wizard with part of a point left reads 1, never 0 (which is down).
+		_health_value.text = str(ceili(health))
+		var downed: bool = health <= 0.0
 		if downed != _downed:
 			_downed = downed
 			_refresh_status()
@@ -162,7 +163,7 @@ func reset() -> void:
 
 
 ## The health shown, or -1 before any numbers arrived.
-func health() -> int:
+func health() -> float:
 	return _health
 
 

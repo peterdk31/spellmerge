@@ -748,7 +748,7 @@ func trauma() -> float:
 	return _trauma
 
 
-func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2) -> void:
+func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector2) -> void:
 	_react(target)
 	var aim: Vector2 = Vector2.ZERO
 	var at: Vector2 = position
@@ -770,7 +770,9 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 	_impact_target = 0
 	# The kind of the hit came just before (`hit_landed`): its default stop, shake and sound.
 	var stop: float = preset.hit_stop_seconds
-	var shake: float = preset.hit_shake
+	# A hit of part of a point (an atom's speck) shakes as much as its share, so a stream of them
+	# is not a quake.
+	var shake: float = preset.hit_shake * minf(amount, 1.0)
 	var sound: StringName = preset.hit_sound
 	var own: bool = false
 	var shot: int = -1
@@ -792,7 +794,7 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
-func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2, kind: StringName, shot: int) -> void:
+func _on_hit_landed(caster: int, target: Node, _amount: float, _position: Vector2, kind: StringName, shot: int) -> void:
 	if target == null:
 		return
 	_kind_target = target.get_instance_id()
@@ -804,7 +806,7 @@ func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2,
 
 ## A heal: the cue `heal` (a soft ring in green on the wizard, with no stop and no shake). Its
 ## ring is in its own colour, whoever healed.
-func _on_heal_dealt(_player: int, _target: Node, _amount: int, position: Vector2) -> void:
+func _on_heal_dealt(_player: int, _target: Node, _amount: float, position: Vector2) -> void:
 	play_cue(&"heal", ActorsScript.NONE, position)
 
 

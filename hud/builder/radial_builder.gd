@@ -1016,7 +1016,7 @@ func _on_build_refused(player: int, reason: String) -> void:
 		_say(reason)
 
 
-func _on_stats_changed(player: int, _health: int, _max_health: int, _mana: float, max_mana: float) -> void:
+func _on_stats_changed(player: int, _health: float, _max_health: float, _mana: float, max_mana: float) -> void:
 	if player == index and max_mana > 0.0 and not is_equal_approx(max_mana, _max_mana):
 		_max_mana = max_mana
 		_changed()

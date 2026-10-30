@@ -36,7 +36,7 @@ const SAMPLE_EVERY: int = 2
 ## entity) for this long.
 const QUIET_SECONDS: float = 0.25
 ## Health of an enemy that should not die by accident.
-const HEALTH: int = 400
+const HEALTH: float = 400.0
 ## Mana of the wizard: no cast is refused for mana.
 const MANA: float = 10000.0
 
@@ -137,7 +137,7 @@ func add_ally(at: Vector2) -> Actor:
 ## An enemy whose hurt circle is centred on `at`, standing still (it is pushed by knockback and
 ## pulls). With `cards` it casts them once along `aim` at the first step (a donor for relay), or
 ## for the whole run when `stream` (an enemy shooter).
-func add_enemy(label: StringName, at: Vector2, health: int = HEALTH, cards: Array[StringName] = [], aim: Vector2 = Vector2.LEFT, stream: bool = false) -> Actor:
+func add_enemy(label: StringName, at: Vector2, health: float = HEALTH, cards: Array[StringName] = [], aim: Vector2 = Vector2.LEFT, stream: bool = false) -> Actor:
 	var mind: ActorFixture.Scripted = null
 	if not cards.is_empty():
 		mind = ActorFixture.Scripted.new()
@@ -148,12 +148,6 @@ func add_enemy(label: StringName, at: Vector2, health: int = HEALTH, cards: Arra
 		else:
 			mind.presses = [0]
 	return _body(label, at, mind, cards, health)
-
-
-## `body` is owed `share` of a point already (combat's leftover of hits below a point): at 1 health
-## and 0.99 owed, any hit kills it, a speck's too.
-func owe(body: Node2D, share: float) -> void:
-	combat._hit_carry[combat._row_of(body)] = share
 
 
 ## A wall over `rect`.
@@ -242,7 +236,7 @@ func free_all() -> void:
 			node.free()
 
 
-func _body(label: StringName, centre: Vector2, mind: ActorController, cards: Array[StringName], health: int) -> Actor:
+func _body(label: StringName, centre: Vector2, mind: ActorController, cards: Array[StringName], health: float) -> Actor:
 	var body := Actor.new()
 	body.name = String(label)
 	body.events = bus
@@ -343,20 +337,20 @@ func _listen() -> void:
 		_put("wall %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.projectile_expired.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("expired %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
-	bus.damage_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
-		_put("damage %s -> %s %d" % [_who(caster), _name_of(target), amount]))
-	bus.hit_landed.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2, kind: StringName, _shot: int) -> void:
-		_put("landed %s -> %s %d %s" % [_who(caster), _name_of(target), amount, kind]))
-	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
-		_put("heal %s -> %s %d" % [_who(caster), _name_of(target), amount]))
+	bus.damage_dealt.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2) -> void:
+		_put("damage %s -> %s %.2f" % [_who(caster), _name_of(target), amount]))
+	bus.hit_landed.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2, kind: StringName, _shot: int) -> void:
+		_put("landed %s -> %s %.2f %s" % [_who(caster), _name_of(target), amount, kind]))
+	bus.heal_dealt.connect(func(caster: int, target: Node, amount: float, _at_point: Vector2) -> void:
+		_put("heal %s -> %s %.2f" % [_who(caster), _name_of(target), amount]))
 	bus.status_applied.connect(func(caster: int, target: Node, id: StringName) -> void:
 		_put("status %s -> %s %s" % [_who(caster), _name_of(target), id]))
 	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2, _shot: int) -> void:
 		_put("reaction %s %s at %s" % [_who(caster), id, _at(at)]))
 	bus.kill_landed.connect(func(caster: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_put("kill %s %s %s at %s" % [_who(caster), _node(tag), _name_of(target), _at(at)]))
-	bus.actor_hurt.connect(func(actor: int, amount: int, _at_point: Vector2, tag: int, kind: StringName) -> void:
-		_put("hurt %s %d %s %s" % [_who(actor), amount, _node(tag), kind]))
+	bus.actor_hurt.connect(func(actor: int, amount: float, _at_point: Vector2, tag: int, kind: StringName) -> void:
+		_put("hurt %s %.2f %s %s" % [_who(actor), amount, _node(tag), kind]))
 	bus.cue_shown.connect(func(caster: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
 		_put("cue %s %s at %s r%d" % [_who(caster), cue, _at(at), roundi(size)]))
 	bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
@@ -417,7 +411,7 @@ func _sample() -> void:
 	for body in _bodies:
 		var seen: String = "gone"
 		if is_instance_valid(body) and not body.is_dying():
-			seen = "at %s health %d" % [_at(body.global_position), combat.health_of(body)]
+			seen = "at %s health %.2f" % [_at(body.global_position), combat.health_of(body)]
 		if _last_seen.get(body.name, "") != seen:
 			_last_seen[body.name] = seen
 			_put("%s %s" % [body.name, seen])

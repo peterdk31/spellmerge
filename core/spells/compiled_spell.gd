@@ -14,7 +14,7 @@ var element_name: String = ""
 var modifier_ids: Array[StringName] = []
 var trigger_id: StringName = &""
 
-## Damage of one hit; may be below 1 (combat keeps each target's leftover, `Combat._whole`).
+## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
 var mana_cost: float = 0.0
 var cooldown: float = 0.5

@@ -213,8 +213,9 @@ func run(seconds: float) -> void:
 
 ## Health `imp` has lost (all of it once it is dead and gone).
 func lost(imp: Node2D) -> int:
-	var left: int = combat.health_of(imp) if is_instance_valid(imp) else -1
-	return IMP_HEALTH if left < 0 else IMP_HEALTH - left
+	var left: float = combat.health_of(imp) if is_instance_valid(imp) else -1.0
+	# Whole points: health is decimal, 7.5 lost is 7 (a hair over, for float sums of specks).
+	return IMP_HEALTH if left < 0.0 else floori(float(IMP_HEALTH) - left + 0.0001)
 
 
 ## True when `imp` has died (a spell's hit or anything else took all its health).

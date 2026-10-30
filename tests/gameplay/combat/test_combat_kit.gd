@@ -267,7 +267,7 @@ func test_a_burn_tick_spends_no_shock_and_no_static_and_adds_no_hex() -> void:
 func test_a_burn_tick_on_a_wizard_is_quiet_but_reaches_its_health_and_its_hud() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	var stats: Array = []
-	_bus.player_stats_changed.connect(func(p: int, health: int, _most: int, _mana: float, _max_mana: float) -> void: stats.append([p, health]))
+	_bus.player_stats_changed.connect(func(p: int, health: float, _most: float, _mana: float, _max_mana: float) -> void: stats.append([p, health]))
 	_combat.apply_status(0, 0, &"burn", 1.0, 4.0)
 	_run(1.0)
 	# The seat tells the HUD on its next look.

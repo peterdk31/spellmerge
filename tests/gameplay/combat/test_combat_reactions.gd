@@ -224,7 +224,9 @@ func test_flare_on_a_shocked_enemy_hit_by_fire() -> void:
 	_combat.apply_status(0, enemy, &"shock", 4.0, 0.0001)
 	_hit(0, enemy, &"fire")
 	check(_ids().has(&"flare"), "fire on shock flares")
-	check_equal(_combat.health_of(wide), 98 - 1, "the burst plus the shock's one-point jump (the jump is at least 1)")
+	# Health is decimal (2026-10-30): the jump is its share of the hit, here a hair, no longer at
+	# least a point.
+	check(absf(_combat.health_of(wide) - 98.0) < 0.001, "the burst plus the shock's tiny jump (%s)" % _combat.health_of(wide))
 
 
 # --- Kindle: fire and void, spread ---
@@ -313,7 +315,7 @@ func test_rift_bursts_and_pulls_toward_the_centre() -> void:
 	check_equal(_ids(), [&"rift"], "rift fired")
 	# The burst's 2, and the shock's own jump of at least 1 to the nearest enemy (the hit
 	# spends the shock before the reaction runs, so rift only adds the burst).
-	check_equal(_combat.health_of(near), 100 - 2 - 1, "the neighbour takes the burst and the jump")
+	check(absf(_combat.health_of(near) - 98.0) < 0.001, "the neighbour takes the burst and the jump, its tiny share (%s)" % _combat.health_of(near))
 	check(_combat.knockback_of(near).x < 0.0, "and is pulled toward the centre")
 	check_equal(_combat.health_of(outside), 100, "out of reach is untouched")
 
@@ -530,8 +532,8 @@ func test_fire_on_a_charged_enemy_discharges_and_then_bursts() -> void:
 	check_equal(ids.size(), 2, "two reactions, no more: the discharge does not start another")
 	check(ids.has(CombatScript.DISCHARGE) and ids.has(&"overload"), "the discharge and the overload both fired")
 	check_equal(arcs.size(), 1, "one arc, to the one neighbour of another team")
-	# The discharge is 60% of the 4 damage (2); the burst is 4.
-	check_equal(_combat.health_of(near), 100 - 2 - 4, "the neighbour takes the discharge and the burst")
+	# The discharge is 60% of the 4 damage (2.4); the burst is 4.
+	check(is_equal_approx(_combat.health_of(near), 100.0 - 2.4 - 4.0), "the neighbour takes the discharge and the burst (%s)" % _combat.health_of(near))
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 4, "the struck enemy takes its hit and the burst, not the discharge")
 
 

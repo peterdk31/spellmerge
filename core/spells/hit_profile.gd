@@ -4,7 +4,7 @@ extends RefCounted
 ## `gameplay/combat`: the numbers it needs and nothing else, so combat reads no spell
 ## field. One object per compiled spell, shared and read-only: no hit allocates.
 
-## Damage of one hit; may be below 1 (combat keeps each target's leftover, `Combat._whole`).
+## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
 ## Knockback strength of one hit, in pixels per second.
 var knockback: float = 0.0

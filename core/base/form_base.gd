@@ -28,7 +28,7 @@ const POSE_RANGES: Dictionary = {
 
 
 ## Damage of one hit before the element and modifiers. It may be below 1 (an atom's speck):
-## combat keeps what each target is owed and takes a whole point once it adds up.
+## health is decimal, so a 0.3 hit takes 0.3 of it.
 @export var base_damage: float = 1.0
 ## Mana taken per cast.
 @export var mana_cost: float = 0.0

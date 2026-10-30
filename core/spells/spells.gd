@@ -2076,7 +2076,7 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
 ## the actor was hurt (a wizard or an enemy alike, actors G3b), whatever the carrier is (a shot, a
 ## beam, a dash, an entity...; `_lc_tag`).
-func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: StringName) -> void:
+func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: StringName) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
 	# Payloads may list more such carriers; they sit past `count` and wait for the next hurt.

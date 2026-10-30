@@ -48,7 +48,7 @@ func test_the_echo_hits_a_moment_after_the_bolt() -> void:
 	var plain: int = _lost(["bolt"], Vector2(100.0, 0.0), 1.5)
 	check(plain > 0, "a plain bolt hurts")
 	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 0.5), plain, "only the bolt has hit by 0.5 s")
-	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 1.5), plain + floori(plain * 0.5), "the echo adds half again (the half point is owed)")
+	check_equal(_lost(["echo", "bolt"], Vector2(100.0, 0.0), 1.5), plain + floori(plain * 0.5), "the echo adds half again (7.5: 7 whole points)")
 
 
 func test_the_timer_nova_is_rung_twice() -> void:

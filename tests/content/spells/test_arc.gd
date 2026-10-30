@@ -40,32 +40,87 @@ func test_the_orb_zaps_what_it_never_touches() -> void:
 
 
 func test_a_zap_hits_for_half() -> void:
-	# A rune zaps an imp beside it; the zaps are half a rune hit each.
+	# A rune zaps an imp beside it; the zaps are half a rune hit each, at random moments, about
+	# twice a second (the card's rate on average), some missing at that distance.
 	var arena := ArenaScript.new(root)
 	var staff: CompiledStaff = arena.install_cards(0, 0, ["arc", "rune"])
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	arena.free_all()
 	check(spell.arc_hit != null and spell.arc_hit.damage == roundi(spell.damage * SpellLimits.ARC_DAMAGE), "half the rune's damage")
-	var lost: int = _lost(["arc", "rune"], [Vector2(0.0, 40.0)] as Array[Vector2], 2.05)[0]
-	# Ready at once, then every half second: at 0, 0.5, 1, 1.5 and 2 s.
-	check_equal(lost, floori(spell.arc_hit.damage * 5.0), "five zaps in two seconds (%d)" % lost)
+	var lost: int = _lost(["arc", "rune"], [Vector2(0.0, 40.0)] as Array[Vector2], 4.0)[0]
+	var zaps: float = float(lost) / spell.arc_hit.damage
+	check(lost > 0 and is_equal_approx(zaps, roundf(zaps)), "whole zaps of half a hit each (%d)" % lost)
+	check(zaps >= 2.0 and zaps <= 10.0, "about twice a second in 4 s, less its misses (%d zaps)" % roundi(zaps))
 
 
-## Its zap is ready when it is cast (owner, 2026-10-30): the interval is the wait after a zap, not
-## a fuse, so a bolt zaps the imp beside its first steps (it waited half a second, 110 px on).
-func test_a_zap_is_ready_at_once() -> void:
-	var lost: Array[int] = _lost(["arc", "bolt"], [Vector2(20.0, 45.0)] as Array[Vector2], 0.3)
-	check(lost[0] > 0, "the imp beside its start is zapped at once (%d)" % lost[0])
+## An arc is a crackle, not a clock (owner, 2026-10-30: "arcs should be much more unpredictable"):
+## shots cast the same way past the same imps zap from different places on their way, at
+## different imps (it fired from the same spot every time while it was a clock).
+func test_shots_cast_alike_zap_from_different_places() -> void:
+	var arena := ArenaScript.new(root)
+	for n in 6:
+		arena.add_imp(Vector2(40.0 + 40.0 * n, 42.0))
+	var from: Array[float] = []
+	var at: Dictionary = {}
+	arena.bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"zap" and length > 22.0:
+			from.append(origin.x)
+			at[roundi((origin + direction * length).x / 40.0)] = true)
+	arena.install_cards(0, 0, ["arc", "bolt"])
+	for n in 12:
+		arena.cast(0, 0)
+		arena.run(0.5)
+	var low: float = INF
+	var high: float = -INF
+	for x: float in from:
+		low = minf(low, x)
+		high = maxf(high, x)
+	check(from.size() >= 4, "the bolts zapped (%d)" % from.size())
+	check(high - low > 80.0, "from places along the way more than 80 px apart (%.0f to %.0f)" % [low, high])
+	check(at.size() >= 3, "at different imps (%d)" % at.size())
+	arena.free_all()
+
+
+## The farther the body, the likelier the zap misses it (SpellLimits.ARC_MISS_FAR): a rune beside an
+## imp hurts it more than one at the edge of its reach, though both zap as often.
+func test_a_far_zap_misses_more_often() -> void:
+	var near: int = _lost(["arc", "rune"], [Vector2(0.0, 22.0)] as Array[Vector2], 8.0)[0]
+	var far: int = _lost(["arc", "rune"], [Vector2(0.0, 58.0)] as Array[Vector2], 8.0)[0]
+	check(near > far, "the near imp lost more (%d) than the far one (%d)" % [near, far])
+
+
+## With nothing in reach an arc shot throws harmless sparks into the air now and then.
+func test_with_nothing_near_it_sparks_into_the_air() -> void:
+	var arena := ArenaScript.new(root)
+	var sparks: Array[int] = [0]
+	arena.bus.form_shown.connect(func(_caster: int, form: StringName, _origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"zap" and length <= 22.0:
+			sparks[0] += 1)
+	arena.install_cards(0, 0, ["arc", "rune"])
+	arena.cast(0, 0)
+	arena.run(4.0)
+	check(sparks[0] >= 4, "about three sparks a second (%d in 4 s)" % sparks[0])
+	arena.free_all()
 
 
 ## It never zaps the body its shot hits next: the shot hits it anyway, so an arc reaches beside its
 ## way, not a second hit on its target (owner, 2026-10-30).
 func test_a_zap_skips_what_its_shot_hits_next() -> void:
 	var plain: Array[int] = _lost(["bolt"], [Vector2(50.0, 0.0)] as Array[Vector2], 1.0)
-	var lost: Array[int] = _lost(["arc", "bolt"], [Vector2(50.0, 0.0), Vector2(20.0, 45.0)] as Array[Vector2], 1.0)
 	check(plain[0] > 0, "a bolt hits the imp ahead")
-	check_equal(lost[0], plain[0], "with arc that imp takes the bolt only, not a zap before it")
-	check(lost[1] > 0, "the imp beside the way is zapped")
+	for n in 8:
+		# Each is a shot of its own, rolling its own crackle.
+		var arena := ArenaScript.new(root)
+		var imp: Node2D = arena.add_imp(Vector2(50.0, 0.0))
+		arena.install_cards(0, 0, ["arc", "bolt"])
+		for k in n:
+			arena.cast(0, 0)
+			arena.run(1.2)
+		var before: int = arena.lost(imp)
+		arena.cast(0, 0)
+		arena.run(1.0)
+		check_equal(arena.lost(imp) - before, plain[0], "shot %d: the imp ahead takes the bolt only, not a zap before it" % n)
+		arena.free_all()
 
 
 func test_a_zap_sets_off_on_hit() -> void:

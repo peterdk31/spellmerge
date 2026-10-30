@@ -38,6 +38,19 @@ const CHAIN_RANGE: float = 96.0
 const ARC_DAMAGE: float = 0.5
 ## Zaps all shots together may make in one physics step; more wait for the next.
 const MAX_ARCS_PER_STEP: int = 32
+## An arc is a crackle, not a clock (owner, 2026-10-30: "much more unpredictable"): a shot's first
+## zap comes at a random moment of its first interval, each next one ARC_GAP_LEAST to
+## ARC_GAP_MOST intervals after the last (the card's rate on average), at a body in reach picked at
+## random, the near ones likelier (`pick_target`). One point-blank always hits; one at the edge of
+## its reach misses ARC_MISS_FAR of the time and strikes the air beside the body.
+const ARC_GAP_LEAST: float = 0.5
+const ARC_GAP_MOST: float = 1.5
+const ARC_MISS_FAR: float = 0.6
+## Sparks a second an arc shot with nothing in its reach throws into the air, ARC_SPARK_SHORTEST
+## to ARC_SPARK_LONGEST pixels: looks only, they hit nothing and wait for no clock.
+const ARC_SPARKS: float = 3.0
+const ARC_SPARK_SHORTEST: float = 8.0
+const ARC_SPARK_LONGEST: float = 22.0
 ## Magnet shots that may pull in one physics step; the others take turns.
 const MAX_PULLS_PER_STEP: int = 16
 ## Pixels per second a `magnet` shot pulls the enemies near it toward itself.

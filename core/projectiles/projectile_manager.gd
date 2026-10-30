@@ -260,6 +260,8 @@ const HOMING_PERIOD: int = 4
 const RAY_SEGMENTS: int = 8
 ## The most points of its last step a swing's or beam's guard tests a shot at (`_guard_samples`).
 const GUARD_PATH_SAMPLES: int = 16
+## The least weight a target in reach has in `pick_target`, so one at the edge can still be picked.
+const PICK_LEAST_WEIGHT: float = 0.05
 ## Rows `sweep`'s results hold at first; they grow when a sweep finds more.
 const SWEEP_START: int = 32
 ## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
@@ -4308,6 +4310,47 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		return null
 	nearest_point = _target_pos[best]
 	return _targets[best]
+
+
+## A target on `layers` (not of `team`, and not `exclude`) whose hit circle overlaps the circle
+## (`point`, `radius`), picked by `roll` (0 to 1) with the near ones likelier: each weighs
+## (1 - its distance / the reach) squared, at least PICK_LEAST_WEIGHT; or null. An arc's zap. The
+## centre of the one returned is left in `nearest_point`. Two passes, no allocation.
+func pick_target(point: Vector2, radius: float, layers: int, exclude: Node2D, team: int, roll: float) -> Node2D:
+	nearest_point = Vector2.INF
+	if not point.is_finite() or not is_finite(radius):
+		return null
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	_query_ready()
+	var cells: Vector4i = _query_cells(point, radius)
+	var total: float = 0.0
+	var last: int = -1
+	for pass_n in 2:
+		var left: float = roll * total
+		for y in range(cells.y, cells.w + 1):
+			for x in range(cells.x, cells.z + 1):
+				var t: int = _cell_head[y * _grid_w + x]
+				while t >= 0:
+					if _query_match(t, point, radius, layers, skip) and (team == ActorsScript.NONE or _target_team[t] != team):
+						var reach: float = maxf(radius + _target_radius[t], 0.001)
+						var near: float = clampf(1.0 - _target_pos[t].distance_to(point) / reach, 0.0, 1.0)
+						var weight: float = maxf(near * near, PICK_LEAST_WEIGHT)
+						if pass_n == 0:
+							total += weight
+						else:
+							last = t
+							left -= weight
+							if left <= 0.0:
+								nearest_point = _target_pos[t]
+								return _targets[t]
+					t = _target_next[t]
+		if total <= 0.0:
+			return null
+	# (A roll of 1 that float sums left a hair over: the last one.)
+	if last >= 0:
+		nearest_point = _target_pos[last]
+		return _targets[last]
+	return null
 
 
 ## The first target on `layers` (not of `team`, as `nearest_target`) along the line from `point`

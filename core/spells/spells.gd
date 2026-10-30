@@ -140,6 +140,8 @@ const PIERCE_ALL: int = 1 << 30
 ## How a ray this runtime sends itself looks and blocks (a chain jump, a zap: `form_shown`,
 ## `block_shot`): as a beam's line. A look, not a carrier: it runs no carrier.
 const RAY_FORM: StringName = &"beam"
+## The look of an arc's zap and its sparks (Feel draws lightning for it).
+const ZAP_FORM: StringName = &"zap"
 
 
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
@@ -255,11 +257,13 @@ var _lc_at: PackedVector2Array = PackedVector2Array()
 var _lc_way: PackedVector2Array = PackedVector2Array()
 var _lc_count: int = 0
 ## Slots of live shots with `arc`, `_arc_count` of them, flagged in `_rec_arc`; `_rec_arc_clock` is
-## the seconds to each one's next zap.
+## the seconds to each one's next zap, `_rec_arc_rolls` how many random numbers it has drawn (its
+## rolls are a hash of its sequence number and that count: the same every run, `_arc_roll`).
 var _arcs: PackedInt32Array = PackedInt32Array()
 var _arc_count: int = 0
 var _rec_arc: PackedByteArray = PackedByteArray()
 var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
+var _rec_arc_rolls: PackedInt32Array = PackedInt32Array()
 ## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`).
 var _arcs_used: int = 0
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
@@ -1342,6 +1346,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_rec_arc.resize(size)
 		_rec_magnet.resize(size)
 		_rec_arc_clock.resize(size)
+		_rec_arc_rolls.resize(size)
 		_rec_relay.resize(size)
 		_rec_zap.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
@@ -1362,8 +1367,9 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	var at: Vector2 = projectiles.get_position_of(slot)
 	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
 	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
-		# Ready at once (owner, 2026-10-30): its interval is the wait after a zap, not a fuse.
-		_rec_arc_clock[slot] = 0.0
+		# Its first zap comes at a random moment of its first interval (SpellLimits.ARC_GAP_LEAST).
+		_rec_arc_rolls[slot] = 0
+		_rec_arc_clock[slot] = spell.arc_interval * _arc_roll(slot)
 		if _rec_arc[slot] == 0:
 			if _arc_count == _arcs.size():
 				_arcs.resize(_arcs.size() * 2)
@@ -1800,7 +1806,8 @@ func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
 
 
 ## Runs the `arc` shots on by `delta`: each whose clock runs out zaps (`_zap`), at most
-## `SpellLimits.MAX_ARCS_PER_STEP` in all; one over the cap zaps in a later step.
+## `SpellLimits.MAX_ARCS_PER_STEP` in all; one over the cap zaps in a later step. Meanwhile a shot
+## with nothing in reach now and then throws a spark into the air (`_spark`).
 func _step_arcs(delta: float) -> void:
 	_arcs_used = 0
 	var i: int = 0
@@ -1812,9 +1819,38 @@ func _step_arcs(delta: float) -> void:
 			_arcs[i] = _arcs[_arc_count]
 			continue
 		_rec_arc_clock[slot] -= delta
-		if _rec_arc_clock[slot] <= 0.0 and _arcs_used < SpellLimits.MAX_ARCS_PER_STEP:
-			_zap(slot)
+		if _arcs_used < SpellLimits.MAX_ARCS_PER_STEP:
+			var zapped: bool = _rec_arc_clock[slot] <= 0.0 and _zap(slot)
+			if not zapped and _arc_roll(slot) < SpellLimits.ARC_SPARKS * delta:
+				_spark(slot)
 		i += 1
+
+
+## A random number in [0, 1) for the arc shot in `slot`: a hash of its sequence number and how many
+## it drew before, so a run is the same every time (tests, replays) and no two shots alike.
+func _arc_roll(slot: int) -> float:
+	var n: int = _rec_arc_rolls[slot]
+	_rec_arc_rolls[slot] = n + 1
+	var h: int = (int(projectiles.get_seq_of(slot)) * 73856093) ^ (n * 19349663) ^ 83492791
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(h & 0xFFFFFF) / 16777216.0
+
+
+## The arc shot in `slot` throws a harmless spark into the air: a short zap's look in a random
+## direction, when no body is in its reach.
+func _spark(slot: int) -> void:
+	var tag: int = projectiles.get_tag_of(slot)
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null or events == null:
+		return
+	var at: Vector2 = projectiles.get_position_of(slot)
+	if projectiles.nearest_target(at, spell.arc_reach, HITS, null, null, _team(SpellTag.caster_of(tag))) != null:
+		return
+	var way: Vector2 = Vector2.from_angle(_arc_roll(slot) * TAU)
+	var length: float = lerpf(SpellLimits.ARC_SPARK_SHORTEST, SpellLimits.ARC_SPARK_LONGEST, _arc_roll(slot))
+	_arcs_used += 1
+	events.form_shown.emit(SpellTag.caster_of(tag), ZAP_FORM, at, way, length, spell.tint, spell.look)
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
@@ -1847,17 +1883,20 @@ func _step_magnets() -> void:
 	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
-## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach` but the
-## one its shot hits next (`first_on_path`), hitting with its
+## Shot `slot`'s zap: a short ray to a body of another team within its `arc_reach`, picked at random
+## with the near ones likelier (`pick_target`), never the one its shot hits next (`first_on_path`);
+## the farther it is, the likelier the zap misses it and strikes the air beside it
+## (SpellLimits.ARC_MISS_FAR). It hits with its
 ## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body. With no
-## body in reach the shot tries again next step.
-func _zap(slot: int) -> void:
+## body in reach the shot tries again next step. True when it zapped (or missed), false when it
+## found no body.
+func _zap(slot: int) -> bool:
 	var tag: int = projectiles.get_tag_of(slot)
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.arc_interval <= 0.0:
 		_rec_arc_clock[slot] = INF
-		return
+		return false
 	var at: Vector2 = projectiles.get_position_of(slot)
 	var actor: int = SpellTag.caster_of(tag)
 	# It never zaps the body its shot hits next, which it hits anyway: an arc reaches beside the
@@ -1866,21 +1905,29 @@ func _zap(slot: int) -> void:
 	var ahead: float = minf(velocity.length() * projectiles.get_life_of(slot), spell.arc_reach)
 	var path_to: Vector2 = at + velocity.normalized() * ahead if not velocity.is_zero_approx() else at
 	var next: Node2D = projectiles.first_on_path(at, path_to, projectiles.get_radius_of(slot), HITS, _team(actor))
-	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, next, _team(actor))
+	var target: Node2D = projectiles.pick_target(at, spell.arc_reach, HITS, next, _team(actor), _arc_roll(slot))
 	var aim: Vector2 = projectiles.nearest_point
 	if target == null or not aim.is_finite():
-		return
-	_rec_arc_clock[slot] += spell.arc_interval
-	if _rec_arc_clock[slot] <= 0.0:
-		_rec_arc_clock[slot] = spell.arc_interval
+		return false
+	_rec_arc_clock[slot] = spell.arc_interval * lerpf(SpellLimits.ARC_GAP_LEAST, SpellLimits.ARC_GAP_MOST, _arc_roll(slot))
 	_arcs_used += 1
 	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
+	var far: float = clampf(at.distance_to(aim) / maxf(spell.arc_reach, 0.001), 0.0, 1.0)
+	if _arc_roll(slot) < SpellLimits.ARC_MISS_FAR * far:
+		# A miss: it strikes the air a little beside the body, to one side or the other.
+		var side: Vector2 = Vector2(-way.y, way.x) * (1.0 if _arc_roll(slot) < 0.5 else -1.0)
+		var beside: Vector2 = aim + side * lerpf(8.0, 16.0, _arc_roll(slot))
+		var past: Vector2 = projectiles.clip_to_walls(at, beside)
+		if events != null and not past.is_equal_approx(at):
+			events.form_shown.emit(actor, ZAP_FORM, at, at.direction_to(past), at.distance_to(past), spell.tint, spell.look)
+		return true
 	var ray: RayHit = _ray_begin(tag, way, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.arc_hit, slot)
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_end()
 	if got > 0.0 and events != null:
-		events.form_shown.emit(actor, RAY_FORM, at, way, got, spell.tint, spell.look)
+		events.form_shown.emit(actor, ZAP_FORM, at, way, got, spell.tint, spell.look)
 	_cast_jumps()
+	return true
 
 
 func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -> void:

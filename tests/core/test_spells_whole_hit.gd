@@ -156,9 +156,11 @@ func test_an_echoed_shots_zaps_hit_at_the_echos_share() -> void:
 		arena.run(9.0)
 		lost.append(_lost_big(arena, imp))
 		arena.free_all()
-	var zaps: int = lost[0] / spell.arc_hit.damage
+	var zaps: int = roundi(lost[0] / spell.arc_hit.damage)
 	check(zaps > 4, "the rune zapped (%d)" % zaps)
-	check_equal(lost[1], lost[0] + zaps * spell.echo_arc_hit.damage, "the echo's rune zaps as often, at the echo's share")
+	# The echo's rune is a shot of its own: it crackles at its own random moments, at the echo's share.
+	var extra: float = float(lost[1] - lost[0]) / spell.echo_arc_hit.damage
+	check(extra >= 2.0 and is_equal_approx(extra, roundf(extra)) and extra <= zaps * 2.0, "the echo's rune zaps too, at the echo's share (%s zaps)" % extra)
 
 
 func test_a_zap_keeps_slam_and_heal() -> void:

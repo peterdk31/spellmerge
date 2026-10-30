@@ -218,13 +218,14 @@ func test_no_zap_out_of_reach() -> void:
 	check(_hits_on(far).is_empty(), "an imp 90 px off the path is out of a 60 px reach")
 
 
-func test_zaps_keep_to_the_clock() -> void:
+func test_zaps_keep_to_the_card_rate_on_average() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"arc", &"rune"])
 	_cast()
-	_tick(121)
+	_tick(241)
 	var zaps: int = _hits_on(imp).size()
-	check(zaps >= 4 and zaps <= 5, "a rune zapping at once, then twice a second for 2 s, zaps about 5 times (%d)" % zaps)
+	# Twice a second at random moments, some missing at 40 of its 60 px: about 5 in 4 s.
+	check(zaps >= 2 and zaps <= 9, "a rune crackling twice a second for 4 s hits about 5 times (%d)" % zaps)
 
 
 func test_a_zap_sets_off_on_hit() -> void:
@@ -232,14 +233,14 @@ func test_a_zap_sets_off_on_hit() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"arc", &"on_hit", &"rune", &"nova"])
 	_cast()
-	# Its first zap is at once; the next would come at 0.5 s.
-	_tick(25)
+	# Its zaps come at random moments, about twice a second.
+	_tick(121)
 	var novas: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
 		if spell != null and spell.form_id == &"nova":
 			novas += 1
-	check_equal(novas, 8, "the zap fired the nova payload once: eight nova shots")
+	check(novas >= 8 and novas % 8 == 0, "each zap that hit fired the nova payload: eight nova shots each (%d)" % novas)
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
 
 

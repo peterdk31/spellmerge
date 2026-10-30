@@ -1,0 +1,9 @@
+{
+	"id": "reach_far_bolt",
+	"name": "Reach far bolt",
+	"does": "A fire bolt with reach flies longer and burns an imp past where a plain bolt ends.",
+	"casts": [{"staff": 0, "cards": ["reach", "fire", "bolt"]}],
+	"imps": [[320, 0]],
+	"seconds": 2.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

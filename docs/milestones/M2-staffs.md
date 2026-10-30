@@ -57,7 +57,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 
 | Card | Does | Two interactions |
 | --- | --- | --- |
-| dash (Short Dash), medium dash, long dash | The wizard dashes along the move direction (today's dodge, **without** the invulnerable window) a fixed 48, 80 or 128 px (`ray_length`); its speed only sets how long that takes, so `faster` arrives sooner, never farther (owner, 2026-10-27). 2 s delay each. End point: where the dash ends | `shield · dash` blocks one hit during the dash; `blast · dash` explodes at the end |
+| dash | The wizard dashes along the move direction (today's dodge, **without** the invulnerable window) a fixed 80 px (`ray_length`; `reach · dash` 128, owner 2026-10-30: one Dash and a Reach card); its speed only sets how long that takes, so `faster` arrives sooner, never farther (owner, 2026-10-27). 2 s delay. End point: where the dash ends | `shield · dash` blocks one hit during the dash; `blast · dash` explodes at the end |
 | teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
 | hook | A shot that pulls the caster to where it hits | `shield · hook` is a safe gap-closer; `blast · hook` charges in with a bang |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |

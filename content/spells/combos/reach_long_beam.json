@@ -1,0 +1,9 @@
+{
+	"id": "reach_long_beam",
+	"name": "Reach long beam",
+	"does": "A fire beam with reach is longer and burns an imp past a plain beam's end.",
+	"casts": [{"staff": 0, "cards": ["reach", "fire", "beam"]}],
+	"imps": [[320, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

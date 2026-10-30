@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by a small generator, outline worked out from the shape)",
-			"prompt": "A 16x16 icon for the Short Dash card: a grey head rushing right with one motion bar behind it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"prompt": "A 16x16 icon for the Dash card: a grey head rushing right with two motion bars behind it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
 		}
 	]
 }

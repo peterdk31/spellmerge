@@ -448,6 +448,13 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
 	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
 		spell.echo_hit = spell.hit.scaled(SpellLimits.ECHO_DAMAGE, 1.0)
+	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:
+		spell.blast_hit = blast_hit(spell.hit)
+		if spell.echo_hit != null:
+			spell.echo_blast_hit = blast_hit(spell.echo_hit)
+	# The cards that land on a point strike everything there: an explosion too.
+	if form == null:
+		spell.hit.kind = &"burst"
 	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
 	if arc > 0.0:
 		# Zaps per second add up over arc cards (a shot zaps at most once a physics step); a zap
@@ -471,6 +478,15 @@ static func zap_hit(hit: HitProfile) -> HitProfile:
 	var zap: HitProfile = hit.scaled(SpellLimits.ARC_DAMAGE, SpellLimits.ARC_DAMAGE)
 	zap.kind = &"ray"
 	return zap
+
+
+## What a blast's strike of a carrier that hits with `hit` does: the same hit, kind `burst` (its
+## hit-stop, shake and sound, "downed by your own Blast"): what it strikes is the carrier's hit
+## (rules R4 F2), and it feels like an explosion. Spells asks it again for a hit that changed (`relay`).
+static func blast_hit(hit: HitProfile) -> HitProfile:
+	var blast: HitProfile = hit.copy()
+	blast.kind = &"burst"
+	return blast
 
 
 ## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none):

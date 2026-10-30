@@ -58,6 +58,10 @@ var hit: HitProfile = null
 ## What an echo's second firing does: the whole hit at ECHO_DAMAGE (heal, slam, every status
 ## and the kind kept). Null without an `echo` modifier.
 var echo_hit: HitProfile = null
+## What a `blast`'s strikes do: the carrier's hit (and its echo's), as `burst` (`StaffCompiler.blast_hit`),
+## so an explosion feels like one whatever set it off. Null without a blast.
+var blast_hit: HitProfile = null
+var echo_blast_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0

@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: An explosion hits as `burst` (owner)
+
+- **A blast's strikes are `burst` again** (owner, after the merge of R4 F2 with the carriers): what a blast strikes is still its carrier's hit (cards, triggers, chain, relay: rules R4 F2), but with kind `burst`, so it has the explosion's hit-stop, shake and sound and a wizard caught in their own reads "downed by your own Blast", not "Shot" or "Beam". The cards that land on a point strike as `burst` too, as the area hit did before F2. The compiler makes the copy once (`CompiledSpell.blast_hit`, `echo_blast_hit`; `StaffCompiler.blast_hit`); a hit that relay changed is copied per blast. The kind is a feel-and-text label only: no rule reads it.
+
 ## 2026-10-30: A wasted card has no text; works is yes or no (owner)
 
 - **No reasons** (owner: "I don't need a string explaining why! Just a works = yes/no ... No text should be shown. The visuals are enough"): a card that does nothing is marked in the builder (the "!" on its slot, greyed in the staff rows and the radial builder) and nothing says why. The needs are flags only (`ModifierBase.NEEDS`: `{"any": FLIES}`), a carrier answers `works(behaviour)` and `fires(event)` with a bool, `CompiledCast.wasted` and `CompiledStaff.wasted` are slot -> true, and `Spells.card_works(card_id, carrier)` replaces `card_waste`. The carriers lost the words that only built sentences (`noun`, `what`, `hits_nothing`). This reverses rule 1's "with a reason a player can read" (M2-rules.md R2a, R2c); the rule itself, works or wasted and never silent, stands, and `test_card_rules` still checks it.

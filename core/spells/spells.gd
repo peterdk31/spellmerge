@@ -1130,8 +1130,9 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, heading: Vector2) -> vo
 ## A `blast` at the end point `at` of the carrier with `tag`: its explosion (`cue_shown`, the cue
 ## its blast card names) and a strike of everything within its strength (`_strike_round`,
 ## `everyone`): each body it catches is a hit of the carrier (rules R4 F2), with what the carrier
-## hits with now and the chain jumps it has left (the ray's being sent, else the shot `shot`'s),
-## so a jump's blast jumps no further than the jump. Its hits blast no more. Nothing without a blast.
+## hits with now as `burst` (`CompiledSpell.blast_hit`) and the chain jumps it has left (the ray's
+## being sent, else the shot `shot`'s), so a jump's blast jumps no further than the jump. Its hits
+## blast no more. Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int = -1) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius <= 0.0 or events == null or not at.is_finite():
@@ -1147,7 +1148,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 		prev = _rec_prev[shot]
 	var was: bool = _blasting
 	_blasting = true
-	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, hit_profile(tag, shot), true, chain, prev)
+	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), true, chain, prev)
 	_blasting = was
 
 
@@ -2519,6 +2520,16 @@ func _component(id: StringName) -> SpellComponent:
 func _name_of(component: SpellComponent) -> String:
 	return component.display_name if not component.display_name.is_empty() else String(component.id)
 
+
+
+## What a blast of `spell` strikes with when its carrier hits with `hit`: the compiled `burst` copy
+## of its own hit or its echo's, else (relay took an element on, a jump's parent hit) a new one.
+func _blast_hit(spell: CompiledSpell, hit: HitProfile) -> HitProfile:
+	if hit == spell.hit and spell.blast_hit != null:
+		return spell.blast_hit
+	if hit == spell.echo_hit and spell.echo_blast_hit != null:
+		return spell.echo_blast_hit
+	return StaffCompiler.blast_hit(hit if hit != null else spell.hit)
 
 
 ## Where the familiar with `key` (`entity_key`) is now, told by Entities every step: what its

@@ -104,8 +104,8 @@ extends Node2D
 ## leaves the bounds, or that the cap drops sends nothing: those did not run out.
 ##
 ## Motion: `MOTION_STRAIGHT` (default) flies on its velocity; `MOTION_STILL` (the
-## rune) never moves: its velocity is ignored and it waits for a target to enter its
-## circle. It still ends by life or by a hit, as any shot does.
+## rune) does not fly: its velocity is ignored and it waits for a target to enter its
+## circle (homing creeps it toward one). It still ends by life or by a hit, as any shot does.
 ##
 ## Queries: `nearest_target(point, radius, layers, exclude)` and `targets_in(point,
 ## radius, layers, out)` use the same grid as hits, so chain, homing and area effects
@@ -125,7 +125,7 @@ extends Node2D
 ##
 ## Homing: `set_homing(slot, turn_rate, within)` makes a straight shot turn toward a
 ## target no further than `within` pixels from it (picked at random and kept while it can), at most `turn_rate` radians a
-## second, keeping its speed. The caller says how far (`CompiledSpell.homing_range`); there
+## second, keeping its speed; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
@@ -248,6 +248,9 @@ const WORK_PER_STEP: int = 6000
 const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
+## The most a returning homing shot's way home bends off the line to its caster (radians): under
+## a right angle, so it always closes in (`_pass_return`).
+const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
@@ -611,10 +614,13 @@ var _one: PackedInt32Array = PackedInt32Array([0])
 var _shield_order: PackedInt32Array = PackedInt32Array()
 ## True while `_catch_up` runs a waiting shot's passes (they do not make it wait again).
 var _catching_up: bool = false
-## The live shots a shield checks, made once a step the first time a shield needs it (see
-## `_shield_block`).
-var _scan_slots: PackedInt32Array = PackedInt32Array()
-var _scan_count: int = 0
+## The live shots on the target grid's cells, made once a step the first time a shield needs
+## them (see `_shield_block`): the first shot in each cell (-1 for none), the next in its chain
+## (slot order), and the most any of them reaches from where it is (its radius and its step's
+## path).
+var _shot_head: PackedInt32Array = PackedInt32Array()
+var _shot_next: PackedInt32Array = PackedInt32Array()
+var _shot_reach: float = 0.0
 var _scan_step: int = -1
 ## True while a `projectile_expired` is sent for a shot that ended on a wall (the `on wall`
 ## trigger reads it); false for every other end.
@@ -956,7 +962,7 @@ func set_cap(value: int) -> void:
 		_move_head[slot] = -1
 	if _move_left.is_empty():
 		_grow_moves(MOVES_START)
-	_scan_slots.resize(_cap)
+	_shot_next.resize(_cap)
 	_members.resize(_cap * BEHAVIOURS)
 	_member_at.resize(_cap * BEHAVIOURS)
 	_kinds.resize(_cap)
@@ -1043,11 +1049,18 @@ func set_bounds(rect: Rect2) -> void:
 	_cell_count.resize(_grid_w * _grid_h)
 	_cell_count.fill(0)
 	_cell_box.resize(_grid_w * _grid_h)
+	_shot_head.resize(_grid_w * _grid_h)
+	_scan_step = -1
 	_grid_stale = true
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
 	clear_walls()
+
+
+## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
+func room_size() -> float:
+	return maxf(_bounds.size.x, _bounds.size.y)
 
 
 ## Make these world rectangles solid, replacing any walls set before. Parts outside
@@ -1567,12 +1580,13 @@ func _grow_moves(size: int) -> void:
 		_move_free = at
 
 
-## Make the straight shot in `slot` home on targets no further than `within` pixels from
-## it, turning at most `turn_rate` radians a second. Returns false for an empty slot, a shot
-## that is not straight, a rate that is negative or not finite, or a `within` that is not
-## above 0 and finite; true when the rate was applied, 0 included (0 stops homing).
+## Make the shot in `slot` home on targets no further than `within` pixels from it: a straight
+## shot turns at most `turn_rate` radians a second, a still one (a rune) creeps toward its
+## target at SpellLimits.HOMING_DRIFT. Returns false for an empty slot, an orbit shot (held on
+## its circle), a rate that is negative or not finite, or a `within` that is not above 0 and
+## finite; true when the rate was applied, 0 included (0 stops homing).
 func set_homing(slot: int, turn_rate: float, within: float) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
 		return false
 	if not is_finite(turn_rate) or turn_rate < 0.0 or not is_finite(within) or within <= 0.0:
 		return false
@@ -1640,11 +1654,18 @@ func get_core_of(slot: int) -> Color:
 
 # --- Behaviours of the projectile kit (staffs B1) -------------------------------------
 # Each setter takes the slot `spawn` returned, right after spawning, and returns false (and
-# does nothing) for a slot that is not a live straight shot or a bad number. Orbit and still
-# shots keep their own motion, so the travel behaviours do not apply to them.
+# does nothing) for an empty slot, a bad number, or a shot that cannot do it (rules R4h): what
+# turns or steers a flight (bounce, ghost, return) needs a straight shot; what changes a motion
+# (linger, spiral, sticky) needs a shot that moves, an orbit too; homing any shot but an orbit
+# (a rune creeps, R4i); growth takes any shot.
 
 func _is_flyer(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] == MOTION_STRAIGHT
+
+
+## A live shot that moves: a straight shot or an orbit (a still shot does not move).
+func _moves(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] != MOTION_STILL
 
 
 ## The shot bounces off walls `times` times instead of ending on the first (a bounce may hit
@@ -1664,14 +1685,15 @@ func set_ghost(slot: int) -> bool:
 	return true
 
 
-## The shot flies in a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave); its centre
-## line is the straight path.
+## The shot weaves a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave) round its path:
+## a flying shot round its straight line, an orbit shot in and out round its circle (`_pass_orbit`).
 func set_spiral(slot: int, width: float) -> bool:
-	if not _is_flyer(slot) or not (width > 0.0) or not is_finite(width):
+	if not _moves(slot) or not (width > 0.0) or not is_finite(width):
 		return false
 	_wave[slot] = width * 0.5
 	_flags[slot] |= F_WAVE
-	_join(slot, B_SPIRAL)
+	if _motion[slot] == MOTION_STRAIGHT:
+		_join(slot, B_SPIRAL)
 	return true
 
 
@@ -1685,19 +1707,20 @@ func set_return(slot: int) -> bool:
 	return true
 
 
-## The shot stops in mid-air for `seconds` when half its life is gone, then goes on.
+## The shot stops for `seconds` when half its life is gone, then goes on: a flying shot hangs in
+## mid-air, an orbit shot stops circling (it keeps to its caster).
 func set_linger(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_linger[slot] = seconds
 	_join(slot, B_LINGER)
 	return true
 
 
-## The shot's radius grows by `factor` each second of flight, until it is as big as the room
-## (`set_bounds`; nothing is bigger): a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
+## The shot's radius grows by `factor` each second it lives, until it is as big as the room
+## (`set_bounds`; nothing is bigger): a wider hit circle (a rune's trigger circle), the same damage. `get_growth_of` tells how much bigger it is.
 func set_growth(slot: int, factor: float) -> bool:
-	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not (factor > 1.0) or not is_finite(factor):
 		return false
 	_growth[slot] = factor
 	_join(slot, B_GROWTH)
@@ -1712,10 +1735,10 @@ func get_growth_of(slot: int) -> float:
 	return _radius[slot] / _radius0[slot]
 
 
-## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry).
-## The hit is sent as usual, and a stuck shot hits nothing more.
+## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry); an
+## orbit shot leaves its circle for it. The hit is sent as usual, and a stuck shot hits nothing more.
 func set_sticky(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_stick[slot] = seconds
 	return true
@@ -2139,8 +2162,9 @@ func _pass_hits(top: int, delta: float) -> void:
 # - growth before linger and return: a lingering shot still grows, and a returning one reaches
 #   its caster with the radius it has now.
 # - linger before return, homing and spiral: a shot that hangs still does none of them.
-# - orbit: on its own (an orbit shot has no other motion behaviour).
-# - return before homing: a shot on its way back does not home.
+# - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
+# - return before homing: a shot on its way back heads for its caster, bent toward the target its
+#   homing found (`_pass_return`); the homing pass only searches for it.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
 # - shield after the hits: it checks every shot's whole path of this step.
@@ -2265,7 +2289,7 @@ func _pass_stuck(list: PackedInt32Array, first: int, count: int, _delta: float) 
 
 ## Growth (`set_growth`): the radius grows by its factor a second, until it is as big as the room.
 func _pass_growth(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
-	var room: float = maxf(_bounds.size.x, _bounds.size.y)
+	var room: float = room_size()
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] == S_MOVING:
@@ -2290,11 +2314,13 @@ func _pass_linger(list: PackedInt32Array, first: int, count: int, delta: float) 
 
 ## Orbit (`spawn_orbit`): the shot turns round its caster, its velocity the tangent (for the
 ## drawing). It vanishes quietly when its caster's anchor is gone. One whose caster is a shot waits
-## for its turn, so it circles that shot where it was when the step came to it.
+## for its turn, so it circles that shot where it was when the step came to it. A lingering one
+## (S_HELD) keeps to its caster without turning; a spiral (`set_spiral`) weaves its radius.
 func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
-		if _state[slot] != S_MOVING:
+		var state: int = _state[slot]
+		if state != S_MOVING and state != S_HELD:
 			continue
 		var caster: int = _caster_slot[slot]
 		var centre: Vector2 = _caster_at[slot]
@@ -2308,9 +2334,11 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 		if not centre.is_finite():
 			_state[slot] = S_GONE
 			continue
-		_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+		if state == S_MOVING:
+			_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+			_wave_age[slot] += delta
 		var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
-		_pos[slot] = centre + away * _orbit_radius[slot]
+		_pos[slot] = centre + away * (_orbit_radius[slot] + _wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 		_vel[slot] = Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
 		_orbit_centre[slot] = centre
 
@@ -2327,7 +2355,8 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_wait(slot, B_RETURN)
 			continue
 		var flags: int = _flags[slot]
-		if (flags & F_TURNED) == 0:
+		var turned: bool = (flags & F_TURNED) == 0
+		if turned:
 			_flags[slot] |= F_TURNED
 			_speed[slot] = _vel[slot].length()
 			_forget_all(slot)
@@ -2342,18 +2371,32 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_pos[slot] = anchor
 			_state[slot] = S_EXPIRE
 			continue
-		_vel[slot] = way.normalized() * _speed[slot]
+		var heading: Vector2 = way.normalized()
+		if _turn[slot] > 0.0:
+			# Homing bends the way home (rules R4a): the shot's angle off the line to its caster
+			# turns toward its target at the homing rate (back to 0 with none in reach), never past
+			# RETURN_BEND, so it always closes in on its caster and never circles.
+			var bend: float = 0.0 if turned else clampf(heading.angle_to(_vel[slot]), -RETURN_BEND, RETURN_BEND)
+			var goal: Vector2 = _home_at[slot]
+			var want: float = 0.0
+			if goal.is_finite() and not goal.is_equal_approx(here):
+				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
+			heading = heading.rotated(move_toward(bend, want, _turn[slot] * delta))
+		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
 
 
 ## Homing (`set_homing`): the shot turns toward the point it last found, at most its turn rate, and
-## flies on along its new velocity. On its search step (one in HOMING_PERIOD, slots taking turns)
+## flies on along its new velocity; a shot with no speed (a rune) creeps toward it at
+## SpellLimits.HOMING_DRIFT. On its search step (one in HOMING_PERIOD, slots taking turns)
 ## it waits for its turn, then looks for a target while there is hit work left (`_homing_point`).
+## A returning shot on its way back only searches: `_pass_return` bends its way with the point.
 func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
-		if _state[slot] != S_MOVING:
+		var state: int = _state[slot]
+		if state != S_MOVING and state != S_RETURNING:
 			continue
 		if ((slot + _step_index) % HOMING_PERIOD) == 0:
 			if not _catching_up:
@@ -2361,12 +2404,17 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 				continue
 			if _work_left > 0:
 				_home_at[slot] = _homing_point(slot, _prev[slot])
+		if state == S_RETURNING:
+			continue
 		var goal: Vector2 = _home_at[slot]
-		var velocity: Vector2 = _vel[slot]
-		if not goal.is_finite() or velocity.is_zero_approx():
+		if not goal.is_finite():
 			continue
 		var want: Vector2 = goal - _prev[slot]
 		if want.is_zero_approx():
+			continue
+		var velocity: Vector2 = _vel[slot]
+		if velocity.is_zero_approx():
+			_pos[slot] = _prev[slot] + want.limit_length(SpellLimits.HOMING_DRIFT * delta)
 			continue
 		# `turned_toward`, written out (this runs for every homing shot every step).
 		var most: float = _turn[slot] * delta
@@ -2438,7 +2486,7 @@ func _has_homing_move(slot: int) -> bool:
 ## path touched this step (`_shield_block`), in slot order.
 func _pass_shield(list: PackedInt32Array, first: int, count: int, _delta: float) -> void:
 	# The list in slot order (insertion sort into the scratch: shields are few), as blocks spend
-	# charges and the hit-work budget in that order.
+	# charges in that order.
 	for n in count:
 		var slot: int = list[first + n]
 		var at: int = n
@@ -2503,46 +2551,74 @@ func _solid_at(point: Vector2) -> bool:
 
 ## Check a shielded shot against the shots of other teams (aim, actors G3a: a shield stops
 ## every shot whose caster was on another team when it was cast, a shot of no actor included,
-## never its own team's): every one it touches is stopped, one shield charge each, and
-## `shot_blocked` is sent. The list of live shots is made once per step, the first time a shield
-## needs it; the scan is charged to the hit-work budget.
+## never its own team's): every one it touches is stopped, one shield charge each (cell by cell,
+## in slot order within a cell), and `shot_blocked` is sent. It looks only at the shots on the
+## grid cells its path could touch (the shots are put on the target grid's cells once per step,
+## the first time a shield needs them). Not charged to the hit-work budget: a block always
+## happens (rules R4).
 func _shield_block(slot: int) -> void:
 	if _scan_step != _step_index:
 		_scan_step = _step_index
-		_scan_count = 0
-		for other in _high:
-			if _alive[other] != 0:
-				_scan_slots[_scan_count] = other
-				_scan_count += 1
+		_fill_shot_grid()
+	# Every shot that may touch this one's path this step: its box, widened by the reach.
+	var pad: float = _radius[slot] + _shot_reach
+	var low: Vector2 = _prev[slot].min(_pos[slot]) - Vector2(pad, pad)
+	var high: Vector2 = _prev[slot].max(_pos[slot]) + Vector2(pad, pad)
+	var x0: int = clampi(floori((low.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+	var x1: int = clampi(floori((high.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+	var y0: int = clampi(floori((low.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
+	var y1: int = clampi(floori((high.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
 	var mine: int = _team[slot]
-	for n in _scan_count:
-		if (_shield[slot] <= 0 and _deflect[slot] == 0) or _work_left <= 0:
-			return
-		_work_left -= 1
-		var other: int = _scan_slots[n]
-		if _alive[other] == 0 or other == slot or _team[other] == mine:
-			continue
-		var reach: float = _radius[slot] + _radius[other]
-		# Both shots move during the step: in the enemy shot's frame the shield goes along
-		# the relative path, so the test is the distance from that segment to the origin.
-		var start: Vector2 = _prev[slot] - _prev[other]
-		var path: Vector2 = (_pos[slot] - _pos[other]) - start
-		var along: float = 0.0
-		if not path.is_zero_approx():
-			along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
-		if (start + path * along).length_squared() > reach * reach:
-			continue
-		if _deflect[slot] != 0:
-			# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
-			deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
-			continue
-		_shield[slot] -= 1
-		var at: Vector2 = _pos[other]
-		_kill(other)
-		if events != null:
-			event_slot = slot
-			events.shot_blocked.emit(_actor[slot], at, _tag[slot])
-			event_slot = -1
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var other: int = _shot_head[y * _grid_w + x]
+			while other >= 0:
+				if _shield[slot] <= 0 and _deflect[slot] == 0:
+					return
+				if _alive[other] != 0 and other != slot and _team[other] != mine:
+					_shield_meets(slot, other)
+				other = _shot_next[other]
+
+
+## `_shield_block` for one shot of another team: stopped or deflected when it touches the shield.
+func _shield_meets(slot: int, other: int) -> void:
+	var reach: float = _radius[slot] + _radius[other]
+	# Both shots move during the step: in the enemy shot's frame the shield goes along
+	# the relative path, so the test is the distance from that segment to the origin.
+	var start: Vector2 = _prev[slot] - _prev[other]
+	var path: Vector2 = (_pos[slot] - _pos[other]) - start
+	var along: float = 0.0
+	if not path.is_zero_approx():
+		along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
+	if (start + path * along).length_squared() > reach * reach:
+		return
+	if _deflect[slot] != 0:
+		# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
+		deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
+		return
+	_shield[slot] -= 1
+	var at: Vector2 = _pos[other]
+	_kill(other)
+	if events != null:
+		event_slot = slot
+		events.shot_blocked.emit(_actor[slot], at, _tag[slot])
+		event_slot = -1
+
+
+## Put every live shot on the target grid's cell where it is now (chains in slot order), and
+## find the most any reaches from there this step (radius and path), for `_shield_block`.
+func _fill_shot_grid() -> void:
+	_shot_head.fill(-1)
+	_shot_reach = 0.0
+	var other: int = _high - 1
+	while other >= 0:
+		if _alive[other] != 0:
+			var at: Vector2 = _pos[other]
+			var cell: int = clampi(floori((at.y - _grid_y) / GRID_CELL), 0, _grid_h - 1) * _grid_w + clampi(floori((at.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+			_shot_next[other] = _shot_head[cell]
+			_shot_head[cell] = other
+			_shot_reach = maxf(_shot_reach, _radius[other] + at.distance_to(_prev[other]))
+		other -= 1
 
 
 ## Where a shot is drawn when it is at `at`: where it is, except a new orbit shot, which is drawn
@@ -2676,14 +2752,15 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## inside a wall. The hits are found before any event is sent, so a handler may remove or free
 ## targets, or fire another ray, as deep as it likes. Nothing caps a ray (RAY_PATH_START). Where
 ## it ended and its heading there are left in `ray_end` and `ray_end_heading`, and the path it
-## walked in `ray_path`. It allocates only when a ray is bigger than any before it.
-func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0) -> float:
+## walked in `ray_path`. A `ghost` ray passes through walls (it never turns or ends at one). It
+## allocates only when a ray is bigger than any before it.
+func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0, ghost: bool = false) -> float:
 	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
 		return 0.0
 	_path[0] = origin
 	_path[1] = origin + direction.normalized() * length
-	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces)
+	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces, Callable(), ghost)
 
 
 ## A beam like `ray` along the path `points[offset]` to `points[offset + count - 1]`, cut to
@@ -2693,10 +2770,10 @@ func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce
 ## hits. With `bounces` it turns at walls as `ray` does, and goes on from there along `steer`'s
 ## path when it is given one (a homing beam homes again after every turn: `steer.call(turn, at,
 ## way, left)` gets the turn's index in the path, where it is, the way off the wall and the length
-## left, and returns the points that follow `at`; empty for straight on), else straight. Returns
-## how far it got along the path; `ray_end` and `ray_end_heading` say where, and `ray_path` what
-## it walked.
-func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable()) -> float:
+## left, and returns the points that follow `at`; empty for straight on), else straight. A
+## `ghost` one passes through walls. Returns how far it got along the path; `ray_end` and
+## `ray_end_heading` say where, and `ray_path` what it walked.
+func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	ray_path_count = 0
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
 		return 0.0
@@ -2717,7 +2794,7 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 		_path[i] = point
 	if used == 0:
 		return 0.0
-	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer)
+	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
 
 
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
@@ -2828,7 +2905,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
-func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable()) -> float:
+func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
@@ -2856,7 +2933,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var b: Vector2 = _path[at_piece + 1]
 		var piece: float = a.distance_to(b)
 		used = at_piece + 1
-		if _has_walls:
+		if _has_walls and not ghost:
 			# A ray walks every cell it crosses, however long it is.
 			var cut: float = _wall_hit(a, b, 1 << 30)
 			if cut >= 0.0:
@@ -3769,6 +3846,11 @@ func get_actor_of(slot: int) -> int:
 	return _actor[slot] if slot >= 0 and slot < _cap else -1
 
 
+## The seconds the shot in `slot` has left to live, 0 for an empty slot.
+func get_life_of(slot: int) -> float:
+	return _life[slot] if is_alive(slot) else 0.0
+
+
 ## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
 func get_velocity_of(slot: int) -> Vector2:
 	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
@@ -3909,19 +3991,21 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps
-## the circle (`point`, `radius`), and return how many. Pass the same array each time
+## the circle (`point`, `radius`), and return how many; with a finite `to`, the circles round
+## every point of the line from `point` to `to` (a beam's magnet). Pass the same array each time
 ## so nothing is allocated. Order is not defined.
-func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D]) -> int:
+func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D], to: Vector2 = Vector2.INF) -> int:
 	out.clear()
 	if not point.is_finite() or not is_finite(radius):
 		return 0
+	var end: Vector2 = to if to.is_finite() else point
 	_query_ready()
-	var cells: Vector4i = _query_cells(point, radius)
+	var cells: Vector4i = _query_cells((point + end) * 0.5, radius + point.distance_to(end) * 0.5)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, 0):
+				if _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end), radius, layers, 0):
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()

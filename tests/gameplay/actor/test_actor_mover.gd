@@ -172,6 +172,16 @@ func test_recoils_of_different_times_move_the_sum_of_their_distances() -> void:
 	check(body.global_position.distance_to(START + Vector2(-40.0, 0.0)) < 0.01, "two recoils move 20 + 20 px, got %s" % body.global_position)
 
 
+func test_every_recoil_moves_its_distance_however_many_run() -> void:
+	# Regression: at most 8 pushes ran at once and a ninth was dropped.
+	var body: Actor = _mover()
+	for i: int in 12:
+		_ask(body, &"recoil", Vector2(-2.0, 0.0), 1.0)
+		_world.run(1)
+	_world.run(80)
+	check(body.global_position.distance_to(START + Vector2(-24.0, 0.0)) < 0.01, "twelve running recoils move 12 x 2 px, got %s" % body.global_position)
+
+
 func test_a_dash_walks_its_whole_distance_and_is_answered_one_step_later() -> void:
 	var body: Actor = _mover()
 	_controller(body).move = Vector2.RIGHT

@@ -377,8 +377,8 @@ func _listen() -> void:
 		_put("deflected %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_put("barrier %s %s %d for %d ms" % [_who(caster), _node(tag), charges, roundi(seconds * 1000.0)]))
-	bus.pull_requested.connect(func(caster: int, at: Vector2, radius: float, strength: float, tag: int) -> void:
-		_put("pull %s %s at %s r%d %d" % [_who(caster), _node(tag), _at(at), roundi(radius), roundi(strength)]))
+	bus.pull_requested.connect(func(caster: int, at: Vector2, radius: float, strength: float, tag: int, to: Vector2) -> void:
+		_put("pull %s %s at %s to %s r%d %d" % [_who(caster), _node(tag), _at(at), _at(to), roundi(radius), roundi(strength)]))
 	bus.possess_requested.connect(func(caster: int, target: int, seconds: float, tag: int) -> void:
 		_put("possess %s %s %s for %d ms" % [_who(caster), _who(target), _node(tag), roundi(seconds * 1000.0)]))
 	bus.discharge_arc.connect(func(caster: int, from: Vector2, to: Vector2) -> void:
@@ -397,7 +397,8 @@ func _sample() -> void:
 			var points: PackedStringArray = PackedStringArray()
 			for n in spells.beam_point_count(at):
 				points.append(_at(spells.beam_point(at, n)))
-			_put("beam %s %s" % [_who(spells.beam_caster(at)), " ".join(points)])
+			# How wide it hits (growth) as well as where.
+			_put("beam %s w%d %s" % [_who(spells.beam_caster(at)), roundi(spells.beam_growth(at) * 100.0), " ".join(points)])
 	for at in spells.slam_slots():
 		if spells.slam_on(at):
 			# A slam's row is read directly: Spells has no getter for its caster and aim.

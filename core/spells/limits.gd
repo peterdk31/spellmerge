@@ -67,6 +67,11 @@ const BUDGETS: int = ActorsScript.SHARED + 1
 ## `lifetime`, so a held staff keeps one on.
 const BEAM_ROWS_START: int = 64
 const BEAM_TICK: float = 0.15
+## A spiral beam's wave (rules R4f): pixels along it a wave (about a spiral bolt's, 220 px/s for
+## Projectiles.SPIRAL_PERIOD), and the points it is drawn and hit along per wave. 8 a wave keeps a
+## 240 px beam at 19 points, well inside the 80 its shader draws (a longer path is thinned).
+const BEAM_WAVE: float = 112.0
+const BEAM_WAVE_STEPS: int = 8
 ## A deflected shot flies this many times faster, again at every deflect, so a rally speeds up
 ## (melee I3; the owner's playground, 2026-10-29). Its pool and the hit pass's sweep of its whole
 ## path each step are the engine's limits; nothing caps the speed.
@@ -79,6 +84,10 @@ const SLAM_GROW: float = 0.67
 ## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
 ## radians a second bend it 43 degrees; more homing bends it further, all the way round).
 const INSTANT_HOMING_SECONDS: float = 0.25
+## Pixels per second a homing still shot (a rune) creeps toward its target (rules R4i): below the
+## slowest walking enemy (30), so a rune that homes is a trap that follows, never a chaser one can
+## not walk away from, and over a rune's 8 s it creeps about the Homing card's reach (160 px).
+const HOMING_DRIFT: float = 24.0
 ## A homing teleport whose target is within its distance lands this far outside the target's
 ## hit circle (a wizard's body radius), not on it.
 const LAND_CLEARANCE: float = 6.0

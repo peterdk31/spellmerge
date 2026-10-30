@@ -28,8 +28,6 @@ func before_each() -> void:
 	_feel.drive_engine = false
 	var preset: FeelPresetScript = FeelPresetScript.new()
 	preset.hit_sound = &""
-	preset.deflect_sound = &""
-	preset.parry_sound = &""
 	_feel.preset = preset
 	root.add_child(_feel)
 
@@ -58,7 +56,7 @@ func test_a_deflected_shot_flashes_big_and_white_in_its_new_casters_colours() ->
 		return
 	check_equal(flash["ramp"], _world.table.ramp_of(batter.id), "in the deflecting actor's colours")
 	check_equal(flash["core"], Color.WHITE, "white: the ramp's own white-hot core")
-	check_equal(flash["zoom"], roundi(_feel.preset.deflect_size), "as big as the preset says")
+	check_equal(flash["zoom"], _feel.cue_of(&"deflect").parts[0]["zoom"], "as big as the cue says")
 	# A hit's spray and a shot's landing flare are 1 to 3; a deflect's flash is bigger.
 	check(int(flash["zoom"]) > 3, "bigger than a hit's (%d)" % int(flash["zoom"]))
 	check((flash["at"] as Vector2).distance_to(Vector2(20.0, 0.0)) <= 1.0, "where it turned")
@@ -75,12 +73,12 @@ func test_a_swing_block_is_a_parry_a_gold_star_and_a_local_stop() -> void:
 	var star: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
 	check(not star.is_empty(), "a four-point star shows")
 	if not star.is_empty():
-		check_equal(star["core"], _feel.preset.parry_color, "in Spark gold")
+		check_equal(star["core"], Color("f2c230"), "in Spark gold")
 		check((int(star["look"]) & FeelScript.EXACT) != 0, "exactly that colour, whoever parried")
-		check_equal(star["zoom"], roundi(_feel.preset.parry_size), "as big as the preset says")
+		check_equal(star["zoom"], _feel.cue_of(&"parry").parts[0]["zoom"], "as big as the cue says")
 		check(int(star["zoom"]) > 3, "big, bigger than a hit's")
-	check(_world.table.held_left(parrier.id) >= _feel.preset.parry_stop_seconds - 0.0001, "the parrying actor is held for the parry")
-	check(is_equal_approx(_feel.preset.parry_stop_seconds, 0.06), "the playground's 0.06 s")
+	check(_world.table.held_left(parrier.id) >= _feel.cue_of(&"parry").hold - 0.0001, "the parrying actor is held for the parry")
+	check(is_equal_approx(_feel.cue_of(&"parry").hold, 0.06), "the playground's 0.06 s")
 	check_equal(_world.table.held_left(other.id), 0.0, "another actor is not")
 	check_equal(_world.table.held_left(shooter.id), 0.0, "nor the shooter")
 	check_equal(_feel.stop_left, 0.0, "the game runs on")

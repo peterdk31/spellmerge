@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"fireball"
+parts = Array[Dictionary]([{"effect": &"fireball", "reach": 1.0}, {"effect": &"debris", "reach": 1.0, "particles": true}, {"effect": &"scorch", "reach": 1.0}])
+shake = 0.75
+kick = 3.0
+kick_way = &"away"

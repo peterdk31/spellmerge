@@ -61,15 +61,21 @@ its own:
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
-| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | dash and teleport (a move), rain (a telegraph), wall (one solid line), bolt (adds the nova's ring) |
-| `shoot` | a shot flying along its heading | rune (still, placed ahead), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (an entity) |
+| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), bolt (adds the nova's ring) |
+| `shoot` | a shot flying along its heading | rune (still, placed ahead), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
-| `step`, `end_of`, `end_actor`, `clear` | nothing | beam, swing, slam (their rows) |
+| `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows) |
+| `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
+| `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | bolt, beam, swing, slam, rain (for an enemy's telegraph) |
 
-A carrier asks the runtime for the shared path through `rt`: the shot kit (`_land_shot`), moves
-(`_move_caster`), entities (`_spawn_entity`), and the hit path. A hit with no shot slot (a beam's,
+Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the
+launch both make, with `_aim_move`, `_move_body` and `_moved_shot` for their own part), decoy and
+familiar extend `CarrierEntity` (a body `ai` makes, ended by `entity_ended`), and every move of a
+caster or of the shot that cast it (dash, teleport, hook, swap, recoil) goes through `CasterMoves`
+(`core/spells/caster_moves.gd`), whose end point runs the carrier's `on_move_end`. A carrier asks the
+runtime for the rest of the shared path through `rt`: the shot kit (`_land_shot`) and the hit path. A hit with no shot slot (a beam's,
 a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
 (`_ray_begin`/`_ray_end`), so cards, payloads and chains work the same on every carrier.
 

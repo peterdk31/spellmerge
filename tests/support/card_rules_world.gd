@@ -280,7 +280,7 @@ func _shot_within(distance: float) -> bool:
 func _is_quiet() -> bool:
 	if projectiles.get_count() > 0 or spells.beam_count() > 0 or spells.swing_count() > 0 or spells.slam_count() > 0:
 		return false
-	if not spells._pending.is_empty() or spells._mv_count > 0 or spells._jq_count > 0:
+	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false
 	if entities.count() > 0:
 		return false

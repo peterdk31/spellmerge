@@ -729,3 +729,8 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 
 func reach_of(spell: CompiledSpell) -> float:
 	return spell.ray_length
+
+
+## A held beam is switched off: it ends quietly.
+func switch_off(tag: int) -> void:
+	end_of(tag)

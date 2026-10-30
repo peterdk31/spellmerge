@@ -27,9 +27,10 @@ static func ids() -> Array[StringName]:
 	return out
 
 
-## A fresh carrier of every kind, by id.
+## A fresh carrier of every kind, by id, in the order the runtime steps them (a dash's strikes, then
+## beams, swings and slams, as before carriers had their own scripts).
 static func make_all() -> Dictionary:
 	var all: Dictionary = {}
-	for carrier: Carrier in [CarrierBolt.new(), CarrierRune.new(), CarrierOrbit.new(), CarrierBeam.new(), CarrierDash.new(), CarrierTeleport.new(), CarrierHook.new(), CarrierSwap.new(), CarrierWall.new(), CarrierRain.new(), CarrierDecoy.new(), CarrierFamiliar.new(), CarrierSwing.new(), CarrierSlam.new()]:
+	for carrier: Carrier in [CarrierBolt.new(), CarrierRune.new(), CarrierOrbit.new(), CarrierDash.new(), CarrierTeleport.new(), CarrierBeam.new(), CarrierHook.new(), CarrierSwap.new(), CarrierWall.new(), CarrierRain.new(), CarrierDecoy.new(), CarrierFamiliar.new(), CarrierSwing.new(), CarrierSlam.new()]:
 		all[carrier.id()] = carrier
 	return all

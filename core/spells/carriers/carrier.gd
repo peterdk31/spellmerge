@@ -264,7 +264,7 @@ func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _posit
 	return false
 
 
-## A move of this carrier ended at `at` (`Spells._move_end`), before its blast and `on expire`.
+## A move of this carrier ended at `at` (`CasterMoves.end`), before its blast and `on expire`.
 func on_move_end(_spell: CompiledSpell, _tag: int, _actor: int, _at: Vector2, _heading: Vector2) -> void:
 	pass
 
@@ -286,6 +286,17 @@ func end_actor(_actor: int) -> void:
 
 ## Every row of it gone at once, quietly (`Spells.clear`).
 func clear() -> void:
+	pass
+
+
+## `actor`'s caster opened or closed under its id: what this carrier keeps per actor starts over.
+func reset_actor(_actor: int) -> void:
+	pass
+
+
+## A held (`hold`) carrier of `tag` is switched off (its staff cast again or edited): what is still
+## on ends. Its shots in the manager are removed by the runtime.
+func switch_off(_tag: int) -> void:
 	pass
 
 

@@ -87,10 +87,10 @@ func on_hit(spell: CompiledSpell, tag: int, actor: int, target: Node, _position:
 		if node != null and anchor.is_finite():
 			rt.events.target_move_requested.emit(actor, target, anchor)
 			rt.events.caster_move_requested.emit(actor, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
-			rt._shield_move(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
+			rt._moves.shield(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
 	elif node != null:
 		var from: Vector2 = rt.projectiles.get_position_of(caster)
 		rt.events.target_move_requested.emit(actor, target, from)
 		rt.projectiles.move_shot(caster, node.global_position - from, 0.0)
-		rt._shield_move(spell, tag, actor, caster, 0.0)
+		rt._moves.shield(spell, tag, actor, caster, 0.0)
 	return false

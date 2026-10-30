@@ -279,10 +279,8 @@ var _arcs: PackedInt32Array = PackedInt32Array()
 var _arc_count: int = 0
 var _rec_arc: PackedByteArray = PackedByteArray()
 var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
-## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`), and the slot of the shot whose zap
-## is being sent (-1 for none): the zap is a hit of that shot (`relay`, chain jumps).
+## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`).
 var _arcs_used: int = 0
-var _arc_slot: int = -1
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
 var _magnets: PackedInt32Array = PackedInt32Array()
 var _magnet_count: int = 0
@@ -335,14 +333,13 @@ var _mv_count: int = 0
 var _passes: Array[MovePass] = []
 var _passes_free: Array[MovePass] = []
 
-## The beam being cast: its tag and direction.
-var _ray_tag: int = 0
-var _ray_dir: Vector2 = Vector2.ZERO
-var _ray_chain: int = 0
-var _ray_prev: int = 0
-## What the ray being sent hits with when not its spell's own `hit` (null): an echo's, a zap's,
-## or what the hit a chain jump came from hit with.
-var _ray_hit: HitProfile = null
+## The ray being sent (`RayHit`): what a hit with no shot slot is (a beam's, a swing's, a slam's, a
+## dash's, a rain's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
+## `_ray_begin` takes the next record of the stack (made once, then reused) and `_ray_end` gives it
+## back, so a ray sent from inside another's hit handler leaves the outer one as it was.
+var _rays: Array[RayHit] = [RayHit.new()]
+var _ray_depth: int = 0
+var _ray: RayHit = _rays[0]
 ## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
 ## would recurse as deep as it jumps). The outermost beam casts them, first in first out, once
@@ -937,8 +934,8 @@ func hit_profile(tag: int) -> HitProfile:
 		return _rec_relay[slot]
 	# A ray (a beam, a swing, a zap, a jump of any) has no slot: it hits with what the
 	# one being sent carries (an echo's half, a zap's share, a jump's parent hit).
-	if _ray_hit != null and tag == _ray_tag:
-		return _ray_hit
+	if _ray.hit != null and tag == _ray.tag:
+		return _ray.hit
 	return spell.hit
 
 
@@ -1280,9 +1277,29 @@ func _land_strike(spell: CompiledSpell, tag: int, actor: int, at: Vector2, headi
 		_strike_bodies(spell, tag, actor, found, struck, at, heading, spell.chain_jumps, 0, spell.echo_hit if _echo_spell == spell else null)
 
 
+## Sends a ray: until `_ray_end`, every hit with no shot slot is this one (`_on_hit`, `hit_profile`,
+## `_relay`), with `tag`'s cards, going along `dir`, with `chain` jumps left after `prev`, hitting
+## with `hit` when not its spell's own (null), as a zap of shot `arc_slot` (-1 for none). Returns the
+## record, so a sweep can turn `dir` from body to body and read what `relay` left in `hit`.
+func _ray_begin(tag: int, dir: Vector2, chain: int, prev: int, hit: HitProfile, arc_slot: int) -> RayHit:
+	_ray_depth += 1
+	if _ray_depth == _rays.size():
+		_rays.append(RayHit.new())
+	_ray = _rays[_ray_depth]
+	_ray.set_to(tag, dir, chain, prev, hit, arc_slot)
+	return _ray
+
+
+## Ends the ray `_ray_begin` sent: the one it was sent from (or none) is the ray again.
+func _ray_end() -> void:
+	_ray.hit = null
+	_ray_depth -= 1
+	_ray = _rays[_ray_depth]
+
+
 ## Strikes the first `found` bodies of `Projectiles.sweep` that are not in `struck` yet (and adds
-## them), each pushed outward from `centre` (along `way` when it is on it), in the beam context
-## `_ray_*` that `_on_hit` reads, as a swing's and a slam's: its hits carry its cards, payloads
+## them), each pushed outward from `centre` (along `way` when it is on it), as a ray
+## (`_ray_begin`) that `_on_hit` reads, as a swing's and a slam's: its hits carry its cards, payloads
 ## and chains. `hit` is what it hits with when not its spell's own (an echo's), else null.
 func _strike_bodies(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Array[Node], centre: Vector2, way: Vector2, chain: int, prev: int, hit: HitProfile) -> void:
 	var first: int = struck.size()
@@ -1293,18 +1310,7 @@ func _strike_bodies(spell: CompiledSpell, tag: int, actor: int, found: int, stru
 	var last: int = struck.size()
 	if last == first:
 		return
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_chain = chain
-	_ray_prev = prev
-	_ray_hit = hit
-	_arc_slot = -1
-	_ray_dir = way
+	var ray: RayHit = _ray_begin(tag, way, chain, prev, hit, -1)
 	for row in range(first, last):
 		var node: Node = struck[row]
 		if not is_instance_valid(node) or not (node is Node2D):
@@ -1312,12 +1318,7 @@ func _strike_bodies(spell: CompiledSpell, tag: int, actor: int, found: int, stru
 		var body: Vector2 = (node as Node2D).global_position
 		var out: Vector2 = centre.direction_to(body) if not centre.is_equal_approx(body) else way
 		projectiles.strike(actor, node, centre, out, tag, spell.form_id)
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+	_ray_end()
 	_cast_jumps()
 
 
@@ -1468,7 +1469,7 @@ func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: i
 
 
 ## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once, outward from
-## `at`, with `hit` (null: its own) in the beam context `_ray_*` that `_on_hit` reads, so the
+## `at`, with `hit` (null: its own) as a ray (`_ray_begin`) that `_on_hit` reads, so the
 ## whole hit goes with it: infusions, heavy, chain, siphon, possess and `on hit` (a slam's ring
 ## strikes the same way as it grows). The bodies are copied first: what a hit sets off can sweep.
 func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile) -> void:
@@ -1478,29 +1479,14 @@ func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way:
 	var struck: Array[Node] = []
 	for i in found:
 		struck.append(projectiles.sweep_nodes[i])
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_chain = spell.chain_jumps
-	_ray_prev = 0
-	_ray_hit = hit
-	_arc_slot = -1
+	var ray: RayHit = _ray_begin(tag, _ray.dir, spell.chain_jumps, 0, hit, -1)
 	for node in struck:
 		if not is_instance_valid(node) or not (node is Node2D):
 			continue
 		var body: Vector2 = (node as Node2D).global_position
-		_ray_dir = at.direction_to(body) if not at.is_equal_approx(body) else way
-		projectiles.strike(actor, node, at, _ray_dir, tag, &"rain")
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+		ray.dir = at.direction_to(body) if not at.is_equal_approx(body) else way
+		projectiles.strike(actor, node, at, ray.dir, tag, &"rain")
+	_ray_end()
 	_cast_jumps()
 
 
@@ -2030,18 +2016,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 ## for the hit handler. It pierces as its carrier does and passes walls with ghost.
 func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, hit: HitProfile = null) -> void:
 	shot_started(tag)
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_dir = heading
-	_ray_chain = chain
-	_ray_prev = prev
-	_ray_hit = hit
-	_arc_slot = -1
+	var ray: RayHit = _ray_begin(tag, heading, chain, prev, hit, -1)
 	var reach: float = spell.ray_length if length < 0.0 else length
 	var got: float = projectiles.ray(actor, origin, heading, reach, spell.pierce, HITS, tag, spell.radius * 0.5, source, _bounces(spell), _ghost(spell))
 	var end: Vector2 = origin + heading * got
@@ -2072,12 +2047,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 		_blast(spell, tag, actor, end)
 	if got > 0.0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 		_fire_payload(spell, tag, actor, end, end_heading, null)
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+	_ray_end()
 	shot_ended(tag)
 	_cast_jumps()
 
@@ -2379,8 +2349,8 @@ func _picked_before(at: int, leg: int) -> bool:
 	return false
 
 
-## Live beam `at` along its curve: with `hit`, its hits, payloads and chain jumps (in the beam
-## context `_ray_*` that `_on_hit` reads); without, only how far it gets.
+## Live beam `at` along its curve: with `hit`, its hits, payloads and chain jumps (sent as a
+## ray, `_ray_begin`, that `_on_hit` reads); without, only how far it gets.
 func _beam_cast(at: int, hit: bool) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
@@ -2399,30 +2369,14 @@ func _beam_cast(at: int, hit: bool) -> void:
 		if bounces > 0:
 			_beam_keep_path(at)
 		return
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_dir = _bm_dir[at]
-	_ray_chain = _bm_chain[at]
-	_ray_prev = _bm_prev[at]
-	_ray_hit = _bm_hit[at]
-	_arc_slot = -1
+	var ray: RayHit = _ray_begin(tag, _bm_dir[at], _bm_chain[at], _bm_prev[at], _bm_hit[at], -1)
 	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, true, bounces, steer, ghost)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	var turned: bool = bounces > 0 and projectiles.ray_path_count > 0
 	# What relay took on stays for its later hits.
-	var took: HitProfile = _ray_hit
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+	var took: HitProfile = ray.hit
+	_ray_end()
 	# A hit handler may have ended this beam (a rebuild) or reused its row.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_bm_hit[at] = took
@@ -2747,7 +2701,7 @@ func _swing_guard(at: int, from: float, to: float) -> void:
 
 
 ## Swing `at` turned from `from` to `to` radians off its aim: it strikes each body in that wedge it
-## has not struck yet (in the beam context `_ray_*` that `_on_hit` reads), outward from its hand.
+## has not struck yet (as a ray (`_ray_begin`) that `_on_hit` reads), outward from its hand.
 func _swing_cast(at: int, from: float, to: float) -> void:
 	var spell: CompiledSpell = _sw_spell[at]
 	var tag: int = _sw_tag[at]
@@ -2771,30 +2725,15 @@ func _swing_cast(at: int, from: float, to: float) -> void:
 	var last: int = struck.size()
 	if last == first:
 		return
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_chain = _sw_chain[at]
-	_ray_prev = _sw_prev[at]
-	_ray_hit = spell.echo_hit if _sw_echo[at] != 0 else null
-	_arc_slot = -1
+	var ray: RayHit = _ray_begin(tag, _ray.dir, _sw_chain[at], _sw_prev[at], spell.echo_hit if _sw_echo[at] != 0 else null, -1)
 	for row in range(first, last):
 		# A hit handler may have ended this swing (a rebuild) or reused its row.
 		if _sw_on[at] == 0 or _sw_tag[at] != tag:
 			break
 		var point: Vector2 = points[row]
-		_ray_dir = origin.direction_to(point) if not origin.is_equal_approx(point) else _sw_dir[at]
+		ray.dir = origin.direction_to(point) if not origin.is_equal_approx(point) else _sw_dir[at]
 		projectiles.strike(actor, struck[row], point, heads[row], tag, &"swing")
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+	_ray_end()
 	_cast_jumps()
 
 
@@ -2978,7 +2917,7 @@ func _slam_guard(at: int, reach: float) -> void:
 
 
 ## Slam `at`'s ring, `reach` across now: it strikes each body in it it has not struck yet, outward
-## from the impact, in the beam context `_ray_*` that `_on_hit` reads (as `_swing_cast`).
+## from the impact, as a ray (`_ray_begin`) that `_on_hit` reads (as `_swing_cast`).
 func _slam_cast(at: int, reach: float) -> void:
 	if reach <= 0.0:
 		return
@@ -2999,16 +2938,8 @@ func _slam_cast(at: int, reach: float) -> void:
 	var last: int = struck.size()
 	if last == first:
 		return
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
+	var ray: RayHit = _ray_begin(tag, _ray.dir, _sl_chain[at], _sl_prev[at], null, _ray.arc_slot)
 	var saved_echo: CompiledSpell = _echo_spell
-	var saved_hit: HitProfile = _ray_hit
-	_ray_tag = tag
-	_ray_hit = null
-	_ray_chain = _sl_chain[at]
-	_ray_prev = _sl_prev[at]
 	_echo_spell = spell if _sl_echo[at] != 0 else null
 	for row in range(first, last):
 		# A hit handler may have ended this slam (a rebuild) or reused its row.
@@ -3019,15 +2950,11 @@ func _slam_cast(at: int, reach: float) -> void:
 			continue
 		var body: Vector2 = (node as Node2D).global_position
 		var out: Vector2 = impact.direction_to(body) if not impact.is_equal_approx(body) else _sl_dir[at]
-		_ray_dir = out
+		ray.dir = out
 		# Struck at the impact, so the hit's push throws it outward from there.
 		projectiles.strike(actor, node, impact, out, tag, &"slam")
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
+	_ray_end()
 	_echo_spell = saved_echo
-	_ray_hit = saved_hit
 	_cast_jumps()
 
 
@@ -3867,25 +3794,9 @@ func _zap(slot: int) -> void:
 		_rec_arc_clock[slot] = spell.arc_interval
 	_arcs_used += 1
 	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
-	var saved_tag: int = _ray_tag
-	var saved_dir: Vector2 = _ray_dir
-	var saved_chain: int = _ray_chain
-	var saved_prev: int = _ray_prev
-	var saved_hit: HitProfile = _ray_hit
-	var saved_arc: int = _arc_slot
-	_ray_tag = tag
-	_ray_dir = way
-	_ray_chain = _rec_chain[slot]
-	_ray_prev = _rec_prev[slot]
-	_ray_hit = _rec_zap[slot] if _rec_zap[slot] != null else spell.arc_hit
-	_arc_slot = slot
+	var ray: RayHit = _ray_begin(tag, way, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.arc_hit, slot)
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
-	_ray_tag = saved_tag
-	_ray_dir = saved_dir
-	_ray_chain = saved_chain
-	_ray_prev = saved_prev
-	_ray_hit = saved_hit
-	_arc_slot = saved_arc
+	_ray_end()
 	if got > 0.0 and events != null:
 		events.form_shown.emit(actor, &"beam", at, way, got, spell.tint, spell.look)
 	_cast_jumps()
@@ -3906,11 +3817,11 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
 	var heading: Vector2 = Vector2.RIGHT
 	var by_ray: bool = slot < 0
 	if by_ray:
-		if tag != _ray_tag:
+		if tag != _ray.tag:
 			return
-		chain = _ray_chain
-		prev = _ray_prev
-		heading = _ray_dir
+		chain = _ray.chain
+		prev = _ray.prev
+		heading = _ray.dir
 	else:
 		if _same(slot):
 			chain = _rec_chain[slot]
@@ -3920,12 +3831,12 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
 	# zap's jumps as its shot does.
 	var carried: HitProfile = null
 	var carried_zap: HitProfile = null
-	var from: int = _arc_slot if by_ray else slot
+	var from: int = _ray.arc_slot if by_ray else slot
 	if from >= 0 and _same(from):
 		carried = _rec_relay[from]
 		carried_zap = _rec_zap[from]
 	elif by_ray:
-		carried = _ray_hit
+		carried = _ray.hit
 	var held: bool = spell.payload != null and spell.trigger_event == TriggerBase.Event.HIT
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, actor, target, position, slot)
@@ -4062,7 +3973,7 @@ func _on_expired(actor: int, position: Vector2, tag: int) -> void:
 ## payload goes the way the shot or beam goes on. A zap (`_zap`, its shot's tag) that ends on a
 ## wall is not its shot meeting one: it sets off nothing (rules R4a).
 func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int) -> void:
-	if _arc_slot >= 0:
+	if _ray.arc_slot >= 0:
 		return
 	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, false, heading)
 
@@ -4102,8 +4013,8 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, ba
 	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
 		slot = -1
 	# A beam has no slot: while its `ray()` runs, its payload goes along the beam.
-	var by_ray: bool = slot < 0 and tag == _ray_tag
-	var heading: Vector2 = way if not way.is_zero_approx() else (_ray_dir if by_ray else _heading(spell, slot, at, actor))
+	var by_ray: bool = slot < 0 and tag == _ray.tag
+	var heading: Vector2 = way if not way.is_zero_approx() else (_ray.dir if by_ray else _heading(spell, slot, at, actor))
 	if back_off:
 		at -= heading * SpellLimits.EXPIRE_BACKOFF
 	_fire_payload(spell, tag, actor, at, heading, source, slot)
@@ -4135,7 +4046,7 @@ func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: Str
 ## (`_last_infused`): their elements, each with its status, join this hit and its later ones,
 ## its zaps and its chain jumps. The rest of the hit stays as it was (heal, slam, damage, kind).
 ## An actor that never cast an infused carrier gives nothing. A ray with it (a beam or a
-## jump of one; rules R4f) keeps what it took on in `_ray_hit` for its later hits, a live beam
+## jump of one; rules R4f) keeps what it took on in `_ray.hit` for its later hits, a live beam
 ## for as long as it is on (`_bm_hit`). Allocates two profiles per such hit, never per frame.
 func _relay(target: Node, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
@@ -4145,13 +4056,13 @@ func _relay(target: Node, tag: int) -> void:
 	if donor_actor < 0 or donor_actor >= ACTORS:
 		return
 	var slot: int = projectiles.event_slot
-	if slot < 0 and tag == _ray_tag:
-		slot = _arc_slot
-	var by_ray: bool = slot < 0 and tag == _ray_tag
+	if slot < 0 and tag == _ray.tag:
+		slot = _ray.arc_slot
+	var by_ray: bool = slot < 0 and tag == _ray.tag
 	var donor: CompiledSpell = _last_infused[donor_actor]
 	if donor == null or (not by_ray and (slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag)):
 		return
-	var base: HitProfile = _ray_hit if by_ray else _rec_relay[slot]
+	var base: HitProfile = _ray.hit if by_ray else _rec_relay[slot]
 	if base == null:
 		base = spell.hit
 	var merged: HitProfile = null
@@ -4165,14 +4076,14 @@ func _relay(target: Node, tag: int) -> void:
 	if merged == null:
 		return
 	if by_ray:
-		_ray_hit = merged
+		_ray.hit = merged
 		return
 	if base.element_id == &"":
 		projectiles.set_core(slot, donor.tint)
 	_rec_relay[slot] = merged
 	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.arc_hit != null else null
-	if slot == _arc_slot:
-		_ray_hit = _rec_zap[slot]
+	if slot == _ray.arc_slot:
+		_ray.hit = _rec_zap[slot]
 
 
 ## Adds element `n` of `from` to `onto`, with its status (none if `from` has none for it), as

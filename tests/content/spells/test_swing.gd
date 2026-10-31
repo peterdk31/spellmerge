@@ -33,7 +33,6 @@ func test_the_card_is_a_valid_carrier() -> void:
 	check_equal(card.id, &"swing", "its id is its folder")
 	check_equal(card.carrier, &"swing", "it is a swing")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
-	check(not card.name_words.is_empty(), "it has name words")
 
 
 func test_it_has_the_playgrounds_numbers() -> void:

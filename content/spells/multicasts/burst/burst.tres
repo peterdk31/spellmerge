@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"burst"
 display_name = "Burst"
-name_words = PackedStringArray("Rapid", "Stuttering")
 complexity = 3
 icon = ExtResource("2_icon")
 extra_draws = 0

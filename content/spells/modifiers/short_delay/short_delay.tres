@@ -8,7 +8,6 @@ script = ExtResource("1_base")
 id = &"short_delay"
 demo = true
 display_name = "Short Delay"
-name_words = PackedStringArray("Hasty", "Impatient")
 complexity = 1
 icon = ExtResource("2_icon")
 cooldown_mult = 0.5

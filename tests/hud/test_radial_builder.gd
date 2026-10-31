@@ -463,17 +463,3 @@ func test_x_and_a_do_nothing_in_the_builder() -> void:
 	check_equal(_whole.size(), 0, "nothing was asked for")
 	check_equal(radial.note_text(), "", "and nothing is said")
 	check(radial.is_open(), "the builder stays open")
-
-
-func test_the_names_of_the_casts_show_for_each_cast() -> void:
-	_start(1)
-	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost nova"))
-	var names: PackedStringArray = radial.cast_names()
-	check_equal(names.size(), 2, "a name for each of the two casts")
-	for word in names:
-		check(word != "", "the name is not empty")
-	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
-	check_equal(radial.cast_names().size(), 1, "one cast, one name")
-	_bus.staff_cards_requested.emit(0, 1, _ids("-"))
-	check_equal(radial.cast_names().size(), 0, "no cast, no name")

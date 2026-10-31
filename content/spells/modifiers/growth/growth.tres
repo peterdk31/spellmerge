@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"growth"
 display_name = "Growth"
-name_words = PackedStringArray("Swelling", "Growing")
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2

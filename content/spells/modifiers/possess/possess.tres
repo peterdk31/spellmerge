@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"possess"
 display_name = "Possess"
-name_words = PackedStringArray("Haunting", "Possessing")
 complexity = 4
 icon = ExtResource("2_icon")
 mana_mult = 2.5

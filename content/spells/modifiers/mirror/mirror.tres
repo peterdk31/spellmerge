@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"mirror"
 display_name = "Mirror"
-name_words = PackedStringArray("Mirrored", "Twinned")
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour = 16

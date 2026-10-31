@@ -38,9 +38,6 @@ extends Control
 ##   (every shot landing once) and the cycle's time; with a card pointed at, what RT would make
 ##   of each ("> 31%"). The hub shows the same when no card is pointed at.
 ##
-## - Above the hint row, the names of the shown staff's casts (staffs E1), as the staff would be
-##   with the pointed card.
-##
 ## What it shows comes only from events: `staff_changed` (the plain `Spells.staff_view`),
 ## `bag_changed`, `build_refused` and `player_stats_changed` (the wizard's maximum mana). What it
 ## asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested` (the whole
@@ -249,9 +246,6 @@ var _numbers_at: Vector2 = Vector2.ZERO
 var _center: Vector2 = Vector2.ZERO
 var _hints_at: Vector2 = Vector2.ZERO
 var _kinds_at: Vector2 = Vector2.ZERO
-var _names_at: Vector2 = Vector2.ZERO
-var _names_width: float = 0.0
-var _names_line: String = ""
 
 ## Button glyphs: the staff tabs (LB, RB), the hints (RT, LT, Y, B) and the kind row (d-pad).
 var _glyph_prev: ActionGlyphScript = null
@@ -420,20 +414,6 @@ func hint_verbs() -> Array[String]:
 ## The short note shown after a refusal or a press that did nothing, or "".
 func note_text() -> String:
 	return _note if _note_left > 0.0 else ""
-
-
-## The names of the shown staff's casts (staffs E1), in cycle order, as the staff would be with
-## the pointed card; casts without a name are left out.
-func cast_names() -> PackedStringArray:
-	var plan: Dictionary = _preview_view if not _preview_cards.is_empty() else _plans[_viewed]
-	var out := PackedStringArray()
-	var casts: Variant = plan.get("casts", [])
-	if casts is Array:
-		for cast: Variant in casts:
-			var word: String = str((cast as Dictionary).get("name", "")) if cast is Dictionary else ""
-			if word != "":
-				out.append(word)
-	return out
 
 
 ## Move the marker as a click on a slot does (for P1's mouse and tests).
@@ -1022,9 +1002,6 @@ func _place() -> void:
 	_center = Vector2(floorf((ring_left + ring_right) * 0.5), _quarter.position.y + RING_FROM_EDGE)
 	_hints_at = Vector2(ring_left, _quarter.end.y - HINT_HEIGHT - 2.0)
 	_kinds_at = Vector2(_center.x, _quarter.position.y + 2.0)
-	# The row just over the hints is left free (it held the staff codes' buttons).
-	_names_at = Vector2(ring_left, _hints_at.y - HINT_HEIGHT * 2.0 - 1.0)
-	_names_width = ring_right - ring_left
 	var tab_x: float = _tabs_at.x
 	_glyph_prev.position = Vector2(tab_x, _tabs_at.y)
 	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + 13.0 * STAFF_COUNT + 1.0, _tabs_at.y)
@@ -1068,8 +1045,6 @@ func _refresh_hints() -> void:
 		x += glyph.custom_minimum_size.x + 2.0
 		_hint_text_x[at] = x
 		x += _text_width(_hint_verbs[at]) + 6.0
-	var names: PackedStringArray = cast_names()
-	_names_line = _fit(" / ".join(names), _names_width) if not names.is_empty() else ""
 	var show_kinds: bool = layout == Layout.KIND and _kinds.size() > 1
 	for glyph in _kind_glyphs:
 		glyph.visible = show_kinds
@@ -1122,7 +1097,6 @@ func _draw() -> void:
 	_draw_numbers()
 	_draw_ring()
 	_draw_hub()
-	_draw_names()
 	_draw_hints()
 	_draw_flyers()
 
@@ -1384,14 +1358,6 @@ func _draw_hub() -> void:
 func _draw_hints() -> void:
 	for at in _hint_verbs.size():
 		_text(_hint_verbs[at], Vector2(_hint_text_x[at], _hints_at.y + 1.0), TEXT if _hint_live[at] else DIM)
-
-
-## The names of the casts, joined, cut to the width of the ring's side.
-func _draw_names() -> void:
-	if _names_line == "":
-		return
-	draw_rect(Rect2(_names_at, Vector2(_text_width(_names_line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
-	_text(_names_line, _names_at + Vector2(1.0, 0.0), GOLD)
 
 
 ## `text` cut with ".." to fit `width` pixels.

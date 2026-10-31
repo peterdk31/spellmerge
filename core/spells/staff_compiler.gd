@@ -55,12 +55,8 @@ var _reached_end: bool = false
 var _useful: Dictionary = {}
 
 
-var _namer: SpellNamer = null
-
-
 func _init(lookup: Callable) -> void:
 	_lookup = lookup
-	_namer = SpellNamer.new(lookup)
 
 
 ## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`. Cards past `staff.slots`
@@ -106,7 +102,6 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_cast.delay += staff.cast_delay if staff != null else 0.0
 	if _cast.recharges and staff != null:
 		_cast.delay += staff.recharge
-	_cast.spell_name = _namer.name_cast(_cast, _out.cards)
 	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.delay), ", then recharge" if _cast.recharges else ""]
 	return _cast
 

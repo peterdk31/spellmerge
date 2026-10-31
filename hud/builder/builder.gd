@@ -532,12 +532,7 @@ func _render_plan() -> void:
 			if cast is Dictionary:
 				var row: Dictionary = cast
 				var said: String = str(row.get("text", "")).trim_suffix(".")
-				var cast_name: String = str(row.get("name", ""))
-				if cast_name != "":
-					lines.append("%d: %s" % [number, cast_name])
-					lines.append("   %s (%s)" % [said, _numbers(row)])
-				else:
-					lines.append("%d: %s (%s)" % [number, said, _numbers(row)])
+				lines.append("%d: %s (%s)" % [number, said, _numbers(row)])
 				number += 1
 	_plan.text = "\n".join(lines) if not lines.is_empty() else "Empty: put cards in the slots."
 	_render_note()

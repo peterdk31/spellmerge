@@ -507,7 +507,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
-## (read order), `name` (the generated spell name, `SpellNamer`), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
+## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
 ## true); `wasted` for the staff (cards that did nothing in any cast that read them); and
 ## `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
@@ -517,7 +517,7 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var casts: Array[Dictionary] = []
 	for cast in compiled.casts:
 		casts.append({
-			"slots": cast.slots, "name": cast.spell_name, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
+			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
 			"damage": _cast_damage(cast),
 			"recharges": cast.recharges, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),

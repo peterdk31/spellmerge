@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"linger"
 display_name = "Linger"
-name_words = PackedStringArray("Loitering", "Lingering")
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour = 9

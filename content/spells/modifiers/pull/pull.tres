@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"pull"
 display_name = "Pull"
-name_words = PackedStringArray("Hooking", "Tugging")
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2

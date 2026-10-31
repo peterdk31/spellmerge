@@ -241,6 +241,26 @@ func spend_hold(id: int, delta: float) -> float:
 	return delta - held
 
 
+## `spend_hold` for the first `count` actors of `ids` at once (a crowd's step: one call instead of
+## one per body, Horde swarm S4): `seconds[i]` becomes what `maxf(spend_hold(ids[i], delta), 0.0)`
+## returns, and each stop is spent as that spends it. `seconds` must hold `count` entries.
+func spend_holds(ids: PackedInt32Array, count: int, delta: float, seconds: PackedFloat64Array) -> void:
+	for i in count:
+		var id: int = ids[i]
+		if id < 0 or id >= ACTORS or _held[id] <= 0.0:
+			seconds[i] = maxf(delta, 0.0)
+			continue
+		# `spend_hold`, written out.
+		var held: float = _held[id]
+		if held > delta:
+			_held[id] = held - delta
+			seconds[i] = 0.0
+			continue
+		_held[id] = 0.0
+		held_count -= 1
+		seconds[i] = maxf(delta - held, 0.0)
+
+
 func _release_hold(id: int) -> void:
 	if _held[id] > 0.0:
 		_held[id] = 0.0

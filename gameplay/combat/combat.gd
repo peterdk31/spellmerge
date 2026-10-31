@@ -446,6 +446,36 @@ func own_knockback(actor: Node2D, id: int, delta: float) -> Vector2:
 	return push
 
 
+## `own_pace` and `own_knockback` for the first `count` bodies of `nodes` (their actor ids in `ids`)
+## at once (a crowd's step: one call instead of two per body, Horde swarm S4): for each `i` whose
+## `seconds[i]` is above 0, `paces[i]` becomes `own_pace(nodes[i], ids[i])` and `pushes[i]`
+## `own_knockback(nodes[i], ids[i], seconds[i])`, the push spent as that spends it; the others are
+## left as they were (a body held still spends no push). The arrays must hold `count` entries.
+func own_paces_and_pushes(nodes: Array[Node2D], ids: PackedInt32Array, count: int, seconds: PackedFloat64Array, paces: PackedFloat64Array, pushes: PackedVector2Array) -> void:
+	for i in count:
+		var walk: float = seconds[i]
+		if walk <= 0.0:
+			continue
+		var actor: Node2D = nodes[i]
+		var id: int = ids[i]
+		if id < 0 or id >= ACTORS or _nodes[id] != actor or _body[id] == BODY_NONE:
+			var row: int = _row_of_node(actor)
+			paces[i] = _pace(row)
+			pushes[i] = _consume_knockback(row, walk)
+			continue
+		# `own_pace` and `own_knockback`, written out.
+		if _freeze_left[id] > 0.0:
+			paces[i] = 0.0
+		elif _chill_left[id] > 0.0:
+			paces[i] = 1.0 - _chill_slow[id]
+		else:
+			paces[i] = 1.0
+		var push: Vector2 = _knock[id]
+		if push != Vector2.ZERO:
+			_knock[id] = push.move_toward(Vector2.ZERO, KNOCKBACK_DECAY * walk)
+		pushes[i] = push
+
+
 func _pace(row: int) -> float:
 	if row == ActorsScript.NONE:
 		return 1.0

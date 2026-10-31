@@ -142,6 +142,10 @@ var _target_slot: PackedInt32Array = PackedInt32Array()
 var _give: PackedFloat32Array = PackedFloat32Array()
 var _push: PackedVector2Array = PackedVector2Array()
 var _next: PackedInt32Array = PackedInt32Array()
+## Per row, this step: its hash cell, and Combat's pace and push for it (`own_paces_and_pushes`).
+var _cell_of: PackedInt32Array = PackedInt32Array()
+var _paces: PackedFloat64Array = PackedFloat64Array()
+var _pushes: PackedVector2Array = PackedVector2Array()
 ## The distinct targets: node, how many rows chase it, whether it can be chased this step and its
 ## feet (in the parent's space).
 var _slot_nodes: Array[Node2D] = []
@@ -300,51 +304,57 @@ func step(delta: float) -> void:
 	var origin: Vector2 = _parent.global_position if _parent.is_inside_tree() else _parent.position
 	_read_candidates(delta)
 	_read_targets(origin)
+	# Every row's local stop, then its pace and push, each asked once for all rows (a call per row
+	# each cost more than the rest of the row's step; S4). The rows do not touch each other's stops
+	# or Combat rows, so asking first answers as asking row by row did.
 	var held: bool = actors != null and actors.held_count > 0
+	if held:
+		actors.spend_holds(actor_ids, count, delta, ran)
+	else:
+		ran.fill(delta)
+	combat.own_paces_and_pushes(nodes, actor_ids, count, ran, _paces, _pushes)
+	var close_sq: float = CLOSE_ENOUGH * CLOSE_ENOUGH
 	for i in count:
-		var node: Node2D = nodes[i]
-		var id: int = actor_ids[i]
 		if hurt_left[i] > 0.0:
 			hurt_left[i] = maxf(hurt_left[i] - delta, 0.0)
-		var walk: float = delta
-		if held:
-			walk = maxf(actors.spend_hold(id, delta), 0.0)
-			ran[i] = walk
-			if walk <= 0.0:
-				velocities[i] = Vector2.ZERO
-				_give[i] = 0.0
-				continue
-		else:
-			ran[i] = delta
+		var walk: float = ran[i]
+		if held and walk <= 0.0:
+			velocities[i] = Vector2.ZERO
+			_give[i] = 0.0
+			continue
 		var slot: int = _target_slot[i]
 		var wait: float = _retarget_left[i] - walk
 		if wait > 0.0 and _grudge_left[i] <= 0.0 and (slot < 0 or _slot_ok[slot] != 0):
 			# The usual step (`_think`, written out): no look due.
 			_retarget_left[i] = wait
 		else:
-			_think(i, node, id, walk, origin)
+			_think(i, nodes[i], actor_ids[i], walk, origin)
 			slot = _target_slot[i]
-		var pace: float = combat.own_pace(node, id)
+		var pace: float = _paces[i]
+		var push: Vector2 = _pushes[i]
+		if walk <= 0.0:
+			# A step of no time (never in play): asked here, as Combat leaves such rows alone.
+			pace = combat.own_pace(nodes[i], actor_ids[i])
+			push = combat.own_knockback(nodes[i], actor_ids[i], walk)
 		var velocity: Vector2 = Vector2.ZERO
 		if slot >= 0:
 			var to_target: Vector2 = _slot_at[slot] - positions[i]
 			var far_sq: float = to_target.length_squared()
 			if far_sq > 0.0:
-				aims[i] = to_target / sqrt(far_sq)
-				if far_sq > CLOSE_ENOUGH * CLOSE_ENOUGH:
-					velocity = aims[i] * (_speed[i] * pace)
-		velocity += combat.own_knockback(node, id, walk)
+				var aim: Vector2 = to_target / sqrt(far_sq)
+				aims[i] = aim
+				if far_sq > close_sq:
+					velocity = aim * (_speed[i] * pace)
+		velocity += push
 		velocities[i] = velocity
 		_give[i] = 1.0 if pace > 0.0 else 0.0
 	# The look steps once the velocities and aims are set, before the rows move.
 	if look != null and is_instance_valid(look):
 		look.call(&"step", delta)
-	for i in count:
-		positions[i] += velocities[i] * ran[i]
+	# The rows move as the spacing's hash is filled (`_space`), then the push, the floor and the
+	# walls, and each node's `position`, in one pass (`_keep_in`).
 	_space()
 	_keep_in()
-	for i in count:
-		nodes[i].position = positions[i]
 	moved += 1
 
 
@@ -499,45 +509,47 @@ func _feet_of(node: Node2D) -> Vector2:
 ## eight neighbours, so every pair is seen once.
 func _space() -> void:
 	_cell_head.fill(-1)
+	_push.fill(Vector2.ZERO)
 	var inv: float = 1.0 / _cell
 	var gw: int = _grid_w
 	var gh: int = _grid_h
 	var ox: float = _arena.position.x
 	var oy: float = _arena.position.y
 	for i in count:
-		var p: Vector2 = positions[i]
-		var cell: int = clampi(int((p.y - oy) * inv), 0, gh - 1) * gw + clampi(int((p.x - ox) * inv), 0, gw - 1)
+		# The row's move of this step first (its velocity for the seconds it ran).
+		var p: Vector2 = positions[i] + velocities[i] * ran[i]
+		positions[i] = p
+		var cy: int = clampi(int((p.y - oy) * inv), 0, gh - 1)
+		var cx: int = clampi(int((p.x - ox) * inv), 0, gw - 1)
+		var cell: int = cy * gw + cx
 		_next[i] = _cell_head[cell]
 		_cell_head[cell] = i
-		_push[i] = Vector2.ZERO
+		_cell_of[i] = cell
 	# Half the rows own their pairs this step, the other half the next (a pair is seen every other
 	# step, from whichever of its rows owns it then), at twice the share.
 	var share: float = minf(SPACING_SHARE * 2.0, 1.0)
 	for i in range(moved & 1, count, 2):
+		var cell: int = _cell_of[i]
+		var cy: int = cell / gw
+		var cx: int = cell - cy * gw
+		# Its own cell (only the rows after it in the list: each pair once), then four of its
+		# neighbours: right, and the three below, in that order.
+		var right: bool = cx + 1 < gw
+		var has_below: bool = cy + 1 < gh
+		var below: int = cell + gw
+		var j: int = _next[i]
+		var h1: int = _cell_head[cell + 1] if right else -1
+		var h2: int = _cell_head[below] if has_below else -1
+		var h3: int = _cell_head[below - 1] if has_below and cx > 0 else -1
+		var h4: int = _cell_head[below + 1] if has_below and right else -1
+		if j < 0 and h1 < 0 and h2 < 0 and h3 < 0 and h4 < 0:
+			continue
 		var p: Vector2 = positions[i]
 		var r: float = _radius[i]
 		var gi: float = _give[i]
 		var push_i: Vector2 = _push[i]
-		var cx: int = clampi(int((p.x - ox) * inv), 0, gw - 1)
-		var cy: int = clampi(int((p.y - oy) * inv), 0, gh - 1)
-		# Its own cell (only the rows after it in the list: each pair once), then four of its
-		# neighbours: right, and the three below.
-		var right: bool = cx + 1 < gw
-		var has_below: bool = cy + 1 < gh
-		var below: int = (cy + 1) * gw + cx
-		for k in 5:
-			var j: int = -1
-			match k:
-				0:
-					j = _next[i]
-				1:
-					j = _cell_head[cy * gw + cx + 1] if right else -1
-				2:
-					j = _cell_head[below] if has_below else -1
-				3:
-					j = _cell_head[below - 1] if has_below and cx > 0 else -1
-				4:
-					j = _cell_head[below + 1] if has_below and right else -1
+		var k: int = 0
+		while true:
 			while j >= 0:
 				var d: Vector2 = positions[j] - p
 				var reach: float = r + _radius[j]
@@ -557,27 +569,48 @@ func _space() -> void:
 						push_i -= shift * gi
 						_push[j] += shift * gj
 				j = _next[j]
+			k += 1
+			if k == 1:
+				j = h1
+			elif k == 2:
+				j = h2
+			elif k == 3:
+				j = h3
+			elif k == 4:
+				j = h4
+			else:
+				break
 		_push[i] = push_i
-	for i in count:
-		if _push[i] != Vector2.ZERO:
-			positions[i] += _push[i]
 
 
-## Every row on the floor and out of the walls: a move into a wall cell slides along it or stays.
+## Every row's spacing push (`_space`), then on the floor and out of the walls (a move into a wall
+## cell slides along it or stays), and its node's `position` written.
 func _keep_in() -> void:
 	var low: Vector2 = _arena.position
 	var high: Vector2 = _arena.end
+	var ax: float = _arena.position.x
+	var ay: float = _arena.position.y
+	var walls: bool = _has_walls
 	for i in count:
-		var p: Vector2 = positions[i].clamp(low, high)
-		if _has_walls and _walled(p):
-			var was: Vector2 = nodes[i].position
-			if not _walled(Vector2(p.x, was.y)):
-				p = Vector2(p.x, was.y)
-			elif not _walled(Vector2(was.x, p.y)):
-				p = Vector2(was.x, p.y)
-			else:
-				p = was
+		var p: Vector2 = positions[i]
+		var push: Vector2 = _push[i]
+		if push != Vector2.ZERO:
+			p += push
+		p = p.clamp(low, high)
+		if walls:
+			# `_walled(p)`, written out.
+			var cx: int = int((p.x - ax) / WALL_CELL)
+			var cy: int = int((p.y - ay) / WALL_CELL)
+			if cx >= 0 and cy >= 0 and cx < _wall_w and cy < _wall_h and _walls[cy * _wall_w + cx] != 0:
+				var was: Vector2 = nodes[i].position
+				if not _walled(Vector2(p.x, was.y)):
+					p = Vector2(p.x, was.y)
+				elif not _walled(Vector2(was.x, p.y)):
+					p = Vector2(was.x, p.y)
+				else:
+					p = was
 		positions[i] = p
+		nodes[i].position = p
 
 
 func _walled(p: Vector2) -> bool:
@@ -758,6 +791,9 @@ func _grow(size: int) -> void:
 	_give.resize(size)
 	_push.resize(size)
 	_next.resize(size)
+	_cell_of.resize(size)
+	_paces.resize(size)
+	_pushes.resize(size)
 
 
 ## The autoloads, for every service the director did not hand over.

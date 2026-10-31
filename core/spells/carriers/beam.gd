@@ -99,6 +99,11 @@ func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS
 
 
+## It dissolves over the last SpellLimits.BEAM_FADE of its life, zapping nothing then.
+func fade() -> float:
+	return SpellLimits.BEAM_FADE
+
+
 func step_order() -> int:
 	return 2
 
@@ -163,7 +168,7 @@ func _pull_magnets() -> void:
 ## reach of its line, as far as it got, rolls its chance (again SpellLimits.ZAP_AGAIN after it was
 ## zapped or lost its roll), and on a win is zapped from the
 ## nearest point of its line at a random moment while it is in reach (at most
-## SpellLimits.ZAP_WAIT_MOST and the time until the beam starts to dissolve, `_zap_time_left`; a
+## SpellLimits.ZAP_WAIT_MOST and the time until the beam starts to dissolve, `Carrier.active_left`; a
 ## beam stands where it is held, so a body stays in reach until it or the beam moves); a waiting zap
 ## whose body left the reach is made as it leaves. A beam with nothing in reach now and then throws a
 ## spark off its line. A dissolving beam zaps nothing (owner, 2026-10-31): its waiting zaps are
@@ -176,7 +181,7 @@ func _step_zaps(delta: float) -> void:
 		var spell: CompiledSpell = _bm_spell[at]
 		if spell.zap_chance <= 0.0 or spell.zap_reach <= 0.0 or _bm_count[at] < 1:
 			continue
-		var left: float = _zap_time_left(at)
+		var left: float = active_left(_bm_life[at], _bm_span[at])
 		if left <= 0.0:
 			_drop_zaps(at)
 			continue
@@ -211,14 +216,6 @@ func _step_zaps(delta: float) -> void:
 					_bm_due_body[n] = body
 					_bm_due_at[n] = kit.clock() + wait
 					_bm_due_count[at] += 1
-
-
-## Seconds before live beam `at` starts to dissolve (SpellLimits.BEAM_FADE of its life left; a held
-## one, which ends when switched off, its life left): how long it may still zap.
-func _zap_time_left(at: int) -> float:
-	if _bm_span[at] >= SpellLimits.HOLD_LIFETIME:
-		return _bm_life[at]
-	return _bm_life[at] - SpellLimits.BEAM_FADE * _bm_span[at]
 
 
 ## Live beam `at` drops the zaps it has won but not made.
@@ -834,7 +831,8 @@ func step(delta: float) -> void:
 ## each on or off. A beam on runs along its path (`beam_point_count`, `beam_point`; a homing one
 ## bends onto a target, `beam_end`, through `beam_bend`, and with pierce on to more), cut to its
 ## first `beam_reach` pixels (its length, a wall, or the target that spends it).
-## `beam_since_hit` is seconds since its last hit; `beam_left` is its life left, 0 to 1.
+## `beam_since_hit` is seconds since its last hit; `beam_left` is its life left, 0 to 1, and
+## `beam_fade` how whole it looks, 1 to 0 as it dissolves at its end (`Carrier.fade_left`).
 func beam_slots() -> int:
 	return _bm_on.size()
 
@@ -893,6 +891,10 @@ func beam_look(at: int) -> int:
 
 func beam_since_hit(at: int) -> float:
 	return kit.clock() - _bm_hit_at[at]
+
+
+func beam_fade(at: int) -> float:
+	return fade_left(_bm_life[at], _bm_span[at])
 
 
 func beam_left(at: int) -> float:

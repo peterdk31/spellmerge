@@ -1852,9 +1852,8 @@ func _draw_live_beams() -> void:
 		var before: Vector3 = path[used - 2]
 		var end_dir: Vector2 = Vector2(before.x, before.y).direction_to(end_at)
 		var since: float = beams.call("beam_since_hit", i)
-		var left: float = beams.call("beam_left", i)
-		# It dissolves over the last SpellLimits.BEAM_FADE of its life, when it no longer zaps.
-		var fade: float = clampf(left / SpellLimits.BEAM_FADE, 0.0, 1.0)
+		# It dissolves at its end as its carrier says (`Carrier.fade_left`), when it acts no more.
+		var fade: float = beams.call("beam_fade", i)
 		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
 		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
 		# Drawn across a fixed width; flare, flicker and fade swell and dissolve its pixels instead

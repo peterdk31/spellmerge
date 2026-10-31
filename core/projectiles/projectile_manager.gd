@@ -4170,6 +4170,11 @@ func get_life_of(slot: int) -> float:
 	return _life[slot] if is_alive(slot) else 0.0
 
 
+## The seconds the shot in `slot` was spawned to live (its whole life), 0 for an empty slot.
+func get_span_of(slot: int) -> float:
+	return _span[slot] if is_alive(slot) else 0.0
+
+
 ## The hit radius of the shot in `slot` now (growth included), or 0 for an empty slot.
 func get_radius_of(slot: int) -> float:
 	return _radius[slot] if is_alive(slot) else 0.0

@@ -261,6 +261,9 @@ class FakeBeams:
 	func beam_left(_at: int) -> float:
 		return 1.0
 
+	func beam_fade(_at: int) -> float:
+		return 1.0
+
 
 func _live_lines() -> Array[MeshInstance2D]:
 	var found: Array[MeshInstance2D] = []

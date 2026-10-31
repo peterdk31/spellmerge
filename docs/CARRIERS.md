@@ -119,6 +119,23 @@ The looks, `ai` and the tests read a carrier's own getters from that carrier's c
 `CarrierDash.of(spells)`, `CarrierDecoy.of(spells)` (each is `Spells.carrier(id)`, typed). A new
 carrier with rows others read adds the same `static func of`.
 
+### Its end: when a carrier is going
+
+A carrier that dissolves at its end says so once, in `fade()`: the share of its life, at its end,
+over which it fades out (0, the default, ends at once; a beam's is `SpellLimits.BEAM_FADE`, its last
+quarter; a held one never fades, it ends when switched off). Two shared helpers on `Carrier` read
+it, so the logic and the looks agree on the moment:
+
+- `active_left(life_left, span)`: the seconds it may still act. Anything a carrier times waits
+  within it, and a wait still running when it reaches 0 is dropped: a carrier that is going does
+  nothing more of its own accord (owner, 2026-10-31). A won zap does this, a beam's in its rows and
+  a shot's in `Spells._active_left`.
+- `fade_left(life_left, span)`: how whole it looks, 1 to 0 over its fade. Feel draws a beam's fade
+  from it (`CarrierBeam.beam_fade`).
+
+To time something new on a carrier, wait at most `active_left` and check it again before acting.
+To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
+
 ## Adding a carrier
 
 1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, and

@@ -479,6 +479,32 @@ func test_the_break_freezes_the_swarm() -> void:
 	check(run.swarm.nodes[0].position != before, "and walks again after it")
 
 
+## Regression (integration, 2026-10-31): the director runs while the tree is paused (it hears picks
+## and readiness), so its physics step moved the swarm through every level-up break and the pause menu.
+func test_the_swarm_stands_still_in_a_break_and_while_paused() -> void:
+	var run: Fixture = _make()
+	run.wizard(Vector2.ZERO)
+	var director: HordeScript = _director_on(run, {Fixture.MiteData.id: 1.0})
+	director.step(Fixture.STEP)
+	check(run.swarm.count > 0, "a swarmer appeared")
+	var before: Vector2 = run.swarm.nodes[0].position
+	director.call("_start_break")
+	check(director.in_break(), "a break is on")
+	for i in 10:
+		director.physics_step(Fixture.STEP)
+	check_equal(run.swarm.nodes[0].position, before, "it stands through a level-up break")
+	director.call("_end_break")
+	paused = true
+	for i in 10:
+		director.physics_step(Fixture.STEP)
+	paused = false
+	check_equal(run.swarm.nodes[0].position, before, "and while the pause menu holds the game")
+	run.projectiles.step(Fixture.STEP)
+	for i in 10:
+		director.physics_step(Fixture.STEP)
+	check(run.swarm.nodes[0].position != before, "and walks again after both")
+
+
 func test_a_restart_forgets_the_swarm() -> void:
 	var run: Fixture = _make()
 	run.wizard(Vector2.ZERO)

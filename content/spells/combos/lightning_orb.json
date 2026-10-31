@@ -1,9 +1,14 @@
 {
 	"id": "lightning_orb",
 	"name": "Lightning orb",
-	"does": "A slow orb that crawls past an imp without touching it and zaps it with static as it goes.",
-	"casts": [{"staff": 0, "cards": ["slow", "lightning", "arc", "bolt"]}],
+	"does": "Slow orbs crawl past an imp without touching it; each has a 50% chance to zap it with static as it comes near.",
+	"casts": [
+		{"staff": 0, "cards": ["slow", "lightning", "zap", "bolt"]},
+		{"staff": 0, "cards": ["slow", "lightning", "zap", "bolt"], "at": 1.0},
+		{"staff": 0, "cards": ["slow", "lightning", "zap", "bolt"], "at": 2.0},
+		{"staff": 0, "cards": ["slow", "lightning", "zap", "bolt"], "at": 3.0}
+	],
 	"imps": [[60, 45]],
-	"seconds": 3.0,
+	"seconds": 6.0,
 	"checks": [{"kind": "status", "imps": [0], "status": "static"}]
 }

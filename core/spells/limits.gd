@@ -5,7 +5,7 @@ extends RefCounted
 ## payload depth, no clamps on the compiled numbers, and no limit on what a card or a trigger
 ## does (owner, 2026-10-29: interactions are not limited, they follow the rules). What is left is
 ## engine pacing that spreads load over steps and never drops anything (the per-step fire pacing,
-## the arc and magnet turns; the projectile pool lives in `core/projectiles`), room made at
+## the zap and magnet turns; the projectile pool lives in `core/projectiles`), room made at
 ## start that grows when needed, and tuning. If the stress benchmark
 ## (tests/benchmark/stress_runner.gd) or the emergent combo report shows a staff that freezes
 ## the game, a limit, a mana cost or a cheaper effect is decided then (owner, 2026-10-26).
@@ -34,23 +34,20 @@ const PENDING_START: int = 128
 const ECHO_DAMAGE: float = 0.5
 ## Reach in pixels of a chain's jump to the next target.
 const CHAIN_RANGE: float = 96.0
-## Share of its shot's damage an `arc` zap hits for (the shot's infusions come along).
-const ARC_DAMAGE: float = 0.5
+## Share of its shot's damage a `zap` hits for (the shot's infusions come along).
+const ZAP_DAMAGE: float = 0.5
 ## Zaps all shots together may make in one physics step; more wait for the next.
-const MAX_ARCS_PER_STEP: int = 32
-## An arc is a crackle, not a clock (owner, 2026-10-30: "much more unpredictable"): a shot's first
-## zap comes at a random moment of its first interval, each next one ARC_GAP_LEAST to
-## ARC_GAP_MOST intervals after the last (the card's rate on average), at a body in reach picked at
-## random, the near ones likelier (`pick_target`). One point-blank always hits; one at the edge of
-## its reach misses ARC_MISS_FAR of the time and strikes the air beside the body.
-const ARC_GAP_LEAST: float = 0.5
-const ARC_GAP_MOST: float = 1.5
-const ARC_MISS_FAR: float = 0.6
-## Sparks a second an arc shot with nothing in its reach throws into the air, ARC_SPARK_SHORTEST
-## to ARC_SPARK_LONGEST pixels: looks only, they hit nothing and wait for no clock.
-const ARC_SPARKS: float = 3.0
-const ARC_SPARK_SHORTEST: float = 8.0
-const ARC_SPARK_LONGEST: float = 22.0
+const MAX_ZAPS_PER_STEP: int = 32
+## A zap is a chance, not a clock (owner, 2026-10-30): each body that comes within a zap shot's
+## reach rolls the shot's `zap_chance` once, and on a roll that wins is zapped at once, the body
+## its shot is about to hit too. Shots look for bodies every ZAP_EVERY steps (half of them each
+## step), which is soon enough at any speed and halves the cost.
+const ZAP_EVERY: int = 2
+## Sparks a second a zap shot with nothing in its reach throws into the air, ZAP_SPARK_SHORTEST
+## to ZAP_SPARK_LONGEST pixels: looks only, they hit nothing and wait for no clock.
+const ZAP_SPARKS: float = 3.0
+const ZAP_SPARK_SHORTEST: float = 8.0
+const ZAP_SPARK_LONGEST: float = 22.0
 ## Magnet shots that may pull in one physics step; the others take turns.
 const MAX_PULLS_PER_STEP: int = 16
 ## Pixels per second a `magnet` shot pulls the enemies near it toward itself.

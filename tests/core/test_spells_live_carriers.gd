@@ -63,10 +63,10 @@ func before_each() -> void:
 	dash.carrier = &"dash"
 	dash.ray_length = 40.0
 	var arc := ModifierBase.new()
-	arc.behaviour = ModifierBase.Behaviour.ARC
+	arc.behaviour = ModifierBase.Behaviour.ZAP
 	arc.behaviour_strength = 2.0
 	arc.behaviour_reach = 60.0
-	_put(arc, &"arc")
+	_put(arc, &"zap")
 	var timer := TriggerBase.new()
 	timer.event = TriggerBase.Event.TIMER
 	timer.interval = 0.5
@@ -142,7 +142,7 @@ func test_an_arc_on_a_short_shot_zaps_before_it_ends() -> void:
 	target.global_position = Vector2(60, 30)
 	_mgr.add_target(target, 8.0, ManagerScript.LAYER_ENEMY)
 	# Arc 2: every 0.5 s, so the 0.4 s shot zaps first at 0.2 s.
-	_build([&"arc", &"short"])
+	_build([&"zap", &"short"])
 	_cast()
 	_tick(30)
 	check_equal(_hits.size(), 1, "the shot zapped the body off its line once")

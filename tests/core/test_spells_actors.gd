@@ -93,7 +93,7 @@ func before_each() -> void:
 	_modifier(&"siphon", ModifierBase.Behaviour.SIPHON, 2.0)
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
-	_modifier(&"arc", ModifierBase.Behaviour.ARC, 2.0).behaviour_reach = 60.0
+	_modifier(&"zap", ModifierBase.Behaviour.ZAP, 2.0).behaviour_reach = 60.0
 	_trigger(&"on_hurt", TriggerBase.Event.HURT)
 	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
 
@@ -460,7 +460,7 @@ func test_an_enemys_arc_zaps_another_team_only() -> void:
 	var imp: int = ActorSeats.enemy(_table)
 	var mate: Node2D = _target(Vector2(0.0, -30.0), ManagerScript.LAYER_ENEMY, ActorSeats.enemy(_table))
 	var wizard: Node2D = _target(Vector2(0.0, 50.0), ManagerScript.LAYER_PLAYER, W0)
-	_build(imp, [&"arc", &"rune"])
+	_build(imp, [&"zap", &"rune"])
 	_cast(imp)
 	_tick(60)
 	check(_hit_targets().has(wizard), "the rune zaps the wizard")

@@ -24,7 +24,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.HOMING, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.BOUNCE,
 	ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.GHOST,
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
-	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
+	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ZAP,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
 	ModifierBase.Behaviour.PULL,
 ]
@@ -394,8 +394,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.lifetime *= modifier.reach_mult
 		else:
 			spell.ray_length *= modifier.reach_mult
-		if modifier.behaviour == ModifierBase.Behaviour.ARC:
-			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
+		if modifier.behaviour == ModifierBase.Behaviour.ZAP:
+			spell.zap_reach = maxf(spell.zap_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
 			spell.behaviour_cues[modifier.behaviour] = modifier.cue
@@ -455,14 +455,14 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	# The cards that land on a point strike everything there: an explosion too.
 	if form == null:
 		spell.hit.kind = &"burst"
-	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
-	if arc > 0.0:
-		# Zaps per second add up over arc cards (a shot zaps at most once a physics step); a zap
-		# hits like a ray, at ARC_DAMAGE of the shot.
-		spell.arc_interval = 1.0 / arc
-		spell.arc_hit = zap_hit(spell.hit)
+	var zap: float = spell.behaviour(ModifierBase.Behaviour.ZAP)
+	if zap > 0.0:
+		# The chance each body the shot passes is zapped, once (zap cards combine as chances,
+		# `stacked`); a zap hits like a ray, at ZAP_DAMAGE of the shot.
+		spell.zap_chance = zap
+		spell.zap_hit = zap_hit(spell.hit)
 		if spell.echo_hit != null:
-			spell.echo_arc_hit = zap_hit(spell.echo_hit)
+			spell.echo_zap_hit = zap_hit(spell.echo_hit)
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
@@ -472,10 +472,10 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	return spell
 
 
-## What a zap (`arc`) of a shot that hits with `hit` does: the same hit, ray kind, at ARC_DAMAGE of
+## What a zap (`arc`) of a shot that hits with `hit` does: the same hit, ray kind, at ZAP_DAMAGE of
 ## its strength and knockback. Spells asks it again for a shot whose hit changed (`relay`).
 static func zap_hit(hit: HitProfile) -> HitProfile:
-	var zap: HitProfile = hit.scaled(SpellLimits.ARC_DAMAGE, SpellLimits.ARC_DAMAGE)
+	var zap: HitProfile = hit.scaled(SpellLimits.ZAP_DAMAGE, SpellLimits.ZAP_DAMAGE)
 	zap.kind = &"ray"
 	return zap
 
@@ -492,10 +492,13 @@ static func blast_hit(hit: HitProfile) -> HitProfile:
 ## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none):
 ## counts add (bounces, shields, seconds, pixels) and multipliers multiply (heavy's knockback,
 ## growth's factor; rule 3, docs/milestones/M2-rules.md R1c), so two heavy cards are 4 x 4, not 4 + 4.
-## Homing multiplies too, by its own rule (HOMING_STACK).
+## Homing multiplies too, by its own rule (HOMING_STACK). Chances (zap's) combine as chances do:
+## two 50% cards are 75%, never past 100%.
 static func stacked(behaviour: int, before: float, strength: float) -> float:
 	if before > 0.0 and MULTIPLIED.has(behaviour):
 		return before * strength
+	if behaviour == ModifierBase.Behaviour.ZAP:
+		return 1.0 - (1.0 - clampf(before, 0.0, 1.0)) * (1.0 - clampf(strength, 0.0, 1.0))
 	return before + strength
 
 

@@ -1,20 +1,20 @@
 extends "res://tests/support/screenshot.gd"
-## Arc shots as the game draws them (owner, 2026-10-30: arcs crackle at random and look like
-## lightning): a stream of arc atoms (plain, lightning and frost) and of arc fire bolts, cast every
-## frame they are ready for half a second, past a row of dummies beside their line. Their zaps
-## leave from different places at different dummies, some miss, and with nothing near they spark
-## into the air. `live_arcs`, `live_arcs_2` and `live_arcs_3` are the whole screen a sixth of a
-## second apart, `live_arcs_4x` a crop of the lightning stream.
+## Zap shots as the game draws them (owner, 2026-10-30: each body a zap shot passes has a 50%
+## chance to be zapped, drawn as lightning): a stream of zap atoms (plain, lightning, frost) and of
+## zap fire bolts, cast whenever they are ready for two thirds of a second, past a row of dummies
+## beside their line; which dummies each shot zaps is a roll. `live_zaps`, `live_zaps_2` and
+## `live_zaps_3` are the whole screen a sixth of a
+## second apart, `live_zaps_4x` a crop of the lightning stream.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
 const STARTER := preload("res://content/wizard/staffs/curl/curl.tres")
 ## Each row: the cards and where its stream starts; its dummies stand beside its line.
 const ROWS: Array = [
-	[[&"arc", &"atom"], Vector2(30.0, 50.0)],
-	[[&"arc", &"lightning", &"atom"], Vector2(30.0, 140.0)],
-	[[&"arc", &"frost", &"atom"], Vector2(30.0, 230.0)],
-	[[&"arc", &"fire", &"bolt"], Vector2(30.0, 320.0)],
+	[[&"zap", &"atom"], Vector2(30.0, 50.0)],
+	[[&"zap", &"lightning", &"atom"], Vector2(30.0, 140.0)],
+	[[&"zap", &"frost", &"atom"], Vector2(30.0, 230.0)],
+	[[&"zap", &"fire", &"bolt"], Vector2(30.0, 320.0)],
 ]
 ## How far beside the line the dummies stand, and how far apart.
 const BESIDE: float = 34.0
@@ -57,5 +57,5 @@ func take() -> void:
 			for i in ROWS.size():
 				spells.call("cast_staff", wizards[0], i, ROWS[i][1], Vector2.RIGHT, 100.0)
 			await physics_frame
-		await shot("live_arcs" if moment == 0 else "live_arcs_%d" % (moment + 1))
-	await snap(Vector2(200.0, 140.0), "live_arcs_4x", Vector2i(160, 60), 4)
+		await shot("live_zaps" if moment == 0 else "live_zaps_%d" % (moment + 1))
+	await snap(Vector2(200.0, 140.0), "live_zaps_4x", Vector2i(160, 60), 4)

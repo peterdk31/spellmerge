@@ -141,30 +141,17 @@ func test_an_echoed_beams_jumps_hit_at_half_on_every_tick() -> void:
 
 
 func test_an_echoed_shots_zaps_hit_at_the_echos_share() -> void:
-	var spell: CompiledSpell = _spell(["echo", "arc", "rune"])
-	check(spell.echo_arc_hit != null, "an echoed shot has its own zap")
-	if spell.echo_arc_hit == null:
+	var spell: CompiledSpell = _spell(["echo", "zap", "rune"])
+	check(spell.echo_zap_hit != null, "an echoed shot has its own zap")
+	if spell.echo_zap_hit == null:
 		return
-	check_equal(spell.echo_arc_hit.damage, maxi(roundi(spell.echo_hit.damage * SpellLimits.ARC_DAMAGE), 1), "the echo's damage at the zap's share")
-	check_equal(spell.echo_arc_hit.kind, &"ray", "a zap is a ray hit")
-	var lost: Array[int] = []
-	for cards: Array in [["arc", "rune"], ["echo", "arc", "rune"]]:
-		var arena := ArenaScript.new(root)
-		var imp: Node2D = arena.add_imp(Vector2(0.0, 40.0), BIG)
-		arena.install_cards(0, 0, cards)
-		arena.cast(0, 0)
-		arena.run(9.0)
-		lost.append(_lost_big(arena, imp))
-		arena.free_all()
-	var zaps: int = roundi(lost[0] / spell.arc_hit.damage)
-	check(zaps > 4, "the rune zapped (%d)" % zaps)
-	# The echo's rune is a shot of its own: it crackles at its own random moments, at the echo's share.
-	var extra: float = float(lost[1] - lost[0]) / spell.echo_arc_hit.damage
-	check(extra >= 2.0 and is_equal_approx(extra, roundf(extra)) and extra <= zaps * 2.0, "the echo's rune zaps too, at the echo's share (%s zaps)" % extra)
+	check(is_equal_approx(spell.echo_zap_hit.damage, spell.echo_hit.damage * SpellLimits.ZAP_DAMAGE), "the echo's damage at the zap's share")
+	check_equal(spell.echo_zap_hit.kind, &"ray", "a zap is a ray hit")
+	# (How often a rune zaps is the card's chance, tests/content/spells/test_zap.gd: one roll a body.)
 
 
 func test_a_zap_keeps_slam_and_heal() -> void:
-	var spell: CompiledSpell = _spell(["heavy", "mend", "arc", "bolt"])
-	check(spell.arc_hit.slam > 0, "a heavy shot's zap slams")
-	check(spell.arc_hit.heal > 0, "a mend shot's zap heals")
-	check_equal(spell.arc_hit.knockback, spell.hit.knockback * SpellLimits.ARC_DAMAGE, "at the zap's share of knockback")
+	var spell: CompiledSpell = _spell(["heavy", "mend", "zap", "bolt"])
+	check(spell.zap_hit.slam > 0, "a heavy shot's zap slams")
+	check(spell.zap_hit.heal > 0, "a mend shot's zap heals")
+	check_equal(spell.zap_hit.knockback, spell.hit.knockback * SpellLimits.ZAP_DAMAGE, "at the zap's share of knockback")

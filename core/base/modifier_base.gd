@@ -52,13 +52,13 @@ enum Behaviour {
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
 	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.NEEDS`).
 	RETURN,
-	## Zaps an enemy within `behaviour_reach` pixels, picked at random with the near ones likelier
-	## and never the one its shot hits next, `behaviour_strength` times a second on average at
-	## random moments (arc cards add up; a far one is missed more often; with nothing near it
-	## sparks into the air; SpellLimits.ARC_*) while the shot lives, at `SpellLimits.ARC_DAMAGE` of its damage with its infusions; a zap
+	## Each enemy that comes within `behaviour_reach` pixels of the shot has a `behaviour_strength`
+	## chance (0 to 1; 0.5 the card) to be zapped, once per shot, at once, the one the shot is
+	## about to hit too (zap cards combine as chances: two are 75%; with nothing near the shot
+	## sparks into the air; SpellLimits.ZAP_*; owner, 2026-10-30), at `SpellLimits.ZAP_DAMAGE` of its damage with its infusions; a zap
 	## is a hit, so it sets off `on hit` and chains (owner, 2026-10-27). Only on a carrier that
 	## stays in the air as a shot.
-	ARC,
+	ZAP,
 	## Every actor the carrier hits is possessed for `behaviour_strength` seconds (actors G9,
 	## `possess_requested`; owner, 2026-10-29): the caster's controller drives the oldest of the
 	## bodies it possesses and the others copy its intent; the caster's body stands. The rule is in
@@ -102,7 +102,7 @@ const NEEDS: Dictionary = {
 	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
 	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
 	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
-	Behaviour.ARC: {"any": CarrierTraits.STAYS},
+	Behaviour.ZAP: {"any": CarrierTraits.STAYS},
 }
 
 @export var damage_mult: float = 1.0

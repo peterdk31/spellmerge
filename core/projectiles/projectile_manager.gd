@@ -260,8 +260,6 @@ const HOMING_PERIOD: int = 4
 const RAY_SEGMENTS: int = 8
 ## The most points of its last step a swing's or beam's guard tests a shot at (`_guard_samples`).
 const GUARD_PATH_SAMPLES: int = 16
-## The least weight a target in reach has in `pick_target`, so one at the edge can still be picked.
-const PICK_LEAST_WEIGHT: float = 0.05
 ## Rows `sweep`'s results hold at first; they grow when a sweep finds more.
 const SWEEP_START: int = 32
 ## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
@@ -4312,72 +4310,27 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	return _targets[best]
 
 
-## A target on `layers` (not of `team`, and not `exclude`) whose hit circle overlaps the circle
-## (`point`, `radius`), picked by `roll` (0 to 1) with the near ones likelier: each weighs
-## (1 - its distance / the reach) squared, at least PICK_LEAST_WEIGHT; or null. An arc's zap. The
-## centre of the one returned is left in `nearest_point`. Two passes, no allocation.
-func pick_target(point: Vector2, radius: float, layers: int, exclude: Node2D, team: int, roll: float) -> Node2D:
-	nearest_point = Vector2.INF
+## Fill `out` with the targets on `layers` not of `team` (Actors.NONE: of any) whose hit circle
+## overlaps the circle (`point`, `radius`), and `centres` with where each one's hit circle is, in
+## the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
+## run. Pass the same arrays each time: nothing is allocated once they have grown.
+func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Array[Node2D], centres: PackedVector2Array) -> int:
+	out.clear()
 	if not point.is_finite() or not is_finite(radius):
-		return null
-	var skip: int = exclude.get_instance_id() if exclude != null else 0
+		return 0
 	_query_ready()
 	var cells: Vector4i = _query_cells(point, radius)
-	var total: float = 0.0
-	var last: int = -1
-	for pass_n in 2:
-		var left: float = roll * total
-		for y in range(cells.y, cells.w + 1):
-			for x in range(cells.x, cells.z + 1):
-				var t: int = _cell_head[y * _grid_w + x]
-				while t >= 0:
-					if _query_match(t, point, radius, layers, skip) and (team == ActorsScript.NONE or _target_team[t] != team):
-						var reach: float = maxf(radius + _target_radius[t], 0.001)
-						var near: float = clampf(1.0 - _target_pos[t].distance_to(point) / reach, 0.0, 1.0)
-						var weight: float = maxf(near * near, PICK_LEAST_WEIGHT)
-						if pass_n == 0:
-							total += weight
-						else:
-							last = t
-							left -= weight
-							if left <= 0.0:
-								nearest_point = _target_pos[t]
-								return _targets[t]
-					t = _target_next[t]
-		if total <= 0.0:
-			return null
-	# (A roll of 1 that float sums left a hair over: the last one.)
-	if last >= 0:
-		nearest_point = _target_pos[last]
-		return _targets[last]
-	return null
-
-
-## The first target on `layers` (not of `team`, as `nearest_target`) along the line from `point`
-## to `to` whose hit circle a circle of `radius` moving along it touches, or null: what a shot
-## there will hit next (an arc's zap skips it, as the shot hits it anyway). A line of no length is
-## the circle at `point`. Allocation-free.
-func first_on_path(point: Vector2, to: Vector2, radius: float, layers: int, team: int = ActorsScript.NONE) -> Node2D:
-	if not point.is_finite() or not to.is_finite() or not is_finite(radius):
-		return null
-	var way: Vector2 = to - point
-	var length: float = way.length()
-	var dir: Vector2 = way / length if length > 0.0 else Vector2.ZERO
-	var best: int = -1
-	var best_along: float = INF
-	_query_ready()
-	var cells: Vector4i = _query_cells((point + to) * 0.5, radius + length * 0.5)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (team == ActorsScript.NONE or _target_team[t] != team) and _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, to), radius, layers, 0):
-					var along: float = (_target_pos[t] - point).dot(dir)
-					if along < best_along:
-						best_along = along
-						best = t
+				if _query_match(t, point, radius, layers, 0) and (team == ActorsScript.NONE or _target_team[t] != team):
+					if centres.size() <= out.size():
+						centres.resize(maxi(out.size() * 2, 8))
+					centres[out.size()] = _target_pos[t]
+					out.append(_targets[t])
 				t = _target_next[t]
-	return _targets[best] if best >= 0 else null
+	return out.size()
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps

@@ -1854,7 +1854,7 @@ func _step_zaps(delta: float) -> void:
 		var slot: int = _zappers[i]
 		if not _knows(slot):
 			_rec_zapper[slot] = 0
-			_rec_due_count[slot] = 0
+			_drop_zaps(slot)
 			_zapper_count -= 1
 			_zappers[i] = _zappers[_zapper_count]
 			continue
@@ -1864,6 +1864,10 @@ func _step_zaps(delta: float) -> void:
 		var tag: int = projectiles.get_tag_of(slot)
 		var spell: CompiledSpell = _profiles.get(tag)
 		if spell == null or spell.zap_chance <= 0.0:
+			continue
+		# A shot that is going (`Carrier.active_left`) zaps nothing: its waiting zaps are dropped.
+		if _active_left(slot, spell) <= 0.0:
+			_drop_zaps(slot)
 			continue
 		var at: Vector2 = projectiles.get_position_of(slot)
 		var near: int = projectiles.targets_near(at, spell.zap_reach, HITS, _team(SpellTag.caster_of(tag)), _zap_near, _zap_centres, _zap_radii)
@@ -1922,7 +1926,8 @@ func _zaps_due(slot: int, spell: CompiledSpell, near: int) -> void:
 
 ## Seconds the body whose hit circle is at `centre`, `radius` big, stays in the reach of the zap shot
 ## in `slot`, as the shot flies on now: until the shot hits it, if it is on its way, else until the
-## shot has passed through its reach; at most its life left and SpellLimits.ZAP_WAIT_MOST (a shot
+## shot has passed through its reach; at most until it starts to go (`_active_left`) and
+## SpellLimits.ZAP_WAIT_MOST (a shot
 ## that stands still: the most).
 func _zap_window(slot: int, spell: CompiledSpell, centre: Vector2, radius: float) -> float:
 	var velocity: Vector2 = projectiles.get_velocity_of(slot)
@@ -1940,7 +1945,20 @@ func _zap_window(slot: int, spell: CompiledSpell, centre: Vector2, radius: float
 	else:
 		var reach: float = spell.zap_reach + radius
 		seconds = (along + sqrt(maxf(reach * reach - across * across, 0.0))) / speed
-	return clampf(minf(seconds, projectiles.get_life_of(slot)), 0.0, SpellLimits.ZAP_WAIT_MOST)
+	return clampf(minf(seconds, _active_left(slot, spell)), 0.0, SpellLimits.ZAP_WAIT_MOST)
+
+
+## Seconds the shot in `slot` of `spell` may still act before it starts to go (its carrier's
+## `Carrier.active_left`: its life left, less its fade): what anything it times waits within.
+func _active_left(slot: int, spell: CompiledSpell) -> float:
+	return _carrier_of(spell).active_left(projectiles.get_life_of(slot), projectiles.get_span_of(slot))
+
+
+## The shot in `slot` drops the zaps it has won but not made.
+func _drop_zaps(slot: int) -> void:
+	for n in _rec_due_count[slot]:
+		_rec_due_body[slot * ZAP_DUE + n] = null
+	_rec_due_count[slot] = 0
 
 
 ## True when the zap shot in `slot` has rolled for the body of instance id `id` less than

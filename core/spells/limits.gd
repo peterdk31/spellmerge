@@ -51,6 +51,10 @@ const ZAP_WAIT_MOST: float = 0.6
 ## Seconds after a body was zapped (or lost its roll) before the same shot or beam rolls for it
 ## again (owner, 2026-10-31: a held zap orbit keeps zapping what stays beside it).
 const ZAP_AGAIN: float = 1.0
+## The share of its life a beam that runs out has left when it starts to dissolve (Feel fades it
+## from here to its end). A beam zaps nothing from then on (owner, 2026-10-31: no zap from a carrier
+## that is gone): a won zap still waiting is dropped, and nothing rolls.
+const BEAM_FADE: float = 0.25
 ## Sparks a second a zap shot with nothing in its reach throws into the air, ZAP_SPARK_SHORTEST
 ## to ZAP_SPARK_LONGEST pixels: looks only, they hit nothing and wait for no clock.
 const ZAP_SPARKS: float = 3.0

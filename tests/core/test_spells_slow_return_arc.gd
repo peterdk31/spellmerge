@@ -350,6 +350,43 @@ func test_a_beam_zaps_the_enemy_beside_its_line() -> void:
 		check(from[0].distance_to(Vector2(100.0, 0.0)) < 1.0, "from the line beside the imp (%s)" % from[0])
 
 
+## No zap from a carrier that is going (owner, 2026-10-31): a beam zaps only before it starts to
+## dissolve (SpellLimits.BEAM_FADE of its life left), so no lightning comes from a beam fading or
+## gone; a zap still waiting then is dropped.
+func test_a_beam_zaps_only_before_it_dissolves() -> void:
+	_target(Vector2(100.0, 40.0))
+	var lefts: Array[float] = []
+	_bus.form_shown.connect(func(_caster: int, form: StringName, _origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"zap" and length > 22.0:
+			var beams: CarrierBeam = CarrierBeam.of(_spells)
+			for at in beams.beam_slots():
+				if beams.beam_on(at):
+					lefts.append(beams.beam_left(at)))
+	_build(0, [&"zap", &"beam"])
+	for n in 12:
+		_spells._cooldown.fill(0.0)
+		_cast()
+		_tick(30)
+	check_equal(lefts.size(), 12, "every beam zapped the imp (a sure card), each from a live beam")
+	for left: float in lefts:
+		check(left >= SpellLimits.BEAM_FADE, "zapped before the beam dissolves (%.2f of its life left)" % left)
+
+
+func test_a_dissolving_beam_zaps_nothing() -> void:
+	# The imp comes in reach once the beam has started to dissolve: no zap.
+	var imp: Node2D = _target(Vector2(100.0, 300.0))
+	_build(0, [&"zap", &"beam"])
+	_cast()
+	var beams: CarrierBeam = CarrierBeam.of(_spells)
+	while beams.beam_count() > 0 and beams.beam_left(0) > SpellLimits.BEAM_FADE:
+		_tick(1)
+	_mgr.remove_target(imp)
+	imp.global_position = Vector2(100.0, 40.0)
+	_mgr.add_target(imp, 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+	_tick(30)
+	check(_hits_on(imp).is_empty(), "a fading beam does not zap the imp that came in reach")
+
+
 func test_a_beam_does_not_zap_out_of_reach() -> void:
 	var far: Node2D = _target(Vector2(100.0, 90.0))
 	var beyond: Node2D = _target(Vector2(280.0, 0.0))

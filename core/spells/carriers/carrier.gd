@@ -202,6 +202,35 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _directi
 	return kit.land_shot(slot, spell, tag, source, chain, prev)
 
 
+# --- Its end: when it is going ------------------------------------------------------
+
+## The share of its life (0 to 1), at its end, over which it dissolves: its looks fade out
+## (`fade_left`) and it does nothing more of its own accord (`active_left`; owner, 2026-10-31: "a zap
+## should not trigger if the carrier it triggers from is gone"). 0, the default, for a carrier that
+## ends at once (a shot's core goes at its end). A beam's is SpellLimits.BEAM_FADE. A held one (its
+## life SpellLimits.HOLD_LIFETIME) has no fade: switched off, it ends at once.
+func fade() -> float:
+	return 0.0
+
+
+## Seconds a carrier of this kind with `life_left` of its `span` seconds to go may still act before it
+## starts to dissolve (`fade`): what anything it times waits within (a won zap, ...). 0 or less: it
+## is going, so a wait still running is dropped and nothing new starts.
+func active_left(life_left: float, span: float) -> float:
+	if span <= 0.0 or span >= SpellLimits.HOLD_LIFETIME:
+		return life_left
+	return life_left - fade() * span
+
+
+## How whole a carrier of this kind with `life_left` of its `span` seconds to go looks, 1 to 0 over its
+## `fade` (1 while it is not going): what its looks fade by.
+func fade_left(life_left: float, span: float) -> float:
+	var share: float = fade()
+	if share <= 0.0 or span <= 0.0 or span >= SpellLimits.HOLD_LIFETIME:
+		return 1.0
+	return clampf(life_left / (share * span), 0.0, 1.0)
+
+
 ## What a hit of this carrier does of its own, besides the shared hit path (`Spells._on_hit_effects`):
 ## a swap's trade. Not for a blast's hits, which move nothing (rules R4 F2).
 func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _position: Vector2, _slot: int) -> void:

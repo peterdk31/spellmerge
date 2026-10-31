@@ -57,11 +57,15 @@ const SEATS: int = 4
 const START_BAG: Array[StringName] = [&"dash", &"swing"]
 ## Cards in one level-up offer.
 const OFFER_SIZE: int = 3
-## The most horde enemies alive at once, whatever the curve says (owner, 2026-10-31: playtest at
-## these until a swarm without a node per enemy exists; H1 measured about 200-250 on desktop and
-## 80-100 on web at 60 FPS).
-const MAX_ALIVE_DESKTOP: int = 200
-const MAX_ALIVE_WEB: int = 100
+## The most horde enemies alive at once, whatever the curve says. Set by the swarm stress run (S4,
+## docs/milestones/horde-swarm.md, "S4: scale"): one cap counts swarmers and full actors alike,
+## and a full actor (a staff enemy) costs about five swarmers, so the cap is set at the curve's
+## heaviest mix (its last point: about 41% full actors). There, 225 holds 60 FPS on desktop
+## (headless, four bots, 500 shots: frame 11-14 ms; 250 sits on the line); 150 costs on desktop
+## what the old web cap's 100 full actors did, so the web keeps its old frame (scripts there run
+## roughly 2-3x slower). 500+ needs a cap per kind or a cost per kind (the same document).
+const MAX_ALIVE_DESKTOP: int = 225
+const MAX_ALIVE_WEB: int = 150
 ## At most this many enemies appear in one step, so a burst never hitches.
 const SPAWN_PER_FRAME: int = 4
 ## No enemy appears closer than this to a wizard (pixels).

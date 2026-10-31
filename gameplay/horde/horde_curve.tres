@@ -59,7 +59,7 @@ weights = Dictionary[StringName, float]({
 script = ExtResource("2_point")
 seconds = 240.0
 spawns_per_second = 4.0
-cap_alive = 200
+cap_alive = 225
 weights = Dictionary[StringName, float]({
 &"bone_husk": 6.0,
 &"bone_scepter": 1.0,

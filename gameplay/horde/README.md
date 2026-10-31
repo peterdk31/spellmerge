@@ -26,7 +26,7 @@ Built as part H3 of [docs/milestones/horde.md](../../docs/milestones/horde.md), 
 
 ## Allowed files
 
-`.gd` and `.tres`, plus `.uid` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
+`.gd`, `.tres` and the swarm look's shader (`swarm_look.gdshader`, warmed by `horde.gd`), plus `.uid` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
 ## Steps
 

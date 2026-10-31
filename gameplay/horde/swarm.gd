@@ -26,9 +26,11 @@ extends RefCounted
 ## actor-table id (promotion, part S3). The look (`look`) is told of each step, hit and removal.
 ##
 ## **The step** (`step(delta)`, one for all rows, in physics steps):
-## - **Chase** as `AIController` chases: the nearest standing actor of another team from the
-##   projectile manager's target grid (`nearest_target` with the team), a decoy in its lure range
-##   first (`Entities.lure`), a teammate that hurt it for `AIController.GRUDGE_TIME` (its grudge).
+## - **Chase** as `AIController` chases: the nearest standing actor of another team, a decoy in
+##   its lure range first (`Entities.lure`), a teammate that hurt it for `AIController.GRUDGE_TIME`
+##   (its grudge). The actors of other teams are read from the actor table a few times a second
+##   (`_read_candidates`: the few that Combat has registered), not from the projectile manager's
+##   grid, which a look without a range would walk whole (every swarmer is a target in it).
 ##   Each row looks every `AIController.RETARGET_TIME` seconds, staggered by its seed, at once
 ##   when its target is lost, downed or dying (checked once a step per distinct target, not per
 ##   row), and only on the timer while it has none.
@@ -38,7 +40,7 @@ extends RefCounted
 ##   `target_move_requested` puts a swarmer where it says.
 ## - **Spacing:** swarmers do not stack. A spatial hash (cells of at least twice the largest body
 ##   radius) finds the pairs that overlap; each pair is moved apart by `SPACING_SHARE` of the
-##   overlap a step, split by how free each one is to move (a frozen or held swarmer is not moved,
+##   overlap a step (half the rows own their pairs each step, at twice the share), split by how free each one is to move (a frozen or held swarmer is not moved,
 ##   the other takes it all). No pair is looked at twice; nothing is O(n²).
 ## - **Walls:** the floor the director derived (`start`'s `arena`: the room's walls, a body's
 ##   radius in) holds every swarmer, and the world's other wall bodies (static bodies on layer 1
@@ -71,14 +73,18 @@ const HURT_TIME: float = CreatureLook.HURT_TIME
 const FIRST_LOOK: float = -1.0
 ## Rows made room for at first; the arrays double when full.
 const START_ROOM: int = 256
-## The share of an overlap two swarmers are moved apart by in one step.
+## The share of an overlap two swarmers are moved apart by per step (each pair is seen every other
+## step, at twice this).
 const SPACING_SHARE: float = 0.5
 ## The spatial hash's smallest cell (pixels); larger when a kind's body needs it.
-const SPACING_CELL: float = 16.0
+const SPACING_CELL: float = 8.0
 ## The wall grid's cell (pixels), and how far a wall reaches out for a body's centre (about the
 ## largest swarmer's radius).
 const WALL_CELL: float = 8.0
 const WALL_PAD: float = 8.0
+## Seconds between two readings of the actors a swarmer may chase, and the most kept.
+const CANDIDATE_TIME: float = 0.1
+const MAX_CANDIDATES: int = 64
 ## Distinct targets the rows chase at once (a target no row chases frees its place).
 const TARGET_SLOTS: int = 64
 ## The wall layer of the world's static bodies.
@@ -143,6 +149,12 @@ var _slot_refs: PackedInt32Array = PackedInt32Array()
 var _slot_ok: PackedByteArray = PackedByteArray()
 var _slot_at: PackedVector2Array = PackedVector2Array()
 var _slot_used: int = 0
+## The actors a swarmer may chase (`_read_candidates`): node, team, hurt circle offset.
+var _cand_nodes: Array[Node2D] = []
+var _cand_team: PackedInt32Array = PackedInt32Array()
+var _cand_offset: PackedVector2Array = PackedVector2Array()
+var _cand_count: int = 0
+var _cand_left: float = 0.0
 ## The spatial hash over the floor.
 var _cell: float = SPACING_CELL
 var _grid_w: int = 1
@@ -164,6 +176,9 @@ func _init() -> void:
 	_slot_refs.resize(TARGET_SLOTS)
 	_slot_ok.resize(TARGET_SLOTS)
 	_slot_at.resize(TARGET_SLOTS)
+	_cand_nodes.resize(MAX_CANDIDATES)
+	_cand_team.resize(MAX_CANDIDATES)
+	_cand_offset.resize(MAX_CANDIDATES)
 
 
 ## The kind the swarm runs `data` as (prepared from it), or null when the enemy is not a swarmer.
@@ -202,6 +217,10 @@ func stop() -> void:
 		_slot_nodes[slot] = null
 		_slot_refs[slot] = 0
 	_slot_used = 0
+	for c in _cand_count:
+		_cand_nodes[c] = null
+	_cand_count = 0
+	_cand_left = 0.0
 	_parent = null
 
 
@@ -279,6 +298,7 @@ func step(delta: float) -> void:
 		moved += 1
 		return
 	var origin: Vector2 = _parent.global_position if _parent.is_inside_tree() else _parent.position
+	_read_candidates(delta)
 	_read_targets(origin)
 	var held: bool = actors != null and actors.held_count > 0
 	for i in count:
@@ -296,8 +316,14 @@ func step(delta: float) -> void:
 				continue
 		else:
 			ran[i] = delta
-		_think(i, node, id, walk, origin)
 		var slot: int = _target_slot[i]
+		var wait: float = _retarget_left[i] - walk
+		if wait > 0.0 and _grudge_left[i] <= 0.0 and (slot < 0 or _slot_ok[slot] != 0):
+			# The usual step (`_think`, written out): no look due.
+			_retarget_left[i] = wait
+		else:
+			_think(i, node, id, walk, origin)
+			slot = _target_slot[i]
 		var pace: float = combat.own_pace(node, id)
 		var velocity: Vector2 = Vector2.ZERO
 		if slot >= 0:
@@ -352,12 +378,54 @@ func _find_target(i: int, node: Node2D, id: int, origin: Vector2) -> Node2D:
 		var decoy: Node2D = entities.lure(here)
 		if decoy != null:
 			return decoy
-	if projectiles == null:
-		return null
 	var team: int = actors.team_of(id) if actors != null else ActorsScript.TEAM_ENEMIES
 	var from: Vector2 = here + kinds_list[kinds[i]].body_offset
-	var found: Node2D = projectiles.nearest_target(from, SIGHT, ProjectileManagerScript.ACTOR_LAYERS, node, null, team)
-	return found if _chaseable(found) else null
+	var best: Node2D = null
+	var best_sq: float = SIGHT * SIGHT
+	for c in _cand_count:
+		if _cand_team[c] == team:
+			continue
+		var other: Node2D = _cand_nodes[c]
+		if other == node or not _chaseable(other):
+			continue
+		var d: float = (_feet_of(other) + _cand_offset[c]).distance_squared_to(from)
+		if d < best_sq:
+			best_sq = d
+			best = other
+	return best
+
+
+## The actors a swarmer may chase, read from the actor table every CANDIDATE_TIME seconds: every
+## actor of another team than the swarm's that Combat has registered (a body that can be hit), with
+## its body offset. The look then picks the nearest standing one among these few, as
+## `nearest_target` with the team would among the grid's targets, without walking a grid full of
+## swarmers (an unbounded `nearest_target` visits every target: about 0.5 ms at 1,000).
+func _read_candidates(delta: float) -> void:
+	_cand_left -= delta
+	if _cand_left > 0.0 or actors == null:
+		return
+	_cand_left = CANDIDATE_TIME
+	for c in _cand_count:
+		_cand_nodes[c] = null
+	_cand_count = 0
+	var open: int = actors.open_count()
+	var seen: int = 0
+	for id in ActorsScript.ACTORS:
+		if seen >= open or _cand_count >= MAX_CANDIDATES:
+			break
+		var team: int = actors.team_of(id)
+		if team == ActorsScript.NONE:
+			continue
+		seen += 1
+		if team == ActorsScript.TEAM_ENEMIES:
+			continue
+		var body := actors.node_of(id) as Node2D
+		if body == null or not combat.is_registered(body):
+			continue
+		_cand_nodes[_cand_count] = body
+		_cand_team[_cand_count] = team
+		_cand_offset[_cand_count] = (body as Actor).body_offset if body is Actor else Vector2.ZERO
+		_cand_count += 1
 
 
 ## The row chases `target` (null: nothing): the slot it holds is given back, the new one taken.
@@ -427,8 +495,8 @@ func _feet_of(node: Node2D) -> Vector2:
 # --- Spacing and walls --------------------------------------------------------------------------
 
 ## Moves overlapping pairs apart (see the class doc): the hash is filled with every row, then
-## each row looks at its own cell (the rows after it in the cell's list) and four of its eight
-## neighbours, so every pair is seen once.
+## each owning row looks at its own cell (the rows after it in the cell's list) and four of its
+## eight neighbours, so every pair is seen once.
 func _space() -> void:
 	_cell_head.fill(-1)
 	var inv: float = 1.0 / _cell
@@ -442,51 +510,57 @@ func _space() -> void:
 		_next[i] = _cell_head[cell]
 		_cell_head[cell] = i
 		_push[i] = Vector2.ZERO
-	for i in count:
+	# Half the rows own their pairs this step, the other half the next (a pair is seen every other
+	# step, from whichever of its rows owns it then), at twice the share.
+	var share: float = minf(SPACING_SHARE * 2.0, 1.0)
+	for i in range(moved & 1, count, 2):
 		var p: Vector2 = positions[i]
+		var r: float = _radius[i]
+		var gi: float = _give[i]
+		var push_i: Vector2 = _push[i]
 		var cx: int = clampi(int((p.x - ox) * inv), 0, gw - 1)
 		var cy: int = clampi(int((p.y - oy) * inv), 0, gh - 1)
-		# Its own cell: only the rows after it in the list (each pair once).
-		_pair_with(i, _next[i])
-		# Four neighbours: right, and the three below.
-		if cx + 1 < gw:
-			_pair_with(i, _cell_head[cy * gw + cx + 1])
-		if cy + 1 < gh:
-			var below: int = (cy + 1) * gw + cx
-			_pair_with(i, _cell_head[below])
-			if cx > 0:
-				_pair_with(i, _cell_head[below - 1])
-			if cx + 1 < gw:
-				_pair_with(i, _cell_head[below + 1])
+		# Its own cell (only the rows after it in the list: each pair once), then four of its
+		# neighbours: right, and the three below.
+		var right: bool = cx + 1 < gw
+		var has_below: bool = cy + 1 < gh
+		var below: int = (cy + 1) * gw + cx
+		for k in 5:
+			var j: int = -1
+			match k:
+				0:
+					j = _next[i]
+				1:
+					j = _cell_head[cy * gw + cx + 1] if right else -1
+				2:
+					j = _cell_head[below] if has_below else -1
+				3:
+					j = _cell_head[below - 1] if has_below and cx > 0 else -1
+				4:
+					j = _cell_head[below + 1] if has_below and right else -1
+			while j >= 0:
+				var d: Vector2 = positions[j] - p
+				var reach: float = r + _radius[j]
+				var far_sq: float = d.length_squared()
+				if far_sq < reach * reach:
+					var gj: float = _give[j]
+					var give: float = gi + gj
+					if give > 0.0:
+						var far: float = sqrt(far_sq)
+						var normal: Vector2
+						if far > 0.0001:
+							normal = d / far
+						else:
+							# On the same spot: apart along a direction from the pair's seeds.
+							normal = Vector2.from_angle(float((seeds[i] ^ seeds[j]) & 1023) * (TAU / 1024.0))
+						var shift: Vector2 = normal * ((reach - far) * share / give)
+						push_i -= shift * gi
+						_push[j] += shift * gj
+				j = _next[j]
+		_push[i] = push_i
 	for i in count:
 		if _push[i] != Vector2.ZERO:
 			positions[i] += _push[i]
-
-
-## Row `i` against every row of the list starting at `j`.
-func _pair_with(i: int, j: int) -> void:
-	var p: Vector2 = positions[i]
-	var r: float = _radius[i]
-	while j >= 0:
-		var d: Vector2 = positions[j] - p
-		var reach: float = r + _radius[j]
-		var far_sq: float = d.length_squared()
-		if far_sq < reach * reach:
-			var gi: float = _give[i]
-			var gj: float = _give[j]
-			var give: float = gi + gj
-			if give > 0.0:
-				var normal: Vector2
-				var far: float = sqrt(far_sq)
-				if far > 0.0001:
-					normal = d / far
-				else:
-					# On the same spot: apart along a direction from the pair's seeds.
-					normal = Vector2.from_angle(float((seeds[i] ^ seeds[j]) & 1023) * (TAU / 1024.0))
-				var shift: Vector2 = normal * ((reach - far) * SPACING_SHARE / give)
-				_push[i] -= shift * gi
-				_push[j] += shift * gj
-		j = _next[j]
 
 
 ## Every row on the floor and out of the walls: a move into a wall cell slides along it or stays.

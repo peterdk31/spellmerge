@@ -5,10 +5,13 @@ extends SceneTree
 ##
 ## godot --headless --path . --script res://tests/benchmark/stress.gd
 ## godot --headless --path . --script res://tests/benchmark/stress.gd -- --horde
+## godot --headless --path . --script res://tests/benchmark/stress.gd -- --horde-swarm
 ##
 ## With `--horde` it runs only the horde scenarios (500+ enemies, Horde H1; the runner's
 ## `HORDE`), which the default run leaves out; so does an exported test build started with
 ## `--stress --horde`.
+## With `--horde-swarm` it runs only the swarm scenario (1,000 swarmers in the horde's swarm beside
+## 50 staff enemies, docs/milestones/horde-swarm.md S1), with the physics step's parts timed.
 ##
 ## `test_stress.gd` runs a short version under `build.sh --quick --tests`.
 

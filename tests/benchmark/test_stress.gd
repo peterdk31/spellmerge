@@ -43,6 +43,12 @@ func _initialize() -> void:
 		printerr("TEST FAILED: --horde should pick the horde scenarios and nothing else the default, got %s" % [horde])
 		quit(1)
 		return
+	# The swarm scenario (Horde swarm S1) runs only on `--horde-swarm`, never in a web build.
+	var swarm_run: Array[int] = RunnerScript.scenarios_from_args(PackedStringArray(["--horde-swarm"]), all)
+	if swarm_run != RunnerScript.HORDE_SWARM or not RunnerScript.scenarios_for(swarm_run, true).is_empty() or int(RunnerScript.SCENARIOS[swarm_run[0]].get("swarm", 0)) < 1000:
+		printerr("TEST FAILED: --horde-swarm should pick the desktop swarm scenario of 1,000 swarmers, got %s" % [swarm_run])
+		quit(1)
+		return
 	var web_horde: Array[int] = RunnerScript.scenarios_for(horde, true)
 	if web_horde.size() != 1 or RunnerScript.SCENARIOS[web_horde[0]]["enemies"] < 500:
 		printerr("TEST FAILED: a web build should keep the web horde of 500+, got %s" % [web_horde])

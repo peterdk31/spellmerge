@@ -119,6 +119,11 @@ var own_payload: CompiledGroup = null
 var node: int = -1
 ## The carrier's slot in the staff, -1 for a fallback.
 var slot: int = -1
+## The slots of its own cards, in the order they were read: the infusions and modifiers attached
+## to it, then its carrier (a fallback: the cards that landed there). Set where the compiler
+## attaches them; its triggers are in `triggers` and a group's multicasts in the group. For the
+## builder's tree (docs/milestones/M2-builder-tree.md, part T3).
+var card_slots: PackedInt32Array = PackedInt32Array()
 
 
 ## The stacked strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.

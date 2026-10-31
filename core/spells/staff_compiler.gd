@@ -130,6 +130,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		elif card is MulticastBase:
 			var multicast := card as MulticastBase
 			group.multicast_ids.append(multicast.id)
+			group.multicast_slots.append(slot)
 			_useful[slot] = true
 			_cast.mana += multicast.mana_cost
 			_cast.delay += multicast.cooldown
@@ -174,6 +175,8 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					_waste(at)
 				else:
 					_attach(at, slot)
+					spell.card_slots.append(at)
+			spell.card_slots.append(slot)
 			if form.carries_payload():
 				spell.own_payload = _read_group(1, true)
 			for t in triggers.size():
@@ -253,6 +256,7 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 	var spell: CompiledSpell = _build(null, elements, kept_modifiers, kind)
 	for at: int in kept_slots:
 		_attach(at, target)
+	spell.card_slots = kept_slots
 	return spell
 
 

@@ -509,8 +509,8 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
-## true); `wasted` for the staff (cards that did nothing in any cast that read them); and
-## `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
+## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
+## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
 ## (the radial builder shows what a card would change before it is put in).
 func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var compiled: CompiledStaff = compile_staff(cards, staff)
@@ -521,10 +521,64 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 			"damage": _cast_damage(cast),
 			"recharges": cast.recharges, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
+			"tree": cast_tree(cast),
 		})
 	var row: Array[StringName] = []
 	row.assign(compiled.cards)
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
+
+
+## Shown as a tree's row for a fallback: the cards that landed on the caster, or where a payload began.
+const TREE_ON_CASTER: String = "On you"
+const TREE_AT_POINT: String = "Where it ends"
+
+
+## The rows of one cast as the builder's tree draws them (docs/milestones/M2-builder-tree.md,
+## part T3), depth first: a row per carrier and one per trigger that fires. Each row is plain
+## values: `depth` (0 for the cast's own carriers, one more per payload level), `trigger` (the
+## trigger card's slot, -1 for a carrier row), `slots` (the cards the row shows: a group's
+## multicasts on its first carrier's row, then that carrier's own cards, `CompiledSpell.card_slots`;
+## a trigger row shows the first carrier its payload fires) and `name` (the carrier's or the
+## trigger card's display name). The cast's first row also has its `mana` and `damage`. A
+## payload's further carriers (a multicast in it) are rows of their own at the payload's depth,
+## with no trigger; a rain's carried group is read the same way below it. A wasted trigger has no row.
+func cast_tree(cast: CompiledCast) -> Array[Dictionary]:
+	var rows: Array[Dictionary] = []
+	if cast.group != null:
+		_tree_group(cast.group, 0, -1, &"", rows)
+	if not rows.is_empty():
+		rows[0]["mana"] = cast.mana
+		rows[0]["damage"] = _cast_damage(cast)
+	return rows
+
+
+## The rows of `group` at `depth`: its first carrier on the row of `trigger` (a slot, -1 for
+## none, named `trigger_id`), its others on rows of their own; each carrier's triggers after it.
+func _tree_group(group: CompiledGroup, depth: int, trigger: int, trigger_id: StringName, rows: Array[Dictionary]) -> void:
+	for at in group.spells.size():
+		var spell: CompiledSpell = group.spells[at]
+		var slots := PackedInt32Array()
+		if at == 0:
+			slots.append_array(group.multicast_slots)
+		slots.append_array(spell.card_slots)
+		var by_trigger: bool = at == 0 and trigger >= 0
+		var shown: String = component_name(trigger_id) if by_trigger else _tree_carrier_name(spell)
+		rows.append({"depth": depth, "trigger": trigger if by_trigger else -1, "slots": slots, "name": shown})
+		# A trigger row's carrier keeps its own payloads one level further in.
+		var inner: int = depth + 1
+		if spell.own_payload != null and not spell.own_payload.is_empty():
+			_tree_group(spell.own_payload, inner, -1, &"", rows)
+		for fires in spell.triggers:
+			if fires.payload != null and not fires.payload.is_empty():
+				_tree_group(fires.payload, inner, fires.slot, fires.id, rows)
+
+
+func _tree_carrier_name(spell: CompiledSpell) -> String:
+	if spell.fallback == CompiledSpell.FALLBACK_CASTER:
+		return TREE_ON_CASTER
+	if spell.fallback == CompiledSpell.FALLBACK_POINT:
+		return TREE_AT_POINT
+	return spell.form_name if spell.form_name != "" else String(spell.form_id)
 
 
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):

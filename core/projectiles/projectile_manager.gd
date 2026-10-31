@@ -1557,6 +1557,35 @@ func remove_target(node: Node2D) -> void:
 		_grid_stale = true
 
 
+## The body `old` is replaced by `new` for the same actor (the swarm's promotion, the event
+## `body_replaced`; Spells passes it on): `old`'s target entry becomes `new`'s in place (its
+## order among the targets kept), and every shot that keeps `old` keeps `new` instead: its
+## homing target, its memory of what it hit, the body it sticks to and the body its payload skips.
+## Call it before `new` registers (its `add_target` then updates the entry).
+func replace_body(old: Node, new: Node) -> void:
+	if old == null or new == null or old == new or not new is Node2D:
+		return
+	var from: int = old.get_instance_id()
+	var to: int = new.get_instance_id()
+	var at: int = _target_id.find(from)
+	if at >= 0 and _target_id.find(to) < 0:
+		_targets[at] = new
+		_target_id[at] = to
+	for slot in _cap:
+		if _home_target[slot] == from:
+			_home_target[slot] = to
+		if _skip_id[slot] == from:
+			_skip_id[slot] = to
+		var stuck: Variant = _stuck_to[slot]
+		if is_instance_valid(stuck) and stuck == old:
+			_stuck_to[slot] = new
+	for entry in _mem_id.size():
+		if _mem_id[entry] == from:
+			_mem_id[entry] = to
+	if homing_target == from:
+		homing_target = to
+
+
 func get_target_count() -> int:
 	return _targets.size()
 

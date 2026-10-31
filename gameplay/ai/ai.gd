@@ -259,6 +259,16 @@ func _on_damaged(caster: int, _amount: float) -> void:
 	_retarget_left = 0.0
 
 
+## A grudge carried over from the body this actor replaces (the horde swarm's promotion, which
+## keeps a swarmer's grudge): it chases `attacker` for `seconds` more, as if hurt by it just now.
+func carry_grudge(attacker: Node2D, seconds: float) -> void:
+	if seconds <= 0.0 or not _is_valid_target(attacker):
+		return
+	grudge = attacker
+	_grudge_left = seconds
+	_retarget_left = 0.0
+
+
 func _drop_grudge() -> void:
 	grudge = null
 	_grudge_left = 0.0

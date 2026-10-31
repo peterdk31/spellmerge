@@ -131,6 +131,8 @@ signal possess_requested(caster: int, target: int, seconds: float, tag: int)
 signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
+## Sender: horde (the swarm's promotion, docs/milestones/horde-swarm.md). The body `old` of the actor `actor` is replaced by `new` (the actor id, its Combat row and its place stay): sent just before `new` is added to the tree and `old` is freed, so whatever keeps a body by its node or instance id (a homing shot's target, a shot's or a sweep's memory of what it hit, a chain's last body, a status look) keeps `new` instead. Heard by core/spells (and through it core/projectiles) and feel.
+signal body_replaced(actor: int, old: Node, new: Node)
 ## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal hit_landed(caster: int, target: Node, amount: float, position: Vector2, kind: StringName, shot: int)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.

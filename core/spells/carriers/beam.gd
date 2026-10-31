@@ -106,6 +106,12 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 
 
 ## Every beam gone at once, quietly (`Spells.clear`).
+## The swarm promoted a body (`Carrier.replace_body`): a beam's chain that came from `old` came
+## from `new`.
+func replace_body(old: Node, new: Node) -> void:
+	_replace_in_rows(old, new, [], _bm_prev)
+
+
 func clear() -> void:
 	_bm_on.fill(0)
 	_bm_spell.fill(null)

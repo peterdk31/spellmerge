@@ -66,6 +66,7 @@ const EVENTS: Dictionary = {
 	&"possess_requested": [["caster", TYPE_INT], ["target", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"possess_started": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"possess_ended": [["caster", TYPE_INT], ["actor", TYPE_INT]],
+	&"body_replaced": [["actor", TYPE_INT], ["old", TYPE_OBJECT], ["new", TYPE_OBJECT]],
 	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT]],
 	&"heal_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
 	# Players.

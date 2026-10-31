@@ -45,6 +45,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_shield_requested`, `pull_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
+| `body_replaced` | `horde` (the swarm's promotion) | `core/spells` (and through it `core/projectiles`), `feel` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |

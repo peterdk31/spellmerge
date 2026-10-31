@@ -19,9 +19,14 @@ extends Node2D
 ##   `seeds`; seeded as a Face seeds its own, and stepped the same, so a row with a Face's seed
 ##   blinks when that Face does), and the follow-through lag of eyes and brows behind the body.
 ## A full enemy's statuses are Feel's, drawn by node position (each swarmer keeps its bare node),
-## so they are not here. Not the same yet: Feel's death animation copies the dead node's "Sprite",
-## which a swarmer's bare node lacks, so a swarmer dies without it (integration's to give Feel);
-## Feel flashes at most REACT_SLOTS sprites at once, the look every row hit.
+## so they are not here.
+## - Feel's flash: every hit row flashes, as Feel flashes every hit sprite (owner, 2026-10-31: no
+##   limit on interactions); a hit on a row already flashing starts its flash again.
+## - Feel's death animation copies the dead body's "Sprite": a swarmer's bare node has none, so
+##   the look names itself under Feel's `SPRITE_GIVER` metadata on each swarmer's node, and
+##   `sprite_of(node)` answers a hidden Sprite2D showing that swarmer as drawn now (its frame, the
+##   hurt pose's strip, the hop, its place); a row that died is kept for that (`on_row_died`), so
+##   the order Feel and the swarm hear `enemy_died` in does not matter.
 ##
 ## Each instance's mesh is three quads, body, eyes and brows, so a swarmer is drawn whole before the
 ## next, as an actor's nodes are, in row order within its kind (`swarm_look.gdshader` places them
@@ -41,6 +46,8 @@ extends Node2D
 ##   moves their positions (a full actor's looks step after its Mover and before `move_and_slide`).
 ## - `on_hit(row)` for every `damage_dealt` naming a swarmer's node (as Combat's hit sends a full
 ##   actor its `damaged`, which CreatureLook, Face and Feel react to).
+## - `on_row_died(row)` when the swarmer in `row` died, before its row is removed (Feel's death
+##   animation reads it).
 ## - `on_row_removed(row)` right after it swap-removed `row` (the last row moved into `row`), and
 ##   `on_row_moved(from, to)` for any other move of a row; new rows are taken up by themselves
 ##   (rows `count` grew by). `clear()` when the swarm empties at once.
@@ -51,6 +58,7 @@ extends Node2D
 ## swarm's largest count, and each batch is written from one reused buffer.
 
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
 const SHADER: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
 const DEFAULT_PRESET: Resource = preload("res://gameplay/feel/presets/punchy.tres")
 ## Floats per instance in a batch's buffer: a 2D transform, a colour and the custom data.
@@ -123,6 +131,14 @@ var _flash_amount: PackedFloat32Array = PackedFloat32Array()
 var _squash: PackedFloat32Array = PackedFloat32Array()
 ## A held row's looks have shown the start of its hold (Actor.step's `_hold_shown`).
 var _hold_shown: PackedByteArray = PackedByteArray()
+## Per kind: its scene's Sprite as Feel's death animation copies it (texture, frames, region,
+## offset, centring, flips, place and scale), and its hurt strip (or null).
+var _sprites: Array[Dictionary] = []
+var _hurt_strips: Array[Texture2D] = []
+## The Sprite2D `sprite_of` fills (hidden, a child of the look), and the node it was last filled
+## for when that row died (`on_row_died`), by instance id (0: none).
+var _ghost_source: Sprite2D = null
+var _ghost_of: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## How far the face layers close on the body in one step of `_k_delta` seconds (Face's).
@@ -358,8 +374,79 @@ func on_row_removed(row: int) -> void:
 ## Forget every row (the swarm emptied at once).
 func clear() -> void:
 	_count = 0
+	_ghost_of = 0
 	for batch in _batches:
 		batch.multimesh.visible_instance_count = 0
+
+
+## Rows whose Feel flash shows now (tests).
+func flashing() -> int:
+	var shown: int = 0
+	for row in _count:
+		if _flash_left[row] > 0.0:
+			shown += 1
+	return shown
+
+
+## The swarmer in `row` died (its row is removed next): Feel's death animation may still ask for it
+## (`sprite_of`) after the row is gone.
+func on_row_died(row: int) -> void:
+	_take_rows()
+	if row < 0 or row >= _count:
+		return
+	var node: Object = (swarm.nodes as Array)[row] as Object
+	if _fill_ghost(row) and node != null:
+		_ghost_of = node.get_instance_id()
+
+
+## For Feel's death animation (its `SPRITE_GIVER`): a hidden Sprite2D showing the swarmer `node` as
+## it is drawn now, as a full enemy's "Sprite" shows it (the frame, or the hurt pose's strip while
+## it shows; the hop in its offset, at rest scale, at its place), or null for a node it does not
+## draw. The same Sprite2D every time: copy it at once.
+func sprite_of(node: Node) -> Sprite2D:
+	if swarm == null or node == null or not is_instance_valid(node):
+		return null
+	_take_rows()
+	var row: int = swarm.call(&"row_of", node) as int if swarm.has_method(&"row_of") else -1
+	if row >= 0 and row < _count:
+		return _ghost_source if _fill_ghost(row) else null
+	return _ghost_source if _ghost_of != 0 and _ghost_of == node.get_instance_id() else null
+
+
+## `_ghost_source` shows row `row` (false when its kind has no sprite).
+func _fill_ghost(row: int) -> bool:
+	var kind: int = (swarm.kinds as PackedInt32Array)[row]
+	if kind < 0 or kind >= _sprites.size() or _sprites[kind].is_empty():
+		return false
+	if _ghost_source == null:
+		_ghost_source = Sprite2D.new()
+		_ghost_source.name = "GhostSource"
+		_ghost_source.visible = false
+		add_child(_ghost_source)
+	var look: Dictionary = _sprites[kind]
+	var ghost: Sprite2D = _ghost_source
+	var hurt: Texture2D = _hurt_strips[kind]
+	if hurt != null and _hurt_left[row] > 0.0:
+		# CreatureLook._show_strip: square frames, the first shown.
+		ghost.texture = hurt
+		ghost.hframes = maxi(roundi(float(hurt.get_width()) / maxf(float(hurt.get_height()), 1.0)), 1)
+		ghost.vframes = 1
+		ghost.frame = 0
+	else:
+		ghost.texture = look["texture"]
+		ghost.hframes = look["hframes"]
+		ghost.vframes = look["vframes"]
+		ghost.frame = look["frame"]
+	ghost.region_enabled = look["region_enabled"]
+	ghost.region_rect = look["region_rect"]
+	ghost.centered = look["centered"]
+	ghost.flip_h = look["flip_h"]
+	ghost.flip_v = look["flip_v"]
+	# CreatureLook's hop is the sprite's offset; the place is the swarmer's feet plus the Sprite's.
+	ghost.offset = (look["offset"] as Vector2) + Vector2(0.0, _lift[row])
+	ghost.position = (swarm.positions as PackedVector2Array)[row] + (look["position"] as Vector2)
+	ghost.scale = look["scale"]
+	return true
 
 
 ## Rows the look knows now.
@@ -540,6 +627,11 @@ func _start_row(row: int, kind: int) -> void:
 	var anchor: Vector2 = _anchor[kind] if kind >= 0 and kind < _anchor.size() else Vector2.ZERO
 	_eyes_at[row] = anchor
 	_brows_at[row] = anchor
+	# Feel's death animation asks the look for the swarmer's sprite (FeelScript.SPRITE_GIVER).
+	if "nodes" in swarm:
+		var node: Object = (swarm.nodes as Array)[row] as Object
+		if node != null and is_instance_valid(node):
+			node.set_meta(FeelScript.SPRITE_GIVER, self)
 
 
 ## Room for `rows` rows (and their instances in every batch), grown GROW at a time.
@@ -669,6 +761,16 @@ func _add_kind(scene: PackedScene) -> void:
 	material.set_shader_parameter(&"eyes_row", float(style))
 	var brow_row: int = 1 if style == Face.Style.STRAY_ONE else 0
 	material.set_shader_parameter(&"brows_row", float(brow_row))
+	var kept: Dictionary = {}
+	if sprite != null and sprite.texture != null:
+		kept = {
+			"texture": sprite.texture, "hframes": sprite.hframes, "vframes": sprite.vframes, "frame": sprite.frame,
+			"region_enabled": sprite.region_enabled, "region_rect": sprite.region_rect, "offset": sprite.offset,
+			"centered": sprite.centered, "flip_h": sprite.flip_h, "flip_v": sprite.flip_v,
+			"position": sprite.position, "scale": sprite.scale,
+		}
+	_sprites.append(kept)
+	_hurt_strips.append(creature.hurt_texture if creature != null else null)
 	if instance != null:
 		instance.free()
 	var multimesh := MultiMesh.new()

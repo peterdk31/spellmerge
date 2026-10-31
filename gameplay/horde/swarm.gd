@@ -48,6 +48,30 @@ extends RefCounted
 ##   slides along it (x alone, then y alone) or stays.
 ## - Then each node's `position` is written.
 ##
+## **Promotion** (part S3, docs/milestones/horde-swarm.md, "Where a rule needs a full actor"): a
+## rule that needs the actor kit promotes the swarmer to the full actor of its kind; today that is
+## only `possess_requested` naming a swarmer's actor id (every other request a card makes of a body
+## is heard here or in Combat: hits, statuses, pushes, pulls, barriers, swaps, local stops, decoys).
+## A request is kept and the swarmer promoted at the next moment no hit is being dealt: the start of
+## Combat's next step (`Combat.stepping`, before it ticks statuses and checks touches), or of the
+## swarm's own step if that comes first. So whatever the hit that asked still does (Combat's damage,
+## its payload, its chain) is done to the swarmer it hit, and the full actor stands before anything
+## touches it (a hit from a shot is promoted in the same physics frame). `promote(row)`: the kind's scene (`SwarmKind.scene`,
+## with its `EnemyBase` as `data` and the swarm's services) at the row's place, its aim and velocity,
+## under the same parent (so the director counts it as before: alive, its kill, its gem), with:
+## - **the same actor id** (`Actor.take_id`): the id Combat opened for the swarmer is the actor's,
+##   so whatever keeps the id (a spell's caster, a hold, the actor table's team and node) keeps it;
+## - **the same Combat row:** `Combat.row_state` before, `carry_row_state` after the actor
+##   registered (health, every status with its time, strength and stacks, barrier, push, armed slam,
+##   contact and reaction waits, who hurt it last);
+## - **the same body for whatever keeps a node:** `body_replaced(id, old, new)` is sent before the actor
+##   is added (Spells, the projectile manager and Feel keep the new node instead: homing targets,
+##   hit memories, stuck shots, payload skips, chain and sweep memories, status looks), and the
+##   swarm's own target slots (a grudge on it) follow it too;
+## - its grudge (`AIController.carry_grudge`).
+## The row is dropped (the look told), the bare node freed, and the actor takes the request
+## (`Actor.take_possession`). A promoted swarmer stays a full actor.
+##
 ## Nothing is allocated in a step: the arrays grow only when a spawn needs room (doubling).
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -55,6 +79,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 ## The kinds the director runs in the swarm: an enemy whose id one of these names.
 const KINDS: Array[SwarmKind] = [
@@ -97,6 +122,7 @@ var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
 var actors: ActorsScript = null
 var entities: EntitiesScript = null
+var spells: SpellsScript = null
 
 ## The rows (see the class doc). Only the swarm writes them.
 var nodes: Array[Node2D] = []
@@ -120,6 +146,11 @@ var ran: PackedFloat64Array = PackedFloat64Array()
 var look: Node = null
 ## How many looks for a target the rows made (tests count them).
 var lookup_count: int = 0
+## How many swarmers were promoted to full actors (tests count them).
+var promoted_count: int = 0
+## The share of an overlap two swarmers are moved apart by per step (SPACING_SHARE; 0: they
+## stack as full actors do, which tests comparing a swarmer with a full actor ask for).
+var spacing: float = SPACING_SHARE
 
 ## The randomness of the seeds. Tests seed it.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -167,6 +198,12 @@ var _wall_h: int = 1
 var _has_walls: bool = false
 var _listening: bool = false
 var _warned: bool = false
+## The possessions asked for swarmers since the last step (promoted at the start of the next):
+## caster, target actor id and seconds of each, `_asked` of them.
+var _ask_caster: PackedInt32Array = PackedInt32Array()
+var _ask_target: PackedInt32Array = PackedInt32Array()
+var _ask_seconds: PackedFloat32Array = PackedFloat32Array()
+var _asked: int = 0
 
 
 func _init() -> void:
@@ -221,6 +258,7 @@ func stop() -> void:
 		_cand_nodes[c] = null
 	_cand_count = 0
 	_cand_left = 0.0
+	_asked = 0
 	_parent = null
 
 
@@ -294,6 +332,7 @@ func step(delta: float) -> void:
 		if not is_instance_valid(nodes[row]):
 			_drop(row)
 		row -= 1
+	_promote_asked()
 	if count == 0:
 		moved += 1
 		return
@@ -341,7 +380,8 @@ func step(delta: float) -> void:
 		look.call(&"step", delta)
 	for i in count:
 		positions[i] += velocities[i] * ran[i]
-	_space()
+	if spacing > 0.0:
+		_space()
 	_keep_in()
 	for i in count:
 		nodes[i].position = positions[i]
@@ -512,7 +552,7 @@ func _space() -> void:
 		_push[i] = Vector2.ZERO
 	# Half the rows own their pairs this step, the other half the next (a pair is seen every other
 	# step, from whichever of its rows owns it then), at twice the share.
-	var share: float = minf(SPACING_SHARE * 2.0, 1.0)
+	var share: float = minf(spacing * 2.0, 1.0)
 	for i in range(moved & 1, count, 2):
 		var p: Vector2 = positions[i]
 		var r: float = _radius[i]
@@ -656,20 +696,29 @@ func _listen(on: bool) -> void:
 	if events == null or not is_instance_valid(events) or on == _listening:
 		return
 	_listening = on
+	if combat != null and is_instance_valid(combat):
+		if on and not combat.stepping.is_connected(_promote_asked):
+			combat.stepping.connect(_promote_asked)
+		elif not on and combat.stepping.is_connected(_promote_asked):
+			combat.stepping.disconnect(_promote_asked)
 	if on:
 		events.enemy_died.connect(_on_enemy_died)
 		events.damage_dealt.connect(_on_damage_dealt)
 		events.target_move_requested.connect(_on_target_move_requested)
+		events.possess_requested.connect(_on_possess_requested)
 	else:
 		events.enemy_died.disconnect(_on_enemy_died)
 		events.damage_dealt.disconnect(_on_damage_dealt)
 		events.target_move_requested.disconnect(_on_target_move_requested)
+		events.possess_requested.disconnect(_on_possess_requested)
 
 
 ## A swarmer died (Combat frees its node next): its row goes.
 func _on_enemy_died(_killer: int, enemy: Node, _at: Vector2, _shot: int) -> void:
 	var row: int = row_of(enemy)
 	if row >= 0:
+		if look != null and is_instance_valid(look) and look.has_method(&"on_row_died"):
+			look.call(&"on_row_died", row)
 		_drop(row)
 
 
@@ -701,6 +750,101 @@ func _on_target_move_requested(_caster: int, target: Node, to: Vector2) -> void:
 	var origin: Vector2 = _parent.global_position if _parent != null and _parent.is_inside_tree() else Vector2.ZERO
 	positions[row] = to - origin
 	nodes[row].position = positions[row]
+
+
+## A possession asked for a swarmer: kept, and the swarmer promoted at the start of the next step
+## (see the class doc).
+func _on_possess_requested(caster: int, target: int, seconds: float, _tag: int) -> void:
+	if actors == null or row_of(actors.node_of(target)) < 0:
+		return
+	if _asked == _ask_target.size():
+		var room: int = maxi(_asked * 2, 4)
+		_ask_caster.resize(room)
+		_ask_target.resize(room)
+		_ask_seconds.resize(room)
+	_ask_caster[_asked] = caster
+	_ask_target[_asked] = target
+	_ask_seconds[_asked] = seconds
+	_asked += 1
+
+
+# --- Promotion ----------------------------------------------------------------------------------
+
+## Every swarmer asked for is promoted (once), and each request taken by its actor, in the order
+## they came.
+func _promote_asked() -> void:
+	if _asked == 0:
+		return
+	var asked: int = _asked
+	_asked = 0
+	for n in asked:
+		var node: Node = actors.node_of(_ask_target[n]) if actors != null else null
+		var row: int = row_of(node)
+		var body: Actor = promote(row) if row >= 0 else node as Actor
+		if body != null and is_instance_valid(body) and body.is_inside_tree():
+			body.take_possession(_ask_caster[n], _ask_seconds[n])
+
+
+## Replaces the swarmer in `row` with the full actor of its kind, the same actor in every way the
+## game keeps (see the class doc), and returns it; null when it cannot be made (no scene, or it is
+## not an Actor), and the swarmer stays.
+func promote(row: int) -> Actor:
+	if row < 0 or row >= count or _parent == null or not is_instance_valid(_parent):
+		return null
+	var kind: SwarmKind = kinds_list[kinds[row]]
+	if kind == null or kind.scene == null:
+		return null
+	var made: Node = kind.scene.instantiate()
+	var actor := made as Actor
+	if actor == null:
+		if made != null:
+			made.free()
+		push_warning("Swarm: %s is no actor scene, so a swarmer of it cannot be promoted." % kind.enemy_id)
+		return null
+	var old: Node2D = nodes[row]
+	var id: int = actor_ids[row]
+	var state: Dictionary = combat.row_state(old) if combat != null and is_instance_valid(combat) else {}
+	actor.data = kind.enemy
+	actor.events = events
+	actor.combat = combat
+	actor.projectiles = projectiles
+	actor.spells = spells
+	actor.actors = actors
+	actor.take_id = id
+	actor.name = old.name
+	actor.position = positions[row]
+	actor.aim = aims[row]
+	actor.velocity = velocities[row]
+	var ai: AIController = null
+	for child: Node in actor.get_children():
+		if child is AIController:
+			ai = child as AIController
+			if entities != null:
+				ai.entities = entities
+			break
+	var grudge: Node2D = null
+	var grudge_left: float = _grudge_left[row]
+	if grudge_left > 0.0 and _target_slot[row] >= 0:
+		grudge = _slot_nodes[_target_slot[row]]
+	_drop(row)
+	# Whatever keeps the old body keeps the actor from now on (it is not in the tree yet: its target
+	# entry is taken over in place, and its registration below finds it).
+	if events != null and is_instance_valid(events):
+		events.body_replaced.emit(id, old, actor)
+	for slot in _slot_used:
+		var held: Variant = _slot_nodes[slot]
+		if is_instance_valid(held) and held == old:
+			_slot_nodes[slot] = actor
+	# The old node leaves first, so the actor takes its name.
+	_parent.remove_child(old)
+	_parent.add_child(actor)
+	if not state.is_empty():
+		combat.carry_row_state(actor, state)
+	if ai != null and grudge != null and is_instance_valid(grudge):
+		ai.carry_grudge(grudge, grudge_left)
+	old.free()
+	promoted_count += 1
+	return actor
 
 
 # --- Rows ---------------------------------------------------------------------------------------
@@ -776,3 +920,5 @@ func _find_services() -> void:
 		actors = root.get_node_or_null(^"Actors") as ActorsScript
 	if entities == null:
 		entities = root.get_node_or_null(^"Entities") as EntitiesScript
+	if spells == null:
+		spells = root.get_node_or_null(^"Spells") as SpellsScript

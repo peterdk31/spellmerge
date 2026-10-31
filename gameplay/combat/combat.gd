@@ -146,6 +146,11 @@ const BODY_PLAIN: int = 3
 ## Where a body without the kit keeps its actor id, looked at in this order.
 const OWN_ID_PROPERTIES: Array[StringName] = [&"actor_id", &"caster"]
 
+## Sent at the start of every `step`, before freed bodies are dropped, statuses tick and touches are
+## checked: the moment no hit is being dealt. The horde swarm promotes the swarmers a rule asked
+## for here (docs/milestones/horde-swarm.md, S3), so the full actor stands before anything touches.
+signal stepping()
+
 ## The event bus, the projectile manager and the registry. Only tests set these, before
 ## adding the node; otherwise the "Events", "Projectiles" and "Registry" autoloads are used.
 var events: EventsScript = null
@@ -399,6 +404,77 @@ func health_of(actor: Variant) -> float:
 func knockback_of(actor: Variant) -> Vector2:
 	var row: int = _row_of(actor)
 	return _knock[row] if row != ActorsScript.NONE else Vector2.ZERO
+
+
+## Everything Combat keeps on `actor` (an id or its node) but its body, hurt circle and touch: its
+## health, every status (time left, strength, stacks, who set a burn), its barrier, its push, its
+## armed slam, its contact wait, its reaction wait and who hurt it last. Empty when it is not
+## registered. The swarm's promotion (docs/milestones/horde-swarm.md) carries a swarmer's row to
+## the full actor that replaces it with `carry_row_state`. Allocates (one Dictionary): not per step.
+func row_state(actor: Variant) -> Dictionary:
+	var row: int = _row_of(actor)
+	if row == ActorsScript.NONE:
+		return {}
+	return {
+		"health": health_of(row), "knock": _knock[row], "contact_left": _contact_left[row],
+		"burn": [_burn_left[row], _burn_rate[row], _burn_carry[row], _burn_by[row]],
+		"chill": [_chill_left[row], _chill_slow[row], _chill_stacks[row]], "freeze": _freeze_left[row],
+		"shock": [_shock_left[row], _shock_share[row]], "hex": [_hex_left[row], _hex_extra[row]],
+		"static": [_static_left[row], _static_share[row]], "react_wait": _react_wait[row],
+		"shield": [_shield[row], _shield_left[row], _shield_tag[row]], "slam": [_slam[row], _slam_by[row]],
+		"last": [_last_by[row], _last_kind[row], _last_name[row]],
+	}
+
+
+## Puts `state` (a `row_state`) on `actor` (an id or its node, registered): its health (a kit
+## Actor's Health is set to it, at most its most), statuses, barrier, push and the rest, as they
+## were. Sends nothing (nothing new happened to it). Returns false when `actor` is not registered.
+func carry_row_state(actor: Variant, state: Dictionary) -> bool:
+	var row: int = _row_of(actor)
+	if row == ActorsScript.NONE or state.is_empty():
+		return false
+	var health: float = state["health"] as float
+	if health >= 0.0:
+		if _body[row] == BODY_ACTOR:
+			var kit: Actor = _nodes[row] as Actor
+			if kit.health != null and kit.health.health != health:
+				kit.health.reset(health)
+		else:
+			_health[row] = minf(health, _max_health[row])
+	_knock[row] = state["knock"] as Vector2
+	_contact_left[row] = state["contact_left"] as float
+	var burn: Array = state["burn"]
+	_burn_left[row] = burn[0]
+	_burn_rate[row] = burn[1]
+	_burn_carry[row] = burn[2]
+	_burn_by[row] = burn[3]
+	var chill: Array = state["chill"]
+	_chill_left[row] = chill[0]
+	_chill_slow[row] = chill[1]
+	_chill_stacks[row] = chill[2]
+	_freeze_left[row] = state["freeze"] as float
+	var shock: Array = state["shock"]
+	_shock_left[row] = shock[0]
+	_shock_share[row] = shock[1]
+	var hex: Array = state["hex"]
+	_hex_left[row] = hex[0]
+	_hex_extra[row] = hex[1]
+	var charge: Array = state["static"]
+	_static_left[row] = charge[0]
+	_static_share[row] = charge[1]
+	_react_wait[row] = state["react_wait"] as float
+	var barrier: Array = state["shield"]
+	_shield[row] = barrier[0]
+	_shield_left[row] = barrier[1]
+	_shield_tag[row] = barrier[2]
+	var slam: Array = state["slam"]
+	_slam[row] = slam[0]
+	_slam_by[row] = slam[1]
+	var last: Array = state["last"]
+	_last_by[row] = last[0]
+	_last_kind[row] = last[1]
+	_last_name[row] = last[2]
+	return true
 
 
 ## For whoever moves the body `actor` (its node: the one call a body makes about itself every
@@ -1119,6 +1195,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 ## contact hurts. Called every physics frame; tests call it with fixed deltas. Knockback is not
 ## applied here (see the top).
 func step(delta: float) -> void:
+	stepping.emit()
 	# Drop bodies freed from outside (backwards: a freed row takes the last one's place).
 	var n: int = _live.size() - 1
 	while n >= 0:

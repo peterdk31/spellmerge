@@ -14,6 +14,13 @@ extends RefCounted
 ## changes nothing. Two worlds built alike and cast alike write the same trace (the runtime's
 ## randomness is seeded by the cast).
 ##
+## Kinds (horde swarm S3, tests/core/test_card_rules_swarm.gd): with `kind_of` set (health ->
+## a prepared SwarmKind), an enemy without cards is that kind instead of the plain test enemy: its
+## full actor scene (with the kind's data and its own AI), or with `as_swarm` a swarmer of a swarm
+## (`swarm`, stepped first in each step, as the director steps it before the actors move). A
+## swarmer is traced as an actor is (by its label, its place and its Combat health), and the actor
+## it is promoted to (`body_replaced`) goes on under the same label.
+##
 ##     var world := World.new(root, shelf, staff)
 ##     world.add_wizard([&"homing", &"bolt"])
 ##     world.add_enemy(&"A", Vector2(90.0, 0.0))
@@ -28,6 +35,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorFixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
+const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 
 const STEP: float = 1.0 / 60.0
 ## Steps between two samples of the shots, beams, swings and actors.
@@ -68,10 +76,22 @@ var expect: PackedStringArray = PackedStringArray()
 var differs: bool = false
 ## Calls made after the step of that index: step -> Array[Callable].
 var at_step: Dictionary = {}
+## The kind of an enemy without cards (see the class doc): health -> SwarmKind; empty for none.
+var kind_of: Callable = Callable()
+## True: such enemies are swarmers of `swarm`.
+var as_swarm: bool = false
+var swarm: SwarmScript = null
 
 var _root: Node
 var _staff: StaffBase
 var _bodies: Array[Actor] = []
+## What the trace samples, in the order it was made: [label, its body (an Actor or a swarmer's node)].
+var _traced: Array[Array] = []
+var _swarm_parent: Node2D = null
+## Where among the bodies the swarm steps (where its first swarmer would stand as an actor), and
+## how many promoted actors were put there after it.
+var _swarm_at: int = -1
+var _promoted: int = 0
 var _walls: Array[Rect2] = []
 ## The root's children before this world, so `free_all` frees what it left there.
 var _root_before: Array[Node] = []
@@ -136,8 +156,11 @@ func add_ally(at: Vector2) -> Actor:
 
 ## An enemy whose hurt circle is centred on `at`, standing still (it is pushed by knockback and
 ## pulls). With `cards` it casts them once along `aim` at the first step (a donor for relay), or
-## for the whole run when `stream` (an enemy shooter).
-func add_enemy(label: StringName, at: Vector2, health: float = HEALTH, cards: Array[StringName] = [], aim: Vector2 = Vector2.LEFT, stream: bool = false) -> Actor:
+## for the whole run when `stream` (an enemy shooter). Without, and with `kind_of`, it is of that
+## kind (see the class doc).
+func add_enemy(label: StringName, at: Vector2, health: float = HEALTH, cards: Array[StringName] = [], aim: Vector2 = Vector2.LEFT, stream: bool = false) -> Node2D:
+	if cards.is_empty() and kind_of.is_valid():
+		return _kind_body(label, at, kind_of.call(health) as SwarmKind)
 	var mind: ActorFixture.Scripted = null
 	if not cards.is_empty():
 		mind = ActorFixture.Scripted.new()
@@ -195,7 +218,17 @@ func run(seconds: float, least: float = 0.0) -> int:
 		if _press_within > 0.0 and _shot_within(_press_within):
 			_press_within = 0.0
 			brain.presses = [0]
-		for body in _bodies:
+		# The bodies in the order they were made; the swarm steps where its swarmers stand.
+		var n: int = 0
+		var swarm_due: bool = swarm != null
+		_promoted = 0
+		while n < _bodies.size() or swarm_due:
+			if swarm_due and n >= _swarm_at:
+				swarm_due = false
+				swarm.step(STEP)
+				continue
+			var body: Actor = _bodies[n]
+			n += 1
 			if is_instance_valid(body) and body.is_inside_tree():
 				body.step(STEP)
 				body.position += body.velocity * STEP
@@ -227,6 +260,11 @@ func free_all() -> void:
 		if is_instance_valid(body):
 			body.free()
 	_bodies.clear()
+	_traced.clear()
+	if swarm != null:
+		swarm.stop()
+	if _swarm_parent != null and is_instance_valid(_swarm_parent):
+		_swarm_parent.free()
 	# A possession may have moved a controller out of its body (into the root).
 	for node: Node in _root.get_children():
 		if not _root_before.has(node) and node != entities:
@@ -266,7 +304,69 @@ func _body(label: StringName, centre: Vector2, mind: ActorController, cards: Arr
 	body.set_physics_process(false)
 	_bodies.append(body)
 	_names[body.id] = String(label)
+	_traced.append([String(label), body])
 	return body
+
+
+## An enemy of `kind` (see the class doc) whose hurt circle is centred on `at`: its full actor, or
+## a swarmer.
+func _kind_body(label: StringName, at: Vector2, kind: SwarmKind) -> Node2D:
+	var feet: Vector2 = at - kind.hurt_offset
+	if as_swarm:
+		if swarm == null:
+			_swarm_parent = Node2D.new()
+			_swarm_parent.name = "Swarm"
+			_root.add_child(_swarm_parent)
+			swarm = SwarmScript.new()
+			swarm.events = bus
+			swarm.combat = combat
+			swarm.projectiles = projectiles
+			swarm.spells = spells
+			swarm.actors = table
+			swarm.entities = entities
+			swarm.rng.seed = 7
+			# Full actors walk through each other: so do these, so only the cards are compared.
+			swarm.spacing = 0.0
+			swarm.start(_swarm_parent, Rect2(-480.0, -480.0, 960.0, 960.0))
+			_swarm_at = _bodies.size()
+		var row: int = swarm.spawn(kind, feet)
+		var node: Node2D = swarm.nodes[row]
+		node.name = String(label)
+		_names[swarm.actor_ids[row]] = String(label)
+		_traced.append([String(label), node])
+		return node
+	var body := kind.scene.instantiate() as Actor
+	body.name = String(label)
+	body.data = kind.enemy
+	body.events = bus
+	body.combat = combat
+	body.projectiles = projectiles
+	body.spells = spells
+	body.actors = table
+	for child: Node in body.get_children():
+		if child is AIController:
+			(child as AIController).entities = entities
+	body.position = feet
+	_root.add_child(body)
+	body.set_physics_process(false)
+	_bodies.append(body)
+	_names[body.id] = String(label)
+	_traced.append([String(label), body])
+	return body
+
+
+## A swarmer was promoted (`body_replaced`): its actor is stepped and traced under its label.
+func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
+	var actor := new as Actor
+	if actor == null:
+		return
+	actor.set_physics_process(false)
+	# Stepped where the swarm steps, right after it (as its swarmer was).
+	_bodies.insert(clampi(_swarm_at + _promoted, 0, _bodies.size()), actor)
+	_promoted += 1
+	for entry: Array in _traced:
+		if is_instance_valid(entry[1]) and entry[1] == old:
+			entry[1] = actor
 
 
 func _shot_within(distance: float) -> bool:
@@ -384,6 +484,7 @@ func _listen() -> void:
 	# A carrier's shape as a player sees it (so a longer reach shows; its tint and look are left out).
 	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
+	bus.body_replaced.connect(_on_body_replaced)
 	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2, _shot: int) -> void:
 		_put("died %s by %s at %s" % [_name_of(enemy), _who(killer), _at(at)]))
 
@@ -408,13 +509,15 @@ func _sample() -> void:
 	for at in CarrierSwing.of(spells).swing_slots():
 		if CarrierSwing.of(spells).swing_on(at):
 			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(CarrierSwing.of(spells).swing_actor(at)), _node(CarrierSwing.of(spells).swing_tag(at)), _at(CarrierSwing.of(spells).swing_origin(at)), _at(CarrierSwing.of(spells).swing_dir(at) * 100.0), CarrierSwing.of(spells).swing_side(at), roundi(rad_to_deg(CarrierSwing.of(spells).swing_turned(at))), roundi(CarrierSwing.of(spells).swing_reach(at))])
-	for body in _bodies:
+	for entry: Array in _traced:
+		var label: String = entry[0]
+		var body: Variant = entry[1]
 		var seen: String = "gone"
-		if is_instance_valid(body) and not body.is_dying():
-			seen = "at %s health %.2f" % [_at(body.global_position), combat.health_of(body)]
-		if _last_seen.get(body.name, "") != seen:
-			_last_seen[body.name] = seen
-			_put("%s %s" % [body.name, seen])
+		if is_instance_valid(body) and not (body is Actor and (body as Actor).is_dying()) and combat.is_registered(body):
+			seen = "at %s health %.2f" % [_at((body as Node2D).global_position), combat.health_of(body)]
+		if _last_seen.get(label, "") != seen:
+			_last_seen[label] = seen
+			_put("%s %s" % [label, seen])
 	var live: int = entities.count()
 	if live != _last_entities:
 		_last_entities = live

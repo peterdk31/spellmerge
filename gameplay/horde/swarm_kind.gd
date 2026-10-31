@@ -22,7 +22,7 @@ var enemy: EnemyBase = null
 ## The full actor scene of the enemy (promotion, S3).
 var scene: PackedScene = null
 ## From the `EnemyBase`.
-var health: int = 1
+var health: float = 1.0
 var speed: float = 0.0
 var contact_damage: int = 0
 ## The hurt circle: radius and centre from the feet (the scene's `Hurtbox`).
@@ -59,7 +59,8 @@ func prepare(data: EnemyBase) -> bool:
 		return false
 	enemy = data
 	scene = data.scene
-	health = maxi(data.max_health, 1)
+	# As the full actor's Health takes it (parts of a point too), never 0.
+	health = maxf(data.max_health, Health.EMPTY)
 	speed = data.move_speed
 	contact_damage = data.contact_damage
 	var actor := body as Actor

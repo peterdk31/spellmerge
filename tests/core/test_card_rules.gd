@@ -540,7 +540,7 @@ func _costs_of(card: SpellComponent) -> StringName:
 ## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
 func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
-	var world := World.new(root, _shelf, _staff)
+	var world: World = _make_world()
 	# Stop at the first difference: the cell is ✓ then.
 	world.expect = expect
 	var r: float = reach(form)
@@ -556,7 +556,7 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 			# Its own cast flies off up into a wall.
 			world.add_wall(Rect2(-480.0, -160.0, 960.0, 8.0))
 		# A weak target has 0.01 health: any hit kills it, a speck's too (an atom's 0.3).
-		var target: Actor = world.add_enemy(&"A", Vector2(r, 0.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
+		var target: Node2D = world.add_enemy(&"A", Vector2(r, 0.0), WEAK_HEALTH if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
 		if scene.get("status", false):
 			var row: ReactionRow = _reaction()
 			if row != null:
@@ -594,6 +594,11 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	var trace: PackedStringArray = world.trace
 	world.free_all()
 	return trace
+
+
+## The world a cast runs in (tests/core/test_card_rules_swarm.gd makes its enemies swarmers).
+func _make_world() -> World:
+	return World.new(root, _shelf, _staff)
 
 
 static func _first_difference(a: PackedStringArray, b: PackedStringArray) -> String:

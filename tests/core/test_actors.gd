@@ -274,3 +274,22 @@ func test_a_hold_ends_when_the_actor_closes_opens_again_or_the_table_clears() ->
 	_actors.clear()
 	check_equal(_actors.held_count, 0, "clear releases every hold")
 	check_equal(_actors.held_left(again), 0.0, "and the seconds")
+
+
+func test_teams_is_team_of_for_every_id() -> void:
+	var ids: Array[int] = _open_enemies(5)
+	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 0, 0)
+	_actors.close(ids[2])
+	_actors.set_driver(ids[3], ActorsScript.TEAM_WIZARDS, ActorsScript.NONE)
+	var teams: PackedInt32Array = _actors.teams()
+	check_equal(teams.size(), ActorsScript.ACTORS, "a team for every id")
+	var differ: int = 0
+	for id in ActorsScript.ACTORS:
+		if teams[id] != _actors.team_of(id):
+			differ += 1
+	check_equal(differ, 0, "each is team_of (NONE for a closed or never opened id)")
+	check_equal(teams[wizard], ActorsScript.TEAM_WIZARDS, "a wizard's")
+	_actors.set_driver(ids[0], ActorsScript.TEAM_WIZARDS, ActorsScript.NONE)
+	_actors.close(ids[1])
+	check_equal(teams[ids[0]], ActorsScript.TEAM_WIZARDS, "the table's own array: a later change shows in it")
+	check_equal(teams[ids[1]], ActorsScript.NONE, "and a close")

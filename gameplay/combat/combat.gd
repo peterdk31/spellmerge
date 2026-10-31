@@ -242,6 +242,11 @@ var _touch_amount: PackedInt32Array = PackedInt32Array()
 # The actors contact may hurt this step and their teams; the teams that touch, as bits.
 var _victims: PackedInt32Array = PackedInt32Array()
 var _victim_team: PackedInt32Array = PackedInt32Array()
+## Where each victim's hurt circle is this step (the direct check, `_touch`).
+var _victim_at: PackedVector2Array = PackedVector2Array()
+## The actor table's teams (`Actors.teams`, taken in `step`; its own array, always current):
+## what `_team` answers for each row, without a call.
+var _teams: PackedInt32Array = PackedInt32Array()
 var _toucher_teams: int = 0
 # Scratch lists for grid queries, one per nesting depth (a hit set off by another hit's burst
 # gets its own), so nothing is allocated once the deepest nesting was seen.
@@ -1121,12 +1126,17 @@ func step(delta: float) -> void:
 			_free_row(_live[n])
 		n -= 1
 	_toucher_teams = 0
+	# Every actor's team at once (`_team` for each row, written out: this runs for every body, every
+	# step; Horde swarm S5): the table's own array, so it is always current; read only.
+	var table: ActorsScript = _table()
+	_teams = table.teams() if table != null else PackedInt32Array()
 	for i in _live.size():
 		var row: int = _live[i]
 		_tick(row, delta)
-		_check_slam(row)
+		if _slam[row] > 0:
+			_check_slam(row)
 		if _contact_damage[row] > 0:
-			_toucher_teams |= _team_bit(_team(row))
+			_toucher_teams |= _team_bit(_teams[row] if row < _teams.size() else ActorsScript.NONE)
 	_send_burns()
 	_send_slams()
 	if _toucher_teams != 0:
@@ -1137,7 +1147,9 @@ func step(delta: float) -> void:
 ## Count one actor's statuses, barrier and contact wait down; burn collects whole points of
 ## damage for _send_burns().
 func _tick(row: int, delta: float) -> void:
-	_contact_left[row] = maxf(_contact_left[row] - delta, 0.0)
+	# A count at 0 stays at 0: only the ones running are written (what is read is all of them).
+	if _contact_left[row] != 0.0:
+		_contact_left[row] = maxf(_contact_left[row] - delta, 0.0)
 	if _shield_left[row] > 0.0:
 		_shield_left[row] = maxf(_shield_left[row] - delta, 0.0)
 		if _shield_left[row] == 0.0:
@@ -1157,11 +1169,16 @@ func _tick(row: int, delta: float) -> void:
 		if _chill_left[row] == 0.0:
 			_chill_slow[row] = 0.0
 			_chill_stacks[row] = 0
-	_freeze_left[row] = maxf(_freeze_left[row] - delta, 0.0)
-	_shock_left[row] = maxf(_shock_left[row] - delta, 0.0)
-	_hex_left[row] = maxf(_hex_left[row] - delta, 0.0)
-	_static_left[row] = maxf(_static_left[row] - delta, 0.0)
-	_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
+	if _freeze_left[row] != 0.0:
+		_freeze_left[row] = maxf(_freeze_left[row] - delta, 0.0)
+	if _shock_left[row] != 0.0:
+		_shock_left[row] = maxf(_shock_left[row] - delta, 0.0)
+	if _hex_left[row] != 0.0:
+		_hex_left[row] = maxf(_hex_left[row] - delta, 0.0)
+	if _static_left[row] != 0.0:
+		_static_left[row] = maxf(_static_left[row] - delta, 0.0)
+	if _react_wait[row] != 0.0:
+		_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 
 
 ## Deal the burn damage counted this step: quiet hits of kind `status`. After the loop, because
@@ -1221,11 +1238,12 @@ func _send_slams() -> void:
 func _touch() -> void:
 	_victims.clear()
 	_victim_team.clear()
+	var team_rows: int = _teams.size()
 	for i in _live.size():
 		var row: int = _live[i]
 		if _contact_left[row] > 0.0:
 			continue
-		var team: int = _team(row)
+		var team: int = _teams[row] if row < team_rows else ActorsScript.NONE
 		if (_toucher_teams & ~_team_bit(team)) == 0 or not _can_hurt(row):
 			continue
 		_victims.append(row)
@@ -1233,18 +1251,37 @@ func _touch() -> void:
 	if _victims.is_empty():
 		return
 	if _victims.size() <= CONTACT_DIRECT or projectiles == null:
+		# The victims' hurt circles once (nothing moves while contact is counted), and the box round
+		# them all, a pixel wider: a toucher whose circle stays out of it touches none of them, so
+		# most of a crowd is passed after one look at where it is (Horde swarm S5).
+		var victims: int = _victims.size()
+		_victim_at.resize(victims)
+		var low: Vector2 = Vector2.INF
+		var high: Vector2 = -Vector2.INF
+		for v in victims:
+			var victim: int = _victims[v]
+			var centre: Vector2 = _position_of(_nodes[victim]) + _hurt_offset[victim]
+			_victim_at[v] = centre
+			var spread: float = _hurt_radius[victim] + 1.0
+			low = low.min(centre - Vector2(spread, spread))
+			high = high.max(centre + Vector2(spread, spread))
 		for i in _live.size():
 			var row: int = _live[i]
 			if _contact_damage[row] <= 0:
 				continue
-			var team: int = _team(row)
-			var at: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
-			for v in _victims.size():
+			# `_position_of`, written out.
+			var body: Node2D = _nodes[row]
+			var at: Vector2 = (body.global_position if body.is_inside_tree() else body.position) + _hurt_offset[row]
+			var own: float = _hurt_radius[row]
+			if at.x + own < low.x or at.y + own < low.y or at.x - own > high.x or at.y - own > high.y:
+				continue
+			var team: int = _teams[row] if row < team_rows else ActorsScript.NONE
+			for v in victims:
 				var victim: int = _victims[v]
 				if victim == row or _victim_team[v] == team or _contact_left[victim] > 0.0:
 					continue
-				var reach: float = _hurt_radius[row] + _hurt_radius[victim]
-				if at.distance_squared_to(_position_of(_nodes[victim]) + _hurt_offset[victim]) <= reach * reach:
+				var reach: float = own + _hurt_radius[victim]
+				if at.distance_squared_to(_victim_at[v]) <= reach * reach:
 					_touched(victim, row)
 		return
 	var near: Array[Node2D] = _take_scratch()

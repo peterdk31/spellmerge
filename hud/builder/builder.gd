@@ -104,16 +104,10 @@ const HINT_ROW: String = "Put in"
 const HINT_BACK: String = "back"
 const HINT_TAB: String = "Show staff"
 const HINT_CLOSE: String = "Close"
-const HINT_COPY: String = "Copy code"
-const HINT_PASTE: String = "Paste code"
 const HINT_ACTION: StringName = &"accept"
 const HINT_BACK_ACTION: StringName = &"back"
 const HINT_BAG_ACTION: StringName = &"alternate"
 const REFUSED_PREFIX: String = "Refused: "
-const COPIED_PREFIX: String = "Copied the staff code"
-const CLIPBOARD_EMPTY: String = "The clipboard is empty, or the browser blocked it."
-const PASTED_TEXT: String = "Pasted the code."
-const NOTHING_TO_COPY: String = "The staff is empty."
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -154,14 +148,6 @@ var _tab_glyphs: Array[ActionGlyphScript] = []
 var _tab_leads: Array[Label] = []
 var _tab_tails: Array[Label] = []
 var _close: Button = null
-## Staff codes (staffs D2): copy the shown staff as text, paste one over it.
-var _copy: Button = null
-var _paste: Button = null
-## What the last copy or paste said, shown in the note until something else happens.
-var _message: String = ""
-## The system clipboard, as callables so tests do not touch the real one.
-var clipboard_get: Callable = DisplayServer.clipboard_get
-var clipboard_set: Callable = DisplayServer.clipboard_set
 var _slots: Array[Button] = []
 var _slots_window: Control = null
 var _slots_holder: VBoxContainer = null
@@ -227,14 +213,6 @@ func _ready() -> void:
 		content.minimum_size_changed.connect(_fit_tab.bind(staff))
 	_close = _make_button(tabs, "Close")
 	_close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var codes := HBoxContainer.new()
-	codes.name = "Codes"
-	codes.add_theme_constant_override("separation", 2)
-	column.add_child(codes)
-	_copy = _make_button(codes, "Copy")
-	_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_paste = _make_button(codes, "Paste")
-	_paste.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var lists := HBoxContainer.new()
 	lists.name = "Lists"
 	lists.add_theme_constant_override("separation", 4)
@@ -291,7 +269,6 @@ func open_builder() -> bool:
 	_slot = 0
 	_focused = null
 	_reason = ""
-	_message = ""
 	_held_staff = NOTHING
 	_place_info()
 	_render()
@@ -367,14 +344,6 @@ func tab_marks(staff: int) -> String:
 
 func close_button() -> Button:
 	return _close
-
-
-func copy_button() -> Button:
-	return _copy
-
-
-func paste_button() -> Button:
-	return _paste
 
 
 ## The bag rows now shown, in order, and the card each puts in (`&""` is "Empty").
@@ -503,8 +472,6 @@ func _render() -> void:
 	_title.text = "P%d Staff %s" % [index + 1, STAFF_NAMES[_viewed]]
 	_render_tabs()
 	_set_text(_close, "Close")
-	_set_text(_copy, "Copy code")
-	_set_text(_paste, "Paste code")
 	while _slots.size() < cards.size():
 		_slots.append(_make_row(_slots_holder, "Slot%d" % _slots.size()))
 	var wasted: Dictionary = _wasted()
@@ -581,8 +548,6 @@ func _render_note() -> void:
 	var at_slot: int = _slots.find(_focused as Button)
 	if _reason != "":
 		_note.text = REFUSED_PREFIX + _reason
-	elif _message != "":
-		_note.text = _message
 	else:
 		var link: String = _link_sentence(at_slot)
 		var description: String = _description_in_focus()
@@ -612,10 +577,6 @@ func _hint_in_focus() -> String:
 		return HINT_TAB
 	if button == _close:
 		return HINT_CLOSE
-	if button == _copy:
-		return HINT_COPY
-	if button == _paste:
-		return HINT_PASTE
 	return ""
 
 
@@ -660,8 +621,6 @@ func _rebuild_controls() -> void:
 		_controls.append(tab)
 	# Close is drawn right of the tabs, so it is reached right after them.
 	_controls.append(_close)
-	_controls.append(_copy)
-	_controls.append(_paste)
 	for slot in cards_of(_viewed).size():
 		_controls.append(_slots[slot])
 	for row in _row_ids.size():
@@ -712,7 +671,6 @@ func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 		return
 	_plans[staff] = plan.duplicate(true)
 	_reason = ""
-	_message = ""
 	_render()
 	_resync_focus()
 
@@ -722,7 +680,6 @@ func _on_build_refused(player: int, reason: String) -> void:
 	if player != index:
 		return
 	_reason = reason
-	_message = ""
 	_render_note()
 
 
@@ -786,10 +743,6 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	if control == _close:
 		close_builder()
-	elif control == _copy:
-		_copy_code()
-	elif control == _paste:
-		_paste_code()
 	elif _tabs.has(control as Button):
 		_show_staff(_tabs.find(control as Button))
 		if not _slots.is_empty():
@@ -862,23 +815,13 @@ func _navigate(from: Control, direction: Vector2i) -> Control:
 			return tab_row[maxi(at_tab - 1, 0)]
 		if direction == Vector2i.RIGHT:
 			return tab_row[mini(at_tab + 1, tab_row.size() - 1)]
-		if direction == Vector2i.DOWN:
-			return _copy
-		return button
-	if button == _copy or button == _paste:
-		if direction == Vector2i.UP:
-			return _tabs[_viewed]
 		if direction == Vector2i.DOWN and cards > 0:
 			return _slots[clampi(_slot, 0, cards - 1)]
-		if direction == Vector2i.LEFT:
-			return _copy
-		if direction == Vector2i.RIGHT:
-			return _paste
 		return button
 	var at_slot: int = _slots.find(button)
 	if at_slot >= 0:
 		if direction == Vector2i.UP:
-			return _slots[at_slot - 1] if at_slot > 0 else _copy
+			return _slots[at_slot - 1] if at_slot > 0 else _tabs[_viewed]
 		if direction == Vector2i.DOWN:
 			return _slots[mini(at_slot + 1, cards - 1)]
 		if direction == Vector2i.RIGHT and not _row_ids.is_empty():
@@ -887,7 +830,7 @@ func _navigate(from: Control, direction: Vector2i) -> Control:
 	var at_row: int = _rows.find(button)
 	if at_row >= 0:
 		if direction == Vector2i.UP:
-			return _rows[at_row - 1] if at_row > 0 else _paste
+			return _rows[at_row - 1] if at_row > 0 else _tabs[_viewed]
 		if direction == Vector2i.DOWN:
 			return _rows[mini(at_row + 1, _row_ids.size() - 1)]
 		if direction == Vector2i.LEFT and cards > 0:
@@ -904,51 +847,6 @@ func _row_for(slot: int) -> int:
 		if at >= 0:
 			return at
 	return 0
-
-
-## Copy the shown staff's code to the clipboard and say so (staffs D2).
-func _copy_code() -> void:
-	var code: String = SpellsScript.staff_code(cards_of(_viewed))
-	if code == StaffCode.PREFIX:
-		_message = NOTHING_TO_COPY
-	else:
-		clipboard_set.call(code)
-		var count: int = 0
-		for card in cards_of(_viewed):
-			if card != NO_CARD:
-				count += 1
-		_message = "%s (%d cards)." % [COPIED_PREFIX, count]
-	_reason = ""
-	_render_note()
-
-
-## Put the clipboard's staff code into the shown staff, all its slots at once. A code the
-## registry does not fully know, or with more cards than the staff has slots, changes nothing
-## and says why; whether the player owns the cards is the player's to answer
-## (`build_refused`).
-func _paste_code() -> void:
-	_reason = ""
-	_message = ""
-	var slots: int = cards_of(_viewed).size()
-	if _spells == null or slots == 0:
-		return
-	var text: String = str(clipboard_get.call())
-	if text.strip_edges().is_empty():
-		_reason = CLIPBOARD_EMPTY
-		_render_note()
-		return
-	var read: Dictionary = _spells.parse_staff_code(text, slots)
-	if not bool(read.get("ok", false)):
-		_reason = str(read.get("error", ""))
-		_render_note()
-		return
-	if _held_staff != NOTHING:
-		_drop()
-	if _events != null:
-		_events.staff_cards_requested.emit(index, _viewed, read["cards"] as Array[StringName])
-	if _reason == "":
-		_message = PASTED_TEXT
-	_render_note()
 
 
 func _show_staff(staff: int) -> void:

@@ -1,8 +1,11 @@
 extends Control
 ## One player's radial staff builder (owner, 2026-10-26), the second builder beside the list
 ## one (`builder.gd`); the pause menu's Sandbox page switches between them (`hud/panels`). It
-## fills the player's quarter of the screen around their corner panel, never pauses the game,
-## and is drawn in code at the view's 1x pixels.
+## fills the player's quarter of the screen, laid out the same in every quarter (the column on
+## the left, the ring on its right; owner, 2026-10-31, docs/milestones/M2-builder-tree.md), never
+## pauses the game, and is drawn in code at the view's 1x pixels. While it is open the corner
+## panel is hidden (`hud/panels`): thin HP and MP bars framed in the player's colour sit on top of
+## the column instead, so health stays in view during a wave.
 ##
 ## - **The ring:** every card of the bag on a circle, grouped by kind (carriers, modifiers,
 ##   infusions, triggers, multicasts) with a coloured arc and a gap between kinds; or, with the
@@ -17,7 +20,7 @@ extends Control
 ##   its border (`STICKY_ANGLE`), so a wobbling thumb does not flicker between two cards.
 ## - **Ring styles** (owner, 2026-10-30): `ring_picker` swaps in another way to pick and draw the
 ##   ring (`rings/`: a zoom fan, a kinds-first ring), each in its own file so it is easy to drop.
-## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
+## - **The slots:** the shown staff's slots in five columns under the staff tabs, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed:
 ##   while pointing, the slots show the staff as RT would leave it (the rest pushed on, its casts
@@ -30,13 +33,17 @@ extends Control
 ##   **LT** (`staff_4`; Q) takes the marked card out (PUSH closes the gap). On an empty slot
 ##   with no card after it, LT takes out the last card before it and the marker steps back to
 ##   it (an undo while building); with PUSH, on an empty slot with cards after it, it closes
-##   the gap. **Hold Y** (`extra`; R) for `CLEAR_HOLD` seconds to clear the staff: a red frame
-##   fills round the slots, then every card fades out at once. **LB, RB** (`page_prev`,
-##   `page_next`) show the previous or next staff; **B** closes it.
-## - **Numbers:** under the slots, the staff's cycle: the mana of its dearest cast as a share
-##   of the wizard's mana (red with "!" above 100 %: it cannot be cast), the damage of the cycle
-##   (every shot landing once) and the cycle's time; with a card pointed at, what RT would make
-##   of each ("> 31%"). The hub shows the same when no card is pointed at.
+##   the gap. **Held** for `CLEAR_HOLD` seconds, LT clears the rest of the staff: a red frame
+##   fills round the slots, then every card fades out at once (the press has already taken one
+##   out, so a clear ends the same). **LB, RB** (`page_prev`, `page_next`) show the previous or
+##   next staff; **B** closes it.
+## - **The card info panel:** under the slots, the card under the marker: its name, its kind
+##   in the kind's colour (and a frame in it), its lore line wrapped (`Spells.component_description`)
+##   and, under a line, its numbers (`Spells.component_stats`; none for a trigger). An empty slot
+##   says so. A refusal's note shows over its top for a moment.
+## - **Numbers:** the hub in the ring's middle shows the staff's cycle when no card is pointed
+##   at: the mana of its dearest cast as a share of the wizard's mana (red with "!" above 100 %:
+##   it cannot be cast), the damage of the cycle (every shot landing once) and the cycle's time.
 ##
 ## What it shows comes only from events: `staff_changed` (the plain `Spells.staff_view`),
 ## `bag_changed`, `build_refused` and `player_stats_changed` (the wizard's maximum mana). What it
@@ -44,7 +51,7 @@ extends Control
 ## staff: a push, a closed gap, an undo, a clear), so this node never changes a staff itself.
 ## It opens through `core/ui_focus` with itself as the one control, so its owner's gameplay
 ## input is captured and `back` and the paging buttons come as UIFocus signals; the sticks, the
-## triggers and Y are read from `core/input` (press counts and the menu sticks), only for its
+## triggers are read from `core/input` (press counts and the menu sticks), only for its
 ## own player. Hints show the buttons (`widgets/action_glyph.gd`), never action names.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -86,12 +93,19 @@ const WARN: Color = Color("#e0592f")
 ## The frames round the casts of the cycle in the slots, every other cast in the other shade.
 const GROUP_COLORS: Array[Color] = [Color("#f4f1ea"), Color("#a39fb8")]
 
-## The layout, in the view's pixels, for P1's quarter (top left); the others mirror it so the
-## column always sits under or over the corner panel, at the screen's edge.
+## The layout, in the view's pixels from the quarter's top left, the same in every quarter.
 const EDGE: float = 4.0
 const COLUMN_WIDTH: float = 112.0
-## The corner panel's band (its 55 px and the margins) that the column leaves free.
-const CORNER_BAND: float = 62.0
+## The HP and MP bars on top of the column: a 1 px frame in the player's colour round two 2 px
+## bars (HP over MP) with a 1 px line between, 7 px in all.
+const BARS_HEIGHT: float = 7.0
+const TABS_FROM_TOP: float = 11.0
+const SLOTS_FROM_TOP: float = 26.0
+## The bars' colours, the corner panel's (the theme's HealthBar and ManaBar fills), and each
+## player's colour (the theme's PlayerPanel1-4 borders).
+const HEALTH_COLOR: Color = Color("#e0592f")
+const MANA_COLOR: Color = Color("#f2c230")
+const PLAYER_COLORS: Array[Color] = [Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4")]
 const SLOT_SIZE: float = 16.0
 const SLOT_STEP: float = 18.0
 const SLOT_COLUMNS: int = 5
@@ -127,6 +141,8 @@ const STICKY_SHARE: float = 0.4
 const MOUSE_INNER: float = 10.0
 const MOUSE_OUTER: float = 90.0
 const CLEAR_HOLD: float = 0.6
+## LT held this long before the clear's red frame shows, so a quick take-out does not flash it.
+const CLEAR_SHOW: float = 0.12
 const FADE_TIME: float = 0.25
 const FLY_TIME: float = 0.15
 const POP_TIME: float = 0.07
@@ -148,8 +164,9 @@ const FULL_NOTE: String = "The staff is full"
 const POINT_NOTE: String = "Point at a card first"
 const EMPTY_NOTE: String = "Nothing to take out"
 const NO_CARDS_TEXT: String = "No cards"
-## The hint row's buttons (RT, LT, Y, B) and the buttons read here by press count.
-const HINT_ACTIONS: Array[StringName] = [&"staff_2", &"staff_4", &"extra", &"back"]
+const EMPTY_SLOT_TEXT: String = "Empty slot"
+## The hint row's buttons (RT, LT, B) and the buttons read here by press count.
+const HINT_ACTIONS: Array[StringName] = [&"staff_2", &"staff_4", &"back"]
 const READ_ACTIONS: Array[StringName] = [&"staff_2", &"staff_3", &"staff_4", &"kind_prev", &"kind_next"]
 ## What LT does on the marked slot.
 const LT_TAKE: StringName = &"take"
@@ -190,6 +207,10 @@ var _input: InputManagerScript = null
 var _plans: Array[Dictionary] = [{}, {}, {}, {}]
 var _bag: Array[StringName] = []
 var _max_mana: float = 100.0
+## The wizard's health and mana now, for the bars (negative until the first `player_stats_changed`).
+var _health: float = -1.0
+var _max_health: float = 100.0
+var _mana: float = 0.0
 
 ## The ring's entries, one per card id and level in the bag: {id, level, count, kind}.
 var _entries: Array[Dictionary] = []
@@ -219,7 +240,8 @@ var _preview_view: Dictionary = {}
 var _seen: Dictionary = {}
 var _move_dir: Vector2i = Vector2i.ZERO
 var _move_wait: float = 0.0
-## Seconds `extra` has been held (negative when not held), and whether this hold cleared.
+## Seconds LT has been held (negative when not held), and whether this hold is done (cleared,
+## or there was nothing left to clear).
 var _clear_held: float = -1.0
 var _clear_done: bool = false
 var _note: String = ""
@@ -236,24 +258,26 @@ var _fading: Array[StringName] = []
 var _fade_start: float = -1.0
 var _dirty: bool = true
 
-## Laid out by `_place()`: the quarter, the column under or over the corner panel, the slots'
-## top left, the numbers' first line, the ring's middle, the hint row and the kind row.
+## Laid out by `_place()`: the quarter, the column on its left, the bars, the tabs and the slots'
+## top left, the card info panel, the ring's side, the ring's middle, the hint row and the kind row.
 var _quarter: Rect2 = Rect2()
 var _column: Rect2 = Rect2()
+var _bars_at: Vector2 = Vector2.ZERO
 var _tabs_at: Vector2 = Vector2.ZERO
 var _slots_at: Vector2 = Vector2.ZERO
-var _numbers_at: Vector2 = Vector2.ZERO
+var _info: Rect2 = Rect2()
+var _ring_side: Rect2 = Rect2()
 var _center: Vector2 = Vector2.ZERO
 var _hints_at: Vector2 = Vector2.ZERO
 var _kinds_at: Vector2 = Vector2.ZERO
 
-## Button glyphs: the staff tabs (LB, RB), the hints (RT, LT, Y, B) and the kind row (d-pad).
+## Button glyphs: the staff tabs (LB, RB), the hints (`HINT_ACTIONS`) and the kind row (d-pad).
 var _glyph_prev: ActionGlyphScript = null
 var _glyph_next: ActionGlyphScript = null
 var _hint_glyphs: Array[ActionGlyphScript] = []
-var _hint_verbs: Array[String] = ["", "", "", ""]
-var _hint_live: Array[bool] = [true, true, true, true]
-var _hint_text_x: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _hint_verbs: Array[String] = []
+var _hint_live: Array[bool] = []
+var _hint_text_x: PackedFloat32Array = PackedFloat32Array()
 var _kind_glyphs: Array[ActionGlyphScript] = []
 
 
@@ -266,6 +290,9 @@ func _ready() -> void:
 	_glyph_next = _make_glyph("GlyphNext")
 	for action in HINT_ACTIONS:
 		_hint_glyphs.append(_make_glyph("Hint_%s" % action))
+		_hint_verbs.append("")
+		_hint_live.append(true)
+		_hint_text_x.append(0.0)
 	_kind_glyphs.append(_make_glyph("KindPrev"))
 	_kind_glyphs.append(_make_glyph("KindNext"))
 	for action in READ_ACTIONS:
@@ -387,6 +414,44 @@ func direction_to(id: StringName) -> Vector2:
 ## The ring's middle in view pixels (for screenshots).
 func ring_center() -> Vector2:
 	return _center
+
+
+## Where the parts sit, in view pixels (for the layout test): `quarter`, `column`, `bars`, `slots`
+## (the four rows shown), `info`, `ring` (the ring with its kind arcs) and `hints`.
+func layout_parts() -> Dictionary:
+	var reach: float = RING_RADIUS + ARC_OUT + 2.0
+	var hints_width: float = _hint_text_x[_hint_text_x.size() - 1] + _text_width(_hint_verbs[_hint_verbs.size() - 1]) - _hints_at.x if not _hint_verbs.is_empty() else 0.0
+	return {
+		"quarter": _quarter, "column": _column,
+		"bars": Rect2(_bars_at, Vector2(COLUMN_WIDTH, BARS_HEIGHT)),
+		"slots": Rect2(_slots_at - Vector2(3.0, 3.0), Vector2(SLOT_STEP * SLOT_COLUMNS + 4.0, SLOT_STEP * SLOT_ROWS + 4.0)),
+		"info": _info,
+		"ring": Rect2(_center - Vector2(reach, reach), Vector2(reach, reach) * 2.0),
+		"hints": Rect2(_hints_at, Vector2(hints_width, HINT_HEIGHT)),
+	}
+
+
+## What the card info panel shows: the card under the slot marker. `id` (`&""` for an empty
+## slot), `name`, `kind` (the kind's word), `lines` (its lore line, wrapped to the panel) and
+## `stats` (its numbers; none for a trigger). An empty slot's `name` is "Empty slot".
+func card_info() -> Dictionary:
+	var cards: Array[StringName] = cards_of(_viewed)
+	var id: StringName = cards[_slot] if _slot < cards.size() else NO_CARD
+	if id == NO_CARD or _spells == null:
+		return {"id": NO_CARD, "name": EMPTY_SLOT_TEXT, "kind": "", "lines": PackedStringArray(), "stats": PackedStringArray()}
+	var kind: StringName = _spells.component_kind(id)
+	var stats: PackedStringArray = _spells.component_stats(id) if kind != &"trigger" else PackedStringArray()
+	return {
+		"id": id, "name": _name_of(id), "kind": String(KIND_WORDS.get(kind, "")),
+		"lines": _wrap(_spells.component_description(id), _info.size.x - 6.0), "stats": stats,
+	}
+
+
+## The wizard's health and mana as the bars show them: shares of the maximum, 0 to 1.
+func bar_shares() -> Vector2:
+	if _health < 0.0:
+		return Vector2.ZERO
+	return Vector2(clampf(_health / maxf(_max_health, 1.0), 0.0, 1.0), clampf(_mana / maxf(_max_mana, 1.0), 0.0, 1.0))
 
 
 ## The lines the hub shows now.
@@ -599,9 +664,11 @@ func mouse_reach() -> Vector2:
 	return offset / RING_RADIUS if offset.length() < MOUSE_OUTER else Vector2.ZERO
 
 
-## Hold `extra` (Y) to clear the staff, once per hold.
+## Hold LT (`staff_4`) to clear the rest of the staff, once per hold (owner, 2026-10-31). Its
+## press has already acted (`_take_out`); with no card left there is nothing to clear and the
+## hold ends quietly.
 func _poll_clear(delta: float) -> void:
-	var held: bool = _input != null and _input.get_strength(index, &"extra") > 0.0
+	var held: bool = _input != null and _input.is_held(index, &"staff_4")
 	if not held:
 		if _clear_held >= 0.0:
 			_changed()
@@ -609,6 +676,11 @@ func _poll_clear(delta: float) -> void:
 		_clear_done = false
 		return
 	if _clear_done:
+		return
+	if not cards_of(_viewed).any(func(id: StringName) -> bool: return id != NO_CARD):
+		_clear_held = -1.0
+		_clear_done = true
+		_changed()
 		return
 	_clear_held = maxf(_clear_held, 0.0) + delta
 	if _clear_held >= CLEAR_HOLD:
@@ -894,10 +966,15 @@ func _on_build_refused(player: int, reason: String) -> void:
 	_say(reason)
 
 
-func _on_stats_changed(player: int, _health: float, _max_health: float, _mana: float, max_mana: float) -> void:
-	if player == index and max_mana > 0.0 and not is_equal_approx(max_mana, _max_mana):
+func _on_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float) -> void:
+	if player != index:
+		return
+	if max_mana > 0.0:
 		_max_mana = max_mana
-		_changed()
+	_health = health
+	_max_health = maxf(max_health, 1.0)
+	_mana = mana
+	_changed()
 
 
 func _on_closed(player: int) -> void:
@@ -989,19 +1066,22 @@ func _place() -> void:
 	var right: bool = index % 2 == 1
 	var bottom: bool = index >= 2
 	_quarter = Rect2(Vector2(half.x if right else 0.0, half.y if bottom else 0.0), half)
-	var column_x: float = _quarter.end.x - EDGE - COLUMN_WIDTH if right else _quarter.position.x + EDGE
-	var band_top: float = _quarter.position.y + (2.0 if bottom else CORNER_BAND)
-	_column = Rect2(column_x, band_top, COLUMN_WIDTH, _quarter.size.y - CORNER_BAND - 2.0)
-	_tabs_at = Vector2(column_x + 2.0, band_top)
-	_slots_at = Vector2(column_x + 4.0, band_top + 15.0)
-	_numbers_at = Vector2(column_x + 2.0, _slots_at.y + SLOT_STEP * SLOT_ROWS + 1.0)
-	var ring_left: float = _quarter.position.x + EDGE if right else column_x + COLUMN_WIDTH + EDGE
-	var ring_right: float = column_x - EDGE if right else _quarter.end.x - EDGE
-	# The ring, its kind row and the hints sit the same in every quarter (only the column moves
-	# round the corner panel), so the hint rows of a top and a bottom player never touch.
+	# Every quarter as player 1's: the column on the left, the ring on its right (owner, 2026-10-31).
+	var column_x: float = _quarter.position.x + EDGE
+	var top: float = _quarter.position.y + 2.0
+	_column = Rect2(column_x, top, COLUMN_WIDTH, _quarter.size.y - 4.0)
+	_bars_at = Vector2(column_x, top)
+	_tabs_at = Vector2(column_x + 2.0, top + TABS_FROM_TOP)
+	_slots_at = Vector2(column_x + 4.0, top + SLOTS_FROM_TOP)
+	var info_top: float = _slots_at.y + SLOT_STEP * SLOT_ROWS + 2.0
+	_info = Rect2(column_x + 2.0, info_top, COLUMN_WIDTH - 4.0, _quarter.end.y - 3.0 - info_top)
+	var ring_left: float = column_x + COLUMN_WIDTH + EDGE
+	var ring_right: float = _quarter.end.x - EDGE
 	_center = Vector2(floorf((ring_left + ring_right) * 0.5), _quarter.position.y + RING_FROM_EDGE)
 	_hints_at = Vector2(ring_left, _quarter.end.y - HINT_HEIGHT - 2.0)
 	_kinds_at = Vector2(_center.x, _quarter.position.y + 2.0)
+	# The ring's side, from the top down to the hint row: the tree's space (part T5).
+	_ring_side = Rect2(ring_left, top, ring_right - ring_left, _hints_at.y - 1.0 - top)
 	var tab_x: float = _tabs_at.x
 	_glyph_prev.position = Vector2(tab_x, _tabs_at.y)
 	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + 13.0 * STAFF_COUNT + 1.0, _tabs_at.y)
@@ -1031,12 +1111,11 @@ func _slot_at(point: Vector2) -> int:
 
 
 ## Lay the hint row out for what the buttons do now: RT, LT (its verb follows the marked
-## slot), Y and B, each glyph then its verb.
+## slot) and B, each glyph then its verb.
 func _refresh_hints() -> void:
 	var lt: StringName = lt_action()
-	_hint_verbs = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), CLEAR_VERB, CLOSE_VERB]
-	var cards: Array[StringName] = cards_of(_viewed)
-	_hint_live = [_pointed != NONE, lt != &"", cards.any(func(id: StringName) -> bool: return id != NO_CARD), true]
+	_hint_verbs = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), CLOSE_VERB]
+	_hint_live = [_pointed != NONE, lt != &"", true]
 	var x: float = _hints_at.x
 	for at in _hint_glyphs.size():
 		var glyph: ActionGlyphScript = _hint_glyphs[at]
@@ -1092,9 +1171,10 @@ func _draw() -> void:
 	if not _open:
 		return
 	draw_rect(_quarter, SHADE)
+	_draw_bars()
 	_draw_tabs()
 	_draw_slots()
-	_draw_numbers()
+	_draw_info()
 	_draw_ring()
 	_draw_hub()
 	_draw_hints()
@@ -1167,7 +1247,7 @@ func _draw_slots() -> void:
 		draw_rect(Rect2(frame.position - Vector2(1.0, 1.0), Vector2(1.0, 3.0)), GOLD)
 		draw_rect(Rect2(frame.end - Vector2(2.0, 0.0), Vector2(3.0, 1.0)), GOLD)
 		draw_rect(Rect2(frame.end - Vector2(0.0, 2.0), Vector2(1.0, 3.0)), GOLD)
-	if _clear_held >= 0.0:
+	if _clear_held >= CLEAR_SHOW:
 		var share: float = clampf(_clear_held / CLEAR_HOLD, 0.0, 1.0)
 		var shown: int = mini(cards.size() - _first_row * SLOT_COLUMNS, SLOT_ROWS * SLOT_COLUMNS)
 		var box := Rect2(_slots_at - Vector2(3.0, 3.0), Vector2(SLOT_STEP * SLOT_COLUMNS + 4.0, SLOT_STEP * ceili(float(shown) / float(SLOT_COLUMNS)) + 4.0))
@@ -1238,24 +1318,71 @@ func _draw_icon(id: StringName, rect: Rect2, alpha: float) -> void:
 	draw_texture_rect(icon, Rect2(at, Vector2(size, size)), false, Color(1.0, 1.0, 1.0, alpha))
 
 
-func _draw_numbers() -> void:
-	var now: Dictionary = _numbers(_plans[_viewed])
-	var lines: PackedStringArray = _number_lines(now, _preview)
-	for at in lines.size():
-		var y: float = _numbers_at.y + at * LINE_STEP
-		var line: String = lines[at]
-		var cut: int = line.find(" > ")
-		var head: String = line if cut < 0 else line.left(cut)
-		var color: Color = WARN if head.ends_with("!") else TEXT
-		_text(head, Vector2(_numbers_at.x, y), color)
-		if cut >= 0:
-			var tail: String = line.substr(cut)
-			_text(tail, Vector2(_numbers_at.x + _text_width(head), y), WARN if tail.ends_with("!") else GOLD)
+## The HP and MP bars on top of the column, framed in the player's colour (owner, 2026-10-31).
+func _draw_bars() -> void:
+	var frame := Rect2(_bars_at, Vector2(COLUMN_WIDTH, BARS_HEIGHT))
+	draw_rect(frame, PLAYER_COLORS[clampi(index, 0, PLAYER_COUNT - 1)])
+	var inner := Rect2(frame.position + Vector2(1.0, 1.0), Vector2(frame.size.x - 2.0, 2.0))
+	var shares: Vector2 = bar_shares()
+	draw_rect(inner, OUTLINE)
+	draw_rect(Rect2(inner.position, Vector2(roundf(inner.size.x * shares.x), 2.0)), HEALTH_COLOR)
+	var lower := Rect2(inner.position + Vector2(0.0, 3.0), inner.size)
+	draw_rect(lower, OUTLINE)
+	draw_rect(Rect2(lower.position, Vector2(roundf(lower.size.x * shares.y), 2.0)), MANA_COLOR)
+
+
+## The card info panel: the card under the slot marker (`card_info`), and a refusal's note over its top.
+func _draw_info() -> void:
+	var box: Rect2 = _info
+	var info: Dictionary = card_info()
+	draw_rect(box, OUTLINE)
+	if info["id"] == NO_CARD:
+		_frame(box, LINE)
+		_text(info["name"], box.position + Vector2(3.0, 2.0), DIM)
+	else:
+		var kind: StringName = _spells.component_kind(info["id"]) if _spells != null else &""
+		var color: Color = KIND_COLORS.get(kind, DIM)
+		_frame(box, color)
+		var kind_word: String = info["kind"]
+		var kind_x: float = box.end.x - 3.0 - _text_width(kind_word)
+		_text(_fit(info["name"], kind_x - box.position.x - 6.0), box.position + Vector2(3.0, 2.0), TEXT)
+		_text(kind_word, Vector2(kind_x, box.position.y + 2.0), color)
+		var stats: PackedStringArray = info["stats"]
+		var stats_y: float = box.end.y - 2.0 - stats.size() * LINE_STEP
+		var first_y: float = box.position.y + 2.0 + LINE_STEP
+		var bottom: float = stats_y - 2.0 if not stats.is_empty() else box.end.y - 2.0
+		var lines: PackedStringArray = info["lines"]
+		var room: int = maxi(floori((bottom - first_y) / LINE_STEP), 0)
+		for at in mini(lines.size(), room):
+			var line: String = lines[at]
+			if at == room - 1 and lines.size() > room:
+				line = _fit(line + "..", box.size.x - 6.0)
+			_text(line, Vector2(box.position.x + 3.0, first_y + at * LINE_STEP), MUTED)
+		if not stats.is_empty():
+			draw_rect(Rect2(box.position.x + 2.0, stats_y - 2.0, box.size.x - 4.0, 1.0), LINE)
+			for at in stats.size():
+				_text(stats[at], Vector2(box.position.x + 3.0, stats_y + at * LINE_STEP), TEXT)
 	if note_text() != "":
-		var box := Rect2(_numbers_at - Vector2(2.0, 1.0), Vector2(COLUMN_WIDTH - 2.0, LINE_STEP * 3.0 + 2.0))
-		draw_rect(box, OUTLINE)
-		_frame(box, WARN)
-		_text(_note, _numbers_at + Vector2(2.0, 1.0), WARN)
+		var note := Rect2(box.position, Vector2(box.size.x, LINE_STEP + 3.0))
+		draw_rect(note, OUTLINE)
+		_frame(note, WARN)
+		_text(_fit(_note, box.size.x - 6.0), note.position + Vector2(3.0, 1.0), WARN)
+
+
+## `text` broken into lines of at most `width` pixels, at spaces (a word too long is cut).
+func _wrap(text: String, width: float) -> PackedStringArray:
+	var lines := PackedStringArray()
+	var line: String = ""
+	for word in text.split(" ", false):
+		var tried: String = word if line == "" else line + " " + word
+		if line != "" and _text_width(tried) > width:
+			lines.append(line)
+			line = word
+		else:
+			line = tried
+	if line != "":
+		lines.append(_fit(line, width))
+	return lines
 
 
 func _draw_ring() -> void:

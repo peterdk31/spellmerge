@@ -2,9 +2,10 @@ extends "res://tests/support/suite.gd"
 ## Tests for the radial builder in hud/builder (owner, 2026-10-26): opened with B when the pause
 ## menu's Sandbox page picked it, the right stick picks a card on the ring (with a rumble), RT
 ## puts it in the marked slot (pushing the rest right, or replacing), LT takes a card out (an
-## undo past the last card), holding Y clears the staff, LB and RB switch staffs, the left stick
-## moves the marker, the d-pad flips the kind with the one-kind ring, and the numbers show the
-## mana share and what RT would change. The wizards are real (the real registry and spell
+## undo past the last card; held, it clears the staff), LB and RB switch staffs, the left stick
+## moves the marker, the d-pad flips the kind with the one-kind ring, the numbers show the mana
+## share and what RT would change, and one layout for every quarter (bars, card info, the corner
+## panel hidden while it is open). The wizards are real (the real registry and spell
 ## runtime, the 20-slot dev staff), so every request is answered as in the game.
 ##
 ## godot --headless --path . --script res://tests/hud/test_radial_builder.gd
@@ -318,21 +319,44 @@ func test_lt_past_the_last_card_is_an_undo() -> void:
 	check_equal(radial.lt_action(), &"", "and then LT has nothing to do")
 
 
-func test_holding_y_clears_the_staff_once() -> void:
+func test_holding_lt_clears_the_staff_once() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_input.send_virtual(0, &"extra", 1.0)
+	radial.mark_slot(0)
+	_input.send_virtual(0, &"staff_4", 1.0)
 	_frame()
-	check_equal(radial.cards_of(1).slice(0, 2), _ids("fire bolt"), "a short press does nothing yet")
+	check_equal(radial.cards_of(1).slice(0, 2), _ids("bolt -"), "the press takes the marked card out at once")
 	for _i in ceili(RadialScript.CLEAR_HOLD / STEP) + 1:
 		_frame()
-	check(radial.cards_of(1).all(func(id: StringName) -> bool: return id == &""), "held long enough, the staff is clear")
+	check(radial.cards_of(1).all(func(id: StringName) -> bool: return id == &""), "held long enough, the rest is cleared")
 	check_equal(radial.marked_slot(), 0, "the marker goes back to the start")
 	var asked: int = _whole.size()
 	for _i in 20:
 		_frame()
 	check_equal(_whole.size(), asked, "one clear per hold")
+	_input.send_virtual(0, &"staff_4", 0.0)
+	_frame()
+
+
+func test_y_no_longer_clears() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	_input.send_virtual(0, &"extra", 1.0)
+	for _i in ceili(RadialScript.CLEAR_HOLD / STEP) + 2:
+		_frame()
 	_input.send_virtual(0, &"extra", 0.0)
+	_frame()
+	check_equal(radial.cards_of(1).slice(0, 2), _ids("fire bolt"), "holding Y leaves the staff")
+
+
+func test_a_quick_lt_tap_takes_one_card_and_never_clears() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	radial.mark_slot(0)
+	_tap(0, &"staff_4")
+	for _i in ceili(RadialScript.CLEAR_HOLD / STEP) + 2:
+		_frame()
+	check_equal(radial.cards_of(1).slice(0, 2), _ids("bolt -"), "only the marked card came out")
 
 
 func test_lb_rb_switch_staffs_and_the_left_stick_moves_the_marker() -> void:
@@ -463,3 +487,66 @@ func test_x_and_a_do_nothing_in_the_builder() -> void:
 	check_equal(_whole.size(), 0, "nothing was asked for")
 	check_equal(radial.note_text(), "", "and nothing is said")
 	check(radial.is_open(), "the builder stays open")
+
+
+func test_the_corner_panel_hides_while_the_radial_is_open() -> void:
+	_start(2)
+	check(_hud.get_panel(0).visible and _hud.get_panel(1).visible, "both corner panels show in the room")
+	_open(0)
+	check(not _hud.get_panel(0).visible, "player 1's corner panel is hidden while their radial is open")
+	check(_hud.get_panel(1).visible, "player 2's stays")
+	_tap(0, &"back")
+	_frame()
+	check(not _radial(0).is_open(), "B closed it")
+	check(_hud.get_panel(0).visible, "and the corner panel is back")
+
+
+func test_the_bars_follow_the_players_stats() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	_bus.player_stats_changed.emit(0, 30.0, 120.0, 25.0, 100.0)
+	check(radial.bar_shares().is_equal_approx(Vector2(0.25, 0.25)), "health and mana as shares: %s" % radial.bar_shares())
+	_bus.player_stats_changed.emit(1, 0.0, 120.0, 0.0, 100.0)
+	check(radial.bar_shares().is_equal_approx(Vector2(0.25, 0.25)), "another player's stats change nothing")
+
+
+func test_the_card_info_shows_the_marked_card() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	radial.mark_slot(1)
+	var info: Dictionary = radial.card_info()
+	check_equal(info["id"], &"bolt", "the bolt is under the marker")
+	check_equal(info["name"], _spells.component_name(&"bolt"), "its name")
+	check_equal(info["kind"], "Carrier", "its kind")
+	check(not (info["lines"] as PackedStringArray).is_empty(), "its lore line")
+	check_equal(info["stats"], _spells.component_stats(&"bolt"), "its numbers")
+	_point(0, &"nova")
+	check_equal(radial.card_info()["id"], &"bolt", "pointing at a card on the ring does not change it")
+	_let_go(0)
+	radial.mark_slot(5)
+	check_equal(radial.card_info()["name"], RadialScript.EMPTY_SLOT_TEXT, "an empty slot says so")
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt nova"))
+	radial.mark_slot(0)
+	check_equal(radial.card_info()["kind"], "Trigger", "a trigger")
+	check((radial.card_info()["stats"] as PackedStringArray).is_empty(), "shows no numbers")
+
+
+func test_four_quarters_are_laid_out_alike_and_fit_the_view() -> void:
+	_start(4)
+	for player in 4:
+		_open(player)
+	var view := Rect2(Vector2.ZERO, _radial(0).get_viewport_rect().size)
+	check_equal(view.size, Vector2(640.0, 360.0), "the game's view")
+	var all: Array[Dictionary] = []
+	for player in 4:
+		all.append(_radial(player).layout_parts())
+	for player in 4:
+		var parts: Dictionary = all[player]
+		var quarter: Rect2 = parts["quarter"]
+		for key: String in ["column", "bars", "slots", "info", "ring", "hints"]:
+			check(quarter.encloses(parts[key] as Rect2), "player %d's %s is inside its quarter: %s in %s" % [player + 1, key, parts[key], quarter])
+		check((parts["column"] as Rect2).position - quarter.position == (all[0]["column"] as Rect2).position - (all[0]["quarter"] as Rect2).position, "player %d's column sits where player 1's does" % (player + 1))
+		check((parts["ring"] as Rect2).position.x > (parts["column"] as Rect2).end.x, "player %d's ring is right of the column" % (player + 1))
+		check(not (parts["ring"] as Rect2).intersects(parts["column"] as Rect2), "player %d's ring and column do not touch" % (player + 1))
+		check(not (parts["hints"] as Rect2).intersects(parts["ring"] as Rect2), "player %d's hints are under the ring" % (player + 1))
+		check((parts["info"] as Rect2).size.x >= 100.0 and (parts["info"] as Rect2).size.y >= 70.0, "player %d's card info has room: %s" % [player + 1, parts["info"]])

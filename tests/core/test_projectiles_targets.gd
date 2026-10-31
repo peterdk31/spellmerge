@@ -22,9 +22,12 @@ const ROOM: Vector2 = Vector2(640.0, 360.0)
 const BODIES: int = 400
 const SHOTS: int = 300
 const STEPS: int = 90
-## The crowd's hits on the manager before S5 (count and hash of every hit and query, in order).
+## The crowd's hits on the manager before S5 (count and hash of every hit and query, in order),
+## recorded again on main's manager and Combat as they were before S5 when main's homing and atom
+## changes came in (2026-10-31): a change to how shots fly changes this hash, so record it again
+## on the code before the change, never from the code under test.
 const RECORDED_HITS: int = 7282
-const RECORDED_HASH: int = 1061175539
+const RECORDED_HASH: int = 3052657089
 
 var _bus: EventsScript
 var _mgr: ManagerScript

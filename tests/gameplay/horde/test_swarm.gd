@@ -407,7 +407,6 @@ func _director_on(run: Fixture, weights: Dictionary) -> HordeScript:
 	_director = HordeScript.new()
 	_director.events = run.bus
 	_director.actors = run.actors
-	_director.projectiles = run.projectiles
 	_director.registry = run.registry
 	_director.view_size = Vector2(640.0, 360.0)
 	_director.curve = HordeFixture.curve([[0.0, 30.0, 200]], weights)

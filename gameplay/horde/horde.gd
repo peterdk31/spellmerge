@@ -45,6 +45,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
 const SwarmScript := preload("res://gameplay/horde/swarm.gd")
+const SwarmLookScript := preload("res://gameplay/horde/swarm_look.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## The swarm's look's shader (swarm_look.gd), compiled before the first room with the rest.
 const SwarmLookShader: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
@@ -293,7 +294,7 @@ func start(new_world: Node2D) -> void:
 	_camera = _find_camera()
 	_arena = _find_arena()
 	if swarm != null:
-		swarm.start(_horde, _arena)
+		_start_swarm()
 	_read_kinds()
 	_read_cards()
 	for seat in SEATS:
@@ -403,15 +404,26 @@ func _pick_kind() -> EnemyBase:
 	return last
 
 
+## Starts the swarm on this run's `Horde` node and gives it its look (`swarm_look.gd`), a child of
+## the same node at no offset, so it draws where the swarmers' bare nodes stand; the old run's look
+## went with the old node.
+func _start_swarm() -> void:
+	swarm.start(_horde, _arena)
+	var look := SwarmLookScript.new()
+	look.name = "SwarmLook"
+	look.setup(swarm)
+	_horde.add_child(look)
+	swarm.look = look
+
+
 func _add_enemy(data: EnemyBase, at: Vector2) -> bool:
 	var kind: SwarmKind = SwarmScript.kind_for(data)
 	if kind != null:
 		if swarm == null:
 			swarm = SwarmScript.new()
 			swarm.events = events
-			swarm.projectiles = projectiles
 			swarm.actors = actors
-			swarm.start(_horde, _arena)
+			_start_swarm()
 		if swarm.spawn(kind, at) < 0:
 			return false
 		alive += 1

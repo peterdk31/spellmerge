@@ -57,7 +57,8 @@ enum Behaviour {
 	## reach (SpellLimits.ZAP_WAIT_MOST), the one the shot is about to hit too, before it hits (zap cards combine as chances: two are 75%; with nothing near the shot
 	## sparks into the air; SpellLimits.ZAP_*; owner, 2026-10-30), at `SpellLimits.ZAP_DAMAGE` of its damage with its infusions; a zap
 	## is a hit, so it sets off `on hit` and chains (owner, 2026-10-27). Only on a carrier that
-	## stays in the air as a shot.
+	## stays in the air as a shot, or a line (a beam: the bodies near its line, zapped from it,
+	## `CarrierBeam._step_zaps`).
 	ZAP,
 	## Every actor the carrier hits is possessed for `behaviour_strength` seconds (actors G9,
 	## `possess_requested`; owner, 2026-10-29): the caster's controller drives the oldest of the
@@ -102,7 +103,7 @@ const NEEDS: Dictionary = {
 	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
 	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
 	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
-	Behaviour.ZAP: {"any": CarrierTraits.STAYS},
+	Behaviour.ZAP: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
 }
 
 @export var damage_mult: float = 1.0

@@ -149,10 +149,17 @@ func test_a_zap_sets_off_on_hit() -> void:
 	arena.free_all()
 
 
-func test_it_is_wasted_on_a_beam() -> void:
+## A beam zaps what is beside its line (owner, 2026-10-31): an imp 40 px off it, never on it.
+func test_a_beam_zaps_the_imp_beside_its_line() -> void:
 	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(Vector2(80.0, 40.0))
 	var staff: CompiledStaff = arena.install_cards(0, 0, ["zap", "beam"])
-	check(staff.wasted.has(0), "zap on a beam is wasted (chain is the beam's way to jump)")
+	check(not staff.wasted.has(0), "zap on a beam counts: %s" % staff.wasted)
+	# Each beam rolls once for the imp (50%): a few beams, so it is zapped.
+	for n in 6:
+		arena.cast(0, 0)
+		arena.run(1.2)
+	check(arena.lost(imp) > 0, "the imp beside the beam is zapped")
 	arena.free_all()
 
 

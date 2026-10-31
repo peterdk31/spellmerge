@@ -876,6 +876,8 @@ func step(delta: float) -> void:
 	for c in _cooldown_rows:
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
 	_fires_used.fill(0)
+	# The zap cap's window opens before the carriers step: a live beam zaps in its `step`.
+	_zaps_used = 0
 	_clock += delta
 	_run_waiting_fires()
 	_moves.step(delta)
@@ -1841,7 +1843,6 @@ func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
 ## as it leaves. At most `SpellLimits.MAX_ZAPS_PER_STEP` zaps a step; a body over the cap rolls in
 ## a later step. A shot with no body in reach now and then throws a spark into the air (`_spark`).
 func _step_zaps(delta: float) -> void:
-	_zaps_used = 0
 	_zap_steps += 1
 	var i: int = 0
 	while i < _zapper_count:
@@ -1957,7 +1958,13 @@ func _rolled(slot: int, id: int) -> void:
 func _zap_roll(slot: int) -> float:
 	var n: int = _rec_zap_rolls[slot]
 	_rec_zap_rolls[slot] = n + 1
-	var h: int = (int(projectiles.get_seq_of(slot)) * 73856093) ^ (n * 19349663) ^ 83492791
+	return zap_hash(int(projectiles.get_seq_of(slot)), n)
+
+
+## The `n`th random number in [0, 1) of the zapper born `seed` (a shot's sequence number, a live
+## beam's birth): a hash, the same every run.
+static func zap_hash(seed: int, n: int) -> float:
+	var h: int = (seed * 73856093) ^ (n * 19349663) ^ 83492791
 	h = (h ^ (h >> 13)) * 1274126177
 	h = h ^ (h >> 16)
 	return float(h & 0xFFFFFF) / 16777216.0
@@ -2008,12 +2015,18 @@ func _step_magnets() -> void:
 ## `zap_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body.
 func _zap(slot: int, spell: CompiledSpell, aim: Vector2) -> void:
-	var tag: int = projectiles.get_tag_of(slot)
-	var at: Vector2 = projectiles.get_position_of(slot)
+	_zap_ray(spell, projectiles.get_tag_of(slot), projectiles.get_position_of(slot), aim, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.zap_hit, slot)
+
+
+## A zap of the carrier `spell` with `tag` from `at` to `aim`, with `chain` jumps left after `prev`,
+## hitting with `hit`: a short ray (`_ray_begin`, marked a zap), drawn as lightning. `slot` is the
+## shot zapping, or -1 for a carrier with no slot (a live beam, `CarrierBeam`).
+func _zap_ray(spell: CompiledSpell, tag: int, at: Vector2, aim: Vector2, chain: int, prev: int, hit: HitProfile, slot: int) -> void:
 	var actor: int = SpellTag.caster_of(tag)
 	_zaps_used += 1
 	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
-	var ray: RayHit = _ray_begin(tag, way, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.zap_hit, slot)
+	var ray: RayHit = _ray_begin(tag, way, chain, prev, hit, slot)
+	ray.zapping = true
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_end()
 	if got > 0.0 and events != null:
@@ -2163,7 +2176,7 @@ func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 ## payload goes the way the shot or beam goes on. A zap (`_zap`, its shot's tag) that ends on a
 ## wall is not its shot meeting one: it sets off nothing (rules R4a).
 func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int, shot: int) -> void:
-	if _ray.zap_slot >= 0:
+	if _ray.zapping:
 		return
 	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, shot, false, heading)
 

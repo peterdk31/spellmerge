@@ -4317,18 +4317,23 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 ## Fill `out` with the targets on `layers` not of `team` (Actors.NONE: of any) whose hit circle
 ## overlaps the circle (`point`, `radius`), `centres` with where each one's hit circle is and
 ## `radii` with how big, in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
-## run. Pass the same arrays each time: nothing is allocated once they have grown.
-func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Array[Node2D], centres: PackedVector2Array, radii: PackedFloat32Array) -> int:
-	out.clear()
+## run. With a finite `to`, the circles round every point of the line from `point` to `to` (a
+## beam's zap, a piece of its path at a time); with `keep`, `out` is added to, not cleared, and a
+## target already in it is not added again. Pass the same arrays each time: nothing is allocated once they have grown.
+func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Array[Node2D], centres: PackedVector2Array, radii: PackedFloat32Array, to: Vector2 = Vector2.INF, keep: bool = false) -> int:
+	if not keep:
+		out.clear()
 	if not point.is_finite() or not is_finite(radius):
-		return 0
+		return out.size()
+	var end: Vector2 = to if to.is_finite() else point
 	_query_ready()
-	var cells: Vector4i = _query_cells(point, radius)
+	var cells: Vector4i = _query_cells((point + end) * 0.5, radius + point.distance_to(end) * 0.5)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, 0) and (team == ActorsScript.NONE or _target_team[t] != team):
+				var at: Vector2 = point if end == point else Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
+				if _query_match(t, at, radius, layers, 0) and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
 						radii.resize(centres.size())

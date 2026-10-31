@@ -162,6 +162,30 @@ func ray_end() -> void:
 	_rt._ray_end()
 
 
+## A zap of the carrier `spell` with `tag` from `at` to the body whose hit circle is at `aim`, with
+## `chain` jumps left after `prev`, hitting with `hit` (`spell.zap_hit` or what replaces it): a hit
+## of the carrier like any other, drawn as lightning (`Spells._zap_ray`). It casts its jumps too.
+func zap(spell: CompiledSpell, tag: int, at: Vector2, aim: Vector2, chain: int, prev: int, hit: HitProfile) -> void:
+	_rt._zap_ray(spell, tag, at, aim, chain, prev, hit, -1)
+
+
+## True while zaps this step have room under `SpellLimits.MAX_ZAPS_PER_STEP`.
+func zap_room() -> bool:
+	return _rt._zaps_used < SpellLimits.MAX_ZAPS_PER_STEP
+
+
+## A harmless spark of `spell` with `tag`: a zap's look from `at` along `way`, `length` pixels long.
+func spark(spell: CompiledSpell, tag: int, at: Vector2, way: Vector2, length: float) -> void:
+	_rt._zaps_used += 1
+	if _rt.events != null:
+		_rt.events.form_shown.emit(SpellTag.caster_of(tag), SpellRuntime.ZAP_FORM, at, way, length, spell.tint, spell.look)
+
+
+## The team of `actor` (`Actors.team_of`; NONE without an actor table): what a zap aims away from.
+func team(actor: int) -> int:
+	return _rt._team(actor)
+
+
 ## Casts the chain jumps the hits so far queued (after a ray, outside its hit handler).
 func cast_jumps() -> void:
 	_rt._cast_jumps()

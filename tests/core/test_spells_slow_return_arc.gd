@@ -305,9 +305,74 @@ func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	check_equal(most, 1, "only the orb: its on wall payload never fired")
 
 
-func test_zap_is_wasted_on_a_beam() -> void:
+func test_zap_works_on_a_beam() -> void:
 	var staff: CompiledStaff = _compile([&"zap", &"beam"])
-	check(staff.wasted.has(0), "zap on a beam is wasted")
+	check(not staff.wasted.has(0), "zap on a beam counts: %s" % staff.wasted)
+
+
+## A beam zaps the bodies beside its line (owner, 2026-10-31: the new zap did nothing on a beam):
+## an imp 40 px off a 200 px beam, never on it, is zapped once, from the line beside it, at
+## ZAP_DAMAGE with the beam's infusion.
+func test_a_beam_zaps_the_enemy_beside_its_line() -> void:
+	var imp: Node2D = _target(Vector2(100.0, 40.0))
+	var from: Array[Vector2] = []
+	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"zap" and length > 22.0:
+			from.append(origin))
+	_build(0, [&"zap", &"lightning", &"beam"])
+	_cast()
+	_tick(60)
+	var zaps: Array = _hits_on(imp)
+	check_equal(zaps.size(), 1, "it zaps the imp once a beam")
+	if not zaps.is_empty():
+		var profile: HitProfile = zaps[0][4]
+		check(profile != null and is_equal_approx(profile.damage, 5.0 * SpellLimits.ZAP_DAMAGE), "the zap at ZAP_DAMAGE of the beam")
+		check(profile != null and profile.status_id == &"static", "carrying the beam's infusion")
+	check_equal(from.size(), 1, "one bolt drawn")
+	if not from.is_empty():
+		check(from[0].distance_to(Vector2(100.0, 0.0)) < 1.0, "from the line beside the imp (%s)" % from[0])
+
+
+func test_a_beam_does_not_zap_out_of_reach() -> void:
+	var far: Node2D = _target(Vector2(100.0, 90.0))
+	var beyond: Node2D = _target(Vector2(280.0, 0.0))
+	_build(0, [&"zap", &"beam"])
+	_cast()
+	_tick(60)
+	check(_hits_on(far).is_empty(), "an imp 90 px off the line is out of a 60 px reach")
+	check(_hits_on(beyond).is_empty(), "an imp 80 px past the beam's end is too")
+
+
+## A beam's zap is a hit of the beam: `on hit` fires its payload from the zapped imp.
+func test_a_beam_zap_sets_off_on_hit() -> void:
+	var imp: Node2D = _target(Vector2(100.0, 40.0))
+	_build(0, [&"zap", &"on_hit", &"beam", &"nova"])
+	_cast()
+	_tick(60)
+	var novas: int = 0
+	for row: Array in _ended:
+		var spell: CompiledSpell = _spells._profiles.get(row[2])
+		if spell != null and spell.form_id == &"nova":
+			novas += 1
+	check(not _hits_on(imp).is_empty(), "the imp was zapped")
+	check_equal(novas, 8, "the zap fired the nova payload once: eight nova shots")
+
+
+## Rules R4a for a beam's zap: one that ends on a wall sets off no `on wall` (a beam's zap has no slot).
+func test_a_beam_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
+	var imp: Node2D = _target(Vector2(100.0, 40.0))
+	_mgr.set_walls([Rect2(50.0, 16.0, 100.0, 8.0)] as Array[Rect2])
+	var walls: Array[int] = [0]
+	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: walls[0] += 1)
+	_build(0, [&"zap", &"on_wall", &"beam", &"nova"])
+	_cast()
+	var most: int = 0
+	for _i in 60:
+		_tick(1)
+		most = maxi(most, _mgr.get_count())
+	check(walls[0] > 0, "the zap ended on the wall between the beam and the imp (%d)" % walls[0])
+	check(_hits_on(imp).is_empty(), "the wall kept the imp from the zap")
+	check_equal(most, 0, "its on wall payload never fired")
 
 
 func test_zaps_are_capped_per_step() -> void:

@@ -163,9 +163,11 @@ func _pull_magnets() -> void:
 ## reach of its line, as far as it got, rolls its chance (again SpellLimits.ZAP_AGAIN after it was
 ## zapped or lost its roll), and on a win is zapped from the
 ## nearest point of its line at a random moment while it is in reach (at most
-## SpellLimits.ZAP_WAIT_MOST and the beam's life left; a beam stands where it is held, so a body
-## stays in reach until it or the beam moves); a waiting zap whose body left the reach is made as it
-## leaves. A beam with nothing in reach now and then throws a spark off its line.
+## SpellLimits.ZAP_WAIT_MOST and the time until the beam starts to dissolve, `_zap_time_left`; a
+## beam stands where it is held, so a body stays in reach until it or the beam moves); a waiting zap
+## whose body left the reach is made as it leaves. A beam with nothing in reach now and then throws a
+## spark off its line. A dissolving beam zaps nothing (owner, 2026-10-31): its waiting zaps are
+## dropped.
 func _step_zaps(delta: float) -> void:
 	_zap_steps += 1
 	for at in _bm_on.size():
@@ -173,6 +175,10 @@ func _step_zaps(delta: float) -> void:
 			continue
 		var spell: CompiledSpell = _bm_spell[at]
 		if spell.zap_chance <= 0.0 or spell.zap_reach <= 0.0 or _bm_count[at] < 1:
+			continue
+		var left: float = _zap_time_left(at)
+		if left <= 0.0:
+			_drop_zaps(at)
 			continue
 		var near: int = _zap_reach_of(at, spell.zap_reach)
 		_zaps_due(at, near)
@@ -195,7 +201,7 @@ func _step_zaps(delta: float) -> void:
 			else:
 				# It waits a random moment of the time it stays in reach, less a look's step; it rolls
 				# again ZAP_AGAIN after.
-				var window: float = minf(SpellLimits.ZAP_WAIT_MOST, _bm_life[at])
+				var window: float = minf(SpellLimits.ZAP_WAIT_MOST, left)
 				var wait: float = _zap_roll(at) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
 				_rolled(at, body.get_instance_id(), kit.clock() + wait)
 				if wait <= 0.0 or _bm_due_count[at] >= SpellRuntime.ZAP_DUE:
@@ -205,6 +211,21 @@ func _step_zaps(delta: float) -> void:
 					_bm_due_body[n] = body
 					_bm_due_at[n] = kit.clock() + wait
 					_bm_due_count[at] += 1
+
+
+## Seconds before live beam `at` starts to dissolve (SpellLimits.BEAM_FADE of its life left; a held
+## one, which ends when switched off, its life left): how long it may still zap.
+func _zap_time_left(at: int) -> float:
+	if _bm_span[at] >= SpellLimits.HOLD_LIFETIME:
+		return _bm_life[at]
+	return _bm_life[at] - SpellLimits.BEAM_FADE * _bm_span[at]
+
+
+## Live beam `at` drops the zaps it has won but not made.
+func _drop_zaps(at: int) -> void:
+	for n in _bm_due_count[at]:
+		_bm_due_body[at * SpellRuntime.ZAP_DUE + n] = null
+	_bm_due_count[at] = 0
 
 
 ## Fills `_zap_near` (with `_zap_centres`, `_zap_radii`) with the bodies of another team than live
@@ -713,9 +734,7 @@ func _end_beam(at: int, finished: bool) -> void:
 	_bm_source[at] = null
 	_bm_hit[at] = null
 	_bm_zap_hit[at] = null
-	for n in _bm_due_count[at]:
-		_bm_due_body[at * SpellRuntime.ZAP_DUE + n] = null
-	_bm_due_count[at] = 0
+	_drop_zaps(at)
 	var tip: Vector2 = _bm_tip[at]
 	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
 		kit.blast(spell, tag, actor, tip)

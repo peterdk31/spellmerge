@@ -25,6 +25,12 @@ func _initialize() -> void:
 	_check(float(probe.call("steps_per_frame_average")) > 0.0, "physics steps per frame are counted")
 	_check(int(probe.call("steps_per_frame_max")) >= 1, "at least one physics step ran in the busiest frame")
 	_check(EffectSlots.DEFAULT > 0, "the effect slots are readable")
+	# Its own clock (the monitors are each the longest of a second): every step's scripts are timed
+	# from the first marker to the probe, which run first and last.
+	_check(float(probe.call("physics_scripts_average_ms")) > 0.0, "physics steps' scripts are timed")
+	_check(float(probe.call("physics_scripts_max_ms")) >= float(probe.call("physics_scripts_average_ms")), "the longest step is no shorter than the average")
+	_check(float(probe.call("process_scripts_average_ms")) > 0.0, "process passes' scripts are timed")
+	_check(int(probe.process_physics_priority) > 0 and probe.get_child_count() == 1 and probe.get_child(0).process_physics_priority < 0, "the probe runs last and its marker first")
 	probe.call("report")
 	probe.free()
 	_check_known_samples()

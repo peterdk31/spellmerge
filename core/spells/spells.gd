@@ -466,6 +466,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.disconnect(_on_reaction)
 		events.entity_ended.disconnect(_on_entity_ended)
 		events.caster_move_finished.disconnect(_moves.finished)
+		events.body_replaced.disconnect(_on_body_replaced)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -482,6 +483,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.connect(_on_reaction)
 		events.entity_ended.connect(_on_entity_ended)
 		events.caster_move_finished.connect(_moves.finished)
+		events.body_replaced.connect(_on_body_replaced)
 
 
 ## True when the card `card_id` does something on the carrier `carrier` (`FormBase.carrier`) on its
@@ -2706,6 +2708,30 @@ func familiar_at(key: int, at: Vector2) -> void:
 
 ## An entity `ai` made for a carrier ended where it stood: the carrier its kind names (a decoy, a
 ## familiar) runs its end (`CarrierEntity.entity_ended`).
+## The body `old` was replaced by `new` for the same actor (`body_replaced`: the swarm's
+## promotion): what keeps `old` keeps `new` from now on: the projectile manager's shots
+## (`replace_body`), a chain's last body (by shot and in the jump queue) and each carrier's rows (a
+## sweep's struck bodies, its chain's last body: `Carrier.replace_body`).
+func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
+	if old == null or new == null or old == new:
+		return
+	if projectiles != null:
+		projectiles.replace_body(old, new)
+	var from: int = old.get_instance_id()
+	var to: int = new.get_instance_id()
+	for slot in _rec_prev.size():
+		if _rec_prev[slot] == from:
+			_rec_prev[slot] = to
+	for at in _jq_prev.size():
+		if _jq_prev[at] == from:
+			_jq_prev[at] = to
+		var held: Variant = _jq_target[at]
+		if is_instance_valid(held) and held == old:
+			_jq_target[at] = new as Node2D
+	for carrier: Carrier in _carriers.values():
+		carrier.replace_body(old, new)
+
+
 func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int) -> void:
 	var carrier: CarrierEntity = _carriers.get(kind) as CarrierEntity
 	if carrier != null:

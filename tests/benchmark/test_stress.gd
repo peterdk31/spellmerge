@@ -8,6 +8,7 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/benchmark/test_stress.gd
 
 const RunnerScript := preload("res://tests/benchmark/stress_runner.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 
 func _initialize() -> void:
@@ -43,6 +44,23 @@ func _initialize() -> void:
 		printerr("TEST FAILED: --horde should pick the horde scenarios and nothing else the default, got %s" % [horde])
 		quit(1)
 		return
+	# The swarm scenarios (Horde swarm S1, S4) run only on `--horde-swarm`: the desktop's 1,000
+	# swarmers, and the web's 500, the only one a web build keeps.
+	var swarm_run: Array[int] = RunnerScript.scenarios_from_args(PackedStringArray(["--horde-swarm"]), all)
+	var web_swarm: Array[int] = RunnerScript.scenarios_for(swarm_run, true)
+	if swarm_run != RunnerScript.HORDE_SWARM or swarm_run.size() != 2 or int(RunnerScript.SCENARIOS[swarm_run[0]].get("swarm", 0)) < 1000 or web_swarm.size() != 1 or int(RunnerScript.SCENARIOS[web_swarm[0]].get("swarm", 0)) < 500:
+		printerr("TEST FAILED: --horde-swarm should pick the desktop swarm of 1,000 and the web's of 500 (a web build only that), got %s" % [swarm_run])
+		quit(1)
+		return
+	# Every body is an actor: a swarm scenario's swarmers, staff enemies and wizards fit the actor
+	# table, or the runner spends its frames on spawns the table refuses (S4).
+	for index in swarm_run:
+		var scenario: Dictionary = RunnerScript.SCENARIOS[index]
+		var bodies: int = int(scenario["swarm"]) + int(scenario["staff_enemies"]) + RunnerScript.PLAYERS
+		if bodies > ActorsScript.ACTORS or int(scenario["enemies"]) != int(scenario["swarm"]) + int(scenario["staff_enemies"]):
+			printerr("TEST FAILED: the swarm scenario %s needs %d actors, the table has %d" % [scenario["label"], bodies, ActorsScript.ACTORS])
+			quit(1)
+			return
 	var web_horde: Array[int] = RunnerScript.scenarios_for(horde, true)
 	if web_horde.size() != 1 or RunnerScript.SCENARIOS[web_horde[0]]["enemies"] < 500:
 		printerr("TEST FAILED: a web build should keep the web horde of 500+, got %s" % [web_horde])

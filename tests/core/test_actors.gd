@@ -258,6 +258,34 @@ func test_spend_hold_over_a_partial_an_exact_and_a_long_step() -> void:
 	check_equal(_actors.spend_hold(99999, 0.25), 0.25, "a bad id is never held")
 
 
+## `spend_holds` (a crowd's step, Horde swarm S4) answers and spends as `spend_hold` one by one: a
+## second table, given the same holds, is asked row by row.
+func test_spend_holds_does_what_spend_hold_does_for_each() -> void:
+	var twin := own(ActorsScript.new()) as ActorsScript
+	var holds: Array[float] = [0.0, 0.75, 0.25, 0.1, 0.0, 2.0]
+	var ids := PackedInt32Array()
+	for seconds in holds:
+		var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+		twin.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+		if seconds > 0.0:
+			_actors.hold(id, seconds)
+			twin.hold(id, seconds)
+		ids.append(id)
+	ids.append(99999)
+	ids.append(ActorsScript.NONE)
+	var seconds_out := PackedFloat64Array()
+	seconds_out.resize(ids.size() + 1)
+	seconds_out[ids.size()] = -7.0
+	for step in 3:
+		_actors.spend_holds(ids, ids.size(), 0.25, seconds_out)
+		for i in ids.size():
+			check_equal(seconds_out[i], maxf(twin.spend_hold(ids[i], 0.25), 0.0), "step %d, actor %d runs what spend_hold says" % [step, ids[i]])
+		check_equal(_actors.held_count, twin.held_count, "step %d: as many held" % step)
+		for id in holds.size():
+			check_equal(_actors.held_left(id), twin.held_left(id), "step %d: actor %d's stop left" % [step, id])
+	check_equal(seconds_out[ids.size()], -7.0, "nothing past `count` is written")
+
+
 func test_a_hold_ends_when_the_actor_closes_opens_again_or_the_table_clears() -> void:
 	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
 	_actors.hold(id, 1.0)
@@ -274,3 +302,22 @@ func test_a_hold_ends_when_the_actor_closes_opens_again_or_the_table_clears() ->
 	_actors.clear()
 	check_equal(_actors.held_count, 0, "clear releases every hold")
 	check_equal(_actors.held_left(again), 0.0, "and the seconds")
+
+
+func test_teams_is_team_of_for_every_id() -> void:
+	var ids: Array[int] = _open_enemies(5)
+	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 0, 0)
+	_actors.close(ids[2])
+	_actors.set_driver(ids[3], ActorsScript.TEAM_WIZARDS, ActorsScript.NONE)
+	var teams: PackedInt32Array = _actors.teams()
+	check_equal(teams.size(), ActorsScript.ACTORS, "a team for every id")
+	var differ: int = 0
+	for id in ActorsScript.ACTORS:
+		if teams[id] != _actors.team_of(id):
+			differ += 1
+	check_equal(differ, 0, "each is team_of (NONE for a closed or never opened id)")
+	check_equal(teams[wizard], ActorsScript.TEAM_WIZARDS, "a wizard's")
+	_actors.set_driver(ids[0], ActorsScript.TEAM_WIZARDS, ActorsScript.NONE)
+	_actors.close(ids[1])
+	check_equal(teams[ids[0]], ActorsScript.TEAM_WIZARDS, "the table's own array: a later change shows in it")
+	check_equal(teams[ids[1]], ActorsScript.NONE, "and a close")

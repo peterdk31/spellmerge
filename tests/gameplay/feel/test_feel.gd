@@ -447,16 +447,34 @@ func _test_hit_flash_and_squash() -> void:
 	enemy.free()
 	_feel.step(STEP)
 	_check(_feel.reacting_sprites() == 0, "a freed sprite is dropped")
+	# No limit (owner, 2026-10-31): 120 bodies hit in one frame, actors and plain nodes, all flash.
 	var crowd: Array[Node2D] = []
-	for i in 40:
-		var many := Node2D.new()
+	var sprites: Array[Sprite2D] = []
+	for i in 120:
+		var many: Node2D = Actor.new() if i % 2 == 0 else Node2D.new()
 		var s := Sprite2D.new()
 		s.name = "Sprite"
 		many.add_child(s)
 		root.add_child(many)
 		crowd.append(many)
+		sprites.append(s)
 		_bus.damage_dealt.emit(i % 4, many, 1, Vector2.ZERO)
-	_check(_feel.reacting_sprites() <= FeelScript.REACT_SLOTS, "reactions stay within their limit")
+	_check(_feel.reacting_sprites() == 120, "every one of 120 sprites hit at once reacts")
+	var flashing: int = 0
+	for s in sprites:
+		if s.material != null:
+			flashing += 1
+	_check(flashing == 120, "and flashes (%d)" % flashing)
+	_bus.damage_dealt.emit(0, crowd[7], 1, Vector2.ZERO)
+	_bus.damage_dealt.emit(0, crowd[8], 1, Vector2.ZERO)
+	_check(_feel.reacting_sprites() == 120, "a second hit on a flashing actor or node adds none")
+	var room: int = _feel._react_sprites.size()
+	for i in 4:
+		_feel.step(STEP)
+	_check(_feel.reacting_sprites() == 0, "every flash ends")
+	for i in 120:
+		_bus.damage_dealt.emit(0, crowd[i], 1, Vector2.ZERO)
+	_check(_feel.reacting_sprites() == 120 and _feel._react_sprites.size() == room, "the next crowd reuses the room: nothing grows")
 	for many in crowd:
 		many.free()
 

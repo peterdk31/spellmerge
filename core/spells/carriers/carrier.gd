@@ -238,6 +238,27 @@ func reset_actor(_actor: int) -> void:
 	pass
 
 
+## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's
+## promotion): every row that keeps `old` (by node or instance id) keeps `new` instead.
+func replace_body(_old: Node, _new: Node) -> void:
+	pass
+
+
+## For a carrier's `replace_body`: `new` for `old` in every row's list of bodies (`struck`, one
+## Array per row; empty for none) and every instance id in `ids` (a chain's last body).
+static func _replace_in_rows(old: Node, new: Node, struck: Array, ids: PackedInt64Array) -> void:
+	for bodies: Array in struck:
+		for n in bodies.size():
+			var body: Variant = bodies[n]
+			if is_instance_valid(body) and body == old:
+				bodies[n] = new
+	var from: int = old.get_instance_id()
+	var to: int = new.get_instance_id()
+	for at in ids.size():
+		if ids[at] == from:
+			ids[at] = to
+
+
 ## A held (`hold`) carrier of `tag` is switched off (its staff cast again or edited): what is still
 ## on ends. Its shots in the manager are removed by the runtime.
 func switch_off(_tag: int) -> void:

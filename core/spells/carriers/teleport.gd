@@ -30,6 +30,12 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	_landed_at.resize(SpellRuntime.ACTORS)
 
 
+## The swarm promoted a body (`Carrier.replace_body`): a teleport that landed at `old` landed at
+## `new`.
+func replace_body(old: Node, new: Node) -> void:
+	_replace_in_rows(old, new, [], _landed_at)
+
+
 func clear() -> void:
 	_landed_at.fill(0)
 

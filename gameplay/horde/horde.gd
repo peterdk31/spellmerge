@@ -44,6 +44,11 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
+const SwarmScript := preload("res://gameplay/horde/swarm.gd")
+const SwarmLookScript := preload("res://gameplay/horde/swarm_look.gd")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+## The swarm's look's shader (swarm_look.gd), compiled before the first room with the rest.
+const SwarmLookShader: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
 const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres")
 
 const SEATS: int = 4
@@ -52,11 +57,15 @@ const SEATS: int = 4
 const START_BAG: Array[StringName] = [&"dash", &"swing"]
 ## Cards in one level-up offer.
 const OFFER_SIZE: int = 3
-## The most horde enemies alive at once, whatever the curve says (owner, 2026-10-31: playtest at
-## these until a swarm without a node per enemy exists; H1 measured about 200-250 on desktop and
-## 80-100 on web at 60 FPS).
-const MAX_ALIVE_DESKTOP: int = 200
-const MAX_ALIVE_WEB: int = 100
+## The most horde enemies alive at once, whatever the curve says. Set by the swarm stress run (S4,
+## docs/milestones/horde-swarm.md, "S4: scale"): one cap counts swarmers and full actors alike,
+## and a full actor (a staff enemy) costs about five swarmers, so the cap is set at the curve's
+## heaviest mix (its last point: about 41% full actors). There, 225 holds 60 FPS on desktop
+## (headless, four bots, 500 shots: frame 11-14 ms; 250 sits on the line); 150 costs on desktop
+## what the old web cap's 100 full actors did, so the web keeps its old frame (scripts there run
+## roughly 2-3x slower). 500+ needs a cap per kind or a cost per kind (the same document).
+const MAX_ALIVE_DESKTOP: int = 225
+const MAX_ALIVE_WEB: int = 150
 ## At most this many enemies appear in one step, so a burst never hitches.
 const SPAWN_PER_FRAME: int = 4
 ## No enemy appears closer than this to a wizard (pixels).
@@ -98,6 +107,10 @@ var view_size: Vector2 = Vector2.ZERO
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
 var web: bool = OS.has_feature("web")
+## The swarm (`swarm.gd`, docs/milestones/horde-swarm.md): an enemy with a `SwarmKind` spawns
+## there instead of as a full actor; it moves in physics steps (`physics_step`), not in a break.
+## Made at the first such spawn with the director's services; tests may set one before `start`.
+var swarm: SwarmScript = null
 
 ## The world of the run, or null while no horde runs.
 var world: Node2D = null
@@ -156,6 +169,7 @@ func _ready() -> void:
 	# A build break pauses the tree; the director goes on hearing picks and readiness (signals) and
 	# giving a joiner its bag (`_process`).
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	ShaderWarmupScript.want(SwarmLookShader, ShaderWarmupScript.BATCH)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -181,6 +195,21 @@ func _process(delta: float) -> void:
 	if get_tree().paused and not _break_on:
 		return
 	step(delta)
+
+
+func _physics_process(delta: float) -> void:
+	physics_step(delta)
+
+
+## Moves the swarm on by `delta` seconds (a physics step, as the full actors move), unless no run
+## is up or the game stands still: a level-up break or the pause menu (this node runs while the
+## tree is paused, the swarm must not), or the `Horde` node disabled.
+func physics_step(delta: float) -> void:
+	if swarm == null or world == null or _horde == null or not is_instance_valid(_horde):
+		return
+	if _break_on or (is_inside_tree() and get_tree().paused) or _horde.process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	swarm.step(delta)
 
 
 ## True while a horde run is up.
@@ -268,6 +297,8 @@ func start(new_world: Node2D) -> void:
 	world.move_child(_gems, mini(1, world.get_child_count() - 1))
 	_camera = _find_camera()
 	_arena = _find_arena()
+	if swarm != null:
+		_start_swarm()
 	_read_kinds()
 	_read_cards()
 	for seat in SEATS:
@@ -290,6 +321,8 @@ func stop() -> void:
 		_joined[seat] = false
 		_down[seat] = false
 		_bag_due[seat] = false
+	if swarm != null:
+		swarm.stop()
 	if _break_on:
 		_end_break()
 	for node: Node in [_horde, _gems]:
@@ -375,7 +408,30 @@ func _pick_kind() -> EnemyBase:
 	return last
 
 
+## Starts the swarm on this run's `Horde` node and gives it its look (`swarm_look.gd`), a child of
+## the same node at no offset, so it draws where the swarmers' bare nodes stand; the old run's look
+## went with the old node.
+func _start_swarm() -> void:
+	swarm.start(_horde, _arena)
+	var look := SwarmLookScript.new()
+	look.name = "SwarmLook"
+	look.setup(swarm)
+	_horde.add_child(look)
+	swarm.look = look
+
+
 func _add_enemy(data: EnemyBase, at: Vector2) -> bool:
+	var kind: SwarmKind = SwarmScript.kind_for(data)
+	if kind != null:
+		if swarm == null:
+			swarm = SwarmScript.new()
+			swarm.events = events
+			swarm.actors = actors
+			_start_swarm()
+		if swarm.spawn(kind, at) < 0:
+			return false
+		alive += 1
+		return true
 	var node: Node = data.scene.instantiate()
 	var body := node as Node2D
 	if body == null:

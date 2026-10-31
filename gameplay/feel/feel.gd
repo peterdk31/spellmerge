@@ -16,8 +16,9 @@ extends Node
 ## - an effect (see "Effects" below): sparks sprayed on along the hit, or a puff all
 ##   round for a hit with no way. A kill turns its killing blow's spray into a bigger
 ##   puff, so it costs one slot, not two.
-## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node
-##   (a fixed set of reactions; a sprite that is gone is skipped).
+## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node, on every hit
+##   sprite however many (one shared flash material; no limit, owner 2026-10-31; a sprite that is
+##   gone is skipped).
 ## - a white-hot ring where an enemy dies, and a death animation: a copy of the dead
 ##   enemy's `Sprite` turns white-hot and falls apart pixel by pixel (the enemy itself is
 ##   freed at once).
@@ -116,8 +117,10 @@ const BEAM_QUADS: Array[Vector3i] = [
 
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
-## Sprites reacting to a hit at once; a hit past this only skips its flash.
-const REACT_SLOTS: int = 16
+## Room for sprites reacting to a hit made at first; every hit sprite flashes (owner,
+## 2026-10-31: no limit on interactions), and the room doubles when a crowd needs more, up to the
+## largest crowd seen, and is kept.
+const REACT_START: int = 64
 ## Reaction names (labels) rising at once.
 const REACTION_SLOTS: int = 4
 ## Characters that show a status at once (an effect that follows each), and how often the
@@ -137,6 +140,10 @@ const SPRAY_MAX_SIZE: float = 1.6
 ## Death animations at once; past that the oldest slot is taken over. They draw above the
 ## room and the wizards, under the shots and effects.
 const GHOST_SLOTS: int = 8
+## A body without a `Sprite` child (a swarmer's bare node, docs/milestones/horde-swarm.md) names
+## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
+## showing the body as it is drawn now (or null), which the death animation copies instead.
+const SPRITE_GIVER: StringName = &"sprite_giver"
 const GHOST_Z: int = 21
 ## The effects drawn with the shot shaders (see "Effects" above): the kinds they know (K_* in
 ## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
@@ -336,9 +343,15 @@ var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
-## Hit reactions: the sprite, the scale it had, and seconds left (parallel arrays).
-## Instance ids, not references: a sprite may be freed while it waits, and an
-## array cannot hold a freed object.
+## Hit reactions: the sprite, the scale it had, and seconds left (parallel arrays, the first
+## `_react_count` in use; they grow to the largest crowd seen and never shrink, so a busy frame
+## allocates only the first time). Instance ids, not references: a sprite may be freed while it
+## waits, and an array cannot hold a freed object. `_react_actor` is the actor id of each (-1 for a
+## body that is no actor), and `_react_of_actor` the reaction of each actor id (checked against its
+## sprite), so a hit finds its reaction without searching a thousand.
+var _react_count: int = 0
+var _react_actor: PackedInt32Array = PackedInt32Array()
+var _react_of_actor: PackedInt32Array = PackedInt32Array()
 var _react_sprites: PackedInt64Array = PackedInt64Array()
 var _react_scale: PackedVector2Array = PackedVector2Array()
 var _react_written: PackedVector2Array = PackedVector2Array()
@@ -555,6 +568,7 @@ func _ready() -> void:
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
+	events.body_replaced.connect(_on_body_replaced)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -613,7 +627,7 @@ func step(real_delta: float) -> void:
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
 func _step_reactions(real_delta: float) -> void:
-	var at: int = _react_sprites.size() - 1
+	var at: int = _react_count - 1
 	while at >= 0:
 		_react_left[at] -= real_delta
 		var sprite := instance_from_id(_react_sprites[at]) as Sprite2D
@@ -625,19 +639,7 @@ func _step_reactions(real_delta: float) -> void:
 			if alive:
 				sprite.material = null
 				sprite.scale = _react_scale[at]
-			var last: int = _react_sprites.size() - 1
-			_react_sprites[at] = _react_sprites[last]
-			_react_scale[at] = _react_scale[last]
-			_react_written[at] = _react_written[last]
-			_react_left[at] = _react_left[last]
-			_react_total[at] = _react_total[last]
-			_react_amount[at] = _react_amount[last]
-			_react_sprites.resize(last)
-			_react_scale.resize(last)
-			_react_written.resize(last)
-			_react_left.resize(last)
-			_react_total.resize(last)
-			_react_amount.resize(last)
+			_drop_reaction(at)
 		else:
 			var squash: float = _react_amount[at] * _react_left[at] / maxf(_react_total[at], 0.001)
 			_react_written[at] = _react_scale[at] * Vector2(1.0 + squash, 1.0 - squash)
@@ -665,6 +667,11 @@ func _start_ghost(dead: Node) -> void:
 	if preset.death_anim_seconds <= 0.0 or dead == null or not is_instance_valid(dead):
 		return
 	var source := dead.get_node_or_null("Sprite") as Sprite2D
+	if source == null and dead.has_meta(SPRITE_GIVER):
+		# A body drawn by another node (a swarmer): that node's Sprite2D for it as it shows now.
+		var giver: Variant = dead.get_meta(SPRITE_GIVER)
+		if is_instance_valid(giver) and (giver as Object).has_method(&"sprite_of"):
+			source = (giver as Object).call(&"sprite_of", dead) as Sprite2D
 	if source == null or source.texture == null:
 		return
 	var slot: int = _next_ghost
@@ -685,7 +692,7 @@ func _start_ghost(dead: Node) -> void:
 	ghost.modulate = Color.WHITE
 	# At the rest scale: a sprite killed mid-squash would otherwise pop.
 	var rest: Vector2 = source.global_scale
-	var at: int = _react_sprites.find(source.get_instance_id())
+	var at: int = _find_reaction(source.get_instance_id(), _actor_of(dead))
 	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
 		rest = rest / source.scale * _react_scale[at]
 	ghost.scale = rest
@@ -705,26 +712,89 @@ func _react(target: Node) -> void:
 	var sprite := target.get_node_or_null("Sprite") as Sprite2D
 	if sprite == null:
 		return
-	var at: int = _react_sprites.find(sprite.get_instance_id())
-	if at >= 0:
-		_react_left[at] = seconds
-		_react_total[at] = seconds
-		_react_amount[at] = amount
-	elif _react_sprites.size() < REACT_SLOTS:
-		_react_sprites.append(sprite.get_instance_id())
-		_react_scale.append(sprite.scale)
-		_react_written.append(sprite.scale)
-		_react_left.append(seconds)
-		_react_total.append(seconds)
-		_react_amount.append(amount)
-	else:
-		return
+	var id: int = sprite.get_instance_id()
+	var actor: int = _actor_of(target)
+	var at: int = _find_reaction(id, actor)
+	if at < 0:
+		if _react_count == _react_sprites.size():
+			_grow_reactions(maxi(_react_count * 2, REACT_START))
+		at = _react_count
+		_react_count += 1
+		_react_sprites[at] = id
+		_react_actor[at] = actor
+		if actor >= 0 and actor < _react_of_actor.size():
+			_react_of_actor[actor] = at
+		_react_scale[at] = sprite.scale
+		_react_written[at] = sprite.scale
+	_react_left[at] = seconds
+	_react_total[at] = seconds
+	_react_amount[at] = amount
+	# One material shared by every flashing sprite (its flash is the shader's): nothing per flash.
 	sprite.material = _flash_material
+
+
+## The reaction of the sprite with instance id `sprite` (of the actor `actor`, -1 for none), or -1.
+func _find_reaction(sprite: int, actor: int) -> int:
+	if actor >= 0 and actor < _react_of_actor.size():
+		var at: int = _react_of_actor[actor]
+		return at if at >= 0 and at < _react_count and _react_sprites[at] == sprite else -1
+	var found: int = _react_sprites.find(sprite)
+	return found if found < _react_count else -1
+
+
+## Reaction `at` ends: the last one takes its place.
+func _drop_reaction(at: int) -> void:
+	var last: int = _react_count - 1
+	var actor: int = _react_actor[at]
+	if actor >= 0 and actor < _react_of_actor.size() and _react_of_actor[actor] == at:
+		_react_of_actor[actor] = -1
+	if at != last:
+		_react_sprites[at] = _react_sprites[last]
+		_react_actor[at] = _react_actor[last]
+		_react_scale[at] = _react_scale[last]
+		_react_written[at] = _react_written[last]
+		_react_left[at] = _react_left[last]
+		_react_total[at] = _react_total[last]
+		_react_amount[at] = _react_amount[last]
+		var moved: int = _react_actor[at]
+		if moved >= 0 and moved < _react_of_actor.size() and _react_of_actor[moved] == last:
+			_react_of_actor[moved] = at
+	_react_sprites[last] = 0
+	_react_count = last
+
+
+## Room for `size` reactions (they only grow), and the index by actor id once.
+func _grow_reactions(size: int) -> void:
+	if _react_of_actor.is_empty():
+		_react_of_actor.resize(ActorsScript.ACTORS)
+		_react_of_actor.fill(-1)
+	_react_sprites.resize(size)
+	_react_actor.resize(size)
+	_react_scale.resize(size)
+	_react_written.resize(size)
+	_react_left.resize(size)
+	_react_total.resize(size)
+	_react_amount.resize(size)
+
+
+## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's
+## promotion): a status shown on `old` and every effect following it follow `new`.
+func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
+	if old == null or new == null or not new is Node2D:
+		return
+	var from: int = old.get_instance_id()
+	var at: int = _status_enemies.find(from)
+	if at >= 0 and _status_enemies.find(new.get_instance_id()) < 0:
+		_status_enemies[at] = new.get_instance_id()
+	for slot in _effect_follow.size():
+		var follow: Variant = _effect_follow[slot]
+		if is_instance_valid(follow) and follow == old:
+			_effect_follow[slot] = new as Node2D
 
 
 ## Sprites flashing right now (for tests).
 func reacting_sprites() -> int:
-	return _react_sprites.size()
+	return _react_count
 
 
 ## Death animations showing right now (for tests).

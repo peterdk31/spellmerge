@@ -30,7 +30,8 @@ func _initialize() -> void:
 	var names: Array[String] = []
 	for method: Dictionary in get_method_list():
 		var method_name: String = method["name"]
-		if method_name.begins_with("test_"):
+		# A test that overrides one of the script it extends is listed for both: run it once.
+		if method_name.begins_with("test_") and not names.has(method_name):
 			names.append(method_name)
 	names.sort()
 	for method_name in names:

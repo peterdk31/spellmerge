@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"triple"
 display_name = "Triple"
-name_words = PackedStringArray("Thrice", "Triple")
 complexity = 3
 icon = ExtResource("2_icon")
 extra_draws = 2

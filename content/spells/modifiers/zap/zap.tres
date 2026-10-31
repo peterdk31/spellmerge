@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"zap"
 display_name = "Zap"
-name_words = PackedStringArray("Zapping", "Crackling")
 complexity = 3
 icon = ExtResource("2_icon")
 mana_mult = 1.5

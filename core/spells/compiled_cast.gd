@@ -21,7 +21,5 @@ var wrapped: bool = false
 var targets: Dictionary = {}
 ## Slots whose card did nothing in this cast -> true.
 var wasted: Dictionary = {}
-## The generated name of the cast (`SpellNamer`): the same cards always give the same name.
-var spell_name: String = ""
 ## What the cast does, in plain words, for the builder's cast plan.
 var description: String = ""

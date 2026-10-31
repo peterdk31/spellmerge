@@ -71,6 +71,10 @@ func before_each() -> void:
 	timer.event = TriggerBase.Event.TIMER
 	timer.interval = 0.5
 	_put(timer, &"on_timer")
+	var second := TriggerBase.new()
+	second.event = TriggerBase.Event.TIMER
+	second.interval = 0.5
+	_put(second, &"on_timer_2")
 	var hurt := TriggerBase.new()
 	hurt.event = TriggerBase.Event.HURT
 	_put(hurt, &"on_hurt")
@@ -192,6 +196,17 @@ func test_a_timer_on_a_decoy_fires_from_it_until_it_ends() -> void:
 	_bus.entity_ended.emit(0, &"decoy", Vector2(30, 40), tag)
 	_tick(60)
 	check_equal(_runes().size(), 1, "an ended decoy ticks no more")
+
+
+func test_two_timers_on_a_decoy_each_fire_their_own_payload() -> void:
+	_build([&"on_timer", &"on_timer_2", &"decoy", &"rune", &"rune"])
+	var tag: int = _spells.current_tag(0, 0, 0)
+	_spells.cast_staff(0, 0, Vector2(30, 40), Vector2.RIGHT, 10.0)
+	_tick(31)
+	check_equal(_runes().size(), 2, "each timer fired its own rune every 0.5 s")
+	_bus.entity_ended.emit(0, &"decoy", Vector2(30, 40), tag)
+	_tick(60)
+	check_equal(_runes().size(), 2, "an ended decoy ticks no more: both its timers leave with it")
 
 
 func test_a_timer_on_a_dash_fires_from_the_caster_as_it_moves() -> void:

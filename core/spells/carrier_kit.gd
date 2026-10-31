@@ -234,9 +234,10 @@ func blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	_rt._blast(spell, tag, actor, at)
 
 
-## Fires the payload of `spell` from `at` along `heading`, cast by the point `at`.
-func fire_payload(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node) -> void:
-	_rt._fire_payload(spell, tag, actor, at, heading, source)
+## Fires the payload of every trigger of `spell` on `event` (a `TriggerBase.Event`) from `at`
+## along `heading`, cast by the point `at`.
+func fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node) -> void:
+	_rt._fire_payloads(spell, event, tag, actor, at, heading, source)
 
 
 ## A trigger fires `group` from `at` along `heading`, cast by `caster` (`CASTER_POINT`,

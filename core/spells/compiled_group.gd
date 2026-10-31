@@ -14,6 +14,8 @@ var scatter: bool = false
 var repeats: int = 1
 ## The multicast cards read into the group, in slot order (for its name).
 var multicast_ids: Array[StringName] = []
+## Their slots, in the same order (for the builder's tree).
+var multicast_slots: PackedInt32Array = PackedInt32Array()
 var repeat_interval: float = 0.0
 
 

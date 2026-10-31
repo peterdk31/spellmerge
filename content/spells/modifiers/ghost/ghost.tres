@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"ghost"
 display_name = "Ghost"
-name_words = PackedStringArray("Ghostly", "Spooky")
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2

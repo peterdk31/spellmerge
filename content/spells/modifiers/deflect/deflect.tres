@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"deflect"
 display_name = "Deflect"
-name_words = PackedStringArray("Rebounding", "Batting")
 complexity = 2
 icon = ExtResource("2_icon")
 cooldown_mult = 1.2

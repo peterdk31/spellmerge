@@ -72,8 +72,9 @@ func entity_ended(actor: int, position: Vector2, tag: int) -> void:
 	var spell: CompiledSpell = kit.spell_of(tag)
 	if spell != null and position.is_finite():
 		kit.blast(spell, tag, actor, position)
-		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			kit.fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, SpellRuntime.CASTER_POINT)
+		for trigger in spell.triggers:
+			if trigger.event == TriggerBase.Event.EXPIRE:
+				kit.fire(trigger.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, SpellRuntime.CASTER_POINT)
 	kit.shot_ended(tag)
 
 

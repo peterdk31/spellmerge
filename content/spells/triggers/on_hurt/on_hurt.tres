@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"on_hurt"
 display_name = "On Hurt"
-name_words = PackedStringArray("Indignant", "Wincing")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 7

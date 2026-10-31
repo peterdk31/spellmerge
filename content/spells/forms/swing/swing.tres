@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"swing"
 display_name = "Swing"
-name_words = PackedStringArray("Swing", "Sweep")
 complexity = 1
 icon = ExtResource("2_icon")
 base_damage = 2

@@ -154,7 +154,7 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 	print("FUZZ:%d staffs, slowest mean step %.3f ms, slowest step %.3f ms, most live shots %d, shots dropped at the pool %d" % [STAFFS, slowest_mean, slowest_step, peak, dropped])
 
 
-## The numbers of one staff's run for the report: its name (the first cast's, from its cards),
+## The numbers of one staff's run for the report: its title (the first cast's description),
 ## the imps it killed, the reactions it set off (and how many kinds), its peak live shots, the
 ## shots the pool dropped and its mean step time.
 func _report_row(number: int, arena: ArenaScript, staff: CompiledStaff, label: String, mean: float) -> Dictionary:
@@ -164,11 +164,8 @@ func _report_row(number: int, arena: ArenaScript, staff: CompiledStaff, label: S
 	var kinds: Dictionary = {}
 	for id in arena.reaction_ids():
 		kinds[id] = true
-	var title: String = ""
-	for cast in staff.casts:
-		if not cast.spell_name.is_empty():
-			title = cast.spell_name
-			break
+	# A cast is called by its plain description (the generated names are gone, owner 2026-10-31).
+	var title: String = staff.casts[0].description if not staff.casts.is_empty() else ""
 	return {"index": number, "label": label, "name": title, "kills": kills, "reactions": arena.reactions.size(), "kinds": kinds.size(), "shots": arena.peak_shots, "dropped": arena.projectiles.dropped, "safeguard": arena.projectiles.dropped * 1000 + arena.peak_shots, "mean": mean}
 
 
@@ -187,7 +184,7 @@ func _top(rows: Array[Dictionary], key: String) -> Array[Dictionary]:
 ## The emergent combo report (staffs D1): the best random staffs by kills and by reactions, the
 ## costliest by frame time and by shots dropped at the pool (the safeguard). A run's lines go
 ## into docs/LOG.md; frame times depend on the machine, the rest does not. Each line starts with
-## the ranked value, then the staff's name and cards, then the other numbers.
+## the ranked value, then the staff's first cast described and its cards, then the other numbers.
 func _print_report(rows: Array[Dictionary]) -> void:
 	var views: Array = [
 		["kills", "REPORT BEST BY KILLS", "%d kills"],
@@ -199,7 +196,7 @@ func _print_report(rows: Array[Dictionary]) -> void:
 		var key: String = view[0]
 		for row in _top(rows, key):
 			var value: String = (view[2] as String) % (float(row[key]) if key == "mean" else int(row[key]))
-			var title: String = row["name"] if not (row["name"] as String).is_empty() else "(unnamed)"
+			var title: String = row["name"] if not (row["name"] as String).is_empty() else "(no cast)"
 			print("%s: %s | %s | %s | %d kills, %d reactions (%d kinds), %d peak shots, %d dropped, %.2f ms" % [view[1], value, title, row["label"], int(row["kills"]), int(row["reactions"]), int(row["kinds"]), int(row["shots"]), int(row["dropped"]), float(row["mean"])])
 	if not rows.is_empty() and int(_top(rows, "kills")[0]["kills"]) == 0:
 		print("REPORT WARNING: no staff killed an imp; the imps' health (%s) may be too high for the cards" % IMP_HEALTH)

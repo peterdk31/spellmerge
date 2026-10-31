@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"shield"
 display_name = "Shield"
-name_words = PackedStringArray("Guarded", "Bubbled")
 complexity = 2
 icon = ExtResource("2_icon")
 behaviour = 3

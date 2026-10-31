@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"atom"
 display_name = "Atom"
-name_words = PackedStringArray("Atom", "Mote", "Speck")
 complexity = 1
 icon = ExtResource("2_icon")
 base_damage = 0.3

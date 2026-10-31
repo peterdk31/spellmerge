@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"decoy"
 display_name = "Decoy"
-name_words = PackedStringArray("Decoy", "Dummy")
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

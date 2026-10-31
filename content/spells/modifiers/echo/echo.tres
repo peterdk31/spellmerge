@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"echo"
 display_name = "Echo"
-name_words = PackedStringArray("Echoing", "Repeating")
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour = 8

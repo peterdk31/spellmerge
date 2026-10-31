@@ -298,8 +298,8 @@ func _end_swing(at: int, finished: bool) -> void:
 		var end: Vector2 = swing_end_point(_sw_origin[at], _sw_dir[at], _sw_side[at], spell.arc, spell.ray_length)
 		end = kit.projectiles.clip_to_walls(_sw_origin[at], end)
 		kit.blast(spell, tag, actor, end)
-		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			kit.fire_payload(spell, tag, actor, end, _sw_dir[at], null)
+		if spell.fires_on(TriggerBase.Event.EXPIRE):
+			kit.fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, end, _sw_dir[at], null)
 	kit.shot_ended(tag)
 
 

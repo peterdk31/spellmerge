@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"magnet"
 display_name = "Magnet"
-name_words = PackedStringArray("Clingy", "Magnetic")
 complexity = 2
 icon = ExtResource("2_icon")
 behaviour = 13

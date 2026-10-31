@@ -70,7 +70,6 @@ func test_the_card_is_a_valid_modifier() -> void:
 	check_equal(card.behaviour_strength, 1.0, "strength unused (1): it turns every shot that touches it")
 	check_equal(card.complexity, 2, "complexity 2, as shield")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
-	check(not card.name_words.is_empty(), "it has name words")
 	check_equal(card.look_layer, ManagerScript.LOOK_ZIG, "the zig look, shots thrown back at an angle (docs/DECISIONS.md)")
 
 

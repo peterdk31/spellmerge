@@ -4,9 +4,10 @@ extends "res://tests/support/screenshot.gd"
 ## Card sheets first: every real card the registry found (so a new card adds itself), pointed at
 ## in turn, its ring and hub cropped into sheets of eight (radial_cards_1, radial_cards_2, ...).
 ## Then shots, in the sandbox with the radial builder picked: one player pointing at a nova (the hub
-## shows its numbers, the marked slot its ghost, the numbers what RT would change), then after
-## two cards were put in, the one-kind ring on the modifiers, a clear held half way, and all four
-## players with their radials open at once.
+## shows its numbers, the marked slot its ghost, the card info panel the marked card), then after
+## two cards were put in, the one-kind ring on the modifiers, LT held half way to a clear, and all
+## four players with their radials open at once, every quarter laid out alike (the corner panels
+## hidden, the HP and MP bars on top of each column).
 
 ## A card sheet: crops of SHEET_CROP px round the ring's middle, SHEET_COLUMNS by SHEET_ROWS.
 const SHEET_CROP := 150
@@ -48,10 +49,10 @@ func take() -> void:
 	await settle(SHEET_FRAMES)
 	await _point(0, &"pierce", true)
 	await shot("radial_one_kind")
-	_input.call("send_virtual", 0, &"extra", 1.0)
+	_input.call("send_virtual", 0, &"staff_4", 1.0)
 	await create_timer(0.3).timeout
 	await shot("radial_clearing")
-	_input.call("send_virtual", 0, &"extra", 0.0)
+	_input.call("send_virtual", 0, &"staff_4", 0.0)
 	_hud.call("_on_builder_options_changed", true, 0, true)
 	if not await _open([1, 2, 3]):
 		return

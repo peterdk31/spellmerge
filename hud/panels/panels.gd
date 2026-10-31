@@ -390,8 +390,12 @@ func _place_builder(player: int) -> void:
 	_builders[player].offset_right = x
 
 
+## A corner panel shows while its player is in a room, except while their radial builder is open:
+## the radial shows the bars itself, so its column can sit where the panel was (owner,
+## 2026-10-31, docs/milestones/M2-builder-tree.md). The radial is shown before its menu opens and
+## hidden before it closes, so `visible` is already right when UIFocus says so.
 func _refresh(player: int) -> void:
-	_panels[player].visible = _in_room and _joined[player]
+	_panels[player].visible = _in_room and _joined[player] and not _radials[player].visible
 
 
 func _on_player_joined(player: int) -> void:
@@ -527,8 +531,10 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 func _on_menu_opened(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(true)
+		_refresh(player)
 
 
 func _on_menu_closed(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(false)
+		_refresh(player)

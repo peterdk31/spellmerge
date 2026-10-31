@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"sniper"
 display_name = "Sniper"
-name_words = PackedStringArray("Patient", "Sniping")
 complexity = 1
 icon = ExtResource("2_icon")
 spread_mult = 0.25

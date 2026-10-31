@@ -8,7 +8,6 @@ script = ExtResource("1_base")
 id = &"timer"
 demo = true
 display_name = "Timer"
-name_words = PackedStringArray("Ticking", "Patient")
 complexity = 2
 icon = ExtResource("2_icon")
 event = 2

@@ -21,7 +21,7 @@ The **cards** players put in their staffs, in any order, and that a staff reads 
 
 ### Name words
 
-Every card has `name_words` (a `PackedStringArray`, the plainest word first), the words it brings to the generated name of a cast (`core/spells/spell_namer.gd`; `tests/core/test_spell_names.gd` fails on a card without them). A carrier: its noun ("Bolt", then "Dart"). An infusion: a prefix fused with the other infusions' ("Frost" → "Firefrost"). A modifier: an adjective ("Seeking"). A trigger: the word before its payload ("Sudden" → "of Sudden Novas"). A multicast: a hyphenated prefix ("Twice" → "Twice-Bolt"). Original words only, and make them fun to read out loud.
+Cards have no `name_words` any more: the generated cast names (staffs E1) are gone (owner, 2026-10-31); a cast is described in plain words by the compiler.
 
 ### Fields and ranges per kind
 

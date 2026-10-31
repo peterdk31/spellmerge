@@ -432,6 +432,12 @@ func get_strength(player: int, action: StringName) -> float:
 	return _strength[player][action]
 
 
+## Whether `action` is down for `player` now, captured or not: for the menu that holds the
+## capture, as `get_press_count` counts its presses (the radial builder's LT held clears a staff).
+func is_held(player: int, action: StringName) -> bool:
+	return _valid(player) and float(_strength[player].get(action, 0.0)) > 0.0
+
+
 func is_action_pressed(player: int, action: StringName) -> bool:
 	return get_strength(player, action) > 0.0
 

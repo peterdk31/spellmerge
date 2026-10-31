@@ -225,7 +225,7 @@ func test_a_counter_dash_reads_in_slot_order() -> void:
 	var dash: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal(dash.form_id, &"dash", "a dash")
 	check_equal(dash.behaviour(ModifierBase.Behaviour.SHIELD), 1.0, "with one shield")
-	check_equal(dash.trigger_event, TriggerBase.Event.BLOCK, "that fires on a block")
+	check(dash.fires_on(TriggerBase.Event.BLOCK), "that fires on a block")
 	check_equal(_forms(dash.payload), [&"nova"] as Array[StringName], "a nova")
 
 
@@ -277,10 +277,74 @@ func test_several_infusions_ride_one_shot_first_one_first() -> void:
 	check_equal(spell.hit.element_ids, [&"fire", &"frost"] as Array[StringName], "the hit carries both")
 
 
-func test_a_second_trigger_before_one_carrier_is_wasted() -> void:
+func test_each_trigger_takes_its_own_payload_in_order() -> void:
+	var staff: CompiledStaff = _compile("on_hit on_expire bolt nova fire bolt")
+	check_equal(staff.casts.size(), 1, "one cast reads both payloads")
+	check(staff.wasted.is_empty(), "nothing is wasted: %s" % staff.wasted)
+	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
+	check_equal(bolt.triggers.size(), 2, "two triggers")
+	if bolt.triggers.size() == 2:
+		check_equal(bolt.triggers[0].event, TriggerBase.Event.HIT, "the first is on hit")
+		check_equal(_forms(bolt.triggers[0].payload), [&"nova"] as Array[StringName], "and fires the nova")
+		check_equal(bolt.triggers[1].event, TriggerBase.Event.EXPIRE, "the second is on expire")
+		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
+		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "with its fire")
+	check_equal(staff.casts[0].targets.get(0, -1), 2, "on hit goes on the bolt")
+	check_equal(staff.casts[0].targets.get(1, -1), 2, "on expire goes on the bolt")
+	check(staff.casts[0].recharges, "no card is left: recharge")
+
+
+func test_the_same_trigger_twice_fires_two_payloads() -> void:
+	var bolt: CompiledSpell = _compile("on_hit on_hit bolt nova bolt").casts[0].group.spells[0]
+	check_equal(bolt.triggers.size(), 2, "both count")
+	if bolt.triggers.size() == 2:
+		check_equal(_forms(bolt.triggers[0].payload), [&"nova"] as Array[StringName], "a nova on hit")
+		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
+
+
+func test_a_trigger_with_no_cards_left_is_wasted_and_the_others_keep_theirs() -> void:
 	var staff: CompiledStaff = _compile("on_hit on_expire bolt nova")
-	check_equal(staff.casts[0].group.spells[0].trigger_event, TriggerBase.Event.HIT, "the first trigger counts")
-	check(staff.wasted.has(1), "the second is wasted")
+	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
+	check_equal(bolt.triggers.size(), 1, "only on hit has a payload")
+	check(not staff.wasted.has(0), "on hit counts")
+	check(staff.wasted.has(1), "on expire finds nothing to fire (the read wraps to used cards) and is wasted: %s" % staff.wasted)
+
+
+func test_payloads_nest_before_the_next_trigger_reads() -> void:
+	# On hit: a bolt that, on expire, fires a nova. On expire: a fire bolt.
+	var staff: CompiledStaff = _compile("on_hit on_expire bolt on_expire bolt nova fire bolt")
+	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
+	check_equal(bolt.triggers.size(), 2, "two triggers")
+	if bolt.triggers.size() == 2:
+		var inner: CompiledSpell = bolt.triggers[0].payload.spells[0]
+		check_equal(inner.form_id, &"bolt", "on hit fires a bolt")
+		check_equal(_forms(inner.payload), [&"nova"] as Array[StringName], "whose own payload is read first")
+		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "then on expire takes the fire bolt")
+
+
+func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
+	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double nova nova bolt").casts[0].group.spells[0]
+	check_equal(bolt.triggers.size(), 2, "two triggers")
+	if bolt.triggers.size() == 2:
+		check_equal(_forms(bolt.triggers[0].payload), [&"nova", &"nova"] as Array[StringName], "the double takes two novas")
+		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
+
+
+func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
+	_form(&"slam", 1, 1).carrier = &"slam"
+	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
+	# A slam is over at once: its timer never fires, but it still reads the nova, so on hit gets the bolt.
+	var staff: CompiledStaff = _compile("timer on_hit slam nova bolt")
+	var slam: CompiledSpell = staff.casts[0].group.spells[0]
+	check(staff.wasted.has(0) and staff.wasted.has(3), "the timer and its nova are wasted: %s" % staff.wasted)
+	check_equal(slam.triggers.size(), 1, "only on hit is left")
+	if slam.triggers.size() == 1:
+		check_equal(_forms(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
+
+
+func test_triggers_with_no_carrier_are_all_wasted() -> void:
+	var staff: CompiledStaff = _compile("on_hit on_expire")
+	check(staff.wasted.has(0) and staff.wasted.has(1), "both are wasted: %s" % staff.wasted)
 
 
 func test_scatter_and_burst_mark_the_group() -> void:

@@ -2,6 +2,25 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-31: The builder's tree view; copy/paste and cast names removed (owner)
+
+Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), worked out over mockups rendered in the game at true scale.
+
+- **A tree of the compiled staff on Y,** in the ring's place: a row per carrier and per trigger, made of the slots' own 16 px tiles, the trigger card's name and nothing else on a trigger row. With each trigger taking its own payload, the slot grid alone no longer says what a staff does.
+- **Rejected on the way:** brackets with words under the slots (they assumed a slot row that does not exist: the slots are a 5 × 4 grid of 16 px tiles in a 112 px column); a mark on every tile of every payload (it covers the icons and clashes where payloads nest); a card popup (it covered rows of the tree).
+- **The card under the slot marker is described in the column,** where the corner panel and the staff's numbers were: both are hidden while the builder is open, and thin HP and MP bars framed in the player's colour sit on top of the column instead, so health stays in view during a wave.
+- **Every quarter is laid out as player 1's:** the column on the left, the ring or tree on the right.
+- **The hub keeps the staff's numbers** when no card is pointed at (owner: good to see them).
+- **LT held clears the staff** (the press still takes out at once); Y opens the tree.
+- **Removed: staff codes (staffs D2) and cast names (staffs E1).** Copy and paste go from both builders, with `StaffCode`; the generated names go, with `SpellNamer` and every card's `name_words`. Where a cast was called by its name, its plain description is used.
+
+## 2026-10-31: Each trigger takes its own payload (owner)
+
+- **Rule:** the triggers before a carrier are all kept, and after the carrier each reads its own payload, in slot order: the first trigger the next group, the second the group after it. A payload's own payloads are read inside it first (depth-first). A trigger whose payload finds no card, or whose event never happens on the carrier, is wasted as before; the others keep theirs. Before, a second trigger before one carrier was wasted.
+- **Why:** it makes a staff a tree, not a chain: one carrier can do something different on each event (`on hit · on expire · bolt · nova · frost · bolt`), and payloads branch at every level, which gives the most combinations (pillar 1). Every extra trigger costs the cards and mana of its own payload, so it never multiplies a payload for free. It extends Noita's reading (a trigger's payload is what is read after it) in the same spirit. Chosen over "every trigger fires one shared payload", which made extra triggers free repeats of the same effect, and over stacking only timers, which was a special case (a timer-only rule in the compiler; tried on 2026-10-31 and dropped the same day).
+- **How:** `CompiledSpell.triggers` (each a `CompiledSpell.Trigger`: event, interval, payload, slot) replaces `trigger_event`, `trigger_interval` and the single `payload` (now the first trigger's, read-only). The runtime fires every trigger whose event happens (`Spells._fire_payloads`, `CarrierKit.fire_payloads`); a lasting carrier is listed once per timer or on hurt trigger (`_lc_trigger`), each with its own clock. A shot that ends on a wall fires both its `on wall` and its `on expire` payloads.
+- **Fire rate:** two timers are two payloads on the same clock, not a faster one. A faster totem comes from what its payload holds (`burst`, `triple`) or from a card that changes a timer's interval, if one is ever wanted.
+
 ## 2026-10-30: A carrier knows the runtime only through its kit; the runtime names no carrier (owner)
 
 - **The kit** (owner, in the review of the carriers PR: the carriers reached into about 34 of the runtime's own members, so a new carrier had to read `spells.gd`): a carrier, `CasterMoves` and `StaffPoses` ask the runtime only through `CarrierKit` (`core/spells/carrier_kit.gd`), one short file of named, documented calls (the cast under way, the aim, the shot kit, the hit path, payloads, live carriers, moves, entities). Each forwards to the runtime's one rule for it; nothing moved or changed in what it does. Something a carrier needs that the kit lacks is added to the kit, never reached around it.

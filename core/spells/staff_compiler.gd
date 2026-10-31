@@ -6,7 +6,8 @@ extends RefCounted
 ##
 ## In short: a cast reads one group from the cursor. Modifiers and infusions wait for the next
 ## carrier; a multicast card makes the group want more carriers (or fire again); a trigger waits
-## for the next carrier, whose payload is the group read right after it. Reading wraps past the
+## for the next carrier, whose payload is the group read right after it (with more triggers, each
+## takes the next group in turn). Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
 ## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
 ## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
@@ -54,12 +55,8 @@ var _reached_end: bool = false
 var _useful: Dictionary = {}
 
 
-var _namer: SpellNamer = null
-
-
 func _init(lookup: Callable) -> void:
 	_lookup = lookup
-	_namer = SpellNamer.new(lookup)
 
 
 ## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`. Cards past `staff.slots`
@@ -105,7 +102,6 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_cast.delay += staff.cast_delay if staff != null else 0.0
 	if _cast.recharges and staff != null:
 		_cast.delay += staff.recharge
-	_cast.spell_name = _namer.name_cast(_cast, _out.cards)
 	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.delay), ", then recharge" if _cast.recharges else ""]
 	return _cast
 
@@ -117,8 +113,9 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 	var elements: Array[ElementBase] = []
 	var modifiers: Array[ModifierBase] = []
 	var kept: PackedInt32Array = PackedInt32Array()
-	var trigger: TriggerBase = null
-	var trigger_slot: int = -1
+	# The triggers kept for the next carrier, in slot order; each takes its own payload.
+	var triggers: Array[TriggerBase] = []
+	var trigger_slots: PackedInt32Array = PackedInt32Array()
 	while want > 0:
 		var slot: int = _next_slot()
 		if slot < 0:
@@ -133,6 +130,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		elif card is MulticastBase:
 			var multicast := card as MulticastBase
 			group.multicast_ids.append(multicast.id)
+			group.multicast_slots.append(slot)
 			_useful[slot] = true
 			_cast.mana += multicast.mana_cost
 			_cast.delay += multicast.cooldown
@@ -144,11 +142,8 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					group.repeats *= maxi(multicast.repeats, 1)
 					group.repeat_interval = maxf(group.repeat_interval, multicast.repeat_interval)
 		elif card is TriggerBase:
-			if trigger != null:
-				_waste(slot)
-			else:
-				trigger = card as TriggerBase
-				trigger_slot = slot
+			triggers.append(card as TriggerBase)
+			trigger_slots.append(slot)
 		elif card is FormBase:
 			var form := card as FormBase
 			var on: Carrier = Carriers.of(form.carrier)
@@ -169,7 +164,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			var kept_elements: Array[ElementBase] = []
 			if on.takes_infusion(blasts) or keep_wasted:
 				kept_elements = elements
-			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
+			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
 			for at: int in kept:
@@ -180,48 +175,62 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					_waste(at)
 				else:
 					_attach(at, slot)
+					spell.card_slots.append(at)
+			spell.card_slots.append(slot)
 			if form.carries_payload():
 				spell.own_payload = _read_group(1, true)
-			if trigger != null:
-				# A trigger whose event never happens on this carrier still reads its payload, so the
-				# cards after it are read in the same order whether it fires or not; the payload is
-				# then wasted with it (rules R2b).
-				var never: bool = not keep_wasted and not _trigger_fires(trigger, form, kept_elements, kept_modifiers)
-				var first: int = _cast.slots.size()
-				var mana: float = _cast.mana
-				var delay: float = _cast.delay
-				var useful: Dictionary = _useful.duplicate() if never else {}
-				var held: CompiledGroup = _read_group(1, true)
-				if held.is_empty():
-					_waste(trigger_slot)
-					spell.trigger_id = &""
-				elif never:
-					_waste(trigger_slot)
-					spell.trigger_id = &""
-					_cast.mana = mana
-					_cast.delay = delay
-					for at: int in _cast.slots.slice(first):
-						_cast.targets.erase(at)
-						if not useful.has(at):
-							_useful.erase(at)
-						if not _cast.wasted.has(at):
-							_waste(at)
-				else:
-					_attach(trigger_slot, slot)
-					spell.payload = held
+			for t in triggers.size():
+				_read_trigger(spell, triggers[t], trigger_slots[t], form, kept_elements, kept_modifiers)
 			group.spells.append(spell)
 			elements = []
 			modifiers = []
 			kept = PackedInt32Array()
-			trigger = null
+			triggers = []
+			trigger_slots = PackedInt32Array()
 			want -= 1
-	if trigger != null:
-		_waste(trigger_slot)
+	# Triggers with no carrier after them are wasted.
+	for at: int in trigger_slots:
+		_waste(at)
 	if not elements.is_empty() or not modifiers.is_empty():
 		var fallback: CompiledSpell = _fallback(elements, modifiers, kept, payload)
 		if fallback != null:
 			group.spells.append(fallback)
 	return group
+
+
+## Reads the payload of `trigger` (in `trigger_slot`) on the carrier `spell` (in `form`): the group
+## read next. A trigger whose event never happens on this carrier still reads its payload, so the
+## cards after it are read in the same order whether it fires or not; the payload is then wasted
+## with it (rules R2b). One with nothing to fire is wasted too. Every trigger of a carrier is read
+## the same way, in slot order, so each takes the next group (owner, 2026-10-31).
+func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> void:
+	var never: bool = not keep_wasted and not _trigger_fires(trigger, form, elements, modifiers)
+	var first: int = _cast.slots.size()
+	var mana: float = _cast.mana
+	var delay: float = _cast.delay
+	var useful: Dictionary = _useful.duplicate() if never else {}
+	var held: CompiledGroup = _read_group(1, true)
+	if held.is_empty():
+		_waste(trigger_slot)
+	elif never:
+		_waste(trigger_slot)
+		_cast.mana = mana
+		_cast.delay = delay
+		for at: int in _cast.slots.slice(first):
+			_cast.targets.erase(at)
+			if not useful.has(at):
+				_useful.erase(at)
+			if not _cast.wasted.has(at):
+				_waste(at)
+	else:
+		_attach(trigger_slot, spell.slot)
+		var fires := CompiledSpell.Trigger.new()
+		fires.id = trigger.id
+		fires.event = trigger.event
+		fires.interval = trigger.interval
+		fires.payload = held
+		fires.slot = trigger_slot
+		spell.triggers.append(fires)
 
 
 ## The cards left without a carrier, on the caster or on the payload's origin. Elements always
@@ -244,9 +253,10 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 	if elements.is_empty() and kept_modifiers.is_empty():
 		return null
 	var kind: int = CompiledSpell.FALLBACK_POINT if payload else CompiledSpell.FALLBACK_CASTER
-	var spell: CompiledSpell = _build(null, elements, kept_modifiers, null, kind)
+	var spell: CompiledSpell = _build(null, elements, kept_modifiers, kind)
 	for at: int in kept_slots:
 		_attach(at, target)
+	spell.card_slots = kept_slots
 	return spell
 
 
@@ -326,7 +336,7 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) ->
 
 
 ## A compiled spell from a carrier (or none, for a fallback) and the cards that attach to it.
-func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], trigger: TriggerBase, fallback: int) -> CompiledSpell:
+func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.node = _out.nodes.size()
 	_out.nodes.append(spell)
@@ -463,10 +473,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.zap_hit = zap_hit(spell.hit)
 		if spell.echo_hit != null:
 			spell.echo_zap_hit = zap_hit(spell.echo_hit)
-	if trigger != null:
-		spell.trigger_id = trigger.id
-		spell.trigger_event = trigger.event
-		spell.trigger_interval = trigger.interval
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
@@ -594,11 +600,11 @@ func _spell_text(spell: CompiledSpell) -> String:
 				text += " (%s)" % ", ".join(modifiers)
 	if spell.own_payload != null and not spell.own_payload.is_empty():
 		text += " carrying %s" % _group_text(spell.own_payload)
-	if spell.payload != null:
-		var when: String = WHEN[spell.trigger_event] if spell.trigger_event < WHEN.size() else "then"
-		if spell.trigger_event == TriggerBase.Event.TIMER:
-			when = when % _number(spell.trigger_interval)
-		text += "; %s: %s" % [when, _group_text(spell.payload)]
+	for trigger in spell.triggers:
+		var when: String = WHEN[trigger.event] if trigger.event < WHEN.size() else "then"
+		if trigger.event == TriggerBase.Event.TIMER:
+			when = when % _number(trigger.interval)
+		text += "; %s: %s" % [when, _group_text(trigger.payload)]
 	return text
 
 

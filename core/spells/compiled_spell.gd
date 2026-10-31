@@ -1,8 +1,8 @@
 class_name CompiledSpell
 extends RefCounted
 ## One carrier of a staff turned into final numbers (`StaffCompiler`, docs/milestones/
-## M2-staffs.md): what it fires, with the infusions, modifiers and trigger that attached to it,
-## and the payload its trigger fires. A fallback (cards that landed on the caster or on a
+## M2-staffs.md): what it fires, with the infusions, modifiers and triggers that attached to it,
+## and the payload each trigger fires (`triggers`). A fallback (cards that landed on the caster or on a
 ## payload's origin) is one too, with `fallback` set. It is read-only data for the spell runtime;
 ## nothing but `core/spells/` reads it (the builder gets plain values from `Spells.staff_view`).
 
@@ -12,7 +12,10 @@ var element_id: StringName = &""
 var form_name: String = ""
 var element_name: String = ""
 var modifier_ids: Array[StringName] = []
-var trigger_id: StringName = &""
+## The id of its first trigger, `&""` for none (for its name; the runtime reads `triggers`).
+var trigger_id: StringName:
+	get:
+		return triggers[0].id if not triggers.is_empty() else &""
 
 ## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
@@ -86,10 +89,6 @@ var zap_hit: HitProfile = null
 ## An echoed shot's zap: `zap_hit` at ECHO_DAMAGE. Null without both `zap` and `echo`.
 var echo_zap_hit: HitProfile = null
 
-## A `TriggerBase.Event` value, meaningful only when `payload` is not null.
-var trigger_event: int = TriggerBase.Event.HIT
-var trigger_interval: float = 0.0
-
 ## `fallback` values: a carrier's spell, the cards that landed on the caster, or on a
 ## payload's origin.
 const FALLBACK_NONE: int = 0
@@ -104,14 +103,27 @@ var behaviours: PackedFloat32Array = PackedFloat32Array()
 ## The cue each behaviour goes off with (`ModifierBase.cue`), by `ModifierBase.Behaviour`: the
 ## first card of that behaviour in slot order that names one. Only the named ones are kept.
 var behaviour_cues: Dictionary = {}
-## The group the trigger fires, or null.
-var payload: CompiledGroup = null
+## Every trigger on the carrier that fires, in slot order, each with its own payload: the
+## triggers before a carrier take the groups read after it in turn (owner, 2026-10-31,
+## docs/milestones/M2-staffs.md, "Reading a staff"). A trigger that never fires or found nothing
+## to fire is not here (it is wasted).
+var triggers: Array[Trigger] = []
+## The first trigger's payload, or null without a trigger (for a reader that follows one chain,
+## such as `chain_length`; the runtime fires every one of `triggers`).
+var payload: CompiledGroup:
+	get:
+		return triggers[0].payload if not triggers.is_empty() else null
 ## The group a rain carries (its payload), or null.
 var own_payload: CompiledGroup = null
 ## Index in `CompiledStaff.nodes`; the tag of this spell's shots carries it.
 var node: int = -1
 ## The carrier's slot in the staff, -1 for a fallback.
 var slot: int = -1
+## The slots of its own cards, in the order they were read: the infusions and modifiers attached
+## to it, then its carrier (a fallback: the cards that landed there). Set where the compiler
+## attaches them; its triggers are in `triggers` and a group's multicasts in the group. For the
+## builder's tree (docs/milestones/M2-builder-tree.md, part T3).
+var card_slots: PackedInt32Array = PackedInt32Array()
 
 
 ## The stacked strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
@@ -132,6 +144,27 @@ func chain_length() -> int:
 	return 1 + payload.spells[0].chain_length()
 
 
+## True when one of its triggers goes off on `event` (a `TriggerBase.Event`).
+func fires_on(event: int) -> bool:
+	for trigger in triggers:
+		if trigger.event == event:
+			return true
+	return false
+
+
 ## True when its carrier answers yes to `flag` (a `CarrierTraits` flag).
 func has_trait(flag: int) -> bool:
 	return traits & flag != 0
+
+
+## One trigger of a carrier and the group it fires.
+class Trigger:
+	extends RefCounted
+	var id: StringName = &""
+	## A `TriggerBase.Event` value.
+	var event: int = TriggerBase.Event.HIT
+	## Seconds between fires, for a timer.
+	var interval: float = 0.0
+	var payload: CompiledGroup = null
+	## The trigger card's slot in the staff.
+	var slot: int = -1

@@ -8,7 +8,6 @@ script = ExtResource("1_base")
 id = &"fire"
 demo = true
 display_name = "Fire"
-name_words = PackedStringArray("Fire", "Cinder")
 complexity = 1
 icon = ExtResource("2_icon")
 status_id = &"burn"

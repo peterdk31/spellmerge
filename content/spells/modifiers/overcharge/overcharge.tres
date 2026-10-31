@@ -7,7 +7,6 @@
 script = ExtResource("1_base")
 id = &"overcharge"
 display_name = "Overcharge"
-name_words = PackedStringArray("Overstuffed", "Overcharged")
 complexity = 2
 icon = ExtResource("2_icon")
 damage_mult = 2.0

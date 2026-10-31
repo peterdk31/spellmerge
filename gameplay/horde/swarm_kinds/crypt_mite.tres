@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="SwarmKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://gameplay/horde/swarm_kind.gd" id="1_kind"]
+
+[resource]
+script = ExtResource("1_kind")
+enemy_id = &"crypt_mite"

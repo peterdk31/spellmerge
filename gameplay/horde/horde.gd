@@ -44,6 +44,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
+const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres")
 
 const SEATS: int = 4
@@ -98,6 +99,10 @@ var view_size: Vector2 = Vector2.ZERO
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
 var web: bool = OS.has_feature("web")
+## The swarm (`swarm.gd`, docs/milestones/horde-swarm.md): an enemy with a `SwarmKind` spawns
+## there instead of as a full actor; it moves in physics steps (`physics_step`), not in a break.
+## Made at the first such spawn with the director's services; tests may set one before `start`.
+var swarm: SwarmScript = null
 
 ## The world of the run, or null while no horde runs.
 var world: Node2D = null
@@ -181,6 +186,21 @@ func _process(delta: float) -> void:
 	if get_tree().paused and not _break_on:
 		return
 	step(delta)
+
+
+func _physics_process(delta: float) -> void:
+	physics_step(delta)
+
+
+## Moves the swarm on by `delta` seconds (a physics step, as the full actors move), unless no run
+## is up or the game stands still: a level-up break or the pause menu (this node runs while the
+## tree is paused, the swarm must not), or the `Horde` node disabled.
+func physics_step(delta: float) -> void:
+	if swarm == null or world == null or _horde == null or not is_instance_valid(_horde):
+		return
+	if _break_on or (is_inside_tree() and get_tree().paused) or _horde.process_mode == Node.PROCESS_MODE_DISABLED:
+		return
+	swarm.step(delta)
 
 
 ## True while a horde run is up.
@@ -268,6 +288,8 @@ func start(new_world: Node2D) -> void:
 	world.move_child(_gems, mini(1, world.get_child_count() - 1))
 	_camera = _find_camera()
 	_arena = _find_arena()
+	if swarm != null:
+		swarm.start(_horde, _arena)
 	_read_kinds()
 	_read_cards()
 	for seat in SEATS:
@@ -290,6 +312,8 @@ func stop() -> void:
 		_joined[seat] = false
 		_down[seat] = false
 		_bag_due[seat] = false
+	if swarm != null:
+		swarm.stop()
 	if _break_on:
 		_end_break()
 	for node: Node in [_horde, _gems]:
@@ -376,6 +400,18 @@ func _pick_kind() -> EnemyBase:
 
 
 func _add_enemy(data: EnemyBase, at: Vector2) -> bool:
+	var kind: SwarmKind = SwarmScript.kind_for(data)
+	if kind != null:
+		if swarm == null:
+			swarm = SwarmScript.new()
+			swarm.events = events
+			swarm.projectiles = projectiles
+			swarm.actors = actors
+			swarm.start(_horde, _arena)
+		if swarm.spawn(kind, at) < 0:
+			return false
+		alive += 1
+		return true
 	var node: Node = data.scene.instantiate()
 	var body := node as Node2D
 	if body == null:

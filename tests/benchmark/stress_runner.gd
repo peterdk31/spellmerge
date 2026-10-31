@@ -55,6 +55,7 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 
 const PLAYERS: int = 4
 ## The horde scenarios' frame line (p95, milliseconds; headless, so game logic only):
@@ -77,9 +78,19 @@ const SCENARIOS: Array[Dictionary] = [
 	{"label": "web, hit particles off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "particles": false},
 	{"label": "horde", "enemies": 600, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
 	{"label": "horde, web", "enemies": 500, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS},
+	{"label": "horde, swarm", "enemies": 1050, "swarm": 1000, "staff_enemies": 50, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
 ]
 ## The horde scenarios, run by `stress.gd -- --horde` instead of the default ones.
 const HORDE: Array[int] = [4, 5]
+## The swarm scenario (docs/milestones/horde-swarm.md, S1): `swarm` swarmers (the crypt mite's
+## kind with ENEMY_HEALTH) in a swarm (`swarm.gd`) the runner steps, beside `staff_enemies` staff
+## enemies as full actors (the bots fight only actors). The runner then steps the projectile
+## manager, Spells and Combat itself, before the swarm's step, and times the four per physics step
+## (`BENCH: stress parts, physics step`). Run by `stress.gd -- --horde-swarm`, alone.
+const HORDE_SWARM: Array[int] = [6]
+const SWARM_KIND_ID: StringName = &"crypt_mite"
+## Swarmers added per frame at most.
+const SWARM_SPAWN_PER_FRAME: int = 60
 ## Game seconds a scenario takes to build up before frames are measured, and to measure.
 const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
@@ -154,6 +165,23 @@ var _enemy_data: EnemyBase = null
 ## The horde's swarmer (`_swarm_data`), how many staff enemies a horde scenario keeps standing,
 ## and how many of the crowd carry a staff now.
 var _swarm_data: EnemyBase = null
+## The swarm scenario's swarm, its node, its kind and how many swarmers it keeps; the systems it
+## steps itself, and microseconds and steps timed in the measured window.
+var _swarm: SwarmScript = null
+var _swarm_node: Node2D = null
+var _swarm_kind: SwarmKind = null
+var _target_swarm: int = 0
+var _combat: Node = null
+var _spells: Node = null
+var _spells_usec: int = 0
+var _spells_max_usec: int = 0
+var _swarm_usec: int = 0
+var _projectiles_usec: int = 0
+var _combat_usec: int = 0
+var _swarm_max_usec: int = 0
+var _projectiles_max_usec: int = 0
+var _combat_max_usec: int = 0
+var _timed_steps: int = 0
 var _target_staffed: int = 0
 var _staffed: int = 0
 ## The wizards of the scenario running and their Downed components, by seat.
@@ -225,6 +253,8 @@ static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
 
 ## The scenarios a run's user arguments ask for: the horde ones for `--horde`, else `default`.
 static func scenarios_from_args(args: PackedStringArray, default: Array[int]) -> Array[int]:
+	if args.has("--horde-swarm"):
+		return HORDE_SWARM.duplicate()
 	return HORDE.duplicate() if args.has("--horde") else default.duplicate()
 
 
@@ -248,6 +278,18 @@ func _next_scenario() -> void:
 	_target_enemies = scenario["enemies"]
 	_target_shots = scenario["shots"]
 	_target_staffed = ceili(float(_target_enemies) * float(scenario.get("staffed", 1.0)))
+	_target_swarm = int(scenario.get("swarm", 0))
+	if _target_swarm > 0:
+		_target_staffed = int(scenario.get("staff_enemies", 0))
+	_swarm_usec = 0
+	_spells_usec = 0
+	_spells_max_usec = 0
+	_projectiles_usec = 0
+	_combat_usec = 0
+	_swarm_max_usec = 0
+	_projectiles_max_usec = 0
+	_combat_max_usec = 0
+	_timed_steps = 0
 	_staffed = 0
 	_rng.seed = SEED
 	_casts = [0, 0, 0, 0]
@@ -302,6 +344,9 @@ func _start_measuring(scenario: Dictionary) -> void:
 		_finish(["the enemy data is missing"])
 		return
 	_swarm_data = swarm_data(_enemy_data)
+	if _target_swarm > 0 and not _start_swarm():
+		_finish(["the swarm could not start"])
+		return
 	_wizards.clear()
 	_downs.clear()
 	for index in PLAYERS:
@@ -319,6 +364,33 @@ func _start_measuring(scenario: Dictionary) -> void:
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_active = true
+
+
+## The swarm scenario: a swarm of the crypt mite's kind (with ENEMY_HEALTH) under a node of the
+## world, on the room's floor; the projectile manager, Spells and Combat are stepped by the runner.
+func _start_swarm() -> bool:
+	var registry: Node = get_tree().root.get_node_or_null("Registry")
+	var mite: EnemyBase = registry.call("get_resource", &"enemies", SWARM_KIND_ID) as EnemyBase if registry != null else null
+	_combat = get_tree().root.get_node_or_null("Combat")
+	_spells = get_tree().root.get_node_or_null("Spells")
+	var world := _flow.get("world") as Node2D
+	if mite == null or _combat == null or _spells == null or world == null:
+		return false
+	var data: EnemyBase = mite.duplicate() as EnemyBase
+	data.max_health = ENEMY_HEALTH
+	_swarm_kind = SwarmKind.new()
+	_swarm_kind.enemy_id = SWARM_KIND_ID
+	if not _swarm_kind.prepare(data):
+		return false
+	_swarm_node = Node2D.new()
+	_swarm_node.name = "Swarm"
+	world.add_child(_swarm_node)
+	_swarm = SwarmScript.new()
+	_swarm.start(_swarm_node, ENEMY_AREA)
+	_projectiles.set_physics_process(false)
+	_spells.set_physics_process(false)
+	_combat.set_physics_process(false)
+	return true
 
 
 ## The imp's data with more health, so the crowd is not killed within seconds.
@@ -404,15 +476,43 @@ func _time_parts() -> void:
 	_parts_frames += 1
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if not _active:
 		return
+	if _swarm != null:
+		_step_swarm_timed(delta)
 	_top_up_shots()
 	var count: int = int(_projectiles.call("get_count"))
 	_peak_shots = maxi(_peak_shots, count)
 	if _measuring:
 		_shot_sum += count
 		_shot_samples += 1
+
+
+## The swarm scenario's physics step: the projectile manager, Spells, Combat and the swarm, each
+## timed. (The runner steps after the world, so the systems run after the actors' step here instead
+## of before it; that changes the order within a step, not its cost.)
+func _step_swarm_timed(delta: float) -> void:
+	var start: int = Time.get_ticks_usec()
+	_projectiles.call("step", delta)
+	var shot: int = Time.get_ticks_usec()
+	_spells.call("step", delta)
+	var cast: int = Time.get_ticks_usec()
+	_combat.call("step", delta)
+	var fought: int = Time.get_ticks_usec()
+	_swarm.step(delta)
+	var done: int = Time.get_ticks_usec()
+	if not _measuring:
+		return
+	_timed_steps += 1
+	_projectiles_usec += shot - start
+	_spells_usec += cast - shot
+	_spells_max_usec = maxi(_spells_max_usec, cast - shot)
+	_combat_usec += fought - cast
+	_swarm_usec += done - fought
+	_projectiles_max_usec = maxi(_projectiles_max_usec, shot - start)
+	_combat_max_usec = maxi(_combat_max_usec, fought - cast)
+	_swarm_max_usec = maxi(_swarm_max_usec, done - fought)
 
 
 ## Nobody dies and nobody runs dry: this is a stress scene, not a balance test.
@@ -442,6 +542,8 @@ func _top_up_enemies() -> void:
 		return
 	var add: int = mini(_target_enemies - alive, SPAWN_PER_FRAME)
 	for i in add:
+		if _target_swarm > 0 and _staffed >= _target_staffed:
+			break
 		var data: EnemyBase = _enemy_data if _staffed < _target_staffed else _swarm_data
 		var enemy := data.scene.instantiate() as Actor
 		if enemy == null:
@@ -453,6 +555,11 @@ func _top_up_enemies() -> void:
 		world.add_child(enemy)
 		_enemies.append(enemy)
 		alive += 1
+	if _swarm != null:
+		var room: int = mini(_target_swarm - _swarm.count, SWARM_SPAWN_PER_FRAME)
+		for i in room:
+			_swarm.spawn(_swarm_kind, ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y))
+		alive += _swarm.count
 	_peak_enemies = maxi(_peak_enemies, alive)
 	if _measuring:
 		_enemy_sum += alive
@@ -543,6 +650,9 @@ func _report_parts() -> void:
 	var crowd: float = maxf(1.0, float(_enemies.size()))
 	print("BENCH: stress parts, enemy step: avg %.3f ms max %.3f ms for one pass over %d enemies (%.1f us each; includes the combat lookups)" % [float(_enemy_step_usec) / frames / 1000.0, float(_enemy_step_max_usec) / 1000.0, _enemies.size(), float(_enemy_step_usec) / frames / crowd])
 	print("BENCH: stress parts, combat status lookups (speed factor and knockback): avg %.3f ms max %.3f ms per pass" % [float(_lookup_usec) / frames / 1000.0, float(_lookup_max_usec) / 1000.0])
+	if _timed_steps > 0:
+		var steps: float = float(_timed_steps)
+		print("BENCH: stress parts, physics step (%d steps, %d swarmers at the end): swarm avg %.3f ms max %.3f, projectile manager avg %.3f ms max %.3f, Spells avg %.3f ms max %.3f, Combat avg %.3f ms max %.3f" % [_timed_steps, _swarm.count if _swarm != null else 0, float(_swarm_usec) / steps / 1000.0, float(_swarm_max_usec) / 1000.0, float(_projectiles_usec) / steps / 1000.0, float(_projectiles_max_usec) / 1000.0, float(_spells_usec) / steps / 1000.0, float(_spells_max_usec) / 1000.0, float(_combat_usec) / steps / 1000.0, float(_combat_max_usec) / 1000.0])
 	print("BENCH: stress parts, Feel step (hit particles, flashes, labels; the particles' own work is in the renderer and the particles-off run): avg %.3f ms per pass" % (float(_feel_step_usec) / frames / 1000.0))
 
 
@@ -560,10 +670,25 @@ func _teardown_scenario() -> void:
 	if _flow != null:
 		_flow.call("stop_run")
 	_enemies.clear()
+	_stop_swarm()
 	_restore_diagnostics()
 	if _probe != null:
 		_probe.free()
 		_probe = null
+
+
+## The swarm scenario's end: the swarm forgotten, the systems step themselves again.
+func _stop_swarm() -> void:
+	if _swarm != null:
+		_swarm.stop()
+	_swarm = null
+	_swarm_node = null
+	_target_swarm = 0
+	_projectiles.set_physics_process(true)
+	if _spells != null:
+		_spells.set_physics_process(true)
+	if _combat != null:
+		_combat.set_physics_process(true)
 
 
 ## Back to drawing with particles, after a variant (and when the run ends).

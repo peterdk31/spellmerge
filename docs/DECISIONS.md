@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-31: The builder's tree view; copy/paste and cast names removed (owner)
+
+Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), worked out over mockups rendered in the game at true scale.
+
+- **A tree of the compiled staff on Y,** in the ring's place: a row per carrier and per trigger, made of the slots' own 16 px tiles, the trigger card's name and nothing else on a trigger row. With each trigger taking its own payload, the slot grid alone no longer says what a staff does.
+- **Rejected on the way:** brackets with words under the slots (they assumed a slot row that does not exist: the slots are a 5 × 4 grid of 16 px tiles in a 112 px column); a mark on every tile of every payload (it covers the icons and clashes where payloads nest); a card popup (it covered rows of the tree).
+- **The card under the slot marker is described in the column,** where the corner panel and the staff's numbers were: both are hidden while the builder is open, and thin HP and MP bars framed in the player's colour sit on top of the column instead, so health stays in view during a wave.
+- **Every quarter is laid out as player 1's:** the column on the left, the ring or tree on the right.
+- **The hub keeps the staff's numbers** when no card is pointed at (owner: good to see them).
+- **LT held clears the staff** (the press still takes out at once); Y opens the tree.
+- **Removed: staff codes (staffs D2) and cast names (staffs E1).** Copy and paste go from both builders, with `StaffCode`; the generated names go, with `SpellNamer` and every card's `name_words`. Where a cast was called by its name, its plain description is used.
+
 ## 2026-10-31: Each trigger takes its own payload (owner)
 
 - **Rule:** the triggers before a carrier are all kept, and after the carrier each reads its own payload, in slot order: the first trigger the next group, the second the group after it. A payload's own payloads are read inside it first (depth-first). A trigger whose payload finds no card, or whose event never happens on the carrier, is wasted as before; the others keep theirs. Before, a second trigger before one carrier was wasted.

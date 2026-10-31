@@ -16,11 +16,11 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [x] **Card rules: the compiler says what does nothing (rules R2).** Done (#468). (`core/spells/`, builder text) Design: [M2-rules.md](milestones/M2-rules.md), "R2". One table `behaviour × motion` (runs, or a reason a player understands) kept next to the runtime that asks it (R2a); `trigger_runs(event, motion)` for triggers (R2b); the builder and staff view show the reasons (R2c). Tests: every ✗ of the audit matrix that R4 does not turn into ✓ is listed as wasted with a reason; the melee carriers (swing, slam) are in the matrix.
 - [x] **Card rules: the permanent check (rules R3).** Done (landed with #468; the rule 2 checks are deferred to `docs/BACKLOG.md`). (`tests/core/test_card_rules.gd`) After R2. Finds every modifier, trigger, infusion and multicast card and every carrier by itself; a card is either listed as wasted with a reason or changes a recorded trace; per-behaviour probes; a behaviour or event with no probe fails with "no probe for `<name>`"; prints the matrix. See M2-rules.md, "R3" and "Automatic discovery".
-- [ ] **Builder tree view, T1: copy and paste gone.** (`core/spells/`, `hud/builder/`, tests) Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), part T1 (owner, 2026-10-31). After "Each trigger takes its own payload" has merged.
-- [ ] **Builder tree view, T2: cast names gone.** (`core/spells/`, `core/base/`, every card's `name_words` under `content/spells/`, tests) Part T2. After T1.
-- [ ] **Builder tree view, T3: the tree's data.** (`core/spells/` `staff_view`, `tests/core/`) Part T3. After T2.
-- [ ] **Builder tree view, T4: one layout for all, bars and card info.** (`hud/builder/radial_builder.gd`, `hud/panels/`, tests, screenshots) Part T4. After T1 and T2.
-- [ ] **Builder tree view, T5: the tree view.** (`hud/builder/`, tests, screenshots) Part T5. After T3 and T4.
+- [x] **Builder tree view, T1: copy and paste gone.** Done (#505). (`core/spells/`, `hud/builder/`, tests) Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), part T1 (owner, 2026-10-31). After "Each trigger takes its own payload" has merged.
+- [x] **Builder tree view, T2: cast names gone.** Done (#505). (`core/spells/`, `core/base/`, every card's `name_words` under `content/spells/`, tests) Part T2. After T1.
+- [x] **Builder tree view, T3: the tree's data.** Done (#505). (`core/spells/` `staff_view`, `tests/core/`) Part T3. After T2.
+- [x] **Builder tree view, T4: one layout for all, bars and card info.** Done (#505). (`hud/builder/radial_builder.gd`, `hud/panels/`, tests, screenshots) Part T4. After T1 and T2.
+- [x] **Builder tree view, T5: the tree view.** Done (#505). (`hud/builder/`, tests, screenshots) Part T5. After T3 and T4.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane

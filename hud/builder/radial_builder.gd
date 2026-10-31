@@ -37,6 +37,11 @@ extends Control
 ##   fills round the slots, then every card fades out at once (the press has already taken one
 ##   out, so a clear ends the same). **LB, RB** (`page_prev`, `page_next`) show the previous or
 ##   next staff; **B** closes it.
+## - **The tree** (owner, 2026-10-31, `tree_view.gd`): **Y** (`extra`; R) swaps the ring (and its
+##   kind row) for a tree of the shown staff's cycle in the same space, and back. The right
+##   stick (P1's mouse wheel) scrolls it; the left stick still moves the slot marker, whose card's
+##   row and tile are marked in the tree; RT has nothing to put in there; P1's click on a tile
+##   marks its slot.
 ## - **The card info panel:** under the slots, the card under the marker: its name, its kind
 ##   in the kind's colour (and a frame in it), its lore line wrapped (`Spells.component_description`)
 ##   and, under a line, its numbers (`Spells.component_stats`; none for a trigger). An empty slot
@@ -60,6 +65,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RingPickerScript := preload("res://hud/builder/rings/ring_picker.gd")
+const TreeViewScript := preload("res://hud/builder/tree_view.gd")
 
 ## How the ring shows the bag: every card at once, or one kind at a time.
 enum Layout { ALL, KIND }
@@ -165,9 +171,11 @@ const POINT_NOTE: String = "Point at a card first"
 const EMPTY_NOTE: String = "Nothing to take out"
 const NO_CARDS_TEXT: String = "No cards"
 const EMPTY_SLOT_TEXT: String = "Empty slot"
-## The hint row's buttons (RT, LT, B) and the buttons read here by press count.
-const HINT_ACTIONS: Array[StringName] = [&"staff_2", &"staff_4", &"back"]
-const READ_ACTIONS: Array[StringName] = [&"staff_2", &"staff_3", &"staff_4", &"kind_prev", &"kind_next"]
+const TREE_VERB: String = "Tree"
+const RING_VERB: String = "Ring"
+## The hint row's buttons (RT, LT, Y, B) and the buttons read here by press count.
+const HINT_ACTIONS: Array[StringName] = [&"staff_2", &"staff_4", &"extra", &"back"]
+const READ_ACTIONS: Array[StringName] = [&"staff_2", &"staff_3", &"staff_4", &"kind_prev", &"kind_next", &"extra"]
 ## What LT does on the marked slot.
 const LT_TAKE: StringName = &"take"
 const LT_UNDO: StringName = &"undo"
@@ -224,6 +232,9 @@ var _kinds: Array[StringName] = []
 var _kind_page: int = 0
 
 var _open: bool = false
+## The tree view (Y), drawn by its own node in the ring's place, and whether it shows.
+var _tree: TreeViewScript = null
+var _tree_open: bool = false
 var _viewed: int = 1
 var _slot: int = 0
 var _first_row: int = 0
@@ -297,6 +308,10 @@ func _ready() -> void:
 	_kind_glyphs.append(_make_glyph("KindNext"))
 	for action in READ_ACTIONS:
 		_seen[action] = 0
+	_tree = TreeViewScript.new()
+	_tree.name = "TreeView"
+	_tree.visible = false
+	add_child(_tree)
 
 
 ## Connect to the event bus, the focus service, the spell runtime and the input manager (called
@@ -308,6 +323,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_input = input
 	for glyph in [_glyph_prev, _glyph_next] + _hint_glyphs + _kind_glyphs:
 		(glyph as ActionGlyphScript).bind(input)
+	_tree.kind_colors = KIND_COLORS
+	_tree.spells = spells
 	_glyph_prev.show_action(index, &"page_prev")
 	_glyph_next.show_action(index, &"page_next")
 	for at in HINT_ACTIONS.size():
@@ -352,6 +369,8 @@ func open_builder() -> bool:
 	_flyers.clear()
 	_fading.clear()
 	_slot = _end_slot()
+	_tree_open = false
+	_tree.visible = false
 	_prime()
 	_refresh_preview()
 	set_process(true)
@@ -409,6 +428,35 @@ func direction_to(id: StringName) -> Vector2:
 		if _ring_entry[at] != NONE and _entries[_ring_entry[at]]["id"] == id:
 			return direction_of(_ring_angle[at])
 	return Vector2.ZERO
+
+
+## Whether the tree shows in the ring's place.
+func is_tree_open() -> bool:
+	return _tree_open
+
+
+## The tree view node (for tests and screenshots).
+func tree_view() -> TreeViewScript:
+	return _tree
+
+
+## Y: swap the ring for the tree, or back. Pointing ends: the tree has no card to put in.
+func toggle_tree() -> void:
+	_tree_open = not _tree_open
+	_tree.visible = _tree_open
+	_pointed = NONE
+	if ring_picker != null:
+		ring_picker.reset()
+	if _tree_open:
+		_sync_tree()
+		_tree.restart()
+	_refresh_preview()
+	_changed()
+
+
+func _sync_tree() -> void:
+	_tree.set_plan(_plans[_viewed], _max_mana)
+	_tree.set_marked(_slot)
 
 
 ## The ring's middle in view pixels (for screenshots).
@@ -489,6 +537,7 @@ func mark_slot(slot: int) -> void:
 	_slot = clampi(slot, 0, count - 1)
 	_marker_at = _clock
 	_scroll_to_marker()
+	_tree.set_marked(_slot)
 	_refresh_preview()
 	_changed()
 
@@ -516,6 +565,8 @@ func step(delta: float) -> void:
 			_flyers.remove_at(at)
 	if _dirty:
 		_dirty = false
+		if _tree_open:
+			_tree.set_marked(_slot)
 		_refresh_hints()
 		queue_redraw()
 
@@ -545,9 +596,16 @@ func _presses(action: StringName) -> int:
 
 func _poll_buttons() -> void:
 	var mouse_slot: int = _mouse_slot()
+	for _press in _presses(&"extra"):
+		toggle_tree()
 	for _press in _presses(&"staff_2"):
 		if mouse_slot != NONE:
 			mark_slot(mouse_slot)
+		elif _tree_open:
+			# The tree has no card pointed at; P1's click on a tile marks its slot.
+			var tile: int = _tree.slot_at(get_global_mouse_position()) if _uses_mouse() else NONE
+			if tile != NONE:
+				mark_slot(tile)
 		else:
 			_put_in()
 	for _press in _presses(&"staff_3"):
@@ -598,6 +656,10 @@ func _move_marker(dir: Vector2i) -> void:
 ## ring) lets the card go too, so the hub shows the staff's numbers again. A ring style
 ## (`ring_picker`) picks in its own way.
 func _poll_pointer(delta: float) -> void:
+	if _tree_open:
+		# The right stick scrolls the tree.
+		_tree.step(delta, _input.menu_tilt(index).y if _input != null else 0.0)
+		return
 	var aim: Vector2 = _input.menu_aim(index) if _input != null else Vector2.ZERO
 	if aim.length() < POINT_THRESHOLD:
 		aim = _mouse_aim()
@@ -703,6 +765,19 @@ func _mouse_slot() -> int:
 	if not _uses_mouse():
 		return NONE
 	return _slot_at(get_global_mouse_position())
+
+
+## P1's mouse wheel scrolls the tree.
+func _unhandled_input(event: InputEvent) -> void:
+	if not _open or not _tree_open or not _uses_mouse():
+		return
+	var button := event as InputEventMouseButton
+	if button == null or not button.pressed:
+		return
+	if button.button_index == MOUSE_BUTTON_WHEEL_UP:
+		_tree.wheel(-1)
+	elif button.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		_tree.wheel(1)
 
 
 func _uses_mouse() -> bool:
@@ -840,6 +915,8 @@ func _show_staff(staff: int) -> void:
 	_slot = _end_slot()
 	_first_row = 0
 	_scroll_to_marker()
+	if _tree_open:
+		_sync_tree()
 	_marker_at = _clock
 	_refresh_preview()
 	_changed()
@@ -925,6 +1002,8 @@ func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
 		var count: int = cards_of(_viewed).size()
 		_slot = clampi(_slot, 0, maxi(count - 1, 0))
 		_refresh_preview()
+		if _tree_open:
+			_sync_tree()
 	_changed()
 
 
@@ -974,6 +1053,8 @@ func _on_stats_changed(player: int, health: float, max_health: float, mana: floa
 	_health = health
 	_max_health = maxf(max_health, 1.0)
 	_mana = mana
+	if _tree_open and max_mana > 0.0:
+		_tree.set_plan(_plans[_viewed], _max_mana)
 	_changed()
 
 
@@ -1082,6 +1163,8 @@ func _place() -> void:
 	_kinds_at = Vector2(_center.x, _quarter.position.y + 2.0)
 	# The ring's side, from the top down to the hint row: the tree's space (part T5).
 	_ring_side = Rect2(ring_left, top, ring_right - ring_left, _hints_at.y - 1.0 - top)
+	_tree.position = _ring_side.position
+	_tree.size = _ring_side.size
 	var tab_x: float = _tabs_at.x
 	_glyph_prev.position = Vector2(tab_x, _tabs_at.y)
 	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + 13.0 * STAFF_COUNT + 1.0, _tabs_at.y)
@@ -1111,11 +1194,11 @@ func _slot_at(point: Vector2) -> int:
 
 
 ## Lay the hint row out for what the buttons do now: RT, LT (its verb follows the marked
-## slot) and B, each glyph then its verb.
+## slot), Y (the tree or the ring) and B, each glyph then its verb.
 func _refresh_hints() -> void:
 	var lt: StringName = lt_action()
-	_hint_verbs = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), CLOSE_VERB]
-	_hint_live = [_pointed != NONE, lt != &"", true]
+	_hint_verbs = [PUT_VERB, UNDO_VERB if lt == LT_UNDO else (GAP_VERB if lt == LT_GAP else TAKE_VERB), RING_VERB if _tree_open else TREE_VERB, CLOSE_VERB]
+	_hint_live = [_pointed != NONE and not _tree_open, lt != &"", true, true]
 	var x: float = _hints_at.x
 	for at in _hint_glyphs.size():
 		var glyph: ActionGlyphScript = _hint_glyphs[at]
@@ -1124,7 +1207,7 @@ func _refresh_hints() -> void:
 		x += glyph.custom_minimum_size.x + 2.0
 		_hint_text_x[at] = x
 		x += _text_width(_hint_verbs[at]) + 6.0
-	var show_kinds: bool = layout == Layout.KIND and _kinds.size() > 1
+	var show_kinds: bool = layout == Layout.KIND and _kinds.size() > 1 and not _tree_open
 	for glyph in _kind_glyphs:
 		glyph.visible = show_kinds
 	if show_kinds:
@@ -1175,8 +1258,9 @@ func _draw() -> void:
 	_draw_tabs()
 	_draw_slots()
 	_draw_info()
-	_draw_ring()
-	_draw_hub()
+	if not _tree_open:
+		_draw_ring()
+		_draw_hub()
 	_draw_hints()
 	_draw_flyers()
 

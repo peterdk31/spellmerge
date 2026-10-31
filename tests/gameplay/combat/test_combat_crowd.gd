@@ -114,6 +114,59 @@ func test_a_crowd_round_many_wizards_touches_as_before() -> void:
 	check_equal(got, RECORDED_MANY, "the same touches and burns, in the same order, as before")
 
 
+## `own_paces_and_pushes` (the swarm's step, Horde swarm S4) answers and spends as `own_pace` and
+## `own_knockback` body by body: a second Combat with the same bodies, statuses and pushes is asked
+## one at a time. Covered: free, chilled, frozen and pushed bodies, a body under a wrong id (looked
+## up by node), one Combat never heard of, and a row with no seconds (left alone).
+func test_paces_and_pushes_for_a_crowd_are_each_bodys_own() -> void:
+	var twin_actors := own(ActorsScript.new()) as ActorsScript
+	var twin := own(CombatScript.new()) as CombatScript
+	twin.events = own(EventsScript.new()) as EventsScript
+	twin.actors = twin_actors
+	twin.projectiles = null
+	twin.setup()
+	var nodes: Array[Node2D] = []
+	var twins: Array[Node2D] = []
+	var ids := PackedInt32Array()
+	for i in 7:
+		nodes.append(_body(Vector2(40.0 * float(i) + 20.0, 100.0), 50, 6.0, 0, false))
+		var other := own(Node2D.new()) as Node2D
+		_holder.add_child(other)
+		twin.register_actor(other, 50, 6.0, 0, Vector2(0.0, -4.0))
+		twins.append(other)
+		ids.append(_combat.actor_of(nodes[i]))
+	for combat: CombatScript in [_combat, twin]:
+		var bodies: Array[Node2D] = nodes if combat == _combat else twins
+		combat.apply_status(ActorsScript.NONE, bodies[1], CombatScript.CHILL, 2.0, 0.3)
+		for stack in CombatScript.CHILL_STACKS_TO_FREEZE:
+			combat.apply_status(ActorsScript.NONE, bodies[2], CombatScript.CHILL, 2.0, 0.3)
+		combat.hit(ActorsScript.NONE, bodies[3], 1, Vector2.RIGHT, 300.0)
+		combat.hit(ActorsScript.NONE, bodies[4], 1, Vector2.UP, 90.0)
+		combat.apply_status(ActorsScript.NONE, bodies[4], CombatScript.CHILL, 2.0, 0.3)
+	# Body 5 under body 0's id (looked up by its node), body 6 unknown to Combat.
+	ids[5] = ids[0]
+	_combat.unregister_actor(nodes[6])
+	twin.unregister_actor(twins[6])
+	var seconds := PackedFloat64Array([0.05, 0.05, 0.05, 0.05, 0.0, 0.05, 0.05])
+	var paces := PackedFloat64Array([-1.0, -1.0, -1.0, -1.0, -1.0, -1.0, -1.0])
+	var pushes := PackedVector2Array()
+	pushes.resize(7)
+	pushes[4] = Vector2(-3.0, -3.0)
+	for step in 3:
+		_combat.own_paces_and_pushes(nodes, ids, 7, seconds, paces, pushes)
+		for i in 7:
+			var id: int = twin.actor_of(twins[i]) if i != 5 else ids[5]
+			if seconds[i] <= 0.0:
+				check_equal(paces[i], -1.0, "step %d: a row with no seconds keeps its pace" % step)
+				check_equal(pushes[i], Vector2(-3.0, -3.0), "step %d: and its push" % step)
+				continue
+			check_equal(paces[i], twin.own_pace(twins[i], id), "step %d, body %d: its own pace" % [step, i])
+			check_equal(pushes[i], twin.own_knockback(twins[i], id, seconds[i]), "step %d, body %d: its own push, spent" % [step, i])
+	check(paces[2] == 0.0 and paces[1] > 0.0 and paces[1] < 1.0 and paces[0] == 1.0, "frozen stands, chilled walks slower, free walks")
+	check(pushes[3] != Vector2.ZERO and pushes[3].x > 0.0, "a push goes the way of its hit")
+	check_equal(_combat.knockback_of(nodes[4]), twin.knockback_of(twins[4]), "the held body's push is not spent")
+
+
 func test_a_touch_at_exactly_the_reach_lands() -> void:
 	var wizard: Node2D = _body(Vector2(200.0, 200.0), 100, 8.0, 0, true)
 	_body(Vector2(216.0, 200.0), 10, 8.0, 2, false)

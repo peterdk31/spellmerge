@@ -47,6 +47,45 @@ S1, S2 and S5 are built in parallel (S2 reads the rows S1 defines, below); S3 af
 
 `Swarm` (in `swarm.gd`) keeps, by row 0 to `count - 1` (packed arrays, rows swap-removed on death): `nodes` (the bare Node2D), `kinds` (index into `kinds_list`, each a `SwarmKind`: enemy id, the full scene to promote to, the body texture and the stray face style read from that scene), `positions`, `velocities`, `aims` (the look direction), `seeds` (per-row, for idle habits), `hurt_left` (seconds of the hurt pose left, set on `damage_dealt`), `down` (never true for a swarmer today), and `moved` (the step after which the look reads them). The look never writes them.
 
+## S4: scale (2026-10-31)
+
+Measured with `stress.gd -- --horde-swarm` (headless Linux under WSL, 24 threads, otherwise idle; game logic only, no rendering): four bots with heavy builds, the shot cap (500) kept full with filler shots, the swarm with its look, staff enemies as full actors. `--profile` adds a tree profile (`tests/benchmark/tree_profile.gd`: every processing node timed by script, the engine's own time apart; `--profile-signals` also times the hot events' listeners), `--swarm=N --staff=M` sets the counts, and `tests/benchmark/swarm_step.gd` times the swarm and its look alone.
+
+**Where the time went (before; the run asked for 1,000 swarmers and 50 staff enemies).** The probe's "physics step avg 30 ms" was not a step: Godot's `TIME_PHYSICS_PROCESS` monitor is the longest step of each second, refreshed once a second. The real steps took about 13 ms, run 1.7 times a frame:
+
+| Part | ms | |
+|---|---|---|
+| Projectile manager | 3.8-4.4 a step | target refresh 0.7, hit tests 2.2, the hit events: a spell hit's reactions and bursts strike dozens of packed swarmers (1.3 reactions a step at about 2.6 ms each), every damage about 30 us with its listeners (Feel's juice about 16, Combat's own about 10, the swarm 2.5); each shot hit's `projectile_impact` about 10 us (Feel 8) |
+| Swarm | 3.7 a step | rows 1.8 (three calls into Actors and Combat per row), spacing 1.8, walls 0.6, node writes 0.2 |
+| 50 staff enemies and 4 wizards | about 4 a step | 74 us an actor (AI, caster, looks, mover, `move_and_slide`) |
+| Spells, Combat | 1.0-1.2, 0.9 a step | |
+| The engine | about 1.2 a step | physics server, message queue, frees |
+| Process scripts | about 6 a frame | the runner 3.7 (the bots 0.7; the rest were spawns the full actor table refused, below), shot drawing 2.0, Feel 0.8, HUD 0.2 |
+
+Found: 1,000 swarmers + 50 staff enemies + 4 wizards is more than the actor table's 1,024, so every frame the runner tried about 30 spawns that Combat refused, each making and freeing a node (about 70 us each). The scenario now asks for 1,000 + 16, and a web-size one, 500 + 25, was added. The look was missing (the runner built its own swarm); it is in now and timed apart: 1.25 ms a step and 0.6 ms a frame at 1,000. Peak nodes about 3,200: the 1,000 bare swarmer nodes, about 950 in the actors (sprites, components), about 800 in the HUD (buttons, glyphs, labels) and about 270 in Feel; only the actors process per frame.
+
+**Changed:** the swarm step asks for every row's stop, pace and push once (`Actors.spend_holds`, `Combat.own_paces_and_pushes`), folds the move into the spacing hash and the push, floor, walls and node writes into one pass, and walks the neighbour cells without a `match`. Every swarmer moves exactly as before (`tests/gameplay/horde/test_swarm_steps.gd`: a fingerprint recorded before). The swarm alone at 1,000: 4.45 to 3.29 ms a step (`swarm_step.gd`, medians). The probe now times every step's scripts itself.
+
+**After** (frame avg, two runs each):
+
+| Scenario | Before | After |
+|---|---|---|
+| 1,000 swarmers + 16 staff | 153 ms (a step 17.6 ms: 8 steps a frame) | 90-155 ms (a step 15.0-18.3 ms): not 60 FPS |
+| 600 + 16 | | 15.0-18.7 ms |
+| 500 + 25 (web size) | 19.7 ms (a step 12.5) | 13.8-14.6 ms (a step 11.5): 60 FPS |
+
+A step costs about 6.4 ms, plus 9-11 us a swarmer (swarm 3.3-3.8, look 1.2-1.3, Combat, more hits), plus 33-43 us a full actor: a full actor costs about five swarmers. 60 FPS holds while a step stays under about 12 ms (process about 3.5 ms and the engine about 1.3 ms come on top). **Web** (an estimate: scripts there run roughly 2-3x slower): at 500 + 25 a step would take 23-35 ms. The crowd's own share is about 3.5 ms on desktop (7-10 on web); the rest is the four bots' spells and 500 shots, so this load does not hold 60 FPS on the web at any crowd.
+
+**Caps:** the director's one cap counts swarmers and full actors alike, and the curve's last point is about 41% full actors. At that mix 225 holds 60 FPS on desktop (frames 11.4-14.2 ms; 250 sits on the line at 13.7-19.0; 300 is over at 17.5-19.1), and 150 costs what the old web cap's 100 full actors did (8.5-8.7 against 8.2-9.0 ms). So MAX_ALIVE_DESKTOP goes from 200 to 225 (and the curve's last point), and MAX_ALIVE_WEB from 100 to 150. For 500+ the full actors must be counted for what they cost: a cap per kind or a cost per kind (a full actor counts as 4-5 swarmers: about 600 swarmer-units on desktop, 300 on the web), with the late curve mostly swarmers.
+
+**Left** (shared areas, or bigger than S4):
+- Every damage's listeners: Feel starts a sound, reads the camera and shows an effect per hit, about 2 ms a step here. A hit sound once per sound per step, and the camera read once a frame, would cut it without a visible change.
+- A full actor's step (AI, looks, mover).
+- The projectile manager reads every swarmer's node for its place each step (0.7 ms at 1,000); it could take the swarm's rows instead.
+- Spacing (1.25 ms at 1,000) and the look (1.2 us a row) are near what GDScript does.
+- Single steps of 25-55 ms when the bots' heavy builds cast (the p95).
+- Past 1,020 bodies the actor table must grow (SpellTag's caster bits, as H1 did).
+
 ## Owner answers (2026-10-31)
 
 1. A simpler look is not fine: swarmers look exactly like full enemies.

@@ -64,6 +64,7 @@ func before_each() -> void:
 	slow.speed_mult = 0.3
 	slow.lifetime_mult = 3.0
 	_modifier(&"return", ModifierBase.Behaviour.RETURN, 1.0)
+	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	# A sure zap (100%), so these tests read its rules, not its chance (tests/content/spells/test_zap.gd).
 	var arc: ModifierBase = _modifier(&"zap", ModifierBase.Behaviour.ZAP, 1.0)
 	arc.behaviour_reach = 60.0
@@ -198,13 +199,13 @@ func test_a_zap_compiles_its_chance_reach_and_weaker_hit() -> void:
 
 
 func test_a_slow_orb_zaps_the_enemy_beside_its_path() -> void:
-	# A slow orb (30 px/s) passes 40 px from an imp: it never touches it, but zaps it, once.
+	# A slow orb (30 px/s) passes 40 px from an imp: it never touches it, but zaps it.
 	var imp: Node2D = _target(Vector2(30.0, 40.0))
 	_build(0, [&"zap", &"lightning", &"orb"])
 	_cast()
 	_tick(150)
 	var zaps: Array = _hits_on(imp)
-	check_equal(zaps.size(), 1, "it zaps the imp once, as it comes in reach")
+	check(not zaps.is_empty(), "it zaps the imp as it passes")
 	if not zaps.is_empty():
 		var profile: HitProfile = zaps[0][4]
 		check(profile != null and is_equal_approx(profile.damage, 10.0 * SpellLimits.ZAP_DAMAGE), "the zap at ZAP_DAMAGE of the orb")
@@ -219,16 +220,32 @@ func test_no_zap_out_of_reach() -> void:
 	check(_hits_on(far).is_empty(), "an imp 90 px off the path is out of a 60 px reach")
 
 
-## Each body rolls once a shot (owner, 2026-10-30): a rune beside an imp for 4 s zaps it once, at a
-## random moment of the most a zap waits (SpellLimits.ZAP_WAIT_MOST: a rune stands still).
-func test_each_body_is_zapped_once_a_shot() -> void:
+## A body rolls again SpellLimits.ZAP_AGAIN after its zap (owner, 2026-10-31; it was once a shot):
+## a sure rune beside an imp for 4 s zaps it within the most a zap waits (SpellLimits.ZAP_WAIT_MOST: a
+## rune stands still), then again and again, never sooner than ZAP_AGAIN after the last.
+func test_a_body_is_zapped_again_after_a_second() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"zap", &"rune"])
 	_cast()
-	_tick(roundi(SpellLimits.ZAP_WAIT_MOST / DT) + 2 * SpellLimits.ZAP_EVERY + 1)
-	check_equal(_hits_on(imp).size(), 1, "zapped within the longest wait")
+	var steps: Array[int] = []
+	for step in 239:
+		var had: int = _hits_on(imp).size()
+		_tick(1)
+		if _hits_on(imp).size() > had:
+			steps.append(step + 1)
+	check(not steps.is_empty() and steps[0] <= roundi(SpellLimits.ZAP_WAIT_MOST / DT) + 2 * SpellLimits.ZAP_EVERY + 1, "zapped within the longest wait (%s)" % [steps])
+	check(steps.size() >= 3, "and again in its 4 s (%s)" % [steps])
+	for n in range(1, steps.size()):
+		check((steps[n] - steps[n - 1]) * DT >= SpellLimits.ZAP_AGAIN - 0.001, "zap %d no sooner than ZAP_AGAIN after the last (%s)" % [n, steps])
+
+
+## A held beam zaps the imp beside it again too.
+func test_a_held_beam_zaps_again_after_a_second() -> void:
+	var imp: Node2D = _target(Vector2(100.0, 40.0))
+	_build(0, [&"zap", &"hold", &"beam"])
+	_cast()
 	_tick(240)
-	check_equal(_hits_on(imp).size(), 1, "and never again by that rune")
+	check(_hits_on(imp).size() >= 3, "zapped again and again while the beam is held 4 s (%d)" % _hits_on(imp).size())
 
 
 ## The moment is random too (owner, 2026-10-30): bolts flying past the same imp zap it from
@@ -274,11 +291,11 @@ func test_the_body_ahead_is_zapped_before_the_shot_hits_it() -> void:
 
 
 func test_a_zap_sets_off_on_hit() -> void:
-	# `on hit` fires its payload at the first zapped imp, from there.
+	# `on hit` fires its payload at the first zapped imp, from there (a second, before the next zap).
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"zap", &"on_hit", &"rune", &"nova"])
 	_cast()
-	_tick(121)
+	_tick(roundi(SpellLimits.ZAP_AGAIN / DT))
 	var novas: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])

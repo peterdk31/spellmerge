@@ -267,13 +267,15 @@ var _lc_count: int = 0
 ## Slots of live shots with `zap`, `_zapper_count` of them, flagged in `_rec_zapper`;
 ## `_rec_zap_rolls` is how many random numbers each has drawn (its rolls are a hash of its sequence
 ## number and that count: the same every run, `_zap_roll`), and `_rec_zapped` the instance ids of
-## the bodies it has rolled for, ZAP_MEMORY a slot side by side, `_rec_zapped_count` of them (each
-## body rolls once a shot; past ZAP_MEMORY the oldest is forgotten).
+## the bodies it has rolled for, with `_rec_zapped_at` the moment each was zapped or lost its roll,
+## ZAP_MEMORY a slot side by side, `_rec_zapped_count` of them (a body rolls again
+## SpellLimits.ZAP_AGAIN after that moment; past ZAP_MEMORY the oldest is forgotten).
 var _zappers: PackedInt32Array = PackedInt32Array()
 var _zapper_count: int = 0
 var _rec_zapper: PackedByteArray = PackedByteArray()
 var _rec_zap_rolls: PackedInt32Array = PackedInt32Array()
 var _rec_zapped: PackedInt64Array = PackedInt64Array()
+var _rec_zapped_at: PackedFloat64Array = PackedFloat64Array()
 var _rec_zapped_count: PackedInt32Array = PackedInt32Array()
 ## The zaps each shot has won but not made yet, ZAP_DUE a slot side by side, `_rec_due_count` of
 ## them: the body and the moment (`_clock`) it is zapped.
@@ -1374,6 +1376,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_rec_zap_rolls.resize(size)
 		_rec_zapped_count.resize(size)
 		_rec_zapped.resize(size * ZAP_MEMORY)
+		_rec_zapped_at.resize(size * ZAP_MEMORY)
 		_rec_due_body.resize(size * ZAP_DUE)
 		_rec_due_at.resize(size * ZAP_DUE)
 		_rec_due_count.resize(size)
@@ -1873,12 +1876,14 @@ func _step_zaps(delta: float) -> void:
 			var body: Node2D = _zap_near[k]
 			if not is_instance_valid(body) or _has_rolled(slot, body.get_instance_id()):
 				continue
-			_rolled(slot, body.get_instance_id())
-			if _zap_roll(slot) < spell.zap_chance:
+			if _zap_roll(slot) >= spell.zap_chance:
+				_rolled(slot, body.get_instance_id(), _clock)
+			else:
 				# It waits a random moment of the time the body stays in reach, less a look's step so
-				# it is made before the shot hits it or leaves it.
+				# it is made before the shot hits it or leaves it; it rolls again ZAP_AGAIN after.
 				var window: float = _zap_window(slot, spell, _zap_centres[k], _zap_radii[k])
 				var wait: float = _zap_roll(slot) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
+				_rolled(slot, body.get_instance_id(), _clock + wait)
 				if wait <= 0.0 or _rec_due_count[slot] >= ZAP_DUE:
 					_zap(slot, spell, _zap_centres[k])
 				else:
@@ -1936,20 +1941,22 @@ func _zap_window(slot: int, spell: CompiledSpell, centre: Vector2, radius: float
 	return clampf(minf(seconds, projectiles.get_life_of(slot)), 0.0, SpellLimits.ZAP_WAIT_MOST)
 
 
-## True when the zap shot in `slot` has rolled for the body of instance id `id`.
+## True when the zap shot in `slot` has rolled for the body of instance id `id` less than
+## SpellLimits.ZAP_AGAIN ago (from its zap, or the roll it lost).
 func _has_rolled(slot: int, id: int) -> bool:
 	var first: int = slot * ZAP_MEMORY
 	for n in mini(_rec_zapped_count[slot], ZAP_MEMORY):
-		if _rec_zapped[first + n] == id:
+		if _rec_zapped[first + n] == id and _clock - _rec_zapped_at[first + n] < SpellLimits.ZAP_AGAIN:
 			return true
 	return false
 
 
-## The zap shot in `slot` has rolled for the body of instance id `id` (in a ring: past ZAP_MEMORY
-## the oldest is forgotten).
-func _rolled(slot: int, id: int) -> void:
+## The zap shot in `slot` has rolled for the body of instance id `id`, which is zapped (or lost its
+## roll) at `when` (in a ring: past ZAP_MEMORY the oldest is forgotten).
+func _rolled(slot: int, id: int, when: float) -> void:
 	var n: int = _rec_zapped_count[slot]
 	_rec_zapped[slot * ZAP_MEMORY + n % ZAP_MEMORY] = id
+	_rec_zapped_at[slot * ZAP_MEMORY + n % ZAP_MEMORY] = when
 	_rec_zapped_count[slot] = n + 1
 
 

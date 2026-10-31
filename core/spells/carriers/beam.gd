@@ -65,12 +65,13 @@ var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
 var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
 ## A live beam's `zap` (rules as a shot's, `Spells._step_zaps`): what its zaps hit with when not
 ## its spell's `zap_hit` (null: an echo's, or its relay's), how many random numbers it has drawn
-## (`SpellRuntime.zap_hash` of its birth and that count), the bodies it has rolled for
-## (`SpellRuntime.ZAP_MEMORY` a row, `_bm_zapped_count` of them) and the won zaps it keeps waiting
+## (`SpellRuntime.zap_hash` of its birth and that count), the bodies it has rolled for and when
+## each was zapped or lost its roll (`SpellRuntime.ZAP_MEMORY` a row, `_bm_zapped_count` of them) and the won zaps it keeps waiting
 ## (`SpellRuntime.ZAP_DUE` a row, `_bm_due_count` of them: the body and the moment it is zapped).
 var _bm_zap_hit: Array[HitProfile] = []
 var _bm_zap_rolls: PackedInt32Array = PackedInt32Array()
 var _bm_zapped: PackedInt64Array = PackedInt64Array()
+var _bm_zapped_at: PackedFloat64Array = PackedFloat64Array()
 var _bm_zapped_count: PackedInt32Array = PackedInt32Array()
 var _bm_due_body: Array[Node2D] = []
 var _bm_due_at: PackedFloat64Array = PackedFloat64Array()
@@ -119,6 +120,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
+	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_due_body.resize(rows * SpellRuntime.ZAP_DUE)
 	_bm_due_at.resize(rows * SpellRuntime.ZAP_DUE)
 	for i in rows * _bm_legs:
@@ -158,7 +160,8 @@ func _pull_magnets() -> void:
 
 ## Every live beam with `zap` (half of them each step, SpellLimits.ZAP_EVERY), as a zap shot does
 ## (`Spells._step_zaps`, owner, 2026-10-31): each body of another team that comes within the card's
-## reach of its line, as far as it got, rolls its chance once a beam, and on a win is zapped from the
+## reach of its line, as far as it got, rolls its chance (again SpellLimits.ZAP_AGAIN after it was
+## zapped or lost its roll), and on a win is zapped from the
 ## nearest point of its line at a random moment while it is in reach (at most
 ## SpellLimits.ZAP_WAIT_MOST and the beam's life left; a beam stands where it is held, so a body
 ## stays in reach until it or the beam moves); a waiting zap whose body left the reach is made as it
@@ -187,11 +190,14 @@ func _step_zaps(delta: float) -> void:
 			var body: Node2D = _zap_near[k]
 			if not is_instance_valid(body) or _has_rolled(at, body.get_instance_id()):
 				continue
-			_rolled(at, body.get_instance_id())
-			if _zap_roll(at) < spell.zap_chance:
-				# It waits a random moment of the time it stays in reach, less a look's step.
+			if _zap_roll(at) >= spell.zap_chance:
+				_rolled(at, body.get_instance_id(), kit.clock())
+			else:
+				# It waits a random moment of the time it stays in reach, less a look's step; it rolls
+				# again ZAP_AGAIN after.
 				var window: float = minf(SpellLimits.ZAP_WAIT_MOST, _bm_life[at])
 				var wait: float = _zap_roll(at) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
+				_rolled(at, body.get_instance_id(), kit.clock() + wait)
 				if wait <= 0.0 or _bm_due_count[at] >= SpellRuntime.ZAP_DUE:
 					_zap(at, _zap_centres[k])
 				else:
@@ -292,20 +298,22 @@ func _point_along(at: int, distance: float) -> Vector2:
 	return _bm_points[base + _bm_count[at] - 1]
 
 
-## True when live beam `at` has rolled for the body of instance id `id`.
+## True when live beam `at` has rolled for the body of instance id `id` less than
+## SpellLimits.ZAP_AGAIN ago (from its zap, or the roll it lost).
 func _has_rolled(at: int, id: int) -> bool:
 	var first: int = at * SpellRuntime.ZAP_MEMORY
 	for n in mini(_bm_zapped_count[at], SpellRuntime.ZAP_MEMORY):
-		if _bm_zapped[first + n] == id:
+		if _bm_zapped[first + n] == id and kit.clock() - _bm_zapped_at[first + n] < SpellLimits.ZAP_AGAIN:
 			return true
 	return false
 
 
-## Live beam `at` has rolled for the body of instance id `id` (in a ring: past ZAP_MEMORY the oldest
-## is forgotten).
-func _rolled(at: int, id: int) -> void:
+## Live beam `at` has rolled for the body of instance id `id`, which is zapped (or lost its roll) at
+## `when` (in a ring: past ZAP_MEMORY the oldest is forgotten).
+func _rolled(at: int, id: int, when: float) -> void:
 	var n: int = _bm_zapped_count[at]
 	_bm_zapped[at * SpellRuntime.ZAP_MEMORY + n % SpellRuntime.ZAP_MEMORY] = id
+	_bm_zapped_at[at * SpellRuntime.ZAP_MEMORY + n % SpellRuntime.ZAP_MEMORY] = when
 	_bm_zapped_count[at] = n + 1
 
 
@@ -750,6 +758,7 @@ func _grow_beams() -> void:
 	_bm_zapped_count.resize(size)
 	_bm_due_count.resize(size)
 	_bm_zapped.resize(size * SpellRuntime.ZAP_MEMORY)
+	_bm_zapped_at.resize(size * SpellRuntime.ZAP_MEMORY)
 	_bm_due_body.resize(size * SpellRuntime.ZAP_DUE)
 	_bm_due_at.resize(size * SpellRuntime.ZAP_DUE)
 	_bm_points.resize(size * _bm_stride)

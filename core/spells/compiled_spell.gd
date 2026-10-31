@@ -79,7 +79,7 @@ var chain_jumps: int = 0
 ## multiplied); 1 means the staff's own spread.
 var spread_mult: float = 1.0
 ## `zap`: the chance (0 to 1; 0 for none) that each body coming within `zap_reach` of a shot is
-## zapped, once per shot, and what a zap hits with.
+## zapped (rolled again `SpellLimits.ZAP_AGAIN` after it was zapped or lost), and what a zap hits with.
 var zap_chance: float = 0.0
 var zap_reach: float = 0.0
 var zap_hit: HitProfile = null

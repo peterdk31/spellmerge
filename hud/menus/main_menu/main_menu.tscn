@@ -55,6 +55,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Play"
 
+[node name="Horde" type="Button" parent="Center/Lines"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Horde"
+
 [node name="Fullscreen" type="Button" parent="Center/Lines"]
 unique_name_in_owner = true
 layout_mode = 2

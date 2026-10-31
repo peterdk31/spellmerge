@@ -31,7 +31,11 @@ extends PanelContainer
 ## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
 ## again closes it (panels.gd). Every button of every page is in one UIFocus list and the
 ## buttons of the other pages are hidden, so UIFocus skips them. The focused button is marked
-## with "> ", never by colour alone. Closing it (or its player's device leaving) un-pauses.
+## with "> ", never by colour alone. Closing it (or its player's device leaving) un-pauses,
+## except in the horde's build break (`horde_break_changed(true)` until `(false)`; owner,
+## 2026-10-31), which keeps the game paused until every player is ready: closing the menu then
+## leaves the tree paused, and a break that ends while the menu is open (the director
+## un-pauses) is paused again here, until the menu closes.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -82,6 +86,8 @@ var page: Page = Page.MAIN
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _sandbox_on: bool = false
+## True during the horde's build break (it holds the game paused).
+var _horde_break: bool = false
 var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
@@ -138,6 +144,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_shake()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
+		_events.horde_break_changed.connect(_on_horde_break_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -291,6 +298,14 @@ func _set_paused(on: bool) -> void:
 		get_tree().paused = on
 
 
+## The horde's build break began or ended. The director un-pauses before it says the break ended,
+## so an open menu pauses again.
+func _on_horde_break_changed(on: bool) -> void:
+	_horde_break = on
+	if not on and is_open():
+		_set_paused(true)
+
+
 func _on_sandbox_changed(on: bool) -> void:
 	_sandbox_on = on
 	if not on and page == Page.SANDBOX:
@@ -306,7 +321,8 @@ func _on_closed(player: int) -> void:
 	_focused = null
 	visible = false
 	_show_page(Page.MAIN)
-	_set_paused(false)
+	# The horde's build break keeps the game paused after the menu.
+	_set_paused(_horde_break)
 	closed_menu.emit(player)
 
 

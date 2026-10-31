@@ -29,6 +29,7 @@ Entities="*res://gameplay/ai/entities.gd"
 Feel="*res://gameplay/feel/feel.gd"
 Flow="*res://gameplay/flow/flow.gd"
 Coop="*res://gameplay/coop/coop.gd"
+Horde="*res://gameplay/horde/horde.gd"
 Hud="*res://hud/panels/panels.tscn"
 Loading="*res://core/loading/loading.gd"
 

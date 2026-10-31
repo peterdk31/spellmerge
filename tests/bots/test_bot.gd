@@ -2,7 +2,8 @@ extends SceneTree
 ## Tests for the bot (tests/bots/bot.gd): it takes a virtual device, an idler sends
 ## nothing, a fighter walks toward the enemies and lets go of every input when the
 ## run is over, the B tap goes through the input path to its own player only,
-## and leaving frees the slot. Bots for different indices never disturb each other.
+## and leaving frees the slot. Bots for different indices never disturb each other. Enemies
+## are found in the world and one level down under its `Horde` node (a horde run's).
 ##
 ## godot --headless --path . --script res://tests/bots/test_bot.gd
 
@@ -26,6 +27,7 @@ func _initialize() -> void:
 	_test_join_and_leave()
 	_test_idler_sends_nothing()
 	_test_builder_walk()
+	_test_enemies_under_the_horde_node_are_found()
 	await _test_fighter(events)
 	if _failures.is_empty():
 		print("TEST OK: tests/bots")
@@ -103,6 +105,38 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	_check(own, "all build calls are for the bot's own player and staff 3")
 	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
+
+
+## An enemy actor at `at` under `parent`; an AI drives it (set once it is ready, which takes
+## the home controller it has none of).
+func _enemy(parent: Node, at: Vector2) -> Actor:
+	var enemy := Actor.new()
+	enemy.position = at
+	parent.add_child(enemy)
+	enemy.controller = AIController.new()
+	return enemy
+
+
+func _test_enemies_under_the_horde_node_are_found() -> void:
+	var bot := BotScript.new()
+	var world := Node2D.new()
+	root.add_child(world)
+	var outside: Actor = _enemy(world, Vector2(100.0, 0.0))
+	_check(bot.call("_nearest_enemy", world, Vector2.ZERO) == outside, "without a horde, the world's own enemy")
+	var horde := Node2D.new()
+	horde.name = "Horde"
+	world.add_child(horde)
+	var inside: Actor = _enemy(horde, Vector2(20.0, 0.0))
+	_check(bot.call("_nearest_enemy", world, Vector2.ZERO) == inside, "a nearer enemy under the Horde node is found")
+	inside.position = Vector2(300.0, 0.0)
+	_check(bot.call("_nearest_enemy", world, Vector2.ZERO) == outside, "the world's nearer one still wins")
+	world.remove_child(outside)
+	_check(bot.call("_nearest_enemy", world, Vector2.ZERO) == inside, "a horde alone is found")
+	for enemy: Actor in [outside, inside]:
+		enemy.controller.free()
+	outside.free()
+	root.remove_child(world)
+	world.free()
 
 
 func _test_idler_sends_nothing() -> void:

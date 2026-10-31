@@ -949,8 +949,12 @@ func _process(_delta: float) -> void:
 	update_draw()
 
 
-## Set the global cap and remove every projectile. Not for use mid-fight.
+## Set the global cap and remove every projectile. Not for use mid-fight. The shots are removed
+## first, while the arrays still have the old size: a smaller cap than the shots' highest slot
+## then ends them all (`shot_ended`) instead of reading past the shrunk arrays.
 func set_cap(value: int) -> void:
+	if _cap > 0 and _alive.size() == _cap:
+		clear()
 	_cap = maxi(value, 1)
 	_pos.resize(_cap)
 	_prev.resize(_cap)

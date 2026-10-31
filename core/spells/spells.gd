@@ -228,6 +228,10 @@ var _generation_live: Dictionary = {}
 
 ## actor * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
+## Every cooldown row from this one on is 0: `step` counts down only the rows below it, not all
+## ACTORS x STAFFS of them (4,096 since Horde H1, about 0.3 ms a physics step in GDScript).
+## Actor ids are handed out lowest first, so it stays near the highest id that ever cast.
+var _cooldown_rows: int = 0
 ## Payloads each actor has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
@@ -822,6 +826,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if not _hold_tags[index].is_empty():
 		_release_hold(index)
 		_cooldown[index] = compiled.staff.cast_delay if compiled.staff != null else 0.0
+		_cooldown_rows = maxi(_cooldown_rows, index + 1)
 		return 0.0
 	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
 	if mana < cast.mana:
@@ -849,6 +854,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 ## The delay and the next cast of the cycle, after `cast` fired (or had nothing in it).
 func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> void:
 	_cooldown[index] = cast.delay
+	_cooldown_rows = maxi(_cooldown_rows, index + 1)
 	_cursor[index] = 0 if cast.recharges else (_cursor[index] + 1) % compiled.casts.size()
 
 
@@ -859,7 +865,7 @@ func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> voi
 ## between the two (a beam's on-expire spell, an actor's own cast) counts against whichever
 ## window is open.
 func step(delta: float) -> void:
-	for c in _cooldown.size():
+	for c in _cooldown_rows:
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
 	_fires_used.fill(0)
 	_clock += delta
@@ -2232,6 +2238,7 @@ static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
 ## Forgets every registered spell and shot count (a new run, and tests).
 func clear() -> void:
 	_cooldown.fill(0.0)
+	_cooldown_rows = 0
 	_fires_used.fill(0)
 	_jq_head = 0
 	_jq_count = 0

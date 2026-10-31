@@ -26,7 +26,7 @@ var _poses_set: SetPoses = null
 
 
 ## Room for every actor id's four staffs.
-const ROWS: int = 512 * 4
+const ROWS: int = ACTORS * 4
 
 
 func _init() -> void:

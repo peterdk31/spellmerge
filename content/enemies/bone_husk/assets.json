@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/enemies/bone_husk/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (SVG rects written by a small generator from a hand-drawn pixel grid, 2026-10-30)",
+			"prompt": "The Bone Husk, a horde swarmer: a hollow thighbone club, broad twin-knobbed head with a dark hollow across it where its two eyes glow, a thick cracked Bone shaft bound with a Wood band, a heavy knobbed foot and a Spark ferrule. Wider and heavier than the other strays (16 px wide), a slow brute. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (eyes and brows) is a separate layer. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		}
+	]
+}

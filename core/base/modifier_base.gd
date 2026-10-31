@@ -53,8 +53,8 @@ enum Behaviour {
 	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.NEEDS`).
 	RETURN,
 	## Each enemy that comes within `behaviour_reach` pixels of the shot has a `behaviour_strength`
-	## chance (0 to 1; 0.5 the card) to be zapped, once per shot, at once, the one the shot is
-	## about to hit too (zap cards combine as chances: two are 75%; with nothing near the shot
+	## chance (0 to 1; 0.5 the card) to be zapped, once per shot, at a random moment while it is in
+	## reach (SpellLimits.ZAP_WAIT_MOST), the one the shot is about to hit too, before it hits (zap cards combine as chances: two are 75%; with nothing near the shot
 	## sparks into the air; SpellLimits.ZAP_*; owner, 2026-10-30), at `SpellLimits.ZAP_DAMAGE` of its damage with its infusions; a zap
 	## is a hit, so it sets off `on hit` and chains (owner, 2026-10-27). Only on a carrier that
 	## stays in the air as a shot.

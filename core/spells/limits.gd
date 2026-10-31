@@ -39,10 +39,15 @@ const ZAP_DAMAGE: float = 0.5
 ## Zaps all shots together may make in one physics step; more wait for the next.
 const MAX_ZAPS_PER_STEP: int = 32
 ## A zap is a chance, not a clock (owner, 2026-10-30): each body that comes within a zap shot's
-## reach rolls the shot's `zap_chance` once, and on a roll that wins is zapped at once, the body
-## its shot is about to hit too. Shots look for bodies every ZAP_EVERY steps (half of them each
+## reach rolls the shot's `zap_chance` once, and on a roll that wins is zapped at a random moment
+## while it is in reach (ZAP_WAIT_MOST), the body its shot is about to hit too. Shots look for bodies every ZAP_EVERY steps (half of them each
 ## step), which is soon enough at any speed and halves the cost.
 const ZAP_EVERY: int = 2
+## A won zap waits a random moment of the time its body stays in reach (owner, 2026-10-30: "make
+## this random as well"): of the shot's way through its reach circle, or until it hits that body,
+## at most ZAP_WAIT_MOST seconds (a shot that stands still, a rune); a body that leaves first is
+## zapped as it leaves.
+const ZAP_WAIT_MOST: float = 0.6
 ## Sparks a second a zap shot with nothing in its reach throws into the air, ZAP_SPARK_SHORTEST
 ## to ZAP_SPARK_LONGEST pixels: looks only, they hit nothing and wait for no clock.
 const ZAP_SPARKS: float = 3.0

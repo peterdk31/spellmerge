@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Zap card (content/spells/modifiers/zap/; it was Arc until the owner renamed it, 2026-10-30):
 ## each body that comes within 60 px of the next shot has a 50% chance to be zapped, once per shot,
-## at once, whatever its distance, the body the shot is about to hit too. A zap hits at half the
+## at a random moment while it is in reach, whatever its distance, the body the shot is about to hit too. A zap hits at half the
 ## shot's damage, with its infusions; it is a hit, so it sets off `on hit` and chains. More zap cards
 ## combine as chances (two are 75%). `slow · lightning · zap · bolt` is the lightning orb.
 ##

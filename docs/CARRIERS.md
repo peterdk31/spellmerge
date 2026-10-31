@@ -103,7 +103,7 @@ runtime's one rule for it, shared by every carrier:
 | The aim | `aim_origin`, `aim_dir`, `aim_pivot`, `aim_seen`, `walk_turn` (by actor) |
 | Shots | `fan_angle`, `staff_spread`, `placed_at`, `land_shot` (or `apply_travel` then `register`) |
 | Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as its block form), `guard_path`, `bounces`, `ghost` |
-| What it leaves behind | `blast`, `fire_payload`, `fire`, `delay` |
+| What it leaves behind | `blast`, `fire_payloads`, `fire`, `delay` |
 | Live carriers | `live_join` (`SpellRuntime.LC_SLOT`, `LC_ROW`, `LC_ACTOR`, `LC_POINT`), `live_leave` |
 | Moves and entities | `moves()` (`CasterMoves`), `request_entity` |
 

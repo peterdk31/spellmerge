@@ -143,8 +143,11 @@ func test_a_trigger_compiles_into_the_spell_numbers() -> void:
 	for id in TRIGGERS:
 		var spell: CompiledSpell = _compile({"form": &"bolt", "trigger": id, "held": {"form": &"nova"}})
 		var trigger: TriggerBase = _trigger(id)
-		check_equal(spell.trigger_event, trigger.event, "%s: the event is compiled" % id)
-		check_equal(spell.trigger_interval, trigger.interval, "%s: the interval is compiled" % id)
+		check_equal(spell.triggers.size(), 1, "%s: one trigger" % id)
+		if spell.triggers.is_empty():
+			continue
+		check_equal(spell.triggers[0].event, trigger.event, "%s: the event is compiled" % id)
+		check_equal(spell.triggers[0].interval, trigger.interval, "%s: the interval is compiled" % id)
 		check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "%s: the payload is the nova" % id)
 
 
@@ -225,6 +228,34 @@ func test_on_expire_does_not_fire_when_the_shot_hit_something() -> void:
 	_tick(120)
 	check_equal(_hits.size(), 1, "the bolt hit the target")
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 0, "a shot that ends on a hit does not expire")
+
+
+# --- Several triggers on one carrier ----------------------------------------
+
+func test_two_triggers_fire_their_own_payloads() -> void:
+	_target(Vector2(80.0, 0.0))
+	# A piercing bolt: a nova when it hits, a bolt where it ends.
+	var cards: Array[StringName] = [&"on_hit", &"on_expire", &"pierce", &"bolt", &"nova", &"bolt"]
+	StaffKit.build(_spells, 0, 0, cards)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "it is cast")
+	var nova_tag: int = _spells.current_tag(0, 0, 1)
+	var bolt_tag: int = _spells.current_tag(0, 0, 2)
+	_tick(40)
+	check_equal(_born(nova_tag), 8, "the hit fired the nova of eight")
+	check_equal(_born(bolt_tag), 0, "the end's bolt waits for the end")
+	_tick(60)
+	check_equal(_born(nova_tag), 8, "the end fires no nova")
+	check_equal(_born(bolt_tag), 1, "and the end fired its own bolt")
+
+
+func test_a_shot_ending_on_a_wall_fires_its_on_wall_and_its_on_expire() -> void:
+	var walls: Array[Rect2] = [Rect2(100.0, -50.0, 50.0, 100.0)]
+	_mgr.set_walls(walls)
+	StaffKit.build(_spells, 0, 0, [&"on_wall", &"on_expire", &"bolt", &"nova", &"bolt"] as Array[StringName])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_tick(40)
+	check_equal(_born(_spells.current_tag(0, 0, 1)), 8, "on wall fired the nova")
+	check_equal(_born(_spells.current_tag(0, 0, 2)), 1, "and on expire the bolt")
 
 
 # --- Timer ------------------------------------------------------------------

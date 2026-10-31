@@ -19,8 +19,9 @@ extends Node
 ## strike everything there (`_strike_round`); a dash card asks the caster's body to move
 ## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
 ##
-## Payloads: a trigger's payload (a group) is fired by its shot's `projectile_hit` (on hit),
-## `projectile_expired` (on expire) or every `trigger_interval` seconds (timer, `_step_live`; the
+## Payloads: each trigger of a carrier has its own payload (a group; `CompiledSpell.triggers`),
+## fired by its shot's `projectile_hit` (on hit), `projectile_expired` (on expire) or every
+## `interval` seconds of that timer (timer, `_step_live`; the
 ## first tick after the interval or half the carrier's life, whichever is shorter). It starts at
 ## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
@@ -254,6 +255,8 @@ const LC_SLOT: int = 0
 const LC_ROW: int = 1
 const LC_ACTOR: int = 2
 const LC_POINT: int = 3
+## Which of its carrier's `triggers` each entry fires (a carrier with two timers has two entries).
+var _lc_trigger: PackedInt32Array = PackedInt32Array()
 var _lc_tag: PackedInt64Array = PackedInt64Array()
 var _lc_kind: PackedInt32Array = PackedInt32Array()
 var _lc_ref: PackedInt32Array = PackedInt32Array()
@@ -1131,11 +1134,14 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 			repeat.again = true
 			repeat.echoed = echoed
 	# `on cast`: the payload leaves at once, from where the carrier did, cast by the carrier's caster.
-	if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST:
-		if from_caster:
-			_fire(spell.payload, actor, staff, generation, origin, heading, source, _caster, true)
-		else:
-			_fire(spell.payload, actor, staff, generation, origin, heading, source, _caster)
+	if launched > 0:
+		for trigger in spell.triggers:
+			if trigger.event != TriggerBase.Event.CAST:
+				continue
+			if from_caster:
+				_fire(trigger.payload, actor, staff, generation, origin, heading, source, _caster, true)
+			else:
+				_fire(trigger.payload, actor, staff, generation, origin, heading, source, _caster)
 	var echo: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
 	if launched > 0 and not echoed and not again and echo > 0.0:
 		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster).echoed = true
@@ -1453,8 +1459,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
 		_blast(spell, tag, actor, end)
-	if got > 0.0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-		_fire_payload(spell, tag, actor, end, end_heading, null)
+	if got > 0.0:
+		_fire_payloads(spell, TriggerBase.Event.EXPIRE, tag, actor, end, end_heading, null)
 	_ray_end()
 	shot_ended(tag)
 	_cast_jumps()
@@ -1600,12 +1606,19 @@ func _grow_jumps() -> void:
 	_jq_head = 0
 
 
-## Fires the payload of `spell` (whose shot has `tag`) from `at` along `heading`, in the same
-## actor's staff and generation as the shot.
-## Fires the payload of `spell` from `at`. Its caster is the shot in `slot` that fired it while
-## that shot still flies, otherwise the point `at` (see `_caster`).
-func _fire_payload(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
-	_fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
+## Fires `payload` of a shot with `tag` from `at` along `heading`, in the same actor's staff and
+## generation as the shot. Its caster is the shot in `slot` that fired it while that shot still
+## flies, otherwise the point `at` (see `_caster`).
+func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
+	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
+
+
+## Fires the payload of every trigger of `spell` that goes off on `event` (a carrier's triggers
+## each fire their own; see `CompiledSpell.triggers`), as `_fire_payload`.
+func _fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
+	for trigger in spell.triggers:
+		if trigger.event == event:
+			_fire_payload(trigger.payload, tag, actor, at, heading, source, slot)
 
 
 ## A trigger fires `group`: now, when this step's budget (`fire_shots_per_step` shots for the
@@ -1726,28 +1739,44 @@ static func first_tick(interval: float, life: float) -> float:
 	return minf(interval, life * 0.5)
 
 
-## Lists a carrier of `tag` that lasts, when it has a `timer` or `on hurt` trigger (see `_lc_tag`):
-## `kind` and `ref` (with `seq`, the row's birth) say where it is, `tied` that it ends with that
-## row, else it lives `life` seconds; `at` is where it starts and `way` its way.
+## Lists a carrier of `tag` that lasts, once for each `timer` or `on hurt` trigger it has (see
+## `_lc_tag`): `kind` and `ref` (with `seq`, the row's birth) say where it is, `tied` that it ends
+## with that row, else it lives `life` seconds; `at` is where it starts and `way` its way.
 func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tied: bool, life: float, at: Vector2, way: Vector2) -> void:
-	if spell.payload == null or (spell.trigger_event != TriggerBase.Event.TIMER and spell.trigger_event != TriggerBase.Event.HURT):
-		return
+	for t in spell.triggers.size():
+		var trigger: CompiledSpell.Trigger = spell.triggers[t]
+		if trigger.event == TriggerBase.Event.TIMER or trigger.event == TriggerBase.Event.HURT:
+			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
+
+
+## How many entries `_lc_join` lists for one carrier of `spell`: its `timer` and `on hurt` triggers.
+static func _lc_rows(spell: CompiledSpell) -> int:
+	var rows: int = 0
+	for trigger in spell.triggers:
+		if trigger.event == TriggerBase.Event.TIMER or trigger.event == TriggerBase.Event.HURT:
+			rows += 1
+	return rows
+
+
+func _lc_join_one(trigger: int, interval: float, tag: int, kind: int, ref: int, seq: int, tied: bool, life: float, at: Vector2, way: Vector2) -> void:
 	if _lc_count == _lc_tag.size():
 		_lc_grow(_lc_count * 2)
 	var i: int = _lc_count
 	_lc_count += 1
+	_lc_trigger[i] = trigger
 	_lc_tag[i] = tag
 	_lc_kind[i] = kind
 	_lc_ref[i] = ref
 	_lc_seq[i] = seq
 	_lc_tied[i] = 1 if tied else 0
 	_lc_left[i] = INF if tied else life
-	_lc_clock[i] = first_tick(spell.trigger_interval, life)
+	_lc_clock[i] = first_tick(interval, life)
 	_lc_at[i] = at
 	_lc_way[i] = way.normalized() if way.is_finite() and not way.is_zero_approx() else Vector2.RIGHT
 
 
 func _lc_grow(size: int) -> void:
+	_lc_trigger.resize(size)
 	_lc_tag.resize(size)
 	_lc_kind.resize(size)
 	_lc_ref.resize(size)
@@ -1762,6 +1791,7 @@ func _lc_grow(size: int) -> void:
 ## Takes live carrier `i` off the list (the last one takes its place).
 func _lc_remove(i: int) -> void:
 	_lc_count -= 1
+	_lc_trigger[i] = _lc_trigger[_lc_count]
 	_lc_tag[i] = _lc_tag[_lc_count]
 	_lc_kind[i] = _lc_kind[_lc_count]
 	_lc_ref[i] = _lc_ref[_lc_count]
@@ -1776,11 +1806,15 @@ func _lc_remove(i: int) -> void:
 ## A carrier of `tag` that is not tied to a row ended (an entity): one of its entries leaves, or
 ## with `every` all of them (its build was revoked).
 func _lc_leave(tag: int, every: bool) -> void:
+	# One carrier is listed once per timer or on hurt trigger (`_lc_join`).
+	var spell: CompiledSpell = _profiles.get(tag)
+	var left: int = maxi(_lc_rows(spell), 1) if spell != null else 1
 	var i: int = _lc_count - 1
 	while i >= 0:
 		if _lc_tag[i] == tag and _lc_tied[i] == 0:
 			_lc_remove(i)
-			if not every:
+			left -= 1
+			if not every and left <= 0:
 				return
 		i -= 1
 
@@ -1813,18 +1847,22 @@ func _step_live(delta: float) -> void:
 			continue
 		if at.is_finite():
 			_lc_at[i] = at
-		if spell.trigger_event == TriggerBase.Event.TIMER:
+		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
+		if trigger != null and trigger.event == TriggerBase.Event.TIMER:
 			_lc_clock[i] -= delta
 			if _lc_clock[i] <= 0.0:
-				_lc_clock[i] += spell.trigger_interval
-				_lc_fire(i, spell, _lc_at[i])
+				_lc_clock[i] += trigger.interval
+				_lc_fire(i, trigger.payload, _lc_at[i])
 		i += 1
 
 
 ## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
 ## (`_heading`), else outward from its caster's body through it, else its `_lc_way`. Its shot casts
 ## the payload while it flies, else the point does.
-func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
+	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
+	if spell == null:
+		return
 	var tag: int = _lc_tag[i]
 	var actor: int = SpellTag.caster_of(tag)
 	var at: Vector2 = _lc_at[i]
@@ -1838,7 +1876,13 @@ func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(spell, tag, actor, from, way, null, slot)
+	_fire_payload(payload, tag, actor, from, way, null, slot)
+
+
+## The trigger live carrier `i` fires, or null.
+func _lc_trigger_of(i: int, spell: CompiledSpell) -> CompiledSpell.Trigger:
+	var t: int = _lc_trigger[i]
+	return spell.triggers[t] if spell != null and t >= 0 and t < spell.triggers.size() else null
 
 
 ## Runs the `zap` shots (half of them each step, SpellLimits.ZAP_EVERY): each body of another team
@@ -2096,11 +2140,9 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 		carried_zap = _rec_zap[from]
 	elif by_ray:
 		carried = _ray.hit
-	var held: bool = spell.payload != null and spell.trigger_event == TriggerBase.Event.HIT
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, actor, target, position, slot)
-	if held:
-		_fire_payload(spell, tag, actor, position, heading, target, slot)
+	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot)
 	if chain > 0:
 		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
 
@@ -2188,14 +2230,14 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 
 
 func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
-	var event: int = TriggerBase.Event.EXPIRE
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
-		event = TriggerBase.Event.WALL
 	# Every carrier blasts at its end point (rules R1d): a pulling shot that missed, where it ended.
 	if spell != null:
 		_blast(spell, tag, actor, position, shot)
-	_fire_event(event, actor, position, tag, null, shot, true)
+	# A shot that ends on a wall meets that wall and ends: its `on wall` and `on expire` both fire.
+	if projectiles.expired_on_wall:
+		_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, shot, true)
+	_fire_event(TriggerBase.Event.EXPIRE, actor, position, tag, null, shot, true)
 
 
 ## `on wall` at every wall that does not end the shot (a bounce) and at every wall a beam
@@ -2238,7 +2280,7 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.payload == null or spell.trigger_event != event:
+	if spell == null or not spell.fires_on(event):
 		return
 	var slot: int = shot
 	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
@@ -2248,7 +2290,7 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 	var heading: Vector2 = way if not way.is_zero_approx() else (_ray.dir if by_ray else _heading(spell, slot, at, actor))
 	if back_off:
 		at -= heading * SpellLimits.EXPIRE_BACKOFF
-	_fire_payload(spell, tag, actor, at, heading, source, slot)
+	_fire_payloads(spell, event, tag, actor, at, heading, source, slot)
 
 
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
@@ -2262,14 +2304,15 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 	for i in count:
 		var tag: int = _lc_tag[i]
 		var spell: CompiledSpell = _profiles.get(tag)
-		if spell == null or spell.trigger_event != TriggerBase.Event.HURT or SpellTag.caster_of(tag) != actor:
+		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
+		if trigger == null or trigger.event != TriggerBase.Event.HURT or SpellTag.caster_of(tag) != actor:
 			continue
 		var at: Vector2 = _lc_where(i)
 		if at.is_finite():
 			_lc_at[i] = at
 		elif _lc_tied[i] == 1:
 			continue
-		_lc_fire(i, spell, position)
+		_lc_fire(i, trigger.payload, position)
 
 
 ## `relay` (owner, 2026-10-28): a shot with it that hits any actor (a wizard, an enemy, a
@@ -2630,8 +2673,11 @@ func _group_has(group: CompiledGroup, node: int) -> bool:
 	if group == null:
 		return false
 	for spell in group.spells:
-		if spell.node == node or _group_has(spell.payload, node) or _group_has(spell.own_payload, node):
+		if spell.node == node or _group_has(spell.own_payload, node):
 			return true
+		for trigger in spell.triggers:
+			if _group_has(trigger.payload, node):
+				return true
 	return false
 
 
@@ -2719,9 +2765,9 @@ func familiar_at(key: int, at: Vector2) -> void:
 	if key == 0 or not at.is_finite():
 		return
 	for i in _lc_count:
+		# One entry per timer or on hurt trigger of the familiar's carrier.
 		if _lc_seq[i] == key and _lc_kind[i] == LC_POINT:
 			_lc_at[i] = at
-			return
 
 
 ## An entity `ai` made for a carrier ended where it stood: the carrier its kind names (a decoy, a

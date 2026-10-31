@@ -51,8 +51,9 @@ func land(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, ge
 	kit.blast(spell, tag, actor, point)
 	if group != null and not group.is_empty():
 		kit.fire(group, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
-	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-		kit.fire(spell.payload, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
+	for trigger in spell.triggers:
+		if trigger.event == TriggerBase.Event.EXPIRE:
+			kit.fire(trigger.payload, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)
 
 
 ## Where a carrier placed at `point` ahead of its caster at `origin` (a rain) goes when it

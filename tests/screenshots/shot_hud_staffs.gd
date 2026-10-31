@@ -10,8 +10,8 @@ extends "res://tests/support/screenshot.gd"
 ## each corner), and the same four corners again with the pause menu's other reload switch, the
 ## shade on the next cast (`hud_staffs_next_cast_p1-4`).
 
-## The staffs every wizard starts with: a dash; three casts; a second trigger before the same
-## carrier (wasted) and a payload; a long staff that does not fit the row.
+## The staffs every wizard starts with: a dash; three casts; two triggers before the same
+## carrier, the second with nothing left to fire (wasted); a long staff that does not fit the row.
 const CARDS: Array = [
 	[&"dash"],
 	[&"fire", &"bolt", &"frost", &"nova", &"bolt"],

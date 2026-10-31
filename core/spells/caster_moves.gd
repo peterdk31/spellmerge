@@ -131,8 +131,9 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 		return
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.blast(spell, tag, actor, at)
-	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-		kit.fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
+	for trigger in spell.triggers:
+		if trigger.event == TriggerBase.Event.EXPIRE:
+			kit.fire(trigger.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
 
 
 ## Where a dash or teleport ended, or a pull whose hit spent its shot (`pull_ends`): the carrier's

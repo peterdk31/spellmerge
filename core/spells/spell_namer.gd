@@ -96,9 +96,11 @@ func _spell_parts(spell: CompiledSpell, depth: int) -> PackedStringArray:
 		return PackedStringArray([" ".join(words), ""])
 	if spell.own_payload != null and not spell.own_payload.is_empty():
 		tail.append(_group_name(spell.own_payload, true, depth + 1))
-	if spell.payload != null and not spell.payload.is_empty():
-		var said: String = _group_name(spell.payload, true, depth + 1)
-		var trigger: String = _word(spell.trigger_id, false) if spell.trigger_id != &"" else ""
+	for fires in spell.triggers:
+		if fires.payload == null or fires.payload.is_empty():
+			continue
+		var said: String = _group_name(fires.payload, true, depth + 1)
+		var trigger: String = _word(fires.id, false) if fires.id != &"" else ""
 		tail.append(trigger + " " + said if trigger != "" else said)
 	var suffix: String = " of " + " and ".join(tail) if not tail.is_empty() else ""
 	return PackedStringArray([" ".join(words), suffix])

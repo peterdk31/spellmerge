@@ -120,8 +120,8 @@ The compiler (`Spells.compile_staff`, part A4) turns a staff's slots into its **
 2. Cards are read left to right; empty slots are skipped.
    - A **modifier or infusion** is kept for the next carrier of this group.
    - A **multicast** card adds its `extra_draws` to the carriers this group wants (double adds 1, triple 2, scatter 2); burst marks the group to fire 3 times.
-   - A **trigger** is kept for the next carrier. A second trigger before the same carrier is wasted.
-   - A **carrier** takes every kept modifier, infusion and trigger. If it has a trigger (or is `rain`), its **payload** is read right now, as a new group by these same rules; the payload's cards are part of this cast. Then this group wants one carrier fewer. When it wants none, the group ends.
+   - A **trigger** is kept for the next carrier. Several may be kept (owner, 2026-10-31).
+   - A **carrier** takes every kept modifier, infusion and trigger. If it has a trigger (or is `rain`), its **payload** is read right now, as a new group by these same rules; the payload's cards are part of this cast. **With several triggers, each takes its own payload, in slot order:** the first trigger the group read after the carrier, the second the group after that, and so on (a rain's own payload first). A payload's own payloads are read inside it, before the next trigger's. A trigger whose payload finds no card is wasted; the others keep theirs. Then this group wants one carrier fewer. When it wants none, the group ends.
 3. **Wrap-around:** reading past the last slot goes on from the first. If any reading in the cast (payloads included) wrapped, the staff recharges after the cast.
 4. **Use once:** a card already read in this cast ends the current group where it is. This is what keeps wrap-around from looping forever, and why every staff's cycle is finite.
 5. **The fallback carrier:** if a group ends with modifiers or infusions kept and no carrier to take them, they land on a fallback carrier: **the caster** for the cast's own group, **the payload's origin point** for a payload (an instant hit there, radius 8 px). `blast` explodes there, `fire` burns whatever is there, `shield` gives the caster a barrier (on the caster only). Cards that mean nothing there (homing, pierce) are wasted. A kept trigger with no carrier is wasted.
@@ -142,6 +142,9 @@ A modifier or infusion affects **only the next carrier**, not every carrier of a
 - `on hit · bolt`: the payload wraps to slot 1 (`on hit`, already used), so it is empty and the trigger is wasted. It wrapped: recharge.
 - `bolt · on hit`: cast 1 is a bolt. Cast 2 reads `on hit`, wraps to the `bolt` (unused in this cast) which takes it; the payload wraps to `on hit` again, used, so it is empty and the trigger is wasted. Recharge.
 - `shield · on block · dash · nova`: a dash with one shield; when the shield blocks a hit, a nova fires from there.
+- `on hit · on expire · bolt · nova · frost · bolt`: one cast: a bolt that fires a nova when it hits and a frost bolt where it ends.
+- `on hit · on expire · bolt · nova`: the nova is on hit's; on expire's payload wraps to used cards, so it is empty and on expire is wasted.
+- `on hit · on expire · bolt · on expire · bolt · nova · fire · bolt`: on hit fires a bolt that bursts into a nova where it ends (read first, inside that payload); on expire fires the fire bolt.
 
 ### Numbers of a cast
 

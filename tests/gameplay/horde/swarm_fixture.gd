@@ -1,6 +1,6 @@
 extends RefCounted
 ## A small world for the swarm's tests (docs/milestones/horde-swarm.md, S1): its own event bus,
-## actor table, projectile manager, Spells (a stand-in registry with a plain bolt and the real
+## actor table, projectile manager, Spells (a stand-in registry with the real bolt and the real
 ## elements, so a hit carries a real compiled profile) and Combat, a world in the tree with a
 ## `Horde` node, and a swarm (`swarm.gd`) on a floor round the origin. Wizards are actors made
 ## from the real wizard scene, standing still. Everything is stepped only by hand (`run`).
@@ -22,8 +22,8 @@ const STEP: float = 0.0625
 ## The floor the swarm keeps its swarmers on.
 const ARENA: Rect2 = Rect2(-480.0, -280.0, 960.0, 560.0)
 const ELEMENTS: Array[StringName] = [&"fire", &"frost", &"storm", &"void", &"lightning"]
-## The plain bolt's damage.
-const BOLT_DAMAGE: int = 4
+## The real bolt card (the tests read its damage).
+const BoltCard: Resource = preload("res://content/spells/forms/bolt/bolt.tres")
 
 
 ## The registry questions the director asks (the swarmers' data and the cards).
@@ -66,12 +66,7 @@ func _init(root: Node) -> void:
 	projectiles.actors = actors
 	registry = FakeRegistry.new()
 	var cards: Dictionary = {}
-	var bolt := FormBase.new()
-	bolt.id = &"bolt"
-	bolt.base_damage = BOLT_DAMAGE
-	bolt.speed = 200.0
-	bolt.lifetime = 1.0
-	cards[&"bolt"] = bolt
+	cards[&"bolt"] = BoltCard
 	for element in ELEMENTS:
 		cards[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])
 	registry.folders[&"spells"] = cards

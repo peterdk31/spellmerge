@@ -452,7 +452,8 @@ func test_a_swarmer_dies_to_bolts_and_drops_a_gem() -> void:
 	run.bus.enemy_died.connect(func(_k: int, enemy: Node, _at: Vector2, _s: int) -> void: died.append(enemy))
 	var alive: int = director.alive
 	var bolt: int = run.tag(wizard.id)
-	for i in ceili(float(Fixture.MiteData.max_health) / float(Fixture.BOLT_DAMAGE)):
+	var damage: int = int(Fixture.BoltCard.get("base_damage"))
+	for i in ceili(float(Fixture.MiteData.max_health) / float(damage)):
 		run.hit(wizard.id, node, bolt)
 	check(died.has(node), "the bolts killed it (enemy_died)")
 	check_equal(director.kills, 1, "the director counted the kill")

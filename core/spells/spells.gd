@@ -142,8 +142,10 @@ const PIERCE_ALL: int = 1 << 30
 const RAY_FORM: StringName = &"beam"
 ## The look of a zap and its sparks (Feel draws lightning for it).
 const ZAP_FORM: StringName = &"zap"
-## Bodies a zap shot remembers rolling for (`_rec_zapped`).
+## Bodies a zap shot remembers rolling for (`_rec_zapped`), and the won zaps it can keep waiting
+## (`_rec_due_body`; past that it makes the zap at once).
 const ZAP_MEMORY: int = 32
+const ZAP_DUE: int = 8
 
 
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
@@ -273,13 +275,19 @@ var _rec_zapper: PackedByteArray = PackedByteArray()
 var _rec_zap_rolls: PackedInt32Array = PackedInt32Array()
 var _rec_zapped: PackedInt64Array = PackedInt64Array()
 var _rec_zapped_count: PackedInt32Array = PackedInt32Array()
+## The zaps each shot has won but not made yet, ZAP_DUE a slot side by side, `_rec_due_count` of
+## them: the body and the moment (`_clock`) it is zapped.
+var _rec_due_body: Array[Node2D] = []
+var _rec_due_at: PackedFloat64Array = PackedFloat64Array()
+var _rec_due_count: PackedInt32Array = PackedInt32Array()
 ## Zaps made in this step (`SpellLimits.MAX_ZAPS_PER_STEP`), and the steps run (which half of the
 ## zap shots looks this step, SpellLimits.ZAP_EVERY).
 var _zaps_used: int = 0
 var _zap_steps: int = 0
-## The bodies in a zap shot's reach and their centres (reused, `targets_near`).
+## The bodies in a zap shot's reach, their centres and sizes (reused, `targets_near`).
 var _zap_near: Array[Node2D] = []
 var _zap_centres: PackedVector2Array = PackedVector2Array()
+var _zap_radii: PackedFloat32Array = PackedFloat32Array()
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
 var _magnets: PackedInt32Array = PackedInt32Array()
 var _magnet_count: int = 0
@@ -1364,6 +1372,9 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_rec_zap_rolls.resize(size)
 		_rec_zapped_count.resize(size)
 		_rec_zapped.resize(size * ZAP_MEMORY)
+		_rec_due_body.resize(size * ZAP_DUE)
+		_rec_due_at.resize(size * ZAP_DUE)
+		_rec_due_count.resize(size)
 		_rec_relay.resize(size)
 		_rec_zap.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
@@ -1384,9 +1395,10 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	var at: Vector2 = projectiles.get_position_of(slot)
 	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
 	if spell.zap_chance > 0.0 and spell.zap_reach > 0.0:
-		# A fresh shot: it has rolled for no body yet.
+		# A fresh shot: it has rolled for no body yet, and has no zap waiting.
 		_rec_zap_rolls[slot] = 0
 		_rec_zapped_count[slot] = 0
+		_rec_due_count[slot] = 0
 		if _rec_zapper[slot] == 0:
 			if _zapper_count == _zappers.size():
 				_zappers.resize(_zappers.size() * 2)
@@ -1824,9 +1836,10 @@ func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
 
 ## Runs the `zap` shots (half of them each step, SpellLimits.ZAP_EVERY): each body of another team
 ## that has come within a shot's reach since it last looked rolls the shot's chance, once, and on a
-## win is zapped at once (`_zap`), the body the shot is about to hit too (owner, 2026-10-30). At
-## most `SpellLimits.MAX_ZAPS_PER_STEP` zaps a step; a body over the cap rolls in a later step. A
-## shot with no body in reach now and then throws a spark into the air (`_spark`).
+## win is zapped (`_zap`) at a random moment while it is in reach (`_zap_window`), the body the
+## shot is about to hit too (owner, 2026-10-30); a waiting zap whose body left the reach is made
+## as it leaves. At most `SpellLimits.MAX_ZAPS_PER_STEP` zaps a step; a body over the cap rolls in
+## a later step. A shot with no body in reach now and then throws a spark into the air (`_spark`).
 func _step_zaps(delta: float) -> void:
 	_zaps_used = 0
 	_zap_steps += 1
@@ -1835,6 +1848,7 @@ func _step_zaps(delta: float) -> void:
 		var slot: int = _zappers[i]
 		if not _knows(slot):
 			_rec_zapper[slot] = 0
+			_rec_due_count[slot] = 0
 			_zapper_count -= 1
 			_zappers[i] = _zappers[_zapper_count]
 			continue
@@ -1846,8 +1860,9 @@ func _step_zaps(delta: float) -> void:
 		if spell == null or spell.zap_chance <= 0.0:
 			continue
 		var at: Vector2 = projectiles.get_position_of(slot)
-		var near: int = projectiles.targets_near(at, spell.zap_reach, HITS, _team(SpellTag.caster_of(tag)), _zap_near, _zap_centres)
-		if near == 0:
+		var near: int = projectiles.targets_near(at, spell.zap_reach, HITS, _team(SpellTag.caster_of(tag)), _zap_near, _zap_centres, _zap_radii)
+		_zaps_due(slot, spell, near)
+		if near == 0 and _rec_due_count[slot] == 0:
 			if _zaps_used < SpellLimits.MAX_ZAPS_PER_STEP and _zap_roll(slot) < SpellLimits.ZAP_SPARKS * delta * SpellLimits.ZAP_EVERY:
 				_spark(slot, spell)
 			continue
@@ -1859,7 +1874,65 @@ func _step_zaps(delta: float) -> void:
 				continue
 			_rolled(slot, body.get_instance_id())
 			if _zap_roll(slot) < spell.zap_chance:
-				_zap(slot, spell, _zap_centres[k])
+				# It waits a random moment of the time the body stays in reach, less a look's step so
+				# it is made before the shot hits it or leaves it.
+				var window: float = _zap_window(slot, spell, _zap_centres[k], _zap_radii[k])
+				var wait: float = _zap_roll(slot) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
+				if wait <= 0.0 or _rec_due_count[slot] >= ZAP_DUE:
+					_zap(slot, spell, _zap_centres[k])
+				else:
+					var n: int = slot * ZAP_DUE + _rec_due_count[slot]
+					_rec_due_body[n] = body
+					_rec_due_at[n] = _clock + wait
+					_rec_due_count[slot] += 1
+
+
+## Makes the waiting zaps of the shot in `slot` that are due, or whose body has left its reach (made
+## as it leaves); a body gone from the world is dropped. `near` bodies are in reach now (`_zap_near`).
+func _zaps_due(slot: int, spell: CompiledSpell, near: int) -> void:
+	var first: int = slot * ZAP_DUE
+	var n: int = 0
+	while n < _rec_due_count[slot]:
+		if _zaps_used >= SpellLimits.MAX_ZAPS_PER_STEP or not _knows(slot):
+			return
+		var body: Node2D = _rec_due_body[first + n]
+		var k: int = _zap_near.find(body) if is_instance_valid(body) else -1
+		var gone: bool = not is_instance_valid(body)
+		if gone or k < 0 or k >= near or _clock >= _rec_due_at[first + n]:
+			if not gone:
+				# In reach: at its hit circle; just out of it: where it stands.
+				_zap(slot, spell, _zap_centres[k] if k >= 0 and k < near else body.global_position)
+			# Take it off the list: the last one fills its place.
+			var last: int = first + _rec_due_count[slot] - 1
+			_rec_due_body[first + n] = _rec_due_body[last]
+			_rec_due_at[first + n] = _rec_due_at[last]
+			_rec_due_body[last] = null
+			_rec_due_count[slot] -= 1
+			continue
+		n += 1
+
+
+## Seconds the body whose hit circle is at `centre`, `radius` big, stays in the reach of the zap shot
+## in `slot`, as the shot flies on now: until the shot hits it, if it is on its way, else until the
+## shot has passed through its reach; at most its life left and SpellLimits.ZAP_WAIT_MOST (a shot
+## that stands still: the most).
+func _zap_window(slot: int, spell: CompiledSpell, centre: Vector2, radius: float) -> float:
+	var velocity: Vector2 = projectiles.get_velocity_of(slot)
+	var speed: float = velocity.length()
+	if speed < 1.0:
+		return SpellLimits.ZAP_WAIT_MOST
+	var way: Vector2 = velocity / speed
+	var to: Vector2 = centre - projectiles.get_position_of(slot)
+	var along: float = to.dot(way)
+	var across: float = absf(to.cross(way))
+	var touch: float = projectiles.get_radius_of(slot) + radius
+	var seconds: float = 0.0
+	if along > 0.0 and across < touch:
+		seconds = (along - touch) / speed
+	else:
+		var reach: float = spell.zap_reach + radius
+		seconds = (along + sqrt(maxf(reach * reach - across * across, 0.0))) / speed
+	return clampf(minf(seconds, projectiles.get_life_of(slot)), 0.0, SpellLimits.ZAP_WAIT_MOST)
 
 
 ## True when the zap shot in `slot` has rolled for the body of instance id `id`.
@@ -2264,6 +2337,8 @@ func clear() -> void:
 	_rec_magnet.fill(0)
 	_rec_seq.fill(-1)
 	_rec_zapper.fill(0)
+	_rec_due_count.fill(0)
+	_rec_due_body.fill(null)
 	_rec_relay.fill(null)
 	_rec_zap.fill(null)
 	_jq_hit.fill(null)

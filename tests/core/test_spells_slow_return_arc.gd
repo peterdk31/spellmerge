@@ -219,16 +219,58 @@ func test_no_zap_out_of_reach() -> void:
 	check(_hits_on(far).is_empty(), "an imp 90 px off the path is out of a 60 px reach")
 
 
-## Each body rolls once a shot (owner, 2026-10-30): a rune beside an imp for 4 s zaps it once, at
-## once (within the two steps a shot takes to look, SpellLimits.ZAP_EVERY).
-func test_each_body_is_zapped_once_a_shot_at_once() -> void:
+## Each body rolls once a shot (owner, 2026-10-30): a rune beside an imp for 4 s zaps it once, at a
+## random moment of the most a zap waits (SpellLimits.ZAP_WAIT_MOST: a rune stands still).
+func test_each_body_is_zapped_once_a_shot() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"zap", &"rune"])
 	_cast()
-	_tick(SpellLimits.ZAP_EVERY + 1)
-	check_equal(_hits_on(imp).size(), 1, "zapped as soon as the rune looks")
+	_tick(roundi(SpellLimits.ZAP_WAIT_MOST / DT) + 2 * SpellLimits.ZAP_EVERY + 1)
+	check_equal(_hits_on(imp).size(), 1, "zapped within the longest wait")
 	_tick(240)
 	check_equal(_hits_on(imp).size(), 1, "and never again by that rune")
+
+
+## The moment is random too (owner, 2026-10-30): bolts flying past the same imp zap it from
+## different places on their way through its reach, not all as it comes in reach.
+func test_bolts_past_an_imp_zap_it_from_different_places() -> void:
+	var imp: Node2D = _target(Vector2(120.0, 40.0))
+	var from: Array[float] = []
+	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _way: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"zap" and length > 22.0:
+			from.append(origin.x))
+	_build(0, [&"zap", &"bolt"])
+	for n in 10:
+		_spells._cooldown.fill(0.0)
+		_cast()
+		_tick(90)
+	var low: float = INF
+	var high: float = -INF
+	for x: float in from:
+		low = minf(low, x)
+		high = maxf(high, x)
+	check_equal(from.size(), 10, "every bolt zapped the imp (a sure card)")
+	check(high - low > 30.0, "from places along the way more than 30 px apart (%.0f to %.0f)" % [low, high])
+
+
+## The body a shot is about to hit is zapped before the shot gets there (its wait ends first).
+func test_the_body_ahead_is_zapped_before_the_shot_hits_it() -> void:
+	var imp: Node2D = _target(Vector2(100.0, 0.0))
+	_build(0, [&"zap", &"bolt"])
+	for n in 8:
+		_spells._cooldown.fill(0.0)
+		_cast()
+		_tick(60)
+	var kinds: Array[StringName] = []
+	for hit: Array in _hits_on(imp):
+		var profile: HitProfile = hit[4]
+		kinds.append(profile.kind if profile != null else &"")
+	var order: PackedStringArray = PackedStringArray()
+	for kind: StringName in kinds:
+		order.append(String(kind))
+	check_equal(kinds.size(), 16, "eight bolts and their eight zaps (%s)" % ", ".join(order))
+	for n in mini(kinds.size(), 16) / 2:
+		check(kinds[n * 2] == &"ray" and kinds[n * 2 + 1] != &"ray", "bolt %d: the zap, then the bolt (%s)" % [n, ", ".join(order)])
 
 
 func test_a_zap_sets_off_on_hit() -> void:

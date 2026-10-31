@@ -4315,10 +4315,10 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 
 
 ## Fill `out` with the targets on `layers` not of `team` (Actors.NONE: of any) whose hit circle
-## overlaps the circle (`point`, `radius`), and `centres` with where each one's hit circle is, in
-## the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
+## overlaps the circle (`point`, `radius`), `centres` with where each one's hit circle is and
+## `radii` with how big, in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
 ## run. Pass the same arrays each time: nothing is allocated once they have grown.
-func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Array[Node2D], centres: PackedVector2Array) -> int:
+func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Array[Node2D], centres: PackedVector2Array, radii: PackedFloat32Array) -> int:
 	out.clear()
 	if not point.is_finite() or not is_finite(radius):
 		return 0
@@ -4331,7 +4331,9 @@ func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Ar
 				if _query_match(t, point, radius, layers, 0) and (team == ActorsScript.NONE or _target_team[t] != team):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
+						radii.resize(centres.size())
 					centres[out.size()] = _target_pos[t]
+					radii[out.size()] = _target_radius[t]
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()

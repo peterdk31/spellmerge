@@ -82,7 +82,7 @@ Fissure removed 2026-10-30 (owner): its column below is history.
 | growth | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | relay | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
-| arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
+| zap | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
 **Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `Carrier.fires` and `Carrier.fires_with` (`TriggerBase.NEEDS`). ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's shield is a barrier on the wizard; since R4c a dash and a teleport hit, and their deflect turns the shots they pass or land by) · b only with a blast, whose strikes are the carrier's hits (R4 F2: on hit, chain, siphon, possess, relay and the infusions too). On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 

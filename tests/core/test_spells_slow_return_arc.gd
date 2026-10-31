@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The kit behind the Slow, Return and Arc cards (owner, 2026-10-27): `lifetime_mult` on a
 ## modifier, `return` as a modifier behaviour (it was a boomerang carrier), and `arc`, a shot that
-## zaps the nearest enemy in its reach on a clock, at `SpellLimits.ARC_DAMAGE` of its damage with
+## zaps the nearest enemy in its reach on a clock, at `SpellLimits.ZAP_DAMAGE` of its damage with
 ## its infusions, as a hit that sets off `on hit` payloads and chains. It runs a real projectile
 ## manager and event bus, stepped by hand, with cards built in code.
 ##
@@ -64,7 +64,8 @@ func before_each() -> void:
 	slow.speed_mult = 0.3
 	slow.lifetime_mult = 3.0
 	_modifier(&"return", ModifierBase.Behaviour.RETURN, 1.0)
-	var arc: ModifierBase = _modifier(&"arc", ModifierBase.Behaviour.ARC, 2.0)
+	# A sure zap (100%), so these tests read its rules, not its chance (tests/content/spells/test_zap.gd).
+	var arc: ModifierBase = _modifier(&"zap", ModifierBase.Behaviour.ZAP, 1.0)
 	arc.behaviour_reach = 60.0
 	var on_hit := TriggerBase.new()
 	on_hit.event = TriggerBase.Event.HIT
@@ -184,56 +185,58 @@ func test_the_boomerang_carrier_is_gone() -> void:
 
 # --- Arc ------------------------------------------------------------------------------------
 
-func test_an_arc_compiles_its_clock_reach_and_weaker_hit() -> void:
-	var spell: CompiledSpell = _compile([&"arc", &"lightning", &"bolt"]).casts[0].group.spells[0]
-	check(is_equal_approx(spell.arc_interval, 0.5), "two zaps a second: every 0.5 s (%s)" % spell.arc_interval)
-	check_equal(spell.arc_reach, 60.0, "the card's reach")
-	check(spell.arc_hit != null, "a zap's hit")
-	if spell.arc_hit != null:
-		check_equal(spell.arc_hit.damage, roundi(10 * SpellLimits.ARC_DAMAGE), "at ARC_DAMAGE of the shot")
-		check_equal(spell.arc_hit.status_id, &"static", "with its infusion")
-	var two: CompiledSpell = _compile([&"arc", &"arc", &"bolt"]).casts[0].group.spells[0]
-	check(is_equal_approx(two.arc_interval, 0.25), "two arc cards zap twice as often (%s)" % two.arc_interval)
+func test_a_zap_compiles_its_chance_reach_and_weaker_hit() -> void:
+	var spell: CompiledSpell = _compile([&"zap", &"lightning", &"bolt"]).casts[0].group.spells[0]
+	check(is_equal_approx(spell.zap_chance, 1.0), "the card's chance (%s)" % spell.zap_chance)
+	check_equal(spell.zap_reach, 60.0, "the card's reach")
+	check(spell.zap_hit != null, "a zap's hit")
+	if spell.zap_hit != null:
+		check(is_equal_approx(spell.zap_hit.damage, 10.0 * SpellLimits.ZAP_DAMAGE), "at ZAP_DAMAGE of the shot")
+		check_equal(spell.zap_hit.status_id, &"static", "with its infusion")
+	var two: CompiledSpell = _compile([&"zap", &"zap", &"bolt"]).casts[0].group.spells[0]
+	check(is_equal_approx(two.zap_chance, 1.0), "two sure cards are still sure, never past 100%% (%s)" % two.zap_chance)
 
 
 func test_a_slow_orb_zaps_the_enemy_beside_its_path() -> void:
-	# A slow orb (30 px/s) passes 40 px from an imp: it never touches it, but zaps it.
+	# A slow orb (30 px/s) passes 40 px from an imp: it never touches it, but zaps it, once.
 	var imp: Node2D = _target(Vector2(30.0, 40.0))
-	_build(0, [&"arc", &"lightning", &"orb"])
+	_build(0, [&"zap", &"lightning", &"orb"])
 	_cast()
 	_tick(150)
 	var zaps: Array = _hits_on(imp)
-	check(zaps.size() >= 3, "it zaps the imp again and again (%d)" % zaps.size())
+	check_equal(zaps.size(), 1, "it zaps the imp once, as it comes in reach")
 	if not zaps.is_empty():
 		var profile: HitProfile = zaps[0][4]
-		check(profile != null and profile.damage == roundi(10 * SpellLimits.ARC_DAMAGE), "each zap at ARC_DAMAGE of the orb")
+		check(profile != null and is_equal_approx(profile.damage, 10.0 * SpellLimits.ZAP_DAMAGE), "the zap at ZAP_DAMAGE of the orb")
 		check(profile != null and profile.status_id == &"static", "carrying the orb's infusion")
 
 
 func test_no_zap_out_of_reach() -> void:
 	var far: Node2D = _target(Vector2(30.0, 90.0))
-	_build(0, [&"arc", &"orb"])
+	_build(0, [&"zap", &"orb"])
 	_cast()
 	_tick(120)
 	check(_hits_on(far).is_empty(), "an imp 90 px off the path is out of a 60 px reach")
 
 
-func test_zaps_keep_to_the_clock() -> void:
+## Each body rolls once a shot (owner, 2026-10-30): a rune beside an imp for 4 s zaps it once, at
+## once (within the two steps a shot takes to look, SpellLimits.ZAP_EVERY).
+func test_each_body_is_zapped_once_a_shot_at_once() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
-	_build(0, [&"arc", &"rune"])
+	_build(0, [&"zap", &"rune"])
 	_cast()
-	_tick(121)
-	var zaps: int = _hits_on(imp).size()
-	check(zaps >= 4 and zaps <= 5, "a rune zapping at once, then twice a second for 2 s, zaps about 5 times (%d)" % zaps)
+	_tick(SpellLimits.ZAP_EVERY + 1)
+	check_equal(_hits_on(imp).size(), 1, "zapped as soon as the rune looks")
+	_tick(240)
+	check_equal(_hits_on(imp).size(), 1, "and never again by that rune")
 
 
 func test_a_zap_sets_off_on_hit() -> void:
 	# `on hit` fires its payload at the first zapped imp, from there.
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
-	_build(0, [&"arc", &"on_hit", &"rune", &"nova"])
+	_build(0, [&"zap", &"on_hit", &"rune", &"nova"])
 	_cast()
-	# Its first zap is at once; the next would come at 0.5 s.
-	_tick(25)
+	_tick(121)
 	var novas: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
@@ -247,7 +250,7 @@ func test_a_zap_sets_off_on_hit() -> void:
 func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	var imp: Node2D = _target(Vector2(30.0, 40.0))
 	_mgr.set_walls([Rect2(-100.0, 16.0, 300.0, 8.0)] as Array[Rect2])
-	_build(0, [&"arc", &"on_wall", &"orb", &"nova"])
+	_build(0, [&"zap", &"on_wall", &"orb", &"nova"])
 	_cast()
 	var walls: Array[int] = [0]
 	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: walls[0] += 1)
@@ -260,9 +263,9 @@ func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	check_equal(most, 1, "only the orb: its on wall payload never fired")
 
 
-func test_arc_is_wasted_on_a_beam() -> void:
-	var staff: CompiledStaff = _compile([&"arc", &"beam"])
-	check(staff.wasted.has(0), "arc on a beam is wasted")
+func test_zap_is_wasted_on_a_beam() -> void:
+	var staff: CompiledStaff = _compile([&"zap", &"beam"])
+	check(staff.wasted.has(0), "zap on a beam is wasted")
 
 
 func test_zaps_are_capped_per_step() -> void:
@@ -270,7 +273,7 @@ func test_zaps_are_capped_per_step() -> void:
 	_target(Vector2(0.0, 0.0))
 	_mgr.set_cap(512)
 	for player in 4:
-		_build(player, [&"arc", &"rune"])
+		_build(player, [&"zap", &"rune"])
 	var per_step: Array[int] = []
 	for n in 12:
 		for player in 4:
@@ -279,14 +282,14 @@ func test_zaps_are_capped_per_step() -> void:
 	var before: int = _hits.size()
 	_tick(31)
 	check(_hits.size() - before > 0, "they zap")
-	check(_spells._arcs_used <= SpellLimits.MAX_ARCS_PER_STEP, "at most the cap in the last step")
+	check(_spells._zaps_used <= SpellLimits.MAX_ZAPS_PER_STEP, "at most the cap in the last step")
 
 
 func test_four_players_orbs_zap_their_own_imps() -> void:
 	var imps: Array[Node2D] = []
 	for player in 4:
 		imps.append(_target(Vector2(30.0, 40.0 + 200.0 * player)))
-		_build(player, [&"arc", &"orb"])
+		_build(player, [&"zap", &"orb"])
 	for player in 4:
 		_cast(player, Vector2(0.0, 200.0 * player))
 	_tick(90)

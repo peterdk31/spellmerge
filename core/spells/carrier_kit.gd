@@ -152,9 +152,9 @@ func register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int) 
 
 ## Sends a ray: until `ray_end`, every hit with no shot slot is this one, with `tag`'s cards, going
 ## along `dir`, with `chain` jumps left after `prev`, hitting with `hit` when not its spell's own
-## (null), as a zap of shot `arc_slot` (-1 for none). Returns the record (`RayHit`).
-func ray_begin(tag: int, dir: Vector2, chain: int, prev: int, hit: HitProfile, arc_slot: int) -> RayHit:
-	return _rt._ray_begin(tag, dir, chain, prev, hit, arc_slot)
+## (null), as a zap of shot `zap_slot` (-1 for none). Returns the record (`RayHit`).
+func ray_begin(tag: int, dir: Vector2, chain: int, prev: int, hit: HitProfile, zap_slot: int) -> RayHit:
+	return _rt._ray_begin(tag, dir, chain, prev, hit, zap_slot)
 
 
 ## Ends the ray `ray_begin` sent.

@@ -140,6 +140,10 @@ const PIERCE_ALL: int = 1 << 30
 ## How a ray this runtime sends itself looks and blocks (a chain jump, a zap: `form_shown`,
 ## `block_shot`): as a beam's line. A look, not a carrier: it runs no carrier.
 const RAY_FORM: StringName = &"beam"
+## The look of a zap and its sparks (Feel draws lightning for it).
+const ZAP_FORM: StringName = &"zap"
+## Bodies a zap shot remembers rolling for (`_rec_zapped`).
+const ZAP_MEMORY: int = 32
 
 
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
@@ -258,14 +262,24 @@ var _lc_clock: PackedFloat32Array = PackedFloat32Array()
 var _lc_at: PackedVector2Array = PackedVector2Array()
 var _lc_way: PackedVector2Array = PackedVector2Array()
 var _lc_count: int = 0
-## Slots of live shots with `arc`, `_arc_count` of them, flagged in `_rec_arc`; `_rec_arc_clock` is
-## the seconds to each one's next zap.
-var _arcs: PackedInt32Array = PackedInt32Array()
-var _arc_count: int = 0
-var _rec_arc: PackedByteArray = PackedByteArray()
-var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
-## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`).
-var _arcs_used: int = 0
+## Slots of live shots with `zap`, `_zapper_count` of them, flagged in `_rec_zapper`;
+## `_rec_zap_rolls` is how many random numbers each has drawn (its rolls are a hash of its sequence
+## number and that count: the same every run, `_zap_roll`), and `_rec_zapped` the instance ids of
+## the bodies it has rolled for, ZAP_MEMORY a slot side by side, `_rec_zapped_count` of them (each
+## body rolls once a shot; past ZAP_MEMORY the oldest is forgotten).
+var _zappers: PackedInt32Array = PackedInt32Array()
+var _zapper_count: int = 0
+var _rec_zapper: PackedByteArray = PackedByteArray()
+var _rec_zap_rolls: PackedInt32Array = PackedInt32Array()
+var _rec_zapped: PackedInt64Array = PackedInt64Array()
+var _rec_zapped_count: PackedInt32Array = PackedInt32Array()
+## Zaps made in this step (`SpellLimits.MAX_ZAPS_PER_STEP`), and the steps run (which half of the
+## zap shots looks this step, SpellLimits.ZAP_EVERY).
+var _zaps_used: int = 0
+var _zap_steps: int = 0
+## The bodies in a zap shot's reach and their centres (reused, `targets_near`).
+var _zap_near: Array[Node2D] = []
+var _zap_centres: PackedVector2Array = PackedVector2Array()
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
 var _magnets: PackedInt32Array = PackedInt32Array()
 var _magnet_count: int = 0
@@ -274,7 +288,7 @@ var _magnet_from: int = 0
 var _rec_magnet: PackedByteArray = PackedByteArray()
 ## What a shot hits with when it is not its spell's own `hit`, by slot (null: `hit`): an echo's
 ## `echo_hit`, what a relay shot became after it hit an actor that had cast an infusion, or what
-## the hit a chain jump came from hit with. `_rec_zap` is the same for the shot's zaps (`arc_hit`).
+## the hit a chain jump came from hit with. `_rec_zap` is the same for the shot's zaps (`zap_hit`).
 var _rec_relay: Array[HitProfile] = []
 var _rec_zap: Array[HitProfile] = []
 ## The carrier of each actor's last cast that had an infusion (for `relay`), or null.
@@ -411,7 +425,7 @@ func _init() -> void:
 	_jq_prev.resize(JUMP_QUEUE)
 	_jq_hit.resize(JUMP_QUEUE)
 	_lc_grow(64)
-	_arcs.resize(64)
+	_zappers.resize(64)
 	_magnets.resize(64)
 	_ray_guard_points.resize(64)
 
@@ -860,7 +874,7 @@ func step(delta: float) -> void:
 	for carrier: Carrier in _carriers.values():
 		carrier.step(delta)
 	_step_live(delta)
-	_step_arcs(delta)
+	_step_zaps(delta)
 	_step_magnets()
 	_run_pending()
 
@@ -901,14 +915,14 @@ func _land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: 
 
 ## Sends a ray: until `_ray_end`, every hit with no shot slot is this one (`_on_hit`, `hit_profile`,
 ## `_relay`), with `tag`'s cards, going along `dir`, with `chain` jumps left after `prev`, hitting
-## with `hit` when not its spell's own (null), as a zap of shot `arc_slot` (-1 for none). Returns the
+## with `hit` when not its spell's own (null), as a zap of shot `zap_slot` (-1 for none). Returns the
 ## record, so a sweep can turn `dir` from body to body and read what `relay` left in `hit`.
-func _ray_begin(tag: int, dir: Vector2, chain: int, prev: int, hit: HitProfile, arc_slot: int) -> RayHit:
+func _ray_begin(tag: int, dir: Vector2, chain: int, prev: int, hit: HitProfile, zap_slot: int) -> RayHit:
 	_ray_depth += 1
 	if _ray_depth == _rays.size():
 		_rays.append(RayHit.new())
 	_ray = _rays[_ray_depth]
-	_ray.set_to(tag, dir, chain, prev, hit, arc_slot)
+	_ray.set_to(tag, dir, chain, prev, hit, zap_slot)
 	return _ray
 
 
@@ -1345,13 +1359,15 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 			_rec_seq[at] = -1
 		_rec_chain.resize(size)
 		_rec_prev.resize(size)
-		_rec_arc.resize(size)
+		_rec_zapper.resize(size)
 		_rec_magnet.resize(size)
-		_rec_arc_clock.resize(size)
+		_rec_zap_rolls.resize(size)
+		_rec_zapped_count.resize(size)
+		_rec_zapped.resize(size * ZAP_MEMORY)
 		_rec_relay.resize(size)
 		_rec_zap.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
-	_rec_zap[slot] = spell.echo_arc_hit if spell == _echo_spell else null
+	_rec_zap[slot] = spell.echo_zap_hit if spell == _echo_spell else null
 	if _caster != CASTER_WIZARD:
 		# A payload's shot: an orbit circles the shot that cast it and a returning one flies back
 		# to it, or to the point it was cast from.
@@ -1367,15 +1383,16 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	var life: float = projectiles.get_life_of(slot)
 	var at: Vector2 = projectiles.get_position_of(slot)
 	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
-	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
-		# Ready at once (owner, 2026-10-30): its interval is the wait after a zap, not a fuse.
-		_rec_arc_clock[slot] = 0.0
-		if _rec_arc[slot] == 0:
-			if _arc_count == _arcs.size():
-				_arcs.resize(_arcs.size() * 2)
-			_arcs[_arc_count] = slot
-			_arc_count += 1
-			_rec_arc[slot] = 1
+	if spell.zap_chance > 0.0 and spell.zap_reach > 0.0:
+		# A fresh shot: it has rolled for no body yet.
+		_rec_zap_rolls[slot] = 0
+		_rec_zapped_count[slot] = 0
+		if _rec_zapper[slot] == 0:
+			if _zapper_count == _zappers.size():
+				_zappers.resize(_zappers.size() * 2)
+			_zappers[_zapper_count] = slot
+			_zapper_count += 1
+			_rec_zapper[slot] = 1
 	if spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0 and _rec_magnet[slot] == 0:
 		if _magnet_count == _magnets.size():
 			_magnets.resize(_magnets.size() * 2)
@@ -1805,22 +1822,83 @@ func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
 	_fire_payload(spell, tag, actor, from, way, null, slot)
 
 
-## Runs the `arc` shots on by `delta`: each whose clock runs out zaps (`_zap`), at most
-## `SpellLimits.MAX_ARCS_PER_STEP` in all; one over the cap zaps in a later step.
-func _step_arcs(delta: float) -> void:
-	_arcs_used = 0
+## Runs the `zap` shots (half of them each step, SpellLimits.ZAP_EVERY): each body of another team
+## that has come within a shot's reach since it last looked rolls the shot's chance, once, and on a
+## win is zapped at once (`_zap`), the body the shot is about to hit too (owner, 2026-10-30). At
+## most `SpellLimits.MAX_ZAPS_PER_STEP` zaps a step; a body over the cap rolls in a later step. A
+## shot with no body in reach now and then throws a spark into the air (`_spark`).
+func _step_zaps(delta: float) -> void:
+	_zaps_used = 0
+	_zap_steps += 1
 	var i: int = 0
-	while i < _arc_count:
-		var slot: int = _arcs[i]
+	while i < _zapper_count:
+		var slot: int = _zappers[i]
 		if not _knows(slot):
-			_rec_arc[slot] = 0
-			_arc_count -= 1
-			_arcs[i] = _arcs[_arc_count]
+			_rec_zapper[slot] = 0
+			_zapper_count -= 1
+			_zappers[i] = _zappers[_zapper_count]
 			continue
-		_rec_arc_clock[slot] -= delta
-		if _rec_arc_clock[slot] <= 0.0 and _arcs_used < SpellLimits.MAX_ARCS_PER_STEP:
-			_zap(slot)
 		i += 1
+		if (slot + _zap_steps) % SpellLimits.ZAP_EVERY != 0:
+			continue
+		var tag: int = projectiles.get_tag_of(slot)
+		var spell: CompiledSpell = _profiles.get(tag)
+		if spell == null or spell.zap_chance <= 0.0:
+			continue
+		var at: Vector2 = projectiles.get_position_of(slot)
+		var near: int = projectiles.targets_near(at, spell.zap_reach, HITS, _team(SpellTag.caster_of(tag)), _zap_near, _zap_centres)
+		if near == 0:
+			if _zaps_used < SpellLimits.MAX_ZAPS_PER_STEP and _zap_roll(slot) < SpellLimits.ZAP_SPARKS * delta * SpellLimits.ZAP_EVERY:
+				_spark(slot, spell)
+			continue
+		for k in near:
+			if _zaps_used >= SpellLimits.MAX_ZAPS_PER_STEP or not _knows(slot):
+				break
+			var body: Node2D = _zap_near[k]
+			if not is_instance_valid(body) or _has_rolled(slot, body.get_instance_id()):
+				continue
+			_rolled(slot, body.get_instance_id())
+			if _zap_roll(slot) < spell.zap_chance:
+				_zap(slot, spell, _zap_centres[k])
+
+
+## True when the zap shot in `slot` has rolled for the body of instance id `id`.
+func _has_rolled(slot: int, id: int) -> bool:
+	var first: int = slot * ZAP_MEMORY
+	for n in mini(_rec_zapped_count[slot], ZAP_MEMORY):
+		if _rec_zapped[first + n] == id:
+			return true
+	return false
+
+
+## The zap shot in `slot` has rolled for the body of instance id `id` (in a ring: past ZAP_MEMORY
+## the oldest is forgotten).
+func _rolled(slot: int, id: int) -> void:
+	var n: int = _rec_zapped_count[slot]
+	_rec_zapped[slot * ZAP_MEMORY + n % ZAP_MEMORY] = id
+	_rec_zapped_count[slot] = n + 1
+
+
+## A random number in [0, 1) for the zap shot in `slot`: a hash of its sequence number and how many
+## it drew before, so a run is the same every time (tests, replays) and no two shots alike.
+func _zap_roll(slot: int) -> float:
+	var n: int = _rec_zap_rolls[slot]
+	_rec_zap_rolls[slot] = n + 1
+	var h: int = (int(projectiles.get_seq_of(slot)) * 73856093) ^ (n * 19349663) ^ 83492791
+	h = (h ^ (h >> 13)) * 1274126177
+	h = h ^ (h >> 16)
+	return float(h & 0xFFFFFF) / 16777216.0
+
+
+## The zap shot in `slot` throws a harmless spark into the air: a short zap's look in a random
+## direction (it has no body in reach).
+func _spark(slot: int, spell: CompiledSpell) -> void:
+	if events == null:
+		return
+	var way: Vector2 = Vector2.from_angle(_zap_roll(slot) * TAU)
+	var length: float = lerpf(SpellLimits.ZAP_SPARK_SHORTEST, SpellLimits.ZAP_SPARK_LONGEST, _zap_roll(slot))
+	_zaps_used += 1
+	events.form_shown.emit(SpellTag.caster_of(projectiles.get_tag_of(slot)), ZAP_FORM, projectiles.get_position_of(slot), way, length, spell.tint, spell.look)
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
@@ -1853,39 +1931,20 @@ func _step_magnets() -> void:
 	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
-## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach` but the
-## one its shot hits next (`first_on_path`), hitting with its
-## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
-## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body. With no
-## body in reach the shot tries again next step.
-func _zap(slot: int) -> void:
+## Shot `slot`'s zap of the body whose hit circle is at `aim`: a short ray there, hitting with its
+## `zap_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
+## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body.
+func _zap(slot: int, spell: CompiledSpell, aim: Vector2) -> void:
 	var tag: int = projectiles.get_tag_of(slot)
-	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.arc_interval <= 0.0:
-		_rec_arc_clock[slot] = INF
-		return
 	var at: Vector2 = projectiles.get_position_of(slot)
 	var actor: int = SpellTag.caster_of(tag)
-	# It never zaps the body its shot hits next, which it hits anyway: an arc reaches beside the
-	# shot's way (owner, 2026-10-30). Its way ahead goes as far as the zap reaches or it flies.
-	var velocity: Vector2 = projectiles.get_velocity_of(slot)
-	var ahead: float = minf(velocity.length() * projectiles.get_life_of(slot), spell.arc_reach)
-	var path_to: Vector2 = at + velocity.normalized() * ahead if not velocity.is_zero_approx() else at
-	var next: Node2D = projectiles.first_on_path(at, path_to, projectiles.get_radius_of(slot), HITS, _team(actor))
-	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, HITS, null, next, _team(actor))
-	var aim: Vector2 = projectiles.nearest_point
-	if target == null or not aim.is_finite():
-		return
-	_rec_arc_clock[slot] += spell.arc_interval
-	if _rec_arc_clock[slot] <= 0.0:
-		_rec_arc_clock[slot] = spell.arc_interval
-	_arcs_used += 1
+	_zaps_used += 1
 	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
-	var ray: RayHit = _ray_begin(tag, way, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.arc_hit, slot)
+	var ray: RayHit = _ray_begin(tag, way, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.zap_hit, slot)
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_end()
 	if got > 0.0 and events != null:
-		events.form_shown.emit(actor, RAY_FORM, at, way, got, spell.tint, spell.look)
+		events.form_shown.emit(actor, ZAP_FORM, at, way, got, spell.tint, spell.look)
 	_cast_jumps()
 
 
@@ -1918,7 +1977,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 	# zap's jumps as its shot does.
 	var carried: HitProfile = null
 	var carried_zap: HitProfile = null
-	var from: int = _ray.arc_slot if by_ray else slot
+	var from: int = _ray.zap_slot if by_ray else slot
 	if from >= 0 and _same(from):
 		carried = _rec_relay[from]
 		carried_zap = _rec_zap[from]
@@ -2031,7 +2090,7 @@ func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 ## payload goes the way the shot or beam goes on. A zap (`_zap`, its shot's tag) that ends on a
 ## wall is not its shot meeting one: it sets off nothing (rules R4a).
 func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int, shot: int) -> void:
-	if _ray.arc_slot >= 0:
+	if _ray.zap_slot >= 0:
 		return
 	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, shot, false, heading)
 
@@ -2116,7 +2175,7 @@ func _relay(target: Node, tag: int, shot: int) -> void:
 		return
 	var slot: int = shot
 	if slot < 0 and tag == _ray.tag:
-		slot = _ray.arc_slot
+		slot = _ray.zap_slot
 	var by_ray: bool = slot < 0 and tag == _ray.tag
 	var donor: CompiledSpell = _last_infused[donor_actor]
 	if donor == null or (not by_ray and (slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag)):
@@ -2140,8 +2199,8 @@ func _relay(target: Node, tag: int, shot: int) -> void:
 	if base.element_id == &"":
 		projectiles.set_core(slot, donor.tint)
 	_rec_relay[slot] = merged
-	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.arc_hit != null else null
-	if slot == _ray.arc_slot:
+	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
+	if slot == _ray.zap_slot:
 		_ray.hit = _rec_zap[slot]
 
 
@@ -2199,12 +2258,12 @@ func clear() -> void:
 	_last_form.fill(&"")
 	_cast_count.fill(0)
 	_lc_count = 0
-	_arc_count = 0
+	_zapper_count = 0
 	_magnet_count = 0
 	_magnet_from = 0
 	_rec_magnet.fill(0)
 	_rec_seq.fill(-1)
-	_rec_arc.fill(0)
+	_rec_zapper.fill(0)
 	_rec_relay.fill(null)
 	_rec_zap.fill(null)
 	_jq_hit.fill(null)

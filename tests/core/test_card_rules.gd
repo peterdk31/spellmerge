@@ -165,6 +165,9 @@ const LINE: Dictionary = {"name": "target", "line": true}
 const OPEN: Dictionary = {"name": "open"}
 const CROWD_AGAIN: Dictionary = {"name": "a crowd, cast again", "line": true, "crowd": true, "repeat": true}
 const SIDE_TARGET: Dictionary = {"name": "target off the line", "side": true}
+## The same, cast again while it lasts: a zap is a chance (50% a body a shot), so one shot may
+## pass the target without zapping it; a stream of them does not.
+const SIDE_AGAIN: Dictionary = {"name": "target off the line, cast again", "side": true, "repeat": true}
 const TWO_TARGETS: Dictionary = {"name": "two targets", "line": true, "second": true}
 const SHOOTER: Dictionary = {"name": "enemy shooter", "shooter": true}
 const WALL: Dictionary = {"name": "wall, target behind", "wall": 0.6, "back": true}
@@ -187,8 +190,10 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			# Numbers: damage, pierce, size, speed and cooldown show on targets, a crowd and casts
 			# made again; a longer or slower life in the open.
 			return [CROWD_AGAIN, OPEN]
-		ModifierBase.Behaviour.HOMING, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.ARC:
+		ModifierBase.Behaviour.HOMING, ModifierBase.Behaviour.MAGNET:
 			return [SIDE_TARGET]
+		ModifierBase.Behaviour.ZAP:
+			return [SIDE_TARGET, SIDE_AGAIN]
 		ModifierBase.Behaviour.CHAIN:
 			return [TWO_TARGETS]
 		ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT:

@@ -1,0 +1,14 @@
+{
+	"id": "zap_nova_trap",
+	"name": "Zap nova trap",
+	"does": "Runes that may zap the imp near them (50% each), and a zap sets off a nova from that imp which hits the one behind it.",
+	"casts": [
+		{"staff": 0, "cards": ["zap", "on_hit", "rune", "nova"]},
+		{"staff": 0, "cards": ["zap", "on_hit", "rune", "nova"], "at": 2.5},
+		{"staff": 0, "cards": ["zap", "on_hit", "rune", "nova"], "at": 5.0},
+		{"staff": 0, "cards": ["zap", "on_hit", "rune", "nova"], "at": 7.5}
+	],
+	"imps": [[0, 50], [0, 75]],
+	"seconds": 9.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

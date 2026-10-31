@@ -17,13 +17,16 @@ var prev: int = 0
 ## what the hit a jump came from hit with, or what `relay` took on while the ray is out.
 var hit: HitProfile = null
 ## The slot of the shot whose zap this is (-1 for none): the zap is a hit of that shot.
-var arc_slot: int = -1
+var zap_slot: int = -1
+## True for a zap (a shot's or a live beam's, which has no slot): a wall it ends on sets off nothing.
+var zapping: bool = false
 
 
-func set_to(ray_tag: int, way: Vector2, jumps: int, from: int, with: HitProfile, zap_slot: int) -> void:
+func set_to(ray_tag: int, way: Vector2, jumps: int, from: int, with: HitProfile, of_shot: int) -> void:
 	tag = ray_tag
 	dir = way
 	chain = jumps
 	prev = from
 	hit = with
-	arc_slot = zap_slot
+	zap_slot = of_shot
+	zapping = of_shot >= 0

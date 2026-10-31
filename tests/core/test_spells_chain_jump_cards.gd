@@ -91,7 +91,7 @@ func test_a_jump_pierces() -> void:
 
 
 func test_a_jump_zaps() -> void:
-	_has(["arc"], func(a: ArenaScript, s: int) -> bool: return a.spells._rec_arc[s] == 1, "arc")
+	_has(["zap"], func(a: ArenaScript, s: int) -> bool: return a.spells._rec_zapper[s] == 1, "zap")
 
 
 func test_a_jump_pulls() -> void:

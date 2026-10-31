@@ -17,7 +17,7 @@ const FIRST_SIX: Array[ModifierBase] = [
 ]
 
 const LATER: Array[ModifierBase] = [
-	preload("res://content/spells/modifiers/arc/arc.tres"),
+	preload("res://content/spells/modifiers/zap/zap.tres"),
 	preload("res://content/spells/modifiers/blast/blast.tres"),
 	preload("res://content/spells/modifiers/bounce/bounce.tres"),
 	preload("res://content/spells/modifiers/deflect/deflect.tres"),
@@ -62,7 +62,7 @@ const ALLOWED_SHARES: Dictionary = {
 	15: ["heavy", "sticky"],
 	16: ["growth", "linger"],
 	17: ["spiral", "return", "relay", "recoil"],
-	18: ["bounce", "arc", "deflect"],
+	18: ["bounce", "zap", "deflect"],
 	19: ["echo", "mirror", "ghost"],
 	20: ["magnet", "siphon", "possess"],
 	21: ["slow", "hold", "short_delay"],

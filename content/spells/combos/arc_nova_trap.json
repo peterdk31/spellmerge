@@ -1,9 +1,0 @@
-{
-	"id": "arc_nova_trap",
-	"name": "Arc nova trap",
-	"does": "A rune that zaps the imp that comes near, and the zap sets off a nova from that imp which hits the one behind it.",
-	"casts": [{"staff": 0, "cards": ["arc", "on_hit", "rune", "nova"]}],
-	"imps": [[0, 50], [0, 75]],
-	"seconds": 2.0,
-	"checks": [{"kind": "damaged", "imps": [0, 1]}]
-}

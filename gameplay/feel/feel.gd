@@ -239,8 +239,11 @@ const DASH_MARGIN: float = 12.0
 const DASH_ACROSS: float = 32.0
 ## A discharge arc is drawn like a dash: its length in the zoom's place, ARC_MARGIN past each end,
 ## ARC_ACROSS across (the shader's).
-const ARC_MARGIN: float = 4.0
-const ARC_ACROSS: float = 16.0
+const ARC_MARGIN: float = 12.0
+const ARC_ACROSS: float = 56.0
+## A zap no longer than this is a zap shot's spark into the air (SpellLimits.ZAP_SPARK_LONGEST): it
+## burns out sooner.
+const SPARK_LONGEST: float = 22.0
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
 const STATUS_RISE: float = 8.0
@@ -1751,6 +1754,11 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 		play_cue(cue, caster, origin, direction, length, tint, look)
 		return
 	var ramp: int = _ramp_of(caster)
+	if form == &"zap":
+		# A zap or a zap shot's spark: lightning in the shot's colours (its infusion's, else its caster's).
+		if length > 0.0 and direction != Vector2.ZERO and preset.arc_seconds > 0.0:
+			show_effect(KIND_ARC, origin, direction, tint, ramp, look, 1, preset.arc_seconds * (1.0 if length > SPARK_LONGEST else 0.6), length)
+		return
 	if form == &"dash":
 		# Only its dust here: the wizard picks its way (where it walks), so its streaks and cards
 		# are its trail, and the ring comes where it lands.

@@ -75,6 +75,7 @@ Built in parallel from the foundation commit (the events, this document, the ROA
 | H3 | **The director** | `gameplay/horde/`, `project.godot` (the autoload), `tests/gameplay/horde/` | Spawning, the curve, kills, gems, levels, offers, picks, the build break, status, the end |
 | H4 | **Swarm enemies** | `content/enemies/<two new folders>` | Two cheap touch-only swarmers (art, data, scene, `assets.json`) |
 | H5 | **The horde HUD** | `hud/panels/horde/`, `hud/panels/panels.tscn`, `hud/README.md` | The status line and experience bar, the per-seat pick cards, the break countdown, the end summary |
+| S1-S7 | **The swarm** | `gameplay/horde/` and the parts in [horde-swarm.md](horde-swarm.md) | 500+ enemies: S1-S5 merged 2026-10-31; S6 (a cost budget) and S7 (1,000 at 60 FPS) planned there |
 | H6 | **Tuning and recycling** | after H1-H5 merge | The curve's numbers by playing, enemy recycling if H1's numbers ask for it |
 
 ## Removing it

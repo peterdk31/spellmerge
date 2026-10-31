@@ -86,6 +86,45 @@ A step costs about 6.4 ms, plus 9-11 us a swarmer (swarm 3.3-3.8, look 1.2-1.3, 
 - Single steps of 25-55 ms when the bots' heavy builds cast (the p95).
 - Past 1,020 bodies the actor table must grow (SpellTag's caster bits, as H1 did).
 
+## Merged (2026-10-31)
+
+S1, S2, S3, S4 and S5 merged together on main. Measured after the merge (S3 removed Feel's flash cap; `stress.gd -- --horde-swarm`, headless desktop, idle machine):
+
+| Scenario | Frame avg | p95 | A physics step's scripts |
+|---|---|---|---|
+| 500 swarmers + 25 staff enemies | 7.5 ms | 17.3 ms | 8.6 ms |
+| 1,000 swarmers + 16 staff enemies | 35 ms | 91 ms | 14.1 ms (2.1 steps a frame: it falls behind) |
+
+Caps: 225 alive on desktop, 150 on the web, one count for swarmers and full actors alike.
+
+## Next (owner, 2026-10-31: plan saved, not started)
+
+Two parts, in this order. Each is one branch and one PR; both are measured with `stress.gd -- --horde-swarm` (and `--swarm=N --staff=M` sweeps) before and after, and neither changes a rule or a result (every equivalence and fingerprint test still passes).
+
+### S6: a cost budget instead of a head count
+
+The director's cap counts heads, so the full actors in the late curve (about 41 %) set the limit. Count what each enemy costs instead.
+
+- **Cost per kind.** Each enemy kind gets a cost in swarmer units: a swarmer 1, a full actor its measured share (S4: about 4-5). Read from data, not a table in code: a field on `SwarmKind` for swarm kinds, and a default for full actors that the stress run measures and the director reads (`HORDE_FULL_ACTOR_COST`, one named constant, changed only with a measurement).
+- **The budget.** `MAX_ALIVE_DESKTOP` / `MAX_ALIVE_WEB` become `BUDGET_DESKTOP` / `BUDGET_WEB` in units: about 600 on desktop and 300 on the web to start (S4's estimate), set from the sweep. The director spawns while the alive cost plus the next enemy's cost fits; a draw that does not fit waits (deferred, never dropped; the weights stay as written).
+- **The curve.** Its late points move to mostly swarmers (staff enemies as the spice, not the bulk), so 500+ bodies stand at once on desktop. The curve's numbers stay a first guess, tuned by playing.
+- **HUD.** `horde_status`'s `alive` stays the head count; nothing new on screen.
+- **Tests:** a full actor and N swarmers fill the budget the same; a draw that does not fit waits and comes later; the web budget is used on the web; the curve reaches 500+ heads on desktop at its last point.
+- **Done when:** the late horde stands at 500+ on desktop with the frame p95 under 16.7 ms in the sweep at the curve's late mix, and the web budget costs no more than the web cap of 150 heads does today.
+
+### S7: 1,000 swarmers at 60 FPS on desktop
+
+Today a step's scripts take 14 ms at 1,000; 60 FPS needs about 10-12 (process and the engine come on top). From S4's list, biggest first:
+
+1. **Feel's per-hit juice (about 2 ms a step).** A hit sound starts once per sound per step (not once per hit), and Feel reads the camera once a frame, not per hit. The same sounds and effects show; a test that 200 hits in one step start one sound each and every effect.
+2. **The projectile manager's target refresh (0.7 ms at 1,000).** A body owner that keeps positions in packed rows (the swarm) hands them over in bulk, and the manager skips the node reads for those targets. S5 measured a bulk push as a small win then; measure again now that the rest is cheaper, keep it only if it wins.
+3. **Spikes (single steps of 25-55 ms, the p95).** Profile the bots' heavy casts (`--profile --profile-signals`): which card's work lands in one step. Spread it over steps (deferral, as the fire budget does), never drop it.
+4. **Hit events in packed crowds.** A reaction or burst striking dozens of swarmers costs about 2.6 ms: look at what each strike's listeners do per body (Combat, Feel, the swarm) and batch what can be batched.
+5. **The actor table.** 1,000 swarmers plus the full actors and wizards is past 1,020: grow `Actors.ACTORS` to 2,048 and the spell tag's caster to 11 bits (`FLAG` to bit 25), as H1 did for 1,024.
+6. **Then** spacing (1.25 ms) and the look (1.2 us a row) are near what GDScript does; if still short, halve spacing's work again (a quarter of the rows a step at four times the push) and measure that it looks the same.
+
+- **Done when:** `--horde-swarm` at 1,000 swarmers + 16 staff enemies holds a frame average under 16.7 ms and a p95 under 25 ms on desktop headless, over two runs; the web-size scenario does not get slower. Then S6's desktop budget is raised to what the sweep holds.
+
 ## Owner answers (2026-10-31)
 
 1. A simpler look is not fine: swarmers look exactly like full enemies.

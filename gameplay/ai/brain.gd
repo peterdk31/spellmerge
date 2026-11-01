@@ -24,10 +24,17 @@ extends RefCounted
 ## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
 ## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
 ##
+## **Enemies telegraph, allies don't** (owner, 2026-11-01): a telegraph is a warning for the
+## players, so a brain driving an actor of the players' team winds up nothing (`warns()` false:
+## `windup_for` is 0 and the cast leaves the step its staff is ready, so no telegraph and no
+## furious face). It follows the driven actor's team, which is its driver's: a bot, a minion, and
+## an enemy body a player's side drives cast at once; an enemy's AI possessing a wizard still warns.
+##
 ## Nothing here allocates per step.
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION }
 ## How a plan walks: stand, toward or away from the target, or a set way (`plan_way`).
@@ -265,8 +272,16 @@ func telegraph_staff() -> int:
 	return maxi(plan_staff, 0)
 
 
-## The windup the next attack of staff `at` would take (seconds), for its telegraph.
+## False while the actor it drives is on the players' team: an ally gives no warning.
+func warns() -> bool:
+	return actor == null or actor.team() != ActorsScript.TEAM_WIZARDS
+
+
+## The windup the next attack of staff `at` would take (seconds), for its telegraph; 0 for an ally
+## (`warns`).
 func windup_for(at: int) -> float:
+	if not warns():
+		return 0.0
 	var sense: CastSense = _sense_of(at)
 	if sense == null:
 		return snappedf(WINDUP_BASE * profile.windup_scale, TIME_GRAIN)
@@ -529,6 +544,9 @@ func _chase(intent: ActorIntent) -> void:
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
 	_begin_windup(plan_staff, windup, now, intent)
+	if windup <= 0.0:
+		# No warning to give (an ally): the cast leaves this step.
+		_release(intent)
 
 
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:

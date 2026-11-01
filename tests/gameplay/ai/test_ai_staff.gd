@@ -284,7 +284,8 @@ func test_a_cast_that_is_not_aimed_ignores_walls() -> void:
 ## A minion (owner, 2026-11-01: an idea for a card, not built yet): an enemy handed to an AI of the
 ## players' team (`Actor.drive`) fights for them with no other code. Its team is its driver's, so
 ## it targets the other enemies (never the wizard), casts its own staff at them through the same
-## states, walls included; `release` gives it back to its own AI, an enemy again.
+## states, walls included; as an ally it winds nothing up (enemies telegraph, allies don't: owner,
+## 2026-11-01); `release` gives it back to its own AI, an enemy again.
 func test_an_enemy_driven_by_an_ai_of_the_players_team_is_a_minion() -> void:
 	_wizard.position = Vector2(-80.0, 0.0)
 	var minion := _enemy(_data([&"bolt"], 100.0, 10.0), Vector2(0.0, 0.0))
@@ -295,13 +296,14 @@ func test_an_enemy_driven_by_an_ai_of_the_players_team_is_a_minion() -> void:
 	minion.drive(mind)
 	check_equal(minion.team(), ActorsScript.TEAM_WIZARDS, "its team is its new driver's")
 	check_equal(_actors.team_of(minion.id), ActorsScript.TEAM_WIZARDS, "and the actor table knows it")
+	var telegraphed: bool = false
 	for i in int(1.0 / STEP):
-		if mind.is_telegraphing():
+		telegraphed = telegraphed or mind.is_telegraphing()
+		if _combat.health_of(foe) < ImpData.max_health:
 			break
 		_run(STEP)
-	check(mind.is_telegraphing(), "it winds up")
-	check(mind.target == foe, "at the other enemy, not the wizard")
-	_run(mind.windup_time + 0.5)
+	check(mind.target == foe, "it fights the other enemy, not the wizard")
 	check(_combat.health_of(foe) < ImpData.max_health, "its own staff hurt the enemy")
+	check(not telegraphed, "with no windup: an ally warns nobody")
 	minion.release()
 	check_equal(minion.team(), ActorsScript.TEAM_ENEMIES, "released, it is an enemy again")

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-01: Showcase sandbox staffs, mana per staff, one staff file per setup (owner session)
+
+The sandbox starts with two showcase builds of the trigger tree (`Flow.SANDBOX_START_CARDS`): Y the most shots (`on expire · fire · split ×3 · nova · frost · split ×3 · nova`, holding the 3000-shot cap for about three seconds) and B a decoy turret (`timer · on hurt · decoy`, all 20 slots, none wasted). Mana is the staff's now (owner): `StaffBase.max_mana`/`mana_regen`, one pool per staff in `Caster`, holds and siphon per staff, the panel's bar the staff on show and the builder's the viewed staff (`staff_mana_changed`); enemies' pools moved onto their staffs. Staffs are one file per setup, used as they are (owner): Play and the horde hold the four basic staffs, the sandbox the dev staff (a million mana) on every button; the build channel no longer picks staffs. Bots leave `wall` out of their random builds (it stalled the 4-bot run with 4-slot staffs). Open: each basic staff has the old wizard's 100 mana, so a wizard has four times the mana across its staffs (docs/DECISIONS.md).
+
 ## 2026-10-29: Clip recorder knows combo `mates` and cast `dir`
 
 The relay clips now show the teammate (a wizard body shots can hit) and the cast direction, so the bolt reaches the imp. Tests in `tests/clips/test_clip_scenarios.gd`.

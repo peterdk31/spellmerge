@@ -233,3 +233,25 @@ func test_play_keeps_its_own_start_cards() -> void:
 	input.add_virtual_device(0)
 	events.emit_signal("play_requested", 0)
 	check_equal(flow.start_cards_for_mode(), flow.start_cards, "Play starts with start_cards")
+
+
+## The dev staff's mana (owner, 2026-11-01): in a `dev` or `preview` build the sandbox's wizards
+## get DEV_MANA as their pool and regen; a stable build keeps the scene's own numbers.
+func test_dev_builds_give_practically_infinite_mana() -> void:
+	var was: String = flow.channel
+	for name: String in ["dev", "preview", "stable"]:
+		flow.channel = name
+		_start(2)
+		var dev: bool = name != "stable"
+		check_equal(flow.dev_numbers(), dev, "%s: dev numbers" % name)
+		for wizard in _wizards():
+			if dev:
+				check_equal(wizard.caster.max_mana, FlowScript.DEV_MANA, "%s: the pool" % name)
+				check_equal(wizard.caster.regen, FlowScript.DEV_MANA, "%s: the regen" % name)
+				check_equal(wizard.caster.mana, FlowScript.DEV_MANA, "%s: it starts full" % name)
+			else:
+				check(wizard.caster.max_mana < FlowScript.DEV_MANA, "%s: the scene's own pool" % name)
+		flow.stop_run()
+		for index in 4:
+			input.leave(index)
+	flow.channel = was

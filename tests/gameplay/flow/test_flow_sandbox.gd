@@ -194,3 +194,42 @@ func test_everyone_down_stands_up_with_their_staffs() -> void:
 		flow.stop_run()
 		for index in 4:
 			input.leave(index)
+
+
+## The sandbox's own start cards (owner, 2026-11-01): Play's A and X, and the two showcase builds
+## on Y and B, every card of them used (none wasted) on the sandbox's staffs.
+func test_the_sandbox_starts_with_its_showcase_staffs() -> void:
+	for count: int in [1, 2, 4]:
+		_start(count)
+		check_equal(flow.start_cards_for_mode(), FlowScript.SANDBOX_START_CARDS, "%d players: the sandbox's cards" % count)
+		for wizard in _wizards():
+			var seat: int = PlayerController.of(wizard).seat
+			for at in 4:
+				var wanted: Array[StringName] = []
+				for id: Variant in FlowScript.SANDBOX_START_CARDS[at]:
+					wanted.append(StringName(str(id)))
+				check_equal(wizard.caster.cards_of(at).filter(func(id: StringName) -> bool: return id != &""), wanted, "%d players: seat %d staff %d holds its cards" % [count, seat, at])
+		flow.stop_run()
+		for index in 4:
+			input.leave(index)
+
+
+func test_the_showcase_builds_waste_no_card() -> void:
+	var spells: Node = root.get_node("Spells")
+	var dev: StaffBase = root.get_node("Registry").call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
+	for at: int in [2, 3]:
+		var ids: Array[StringName] = []
+		for id: Variant in FlowScript.SANDBOX_START_CARDS[at]:
+			ids.append(StringName(str(id)))
+		check(ids.size() <= dev.slots, "staff %d fits the sandbox staff" % at)
+		var view: Dictionary = spells.call("staff_view", ids, dev)
+		check(not bool(view["empty"]), "staff %d casts something" % at)
+		check_equal((view["wasted"] as Dictionary).size(), 0, "staff %d wastes no card" % at)
+		check_equal((view["casts"] as Array).size(), 1, "staff %d is one cast" % at)
+		check(float((view["casts"] as Array)[0]["mana"]) <= 100.0, "staff %d can be cast from a full pool" % at)
+
+
+func test_play_keeps_its_own_start_cards() -> void:
+	input.add_virtual_device(0)
+	events.emit_signal("play_requested", 0)
+	check_equal(flow.start_cards_for_mode(), flow.start_cards, "Play starts with start_cards")

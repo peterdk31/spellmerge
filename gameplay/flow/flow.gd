@@ -61,7 +61,9 @@ extends Node
 ## `sandbox_action_requested`: `imp_wave` adds a wave of imps (wave 1's size, while fewer than
 ## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
 ## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
-## keep their staffs, instead of a restart.
+## keep their staffs, instead of a restart. Its wizards start with SANDBOX_START_CARDS, not
+## `start_cards`: Play's A and X, and two showcase builds on Y (the most shots) and B (a decoy
+## turret).
 ##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX (above) or MODE_HORDE.
 ##
@@ -103,6 +105,22 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
 ## The cards a horde run starts with instead (owner, 2026-10-31): RB a dash staff, RT a swing staff.
 const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
+## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
+## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
+## Y, the most shots: a fire nova split three times (216 shots) whose every shot, when it ends,
+## fires a frost nova split three times (216 each): far past the projectile cap (3000 on
+## desktop), which it holds for about three seconds; 67.5 mana. Two payload levels only: a
+## third would queue a million shots, minutes of backlog at `SpellLimits.FIRE_SHOTS_PER_STEP`.
+## B, a decoy turret: every 0.5 s it fires a homing fire, frost and lightning bolt (the
+## lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova
+## with a blast; 34.6 mana, every card used.
+const SANDBOX_START_CARDS: Array = [
+	[&"dash"],
+	[&"fire", &"bolt"],
+	[&"on_expire", &"fire", &"split", &"split", &"split", &"nova", &"frost", &"split", &"split", &"split", &"nova"],
+	[&"timer", &"on_hurt", &"decoy", &"triple", &"homing", &"fire", &"bolt", &"homing", &"frost", &"bolt",
+		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"blast", &"nova"],
+]
 ## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
 ## spawn after these stands another of the first, `dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
@@ -801,6 +819,17 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return _plain_staffs
 
 
+## The cards each staff of a new wizard starts with in this run's `mode`: HORDE_START_CARDS in
+## the horde, SANDBOX_START_CARDS in the sandbox, `start_cards` in Play.
+func start_cards_for_mode() -> Array:
+	match mode:
+		MODE_HORDE:
+			return HORDE_START_CARDS
+		MODE_SANDBOX:
+			return SANDBOX_START_CARDS
+	return start_cards
+
+
 ## The starter heads by button, each a copy with the dev staff's numbers when `dev_numbers` (empty
 ## when one is missing).
 func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
@@ -825,7 +854,7 @@ func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	var cards: Array = HORDE_START_CARDS if mode == MODE_HORDE else start_cards
+	var cards: Array = start_cards_for_mode()
 	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at

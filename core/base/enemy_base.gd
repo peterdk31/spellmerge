@@ -7,6 +7,8 @@ extends Resource
 @export var id: StringName = &""
 ## True for content shown in the free web demo.
 @export var demo: bool = false
+## Its name for people (the enemy arena's picker); empty: its id.
+@export var display_name: String = ""
 @export var max_health: float = 1.0
 ## Pixels per second.
 @export var move_speed: float = 0.0
@@ -34,6 +36,11 @@ extends Resource
 
 ## The most staffs an enemy may hold (the staff buttons).
 const MAX_STAFFS: int = 4
+
+
+## Its name for people: `display_name`, else its id in words.
+func shown_name() -> String:
+	return display_name if display_name != "" else String(id).replace("_", " ").capitalize()
 
 
 ## True when it holds at least one staff with a card.

@@ -204,3 +204,15 @@ func test_a_teammates_windup_staggers_the_next() -> void:
 	board.step(TeamBoard.BEAT)
 	check_equal(board.beat(1, 8, 1.0), 1.0, "and only for the beat")
 	check_equal(board.beat(2, 8, 1.0), 1.0, "another team is not slowed")
+
+
+func test_the_ai_view_shows_what_it_does() -> void:
+	fx.players[0].position = Vector2(150.0, 0.0)
+	var imp: Actor = fx.imp()
+	CreatureLook.ai_view = true
+	fx.run(imp, 2)
+	var words: String = Fixture.look(imp).ai_view_text()
+	CreatureLook.ai_view = false
+	check(words.begins_with("fight"), "the AI view names its behaviour and step: %s" % words)
+	fx.run(imp, 1)
+	check_equal(Fixture.look(imp).ai_view_text(), "", "nothing once it is off")

@@ -38,8 +38,12 @@ signal effect_slots_changed(slots: int)
 signal screen_shake_changed(enabled: bool)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
-## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
+## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave`, `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
+## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
+signal sandbox_spawn_requested(player: int, enemy_id: StringName, count: int)
+## Sender: hud. The sandbox page's "AI view" switch flipped: each enemy shows what its AI is doing. Heard by ai (enemy AI AI8).
+signal ai_view_changed(on: bool)
 ## The Horde button was pressed (docs/milestones/horde.md). Heard by flow, which starts a horde run.
 signal horde_requested(player: int)
 ## `player` picked offer number `choice` (0-2) of their open level-up pick. Heard by horde.

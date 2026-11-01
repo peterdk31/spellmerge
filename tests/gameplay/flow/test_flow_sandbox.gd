@@ -141,6 +141,26 @@ func test_imp_wave_adds_imps_up_to_the_cap() -> void:
 	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies are not imps")
 
 
+func test_the_enemy_arena_spawns_any_enemy_and_clears_them() -> void:
+	_start(1)
+	events.emit_signal("sandbox_spawn_requested", 0, &"storm_fork", 3)
+	check_equal(flow.enemies_left(), 3, "three Storm Forks")
+	check_equal(flow.spawn_in_sandbox(&"splinter", 2), 2, "and two Splinters, from code too")
+	check_equal(flow.spawn_in_sandbox(&"no_such_enemy", 2), 0, "an unknown id spawns nothing")
+	check_equal(flow.spawn_in_sandbox(&"splinter", 100), FlowScript.WAVE_MAX - 5, "never past WAVE_MAX")
+	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_CLEAR_ENEMIES)
+	check_equal(flow.enemies_left(), 0, "clear takes them all")
+	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies stay")
+	check_equal(cleared, 0, "and clearing starts no break")
+
+
+func test_the_enemy_arena_is_only_in_the_sandbox() -> void:
+	for index in 1:
+		input.add_virtual_device(index)
+	events.emit_signal("play_requested", 0)
+	check_equal(flow.spawn_in_sandbox(&"storm_fork", 3), 0, "Play has no arena")
+
+
 func test_clearing_the_imps_starts_no_break() -> void:
 	_start(1)
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)

@@ -48,6 +48,7 @@ func _initialize() -> void:
 	_test_the_screen_shake_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
+	_test_the_enemy_arena()
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
@@ -182,7 +183,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_names() == ["Resume", "Sandbox", "Settings"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
-	_check(_names() == ["ImpWave", "ResetDummies", "BuilderStyle", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
+	_check(_names() == ["ImpWave", "ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "BuilderStyle", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ImpWave")
 	_press(1, "ImpWave")
 	_press(1, "ResetDummies")
@@ -193,6 +194,36 @@ func _test_sandbox_entry_and_actions() -> void:
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 	_bus.sandbox_changed.emit(false)
 	_check(_names() == ["Resume", "Settings"], "out of the sandbox the entry goes")
+
+
+func _test_the_enemy_arena() -> void:
+	_setup(1, true)
+	var spawns: Array = []
+	var views: Array[bool] = []
+	_bus.sandbox_spawn_requested.connect(func(player: int, id: StringName, count: int) -> void: spawns.append([player, id, count]))
+	_bus.ai_view_changed.connect(func(on: bool) -> void: views.append(on))
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Sandbox")
+	var menu: PauseMenuScript = _menu()
+	_check(menu.arena_ids.size() >= 7, "every enemy of the registry is listed, got %s" % [menu.arena_ids])
+	_check(menu.arena_names.has("Cinder Rod"), "by its name")
+	var first: StringName = menu.arena_ids[0]
+	_check(menu.button("ArenaEnemy").text.ends_with("Enemy: " + menu.arena_names[0]), "the first is picked")
+	_press(0, "ArenaEnemy")
+	_check(menu.arena_pick == 1, "accept picks the next")
+	_press(0, "ArenaCount")
+	_press(0, "ArenaCount")
+	_check(menu.button("ArenaCount").text.ends_with("Count: 3"), "the count steps up")
+	_press(0, "ArenaSpawn")
+	_check(spawns == [[0, menu.arena_ids[1], 3]], "spawn asks for three of the picked enemy, got %s" % [spawns])
+	_press(0, "ArenaClear")
+	_check(_actions.has([0, &"clear_enemies"]), "clear asks flow to clear the enemies, got %s" % [_actions])
+	_press(0, "AIView")
+	_press(0, "AIView")
+	_check(views == [true, false], "the AI view flips on and off, got %s" % [views])
+	_check(first != &"", "an id")
+	_check(menu.page == PauseMenuScript.Page.SANDBOX, "the page stays")
 
 
 func _test_the_sandbox_switches_the_reload() -> void:

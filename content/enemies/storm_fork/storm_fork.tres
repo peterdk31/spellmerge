@@ -26,6 +26,7 @@ cards = Array[StringName]([&"triple", &"lightning", &"bolt"])
 [resource]
 script = ExtResource("1_base")
 id = &"storm_fork"
+display_name = "Storm Fork"
 demo = true
 max_health = 24.0
 move_speed = 35.0

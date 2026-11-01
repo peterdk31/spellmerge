@@ -269,6 +269,7 @@ func _ready() -> void:
 	events.entity_end_requested.connect(_on_end_requested)
 	events.projectile_hit.connect(_on_projectile_hit)
 	events.room_entered.connect(_on_room_entered)
+	events.ai_view_changed.connect(_on_ai_view_changed)
 	events.run_ended.connect(_on_run_ended)
 
 
@@ -451,6 +452,11 @@ func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag
 	_hits[row] -= 1
 	if _hits[row] <= 0:
 		_end(row, true)
+
+
+## The sandbox's "AI view" switch (enemy AI AI8): every enemy's look shows what its AI does.
+func _on_ai_view_changed(on: bool) -> void:
+	CreatureLook.ai_view = on
 
 
 func _on_room_entered(_room_id: StringName) -> void:

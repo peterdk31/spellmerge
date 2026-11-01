@@ -137,6 +137,8 @@ const MODE_HORDE: StringName = &"horde"
 ## The actions of `sandbox_action_requested`.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
+## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
+const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
 ## The sandbox's staff, on every button, and the four basic staffs of Play and the horde by
 ## button (RB, RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
@@ -259,6 +261,7 @@ func _ready() -> void:
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
 	events.sandbox_action_requested.connect(_on_sandbox_action_requested)
+	events.sandbox_spawn_requested.connect(_on_sandbox_spawn_requested)
 	events.horde_requested.connect(_on_horde_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
@@ -569,6 +572,8 @@ func _on_sandbox_action_requested(player: int, action: StringName) -> void:
 		ACTION_IMP_WAVE:
 			if _enemy_data != null and _enemies.size() < WAVE_MAX:
 				_spawn_enemies(world, _room, _enemy_data, mini(WAVE.size(), WAVE_MAX - _enemies.size()))
+		ACTION_CLEAR_ENEMIES:
+			clear_sandbox_enemies()
 		ACTION_RESET_DUMMIES:
 			for dummy: Node in _dummies:
 				if is_instance_valid(dummy):
@@ -577,6 +582,38 @@ func _on_sandbox_action_requested(player: int, action: StringName) -> void:
 			_spawn_dummies(world, _room)
 		_:
 			push_warning("Flow: unknown sandbox action '%s'." % action)
+
+
+## The enemy arena's spawn (enemy AI AI8): `count` enemies of `enemy_id`. Ignored out of the sandbox.
+func _on_sandbox_spawn_requested(player: int, enemy_id: StringName, count: int) -> void:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
+	spawn_in_sandbox(enemy_id, count)
+
+
+## Put `count` enemies of the registry's `enemy_id` in the sandbox room, at its enemy spawns, while
+## fewer than WAVE_MAX are up (the enemy arena: to play against one kind, or tune it; tests use it
+## too). Returns how many came; 0 out of a sandbox run or for an unknown id.
+func spawn_in_sandbox(enemy_id: StringName, count: int) -> int:
+	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or registry == null:
+		return 0
+	var data: EnemyBase = registry.get_resource(&"enemies", enemy_id) as EnemyBase
+	if data == null or data.scene == null:
+		push_warning("Flow: no enemy '%s' to spawn in the sandbox." % enemy_id)
+		return 0
+	var room_left: int = WAVE_MAX - _enemies.size()
+	var wanted: int = clampi(count, 0, room_left)
+	var before: int = _enemies.size()
+	_spawn_enemies(world, _room, data, wanted)
+	return _enemies.size() - before
+
+
+## Every enemy the sandbox spawned goes (its dummies stay).
+func clear_sandbox_enemies() -> void:
+	for enemy: Node in _enemies:
+		if is_instance_valid(enemy):
+			_detach(enemy)
+	_enemies.clear()
 
 
 ## Add the wizard of a player who joined mid-run. Ignored while no run is up, and

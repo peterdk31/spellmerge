@@ -34,7 +34,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
 - [ ] **Enemy AI: the TeamBoard (AI6).** (`gameplay/ai/`) After AI5. Staggered fire is built (`TeamBoard.beat`); left: spreading round a target and the call (a Face glance at a teammate before a group attack).
 - [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
-- [ ] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
+- [x] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
 - [ ] **Enemy AI: bots on the brain (AI9).** (`tests/bots/`) After AI5.
 - [ ] **Enemy AI: difficulty (AI10).** (`gameplay/ai/`) After AI5 and once difficulty sends `difficulty_changed`.
 - [x] **Shared files split (staffs A2).** One combo per file in `content/spells/combos/` (read by `tests/support/combo_files.gd`, the clip scenarios and `tools/atlas.py`); `assets.json` beside a content folder's files, read with the manifests by `SpellValidator.load_manifest`; `test_combos` checks every registry component, and the icon and drop-list counts are derived. Owner session, 2026-10-26.

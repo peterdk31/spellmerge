@@ -26,6 +26,7 @@ cards = Array[StringName]([&"frost", &"pull", &"bolt"])
 [resource]
 script = ExtResource("1_base")
 id = &"rime_crook"
+display_name = "Rime Crook"
 demo = true
 max_health = 20.0
 move_speed = 40.0

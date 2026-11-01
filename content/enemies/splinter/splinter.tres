@@ -26,6 +26,7 @@ cards = Array[StringName]([&"dash"])
 [resource]
 script = ExtResource("1_base")
 id = &"splinter"
+display_name = "Splinter"
 demo = true
 max_health = 12.0
 move_speed = 60.0

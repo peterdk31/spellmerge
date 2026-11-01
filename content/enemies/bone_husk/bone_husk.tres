@@ -6,6 +6,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"bone_husk"
+display_name = "Bone Husk"
 demo = true
 max_health = 40
 move_speed = 30.0

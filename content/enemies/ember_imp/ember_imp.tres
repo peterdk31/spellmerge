@@ -26,6 +26,7 @@ cards = Array[StringName]([&"fire", &"bolt"])
 [resource]
 script = ExtResource("1_base")
 id = &"ember_imp"
+display_name = "Cinder Rod"
 demo = true
 max_health = 20.0
 move_speed = 45.0

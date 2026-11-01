@@ -1,0 +1,105 @@
+extends "res://tests/support/suite.gd"
+## Working together (enemy AI L2-L4, docs/milestones/M2-enemy-ai.md, "What is left"): the team
+## board's reports and a healer that heals its hurt teammates, never a wizard. Real cards from the
+## registry, enemies from the imp's scene with staffs made here, stepped by hand.
+##
+## godot --headless --path . --script res://tests/gameplay/ai/test_ai_team.gd
+
+const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
+const CombatScript := preload("res://gameplay/combat/combat.gd")
+
+var fx: Fixture
+## Heals landed, by the node healed (`hit_landed` of kind heal).
+var healed: Dictionary = {}
+
+
+func before_each() -> void:
+	fx = Fixture.new(root)
+	healed = {}
+	fx.bus.hit_landed.connect(_on_hit_landed)
+
+
+func after_each() -> void:
+	fx.free_all()
+
+
+func _on_hit_landed(_caster: int, target: Node, _amount: float, _at: Vector2, kind: StringName, _shot: int) -> void:
+	if kind == CombatScript.KIND_HEAL:
+		healed[target.get_instance_id()] = int(healed.get(target.get_instance_id(), 0)) + 1
+
+
+## A teammate standing at `at` (no staff, no walk), with `share` of its health left.
+func _hurt_mate(at: Vector2, share: float) -> Actor:
+	var data: EnemyBase = Fixture.staffed([])
+	data.max_health = 100.0
+	data.move_speed = 0.0
+	var body: Actor = fx.imp(at, data)
+	body.health.reset(100.0 * share)
+	return body
+
+
+func test_the_board_keeps_reports() -> void:
+	var board := TeamBoard.new()
+	var slot: int = board.report(1, 7, Vector2(10.0, 0.0), 0.5)
+	check_equal(board.mate(1, slot), 7, "a report takes a slot")
+	check_equal(board.mate_place(1, slot), Vector2(10.0, 0.0), "where it stands")
+	check_equal(board.mate_health(1, slot), 0.5, "and how hurt it is")
+	check_equal(board.report(1, 7, Vector2.ZERO, 0.4), slot, "the next report of the same actor keeps its slot")
+	check_equal(board.mate(2, slot), -1, "another team's row is empty")
+	board.step(TeamBoard.REPORT_LIFE + 0.1)
+	check_equal(board.mate(1, slot), -1, "an old report no longer counts")
+
+
+func test_a_crowd_keeps_its_hurt_on_the_board() -> void:
+	var board := TeamBoard.new()
+	board.report(1, 100, Vector2.ZERO, 0.2)
+	for i in TeamBoard.PLACES * 3:
+		board.step(0.01)
+		board.report(1, i, Vector2.ZERO, 1.0)
+	var kept: bool = false
+	for slot in TeamBoard.PLACES:
+		kept = kept or board.mate(1, slot) == 100
+	check(kept, "teammates that are not hurt make way first, so a hurt one stays for a healer")
+
+
+func test_it_heals_a_hurt_teammate_never_a_wizard() -> void:
+	# The wizard is hurt too, and as near: a heal is only ever for its own team.
+	fx.players[0].position = Vector2(-90.0, 0.0)
+	fx.players[0].health.reset(fx.players[0].health.max_health * 0.5)
+	var wizard_health: float = fx.players[0].health.health
+	var healer: Actor = fx.staffed_enemy([["mend", "bolt"]])
+	var mate: Actor = _hurt_mate(Vector2(0.0, 70.0), 0.3)
+	var brain: AIBrain = Fixture.ai(healer).brain
+	var healing: bool = false
+	for i in 64:
+		fx.run_all(1)
+		if brain.behaviour != null and brain.behaviour.name() == "heal ally":
+			healing = true
+			check(brain.plan_target == mate, "it aims its heal at the teammate")
+		check(fx.players[0].health.health <= wizard_health, "the wizard is never healed")
+	check(healing, "a hurt teammate in reach makes it heal")
+	check(int(healed.get(mate.get_instance_id(), 0)) > 0, "the teammate is healed: %s" % healed)
+	check(AIBrain.health_of(mate) > 0.3, "its health goes up: %.2f" % AIBrain.health_of(mate))
+	check_equal(int(healed.get(fx.players[0].get_instance_id(), 0)), 0, "no heal lands on the wizard")
+
+
+func test_it_leaves_a_teammate_that_is_well() -> void:
+	fx.players[0].position = Vector2(300.0, 0.0)
+	var healer: Actor = fx.staffed_enemy([["mend", "bolt"]])
+	_hurt_mate(Vector2(0.0, 70.0), 0.9)
+	var brain: AIBrain = Fixture.ai(healer).brain
+	for i in 32:
+		fx.run_all(1)
+		check(brain.behaviour == null or brain.behaviour.name() != "heal ally", "nobody to heal")
+	check(healed.is_empty(), "no heal cast: %s" % healed)
+
+
+func test_it_heals_itself_with_a_heal_that_lands_on_it() -> void:
+	fx.players[0].position = Vector2(300.0, 0.0)
+	var data: EnemyBase = Fixture.staffed([["mend"]])
+	data.max_health = 100.0
+	var healer: Actor = fx.imp(Vector2.ZERO, data)
+	healer.health.reset(30.0)
+	fx.run_all(48)
+	check(int(healed.get(healer.get_instance_id(), 0)) > 0, "hurt, it casts the heal that lands on it: %s" % healed)
+	check(healer.health.health > 30.0, "and its health goes up: %.1f" % healer.health.health)

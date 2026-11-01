@@ -33,7 +33,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
 - [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
 - [ ] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), "What is left", L1. First.
-- [ ] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2.
+- [x] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2. Done: `plan_target`, the board's reports, `behaviours/heal_ally.gd`, `CastSense.heals_self`; the combo test casts the heal-only combo.
 - [ ] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4.
 - [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
 - [x] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.

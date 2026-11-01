@@ -57,6 +57,9 @@ func test_moves_blocks_spawns_heals() -> void:
 	var mend: CastSense = _sense(["mend", "bolt"])
 	check(mend.heals, "a mend bolt heals")
 	check_equal(mend.damage, 0.0, "and hurts nobody")
+	check(not mend.heals_self, "it flies off, so it does not heal its caster")
+	var alone: CastSense = _sense(["mend"])
+	check(alone.heals and alone.heals_self, "a mend with no carrier lands on its caster and heals it")
 
 
 func test_held_and_sustained() -> void:

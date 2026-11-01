@@ -83,7 +83,8 @@ const REACTION_JITTER: float = 0.2
 var actor: Actor = null
 var profile: AIProfile = null
 var entities: EntitiesScript = null
-## The team board of its team (gameplay/ai/team_board.gd), or null: staggered fire and calls.
+## The team board (gameplay/ai/team_board.gd), or null: staggered fire, calls, and where its
+## teammates stand and how hurt they are (it reports itself at each decision).
 var board: TeamBoard = null
 ## Seeded per actor (`setup`), so a test repeats.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -124,6 +125,8 @@ var plan_staff: int = -1
 var plan_move: Move = Move.STAND
 var plan_way: Vector2 = Vector2.ZERO
 var plan_urgent: bool = false
+## What the planned staff is aimed at when not `target` (a teammate to heal); null for `target`.
+var plan_target: Node2D = null
 ## Per behaviour: a staff it picked in `want` for `act`, and a number it keeps (`AIBehaviour`).
 var picks: PackedInt32Array = PackedInt32Array()
 var memo: PackedFloat32Array = PackedFloat32Array()
@@ -155,6 +158,8 @@ var _strafe_side: float = 1.0
 ## Instance id of `target` when it was chosen, or 0 for none; `target` typed when an actor.
 var _target_id: int = 0
 var _target_actor: Actor = null
+## Its slot on the board at its last report (-1 for none).
+var _report_slot: int = -1
 
 
 ## Start driving `with_actor` by `with_profile` (null: the shared default). `seed_value` seeds its
@@ -330,11 +335,48 @@ func staffs_changed() -> void:
 	_decide_now = true
 
 
-## Behaviours ask: does the next cast `sense` reach the target from here?
-func reaches(sense: CastSense) -> bool:
+## Behaviours ask: does the next cast `sense` reach the target from here (or `other`, when
+## given: a teammate)?
+func reaches(sense: CastSense, other: Node2D = null) -> bool:
+	var far: float = distance if other == null else actor.global_position.distance_to(other.global_position)
+	var radius: float = _target_radius() if other == null else _radius_of(other)
 	if sense.reach > 0.0:
-		return distance <= sense.reach * 0.95 + _target_radius()
-	return distance <= maxf(sense.close_reach, 24.0) + _target_radius()
+		return far <= sense.reach * 0.95 + radius
+	return far <= maxf(sense.close_reach, 24.0) + radius
+
+
+## Behaviours ask: of its teammates the board has under `TeamBoard.HURT` (itself not), the most
+## hurt that a cast of `sense` reaches along a clear line, or null.
+func hurt_mate(sense: CastSense) -> Actor:
+	if board == null or actor.actors == null:
+		return null
+	var team: int = actor.team()
+	var best: Actor = null
+	var lowest: float = TeamBoard.HURT
+	for slot in TeamBoard.PLACES:
+		var who: int = board.mate(team, slot)
+		if who < 0 or who == actor.id or board.mate_health(team, slot) >= TeamBoard.HURT:
+			continue
+		if actor.actors.team_of(who) != team:
+			continue
+		var mate: Actor = actor.actors.node_of(who) as Actor
+		if mate == null or not _is_valid_target(mate):
+			continue
+		var share: float = health_of(mate)
+		if share >= lowest or not reaches(sense, mate):
+			continue
+		if sense.reach > 0.0 and not AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, mate.global_position + mate.body_offset):
+			continue
+		best = mate
+		lowest = share
+	return best
+
+
+## Behaviours ask: the health of `body` now, a share of its most (1 without Health).
+static func health_of(body: Actor) -> float:
+	if body == null or body.health == null or body.health.max_health <= 0.0:
+		return 1.0
+	return body.health.health / body.health.max_health
 
 
 ## Behaviours ask: a way to cover from the target within reach (a wall between), or ZERO.
@@ -392,7 +434,9 @@ func _perceive() -> void:
 		to_target = Vector2.ZERO
 		distance = 0.0
 		line_clear = true
-	health_fraction = actor.health.health / actor.health.max_health if actor.health != null and actor.health.max_health > 0.0 else 1.0
+	health_fraction = health_of(actor)
+	if board != null:
+		_report_slot = board.report(actor.team(), actor.id, actor.global_position, health_fraction, _report_slot)
 	_read_staffs()
 	_perceive_threat()
 
@@ -495,17 +539,23 @@ func _clear_plan() -> void:
 	plan_move = Move.STAND
 	plan_way = Vector2.ZERO
 	plan_urgent = false
+	plan_target = null
 
 
 # --- carrying it out ---
 
 
 func _chase(intent: ActorIntent) -> void:
-	if target == null:
+	var aimed: Node2D = _aim_node()
+	if aimed == null:
 		return
-	var now: Vector2 = target.global_position - actor.global_position
+	var now: Vector2 = aimed.global_position - actor.global_position
 	if now != Vector2.ZERO:
 		intent.aim = now
+	var aim_way: Vector2 = now
+	if aimed != target:
+		# The plan aims at a teammate; it walks as planned by its target.
+		now = target.global_position - actor.global_position if target != null else Vector2.ZERO
 	match plan_move:
 		Move.TOWARD:
 			if now.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH:
@@ -528,7 +578,7 @@ func _chase(intent: ActorIntent) -> void:
 	if not actor.caster.cast_ready(windup, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
-	_begin_windup(plan_staff, windup, now, intent)
+	_begin_windup(plan_staff, windup, aim_way, intent)
 
 
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:
@@ -561,14 +611,15 @@ func _release(intent: ActorIntent) -> void:
 func _channel(delta: float, intent: ActorIntent) -> void:
 	_channel_left -= delta * _pace()
 	var sense: CastSense = _chosen_sense
-	var keep: bool = _channel_left > 0.0 and target != null and sense != null and actor.caster != null
+	var aimed: Node2D = _aim_node()
+	var keep: bool = _channel_left > 0.0 and aimed != null and sense != null and actor.caster != null
 	if keep:
-		var now: Vector2 = target.global_position - actor.global_position
+		var now: Vector2 = aimed.global_position - actor.global_position
 		if profile.track_speed > 0.0 and now != Vector2.ZERO:
 			var turn: float = deg_to_rad(profile.track_speed) * delta * _pace()
 			var off: float = _locked_aim.angle_to(now)
 			_locked_aim = _locked_aim.rotated(clampf(off, -turn, turn))
-		keep = _in_lane(sense, now) and actor.caster.free_mana(chosen) >= sense.mana
+		keep = _in_lane(sense, now, _radius_of(aimed)) and actor.caster.free_mana(chosen) >= sense.mana
 	intent.aim = _locked_aim
 	if keep:
 		intent.hold(chosen, true)
@@ -578,16 +629,17 @@ func _channel(delta: float, intent: ActorIntent) -> void:
 	_state_left = recover_time
 
 
-## True while the target stands where a held cast along the aim still meets it.
-func _in_lane(sense: CastSense, now: Vector2) -> bool:
+## True while what it aims at (`now` away, `radius` round) stands where a held cast along the aim
+## still meets it.
+func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 	var reach: float = sense.reach if sense.reach > 0.0 else sense.close_reach
 	var along: float = now.dot(_locked_aim)
-	if along < -LANE_MARGIN or along > reach + LANE_MARGIN + _target_radius():
+	if along < -LANE_MARGIN or along > reach + LANE_MARGIN + radius:
 		return false
 	if sense.reach <= 0.0:
 		return true
 	var across: float = absf(now.cross(_locked_aim))
-	return across <= sense.radius + _target_radius() + LANE_MARGIN
+	return across <= sense.radius + radius + LANE_MARGIN
 
 
 func _to_chase() -> void:
@@ -595,14 +647,16 @@ func _to_chase() -> void:
 	_decide_now = true
 
 
-## Where to aim a cast of `sense` at the target `now` away: ahead of a moving one by its flight
-## (`lead`), then off by the profile's aim error, once.
+## Where to aim a cast of `sense` at what the plan aims at (`_aim_node`), `now` away: ahead of a
+## moving one by its flight (`lead`), then off by the profile's aim error, once.
 func _aim_for(sense: CastSense, now: Vector2) -> Vector2:
 	var point: Vector2 = now
-	if _target_actor != null:
-		point += _target_actor.body_offset - actor.body_offset
+	var aimed: Node2D = _aim_node()
+	var aimed_actor: Actor = aimed as Actor
+	if aimed_actor != null:
+		point += aimed_actor.body_offset - actor.body_offset
 	if sense != null and sense.speed > 0.0 and profile.lead > 0.0:
-		var body := target as CharacterBody2D
+		var body := aimed as CharacterBody2D
 		if body != null:
 			point += body.velocity * (point.length() / sense.speed) * profile.lead
 	if point == Vector2.ZERO:
@@ -638,6 +692,23 @@ func _reaction() -> float:
 
 func _target_radius() -> float:
 	return _target_actor.hurtbox.radius if _target_actor != null and _target_actor.hurtbox != null else 0.0
+
+
+func _radius_of(node: Node2D) -> float:
+	if node == target:
+		return _target_radius()
+	var other: Actor = node as Actor
+	return other.hurtbox.radius if other != null and other.hurtbox != null else 0.0
+
+
+## What the plan aims at: `plan_target` while it can be aimed at (let go once it cannot), else
+## the target.
+func _aim_node() -> Node2D:
+	if plan_target != null:
+		if _is_valid_target(plan_target):
+			return plan_target
+		plan_target = null
+	return target
 
 
 ## True when no wall stands between the actor's body and its target's (`AISight`).

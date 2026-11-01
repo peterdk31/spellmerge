@@ -235,22 +235,25 @@ func test_play_keeps_its_own_start_cards() -> void:
 	check_equal(flow.start_cards_for_mode(), flow.start_cards, "Play starts with start_cards")
 
 
-## The dev staff's mana (owner, 2026-11-01): in a `dev` or `preview` build the sandbox's wizards
-## get DEV_MANA as their pool and regen; a stable build keeps the scene's own numbers.
+## The dev staff's mana (owner, 2026-11-01): mana is the staff's, so in a `dev` or `preview` build
+## every staff of a sandbox wizard has the dev staff's pool and regen (a million); a stable build
+## keeps the starter heads' own.
 func test_dev_builds_give_practically_infinite_mana() -> void:
 	var was: String = flow.channel
+	var dev: StaffBase = root.get_node("Registry").call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
+	check(dev.max_mana >= 1000000.0 and dev.mana_regen >= 1000000.0, "the dev staff's pool and regen are practically infinite")
 	for name: String in ["dev", "preview", "stable"]:
 		flow.channel = name
 		_start(2)
-		var dev: bool = name != "stable"
-		check_equal(flow.dev_numbers(), dev, "%s: dev numbers" % name)
+		var dev_build: bool = name != "stable"
 		for wizard in _wizards():
-			if dev:
-				check_equal(wizard.caster.max_mana, FlowScript.DEV_MANA, "%s: the pool" % name)
-				check_equal(wizard.caster.regen, FlowScript.DEV_MANA, "%s: the regen" % name)
-				check_equal(wizard.caster.mana, FlowScript.DEV_MANA, "%s: it starts full" % name)
-			else:
-				check(wizard.caster.max_mana < FlowScript.DEV_MANA, "%s: the scene's own pool" % name)
+			for at in 4:
+				if dev_build:
+					check_equal(wizard.caster.max_mana_of(at), dev.max_mana, "%s: staff %d's pool" % [name, at])
+					check_equal(wizard.caster.staff_of(at).mana_regen, dev.mana_regen, "%s: staff %d's regen" % [name, at])
+					check_equal(wizard.caster.mana_of(at), dev.max_mana, "%s: staff %d starts full" % [name, at])
+				else:
+					check(wizard.caster.max_mana_of(at) < dev.max_mana, "%s: staff %d keeps its head's pool" % [name, at])
 		flow.stop_run()
 		for index in 4:
 			input.leave(index)

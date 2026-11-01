@@ -482,8 +482,6 @@ static func swarm_data(from: EnemyBase) -> EnemyBase:
 	var copy: EnemyBase = from.duplicate() as EnemyBase
 	copy.staff = null
 	copy.cards = [] as Array[StringName]
-	copy.max_mana = 0.0
-	copy.mana_regen = 0.0
 	copy.move_speed = SWARM_SPEED
 	copy.contact_damage = SWARM_CONTACT
 	return copy
@@ -615,7 +613,7 @@ func _keep_wizards_up() -> void:
 		var wizard: Actor = _wizards[index]
 		if not is_instance_valid(wizard):
 			continue
-		wizard.caster.mana = wizard.caster.max_mana
+		wizard.caster.set_mana(0, wizard.caster.max_mana_of(0))
 		_downs[index].revive(index)
 		_downs[index].protect(1.0)
 

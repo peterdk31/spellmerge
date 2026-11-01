@@ -47,11 +47,13 @@ extends Control
 ##   and, under a line, its numbers (`Spells.component_stats`; none for a trigger). An empty slot
 ##   says so. A refusal's note shows over its top for a moment.
 ## - **Numbers:** the hub in the ring's middle shows the staff's cycle when no card is pointed
-##   at: the mana of its dearest cast as a share of the wizard's mana (red with "!" above 100 %:
+##   at: the mana of its dearest cast as a share of that staff's own pool (red with "!" above 100 %:
 ##   it cannot be cast), the damage of the cycle (every shot landing once) and the cycle's time.
 ##
 ## What it shows comes only from events: `staff_changed` (the plain `Spells.staff_view`),
-## `bag_changed`, `build_refused` and `player_stats_changed` (the wizard's maximum mana). What it
+## `bag_changed`, `build_refused`, `player_stats_changed` (the wizard's health) and
+## `staff_mana_changed` (each staff's own pool: the MP bar and the shares are the viewed
+## staff's). What it
 ## asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested` (the whole
 ## staff: a push, a closed gap, an undo, a clear), so this node never changes a staff itself.
 ## It opens through `core/ui_focus` with itself as the one control, so its owner's gameplay
@@ -211,14 +213,15 @@ var _ui_focus: UIFocusScript = null
 var _spells: SpellsScript = null
 var _input: InputManagerScript = null
 
-## Mirrors of what the player announced: each staff's view, the bag, the wizard's maximum mana.
+## Mirrors of what the player announced: each staff's view, the bag, each staff's pool.
 var _plans: Array[Dictionary] = [{}, {}, {}, {}]
 var _bag: Array[StringName] = []
-var _max_mana: float = 100.0
-## The wizard's health and mana now, for the bars (negative until the first `player_stats_changed`).
+var _max_mana: PackedFloat32Array = PackedFloat32Array([100.0, 100.0, 100.0, 100.0])
+## The wizard's health (negative until the first `player_stats_changed`) and each staff's mana
+## now, for the bars.
 var _health: float = -1.0
 var _max_health: float = 100.0
-var _mana: float = 0.0
+var _mana: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 ## The ring's entries, one per card id and level in the bag: {id, level, count, kind}.
 var _entries: Array[Dictionary] = []
@@ -336,6 +339,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_events.bag_changed.connect(_on_bag_changed)
 		_events.build_refused.connect(_on_build_refused)
 		_events.player_stats_changed.connect(_on_stats_changed)
+		_events.staff_mana_changed.connect(_on_staff_mana_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.cancelled.connect(_on_cancelled)
@@ -455,7 +459,7 @@ func toggle_tree() -> void:
 
 
 func _sync_tree() -> void:
-	_tree.set_plan(_plans[_viewed], _max_mana)
+	_tree.set_plan(_plans[_viewed], _max_mana[_viewed])
 	_tree.set_marked(_slot)
 
 
@@ -495,11 +499,12 @@ func card_info() -> Dictionary:
 	}
 
 
-## The wizard's health and mana as the bars show them: shares of the maximum, 0 to 1.
+## The wizard's health and the viewed staff's mana as the bars show them: shares of the
+## maximum, 0 to 1.
 func bar_shares() -> Vector2:
 	if _health < 0.0:
 		return Vector2.ZERO
-	return Vector2(clampf(_health / maxf(_max_health, 1.0), 0.0, 1.0), clampf(_mana / maxf(_max_mana, 1.0), 0.0, 1.0))
+	return Vector2(clampf(_health / maxf(_max_health, 1.0), 0.0, 1.0), clampf(_mana[_viewed] / maxf(_max_mana[_viewed], 1.0), 0.0, 1.0))
 
 
 ## The lines the hub shows now.
@@ -972,9 +977,9 @@ func _numbers(plan: Dictionary) -> Dictionary:
 	return {"mana": mana, "damage": damage, "seconds": seconds}
 
 
-## The share of the wizard's mana, in whole percent.
+## The share of the viewed staff's pool, in whole percent.
 func _percent(mana: float) -> int:
-	return roundi(mana / maxf(_max_mana, 1.0) * 100.0)
+	return roundi(mana / maxf(_max_mana[_viewed], 1.0) * 100.0)
 
 
 func _number_lines(now: Dictionary, then: Dictionary) -> PackedStringArray:
@@ -1045,16 +1050,22 @@ func _on_build_refused(player: int, reason: String) -> void:
 	_say(reason)
 
 
-func _on_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float) -> void:
+func _on_stats_changed(player: int, health: float, max_health: float, _mana_shown: float, _max_mana_shown: float) -> void:
 	if player != index:
 		return
-	if max_mana > 0.0:
-		_max_mana = max_mana
 	_health = health
 	_max_health = maxf(max_health, 1.0)
-	_mana = mana
-	if _tree_open and max_mana > 0.0:
-		_tree.set_plan(_plans[_viewed], _max_mana)
+	_changed()
+
+
+func _on_staff_mana_changed(player: int, staff: int, mana: float, max_mana: float) -> void:
+	if player != index or staff < 0 or staff >= _mana.size():
+		return
+	_mana[staff] = mana
+	if max_mana > 0.0:
+		_max_mana[staff] = max_mana
+	if _tree_open and staff == _viewed and max_mana > 0.0:
+		_tree.set_plan(_plans[_viewed], _max_mana[_viewed])
 	_changed()
 
 

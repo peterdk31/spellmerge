@@ -121,7 +121,7 @@ extends Node
 ##   actor (an AI reads `reserved_mana`).
 ## A body that casts opens its caster with `open_caster(id)` and closes it with `close_caster`
 ## (its staffs, waiting launches, holds and beams end; its shots in the air fly on). Its siphon
-## refunds come as `mana_refund_requested(caster, amount)`, and `on hurt` fires on its
+## refunds come as `mana_refund_requested(caster, staff, amount)`, and `on hurt` fires on its
 ## `actor_hurt`.
 ##
 ## Order matters: a shot that spawns children (a payload on hit) must call `shot_started` for
@@ -2194,7 +2194,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, position: Vector2, slot: int) -> void:
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
-		_refund(actor, refund)
+		_refund(actor, SpellTag.staff_of(tag), refund)
 	var possess: float = spell.behaviour(ModifierBase.Behaviour.POSSESS)
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
@@ -2529,8 +2529,9 @@ func next_cast_mana(actor: int, staff: int) -> float:
 	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
 
 
-## True when the next cast of this actor's staff can leave within `within` seconds with `mana`:
-## its delay is no longer than that, and `mana` less what its sustained carriers hold
+## True when the next cast of this actor's staff can leave within `within` seconds with `mana`
+## (that staff's pool): its delay is no longer than that, and `mana` less what the staff's
+## sustained carriers hold
 ## (`reserved_mana`) pays `next_cast_mana`. False with no build. One call for what an enemy's AI
 ## asks every step while its target is in reach (performance pass, 2026-10-28).
 func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
@@ -2545,11 +2546,7 @@ func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 	var cost: float = 0.0
 	if _hold_tags[index].is_empty():
 		cost = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
-	var first: int = actor * SpellLimits.STAFFS
-	var reserved: float = 0.0
-	for at in SpellLimits.STAFFS:
-		reserved += _hold_mana[first + at]
-	return maxf(mana - reserved, 0.0) >= cost
+	return maxf(mana - _hold_mana[index], 0.0) >= cost
 
 
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
@@ -2580,11 +2577,11 @@ func _next_carrier(actor: int, staff: int) -> CompiledSpell:
 	return null if cast.group.is_empty() else cast.group.spells[0]
 
 
-## Siphon: mana comes back to the actor `actor`, whoever it is; its body (a wizard's player,
-## an enemy's AI) takes it from `mana_refund_requested`.
-func _refund(actor: int, amount: float) -> void:
+## Siphon: mana comes back to staff `staff` of the actor `actor`, whoever it is; its Caster
+## takes it from `mana_refund_requested`.
+func _refund(actor: int, staff: int, amount: float) -> void:
 	if events != null and actor >= 0 and actor < ACTORS:
-		events.mana_refund_requested.emit(actor, amount)
+		events.mana_refund_requested.emit(actor, staff, amount)
 
 
 ## The actor table: the injected one, else the projectile manager's (its own or the `Actors`
@@ -2693,7 +2690,7 @@ func _start_hold(tag: int) -> void:
 	if _hold_tags[index].is_empty():
 		_hold_mana[index] = _cast_mana_of(_installed[index], SpellTag.node_of(tag))
 	_hold_tags[index].append(tag)
-	_send_reserved(actor)
+	_send_reserved(actor, SpellTag.staff_of(tag))
 
 
 ## The mana of the cast of `compiled` that `node` belongs to (its own carrier or one of its
@@ -2739,7 +2736,7 @@ func _release_hold(index: int) -> void:
 			# remove_by_tag sends no shot_ended, so the counts are ended here.
 			for _n in projectiles.remove_by_tag(tag):
 				shot_ended(tag)
-	_send_reserved(floori(float(index) / SpellLimits.STAFFS))
+	_send_reserved(floori(float(index) / SpellLimits.STAFFS), index % SpellLimits.STAFFS)
 
 
 ## The last shot of `tag` ended: if it was a sustained carrier, it is off now.
@@ -2753,27 +2750,23 @@ func _end_hold_of(tag: int) -> void:
 	_hold_tags[index].remove_at(at)
 	if _hold_tags[index].is_empty():
 		_hold_mana[index] = 0.0
-		_send_reserved(SpellTag.caster_of(tag))
+		_send_reserved(SpellTag.caster_of(tag), SpellTag.staff_of(tag))
 
 
-## Mana this actor's sustained carriers hold, over all their staffs.
-func reserved_mana(actor: int) -> float:
-	var total: float = 0.0
-	if actor >= 0 and actor < ACTORS:
-		for staff in SpellLimits.STAFFS:
-			total += _hold_mana[actor * SpellLimits.STAFFS + staff]
-	return total
+## Mana the sustained carriers of this actor's staff `staff` hold from that staff's pool.
+func reserved_mana(actor: int, staff: int) -> float:
+	return _hold_mana[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0.0
 
 
-## Tells the HUD of the seat that drives `actor` what its sustained carriers hold (an AI reads
-## `reserved_mana` itself; the event is the seat's).
-func _send_reserved(actor: int) -> void:
+## Tells the HUD of the seat that drives `actor` what the sustained carriers of its staff
+## `staff` hold (an AI reads `reserved_mana` itself; the event is the seat's).
+func _send_reserved(actor: int, staff: int) -> void:
 	if events == null:
 		return
 	var table: ActorsScript = _actor_table()
 	var seat: int = table.seat_of(actor) if table != null else ActorsScript.NONE
 	if seat != ActorsScript.NONE:
-		events.mana_reserved.emit(seat, reserved_mana(actor))
+		events.mana_reserved.emit(seat, staff, reserved_mana(actor, staff))
 
 
 func _component(id: StringName) -> SpellComponent:

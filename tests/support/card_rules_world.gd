@@ -108,7 +108,10 @@ var _press_within: float = 0.0
 func _init(root: Node, shelf: Shelf, staff: StaffBase) -> void:
 	_root = root
 	_root_before = root.get_children()
-	_staff = staff
+	# Its own copy with a deep pool and no regen: the pool is the staff's.
+	_staff = staff.duplicate() as StaffBase
+	_staff.max_mana = MANA
+	_staff.mana_regen = 0.0
 	bus = EventsScript.new()
 	projectiles = ProjectilesScript.new()
 	projectiles.events = bus
@@ -293,8 +296,6 @@ func _body(label: StringName, centre: Vector2, mind: ActorController, cards: Arr
 		caster.staff_count = 1
 		caster.start_cards = [cards]
 		caster.staff = _staff
-		caster.max_mana = MANA
-		caster.regen = 0.0
 		body.add_child(caster)
 	if mind != null:
 		body.add_child(mind)
@@ -465,7 +466,7 @@ func _listen() -> void:
 		_put("ended %s %s %s at %s" % [_who(caster), kind, _node(tag), _at(at)]))
 	bus.entity_end_requested.connect(func(caster: int, tag: int) -> void:
 		_put("end %s %s" % [_who(caster), _node(tag)]))
-	bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void:
+	bus.mana_refund_requested.connect(func(caster: int, _at: int, amount: float) -> void:
 		_put("refund %s %s" % [_who(caster), str(snappedf(amount, 0.01))]))
 	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("blocked %s %s at %s" % [_who(caster), _node(tag), _at(at)]))

@@ -25,8 +25,10 @@ func after_each() -> void:
 ## The imp's numbers with no mana, so it chases and winds up never.
 func _broke() -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.max_mana = 0.0
-	data.mana_regen = 0.0
+	# Its own staff (a copy: the imp's is shared) with an empty pool.
+	data.staff = ImpData.staff.duplicate() as StaffBase
+	data.staff.max_mana = 0.0
+	data.staff.mana_regen = 0.0
 	return data
 
 

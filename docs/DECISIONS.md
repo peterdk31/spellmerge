@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-01: Every staff has its own mana pool (owner)
+
+- **Rule:** mana is a property of the staff (`StaffBase.max_mana`, `mana_regen`), not of the wizard. Each staff a body holds has its own pool, full when the body is set up (`Caster.mana_of(at)`, `max_mana_of(at)`); a cast pays from its own staff's pool only, a `hold` reserves from that pool only (`Spells.reserved_mana(actor, staff)`), siphon refunds the staff whose shot hit (`mana_refund_requested(caster, staff, amount)`), and `mana_reserved` names the staff. Replaces "one mana pool per player, shared by its staffs" (DESIGN.md).
+- **Why:** the owner asked for the sandbox's "practically infinite" mana on the dev staff alone, without a branch in Flow: with mana on the staff it is two numbers on `content/wizard/staffs/dev/dev.tres` (a million each), copied with the dev staff's other numbers (`Flow.DEV_FIELDS`). Chosen over a staff that only sizes one shared pool (the owner picked separate pools).
+- **Enemies:** their pool moved from `EnemyBase.max_mana`/`mana_regen` onto their staff sub-resource; the numbers are the same.
+- **HUD:** the corner panel's mana bar shows the pool of the staff on show (`player_stats_changed` carries it, and is also sent when another staff goes on show); `staff_mana_changed(player, staff, mana, max_mana)` reports every staff's pool, and the builder's MP bar and mana shares are the viewed staff's.
+- **Balance, open:** each starter head has the old wizard's numbers (100, 10 a second), so a wizard has four times the mana it had while using all four staffs. Left for a balance pass.
+
 ## 2026-10-31: The builder's tree view; copy/paste and cast names removed (owner)
 
 Design: [M2-builder-tree.md](milestones/M2-builder-tree.md), worked out over mockups rendered in the game at true scale.

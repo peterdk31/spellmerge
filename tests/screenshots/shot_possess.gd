@@ -41,7 +41,7 @@ func take() -> void:
 	theirs.left = SECONDS * 0.3
 	# The driven imp has taken a hit and cast once, so both bars are part full.
 	combat.call("hit", wizard.id, driven, 12)
-	driven.caster.mana = driven.caster.max_mana * 0.6
+	driven.caster.set_mana(0, driven.caster.max_mana_of(0) * 0.6)
 	await settle(20)
 	var centre: Vector2 = (driven.global_position + wizard.global_position) * 0.5 + Vector2(0.0, -20.0)
 	await snap(centre, "possess_4x", Vector2i(72, 36), 4)

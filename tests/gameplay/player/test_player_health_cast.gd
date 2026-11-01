@@ -123,7 +123,7 @@ func _ids(players: Array[Actor]) -> Array[int]:
 func _test_starts_full() -> void:
 	_setup(1)
 	_check(_players[0].health.health == _players[0].health.max_health, "a wizard starts with full health")
-	_check(_players[0].caster.mana == _players[0].caster.max_mana, "a wizard starts with full mana")
+	_check(_players[0].caster.mana_of(0) == _players[0].caster.max_mana_of(0), "a wizard starts with full mana")
 	_check(not _players[0].is_down(), "a wizard does not start downed")
 
 
@@ -205,11 +205,11 @@ func _test_mana_regenerates_up_to_max() -> void:
 	var caster: Caster = _players[0].caster
 	_arm(_players[0], 40.0, 0.0)
 	_check(caster.cast(0), "a cast with full mana fires")
-	_check(caster.mana == caster.max_mana - 40.0, "a cast takes the spell's cost")
+	_check(caster.mana_of(0) == caster.max_mana_of(0) - 40.0, "a cast takes the spell's cost")
 	_run(16)  # one second
-	_check(caster.mana == caster.max_mana - 40.0 + caster.regen, "mana regenerates per second")
+	_check(caster.mana_of(0) == caster.max_mana_of(0) - 40.0 + caster.staff_of(0).mana_regen, "mana regenerates per second")
 	_run(16 * 20)
-	_check(caster.mana == caster.max_mana, "mana stops at the maximum")
+	_check(caster.mana_of(0) == caster.max_mana_of(0), "mana stops at the maximum")
 
 
 func _test_cast_spends_mana_and_sends_event() -> void:
@@ -220,8 +220,8 @@ func _test_cast_spends_mana_and_sends_event() -> void:
 	_check(_fake.fired_players == [_players[1].id], "holding cast calls the runtime for this wizard's caster number")
 	_check(_fake.fired_slots == [0], "and for the active slot")
 	_check(_casts == [1] and _cast_ids == [&"bolt"], "spell_cast is sent with the player and the form id")
-	_check(_players[1].caster.mana < _players[1].caster.max_mana, "the cast took mana")
-	_check(_players[0].caster.mana == _players[0].caster.max_mana, "the other wizard's mana is untouched")
+	_check(_players[1].caster.mana_of(0) < _players[1].caster.max_mana_of(0), "the cast took mana")
+	_check(_players[0].caster.mana_of(0) == _players[0].caster.max_mana_of(0), "the other wizard's mana is untouched")
 
 
 func _test_cast_origin_stops_at_a_wall() -> void:
@@ -308,7 +308,7 @@ func _test_cast_needs_mana() -> void:
 	_check(caster.cast(0), "first cast fires")
 	_check(not caster.cast(0), "a second cast without enough mana is refused")
 	_check(_fake.fired_players.size() == 1 and _casts.size() == 1, "a refused cast sends nothing")
-	_check(caster.mana == caster.max_mana - 60.0, "a refused cast takes no mana")
+	_check(caster.mana_of(0) == caster.max_mana_of(0) - 60.0, "a refused cast takes no mana")
 
 
 func _test_no_spell_no_cast() -> void:
@@ -345,9 +345,9 @@ func _test_downed_mana_freezes() -> void:
 	_arm(_players[0], 10.0, 1.0)
 	_check(caster.cast(0), "a cast fires before the hit")
 	_hit(_players[0], _players[0].health.max_health)
-	var mana: float = caster.mana
+	var mana: float = caster.mana_of(0)
 	_run(16)
-	_check(caster.mana == mana, "a downed wizard does not regenerate mana")
+	_check(caster.mana_of(0) == mana, "a downed wizard does not regenerate mana")
 	_check(not caster.cast(0), "a downed wizard cannot cast")
 	_revive(_players[0], 1)
 	_check(caster.cast(0), "the cooldown ran in the runtime meanwhile, so the revived wizard casts")
@@ -365,7 +365,7 @@ func _test_two_players_cast_and_down_independently() -> void:
 	_revive(_players[0], 1)
 	_run(1)
 	_check(_fake.fired_players == [_players[1].id, _players[0].id], "player 0 casts again after the revive")
-	_check(_players[1].caster.mana < _players[1].caster.max_mana and _players[1].health.health == _players[1].health.max_health,
+	_check(_players[1].caster.mana_of(0) < _players[1].caster.max_mana_of(0) and _players[1].health.health == _players[1].health.max_health,
 		"player 1 lost mana, not health")
 
 

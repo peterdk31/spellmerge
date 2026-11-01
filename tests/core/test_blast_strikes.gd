@@ -60,7 +60,7 @@ func before_each() -> void:
 		_blasts.append(at))
 	_bus.caster_move_requested.connect(func(_caster: int, _mode: StringName, to: Vector2, _seconds: float, _tag: int) -> void:
 		_moves.append(to))
-	_bus.mana_refund_requested.connect(func(_caster: int, amount: float) -> void:
+	_bus.mana_refund_requested.connect(func(_caster: int, _at: int, amount: float) -> void:
 		_refunds.append(amount))
 	_form(&"bolt", 300.0, 1.0)
 	var decoy: FormBase = _form(&"decoy", 0.0, 2.0)

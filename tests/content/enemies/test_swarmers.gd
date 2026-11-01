@@ -35,7 +35,6 @@ func test_each_is_demo_content_with_its_own_id() -> void:
 	for data in _swarmers():
 		check(data.demo, "%s: in every build, so the horde has it on the web too" % data.id)
 		check(data.staff == null and data.cards.is_empty(), "%s: no staff and no cards" % data.id)
-		check_equal(data.max_mana, 0.0, "%s: no mana" % data.id)
 		check(data.contact_damage > 0, "%s: hurts by touch" % data.id)
 
 

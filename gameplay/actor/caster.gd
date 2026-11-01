@@ -6,15 +6,17 @@ extends ActorComponent
 ## installs it in `Spells` under the actor's caster number (`number`). `current` is the staff on
 ## show (living staffs H3): the one pressed or held last, set before it casts, so the cast leaves
 ## from that staff's tip (`tip`, `Actor.muzzle_position`); a change sends `staff_shown` (living
-## staffs H4: Feel's poof). Every step it gets mana back (`regen` a second and what siphon refunds, up
-## to `max_mana`), tells the systems where the actor is and aims when it moved, turned or showed
+## staffs H4: Feel's poof). Every staff has its own mana pool (owner, 2026-11-01), sized by the
+## staff (`StaffBase.max_mana`, `mana_regen`) and full when the actor is set up: `mana_of(at)`,
+## `max_mana_of(at)`. Every step each pool gets mana back (its staff's regen a second, and what
+## siphon on that staff's shots refunds, up to its staff's maximum), it tells the systems where the actor is and aims when it moved, turned or showed
 ## another staff (the projectile manager's anchor for its orbits at the body, Spells' aim from the
 ## staff tip for its beams; sent again before each cast), and casts the staffs
 ## the intent asks for: a staff pressed this step, or held while it holds no sustained (`hold`)
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
-## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with the
-## free mana (`free_mana`: what it has minus what its sustained cards hold) and pays what Spells
-## took, then sends `actor_cast` (any actor's cast, for visual reactions).
+## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with that
+## staff's free mana (`free_mana(at)`: its pool minus what its sustained cards hold) and pays what
+## Spells took from that pool, then sends `actor_cast` (any actor's cast, for visual reactions).
 ##
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and
@@ -53,11 +55,6 @@ signal staff_built(at: int)
 @export var staffs: Array[StaffBase] = []
 ## The card ids built into each staff when the actor is ready (a list per staff).
 @export var start_cards: Array = []
-## The mana pool, full at the start, and the mana back a second.
-@export var max_mana: float = 100.0
-@export var regen: float = 10.0
-
-var mana: float = 100.0
 ## The staff on show: the one pressed or held last (0 at the start).
 var current: int = 0
 ## The number the actor casts under in Spells (and is the anchor of in the projectile manager),
@@ -69,6 +66,8 @@ static var _cache: Dictionary = {}
 
 ## The card ids of each staff, `slots` long (`&""` is an empty slot), and whether it can cast.
 var _cards: Array = []
+## The mana each staff holds now, by button (`mana_of`).
+var _mana: PackedFloat32Array = PackedFloat32Array()
 var _has_build: PackedByteArray = PackedByteArray()
 ## True once the start cards were built (the first attach).
 var _built: bool = false
@@ -88,7 +87,9 @@ var _placed_pivot: Vector2 = Vector2.INF
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	staff_count = clampi(staff_count, 1, MAX_STAFFS)
-	mana = max_mana
+	_mana.resize(MAX_STAFFS)
+	for at in MAX_STAFFS:
+		_mana[at] = max_mana_of(at)
 	_cards.resize(MAX_STAFFS)
 	for at in MAX_STAFFS:
 		var empty: Array[StringName] = []
@@ -136,7 +137,9 @@ func step(delta: float) -> void:
 			actor.spells.clear_aim(number)
 		_placed_feet = Vector2.INF
 		return
-	mana = minf(mana + regen * delta, max_mana)
+	for at in staff_count:
+		var base: StaffBase = staff_of(at)
+		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
 		# was sent (performance pass, 2026-10-28).
@@ -211,20 +214,36 @@ func cast(at: int) -> bool:
 	var origin: Vector2 = _origin()
 	var direction: Vector2 = actor.aim
 	# The way the body walks, for a dash it casts (staffs A6a).
-	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana(), actor.intent.move)
+	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana(at), actor.intent.move)
 	if spent == SpellsScript.REFUSED:
 		return false
-	mana = maxf(mana - spent, 0.0)
+	_mana[at] = maxf(_mana[at] - spent, 0.0)
 	cast_done.emit(at, origin, direction)
 	if actor.events != null:
 		actor.events.actor_cast.emit(actor.id, actor)
 	return true
 
 
-## Mana a cast may use now: what the actor has, minus what its sustained cards hold.
-func free_mana() -> float:
-	var reserved: float = actor.spells.reserved_mana(number) if actor.spells != null and number >= 0 else 0.0
-	return maxf(mana - reserved, 0.0)
+## The mana staff `at` holds now (0 for a staff that does not exist).
+func mana_of(at: int = 0) -> float:
+	return _mana[at] if at >= 0 and at < _mana.size() else 0.0
+
+
+## The most mana staff `at` holds: its staff's pool.
+func max_mana_of(at: int = 0) -> float:
+	return staff_of(at).max_mana
+
+
+## Set the mana staff `at` holds, kept within 0 and its maximum (tests, a sandbox refill).
+func set_mana(at: int, value: float) -> void:
+	if at >= 0 and at < _mana.size():
+		_mana[at] = clampf(value, 0.0, max_mana_of(at))
+
+
+## Mana a cast of staff `at` may use now: its pool, minus what its sustained cards hold.
+func free_mana(at: int = 0) -> float:
+	var reserved: float = actor.spells.reserved_mana(number, at) if actor.spells != null and number >= 0 else 0.0
+	return maxf(mana_of(at) - reserved, 0.0)
 
 
 ## True when staff `at` has a build that can cast.
@@ -318,7 +337,7 @@ func next_cast_radius(at: int = 0) -> float:
 ## longer than that and the mana is there.
 func cast_ready(within: float, at: int = 0) -> bool:
 	# An AI asks every step while its target is in reach: one call to Spells.
-	return has_staff(at) and actor.spells.cast_ready(number, at, within, mana)
+	return has_staff(at) and actor.spells.cast_ready(number, at, within, mana_of(at))
 
 
 ## Name the actor's hurt circle as its caster number's (its actor id), so its own spells pass
@@ -381,9 +400,10 @@ func _close_number() -> void:
 	_has_build.fill(0)
 
 
-## Siphon gives mana back as an event for its caster number, whoever drives it; never above
-## `max_mana`.
-func _on_mana_refund(caster: int, amount: float) -> void:
+## Siphon gives mana back as an event for its caster number and the staff that cast the shot,
+## whoever drives it; never above that staff's maximum.
+func _on_mana_refund(caster: int, at: int, amount: float) -> void:
 	if number < 0 or caster != number or actor.is_down() or not is_finite(amount) or amount <= 0.0:
 		return
-	mana = minf(mana + amount, max_mana)
+	if at >= 0 and at < staff_count:
+		_mana[at] = minf(_mana[at] + amount, max_mana_of(at))

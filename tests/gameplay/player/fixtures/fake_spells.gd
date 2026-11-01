@@ -127,7 +127,7 @@ class SetPoses:
 		return set_poses[actor][n] if set_poses.has(actor) and set_poses[actor].size() > n else none
 
 
-func is_holding(_player: int, _staff: int) -> bool:
+func is_holding(_player: int, _at: int) -> bool:
 	return false
 
 

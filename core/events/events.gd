@@ -94,10 +94,10 @@ signal entity_spawn_requested(caster: int, kind: StringName, position: Vector2, 
 signal entity_end_requested(caster: int, tag: int)
 ## Sender: ai. The entity of the actor `caster` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
 signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
-## Sender: core/spells. Mana of the actor `caster` comes back (siphon). Heard by player and ai, each for its own actor.
-signal mana_refund_requested(caster: int, amount: float)
-## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
-signal mana_reserved(player: int, amount: float)
+## Sender: core/spells. Mana of the actor `caster`'s staff `staff` (the staff whose shot hit) comes back (siphon). Heard by every actor's Caster, each for its own actor.
+signal mana_refund_requested(caster: int, staff: int, amount: float)
+## Sender: core/spells. `amount` of the mana of staff `staff` of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
+signal mana_reserved(player: int, staff: int, amount: float)
 ## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges (or a carrier's own shield did: `Projectiles.impact_form` is then that carrier's id, `swing`, `beam`, `slam` or `decoy`, while this is sent; a swing's is a parry). Heard by core/spells and feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal shot_blocked(caster: int, position: Vector2, tag: int, shot: int)
 ## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `shot`. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29) and feel (the deflect's flash). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
@@ -146,8 +146,10 @@ signal player_downed(player: int)
 signal player_revived(player: int, reviver: int)
 ## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes (so every frame while a revive fills or drains); 0 means the revive stopped or is done.
 signal revive_progress(player: int, progress: float)
-## Sender: player. The health or the whole-number mana of `player`'s own wizard changed (also while the seat drives another actor or an enemy drives the wizard), or the wizard appeared. Carries all the numbers so a listener never has to ask.
+## Sender: player. The health of `player`'s own wizard, the whole-number mana of its staff on show (`Caster.current`; every staff has its own pool), or which staff is on show changed (also while the seat drives another actor or an enemy drives the wizard), or the wizard appeared. Carries all the numbers so a listener never has to ask.
 signal player_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float)
+## Sender: player. The whole-number mana of staff `staff` (0-3) of `player`'s own wizard changed, or the wizard appeared: that staff's own pool (owner, 2026-11-01). Heard by the builder (the viewed staff's bar and mana shares).
+signal staff_mana_changed(player: int, staff: int, mana: float, max_mana: float)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.

@@ -284,10 +284,10 @@ func test_a_held_carriers_echo_is_a_second_held_copy_switched_off_with_it() -> v
 	# Rules R4e (owner, 2026-10-29): it used to be skipped silently.
 	_build(0, [&"echo", &"hold", &"bolt"])
 	var mana: float = _cast()
-	check_equal(_spells.reserved_mana(0), mana, "the hold reserves its cast")
+	check_equal(_spells.reserved_mana(0, 0), mana, "the hold reserves its cast")
 	_tick(30)
 	check_equal(_mgr.get_count(), 2, "the held shot and its echo")
-	check_equal(_spells.reserved_mana(0), mana, "the echo reserves nothing more")
+	check_equal(_spells.reserved_mana(0, 0), mana, "the echo reserves nothing more")
 	_cast()
 	check_equal(_mgr.get_count(), 0, "one press switches both off")
 	_tick(30)

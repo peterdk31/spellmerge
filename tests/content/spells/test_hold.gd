@@ -35,7 +35,7 @@ func _combo(id: String) -> Dictionary:
 func _play(combo: Dictionary, drop: String = "", again: bool = false) -> Array:
 	var arena := ArenaScript.new(root)
 	var reserved: Array[float] = [0.0]
-	arena.bus.mana_reserved.connect(func(seat: int, amount: float) -> void:
+	arena.bus.mana_reserved.connect(func(seat: int, _at: int, amount: float) -> void:
 		if seat == 0:
 			reserved[0] = amount)
 	for at: Array in combo["imps"]:
@@ -109,7 +109,7 @@ func test_the_next_cast_switches_it_off_and_frees_the_mana() -> void:
 func test_four_players_hold_each() -> void:
 	var arena := ArenaScript.new(root)
 	var reserved: Dictionary = {}
-	arena.bus.mana_reserved.connect(func(seat: int, amount: float) -> void: reserved[seat] = amount)
+	arena.bus.mana_reserved.connect(func(seat: int, _at: int, amount: float) -> void: reserved[seat] = amount)
 	for player in 4:
 		arena.place_caster(player, Vector2(0.0, 150.0 * player))
 		arena.install_cards(player, 0, ["hold", "fire", "orbit"])
@@ -139,7 +139,7 @@ func _payload_node(compiled: CompiledStaff) -> int:
 func test_a_held_payload_holds_and_the_next_cast_ends_it() -> void:
 	var arena := ArenaScript.new(root)
 	var reserved: Array[float] = [0.0]
-	arena.bus.mana_reserved.connect(func(seat: int, amount: float) -> void:
+	arena.bus.mana_reserved.connect(func(seat: int, _at: int, amount: float) -> void:
 		if seat == 0:
 			reserved[0] = amount)
 	arena.add_imp(Vector2(60.0, 0.0), 100000)
@@ -154,13 +154,13 @@ func test_a_held_payload_holds_and_the_next_cast_ends_it() -> void:
 	arena.run(LONG + 1.0)
 	check(arena.spells.live_shots(tag) > 0, "the held orbit outlives its lifetime")
 	check(arena.spells.is_holding(0, 0), "and switches its staff on")
-	check_equal(arena.spells.reserved_mana(0), compiled.casts[0].mana, "it reserves the cast's mana")
+	check_equal(arena.spells.reserved_mana(0, 0), compiled.casts[0].mana, "it reserves the cast's mana")
 	check_equal(reserved[0], compiled.casts[0].mana, "and tells the seat's HUD")
 	check(arena.cast(0, 0), "the next press is taken")
 	arena.run(0.5)
 	check_equal(arena.spells.live_shots(tag), 0, "and switches the held orbit off")
 	check(not arena.spells.is_holding(0, 0), "the staff holds nothing")
-	check_equal(arena.spells.reserved_mana(0), 0.0, "and its mana is free")
+	check_equal(arena.spells.reserved_mana(0, 0), 0.0, "and its mana is free")
 	check_equal(reserved[0], 0.0, "the HUD hears it")
 	arena.free_all()
 
@@ -179,7 +179,7 @@ func test_a_held_payload_of_an_edited_build_lives_its_own_life() -> void:
 	arena.run(1.0)
 	check(arena.spells.live_shots(tag) > 0, "the old bolt hit and fired its orbit")
 	check(not arena.spells.is_holding(0, 0), "which switches nothing on")
-	check_equal(arena.spells.reserved_mana(0), 0.0, "and reserves nothing")
+	check_equal(arena.spells.reserved_mana(0, 0), 0.0, "and reserves nothing")
 	arena.run(LONG)
 	check_equal(arena.spells.live_shots(tag), 0, "it ends after an orbit's lifetime")
 	arena.free_all()

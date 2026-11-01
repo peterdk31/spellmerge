@@ -35,7 +35,7 @@ extends Node
 ## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3): every wizard gets the four
 ## staffs of the build channel (`staffs_for_channel`: the starter heads STARTER_HEADS, one per
 ## button, from `content/wizard/staffs/`; in `dev` and `preview` builds each with the numbers of
-## the `dev` staff, its slots, delay and recharge, and DEV_MANA, mana and regen practically without end) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
+## the `dev` staff, its slots, delay and recharge, and its mana pool and regen, a million each) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
 ## Y and B empty), and builds them itself; flow never touches a spell.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
@@ -140,9 +140,9 @@ const DEV_STAFF: StringName = &"dev"
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## The build channels that get the dev staff (`BuildInfo.channel()`).
 const DEV_CHANNELS: Array[String] = ["dev", "preview"]
-## A wizard's mana and its regen a second wherever the dev staff's numbers are used (owner,
-## 2026-11-01: "practically infinite"), so any build can be tried at once and held down.
-const DEV_MANA: float = 1000000.0
+## The dev staff's numbers a test build's starter heads take: its slots, delay and recharge, and
+## its mana pool and regen (a million each, owner 2026-11-01: "practically infinite").
+const DEV_FIELDS: Array[String] = ["slots", "draw", "cast_delay", "recharge", "spread", "max_mana", "mana_regen"]
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -814,12 +814,6 @@ func staffs_for_channel() -> Array[StaffBase]:
 
 ## The four staffs a wizard of this run's `mode` holds: the horde's are the plain starter heads in
 ## every channel (made once); every other mode's are `staffs_for_channel`.
-## True when this run's wizards hold the dev staff's numbers (and DEV_MANA): a `dev` or
-## `preview` build, in every mode but the horde.
-func dev_numbers() -> bool:
-	return mode != MODE_HORDE and DEV_CHANNELS.has(channel)
-
-
 func staffs_for_mode() -> Array[StaffBase]:
 	if mode != MODE_HORDE:
 		return staffs_for_channel()
@@ -855,7 +849,7 @@ func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
 			return out
 		if dev != null:
 			head = head.duplicate() as StaffBase
-			for field: String in ["slots", "draw", "cast_delay", "recharge", "spread"]:
+			for field: String in DEV_FIELDS:
 				head.set(field, dev.get(field))
 		out.append(head)
 	return out
@@ -865,12 +859,6 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	var wizard := _wizard_scene.instantiate() as Actor
 	var cards: Array = start_cards_for_mode()
 	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode())
-	if dev_numbers():
-		# Before it enters the tree, where the caster fills its pool to max_mana.
-		for child: Node in wizard.get_children():
-			if child is Caster:
-				(child as Caster).max_mana = DEV_MANA
-				(child as Caster).regen = DEV_MANA
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

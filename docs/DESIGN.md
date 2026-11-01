@@ -29,7 +29,7 @@ Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, swap, w
 Spell rules (chosen on 2026-10-26, the pivot at C2):
 
 - **Everything hurts everything** (the owner, 2026-10-28): a spell hurts every body it hits, its caster's included. Players' spells hurt each other, and enemies' spells hurt enemies; there is no friendly-fire setting. Teams only decide whom things aim at (the AI, homing), never whom a hit hurts.
-- **One mana pool per player**, shared by its staffs; sustained spells reserve part of it.
+- **Every staff has its own mana pool** (the owner, 2026-11-01; was one pool per player): the staff sets its size and regen, a cast pays from its own staff's pool, and sustained spells reserve part of that pool.
 - **No build limits** beyond what the engine needs to run; limits are added only when measurements ask for them.
 - **Small shots:** a shot is a small core; its cards add its look in layers.
 - **Test builds are a sandbox:** preview builds start in a room with large staffs, every card and a training dummy.

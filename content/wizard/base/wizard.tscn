@@ -41,8 +41,6 @@ body_radius = 6.0
 [node name="Caster" type="Node" parent="."]
 script = ExtResource("13_caster")
 staff_count = 4
-max_mana = 100.0
-regen = 10.0
 
 [node name="Downed" type="Node" parent="."]
 script = ExtResource("14_downed")

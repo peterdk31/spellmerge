@@ -1307,6 +1307,14 @@ func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
 	return from.lerp(to, t)
 
 
+## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall and
+## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
+## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
+func line_clear(from: Vector2, to: Vector2) -> bool:
+	var cells: int = ceili(from.distance_to(to) / WALL_CELL) * 2 + 2
+	return _wall_hit(from, to, maxi(cells, MAX_WALL_VISITS)) < 0.0
+
+
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell
 ## (checked at the centre and eight points on its rim, each in its 8-pixel cell).
 func circle_blocked(center: Vector2, radius: float) -> bool:

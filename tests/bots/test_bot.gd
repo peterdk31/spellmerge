@@ -45,7 +45,7 @@ func _check(condition: bool, message: String) -> void:
 
 ## The bot calls these by name; a rename must fail here, not silently at runtime.
 func _test_names_exist(events: Node) -> void:
-	for method in ["add_virtual_device", "send_virtual", "leave"]:
+	for method in ["add_virtual_device", "send_virtual", "send_virtual_aim", "leave"]:
 		_check(_input.has_method(method), "PlayerInput has %s" % method)
 	_check(_input.get("NO_DEVICE") != null, "PlayerInput has NO_DEVICE")
 	for method in ["get_wizard", "stop_run"]:
@@ -105,6 +105,39 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	_check(own, "all build calls are for the bot's own player and staff 3")
 	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
+
+
+## A threat's windup (owner, 2026-11-01): the bot finds cover behind any wall near it (only
+## where it would go, no dash of its own); its one way of moving dashes when getting somewhere
+## is urgent and the dash staff is ready, once per urgency, the way it walks. So it dashes into
+## cover, or off the line, with no case for either; it never asks what its staffs cast.
+func _test_cover_or_dash(bot: BotScript, wizard: Actor) -> void:
+	var projectiles: Node = wizard.projectiles
+	var at: Vector2 = wizard.global_position
+	var threat := Node2D.new()
+	threat.position = at + Vector2(150.0, 0.0)
+	root.add_child(threat)
+	var dashes: int = int(_input.call("get_press_count", 0, &"staff_1"))
+	projectiles.call("set_walls", [] as Array[Rect2])
+	bot.call("_seek_cover", wizard, threat)
+	_check(bot.get("_cover") == Vector2.ZERO, "no wall near: no cover")
+	projectiles.call("set_walls", [Rect2(at + Vector2(16.0, 12.0), Vector2(32.0, 32.0))] as Array[Rect2])
+	bot.call("_seek_cover", wizard, threat)
+	var cover: Vector2 = bot.get("_cover")
+	_check(cover != Vector2.ZERO, "a wall near: a way to cover")
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes, "finding cover dashes nothing by itself")
+	bot.call("_move", wizard, cover, false)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes, "a calm move walks, no dash")
+	bot.call("_move", wizard, cover, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "an urgent move with the dash ready dashes")
+	bot.call("_move", wizard, cover, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "once per urgency")
+	bot.call("_move", wizard, Vector2.ZERO, false)
+	bot.call("_move", wizard, Vector2.ZERO, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "standing still (in cover) dashes nowhere")
+	projectiles.call("set_walls", [] as Array[Rect2])
+	bot.call("_release")
+	threat.free()
 
 
 ## An enemy actor at `at` under `parent`; an AI drives it (set once it is ready, which takes
@@ -169,6 +202,7 @@ func _test_fighter(events: Node) -> void:
 		var other := _flow.call("get_wizard", 1) as Node2D
 		_check(other != null and other.global_position != wizard.global_position, "each bot steers its own wizard")
 		_test_build_random(events, bots[0], wizard)
+		_test_cover_or_dash(bots[0], wizard as Actor)
 	_flow.call("stop_run")
 	for bot in bots:
 		bot.step(0.016)

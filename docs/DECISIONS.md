@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-01: AIs handle walls; the bot is a state machine (owner)
+
+- **Why:** a bot holding a wall staff with its bolt stood its wall in front of its own bolts every cast and stalled the 4-bot run; the bots had to leave `wall` out of their builds. The owner asked for AIs that handle walls, useful for enemies too, and suggested the AI be a state machine.
+- **Sight:** `AISight` (gameplay/ai/sight.gd) is how every AI sees walls: the projectile manager's wall grid, which holds the room's walls and every live Wall card, the same grid shots stop on. Chosen over physics rays (what the bot used), so the enemies and the bots agree and nothing needs a physics query.
+- **Enemies:** a new state, REPOSITION: an aimed cast is never wound up into a wall; the enemy walks round it first. A cast that is not aimed (nova, orbit) ignores walls as before.
+- **No AI knows what it casts next (owner):** an AI reads the world, not its own staffs: it walks round whatever stands in its line of fire and seeks cover behind whatever wall is near (`AISight.cover`), whoever made it. A first try had the bot ask whether a staff's next cast was a wall (a `BLOCKS` carrier trait and `next_cast_traits`) and keep it for cover; the owner turned it down, and it is gone. Which staff an AI should fire, and when, needs its own design.
+- **Dashing emerges (owner):** the bot does not dash as part of a dodge. A state says where to go and whether it is urgent; the one move step walks there and, when urgent with the dash staff ready, dashes once (a dash goes the way the body walks). Dashing into cover and dashing off a shot's line are the same code.
+- **Minions (an idea, not built):** the owner asked that a future minion card need only an AI controller. It does: an actor's team is its driver's, so an `AIController` of the players' team handed an enemy (`Actor.drive`) makes it fight the other enemies with its own staff, walls included; `release` makes it an enemy again (`tests/gameplay/ai/test_ai_staff.gd`). Turning an object (a shot, a wall) into one would first need an actor body for it, as decoys and familiars get.
+- **State machine:** the bot's flags and counters became one `State` (APPROACH, ATTACK, DETOUR, UNSTICK, DODGE), an enum and a `match` like the enemy AI's, not a framework of state objects: nothing is allocated per step, and a new state is a new enum value and a branch.
+
 ## 2026-11-01: Every staff has its own mana pool (owner)
 
 - **Rule:** mana is a property of the staff (`StaffBase.max_mana`, `mana_regen`), not of the wizard. Each staff a body holds has its own pool, full when the body is set up (`Caster.mana_of(at)`, `max_mana_of(at)`); a cast pays from its own staff's pool only, a `hold` reserves from that pool only (`Spells.reserved_mana(actor, staff)`), siphon refunds the staff whose shot hit (`mana_refund_requested(caster, staff, amount)`), and `mana_reserved` names the staff. Replaces "one mana pool per player, shared by its staffs" (DESIGN.md).

@@ -17,7 +17,7 @@ static func of(spells: SpellRuntime) -> CarrierDecoy:
 
 
 func traits() -> int:
-	return LASTS | GUARDS | SPEED | SHOTS | SPREAD | MEETS_SHOTS
+	return LASTS | GUARDS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS
 
 
 ## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as

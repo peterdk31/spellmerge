@@ -103,6 +103,7 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	if _cast.recharges and staff != null:
 		_cast.delay += staff.recharge
 	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.delay), ", then recharge" if _cast.recharges else ""]
+	_cast.sense = CastSense.of(_cast)
 	return _cast
 
 

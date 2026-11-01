@@ -329,6 +329,12 @@ func next_cast_reach(at: int = 0) -> float:
 	return actor.spells.next_cast_reach(number, at) if has_staff(at) else 0.0
 
 
+## What the next cast of staff `at` does (`Spells.next_cast_sense`, a `CastSense`), or null with
+## no build: what an AI reads to play whatever staffs the actor holds (docs/milestones/M2-enemy-ai.md).
+func next_cast_sense(at: int = 0) -> CastSense:
+	return actor.spells.next_cast_sense(number, at) if has_staff(at) else null
+
+
 ## The hit radius of the next cast's first carrier (0 for none).
 func next_cast_radius(at: int = 0) -> float:
 	return actor.spells.next_cast_radius(number, at) if has_staff(at) else 0.0

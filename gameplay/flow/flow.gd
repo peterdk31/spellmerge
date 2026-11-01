@@ -32,11 +32,14 @@ extends Node
 ## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
 ## new wizard builds its start staffs again).
 ##
-## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3): every wizard gets the four
-## staffs of the build channel (`staffs_for_channel`: the starter heads STARTER_HEADS, one per
-## button, from `content/wizard/staffs/`; in `dev` and `preview` builds each with the numbers of
-## the `dev` staff, its slots, delay and recharge, and its mana pool and regen, a million each) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
-## Y and B empty), and builds them itself; flow never touches a spell.
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3; owner 2026-11-01: one
+## staff file per setup, used as it is): every wizard gets the four staffs of its run's mode
+## (`staffs_for_mode`), straight from the registry under `wizard`, never copied or changed: in
+## Play and the horde the four basic staffs STARTER_HEADS (`content/wizard/staffs/`, one per
+## button, each its own head), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
+## no delay, practically infinite mana). The build channel plays no part. With them the mode's
+## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `fire bolt`, Y and B empty),
+## which the wizard builds itself; flow never touches a spell.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -61,16 +64,16 @@ extends Node
 ## `sandbox_action_requested`: `imp_wave` adds a wave of imps (wave 1's size, while fewer than
 ## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
 ## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
-## keep their staffs, instead of a restart. Its wizards start with SANDBOX_START_CARDS, not
-## `start_cards`: Play's A and X, and two showcase builds on Y (the most shots) and B (a decoy
-## turret).
+## keep their staffs, instead of a restart. Its wizards hold four `dev` staffs and start with
+## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
+## builds on Y (the most shots) and B (a decoy turret).
 ##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX (above) or MODE_HORDE.
 ##
 ## Horde (docs/milestones/horde.md, H2): `horde_requested` (the main menu's Horde button, in every
 ## build) loads like Play (no intro) and starts a run in the room `horde` (HORDE_ROOM_ID): a wizard
-## per joined player, no waves and no dummies; every wizard holds the four plain starter staffs
-## in every build channel (never the dev numbers, so it plays the same everywhere) with
+## per joined player, no waves and no dummies; every wizard holds the four basic staffs, as in
+## Play, with
 ## HORDE_START_CARDS (a dash staff and a swing staff). `room_entered(&"horde")` is followed by `horde_started(world)`. Flow spawns no
 ## enemy here: the director (`gameplay/horde`) does, under its own node. When every wizard is down,
 ## after HORDE_RESTART_DELAY (once started, a join does not call it off) a fresh world stands and
@@ -134,15 +137,10 @@ const MODE_HORDE: StringName = &"horde"
 ## The actions of `sandbox_action_requested`.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-## The numbers of test builds' staffs (the sandbox), and the four starter heads by button (RB,
-## RT, LB, LT), by id under `wizard`.
+## The sandbox's staff, on every button, and the four basic staffs of Play and the horde by
+## button (RB, RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
-## The build channels that get the dev staff (`BuildInfo.channel()`).
-const DEV_CHANNELS: Array[String] = ["dev", "preview"]
-## The dev staff's numbers a test build's starter heads take: its slots, delay and recharge, and
-## its mana pool and regen (a million each, owner 2026-11-01: "practically infinite").
-const DEV_FIELDS: Array[String] = ["slots", "draw", "cast_delay", "recharge", "spread", "max_mana", "mana_regen"]
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -189,8 +187,9 @@ var world_parent: Node = null
 var room_id_to_play: StringName = DEFAULT_ROOM_ID
 var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
-## The build channel, which picks the staff; `BuildInfo.channel()` unless a test sets it.
-var channel: String = BuildInfo.channel()
+## What the sandbox's wizards start with instead (SANDBOX_START_CARDS unless a test or a
+## screenshot sets other cards).
+var sandbox_cards: Array = SANDBOX_START_CARDS.duplicate(true)
 var wizard_scene: PackedScene = DefaultWizardScene
 ## Whether Play may show the intro (see the class doc), and the save it is remembered in.
 var intro_enabled: bool = true
@@ -222,11 +221,6 @@ var _starter: int = 0
 var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
-## The channel's staffs (`staffs_for_channel`) and the channel they were made for.
-var _channel_staffs: Array[StaffBase] = []
-var _channel_staffs_for: String = ""
-## The plain starter staffs (no dev numbers), the horde's in every channel.
-var _plain_staffs: Array[StaffBase] = []
 ## True from a horde run's start until `horde_ended` is sent.
 var _horde_on: bool = false
 var _enemies: Array[Node] = []
@@ -362,7 +356,7 @@ func start_run(requester: int) -> bool:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
 	if staffs_for_mode().is_empty():
-		push_warning("Flow: a staff for the %s channel is missing from the registry, so no run starts." % channel)
+		push_warning("Flow: a staff for the %s mode is missing from the registry, so no run starts." % mode)
 		return false
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
@@ -800,59 +794,34 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 	return ok
 
 
-## The four staffs a wizard holds in this build channel (empty when one is missing): the starter
-## heads, in a test build each a copy with the dev staff's numbers (made once per channel).
-func staffs_for_channel() -> Array[StaffBase]:
-	if not _channel_staffs.is_empty() and _channel_staffs_for == channel:
-		return _channel_staffs
-	var out: Array[StaffBase] = _starter_staffs(DEV_CHANNELS.has(channel))
-	if not out.is_empty():
-		_channel_staffs = out
-		_channel_staffs_for = channel
+## The four staffs a wizard of this run's `mode` holds, by button, as the registry has them:
+## the sandbox's the `dev` staff on every button, Play's and the horde's the four basic staffs
+## (STARTER_HEADS). Empty when one is missing.
+func staffs_for_mode() -> Array[StaffBase]:
+	var ids: Array[StringName] = STARTER_HEADS
+	if mode == MODE_SANDBOX:
+		ids = [DEV_STAFF, DEV_STAFF, DEV_STAFF, DEV_STAFF]
+	var out: Array[StaffBase] = []
+	if registry == null:
+		return out
+	for id in ids:
+		var staff: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
+		if staff == null:
+			out.clear()
+			return out
+		out.append(staff)
 	return out
 
 
-## The four staffs a wizard of this run's `mode` holds: the horde's are the plain starter heads in
-## every channel (made once); every other mode's are `staffs_for_channel`.
-func staffs_for_mode() -> Array[StaffBase]:
-	if mode != MODE_HORDE:
-		return staffs_for_channel()
-	if _plain_staffs.is_empty():
-		_plain_staffs = _starter_staffs(false)
-	return _plain_staffs
-
-
 ## The cards each staff of a new wizard starts with in this run's `mode`: HORDE_START_CARDS in
-## the horde, SANDBOX_START_CARDS in the sandbox, `start_cards` in Play.
+## the horde, `sandbox_cards` in the sandbox, `start_cards` in Play.
 func start_cards_for_mode() -> Array:
 	match mode:
 		MODE_HORDE:
 			return HORDE_START_CARDS
 		MODE_SANDBOX:
-			return SANDBOX_START_CARDS
+			return sandbox_cards
 	return start_cards
-
-
-## The starter heads by button, each a copy with the dev staff's numbers when `dev_numbers` (empty
-## when one is missing).
-func _starter_staffs(dev_numbers: bool) -> Array[StaffBase]:
-	var out: Array[StaffBase] = []
-	if registry == null:
-		return out
-	var dev: StaffBase = registry.get_resource(&"wizard", DEV_STAFF) as StaffBase if dev_numbers else null
-	if dev_numbers and dev == null:
-		return out
-	for id in STARTER_HEADS:
-		var head: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
-		if head == null:
-			out.clear()
-			return out
-		if dev != null:
-			head = head.duplicate() as StaffBase
-			for field: String in DEV_FIELDS:
-				head.set(field, dev.get(field))
-		out.append(head)
-	return out
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:

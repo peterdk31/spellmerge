@@ -38,7 +38,6 @@ func after_each() -> void:
 	events.disconnect("sandbox_changed", _on_sandbox_changed)
 	flow.stop_run()
 	flow.world_parent = null
-	flow.channel = BuildInfo.channel()
 	for index in 4:
 		input.leave(index)
 
@@ -125,10 +124,9 @@ func test_horde_starts_the_horde_room_with_a_wizard_each_and_no_enemies() -> voi
 		_reset()
 
 
-func test_every_channel_gets_the_plain_starter_staffs_and_the_horde_cards() -> void:
+func test_the_horde_gets_the_basic_staffs_and_the_horde_cards() -> void:
 	var registry: Node = root.get_node("Registry")
-	for name: String in ["dev", "preview", "nightly", "stable"]:
-		flow.channel = name
+	for name: String in ["one run", "another run"]:
 		_start(1)
 		var wizard: Actor = flow.get_wizard(0) as Actor
 		check(wizard != null, "%s: a wizard" % name)
@@ -138,8 +136,7 @@ func test_every_channel_gets_the_plain_starter_staffs_and_the_horde_cards() -> v
 		for at in 4:
 			var head: StaffBase = registry.call("get_resource", &"wizard", FlowScript.STARTER_HEADS[at]) as StaffBase
 			var staff: StaffBase = wizard.caster.staff_of(at)
-			check(staff.head == head.head, "%s: button %d has the %s head" % [name, at, FlowScript.STARTER_HEADS[at]])
-			check_equal(staff.slots, head.slots, "%s: button %d has the starter's slots, never the dev staff's" % [name, at])
+			check(staff == head, "%s: button %d holds the %s staff itself, not a copy" % [name, at, FlowScript.STARTER_HEADS[at]])
 		check_equal(wizard.caster.cards_of(0)[0], &"dash", "%s: RB starts with dash" % name)
 		check_equal(wizard.caster.cards_of(1).slice(0, 1), [&"swing"] as Array[StringName], "%s: RT starts with swing" % name)
 		for empty: int in [2, 3]:
@@ -235,7 +232,6 @@ func test_horde_is_ignored_while_a_run_is_on() -> void:
 
 
 func test_a_joiner_gets_a_wizard_with_the_horde_staffs() -> void:
-	flow.channel = "dev"
 	_start(1)
 	input.add_virtual_device(1)
 	events.emit_signal("player_joined", 1)
@@ -243,7 +239,7 @@ func test_a_joiner_gets_a_wizard_with_the_horde_staffs() -> void:
 	check(joiner != null, "the joiner has a wizard")
 	if joiner != null:
 		var head: StaffBase = root.get_node("Registry").call("get_resource", &"wizard", FlowScript.STARTER_HEADS[0]) as StaffBase
-		check_equal(joiner.caster.staff_of(0).slots, head.slots, "the joiner holds the plain starter staffs too")
+		check(joiner.caster.staff_of(0) == head, "the joiner holds the basic staffs too")
 		check(joiner.get_parent() == flow.world, "in the horde world")
 	check_equal(_count("horde_started"), 1, "a join starts nothing over")
 

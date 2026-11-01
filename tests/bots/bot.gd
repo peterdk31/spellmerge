@@ -34,6 +34,8 @@ const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 ## The staff a bot builds into: staff 3, LB (empty at the start; RB dashes and RT fires the
 ## start bolt).
 const BUILD_STAFF: int = 2
+## Cards a bot's random staff leaves out (see `build_random`).
+const NOT_BUILT: Array[StringName] = [&"wall"]
 ## A random staff has at most this many cards, so a built staff stays quick to cast.
 const BUILD_CARDS: int = 6
 
@@ -94,7 +96,7 @@ func tap_back() -> void:
 
 
 ## Build a random staff into staff 3, slot by slot. The cards are chosen from the wizard's bag
-## with `build_seed`. Returns false when the bot has no wizard or the bag has no carrier. True
+## with `build_seed`, all but NOT_BUILT. Returns false when the bot has no wizard or the bag has no carrier. True
 ## means the requests were sent; check the wizard's `caster.cards_of(BUILD_STAFF)`.
 func build_random(build_seed: int) -> bool:
 	var root: Node = _flow.get_tree().root
@@ -105,6 +107,11 @@ func build_random(build_seed: int) -> bool:
 		return false
 	var bag: Array[StringName] = []
 	bag.assign(PlayerController.of(wizard).bag)
+	# A fighter holds its built staff and its fire bolt at once, so a built wall would stand in
+	# front of its own bolts every cast; a bot cannot play round that (it stalled the 4-bot
+	# run once Play's staffs became the four basic ones of 4 slots, owner 2026-11-01).
+	for blocker: StringName in NOT_BUILT:
+		bag.erase(blocker)
 	var fuzzer := FuzzerScript.new(bag, func(id: StringName) -> StringName: return spells.call("component_kind", id))
 	if not fuzzer.can_build():
 		return false

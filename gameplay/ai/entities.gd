@@ -99,6 +99,7 @@ const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader
 ## A creature's telegraph (`creature_look.gd`), compiled before the first room (shader_warmup.gd).
 const TELEGRAPH_SHADER: Shader = preload("res://gameplay/ai/telegraph.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 const STRIDE: int = 16
 
 ## Above the room and the wizards, below the shots (`ProjectileManagerScript.DRAW_Z`): the
@@ -215,14 +216,12 @@ func _init() -> void:
 	_familiar_node = MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	multimesh.mesh = quad
 	multimesh.instance_count = POOL_SIZE
 	multimesh.visible_instance_count = 0
-	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
 	_familiar_node.multimesh = multimesh
 	var material := ShaderMaterial.new()
 	material.shader = ORBIT_SHADER

@@ -8,6 +8,7 @@ extends MultiMeshInstance2D
 ## within the pickup radius and returns the experience of the gems that reached a wizard this
 ## step. A gem only moves while it is pulled, so only those instances are rewritten.
 
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The most gems on the floor at once; a gem dropped beyond it adds its value to the newest one.
 const MAX_GEMS: int = 1024
 ## Pixels per second a pulled gem flies towards its wizard.
@@ -41,8 +42,8 @@ func _init() -> void:
 	_pulled_by.resize(MAX_GEMS)
 	var quad := QuadMesh.new()
 	quad.size = Vector2(GEM_SIZE, GEM_SIZE)
-	var gems := MultiMesh.new()
-	gems.transform_format = MultiMesh.TRANSFORM_2D
+	# Never culled (Batches): gems lie anywhere on the floor.
+	var gems: MultiMesh = BatchesScript.multimesh()
 	gems.mesh = quad
 	gems.instance_count = MAX_GEMS
 	gems.visible_instance_count = 0

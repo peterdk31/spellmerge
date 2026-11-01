@@ -58,6 +58,7 @@ extends Node2D
 ## swarm's largest count, and each batch is written from one reused buffer.
 
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const SHADER: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
 const DEFAULT_PRESET: Resource = preload("res://gameplay/feel/presets/punchy.tres")
@@ -773,8 +774,8 @@ func _add_kind(scene: PackedScene) -> void:
 	_hurt_strips.append(creature.hurt_texture if creature != null else null)
 	if instance != null:
 		instance.free()
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	# Never culled (Batches): the rows walk anywhere on the floor.
+	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	multimesh.mesh = _layers_mesh()

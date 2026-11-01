@@ -236,6 +236,25 @@ func test_the_batches_hold_an_instance_per_row_of_each_kind() -> void:
 	check_equal(look.batch(husk).texture, (full_husk.get_node(^"Sprite") as Sprite2D).texture, "the husk's batch draws the husk's body")
 
 
+## The renderer culls a batch by the box it read at the node's last redraw, not where the rows
+## walked since: unless each kind's box is the world, the whole kind goes unseen at once (the
+## horde's mites and husks vanished on the web as the camera moved off their first place).
+func test_no_batch_is_ever_culled() -> void:
+	var swarm := FakeSwarm.new()
+	var mite: int = swarm.kind_of(MiteData.scene)
+	var husk: int = swarm.kind_of(HuskData.scene)
+	swarm.add(mite, Vector2(10.0, 20.0), 1)
+	var look: SwarmLook = _look_of(swarm)
+	swarm.add(husk, Vector2(30.0, 40.0), 2)
+	swarm.run_all(STEP)
+	look.step(STEP)
+	look.step_feel(STEP)
+	for kind: int in [mite, husk]:
+		var box: AABB = look.batch(kind).multimesh.custom_aabb
+		check(box.size.x >= 100000.0 and box.size.y >= 100000.0, "kind %d's box is the whole world" % kind)
+		check(box.has_point(Vector3(0.0, 0.0, 0.0)), "kind %d's box is round the world's origin" % kind)
+
+
 ## Feel's numbers are read from its live preset: a longer flash there is a longer flash here.
 func test_the_flash_follows_feels_preset() -> void:
 	var preset: Resource = (_feel.get(&"preset") as Resource).duplicate()

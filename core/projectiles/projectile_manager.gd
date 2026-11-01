@@ -851,6 +851,9 @@ var sweep_heads: PackedVector2Array = PackedVector2Array()
 ## The shots the last `shots_in_wedge` or `shots_on_segment` found (reused; grows). Read right
 ## after the call: deflecting or blocking them can start other queries.
 var guard_slots: PackedInt32Array = PackedInt32Array()
+## The shot `threat` found last (-1 for none), and the way off its line (unit; ZERO for none).
+var threat_slot: int = -1
+var threat_away: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
@@ -2154,6 +2157,52 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 				found = _guard_add(found, slot)
 				break
 	return found
+
+
+## The shot of another team than `team` that will come within `radius` of `point` soonest, within
+## `horizon` seconds: what an AI dodges (enemy AI AI3, docs/milestones/M2-enemy-ai.md). Returns
+## the seconds until it gets there (0 for one already there, a still shot standing on the point
+## included), or -1.0 for none; `threat_slot` is its slot and `threat_away` the unit way off its
+## line on the side `point` already is (away from a still one). The shots of `own` (an actor id,
+## -1 for none) are skipped, as they pass their caster. Straight shots move on their velocity; an
+## orbit is skipped (it circles its caster). One pass over the live shots, allocation-free; an AI
+## asks on its reaction timer, not every step.
+func threat(point: Vector2, radius: float, team: int, own: int = -1, horizon: float = 1.0) -> float:
+	threat_slot = -1
+	threat_away = Vector2.ZERO
+	if not point.is_finite() or not (radius > 0.0):
+		return -1.0
+	var best: float = INF
+	for slot in _high:
+		if _alive[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
+			continue
+		if _motion[slot] == MOTION_ORBIT:
+			continue
+		var reach: float = radius + _radius[slot]
+		var rel: Vector2 = point - _pos[slot]
+		var vel: Vector2 = _vel[slot]
+		var still: bool = _motion[slot] == MOTION_STILL or _state[slot] == S_STUCK or _state[slot] == S_FROZEN or _state[slot] == S_HELD or vel.length_squared() < 1.0
+		var when: float = -1.0
+		if rel.length_squared() <= reach * reach:
+			when = 0.0
+		elif not still:
+			var speed2: float = vel.length_squared()
+			var along: float = rel.dot(vel) / speed2
+			if along <= 0.0 or along > minf(horizon, _life[slot]):
+				continue
+			if (rel - vel * along).length_squared() > reach * reach:
+				continue
+			when = along
+		if when < 0.0 or when >= best:
+			continue
+		best = when
+		threat_slot = slot
+		if still or vel.length_squared() < 1.0:
+			threat_away = rel.normalized() if rel != Vector2.ZERO else Vector2.RIGHT
+		else:
+			var side: Vector2 = rel - vel * (rel.dot(vel) / vel.length_squared())
+			threat_away = side.normalized() if side.length_squared() > 0.01 else vel.orthogonal().normalized()
+	return best if threat_slot >= 0 else -1.0
 
 
 ## How many points of its last step a guard tests a shot at: one for a shot that moves less than

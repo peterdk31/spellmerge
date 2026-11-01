@@ -106,11 +106,11 @@ func _put(component: SpellComponent, id: StringName) -> void:
 func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, delay: float = 0.0) -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
 	data.id = &"test_caster"
-	data.staff = StaffKit.plain_staff(cards.size())
-	data.staff.cast_delay = delay
-	data.cards = cards
-	data.staff.max_mana = max_mana
-	data.staff.mana_regen = regen
+	var staff: StaffBase = StaffKit.plain_staff(cards.size())
+	staff.cast_delay = delay
+	staff.max_mana = max_mana
+	staff.mana_regen = regen
+	data.staffs = [StaffCards.make(staff, cards)] as Array[StaffCards]
 	return data
 
 
@@ -176,10 +176,9 @@ func test_it_opens_an_actor_and_owns_its_body() -> void:
 	_bus.mana_refund_requested.emit(enemy.id, 0, 100.0)
 	check_equal(enemy.caster.mana_of(0), 6.0, "never above its most")
 	check(_spells.current_tag(enemy.id, 0) != 0, "its staff is installed")
-	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
+	check(ImpData.has_staffs() and ImpData.staffs[0].cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
 	var none: EnemyBase = ImpData.duplicate() as EnemyBase
-	none.staff = null
-	none.cards = []
+	none.staffs = [] as Array[StaffCards]
 	var plain := _enemy(none)
 	check(plain.caster == null and plain.caster_number() == -1, "an enemy without a staff has no caster")
 	check(_actors.is_open(plain.id), "but an actor id of its own all the same")

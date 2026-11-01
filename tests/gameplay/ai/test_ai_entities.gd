@@ -123,11 +123,11 @@ func _put(component: SpellComponent, id: StringName) -> void:
 func _data(cards: Array[StringName]) -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
 	data.id = &"test_caster"
-	data.staff = StaffKit.plain_staff(cards.size())
-	data.staff.cast_delay = 0.0
-	data.cards = cards
-	data.staff.max_mana = 20.0
-	data.staff.mana_regen = 0.0
+	var staff: StaffBase = StaffKit.plain_staff(cards.size())
+	staff.cast_delay = 0.0
+	staff.max_mana = 20.0
+	staff.mana_regen = 0.0
+	data.staffs = [StaffCards.make(staff, cards)] as Array[StaffCards]
 	return data
 
 

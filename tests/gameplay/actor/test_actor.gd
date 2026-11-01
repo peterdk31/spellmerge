@@ -115,11 +115,11 @@ func test_enemy_data_goes_to_the_components() -> void:
 	check_equal(imp.mover.speed, ImpData.move_speed, "walking speed")
 	check_equal(imp.contact.damage, ImpData.contact_damage, "contact damage")
 	check(imp.caster != null and imp.caster.has_staff(0), "its staff is built")
-	check_equal(imp.caster.cards_of(0).slice(0, ImpData.cards.size()), ImpData.cards, "with its cards")
-	check_equal(imp.caster.max_mana_of(0), ImpData.staff.max_mana, "its mana, its staff's pool")
+	check_equal(imp.caster.cards_of(0).slice(0, ImpData.staffs[0].cards.size()), ImpData.staffs[0].cards, "with its cards")
+	check_equal(imp.caster.max_mana_of(0), ImpData.staffs[0].staff.max_mana, "its mana, its staff's pool")
 	check(_world.combat.is_registered(imp), "the hurtbox registered it with Combat")
 	var plain_data: EnemyBase = ImpData.duplicate() as EnemyBase
-	plain_data.staff = null
+	plain_data.staffs = [] as Array[StaffCards]
 	var chaser := Actor.new()
 	chaser.data = plain_data
 	chaser.add_child(Caster.new())

@@ -604,9 +604,9 @@ func test_a_wizard_possesses_an_ember_imp_and_its_ai_starts_over_after() -> void
 
 func test_an_ember_imp_with_possess_takes_a_wizard_and_its_ai_drives_it() -> void:
 	var data := ImpData.duplicate() as EnemyBase
-	data.cards = [&"possess", &"bolt"] as Array[StringName]
-	data.staff = ImpData.staff.duplicate() as StaffBase
-	data.staff.max_mana = 40.0
+	var staff: StaffBase = ImpData.staffs[0].staff.duplicate() as StaffBase
+	staff.max_mana = 40.0
+	data.staffs = [StaffCards.make(staff, [&"possess", &"bolt"] as Array[StringName])] as Array[StaffCards]
 	var wizard := _world.wizard(0)
 	var imp := _ember_imp(Vector2(80.0, 0.0), data)
 	var mind := _mind(imp)

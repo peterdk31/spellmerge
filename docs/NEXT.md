@@ -28,9 +28,9 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts. Owner sessions run `tools/check.sh --author peterdk31` (without `--author` it checks as an outside contributor).
 
 - [x] **Enemy AI: the plan (AI1).** (`docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), with the owner's decisions of 2026-11-01.
-- [ ] **Enemy AI: what a cast does (AI2).** (`core/spells/`) After AI1.
-- [ ] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
-- [ ] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
+- [x] **Enemy AI: what a cast does (AI2).** (`core/spells/`) After AI1.
+- [x] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
+- [x] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
 - [ ] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
 - [ ] **Enemy AI: the TeamBoard (AI6).** (`gameplay/ai/`) After AI5.
 - [ ] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.

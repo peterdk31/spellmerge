@@ -1,8 +1,10 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/enemies/splinter/splinter.tscn" id="2_scene"]
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="3_staff"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="4_entry"]
+[ext_resource type="Resource" path="res://content/enemies/profiles/rusher.tres" id="5_profile"]
 
 [sub_resource type="Resource" id="Resource_staff"]
 script = ExtResource("3_staff")
@@ -16,6 +18,11 @@ spread = 0.0
 max_mana = 20.0
 mana_regen = 5.0
 
+[sub_resource type="Resource" id="Resource_entry"]
+script = ExtResource("4_entry")
+staff = SubResource("Resource_staff")
+cards = Array[StringName]([&"dash"])
+
 [resource]
 script = ExtResource("1_base")
 id = &"splinter"
@@ -24,5 +31,5 @@ max_health = 12.0
 move_speed = 60.0
 contact_damage = 8
 scene = ExtResource("2_scene")
-staff = SubResource("Resource_staff")
-cards = Array[StringName]([&"dash"])
+staffs = Array[ExtResource("4_entry")]([SubResource("Resource_entry")])
+profile = ExtResource("5_profile")

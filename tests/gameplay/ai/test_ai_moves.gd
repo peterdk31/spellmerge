@@ -134,11 +134,11 @@ func _put(component: SpellComponent, id: StringName) -> void:
 func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, delay: float = 0.0) -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
 	data.id = &"test_caster"
-	data.staff = StaffKit.plain_staff(cards.size())
-	data.staff.cast_delay = delay
-	data.cards = cards
-	data.staff.max_mana = max_mana
-	data.staff.mana_regen = regen
+	var staff: StaffBase = StaffKit.plain_staff(cards.size())
+	staff.cast_delay = delay
+	staff.max_mana = max_mana
+	staff.mana_regen = regen
+	data.staffs = [StaffCards.make(staff, cards)] as Array[StaffCards]
 	return data
 
 

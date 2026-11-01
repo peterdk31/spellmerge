@@ -473,7 +473,8 @@ func _first(found: ActorComponent, child: Node) -> ActorComponent:
 	return child as ActorComponent
 
 
-## The enemy's numbers to its components. Without a staff and cards the caster is left out.
+## The enemy's numbers to its components: health, speed, touch, size and its 1-4 staffs (enemy AI
+## AI4, docs/milestones/M2-enemy-ai.md). Without a staff the caster is left out.
 func _apply_data() -> void:
 	if data == null:
 		return
@@ -483,15 +484,34 @@ func _apply_data() -> void:
 		mover.speed = data.move_speed
 	if contact != null:
 		contact.damage = data.contact_damage
+	if data.size > 0.0 and not is_equal_approx(data.size, 1.0):
+		_apply_size(data.size)
 	if caster == null:
 		return
-	if data.staff == null or data.cards.is_empty():
+	if not data.has_staffs():
 		_components.erase(caster)
 		caster = null
 		return
-	caster.staff_count = 1
-	caster.staff = data.staff
-	caster.start_cards = [data.cards]
+	var staffs: Array[StaffBase] = []
+	var cards: Array = []
+	for entry: StaffCards in data.staffs.slice(0, EnemyBase.MAX_STAFFS):
+		staffs.append(entry.staff if entry != null else null)
+		cards.append(entry.cards.duplicate() if entry != null else [])
+	caster.staff_count = staffs.size()
+	caster.staffs = staffs
+	caster.staff = staffs[0]
+	caster.start_cards = cards
+
+
+## A bigger or smaller body (a boss): the node scales, and the points and circles kept in pixels
+## (hurt circle, body and hand) with it.
+func _apply_size(factor: float) -> void:
+	scale = Vector2(factor, factor)
+	body_offset *= factor
+	hand_offset *= factor
+	if hurtbox != null:
+		hurtbox.radius *= factor
+		hurtbox.offset *= factor
 
 
 func _open_id() -> void:

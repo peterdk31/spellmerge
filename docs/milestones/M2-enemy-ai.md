@@ -200,6 +200,38 @@ The sandbox room, grown: the pause menu's sandbox page gets an **Enemy** row (a 
 | AI9 | **Bots on the brain** | `tests/bots` | The bot's decisions from the brain; the 4-bot run |
 | AI10 | **Difficulty** | `gameplay/ai` | The TeamBoard hears `difficulty_changed` and scales the profiles (once difficulty sends it) |
 
+## What is left (the plan for the next session)
+
+Status at the end of the first session (2026-11-01): AI1–AI5, AI7 and AI8 are merged; every enemy (the sandbox dummies and the horde's swarmers included) plays by the brain. "Done when" 1, 2, 4 and 5 hold; 3 holds but for the heal-only combo; 6 and 7 are open. Below, each open item as one task, in the order to take them. Each is one PR, with its tests, and ends with `tools/check.sh --author peterdk31` and `tools/ptest.sh` green (the projectile timing test fails under parallel load only: run it alone).
+
+### L1. Measure the cost ("Done when" 7)
+
+Nothing was timed yet. **Do:** run the stress run and the horde run (`tests/benchmark/test_stress.gd`, `stress_runner.gd`; the horde's swarm benchmark `swarm_step.gd`) on the merge base before this work (`a36d5ae`) and on main, same machine, three runs each; also time 200 staffed enemies' `Actor.step` in the AI fixture (median ms per physics step). **If slower:** the likely costs are `AISight.line_clear` on every decision, `Projectiles.threat` for every dodger, and `_read_staffs` calling `cast_ready` per staff; fixes in order: skip `threat` for enemies farther than 2× their band from any other team's actor, lengthen `reaction` with crowd size (TeamBoard knows the count), cache `line_clear` for a decision. **Record** the numbers in docs/DECISIONS.md under this rework.
+
+### L2. Heal ally, and targets other than the enemy ("Done when" 3)
+
+**Do:** (a) the brain gets `plan_target` (a Node2D, null = `target`): the executor aims at it, the reach checks use it. (b) The TeamBoard keeps, per team, its hurt actors (each brain reports its own health fraction and position at its decision; a small fixed array per team, oldest out). (c) `behaviours/heal_ally.gd`: a staff whose next cast `heals` is ready and a teammate under 70% health is within that cast's reach and line → want 0.9 + 0.3 × (1 − its health), plan that staff at it. Also heal itself when the cast lands on the caster (`CastSense` may need a `heals_self` for a fallback on the caster). **Tests:** an enemy with a mend bolt heals a hurt teammate and never a wizard; `test_ai_combos.gd` drops its `HEAL_ONLY` exception.
+
+### L3. Spreading round a target (AI6, part 2)
+
+**Do:** the TeamBoard counts, per target, the attackers of each team (each brain notes its target at its decision; counts reset on the board's timer). An attacker gets a slot round the target: angle = its rank among the target's attackers × (360° / count), offset from the side it already stands on. `keep range` walks toward its slot's point at band distance instead of straight in or out, `fight` gets a small bonus for a target with fewer attackers (scaled by `teamwork`). **Tests:** four imps on one wizard end at least 60° apart round it; with teamwork 0 they do not spread.
+
+### L4. The call (AI6, part 3)
+
+**Do:** a brain starting a windup with `teamwork` > 0 and a teammate within CALL_REACH (from the TeamBoard's positions, L2) first glances at it: the actor's Face shows RAISED and looks toward the teammate for CALL_TIME (a Face method `glance(direction, seconds)`; the Face is the actor kit's, so the AI may call it), and the board records a call (team, point, time). Teammates within reach of the point that can fight get `beat` above 1 for CALL_TIME, so they join in. **Tests:** a called teammate starts its windup within a beat; with teamwork 0 nobody calls. A screenshot (`tests/screenshots/`) of two strays mid-call.
+
+### L5. Bots on the brain (AI9, second try; "Done when" 6)
+
+The first try (2026-11-01, not merged) is described in docs/NEXT.md: the bot owned an `AIBrain` (`setup(wizard, bot_profile, seed)`), filled a spare `ActorIntent` (`brain.think(delta, intent)`) and turned it into buttons (`_hold_move` for the walk, `PlayerInput.send_virtual_aim` for the aim, a tap per pressed staff, the button held per held staff); the brain already keeps holds on that spare intent (`_last_intent`). It failed the 4-bot smoke run about half the time: the brain plays like an enemy (windups, rests, kiting at the edge of its range) where the old bot presses on with its fire held. **Do:** (a) profile fields for a player's way of playing: `windup_scale` 0 allowed (a cast with no telegraph: players have none), `rest_scale` 0; (b) a `press_on` number on `AIProfile` that `keep range` and `fight` read: walk toward the target while casting instead of standing (the executor keeps moving during a windup of 0), (c) the bot profile with both. **Measure:** ten 4-bot smoke runs; merge only when all ten pass and the mean clear time is within 1.5× the old bot's (about 9 s). Then the bot's own state machine and the "RB is the dash" rule go, and the no-card-id test already covers `tests/bots/bot.gd`.
+
+### L6. Difficulty (AI10)
+
+Waits for gameplay/difficulty to send `difficulty_changed`. **Do:** `Entities` hears it once and sets `TeamBoard.skill` (1 at normal); the brain reads `board.skill` where it reads the profile: `reaction` / skill, `accuracy` and `dodge` toward 1 by skill − 1, `windup_scale` / sqrt(skill) (telegraphs stay readable). **Tests:** the same imp reacts faster and aims better at skill 2, and slower at 0.5.
+
+### L7. Strays with roles (content; owner's call)
+
+The strays still hold one staff each. The design meant them to show the system off: e.g. the Splinter a dash and a swing, the Rime Crook its frost bolt and a pull bolt on its own staff, the Bone Scepter a rain and a dash away, the Storm Fork a triple bolt and a wall. Content, one PR, tried in the enemy arena with the AI view; the owner picks the staffs.
+
 ## Self-critique against docs/DESIGN.md
 
 - **Readable chaos:** every harmful cast still has a telegraph, and its length now grows with the danger by rule; the call and staggered fire make a group's attacks read as a sequence.

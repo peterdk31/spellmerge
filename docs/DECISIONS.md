@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-01: The enemy AI's cost (enemy AI L1)
+
+- **Measured:** the base before the rework (`a36d5ae`) against main, three runs each, interleaved, on cores pinned to the run (WSL, 24 threads; other sessions' tests ran on the other cores, so frame times are noisy). A new benchmark, `tests/benchmark/ai_step.gd`: 200 staffed strays of every kind on their own profiles round four wizards that walk and cast; the median of one `Actor.step` pass over the crowd.
+- **Found:** the AI step was 29% slower on main: median 12.4 ms (base) against 16.0 ms. Timing the brain's parts: a decision's `line_clear` 4 µs, `Projectiles.threat` 12 µs, reading the staffs 20 µs, weighing the behaviours 23 µs; the target lookup 175 µs a call, two thirds of the brain's time, because `nearest_target` with the room-wide `SIGHT` reads every cell of the target grid. The base paid the same lookup; the decisions are the new cost (about 1.3 ms a step for 200).
+- **Rule:** the brain looks for its target in rings, nearest first (`AIBrain.LOOKS`: 160 px, 480 px, then the room), and keeps a find only when its centre is inside the ring, so the answer is the nearest of all, as before. The AI step is now 12.2 ms, as fast as the base. The plan's other fixes (skip `threat` far from a fight, a longer `reaction` in a crowd, caching `line_clear`) were not made: they cost little.
+- **The stress and horde runs** (`stress.gd`, `stress.gd -- --horde`; the enemy step part, median of three): web 100 enemies 1.82 ms base, 1.82 main, 1.85 with the rings; desktop 200: 3.19, 3.43, 3.04; horde 600: 8.1, 12.0, 8.4 (the horde run passed 1, 2 and 3 of 3 runs). The swarm (`swarm_step.gd`) does not use the brain and is unchanged (about 4.6 ms for 1,000).
+
 ## 2026-11-01: Enemies telegraph, allies don't (owner)
 
 - **Rule:** a telegraph is a warning for the players, so an AI driving an actor of the players' team winds up nothing; any other team telegraphs as before. It follows the side (teams follow the driver), not a profile: bots, minions and a player's possessed body cast at once, and an enemy's AI possessing a wizard still telegraphs. Planned as the first step of L5 ([M2-enemy-ai.md](milestones/M2-enemy-ai.md)); replaces "a bot profile with `windup_scale` 0" from the first plan.

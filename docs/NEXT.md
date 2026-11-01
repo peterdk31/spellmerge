@@ -32,7 +32,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
 - [x] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
 - [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
-- [ ] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), "What is left", L1. First.
+- [x] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) Done: the target lookup looks near first; the AI is as fast as before it (`tests/benchmark/ai_step.gd`; DECISIONS, "The enemy AI's cost").
 - [ ] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2.
 - [ ] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4.
 - [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.

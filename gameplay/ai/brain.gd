@@ -39,6 +39,10 @@ const RETARGET_TIME: float = 0.5
 const GRUDGE_TIME: float = 3.0
 ## How far it looks for a target: farther than any room, so the nearest anywhere.
 const SIGHT: float = 100000.0
+## The rings it looks in, nearest first, before the whole room: a target is most often near, and
+## a small ring reads a few cells of the target grid where the whole room reads all of them (enemy
+## AI L1: the lookup was two thirds of a staffed enemy's step). The nearest of all is the same.
+const LOOKS: Array[float] = [160.0, 480.0, SIGHT]
 ## Closer than this to its target it stops walking (an actor with nothing to cast, on top of it).
 const CLOSE_ENOUGH: float = 1.0
 ## How far ahead (pixels) a way round a wall, or to cover, is probed.
@@ -661,8 +665,14 @@ func _find_target() -> Node2D:
 		return decoy
 	if actor.projectiles == null:
 		return null
-	var found: Node2D = actor.projectiles.nearest_target(here + actor.body_offset, SIGHT, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
-	return found if _is_valid_target(found) else null
+	var from: Vector2 = here + actor.body_offset
+	for ring: float in LOOKS:
+		var found: Node2D = actor.projectiles.nearest_target(from, ring, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
+		# Found with its centre inside the ring, nothing outside it is nearer; a big body only
+		# touching the ring is checked again in the next.
+		if found != null and (ring >= SIGHT or actor.projectiles.nearest_point.distance_squared_to(from) <= ring * ring):
+			return found if _is_valid_target(found) else null
+	return null
 
 
 ## A freed node may still sit in `target` or `grudge`, hence the Variant. A downed wizard, a down

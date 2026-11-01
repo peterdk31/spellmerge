@@ -58,6 +58,17 @@ func is_telegraphing() -> bool:
 	return false
 
 
+## A boss's phase began on `actor`, the actor it drives (`Phases`): an AI stands through the
+## transition and takes the phase's profile. The base does nothing.
+func phase_started(_actor: Actor, _phase: EnemyPhase) -> void:
+	pass
+
+
+## The staff a committed cast is wound up on (the telegraph's; 0 in the base).
+func telegraph_staff() -> int:
+	return 0
+
+
 ## A possession took `actor`, the actor it drove, for `seconds`; it drives nothing meanwhile
 ## (`stopped` came first). It is handed back with `started`. The base does nothing.
 func set_aside(_actor: Actor, _seconds: float) -> void:

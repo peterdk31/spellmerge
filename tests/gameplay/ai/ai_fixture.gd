@@ -19,6 +19,22 @@ const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 ## Time moves by this fixed binary fraction.
 const STEP: float = 0.0625
 
+## The profile the world's enemies play by unless a test gives another: exact aim, no lead, no
+## randomness, no dodging, no teamwork, so a test sees the same steps every run.
+static var _exact: AIProfile = null
+
+
+static func exact() -> AIProfile:
+	if _exact == null:
+		_exact = AIProfile.new()
+		_exact.name = "exact"
+		_exact.accuracy = 1.0
+		_exact.lead = 0.0
+		_exact.randomness = 0.0
+		_exact.dodge = 0.0
+		_exact.teamwork = 0.0
+	return _exact
+
 var bus: Node
 var actors: ActorsScript
 var combat: Node
@@ -99,6 +115,8 @@ func wire(body: Actor) -> void:
 	body.spells = spells
 	body.actors = actors
 	var mind: AIController = ai(body)
+	if mind != null and mind.profile == null:
+		mind.profile = exact()
 	if mind != null and entities != null:
 		mind.entities = entities
 

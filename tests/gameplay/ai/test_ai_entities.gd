@@ -10,6 +10,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_entities.gd
 
+const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -135,6 +136,7 @@ func _data(cards: Array[StringName]) -> EnemyBase:
 func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
 	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
+	(enemy.get_node("AIController") as AIController).profile = Fixture.exact()
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles

@@ -88,7 +88,7 @@ func test_an_imp_hurt_by_another_imp_turns_on_it_then_back_to_the_wizards() -> v
 	fx.combat.hit(other.id, imp, 1)
 	fx.run(imp, 1)
 	check(ai.target == other, "hurt by another imp, it turns on that imp")
-	check(imp.velocity.x < 0.0, "and walks toward it")
+	check(imp.aim.x < 0.0, "and turns toward it (within its staff's range it walks no nearer)")
 	fx.run(imp, int((AIController.GRUDGE_TIME - 0.25) / Fixture.STEP))
 	check(ai.target == other, "for a while")
 	fx.run(imp, int(0.5 / Fixture.STEP))

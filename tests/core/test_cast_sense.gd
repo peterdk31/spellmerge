@@ -47,6 +47,8 @@ func test_a_nova_hits_round_its_caster() -> void:
 
 func test_moves_blocks_spawns_heals() -> void:
 	check(_sense(["dash"]).moves_caster, "a dash moves its caster")
+	check(_sense(["dash"]).move_reach > 30.0, "its distance: %s" % _sense(["dash"]).move_reach)
+	check(_sense(["teleport"]).move_reach > 30.0, "and a teleport's: %s" % _sense(["teleport"]).move_reach)
 	check(_sense(["teleport"]).moves_caster, "a teleport too")
 	check(_sense(["wall"]).blocks, "a wall blocks shots")
 	check(_sense(["shield"]).blocks, "a shield on the caster blocks")

@@ -126,6 +126,19 @@ func setup(owner_actor: Actor) -> void:
 		actor.damaged.connect(_on_damaged)
 
 
+## A boss's phase changes the face (`Phases`): `new_style` (a `Style` as a number; -1 keeps it) and
+## `new_glow` (alpha 0 keeps it).
+func restyle(new_style: int, new_glow: Color) -> void:
+	if new_style >= 0 and new_style < Style.size():
+		style = new_style as Style
+		_eyes_frame = Vector2i(-1, -1)
+		_brows_frame = Vector2i(-1, -1)
+	if new_glow.a > 0.0:
+		glow = new_glow
+		if _eyes != null:
+			_eyes.modulate = glow
+
+
 ## Show `mood` for `seconds` (over the resting mood and the idle habits; down and a windup still
 ## win). A newer call replaces an older one.
 func show_mood(mood: Mood, seconds: float) -> void:

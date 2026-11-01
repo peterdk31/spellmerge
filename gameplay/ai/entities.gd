@@ -205,6 +205,9 @@ class Decoy extends Node2D:
 var _familiar_node: MultiMeshInstance2D = null
 var _familiar_buffer: PackedFloat32Array = PackedFloat32Array()
 var _clock: float = 0.0
+## What each team's AIs share (staggered fire; enemy AI AI6, docs/milestones/M2-enemy-ai.md),
+## moved on by `step`.
+var board: TeamBoard = TeamBoard.new()
 
 
 func _init() -> void:
@@ -276,6 +279,7 @@ func _physics_process(delta: float) -> void:
 ## Move time on: lifetimes and familiar orbits.
 func step(delta: float) -> void:
 	_clock += delta
+	board.step(delta)
 	if _live == 0:
 		_write_familiars()
 		return
@@ -450,6 +454,7 @@ func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag
 
 
 func _on_room_entered(_room_id: StringName) -> void:
+	board.clear()
 	clear()
 
 

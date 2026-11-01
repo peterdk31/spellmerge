@@ -128,6 +128,10 @@ var take_id: int = ActorsScript.NONE
 var _caster_number: int = -1
 
 var _components: Array[ActorComponent] = []
+## A boss's phases (`Phases`), added by the actor when its data has any; null otherwise.
+var phases: Phases = null
+## The body's scale now (`set_size`; 1 as drawn).
+var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
@@ -215,6 +219,8 @@ func step(delta: float) -> void:
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)
+	if phases != null:
+		phases.step(delta)
 	if possessed_by != null:
 		possessed_by.step(delta)
 	if controller != null:
@@ -485,7 +491,12 @@ func _apply_data() -> void:
 	if contact != null:
 		contact.damage = data.contact_damage
 	if data.size > 0.0 and not is_equal_approx(data.size, 1.0):
-		_apply_size(data.size)
+		set_size(data.size)
+	if not data.phases.is_empty() and phases == null:
+		phases = Phases.new()
+		phases.name = "Phases"
+		add_child(phases)
+		_components.append(phases)
 	if caster == null:
 		return
 	if not data.has_staffs():
@@ -503,15 +514,23 @@ func _apply_data() -> void:
 	caster.start_cards = cards
 
 
-## A bigger or smaller body (a boss): the node scales, and the points and circles kept in pixels
-## (hurt circle, body and hand) with it.
-func _apply_size(factor: float) -> void:
+## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
+## points and circles kept in pixels (hurt circle, body and hand) with it. A hurt circle already
+## registered is registered again at its new size.
+func set_size(factor: float) -> void:
+	if factor <= 0.0 or is_equal_approx(factor, size):
+		return
+	var by: float = factor / size
+	size = factor
 	scale = Vector2(factor, factor)
-	body_offset *= factor
-	hand_offset *= factor
+	body_offset *= by
+	hand_offset *= by
 	if hurtbox != null:
-		hurtbox.radius *= factor
-		hurtbox.offset *= factor
+		hurtbox.radius *= by
+		hurtbox.offset *= by
+		if hurtbox.registered and is_inside_tree():
+			hurtbox.detach()
+			hurtbox.attach()
 
 
 func _open_id() -> void:

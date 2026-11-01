@@ -319,6 +319,31 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	return true
 
 
+## Hold `new_staffs` (1-4, one per button) with `new_cards` (card ids by slot, per staff) instead
+## of the staffs it held: a boss's phase (`Phases`). Each pool starts full; a button it no longer
+## has is emptied (its sustained cards end). `staff_built` follows for each.
+func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
+	if new_staffs.is_empty():
+		return
+	var before: int = staff_count
+	staffs = new_staffs.duplicate()
+	staff = staffs[0]
+	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
+	for at in MAX_STAFFS:
+		_mana[at] = max_mana_of(at)
+	for at in maxi(before, staff_count):
+		var cards: Array[StringName] = []
+		if at < new_cards.size() and new_cards[at] is Array:
+			for id: Variant in new_cards[at]:
+				cards.append(StringName(str(id)))
+		if at < staff_count:
+			set_staff(at, cards)
+		else:
+			_cards[at] = [] as Array[StringName]
+			_install(at)
+			staff_built.emit(at)
+
+
 ## The next cast's mana (`Spells.next_cast_mana`): REFUSED (-1) with no build.
 func next_cast_mana(at: int = 0) -> float:
 	return actor.spells.next_cast_mana(number, at) if has_staff(at) else SpellsScript.REFUSED

@@ -116,6 +116,9 @@ func setup(owner_actor: Actor) -> void:
 	# every hit on anyone).
 	if not actor.damaged.is_connected(_on_damaged):
 		actor.damaged.connect(_on_damaged)
+	# A boss's phase may bring another body sprite (enemy AI AI7).
+	if actor.phases != null and not actor.phases.started.is_connected(_on_phase_started):
+		actor.phases.started.connect(_on_phase_started)
 
 
 ## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.
@@ -197,9 +200,11 @@ func _show_telegraph(on: bool, ai: AIController) -> void:
 	_showing = on
 	if telegraph != null:
 		var caster: Caster = actor.caster
-		var reach: float = caster.next_cast_reach(0) if on and caster != null else 0.0
+		# The staff the AI winds up (enemy AI AI5: it may hold several).
+		var at: int = ai.telegraph_staff() if ai != null else 0
+		var reach: float = caster.next_cast_reach(at) if on and caster != null else 0.0
 		if reach > TELEGRAPH_START:
-			_fit_telegraph(reach, caster.next_cast_radius(0))
+			_fit_telegraph(reach, caster.next_cast_radius(at))
 		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
 		telegraph.visible = on and reach > TELEGRAPH_START
 		if on:
@@ -261,6 +266,15 @@ func _show_strip(strip: Texture2D) -> void:
 	sprite.frame = 0
 	if animation != null and animation.is_inside_tree():
 		animation.pause()
+
+
+## A boss's phase began: its look's body sprite, if it has one, becomes the idle one.
+func _on_phase_started(_index: int, phase: EnemyPhase) -> void:
+	if phase.look == null or phase.look.texture == null or sprite == null:
+		return
+	_idle_texture = phase.look.texture
+	if _pose == Pose.IDLE:
+		sprite.texture = _idle_texture
 
 
 ## A hit on the actor shows the hurt pose at once.

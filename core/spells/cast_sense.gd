@@ -46,7 +46,8 @@ var heals: bool = false
 var status: bool = false
 ## True when it stays on until the button is pressed again (`hold`).
 var sustained: bool = false
-## True when holding the button keeps it going or casts it anew (a beam, a rain, a swing).
+## True when holding the button keeps it going or casts it anew (a beam, a rain, a swing): worth
+## holding as one long cast. (A held button casts any staff again when it is ready.)
 var repeats_held: bool = false
 ## Its cost and its delay (`CompiledCast.mana`, `delay`).
 var mana: float = 0.0
@@ -102,14 +103,15 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		homing = true
 	if spell.has_trait(CarrierTraits.MOVES_CASTER):
 		moves_caster = true
-		move_reach = maxf(move_reach, spell_reach)
+		# A dash runs its `ray_length` (or its flight), a teleport jumps it.
+		move_reach = maxf(move_reach, maxf(spell_reach, maxf(spell.ray_length, spell.speed * spell.lifetime)))
 	if spell.has_trait(CarrierTraits.BLOCKS) or (shield and spell.has_trait(CarrierTraits.GUARDS)):
 		blocks = true
 	if spell.has_trait(CarrierTraits.SPAWNS):
 		spawns = true
 	if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
 		sustained = true
-	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.HOLDS_STAFF):
+	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
 	var ring: bool = spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring or spell.has_trait(CarrierTraits.CARRIES_PAYLOAD):

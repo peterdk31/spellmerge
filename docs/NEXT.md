@@ -31,9 +31,9 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: what a cast does (AI2).** (`core/spells/`) After AI1.
 - [x] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
 - [x] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
-- [ ] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
-- [ ] **Enemy AI: the TeamBoard (AI6).** (`gameplay/ai/`) After AI5.
-- [ ] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
+- [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
+- [ ] **Enemy AI: the TeamBoard (AI6).** (`gameplay/ai/`) After AI5. Staggered fire is built (`TeamBoard.beat`); left: spreading round a target and the call (a Face glance at a teammate before a group attack).
+- [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
 - [ ] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
 - [ ] **Enemy AI: bots on the brain (AI9).** (`tests/bots/`) After AI5.
 - [ ] **Enemy AI: difficulty (AI10).** (`gameplay/ai/`) After AI5 and once difficulty sends `difficulty_changed`.

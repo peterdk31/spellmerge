@@ -67,6 +67,10 @@ const AIM_ERROR: float = deg_to_rad(14.0)
 const DODGE_MARGIN: float = 6.0
 const DODGE_HORIZON: float = 0.9
 const URGENT_TIME: float = 0.35
+## A target winding up a cast aimed within this (dot of its aim and the way to it) counts as a
+## threat this many seconds off (`_read_telegraph`).
+const TELEGRAPH_AIM: float = 0.9
+const TELEGRAPH_THREAT: float = 0.45
 ## Seconds it remembers a hit (for guarding).
 const HURT_MEMORY: float = 2.0
 ## Pixels beyond its lane a held cast's target may stray before it lets go.
@@ -101,8 +105,8 @@ var threat_away: Vector2 = Vector2.ZERO
 var hurt_left: float = 0.0
 ## Its health as a fraction of the most (1 without Health).
 var health_fraction: float = 1.0
-## The range its staffs give: closer than `band_min` it steps back, farther than `band_max` it
-## walks in (both 0 when nothing it casts hurts: it walks into its target).
+## The range its staffs give (reach × (0.75 - 0.6 aggression) to reach × (0.95 - 0.35
+## aggression)): closer than `band_min` it steps back, farther than `band_max` it walks in (both 0 when nothing it casts hurts: it walks into its target).
 var band_min: float = 0.0
 var band_max: float = 0.0
 ## Its staffs now: how many, what each casts next, whether it is ready (within its windup) and
@@ -135,6 +139,8 @@ var recover_time: float = 0.0
 var lookup_count: int = 0
 
 var _chosen_sense: CastSense = null
+## The intent `think` wrote last (the actor's own, or a bot's spare one), for letting go of holds.
+var _last_intent: ActorIntent = null
 var _locked_aim: Vector2 = Vector2.DOWN
 var _state_left: float = 0.0
 var _channel_left: float = 0.0
@@ -180,8 +186,8 @@ func reset() -> void:
 	_decide_now = true
 	behaviour = null
 	_clear_plan()
-	if actor != null and chosen >= 0:
-		actor.intent.hold(chosen, false)
+	if _last_intent != null and chosen >= 0:
+		_last_intent.hold(chosen, false)
 	chosen = -1
 	for i in memo.size():
 		memo[i] = -INF
@@ -189,6 +195,7 @@ func reset() -> void:
 
 ## Think one step of `delta` seconds and write `intent` (the actor's own, or a bot's spare one).
 func think(delta: float, intent: ActorIntent) -> void:
+	_last_intent = intent
 	clock += delta
 	_retarget_left -= delta
 	_decide_left -= delta
@@ -215,7 +222,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 		State.RECOVER:
 			intent.aim = _locked_aim
 			_state_left -= delta * _pace()
-			if _decide_left <= 0.0 and profile.dodge > 0.0:
+			if _decide_left <= 0.0 and (profile.dodge > 0.0 or _can_block()):
 				# Resting is no promise: a shot about to hit may still make it move.
 				_decide_left = _reaction()
 				_perceive_threat()
@@ -311,8 +318,8 @@ func carry_grudge(attacker: Node2D, seconds: float) -> void:
 func transition(seconds: float, next: AIProfile) -> void:
 	if next != null:
 		profile = next
-	if chosen >= 0 and actor != null:
-		actor.intent.hold(chosen, false)
+	if chosen >= 0 and _last_intent != null:
+		_last_intent.hold(chosen, false)
 	state = State.TRANSITION
 	_state_left = seconds
 	_decide_now = true
@@ -386,21 +393,44 @@ func _perceive() -> void:
 		distance = 0.0
 		line_clear = true
 	health_fraction = actor.health.health / actor.health.max_health if actor.health != null and actor.health.max_health > 0.0 else 1.0
-	_perceive_threat()
 	_read_staffs()
+	_perceive_threat()
 
 
 func _perceive_threat() -> void:
 	threat_time = -1.0
 	threat_away = Vector2.ZERO
-	if profile.dodge <= 0.0 or actor.projectiles == null:
+	if actor.projectiles == null or (profile.dodge <= 0.0 and not _can_block()):
 		return
 	var radius: float = (actor.hurtbox.radius if actor.hurtbox != null else 8.0) + DODGE_MARGIN
 	threat_time = actor.projectiles.threat(actor.global_position + actor.body_offset, radius, actor.team(), actor.id, DODGE_HORIZON)
 	threat_away = actor.projectiles.threat_away
-	if threat_time >= 0.0 and profile.randomness > 0.0 and rng.randf() < profile.randomness * 0.3:
+	if threat_time < 0.0:
+		_read_telegraph()
+	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and rng.randf() < profile.randomness * 0.3:
 		# Sometimes it sees the shot late.
 		threat_time = -1.0
+
+
+## Its target winds up a cast aimed at it (a telegraph is there to be read, as a person reads it):
+## a threat about TELEGRAPH_THREAT seconds off, the way off its line on the side it already is.
+func _read_telegraph() -> void:
+	if _target_actor == null or _target_actor.controller == null or not _target_actor.controller.is_telegraphing():
+		return
+	var from_it: Vector2 = actor.global_position - _target_actor.global_position
+	if from_it == Vector2.ZERO or _target_actor.aim.dot(from_it.normalized()) < TELEGRAPH_AIM:
+		return
+	threat_time = TELEGRAPH_THREAT
+	var side: Vector2 = from_it - _target_actor.aim * from_it.dot(_target_actor.aim)
+	threat_away = side.normalized() if side.length_squared() > 1.0 else _target_actor.aim.orthogonal() * _strafe_side
+
+
+## True when some staff's next cast stops shots (so shots coming are worth looking for).
+func _can_block() -> bool:
+	for at in staff_count:
+		if senses[at] != null and senses[at].blocks:
+			return true
+	return false
 
 
 ## What each staff casts next, which are ready and the range band they give.
@@ -422,7 +452,8 @@ func _read_staffs() -> void:
 		best = maxf(best, reach)
 		blast = maxf(blast, sense.blast)
 	if best > 0.0:
-		band_max = best * 0.9
+		# The bolder, the nearer it fights: a slow shot from afar is easy to dodge.
+		band_max = best * (0.95 - 0.35 * profile.aggression)
 		band_min = clampf(best * (0.75 - 0.6 * profile.aggression), 0.0, band_max * 0.9)
 		if blast > 0.0:
 			band_min = minf(maxf(band_min, blast + 12.0), band_max)

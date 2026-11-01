@@ -1,6 +1,7 @@
 extends AIBehaviour
-## Under fire or just hurt, with a staff whose next cast stops shots (a wall, a shield) ready:
-## cast it. Caution makes it keener.
+## A shot is coming (or one just hurt it and more are on the way), with a staff whose next cast
+## stops shots (a wall, a shield) ready: cast it. A touch alone calls for none (a wall stood at
+## every touch only boxes it in). Caution makes it keener.
 
 
 func name() -> String:
@@ -9,7 +10,7 @@ func name() -> String:
 
 func want(brain: AIBrain) -> float:
 	brain.picks[index] = -1
-	var pressed: bool = (brain.threat_time >= 0.0 and brain.threat_time < 0.8) or brain.hurt_left > 0.0
+	var pressed: bool = brain.threat_time >= 0.0 and (brain.threat_time < 0.8 or brain.hurt_left > 0.0)
 	if not pressed:
 		return 0.0
 	for at in brain.staff_count:

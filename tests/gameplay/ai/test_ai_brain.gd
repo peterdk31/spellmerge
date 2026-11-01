@@ -145,13 +145,21 @@ func test_it_channels_a_beam_while_the_target_stays() -> void:
 	check(not imp.intent.is_held(0) or brain.state == AIBrain.State.CHANNEL, "and lets go after")
 
 
-func test_it_guards_when_hurt() -> void:
+func test_it_guards_under_fire() -> void:
 	fx.players[0].position = Vector2(150.0, 0.0)
-	var imp: Actor = _enemy([["fire", "bolt"], ["wall"]])
+	var guarding: AIProfile = _profile()
+	guarding.dodge = 1.0
+	var imp: Actor = _enemy([["fire", "bolt"], ["wall"]], Vector2.ZERO, guarding)
 	fx.run(imp, 1)
 	fx.combat.hit(fx.players[0].id, imp, 1)
 	fx.run(imp, 50)
-	check(casts[1] > 0, "hurt, it stands a wall: %s" % casts)
+	check_equal(casts[1], 0, "a hit alone calls for no wall: %s" % casts)
+	# Shots coming: the wizard fires a stream at it.
+	for i in 40:
+		if i % 8 == 0:
+			fx.projectiles.spawn(fx.players[0].id, imp.position + Vector2(120.0, -12.0), Vector2(-200.0, 0.0), 2.0, 4.0, Fixture.ProjectileManagerScript.ACTOR_LAYERS)
+		fx.run(imp, 1)
+	check(casts[1] > 0, "under fire, it stands a wall: %s" % casts)
 
 
 func test_it_opens_with_a_familiar_once() -> void:

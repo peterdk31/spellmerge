@@ -36,7 +36,10 @@ func want(brain: AIBrain) -> float:
 				waiting = at
 			continue
 		var value: float = READY + minf(sense.damage, 30.0) / 100.0 + (0.05 if sense.status else 0.0)
-		if sense.reach > 0.0 and brain.band_min > 0.0 and brain.distance < brain.band_min:
+		if sense.reach > 0.0 and brain.band_max > 0.0 and brain.distance > brain.band_max:
+			# In reach but beyond its band: it would rather walk in first.
+			value *= 0.25
+		elif sense.reach > 0.0 and brain.band_min > 0.0 and brain.distance < brain.band_min:
 			# Too close for an aimed cast to be its best: a cautious one steps back first.
 			value *= 0.4 + 0.6 * brain.distance / brain.band_min
 		if value > best:

@@ -50,7 +50,7 @@ func want(brain: AIBrain) -> float:
 			best = value
 			brain.picks[index] = at
 	if brain.picks[index] >= 0:
-		return best * brain.team_beat()
+		return (best + brain.spread_bonus()) * brain.team_beat()
 	if waiting >= 0 and brain.distance >= near:
 		# Waiting in its range band; too close, it would rather step back first.
 		brain.picks[index] = waiting

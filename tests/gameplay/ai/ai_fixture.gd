@@ -70,6 +70,8 @@ var registry: Node
 var spells: Node
 ## The decoys the imps ask (`lure`); null leaves the "Entities" autoload, which has none.
 var entities: EntitiesScript = null
+## The team board every AI of this world shares, stepped with the world (`run`, `run_all`).
+var board: TeamBoard = TeamBoard.new()
 var enemies: Array[Actor] = []
 var players: Array[Actor] = []
 var _root: Node
@@ -160,6 +162,8 @@ func wire(body: Actor) -> void:
 		mind.profile = exact()
 	if mind != null and entities != null:
 		mind.entities = entities
+	if mind != null:
+		mind.board = board
 
 
 ## One imp with the first wizard `distance` px to its right, in range to wind up.
@@ -193,6 +197,7 @@ func run(body: Actor, count: int) -> void:
 		combat.step(STEP)
 		projectiles.step(STEP)
 		spells.call("step", STEP)
+		board.step(STEP)
 
 
 ## `count` physics frames of every enemy, then the systems.
@@ -205,6 +210,7 @@ func run_all(count: int) -> void:
 		combat.step(STEP)
 		projectiles.step(STEP)
 		spells.call("step", STEP)
+		board.step(STEP)
 		if entities != null:
 			entities.step(STEP)
 

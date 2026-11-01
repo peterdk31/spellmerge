@@ -2,7 +2,7 @@
 
 **Goal:** one AI for every enemy, minion, boss and test bot. It **reads what its staffs will cast next** and plays them in any situation, so designing an enemy means designing its staffs and a few numbers, never code. Bosses add more staffs, other numbers and **phases**. Enemies **dodge**, **channel** sustained casts, and **look like they work together**.
 
-**Status (2026-11-01):** AI1–AI5, AI7 and AI8 built the same day; of AI6, staggered fire (spreading round a target and the call are left); AI9 done by L5 on its second try (the bots play by the brain; ten 4-bot smoke runs all passed, mean clear 8.7 s against the old bot's 9.0 s). Designed with the owner in one session (the decisions are in "Owner decisions"). An owner exception like phases F, G and H (docs/ROADMAP.md): it is the **baseline** enemies are built on later. Designing actual new enemies and bosses on it stays M3 and later.
+**Status (2026-11-02):** AI1–AI8 done; AI9 done by L5 on its second try (the bots play by the brain; ten 4-bot smoke runs all passed, mean clear 8.7 s against the old bot's 9.0 s); L1 (the cost measured, the target lookup made cheap), L2 (heal ally), L3 (spreading round a target) and L4 (the call) done. Left: L6 (difficulty, waiting for `difficulty_changed`) and L7 (strays with roles, the owner's picks). Designed with the owner in one session (the decisions are in "Owner decisions"). An owner exception like phases F, G and H (docs/ROADMAP.md): it is the **baseline** enemies are built on later. Designing actual new enemies and bosses on it stays M3 and later.
 
 **Why:** today's `AIController` (gameplay/ai/ai.gd) presses staff 0 and nothing else. Its numbers (`attack_range`, `windup_time`, `recover_time`) are exports in each enemy's scene, so enemies differ by hand-tuned constants, not by what they cast. The test bot (tests/bots/bot.gd) has its own state machine and its own rule that "RB is the dash staff". The owner's earlier rule "no AI knows what it casts next" (DECISIONS, 2026-11-01) was there to stop hard-coding like `if dash.is_next(): do_dash()`. This design keeps that goal by a different route: the AI knows **what a cast does** (numbers and yes/no answers), never **which card** it is.
 
@@ -63,6 +63,7 @@ One small read-only object per compiled cast (`CompiledCast.sense`), made once b
 | `blocks` | It stops shots: a wall, a shield, a deflect | `BLOCKS` (new trait), `SHIELD`, `DEFLECT` |
 | `spawns` | It makes a decoy or a familiar | `SPAWNS` (new trait) |
 | `heals` | Its hits heal | the hit profile's `heal` |
+| `heals_self` | Its heal lands on its caster (L2) | a fallback on the caster with a `heal` |
 | `status` | Its hits apply a status | the hit profile |
 | `sustained` | It stays on until pressed again (`hold`) | `HOLD` behaviour |
 | `repeats_held` | Holding the button keeps casting it (rain, swing, beam) | `REPEATS_HELD`, `HOLDS_STAFF` |
@@ -140,7 +141,7 @@ The brain asks every behaviour on its timer, keeps the highest `want` (the runni
 
 **The range band** comes from its staffs now: the best damaging `reach` it has, times `aggression` (the band is `reach × (1 - 0.6 × aggression)` to `reach × 0.95`), and at least its blast radius plus a margin. A bolt makes a kiter, a swing or touch a rusher, and a new staff changes it at once.
 
-**Later behaviours, one file each** (not built now): *Heal ally* (an ally on the TeamBoard is hurt and a `heals` cast is ready: target the ally), *Shield ally*, *Focus fire* (join the attack on a nearly dead target), *Cover a caster* (stand between the players and a teammate in a long windup). The baseline makes them possible: **a target can be anyone**, and the TeamBoard knows who is hurt.
+**Later behaviours, one file each** (not built now, but for the first): *Heal ally* (an ally on the TeamBoard is hurt and a `heals` cast is ready: target the ally; built in L2), *Shield ally*, *Focus fire* (join the attack on a nearly dead target), *Cover a caster* (stand between the players and a teammate in a long windup). The baseline makes them possible: **a target can be anyone**, and the TeamBoard knows who is hurt.
 
 ## The executor
 
@@ -212,13 +213,19 @@ Nothing was timed yet. **Do:** run the stress run and the horde run (`tests/benc
 
 ### L2. Heal ally, and targets other than the enemy ("Done when" 3)
 
+**Done (2026-11-01).** `AIBrain.plan_target`, the board's reports (`TeamBoard.report`, 16 slots a team, a hurt one kept over the well), `behaviours/heal_ally.gd`, `CastSense.heals_self`; tests in `test_ai_team.gd`, and `test_ai_combos.gd` stands a combo's `allies` by the enemy as hurt teammates instead of the `HEAL_ONLY` exception. "Done when" 3 holds.
+
 **Do:** (a) the brain gets `plan_target` (a Node2D, null = `target`): the executor aims at it, the reach checks use it. (b) The TeamBoard keeps, per team, its hurt actors (each brain reports its own health fraction and position at its decision; a small fixed array per team, oldest out). (c) `behaviours/heal_ally.gd`: a staff whose next cast `heals` is ready and a teammate under 70% health is within that cast's reach and line → want 0.9 + 0.3 × (1 − its health), plan that staff at it. Also heal itself when the cast lands on the caster (`CastSense` may need a `heals_self` for a fallback on the caster). **Tests:** an enemy with a mend bolt heals a hurt teammate and never a wizard; `test_ai_combos.gd` drops its `HEAL_ONLY` exception.
 
 ### L3. Spreading round a target (AI6, part 2)
 
+**Done (2026-11-01).** `TeamBoard.note_attack` and its count every `RECOUNT` (slots ranked by the angle each stands at, the ring turned to where they stand); `AIBrain.attackers`, `slot_angle`, `slot_way`, `spread_bonus`; `keep range` walks to its slot (and round to it between casts), `fight` gets the bonus. Tests in `test_ai_team.gd`. The four imps of the test hold a bolt they cannot pay for: with shots, the ones walking round step into each other's fire and the grudges (infighting) take them off the wizard.
+
 **Do:** the TeamBoard counts, per target, the attackers of each team (each brain notes its target at its decision; counts reset on the board's timer). An attacker gets a slot round the target: angle = its rank among the target's attackers × (360° / count), offset from the side it already stands on. `keep range` walks toward its slot's point at band distance instead of straight in or out, `fight` gets a small bonus for a target with fewer attackers (scaled by `teamwork`). **Tests:** four imps on one wizard end at least 60° apart round it; with teamwork 0 they do not spread.
 
 ### L4. The call (AI6, part 3)
+
+**Done (2026-11-01).** `AIBrain.State.CALL` before a windup (not for a cast that harms nobody, nor one with no windup, so allies under L5's rule will not call); `Face.glance`; `TeamBoard.call_attack`, `can_call` (one call a team per `CALL_GAP`), `nearest_mate`, `beat` above 1 near a call; a brain with teamwork decides at once on a new call of its team. Tests in `test_ai_team.gd` and `test_face.gd`; `tests/screenshots/shot_call.gd` (two strays mid-call, `call_6x` and `call_1x`).
 
 **Do:** a brain starting a windup with `teamwork` > 0 and a teammate within CALL_REACH (from the TeamBoard's positions, L2) first glances at it: the actor's Face shows RAISED and looks toward the teammate for CALL_TIME (a Face method `glance(direction, seconds)`; the Face is the actor kit's, so the AI may call it), and the board records a call (team, point, time). Teammates within reach of the point that can fight get `beat` above 1 for CALL_TIME, so they join in. **Tests:** a called teammate starts its windup within a beat; with teamwork 0 nobody calls. A screenshot (`tests/screenshots/`) of two strays mid-call.
 

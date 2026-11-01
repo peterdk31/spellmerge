@@ -13,6 +13,7 @@ const LIST: Array[Script] = [
 	preload("res://gameplay/ai/behaviours/guard.gd"),
 	preload("res://gameplay/ai/behaviours/evade.gd"),
 	preload("res://gameplay/ai/behaviours/open.gd"),
+	preload("res://gameplay/ai/behaviours/heal_ally.gd"),
 ]
 
 static var _all: Array[AIBehaviour] = []

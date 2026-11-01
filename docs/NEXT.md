@@ -27,6 +27,16 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts. Owner sessions run `tools/check.sh --author peterdk31` (without `--author` it checks as an outside contributor).
 
+- [x] **Enemy AI: the plan (AI1).** (`docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), with the owner's decisions of 2026-11-01.
+- [ ] **Enemy AI: what a cast does (AI2).** (`core/spells/`) After AI1.
+- [ ] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
+- [ ] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
+- [ ] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
+- [ ] **Enemy AI: the TeamBoard (AI6).** (`gameplay/ai/`) After AI5.
+- [ ] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
+- [ ] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
+- [ ] **Enemy AI: bots on the brain (AI9).** (`tests/bots/`) After AI5.
+- [ ] **Enemy AI: difficulty (AI10).** (`gameplay/ai/`) After AI5 and once difficulty sends `difficulty_changed`.
 - [x] **Shared files split (staffs A2).** One combo per file in `content/spells/combos/` (read by `tests/support/combo_files.gd`, the clip scenarios and `tools/atlas.py`); `assets.json` beside a content folder's files, read with the manifests by `SpellValidator.load_manifest`; `test_combos` checks every registry component, and the icon and drop-list counts are derived. Owner session, 2026-10-26.
 - [x] **Card and staff classes, events (staffs A3).** `MulticastBase` (fifth card kind, `content/spells/multicasts/`); the new carrier motions, modifier behaviours and trigger events, each commented with its kit; `StaffBase` with `content/wizard/staffs/starter` (4 slots) and `dev` (20), checked by `SpellValidator.check_staff` and the registry; the 19 staffs events in `core/events`; `multicast` as a kind in `tools/atlas.py` and `ci/smbot/clips.py`. Owner session, 2026-10-26.
 - [x] **The staff compiler (staffs A4).** `Spells.compile_staff` and `StaffCompiler` read a staff's cards into its cycle (`CompiledStaff`, `CompiledCast`, `CompiledGroup`; payloads, fallbacks, multicast, wrap-around, use-once, wasted cards with reasons, the numbers of a cast, plain descriptions); `Spells.staff_view` for the builder; `tests/core/test_staff_compiler.gd` holds every example of the design. Additive: the recipe compiler is untouched. The tag's node field is 9 bits (design updated). Owner session, 2026-10-26.

@@ -48,8 +48,9 @@ signal staff_built(at: int)
 
 ## How many staffs (1-4): a wizard has four, an enemy one.
 @export_range(1, 4) var staff_count: int = 1
-## The staff of a button with none in `staffs` (its slots, delay and recharge); without one a
-## staff has 4 slots and casts with no delay of its own.
+## The staff of a button with none in `staffs` (its slots, delay, recharge and mana pool);
+## without one a staff has 4 slots, casts with no delay of its own and has StaffBase's default
+## pool.
 @export var staff: StaffBase = null
 ## The staff of each button (a player's four heads); shorter or null entries fall back to `staff`.
 @export var staffs: Array[StaffBase] = []
@@ -225,12 +226,12 @@ func cast(at: int) -> bool:
 
 
 ## The mana staff `at` holds now (0 for a staff that does not exist).
-func mana_of(at: int = 0) -> float:
+func mana_of(at: int) -> float:
 	return _mana[at] if at >= 0 and at < _mana.size() else 0.0
 
 
 ## The most mana staff `at` holds: its staff's pool.
-func max_mana_of(at: int = 0) -> float:
+func max_mana_of(at: int) -> float:
 	return staff_of(at).max_mana
 
 
@@ -241,7 +242,7 @@ func set_mana(at: int, value: float) -> void:
 
 
 ## Mana a cast of staff `at` may use now: its pool, minus what its sustained cards hold.
-func free_mana(at: int = 0) -> float:
+func free_mana(at: int) -> float:
 	var reserved: float = actor.spells.reserved_mana(number, at) if actor.spells != null and number >= 0 else 0.0
 	return maxf(mana_of(at) - reserved, 0.0)
 

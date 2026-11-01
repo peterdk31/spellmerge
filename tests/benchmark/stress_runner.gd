@@ -613,7 +613,8 @@ func _keep_wizards_up() -> void:
 		var wizard: Actor = _wizards[index]
 		if not is_instance_valid(wizard):
 			continue
-		wizard.caster.set_mana(0, wizard.caster.max_mana_of(0))
+		for at in wizard.caster.staff_count:
+			wizard.caster.set_mana(at, wizard.caster.max_mana_of(at))
 		_downs[index].revive(index)
 		_downs[index].protect(1.0)
 

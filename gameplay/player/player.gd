@@ -101,6 +101,7 @@ var _sent_mana: int = -1
 var _sent_shown: int = -1
 ## What the last `staff_mana_changed` of each staff said (its whole mana; -1: not sent yet).
 var _sent_staff_mana: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _sent_staff_max: PackedFloat32Array = PackedFloat32Array([-1.0, -1.0, -1.0, -1.0])
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
 
@@ -179,6 +180,7 @@ func started(actor: Actor) -> void:
 	_sent_health = -1
 	_sent_mana = -1
 	_sent_staff_mana.fill(-1)
+	_sent_staff_max.fill(-1.0)
 	announce_stats()
 
 
@@ -301,8 +303,8 @@ func forget_presses() -> void:
 			_seen_presses[at] = input.get_press_count(seat, CAST_ACTIONS[at])
 
 
-## Send `staff_mana_changed` for each staff of the home body whose whole mana differs from the
-## last one sent, and `player_stats_changed` if its health, the staff on show or that staff's
+## Send `staff_mana_changed` for each staff of the home body whose whole mana or pool size
+## differs from the last one sent, and `player_stats_changed` if its health, the staff on show or that staff's
 ## whole mana differ.
 func announce_stats() -> void:
 	if _home == null or not is_instance_valid(_home) or _home.events == null:
@@ -311,9 +313,11 @@ func announce_stats() -> void:
 	if caster != null:
 		for at in mini(caster.staff_count, STAFF_COUNT):
 			var whole: int = floori(caster.mana_of(at))
-			if whole != _sent_staff_mana[at]:
+			var most: float = caster.max_mana_of(at)
+			if whole != _sent_staff_mana[at] or most != _sent_staff_max[at]:
 				_sent_staff_mana[at] = whole
-				_home.events.staff_mana_changed.emit(seat, at, float(whole), caster.max_mana_of(at))
+				_sent_staff_max[at] = most
+				_home.events.staff_mana_changed.emit(seat, at, float(whole), most)
 	var health: float = _home.health.health if _home.health != null else 0.0
 	var max_health: float = _home.health.max_health if _home.health != null else 0.0
 	var shown: int = caster.current if caster != null else 0

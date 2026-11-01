@@ -29,6 +29,7 @@ const MENU_TEXT: String = "MENU"
 
 var _health: float = -1.0
 var _mana: int = -1
+var _max_mana: float = -1.0
 var _downed: bool = false
 var _menu_open: bool = false
 var _rows: Array[StaffRowScript] = []
@@ -71,8 +72,10 @@ func set_stats(health: float, max_health: float, mana: float, max_mana: float) -
 		if downed != _downed:
 			_downed = downed
 			_refresh_status()
-	if whole_mana != _mana:
+	# The size counts too: the bar is the staff on show's pool, and another staff's may differ.
+	if whole_mana != _mana or max_mana != _max_mana:
 		_mana = whole_mana
+		_max_mana = max_mana
 		_mana_bar.max_value = maxf(max_mana, 1.0)
 		_mana_bar.value = mana
 		_mana_value.text = str(whole_mana)

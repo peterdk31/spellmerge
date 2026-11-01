@@ -1,30 +1,21 @@
 extends RefCounted
 ## A bot: plays one player slot through a virtual device and the real input path
-## (`PlayerInput.send_virtual`), the same path a gamepad uses. It holds `move_*` and the staff
-## buttons `staff_2` and `staff_3` (RT, LB), and taps `staff_1` (RB, the dash staff) and `back`
-## (B, which opens the builder in play); it never
-## touches a spell field or the projectile manager, so it plays the way a person does. The
-## wizard casts a staff when its button is held, so a bot calls nothing on a spell itself.
+## (`PlayerInput.send_virtual`, `send_virtual_aim`), the same path a gamepad uses. It never
+## touches a spell field or the projectile manager's shots, so it plays the way a person does: the
+## wizard casts what its buttons say.
 ##
-## Fighter: a state machine (owner, 2026-11-01), one `State` a step, picked in this order. It
-## reads the world only, never what its own staffs will cast next (owner: which staff to fire
-## needs more design):
-## - DODGE: an enemy within DODGE_RANGE aims at the wizard and its windup is past DODGE_FROM, as
-##   a person reads a telegraph. It seeks cover: if a way within COVER_PROBE pixels ends behind a
-##   wall from the enemy (any wall, `AISight.cover`) it heads there and stays while the wall is
-##   between them; else it heads off the line of the shot. Getting there is urgent.
-## Moving (`_move`, the same for every state): it walks the way its state wants; when that is
-## urgent and its dash staff (`staff_1`, RB: the bot's own rule for its buttons, not a read of the
-## card) can cast now, it taps it once, and the dash goes the way it walks. So it dashes into cover,
-## or off the line, with no case of its own (owner, 2026-11-01).
-## - UNSTICK: it hardly moved for STUCK_STEPS steps (a pillar): it side-steps for SIDESTEP_STEPS.
-## - DETOUR: the nearest enemy is within FIRE_RANGE but a wall stands between them (any wall, its
-##   own too: `AISight`, the walls shots stop on): it walks the way `AISight.detour` picks for
-##   DETOUR_STEPS steps or until the line is clear, and holds no staff meanwhile.
-## - ATTACK: within FIRE_RANGE with the line clear: it walks at the enemy (a wizard faces where it
-##   walks, so the shots fly at it) and holds `staff_2` (RT, the fire bolt it starts with) and
-##   `staff_3` (LB, the staff it built). It fires while dodging too, whenever the line is clear.
-## - APPROACH: else it walks at the nearest enemy.
+## Fighter (enemy AI L5, docs/milestones/M2-enemy-ai.md): its decisions come from the same brain
+## every enemy plays by (`AIBrain`, gameplay/ai/brain.gd), with the bot's profile
+## (`bot_profile.tres`: no rest, pressing on, quick to react, dodging). The brain drives the
+## wizard but writes a spare `ActorIntent`, never the wizard's own, and the bot turns that into
+## buttons: the walk into the four move actions, the aim into the virtual right stick, a tap of
+## a staff's button for each press and the button held while a staff is held. The wizard is on
+## the players' team, so the brain winds up nothing (enemies telegraph, allies don't: owner,
+## 2026-11-01) and casts the step a staff is ready. It reads what each staff casts next
+## (`CastSense`), never a card: it fires the staff that hurts and reaches, walks round walls
+## (`AISight`), dodges shots and the telegraphs aimed at it, and when getting away is urgent it
+## taps whichever staff's next cast moves the caster (no button is "the dash"). It holds no grudge
+## (a teammate's blast never makes it fight a teammate) and is lured by no decoy.
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 3 (BUILD_STAFF, LB, empty at the
@@ -33,63 +24,36 @@ extends RefCounted
 ## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
 ## and it stays there (the full builder, waves included).
 ##
-## Everything is driven by step(delta), so a run with the same frames repeats. A
-## bot sends an input only when it changes.
+## Everything is driven by step(delta), so a run with the same frames repeats. A bot sends an
+## input only when it changes. Nothing is allocated per step.
 
 enum Mode { FIGHTER, IDLER }
-## The fighter's states (see above).
-enum State { APPROACH, ATTACK, DETOUR, UNSTICK, DODGE }
 
 const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
+## How a bot plays (the brain's numbers).
+const PROFILE: AIProfile = preload("res://tests/bots/bot_profile.tres")
 
-## The staff a bot builds into: staff 3, LB (empty at the start; RB dashes and RT fires the
-## start bolt).
+## The staff a bot builds into: staff 3, LB (empty at the start).
 const BUILD_STAFF: int = 2
-## The staffs a fighter attacks with (RT and LB) and the staff buttons; the dash is staff 0 (RB).
-const ATTACK_STAFFS: Array[int] = [1, 2]
+## The staff buttons, by staff.
 const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 ## A random staff has at most this many cards, so a built staff stays quick to cast.
 const BUILD_CARDS: int = 6
-
-## Closer than this (pixels) the bot holds `cast`.
-const FIRE_RANGE: float = 170.0
-## A step that moves less than this (pixels) counts as stuck.
-const STUCK_DISTANCE: float = 0.5
-const STUCK_STEPS: int = 20
-const SIDESTEP_STEPS: int = 25
-## The staff the bot keeps its dash on: RB, `staff_1` (Play's start cards put `dash` there).
-const DASH_STAFF: int = 0
-## How far (pixels) a way to cover is probed (`AISight.cover`).
-const COVER_PROBE: float = 48.0
-## How far ahead (pixels) a detour direction is probed, and how many steps it is kept.
-const PROBE_DISTANCE: float = 40.0
-const DETOUR_STEPS: int = 15
-## A windup aimed at the wizard (within DODGE_AIM of its line) from closer than
-## DODGE_RANGE pixels is dodged once it is DODGE_FROM along (0 to 1).
-const DODGE_RANGE: float = 140.0
-const DODGE_AIM: float = 0.9
-const DODGE_FROM: float = 0.75
+## The brain of bot `i` is seeded SEED + i, so a run repeats.
+const SEED: int = 4111
 
 var player: int = 0
 var mode: Mode = Mode.FIGHTER
+## The fighter's brain, and the intent it writes (the bot's, never the wizard's own).
+var brain: AIBrain = AIBrain.new()
+var intent: ActorIntent = ActorIntent.new()
 
 var _input: Node = null
 var _flow: Node = null
-## The state it is in (a fighter), and the state's steps left (DETOUR, UNSTICK).
-var state: State = State.APPROACH
-var _state_left: int = 0
 var _held_move: Vector2i = Vector2i.ZERO
+var _held_aim: Vector2 = Vector2.ZERO
 ## The staffs it holds now, by index (0 to 3).
 var _held_staffs: PackedByteArray = PackedByteArray([0, 0, 0, 0])
-## The way to cover in this DODGE, or ZERO when none was near.
-var _cover: Vector2 = Vector2.ZERO
-var _last_position: Vector2 = Vector2.INF
-var _stuck: int = 0
-var _sidestep_sign: float = 1.0
-var _detour: Vector2 = Vector2.ZERO
-var _dodged_enemy: int = 0
-## True once it dashed for this urgency (one dash per threat's windup); false again when calm.
-var _dashed: bool = false
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
@@ -104,7 +68,6 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	mode = bot_mode
 	_input = input
 	_flow = flow
-	_sidestep_sign = 1.0 if index % 2 == 0 else -1.0
 	return int(_input.call("add_virtual_device", player)) != int(_input.get("NO_DEVICE"))
 
 
@@ -152,166 +115,40 @@ func leave() -> void:
 	_input.call("leave", player)
 
 
-## One decision. An idler does nothing.
-func step(_delta: float) -> void:
+## One step: the brain thinks for the wizard and the bot presses what it wants. An idler does
+## nothing.
+func step(delta: float) -> void:
 	if mode == Mode.IDLER:
 		return
 	var wizard := _flow.call("get_wizard", player) as Actor
-	var world := _flow.get("world") as Node2D
-	if wizard == null or world == null or wizard.is_down():
+	if wizard == null or _flow.get("world") == null or wizard.is_down() or wizard.caster == null:
 		_release()
 		return
-	var target: Node2D = _nearest_enemy(world, wizard.global_position)
-	if target == null:
-		_release()
-		return
-	_track_stuck(wizard.global_position)
-	var threat: Node2D = _incoming(world, wizard)
-	var in_range: bool = wizard.global_position.distance_to(target.global_position) <= FIRE_RANGE
-	var clear: bool = _line_clear(wizard, target)
-	_next_state(wizard, target, threat, in_range, clear)
-	var direction: Vector2 = (target.global_position - wizard.global_position).normalized()
-	match state:
-		State.DODGE:
-			if _cover != Vector2.ZERO and not _line_clear(wizard, threat):
-				# In cover: a wall stands between it and the shot. Stay.
-				direction = Vector2.ZERO
-			else:
-				direction = _cover if _cover != Vector2.ZERO else _off_the_line(wizard, threat)
-		State.UNSTICK:
-			direction = direction.orthogonal() * _sidestep_sign
-		State.DETOUR:
-			direction = _detour
-	_move(wizard, direction, state == State.DODGE)
-	# It fires whenever the line is clear and the enemy in range, dodging too; never into a wall.
-	for at: int in ATTACK_STAFFS:
-		_hold_staff(at, in_range and clear)
+	if brain.actor != wizard:
+		# A new wizard (a new run): a fresh brain for it.
+		intent.clear()
+		brain.setup(wizard, PROFILE, SEED + player)
+	intent.begin_step()
+	brain.think(delta, intent)
+	send(intent)
 
 
-## The state for this step, in the order the header gives; entering one does its one-off part.
-func _next_state(wizard: Actor, target: Node2D, threat: Node2D, in_range: bool, clear: bool) -> void:
-	if threat == null:
-		_dodged_enemy = 0
-	else:
-		if threat.get_instance_id() != _dodged_enemy:
-			_dodged_enemy = threat.get_instance_id()
-			_dashed = false
-			_seek_cover(wizard, threat)
-		state = State.DODGE
-		return
-	if _stuck >= STUCK_STEPS:
-		_stuck = 0
-		_sidestep_sign = -_sidestep_sign
-		state = State.UNSTICK
-		_state_left = SIDESTEP_STEPS
-	if state == State.UNSTICK or state == State.DETOUR:
-		_state_left -= 1
-		if _state_left > 0 and not (state == State.DETOUR and clear):
-			return
-	if in_range and not clear:
-		state = State.DETOUR
-		_state_left = DETOUR_STEPS
-		_detour = AISight.detour(wizard.projectiles, wizard.global_position, target.global_position, PROBE_DISTANCE)
-		return
-	state = State.ATTACK if in_range else State.APPROACH
-
-
-## A threat's windup: the way to cover within reach (any wall between it and the threat), or
-## ZERO when none is near.
-func _seek_cover(wizard: Actor, threat: Node2D) -> void:
-	_cover = AISight.cover(wizard.projectiles, wizard.global_position, threat.global_position, COVER_PROBE)
-
-
-## Walk `direction`; when `urgent`, also dash that way once if the dash staff can cast now.
-func _move(wizard: Actor, direction: Vector2, urgent: bool) -> void:
-	_hold_move(direction)
-	if not urgent:
-		_dashed = false
-	elif not _dashed and direction != Vector2.ZERO and wizard.caster.cast_ready(0.0, DASH_STAFF):
-		_tap(DASH_STAFF)
-		_dashed = true
-
-
-## Off the line of the threat's shot, on the side the wizard already is.
-func _off_the_line(wizard: Actor, threat: Node2D) -> Vector2:
-	var aim: Vector2 = threat.get("aim")
-	var away: Vector2 = wizard.global_position - threat.global_position
-	var side: Vector2 = away - aim * away.dot(aim)
-	return side.normalized() if side.length() > 1.0 else aim.orthogonal() * _sidestep_sign
-
-
-## False when a wall (a room's or a Wall card's) is between the wizard and the enemy: shots
-## stop there, and a person does not fire into a wall.
-func _line_clear(wizard: Actor, target: Node2D) -> bool:
-	var to: Vector2 = target.global_position
-	if target is Actor:
-		to += (target as Actor).body_offset
-	return AISight.line_clear(wizard.projectiles, wizard.global_position + wizard.body_offset, to)
-
-
-## The enemy about to shoot at the wizard (see DODGE_*), or null. Enemies stand in the world, or
-## one level down under its `Horde` node (a horde run's enemies).
-func _incoming(world: Node2D, wizard: Node2D) -> Node2D:
-	var found: Node2D = _incoming_among(world, wizard)
-	var horde: Node = world.get_node_or_null(^"Horde")
-	if found == null and horde != null:
-		found = _incoming_among(horde, wizard)
-	return found
-
-
-func _incoming_among(parent: Node, wizard: Node2D) -> Node2D:
-	for child in parent.get_children():
-		var enemy := child as Actor
-		var ai: AIController = _ai_of(enemy)
-		if ai == null or enemy.is_queued_for_deletion():
-			continue
-		if ai.telegraph_progress() < DODGE_FROM:
-			continue
-		var to_wizard: Vector2 = wizard.global_position - enemy.global_position
-		if to_wizard.length() > DODGE_RANGE:
-			continue
-		var aim: Vector2 = enemy.get("aim")
-		if aim.dot(to_wizard.normalized()) >= DODGE_AIM:
-			return enemy
-	return null
-
-
-## The nearest enemy to `from`: among the world's children and, one level down, those of its
-## `Horde` node (a horde run's enemies); null when there is none.
-func _nearest_enemy(world: Node2D, from: Vector2) -> Node2D:
-	var best: Node2D = _nearest_among(world, from, null)
-	var horde: Node = world.get_node_or_null(^"Horde")
-	if horde != null:
-		best = _nearest_among(horde, from, best)
-	return best
-
-
-## The nearest enemy to `from` among `parent`'s children, or `best` when it is nearer.
-func _nearest_among(parent: Node, from: Vector2, best: Node2D) -> Node2D:
-	var best_distance: float = from.distance_squared_to(best.global_position) if best != null else INF
-	for child in parent.get_children():
-		# Enemies are the actors an AI drives (actors G6).
-		var enemy := child as Actor
-		if _ai_of(enemy) == null or enemy.is_queued_for_deletion():
-			continue
-		var distance: float = from.distance_squared_to(enemy.global_position)
-		if distance < best_distance:
-			best_distance = distance
-			best = enemy
-	return best
-
-
-## The AI driving `enemy`, or null (not an actor, or no AI drives it).
-func _ai_of(enemy: Actor) -> AIController:
-	return enemy.controller as AIController if enemy != null else null
-
-
-func _track_stuck(at: Vector2) -> void:
-	if state == State.UNSTICK or at.distance_to(_last_position) >= STUCK_DISTANCE:
-		_stuck = 0
-	else:
-		_stuck += 1
-	_last_position = at
+## Turn `wanted` into buttons: the walk, the aim, a tap per pressed staff and the button held per
+## held staff.
+func send(wanted: ActorIntent) -> void:
+	_hold_move(wanted.move)
+	_aim(wanted.aim)
+	for at in STAFF_ACTIONS.size():
+		var held: bool = wanted.is_held(at)
+		if wanted.is_pressed(at):
+			if _held_staffs[at] != 0:
+				_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
+			_input.call("send_virtual", player, STAFF_ACTIONS[at], 1.0)
+			if not held:
+				_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
+			_held_staffs[at] = 1 if held else 0
+		else:
+			_hold_staff(at, held)
 
 
 ## Hold the four move actions for `direction` (each axis on or off).
@@ -326,6 +163,15 @@ func _hold_move(direction: Vector2) -> void:
 	_held_move = wanted
 
 
+## Push the right stick toward `direction` (ZERO lets it go, and the wizard aims where it walks).
+func _aim(direction: Vector2) -> void:
+	var wanted: Vector2 = direction.normalized() if direction != Vector2.ZERO else Vector2.ZERO
+	if wanted == _held_aim:
+		return
+	_input.call("send_virtual_aim", player, wanted)
+	_held_aim = wanted
+
+
 func _hold_staff(at: int, on: bool) -> void:
 	if (_held_staffs[at] != 0) == on:
 		return
@@ -333,16 +179,11 @@ func _hold_staff(at: int, on: bool) -> void:
 	_held_staffs[at] = 1 if on else 0
 
 
-## Press and let go of staff `at` once (the dash).
-func _tap(at: int) -> void:
-	_input.call("send_virtual", player, STAFF_ACTIONS[at], 1.0)
-	_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
-	_held_staffs[at] = 0
-
-
 func _release() -> void:
 	_hold_move(Vector2.ZERO)
+	_aim(Vector2.ZERO)
 	for at in _held_staffs.size():
 		_hold_staff(at, false)
-	_cover = Vector2.ZERO
-	state = State.APPROACH
+	if brain.actor != null:
+		brain.reset()
+		brain.actor = null

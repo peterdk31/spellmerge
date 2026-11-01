@@ -43,3 +43,23 @@ static func detour(projectiles: ProjectilesScript, from: Vector2, goal: Vector2,
 			best_score = score
 			best = way
 	return best
+
+
+## The way (unit length) to cover from `threat`: of the eight ways whose first `probe` pixels are
+## free, one whose end has a wall (any wall: a room's, a Wall card's, whoever cast it) between it
+## and `threat`, the end farthest from `threat`; ZERO when no such end is near, or with no
+## projectile manager. It asks nothing about what the wall is or who made it.
+static func cover(projectiles: ProjectilesScript, from: Vector2, threat: Vector2, probe: float) -> Vector2:
+	if projectiles == null:
+		return Vector2.ZERO
+	var best: Vector2 = Vector2.ZERO
+	var best_distance: float = -1.0
+	for way: Vector2 in DIRECTIONS:
+		var end: Vector2 = from + way * probe
+		if not projectiles.line_clear(from, end) or projectiles.line_clear(end, threat):
+			continue
+		var distance: float = end.distance_squared_to(threat)
+		if distance > best_distance:
+			best_distance = distance
+			best = way
+	return best

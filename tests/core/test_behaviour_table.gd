@@ -19,7 +19,7 @@ func _staff(cards: Array) -> CompiledStaff:
 func test_every_need_names_known_behaviours_traits_and_fields() -> void:
 	# A typo in a NEEDS row would quietly make a card work or waste everywhere.
 	var fields: Array[String] = ["any", "not", "or_cards", "cards", "or_infused", "not_cards"]
-	var all_traits: int = (CarrierTraits.BLOCKS << 1) - 1
+	var all_traits: int = (CarrierTraits.STRIKES_POINT << 1) - 1
 	for table: Dictionary in [ModifierBase.NEEDS, TriggerBase.NEEDS]:
 		var size: int = ModifierBase.Behaviour.size() if table == ModifierBase.NEEDS else TriggerBase.Event.size()
 		for key: int in table:

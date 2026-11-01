@@ -4,10 +4,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 ## 2026-11-01: AIs handle walls; the bot is a state machine (owner)
 
-- **Why:** a bot holding a wall staff with its bolt stood its wall in front of its own bolts every cast and stalled the 4-bot run; the bots had to leave `wall` out of their builds. The owner asked for AIs that handle walls, useful for enemies too, and agreed the AI could be a state machine.
+- **Why:** a bot holding a wall staff with its bolt stood its wall in front of its own bolts every cast and stalled the 4-bot run; the bots had to leave `wall` out of their builds. The owner asked for AIs that handle walls, useful for enemies too, and suggested the AI be a state machine.
 - **Sight:** `AISight` (gameplay/ai/sight.gd) is how every AI sees walls: the projectile manager's wall grid, which holds the room's walls and every live Wall card, the same grid shots stop on. Chosen over physics rays (what the bot used), so the enemies and the bots agree and nothing needs a physics query.
 - **Enemies:** a new state, REPOSITION: an aimed cast is never wound up into a wall; the enemy walks round it first. A cast that is not aimed (nova, orbit) ignores walls as before.
-- **Cover:** a carrier says it stands as a wall (`CarrierTraits.BLOCKS`), and an AI asks the next cast's traits (`Spells.next_cast_traits`) rather than reading a card. A bot keeps such a staff for cover against a telegraphed shot and never holds it with its attack. Enemies have one staff, so for them a wall staff stays their attack for now; a second staff for cover is the obvious next step.
+- **No AI knows what it casts next (owner):** an AI reads the world, not its own staffs: it walks round whatever stands in its line of fire and seeks cover behind whatever wall is near (`AISight.cover`), whoever made it. A first try had the bot ask whether a staff's next cast was a wall (a `BLOCKS` carrier trait and `next_cast_traits`) and keep it for cover; the owner turned it down, and it is gone. Which staff an AI should fire, and when, needs its own design.
 - **State machine:** the bot's flags and counters became one `State` (APPROACH, ATTACK, DETOUR, UNSTICK, DODGE), an enum and a `match` like the enemy AI's, not a framework of state objects: nothing is allocated per step, and a new state is a new enum value and a branch.
 
 ## 2026-11-01: Every staff has its own mana pool (owner)

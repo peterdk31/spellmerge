@@ -2559,13 +2559,6 @@ func next_cast_reach(actor: int, staff: int) -> float:
 	return _carrier_of(first).reach_of(first)
 
 
-## What the next cast's first carrier is (its `Carrier.traits()`, CarrierTraits flags), 0 with no
-## build: an AI asks, as it asks the reach, without reading a card (`BLOCKS`: a wall, cover).
-func next_cast_traits(actor: int, staff: int) -> int:
-	var first: CompiledSpell = _next_carrier(actor, staff)
-	return _carrier_of(first).traits() if first != null else 0
-
-
 ## The hit radius of the next cast's first carrier (0 for none), for the width of a telegraph.
 func next_cast_radius(actor: int, staff: int) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff)

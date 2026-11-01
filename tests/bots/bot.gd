@@ -6,23 +6,23 @@ extends RefCounted
 ## touches a spell field or the projectile manager, so it plays the way a person does. The
 ## wizard casts a staff when its button is held, so a bot calls nothing on a spell itself.
 ##
-## Fighter: a state machine (owner, 2026-11-01), one `State` a step, picked in this order:
+## Fighter: a state machine (owner, 2026-11-01), one `State` a step, picked in this order. It
+## reads the world only, never what its own staffs will cast next (owner: which staff to fire
+## needs more design):
 ## - DODGE: an enemy within DODGE_RANGE aims at the wizard and its windup is past DODGE_FROM, as
-##   a person reads a telegraph. On entering it puts up cover if it has a guard staff that is
-##   ready (it aims the right stick at the enemy and taps it), else taps `staff_1`, the dash
-##   (once per windup); it steps off the line of the shot while the threat lasts.
+##   a person reads a telegraph. It seeks cover: if a way within COVER_PROBE pixels ends behind a
+##   wall from the enemy (any wall, `AISight.cover`) it walks there and stays while the wall is
+##   between them; else it steps off the line of the shot and taps `staff_1`, the dash (once per
+##   windup).
 ## - UNSTICK: it hardly moved for STUCK_STEPS steps (a pillar): it side-steps for SIDESTEP_STEPS.
-## - DETOUR: the nearest enemy is within FIRE_RANGE but a wall stands between them (a room's or a
-##   Wall card's, its own too: `AISight`, the walls shots stop on): it walks the way
-##   `AISight.detour` picks for DETOUR_STEPS steps, so it never fires into a wall.
+## - DETOUR: the nearest enemy is within FIRE_RANGE but a wall stands between them (any wall, its
+##   own too: `AISight`, the walls shots stop on): it walks the way `AISight.detour` picks for
+##   DETOUR_STEPS steps or until the line is clear, and holds no staff meanwhile.
 ## - ATTACK: within FIRE_RANGE with the line clear: it walks at the enemy (a wizard faces where it
-##   walks, so the shots fly at it) and holds its attack staffs.
+##   walks, so the shots fly at it) and holds `staff_2` (RT, the fire bolt it starts with) and
+##   `staff_3` (LB, the staff it built). It fires while dodging too, whenever the line is clear.
 ## - APPROACH: else it walks at the nearest enemy.
-## Staffs: `staff_2` (RT, the fire bolt it starts with) and `staff_3` (LB, the staff it built) are
-## attack staffs, held in ATTACK, unless the next cast of one puts up a wall (`Caster`'s
-## `next_cast_traits` has `CarrierTraits.BLOCKS`): that one is a guard staff, never held (its wall
-## would stand in front of its own bolts every cast) but tapped toward a threat in DODGE. Idler:
-## stands still; it only opens its builder.
+## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 3 (BUILD_STAFF, LB, empty at the
 ## start) with the same `staff_change_requested` events a person sends (slot by slot, from the
@@ -42,7 +42,7 @@ const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 ## The staff a bot builds into: staff 3, LB (empty at the start; RB dashes and RT fires the
 ## start bolt).
 const BUILD_STAFF: int = 2
-## The staffs a fighter attacks with (RT and LB) and their buttons; the dash is staff 0 (RB).
+## The staffs a fighter attacks with (RT and LB) and the staff buttons; the dash is staff 0 (RB).
 const ATTACK_STAFFS: Array[int] = [1, 2]
 const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 ## A random staff has at most this many cards, so a built staff stays quick to cast.
@@ -54,6 +54,8 @@ const FIRE_RANGE: float = 170.0
 const STUCK_DISTANCE: float = 0.5
 const STUCK_STEPS: int = 20
 const SIDESTEP_STEPS: int = 25
+## How far (pixels) a way to cover is probed (`AISight.cover`).
+const COVER_PROBE: float = 48.0
 ## How far ahead (pixels) a detour direction is probed, and how many steps it is kept.
 const PROBE_DISTANCE: float = 40.0
 const DETOUR_STEPS: int = 15
@@ -74,8 +76,8 @@ var _state_left: int = 0
 var _held_move: Vector2i = Vector2i.ZERO
 ## The staffs it holds now, by index (0 to 3).
 var _held_staffs: PackedByteArray = PackedByteArray([0, 0, 0, 0])
-## True while the right stick aims (a guard staff's cast); let go the next step.
-var _aiming: bool = false
+## The way to cover in this DODGE, or ZERO when none was near.
+var _cover: Vector2 = Vector2.ZERO
 var _last_position: Vector2 = Vector2.INF
 var _stuck: int = 0
 var _sidestep_sign: float = 1.0
@@ -156,10 +158,6 @@ func step(_delta: float) -> void:
 	if target == null:
 		_release()
 		return
-	if _aiming:
-		# The guard staff's cast left last step: the aim follows the walk again.
-		_input.call("send_virtual_aim", player, Vector2.ZERO)
-		_aiming = false
 	_track_stuck(wizard.global_position)
 	var threat: Node2D = _incoming(world, wizard)
 	var in_range: bool = wizard.global_position.distance_to(target.global_position) <= FIRE_RANGE
@@ -168,18 +166,19 @@ func step(_delta: float) -> void:
 	var direction: Vector2 = (target.global_position - wizard.global_position).normalized()
 	match state:
 		State.DODGE:
-			# Off the line of the shot, on the side the wizard already is.
-			var aim: Vector2 = threat.get("aim")
-			var away: Vector2 = wizard.global_position - threat.global_position
-			var side: Vector2 = away - aim * away.dot(aim)
-			direction = side.normalized() if side.length() > 1.0 else aim.orthogonal() * _sidestep_sign
+			if _cover != Vector2.ZERO and not _line_clear(wizard, threat):
+				# In cover: a wall stands between it and the shot. Stay.
+				direction = Vector2.ZERO
+			else:
+				direction = _cover if _cover != Vector2.ZERO else _off_the_line(wizard, threat)
 		State.UNSTICK:
 			direction = direction.orthogonal() * _sidestep_sign
 		State.DETOUR:
 			direction = _detour
 	_hold_move(direction)
 	# It fires whenever the line is clear and the enemy in range, dodging too; never into a wall.
-	_hold_attack(wizard, in_range and clear)
+	for at: int in ATTACK_STAFFS:
+		_hold_staff(at, in_range and clear)
 
 
 ## The state for this step, in the order the header gives; entering one does its one-off part.
@@ -189,7 +188,7 @@ func _next_state(wizard: Actor, target: Node2D, threat: Node2D, in_range: bool, 
 	else:
 		if threat.get_instance_id() != _dodged_enemy:
 			_dodged_enemy = threat.get_instance_id()
-			_cover_or_dash(wizard, threat)
+			_seek_cover(wizard, threat)
 		state = State.DODGE
 		return
 	if _stuck >= STUCK_STEPS:
@@ -209,29 +208,19 @@ func _next_state(wizard: Actor, target: Node2D, threat: Node2D, in_range: bool, 
 	state = State.ATTACK if in_range else State.APPROACH
 
 
-## A threat's windup: put up cover with a ready guard staff, aimed at the threat, else dash.
-func _cover_or_dash(wizard: Actor, threat: Node2D) -> void:
-	var guard: int = _guard_staff(wizard)
-	if guard >= 0:
-		_input.call("send_virtual_aim", player, (threat.global_position - wizard.global_position).normalized())
-		_aiming = true
-		_tap(guard)
-	elif wizard.caster.has_staff(0):
+## A threat's windup: cover within reach (any wall between it and the threat), else a dash.
+func _seek_cover(wizard: Actor, threat: Node2D) -> void:
+	_cover = AISight.cover(wizard.projectiles, wizard.global_position, threat.global_position, COVER_PROBE)
+	if _cover == Vector2.ZERO and wizard.caster.has_staff(0):
 		_tap(0)
 
 
-## The first staff whose next cast puts up a wall and that can cast now, or -1.
-func _guard_staff(wizard: Actor) -> int:
-	for at: int in ATTACK_STAFFS:
-		if _is_guard(wizard, at) and wizard.caster.cast_ready(0.0, at):
-			return at
-	return -1
-
-
-## True when the next cast of staff `at` puts up a wall (CarrierTraits.BLOCKS): cover, not an
-## attack.
-func _is_guard(wizard: Actor, at: int) -> bool:
-	return wizard.caster.next_cast_traits(at) & CarrierTraits.BLOCKS != 0
+## Off the line of the threat's shot, on the side the wizard already is.
+func _off_the_line(wizard: Actor, threat: Node2D) -> Vector2:
+	var aim: Vector2 = threat.get("aim")
+	var away: Vector2 = wizard.global_position - threat.global_position
+	var side: Vector2 = away - aim * away.dot(aim)
+	return side.normalized() if side.length() > 1.0 else aim.orthogonal() * _sidestep_sign
 
 
 ## False when a wall (a room's or a Wall card's) is between the wizard and the enemy: shots
@@ -320,12 +309,6 @@ func _hold_move(direction: Vector2) -> void:
 	_held_move = wanted
 
 
-## Hold the attack staffs while `on` (a guard staff never), let go of the rest.
-func _hold_attack(wizard: Actor, on: bool) -> void:
-	for at: int in ATTACK_STAFFS:
-		_hold_staff(at, on and not _is_guard(wizard, at))
-
-
 func _hold_staff(at: int, on: bool) -> void:
 	if (_held_staffs[at] != 0) == on:
 		return
@@ -333,7 +316,7 @@ func _hold_staff(at: int, on: bool) -> void:
 	_held_staffs[at] = 1 if on else 0
 
 
-## Press and let go of staff `at` once (a dash, a guard staff's wall).
+## Press and let go of staff `at` once (the dash).
 func _tap(at: int) -> void:
 	_input.call("send_virtual", player, STAFF_ACTIONS[at], 1.0)
 	_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
@@ -344,7 +327,5 @@ func _release() -> void:
 	_hold_move(Vector2.ZERO)
 	for at in _held_staffs.size():
 		_hold_staff(at, false)
-	if _aiming:
-		_input.call("send_virtual_aim", player, Vector2.ZERO)
-		_aiming = false
+	_cover = Vector2.ZERO
 	state = State.APPROACH

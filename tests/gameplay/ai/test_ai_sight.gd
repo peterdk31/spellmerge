@@ -56,3 +56,16 @@ func test_the_detour_is_free_and_leads_into_view() -> void:
 func test_without_a_manager_nothing_blocks() -> void:
 	check(AISight.line_clear(null, Vector2.ZERO, Vector2(500.0, 0.0)), "clear")
 	check(AISight.detour(null, Vector2.ZERO, Vector2(10.0, 0.0), 40.0).is_equal_approx(Vector2.RIGHT), "straight at the goal")
+
+
+func test_cover_is_a_free_way_behind_any_wall() -> void:
+	var from := Vector2(200.0, 200.0)
+	var threat := Vector2(400.0, 200.0)
+	check_equal(AISight.cover(mgr, from, threat, 48.0), Vector2.ZERO, "an open room has no cover")
+	# A pillar just below-right: a step down puts it between the wizard and the threat.
+	mgr.set_walls([Rect2(224.0, 216.0, 32.0, 32.0)] as Array[Rect2])
+	var way: Vector2 = AISight.cover(mgr, from, threat, 48.0)
+	check(way != Vector2.ZERO, "a way to cover is found")
+	check(AISight.line_clear(mgr, from, from + way * 48.0), "its steps are free")
+	check(not AISight.line_clear(mgr, from + way * 48.0, threat), "and from its end the threat is behind the wall")
+	check(AISight.cover(null, from, threat, 48.0) == Vector2.ZERO, "no manager, no cover")

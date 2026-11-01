@@ -9,7 +9,7 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | MEETS_SHOTS | BLOCKS
+	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | MEETS_SHOTS
 
 
 ## Wall (rules R4 F6): one solid still shot centred its `ray_length` (or `SpellLimits.WALL_REACH`)

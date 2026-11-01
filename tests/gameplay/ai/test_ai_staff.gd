@@ -285,3 +285,29 @@ func test_a_cast_that_is_not_aimed_ignores_walls() -> void:
 	_projectiles.set_bounds(Rect2(-400.0, -400.0, 800.0, 800.0))
 	_projectiles.set_walls([Rect2(32.0, -40.0, 16.0, 64.0)] as Array[Rect2])
 	check(_until_windup(enemy, 1.0), "a nova winds up behind the wall as before")
+
+
+## A minion (owner, 2026-11-01: an idea for a card, not built yet): an enemy handed to an AI of the
+## players' team (`Actor.drive`) fights for them with no other code. Its team is its driver's, so
+## it targets the other enemies (never the wizard), casts its own staff at them through the same
+## states, walls included; `release` gives it back to its own AI, an enemy again.
+func test_an_enemy_driven_by_an_ai_of_the_players_team_is_a_minion() -> void:
+	_wizard.position = Vector2(-80.0, 0.0)
+	var minion := _enemy(_data([&"bolt"], 100.0, 10.0), Vector2(0.0, 0.0))
+	var foe := _enemy(_data([&"bolt"], 0.0, 0.0), Vector2(70.0, 0.0))
+	var mind := AIController.new()
+	mind.team = ActorsScript.TEAM_WIZARDS
+	minion.add_child(mind)
+	minion.drive(mind)
+	check_equal(minion.team(), ActorsScript.TEAM_WIZARDS, "its team is its new driver's")
+	check_equal(_actors.team_of(minion.id), ActorsScript.TEAM_WIZARDS, "and the actor table knows it")
+	for i in int(1.0 / STEP):
+		if mind.is_telegraphing():
+			break
+		_run(STEP)
+	check(mind.is_telegraphing(), "it winds up")
+	check(mind.target == foe, "at the other enemy, not the wizard")
+	_run(mind.windup_time + 0.5)
+	check(_combat.health_of(foe) < ImpData.max_health, "its own staff hurt the enemy")
+	minion.release()
+	check_equal(minion.team(), ActorsScript.TEAM_ENEMIES, "released, it is an enemy again")

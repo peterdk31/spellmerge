@@ -9,4 +9,4 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return LASTS | SPEED | SHOTS | SPREAD
+	return LASTS | SPEED | SHOTS | SPREAD | SPAWNS

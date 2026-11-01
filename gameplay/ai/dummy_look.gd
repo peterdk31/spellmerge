@@ -2,10 +2,10 @@ class_name DummyLook
 extends ActorLook
 ## What the sandbox's training dummy shows (staffs B7, docs/milestones/M2-staffs.md, "The
 ## sandbox"; a look since actors G6): the training dummy (content/enemies/training_dummy) is an
-## actor with Health (its data's billion), a Hurtbox, no controller and no Mover, so it never
-## moves (knockback, a swap or a pull leave it where it is) and no build takes it down; "Reset
-## dummies" in the sandbox page puts a fresh one there. Enemies never target it: it is on the
-## enemies' team (the actor's `idle_team`).
+## actor with Health (its data's billion), a Hurtbox, the enemy AI like every enemy (an
+## `AIController` and the `post` profile; it holds no staff and has no Mover, so it never moves:
+## knockback, a swap or a pull leave it where it is) and no build takes it down; "Reset dummies"
+## in the sandbox page puts a fresh one there. Enemies never target it: its AI is on their team.
 ##
 ## What it shows, all about its actor, with the scene's labels `%Dps`, `%Status` and `%Number`:
 ## - **Damage numbers:** each `damage_dealt` on the actor rises from its head for NUMBER_TIME

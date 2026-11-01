@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-01: The AI reads what it casts next; behaviours are files (owner)
+
+- **Why:** the owner wants one AI that adapts to whatever staffs an enemy holds, so an enemy or a boss is designed by its staffs and a few numbers, not code ([M2-enemy-ai.md](milestones/M2-enemy-ai.md)). The earlier rule below ("No AI knows what it casts next") was there to stop hard-coding like `if dash.is_next(): do_dash()`; the owner is fine with reversing it as long as that stays impossible.
+- **Rule:** the AI reads a summary of each staff's next cast (`CastSense`: reach, damage, blast, moves the caster, blocks, spawns, heals, sustained...), never a card or carrier id. A test fails on any card or carrier id under `gameplay/ai/` or `tests/bots/`. Replaces "No AI knows what it casts next" (same day, below); the `BLOCKS` trait comes back for this.
+- **Behaviours are files:** each AI behaviour is one stateless file with `want()` and `act()`, shared by every enemy; the highest want wins. Replaces "State machine: an enum and a `match`" for the AI's decisions (below); the executor that carries a plan out keeps a small enum of steps. Why: coop behaviours (heal an ally, shield an ally) are to be added one by one, and a growing `match` works against that. Nothing is allocated per step: behaviours hold no state.
+- **Bosses:** no `.gd` per boss. Staffs make the behaviour; a profile of numbers, more staffs and phases (staffs, profile, look) make a boss. A mechanic the parts cannot express goes into the shared AI.
+- **Bots** are to decide with the same brain and still press virtual buttons. First try held back (same day): brain-driven bots failed the 4-bot smoke run about half the time, so the old bot stays until a bot profile presses on like a person (docs/NEXT.md, AI9).
+- **Found while building:** guarding answers a shot coming, not a touch (a Wall staff stood at every touch boxed its caster in); a target's telegraph aimed at the AI counts as a threat, as a person reads it; the range band narrows with aggression at both ends, and an aimed cast beyond the band is little wanted, because a slow shot from the edge of its reach is easy to dodge.
+
 ## 2026-11-01: AIs handle walls; the bot is a state machine (owner)
 
 - **Why:** a bot holding a wall staff with its bolt stood its wall in front of its own bolts every cast and stalled the 4-bot run; the bots had to leave `wall` out of their builds. The owner asked for AIs that handle walls, useful for enemies too, and suggested the AI be a state machine.

@@ -6,8 +6,12 @@ extends PanelContainer
 ##
 ## Pages, one list of buttons each:
 ## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings.
-## - **Sandbox** (staffs B7): Imp wave and Reset dummies (each sends
-##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page); the
+## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
+##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
+##   `shown_name()`; left and right or `accept` step through them), "Count: 1" (1-8, the same
+##   way), "Spawn" (`sandbox_spawn_requested(player, enemy id, count)`), "Clear enemies"
+##   (`sandbox_action_requested(player, clear_enemies)`) and "AI view: Off" (`ai_view_changed`: each
+##   enemy shows its AI's behaviour and step); the
 ##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
 ##   "Builder: Radial" (the default) or "List", "Ring:" ("Every card", "One kind", or the ring
 ##   styles to try, owner 2026-10-30: "Zoom", "Kinds: hold", "Kinds: depth"; `accept` steps to the
@@ -50,7 +54,6 @@ const TITLES: Dictionary = {
 	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS",
 }
 ## The sandbox actions, as flow knows them.
-const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
@@ -70,6 +73,12 @@ const RING_TEXT: String = "Ring: %s"
 const RING_WORDS: Array[String] = ["Every card", "One kind", "Zoom", "Kinds: hold", "Kinds: depth"]
 const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
+## The enemy arena's rows (enemy AI AI8).
+const ENEMY_TEXT: String = "Enemy: %s"
+const COUNT_TEXT: String = "Count: %d"
+const AI_VIEW_TEXT: String = "AI view: %s"
+const COUNT_MAX: int = 8
+const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
 const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
 const SHAKE_TEXT: String = "Screen shake: %s"
@@ -106,14 +115,28 @@ var screen_shake: bool = true
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
+## The content registry the enemy arena lists enemies from; tests may set their own first, else
+## the `Registry` autoload.
+var registry: Node = null
+## The enemy arena's choice: the enemies' ids (read when the sandbox page opens), the one picked,
+## how many, and whether the AI view is on.
+var arena_ids: Array[StringName] = []
+var arena_names: PackedStringArray = PackedStringArray()
+var arena_pick: int = 0
+var arena_count: int = 1
+var ai_view: bool = false
 
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
 @onready var _resume: Button = _add(Page.MAIN, "Resume", "Resume")
 @onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
-@onready var _imp_wave: Button = _add(Page.SANDBOX, "ImpWave", "Imp wave")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
+@onready var _arena_enemy: Button = _add(Page.SANDBOX, "ArenaEnemy", ENEMY_TEXT % "-")
+@onready var _arena_count: Button = _add(Page.SANDBOX, "ArenaCount", COUNT_TEXT % 1)
+@onready var _arena_spawn: Button = _add(Page.SANDBOX, "ArenaSpawn", "Spawn")
+@onready var _arena_clear: Button = _add(Page.SANDBOX, "ArenaClear", "Clear enemies")
+@onready var _ai_view: Button = _add(Page.SANDBOX, "AIView", AI_VIEW_TEXT % "Off")
 @onready var _builder_style: Button = _add(Page.SANDBOX, "BuilderStyle", BUILDER_TEXT % "Radial")
 @onready var _ring_style: Button = _add(Page.SANDBOX, "RingStyle", RING_TEXT % "Every card")
 @onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
@@ -244,7 +267,47 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 	if control == _effects and direction.x != 0:
 		_set_effect_slots(effect_slots + direction.x * EffectSlots.STEP)
 		return _effects
+	if control == _arena_enemy and direction.x != 0:
+		_pick_enemy(arena_pick + direction.x)
+		return _arena_enemy
+	if control == _arena_count and direction.x != 0:
+		_set_count(clampi(arena_count + direction.x, 1, COUNT_MAX))
+		return _arena_count
 	return null
+
+
+## The enemy arena: read every enemy from the registry (each time the sandbox page opens, so a
+## new folder shows up), keeping the one picked if it is still there.
+func _read_arena() -> void:
+	var source: Node = registry if registry != null else get_node_or_null(^"/root/Registry")
+	var before: StringName = arena_ids[arena_pick] if arena_pick < arena_ids.size() else &""
+	arena_ids.clear()
+	arena_names.clear()
+	if source != null:
+		for item: Variant in source.call("get_all", &"enemies"):
+			var data := item as EnemyBase
+			if data != null and data.scene != null:
+				arena_ids.append(data.id)
+				arena_names.append(data.shown_name())
+	arena_pick = maxi(arena_ids.find(before), 0)
+	_pick_enemy(arena_pick)
+
+
+## Pick enemy `at` (wrapping round the list) and show it.
+func _pick_enemy(at: int) -> void:
+	if arena_ids.is_empty():
+		arena_pick = 0
+		_arena_enemy.set_meta(BASE_TEXT_META, ENEMY_TEXT % "-")
+	else:
+		arena_pick = posmod(at, arena_ids.size())
+		_arena_enemy.set_meta(BASE_TEXT_META, ENEMY_TEXT % arena_names[arena_pick])
+	_mark_focus()
+
+
+func _set_count(count: int) -> void:
+	arena_count = count
+	_arena_count.set_meta(BASE_TEXT_META, COUNT_TEXT % arena_count)
+	_mark_focus()
 
 
 ## Move the slider to `slots` (inside its range), show it and tell feel.
@@ -338,13 +401,27 @@ func _on_activated(player: int, control: Control) -> void:
 	if control == _resume:
 		close_menu()
 	elif control == _sandbox:
+		_read_arena()
 		_go(Page.SANDBOX)
 	elif control == _settings:
 		_go(Page.SETTINGS)
-	elif control == _imp_wave:
-		_send(ACTION_IMP_WAVE)
 	elif control == _reset:
 		_send(ACTION_RESET_DUMMIES)
+	elif control == _arena_enemy:
+		_pick_enemy(arena_pick + 1)
+	elif control == _arena_count:
+		_set_count(arena_count % COUNT_MAX + 1)
+	elif control == _arena_spawn:
+		if _events != null and arena_pick < arena_ids.size():
+			_events.sandbox_spawn_requested.emit(owner_player, arena_ids[arena_pick], arena_count)
+	elif control == _arena_clear:
+		_send(ACTION_CLEAR_ENEMIES)
+	elif control == _ai_view:
+		ai_view = not ai_view
+		_ai_view.set_meta(BASE_TEXT_META, AI_VIEW_TEXT % ("On" if ai_view else "Off"))
+		_mark_focus()
+		if _events != null:
+			_events.ai_view_changed.emit(ai_view)
 	elif control == _builder_style:
 		builder_radial = not builder_radial
 		_show_builder_options()

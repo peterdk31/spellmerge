@@ -19,6 +19,49 @@ const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 ## Time moves by this fixed binary fraction.
 const STEP: float = 0.0625
 
+## The profile the world's enemies play by unless a test gives another: exact aim, no lead, no
+## randomness, no dodging, no teamwork, so a test sees the same steps every run.
+static var _exact: AIProfile = null
+
+
+## A plain staff (no delay unless `delay`, a pool of `max_mana` filling at `regen` a second)
+## holding `cards` (ids by slot), one per slot.
+static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0) -> StaffCards:
+	var ids: Array[StringName] = []
+	for id: Variant in cards:
+		ids.append(StringName(str(id)))
+	var staff := StaffBase.new()
+	staff.id = &"test"
+	staff.slots = maxi(ids.size(), 1)
+	staff.cast_delay = delay
+	staff.recharge = 0.0
+	staff.max_mana = max_mana
+	staff.mana_regen = regen
+	return StaffCards.make(staff, ids)
+
+
+## Enemy data on the imp's body (id `test_caster`) holding one staff per row of `rows` (card ids),
+## each a `staff_entry` with these numbers. The tests' one way to give an enemy staffs.
+static func staffed(rows: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0) -> EnemyBase:
+	var data: EnemyBase = ImpData.duplicate() as EnemyBase
+	data.id = &"test_caster"
+	data.staffs = [] as Array[StaffCards]
+	for row: Variant in rows:
+		data.staffs.append(staff_entry(row as Array, max_mana, regen, delay))
+	return data
+
+
+static func exact() -> AIProfile:
+	if _exact == null:
+		_exact = AIProfile.new()
+		_exact.name = "exact"
+		_exact.accuracy = 1.0
+		_exact.lead = 0.0
+		_exact.randomness = 0.0
+		_exact.dodge = 0.0
+		_exact.teamwork = 0.0
+	return _exact
+
 var bus: Node
 var actors: ActorsScript
 var combat: Node
@@ -91,6 +134,20 @@ func enemy(scene: PackedScene, data: EnemyBase, at: Vector2 = Vector2.ZERO) -> A
 	return body
 
 
+## An enemy on the imp's body holding `rows` (`staffed`, big pools) at `at`, playing by `profile`
+## (`exact()` when null), in this world.
+func staffed_enemy(rows: Array, at: Vector2 = Vector2.ZERO, profile: AIProfile = null) -> Actor:
+	var body: Actor = ImpData.scene.instantiate() as Actor
+	ai(body).profile = profile if profile != null else exact()
+	body.data = staffed(rows)
+	body.position = at
+	wire(body)
+	_root.add_child(body)
+	body.set_physics_process(false)
+	enemies.append(body)
+	return body
+
+
 ## This world's services on `body` (and its AI's decoys), so the autoloads are not used.
 func wire(body: Actor) -> void:
 	body.events = bus
@@ -99,6 +156,8 @@ func wire(body: Actor) -> void:
 	body.spells = spells
 	body.actors = actors
 	var mind: AIController = ai(body)
+	if mind != null and mind.profile == null:
+		mind.profile = exact()
 	if mind != null and entities != null:
 		mind.entities = entities
 

@@ -1,6 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Enemies that cast staffs (staffs F8a, docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy
-## whose data has a staff and cards opens an actor (the enemies' team and ramp, no seat; actors
+## Enemies that cast staffs (staffs F8a, docs/milestones/M2-staffs.md, "Enemy staffs"; enemy AI
+## AI4-AI5: `EnemyBase.staffs`, made here with `Fixture.staffed`): an enemy whose data has a staff
+## opens an actor (the enemies' team and ramp, no seat; actors
 ## G3b) and its caster in Spells, owns its body there, casts its staff after the windup, pays mana
 ## and gets it back (siphon's `mana_refund_requested` for its actor), winds up only when the next
 ## cast is ready (so a telegraph always comes true), shows the next cast's reach, compiles its
@@ -9,12 +10,12 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_staff.gd
 
+const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const StaffKit := preload("res://tests/support/staff_kit.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
@@ -104,20 +105,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 ## Enemy data: the imp's numbers with a staff of `cards` (cast delay `delay`), `max_mana` and
 ## `regen` a second.
 func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, delay: float = 0.0) -> EnemyBase:
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.id = &"test_caster"
-	data.staff = StaffKit.plain_staff(cards.size())
-	data.staff.cast_delay = delay
-	data.cards = cards
-	data.staff.max_mana = max_mana
-	data.staff.mana_regen = regen
-	return data
+	return Fixture.staffed([cards], max_mana, regen, delay)
 
 
 ## An enemy of `data` from the imp's scene (sprite, telegraph), in the tree at `at`.
 func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
 	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
+	(enemy.get_node("AIController") as AIController).profile = Fixture.exact()
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles
@@ -176,10 +171,9 @@ func test_it_opens_an_actor_and_owns_its_body() -> void:
 	_bus.mana_refund_requested.emit(enemy.id, 0, 100.0)
 	check_equal(enemy.caster.mana_of(0), 6.0, "never above its most")
 	check(_spells.current_tag(enemy.id, 0) != 0, "its staff is installed")
-	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
+	check(ImpData.has_staffs() and ImpData.staffs[0].cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
 	var none: EnemyBase = ImpData.duplicate() as EnemyBase
-	none.staff = null
-	none.cards = []
+	none.staffs = [] as Array[StaffCards]
 	var plain := _enemy(none)
 	check(plain.caster == null and plain.caster_number() == -1, "an enemy without a staff has no caster")
 	check(_actors.is_open(plain.id), "but an actor id of its own all the same")

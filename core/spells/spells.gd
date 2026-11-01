@@ -2559,6 +2559,18 @@ func next_cast_reach(actor: int, staff: int) -> float:
 	return _carrier_of(first).reach_of(first)
 
 
+## What the next cast of this caster's staff does (`CastSense`; docs/milestones/M2-enemy-ai.md),
+## for an AI that plays whatever staffs it holds; null with no build.
+func next_cast_sense(actor: int, staff: int) -> CastSense:
+	if not _in_range(actor, staff):
+		return null
+	var index: int = actor * SpellLimits.STAFFS + staff
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return null
+	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].sense
+
+
 ## The hit radius of the next cast's first carrier (0 for none), for the width of a telegraph.
 func next_cast_radius(actor: int, staff: int) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff)

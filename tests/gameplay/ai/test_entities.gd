@@ -117,7 +117,7 @@ func _test_decoy_is_chased_before_a_nearer_wizard() -> void:
 	var imp: Actor = _imp(Vector2.ZERO)
 	_run(1)
 	_check(AiFixture.ai(imp).target != null and AiFixture.ai(imp).target != _world.players[0], "an imp near a decoy chases the decoy, not the nearer wizard")
-	_check(imp.velocity.x < 0.0, "the imp walks toward the decoy")
+	_check(imp.aim.x < 0.0, "the imp turns on the decoy (within its staff's range it walks no nearer)")
 	_world.players[0].position = Vector2(1000.0, 0.0)
 	var far: Actor = _imp(Vector2(600.0, 0.0))
 	_run(1)

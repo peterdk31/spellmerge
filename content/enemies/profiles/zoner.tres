@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AIProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/ai_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+name = "zoner"
+aggression = 0.3
+caution = 0.65
+accuracy = 0.9
+lead = 0.6
+dodge = 0.4
+windup_scale = 1.25

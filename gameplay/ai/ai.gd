@@ -1,112 +1,73 @@
 class_name AIController
 extends ActorController
-## The enemy AI (M1 part 12; a controller since actors G6, docs/milestones/M2-actors.md): chase
-## the nearest actor of another team, then one telegraphed cast of its staff. It drives an actor
-## (gameplay/actor) like a seat's controller does: it only writes the actor's intent (where to
-## walk, where to aim, when to press its staff); the actor's components walk, cast, get hurt and
-## die. It is a child of an enemy's actor scene (content/enemies/ember_imp/ember_imp.tscn), that
-## actor's home controller; a possession (G9) may hand it another actor for a while.
+## The enemy AI as a controller (actors G6; enemy AI AI5, docs/milestones/M2-enemy-ai.md): it drives
+## an actor (gameplay/actor) the way a seat's controller does, by writing the actor's intent and
+## nothing else. The thinking is an `AIBrain` (`brain.gd`): it reads what each of the actor's
+## staffs casts next and plays them by its behaviours, so a new enemy needs staffs and a profile,
+## never code. It is a child of an enemy's actor scene, that actor's home controller; a possession
+## (G9) may hand it another actor for a while, and then it plays that actor's staffs (a wizard's
+## four, say) by its own profile.
 ##
-## States: CHASE (walk to the target), WINDUP (stand still; the aim is locked at its start, so a
-## wizard can step aside, while the actor's CreatureLook shows the telegraph), then the cast and
-## RECOVER (stand still, the aim still locked, so a beam it holds does not track a wizard who
-## stepped aside) before CHASE again. REPOSITION (owner, 2026-11-01): in reach, but a wall (a
-## room's, or a Wall card's: `AISight`) stands between it and the target and its next cast is
-## aimed (it reaches, `Caster.next_cast_reach`), so the shot would only hit the wall: it winds up
-## nothing and walks round (`AISight.detour`) until the line is clear or `reposition_time` is up,
-## then chases again. A cast that is not aimed (a nova, an orbit) ignores walls as before.
-##
-## Targets: the nearest actor of another team than the actor's (`Actor.team`) that can be hit
-## now, from the projectile manager's target grid (`nearest_target` with the team), so it costs
-## the same in a crowd. A downed wizard is no target there (its hurt circle is off), and a decoy
-## within its lure range (`Entities.lure`) is chased first; a decoy that breaks is dropped at
-## once. Retargeting runs every RETARGET_TIME seconds (staggered per controller, so 200 enemies
-## do not all look in one frame), at once when the target is lost, downed or dying (checked each
-## step), and once at the first step. With nobody to chase it looks only every RETARGET_TIME.
-##
-## Grudges (infighting): when an actor of its own team hurts the actor it drives (a stray blast:
-## everything hurts everything, teams only aim), it targets that actor for GRUDGE_TIME seconds,
-## then goes back to its team's targets. Heard from the driven actor's own `Actor.damaged` (sent
-## with every `damage_dealt` naming it), which carries the attacker's actor id for every hit (a
-## shot, a touch, a reaction). Nothing here listens on the bus: a bus listener per enemy was
-## called for every hit on anyone (performance pass, 2026-10-28).
-##
-## The attack is a cast of the actor's staff 0 (its Caster, filled from the enemy's `data`): the
-## windup starts only when the next cast is ready (`Caster.cast_ready(windup_time)`: its delay
-## nearly over and the mana there), so a telegraph is always followed by its cast; until then it
-## holds where it stands. At the end of the windup it presses the staff (`intent.press(0)`), and
-## the Caster casts from the actor's staff tip along the locked aim. An actor without a staff
-## only chases, all the way, and hurts by touch (its Contact) if it hurts at all.
-##
-## Statuses: the actor's Mover slows its walk by Combat's pace (chill slows, freeze stops); the
-## windup and recovery timers here slow by the same pace, so a frozen enemy's attack waits.
-##
-## Entities: it names the actor it drives at home to Entities (`set_enemy`), so its decoys copy
-## it and its familiars circle it, and ends them when it leaves the tree (`enemy_gone`, before
-## the actor's caster closes, so their ends still count).
+## Its profile is its home actor's data's (`EnemyBase.profile`, else `AIProfile.fallback()`), or
+## `profile` when set. Grudges (infighting) come from the driven actor's own `Actor.damaged` (sent
+## with every `damage_dealt` naming it): nothing here listens on the bus (performance pass,
+## 2026-10-28). It names its home actor to Entities (`set_enemy`), so its decoys copy it and its
+## familiars circle it, and ends them when it leaves the tree (`enemy_gone`, before the actor's
+## caster closes). The team board (`Entities.board`) lets its team stagger their attacks.
 ##
 ## All timing runs in `think(actor, delta)`, called by the actor's step, so tests drive it with
 ## fixed deltas. Nothing here allocates per step.
 
-const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
-enum State { CHASE, WINDUP, RECOVER, REPOSITION }
+## The executor's steps (`AIBrain.State`).
+const State := AIBrain.State
 
-## Seconds between looking for the nearest target again.
-const RETARGET_TIME: float = 0.5
-## Seconds it chases a teammate that hurt it before going back to its team's targets.
-const GRUDGE_TIME: float = 3.0
-## How far it looks for a target: farther than any room, so the nearest anywhere.
-const SIGHT: float = 100000.0
-## Closer than this to its target it stops walking (an enemy without a staff, on top of it).
-const CLOSE_ENOUGH: float = 1.0
-## How far ahead (pixels) a way round a wall is probed (`AISight.detour`).
-const DETOUR_PROBE: float = 40.0
+## The brain's timings, named here for the other code that matches them (the horde swarm).
+const RETARGET_TIME: float = AIBrain.RETARGET_TIME
+const GRUDGE_TIME: float = AIBrain.GRUDGE_TIME
+const SIGHT: float = AIBrain.SIGHT
+const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 
-## Walk until the target is this close, then start the attack.
-@export var attack_range: float = 90.0
-## Seconds the telegraph shows before the cast.
-@export var windup_time: float = 0.75
-## Seconds standing still after the cast.
-@export var recover_time: float = 1.0
-## Seconds it walks one way round a wall before it looks again (REPOSITION).
-@export var reposition_time: float = 0.4
+## How it plays (null: its home actor's data's profile, else the shared default).
+@export var profile: AIProfile = null
 
 ## The decoys (`Entities.lure`). Only tests set it, before the actor is added; otherwise the
 ## "Entities" autoload is used.
 var entities: EntitiesScript = null
+## The thinking (made once).
+var brain: AIBrain = AIBrain.new()
 
-var state: State = State.CHASE
+## The step it is in (`AIBrain.State`).
+var state: int:
+	get:
+		return brain.state
 ## What it chases (a wizard, an actor, a decoy), or null.
-var target: Node2D = null
-## The teammate that hurt it last, chased while `grudge_left()` > 0, or null.
-var grudge: Node2D = null
+var target: Node2D:
+	get:
+		return brain.target
+## The teammate that hurt it last, or null.
+var grudge: Node2D:
+	get:
+		return brain.grudge
 ## How often it looked for a target (tests count it).
-var lookup_count: int = 0
+var lookup_count: int:
+	get:
+		return brain.lookup_count
+## The windup of the attack under way, else the one the next attack of its telegraph staff would
+## take (seconds).
+var windup_time: float:
+	get:
+		return brain.windup_time if brain.state == AIBrain.State.WINDUP else brain.windup_for(brain.telegraph_staff())
+## The rest after the attack under way, else after the next attack of its telegraph staff.
+var recover_time: float:
+	get:
+		return brain.recover_time if brain.state == AIBrain.State.RECOVER else brain.rest_for(brain.telegraph_staff())
 
 ## The actor it drives now, or null.
 var _actor: Actor = null
-## The aim locked at the start of the windup (unit length).
-var _locked_aim: Vector2 = Vector2.DOWN
-## The way it walks round a wall while repositioning (unit length).
-var _detour: Vector2 = Vector2.ZERO
-var _state_left: float = 0.0
-var _retarget_left: float = 0.0
-var _retarget_offset: float = 0.0
-var _grudge_left: float = 0.0
-var _looked: bool = false
-## Instance id of `target` when it was chosen, or 0 for none.
-var _target_id: int = 0
-## `target` typed, when it is an actor (most are): the step's "still there?" check is cheaper.
-var _target_actor: Actor = null
 ## The actor id it named to Entities (`set_enemy`), or -1.
 var _named: int = -1
-
-
-func _ready() -> void:
-	# Spread retargeting over the half second so 200 enemies do not all look at once.
-	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
 
 
 func _enter_tree() -> void:
@@ -123,9 +84,14 @@ func _exit_tree() -> void:
 ## It starts driving `actor` (its home actor's `_ready`, or a possession): a fresh chase.
 func started(actor: Actor) -> void:
 	_actor = actor
-	_reset()
+	# Seeded by the actor id, so a run with the same actors repeats (and a crowd is staggered).
+	brain.setup(actor, _profile_for(actor), maxi(actor.id, 0) * 7919 + 17)
+	brain.entities = _entities()
+	brain.board = brain.entities.board if brain.entities != null else null
 	if not actor.damaged.is_connected(_on_damaged):
 		actor.damaged.connect(_on_damaged)
+	if actor.caster != null and not actor.caster.staff_built.is_connected(_on_staff_built):
+		actor.caster.staff_built.connect(_on_staff_built)
 	if actor == get_parent():
 		_name_to_entities()
 
@@ -134,195 +100,69 @@ func started(actor: Actor) -> void:
 func stopped(actor: Actor) -> void:
 	if actor.damaged.is_connected(_on_damaged):
 		actor.damaged.disconnect(_on_damaged)
-	_reset()
+	if actor.caster != null and actor.caster.staff_built.is_connected(_on_staff_built):
+		actor.caster.staff_built.disconnect(_on_staff_built)
+	brain.reset()
 	_actor = null
 
 
-## Write the actor's intent for this step (`delta` seconds): look, chase, wind up, cast, recover.
+## Write the actor's intent for this step (`delta` seconds).
 func think(actor: Actor, delta: float) -> void:
-	_retarget_left -= delta
-	if _grudge_left > 0.0:
-		_grudge_left -= delta
-		if _grudge_left <= 0.0 or not _is_valid_target(grudge):
-			# The grudge is over: back to its team's targets at once.
-			_drop_grudge()
-	# Look on the timer, at the first step (staggered afterwards) or when the target was just
-	# lost. With no target at all only the timer applies. A freed target reads as null, so the
-	# id tells "never had one" from "lost it".
-	var lost: bool = false
-	if _target_id != 0:
-		if _target_actor != null:
-			# `_is_valid_target`, written out for the usual target (this runs every step).
-			lost = not is_instance_valid(_target_actor) or _target_actor.is_down() or _target_actor.is_dying()
-		else:
-			lost = not _is_valid_target(target)
-	if _retarget_left <= 0.0 or lost or not _looked:
-		_retarget_left = RETARGET_TIME if _looked else _retarget_offset
-		_looked = true
-		target = _find_target(actor)
-		_target_id = target.get_instance_id() if target != null else 0
-		_target_actor = target as Actor
-	var intent: ActorIntent = actor.intent
-	intent.move = Vector2.ZERO
-	match state:
-		State.CHASE:
-			_chase(actor)
-		State.WINDUP:
-			intent.aim = _locked_aim
-			_state_left -= delta * _pace(actor)
-			if _state_left <= 0.0:
-				# The cast leaves this step, from the staff tip along the locked aim.
-				intent.press(0)
-				state = State.RECOVER
-				_state_left = recover_time
-		State.RECOVER:
-			intent.aim = _locked_aim
-			_state_left -= delta * _pace(actor)
-			if _state_left <= 0.0:
-				state = State.CHASE
-		State.REPOSITION:
-			_state_left -= delta
-			if target == null or _state_left <= 0.0 or _line_clear(actor):
-				# Round the wall (or done trying): chase, which winds up if the line is clear.
-				state = State.CHASE
-				_chase(actor)
-			else:
-				intent.move = _detour
-				intent.aim = target.global_position - actor.global_position
+	if brain.actor != actor:
+		started(actor)
+	brain.think(delta, actor.intent)
 
 
 ## True from the start of the windup until the cast leaves: the attack is coming.
 func is_telegraphing() -> bool:
-	return state == State.WINDUP
+	return brain.is_telegraphing()
 
 
 ## 0.0 at the start of the telegraph, 1.0 when the cast leaves; 0.0 when not telegraphing.
 func telegraph_progress() -> float:
-	if state != State.WINDUP or windup_time <= 0.0:
-		return 0.0
-	return clampf(1.0 - _state_left / windup_time, 0.0, 1.0)
+	return brain.telegraph_progress()
+
+
+## The staff its telegraph is for (the one wound up).
+func telegraph_staff() -> int:
+	return brain.telegraph_staff()
+
+
+## A boss's phase began: stand through its transition, then play by its profile (if it has one).
+func phase_started(_actor: Actor, phase: EnemyPhase) -> void:
+	brain.transition(phase.transition, phase.profile)
 
 
 ## Seconds the grudge still lasts (0 for none).
 func grudge_left() -> float:
-	return maxf(_grudge_left, 0.0) if grudge != null else 0.0
-
-
-## Walk to the target; in reach, aim at it and wind up when the next cast is ready.
-func _chase(actor: Actor) -> void:
-	if target == null:
-		return
-	var to_target: Vector2 = target.global_position - actor.global_position
-	var near: bool = to_target.length_squared() <= attack_range * attack_range
-	if to_target != Vector2.ZERO:
-		actor.intent.aim = to_target
-	if near and actor.caster != null and actor.caster.has_staff(0):
-		if actor.caster.next_cast_reach(0) > 0.0 and not _line_clear(actor):
-			# An aimed cast would only hit the wall in between: walk round it first.
-			state = State.REPOSITION
-			_state_left = reposition_time
-			_detour = AISight.detour(actor.projectiles, actor.global_position, target.global_position, DETOUR_PROBE)
-			actor.intent.move = _detour
-			return
-		if not actor.caster.cast_ready(windup_time):
-			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast
-			# that comes.
-			return
-		state = State.WINDUP
-		_state_left = windup_time
-		_locked_aim = to_target.normalized() if to_target != Vector2.ZERO else actor.aim
-		actor.intent.aim = _locked_aim
-		return
-	# Out of reach, or nothing to cast: walk on (one without a staff walks into its target).
-	if to_target.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH:
-		actor.intent.move = to_target.normalized()
-
-
-## True when no wall stands between the actor's body and its target's (`AISight`): where its
-## shot leaves and where the target is hit.
-func _line_clear(actor: Actor) -> bool:
-	if target == null:
-		return true
-	var to: Vector2 = target.global_position
-	if _target_actor != null:
-		to += _target_actor.body_offset
-	return AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, to)
-
-
-## The grudge, else a decoy in lure range, else the nearest standing actor of another team.
-func _find_target(actor: Actor) -> Node2D:
-	lookup_count += 1
-	if grudge != null and _grudge_left > 0.0:
-		return grudge
-	var here: Vector2 = actor.global_position
-	var decoy: Node2D = _entities().lure(here) if _entities() != null else null
-	if decoy != null:
-		return decoy
-	if actor.projectiles == null:
-		return null
-	var found: Node2D = actor.projectiles.nearest_target(here + actor.body_offset, SIGHT, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
-	return found if _is_valid_target(found) else null
-
-
-## A freed node may still sit in `target` or `grudge`, hence the Variant. A downed wizard, a down
-## actor and one that is dying are no targets.
-func _is_valid_target(node: Variant) -> bool:
-	if not is_instance_valid(node):
-		return false
-	if node is Actor:
-		var other: Actor = node as Actor
-		return not other.is_down() and not other.is_dying()
-	return not (node.has_method("is_downed") and node.is_downed())
-
-
-## Chill slows the attack timers, freeze stops them (the Mover slows the walk by the same pace).
-## Only the windup and the recovery ask.
-func _pace(actor: Actor) -> float:
-	return actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
-
-
-## Someone hurt the actor it drives: an actor of its own team (not itself) earns a grudge.
-func _on_damaged(caster: int, _amount: float) -> void:
-	if _actor == null or caster < 0 or caster == _actor.id or _actor.actors == null:
-		return
-	if _actor.actors.team_of(caster) != _actor.team():
-		return
-	var attacker: Node2D = _actor.actors.node_of(caster) as Node2D
-	if attacker == null or attacker == _actor or not _is_valid_target(attacker):
-		return
-	grudge = attacker
-	_grudge_left = GRUDGE_TIME
-	# Turn on it at the next step.
-	_retarget_left = 0.0
+	return brain.grudge_left()
 
 
 ## A grudge carried over from the body this actor replaces (the horde swarm's promotion, which
 ## keeps a swarmer's grudge): it chases `attacker` for `seconds` more, as if hurt by it just now.
 func carry_grudge(attacker: Node2D, seconds: float) -> void:
-	if seconds <= 0.0 or not _is_valid_target(attacker):
-		return
-	grudge = attacker
-	_grudge_left = seconds
-	_retarget_left = 0.0
+	brain.carry_grudge(attacker, seconds)
 
 
-func _drop_grudge() -> void:
-	grudge = null
-	_grudge_left = 0.0
-	_retarget_left = 0.0
+## `profile`, else the home actor's data's, else the shared default.
+func _profile_for(actor: Actor) -> AIProfile:
+	if profile != null:
+		return profile
+	var home: Actor = get_parent() as Actor
+	for body: Actor in [home, actor]:
+		if body != null and body.data != null:
+			return body.data.profile_or_fallback()
+	return AIProfile.fallback()
 
 
-## A fresh chase: no target, no grudge, no windup.
-func _reset() -> void:
-	state = State.CHASE
-	target = null
-	_target_id = 0
-	_target_actor = null
-	grudge = null
-	_grudge_left = 0.0
-	_state_left = 0.0
-	_looked = false
-	_retarget_left = _retarget_offset
+## A staff of the actor it drives was built anew.
+func _on_staff_built(_at: int) -> void:
+	brain.staffs_changed()
+
+
+## Someone hurt the actor it drives.
+func _on_damaged(caster: int, _amount: float) -> void:
+	brain.hurt_by(caster)
 
 
 ## `entities`, else the "Entities" autoload (only in the tree).

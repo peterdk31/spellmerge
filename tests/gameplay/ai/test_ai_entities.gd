@@ -10,13 +10,13 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_entities.gd
 
+const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const StaffKit := preload("res://tests/support/staff_kit.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
@@ -121,20 +121,14 @@ func _put(component: SpellComponent, id: StringName) -> void:
 
 ## Enemy data: the imp's numbers with a staff of `cards` and plenty of mana.
 func _data(cards: Array[StringName]) -> EnemyBase:
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.id = &"test_caster"
-	data.staff = StaffKit.plain_staff(cards.size())
-	data.staff.cast_delay = 0.0
-	data.cards = cards
-	data.staff.max_mana = 20.0
-	data.staff.mana_regen = 0.0
-	return data
+	return Fixture.staffed([cards], 20.0, 0.0)
 
 
 ## An enemy of `data` from the imp's scene (its Sprite), in the tree at `at`.
 func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
 	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
+	(enemy.get_node("AIController") as AIController).profile = Fixture.exact()
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles

@@ -54,3 +54,9 @@ const MOVES_CASTER: int = 1 << 21
 ## Does it strike one point near its caster's hand (a slam's impact, `Carrier.strike_point`)? A
 ## staff animation's `land` keys put the staff's tip there; on any other carrier they are refused.
 const STRIKES_POINT: int = 1 << 22
+## Does it stand in the world and stop other actors' shots on its own (a wall)? Read by the AI's
+## summary of a cast (`CastSense.blocks`; docs/milestones/M2-enemy-ai.md), no card needs it.
+const BLOCKS: int = 1 << 23
+## Does it make a body of its own that stays and acts for its caster (a decoy, a familiar)? Read
+## by `CastSense.spawns`; no card needs it.
+const SPAWNS: int = 1 << 24

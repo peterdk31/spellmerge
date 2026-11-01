@@ -480,8 +480,7 @@ func _stress_enemy_data() -> EnemyBase:
 ## H4; the run does not depend on their folders).
 static func swarm_data(from: EnemyBase) -> EnemyBase:
 	var copy: EnemyBase = from.duplicate() as EnemyBase
-	copy.staff = null
-	copy.cards = [] as Array[StringName]
+	copy.staffs = [] as Array[StaffCards]
 	copy.move_speed = SWARM_SPEED
 	copy.contact_damage = SWARM_CONTACT
 	return copy

@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The horde's swarmers (horde H4, docs/milestones/horde.md): the Crypt Mite and the Bone Husk are
 ## cheap, touch-only strays for a horde of 500+. Each is an actor with one 32 px body and the
 ## stray Face, no staff, no cards and no mana, so it has no Caster and no Telegraph: it only
-## chases and hurts by touch. The mite is small, fast and dies to two plain bolts; the husk is
+## chases and hurts by touch (the enemy AI with nothing to cast, by the `swarmer` profile). The mite is small, fast and dies to two plain bolts; the husk is
 ## slow, tough and hits harder. Both die like any enemy (`enemy_died`).
 ##
 ## godot --headless --path . --script res://tests/content/enemies/test_swarmers.gd
@@ -34,7 +34,7 @@ func test_each_is_demo_content_with_its_own_id() -> void:
 	check_equal(HuskData.id, &"bone_husk", "the husk's id is its folder")
 	for data in _swarmers():
 		check(data.demo, "%s: in every build, so the horde has it on the web too" % data.id)
-		check(data.staff == null and data.cards.is_empty(), "%s: no staff and no cards" % data.id)
+		check(data.staffs.is_empty() and not data.has_staffs(), "%s: no staff and no cards" % data.id)
 		check(data.contact_damage > 0, "%s: hurts by touch" % data.id)
 
 

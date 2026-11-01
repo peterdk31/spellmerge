@@ -80,6 +80,12 @@ var _hurt_left: float = 0.0
 var _pose: Pose = Pose.IDLE
 ## True while the telegraph (and the flash) is up.
 var _showing: bool = false
+## The sandbox's "AI view" (enemy AI AI8, `ai_view_changed`, set by Entities): every enemy shows
+## its AI's behaviour and step over its head, for tuning a profile in the enemy arena.
+static var ai_view: bool = false
+## The words over its head while `ai_view` is on (made the first time), and what they said.
+var _ai_label: Label = null
+var _ai_words: String = ""
 ## The actor's Face (null without one), the sprite's own offset, and the time hopped.
 var _face: Face = null
 var _sprite_offset: Vector2 = Vector2.ZERO
@@ -116,6 +122,9 @@ func setup(owner_actor: Actor) -> void:
 	# every hit on anyone).
 	if not actor.damaged.is_connected(_on_damaged):
 		actor.damaged.connect(_on_damaged)
+	# A boss's phase may bring another body sprite (enemy AI AI7).
+	if actor.phases != null and not actor.phases.started.is_connected(_on_phase_started):
+		actor.phases.started.connect(_on_phase_started)
 
 
 ## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.
@@ -123,6 +132,8 @@ func step(delta: float) -> void:
 	if actor.controller != _driver:
 		_driver = actor.controller
 		_ai = _driver as AIController
+	if ai_view or _ai_label != null:
+		_show_ai_view()
 	var ai: AIController = _ai
 	var telegraphing: bool = ai != null and ai.state == AIController.State.WINDUP
 	if telegraphing != _showing:
@@ -197,9 +208,11 @@ func _show_telegraph(on: bool, ai: AIController) -> void:
 	_showing = on
 	if telegraph != null:
 		var caster: Caster = actor.caster
-		var reach: float = caster.next_cast_reach(0) if on and caster != null else 0.0
+		# The staff the AI winds up (enemy AI AI5: it may hold several).
+		var at: int = ai.telegraph_staff() if ai != null else 0
+		var reach: float = caster.next_cast_reach(at) if on and caster != null else 0.0
 		if reach > TELEGRAPH_START:
-			_fit_telegraph(reach, caster.next_cast_radius(0))
+			_fit_telegraph(reach, caster.next_cast_radius(at))
 		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
 		telegraph.visible = on and reach > TELEGRAPH_START
 		if on:
@@ -261,6 +274,44 @@ func _show_strip(strip: Texture2D) -> void:
 	sprite.frame = 0
 	if animation != null and animation.is_inside_tree():
 		animation.pause()
+
+
+## The AI view: "<behaviour> · <step>" over its head while `ai_view` is on; text set only when it
+## changed.
+func _show_ai_view() -> void:
+	if not ai_view:
+		_ai_label.visible = false
+		return
+	if _ai_label == null:
+		_ai_label = Label.new()
+		_ai_label.name = "AIView"
+		_ai_label.position = Vector2(-48.0, -44.0)
+		_ai_label.size = Vector2(96.0, 12.0)
+		_ai_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_ai_label.add_theme_font_size_override(&"font_size", 8)
+		add_child(_ai_label)
+	_ai_label.visible = true
+	var words: String = ""
+	if _ai != null:
+		var brain: AIBrain = _ai.brain
+		words = "%s · %s" % [brain.behaviour.name() if brain.behaviour != null else "-", String(AIBrain.State.keys()[brain.state]).to_lower()]
+	if words != _ai_words:
+		_ai_words = words
+		_ai_label.text = words
+
+
+## Words the AI view shows now ("" while it is off or no AI drives the actor).
+func ai_view_text() -> String:
+	return _ai_words if ai_view else ""
+
+
+## A boss's phase began: its look's body sprite, if it has one, becomes the idle one.
+func _on_phase_started(_index: int, phase: EnemyPhase) -> void:
+	if phase.look == null or phase.look.texture == null or sprite == null:
+		return
+	_idle_texture = phase.look.texture
+	if _pose == Pose.IDLE:
+		sprite.texture = _idle_texture
 
 
 ## A hit on the actor shows the hurt pose at once.

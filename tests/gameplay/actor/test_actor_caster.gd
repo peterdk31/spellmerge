@@ -167,8 +167,8 @@ func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
 	_world.run(1)
 	check(not imp.caster.cast_ready(0.1), "not within its delay")
 	check(imp.caster.cast_ready(_world.spells.cooldown_left(imp.caster_number(), 0)), "but within a windup as long as it")
-	imp.caster.staff = imp.caster.staff.duplicate() as StaffBase
-	imp.caster.staff.mana_regen = 0.0
+	imp.caster.staff = imp.caster.staff_of(0).duplicate() as StaffBase
+	imp.caster.staff_of(0).mana_regen = 0.0
 	imp.caster.set_mana(0, 0.0)
 	check(not imp.caster.cast_ready(5.0), "never without the mana")
 

@@ -23,3 +23,6 @@ var targets: Dictionary = {}
 var wasted: Dictionary = {}
 ## What the cast does, in plain words, for the builder's cast plan.
 var description: String = ""
+## What the cast does, for an AI (`CastSense`, docs/milestones/M2-enemy-ai.md): made by the
+## compiler once the cast is read.
+var sense: CastSense = null

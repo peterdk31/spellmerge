@@ -12,6 +12,8 @@ A fourth, by the owner on 2026-10-29: every card follows the general rules on ev
 
 A fifth, by the owner on 2026-10-30: **Horde**, a separate game mode against a growing horde of 500+ enemies with level-up card picks, in every build, to test the mechanics at scale ([horde.md](milestones/horde.md)). It is built to be removed easily and builds nothing of M3.
 
+A sixth, by the owner on 2026-11-01: **an enemy AI that plays whatever staffs it holds** (it reads what each staff casts next), with profiles, phases for bosses, dodging, channelled casts, teamwork, bots on the same AI and an enemy arena ([M2-enemy-ai.md](milestones/M2-enemy-ai.md), phase AI). It is the baseline; designing new enemies and bosses on it stays M3 and later.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

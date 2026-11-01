@@ -26,17 +26,17 @@ func after_each() -> void:
 func _broke() -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
 	# Its own staff (a copy: the imp's is shared) with an empty pool.
-	data.staff = ImpData.staff.duplicate() as StaffBase
-	data.staff.max_mana = 0.0
-	data.staff.mana_regen = 0.0
+	var staff: StaffBase = ImpData.staffs[0].staff.duplicate() as StaffBase
+	staff.max_mana = 0.0
+	staff.mana_regen = 0.0
+	data.staffs = [StaffCards.make(staff, ImpData.staffs[0].cards)] as Array[StaffCards]
 	return data
 
 
 ## The imp's numbers with no staff.
 func _unarmed() -> EnemyBase:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.staff = null
-	data.cards = []
+	data.staffs = [] as Array[StaffCards]
 	data.contact_damage = 3
 	return data
 
@@ -88,7 +88,7 @@ func test_an_imp_hurt_by_another_imp_turns_on_it_then_back_to_the_wizards() -> v
 	fx.combat.hit(other.id, imp, 1)
 	fx.run(imp, 1)
 	check(ai.target == other, "hurt by another imp, it turns on that imp")
-	check(imp.velocity.x < 0.0, "and walks toward it")
+	check(imp.aim.x < 0.0, "and turns toward it (within its staff's range it walks no nearer)")
 	fx.run(imp, int((AIController.GRUDGE_TIME - 0.25) / Fixture.STEP))
 	check(ai.target == other, "for a while")
 	fx.run(imp, int(0.5 / Fixture.STEP))

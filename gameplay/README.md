@@ -73,7 +73,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
-| `sandbox_requested`, `sandbox_action_requested` | HUD | `flow` |
+| `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
+| `ai_view_changed` | HUD | `ai` (Entities) |
 | `horde_requested` | HUD | `flow` |
 | `horde_pick_requested`, `horde_ready_requested` | HUD | `horde` |
 

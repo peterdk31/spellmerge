@@ -75,7 +75,7 @@ func _initialize() -> void:
 	# A swarmer is the staff enemy's body without its staff: it only chases and touches.
 	var imp: EnemyBase = load("res://content/enemies/ember_imp/ember_imp.tres") as EnemyBase
 	var swarmer: EnemyBase = RunnerScript.swarm_data(imp)
-	if swarmer.staff != null or not swarmer.cards.is_empty() or swarmer.contact_damage <= 0 or swarmer.scene != imp.scene or imp.staff == null:
+	if swarmer.has_staffs() or swarmer.contact_damage <= 0 or swarmer.scene != imp.scene or not imp.has_staffs():
 		printerr("TEST FAILED: the swarmer should be the imp's body with no staff, hurting by touch (and the imp untouched)")
 		quit(1)
 		return

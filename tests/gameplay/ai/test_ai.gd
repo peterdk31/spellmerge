@@ -125,10 +125,11 @@ func _test_chase_stops_without_players() -> void:
 
 func _test_targets_nearest_of_four() -> void:
 	_setup(4)
-	_players()[0].position = Vector2(500.0, 0.0)
-	_players()[1].position = Vector2(0.0, 400.0)
-	_players()[2].position = Vector2(-200.0, 0.0)
-	_players()[3].position = Vector2(0.0, -300.0)
+	# All beyond its staff's range (enemy AI: it keeps the range its staffs give), so it walks.
+	_players()[0].position = Vector2(1000.0, 0.0)
+	_players()[1].position = Vector2(0.0, 800.0)
+	_players()[2].position = Vector2(-400.0, 0.0)
+	_players()[3].position = Vector2(0.0, -600.0)
 	var imp := _imp()
 	imp.step(STEP)
 	_check(_ai(imp).target == _players()[2], "the nearest of four players is chased")

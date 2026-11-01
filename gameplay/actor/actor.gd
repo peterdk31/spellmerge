@@ -128,6 +128,10 @@ var take_id: int = ActorsScript.NONE
 var _caster_number: int = -1
 
 var _components: Array[ActorComponent] = []
+## A boss's phases (`Phases`), added by the actor when its data has any; null otherwise.
+var phases: Phases = null
+## The body's scale now (`set_size`; 1 as drawn).
+var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
@@ -215,6 +219,8 @@ func step(delta: float) -> void:
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)
+	if phases != null:
+		phases.step(delta)
 	if possessed_by != null:
 		possessed_by.step(delta)
 	if controller != null:
@@ -473,7 +479,8 @@ func _first(found: ActorComponent, child: Node) -> ActorComponent:
 	return child as ActorComponent
 
 
-## The enemy's numbers to its components. Without a staff and cards the caster is left out.
+## The enemy's numbers to its components: health, speed, touch, size and its 1-4 staffs (enemy AI
+## AI4, docs/milestones/M2-enemy-ai.md). Without a staff the caster is left out.
 func _apply_data() -> void:
 	if data == null:
 		return
@@ -483,15 +490,47 @@ func _apply_data() -> void:
 		mover.speed = data.move_speed
 	if contact != null:
 		contact.damage = data.contact_damage
+	if data.size > 0.0 and not is_equal_approx(data.size, 1.0):
+		set_size(data.size)
+	if not data.phases.is_empty() and phases == null:
+		phases = Phases.new()
+		phases.name = "Phases"
+		add_child(phases)
+		_components.append(phases)
 	if caster == null:
 		return
-	if data.staff == null or data.cards.is_empty():
+	if not data.has_staffs():
 		_components.erase(caster)
 		caster = null
 		return
-	caster.staff_count = 1
-	caster.staff = data.staff
-	caster.start_cards = [data.cards]
+	var staffs: Array[StaffBase] = []
+	var cards: Array = []
+	for entry: StaffCards in data.staffs.slice(0, EnemyBase.MAX_STAFFS):
+		staffs.append(entry.staff if entry != null else null)
+		cards.append(entry.cards.duplicate() if entry != null else [])
+	caster.staff_count = staffs.size()
+	caster.staffs = staffs
+	caster.staff = staffs[0]
+	caster.start_cards = cards
+
+
+## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
+## points and circles kept in pixels (hurt circle, body and hand) with it. A hurt circle already
+## registered is registered again at its new size.
+func set_size(factor: float) -> void:
+	if factor <= 0.0 or is_equal_approx(factor, size):
+		return
+	var by: float = factor / size
+	size = factor
+	scale = Vector2(factor, factor)
+	body_offset *= by
+	hand_offset *= by
+	if hurtbox != null:
+		hurtbox.radius *= by
+		hurtbox.offset *= by
+		if hurtbox.registered and is_inside_tree():
+			hurtbox.detach()
+			hurtbox.attach()
 
 
 func _open_id() -> void:

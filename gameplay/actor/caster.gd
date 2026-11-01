@@ -319,6 +319,31 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	return true
 
 
+## Hold `new_staffs` (1-4, one per button) with `new_cards` (card ids by slot, per staff) instead
+## of the staffs it held: a boss's phase (`Phases`). Each pool starts full; a button it no longer
+## has is emptied (its sustained cards end). `staff_built` follows for each.
+func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
+	if new_staffs.is_empty():
+		return
+	var before: int = staff_count
+	staffs = new_staffs.duplicate()
+	staff = staffs[0]
+	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
+	for at in MAX_STAFFS:
+		_mana[at] = max_mana_of(at)
+	for at in maxi(before, staff_count):
+		var cards: Array[StringName] = []
+		if at < new_cards.size() and new_cards[at] is Array:
+			for id: Variant in new_cards[at]:
+				cards.append(StringName(str(id)))
+		if at < staff_count:
+			set_staff(at, cards)
+		else:
+			_cards[at] = [] as Array[StringName]
+			_install(at)
+			staff_built.emit(at)
+
+
 ## The next cast's mana (`Spells.next_cast_mana`): REFUSED (-1) with no build.
 func next_cast_mana(at: int = 0) -> float:
 	return actor.spells.next_cast_mana(number, at) if has_staff(at) else SpellsScript.REFUSED
@@ -327,6 +352,12 @@ func next_cast_mana(at: int = 0) -> float:
 ## How far the next cast reaches along the aim (0 for one that is not aimed, or no build).
 func next_cast_reach(at: int = 0) -> float:
 	return actor.spells.next_cast_reach(number, at) if has_staff(at) else 0.0
+
+
+## What the next cast of staff `at` does (`Spells.next_cast_sense`, a `CastSense`), or null with
+## no build: what an AI reads to play whatever staffs the actor holds (docs/milestones/M2-enemy-ai.md).
+func next_cast_sense(at: int = 0) -> CastSense:
+	return actor.spells.next_cast_sense(number, at) if has_staff(at) else null
 
 
 ## The hit radius of the next cast's first carrier (0 for none).

@@ -48,9 +48,6 @@ script = ExtResource("6_caster")
 
 [node name="AIController" type="Node" parent="."]
 script = ExtResource("7_ai")
-attack_range = 110.0
-windup_time = 0.9
-recover_time = 1.2
 
 [node name="CreatureLook" type="Node2D" parent="." node_paths=PackedStringArray("sprite", "telegraph")]
 script = ExtResource("8_look")

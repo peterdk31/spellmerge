@@ -64,6 +64,7 @@ const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
 ## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
@@ -1311,7 +1312,7 @@ func _make_beam_path() -> PackedVector3Array:
 static func beam_mesh() -> ArrayMesh:
 	if _beam_mesh == null:
 		_beam_mesh = _quads_mesh(BEAM_QUADS)
-		_beam_mesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+		_beam_mesh.custom_aabb = BatchesScript.WORLD
 	return _beam_mesh
 
 
@@ -1320,7 +1321,7 @@ static func beam_mesh() -> ArrayMesh:
 static func swing_mesh() -> ArrayMesh:
 	if _swing_mesh == null:
 		_swing_mesh = _quads_mesh(SwingTrailsScript.SWING_QUADS)
-		_swing_mesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+		_swing_mesh.custom_aabb = BatchesScript.WORLD
 	return _swing_mesh
 
 
@@ -1401,14 +1402,12 @@ static func _quads_mesh(quads: Array[Vector3i]) -> ArrayMesh:
 
 func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	# Effects show anywhere in the world; there is no room to fit a box to.
+	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	multimesh.mesh = mesh
 	multimesh.visible_instance_count = 0
-	# Effects show anywhere in the world; there is no room to fit a box to.
-	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
 	node.multimesh = multimesh
 	var material := ShaderMaterial.new()
 	material.shader = shader

@@ -197,6 +197,7 @@ extends Node2D
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 
 ## A shot with a non-zero tag ended; see "Ends" above.
 signal shot_ended(tag: int)
@@ -892,8 +893,8 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 		var quad := QuadMesh.new()
 		quad.size = Vector2.ONE
 		mesh = quad
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	# Never culled until `_fit_draw_bounds` fits its box to the room.
+	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	var material := ShaderMaterial.new()

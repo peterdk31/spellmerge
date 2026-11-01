@@ -42,8 +42,9 @@ const MESH_SHADERS: Array[Shader] = [
 const RECT_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_sprite.gdshader"),
 ]
+const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The world, as far as a draw needs to reach to never be culled.
-const WORLD := AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+const WORLD: AABB = BatchesScript.WORLD
 
 ## True once a warm-up has finished in this session: the shaders stay compiled.
 static var warmed: bool = false
@@ -160,8 +161,7 @@ func _material(shader: Shader) -> ShaderMaterial:
 ## A batch of one instance, as the projectile manager's and Feel's are made.
 func _batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
-	var multimesh := MultiMesh.new()
-	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	multimesh.mesh = mesh
@@ -169,7 +169,6 @@ func _batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	# Data that draws nothing: a trail of row -1 (no samples, not alive), an effect of no kind.
 	multimesh.set_instance_transform_2d(0, Transform2D(Vector2(-1.0, 0.0), Vector2.ZERO, Vector2.ZERO))
 	multimesh.set_instance_custom_data(0, Color(0.0, 0.0, 0.0, 0.0))
-	multimesh.custom_aabb = WORLD
 	node.multimesh = multimesh
 	node.material = _material(shader)
 	node.visible = false

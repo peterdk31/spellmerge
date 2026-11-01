@@ -157,6 +157,16 @@ func test_a_horde_kill_counts_and_drops_a_gem() -> void:
 	check_equal(run.director.gems().gem_position(0), Vector2(100.0, 100.0), "where it died")
 
 
+## The renderer culls the gems' batch by the box it read at the last redraw: unless that box is
+## the world, gems dropped away from it are never drawn.
+func test_the_gems_are_never_culled() -> void:
+	var run: Fixture = _make()
+	run.start()
+	var box: AABB = run.director.gems().multimesh.custom_aabb
+	check(box.size.x >= 100000.0 and box.size.y >= 100000.0, "the gems' box is the whole world")
+	check(box.has_point(Vector3(0.0, 0.0, 0.0)), "round the world's origin")
+
+
 func test_a_death_outside_the_horde_does_not_count() -> void:
 	var run: Fixture = _make()
 	run.start()

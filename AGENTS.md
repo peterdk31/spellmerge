@@ -46,6 +46,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 - **Tests:** code changes come with tests; every bug fix comes with a regression test that would have caught it.
 - **Godot gotchas:** commit the `.uid` files Godot creates; save scenes and resources as text (`.tscn`, `.tres`); no editor plugins.
 - **A new shader is compiled before play:** list a shot shader in `core/projectiles/shader_warmup.gd`, or call `ShaderWarmup.want(shader, how)` where an area first uses its shader; a test fails for any `.gdshader` left out (core/README.md, "The shot shaders").
+- **A batch is made by `Batches.multimesh()`** (`core/projectiles/batches.gd`), never `MultiMesh.new()`: its box is the world, or Godot culls the whole batch by a stale box; a test fails for any other (core/README.md, "Batches are never culled").
 - **Assets:** list each in `art/manifest.json` or `audio/manifest.json`, or, for the files of one content folder, in an `assets.json` in that folder (same shape; one per folder, so parallel PRs don't edit one list): path, origin `human` or `ai`, author, license; for AI also the tool and prompt.
 - **Issues:** a PR that does a queued issue says `Closes #N`, so the reporter is notified when it merges.
 

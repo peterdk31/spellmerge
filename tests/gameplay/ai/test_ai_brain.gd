@@ -197,3 +197,105 @@ func test_the_ai_view_shows_what_it_does() -> void:
 	check(words.begins_with("fight"), "the AI view names its behaviour and step: %s" % words)
 	fx.run(imp, 1)
 	check_equal(Fixture.look(imp).ai_view_text(), "", "nothing once it is off")
+
+
+# --- Pressing on (enemy AI L5: a profile for the test bots, which play like a person) ---------
+
+
+func _pressing(press_on: float) -> AIProfile:
+	var profile: AIProfile = _profile()
+	profile.press_on = press_on
+	return profile
+
+
+func test_with_no_rest_it_goes_on_at_once() -> void:
+	fx.players[0].position = Vector2(100.0, 0.0)
+	var profile: AIProfile = _profile()
+	profile.rest_scale = 0.0
+	var imp: Actor = _enemy([["fire", "bolt"]], Vector2.ZERO, profile)
+	var brain: AIBrain = Fixture.ai(imp).brain
+	check_equal(brain.rest_for(0), 0.0, "rest_scale 0: no rest")
+	var rested: bool = false
+	for i in 60:
+		fx.run(imp, 1)
+		rested = rested or brain.state == AIBrain.State.RECOVER
+	check(casts[0] >= 2, "it casts again and again: %s" % casts)
+	check(not rested, "and never rests between")
+
+
+func test_keep_range_steps_back_only_inside_what_pressing_on_leaves() -> void:
+	var keep: AIBehaviour = null
+	for behaviour: AIBehaviour in AIBehaviours.all():
+		if behaviour.name() == "keep range":
+			keep = behaviour
+	var brain := AIBrain.new()
+	var target := Node2D.new()
+	brain.target = target
+	brain.band_min = 100.0
+	brain.band_max = 200.0
+	brain.distance = 40.0
+	brain.profile = _pressing(0.0)
+	check(keep.want(brain) > 0.0, "an enemy steps back from a target inside its band's near edge")
+	keep.act(brain)
+	check_equal(brain.plan_move, AIBrain.Move.AWAY, "away")
+	brain.profile = _pressing(0.5)
+	check(keep.want(brain) > 0.0, "half pressing on, from one nearer than half of it")
+	brain.distance = 60.0
+	check_equal(keep.want(brain), 0.0, "but not from one beyond that")
+	brain.profile = _pressing(1.0)
+	brain.distance = 1.0
+	check_equal(keep.want(brain), 0.0, "pressing on fully, it never steps back")
+	brain.distance = 300.0
+	check(keep.want(brain) > 0.0, "and still walks in from beyond its band")
+	target.free()
+
+
+func test_pressing_on_it_walks_in_while_it_casts() -> void:
+	fx.players[0].position = Vector2(120.0, 0.0)
+	var imp: Actor = _enemy([["fire", "bolt"]], Vector2.ZERO, _pressing(1.0))
+	var brain: AIBrain = Fixture.ai(imp).brain
+	var last: float = imp.position.distance_to(fx.players[0].position)
+	var backed: bool = false
+	var walked_winding: bool = false
+	for i in 80:
+		fx.run(imp, 1)
+		var now: float = imp.position.distance_to(fx.players[0].position)
+		backed = backed or now > last + 0.01
+		last = now
+		if brain.state == AIBrain.State.WINDUP and imp.velocity.x > 0.0:
+			walked_winding = true
+	check(casts[0] > 0, "it casts: %s" % casts)
+	check(walked_winding, "it walks toward the wizard while it winds up")
+	check(not backed, "it never steps back")
+	check(last < 30.0, "it presses on up to the wizard: %.0f px" % last)
+
+
+func test_an_enemy_stands_to_cast_and_steps_back() -> void:
+	fx.players[0].position = Vector2(40.0, 0.0)
+	var imp: Actor = _enemy([["fire", "bolt"]], Vector2.ZERO, _pressing(0.0))
+	var brain: AIBrain = Fixture.ai(imp).brain
+	var walked_winding: bool = false
+	for i in 80:
+		fx.run(imp, 1)
+		if brain.state == AIBrain.State.WINDUP and imp.velocity != Vector2.ZERO:
+			walked_winding = true
+	check(not walked_winding, "an enemy stands while it winds up")
+	check(imp.position.distance_to(fx.players[0].position) > 55.0, "and steps back from a wizard too close")
+
+
+func test_pressing_on_it_fires_from_beyond_its_band() -> void:
+	fx.players[0].position = Vector2(2000.0, 0.0)
+	var imp: Actor = _enemy([["fire", "bolt"]], Vector2.ZERO, _pressing(0.0))
+	var brain: AIBrain = Fixture.ai(imp).brain
+	fx.run(imp, 1)
+	var sense: CastSense = imp.caster.next_cast_sense(0)
+	check(sense != null and sense.reach * 0.9 > brain.band_max + 10.0, "the bolt reaches past the band")
+	fx.players[0].position = Vector2((brain.band_max + sense.reach * 0.9) * 0.5, 0.0)
+	brain.staffs_changed()
+	fx.run(imp, 1)
+	check(brain.behaviour != null and brain.behaviour.name() != "fight", "an enemy walks in first: %s" % (brain.behaviour.name() if brain.behaviour != null else "none"))
+	brain.profile = _pressing(1.0)
+	brain.staffs_changed()
+	fx.run(imp, 1)
+	check(brain.behaviour != null and brain.behaviour.name() == "fight", "pressing on, it fires from there")
+	check(imp.velocity.x > 0.0, "walking in")

@@ -19,7 +19,8 @@ extends RefCounted
 ## stays in its lane, the mana lasts and `channel_max` is not up, turning after the target at
 ## `track_speed`), RECOVER (stand, the aim locked; a shot about to hit may still make it dodge),
 ## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear) and TRANSITION (a
-## boss changing phase: stand). The windup starts only when the cast can leave within it
+## boss changing phase: stand). A profile that presses on (`AIProfile.press_on`, a test bot's)
+## walks toward its target wherever an enemy stands in a fight, and with no rest goes on at once. The windup starts only when the cast can leave within it
 ## (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
 ## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
 ## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
@@ -221,6 +222,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 			_chase(intent)
 		State.WINDUP:
 			intent.aim = _locked_aim
+			_press_on(intent)
 			_state_left -= delta * _pace()
 			if _state_left <= 0.0:
 				_release(intent)
@@ -228,6 +230,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 			_channel(delta, intent)
 		State.RECOVER:
 			intent.aim = _locked_aim
+			_press_on(intent)
 			_state_left -= delta * _pace()
 			if _decide_left <= 0.0 and (profile.dodge > 0.0 or _can_block()):
 				# Resting is no promise: a shot about to hit may still make it move.
@@ -529,6 +532,8 @@ func _chase(intent: ActorIntent) -> void:
 			intent.move = -now.normalized() if now != Vector2.ZERO else Vector2.ZERO
 		Move.WAY:
 			intent.move = plan_way
+		Move.STAND:
+			_press_on(intent)
 	if plan_urgent:
 		if not _tapped and intent.move != Vector2.ZERO:
 			var mover: int = _ready_mover()
@@ -558,7 +563,7 @@ func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) ->
 	_state_left = windup
 	_locked_aim = _aim_for(_chosen_sense, now)
 	intent.aim = _locked_aim
-	intent.move = Vector2.ZERO
+	_press_on(intent)
 	if board != null:
 		board.started(actor.team(), actor.id)
 
@@ -571,6 +576,10 @@ func _release(intent: ActorIntent) -> void:
 		state = State.CHANNEL
 		_channel_left = profile.channel_max
 		intent.hold(chosen, true)
+		return
+	if recover_time <= 0.0:
+		# No rest (rest_scale 0): it goes on at once.
+		_to_chase()
 		return
 	state = State.RECOVER
 	_state_left = recover_time
@@ -588,6 +597,7 @@ func _channel(delta: float, intent: ActorIntent) -> void:
 			_locked_aim = _locked_aim.rotated(clampf(off, -turn, turn))
 		keep = _in_lane(sense, now) and actor.caster.free_mana(chosen) >= sense.mana
 	intent.aim = _locked_aim
+	_press_on(intent)
 	if keep:
 		intent.hold(chosen, true)
 		return
@@ -611,6 +621,18 @@ func _in_lane(sense: CastSense, now: Vector2) -> bool:
 func _to_chase() -> void:
 	state = State.CHASE
 	_decide_now = true
+
+
+## Where an enemy stands in a fight: a profile that presses on walks toward its target instead, at
+## `press_on` of its speed, until their hurt circles touch.
+func _press_on(intent: ActorIntent) -> void:
+	intent.move = Vector2.ZERO
+	if profile.press_on <= 0.0 or target == null:
+		return
+	var now: Vector2 = target.global_position - actor.global_position
+	var touch: float = _target_radius() + (actor.hurtbox.radius if actor.hurtbox != null else 0.0)
+	if now.length_squared() > touch * touch:
+		intent.move = now.normalized() * profile.press_on
 
 
 ## Where to aim a cast of `sense` at the target `now` away: ahead of a moving one by its flight

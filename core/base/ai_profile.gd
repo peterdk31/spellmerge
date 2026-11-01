@@ -21,8 +21,14 @@ extends Resource
 @export_range(0.0, 1.0) var dodge: float = 0.5
 ## Times every telegraph (a windup lasts longer for a more dangerous cast in any case).
 @export_range(0.25, 4.0) var windup_scale: float = 1.0
-## Times the rest after each cast.
+## Times the rest after each cast (0: none, it goes on at once).
 @export_range(0.0, 4.0) var rest_scale: float = 1.0
+## 0-1: how it presses on in a fight, as a person does: where an enemy stands (planning a cast,
+## winding up, channelling, resting) it walks toward its target at this share of its speed, and it
+## steps back only from a target nearer than its band's near edge × (1 - press_on), so at 1 it
+## never does. An aimed cast is wanted beyond its band too, more the higher it is. 0: an enemy,
+## which stands to cast and keeps its range.
+@export_range(0.0, 1.0) var press_on: float = 0.0
 ## Degrees a second a held cast turns after its target (0: the aim stays locked).
 @export_range(0.0, 720.0) var track_speed: float = 0.0
 ## The longest it holds a cast (seconds).

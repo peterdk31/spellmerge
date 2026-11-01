@@ -3,8 +3,8 @@ extends Node
 ## first room through the real input path. Bots 1-3 fight; bot 4 opens its builder with B
 ## (`back`) when the room starts and idles in it the whole run (the full builder, waves
 ## included). Bots 1-3 also build: when the room starts each builds a seeded random staff into
-## staff 3 with `staff_change_requested` and casts it with staff 2, so the run is played with
-## built staffs.
+## staff 3 with `staff_change_requested`, and their brains (the enemies' AI, tests/bots/bot.gd)
+## play it with their other staffs, so the run is played with built staffs.
 ##
 ## It passes only if
 ##  - `room_cleared` is received,
@@ -35,9 +35,9 @@ extends Node
 ## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1.
 ##
 ## Reproducibility: the game logic draws no random numbers (only cosmetic feel code
-## does) and the bots decide from the world, so a run varies only with frame
+## does) and each bot's brain is seeded by its slot, so a run varies only with frame
 ## timing. There is no seed to set. The pass rate over repeated runs is in
-## docs/LOG.md.
+## docs/LOG.md and, for the bots on the brain, docs/milestones/M2-enemy-ai.md (L5).
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")

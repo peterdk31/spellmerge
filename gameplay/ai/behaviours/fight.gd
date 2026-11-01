@@ -2,7 +2,9 @@ extends AIBehaviour
 ## Cast at the target: of the staffs whose next cast hurts and reaches it now (along a clear line
 ## for an aimed one; round itself for one that is not; never a blast that would catch itself), the
 ## one that is ready and deals most. With one in reach that is not ready yet it stands and waits,
-## so a telegraph only ever shows a cast that comes.
+## so a telegraph only ever shows a cast that comes. A profile that presses on
+## (`AIProfile.press_on`) wants an aimed cast beyond its band and close in too, as a person keeps
+## firing while walking in; the executor walks it toward the target where an enemy stands.
 
 ## Its want with a cast ready, plus a little for the damage it deals.
 const READY: float = 0.8
@@ -21,6 +23,8 @@ func want(brain: AIBrain) -> float:
 		return 0.0
 	var best: float = 0.0
 	var waiting: int = -1
+	var press_on: float = brain.profile.press_on
+	var near: float = brain.band_min * (1.0 - press_on)
 	for at in brain.staff_count:
 		var sense: CastSense = brain.senses[at]
 		if sense == null or sense.empty or not sense.harms() or brain.holding[at] != 0:
@@ -37,17 +41,17 @@ func want(brain: AIBrain) -> float:
 			continue
 		var value: float = READY + minf(sense.damage, 30.0) / 100.0 + (0.05 if sense.status else 0.0)
 		if sense.reach > 0.0 and brain.band_max > 0.0 and brain.distance > brain.band_max:
-			# In reach but beyond its band: it would rather walk in first.
-			value *= 0.25
-		elif sense.reach > 0.0 and brain.band_min > 0.0 and brain.distance < brain.band_min:
+			# In reach but beyond its band: it would rather walk in first (pressing on, fire too).
+			value *= 0.25 + 0.75 * press_on
+		elif sense.reach > 0.0 and near > 0.0 and brain.distance < near:
 			# Too close for an aimed cast to be its best: a cautious one steps back first.
-			value *= 0.4 + 0.6 * brain.distance / brain.band_min
+			value *= 0.4 + 0.6 * brain.distance / near
 		if value > best:
 			best = value
 			brain.picks[index] = at
 	if brain.picks[index] >= 0:
-		return best * brain.team_beat()
-	if waiting >= 0 and brain.distance >= brain.band_min:
+		return (best + brain.spread_bonus()) * brain.team_beat()
+	if waiting >= 0 and brain.distance >= near:
 		# Waiting in its range band; too close, it would rather step back first.
 		brain.picks[index] = waiting
 		return WAITING

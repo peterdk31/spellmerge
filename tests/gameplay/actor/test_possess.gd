@@ -625,3 +625,43 @@ func test_an_ember_imp_with_possess_takes_a_wizard_and_its_ai_drives_it() -> voi
 	_world.run(int(SECONDS / Fixture.STEP) + 1)
 	check(wizard.controller == _seat(wizard), "the seat comes back at the end")
 	check(imp.controller == mind, "and the AI goes home")
+
+
+## The Face among `body`'s children, or null.
+func _face_of(body: Actor) -> Face:
+	for child in body.get_children():
+		if child is Face:
+			return child as Face
+	return null
+
+
+## Enemies telegraph, allies don't (owner, 2026-11-01): the wizard an enemy's AI possesses is on
+## the enemies' team meanwhile, so the AI winds its casts up there too and the other players are
+## warned: the telegraph and the wizard's furious face.
+func test_an_enemy_ai_driving_a_wizard_telegraphs() -> void:
+	var data := ImpData.duplicate() as EnemyBase
+	var staff: StaffBase = ImpData.staffs[0].staff.duplicate() as StaffBase
+	staff.max_mana = 40.0
+	data.staffs = [StaffCards.make(staff, [&"possess", &"bolt"] as Array[StringName])] as Array[StaffCards]
+	var wizard := _world.wizard(0, Vector2.ZERO, [[&"fire", &"bolt"], [], [], []])
+	_world.wizard(1, Vector2(0.0, -110.0))
+	var imp := _ember_imp(Vector2(80.0, 0.0), data)
+	var mind := _mind(imp)
+	var taken: bool = false
+	for i in 64:
+		_world.run(1)
+		if wizard.controller == mind:
+			taken = true
+			break
+	check(taken, "the imp's AI takes the nearer wizard")
+	check_equal(wizard.team(), ActorsScript.TEAM_ENEMIES, "which is on the enemies' team meanwhile")
+	check(mind.brain.windup_for(0) > 0.0, "so its casts wind up")
+	var warned: bool = false
+	var furious: bool = false
+	for i in 30:
+		_world.run(1)
+		if wizard.controller == mind and mind.is_telegraphing():
+			warned = true
+			furious = furious or _face_of(wizard).mood() == Face.Mood.FURIOUS
+	check(warned, "it telegraphs from the wizard's body")
+	check(furious, "with the wizard's furious face")

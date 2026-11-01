@@ -2,7 +2,9 @@ extends "res://tests/support/suite.gd"
 ## Every combo in the catalogue (`content/spells/combos/`), played by an enemy (enemy AI AI5,
 ## docs/milestones/M2-enemy-ai.md, "Done when" 3): it casts each combo's staffs on its own, by
 ## what they cast next, never shoots an aimed cast into a wall, and never kills itself. A wizard
-## stands 100 px away and stings it once a second, so a guarding staff is called for too.
+## stands 100 px away and stings it once a second, so a guarding staff is called for too. A
+## combo's `allies` stand by it as its teammates, hurt by the combo's `hurt` (out of MATE_HEALTH),
+## so a staff that only heals has someone to heal (the Heal ally behaviour, L2).
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_combos.gd
 
@@ -10,9 +12,8 @@ const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
 const SECONDS: float = 6.0
-## Combos whose staffs only heal: no baseline behaviour heals yet (Heal ally comes later,
-## docs/milestones/M2-enemy-ai.md, "Later behaviours").
-const HEAL_ONLY: Array[String] = ["mend_pierce_party"]
+## The most health of a combo's allies.
+const MATE_HEALTH: float = 100.0
 
 
 ## The combo's staffs, by the staff each of its casts names (empty buttons in between kept).
@@ -40,6 +41,12 @@ func test_every_combo_is_played() -> void:
 		var fx := Fixture.new(root)
 		fx.players[0].position = Vector2(100.0, 0.0)
 		var body: Actor = fx.imp(Vector2.ZERO, _data(row.get("casts", [])))
+		for ally: Variant in row.get("allies", []):
+			var at: Array = ally as Array
+			var mate_data: EnemyBase = Fixture.staffed([])
+			mate_data.max_health = MATE_HEALTH
+			var mate: Actor = fx.imp(Vector2(float(at[0]), float(at[1])), mate_data)
+			mate.health.reset(MATE_HEALTH - float(row.get("hurt", 0)))
 		var cast: Array[int] = [0]
 		var walled: Array[int] = [0]
 		if body.caster != null:
@@ -56,7 +63,7 @@ func test_every_combo_is_played() -> void:
 				break
 			fx.run_all(1)
 		check(is_instance_valid(body) and not body.is_dying(), "%s: the enemy is still alive" % id)
-		if cast[0] == 0 and not HEAL_ONLY.has(id):
+		if cast[0] == 0:
 			silent.append(id)
 		check_equal(walled[0], 0, "%s: no aimed cast into a wall" % id)
 		fx.free_all()

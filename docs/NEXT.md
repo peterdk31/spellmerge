@@ -32,12 +32,12 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: shots coming (AI3).** (`core/projectiles/`) After AI1.
 - [x] **Enemy AI: enemy data (AI4).** (`core/base/`, `gameplay/actor/`, `content/enemies/`) After AI1.
 - [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
-- [ ] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), "What is left", L1. First.
-- [ ] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2.
-- [ ] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4.
+- [x] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) Done: the target lookup looks near first; the AI is as fast as before it (`tests/benchmark/ai_step.gd`; DECISIONS, "The enemy AI's cost").
+- [x] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2. Done: `plan_target`, the board's reports, `behaviours/heal_ally.gd`, `CastSense.heals_self`; the combo test casts the heal-only combo.
+- [x] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4. Done: spreading (slots round a target, `keep range` walks to them) and the call (`State.CALL`, `Face.glance`, `beat` above 1 near a call).
 - [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
 - [x] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
-- [ ] **Enemy AI: enemies telegraph, allies don't; bots on the brain (AI9, L5).** (`gameplay/ai/`, `core/base/`, `tests/bots/`) "What is left", L5: first the rule (an AI on the players' team winds up nothing; owner, 2026-11-01), then pressing on, then the bots, measured over ten smoke runs.
+- [x] **Enemy AI: enemies telegraph, allies don't; bots on the brain (AI9, L5).** (`gameplay/ai/`, `core/base/`, `tests/bots/`) "What is left", L5, in three commits: the rule (an AI on the players' team winds up nothing and casts the step its staff is ready; owner, 2026-11-01), pressing on (`AIProfile.press_on`; `rest_scale` 0 skips the rest), then the bots on the brain (`tests/bots/bot_profile.tres`; the state machine and "RB is the dash" gone). Ten 4-bot smoke runs: all passed, mean clear 8.7 s against the old bot's 9.0 s on the same machine (details in M2-enemy-ai.md, L5).
 - [ ] **Enemy AI: difficulty (AI10, L6).** (`gameplay/ai/`) Once difficulty sends `difficulty_changed`; "What is left", L6.
 - [ ] **Enemy AI: strays with roles (L7).** (`content/enemies/`) The owner picks the staffs; "What is left", L7.
 - [x] **Shared files split (staffs A2).** One combo per file in `content/spells/combos/` (read by `tests/support/combo_files.gd`, the clip scenarios and `tools/atlas.py`); `assets.json` beside a content folder's files, read with the manifests by `SpellValidator.load_manifest`; `test_combos` checks every registry component, and the icon and drop-list counts are derived. Owner session, 2026-10-26.

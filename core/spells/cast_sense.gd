@@ -40,8 +40,10 @@ var move_reach: float = 0.0
 var blocks: bool = false
 ## True when it makes a body of its own that stays (a decoy, a familiar).
 var spawns: bool = false
-## True when its hits heal.
+## True when its hits heal, and when a heal lands on its caster itself (a mend that fell back on
+## the caster, with no carrier to fly on): a cast to heal itself with.
 var heals: bool = false
+var heals_self: bool = false
 ## True when its hits apply a status.
 var status: bool = false
 ## True when it stays on until the button is pressed again (`hold`).
@@ -90,6 +92,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 			blocks = true
 		if spell.hit != null and spell.hit.heal > 0:
 			heals = true
+			heals_self = heals_self or spell.fallback == CompiledSpell.FALLBACK_CASTER
 		return
 	var carrier: Carrier = Carriers.of(spell.carrier)
 	var spell_reach: float = carrier.reach_of(spell)

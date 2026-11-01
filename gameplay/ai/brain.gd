@@ -18,18 +18,29 @@ extends RefCounted
 ## (`intent.press`), CHANNEL (a cast that goes on while held: hold the button while the target
 ## stays in its lane, the mana lasts and `channel_max` is not up, turning after the target at
 ## `track_speed`), RECOVER (stand, the aim locked; a shot about to hit may still make it dodge),
-## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear) and TRANSITION (a
-## boss changing phase: stand). The windup starts only when the cast can leave within it
-## (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
+## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear), TRANSITION (a
+## boss changing phase: stand) and CALL (before a windup, with teamwork, a teammate near: it
+## glances at the teammate for `TeamBoard.CALL_TIME`, its Face's brows raised, and the board's call
+## makes the teammates near keener to join in; then it winds up). A profile that presses on
+## (`AIProfile.press_on`, a test bot's) walks toward its target wherever an enemy stands in a
+## fight, and with no rest goes on at once. The windup starts only when the cast can leave within
+## it (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
 ## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
 ## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
+##
+## **Enemies telegraph, allies don't** (owner, 2026-11-01): a telegraph is a warning for the
+## players, so a brain driving an actor of the players' team winds up nothing (`warns()` false:
+## `windup_for` is 0 and the cast leaves the step its staff is ready, so no telegraph and no
+## furious face). It follows the driven actor's team, which is its driver's: a bot, a minion, and
+## an enemy body a player's side drives cast at once; an enemy's AI possessing a wizard still warns.
 ##
 ## Nothing here allocates per step.
 
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
-enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION }
+enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION, CALL }
 ## How a plan walks: stand, toward or away from the target, or a set way (`plan_way`).
 enum Move { STAND, TOWARD, AWAY, WAY }
 
@@ -39,6 +50,10 @@ const RETARGET_TIME: float = 0.5
 const GRUDGE_TIME: float = 3.0
 ## How far it looks for a target: farther than any room, so the nearest anywhere.
 const SIGHT: float = 100000.0
+## The rings it looks in, nearest first, before the whole room: a target is most often near, and
+## a small ring reads a few cells of the target grid where the whole room reads all of them (enemy
+## AI L1: the lookup was two thirds of a staffed enemy's step). The nearest of all is the same.
+const LOOKS: Array[float] = [160.0, 480.0, SIGHT]
 ## Closer than this to its target it stops walking (an actor with nothing to cast, on top of it).
 const CLOSE_ENOUGH: float = 1.0
 ## How far ahead (pixels) a way round a wall, or to cover, is probed.
@@ -78,12 +93,17 @@ const LANE_MARGIN: float = 10.0
 ## The decision timer is the profile's `reaction` times a random factor this far either side, so
 ## a crowd does not decide in one step.
 const REACTION_JITTER: float = 0.2
+## Spreading round a target: the most it turns round the target toward its slot in one plan, and
+## the bonus Fight gets alone on a target (times teamwork, shared by its attackers).
+const SLOT_TURN: float = deg_to_rad(50.0)
+const SPREAD_BONUS: float = 0.1
 
 ## The actor it drives, the profile it plays by and the decoys it is lured by (null: none).
 var actor: Actor = null
 var profile: AIProfile = null
 var entities: EntitiesScript = null
-## The team board of its team (gameplay/ai/team_board.gd), or null: staggered fire and calls.
+## The team board (gameplay/ai/team_board.gd), or null: staggered fire, calls, and where its
+## teammates stand and how hurt they are (it reports itself at each decision).
 var board: TeamBoard = null
 ## Seeded per actor (`setup`), so a test repeats.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -115,6 +135,11 @@ var staff_count: int = 0
 var senses: Array[CastSense] = [null, null, null, null]
 var ready: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 var holding: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+## Spreading round its target (teamwork above 0; `TeamBoard`): how many of its team attacked its
+## target at the board's last count (itself too; 0 for none) and the angle (from the target) of
+## its own slot round it.
+var attackers: int = 0
+var slot_angle: float = 0.0
 ## Seconds this brain has thought (for behaviours' memos).
 var clock: float = 0.0
 
@@ -124,6 +149,8 @@ var plan_staff: int = -1
 var plan_move: Move = Move.STAND
 var plan_way: Vector2 = Vector2.ZERO
 var plan_urgent: bool = false
+## What the planned staff is aimed at when not `target` (a teammate to heal); null for `target`.
+var plan_target: Node2D = null
 ## Per behaviour: a staff it picked in `want` for `act`, and a number it keeps (`AIBehaviour`).
 var picks: PackedInt32Array = PackedInt32Array()
 var memo: PackedFloat32Array = PackedFloat32Array()
@@ -155,6 +182,13 @@ var _strafe_side: float = 1.0
 ## Instance id of `target` when it was chosen, or 0 for none; `target` typed when an actor.
 var _target_id: int = 0
 var _target_actor: Actor = null
+## The actor's Face (the actor kit's), for the call's glance; null without one.
+var _face: Face = null
+## The last call of its team it has heard (`TeamBoard.called_at`).
+var _heard_call: float = -INF
+## Its slot on the board at its last report and at its last noted attack (-1 for none).
+var _report_slot: int = -1
+var _attack_slot: int = -1
 
 
 ## Start driving `with_actor` by `with_profile` (null: the shared default). `seed_value` seeds its
@@ -165,6 +199,11 @@ func setup(with_actor: Actor, with_profile: AIProfile, seed_value: int) -> void:
 	rng.seed = seed_value
 	_retarget_offset = RETARGET_TIME * float(absi(seed_value) % 8) / 8.0
 	_strafe_side = 1.0 if seed_value % 2 == 0 else -1.0
+	_face = null
+	for child in actor.get_children():
+		if child is Face:
+			_face = child as Face
+			break
 	var count: int = AIBehaviours.all().size()
 	if picks.size() != count:
 		picks.resize(count)
@@ -208,12 +247,17 @@ func think(delta: float, intent: ActorIntent) -> void:
 	intent.move = Vector2.ZERO
 	match state:
 		State.CHASE:
+			if board != null and profile.teamwork > 0.0 and board.called_at(actor.team()) > _heard_call:
+				# A teammate called: decide at once whether to join in.
+				_heard_call = board.called_at(actor.team())
+				_decide_now = true
 			if _decide_left <= 0.0 or _decide_now:
 				_perceive()
 				_decide()
 			_chase(intent)
 		State.WINDUP:
 			intent.aim = _locked_aim
+			_press_on(intent)
 			_state_left -= delta * _pace()
 			if _state_left <= 0.0:
 				_release(intent)
@@ -221,6 +265,7 @@ func think(delta: float, intent: ActorIntent) -> void:
 			_channel(delta, intent)
 		State.RECOVER:
 			intent.aim = _locked_aim
+			_press_on(intent)
 			_state_left -= delta * _pace()
 			if _decide_left <= 0.0 and (profile.dodge > 0.0 or _can_block()):
 				# Resting is no promise: a shot about to hit may still make it move.
@@ -244,6 +289,8 @@ func think(delta: float, intent: ActorIntent) -> void:
 			_state_left -= delta
 			if _state_left <= 0.0:
 				_to_chase()
+		State.CALL:
+			_call(delta, intent)
 
 
 ## True from the start of a windup until its cast leaves: the attack is coming.
@@ -265,8 +312,16 @@ func telegraph_staff() -> int:
 	return maxi(plan_staff, 0)
 
 
-## The windup the next attack of staff `at` would take (seconds), for its telegraph.
+## False while the actor it drives is on the players' team: an ally gives no warning.
+func warns() -> bool:
+	return actor == null or actor.team() != ActorsScript.TEAM_WIZARDS
+
+
+## The windup the next attack of staff `at` would take (seconds), for its telegraph; 0 for an ally
+## (`warns`).
 func windup_for(at: int) -> float:
+	if not warns():
+		return 0.0
 	var sense: CastSense = _sense_of(at)
 	if sense == null:
 		return snappedf(WINDUP_BASE * profile.windup_scale, TIME_GRAIN)
@@ -330,11 +385,48 @@ func staffs_changed() -> void:
 	_decide_now = true
 
 
-## Behaviours ask: does the next cast `sense` reach the target from here?
-func reaches(sense: CastSense) -> bool:
+## Behaviours ask: does the next cast `sense` reach the target from here (or `other`, when
+## given: a teammate)?
+func reaches(sense: CastSense, other: Node2D = null) -> bool:
+	var far: float = distance if other == null else actor.global_position.distance_to(other.global_position)
+	var radius: float = _target_radius() if other == null else _radius_of(other)
 	if sense.reach > 0.0:
-		return distance <= sense.reach * 0.95 + _target_radius()
-	return distance <= maxf(sense.close_reach, 24.0) + _target_radius()
+		return far <= sense.reach * 0.95 + radius
+	return far <= maxf(sense.close_reach, 24.0) + radius
+
+
+## Behaviours ask: of its teammates the board has under `TeamBoard.HURT` (itself not), the most
+## hurt that a cast of `sense` reaches along a clear line, or null.
+func hurt_mate(sense: CastSense) -> Actor:
+	if board == null or actor.actors == null:
+		return null
+	var team: int = actor.team()
+	var best: Actor = null
+	var lowest: float = TeamBoard.HURT
+	for slot in TeamBoard.PLACES:
+		var who: int = board.mate(team, slot)
+		if who < 0 or who == actor.id or board.mate_health(team, slot) >= TeamBoard.HURT:
+			continue
+		if actor.actors.team_of(who) != team:
+			continue
+		var mate: Actor = actor.actors.node_of(who) as Actor
+		if mate == null or not _is_valid_target(mate):
+			continue
+		var share: float = health_of(mate)
+		if share >= lowest or not reaches(sense, mate):
+			continue
+		if sense.reach > 0.0 and not AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, mate.global_position + mate.body_offset):
+			continue
+		best = mate
+		lowest = share
+	return best
+
+
+## Behaviours ask: the health of `body` now, a share of its most (1 without Health).
+static func health_of(body: Actor) -> float:
+	if body == null or body.health == null or body.health.max_health <= 0.0:
+		return 1.0
+	return body.health.health / body.health.max_health
 
 
 ## Behaviours ask: a way to cover from the target within reach (a wall between), or ZERO.
@@ -349,7 +441,35 @@ func cover_from_target() -> Vector2:
 func team_beat() -> float:
 	if board == null or actor == null:
 		return 1.0
-	return board.beat(actor.team(), actor.id, profile.teamwork)
+	return board.beat(actor.team(), actor.id, profile.teamwork, actor.global_position)
+
+
+## Behaviours ask: how far round its target its slot is from where it stands (radians, 0 to PI);
+## 0 with no slot to keep (alone on it, or no teamwork).
+func slot_off() -> float:
+	if attackers < 2 or target == null or to_target == Vector2.ZERO:
+		return 0.0
+	return absf(angle_difference((-to_target).angle(), slot_angle))
+
+
+## Behaviours ask: the way to its slot round the target, at the middle of its band (turning round
+## the target at most SLOT_TURN at a time, so it walks round and not through), or ZERO with no
+## slot to keep.
+func slot_way() -> Vector2:
+	if attackers < 2 or target == null or band_max <= 0.0 or to_target == Vector2.ZERO:
+		return Vector2.ZERO
+	var now: float = (-to_target).angle()
+	var turn: float = clampf(angle_difference(now, slot_angle), -SLOT_TURN, SLOT_TURN)
+	var point: Vector2 = target.global_position + Vector2.from_angle(now + turn) * (band_min + band_max) * 0.5
+	var way: Vector2 = point - actor.global_position
+	return way.normalized() if way.length_squared() > 1.0 else Vector2.ZERO
+
+
+## Behaviours ask: a little more keenness to fight a target few of its team attack (teamwork).
+func spread_bonus() -> float:
+	if attackers <= 0:
+		return 0.0
+	return profile.teamwork * SPREAD_BONUS / float(attackers)
 
 
 ## Behaviours ask: walk round the wall in the line for a while (REPOSITION).
@@ -388,11 +508,15 @@ func _perceive() -> void:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
 		line_clear = _line_clear()
+		_note_attack()
 	else:
 		to_target = Vector2.ZERO
 		distance = 0.0
 		line_clear = true
-	health_fraction = actor.health.health / actor.health.max_health if actor.health != null and actor.health.max_health > 0.0 else 1.0
+		attackers = 0
+	health_fraction = health_of(actor)
+	if board != null:
+		_report_slot = board.report(actor.team(), actor.id, actor.global_position, health_fraction, _report_slot)
 	_read_staffs()
 	_perceive_threat()
 
@@ -410,6 +534,17 @@ func _perceive_threat() -> void:
 	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and rng.randf() < profile.randomness * 0.3:
 		# Sometimes it sees the shot late.
 		threat_time = -1.0
+
+
+## With teamwork, it notes its target on the board and reads its slot round it (`TeamBoard`).
+func _note_attack() -> void:
+	if board == null or profile.teamwork <= 0.0:
+		attackers = 0
+		return
+	var team: int = actor.team()
+	_attack_slot = board.note_attack(team, actor.id, _target_id, target.global_position, actor.global_position, _attack_slot)
+	attackers = board.attackers(team, _attack_slot, actor.id)
+	slot_angle = board.slot_angle(team, _attack_slot) if attackers > 0 else 0.0
 
 
 ## Its target winds up a cast aimed at it (a telegraph is there to be read, as a person reads it):
@@ -495,17 +630,23 @@ func _clear_plan() -> void:
 	plan_move = Move.STAND
 	plan_way = Vector2.ZERO
 	plan_urgent = false
+	plan_target = null
 
 
 # --- carrying it out ---
 
 
 func _chase(intent: ActorIntent) -> void:
-	if target == null:
+	var aimed: Node2D = _aim_node()
+	if aimed == null:
 		return
-	var now: Vector2 = target.global_position - actor.global_position
+	var now: Vector2 = aimed.global_position - actor.global_position
 	if now != Vector2.ZERO:
 		intent.aim = now
+	var aim_way: Vector2 = now
+	if aimed != target:
+		# The plan aims at a teammate; it walks as planned by its target.
+		now = target.global_position - actor.global_position if target != null else Vector2.ZERO
 	match plan_move:
 		Move.TOWARD:
 			if now.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH:
@@ -514,6 +655,8 @@ func _chase(intent: ActorIntent) -> void:
 			intent.move = -now.normalized() if now != Vector2.ZERO else Vector2.ZERO
 		Move.WAY:
 			intent.move = plan_way
+		Move.STAND:
+			_press_on(intent)
 	if plan_urgent:
 		if not _tapped and intent.move != Vector2.ZERO:
 			var mover: int = _ready_mover()
@@ -528,7 +671,55 @@ func _chase(intent: ActorIntent) -> void:
 	if not actor.caster.cast_ready(windup, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
-	_begin_windup(plan_staff, windup, now, intent)
+	if _begin_call(windup, intent):
+		return
+	_begin_windup(plan_staff, windup, aim_way, intent)
+	if windup <= 0.0:
+		# No warning to give (an ally): the cast leaves this step.
+		_release(intent)
+
+
+## Before an attack that winds up, with teamwork (as often as `teamwork`), its team not calling
+## lately and a teammate within `TeamBoard.CALL_REACH` on the board: it calls (CALL). Returns
+## whether it did.
+func _begin_call(windup: float, intent: ActorIntent) -> bool:
+	if board == null or profile.teamwork <= 0.0 or windup <= 0.0 or plan_target != null:
+		return false
+	var team: int = actor.team()
+	if not board.can_call(team) or board.is_calling(team):
+		return false
+	var sense: CastSense = _sense_of(plan_staff)
+	if sense == null or not sense.harms():
+		return false
+	var mate: Vector2 = board.nearest_mate(team, actor.id, actor.global_position, TeamBoard.CALL_REACH)
+	if mate == Vector2.INF or rng.randf() >= profile.teamwork:
+		return false
+	state = State.CALL
+	_state_left = TeamBoard.CALL_TIME
+	intent.move = Vector2.ZERO
+	board.call_attack(team, actor.id, actor.global_position)
+	_heard_call = board.called_at(team)
+	if _face != null and is_instance_valid(_face):
+		_face.glance(mate - actor.global_position, TeamBoard.CALL_TIME)
+	return true
+
+
+## Calling: stand, aim at the target, then wind up the planned staff if it is still ready.
+func _call(delta: float, intent: ActorIntent) -> void:
+	if target == null:
+		_to_chase()
+		return
+	var now: Vector2 = target.global_position - actor.global_position
+	if now != Vector2.ZERO:
+		intent.aim = now
+	_state_left -= delta * _pace()
+	if _state_left > 0.0:
+		return
+	var windup: float = windup_for(plan_staff) if plan_staff >= 0 else 0.0
+	if plan_staff >= 0 and actor.caster != null and actor.caster.cast_ready(windup, plan_staff):
+		_begin_windup(plan_staff, windup, now, intent)
+	else:
+		_to_chase()
 
 
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:
@@ -540,7 +731,7 @@ func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) ->
 	_state_left = windup
 	_locked_aim = _aim_for(_chosen_sense, now)
 	intent.aim = _locked_aim
-	intent.move = Vector2.ZERO
+	_press_on(intent)
 	if board != null:
 		board.started(actor.team(), actor.id)
 
@@ -554,6 +745,10 @@ func _release(intent: ActorIntent) -> void:
 		_channel_left = profile.channel_max
 		intent.hold(chosen, true)
 		return
+	if recover_time <= 0.0:
+		# No rest (rest_scale 0): it goes on at once.
+		_to_chase()
+		return
 	state = State.RECOVER
 	_state_left = recover_time
 
@@ -561,15 +756,17 @@ func _release(intent: ActorIntent) -> void:
 func _channel(delta: float, intent: ActorIntent) -> void:
 	_channel_left -= delta * _pace()
 	var sense: CastSense = _chosen_sense
-	var keep: bool = _channel_left > 0.0 and target != null and sense != null and actor.caster != null
+	var aimed: Node2D = _aim_node()
+	var keep: bool = _channel_left > 0.0 and aimed != null and sense != null and actor.caster != null
 	if keep:
-		var now: Vector2 = target.global_position - actor.global_position
+		var now: Vector2 = aimed.global_position - actor.global_position
 		if profile.track_speed > 0.0 and now != Vector2.ZERO:
 			var turn: float = deg_to_rad(profile.track_speed) * delta * _pace()
 			var off: float = _locked_aim.angle_to(now)
 			_locked_aim = _locked_aim.rotated(clampf(off, -turn, turn))
-		keep = _in_lane(sense, now) and actor.caster.free_mana(chosen) >= sense.mana
+		keep = _in_lane(sense, now, _radius_of(aimed)) and actor.caster.free_mana(chosen) >= sense.mana
 	intent.aim = _locked_aim
+	_press_on(intent)
 	if keep:
 		intent.hold(chosen, true)
 		return
@@ -578,16 +775,17 @@ func _channel(delta: float, intent: ActorIntent) -> void:
 	_state_left = recover_time
 
 
-## True while the target stands where a held cast along the aim still meets it.
-func _in_lane(sense: CastSense, now: Vector2) -> bool:
+## True while what it aims at (`now` away, `radius` round) stands where a held cast along the aim
+## still meets it.
+func _in_lane(sense: CastSense, now: Vector2, radius: float) -> bool:
 	var reach: float = sense.reach if sense.reach > 0.0 else sense.close_reach
 	var along: float = now.dot(_locked_aim)
-	if along < -LANE_MARGIN or along > reach + LANE_MARGIN + _target_radius():
+	if along < -LANE_MARGIN or along > reach + LANE_MARGIN + radius:
 		return false
 	if sense.reach <= 0.0:
 		return true
 	var across: float = absf(now.cross(_locked_aim))
-	return across <= sense.radius + _target_radius() + LANE_MARGIN
+	return across <= sense.radius + radius + LANE_MARGIN
 
 
 func _to_chase() -> void:
@@ -595,14 +793,28 @@ func _to_chase() -> void:
 	_decide_now = true
 
 
-## Where to aim a cast of `sense` at the target `now` away: ahead of a moving one by its flight
-## (`lead`), then off by the profile's aim error, once.
+## Where an enemy stands in a fight: a profile that presses on walks toward its target instead, at
+## `press_on` of its speed, until their hurt circles touch.
+func _press_on(intent: ActorIntent) -> void:
+	intent.move = Vector2.ZERO
+	if profile.press_on <= 0.0 or target == null:
+		return
+	var now: Vector2 = target.global_position - actor.global_position
+	var touch: float = _target_radius() + (actor.hurtbox.radius if actor.hurtbox != null else 0.0)
+	if now.length_squared() > touch * touch:
+		intent.move = now.normalized() * profile.press_on
+
+
+## Where to aim a cast of `sense` at what the plan aims at (`_aim_node`), `now` away: ahead of a
+## moving one by its flight (`lead`), then off by the profile's aim error, once.
 func _aim_for(sense: CastSense, now: Vector2) -> Vector2:
 	var point: Vector2 = now
-	if _target_actor != null:
-		point += _target_actor.body_offset - actor.body_offset
+	var aimed: Node2D = _aim_node()
+	var aimed_actor: Actor = aimed as Actor
+	if aimed_actor != null:
+		point += aimed_actor.body_offset - actor.body_offset
 	if sense != null and sense.speed > 0.0 and profile.lead > 0.0:
-		var body := target as CharacterBody2D
+		var body := aimed as CharacterBody2D
 		if body != null:
 			point += body.velocity * (point.length() / sense.speed) * profile.lead
 	if point == Vector2.ZERO:
@@ -640,6 +852,23 @@ func _target_radius() -> float:
 	return _target_actor.hurtbox.radius if _target_actor != null and _target_actor.hurtbox != null else 0.0
 
 
+func _radius_of(node: Node2D) -> float:
+	if node == target:
+		return _target_radius()
+	var other: Actor = node as Actor
+	return other.hurtbox.radius if other != null and other.hurtbox != null else 0.0
+
+
+## What the plan aims at: `plan_target` while it can be aimed at (let go once it cannot), else
+## the target.
+func _aim_node() -> Node2D:
+	if plan_target != null:
+		if _is_valid_target(plan_target):
+			return plan_target
+		plan_target = null
+	return target
+
+
 ## True when no wall stands between the actor's body and its target's (`AISight`).
 func _line_clear() -> bool:
 	if target == null:
@@ -661,8 +890,14 @@ func _find_target() -> Node2D:
 		return decoy
 	if actor.projectiles == null:
 		return null
-	var found: Node2D = actor.projectiles.nearest_target(here + actor.body_offset, SIGHT, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
-	return found if _is_valid_target(found) else null
+	var from: Vector2 = here + actor.body_offset
+	for ring: float in LOOKS:
+		var found: Node2D = actor.projectiles.nearest_target(from, ring, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
+		# Found with its centre inside the ring, nothing outside it is nearer; a big body only
+		# touching the ring is checked again in the next.
+		if found != null and (ring >= SIGHT or actor.projectiles.nearest_point.distance_squared_to(from) <= ring * ring):
+			return found if _is_valid_target(found) else null
+	return null
 
 
 ## A freed node may still sit in `target` or `grudge`, hence the Variant. A downed wizard, a down

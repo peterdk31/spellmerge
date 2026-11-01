@@ -13,7 +13,8 @@ extends ActorController
 ## with every `damage_dealt` naming it): nothing here listens on the bus (performance pass,
 ## 2026-10-28). It names its home actor to Entities (`set_enemy`), so its decoys copy it and its
 ## familiars circle it, and ends them when it leaves the tree (`enemy_gone`, before the actor's
-## caster closes). The team board (`Entities.board`) lets its team stagger their attacks.
+## caster closes). The team board (`Entities.board`) lets its team stagger their attacks and tells
+## it where its teammates stand and how hurt they are.
 ##
 ## All timing runs in `think(actor, delta)`, called by the actor's step, so tests drive it with
 ## fixed deltas. Nothing here allocates per step.
@@ -35,6 +36,8 @@ const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 ## The decoys (`Entities.lure`). Only tests set it, before the actor is added; otherwise the
 ## "Entities" autoload is used.
 var entities: EntitiesScript = null
+## The team board. Only tests set it, before the actor is added; otherwise `Entities.board`.
+var board: TeamBoard = null
 ## The thinking (made once).
 var brain: AIBrain = AIBrain.new()
 
@@ -87,7 +90,10 @@ func started(actor: Actor) -> void:
 	# Seeded by the actor id, so a run with the same actors repeats (and a crowd is staggered).
 	brain.setup(actor, _profile_for(actor), maxi(actor.id, 0) * 7919 + 17)
 	brain.entities = _entities()
-	brain.board = brain.entities.board if brain.entities != null else null
+	if board != null:
+		brain.board = board
+	else:
+		brain.board = brain.entities.board if brain.entities != null else null
 	if not actor.damaged.is_connected(_on_damaged):
 		actor.damaged.connect(_on_damaged)
 	if actor.caster != null and not actor.caster.staff_built.is_connected(_on_staff_built):

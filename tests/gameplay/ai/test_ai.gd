@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_chase_walks_toward_player()
 	_test_chase_stops_without_players()
 	_test_targets_nearest_of_four()
+	_test_targets_nearest_in_every_ring()
 	_test_downed_player_is_skipped()
 	_test_downed_event_retargets_at_once()
 	_test_freed_player_is_dropped()
@@ -137,6 +138,28 @@ func _test_targets_nearest_of_four() -> void:
 	_players()[2].position = Vector2(900.0, 900.0)
 	_run(imp, int(AIController.RETARGET_TIME / STEP) + 1)
 	_check(_ai(imp).target == _players()[3], "after player 2 moves away it retargets the nearest, player 3")
+
+
+## It looks in rings, nearest first (`AIBrain.LOOKS`, enemy AI L1): the nearest of all is found
+## wherever it stands, also just past a ring's edge with a farther one inside the next ring.
+func _test_targets_nearest_in_every_ring() -> void:
+	_setup(3)
+	var cases: Array[Array] = [
+		# Where the three players stand, and which is nearest.
+		[Vector2(1800.0, 0.0), Vector2(0.0, 2000.0), Vector2(-1900.0, 0.0), 0],
+		[Vector2(1800.0, 0.0), Vector2(0.0, 470.0), Vector2(-490.0, 0.0), 1],
+		[Vector2(165.0, 0.0), Vector2(0.0, 185.0), Vector2(-300.0, 0.0), 0],
+		[Vector2(485.0, 0.0), Vector2(0.0, -150.0), Vector2(-200.0, 0.0), 1],
+	]
+	for row: Array in cases:
+		for index in 3:
+			_players()[index].position = row[index]
+		_fx.projectiles.step(STEP)
+		var imp := _imp()
+		imp.step(STEP)
+		_check(_ai(imp).target == _players()[row[3]], "the nearest player (%d) is chased with players at %s" % [row[3], row.slice(0, 3)])
+		_fx.enemies.erase(imp)
+		imp.free()
 
 
 func _test_downed_player_is_skipped() -> void:

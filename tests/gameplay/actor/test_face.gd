@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## and the look pick the right frames of the eye and brow sheets; down, a windup, a hit and
 ## `show_mood` win over the resting mood in that order; the layers trail the body and pop on a
 ## cast, and a teleport is not trailed; blinks come at each style's pace; glances and raised
-## brows only while idle, and never on a stray.
+## brows only while idle, and never on a stray; a glance on purpose (`glance`, the AI's call).
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_face.gd
 
@@ -112,6 +112,25 @@ func test_down_beats_a_windup_beats_a_shown_mood_beats_the_rest() -> void:
 	controller.winding = false
 	_run(1.5)
 	check_equal(face.mood(), Face.Mood.ANGRY, "the shown mood ran out: back to resting")
+
+
+func test_a_glance_looks_that_way_with_raised_brows_for_its_time() -> void:
+	var body := _wearer(Face.Style.STRAY, Face.Mood.ANGRY)
+	var controller := body.controller as ActorFixture.Scripted
+	controller.aim = Vector2.RIGHT
+	var face := _face(body)
+	_world.run(1)
+	face.glance(Vector2(0.0, -30.0), 0.5)
+	_world.run(1)
+	check(face.is_calling(), "a glance on purpose")
+	check_equal(face.look(), Vector2i(0, -1), "it looks up, the way given, not along the aim")
+	check_equal(face.mood(), Face.Mood.RAISED, "with its brows raised")
+	if not face.is_shut():
+		check_equal(face.eyes_frame().x, 1, "the eye frame looks up")
+	_run(0.6)
+	check(not face.is_calling(), "for its time only")
+	check_equal(face.look(), Vector2i(1, 0), "then back along the aim")
+	check_equal(face.mood(), Face.Mood.ANGRY, "and back to resting")
 
 
 func test_a_hit_shows_worried_for_a_moment() -> void:

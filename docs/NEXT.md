@@ -34,7 +34,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Enemy AI: the brain (AI5).** (`gameplay/ai/`) After AI2, AI3, AI4.
 - [ ] **Enemy AI: measure the cost (L1).** (`tests/benchmark/`, `docs/`) [M2-enemy-ai.md](milestones/M2-enemy-ai.md), "What is left", L1. First.
 - [x] **Enemy AI: heal ally (L2).** (`gameplay/ai/`, `core/spells/`) "What is left", L2. Done: `plan_target`, the board's reports, `behaviours/heal_ally.gd`, `CastSense.heals_self`; the combo test casts the heal-only combo.
-- [ ] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4. Spreading (L3) done.
+- [x] **Enemy AI: the TeamBoard (AI6), spreading round a target (L3) and the call (L4).** (`gameplay/ai/`, `gameplay/actor/` Face) Staggered fire is built (`TeamBoard.beat`); "What is left", L3 and L4. Done: spreading (slots round a target, `keep range` walks to them) and the call (`State.CALL`, `Face.glance`, `beat` above 1 near a call).
 - [x] **Enemy AI: phases (AI7).** (`gameplay/actor/`, `gameplay/ai/`) After AI5.
 - [x] **Enemy AI: the enemy arena (AI8).** (`gameplay/flow/`, `hud/menus/pause/`, `core/events/`) After AI4.
 - [ ] **Enemy AI: enemies telegraph, allies don't; bots on the brain (AI9, L5).** (`gameplay/ai/`, `core/base/`, `tests/bots/`) "What is left", L5: first the rule (an AI on the players' team winds up nothing; owner, 2026-11-01), then pressing on, then the bots, measured over ten smoke runs.

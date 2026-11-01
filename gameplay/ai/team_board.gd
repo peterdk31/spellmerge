@@ -21,6 +21,11 @@ extends RefCounted
 ## where they already stand (the mean of their angles less their slots'), so each walks the least
 ## and none crosses another (`attackers`, `slot_angle`).
 ##
+## **The call:** an AI about to start a windup with a teammate within CALL_REACH (`nearest_mate`,
+## from the reports) may first glance at it and call (`call_attack`): for CALL_TIME the teammates
+## within CALL_REACH of where it called are keener than ever to attack (`beat` above 1), so they
+## join in, and its team calls no more for CALL_GAP seconds (`can_call`).
+##
 ## Everything is in small packed arrays made once, a row per team: nothing is allocated after
 ## `_init`.
 
@@ -37,6 +42,12 @@ const HURT: float = 0.7
 const ATTACKS: int = 16
 const NOTE_LIFE: float = 2.0
 const RECOUNT: float = 0.25
+## The call: seconds it lasts, how near (pixels) a teammate must be to glance at or to join in,
+## seconds before the team calls again, and how much keener a teammate that joins is (× teamwork).
+const CALL_TIME: float = 0.5
+const CALL_REACH: float = 160.0
+const CALL_GAP: float = 3.0
+const CALL_BOOST: float = 0.5
 
 ## Seconds it has run (moved on by `step`).
 var clock: float = 0.0
@@ -62,6 +73,10 @@ var _att_angle: PackedFloat32Array = PackedFloat32Array()
 var _theta: PackedFloat32Array = PackedFloat32Array()
 var _rank: PackedInt32Array = PackedInt32Array()
 var _recount_left: float = 0.0
+## Each team's last call: who called, where it stood and when.
+var _call_who: PackedInt32Array = PackedInt32Array()
+var _call_at: PackedVector2Array = PackedVector2Array()
+var _call_when: PackedFloat32Array = PackedFloat32Array()
 
 
 func _init() -> void:
@@ -80,14 +95,19 @@ func _init() -> void:
 	_att_angle.resize(TEAMS * ATTACKS)
 	_theta.resize(ATTACKS)
 	_rank.resize(ATTACKS)
+	_call_who.resize(TEAMS)
+	_call_at.resize(TEAMS)
+	_call_when.resize(TEAMS)
 	clear()
 
 
-## Forget every team's last windup, every report and every attack (a new room).
+## Forget every team's last windup, every report, every attack and every call (a new room).
 func clear() -> void:
 	for team in TEAMS:
 		_last_start[team] = -INF
 		_last_actor[team] = -1
+		_call_who[team] = -1
+		_call_when[team] = -INF
 	_who.fill(-1)
 	_when.fill(-INF)
 	_att_who.fill(-1)
@@ -111,10 +131,15 @@ func started(team: int, who: int) -> void:
 	_last_actor[team] = who
 
 
-## How keen `who` of `team` may be to start an attack now, 0-1: 1, less just after a teammate
-## started one (by up to `teamwork`).
-func beat(team: int, who: int, teamwork: float) -> float:
-	if team < 0 or team >= TEAMS or _last_actor[team] == who or teamwork <= 0.0:
+## How keen `who` of `team`, standing at `at`, may be to start an attack now: above 1 while a
+## teammate's call within CALL_REACH of it lasts (by up to CALL_BOOST × `teamwork`), else 1, less
+## just after a teammate started one (by up to `teamwork`).
+func beat(team: int, who: int, teamwork: float, at: Vector2 = Vector2.INF) -> float:
+	if team < 0 or team >= TEAMS or teamwork <= 0.0:
+		return 1.0
+	if is_calling(team) and _call_who[team] != who and at.distance_squared_to(_call_at[team]) <= CALL_REACH * CALL_REACH:
+		return 1.0 + CALL_BOOST * teamwork
+	if _last_actor[team] == who:
 		return 1.0
 	var since: float = clock - _last_start[team]
 	if since >= BEAT or since < 0.0:
@@ -277,3 +302,45 @@ func _attack_slot_for(base: int, who: int) -> int:
 		if _att_when[row] < _att_when[base + oldest]:
 			oldest = slot
 	return free if free >= 0 else oldest
+
+
+## True when `team` may call now: no call of its own in the last CALL_GAP seconds.
+func can_call(team: int) -> bool:
+	return team >= 0 and team < TEAMS and clock - _call_when[team] >= CALL_GAP
+
+
+## The actor `who` of `team`, standing at `at`, calls its teammates to attack now.
+func call_attack(team: int, who: int, at: Vector2) -> void:
+	if team < 0 or team >= TEAMS:
+		return
+	_call_who[team] = who
+	_call_at[team] = at
+	_call_when[team] = clock
+
+
+## True while a call of `team` lasts (CALL_TIME).
+func is_calling(team: int) -> bool:
+	return team >= 0 and team < TEAMS and clock - _call_when[team] < CALL_TIME
+
+
+## When `team` last called (seconds on `clock`; -INF for never): a brain that sees a newer call
+## decides at once.
+func called_at(team: int) -> float:
+	return _call_when[team] if team >= 0 and team < TEAMS else -INF
+
+
+## Of the reports of `team` (not `who`'s), where the nearest teammate within `reach` of `at`
+## stood; Vector2.INF for none.
+func nearest_mate(team: int, who: int, at: Vector2, reach: float) -> Vector2:
+	var best: Vector2 = Vector2.INF
+	var nearest: float = reach * reach
+	for slot in PLACES:
+		var mate_id: int = mate(team, slot)
+		if mate_id < 0 or mate_id == who:
+			continue
+		var there: Vector2 = _at[team * PLACES + slot]
+		var far: float = at.distance_squared_to(there)
+		if far <= nearest:
+			nearest = far
+			best = there
+	return best

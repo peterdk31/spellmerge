@@ -18,9 +18,11 @@ extends RefCounted
 ## (`intent.press`), CHANNEL (a cast that goes on while held: hold the button while the target
 ## stays in its lane, the mana lasts and `channel_max` is not up, turning after the target at
 ## `track_speed`), RECOVER (stand, the aim locked; a shot about to hit may still make it dodge),
-## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear) and TRANSITION (a
-## boss changing phase: stand). The windup starts only when the cast can leave within it
-## (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
+## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear), TRANSITION (a
+## boss changing phase: stand) and CALL (before a windup, with teamwork, a teammate near: it
+## glances at the teammate for `TeamBoard.CALL_TIME`, its Face's brows raised, and the board's call
+## makes the teammates near keener to join in; then it winds up). The windup starts only when the
+## cast can leave within it (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
 ## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
 ## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
 ##
@@ -29,7 +31,7 @@ extends RefCounted
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
-enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION }
+enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION, CALL }
 ## How a plan walks: stand, toward or away from the target, or a set way (`plan_way`).
 enum Move { STAND, TOWARD, AWAY, WAY }
 
@@ -167,6 +169,10 @@ var _strafe_side: float = 1.0
 ## Instance id of `target` when it was chosen, or 0 for none; `target` typed when an actor.
 var _target_id: int = 0
 var _target_actor: Actor = null
+## The actor's Face (the actor kit's), for the call's glance; null without one.
+var _face: Face = null
+## The last call of its team it has heard (`TeamBoard.called_at`).
+var _heard_call: float = -INF
 ## Its slot on the board at its last report and at its last noted attack (-1 for none).
 var _report_slot: int = -1
 var _attack_slot: int = -1
@@ -180,6 +186,11 @@ func setup(with_actor: Actor, with_profile: AIProfile, seed_value: int) -> void:
 	rng.seed = seed_value
 	_retarget_offset = RETARGET_TIME * float(absi(seed_value) % 8) / 8.0
 	_strafe_side = 1.0 if seed_value % 2 == 0 else -1.0
+	_face = null
+	for child in actor.get_children():
+		if child is Face:
+			_face = child as Face
+			break
 	var count: int = AIBehaviours.all().size()
 	if picks.size() != count:
 		picks.resize(count)
@@ -223,6 +234,10 @@ func think(delta: float, intent: ActorIntent) -> void:
 	intent.move = Vector2.ZERO
 	match state:
 		State.CHASE:
+			if board != null and profile.teamwork > 0.0 and board.called_at(actor.team()) > _heard_call:
+				# A teammate called: decide at once whether to join in.
+				_heard_call = board.called_at(actor.team())
+				_decide_now = true
 			if _decide_left <= 0.0 or _decide_now:
 				_perceive()
 				_decide()
@@ -259,6 +274,8 @@ func think(delta: float, intent: ActorIntent) -> void:
 			_state_left -= delta
 			if _state_left <= 0.0:
 				_to_chase()
+		State.CALL:
+			_call(delta, intent)
 
 
 ## True from the start of a windup until its cast leaves: the attack is coming.
@@ -401,7 +418,7 @@ func cover_from_target() -> Vector2:
 func team_beat() -> float:
 	if board == null or actor == null:
 		return 1.0
-	return board.beat(actor.team(), actor.id, profile.teamwork)
+	return board.beat(actor.team(), actor.id, profile.teamwork, actor.global_position)
 
 
 ## Behaviours ask: how far round its target its slot is from where it stands (radians, 0 to PI);
@@ -629,7 +646,52 @@ func _chase(intent: ActorIntent) -> void:
 	if not actor.caster.cast_ready(windup, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
+	if _begin_call(windup, intent):
+		return
 	_begin_windup(plan_staff, windup, aim_way, intent)
+
+
+## Before an attack that winds up, with teamwork (as often as `teamwork`), its team not calling
+## lately and a teammate within `TeamBoard.CALL_REACH` on the board: it calls (CALL). Returns
+## whether it did.
+func _begin_call(windup: float, intent: ActorIntent) -> bool:
+	if board == null or profile.teamwork <= 0.0 or windup <= 0.0 or plan_target != null:
+		return false
+	var team: int = actor.team()
+	if not board.can_call(team) or board.is_calling(team):
+		return false
+	var sense: CastSense = _sense_of(plan_staff)
+	if sense == null or not sense.harms():
+		return false
+	var mate: Vector2 = board.nearest_mate(team, actor.id, actor.global_position, TeamBoard.CALL_REACH)
+	if mate == Vector2.INF or rng.randf() >= profile.teamwork:
+		return false
+	state = State.CALL
+	_state_left = TeamBoard.CALL_TIME
+	intent.move = Vector2.ZERO
+	board.call_attack(team, actor.id, actor.global_position)
+	_heard_call = board.called_at(team)
+	if _face != null and is_instance_valid(_face):
+		_face.glance(mate - actor.global_position, TeamBoard.CALL_TIME)
+	return true
+
+
+## Calling: stand, aim at the target, then wind up the planned staff if it is still ready.
+func _call(delta: float, intent: ActorIntent) -> void:
+	if target == null:
+		_to_chase()
+		return
+	var now: Vector2 = target.global_position - actor.global_position
+	if now != Vector2.ZERO:
+		intent.aim = now
+	_state_left -= delta * _pace()
+	if _state_left > 0.0:
+		return
+	var windup: float = windup_for(plan_staff) if plan_staff >= 0 else 0.0
+	if plan_staff >= 0 and actor.caster != null and actor.caster.cast_ready(windup, plan_staff):
+		_begin_windup(plan_staff, windup, now, intent)
+	else:
+		_to_chase()
 
 
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:

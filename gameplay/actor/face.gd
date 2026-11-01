@@ -13,6 +13,10 @@ extends ActorLook
 ## (`ActorController.is_telegraphing`: furious, a telegraph on the face), a mood shown for a while
 ## (`show_mood`; a hit shows worried for HURT_TIME), an idle raised brow, then `resting_mood`.
 ##
+## A glance on purpose (`glance`; the enemy AI's call to a teammate, docs/milestones/M2-enemy-ai.md
+## L4): the pupils look that way and the brows are raised for its seconds, over the look from the
+## aim and the idle habits.
+##
 ## Follow-through: the eyes trail the body by LAG seconds and the brows trail the eyes the same
 ## way, at most MAX_LAG pixels each, so a hop or a stop shows in the layers for free; a jump of
 ## more than SNAP pixels (a teleport) is not trailed. A cast pops the eyes up POP_EYES pixels and
@@ -95,6 +99,9 @@ var _blink_left: float = 0.0
 var _glance_in: float = 0.0
 var _glance_left: float = 0.0
 var _glance: Vector2i = Vector2i.ZERO
+## A glance on purpose (`glance`): seconds left and the way.
+var _call_left: float = 0.0
+var _call_look: Vector2i = Vector2i.ZERO
 var _raise_in: float = 0.0
 var _raise_left: float = 0.0
 ## What the layers were last set to (frames and places), so a step sets only what changed.
@@ -146,6 +153,20 @@ func show_mood(mood: Mood, seconds: float) -> void:
 	_shown_left = seconds
 
 
+## Look toward `direction` with the brows raised for `seconds` (a call to a teammate): over the
+## aim's look and the idle habits; down and a windup still win the brows. A newer one replaces it.
+func glance(direction: Vector2, seconds: float) -> void:
+	var way: Vector2 = direction.normalized()
+	_call_look = Vector2i(_lean(way.x), _lean(way.y))
+	_call_left = seconds
+	show_mood(Mood.RAISED, seconds)
+
+
+## True while a glance on purpose (`glance`) holds the pupils.
+func is_calling() -> bool:
+	return _call_left > 0.0
+
+
 ## The brows now.
 func mood() -> Mood:
 	if actor.is_down():
@@ -161,6 +182,8 @@ func mood() -> Mood:
 
 ## Where the pupils look now: -1, 0 or 1 on each axis.
 func look() -> Vector2i:
+	if _call_left > 0.0:
+		return _call_look
 	if _glance_left > 0.0:
 		return _glance
 	return Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))
@@ -197,6 +220,7 @@ func brow_offset() -> Vector2:
 func step(delta: float) -> void:
 	_pop_left = maxf(_pop_left - delta, 0.0)
 	_shown_left = maxf(_shown_left - delta, 0.0)
+	_call_left = maxf(_call_left - delta, 0.0)
 	_step_habits(delta)
 	_follow(delta)
 	# `is_shut`, `look` and `mood` written out (one `is_down` for all three): every actor wears a
@@ -204,7 +228,11 @@ func step(delta: float) -> void:
 	var down: bool = actor.is_down()
 	var column: int = BLINK_COLUMN
 	if _blink_left <= 0.0 and not down:
-		var looking: Vector2i = _glance if _glance_left > 0.0 else Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))
+		var looking: Vector2i = Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))
+		if _call_left > 0.0:
+			looking = _call_look
+		elif _glance_left > 0.0:
+			looking = _glance
 		column = (looking.y + 1) * 3 + looking.x + 1
 	var eyes: Vector2i = Vector2i(column, style)
 	if eyes != _eyes_frame:

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Working together (enemy AI L2-L4, docs/milestones/M2-enemy-ai.md, "What is left"): the team
 ## board's reports and a healer that heals its hurt teammates, never a wizard; attackers spreading
-## round their target. Real cards from the registry, enemies from the imp's scene with staffs made
+## round their target; the call before a group attack. Real cards from the registry, enemies from the imp's scene with staffs made
 ## here, stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_team.gd
@@ -182,3 +182,98 @@ func test_with_no_teamwork_they_do_not_spread() -> void:
 	var apart: float = _closest_pair(bodies)
 	check(apart < 30.0, "they stay side by side: %.0f" % apart)
 	check_equal(Fixture.ai(bodies[0]).brain.attackers, 0, "and count nobody")
+
+
+## An imp that stands where it is (no walk) with a fire bolt and pools to spare, health to spare,
+## at `at`, playing with `teamwork`.
+func _standing_imp(at: Vector2, teamwork: float) -> Actor:
+	var profile: AIProfile = Fixture.exact().duplicate() as AIProfile
+	profile.teamwork = teamwork
+	var data: EnemyBase = Fixture.staffed([["fire", "bolt"]])
+	data.max_health = 1000.0
+	data.move_speed = 0.0
+	var body: Actor = Fixture.ImpData.scene.instantiate() as Actor
+	Fixture.ai(body).profile = profile
+	body.data = data
+	body.position = at
+	fx.wire(body)
+	root.add_child(body)
+	body.set_physics_process(false)
+	fx.enemies.append(body)
+	return body
+
+
+## Two imps side by side, 60 px apart, the wizard out of their reach; once they have told the
+## board where they stand, the wizard steps in front of them (neither is in the other's line).
+func _two_imps(teamwork: float) -> Array[Actor]:
+	fx.players[0].position = Vector2(2000.0, 0.0)
+	fx.players[0].health.protect(1000.0)
+	var bodies: Array[Actor] = [_standing_imp(Vector2(-120.0, -30.0), teamwork), _standing_imp(Vector2(-120.0, 30.0), teamwork)]
+	fx.run_all(16)
+	fx.players[0].position = Vector2.ZERO
+	return bodies
+
+
+func _face(body: Actor) -> Face:
+	return body.get_node(^"Face") as Face
+
+
+func test_a_call_makes_teammates_near_keener() -> void:
+	var board := TeamBoard.new()
+	board.step(TeamBoard.CALL_GAP)
+	check(board.can_call(1), "a team may call")
+	board.call_attack(1, 7, Vector2.ZERO)
+	check(board.is_calling(1), "the call lasts")
+	check(not board.can_call(1), "and the team calls no more for a while")
+	check(board.beat(1, 8, 1.0, Vector2(50.0, 0.0)) > 1.0, "a teammate near the call joins in")
+	check_equal(board.beat(1, 8, 1.0, Vector2(TeamBoard.CALL_REACH * 2.0, 0.0)), 1.0, "one far from it does not")
+	check_equal(board.beat(1, 7, 1.0, Vector2.ZERO), 1.0, "nor the one that called")
+	check_equal(board.beat(1, 8, 0.0, Vector2.ZERO), 1.0, "nor one with no teamwork")
+	check_equal(board.beat(2, 8, 1.0, Vector2.ZERO), 1.0, "nor another team")
+	board.step(TeamBoard.CALL_TIME)
+	check(not board.is_calling(1), "the call is over after CALL_TIME")
+	check_equal(board.beat(1, 8, 1.0, Vector2(50.0, 0.0)), 1.0, "and so is joining in")
+	check_equal(board.nearest_mate(1, 7, Vector2.ZERO, 100.0), Vector2.INF, "with no reports there is no teammate to glance at")
+	board.report(1, 8, Vector2(40.0, 0.0), 1.0)
+	board.report(1, 9, Vector2(90.0, 0.0), 1.0)
+	check_equal(board.nearest_mate(1, 7, Vector2.ZERO, 100.0), Vector2(40.0, 0.0), "the nearest teammate on the board")
+
+
+func test_a_called_teammate_joins_within_a_beat() -> void:
+	var bodies: Array[Actor] = _two_imps(1.0)
+	var caller: int = -1
+	var called_at: float = -1.0
+	var joined_at: float = -1.0
+	var glanced: bool = false
+	var time: float = 0.0
+	for i in 32:
+		fx.run_all(1)
+		time += Fixture.STEP
+		for at in 2:
+			var brain: AIBrain = Fixture.ai(bodies[at]).brain
+			if caller < 0 and brain.state == AIBrain.State.CALL:
+				caller = at
+				called_at = time
+			if caller >= 0 and at != caller and joined_at < 0.0 and brain.state == AIBrain.State.WINDUP:
+				joined_at = time
+		if caller >= 0 and Fixture.ai(bodies[caller]).brain.state == AIBrain.State.CALL:
+			var face: Face = _face(bodies[caller])
+			var other: Actor = bodies[1 - caller]
+			glanced = glanced or (face.mood() == Face.Mood.RAISED and face.look().y == signi(int(other.position.y - bodies[caller].position.y)))
+	check(caller >= 0, "one of them calls before it winds up")
+	check(glanced, "glancing at the other, brows raised")
+	check(joined_at >= 0.0 and joined_at - called_at <= TeamBoard.BEAT, "the other starts its windup within a beat: called %.2f, joined %.2f" % [called_at, joined_at])
+
+
+func test_with_no_teamwork_nobody_calls() -> void:
+	var bodies: Array[Actor] = _two_imps(0.0)
+	var windups: int = 0
+	for i in 48:
+		fx.run_all(1)
+		for body in bodies:
+			var brain: AIBrain = Fixture.ai(body).brain
+			check(brain.state != AIBrain.State.CALL, "nobody calls")
+			if brain.state == AIBrain.State.WINDUP:
+				windups += 1
+	check(windups > 0, "they attack all the same")
+	check(not fx.board.is_calling(1) and fx.board.called_at(1) == -INF, "the board has no call")

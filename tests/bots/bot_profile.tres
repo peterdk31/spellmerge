@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="AIProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/ai_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+name = "bot"
+aggression = 1.0
+caution = 0.2
+accuracy = 0.95
+lead = 0.5
+reaction = 0.1
+dodge = 0.8
+rest_scale = 0.0
+press_on = 1.0
+commitment = 0.3
+randomness = 0.0
+teamwork = 0.0

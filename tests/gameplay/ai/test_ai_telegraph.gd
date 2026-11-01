@@ -4,6 +4,8 @@ extends "res://tests/support/suite.gd"
 ## locked, the line, lane and arrowhead show where the shot goes and how close it is, and the
 ## windup and hurt poses never change when damage lands. The strays' faces carry their mood
 ## (living staffs H5), so no stray has pose strips; the poses are tested on strips made in code.
+## Enemies telegraph, allies don't (owner, 2026-11-01): the same AI on the players' team casts the
+## step its staff is ready, with no telegraph and no furious face.
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -204,3 +206,64 @@ func test_hurt_pose_also_shows_while_recovering() -> void:
 	check(sprite.texture == Fixture.look(imp).hurt_texture, "a hit while recovering shows the hurt pose")
 	fx.run(imp, int(CreatureLook.HURT_TIME / Fixture.STEP) + 1)
 	check(sprite.texture == idle_texture, "afterwards the idle body is back")
+
+
+# --- Enemies telegraph, allies don't (owner, 2026-11-01) --------------------------------------
+
+
+## An imp body holding `rows` (big pools) at `at`, its own AI (exact profile) playing for `team`;
+## its casts counted in `casts`.
+func _imp_of(team: int, rows: Array, at: Vector2, casts: PackedInt32Array) -> Actor:
+	var body: Actor = Fixture.ImpData.scene.instantiate() as Actor
+	Fixture.ai(body).team = team
+	body.data = Fixture.staffed(rows)
+	body.position = at
+	fx.wire(body)
+	root.add_child(body)
+	body.set_physics_process(false)
+	fx.enemies.append(body)
+	body.caster.cast_done.connect(func(staff: int, _o: Vector2, _d: Vector2) -> void: casts[staff] += 1)
+	return body
+
+
+func _face(body: Actor) -> Face:
+	for child in body.get_children():
+		if child is Face:
+			return child as Face
+	return null
+
+
+func test_an_ally_casts_the_step_its_staff_is_ready_with_no_warning() -> void:
+	var casts := PackedInt32Array([0, 0, 0, 0])
+	var foe: Actor = fx.imp(Vector2(80.0, 0.0), Fixture.staffed([]))
+	var ally: Actor = _imp_of(Fixture.ActorsScript.TEAM_WIZARDS, [["fire", "bolt"]], Vector2.ZERO, casts)
+	var mind: AIController = Fixture.ai(ally)
+	var face: Face = _face(ally)
+	check(face != null, "the imp has a face")
+	check_equal(mind.brain.windup_for(0), 0.0, "an ally's cast winds up nothing")
+	fx.run(ally, 1)
+	check(mind.target == foe, "it fights the enemy")
+	check_equal(casts[0], 1, "and casts the first step its staff is ready")
+	var warned: bool = false
+	var furious: bool = false
+	for i in 30:
+		fx.run(ally, 1)
+		warned = warned or mind.is_telegraphing() or ally.get_node("Telegraph").visible
+		furious = furious or (face != null and face.mood() == Face.Mood.FURIOUS)
+	check(casts[0] > 1, "it goes on casting: %s" % casts)
+	check(not warned, "never a telegraph")
+	check(not furious, "never a furious face")
+
+
+func test_the_same_ai_on_the_enemies_team_telegraphs() -> void:
+	var casts := PackedInt32Array([0, 0, 0, 0])
+	fx.players[0].position = Vector2(80.0, 0.0)
+	var enemy: Actor = _imp_of(Fixture.ActorsScript.TEAM_ENEMIES, [["fire", "bolt"]], Vector2.ZERO, casts)
+	var mind: AIController = Fixture.ai(enemy)
+	check(mind.brain.windup_for(0) >= AIBrain.WINDUP_MIN, "an enemy's cast winds up: %.3f" % mind.brain.windup_for(0))
+	fx.run(enemy, 1)
+	check(mind.is_telegraphing() and enemy.get_node("Telegraph").visible, "it telegraphs first")
+	check(_face(enemy).mood() == Face.Mood.FURIOUS, "with a furious face")
+	check_equal(casts[0], 0, "and casts nothing yet")
+	fx.run(enemy, int(mind.windup_time / Fixture.STEP))
+	check_equal(casts[0], 1, "then its cast leaves")

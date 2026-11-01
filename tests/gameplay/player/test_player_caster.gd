@@ -295,12 +295,12 @@ func test_a_hit_pushes_the_wizard() -> void:
 func test_siphon_refunds_mana_up_to_the_most() -> void:
 	var player: Actor = _wizard(0)
 	var caster: Caster = player.caster
-	caster.mana = 10.0
-	_world.bus.mana_refund_requested.emit(player.id, 5.0)
-	check(is_equal_approx(caster.mana, 15.0), "mana comes back, got %f" % caster.mana)
-	_world.bus.mana_refund_requested.emit(player.id, 1000.0)
-	check_equal(caster.mana, caster.max_mana, "never above the most")
-	caster.mana = 10.0
-	_world.bus.mana_refund_requested.emit(player.id + 1, 5.0)
-	_world.bus.mana_refund_requested.emit(player.id, -3.0)
-	check_equal(caster.mana, 10.0, "another caster's refund and a negative one change nothing")
+	caster.set_mana(0, 10.0)
+	_world.bus.mana_refund_requested.emit(player.id, 0, 5.0)
+	check(is_equal_approx(caster.mana_of(0), 15.0), "mana comes back, got %f" % caster.mana_of(0))
+	_world.bus.mana_refund_requested.emit(player.id, 0, 1000.0)
+	check_equal(caster.mana_of(0), caster.max_mana_of(0), "never above the most")
+	caster.set_mana(0, 10.0)
+	_world.bus.mana_refund_requested.emit(player.id + 1, 0, 5.0)
+	_world.bus.mana_refund_requested.emit(player.id, 0, -3.0)
+	check_equal(caster.mana_of(0), 10.0, "another caster's refund and a negative one change nothing")

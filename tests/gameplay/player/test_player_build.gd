@@ -140,9 +140,10 @@ func _creature(at: Vector2) -> Actor:
 	body.add_child(Mover.new())
 	var caster := Caster.new()
 	caster.staff_count = 2
-	caster.staff = _staff
+	# Its own copy of the staff, with a pool of 50 (the pool is the staff's).
+	caster.staff = _staff.duplicate() as StaffBase
+	caster.staff.max_mana = 50.0
 	caster.start_cards = [[&"bolt"], []]
-	caster.max_mana = 50.0
 	body.add_child(caster)
 	body.position = at
 	return _world.add(body)
@@ -194,7 +195,7 @@ func test_each_button_casts_its_own_staff() -> void:
 	_world.hold(0, &"staff_1")
 	_run(1)
 	check(_staff_casts.has([0, 0]), "staff_1 casts staff 1, with staff 2 still held")
-	check(player.caster.mana < player.caster.max_mana, "the casts took mana")
+	check(player.caster.mana_of(0) < player.caster.max_mana_of(0), "the casts took mana")
 
 
 func test_a_tap_just_before_the_staff_is_ready_still_casts() -> void:
@@ -225,14 +226,15 @@ func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> voi
 	_world.hold(0, &"staff_3")
 	_run(1)
 	check(_spells.is_holding(player.id, 2), "the press switches the orbit on")
-	check_equal(caster.free_mana(), caster.mana - 5.0, "its mana is held")
+	check_equal(caster.free_mana(2), caster.mana_of(2) - 5.0, "its mana is held, from its own staff's pool")
+	check_equal(caster.free_mana(0), caster.mana_of(0), "another staff's pool is not held")
 	_run(20)
 	check(_spells.is_holding(player.id, 2), "holding the button does not switch it off")
 	_world.release(0, &"staff_3")
 	_tap(0, &"staff_3")
 	_run(1)
 	check(not _spells.is_holding(player.id, 2), "a new press switches it off")
-	check_equal(caster.free_mana(), caster.mana, "and frees its mana")
+	check_equal(caster.free_mana(2), caster.mana_of(2), "and frees its mana")
 
 
 func test_a_change_request_builds_the_staff_and_is_announced() -> void:
@@ -374,8 +376,8 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	_tap(0, &"staff_1")
 	_run(1)
 	check_equal(_staff_casts, [[0, 0]], "seat 0's button casts the creature's staff, sent for seat 0")
-	check(creature.caster.mana < creature.caster.max_mana, "with the creature's mana")
-	check_equal(wizard.caster.mana, wizard.caster.max_mana, "not the wizard's")
+	check(creature.caster.mana_of(0) < creature.caster.max_mana_of(0), "with the creature's mana")
+	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "not the wizard's")
 	# Its numbers are the wizard's.
 	_stats.clear()
 	_world.hurt(creature, 10)
@@ -426,8 +428,8 @@ func test_a_wizard_no_controller_drives_is_still_its_seats_panel_and_builder() -
 	_run(1)
 	check(_stats.back()[3] < 100.0, "its mana spent shows: %s" % [_stats.back()])
 	_run(16)
-	check(wizard.caster.mana > wizard.caster.max_mana - 5.0, "it gets mana back")
-	check_equal(_stats.back()[3], float(floori(wizard.caster.mana)), "which shows too, with no controller on it")
+	check(wizard.caster.mana_of(0) > wizard.caster.max_mana_of(0) - 5.0, "it gets mana back")
+	check_equal(_stats.back()[3], float(floori(wizard.caster.mana_of(0))), "which shows too, with no controller on it")
 	check(_staff_casts.is_empty(), "a cast no seat pressed is no staff_cast")
 	_world.bus.staff_cards_requested.emit(0, 1, _ids("orbit"))
 	check_equal(wizard.caster.cards_of(1)[0], &"orbit", "seat 0's builder builds it")

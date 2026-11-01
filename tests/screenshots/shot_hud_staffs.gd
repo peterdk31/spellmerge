@@ -35,8 +35,7 @@ func take() -> void:
 	_input = root.get_node("PlayerInput")
 	_flow = root.get_node("Flow")
 	var events: Node = root.get_node("Events")
-	_flow.set("channel", "dev")
-	_flow.set("start_cards", CARDS.duplicate(true))
+	_flow.set("sandbox_cards", CARDS.duplicate(true))
 	_input.call("add_virtual_device", 0)
 	events.emit_signal("sandbox_requested", 0)
 	if not await wait_for(func() -> bool: return _flow.get("sandbox") and _flow.call("get_wizard", 0) != null):

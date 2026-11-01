@@ -59,7 +59,7 @@ func before_each() -> void:
 	_bus.target_move_requested.connect(func(player: int, target: Node, to: Vector2) -> void:
 		_target_moves.append([player, target, to]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
-	_bus.mana_refund_requested.connect(func(player: int, amount: float) -> void:
+	_bus.mana_refund_requested.connect(func(player: int, _at: int, amount: float) -> void:
 		_refunds.append([player, amount]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10

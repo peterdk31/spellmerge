@@ -16,6 +16,8 @@ var _world: Fixture = null
 var _players: Array[Actor] = []
 ## Every event as [player, health, max_health, mana, max_mana].
 var _stats: Array[Array] = []
+## Every staff_mana_changed as [player, staff, mana, max_mana].
+var _staff_mana: Array[Array] = []
 
 
 func _initialize() -> void:
@@ -26,6 +28,7 @@ func _initialize() -> void:
 	_test_nothing_changed_sends_nothing()
 	_test_mana_spent_and_regenerated()
 	_test_four_wizards_keep_their_own_numbers()
+	_test_every_staff_reports_its_own_pool()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/player (player_stats_changed)")
@@ -47,6 +50,7 @@ func _teardown() -> void:
 	_world = null
 	_players.clear()
 	_stats.clear()
+	_staff_mana.clear()
 
 
 func _setup(count: int) -> void:
@@ -54,6 +58,8 @@ func _setup(count: int) -> void:
 	_world = Fixture.new(root, true)
 	_world.bus.player_stats_changed.connect(func(p: int, h: float, mh: float, m: float, mm: float) -> void:
 		_stats.append([p, h, mh, m, mm]))
+	_world.bus.staff_mana_changed.connect(func(p: int, at: int, m: float, mm: float) -> void:
+		_staff_mana.append([p, at, m, mm]))
 	for index in count:
 		_players.append(_world.wizard(index, Vector2(40.0 * index, 0.0)))
 
@@ -64,7 +70,7 @@ func _test_sent_when_the_wizard_appears() -> void:
 	if _stats.is_empty():
 		return
 	var wizard: Actor = _players[0]
-	_check(_stats[0] == [0, wizard.health.max_health, wizard.health.max_health, wizard.caster.max_mana, wizard.caster.max_mana],
+	_check(_stats[0] == [0, wizard.health.max_health, wizard.health.max_health, wizard.caster.max_mana_of(0), wizard.caster.max_mana_of(0)],
 		"the first event carries full health and mana, got %s" % [_stats[0]])
 
 
@@ -118,3 +124,26 @@ func _test_four_wizards_keep_their_own_numbers() -> void:
 	_check(_stats.size() == 1 and _stats[0][0] == 3 and _stats[0][1] == 90, "only player 3 reports its hit, got %s" % [_stats])
 	_check(_players[0].health.health == _players[0].health.max_health and _players[1].health.health == _players[1].health.max_health,
 		"players 0 and 1 are untouched")
+
+
+## Every staff has its own pool (owner, 2026-11-01): each reports its own mana by
+## `staff_mana_changed`, and `player_stats_changed` carries the pool of the staff on show.
+func _test_every_staff_reports_its_own_pool() -> void:
+	_setup(1)
+	var wizard: Actor = _players[0]
+	var seen: Array[int] = []
+	for row: Array in _staff_mana:
+		seen.append(int(row[1]))
+	_check(seen.size() == wizard.caster.staff_count and seen.has(0) and seen.has(wizard.caster.staff_count - 1), "every staff reports its pool when the wizard appears, got %s" % [_staff_mana])
+	_world.fake.cost = 25.0
+	wizard.caster.set_staff(1, [&"bolt"] as Array[StringName])
+	_staff_mana.clear()
+	_stats.clear()
+	_check(wizard.caster.cast(1), "staff 2 casts")
+	PlayerController.of(wizard).announce_stats()
+	_check(_staff_mana.size() == 1 and _staff_mana[0][1] == 1 and _staff_mana[0][2] == wizard.caster.max_mana_of(1) - 25.0,
+		"only staff 2's pool changed, got %s" % [_staff_mana])
+	_check(wizard.caster.mana_of(0) == wizard.caster.max_mana_of(0), "staff 1's pool is untouched")
+	wizard.caster.current = 1
+	PlayerController.of(wizard).announce_stats()
+	_check(not _stats.is_empty() and _stats.back()[3] == wizard.caster.max_mana_of(1) - 25.0, "the panel's mana is the staff on show, got %s" % [_stats])

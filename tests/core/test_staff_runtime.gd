@@ -49,7 +49,7 @@ func before_each() -> void:
 	_areas.clear()
 	_reserved.clear()
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
-	_bus.mana_reserved.connect(func(player: int, amount: float) -> void: _reserved[player] = amount)
+	_bus.mana_reserved.connect(func(player: int, _at: int, amount: float) -> void: _reserved[player] = amount)
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 20

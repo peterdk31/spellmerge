@@ -56,7 +56,7 @@ var spells: Node = null
 
 ## The rows of the shown staff's cycle, each {cast, depth, trigger, slots, name, mana, damage,
 ## first}: `cast` its cast (0 first), `first` true on a cast's first row; the rest as
-## `Spells.cast_tree`, `mana` as a share of the wizard's mana in whole percent.
+## `Spells.cast_tree`, `mana` as a share of the staff's own pool in whole percent.
 var _rows: Array[Dictionary] = []
 ## Per row, the tiles drawn: their slots and their x (from the row's left), the trigger's first.
 var _tile_slots: Array[PackedInt32Array] = []
@@ -76,7 +76,7 @@ func _init() -> void:
 	clip_contents = true
 
 
-## Show the cycle of a staff view (`Spells.staff_view`), with mana as shares of `max_mana`.
+## Show the cycle of a staff view (`Spells.staff_view`), with mana as shares of `max_mana` (the staff's own pool).
 func set_plan(plan: Dictionary, max_mana: float) -> void:
 	_rows.clear()
 	_cards.assign(plan.get("cards", []))

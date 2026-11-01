@@ -126,8 +126,8 @@ func _data(cards: Array[StringName]) -> EnemyBase:
 	data.staff = StaffKit.plain_staff(cards.size())
 	data.staff.cast_delay = 0.0
 	data.cards = cards
-	data.max_mana = 20.0
-	data.mana_regen = 0.0
+	data.staff.max_mana = 20.0
+	data.staff.mana_regen = 0.0
 	return data
 
 
@@ -292,7 +292,7 @@ func test_an_enemys_bolt_hits_another_enemy_in_its_way() -> void:
 	var caster := _enemy(_data([&"bolt"]), Vector2.ZERO)
 	_wizard.position = Vector2(80.0, 0.0)
 	var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 0.0))
-	blocker.caster.mana = 0.0
+	blocker.caster.set_mana(0, 0.0)
 	var health: float = _combat.health_of(blocker)
 	_run(_ai(caster).windup_time + 0.5)
 	check(_combat.health_of(blocker) < health, "the enemy in the way is hit")

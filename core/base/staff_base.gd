@@ -6,7 +6,8 @@ extends Resource
 ## (face style and resting brows) that comes with it. Every player holds four, one per button. A staff is a `.tres` in its own
 ## folder under `content/wizard/staffs/`; the registry finds it under `wizard` by `id`.
 ## Which cards sit in the slots is the player's, not the staff's: a staff is shared,
-## read-only data, like a card.
+## read-only data, like a card. The mana a staff holds now is its holder's (`Caster.mana_of`);
+## the staff sets the pool's size and regen.
 
 ## Unique name, also the folder name.
 @export var id: StringName = &""
@@ -23,6 +24,11 @@ extends Resource
 ## Degrees a shot may leave off its line, either side, at random (seeded per cast); 0 aims true.
 ## The carriers of a multicast leave along one aim, so only this sets them apart.
 @export var spread: float = 0.0
+## The staff's own mana pool, full when its holder enters play, and the mana it gets back a
+## second (owner, 2026-11-01: every staff has its own pool; a cast of this staff pays from it
+## alone, its sustained cards hold part of it, siphon on its shots refills it).
+@export var max_mana: float = 100.0
+@export var mana_regen: float = 10.0
 
 ## The body while this staff is shown (a player's floating staff): a sheet of 48x48 frames, one
 ## column per direction (16, clockwise from pointing right), one row per ramp (the player
@@ -46,6 +52,8 @@ func ranges() -> Dictionary:
 		"recharge": Vector2(0.0, 5.0),
 		"spread": Vector2(0.0, 45.0),
 		"tip": Vector2(0.0, 32.0),
+		"max_mana": Vector2(0.0, 1000000.0),
+		"mana_regen": Vector2(0.0, 1000000.0),
 	}
 
 

@@ -23,8 +23,10 @@ extends ActorController
 ##   presses made meanwhile are not held against the player later; while the actor is down, too.
 ## - **The panel's events** (always from the home body, also while the seat drives another actor
 ##   or another controller drives the wizard): `player_stats_changed` (when it first drives the
-##   wizard and each time it comes home, on a health change and when mana crosses a whole number:
-##   the mana is looked at each step, in `think` or, while away, `watch_home`, so a regen shows a
+##   wizard and each time it comes home, on a health change, when the mana of the staff on show
+##   crosses a whole number and when another staff goes on show; every staff has its own pool),
+##   `staff_mana_changed` (each staff's pool, when it crosses a whole number): the mana is looked
+##   at each step, in `think` or, while away, `watch_home`, so a regen shows a
 ##   step later), `staff_changed` with the plain view of every built staff (`Caster.plan_of`),
 ##   `bag_changed` and `build_refused`.
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
@@ -96,6 +98,10 @@ var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
 var _sent_health: float = -1.0
 var _sent_mana: int = -1
+var _sent_shown: int = -1
+## What the last `staff_mana_changed` of each staff said (its whole mana; -1: not sent yet).
+var _sent_staff_mana: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
+var _sent_staff_max: PackedFloat32Array = PackedFloat32Array([-1.0, -1.0, -1.0, -1.0])
 ## True while a possession has set it aside (`set_aside`), until it drives again.
 var _aside: bool = false
 
@@ -173,6 +179,8 @@ func started(actor: Actor) -> void:
 			_on_staff_built(at)
 	_sent_health = -1
 	_sent_mana = -1
+	_sent_staff_mana.fill(-1)
+	_sent_staff_max.fill(-1.0)
 	announce_stats()
 
 
@@ -295,19 +303,31 @@ func forget_presses() -> void:
 			_seen_presses[at] = input.get_press_count(seat, CAST_ACTIONS[at])
 
 
-## Send `player_stats_changed` for the home body if its health or whole mana differ from the
-## last one sent.
+## Send `staff_mana_changed` for each staff of the home body whose whole mana or pool size
+## differs from the last one sent, and `player_stats_changed` if its health, the staff on show or that staff's
+## whole mana differ.
 func announce_stats() -> void:
 	if _home == null or not is_instance_valid(_home) or _home.events == null:
 		return
+	var caster: Caster = _home.caster
+	if caster != null:
+		for at in mini(caster.staff_count, STAFF_COUNT):
+			var whole: int = floori(caster.mana_of(at))
+			var most: float = caster.max_mana_of(at)
+			if whole != _sent_staff_mana[at] or most != _sent_staff_max[at]:
+				_sent_staff_mana[at] = whole
+				_sent_staff_max[at] = most
+				_home.events.staff_mana_changed.emit(seat, at, float(whole), most)
 	var health: float = _home.health.health if _home.health != null else 0.0
 	var max_health: float = _home.health.max_health if _home.health != null else 0.0
-	var whole_mana: int = floori(_home.caster.mana) if _home.caster != null else 0
-	if health == _sent_health and whole_mana == _sent_mana:
+	var shown: int = caster.current if caster != null else 0
+	var whole_mana: int = floori(caster.mana_of(shown)) if caster != null else 0
+	if health == _sent_health and whole_mana == _sent_mana and shown == _sent_shown:
 		return
 	_sent_health = health
 	_sent_mana = whole_mana
-	var max_mana: float = _home.caster.max_mana if _home.caster != null else 0.0
+	_sent_shown = shown
+	var max_mana: float = caster.max_mana_of(shown) if caster != null else 0.0
 	_home.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
 
 

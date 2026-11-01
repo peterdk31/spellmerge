@@ -63,12 +63,12 @@ func test_a_press_casts_from_the_staff_tip_along_the_aim_and_pays() -> void:
 	var casts: Array = []
 	wizard.caster.cast_done.connect(func(staff: int, origin: Vector2, direction: Vector2) -> void: casts.append([staff, origin, direction]))
 	_world.run(1)
-	var mana: float = wizard.caster.mana
+	var mana: float = wizard.caster.mana_of(0)
 	_press(wizard)
 	wizard.step(Fixture.STEP)
 	check_equal(casts, [[0, Vector2(114.0, 90.0), Vector2.RIGHT]], "cast from the tip along the aim")
 	check(_world.projectiles.get_count() > 0, "a shot flies")
-	check(wizard.caster.mana < mana, "mana was paid")
+	check(wizard.caster.mana_of(0) < mana, "mana was paid")
 	check_equal(wizard.caster.last_form(0), &"bolt", "the carrier is named")
 
 
@@ -105,20 +105,53 @@ func test_a_down_actor_cannot_cast() -> void:
 func test_mana_comes_back_up_to_the_most_and_siphon_refunds_it() -> void:
 	_world = Fixture.new(root)
 	var wizard: Actor = _seated(1, [[&"bolt"]])
-	wizard.caster.mana = 10.0
+	wizard.caster.set_mana(0, 10.0)
 	_world.run(16)
-	check(is_equal_approx(wizard.caster.mana, 10.0 + wizard.caster.regen), "a second of regen: %f" % wizard.caster.mana)
-	_world.bus.mana_refund_requested.emit(wizard.id, 5.0)
-	check(is_equal_approx(wizard.caster.mana, 15.0 + wizard.caster.regen), "siphon refunds its actor id")
-	_world.bus.mana_refund_requested.emit(wizard.id + 1, 5.0)
-	_world.bus.mana_refund_requested.emit(wizard.id, -3.0)
-	check(is_equal_approx(wizard.caster.mana, 15.0 + wizard.caster.regen), "another number's or a negative refund changes nothing")
-	_world.bus.mana_refund_requested.emit(wizard.id, 1000.0)
-	check_equal(wizard.caster.mana, wizard.caster.max_mana, "never above the most")
+	check(is_equal_approx(wizard.caster.mana_of(0), 10.0 + wizard.caster.staff_of(0).mana_regen), "a second of regen: %f" % wizard.caster.mana_of(0))
+	_world.bus.mana_refund_requested.emit(wizard.id, 0, 5.0)
+	check(is_equal_approx(wizard.caster.mana_of(0), 15.0 + wizard.caster.staff_of(0).mana_regen), "siphon refunds its actor id")
+	_world.bus.mana_refund_requested.emit(wizard.id + 1, 0, 5.0)
+	_world.bus.mana_refund_requested.emit(wizard.id, 0, -3.0)
+	check(is_equal_approx(wizard.caster.mana_of(0), 15.0 + wizard.caster.staff_of(0).mana_regen), "another number's or a negative refund changes nothing")
+	_world.bus.mana_refund_requested.emit(wizard.id, 0, 1000.0)
+	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "never above the most")
 	var imp: Actor = _creature([[&"fire", &"bolt"]])
-	imp.caster.mana = 10.0
-	_world.bus.mana_refund_requested.emit(imp.id, 5.0)
-	check(is_equal_approx(imp.caster.mana, 15.0), "a creature's refund comes by the same event: %f" % imp.caster.mana)
+	imp.caster.set_mana(0, 10.0)
+	_world.bus.mana_refund_requested.emit(imp.id, 0, 5.0)
+	check(is_equal_approx(imp.caster.mana_of(0), 15.0), "a creature's refund comes by the same event: %f" % imp.caster.mana_of(0))
+
+
+## Every staff has its own pool (owner, 2026-11-01), sized by the staff: a cast of one staff
+## pays from its pool alone, each pool fills at its own staff's regen up to its own maximum,
+## and a siphon refund goes to the staff whose shot hit.
+func test_every_staff_has_its_own_pool() -> void:
+	_world = Fixture.new(root)
+	var wizard: Actor = _seated(0, [[&"bolt"], [&"bolt"]])
+	var small := StaffBase.new()
+	small.max_mana = 20.0
+	small.mana_regen = 0.0
+	var big := StaffBase.new()
+	big.max_mana = 300.0
+	big.mana_regen = 30.0
+	wizard.caster.staffs = [small, big] as Array[StaffBase]
+	check_equal(wizard.caster.max_mana_of(0), 20.0, "staff 1's pool is its staff's")
+	check_equal(wizard.caster.max_mana_of(1), 300.0, "staff 2's pool is its staff's")
+	wizard.caster.set_mana(0, 20.0)
+	wizard.caster.set_mana(1, 300.0)
+	_press(wizard, 1)
+	_world.run(1)
+	check(wizard.caster.mana_of(1) < 300.0, "staff 2's cast paid from staff 2's pool")
+	check_equal(wizard.caster.mana_of(0), 20.0, "staff 1's pool is untouched")
+	wizard.caster.set_mana(0, 5.0)
+	wizard.caster.set_mana(1, 100.0)
+	_world.run(60)
+	check_equal(wizard.caster.mana_of(0), 5.0, "a staff with no regen gets nothing back")
+	check(wizard.caster.mana_of(1) > 125.0, "the other fills at its own staff's regen: %f" % wizard.caster.mana_of(1))
+	_world.bus.mana_refund_requested.emit(wizard.id, 0, 100.0)
+	check_equal(wizard.caster.mana_of(0), 20.0, "a refund fills its own staff's pool, up to its most")
+	wizard.caster.set_mana(1, 0.0)
+	check(not wizard.caster.cast(1), "an empty pool refuses its staff's cast")
+	check(wizard.caster.cast(0), "while another staff's pool still pays")
 
 
 func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
@@ -134,8 +167,9 @@ func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
 	_world.run(1)
 	check(not imp.caster.cast_ready(0.1), "not within its delay")
 	check(imp.caster.cast_ready(_world.spells.cooldown_left(imp.caster_number(), 0)), "but within a windup as long as it")
-	imp.caster.mana = 0.0
-	imp.caster.regen = 0.0
+	imp.caster.staff = imp.caster.staff.duplicate() as StaffBase
+	imp.caster.staff.mana_regen = 0.0
+	imp.caster.set_mana(0, 0.0)
 	check(not imp.caster.cast_ready(5.0), "never without the mana")
 
 

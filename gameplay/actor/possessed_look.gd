@@ -101,11 +101,14 @@ func health_pixels() -> int:
 	return _pixels(float(actor.health.health) / float(actor.health.max_health))
 
 
-## The mana bar's filled pixels (0 to BAR_WIDTH).
+## The mana bar's filled pixels (0 to BAR_WIDTH): the pool of the staff on show.
 func mana_pixels() -> int:
-	if actor == null or actor.caster == null or actor.caster.max_mana <= 0.0:
+	if actor == null or actor.caster == null:
 		return 0
-	return _pixels(actor.caster.mana / actor.caster.max_mana)
+	var shown: int = actor.caster.current
+	if actor.caster.max_mana_of(shown) <= 0.0:
+		return 0
+	return _pixels(actor.caster.mana_of(shown) / actor.caster.max_mana_of(shown))
 
 
 func _pixels(share: float) -> int:

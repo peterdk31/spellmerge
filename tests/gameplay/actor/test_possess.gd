@@ -121,11 +121,11 @@ func test_a_wizard_possesses_the_imp_its_bolt_hits_and_casts_its_staff_from_the_
 	check(not _stats.has([0, 50, 50]), "seat 0's numbers never become the imp's: %s" % [_stats])
 	# The seat's first button casts the imp's staff, with the imp's mana.
 	_staff_casts.clear()
-	var mana: float = imp.caster.mana
+	var mana: float = imp.caster.mana_of(0)
 	_tap(0, &"staff_1")
 	_world.run(1)
 	check_equal(_staff_casts, [[0, 0]], "seat 0's button casts the imp's staff")
-	check(imp.caster.mana < mana, "with the imp's mana")
+	check(imp.caster.mana_of(0) < mana, "with the imp's mana")
 	# The seat's stick walks the imp; the wizard's body stands and can be hurt.
 	_world.hold(0, &"move_right")
 	_world.run(1)
@@ -184,10 +184,10 @@ func test_a_puppet_copies_the_seats_walk_aim_and_casts() -> void:
 	check(driven.velocity.x > 0.0 and puppet.velocity.x > 0.0, "both walk right: %s %s" % [driven.velocity, puppet.velocity])
 	check_equal(wizard.velocity, Vector2.ZERO, "the wizard's body stands")
 	_world.release(0, &"move_right")
-	var mana: float = puppet.caster.mana
+	var mana: float = puppet.caster.mana_of(0)
 	_tap(0, &"staff_1")
 	_world.run(2)
-	check(puppet.caster.mana < mana, "the seat's button casts the puppet's staff too")
+	check(puppet.caster.mana_of(0) < mana, "the seat's button casts the puppet's staff too")
 	check(puppet.aim.is_equal_approx(driven.aim), "in the same direction: %s %s" % [puppet.aim, driven.aim])
 
 
@@ -472,8 +472,8 @@ func test_the_panel_shows_the_home_wizards_live_health_while_the_seat_drives_an_
 	_tap(0, &"staff_1")
 	_world.run(1)
 	hud.step_staffs()
-	check(imp.caster.mana < imp.caster.max_mana, "seat 0's button casts the imp's staff")
-	check_equal(wizard.caster.mana, wizard.caster.max_mana, "not the wizard's")
+	check(imp.caster.mana_of(0) < imp.caster.max_mana_of(0), "seat 0's button casts the imp's staff")
+	check_equal(wizard.caster.mana_of(0), wizard.caster.max_mana_of(0), "not the wizard's")
 
 
 func test_the_panel_keeps_the_players_live_stats_while_an_ai_drives_the_wizard() -> void:
@@ -490,12 +490,12 @@ func test_the_panel_keeps_the_players_live_stats_while_an_ai_drives_the_wizard()
 	_stats.clear()
 	brain.presses = [0]
 	_world.run(1)
-	check(wizard.caster.mana < wizard.caster.max_mana, "the AI cast the wizard's staff")
+	check(wizard.caster.mana_of(0) < wizard.caster.max_mana_of(0), "the AI cast the wizard's staff")
 	var mana_label := panel.find_child("ManaValue", true, false) as Label
-	check_equal(mana_label.text, str(floori(wizard.caster.mana)), "the panel's mana is the wizard's, live")
-	var before: int = floori(wizard.caster.mana)
+	check_equal(mana_label.text, str(floori(wizard.caster.mana_of(0))), "the panel's mana is the wizard's, live")
+	var before: int = floori(wizard.caster.mana_of(0))
 	_world.run(16)
-	check(floori(wizard.caster.mana) > before and mana_label.text == str(floori(wizard.caster.mana)),
+	check(floori(wizard.caster.mana_of(0)) > before and mana_label.text == str(floori(wizard.caster.mana_of(0))),
 		"and its regen too, with no seat driving it: %s" % mana_label.text)
 	check_equal(panel.status_text(), "", "no possessed word on the panel")
 	check(not _stats.is_empty() and _stats.back()[0] == 0, "sent for seat 0")
@@ -605,7 +605,8 @@ func test_a_wizard_possesses_an_ember_imp_and_its_ai_starts_over_after() -> void
 func test_an_ember_imp_with_possess_takes_a_wizard_and_its_ai_drives_it() -> void:
 	var data := ImpData.duplicate() as EnemyBase
 	data.cards = [&"possess", &"bolt"] as Array[StringName]
-	data.max_mana = 40.0
+	data.staff = ImpData.staff.duplicate() as StaffBase
+	data.staff.max_mana = 40.0
 	var wizard := _world.wizard(0)
 	var imp := _ember_imp(Vector2(80.0, 0.0), data)
 	var mind := _mind(imp)

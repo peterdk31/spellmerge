@@ -13,6 +13,8 @@ draw = 1
 cast_delay = 0.0
 recharge = 0.0
 spread = 0.0
+max_mana = 5.0
+mana_regen = 2.0
 
 [resource]
 script = ExtResource("1_base")
@@ -23,5 +25,3 @@ move_speed = 0.0
 scene = ExtResource("2_scene")
 staff = SubResource("Resource_staff")
 cards = Array[StringName]([&"slow", &"bolt"])
-max_mana = 5.0
-mana_regen = 2.0

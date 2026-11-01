@@ -137,8 +137,8 @@ func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, 
 	data.staff = StaffKit.plain_staff(cards.size())
 	data.staff.cast_delay = delay
 	data.cards = cards
-	data.max_mana = max_mana
-	data.mana_regen = regen
+	data.staff.max_mana = max_mana
+	data.staff.mana_regen = regen
 	return data
 
 

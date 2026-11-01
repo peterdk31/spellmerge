@@ -13,6 +13,8 @@ draw = 1
 cast_delay = 0.0
 recharge = 0.0
 spread = 0.0
+max_mana = 10.0
+mana_regen = 3.0
 
 [resource]
 script = ExtResource("1_base")
@@ -24,5 +26,3 @@ contact_damage = 0
 scene = ExtResource("2_scene")
 staff = SubResource("Resource_staff")
 cards = Array[StringName]([&"fire", &"bolt"])
-max_mana = 10.0
-mana_regen = 3.0

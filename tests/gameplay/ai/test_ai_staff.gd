@@ -109,8 +109,8 @@ func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, 
 	data.staff = StaffKit.plain_staff(cards.size())
 	data.staff.cast_delay = delay
 	data.cards = cards
-	data.max_mana = max_mana
-	data.mana_regen = regen
+	data.staff.max_mana = max_mana
+	data.staff.mana_regen = regen
 	return data
 
 
@@ -167,14 +167,14 @@ func test_it_opens_an_actor_and_owns_its_body() -> void:
 	check_equal(_actors.seat_of(enemy.id), ActorsScript.NONE, "and driven by no seat")
 	check(_actors.node_of(enemy.id) == enemy, "the actor's node is the enemy")
 	check_equal(_projectiles.target_owner_of(enemy), enemy.id, "its body is its actor's, so its own spells skip it")
-	check_equal(enemy.caster.mana, 6.0, "it starts with full mana")
-	enemy.caster.mana = 1.0
-	_bus.mana_refund_requested.emit(_wizard.id, 2.0)
-	check_equal(enemy.caster.mana, 1.0, "another actor's refund is not its own")
-	_bus.mana_refund_requested.emit(enemy.id, 2.0)
-	check_equal(enemy.caster.mana, 3.0, "siphon gives its actor mana back by the event")
-	_bus.mana_refund_requested.emit(enemy.id, 100.0)
-	check_equal(enemy.caster.mana, 6.0, "never above its most")
+	check_equal(enemy.caster.mana_of(0), 6.0, "it starts with full mana")
+	enemy.caster.set_mana(0, 1.0)
+	_bus.mana_refund_requested.emit(_wizard.id, 0, 2.0)
+	check_equal(enemy.caster.mana_of(0), 1.0, "another actor's refund is not its own")
+	_bus.mana_refund_requested.emit(enemy.id, 0, 2.0)
+	check_equal(enemy.caster.mana_of(0), 3.0, "siphon gives its actor mana back by the event")
+	_bus.mana_refund_requested.emit(enemy.id, 0, 100.0)
+	check_equal(enemy.caster.mana_of(0), 6.0, "never above its most")
 	check(_spells.current_tag(enemy.id, 0) != 0, "its staff is installed")
 	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
 	var none: EnemyBase = ImpData.duplicate() as EnemyBase
@@ -190,7 +190,7 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 	check(_until_windup(enemy, 1.0), "in reach and ready, it winds up")
 	_run(_ai(enemy).windup_time + STEP)
 	check_equal(_projectiles.get_count_for(enemy.id), 1, "then its bolt flies")
-	check_equal(enemy.caster.mana, 4.0, "and it paid the cast's mana")
+	check_equal(enemy.caster.mana_of(0), 4.0, "and it paid the cast's mana")
 	_run(0.5)
 	check(_wizard.health.health < _wizard.health.max_health, "the bolt hurt the wizard through combat")
 	check_equal(_combat.health_of(enemy), ImpData.max_health, "and not the enemy that cast it")
@@ -203,7 +203,7 @@ func test_no_windup_without_the_mana_and_regen_brings_it() -> void:
 	broke.free()
 	var slow := _enemy(_data([&"bolt"], 2.0, 1.0))
 	_run(enemy_windup_and_cast(slow))
-	check(slow.caster.mana < 1.0, "the first cast spends it")
+	check(slow.caster.mana_of(0) < 1.0, "the first cast spends it")
 	check(not _until_windup(slow, 1.5), "for about two seconds it cannot afford the next")
 	check(_until_windup(slow, 1.5), "then regen brings it")
 
@@ -227,7 +227,7 @@ func test_the_windup_waits_for_the_staffs_delay() -> void:
 	check(not seen_early, "no telegraph while the delay is longer than the windup")
 	check(_ai(enemy).is_telegraphing(), "it winds up once the delay will be over in time")
 	_run(_ai(enemy).windup_time + STEP)
-	check(_projectiles.get_count_for(enemy.id) >= 1 and enemy.caster.mana <= 96.0, "and the promised cast comes")
+	check(_projectiles.get_count_for(enemy.id) >= 1 and enemy.caster.mana_of(0) <= 96.0, "and the promised cast comes")
 
 
 func test_the_telegraph_shows_the_next_casts_reach() -> void:

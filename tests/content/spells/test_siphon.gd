@@ -27,7 +27,7 @@ func _combo(id: String) -> Dictionary:
 func _play(combo: Dictionary, drop: String = "") -> Array:
 	var arena := ArenaScript.new(root)
 	var refunded: Array[float] = [0.0]
-	arena.bus.mana_refund_requested.connect(func(actor: int, amount: float) -> void:
+	arena.bus.mana_refund_requested.connect(func(actor: int, _at: int, amount: float) -> void:
 		if actor == 0:
 			refunded[0] += amount)
 	for at: Array in combo["imps"]:
@@ -80,7 +80,7 @@ func test_the_combos_hurt_and_refund_only_with_the_card() -> void:
 func test_four_players_are_refunded_each() -> void:
 	var arena := ArenaScript.new(root)
 	var refunded: Dictionary = {}
-	arena.bus.mana_refund_requested.connect(func(actor: int, amount: float) -> void:
+	arena.bus.mana_refund_requested.connect(func(actor: int, _at: int, amount: float) -> void:
 		refunded[actor] = float(refunded.get(actor, 0.0)) + amount)
 	for player in 4:
 		var at := Vector2(0.0, 150.0 * player)

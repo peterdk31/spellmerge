@@ -492,8 +492,6 @@ func _apply_data() -> void:
 	caster.staff_count = 1
 	caster.staff = data.staff
 	caster.start_cards = [data.cards]
-	caster.max_mana = data.max_mana
-	caster.regen = data.mana_regen
 
 
 func _open_id() -> void:

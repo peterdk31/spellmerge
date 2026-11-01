@@ -44,7 +44,7 @@ var _moves: Array = []
 var _areas: Array = []
 var _shown: Array[int] = []
 var _spawns: Array[int] = []
-## Every mana_refund_requested and mana_reserved as [first argument, amount].
+## Every mana_refund_requested and mana_reserved as [first argument, amount, staff].
 var _refunds: Array = []
 var _reserved: Array = []
 
@@ -67,8 +67,8 @@ func before_each() -> void:
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
 	_bus.entity_spawn_requested.connect(func(caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: _spawns.append(caster))
-	_bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void: _refunds.append([caster, amount]))
-	_bus.mana_reserved.connect(func(player: int, amount: float) -> void: _reserved.append([player, amount]))
+	_bus.mana_refund_requested.connect(func(caster: int, at: int, amount: float) -> void: _refunds.append([caster, amount, at]))
+	_bus.mana_reserved.connect(func(player: int, at: int, amount: float) -> void: _reserved.append([player, amount, at]))
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"slow", 30.0, 5.0)
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
@@ -221,7 +221,7 @@ func test_close_caster_ends_its_hold() -> void:
 	_spells.close_caster(imp)
 	check(not _spells.is_holding(imp, 0), "and off once the caster is closed")
 	check_equal(_spells.live_shots(tag), 0, "with its shot")
-	check_equal(_spells.reserved_mana(imp), 0.0, "and its mana")
+	check_equal(_spells.reserved_mana(imp, 0), 0.0, "and its mana")
 
 
 func test_close_caster_ends_its_beams_only() -> void:
@@ -428,7 +428,7 @@ func test_mana_reserved_is_not_sent_for_an_unseated_enemy() -> void:
 	var imp: int = ActorSeats.enemy(_table)
 	_build(imp, [&"hold", &"slow"])
 	_cast(imp)
-	check(_spells.reserved_mana(imp) > 0.0, "its hold reserves mana")
+	check(_spells.reserved_mana(imp, 0) > 0.0, "its hold reserves mana")
 	check(_reserved.is_empty(), "but no seat is told: %s" % [_reserved])
 
 
@@ -439,6 +439,22 @@ func test_an_enemys_siphon_is_refunded_by_event() -> void:
 	_cast(imp)
 	_tick(30)
 	check(_refunds.size() == 1 and _refunds[0][0] == imp and is_equal_approx(_refunds[0][1], 2.0), "mana_refund_requested(enemy, 2): %s" % [_refunds])
+
+
+## Every staff has its own pool (owner, 2026-11-01): a siphon refund and a hold's reservation
+## name the staff that cast, and only that staff's reservation counts against its pool.
+func test_refunds_and_reservations_name_their_staff() -> void:
+	var imp: int = ActorSeats.enemy(_table)
+	StaffKit.build(_spells, imp, 2, [&"siphon", &"bolt"] as Array[StringName])
+	_target(Vector2(80.0, 0.0), ManagerScript.LAYER_PLAYER, W0)
+	_spells.cast_staff(imp, 2, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(_refunds.size() == 1 and _refunds[0][2] == 2, "the refund goes to staff 3: %s" % [_refunds])
+	StaffKit.build(_spells, W0, 1, [&"hold", &"slow"] as Array[StringName])
+	_spells.cast_staff(W0, 1, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check(not _reserved.is_empty() and _reserved[-1][2] == 1 and _reserved[-1][1] > 0.0, "the hold reserves from staff 2: %s" % [_reserved])
+	check(_spells.reserved_mana(W0, 1) > 0.0, "staff 2 holds mana")
+	check_equal(_spells.reserved_mana(W0, 0), 0.0, "staff 1 holds none")
 
 
 func test_next_cast_mana_for_an_ai() -> void:

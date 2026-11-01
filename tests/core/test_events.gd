@@ -53,8 +53,8 @@ const EVENTS: Dictionary = {
 	&"entity_spawn_requested": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT], ["anchor", TYPE_INT]],
 	&"entity_end_requested": [["caster", TYPE_INT], ["tag", TYPE_INT]],
 	&"entity_ended": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"mana_refund_requested": [["caster", TYPE_INT], ["amount", TYPE_FLOAT]],
-	&"mana_reserved": [["player", TYPE_INT], ["amount", TYPE_FLOAT]],
+	&"mana_refund_requested": [["caster", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
+	&"mana_reserved": [["player", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"shot_blocked": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"shot_deflected": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"shield_blocked": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
@@ -74,6 +74,7 @@ const EVENTS: Dictionary = {
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
 	&"revive_progress": [["player", TYPE_INT], ["progress", TYPE_FLOAT]],
 	&"player_stats_changed": [["player", TYPE_INT], ["health", TYPE_FLOAT], ["max_health", TYPE_FLOAT], ["mana", TYPE_FLOAT], ["max_mana", TYPE_FLOAT]],
+	&"staff_mana_changed": [["player", TYPE_INT], ["staff", TYPE_INT], ["mana", TYPE_FLOAT], ["max_mana", TYPE_FLOAT]],
 	&"player_joined": [["player", TYPE_INT]],
 	&"player_left": [["player", TYPE_INT]],
 	# Run and rooms.

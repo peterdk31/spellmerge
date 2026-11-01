@@ -127,6 +127,10 @@ func _test_panel_shows_numbers() -> void:
 	_check((panel.find_child("HealthValue", true, false) as Label).text == "64", "health number is 64")
 	_check((panel.find_child("ManaValue", true, false) as Label).text == "37", "mana number is whole, 37")
 	_check(not panel.is_downed() and panel.status_text() == "", "a healthy player has no status word")
+	# Every staff has its own pool: another staff on show with the same whole mana but a bigger
+	# pool still resizes the bar.
+	panel.set_stats(64, 100, 37.8, 1000.0)
+	_check(mana_bar.max_value == 1000.0, "another staff's pool size shows, same mana: %s" % mana_bar.max_value)
 	panel.free()
 
 

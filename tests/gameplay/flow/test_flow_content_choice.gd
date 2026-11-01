@@ -22,7 +22,6 @@ func after_each() -> void:
 	flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
 	flow.enemy_id_to_play = FlowScript.DEFAULT_ENEMY_ID
 	flow.start_cards = FlowScript.DEFAULT_START_CARDS.duplicate(true)
-	flow.channel = BuildInfo.channel()
 	flow.wizard_scene = FlowScript.DefaultWizardScene
 	input.leave(0)
 
@@ -44,20 +43,27 @@ func test_an_unknown_enemy_starts_no_run() -> void:
 	check(not flow.start_run(0), "a missing enemy must not start a run")
 
 
-func test_each_channel_gets_the_four_starter_heads() -> void:
+## One staff file per setup, used as it is (owner, 2026-11-01): Play and the horde hold the four
+## basic staffs, the sandbox the dev staff on every button, in every build channel.
+func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	var registry: Node = root.get_node("Registry")
-	var dev: StaffBase = registry.call("get_resource", &"wizard", &"dev") as StaffBase
-	for name: String in ["no_such_channel", "stable", "dev", "preview"]:
-		flow.channel = name
-		var staffs: Array[StaffBase] = flow.staffs_for_channel()
-		check_equal(staffs.size(), 4, "%s: four staffs" % name)
+	var dev: StaffBase = registry.call("get_resource", &"wizard", FlowScript.DEV_STAFF) as StaffBase
+	for mode: StringName in [FlowScript.MODE_WAVES, FlowScript.MODE_HORDE, FlowScript.MODE_SANDBOX]:
+		flow.mode = mode
+		var staffs: Array[StaffBase] = flow.staffs_for_mode()
+		check_equal(staffs.size(), 4, "%s: four staffs" % mode)
 		if staffs.size() != 4:
 			continue
 		for at in 4:
-			var head: StaffBase = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
-			check(staffs[at].head == head.head and staffs[at].face_style == head.face_style, "%s: button %d has the %s head" % [name, at, flow.STARTER_HEADS[at]])
-			var slots: int = dev.slots if name == "dev" or name == "preview" else head.slots
-			check_equal(staffs[at].slots, slots, "%s: button %d has the channel's slots" % [name, at])
+			var wanted: StaffBase = dev
+			if mode != FlowScript.MODE_SANDBOX:
+				wanted = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
+			check(staffs[at] == wanted, "%s: button %d holds the %s staff itself" % [mode, at, wanted.id])
+	flow.mode = FlowScript.MODE_WAVES
+	var heads: Dictionary = {}
+	for id in FlowScript.STARTER_HEADS:
+		heads[(registry.call("get_resource", &"wizard", id) as StaffBase).head] = true
+	check_equal(heads.size(), 4, "the four basic staffs have four different heads")
 
 
 func test_other_start_cards_reach_the_wizards() -> void:

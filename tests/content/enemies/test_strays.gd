@@ -91,7 +91,7 @@ func test_each_staff_compiles_and_its_first_cast_is_affordable() -> void:
 		check(body.caster != null and body.caster.has_staff(0), "%s: its staff compiles and casts" % data.id)
 		if body.caster != null and body.caster.has_staff(0):
 			var cost: float = body.caster.next_cast_mana(0)
-			check(cost >= 0.0 and cost <= data.max_mana, "%s: the first cast (%.1f mana) fits its pool (%.1f)" % [data.id, cost, data.max_mana])
+			check(cost >= 0.0 and cost <= data.staff.max_mana, "%s: the first cast (%.1f mana) fits its pool (%.1f)" % [data.id, cost, data.staff.max_mana])
 
 
 func test_each_stray_casts_the_cards_it_was_planned_with() -> void:

@@ -19,13 +19,10 @@ extends Resource
 
 # Staffs F8 (docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy that has a staff and
 # cards attacks by casting them through core/spells like a wizard, player cards only, and pays
-# for each cast from its own mana. A new enemy type is then a sprite and a staff. Without a
+# for each cast from its staff's mana (the staff's `max_mana` and `mana_regen`). A new enemy type is then a sprite and a staff. Without a
 # staff it uses its scene's old attack (until staffs F9 moves every enemy onto staffs).
 
 ## The staff it casts (`content/wizard/staffs/`, or its own), or null for the old attack.
 @export var staff: StaffBase = null
 ## Card ids by slot, as a wizard's staff holds them (`&""` for an empty slot).
 @export var cards: Array[StringName] = []
-## Its mana pool, full when it spawns, and the mana it gets back a second.
-@export var max_mana: float = 0.0
-@export var mana_regen: float = 0.0

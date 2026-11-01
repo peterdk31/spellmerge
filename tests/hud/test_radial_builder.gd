@@ -414,8 +414,11 @@ func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 	var mana: float = 0.0
 	for cast: Dictionary in view["casts"]:
 		mana = maxf(mana, float(cast["mana"]))
-	var share: int = roundi(mana / _players[0].caster.max_mana * 100.0)
-	check_equal(radial.number_lines()[0], "Mana %d%%" % share, "the dearest cast as a share of the wizard's mana")
+	# The viewed staff (2) has its own pool: a pool of 100 here, whatever the build channel gives.
+	_bus.staff_mana_changed.emit(0, 1, 100.0, 100.0)
+	_bus.staff_mana_changed.emit(0, 0, 5.0, 5.0)
+	var share: int = roundi(mana / 100.0 * 100.0)
+	check_equal(radial.number_lines()[0], "Mana %d%%" % share, "the dearest cast as a share of the viewed staff's own pool, not another staff's")
 	check_equal(radial.hub_lines()[0], "Staff 2", "with nothing pointed at, the hub shows the staff")
 	_point(0, &"nova")
 	check(radial.number_lines()[1].contains(" > "), "a pointed card shows what RT would make of the damage: %s" % radial.number_lines()[1])
@@ -506,8 +509,12 @@ func test_the_bars_follow_the_players_stats() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	_bus.player_stats_changed.emit(0, 30.0, 120.0, 25.0, 100.0)
-	check(radial.bar_shares().is_equal_approx(Vector2(0.25, 0.25)), "health and mana as shares: %s" % radial.bar_shares())
+	for at in 4:
+		# Every staff its own pool: the viewed one (staff 2) is a quarter full, the others full.
+		_bus.staff_mana_changed.emit(0, at, 25.0 if at == 1 else 50.0, 100.0 if at == 1 else 50.0)
+	check(radial.bar_shares().is_equal_approx(Vector2(0.25, 0.25)), "health and the viewed staff's mana as shares: %s" % radial.bar_shares())
 	_bus.player_stats_changed.emit(1, 0.0, 120.0, 0.0, 100.0)
+	_bus.staff_mana_changed.emit(1, 1, 0.0, 100.0)
 	check(radial.bar_shares().is_equal_approx(Vector2(0.25, 0.25)), "another player's stats change nothing")
 
 

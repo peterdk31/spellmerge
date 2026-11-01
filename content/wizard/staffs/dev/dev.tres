@@ -11,3 +11,5 @@ draw = 1
 cast_delay = 0.0
 recharge = 0.0
 spread = 0.0
+max_mana = 1000000.0
+mana_regen = 1000000.0

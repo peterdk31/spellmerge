@@ -8,7 +8,6 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
-const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const SECONDS: float = 6.0
 ## Combos whose staffs only heal: no baseline behaviour heals yet (Heal ally comes later,
@@ -16,29 +15,17 @@ const SECONDS: float = 6.0
 const HEAL_ONLY: Array[String] = ["mend_pierce_party"]
 
 
+## The combo's staffs, by the staff each of its casts names (empty buttons in between kept).
 func _data(casts: Array) -> EnemyBase:
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.max_health = 1000.0
-	data.staffs = [] as Array[StaffCards]
-	var rows: Array = []
-	rows.resize(EnemyBase.MAX_STAFFS)
+	var rows: Array = [[], [], [], []]
 	for row: Variant in casts:
 		var at: int = int((row as Dictionary).get("staff", 0))
 		if at >= 0 and at < rows.size():
 			rows[at] = (row as Dictionary).get("cards", [])
-	for row: Variant in rows:
-		var cards: Array[StringName] = []
-		for id: Variant in (row if row is Array else []):
-			cards.append(StringName(str(id)))
-		var staff := StaffBase.new()
-		staff.slots = maxi(cards.size(), 1)
-		staff.cast_delay = 0.0
-		staff.recharge = 0.0
-		staff.max_mana = 200.0
-		staff.mana_regen = 40.0
-		data.staffs.append(StaffCards.make(staff, cards))
-	while not data.staffs.is_empty() and data.staffs[-1].cards.is_empty():
-		data.staffs.pop_back()
+	while not rows.is_empty() and (rows[-1] as Array).is_empty():
+		rows.pop_back()
+	var data: EnemyBase = Fixture.staffed(rows, 200.0, 40.0)
+	data.max_health = 1000.0
 	return data
 
 
@@ -52,13 +39,7 @@ func test_every_combo_is_played() -> void:
 		var id: String = str(row.get("id", ""))
 		var fx := Fixture.new(root)
 		fx.players[0].position = Vector2(100.0, 0.0)
-		var body: Actor = ImpData.scene.instantiate() as Actor
-		(body.get_node("AIController") as AIController).profile = Fixture.exact()
-		body.data = _data(row.get("casts", []))
-		fx.wire(body)
-		root.add_child(body)
-		body.set_physics_process(false)
-		fx.enemies.append(body)
+		var body: Actor = fx.imp(Vector2.ZERO, _data(row.get("casts", [])))
 		var cast: Array[int] = [0]
 		var walled: Array[int] = [0]
 		if body.caster != null:

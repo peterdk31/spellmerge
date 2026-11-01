@@ -131,16 +131,6 @@ func test_sandbox_is_ignored_while_a_run_is_on() -> void:
 	check_equal(flow.room_id, FlowScript.DEFAULT_ROOM_ID, "the normal room stays")
 
 
-func test_imp_wave_adds_imps_up_to_the_cap() -> void:
-	_start(2)
-	events.emit_signal("sandbox_action_requested", 1, FlowScript.ACTION_IMP_WAVE)
-	check_equal(flow.enemies_left(), FlowScript.WAVE.size(), "one press: one wave of imps")
-	for press in 10:
-		events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)
-	check_equal(flow.enemies_left(), FlowScript.WAVE_MAX, "more presses stop at WAVE_MAX imps")
-	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies are not imps")
-
-
 func test_the_enemy_arena_spawns_any_enemy_and_clears_them() -> void:
 	_start(1)
 	events.emit_signal("sandbox_spawn_requested", 0, &"storm_fork", 3)
@@ -161,12 +151,12 @@ func test_the_enemy_arena_is_only_in_the_sandbox() -> void:
 	check_equal(flow.spawn_in_sandbox(&"storm_fork", 3), 0, "Play has no arena")
 
 
-func test_clearing_the_imps_starts_no_break() -> void:
+func test_killing_the_arenas_enemies_starts_no_break() -> void:
 	_start(1)
-	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)
+	flow.spawn_in_sandbox(&"ember_imp", 5)
 	for enemy: Node in flow._enemies.duplicate():
 		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
-	check_equal(flow.enemies_left(), 0, "the imps are gone")
+	check_equal(flow.enemies_left(), 0, "the enemies are gone")
 	check_equal(cleared, 0, "no room_cleared in the sandbox")
 	check_equal(flow.build_break_left(), 0.0, "no build break")
 	check_equal(flow.state, FlowScript.State.RUNNING, "the sandbox keeps running")
@@ -189,7 +179,7 @@ func test_actions_out_of_the_sandbox_do_nothing() -> void:
 	input.add_virtual_device(0)
 	events.emit_signal("play_requested", 0)
 	var imps: int = flow.enemies_left()
-	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)
+	events.emit_signal("sandbox_spawn_requested", 0, &"ember_imp", 5)
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_RESET_DUMMIES)
 	check_equal(flow.enemies_left(), imps, "no imps added to the normal game")
 	check_equal(flow.dummies().size(), 0, "no dummies in the normal game")

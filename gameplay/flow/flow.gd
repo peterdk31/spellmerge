@@ -61,9 +61,10 @@ extends Node
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
 ## `dummy_spawns` (more spawns stand more training dummies, a group to try homing, pierce and
 ## spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
-## `sandbox_action_requested`: `imp_wave` adds a wave of imps (wave 1's size, while fewer than
-## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
-## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
+## `sandbox_action_requested`: `clear_enemies` takes the enemies the arena spawned away,
+## `reset_dummies` puts fresh dummies back; `sandbox_spawn_requested` (the enemy arena, enemy AI AI8)
+## spawns any enemy (`spawn_in_sandbox`, while fewer than WAVE_MAX are up). Clearing them starts no
+## build break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
 ## keep their staffs, instead of a restart. Its wizards hold four `dev` staffs and start with
 ## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
 ## builds on Y (the most shots) and B (a decoy turret).
@@ -135,7 +136,6 @@ const MODE_WAVES: StringName = &"waves"
 const MODE_SANDBOX: StringName = &"sandbox"
 const MODE_HORDE: StringName = &"horde"
 ## The actions of `sandbox_action_requested`.
-const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 ## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
 const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
@@ -563,15 +563,12 @@ func _start_horde(player: int) -> void:
 		mode = MODE_WAVES
 
 
-## A sandbox page's action. Ignored out of the sandbox, and an imp wave while WAVE_MAX imps
-## are up. It changes the room only, never a player's staffs or menus.
+## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
+## player's staffs or menus.
 func _on_sandbox_action_requested(player: int, action: StringName) -> void:
 	if mode != MODE_SANDBOX or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
 		return
 	match action:
-		ACTION_IMP_WAVE:
-			if _enemy_data != null and _enemies.size() < WAVE_MAX:
-				_spawn_enemies(world, _room, _enemy_data, mini(WAVE.size(), WAVE_MAX - _enemies.size()))
 		ACTION_CLEAR_ENEMIES:
 			clear_sandbox_enemies()
 		ACTION_RESET_DUMMIES:

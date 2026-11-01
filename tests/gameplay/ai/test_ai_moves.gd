@@ -15,7 +15,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const StaffKit := preload("res://tests/support/staff_kit.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
@@ -133,14 +132,7 @@ func _put(component: SpellComponent, id: StringName) -> void:
 ## Enemy data: the imp's numbers with a staff of `cards` (cast delay `delay`), `max_mana` and
 ## `regen` a second.
 func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, delay: float = 0.0) -> EnemyBase:
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.id = &"test_caster"
-	var staff: StaffBase = StaffKit.plain_staff(cards.size())
-	staff.cast_delay = delay
-	staff.max_mana = max_mana
-	staff.mana_regen = regen
-	data.staffs = [StaffCards.make(staff, cards)] as Array[StaffCards]
-	return data
+	return Fixture.staffed([cards], max_mana, regen, delay)
 
 
 ## An enemy of `data` from the imp's scene (sprite, telegraph), in the tree at `at`.

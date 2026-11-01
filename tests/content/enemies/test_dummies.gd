@@ -1,11 +1,13 @@
 extends "res://tests/support/suite.gd"
-## The sandbox dummies (staffs B7; actors since G6). The training dummy (an actor with Health, a
-## Hurtbox and its DummyLook, no controller) never dies or moves and shows damage numbers, damage
+## The sandbox dummies (staffs B7; actors since G6; on the enemy AI like every enemy, enemy AI
+## AI8). The training dummy (an actor with Health, a Hurtbox, its DummyLook and an AIController
+## with the `post` profile, no staff and no Mover) never dies or moves and shows damage numbers, damage
 ## per second over the last 5 s, its statuses and reactions; the shooting dummy (an actor driven by
 ## its AIController) stands still and fires slow, telegraphed shots at the nearest wizard (its
 ## staff: `slow · bolt`). Uses the real Combat, Events, Projectiles, Spells and Actors autoloads;
 ## time moves through the actor's step().
 
+const ActorsScript := preload("res://core/actors/actors.gd")
 const TrainingData := preload("res://content/enemies/training_dummy/training_dummy.tres")
 const ShootingData := preload("res://content/enemies/shooting_dummy/shooting_dummy.tres")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -50,6 +52,18 @@ func test_the_data_names_its_scene() -> void:
 	check_equal(ShootingData.id, &"shooting_dummy", "shooting dummy id")
 	check(TrainingData.demo and ShootingData.demo, "both are demo content, so the web preview has them")
 	check(ShootingData.move_speed == 0.0, "the shooting dummy does not walk")
+
+
+func test_the_training_dummy_plays_by_the_ai_and_stands() -> void:
+	var dummy := _training()
+	var ai := dummy.get_node("AIController") as AIController
+	check(ai != null and dummy.controller == ai, "an AI drives it, as every enemy")
+	check_equal(ai.brain.profile.name, "post", "by the post profile")
+	check_equal(dummy.team(), ActorsScript.TEAM_ENEMIES, "on the enemies' team, so enemies never target it")
+	check(dummy.caster == null and dummy.mover == null, "no staff to cast and no legs to walk")
+	for i in 20:
+		dummy.step(0.1)
+	check_equal(dummy.position, Vector2(100.0, 100.0), "so it stands where it was put")
 
 
 func test_the_training_dummy_never_dies() -> void:

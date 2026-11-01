@@ -64,7 +64,7 @@ func take() -> void:
 		return
 	for index in 4:
 		Downed.of(_flow.call("get_wizard", index) as Node).protect(60.0)
-	events.emit_signal("sandbox_action_requested", 1, &"imp_wave")
+	events.emit_signal("sandbox_spawn_requested", 1, &"ember_imp", 5)
 	await create_timer(1.0).timeout
 	var shooter: Node = (_flow.call("dummies") as Array)[1]
 	for wait in 40:

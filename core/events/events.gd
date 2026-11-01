@@ -38,7 +38,7 @@ signal effect_slots_changed(slots: int)
 signal screen_shake_changed(enabled: bool)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
-## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave`, `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
+## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
 ## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
 signal sandbox_spawn_requested(player: int, enemy_id: StringName, count: int)

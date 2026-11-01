@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="AIProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/ai_profile.gd" id="1_profile"]
+
+[resource]
+script = ExtResource("1_profile")
+name = "swarmer"
+aggression = 1.0
+caution = 0.0
+accuracy = 0.8
+lead = 0.0
+dodge = 0.0
+randomness = 0.1
+teamwork = 0.0
+reaction = 0.4

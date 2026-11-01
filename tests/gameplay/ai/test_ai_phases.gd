@@ -20,11 +20,7 @@ func after_each() -> void:
 
 
 func _entry(cards: Array[StringName]) -> StaffCards:
-	var staff := StaffBase.new()
-	staff.slots = cards.size()
-	staff.max_mana = 100.0
-	staff.mana_regen = 50.0
-	return StaffCards.make(staff, cards)
+	return Fixture.staff_entry(cards, 100.0, 50.0)
 
 
 func _boss() -> EnemyBase:

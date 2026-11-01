@@ -36,6 +36,19 @@ func test_every_enemy_is_sound() -> void:
 			check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its staff is valid" % data.id)
 
 
+func test_every_enemy_plays_by_the_enemy_ai() -> void:
+	# The dummies and the horde's swarmers too (owner, 2026-11-01): one system for every enemy.
+	for data in _enemies():
+		check(data.profile != null, "%s names a profile" % data.id)
+		var body: Node = data.scene.instantiate()
+		var ai: AIController = null
+		for child in body.get_children():
+			if child is AIController:
+				ai = child as AIController
+		check(ai != null, "%s: an AIController drives it" % data.id)
+		body.free()
+
+
 func test_more_cards_than_slots_is_caught() -> void:
 	var data := EnemyBase.new()
 	data.id = &"crook"

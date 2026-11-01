@@ -6,7 +6,6 @@ extends "res://tests/support/suite.gd"
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_brain.gd
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
-const ImpData: EnemyBase = preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 var fx: Fixture
 ## Casts per staff of the enemy under test (`Caster.cast_done`).
@@ -22,34 +21,10 @@ func after_each() -> void:
 	fx.free_all()
 
 
-## Enemy data: the imp's body with one plain staff (big pool, no delay) per row of `rows`.
-func _data(rows: Array) -> EnemyBase:
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.staffs = [] as Array[StaffCards]
-	for row: Array in rows:
-		var cards: Array[StringName] = []
-		for id: Variant in row:
-			cards.append(StringName(str(id)))
-		var staff := StaffBase.new()
-		staff.slots = cards.size()
-		staff.cast_delay = 0.0
-		staff.recharge = 0.0
-		staff.max_mana = 1000.0
-		staff.mana_regen = 1000.0
-		data.staffs.append(StaffCards.make(staff, cards))
-	return data
-
-
-## An enemy of `rows` at `at`, playing by `profile` (the exact one when null); its casts counted.
+## An enemy holding `rows` (big pools) at `at`, playing by `profile` (the exact one when null);
+## its casts counted.
 func _enemy(rows: Array, at: Vector2 = Vector2.ZERO, profile: AIProfile = null) -> Actor:
-	var body: Actor = ImpData.scene.instantiate() as Actor
-	(body.get_node("AIController") as AIController).profile = profile if profile != null else Fixture.exact()
-	body.data = _data(rows)
-	body.position = at
-	fx.wire(body)
-	root.add_child(body)
-	body.set_physics_process(false)
-	fx.enemies.append(body)
+	var body: Actor = fx.staffed_enemy(rows, at, profile)
 	if body.caster != null:
 		body.caster.cast_done.connect(func(staff: int, _o: Vector2, _d: Vector2) -> void: casts[staff] += 1)
 	return body
@@ -194,9 +169,7 @@ func test_aim_error_and_lead() -> void:
 
 func test_one_with_no_staff_only_chases() -> void:
 	fx.players[0].position = Vector2(100.0, 0.0)
-	var data: EnemyBase = ImpData.duplicate() as EnemyBase
-	data.staffs = [] as Array[StaffCards]
-	var body: Actor = fx.imp(Vector2.ZERO, data)
+	var body: Actor = fx.imp(Vector2.ZERO, Fixture.staffed([]))
 	fx.run(body, 2)
 	var brain: AIBrain = Fixture.ai(body).brain
 	check(brain.behaviour != null and brain.behaviour.name() == "chase", "it chases")

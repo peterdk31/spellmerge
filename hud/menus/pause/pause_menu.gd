@@ -6,9 +6,8 @@ extends PanelContainer
 ##
 ## Pages, one list of buttons each:
 ## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings.
-## - **Sandbox** (staffs B7): Imp wave and Reset dummies (each sends
-##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page); the
-##   enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
+## - **Sandbox** (staffs B7): Reset dummies (`sandbox_action_requested(player, reset_dummies)`;
+##   it stays on the page); the enemy arena (enemy AI AI8): "Enemy: <name>" (every enemy in the registry, by its
 ##   `shown_name()`; left and right or `accept` step through them), "Count: 1" (1-8, the same
 ##   way), "Spawn" (`sandbox_spawn_requested(player, enemy id, count)`), "Clear enemies"
 ##   (`sandbox_action_requested(player, clear_enemies)`) and "AI view: Off" (`ai_view_changed`: each
@@ -55,7 +54,6 @@ const TITLES: Dictionary = {
 	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS",
 }
 ## The sandbox actions, as flow knows them.
-const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
@@ -133,7 +131,6 @@ var ai_view: bool = false
 @onready var _resume: Button = _add(Page.MAIN, "Resume", "Resume")
 @onready var _sandbox: Button = _add(Page.MAIN, "Sandbox", "Sandbox")
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
-@onready var _imp_wave: Button = _add(Page.SANDBOX, "ImpWave", "Imp wave")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
 @onready var _arena_enemy: Button = _add(Page.SANDBOX, "ArenaEnemy", ENEMY_TEXT % "-")
 @onready var _arena_count: Button = _add(Page.SANDBOX, "ArenaCount", COUNT_TEXT % 1)
@@ -408,8 +405,6 @@ func _on_activated(player: int, control: Control) -> void:
 		_go(Page.SANDBOX)
 	elif control == _settings:
 		_go(Page.SETTINGS)
-	elif control == _imp_wave:
-		_send(ACTION_IMP_WAVE)
 	elif control == _reset:
 		_send(ACTION_RESET_DUMMIES)
 	elif control == _arena_enemy:

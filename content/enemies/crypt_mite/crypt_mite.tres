@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="EnemyBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/enemy_base.gd" id="1_base"]
 [ext_resource type="PackedScene" path="res://content/enemies/crypt_mite/crypt_mite.tscn" id="2_scene"]
+[ext_resource type="Resource" path="res://content/enemies/profiles/swarmer.tres" id="9_profile"]
 
 [resource]
 script = ExtResource("1_base")
@@ -12,3 +13,4 @@ max_health = 8
 move_speed = 70.0
 contact_damage = 3
 scene = ExtResource("2_scene")
+profile = ExtResource("9_profile")

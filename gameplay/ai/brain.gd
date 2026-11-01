@@ -30,8 +30,8 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
 enum State { CHASE, WINDUP, RECOVER, REPOSITION, CHANNEL, TRANSITION }
-## How a plan walks: stand, toward or away from the target, round it, or a set way (`plan_way`).
-enum Move { STAND, TOWARD, AWAY, STRAFE, WAY }
+## How a plan walks: stand, toward or away from the target, or a set way (`plan_way`).
+enum Move { STAND, TOWARD, AWAY, WAY }
 
 ## Seconds between looking for the nearest target again.
 const RETARGET_TIME: float = 0.5
@@ -512,8 +512,6 @@ func _chase(intent: ActorIntent) -> void:
 				intent.move = now.normalized()
 		Move.AWAY:
 			intent.move = -now.normalized() if now != Vector2.ZERO else Vector2.ZERO
-		Move.STRAFE:
-			intent.move = now.normalized().orthogonal() * _strafe_side if now != Vector2.ZERO else Vector2.ZERO
 		Move.WAY:
 			intent.move = plan_way
 	if plan_urgent:

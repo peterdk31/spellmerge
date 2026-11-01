@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-01: The sandbox staff's cog head (owner session)
+
+The `dev` staff has a head of its own (`content/wizard/staffs/dev/head.svg`): an upright eight-tooth cog in the player colour round a gold hub, on a straight shaft with a gold butt, 16 directions by 4 player ramps like the starter sheets; `tip` 18. Sandbox wizards now show it on all four buttons instead of the default curl head. `test_wizard_art.gd` holds it to the same sheet contract.
+
 ## 2026-11-01: AIs handle walls (owner session)
 
 `AISight` (gameplay/ai/sight.gd) gives every AI one view of walls (room walls and Wall cards, from the projectile manager's wall grid; `Projectiles.line_clear`). Enemies got a REPOSITION state: they walk round a wall rather than wind up an aimed cast into it. The test bot is a state machine (APPROACH, ATTACK, DETOUR, UNSTICK, DODGE): it walks round any wall in its line of fire and, at a telegraphed shot, heads for cover behind any wall near it (`AISight.cover`), dashing there when its dash is ready (one move step: urgent and ready means dash, so no dodge-only dash); it never asks what its staffs cast (owner). The bots build walls again: the 4-bot run clears with bot 3's `growth · wall` in 7.8 game seconds.

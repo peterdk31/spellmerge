@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="StaffBase" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="StaffBase" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="1_base"]
+[ext_resource type="Texture2D" uid="uid://dxoerfur017j5" path="res://content/wizard/staffs/dev/head.svg" id="2_head"]
 
 [resource]
 script = ExtResource("1_base")
@@ -13,3 +14,5 @@ recharge = 0.0
 spread = 0.0
 max_mana = 1000000.0
 mana_regen = 1000000.0
+head = ExtResource("2_head")
+tip = 18.0

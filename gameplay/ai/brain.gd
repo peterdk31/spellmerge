@@ -78,6 +78,10 @@ const LANE_MARGIN: float = 10.0
 ## The decision timer is the profile's `reaction` times a random factor this far either side, so
 ## a crowd does not decide in one step.
 const REACTION_JITTER: float = 0.2
+## Spreading round a target: the most it turns round the target toward its slot in one plan, and
+## the bonus Fight gets alone on a target (times teamwork, shared by its attackers).
+const SLOT_TURN: float = deg_to_rad(50.0)
+const SPREAD_BONUS: float = 0.1
 
 ## The actor it drives, the profile it plays by and the decoys it is lured by (null: none).
 var actor: Actor = null
@@ -116,6 +120,11 @@ var staff_count: int = 0
 var senses: Array[CastSense] = [null, null, null, null]
 var ready: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 var holding: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+## Spreading round its target (teamwork above 0; `TeamBoard`): how many of its team attacked its
+## target at the board's last count (itself too; 0 for none) and the angle (from the target) of
+## its own slot round it.
+var attackers: int = 0
+var slot_angle: float = 0.0
 ## Seconds this brain has thought (for behaviours' memos).
 var clock: float = 0.0
 
@@ -158,8 +167,9 @@ var _strafe_side: float = 1.0
 ## Instance id of `target` when it was chosen, or 0 for none; `target` typed when an actor.
 var _target_id: int = 0
 var _target_actor: Actor = null
-## Its slot on the board at its last report (-1 for none).
+## Its slot on the board at its last report and at its last noted attack (-1 for none).
 var _report_slot: int = -1
+var _attack_slot: int = -1
 
 
 ## Start driving `with_actor` by `with_profile` (null: the shared default). `seed_value` seeds its
@@ -394,6 +404,34 @@ func team_beat() -> float:
 	return board.beat(actor.team(), actor.id, profile.teamwork)
 
 
+## Behaviours ask: how far round its target its slot is from where it stands (radians, 0 to PI);
+## 0 with no slot to keep (alone on it, or no teamwork).
+func slot_off() -> float:
+	if attackers < 2 or target == null or to_target == Vector2.ZERO:
+		return 0.0
+	return absf(angle_difference((-to_target).angle(), slot_angle))
+
+
+## Behaviours ask: the way to its slot round the target, at the middle of its band (turning round
+## the target at most SLOT_TURN at a time, so it walks round and not through), or ZERO with no
+## slot to keep.
+func slot_way() -> Vector2:
+	if attackers < 2 or target == null or band_max <= 0.0 or to_target == Vector2.ZERO:
+		return Vector2.ZERO
+	var now: float = (-to_target).angle()
+	var turn: float = clampf(angle_difference(now, slot_angle), -SLOT_TURN, SLOT_TURN)
+	var point: Vector2 = target.global_position + Vector2.from_angle(now + turn) * (band_min + band_max) * 0.5
+	var way: Vector2 = point - actor.global_position
+	return way.normalized() if way.length_squared() > 1.0 else Vector2.ZERO
+
+
+## Behaviours ask: a little more keenness to fight a target few of its team attack (teamwork).
+func spread_bonus() -> float:
+	if attackers <= 0:
+		return 0.0
+	return profile.teamwork * SPREAD_BONUS / float(attackers)
+
+
 ## Behaviours ask: walk round the wall in the line for a while (REPOSITION).
 func reposition() -> void:
 	plan_move = Move.WAY
@@ -430,10 +468,12 @@ func _perceive() -> void:
 		to_target = target.global_position - actor.global_position
 		distance = to_target.length()
 		line_clear = _line_clear()
+		_note_attack()
 	else:
 		to_target = Vector2.ZERO
 		distance = 0.0
 		line_clear = true
+		attackers = 0
 	health_fraction = health_of(actor)
 	if board != null:
 		_report_slot = board.report(actor.team(), actor.id, actor.global_position, health_fraction, _report_slot)
@@ -454,6 +494,17 @@ func _perceive_threat() -> void:
 	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and rng.randf() < profile.randomness * 0.3:
 		# Sometimes it sees the shot late.
 		threat_time = -1.0
+
+
+## With teamwork, it notes its target on the board and reads its slot round it (`TeamBoard`).
+func _note_attack() -> void:
+	if board == null or profile.teamwork <= 0.0:
+		attackers = 0
+		return
+	var team: int = actor.team()
+	_attack_slot = board.note_attack(team, actor.id, _target_id, target.global_position, actor.global_position, _attack_slot)
+	attackers = board.attackers(team, _attack_slot, actor.id)
+	slot_angle = board.slot_angle(team, _attack_slot) if attackers > 0 else 0.0
 
 
 ## Its target winds up a cast aimed at it (a telegraph is there to be read, as a person reads it):

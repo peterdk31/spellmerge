@@ -14,8 +14,15 @@ extends RefCounted
 ## REPORT_LIFE, else the oldest of a teammate that is not hurt, so a hurt teammate stays on the
 ## board for a healer (`mate`, `mate_place`, `mate_health`) even in a crowd.
 ##
-## Everything is in small packed arrays made once, a row of PLACES slots per team: nothing is
-## allocated after `_init`.
+## **Spreading round a target:** at each decision an AI with teamwork notes whom it attacks
+## (`note_attack`; ATTACKS per team, the oldest out). Every RECOUNT seconds the board counts, per
+## target, the team's attackers noted within NOTE_LIFE and gives each a slot round the target:
+## ranked by the angle it stands at, the slots RANK × 360° / count apart, the whole ring turned to
+## where they already stand (the mean of their angles less their slots'), so each walks the least
+## and none crosses another (`attackers`, `slot_angle`).
+##
+## Everything is in small packed arrays made once, a row per team: nothing is allocated after
+## `_init`.
 
 ## Seconds after a teammate's windup during which another waits a little.
 const BEAT: float = 0.35
@@ -26,6 +33,10 @@ const PLACES: int = 16
 const REPORT_LIFE: float = 2.0
 ## Under this share of its most health a teammate is hurt: worth a heal.
 const HURT: float = 0.7
+## Attacks noted per team, how long a note counts and how often they are counted (seconds).
+const ATTACKS: int = 16
+const NOTE_LIFE: float = 2.0
+const RECOUNT: float = 0.25
 
 ## Seconds it has run (moved on by `step`).
 var clock: float = 0.0
@@ -37,6 +48,20 @@ var _who: PackedInt32Array = PackedInt32Array()
 var _at: PackedVector2Array = PackedVector2Array()
 var _health: PackedFloat32Array = PackedFloat32Array()
 var _when: PackedFloat32Array = PackedFloat32Array()
+## The attacks, ATTACKS per team (team × ATTACKS + slot): who (-1 for none), its target (instance
+## id), where the target and the attacker stood, and when; from the last count, how many of the
+## team were on that target (0 for a note that no longer counts) and the angle of this one's slot.
+var _att_who: PackedInt32Array = PackedInt32Array()
+var _att_target: PackedInt64Array = PackedInt64Array()
+var _att_from: PackedVector2Array = PackedVector2Array()
+var _att_at: PackedVector2Array = PackedVector2Array()
+var _att_when: PackedFloat32Array = PackedFloat32Array()
+var _att_count: PackedInt32Array = PackedInt32Array()
+var _att_angle: PackedFloat32Array = PackedFloat32Array()
+## One team's angles and ranks while it is counted.
+var _theta: PackedFloat32Array = PackedFloat32Array()
+var _rank: PackedInt32Array = PackedInt32Array()
+var _recount_left: float = 0.0
 
 
 func _init() -> void:
@@ -46,20 +71,36 @@ func _init() -> void:
 	_at.resize(TEAMS * PLACES)
 	_health.resize(TEAMS * PLACES)
 	_when.resize(TEAMS * PLACES)
+	_att_who.resize(TEAMS * ATTACKS)
+	_att_target.resize(TEAMS * ATTACKS)
+	_att_from.resize(TEAMS * ATTACKS)
+	_att_at.resize(TEAMS * ATTACKS)
+	_att_when.resize(TEAMS * ATTACKS)
+	_att_count.resize(TEAMS * ATTACKS)
+	_att_angle.resize(TEAMS * ATTACKS)
+	_theta.resize(ATTACKS)
+	_rank.resize(ATTACKS)
 	clear()
 
 
-## Forget every team's last windup and every report (a new room).
+## Forget every team's last windup, every report and every attack (a new room).
 func clear() -> void:
 	for team in TEAMS:
 		_last_start[team] = -INF
 		_last_actor[team] = -1
 	_who.fill(-1)
 	_when.fill(-INF)
+	_att_who.fill(-1)
+	_att_when.fill(-INF)
+	_att_count.fill(0)
 
 
 func step(delta: float) -> void:
 	clock += delta
+	_recount_left -= delta
+	if _recount_left <= 0.0:
+		_recount_left = RECOUNT
+		_recount()
 
 
 ## The actor `who` of `team` starts a windup now.
@@ -140,3 +181,99 @@ func _slot_for(base: int, who: int) -> int:
 	if free >= 0:
 		return free
 	return oldest_well if oldest_well >= 0 else oldest
+
+
+## The actor `who` of `team`, standing at `at`, attacks `target` (its instance id), which stands at
+## `target_at`. `hint` is the slot it was given last time (-1 for none). Returns its slot, or -1.
+func note_attack(team: int, who: int, target: int, target_at: Vector2, at: Vector2, hint: int = -1) -> int:
+	if team < 0 or team >= TEAMS or who < 0:
+		return -1
+	var base: int = team * ATTACKS
+	var slot: int = hint if hint >= 0 and hint < ATTACKS and _att_who[base + hint] == who else -1
+	if slot < 0:
+		slot = _attack_slot_for(base, who)
+	var row: int = base + slot
+	if _att_who[row] != who or _att_target[row] != target:
+		# Somebody else's slot, or another target: it has no place round this one until the count.
+		_att_count[row] = 0
+	_att_who[row] = who
+	_att_target[row] = target
+	_att_from[row] = target_at
+	_att_at[row] = at
+	_att_when[row] = clock
+	return slot
+
+
+## How many of `team` attacked the target of `who` (in `slot`) at the last count, itself too; 0
+## when it was not counted yet.
+func attackers(team: int, slot: int, who: int) -> int:
+	if team < 0 or team >= TEAMS or slot < 0 or slot >= ATTACKS:
+		return 0
+	var row: int = team * ATTACKS + slot
+	return _att_count[row] if _att_who[row] == who else 0
+
+
+## The angle (radians, from the target) of the slot round its target of the attacker in `slot`.
+func slot_angle(team: int, slot: int) -> float:
+	return _att_angle[team * ATTACKS + slot]
+
+
+## Counts every team's attackers per target and gives each its slot round it (see the class doc).
+func _recount() -> void:
+	for team in TEAMS:
+		var base: int = team * ATTACKS
+		var live: int = 0
+		for at in ATTACKS:
+			var row: int = base + at
+			if _att_who[row] < 0 or clock - _att_when[row] > NOTE_LIFE:
+				_att_count[row] = 0
+				_theta[at] = INF
+				continue
+			live += 1
+			_theta[at] = (_att_at[row] - _att_from[row]).angle()
+		if live == 0:
+			continue
+		# Each one's count and its rank by angle among its target's attackers.
+		for at in ATTACKS:
+			if _theta[at] == INF:
+				continue
+			var row: int = base + at
+			var count: int = 0
+			var rank: int = 0
+			for other in ATTACKS:
+				if _theta[other] == INF or _att_target[base + other] != _att_target[row]:
+					continue
+				count += 1
+				if _theta[other] < _theta[at] or (_theta[other] == _theta[at] and _att_who[base + other] < _att_who[row]):
+					rank += 1
+			_att_count[row] = count
+			_rank[at] = rank
+		# The ring turned to where they stand: the mean of each one's angle less its slot's.
+		for at in ATTACKS:
+			if _theta[at] == INF:
+				continue
+			var row: int = base + at
+			var gap: float = TAU / float(_att_count[row])
+			var sum: Vector2 = Vector2.ZERO
+			for other in ATTACKS:
+				if _theta[other] == INF or _att_target[base + other] != _att_target[row]:
+					continue
+				sum += Vector2.from_angle(_theta[other] - float(_rank[other]) * gap)
+			var turn: float = sum.angle() if sum.length_squared() > 0.0001 else _theta[at] - float(_rank[at]) * gap
+			_att_angle[row] = wrapf(turn + float(_rank[at]) * gap, -PI, PI)
+
+
+## The slot in the attack row from `base` for `who`: its own, else a free one (or one too old to
+## count), else the oldest.
+func _attack_slot_for(base: int, who: int) -> int:
+	var free: int = -1
+	var oldest: int = 0
+	for slot in ATTACKS:
+		var row: int = base + slot
+		if _att_who[row] == who:
+			return slot
+		if free < 0 and (_att_who[row] < 0 or clock - _att_when[row] > NOTE_LIFE):
+			free = slot
+		if _att_when[row] < _att_when[base + oldest]:
+			oldest = slot
+	return free if free >= 0 else oldest

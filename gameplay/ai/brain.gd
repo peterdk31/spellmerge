@@ -20,8 +20,9 @@ extends RefCounted
 ## `track_speed`), RECOVER (stand, the aim locked; a shot about to hit may still make it dodge),
 ## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear) and TRANSITION (a
 ## boss changing phase: stand). A profile that presses on (`AIProfile.press_on`, a test bot's)
-## walks toward its target wherever an enemy stands in a fight, and with no rest goes on at once. The windup starts only when the cast can leave within it
-## (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
+## walks toward its target wherever an enemy stands in a fight, and with no rest goes on at once.
+## The windup starts only when the cast can leave within it (`Caster.cast_ready`), so a telegraph
+## is always followed by its cast. An urgent plan (a dodge,
 ## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
 ## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
 ##

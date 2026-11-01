@@ -11,9 +11,12 @@ extends RefCounted
 ## needs more design):
 ## - DODGE: an enemy within DODGE_RANGE aims at the wizard and its windup is past DODGE_FROM, as
 ##   a person reads a telegraph. It seeks cover: if a way within COVER_PROBE pixels ends behind a
-##   wall from the enemy (any wall, `AISight.cover`) it walks there and stays while the wall is
-##   between them; else it steps off the line of the shot and taps `staff_1`, the dash (once per
-##   windup).
+##   wall from the enemy (any wall, `AISight.cover`) it heads there and stays while the wall is
+##   between them; else it heads off the line of the shot. Getting there is urgent.
+## Moving (`_move`, the same for every state): it walks the way its state wants; when that is
+## urgent and its dash staff (`staff_1`, RB: the bot's own rule for its buttons, not a read of the
+## card) can cast now, it taps it once, and the dash goes the way it walks. So it dashes into cover,
+## or off the line, with no case of its own (owner, 2026-11-01).
 ## - UNSTICK: it hardly moved for STUCK_STEPS steps (a pillar): it side-steps for SIDESTEP_STEPS.
 ## - DETOUR: the nearest enemy is within FIRE_RANGE but a wall stands between them (any wall, its
 ##   own too: `AISight`, the walls shots stop on): it walks the way `AISight.detour` picks for
@@ -54,6 +57,8 @@ const FIRE_RANGE: float = 170.0
 const STUCK_DISTANCE: float = 0.5
 const STUCK_STEPS: int = 20
 const SIDESTEP_STEPS: int = 25
+## The staff the bot keeps its dash on: RB, `staff_1` (Play's start cards put `dash` there).
+const DASH_STAFF: int = 0
 ## How far (pixels) a way to cover is probed (`AISight.cover`).
 const COVER_PROBE: float = 48.0
 ## How far ahead (pixels) a detour direction is probed, and how many steps it is kept.
@@ -83,6 +88,8 @@ var _stuck: int = 0
 var _sidestep_sign: float = 1.0
 var _detour: Vector2 = Vector2.ZERO
 var _dodged_enemy: int = 0
+## True once it dashed for this urgency (one dash per threat's windup); false again when calm.
+var _dashed: bool = false
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
@@ -175,7 +182,7 @@ func step(_delta: float) -> void:
 			direction = direction.orthogonal() * _sidestep_sign
 		State.DETOUR:
 			direction = _detour
-	_hold_move(direction)
+	_move(wizard, direction, state == State.DODGE)
 	# It fires whenever the line is clear and the enemy in range, dodging too; never into a wall.
 	for at: int in ATTACK_STAFFS:
 		_hold_staff(at, in_range and clear)
@@ -188,6 +195,7 @@ func _next_state(wizard: Actor, target: Node2D, threat: Node2D, in_range: bool, 
 	else:
 		if threat.get_instance_id() != _dodged_enemy:
 			_dodged_enemy = threat.get_instance_id()
+			_dashed = false
 			_seek_cover(wizard, threat)
 		state = State.DODGE
 		return
@@ -208,11 +216,20 @@ func _next_state(wizard: Actor, target: Node2D, threat: Node2D, in_range: bool, 
 	state = State.ATTACK if in_range else State.APPROACH
 
 
-## A threat's windup: cover within reach (any wall between it and the threat), else a dash.
+## A threat's windup: the way to cover within reach (any wall between it and the threat), or
+## ZERO when none is near.
 func _seek_cover(wizard: Actor, threat: Node2D) -> void:
 	_cover = AISight.cover(wizard.projectiles, wizard.global_position, threat.global_position, COVER_PROBE)
-	if _cover == Vector2.ZERO and wizard.caster.has_staff(0):
-		_tap(0)
+
+
+## Walk `direction`; when `urgent`, also dash that way once if the dash staff can cast now.
+func _move(wizard: Actor, direction: Vector2, urgent: bool) -> void:
+	_hold_move(direction)
+	if not urgent:
+		_dashed = false
+	elif not _dashed and direction != Vector2.ZERO and wizard.caster.cast_ready(0.0, DASH_STAFF):
+		_tap(DASH_STAFF)
+		_dashed = true
 
 
 ## Off the line of the threat's shot, on the side the wizard already is.

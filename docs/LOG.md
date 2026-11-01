@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-11-01: AIs handle walls (owner session)
 
-`AISight` (gameplay/ai/sight.gd) gives every AI one view of walls (room walls and Wall cards, from the projectile manager's wall grid; `Projectiles.line_clear`). Enemies got a REPOSITION state: they walk round a wall rather than wind up an aimed cast into it. The test bot is a state machine (APPROACH, ATTACK, DETOUR, UNSTICK, DODGE): it walks round any wall in its line of fire and, at a telegraphed shot, seeks cover behind any wall near it (`AISight.cover`) before it dashes; it never asks what its staffs cast (owner). The bots build walls again: the 4-bot run clears with bot 3's `growth · wall` in 7.0 game seconds.
+`AISight` (gameplay/ai/sight.gd) gives every AI one view of walls (room walls and Wall cards, from the projectile manager's wall grid; `Projectiles.line_clear`). Enemies got a REPOSITION state: they walk round a wall rather than wind up an aimed cast into it. The test bot is a state machine (APPROACH, ATTACK, DETOUR, UNSTICK, DODGE): it walks round any wall in its line of fire and, at a telegraphed shot, heads for cover behind any wall near it (`AISight.cover`), dashing there when its dash is ready (one move step: urgent and ready means dash, so no dodge-only dash); it never asks what its staffs cast (owner). The bots build walls again: the 4-bot run clears with bot 3's `growth · wall` in 7.8 game seconds.
 
 ## 2026-11-01: Showcase sandbox staffs, mana per staff, one staff file per setup (owner session)
 

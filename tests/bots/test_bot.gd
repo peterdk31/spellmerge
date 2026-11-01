@@ -107,23 +107,34 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
 
 
-## A threat's windup (owner, 2026-11-01): the bot seeks cover behind any wall near it, and dashes
-## only when there is none; it never asks what its staffs cast.
+## A threat's windup (owner, 2026-11-01): the bot finds cover behind any wall near it (only
+## where it would go, no dash of its own); its one way of moving dashes when getting somewhere
+## is urgent and the dash staff is ready, once per urgency, the way it walks. So it dashes into
+## cover, or off the line, with no case for either; it never asks what its staffs cast.
 func _test_cover_or_dash(bot: BotScript, wizard: Actor) -> void:
 	var projectiles: Node = wizard.projectiles
 	var at: Vector2 = wizard.global_position
 	var threat := Node2D.new()
 	threat.position = at + Vector2(150.0, 0.0)
 	root.add_child(threat)
-	projectiles.call("set_walls", [] as Array[Rect2])
 	var dashes: int = int(_input.call("get_press_count", 0, &"staff_1"))
+	projectiles.call("set_walls", [] as Array[Rect2])
 	bot.call("_seek_cover", wizard, threat)
 	_check(bot.get("_cover") == Vector2.ZERO, "no wall near: no cover")
-	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "so it dashes")
 	projectiles.call("set_walls", [Rect2(at + Vector2(16.0, 12.0), Vector2(32.0, 32.0))] as Array[Rect2])
 	bot.call("_seek_cover", wizard, threat)
-	_check(bot.get("_cover") != Vector2.ZERO, "a wall near: a way to cover")
-	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "and no dash")
+	var cover: Vector2 = bot.get("_cover")
+	_check(cover != Vector2.ZERO, "a wall near: a way to cover")
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes, "finding cover dashes nothing by itself")
+	bot.call("_move", wizard, cover, false)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes, "a calm move walks, no dash")
+	bot.call("_move", wizard, cover, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "an urgent move with the dash ready dashes")
+	bot.call("_move", wizard, cover, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "once per urgency")
+	bot.call("_move", wizard, Vector2.ZERO, false)
+	bot.call("_move", wizard, Vector2.ZERO, true)
+	_check(int(_input.call("get_press_count", 0, &"staff_1")) == dashes + 1, "standing still (in cover) dashes nowhere")
 	projectiles.call("set_walls", [] as Array[Rect2])
 	bot.call("_release")
 	threat.free()

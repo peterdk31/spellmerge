@@ -76,6 +76,10 @@ func _initialize() -> void:
 		world.combat.step(DT)
 		world.projectiles.step(DT)
 		world.spells.call("step", DT)
+		# The team board (staggered fire, spreading, the call), on the fixture since L2-L4.
+		var board: Variant = world.get("board")
+		if board != null:
+			board.step(DT)
 		if step >= WARMUP:
 			samples.append(spent)
 	samples.sort()

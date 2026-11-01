@@ -26,6 +26,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `MEETS_SHOTS` | Can it stop or turn other shots (not a rain or a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
 | `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |
+| `BLOCKS` | Does it stand as a wall while it lives (a wall)? No card needs it; an AI asks it (`Spells.next_cast_traits`) and keeps such a staff for cover. |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)

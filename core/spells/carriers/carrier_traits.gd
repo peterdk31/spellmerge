@@ -54,3 +54,7 @@ const MOVES_CASTER: int = 1 << 21
 ## Does it strike one point near its caster's hand (a slam's impact, `Carrier.strike_point`)? A
 ## staff animation's `land` keys put the staff's tip there; on any other carrier they are refused.
 const STRIKES_POINT: int = 1 << 22
+## Does it stand as a wall while it lives, which bodies cannot walk through and shots stop on (a
+## wall)? Cast in front of its caster it blocks the caster's own shots too, so an AI keeps a staff
+## that casts one for cover (`Spells.next_cast_traits`) instead of firing it with its attack.
+const BLOCKS: int = 1 << 23

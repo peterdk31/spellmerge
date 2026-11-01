@@ -255,3 +255,33 @@ func test_one_compile_per_enemy_type_and_its_actor_closes() -> void:
 	check(not _actors.is_open(id), "leaving the tree closes its actor")
 	check_equal(_spells.current_tag(id, 0), 0, "and its caster in Spells")
 	check(_actors.is_open(second.id) and _spells.current_tag(second.id, 0) != 0, "the other casts on")
+
+
+## Walls (owner, 2026-11-01): in reach with an aimed cast but a wall in between, it winds up
+## nothing (the shot would hit the wall) and walks round until the line is clear, then casts.
+func test_it_walks_round_a_wall_instead_of_shooting_into_it() -> void:
+	var enemy := _enemy(_data([&"bolt"], 100.0, 10.0), Vector2(0.0, 0.0))
+	_projectiles.set_bounds(Rect2(-400.0, -400.0, 800.0, 800.0))
+	_projectiles.set_walls([Rect2(32.0, -40.0, 16.0, 64.0)] as Array[Rect2])
+	var eye := func() -> bool:
+		return AISight.line_clear(_projectiles, enemy.global_position + enemy.body_offset, _wizard.global_position + _wizard.body_offset)
+	check(not eye.call(), "the wall stands between them")
+	_run(STEP * 2.0)
+	check_equal(_ai(enemy).state, AIController.State.REPOSITION, "in reach but walled off: it repositions")
+	var start: Vector2 = enemy.position
+	var wound: bool = false
+	for i in int(8.0 / STEP):
+		_run(STEP)
+		if _ai(enemy).is_telegraphing():
+			check(eye.call(), "it only winds up with the line clear (at %s)" % enemy.position)
+			wound = true
+			break
+	check(enemy.position.distance_to(start) > 4.0, "it walked")
+	check(wound, "round the wall, it winds up (at %s)" % enemy.position)
+
+
+func test_a_cast_that_is_not_aimed_ignores_walls() -> void:
+	var enemy := _enemy(_data([&"nova"], 100.0, 10.0), Vector2(0.0, 0.0))
+	_projectiles.set_bounds(Rect2(-400.0, -400.0, 800.0, 800.0))
+	_projectiles.set_walls([Rect2(32.0, -40.0, 16.0, 64.0)] as Array[Rect2])
+	check(_until_windup(enemy, 1.0), "a nova winds up behind the wall as before")

@@ -10,7 +10,11 @@ extends ActorController
 ## States: CHASE (walk to the target), WINDUP (stand still; the aim is locked at its start, so a
 ## wizard can step aside, while the actor's CreatureLook shows the telegraph), then the cast and
 ## RECOVER (stand still, the aim still locked, so a beam it holds does not track a wizard who
-## stepped aside) before CHASE again.
+## stepped aside) before CHASE again. REPOSITION (owner, 2026-11-01): in reach, but a wall (a
+## room's, or a Wall card's: `AISight`) stands between it and the target and its next cast is
+## aimed (it reaches, `Caster.next_cast_reach`), so the shot would only hit the wall: it winds up
+## nothing and walks round (`AISight.detour`) until the line is clear or `reposition_time` is up,
+## then chases again. A cast that is not aimed (a nova, an orbit) ignores walls as before.
 ##
 ## Targets: the nearest actor of another team than the actor's (`Actor.team`) that can be hit
 ## now, from the projectile manager's target grid (`nearest_target` with the team), so it costs
@@ -47,7 +51,7 @@ extends ActorController
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
-enum State { CHASE, WINDUP, RECOVER }
+enum State { CHASE, WINDUP, RECOVER, REPOSITION }
 
 ## Seconds between looking for the nearest target again.
 const RETARGET_TIME: float = 0.5
@@ -57,6 +61,8 @@ const GRUDGE_TIME: float = 3.0
 const SIGHT: float = 100000.0
 ## Closer than this to its target it stops walking (an enemy without a staff, on top of it).
 const CLOSE_ENOUGH: float = 1.0
+## How far ahead (pixels) a way round a wall is probed (`AISight.detour`).
+const DETOUR_PROBE: float = 40.0
 
 ## Walk until the target is this close, then start the attack.
 @export var attack_range: float = 90.0
@@ -64,6 +70,8 @@ const CLOSE_ENOUGH: float = 1.0
 @export var windup_time: float = 0.75
 ## Seconds standing still after the cast.
 @export var recover_time: float = 1.0
+## Seconds it walks one way round a wall before it looks again (REPOSITION).
+@export var reposition_time: float = 0.4
 
 ## The decoys (`Entities.lure`). Only tests set it, before the actor is added; otherwise the
 ## "Entities" autoload is used.
@@ -81,6 +89,8 @@ var lookup_count: int = 0
 var _actor: Actor = null
 ## The aim locked at the start of the windup (unit length).
 var _locked_aim: Vector2 = Vector2.DOWN
+## The way it walks round a wall while repositioning (unit length).
+var _detour: Vector2 = Vector2.ZERO
 var _state_left: float = 0.0
 var _retarget_left: float = 0.0
 var _retarget_offset: float = 0.0
@@ -170,6 +180,15 @@ func think(actor: Actor, delta: float) -> void:
 			_state_left -= delta * _pace(actor)
 			if _state_left <= 0.0:
 				state = State.CHASE
+		State.REPOSITION:
+			_state_left -= delta
+			if target == null or _state_left <= 0.0 or _line_clear(actor):
+				# Round the wall (or done trying): chase, which winds up if the line is clear.
+				state = State.CHASE
+				_chase(actor)
+			else:
+				intent.move = _detour
+				intent.aim = target.global_position - actor.global_position
 
 
 ## True from the start of the windup until the cast leaves: the attack is coming.
@@ -198,6 +217,13 @@ func _chase(actor: Actor) -> void:
 	if to_target != Vector2.ZERO:
 		actor.intent.aim = to_target
 	if near and actor.caster != null and actor.caster.has_staff(0):
+		if actor.caster.next_cast_reach(0) > 0.0 and not _line_clear(actor):
+			# An aimed cast would only hit the wall in between: walk round it first.
+			state = State.REPOSITION
+			_state_left = reposition_time
+			_detour = AISight.detour(actor.projectiles, actor.global_position, target.global_position, DETOUR_PROBE)
+			actor.intent.move = _detour
+			return
 		if not actor.caster.cast_ready(windup_time):
 			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast
 			# that comes.
@@ -210,6 +236,17 @@ func _chase(actor: Actor) -> void:
 	# Out of reach, or nothing to cast: walk on (one without a staff walks into its target).
 	if to_target.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH:
 		actor.intent.move = to_target.normalized()
+
+
+## True when no wall stands between the actor's body and its target's (`AISight`): where its
+## shot leaves and where the target is hit.
+func _line_clear(actor: Actor) -> bool:
+	if target == null:
+		return true
+	var to: Vector2 = target.global_position
+	if _target_actor != null:
+		to += _target_actor.body_offset
+	return AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, to)
 
 
 ## The grudge, else a decoy in lure range, else the nearest standing actor of another team.

@@ -329,6 +329,12 @@ func next_cast_reach(at: int = 0) -> float:
 	return actor.spells.next_cast_reach(number, at) if has_staff(at) else 0.0
 
 
+## What the next cast's first carrier is (`Spells.next_cast_traits`: CarrierTraits flags), 0 with
+## no build. `BLOCKS` says it puts up a wall: an AI keeps such a staff for cover.
+func next_cast_traits(at: int) -> int:
+	return actor.spells.next_cast_traits(number, at) if has_staff(at) else 0
+
+
 ## The hit radius of the next cast's first carrier (0 for none).
 func next_cast_radius(at: int = 0) -> float:
 	return actor.spells.next_cast_radius(number, at) if has_staff(at) else 0.0

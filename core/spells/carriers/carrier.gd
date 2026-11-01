@@ -36,6 +36,7 @@ const LINE: int = CarrierTraits.LINE
 const MEETS_SHOTS: int = CarrierTraits.MEETS_SHOTS
 const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
+const BLOCKS: int = CarrierTraits.BLOCKS
 
 
 ## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which

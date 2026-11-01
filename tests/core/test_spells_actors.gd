@@ -467,6 +467,19 @@ func test_next_cast_mana_for_an_ai() -> void:
 	check_equal(_spells.cast_staff(imp, 0, Vector2.ZERO, Vector2.RIGHT, cost), cost, "enough casts and spends it")
 
 
+## What the next cast's first carrier is, for an AI (owner, 2026-11-01): a wall says it blocks
+## (cover), a bolt does not; nothing built is 0.
+func test_next_cast_traits_for_an_ai() -> void:
+	var imp: int = ActorSeats.enemy(_table)
+	check_equal(_spells.next_cast_traits(imp, 0), 0, "nothing built, no traits")
+	_build(imp, [&"bolt"])
+	var bolt: int = _spells.next_cast_traits(imp, 0)
+	check(bolt != 0 and bolt & CarrierTraits.BLOCKS == 0, "a bolt flies and does not block")
+	_form(&"wall_form", 0.0, 1.0).carrier = &"wall"
+	_build(imp, [&"wall_form"])
+	check(_spells.next_cast_traits(imp, 0) & CarrierTraits.BLOCKS != 0, "a wall blocks")
+
+
 # --- Aim: other teams only ----------------------------------------------------------------
 
 func test_an_enemys_chain_skips_its_teammate() -> void:

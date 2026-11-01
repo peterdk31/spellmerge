@@ -45,7 +45,7 @@ func _check(condition: bool, message: String) -> void:
 
 ## The bot calls these by name; a rename must fail here, not silently at runtime.
 func _test_names_exist(events: Node) -> void:
-	for method in ["add_virtual_device", "send_virtual", "leave"]:
+	for method in ["add_virtual_device", "send_virtual", "send_virtual_aim", "leave"]:
 		_check(_input.has_method(method), "PlayerInput has %s" % method)
 	_check(_input.get("NO_DEVICE") != null, "PlayerInput has NO_DEVICE")
 	for method in ["get_wizard", "stop_run"]:
@@ -105,6 +105,28 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	_check(own, "all build calls are for the bot's own player and staff 3")
 	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
+
+
+## A staff whose next cast puts up a wall (owner, 2026-11-01) is a guard staff: never held with the
+## attack (its wall would stand in front of the bot's own bolts), tapped toward a threat instead.
+func _test_a_wall_staff_is_cover(bot: BotScript, wizard: Actor) -> void:
+	wizard.caster.set_staff(BotScript.BUILD_STAFF, [&"wall"] as Array[StringName])
+	wizard.caster.set_staff(1, [&"bolt"] as Array[StringName])
+	_check(bool(bot.call("_is_guard", wizard, BotScript.BUILD_STAFF)), "a wall staff is a guard staff")
+	_check(not bool(bot.call("_is_guard", wizard, 1)), "a bolt staff is not")
+	bot.call("_hold_attack", wizard, true)
+	_check(_input.call("is_action_pressed", 0, &"staff_2"), "the attack holds the bolt staff")
+	_check(not _input.call("is_action_pressed", 0, &"staff_3"), "but never the wall staff")
+	var threat := Node2D.new()
+	threat.position = wizard.global_position + Vector2(60.0, 0.0)
+	root.add_child(threat)
+	var presses: int = int(_input.call("get_press_count", 0, &"staff_3"))
+	bot.call("_cover_or_dash", wizard, threat)
+	_check(int(_input.call("get_press_count", 0, &"staff_3")) == presses + 1, "a threat taps the wall staff")
+	_check((_input.call("get_aim", 0) as Vector2).is_equal_approx(Vector2.RIGHT), "aimed at the threat")
+	bot.call("_release")
+	_check((_input.call("get_aim", 0) as Vector2) == Vector2.ZERO and not _input.call("is_action_pressed", 0, &"staff_2"), "letting go frees the aim and the staffs")
+	threat.free()
 
 
 ## An enemy actor at `at` under `parent`; an AI drives it (set once it is ready, which takes
@@ -169,6 +191,7 @@ func _test_fighter(events: Node) -> void:
 		var other := _flow.call("get_wizard", 1) as Node2D
 		_check(other != null and other.global_position != wizard.global_position, "each bot steers its own wizard")
 		_test_build_random(events, bots[0], wizard)
+		_test_a_wall_staff_is_cover(bots[0], wizard as Actor)
 	_flow.call("stop_run")
 	for bot in bots:
 		bot.step(0.016)

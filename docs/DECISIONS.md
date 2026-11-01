@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-01: Enemies telegraph, allies don't (owner)
+
+- **Rule:** a telegraph is a warning for the players, so an AI driving an actor of the players' team winds up nothing; any other team telegraphs as before. It follows the side (teams follow the driver), not a profile: bots, minions and a player's possessed body cast at once, and an enemy's AI possessing a wizard still telegraphs. Planned as the first step of L5 ([M2-enemy-ai.md](milestones/M2-enemy-ai.md)); replaces "a bot profile with `windup_scale` 0" from the first plan.
+
 ## 2026-11-01: The AI reads what it casts next; behaviours are files (owner)
 
 - **Why:** the owner wants one AI that adapts to whatever staffs an enemy holds, so an enemy or a boss is designed by its staffs and a few numbers, not code ([M2-enemy-ai.md](milestones/M2-enemy-ai.md)). The earlier rule below ("No AI knows what it casts next") was there to stop hard-coding like `if dash.is_next(): do_dash()`; the owner is fine with reversing it as long as that stays impossible.

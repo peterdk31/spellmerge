@@ -1,8 +1,8 @@
 # Web preview of main between daily runs.
 #
 # After each merge to main (about hourly, as the develop sessions merge), the web build only
-# (build.sh --web: no unit tests or smoke tests; the daily run checks everything and its bisect
-# reverts a breaking merge), then it goes to Pages at /preview/. It takes the screenshots for the
+# (build.sh --web: no unit tests or smoke tests; the daily run checks everything, and a broken
+# build is not released), then it goes to Pages at /preview/. It takes the screenshots for the
 # gallery too (about a minute), but a failed one never keeps the build off Pages. No release,
 # no itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases
 # (smbot.site --preview). A newer merge cancels a build still running, so a burst of merges
@@ -43,6 +43,11 @@ jobs:
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display for the screenshots
         continue-on-error: true # no display: no screenshots, the build still goes out
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb

@@ -16,3 +16,11 @@ export_credentials.cfg
 
 # Python
 __pycache__/
+
+# The native module's build (ci/build/native.sh): libraries and the file that names them
+/native/bin/
+/native/src/*.o
+/native/src/*.os
+/native/.sconsign*.dblite
+/native/spellmerge.gdextension
+/native/spellmerge.gdextension.uid

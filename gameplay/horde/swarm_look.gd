@@ -60,6 +60,7 @@ extends Node2D
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const NativeScript := preload("res://core/native/native.gd")
 const SHADER: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
 const DEFAULT_PRESET: Resource = preload("res://gameplay/feel/presets/punchy.tres")
 ## Floats per instance in a batch's buffer: a 2D transform, a colour and the custom data.
@@ -142,11 +143,40 @@ var _ghost_source: Sprite2D = null
 var _ghost_of: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## The native kernel (`SwarmLookKernel`, native/README.md): the rows' step and the batches' writing in
+## C++, the same to the bit, or null to run them here. `native` switches it.
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
 ## How far the face layers close on the body in one step of `_k_delta` seconds (Face's).
 var _k_delta: float = -1.0
 var _k: float = 0.0
 ## The real clock, for Feel's part in `_process`.
 var _last_usec: int = 0
+
+
+## Use the native kernel when `on` and the module is loaded (see `native`). The kernel is handed the
+## numbers below once, so they stay here only.
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = NativeScript.swarm_look_kernel() if on else null
+	if _kernel == null:
+		return
+	var numbers: Dictionary = {
+		"HOP_SPEED_SQ": CreatureLook.HOP_SPEED * CreatureLook.HOP_SPEED, "HOP_RATE": CreatureLook.HOP_RATE,
+		"HOP_HEIGHT": CreatureLook.HOP_HEIGHT, "HOP_IDLE": CreatureLook.HOP_IDLE, "SNAP_SQ": Face.SNAP * Face.SNAP,
+		"MAX_LAG": Face.MAX_LAG, "LOOK_LEAN": Face.LOOK_LEAN, "IDLE_AFTER": Face.IDLE_AFTER, "LAG": Face.LAG,
+		"GLANCE_TIME": Face.GLANCE_TIME, "RAISE_TIME": Face.RAISE_TIME, "FLAG_FLASH": FLAG_FLASH,
+		"FLAG_HURT": FLAG_HURT, "BLINK_COLUMN": Face.BLINK_COLUMN, "WORRIED": Face.Mood.WORRIED,
+		"RAISED": Face.Mood.RAISED, "STRIDE": STRIDE, "BLINK_EVERY": Face.BLINK_EVERY, "BLINK_TIME": Face.BLINK_TIME,
+		"GLANCE_EVERY": Face.GLANCE_EVERY, "RAISE_EVERY": Face.RAISE_EVERY,
+	}
+	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
+	if not _kernel.call(&"configure", numbers):
+		wrong.append("the look's numbers")
+	if not wrong.is_empty():
+		push_error("SwarmLook: the native SwarmLookKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		_kernel = null
 
 
 ## Draw `of_swarm`'s rows from now on.
@@ -157,6 +187,7 @@ func setup(of_swarm: Object) -> void:
 
 func _init() -> void:
 	name = "SwarmLook"
+	set_native(native)
 	# Compiled before the first room, as every shader is (core/README.md, "The shot shaders").
 	ShaderWarmupScript.want(SHADER, ShaderWarmupScript.BATCH)
 
@@ -184,6 +215,9 @@ func step(delta: float) -> void:
 		return
 	_take_kinds()
 	_take_rows()
+	if _kernel != null and "ran" in swarm and "down" in swarm:
+		_kernel.call(&"look_step", self)
+		return
 	var count: int = _count
 	var positions: PackedVector2Array = swarm.positions
 	var velocities: PackedVector2Array = swarm.velocities
@@ -460,6 +494,16 @@ func draw_rows() -> void:
 	if swarm == null:
 		return
 	var kinds_made: int = _batches.size()
+	if _kernel != null:
+		# The kernel sorts the rows and writes every batch's buffer; the renderer is told here.
+		_kernel.call(&"draw_rows", self)
+		for kind in kinds_made:
+			var shown: int = _filled[kind] - _first[kind]
+			var multimesh: MultiMesh = _batches[kind].multimesh
+			if shown > 0:
+				RenderingServer.multimesh_set_buffer(multimesh.get_rid(), _buffers[kind])
+			multimesh.visible_instance_count = shown
+		return
 	var positions: PackedVector2Array = swarm.positions
 	var kinds: PackedInt32Array = swarm.kinds
 	# The rows by kind, in row order within each (a counting sort into `_order`).

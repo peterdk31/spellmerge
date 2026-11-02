@@ -16,6 +16,8 @@ extends SceneTree
 ## physics step's parts timed; `--swarm=N --staff=M` sets their counts, `--profile` adds the tree
 ## profile (tree_profile.gd) and `--profile-signals` times the hot events' listeners too.
 ##
+## `-- --no-native` runs the projectile manager's and the swarm's GDScript in place of the native module.
+##
 ## `test_stress.gd` runs a short version under `build.sh --quick --tests`.
 
 const RunnerScript := preload("res://tests/benchmark/stress_runner.gd")

@@ -5,27 +5,21 @@
 #                  decided by Claude (read-only tools, no write token), attached
 #                  files checked with no secrets, carried out by a script
 #                  (labels, replies, the work queue, CLA signatures)
-#  3. build        build and smoke tests; if broken, revert the day's merges
-#                  newest first until it passes, then run again
+#  3. build        build and smoke tests; a broken build is not released and the
+#                  Daily log says so (nothing is reverted automatically)
 #  4. release      attested immutable release, GitHub Pages, itch.io
 #  5. log          alarms and the Daily log summary
 # Development runs hourly in develop.yml.
 #
 # Nothing runs unless the kill switch is "true" and the Control panel allows
-# it. Only jobs that need a secret use the protected "automation" environment;
-# the revert bisect, which runs the merged code, has no secrets and a read-only
-# token. No outside PR code runs anywhere.
+# it. Only jobs that need a secret use the protected "automation" environment.
+# No outside PR code runs anywhere.
 name: daily
 
 on:
   schedule:
     - cron: "0 3 * * *"
   workflow_dispatch:
-    inputs:
-      retry:
-        description: "Internal: rebuild after automatic reverts (no further reverts)"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -79,7 +73,7 @@ jobs:
   intake-gather:
     name: gather new issues, discussions and outside PRs
     needs: control
-    if: needs.control.outputs.automation == 'true' && !inputs.retry
+    if: needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -259,8 +253,13 @@ jobs:
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Virtual display for the screenshots
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+      - name: Cache the native module's tools (saved by this full build only; ci/build/native.sh checks their pins)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
+      - name: Virtual display for the screenshots, MinGW-w64 for the native module's Windows build
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb g++-mingw-w64-x86-64-posix
       - name: Build, unit tests, screenshots, smoke test and package
         env:
           VERSION: ${{ steps.plan.outputs.version }}
@@ -286,62 +285,6 @@ jobs:
           path: dist
           retention-days: 1
           if-no-files-found: error
-
-  revert-bisect:
-    name: find the merge that broke the build (no secrets)
-    needs: build
-    if: always() && needs.build.result == 'failure' && !inputs.retry
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    outputs:
-      culprits: ${{ steps.bisect.outputs.culprits }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/pinned-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - id: bisect
-        run: python3 -m smbot.revert bisect
-
-  revert-apply:
-    name: revert it and build again
-    needs: revert-bisect
-    if: always() && needs.revert-bisect.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    environment: automation
-    permissions:
-      contents: read
-      checks: read
-      actions: write # start the daily run again after the reverts
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          READ_TOKEN: ${{ github.token }}
-          CULPRITS: ${{ needs.revert-bisect.outputs.culprits }}
-        run: python3 -m smbot.revert apply
-      - name: Build and release again
-        if: needs.revert-bisect.outputs.culprits != '[]'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh workflow run daily.yml --ref main -f retry=true
 
   release:
     name: release
@@ -395,6 +338,11 @@ jobs:
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
       - name: Record every clip
@@ -547,7 +495,7 @@ jobs:
 
   summary:
     name: post to the Daily log
-    needs: [control, intake-gather, intake-decide, intake-apply, build, release, pages, itch, alarms, revert-apply]
+    needs: [control, intake-gather, intake-decide, intake-apply, build, release, pages, itch, alarms]
     if: always() && needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10

@@ -2,6 +2,14 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## The native module (owner, 2026-11-02)
+
+The projectile manager's hot loops run in C++ where the module is built (`native/README.md`, docs/DECISIONS.md 2026-11-02).
+
+- **Run the Windows build.** The Windows export carries the module (MinGW-w64 in CI), but no test runs a Windows binary: one run of the exported game on Windows (or under Wine in CI) should show `is_native()` true.
+- **More kernels, measured first.** Left in GDScript, by cost in the stress runs: the actors' step (looks, the AI, staffs: node work, about the same from C++), the hit handlers (Combat, Spells, Feel), the swarm's chase loop (it calls the AI and Combat; about 0.8 ms for 1,000) and the manager's target refresh (0.6 ms for 1,000 bodies). A data-oriented actor step, like the swarm's, is the bigger lever than porting node code.
+- **The real-GPU web harness** (`wingpu.sh`) has not run the extension-capable web build yet.
+
 ## Carrier traits and card needs (owner, 2026-10-30)
 
 Since 2026-10-30 a carrier answers yes/no questions about itself (`CarrierTraits`), each kind of card says what it needs from one (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), and `Spells.card_works(card_id, carrier)` answers yes or no to "does this card do anything on this carrier?" before it is placed (docs/CARRIERS.md). What that opens, by milestone:

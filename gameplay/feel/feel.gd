@@ -333,6 +333,19 @@ var rest_left: float = 0.0
 var _rest_until: PackedFloat32Array = PackedFloat32Array()
 ## The body (instance id) each rest belongs to, so a reused actor id starts with no rest.
 var _rest_body: PackedInt64Array = PackedInt64Array()
+## The last hit `_on_damage_dealt` gave its flash, hold and sound, by the hit actor's id: the
+## physics frame and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
+## Another hit with all of them the same (no time has passed for Feel or the game) would only do
+## them again: the flash is restarted to the same time, the hold is refused for
+## both bodies (each rests from the first), and the same sound would start on the next voice in the
+## same frame. So it skips them (a crowd of shots on one body: 2026-11-02, "Sandbox storm").
+var _juiced_frame: PackedInt64Array = PackedInt64Array()
+var _juiced_step: PackedInt64Array = PackedInt64Array()
+## Feel's steps so far (`step`).
+var _steps: int = 0
+var _juiced_body: PackedInt64Array = PackedInt64Array()
+var _juiced_by: PackedInt32Array = PackedInt32Array()
+var _juiced_kind: Array[StringName] = []
 ## Current offset applied to the camera.
 var shake_offset: Vector2 = Vector2.ZERO
 
@@ -490,6 +503,12 @@ func _ready() -> void:
 	_rng.seed = 1
 	_rest_until.resize(ActorsScript.ACTORS)
 	_rest_body.resize(ActorsScript.ACTORS)
+	_juiced_frame.resize(ActorsScript.ACTORS)
+	_juiced_frame.fill(-1)
+	_juiced_step.resize(ActorsScript.ACTORS)
+	_juiced_body.resize(ActorsScript.ACTORS)
+	_juiced_by.resize(ActorsScript.ACTORS)
+	_juiced_kind.resize(ActorsScript.ACTORS)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -601,6 +620,7 @@ func _process(delta: float) -> void:
 
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
+	_steps += 1
 	_hit_effect = -1
 	_hit_voice = -1
 	_clock += real_delta
@@ -827,7 +847,10 @@ func trauma() -> float:
 
 
 func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector2) -> void:
-	_react(target)
+	var hit_id: int = _actor_of(target)
+	var repeat: bool = _repeat_hit(hit_id, target, caster)
+	if not repeat:
+		_react(target)
 	var aim: Vector2 = Vector2.ZERO
 	var at: Vector2 = position
 	var tint: Color = Color.WHITE
@@ -863,12 +886,36 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 		sound = look.get("sound", preset.hit_sound) as StringName
 		own = _kind_own
 	_kind_target = 0
-	_hold_bodies(caster, _actor_of(target), stop, false, shot)
-	_juice(position, shake, sound, aim, tint, size, at, colours)
+	if not repeat:
+		_hold_bodies(caster, hit_id, stop, false, shot)
+	var voice: int = _hit_voice
+	_juice(position, shake, &"" if repeat else sound, aim, tint, size, at, colours)
+	if repeat:
+		# The sound of the hit it repeats is still this hit's (a kill stops it, `_on_enemy_died`).
+		_hit_voice = voice
 	if own:
 		# Their own spell: the cue `self_hit` (a ring in its own colour) on this frame, so it is
 		# never taken for an enemy's hit.
 		play_cue(&"self_hit", caster, position)
+
+
+## True when the hit on `target` (the actor `id`) by `caster` repeats the last one this physics
+## frame and Feel step that was flashed, held and heard (same body, attacker and kind: `_juiced_*`); else it
+## becomes that hit. Only an actor's hits are told apart.
+func _repeat_hit(id: int, target: Node, caster: int) -> bool:
+	if id < 0 or id >= _juiced_frame.size() or target == null:
+		return false
+	var frame: int = Engine.get_physics_frames()
+	var body: int = target.get_instance_id()
+	var kind: StringName = _kind if body == _kind_target and frame == _kind_frame else &""
+	if _juiced_frame[id] == frame and _juiced_step[id] == _steps and _juiced_body[id] == body and _juiced_by[id] == caster and _juiced_kind[id] == kind:
+		return true
+	_juiced_frame[id] = frame
+	_juiced_step[id] = _steps
+	_juiced_body[id] = body
+	_juiced_by[id] = caster
+	_juiced_kind[id] = kind
+	return false
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.

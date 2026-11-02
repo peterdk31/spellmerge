@@ -8,7 +8,8 @@ extends ActorLook
 ## in the sandbox page puts a fresh one there. Enemies never target it: its AI is on their team.
 ##
 ## What it shows, all about its actor, with the scene's labels `%Dps`, `%Status` and `%Number`:
-## - **Damage numbers:** each `damage_dealt` on the actor rises from its head for NUMBER_TIME
+## - **Damage numbers:** each hit on the actor (`Actor.damaged`, which Combat sends right after
+##   `damage_dealt`: only this actor's hits, not every hit on anyone) rises from its head for NUMBER_TIME
 ##   seconds, from a pool of NUMBER_COUNT labels (the oldest is reused when all are up).
 ## - **Damage per second** over the last DPS_WINDOW seconds, in DPS_BUCKETS buckets, read from
 ##   the drop of its health in Combat each step, so burn ticks (which send no `damage_dealt` on a
@@ -87,8 +88,8 @@ func setup(owner_actor: Actor) -> void:
 	_number_x.fill(0.0)
 	# Combat registers the actor with its full health once it is in the tree (the Hurtbox).
 	_health = actor.health.max_health if actor.health != null else -1.0
+	actor.damaged.connect(_on_damaged)
 	if actor.events != null:
-		actor.events.damage_dealt.connect(_on_damage_dealt)
 		actor.events.reaction_triggered.connect(_on_reaction_triggered)
 	_show()
 
@@ -176,8 +177,8 @@ func _take_health() -> void:
 	_quiet = 0.0
 
 
-func _on_damage_dealt(_caster: int, target: Node, amount: float, _position: Vector2) -> void:
-	if target != actor or amount <= 0.0:
+func _on_damaged(_by: int, amount: float) -> void:
+	if amount <= 0.0:
 		return
 	var label: Label = _numbers[_next_number]
 	_number_left[_next_number] = NUMBER_TIME

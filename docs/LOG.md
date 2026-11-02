@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-11-02: Max shots and Show FPS settings (owner session)
 
-The pause menu's Settings page has a "Max shots" slider (`ShotCap.STOPS` in core/settings: 250 to 10,000, starting at the platform's cap) and a "Show FPS" switch. The slider sends the new `projectile_cap_changed`, which the projectile manager applies at once (`set_cap`, so the shots in the air end); the switch shows a frame rate readout at the bottom middle (`hud/widgets/fps_counter.gd`). Both are saved (`projectile_cap`, `show_fps`) and read when the menu is bound. Tests: `test_pause_menu.gd` (slider, switch, save, reload), `test_projectiles.gd` (the event sets the cap), `test_events.gd`.
+The pause menu's Settings page has a "Max shots" slider (`ShotCap.STOPS` in core/settings: 250 to 50,000, starting at the platform's cap) and a "Show FPS" switch. The slider sends the new `projectile_cap_changed`, which the projectile manager applies at once (`set_cap`, so the shots in the air end); the switch shows a frame rate readout at the bottom middle (`hud/widgets/fps_counter.gd`). Both are saved (`projectile_cap`, `show_fps`) and read when the menu is bound. Tests: `test_pause_menu.gd` (slider, switch, save, reload), `test_projectiles.gd` (the event sets the cap), `test_events.gd`.
 
 ## 2026-11-02: Projectile caps doubled with the native kernel (owner session)
 

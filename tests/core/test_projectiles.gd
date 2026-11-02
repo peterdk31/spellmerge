@@ -647,7 +647,7 @@ func _test_batches_upload_only_the_used_slice() -> void:
 	_check(idle.instance_count == 128, "100 shots need a batch of 128 (%d)" % idle.instance_count)
 	_mgr.clear()
 	_mgr.update_draw()
-	_check(idle.instance_count == 128 and _mgr._draw_room == 128 and idle.visible_instance_count == 0, "an empty batch keeps its room and draws nothing")
+	_check(idle.instance_count == 128 and _mgr._rooms[ManagerScript.BATCH_BOLT] == 128 and idle.visible_instance_count == 0, "an empty batch keeps its room and draws nothing")
 	for i in 100:
 		_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
 	_mgr.update_draw()

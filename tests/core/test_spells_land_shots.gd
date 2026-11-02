@@ -1,10 +1,13 @@
 extends "res://tests/support/suite.gd"
-## A launch of the plain flying carrier (atom, bolt, nova) spawns its shots together
-## (`CarrierAtom._launch_together`: `ProjectileManager.spawn_batch`, then `Spells._land_shots`),
-## and must leave exactly what one shot at a time leaves (`CarrierAtom.together` false): every
-## array of the manager and every record of the runtime, after casts that give the shots each
-## behaviour, a timer (a lifecycle row), payloads cast by a shot, and a staff spread (its random
-## draws). At a small cap a launch with no room goes one shot at a time, so it is the same too.
+## A carrier whose shot is one pool row (`Carrier.rows_only`: the atom's flying shots, the rune's
+## still ones, the orbit's circling ones) makes a launch's rows together and sets them up in one
+## `Spells._land_shots` (the atom also spawns them in one `ProjectileManager.spawn_batch`). It must
+## leave exactly what one shot at a time leaves (`Carrier.together` false): every array of the
+## manager and every record of the runtime. Every carrier card is cast, from a staff and as a
+## payload fired by a shot, with cards that give the shots each behaviour, timers (lifecycle
+## rows), a staff spread (its random draws), at the desktop cap and at a small one (where a launch
+## with no room goes one at a time). The carriers that are not rows only (beam, swing, slam, wall,
+## rain, the moves and bodies) are cast too: they must be untouched by the switch.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_land_shots.gd
 
@@ -16,12 +19,46 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const STEPS: int = 90
-## The staffs cast, one per staff button, all real cards.
-const STAFFS: Array = [
-	[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova"],
-	[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"fire", &"triple", &"bolt"],
-	[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"frost", &"deflect", &"return", &"split", &"nova"],
-	[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"void", &"chain", &"split", &"atom"],
+## Two sets of staffs of real cards, at most 16 each (four seats of four staffs); staff `i` of a set
+## is seat `i % 4`'s staff `i / 4`. Together they cast every carrier card, from the staff and as a
+## payload (`on_expire`, `on_hit`, `timer`).
+const SETS: Array = [
+	[
+		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova"],
+		[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"fire", &"triple", &"bolt"],
+		[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"frost", &"deflect", &"return", &"split", &"nova"],
+		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"void", &"chain", &"split", &"atom"],
+		[&"timer", &"split", &"split", &"orbit", &"fire", &"bolt"],
+		[&"growth", &"homing", &"split", &"rune"],
+		[&"on_expire", &"split", &"bolt", &"split", &"orbit"],
+		[&"on_expire", &"triple", &"bolt", &"homing", &"split", &"rune"],
+		[&"split", &"beam"],
+		[&"split", &"swing"],
+		[&"split", &"slam"],
+		[&"split", &"wall"],
+		[&"split", &"rain"],
+		[&"on_expire", &"triple", &"bolt", &"split", &"decoy"],
+		[&"split", &"familiar"],
+		[&"on_hit", &"split", &"bolt", &"split", &"swap"],
+	],
+	[
+		[&"on_expire", &"split", &"bolt", &"split", &"beam"],
+		[&"on_expire", &"split", &"bolt", &"split", &"swing"],
+		[&"on_expire", &"split", &"bolt", &"slam"],
+		[&"on_expire", &"split", &"bolt", &"wall"],
+		[&"on_expire", &"split", &"bolt", &"rain"],
+		[&"on_expire", &"split", &"bolt", &"familiar"],
+		[&"on_expire", &"split", &"bolt", &"split", &"atom"],
+		[&"timer", &"split", &"rune", &"split", &"nova"],
+		[&"on_hit", &"split", &"orbit", &"split", &"rune"],
+		[&"dash"],
+		[&"teleport"],
+		[&"on_expire", &"bolt", &"dash"],
+		[&"on_expire", &"bolt", &"teleport"],
+		[&"bigger", &"split", &"split", &"orbit"],
+		[&"triple", &"split", &"rune"],
+		[&"double", &"split", &"nova"],
+	],
 ]
 ## The spread of the staff they are on, in degrees: every shot draws from the generator.
 const SPREAD: float = 12.0
@@ -43,31 +80,51 @@ func before_each() -> void:
 		_targets.append(target)
 
 
+func after_each() -> void:
+	Carrier.together = true
+
+
+func test_every_carrier_card_is_cast() -> void:
+	var cast: Dictionary = {}
+	for staffs: Array in SETS:
+		check(staffs.size() <= 4 * SpellLimits.STAFFS, "a set fits four seats")
+		for cards: Array in staffs:
+			for card: StringName in cards:
+				cast[card] = true
+	for id: StringName in _registry.call("get_ids", &"spells"):
+		var form: FormBase = _registry.call("get_resource", &"spells", id) as FormBase
+		if form != null:
+			check(cast.has(id), "the carrier card '%s' is cast" % id)
+
+
 func test_a_launch_together_leaves_what_one_at_a_time_leaves() -> void:
-	var one: Dictionary = _run(false, 6000)
-	var together: Dictionary = _run(true, 6000)
-	check(int(one["made"]) > 500, "the casts made a crowd (%d shots)" % int(one["made"]))
-	_compare(one, together)
+	for set_index in SETS.size():
+		var one: Dictionary = _run(false, 6000, set_index)
+		var together: Dictionary = _run(true, 6000, set_index)
+		check(int(one["made"]) > 300, "set %d made a crowd (%d shots)" % [set_index + 1, int(one["made"])])
+		_compare(one, together, "set %d" % (set_index + 1))
 
 
 func test_at_a_small_cap_too() -> void:
-	var one: Dictionary = _run(false, 300)
-	var together: Dictionary = _run(true, 300)
-	check(int(one["dropped"]) > 0, "the cap dropped shots (%d)" % int(one["dropped"]))
-	_compare(one, together)
+	for set_index in SETS.size():
+		var one: Dictionary = _run(false, 120, set_index)
+		var together: Dictionary = _run(true, 120, set_index)
+		check(int(one["dropped"]) > 0, "set %d: the cap dropped shots (%d)" % [set_index + 1, int(one["dropped"])])
+		_compare(one, together, "set %d at a small cap" % (set_index + 1))
 
 
-func _compare(one: Dictionary, together: Dictionary) -> void:
-	check_equal(together.keys().size(), one.keys().size(), "the same arrays")
+func _compare(one: Dictionary, together: Dictionary, what: String) -> void:
+	check_equal(together.keys().size(), one.keys().size(), what + ": the same arrays")
 	var differ: Array[String] = []
 	for key: String in one:
 		if var_to_bytes(one[key]) != var_to_bytes(together[key]):
 			differ.append(key)
-	check(differ.is_empty(), "every array the same, byte for byte (differ: %s)" % ", ".join(differ))
+	check(differ.is_empty(), "%s: every array the same, byte for byte (differ: %s)" % [what, ", ".join(differ)])
 
 
-## Cast every staff of STAFFS from a wizard and step; returns a snapshot of the state.
-func _run(together: bool, cap: int) -> Dictionary:
+## Cast every staff of set `set_index` from the four wizards and step; returns a snapshot.
+func _run(together: bool, cap: int, set_index: int) -> Dictionary:
+	Carrier.together = together
 	var bus := EventsScript.new()
 	var manager := ManagerScript.new()
 	manager.events = bus
@@ -76,7 +133,6 @@ func _run(together: bool, cap: int) -> Dictionary:
 	var spells := SpellsScript.new()
 	spells.registry = _registry
 	spells.bind(manager, bus)
-	(spells.carrier(&"atom") as CarrierAtom).together = together
 	for target in _targets:
 		manager.add_target(target, 10.0)
 	var staff := StaffBase.new()
@@ -85,17 +141,19 @@ func _run(together: bool, cap: int) -> Dictionary:
 	staff.cast_delay = 0.0
 	staff.recharge = 0.0
 	staff.spread = SPREAD
-	var origin: Vector2 = Vector2(100.0, 120.0)
-	manager.set_anchor(0, origin)
-	for at in STAFFS.size():
+	var staffs: Array = SETS[set_index]
+	for seat in 4:
+		var origin: Vector2 = _origin(seat)
+		manager.set_anchor(seat, origin)
+		spells.set_aim(seat, origin, Vector2.RIGHT, origin)
+	for i in staffs.size():
 		var cards: Array[StringName] = []
-		cards.assign(STAFFS[at])
-		spells.install_staff(0, at, spells.compile_staff(cards, staff))
-	spells.set_aim(0, origin, Vector2.RIGHT, origin)
+		cards.assign(staffs[i])
+		spells.install_staff(i % 4, i / 4, spells.compile_staff(cards, staff))
 	for step in STEPS:
 		if step % 30 == 0:
-			for at in STAFFS.size():
-				spells.cast_staff(0, at, origin, Vector2.RIGHT.rotated(0.3 * float(at)), 1000000.0)
+			for i in staffs.size():
+				spells.cast_staff(i % 4, i / 4, _origin(i % 4), Vector2.RIGHT.rotated(0.3 * float(i)), 1000000.0)
 		manager.step(DT)
 		spells.step(DT)
 	var out: Dictionary = {}
@@ -113,3 +171,7 @@ func _run(together: bool, cap: int) -> Dictionary:
 	manager.free()
 	bus.free()
 	return out
+
+
+static func _origin(seat: int) -> Vector2:
+	return Vector2(100.0, 60.0 + 50.0 * float(seat))

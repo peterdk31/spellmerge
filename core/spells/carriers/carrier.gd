@@ -195,7 +195,7 @@ var _slots: PackedInt32Array = PackedInt32Array()
 ##
 ## A carrier whose shot is one pool row and nothing more (`rows_only`: the atom's flying shots, the
 ## rune's still ones, the orbit's circling ones) makes them together when the pool has a free slot
-## for each: every row first, in order (`spawn_row`, the spread drawn per shot as before), then all
+## for each: every row first, in order (`spawn_rows`, the spread drawn per shot as before), then all
 ## of them set up in one `land_shots`, which reads what the launch's shots share once. The same
 ## shots and records as one at a time (test_spells_land_shots). With no room for each, a spawn may
 ## drop a shot, maybe one of the launch not yet set up, so they go one at a time.
@@ -206,9 +206,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if together and count >= 2 and rows_only() and kit.projectiles != null and kit.projectiles.has_room_for(count):
 		if _slots.size() < count:
 			_slots.resize(count)
-		for n in count:
-			var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
-			_slots[n] = spawn_row(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, lifetime)
+		spawn_rows(spell, tag, actor, origin, direction, count, lifetime, _slots)
 		return kit.land_shots(_slots, count, spell, tag, source, chain, prev)
 	var made: int = 0
 	for n in count:
@@ -230,6 +228,15 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 ## By default a shot flying along `heading`.
 func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, lifetime: float) -> int:
 	return kit.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
+
+
+## The rows of a launch of `count` shots made together (`launch`), their slots written to `slots`
+## (-1 for one refused): by default `spawn_row` for each, along its heading in the fan, in order
+## (the spread drawn per shot, as one at a time). A carrier may make them faster, the same rows.
+func spawn_rows(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, count: int, lifetime: float, slots: PackedInt32Array) -> void:
+	for n in count:
+		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
+		slots[n] = spawn_row(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, lifetime)
 
 
 ## True when this carrier's `shoot` is its `spawn_row` set up by `land_shot` and nothing else, so a

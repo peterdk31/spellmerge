@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## still ones, the orbit's circling ones) makes a launch's rows together and sets them up in one
 ## `Spells._land_shots` (the atom also spawns them in one `ProjectileManager.spawn_batch`). It must
 ## leave exactly what one shot at a time leaves (`Carrier.together` false): every array of the
-## manager and every record of the runtime. Every carrier card is cast, from a staff and as a
+## manager and every record of the runtime. Every card is cast, the carriers from a staff and as a
 ## payload fired by a shot, with cards that give the shots each behaviour, timers (lifecycle
 ## rows), a staff spread (its random draws), at the desktop cap and at a small one (where a launch
 ## with no room goes one at a time). The carriers that are not rows only (beam, swing, slam, wall,
@@ -19,9 +19,10 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const STEPS: int = 90
-## Two sets of staffs of real cards, at most 16 each (four seats of four staffs); staff `i` of a set
-## is seat `i % 4`'s staff `i / 4`. Together they cast every carrier card, from the staff and as a
-## payload (`on_expire`, `on_hit`, `timer`).
+## Sets of staffs of real cards, at most 16 each (four seats of four staffs); staff `i` of a set
+## is seat `i % 4`'s staff `i / 4`. Together they cast every card (`test_every_card_is_cast`), the
+## carriers from the staff and as a payload (`on_expire`, `on_hit`, `timer`). A new card fails that
+## test until a staff here casts it.
 const SETS: Array = [
 	[
 		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova"],
@@ -59,9 +60,29 @@ const SETS: Array = [
 		[&"triple", &"split", &"rune"],
 		[&"double", &"split", &"nova"],
 	],
+	[
+		[&"blast", &"split", &"nova"],
+		[&"burst", &"split", &"bolt"],
+		[&"echo", &"split", &"nova"],
+		[&"faster", &"heavy", &"split", &"nova"],
+		[&"hold", &"split", &"orbit"],
+		[&"mend", &"split", &"nova"],
+		[&"mirror", &"split", &"rune"],
+		[&"on_block", &"shield", &"split", &"orbit", &"split", &"nova"],
+		[&"on_cast", &"split", &"nova", &"split", &"bolt"],
+		[&"on_hurt", &"split", &"orbit", &"fire", &"nova"],
+		[&"on_kill", &"overcharge", &"split", &"nova", &"split", &"rune"],
+		[&"on_reaction", &"fire", &"split", &"nova", &"frost", &"split", &"nova"],
+		[&"on_wall", &"bounce", &"split", &"nova", &"split", &"atom"],
+		[&"possess", &"pull", &"split", &"bolt"],
+		[&"reach", &"recoil", &"relay", &"split", &"nova"],
+		[&"scatter", &"short_delay", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt"],
+	],
 ]
 ## The spread of the staff they are on, in degrees: every shot draws from the generator.
 const SPREAD: float = 12.0
+## Scratch, not state: left out of the comparison.
+const SCRATCH: Array[String] = ["spells._one_slot"]
 
 
 var _registry: Node
@@ -84,17 +105,17 @@ func after_each() -> void:
 	Carrier.together = true
 
 
-func test_every_carrier_card_is_cast() -> void:
+func test_every_card_is_cast() -> void:
 	var cast: Dictionary = {}
 	for staffs: Array in SETS:
 		check(staffs.size() <= 4 * SpellLimits.STAFFS, "a set fits four seats")
 		for cards: Array in staffs:
 			for card: StringName in cards:
 				cast[card] = true
-	for id: StringName in _registry.call("get_ids", &"spells"):
-		var form: FormBase = _registry.call("get_resource", &"spells", id) as FormBase
-		if form != null:
-			check(cast.has(id), "the carrier card '%s' is cast" % id)
+	var ids: Array = _registry.call("get_ids", &"spells")
+	check(ids.size() > 40, "the registry has the cards (%d)" % ids.size())
+	for id: StringName in ids:
+		check(cast.has(id), "the card '%s' is cast by a staff in SETS" % id)
 
 
 func test_a_launch_together_leaves_what_one_at_a_time_leaves() -> void:
@@ -163,7 +184,8 @@ func _run(together: bool, cap: int, set_index: int) -> Dictionary:
 			var name: String = property["name"]
 			var type: int = property["type"]
 			if type >= TYPE_PACKED_BYTE_ARRAY and type <= TYPE_PACKED_VECTOR4_ARRAY or type == TYPE_INT or type == TYPE_FLOAT:
-				out[prefix + name] = object.get(name)
+				if not SCRATCH.has(prefix + name):
+					out[prefix + name] = object.get(name)
 	out["spells._live"] = spells.get("_live")
 	out["made"] = int(manager.get("_next_seq"))
 	out["dropped"] = manager.dropped

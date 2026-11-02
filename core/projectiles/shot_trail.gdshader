@@ -39,6 +39,10 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // under it), then the pixels, oldest first and the core last, so the newest is on top.
 // The particle kinds are DATA, not code: one row each in the tables below (LOOK TABLE), read by
 // one routine (`spark`), so a new kind is a new row.
+// A quad is one triangle (performance, 2026-11-02: every vertex runs the whole vertex stage, and
+// three are a quarter less than four): its corners are the box's low corner and twice the box
+// along each axis, so the box is inside it, and the fragment stage cuts it to the box (`box`), a
+// pixel in it when its centre is, as a square's two triangles take it.
 // The instance carries its data in its transform (the batch must sit untransformed at the
 // origin): origin the head (where the shot is drawn this frame), x axis (row, newest sample's
 // number), y axis (samples kept, TF_* flags). The colour and the custom data are the look
@@ -156,6 +160,7 @@ const vec2 WINDOW[22] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0),
 // What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
 // mode, three numbers and three colours.
 varying vec2 world;
+varying flat vec4 box;
 varying flat float mode;
 varying flat vec4 v0;
 varying flat vec4 v1;
@@ -284,11 +289,11 @@ struct Spark {
 	vec4 light;
 };
 
-// One routine for every kind, driven by its row of the LOOK TABLE. `t_top` is when the path
-// ends (now for a live shot), `head_end` its newest end, `window` the trail's (WINDOW), `target`
-// where the shot is (or was last: void pulls in to it, shields circle it), `k` the sample before
-// its moment (`samples_before`, by time).
-Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, float k, Look L) {
+// One routine for every kind, driven by its row of the LOOK TABLE. `kind` is the one it was given
+// off as (`trail_kind`, -2 for none), `head_end` the path's newest end, `target` where the shot is
+// (or was last: void pulls in to it, shields circle it), `k` the sample before its moment
+// (`samples_before`, by time).
+Spark spark(float row, float newest, float skip, vec4 head_end, float kind, vec2 target, bool dash, float id, float j, float k, Look L) {
 	Spark S;
 	S.alive = false;
 	S.pos = vec2(0.0);
@@ -300,15 +305,8 @@ Spark spark(float row, float newest, float count, float skip, vec4 head_end, flo
 	S.light = vec4(0.0);
 	float t = id / BIRTHS;
 	float ago = trail_now - t;
-	if (ago < 0.0 || ago > window || t >= t_top) {
-		return S;
-	}
-	float kind = trail_kind(id, j, dash, L.emits, row);
-	if (kind < -1.5) {
-		return S;
-	}
 	// The piece it was born on, and where on it.
-	if (k < 0.0) {
+	if (kind < -1.5 || k < 0.0) {
 		return S;
 	}
 	vec4 A = trail_texel(row, newest, k);
@@ -392,10 +390,10 @@ void vertex() {
 	float flags = MODEL_MATRIX[1].y;
 	vec2 head = MODEL_MATRIX[3].xy;
 	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
-	// corner in UV.y (kind + 0.25 or 0.75).
+	// corner in UV.y (kind + 0.25 or 0.75); a corner of the triangle is 0 or twice the box.
 	float slot = floor(UV.x);
 	float quad = floor(UV.y);
-	vec2 corner = vec2(fract(UV.x) > 0.5 ? 1.0 : 0.0, fract(UV.y) > 0.5 ? 1.0 : 0.0);
+	vec2 corner = vec2(fract(UV.x) > 0.5 ? 2.0 : 0.0, fract(UV.y) > 0.5 ? 2.0 : 0.0);
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, row < 0.0 ? 0.0 : mod(row, 61.0) * 1.618, true);
 	// Zoom 0 in the look (`look_core_zoom`): a speck, its core one pixel; the rest is drawn at 1.
 	bool speck = floor(COLOR.r * 255.0 + 0.5) < 4.0;
@@ -466,12 +464,30 @@ void vertex() {
 	float n = (ceil(o_top / gap) - 1.0 - slot) * gap;
 	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
 	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
-	// The one search of the path: the pieces the quad's moment, pixel or step ends are on.
-	vec2 key = is_spark ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
-	vec2 before = samples_before(row, newest, skip, count - 1.0, key, is_spark);
+	// A particle slot's particle: which of the moment's, and the kind it was given off as (-2 for
+	// none: not born, or outside the path or the trail's window).
+	float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
+	float kind = -2.0;
 	if (is_spark) {
-		float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
-		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, id, j, before.x, L);
+		float t = id / BIRTHS;
+		float ago = trail_now - t;
+		if (ago >= 0.0 && ago <= trail_window(b, dash, tail) && t < t_top) {
+			kind = trail_kind(id, j, dash, L.emits, row);
+		}
+	}
+	// The one search of the path: the pieces the quad's moment, pixel or step ends are on. Only a
+	// slot that may still draw searches (performance, 2026-11-02: the search is most of a vertex's
+	// work, and most particle slots have no particle): a particle that was given off, a tail
+	// pixel while the trail has a tail, a step of lightning's line. The head, the core and the
+	// pieces' lights never read it.
+	bool search = is_spark ? kind > -1.5 : (quad == Q_TAIL ? !dash && tail > 0.0 : quad == Q_JAG && lightning && !dash);
+	vec2 before = vec2(-1.0);
+	if (search) {
+		vec2 key = is_spark ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
+		before = samples_before(row, newest, skip, count - 1.0, key, is_spark);
+	}
+	if (is_spark) {
+		Spark S = spark(row, newest, skip, head_end, kind, target, dash, id, j, before.x, L);
 		if (S.alive) {
 			vec2 px = floor(S.pos);
 			if (quad == Q_SPARK_LIGHT || quad == Q_PIECE_LIGHT) {
@@ -648,8 +664,9 @@ void vertex() {
 		}
 	}
 	// Folded away when there is nothing to draw.
-	VERTEX = shown ? mix(q_lo, q_hi, corner) : vec2(-1.0e6);
+	VERTEX = shown ? q_lo + (q_hi - q_lo) * corner : vec2(-1.0e6);
 	world = VERTEX;
+	box = vec4(q_lo, q_hi);
 	mode = m;
 	v0 = a0;
 	v1 = a1;
@@ -731,5 +748,7 @@ void fragment() {
 			colour = along < v2.x ? c0 : c1;
 		}
 	}
-	COLOR = colour;
+	// Only the box's pixels: the rest of the triangle is outside the quad.
+	bool inside = all(greaterThanEqual(c, box.xy)) && all(lessThan(c, box.zw));
+	COLOR = inside ? colour : vec4(0.0);
 }

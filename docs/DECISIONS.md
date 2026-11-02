@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: Cheaper trail vertices (owner session)
+
+- **Asked:** the owner: "optimize performance more for shots/tails".
+- **Where the time is:** `tests/benchmark/trail_gpu.gd` on llvmpipe, 400 shots: the vertex stage is about 58 of 70 ms a frame (every vertex folded at once: 12 ms); a fragment stage that draws nothing changed nothing. On the CPU the sandbox storm's manager step is mostly the hits' listeners (Combat's 68 us a hit), not the shots' own work; the manager's `update_draw` is 1.3 ms at 4,000 shots.
+- **The search only where it can matter:** every vertex ran the path search, though the head, the core and the pieces' lights never read it and most particle slots have no particle (not given off at this moment, or outside the trail's window). The particle's kind is now picked before the search (`spark` takes it), and only a particle that was given off, a tail pixel while the trail has a tail or a step of lightning's line searches. Still one call site of `samples_before` (Direct3D, 2026-10-29). Pixel-identical. 400 shots 76 -> 51 ms, 60 shots 33 -> 28.5 ms.
+- **One triangle a quad:** a quad was a square of 4 vertices; it is a triangle of 3 (corners at the box's low corner and twice the box along x and y), and the fragment stage keeps a pixel only when its centre is in the box (left and top edges in, right and bottom out, as a square's two triangles take them; where the GL renderer's edge rule would differ, a pixel exactly on a box's edge is at the end of a light's falloff or beside a pixel quad's or line's, so it is 0 either way). Pixel-identical. Vertices a frame -25%; 400 shots 51 -> 47 ms (the triangles cover twice the area, so part of it goes back to fill).
+- **Measured and left:** the trail's window (a 21-step loop over the look bits per particle slot) from the CPU in the free `INSTANCE_CUSTOM.a`: no measurable gain, and it would change the native kernel too. 3,000 shots are not faster on llvmpipe (the pool has already thinned their meshes to a few slots; what is left is per instance). Points (one vertex a quad) were not tried: point sizes are capped on some GPUs, and a light's quad is many pixels wide on a large screen.
+
 ## 2026-11-02: Sandbox storm, a launch's shots made together, repeat hits (owner session)
 
 - **Asked:** the owner: a benchmark of many shots that hit, with the sandbox's dev staff (splits and novas) at dummies, "for you to use"; then the batched spawn "if it will give more performance".

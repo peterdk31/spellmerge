@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: Cheaper trail vertices (owner session)
+
+`shot_trail.gdshader`: the path search (12 texel fetches, most of a vertex's work) runs only for a slot that may still draw (a particle that was given off, a tail pixel while the trail has a tail, a step of lightning's line), and each quad of a trail's mesh is one triangle (`TRAIL_QUAD_VERTICES` 3, cut to its box in the fragment stage), so a quarter fewer vertices. Every frame of `tests/benchmark/trail_gpu.gd` is pixel-identical to before. llvmpipe GPU time, medians of runs taken in turn: 400 shots 76 -> 47 ms (the search 76 -> 51, the triangles 51 -> 47), 60 shots 33 -> 25 ms; 3,000 shots unchanged (about 105 ms: the pool has already thinned those meshes to a few slots). `trail_gpu.gd` takes `--only=` and `--timed=`. Tests: `test_projectile_looks` (the mesh's triangles). Details: docs/DECISIONS.md.
+
 ## 2026-11-02: Sandbox storm and a launch's shots made together (owner session)
 
 `tests/benchmark/sandbox_storm.gd` (new): the sandbox's split-and-nova build held among the training dummies, printing shots, hits per dummy and, with `--profile`/`--profile-signals`, where a step goes. Using it: the atom carrier makes a launch's shots together (`ProjectileManager.spawn_batch`, `set_looks`, `Spells._land_shots`), the same result as one by one (`test_spells_land_shots`, every array byte for byte); Spells' step 5.6 -> 2.3 ms and the frame 33 -> 14-17 ms in the storm. Feel skips the flash, hold and sound of a repeat hit (23 -> 15 us a hit; `test_feel_repeat_hits`), and the training dummy hears only its own hits. Details: docs/DECISIONS.md.

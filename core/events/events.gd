@@ -96,7 +96,7 @@ signal target_move_requested(caster: int, target: Node, to: Vector2)
 signal entity_spawn_requested(caster: int, kind: StringName, position: Vector2, seconds: float, tag: int, anchor: int)
 ## Sender: core/spells. The entities of the actor `caster` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
 signal entity_end_requested(caster: int, tag: int)
-## Sender: ai. The entity of the actor `caster` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
+## Sender: ai. The entity of the actor `caster` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point); ai names the entity's key in `Spells.entity_key` while this is sent, so only that entity's timers leave.
 signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. Mana of the actor `caster`'s staff `staff` (the staff whose shot hit) comes back (siphon). Heard by every actor's Caster, each for its own actor.
 signal mana_refund_requested(caster: int, staff: int, amount: float)

@@ -132,7 +132,8 @@ var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
 ## Spawn order, to find an owner's oldest.
 var _born: PackedInt64Array = PackedInt64Array()
-## A familiar's key from Spells (`Spells.entity_key`, 0 for none): where it is goes back by it.
+## An entity's key from Spells (`Spells.entity_key`, 0 for none): where a familiar is goes back by
+## it, and every entity names it again as it ends.
 var _key: PackedInt64Array = PackedInt64Array()
 ## The familiar's wizard or enemy, or null.
 var _caster: Array[Node2D] = []
@@ -500,7 +501,14 @@ func _end(row: int, announce: bool) -> void:
 		# Out of the tree: its id, hurt circle and caster close, and nothing aims at it any more.
 		remove_child(decoy)
 	if announce and events != null:
+		# Spells hears which of its tag's entities this is (its key), so this one's timer leaves. An
+		# end inside a spawn (the cap) puts back the key the spawn is asking under.
+		var asking: int = spells.entity_key if spells != null else 0
+		if spells != null:
+			spells.entity_key = _key[row]
 		events.entity_ended.emit(_owner[row], kind, _position[row], _tag[row])
+		if spells != null:
+			spells.entity_key = asking
 	queue_redraw()
 
 

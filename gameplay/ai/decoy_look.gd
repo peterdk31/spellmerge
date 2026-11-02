@@ -1,9 +1,10 @@
 class_name DecoyLook
 extends ActorLook
-## A decoy's look (`Entities`): a still copy of its caster's body, the `Sprite` and its `Hat`
-## copied when it is placed (`copy_look`), drawn by the shots' sprite shader part fallen apart in
-## its caster's colour with a glow (`tint`), so it never reads as a second wizard; never
-## see-through (the glow look, 2026-10-27).
+## A decoy's look (`Entities`): a copy of its caster's body, the `Sprite` and its `Hat` copied when
+## it is placed (`copy_look`), drawn by the shots' sprite shader part fallen apart in its caster's
+## colour with a glow (`tint`), so it never reads as a second wizard; never see-through (the glow
+## look, 2026-10-27). A copy of a living staff (a head sheet of `StaffLook.DIRECTIONS` columns)
+## turns to the way the decoy aims, as the staff it copies does.
 
 ## How far the copy has fallen apart (`shot_sprite.gdshader`'s dissolve) and how bright its glow is.
 const DISSOLVE: float = 0.3
@@ -24,6 +25,13 @@ func _init() -> void:
 	hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	hat.material = _material()
 	sprite.add_child(hat)
+
+
+func step(_delta: float) -> void:
+	if sprite.texture != null and sprite.hframes == StaffLook.DIRECTIONS:
+		var column: int = StaffLook.direction_of(actor.aim)
+		if sprite.frame_coords.x != column:
+			sprite.frame_coords = Vector2i(column, sprite.frame_coords.y)
 
 
 func _material() -> ShaderMaterial:

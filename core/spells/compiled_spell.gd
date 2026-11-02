@@ -127,6 +127,9 @@ var slot: int = -1
 ## attaches them; its triggers are in `triggers` and a group's multicasts in the group. For the
 ## builder's tree (docs/milestones/M2-builder-tree.md, part T3).
 var card_slots: PackedInt32Array = PackedInt32Array()
+## The behaviours that make a hit not plain (`plain_hit`), and its answer once worked out (-1 not yet).
+const PLAIN_HIT_BEHAVIOURS: Array[int] = [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.BLAST]
+var _plain_hit: int = -1
 
 
 ## The stacked strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
@@ -157,10 +160,6 @@ func plain_hit() -> bool:
 			if behaviour(kind) > 0.0:
 				_plain_hit = 0
 	return _plain_hit == 1
-
-
-const PLAIN_HIT_BEHAVIOURS: Array[int] = [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.BLAST]
-var _plain_hit: int = -1
 
 
 ## True when one of its triggers goes off on `event` (a `TriggerBase.Event`).

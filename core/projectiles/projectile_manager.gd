@@ -990,6 +990,8 @@ func is_native() -> bool:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
+	if events != null and not events.projectile_cap_changed.is_connected(_on_projectile_cap_changed):
+		events.projectile_cap_changed.connect(_on_projectile_cap_changed)
 	_draw_node = _make_batch(DRAW_Z, TRAIL_SHADER, trail_mesh())
 	_rune_node = _make_batch(DRAW_Z, RUNE_SHADER, null)
 	_orbit_node = _make_batch(DRAW_Z, TRAIL_SHADER, trail_mesh())
@@ -1237,6 +1239,13 @@ func set_cap(value: int) -> void:
 
 func get_cap() -> int:
 	return _cap
+
+
+## The "Max shots" setting (`projectile_cap_changed`): a new cap applies at once, which ends the
+## shots in the air (`set_cap`); the same cap changes nothing.
+func _on_projectile_cap_changed(cap: int) -> void:
+	if cap != _cap:
+		set_cap(cap)
 
 
 ## The area the projectiles live in. Also sizes the target grid.

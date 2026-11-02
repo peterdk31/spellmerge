@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_tag_comes_back_with_the_hit()
 	_test_cap_drop_order_after_other_deaths()
 	_test_default_cap_follows_the_platform()
+	_test_the_max_shots_setting_sets_the_cap()
 	_test_a_smaller_cap_with_shots_in_high_slots()
 	_test_bad_arguments()
 	_test_cap_drops_the_oldest_of_the_richest()
@@ -368,6 +369,25 @@ func _test_default_cap_follows_the_platform() -> void:
 	_setup()
 	var expected: int = ManagerScript.DEFAULT_CAP_WEB if OS.has_feature("web") else ManagerScript.DEFAULT_CAP_DESKTOP
 	_check(_mgr.get_cap() == expected, "the default cap is %d on this platform" % expected)
+
+
+## The pause menu's "Max shots" (`projectile_cap_changed`) sets the cap at once; the shots in the
+## air end; the same cap again changes nothing.
+func _test_the_max_shots_setting_sets_the_cap() -> void:
+	_setup()
+	root.add_child(_mgr)
+	_check(ShotCap.STOPS.has(ShotCap.default_cap()), "the platform's cap is a stop of the setting")
+	for i in 5:
+		_mgr.spawn(0, Vector2(float(i), 0.0), Vector2.RIGHT, 5.0)
+	_bus.projectile_cap_changed.emit(250)
+	_check(_mgr.get_cap() == 250 and _mgr.get_count() == 0, "the new cap applies and the shots in the air end")
+	for i in 300:
+		_mgr.spawn(i % 4, Vector2(float(i % 50), 0.0), Vector2.RIGHT, 5.0)
+	_check(_mgr.get_count() == 250, "it fills and drops at the new cap")
+	_bus.projectile_cap_changed.emit(250)
+	_check(_mgr.get_count() == 250, "the same cap again keeps the shots")
+	_check(ShotCap.snap(1) == ShotCap.STOPS[0] and ShotCap.snap(1_000_000) == ShotCap.STOPS[-1] and ShotCap.snap(5000) == 4000, "a saved number snaps to the nearest stop (the lower on a tie)")
+	_teardown()
 
 
 func _test_bad_arguments() -> void:

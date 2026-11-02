@@ -3,7 +3,7 @@ extends SceneTree
 ## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
 ## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen and Effect slots; `back` (B)
+## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Max shots, Screen shake and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
 ## open builder; in the horde's build break (the game paused until every player is ready) the
 ## menu opens and closes and leaves the game paused, also when the break ends while it is open
@@ -32,6 +32,8 @@ var _actions: Array[Array] = []
 var _slots: Array[int] = []
 ## Every `screen_shake_changed` the bus sent, from before the Hud binds.
 var _shakes: Array[bool] = []
+## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
+var _caps: Array[int] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -46,6 +48,8 @@ func _initialize() -> void:
 	_test_the_fullscreen_switch()
 	_test_the_effect_slots_slider()
 	_test_the_screen_shake_switch()
+	_test_the_max_shots_slider()
+	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
 	_test_the_enemy_arena()
@@ -80,6 +84,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
+	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -100,6 +105,7 @@ func _teardown() -> void:
 	_actions.clear()
 	_slots.clear()
 	_shakes.clear()
+	_caps.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -300,7 +306,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "ScreenShake", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -328,6 +334,74 @@ func _test_the_screen_shake_switch() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(not _menu().screen_shake, "a later menu starts with it off")
 	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Max shots starts at the platform's cap and sends nothing; left and right step through the
+## stops and tell the projectile manager, accept steps up and wraps, and the choice is saved: a
+## menu bound to the same save later starts with it and tells the manager.
+func _test_the_max_shots_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_caps.is_empty(), "nothing is sent at the platform's cap")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("ShotCap")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	var start: int = ShotCap.default_cap()
+	var at: int = ShotCap.index_of(start)
+	_check(ShotCap.STOPS[at] == start, "the platform's cap is a stop")
+	_check(row.text.ends_with("Max shots: %d" % start) and is_equal_approx(bar.value, float(at)), "the platform's cap at the start, in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_left")
+	_frame()
+	_check(_caps == [ShotCap.STOPS[at - 1]], "left asks for the stop below, got %s" % [_caps])
+	_check(row.text.ends_with("Max shots: %d" % ShotCap.STOPS[at - 1]) and is_equal_approx(bar.value, float(at - 1)), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"projectile_cap", 0)) == ShotCap.STOPS[at - 1], "the save remembers it")
+	for i in ShotCap.STOPS.size():
+		_tap(0, &"move_right")
+		_frame()
+	_check(_menu().shot_cap == ShotCap.STOPS[-1] and _caps.back() == ShotCap.STOPS[-1], "it stops at the top")
+	var sent: int = _caps.size()
+	_tap(0, &"move_right")
+	_frame()
+	_check(_caps.size() == sent, "past the end nothing is sent")
+	_press(0, "ShotCap")
+	_check(_menu().shot_cap == ShotCap.STOPS[0], "accept at the top wraps to the bottom")
+	_press(0, "ShotCap")
+	_check(_menu().shot_cap == ShotCap.STOPS[1], "accept steps up")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().shot_cap == ShotCap.STOPS[1], "a later menu starts with the saved cap")
+	_check(_caps == [ShotCap.STOPS[1]], "and tells the manager when the Hud binds, got %s" % [_caps])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Show FPS is off by default (the readout hidden), flips on accept, shows the readout, and is
+## kept in the save: a Hud bound to the same save later shows it from the start.
+func _test_the_show_fps_switch() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	var fps: Label = _hud.get_fps_counter()
+	_check(fps != null and not fps.visible, "the readout is hidden by default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("ShowFps").text.ends_with("Show FPS: Off"), "the switch says Off")
+	_press(0, "ShowFps")
+	_check(_menu().button("ShowFps").text.ends_with("Show FPS: On") and fps.visible, "it flips on and shows the readout")
+	_check(fps.text.ends_with(" FPS"), "the readout reads 'N FPS', got '%s'" % fps.text)
+	_check(bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", false)), "the save remembers it")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().show_fps and _hud.get_fps_counter().visible, "a later Hud shows it from the start")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_press(0, "ShowFps")
+	_check(not _hud.get_fps_counter().visible and not bool(SaveFile.new(SAVE_PATH).get_setting(&"show_fps", true)), "and flips back off, saved")
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 
@@ -404,7 +478,7 @@ func _test_the_effect_slots_slider() -> void:
 	_focus.focus(0, row)
 	_tap(0, &"move_down")
 	_frame()
-	_check(_focus.focused(0) == _menu().button("ScreenShake"), "down leaves the slider")
+	_check(_focus.focused(0) == _menu().button("ShotCap"), "down leaves the slider")
 	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "all on the Settings page")
 
 

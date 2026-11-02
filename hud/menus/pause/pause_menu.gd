@@ -19,7 +19,8 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", Back. The switch asks
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Max shots: 6000", "Screen shake: On",
+##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
@@ -28,7 +29,14 @@ extends PanelContainer
 ##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now). "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
-##   when the menu is bound, so it holds between plays. (The Gameplay page, with
+##   when the menu is bound, so it holds between plays. "Max shots" (owner, 2026-11-02) is a
+##   slider like "Effect slots" through `ShotCap.STOPS` (core/settings), from the platform's cap
+##   (`ShotCap.default_cap()`); each move sends `projectile_cap_changed`, which the projectile
+##   manager applies at once (the shots in the air end), and is saved (`projectile_cap`); a saved
+##   cap other than the default is sent again when the menu is bound. "Show FPS: Off" (or On;
+##   owner, 2026-11-02) flips on `accept`, is saved (`show_fps`) and sends `show_fps_changed`,
+##   which `hud/panels` applies to its frame rate readout (`hud/widgets/fps_counter.gd`); panels
+##   reads `show_fps` once after binding the menu. (The Gameplay page, with
 ##   "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits everything, always.)
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
@@ -67,6 +75,8 @@ signal builder_options_changed(radial: bool, ring: Ring, push: bool)
 ## The reload switch on the Sandbox page flipped: the staff rows show the delay on the button
 ## glyph, or on the next cast.
 signal reload_style_changed(on_button: bool)
+## The "Show FPS" switch on the Settings page flipped.
+signal show_fps_changed(on: bool)
 
 const BUILDER_TEXT: String = "Builder: %s"
 const RING_TEXT: String = "Ring: %s"
@@ -84,6 +94,10 @@ const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
 const SHAKE_TEXT: String = "Screen shake: %s"
 ## The saved setting that holds the choice.
 const SHAKE_SETTING: StringName = &"screen_shake"
+const SHOT_CAP_TEXT: String = "Max shots: %d"
+const SHOT_CAP_SETTING: StringName = &"projectile_cap"
+const FPS_TEXT: String = "Show FPS: %s"
+const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
 const SLIDER_WIDTH: float = 64.0
 
@@ -111,6 +125,10 @@ var reload_on_button: bool = true
 var effect_slots: int = EffectSlots.DEFAULT
 ## The "Screen shake" setting (see the top): on by default.
 var screen_shake: bool = true
+## The "Max shots" setting (see the top): the platform's cap by default.
+var shot_cap: int = ShotCap.default_cap()
+## The "Show FPS" setting (see the top): off by default.
+var show_fps: bool = false
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
@@ -144,8 +162,11 @@ var ai_view: bool = false
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
-@onready var _effects_bar: HSlider = _add_slider(_effects)
+@onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
+@onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
+@onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
+@onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 
 
@@ -165,6 +186,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	if save == null:
 		save = SaveFile.new()
 	_load_shake()
+	_load_shot_cap()
+	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
 		_events.horde_break_changed.connect(_on_horde_break_changed)
@@ -239,13 +262,14 @@ func _add(on_page: Page, node_name: String, text: String) -> Button:
 
 
 ## A slider bar drawn in `row` (at its right), for show only: the row works it (see the top).
-func _add_slider(row: Button) -> HSlider:
+## `longest_text` is the row's longest words, which the row is made wide enough for.
+func _add_slider(row: Button, low: int, high: int, step: int, value: int, longest_text: String) -> HSlider:
 	var bar := HSlider.new()
 	bar.name = "Bar"
-	bar.min_value = EffectSlots.MIN
-	bar.max_value = EffectSlots.MAX
-	bar.step = EffectSlots.STEP
-	bar.value = effect_slots
+	bar.min_value = low
+	bar.max_value = high
+	bar.step = step
+	bar.value = value
 	bar.editable = false
 	bar.focus_mode = Control.FOCUS_NONE
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -256,7 +280,7 @@ func _add_slider(row: Button) -> HSlider:
 	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	# Wide enough for the longest words (focused, at the top) and the bar beside them.
 	var font: Font = row.get_theme_font(&"font")
-	var longest: float = font.get_string_size(FOCUS_MARK + EFFECT_SLOTS_TEXT % EffectSlots.MAX, HORIZONTAL_ALIGNMENT_LEFT, -1, row.get_theme_font_size(&"font_size")).x
+	var longest: float = font.get_string_size(FOCUS_MARK + longest_text, HORIZONTAL_ALIGNMENT_LEFT, -1, row.get_theme_font_size(&"font_size")).x
 	row.custom_minimum_size.x = longest + SLIDER_WIDTH + 24.0
 	return bar
 
@@ -267,6 +291,10 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 	if control == _effects and direction.x != 0:
 		_set_effect_slots(effect_slots + direction.x * EffectSlots.STEP)
 		return _effects
+	if control == _shots and direction.x != 0:
+		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
+		_set_shot_cap(ShotCap.STOPS[at])
+		return _shots
 	if control == _arena_enemy and direction.x != 0:
 		_pick_enemy(arena_pick + direction.x)
 		return _arena_enemy
@@ -442,8 +470,12 @@ func _on_activated(player: int, control: Control) -> void:
 		_show_fullscreen()
 	elif control == _effects:
 		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
+	elif control == _shots:
+		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
 	elif control == _shake:
 		_set_shake(not screen_shake)
+	elif control == _fps:
+		_set_fps(not show_fps)
 	elif control == _sandbox_back or control == _settings_back:
 		_go(Page.MAIN)
 
@@ -476,6 +508,48 @@ func _set_shake(on: bool) -> void:
 	save.set_setting(SHAKE_SETTING, on)
 	if _events != null:
 		_events.screen_shake_changed.emit(on)
+
+
+## Read the saved cap and show it; the manager is told only when it is not the platform's (the
+## manager's own default).
+func _load_shot_cap() -> void:
+	var saved: int = ShotCap.snap(int(save.get_setting(SHOT_CAP_SETTING, ShotCap.default_cap())))
+	_show_shot_cap(saved)
+	if saved != ShotCap.default_cap() and _events != null:
+		_events.projectile_cap_changed.emit(saved)
+
+
+## Move the "Max shots" slider to `cap` (a stop): show it, save it and tell the manager.
+func _set_shot_cap(cap: int) -> void:
+	if cap == shot_cap:
+		return
+	_show_shot_cap(cap)
+	save.set_setting(SHOT_CAP_SETTING, cap)
+	if _events != null:
+		_events.projectile_cap_changed.emit(cap)
+
+
+func _show_shot_cap(cap: int) -> void:
+	shot_cap = cap
+	_shots.set_meta(BASE_TEXT_META, SHOT_CAP_TEXT % cap)
+	_shots_bar.value = ShotCap.index_of(cap)
+	_mark_focus()
+
+
+## Read the saved "Show FPS" choice and show it (panels reads `show_fps` after binding).
+func _load_fps() -> void:
+	show_fps = bool(save.get_setting(FPS_SETTING, false))
+	_fps.set_meta(BASE_TEXT_META, FPS_TEXT % ("On" if show_fps else "Off"))
+	_mark_focus()
+
+
+## Flip the "Show FPS" switch: show it, save it and tell panels.
+func _set_fps(on: bool) -> void:
+	show_fps = on
+	_fps.set_meta(BASE_TEXT_META, FPS_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(FPS_SETTING, on)
+	show_fps_changed.emit(on)
 
 
 ## Write the fullscreen switch's word from the window itself.

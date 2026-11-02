@@ -134,6 +134,7 @@ func _init(root: Node, shelf: Shelf, staff: StaffBase) -> void:
 	entities.projectiles = projectiles
 	entities.spells = spells
 	entities.actors = table
+	entities.combat = combat
 	_root.add_child(entities)
 	entities.set_physics_process(false)
 	_listen()

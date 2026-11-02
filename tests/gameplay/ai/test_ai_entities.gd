@@ -66,6 +66,8 @@ func before_each() -> void:
 	_entities.events = _bus
 	_entities.projectiles = _projectiles
 	_entities.spells = _spells
+	_entities.combat = _combat
+	_entities.actors = _actors
 	root.add_child(_entities)
 	_enemies.clear()
 	var bolt := FormBase.new()
@@ -161,31 +163,32 @@ func _run(seconds: float) -> void:
 		_entities.step(STEP)
 
 
-func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
+func test_an_enemys_decoy_copies_it_aims_at_the_wizard_and_breaks() -> void:
 	var enemy := _enemy(_data([&"decoy"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
 	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "its decoy card makes one decoy, the enemy's")
 	check_equal(_entities.count(EntitiesScript.DECOY, _wizard.id), 0, "not the wizard's")
-	var at: Vector2 = _entities.positions_of(enemy.id, tag)[0]
-	var decoy: Node2D = _projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_ENEMY, enemy)
-	check(decoy is EntitiesScript.Decoy, "a target on the enemies' layer, where wizards' shots and homing look")
+	var decoy: Actor = _entities.decoy_of(enemy.id)
+	if decoy == null:
+		check(false, "the enemy's decoy")
+		return
+	var at: Vector2 = decoy.global_position + decoy.body_offset
+	check(_projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_ENEMY, enemy) == decoy, "a target on the enemies' layer, where wizards' shots and homing look")
 	check(_projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_PLAYER, _wizard) == null, "and not on the wizards' layer")
-	var copied: Sprite2D = (decoy as EntitiesScript.Decoy).sprite
+	check_equal(_projectiles.target_owner_of(decoy), enemy.id, "it belongs to the enemy: its shots pass it")
+	check_equal(_actors.team_of(decoy.id), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
+	var copied: Sprite2D = (decoy.get_node("Look") as DecoyLook).sprite
 	var fresh: Node = ImpData.scene.instantiate()
 	var looks: Array = [(fresh.get_node("Sprite") as Sprite2D).texture, _look(enemy).windup_texture, _look(enemy).hurt_texture]
 	fresh.free()
 	check(copied.texture != null and looks.has(copied.texture), "it copies the enemy's sprite")
-	check(_entities.lure(at) == null, "enemies never chase an enemy's decoy")
-	# Another enemy's shot wears it too (its own enemy's never reach it: core/projectiles).
-	var other_enemy: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0), -1)
-	var wizard_tag: int = SpellTag.make(_wizard.id, 0, 0, 0)
-	for i in EntitiesScript.DECOY_HITS - 2:
-		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "it holds until its last hit")
-	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "DECOY_HITS hits break it, an enemy's among them")
+	_run(4.0 * STEP)
+	var to_wizard: Vector2 = (_wizard.global_position - decoy.global_position).normalized()
+	check(decoy.aim.dot(to_wizard) > 0.95, "it aims at the wizard, its nearest foe (%s)" % decoy.aim)
+	decoy.health.take(EntitiesScript.DECOY_HEALTH, _wizard.id)
+	_run(STEP)
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "with its health gone it breaks")
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
 

@@ -22,7 +22,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `STAYS` | Is it a shot that stays in the world a while (a bolt, a rune, an orbit, a wall...)? |
 | `HITS` | Does it hit things itself (not a decoy or a familiar)? |
 | `LASTS` | Does it last a while (not a slam or a teleport, which are over at once)? |
-| `STEERS` | Can homing steer it (turn it, bend it, or place it on a target)? |
+| `STEERS` | Can homing steer it (turn it, bend it, place it on a target, or creep it toward one: a rune, a wall, a decoy)? |
 | `MEETS_SHOTS` | Can it stop or turn other shots (not a rain or a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
 | `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |

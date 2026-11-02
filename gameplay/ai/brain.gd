@@ -9,8 +9,8 @@ extends RefCounted
 ##
 ## **Perceiving and deciding** run on the profile's `reaction` timer (staggered per brain), and at
 ## once when an attack is over or the target was lost, never every step. Targeting is as before:
-## the nearest actor of another team that can be hit now (`Projectiles.nearest_target`), a
-## player's decoy in lure range first, a teammate that hurt it for GRUDGE_TIME (infighting).
+## the nearest actor of another team that can be hit now (`Projectiles.nearest_target`; a decoy
+## is one, chased when it is the nearest), a teammate that hurt it for GRUDGE_TIME (infighting).
 ##
 ## **The steps of the executor** (`state`): CHASE (walk as planned, aim at the target, wind up the
 ## planned staff once it is ready), WINDUP (stand, the aim locked, with lead and the profile's aim
@@ -98,7 +98,7 @@ const REACTION_JITTER: float = 0.2
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
 
-## The actor it drives, the profile it plays by and the decoys it is lured by (null: none).
+## The actor it drives, the profile it plays by and Entities (its team board; null: none).
 var actor: Actor = null
 var profile: AIProfile = null
 var entities: EntitiesScript = null
@@ -879,36 +879,42 @@ func _line_clear() -> bool:
 	return AISight.line_clear(actor.projectiles, actor.global_position + actor.body_offset, to)
 
 
-## The grudge, else a decoy in lure range, else the nearest standing actor of another team.
+## The grudge, else the nearest standing actor of another team.
 func _find_target() -> Node2D:
 	lookup_count += 1
 	if grudge != null and _grudge_left > 0.0:
 		return grudge
-	var here: Vector2 = actor.global_position
-	var decoy: Node2D = entities.lure(here) if entities != null and is_instance_valid(entities) else null
-	if decoy != null:
-		return decoy
-	if actor.projectiles == null:
+	return nearest_foe(actor)
+
+
+## The nearest standing actor of another team than `from_actor`'s (a decoy among them), or null:
+## looked for in the rings of LOOKS, nearest first. A decoy aims by it too (`DecoyController`).
+static func nearest_foe(from_actor: Actor) -> Node2D:
+	if from_actor.projectiles == null:
 		return null
-	var from: Vector2 = here + actor.body_offset
+	var from: Vector2 = from_actor.global_position + from_actor.body_offset
 	for ring: float in LOOKS:
-		var found: Node2D = actor.projectiles.nearest_target(from, ring, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
+		var found: Node2D = from_actor.projectiles.nearest_target(from, ring, ProjectileManagerScript.ACTOR_LAYERS, from_actor, null, from_actor.team())
 		# Found with its centre inside the ring, nothing outside it is nearer; a big body only
 		# touching the ring is checked again in the next.
-		if found != null and (ring >= SIGHT or actor.projectiles.nearest_point.distance_squared_to(from) <= ring * ring):
-			return found if _is_valid_target(found) else null
+		if found != null and (ring >= SIGHT or from_actor.projectiles.nearest_point.distance_squared_to(from) <= ring * ring):
+			return found if can_target(found) else null
 	return null
 
 
 ## A freed node may still sit in `target` or `grudge`, hence the Variant. A downed wizard, a down
-## actor and one that is dying are no targets.
-func _is_valid_target(node: Variant) -> bool:
+## actor, one that is dying and one out of the world (a decoy that ended) are no targets.
+static func can_target(node: Variant) -> bool:
 	if not is_instance_valid(node):
 		return false
 	if node is Actor:
 		var other: Actor = node as Actor
-		return not other.is_down() and not other.is_dying()
+		return other.is_inside_tree() and not other.is_down() and not other.is_dying()
 	return not (node.has_method("is_downed") and node.is_downed())
+
+
+func _is_valid_target(node: Variant) -> bool:
+	return can_target(node)
 
 
 func _drop_grudge() -> void:

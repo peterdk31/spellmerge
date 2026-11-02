@@ -12,6 +12,8 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const EventsScript := preload("res://core/events/events.gd")
 
 var _rt: SpellRuntime = null
+## The body made for the last `request_entity` (`entity_body`).
+var _entity_body: int = -1
 
 
 func _init(runtime: SpellRuntime) -> void:
@@ -278,10 +280,19 @@ func moves() -> CasterMoves:
 
 ## Asks `ai` for an entity of `kind` (`entity_spawn_requested`) under a new key, which
 ## `Spells.entity_key` holds while the request is sent (Entities keeps it and hands it back with
-## `familiar_at`). Returns the key.
+## `familiar_at`); Entities names the actor it made in `Spells.entity_body` (`entity_body`). Returns
+## the key.
 func request_entity(actor: int, kind: StringName, at: Vector2, seconds: float, tag: int, anchor: int) -> int:
 	_rt._entity_keys += 1
 	_rt.entity_key = _rt._entity_keys
+	_rt.entity_body = -1
 	_rt.events.entity_spawn_requested.emit(actor, kind, at, seconds, tag, anchor)
 	_rt.entity_key = 0
+	_entity_body = _rt.entity_body
+	_rt.entity_body = -1
 	return _rt._entity_keys
+
+
+## The actor id of the body made for the last `request_entity` (a decoy), or -1 for none.
+func entity_body() -> int:
+	return _entity_body

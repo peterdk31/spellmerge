@@ -1,8 +1,9 @@
 class_name CarrierDecoy
 extends CarrierEntity
-## A still copy of its caster that enemies target, for `lifetime` seconds (`&"decoy"`).
-## It hits nothing itself: only a blast carries hit cards and infusions; its shield or deflect
-## guards it.
+## A copy of its caster that the other teams target, for `lifetime` seconds (`&"decoy"`): an
+## actor `ai` makes (`Entities`) that aims itself at the nearest foe, so what its triggers cast goes
+## at its foes. Homing makes it creep toward its target, as a rune (`homing_reach`). It hits nothing
+## itself: only a blast carries hit cards and infusions; its shield or deflect guards it.
 
 
 func id() -> StringName:
@@ -17,7 +18,7 @@ static func of(spells: SpellRuntime) -> CarrierDecoy:
 
 
 func traits() -> int:
-	return LASTS | GUARDS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS
+	return LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS
 
 
 ## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as
@@ -25,6 +26,13 @@ func traits() -> int:
 func decoy_shield(tag: int) -> int:
 	var spell: CompiledSpell = kit.spell_of(tag)
 	return roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)) if spell != null else 0
+
+
+## How far the decoy with `tag` creeps toward a target (its homing reach); 0 when it does not
+## home, or for a tag no build knows.
+func homing_reach(tag: int) -> float:
+	var spell: CompiledSpell = kit.spell_of(tag)
+	return spell.homing_range if spell != null else 0.0
 
 
 func decoy_deflects(tag: int) -> bool:

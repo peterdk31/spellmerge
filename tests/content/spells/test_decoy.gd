@@ -128,3 +128,81 @@ func test_on_block_fires_from_a_decoy() -> void:
 	var got: Dictionary = _guarded([&"on_block", &"shield", &"decoy", &"bolt"])
 	check(got["blocked"] > 0, "it blocks")
 	check_equal(got["fired"], got["blocked"], "and each block fires its payload")
+
+
+## A world with the wizard's staff `cards` (cast once at the first step) and a still enemy whose hurt
+## circle is at `enemy_at`.
+func _world(cards: Array[StringName], enemy_at: Vector2) -> Array:
+	var registry: Node = own(RegistryScript.new()) as Node
+	registry.call("scan")
+	var shelf := own(World.Shelf.new()) as World.Shelf
+	shelf.base = registry
+	var staff := StaffBase.new()
+	staff.id = &"decoy_aim"
+	staff.slots = 16
+	staff.cast_delay = 0.0
+	staff.recharge = 0.0
+	var world := World.new(root, shelf, staff)
+	var wizard: Actor = world.add_wizard(cards)
+	var enemy: Node2D = world.add_enemy(&"E", enemy_at)
+	world.press()
+	return [world, wizard, enemy]
+
+
+## The decoy aims itself (owner, 2026-11-02): a payload fired from an actor's body goes along that
+## actor's aim, and a decoy aims at the nearest foe. The wizard aims along +x; the enemy stands
+## well off that line, so only an aimed bolt finds it.
+func test_a_decoys_timer_fires_at_the_nearest_foe_not_the_way_it_was_cast() -> void:
+	var made: Array = _world([&"timer", &"decoy", &"bolt"], Vector2(40.0, 140.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var enemy: Node2D = made[2]
+	world.run(0.25)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null and decoy.is_inside_tree(), "the decoy is an actor in the world")
+	if decoy != null:
+		var to_enemy: Vector2 = (enemy.global_position - decoy.global_position).normalized()
+		check(decoy.aim.dot(to_enemy) > 0.95, "it aims at the enemy (%s, the enemy %s)" % [decoy.aim, to_enemy])
+		check_equal(world.table.team_of(decoy.id), world.table.team_of(wizard.id), "on its wizard's team")
+	world.run(2.0, 2.0)
+	check(world.combat.health_of(enemy) < World.HEALTH, "its timer's bolts hit the enemy off the cast's line (health %s)" % world.combat.health_of(enemy))
+	world.free_all()
+
+
+## The wizard's own shots pass its decoy, as they pass the wizard (it belongs to the wizard).
+func test_the_wizards_own_shots_pass_its_decoy() -> void:
+	var made: Array = _world([&"decoy"], Vector2(400.0, 0.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(0.25)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null, "a decoy")
+	if decoy != null:
+		check_equal(world.projectiles.target_owner_of(decoy), wizard.id, "its hurt circle is owned by the wizard")
+	world.free_all()
+
+
+## Homing on a decoy makes it creep toward its target at SpellLimits.HOMING_DRIFT, as a homing rune
+## does (owner, 2026-11-02); without homing it stands.
+func test_a_homing_decoy_creeps_toward_its_target_and_a_plain_one_stands() -> void:
+	for homing: bool in [false, true]:
+		var cards: Array[StringName] = [&"decoy"]
+		if homing:
+			cards.push_front(&"homing")
+		var made: Array = _world(cards, Vector2(120.0, 0.0))
+		var world: World = made[0]
+		var wizard: Actor = made[1]
+		world.run(0.125)
+		var decoy: Actor = world.entities.decoy_of(wizard.id)
+		check(decoy != null, "a decoy (homing %s)" % homing)
+		if decoy == null:
+			world.free_all()
+			continue
+		var start: Vector2 = decoy.global_position
+		world.run(1.0, 1.0)
+		var moved: Vector2 = decoy.global_position - start
+		if homing:
+			check(moved.x > SpellLimits.HOMING_DRIFT * 0.9 and moved.x < SpellLimits.HOMING_DRIFT * 1.1, "a homing decoy creeps toward the enemy at HOMING_DRIFT (%s)" % moved)
+		else:
+			check(moved.is_zero_approx(), "a plain decoy stands (%s)" % moved)
+		world.free_all()

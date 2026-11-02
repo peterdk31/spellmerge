@@ -1,6 +1,6 @@
 extends SceneTree
 ## Tests for the entity kit (staffs B5, gameplay/ai/entities.gd and its use in ai.gd): decoys
-## that enemies chase and shoot down, familiars that circle their wizard (they cast nothing
+## (actors that aim themselves) that enemies chase when nearest and shoot down, familiars that circle their wizard (they cast nothing
 ## themselves: core/spells fires their triggers, rules R4 F3), the per-player cap, ending by tag, quiet clears, swap moves, and four
 ## players at once. Time moves by fixed binary-fraction deltas.
 ##
@@ -24,11 +24,13 @@ var _ended: Array[Array] = []
 
 func _initialize() -> void:
 	await process_frame
-	_test_decoy_is_chased_before_a_nearer_wizard()
+	_test_a_decoy_is_chased_when_it_is_the_nearest()
+	_test_a_decoy_aims_at_the_nearest_foe()
 	_test_enemy_shots_break_a_decoy()
-	_test_every_hit_wears_a_decoy()
+	_test_a_decoy_belongs_to_its_owner_and_breaks_when_its_health_is_gone()
 	_test_decoy_runs_out()
 	_test_decoy_copies_its_wizard()
+	_test_a_decoy_is_placed_again()
 	_test_familiar_circles_its_wizard()
 	_test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended()
 	_test_cap_ends_the_oldest()
@@ -59,6 +61,9 @@ func _setup(player_count: int = 1) -> void:
 	_entities = EntitiesScript.new()
 	_entities.events = _world.bus
 	_entities.projectiles = _world.projectiles
+	_entities.spells = _world.spells
+	_entities.actors = _world.actors
+	_entities.combat = _world.combat
 	# In the tree, so the decoys are projectile targets at their real positions.
 	root.add_child(_entities)
 	_ended.clear()
@@ -110,58 +115,94 @@ func _run(count: int) -> void:
 
 # --- Tests ------------------------------------------------------------------
 
-func _test_decoy_is_chased_before_a_nearer_wizard() -> void:
+## No lure (owner, 2026-11-02): a decoy is an actor of its owner's team, chased when it is the
+## nearest, as any.
+func _test_a_decoy_is_chased_when_it_is_the_nearest() -> void:
 	_setup(1)
 	_world.players[0].position = Vector2(60.0, 0.0)
-	_spawn(0, EntitiesScript.DECOY, Vector2(-150.0, 0.0))
+	_spawn(0, EntitiesScript.DECOY, Vector2(-30.0, 0.0))
 	var imp: Actor = _imp(Vector2.ZERO)
 	_run(1)
-	_check(AiFixture.ai(imp).target != null and AiFixture.ai(imp).target != _world.players[0], "an imp near a decoy chases the decoy, not the nearer wizard")
-	_check(imp.aim.x < 0.0, "the imp turns on the decoy (within its staff's range it walks no nearer)")
-	_world.players[0].position = Vector2(1000.0, 0.0)
-	var far: Actor = _imp(Vector2(600.0, 0.0))
+	_check(AiFixture.ai(imp).target == _entities.decoy_of(0), "an imp nearer the decoy chases the decoy")
+	_check(imp.aim.x < 0.0, "and turns on it")
+	_world.bus.room_entered.emit(&"next")
+	_spawn(0, EntitiesScript.DECOY, Vector2(-150.0, 0.0))
+	var other: Actor = _imp(Vector2(10.0, 0.0))
 	_run(1)
-	_check(AiFixture.ai(far).target == _world.players[0], "an imp beyond the lure range chases the wizard")
+	_check(AiFixture.ai(other).target == _world.players[0], "a nearer wizard is chased before a decoy farther off")
+
+
+## The decoy aims itself at the nearest actor of another team, and turns when another comes nearer.
+func _test_a_decoy_aims_at_the_nearest_foe() -> void:
+	_setup(1)
+	_world.players[0].position = Vector2(-400.0, 0.0)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = _entities.decoy_of(0)
+	_check(decoy != null and decoy.is_inside_tree(), "a decoy is an actor in the world")
+	if decoy == null:
+		return
+	_check(decoy.home_controller is DecoyController, "driven by its own controller")
+	_check(_world.actors.team_of(decoy.id) == _world.actors.team_of(0), "on its owner's team")
+	_check(_world.actors.seat_of(decoy.id) == -1, "no seat drives it")
+	_imp(Vector2(0.0, 120.0))
+	_run(1)
+	_check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
+	_imp(Vector2(-60.0, 0.0))
+	_run(int(AIBrain.RETARGET_TIME / STEP) + 1)
+	_check(decoy.aim.dot(Vector2.LEFT) > 0.99, "and at a nearer one once it looks again (%s)" % decoy.aim)
+	_check(decoy.global_position.is_equal_approx(Vector2.ZERO), "a decoy whose card does not home stands")
 
 
 func _test_enemy_shots_break_a_decoy() -> void:
 	_setup(1)
 	_world.players[0].position = Vector2(5000.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(80.0, 0.0), 60.0)
+	var decoy: Actor = _entities.decoy_of(0)
 	var imp: Actor = _imp(Vector2.ZERO)
-	# Wind up, shoot and recover: about 3 s an attack. Three hits break the decoy.
-	_run(int(12.0 / STEP))
+	_run(int(30.0 / STEP))
 	_check(_ended.size() == 1, "the decoy breaks once after enemy shots, got %d ends" % _ended.size())
 	if _ended.size() == 1:
 		_check(_ended[0][0] == 0 and _ended[0][1] == EntitiesScript.DECOY and _ended[0][3] == TAG, "entity_ended names the player, the kind and the tag")
-		_check((_ended[0][2] as Vector2).is_equal_approx(Vector2(80.0, 0.0)), "a decoy ends where it stood")
+		# A body like any: the hits push it (its Mover), so it ends where the last one left it.
+		_check(decoy != null and (_ended[0][2] as Vector2).is_equal_approx(decoy.global_position), "a decoy ends where it stood when it broke (%s)" % _ended[0][2])
 	_check(_entities.count() == 0, "the broken decoy is gone")
 	_run(2)
 	_check(AiFixture.ai(imp).target == _world.players[0], "the imp goes back to the wizard once the decoy breaks")
 
 
-## Every hit wears a decoy down, a teammate's as well as an enemy's (actors G3c: no sides).
-func _test_every_hit_wears_a_decoy() -> void:
+## It belongs to its owner: the owner's shots pass it (its hurt circle is the owner's target), every
+## other actor's hurt it (actors G3c). It breaks when its health is gone, quietly for Combat: no kill.
+func _test_a_decoy_belongs_to_its_owner_and_breaks_when_its_health_is_gone() -> void:
 	_setup(2)
-	_spawn(0, EntitiesScript.DECOY, Vector2(0.0, 0.0))
-	var decoy: Node2D = _entities.lure(Vector2.ZERO)
-	_world.bus.projectile_hit.emit(1, decoy, Vector2.ZERO, TAG, -1)
-	for i in EntitiesScript.DECOY_HITS - 2:
-		_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000, -1)
-	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "it holds until its last hit")
-	_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000, -1)
-	_check(_entities.count() == 0 and _ended.size() == 1, "DECOY_HITS hits break it, a teammate's among them")
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = _entities.decoy_of(0)
+	if decoy == null:
+		_check(false, "a decoy")
+		return
+	_check(_world.projectiles.target_owner_of(decoy) == 0, "its hurt circle is owned by its owner, whose shots pass it")
+	_check(is_equal_approx(_world.combat.health_of(decoy), EntitiesScript.DECOY_HEALTH), "Combat knows it with DECOY_HEALTH")
+	var kills: Array[int] = [0]
+	_world.bus.kill_landed.connect(func(_by: int, _node: Node, _at: Vector2, _tag: int, _shot: int) -> void: kills[0] += 1)
+	_world.bus.enemy_died.connect(func(_by: int, _node: Node, _at: Vector2, _shot: int) -> void: kills[0] += 1)
+	decoy.health.take(EntitiesScript.DECOY_HEALTH - 1.0, 1)
+	_run(1)
+	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "it holds until its health is gone")
+	decoy.health.take(1.0, 1)
+	_run(1)
+	_check(_entities.count() == 0 and _ended.size() == 1, "then it breaks, once")
+	_check(not decoy.is_inside_tree() and not _world.combat.is_registered(decoy), "out of the world: nothing hits or chases it")
+	_check(kills[0] == 0, "a broken decoy is no kill")
 
 
 func _test_decoy_runs_out() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.DECOY, Vector2(30.0, 40.0), 1.0)
+	var decoy: Actor = _entities.decoy_of(0)
 	_run(int(0.9 / STEP))
 	_check(_entities.count() == 1, "a decoy lasts its seconds")
 	_run(int(0.2 / STEP))
 	_check(_entities.count() == 0 and _ended.size() == 1, "and then ends, once")
-	var decoy: Node2D = _entities.lure(Vector2(30.0, 40.0))
-	_check(decoy == null, "an ended decoy lures nobody")
+	_check(decoy != null and not AIBrain.can_target(decoy), "an ended decoy is no target")
 
 
 func _test_decoy_copies_its_wizard() -> void:
@@ -170,15 +211,34 @@ func _test_decoy_copies_its_wizard() -> void:
 	var sprite := _world.players[0].get_node("Sprite") as Sprite2D
 	sprite.frame_coords = Vector2i(9, 0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(10.0, 10.0))
-	var decoy: EntitiesScript.Decoy = _entities.lure(Vector2(10.0, 10.0)) as EntitiesScript.Decoy
+	var decoy: Actor = _entities.decoy_of(0)
 	_check(decoy != null and decoy.visible, "the decoy shows")
 	if decoy != null:
-		_check(decoy.sprite.texture == sprite.texture and decoy.sprite.frame == sprite.frame, "it copies the wizard's sprite and the way it points")
-		var material := decoy.sprite.material as ShaderMaterial
+		var look := decoy.get_node("Look") as DecoyLook
+		_check(look.sprite.texture == sprite.texture and look.sprite.frame == sprite.frame, "it copies the wizard's sprite and the way it points")
+		var material := look.sprite.material as ShaderMaterial
 		_check(decoy.modulate.a == 1.0 and material != null, "never see-through (the glow look): drawn by the shot shader")
 		_check((material.get_shader_parameter(&"dissolve") as float) > 0.0, "part fallen apart, so it never reads as a second wizard")
 		_check(material.get_shader_parameter(&"dissolve_color") != Color(0.957, 0.945, 0.918, 1.0), "in its player's colour")
 		_check(decoy.position.is_equal_approx(Vector2(10.0, 10.0)), "it stands where the card put it")
+
+
+## A row keeps its decoy actor: an ended decoy is placed again, full, under a fresh id.
+func _test_a_decoy_is_placed_again() -> void:
+	_setup(1)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 1.0)
+	var first: Actor = _entities.decoy_of(0)
+	if first == null:
+		_check(false, "a decoy")
+		return
+	first.health.take(5.0, 1)
+	_run(int(1.5 / STEP))
+	_check(_entities.count() == 0, "it ran out")
+	_spawn(0, EntitiesScript.DECOY, Vector2(50.0, 0.0))
+	var again: Actor = _entities.decoy_of(0)
+	_check(again == first, "the row's actor is placed again, not made anew")
+	_check(again.is_inside_tree() and again.id >= 0 and is_equal_approx(again.health.health, EntitiesScript.DECOY_HEALTH), "in the world with an id and full health")
+	_check(_world.combat.is_registered(again), "and hurtable again")
 
 
 func _test_familiar_circles_its_wizard() -> void:
@@ -266,7 +326,7 @@ func _test_room_and_run_clear_quietly() -> void:
 	_spawn(0, EntitiesScript.DECOY, Vector2(5.0, 0.0))
 	_world.bus.room_entered.emit(&"next")
 	_check(_entities.count() == 0 and _ended.is_empty(), "a new room clears every entity without entity_ended")
-	_check(_entities.lure(Vector2(5.0, 0.0)) == null, "and its decoys lure nobody")
+	_check(_entities.decoy_of(0) == null, "and its decoys are gone")
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
 	_world.bus.run_ended.emit(false)
 	_check(_entities.count() == 0 and _ended.is_empty(), "so does the end of the run")

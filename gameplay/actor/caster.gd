@@ -377,7 +377,7 @@ func cast_ready(within: float, at: int = 0) -> bool:
 ## Hurtbox calls it too.
 func own_hurtbox() -> void:
 	if number >= 0 and actor.projectiles != null:
-		actor.projectiles.set_target_owner(actor, number)
+		actor.projectiles.set_target_owner(actor, actor.belongs_to if actor.belongs_to >= 0 else number)
 
 
 ## Compile (or find) and install staff `at`.

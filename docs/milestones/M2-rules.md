@@ -146,7 +146,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 - **Cards:** every modifier, trigger, infusion and multicast card the registry finds in `content/spells/` (the folders it already scans for the game).
 - **Carriers:** every form card the registry finds (`content/spells/forms/`), the melee carriers included; the carrier's `motion` picks the scene it runs in.
 - **What they do:** every value of `ModifierBase.Behaviour` and `TriggerBase.Event`, read from the enums. A card whose behaviour or event has no probe yet fails with "no probe for `<behaviour>`", so adding a new kind of card asks for its probe in the same PR.
-- It is a `tests/**/test_*.gd`, so it runs with the rest of the suite (`tools/ptest.sh`, and the daily build, whose bisect reverts a merge that breaks it).
+- It is a `tests/**/test_*.gd`, so it runs with the rest of the suite (`tools/ptest.sh`, and the daily build, which a merge that breaks it keeps from releasing).
 
 ### R4: decide with the owner, then implement (rules 1, 4, 5)
 

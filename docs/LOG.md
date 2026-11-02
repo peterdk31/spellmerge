@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: Trail meshes by shape (owner session)
+
+Lightning's trails and the dashes draw in batches of their own (`BATCH_*_JAG`, `BATCH_DASH`, `BATCH_ENEMY_DASH`), so a plain shot's trail mesh has no jagged line, no dash streak slots and, with no share for the tails, only its newest pieces' lights: vertices a frame -50% at 400 shots and -81% at 3,000; llvmpipe GPU time 108 -> 70 ms and 403 -> 131 ms. Pixel-identical where no trail changed batch (`tests/benchmark/trail_gpu.gd -- --plain`, new: renders a fixed scene, times it and saves frames). The per-trail work on the CPU and several tail pixels per quad were measured and left (at most 8% and 20%, at low counts). Tests: `test_native_kernel` (every batch compared), `test_projectile_looks` (the shapes, the batches). Details: docs/DECISIONS.md.
+
 ## 2026-11-02: Max shots and Show FPS settings (owner session)
 
 The pause menu's Settings page has a "Max shots" slider (`ShotCap.STOPS` in core/settings: 250 to 50,000, starting at the platform's cap) and a "Show FPS" switch. The slider sends the new `projectile_cap_changed`, which the projectile manager applies at once (`set_cap`, so the shots in the air end); the switch shows a frame rate readout at the bottom middle (`hud/widgets/fps_counter.gd`). Both are saved (`projectile_cap`, `show_fps`) and read when the menu is bound. Tests: `test_pause_menu.gd` (slider, switch, save, reload), `test_projectiles.gd` (the event sets the cap), `test_events.gd`.

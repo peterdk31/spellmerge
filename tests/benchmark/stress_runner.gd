@@ -33,7 +33,7 @@ extends Node
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
 ## The shots the spells make are never enough for the caps, so each physics step
 ## the runner tops the projectile manager up to the target with plain shots owned by the
-## players in turn (at most TOP_UP_PER_STEP a step); the manager's cap is set to the
+## players in turn (at most TOP_UP_PER_STEP a step, more for a larger target); the manager's cap is set to the
 ## target, so the oldest shot of the richest owner is dropped past it, as in play.
 ##
 ## Pass (`STRESS OK`): in each scenario the enemies and the shots averaged at least 90% of
@@ -115,9 +115,13 @@ const ENEMY_HEALTH: float = 120.0
 ## A horde swarmer: the imp's body with no staff, a little faster, hurting by touch.
 const SWARM_SPEED: float = 55.0
 const SWARM_CONTACT: int = 3
-## Enemies added per frame at most, and filler shots per physics step at most.
+## Enemies added per frame at most, and filler shots per physics step at most: TOP_UP_PER_STEP,
+## or more for a larger target (one TOP_UP_SHARE of it a step). Sized for 3,000 shots; at the
+## desktop's 6,000 more shots end on the crowd each step than 120 can replace, and the run fell
+## short of its target (2026-11-02).
 const SPAWN_PER_FRAME: int = 10
 const TOP_UP_PER_STEP: int = 120
+const TOP_UP_SHARE: int = 25
 ## Where enemies appear (inside the walls of the 640x360 room).
 const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 ## The timing pass over the crowd (`_time_parts`) runs on every PARTS_EVERY-th drawn frame.
@@ -677,7 +681,7 @@ func _top_up_enemies() -> void:
 ## Fill the manager up to the target with plain shots, cast by the players' wizards in turn.
 func _top_up_shots() -> void:
 	var missing: int = _target_shots - int(_projectiles.call("get_count"))
-	var count: int = mini(missing, TOP_UP_PER_STEP)
+	var count: int = mini(missing, maxi(TOP_UP_PER_STEP, _target_shots / TOP_UP_SHARE))
 	for i in count:
 		var owner_index: int = i % PLAYERS
 		var wizard := _flow.call("get_wizard", owner_index) as Actor

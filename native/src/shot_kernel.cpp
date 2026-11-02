@@ -80,6 +80,7 @@ constexpr double TRAIL_JUMP = 96.0;
 constexpr double ORBIT_GROW = 0.25;
 constexpr int TRAIL_HEAD = 1;
 constexpr int TRAIL_ORBIT = 2;
+constexpr int TRAIL_DASH = 4;
 constexpr int TRAIL_COST = 4;
 constexpr int ROW_CASTER = -3;
 constexpr int DRAW_STRIDE = 16;
@@ -94,7 +95,13 @@ constexpr int BATCH_RUNE = 1;
 constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
 constexpr int BATCH_ENEMY_RUNE = 4;
-constexpr int BATCHES = 5;
+constexpr int BATCH_BOLT_JAG = 5;
+constexpr int BATCH_ORBIT_JAG = 6;
+constexpr int BATCH_ENEMY_JAG = 7;
+constexpr int BATCH_DASH = 8;
+constexpr int BATCH_ENEMY_DASH = 9;
+constexpr int BATCHES = 10;
+constexpr int64_t LOOK_LIGHTNING_BIT = 1 << 4;
 constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
@@ -201,11 +208,8 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(trail_core, "_trail_core", PACKED_COLOR_ARRAY) \
 	X(anchors, "_anchors", PACKED_VECTOR2_ARRAY) \
 	X(draw_out, "_draw_out", PACKED_INT32_ARRAY) \
-	X(draw_room, "_draw_room", INT) \
-	X(rune_room, "_rune_room", INT) \
-	X(orbit_room, "_orbit_room", INT) \
-	X(enemy_room, "_enemy_room", INT) \
-	X(enemy_rune_room, "_enemy_rune_room", INT) \
+	X(rooms, "_rooms", PACKED_INT32_ARRAY) \
+	X(trail_look, "_trail_look", PACKED_INT32_ARRAY) \
 	X(team, "_team", PACKED_INT32_ARRAY) \
 	X(threat_slot, "threat_slot", INT) \
 	X(threat_away, "threat_away", VECTOR2) \
@@ -812,6 +816,7 @@ const Constant CONSTANTS[] = {
 	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
 	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
+	{ "TRAIL_DASH", (double)TRAIL_DASH },
 	{ "TRAIL_ORBIT", (double)TRAIL_ORBIT },
 	{ "TRAIL_COST", (double)TRAIL_COST },
 	{ "ROW_CASTER", (double)ROW_CASTER },
@@ -827,7 +832,13 @@ const Constant CONSTANTS[] = {
 	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
 	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
+	{ "BATCH_BOLT_JAG", (double)BATCH_BOLT_JAG },
+	{ "BATCH_ORBIT_JAG", (double)BATCH_ORBIT_JAG },
+	{ "BATCH_ENEMY_JAG", (double)BATCH_ENEMY_JAG },
+	{ "BATCH_DASH", (double)BATCH_DASH },
+	{ "BATCH_ENEMY_DASH", (double)BATCH_ENEMY_DASH },
 	{ "BATCHES", (double)BATCHES },
+	{ "LOOK_LIGHTNING_BIT", (double)LOOK_LIGHTNING_BIT },
 	{ "LOOK_GRID", (double)LOOK_GRID },
 	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
@@ -999,6 +1010,19 @@ inline Vector2 drawn_at(int64_t motion, double sim_time, float born, const Vecto
 }
 
 inline bool is_hat_ramp(int64_t ramp) { return ramp >= 0 && ramp < RAMP_ENEMY; }
+
+// `_loose_batch`: the batch a loose trail is written to, a dash's, lightning's or any other, in
+// its ramp's layer.
+inline int64_t loose_batch(int64_t ramp, int64_t flags, int64_t look) {
+	const bool hat = is_hat_ramp(ramp);
+	if ((flags & TRAIL_DASH) != 0) {
+		return hat ? BATCH_DASH : BATCH_ENEMY_DASH;
+	}
+	if ((look & LOOK_LIGHTNING_BIT) != 0) {
+		return hat ? BATCH_BOLT_JAG : BATCH_ENEMY_JAG;
+	}
+	return hat ? BATCH_BOLT : BATCH_ENEMY;
+}
 
 // `look_zoom`, `look_core_zoom`, `look_size`, `particles_of`, `look_color` (static in the manager).
 inline int64_t look_zoom(double radius) {
@@ -1367,7 +1391,7 @@ void ShotKernel::count_draw(Object *m) {
 	Arr<PackedByteArray> alive, motion, drawn_batch;
 	Arr<PackedInt64Array> seq, drawn_seq;
 	Arr<PackedFloat32Array> radius, drawn_radius, drawn_size;
-	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, loose, trail_ramp;
+	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, loose, trail_ramp, trail_flags, trail_look;
 	Arr<PackedColorArray> drawn_color;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
@@ -1384,6 +1408,8 @@ void ShotKernel::count_draw(Object *m) {
 	batch_counts.load(m, k.batch_counts);
 	loose.load(m, k.loose);
 	trail_ramp.load(m, k.trail_ramp);
+	trail_flags.load(m, k.trail_flags);
+	trail_look.load(m, k.trail_look);
 	drawn_color.load(m, k.drawn_color);
 	const int64_t high = m->get(k.high);
 	const int64_t loose_count = m->get(k.loose_count);
@@ -1403,13 +1429,15 @@ void ShotKernel::count_draw(Object *m) {
 			drawn_seq[slot] = seq[slot];
 			drawn_radius[slot] = radius[slot];
 			drawn_look[slot] = look[slot];
-			int64_t batch = BATCH_BOLT;
+			// `_batch_of`.
+			const bool jag = (look[slot] & LOOK_LIGHTNING_BIT) != 0;
+			int64_t batch = jag ? BATCH_BOLT_JAG : BATCH_BOLT;
 			if (!is_hat_ramp(rmp)) {
-				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
+				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : (jag ? BATCH_ENEMY_JAG : BATCH_ENEMY);
 			} else if (mot == MOTION_STILL) {
 				batch = BATCH_RUNE;
 			} else if (mot == MOTION_ORBIT) {
-				batch = BATCH_ORBIT;
+				batch = jag ? BATCH_ORBIT_JAG : BATCH_ORBIT;
 			}
 			drawn_batch[slot] = (uint8_t)batch;
 			drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
@@ -1419,8 +1447,8 @@ void ShotKernel::count_draw(Object *m) {
 		batch_counts[drawn_batch[slot]] += 1;
 	}
 	for (int64_t n = 0; n < loose_count; n++) {
-		const int64_t rmp = trail_ramp[loose[n]];
-		batch_counts[is_hat_ramp(rmp) ? BATCH_BOLT : BATCH_ENEMY] += 1;
+		const int64_t row = loose[n];
+		batch_counts[loose_batch(trail_ramp[row], trail_flags[row], trail_look[row])] += 1;
 	}
 }
 
@@ -1433,7 +1461,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	Arr<PackedVector2Array> prev, pos, vel, orbit_centre, trail_last, anchors;
 	Arr<PackedFloat32Array> drawn_size, born;
 	Arr<PackedInt32Array> drawn_particles, trail, trail_kept, trail_newest, loose, trail_caster, trail_flags;
-	Arr<PackedInt32Array> trail_holder, trail_ramp, draw_out;
+	Arr<PackedInt32Array> trail_holder, trail_ramp, trail_look, draw_out, rooms;
 	Arr<PackedColorArray> drawn_color, core, trail_color, trail_core;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
@@ -1455,7 +1483,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	trail_flags.load(m, k.trail_flags);
 	trail_holder.load(m, k.trail_holder);
 	trail_ramp.load(m, k.trail_ramp);
+	trail_look.load(m, k.trail_look);
 	draw_out.load(m, k.draw_out);
+	rooms.load(m, k.rooms);
 	drawn_color.load(m, k.drawn_color);
 	core.load(m, k.core);
 	trail_color.load(m, k.trail_color);
@@ -1463,12 +1493,10 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const int64_t high = m->get(k.high);
 	const int64_t loose_count = m->get(k.loose_count);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 4 || loose_count > loose.n);
-	const int64_t rooms[BATCHES] = { m->get(k.draw_room), m->get(k.rune_room), m->get(k.orbit_room),
-		m->get(k.enemy_room), m->get(k.enemy_rune_room) };
+	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 4 || loose_count > loose.n || rooms.n < BATCHES);
 	float *out_buffer[BATCHES];
 	int64_t room[BATCHES];
-	int64_t used[BATCHES] = { 0, 0, 0, 0, 0 };
+	int64_t used[BATCHES] = {};
 	for (int64_t b = 0; b < BATCHES; b++) {
 		if (_buffers[b].size() != rooms[b] * DRAW_STRIDE) {
 			_buffers[b].resize(rooms[b] * DRAW_STRIDE);
@@ -1533,14 +1561,15 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 						trace_code(sim_time - (double)born[slot]));
 				used[batch] += 1;
 			}
-		} else if (batch == BATCH_ENEMY || batch == BATCH_ORBIT) {
-			write_trail(batch, trail[slot], at, flags, look_data, core[slot]);
 		} else {
-			write_trail(BATCH_BOLT, trail[slot], at, flags, look_data, core[slot]);
+			write_trail(batch, trail[slot], at, flags, look_data, core[slot]);
 		}
 	}
-	const int64_t shots = used[0] + used[1] + used[2] + used[3] + used[4];
-	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
+	int64_t shots = 0;
+	for (int64_t b = 0; b < BATCHES; b++) {
+		shots += used[b];
+	}
+	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_JAG] + used[BATCH_ENEMY_RUNE];
 	for (int64_t n = 0; n < loose_count; n++) {
 		const int64_t row = loose[n];
 		const int64_t caster = trail_caster[row];
@@ -1552,7 +1581,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				head = anchors[caster];
 			}
 		}
-		write_trail(is_hat_ramp(trail_ramp[row]) ? BATCH_BOLT : BATCH_ENEMY, row, head, flags, trail_color[row], trail_core[row]);
+		write_trail(loose_batch(trail_ramp[row], trail_flags[row], trail_look[row]), row, head, flags, trail_color[row], trail_core[row]);
 	}
 	for (int64_t b = 0; b < BATCHES; b++) {
 		draw_out[b] = (int32_t)used[b];

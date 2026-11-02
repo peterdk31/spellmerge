@@ -29,8 +29,8 @@ const DT: float = 1.0 / 60.0
 const STEPS: int = 150
 const ROOM: Vector2 = Vector2(960.0, 540.0)
 ## The draw arrays the native kernel writes into buffers of its own, so the manager's stay as they
-## were: compared through `_draw_buffers`, not by name.
-const OWN_BUFFERS: Array[StringName] = [&"_draw_buffer", &"_rune_buffer", &"_orbit_buffer", &"_enemy_buffer", &"_enemy_rune_buffer"]
+## were: compared batch by batch in `_compare_draw`, not by name.
+const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## Not compared: node instance ids (each side has its own nodes), the hit test's scratch (the native
 ## pass sizes it for every target at once), what only the native drawing writes and the GDScript
 ## catch-up's one-shot list.
@@ -43,6 +43,8 @@ var _mgrs: Array[ManagerScript] = []
 var _buses: Array[EventsScript] = []
 var _tables: Array[Node] = []
 var _targets: Array = [[], []]
+## The most instances each batch (BATCH_*) drew at once, so every batch is seen compared.
+var _batch_seen: PackedInt32Array = PackedInt32Array()
 var _wizards: Array = [[], []]
 var _events: Array[Array] = [[], []]
 var _imp: int = -1
@@ -150,6 +152,8 @@ func _test_both_step_alike() -> void:
 		bus.projectile_hit.connect(_on_hit.bind(side))
 		bus.projectile_expired.connect(_on_expired.bind(side))
 	_check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
+	_batch_seen.resize(ManagerScript.BATCHES)
+	_batch_seen.fill(0)
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -182,6 +186,8 @@ func _test_both_step_alike() -> void:
 		if _failures.size() > 8:
 			return
 	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
+	for batch in ManagerScript.BATCHES:
+		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 
 
@@ -210,6 +216,10 @@ func _drive(side: int, step: int) -> void:
 			node.global_position += Vector2.from_angle(float(step) * 0.05 + float(i)) * 0.6
 	if step == 40:
 		m.follow_caster(1, Color(0.9, 0.3, 0.2), 1 | 4, 0.4)
+	if step == 45:
+		# An enemy's dash, with lightning's look: a dash's batch all the same.
+		m.set_anchor(_imp, Vector2(480.0, 140.0))
+		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), ManagerScript.LOOK_LIGHTNING_BIT | 2, 0.4)
 	for i in 40 if step < 100 else 8:
 		var caster: int = _imp if i % 5 == 4 else i % 4
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)
@@ -310,14 +320,14 @@ func _compare_draw(step: int) -> void:
 	_check(a.drawn == b.drawn and a.drawn_trails == b.drawn_trails and a.drawn_enemy == b.drawn_enemy,
 			"step %d: the same drawn counts (%d %d %d / %d %d %d)" % [step, a.drawn, a.drawn_trails, a.drawn_enemy, b.drawn, b.drawn_trails, b.drawn_enemy])
 	_check(a.particle_demand == b.particle_demand and a.trail_demand == b.trail_demand, "step %d: the same demand" % step)
-	var nodes: Array[StringName] = [&"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node"]
-	for batch in nodes.size():
-		var count_a: int = (a.get(nodes[batch]) as MultiMeshInstance2D).multimesh.visible_instance_count
-		var count_b: int = (b.get(nodes[batch]) as MultiMeshInstance2D).multimesh.visible_instance_count
+	for batch in ManagerScript.BATCHES:
+		var count_a: int = a._nodes[batch].multimesh.visible_instance_count
+		var count_b: int = b._nodes[batch].multimesh.visible_instance_count
 		_check(count_a == count_b, "step %d batch %d: the same instances (%d / %d)" % [step, batch, count_a, count_b])
-		var buffer_a: PackedFloat32Array = a.get(OWN_BUFFERS[batch])
+		_batch_seen[batch] = maxi(_batch_seen[batch], count_a)
+		var buffer_a: PackedFloat32Array = a._buffers[batch]
 		# The native side drew into the kernel's buffers, or into its own while a solid shot lived.
-		var buffer_b: PackedFloat32Array = b._kernel.call(&"buffer", batch) if not b._any_solid else b.get(OWN_BUFFERS[batch])
+		var buffer_b: PackedFloat32Array = b._kernel.call(&"buffer", batch) if not b._any_solid else b._buffers[batch]
 		var floats: int = mini(count_a, count_b) * ManagerScript.DRAW_STRIDE
 		if buffer_a.size() < floats or buffer_b.size() < floats:
 			_failures.append("step %d batch %d: a buffer too small" % [step, batch])

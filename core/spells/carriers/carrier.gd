@@ -179,10 +179,6 @@ func bind(runtime_kit: CarrierKit, _staff_poses: StaffPoses) -> void:
 	kit = runtime_kit
 
 
-## False makes every launch set its shots up one at a time (`launch`), as before batching; the
-## tests that compare the two set it (test_spells_land_shots). Every carrier reads this one switch.
-static var together: bool = true
-
 ## The slots of a launch made together (`launch`), kept between launches.
 var _slots: PackedInt32Array = PackedInt32Array()
 
@@ -203,7 +199,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if id() == &"":
 		return 0
 	var count: int = spell.shots
-	if together and count >= 2 and rows_only() and kit.projectiles != null and kit.projectiles.has_room_for(count):
+	if count >= 2 and rows_only() and kit.projectiles != null and kit.projectiles.has_room_for(count):
 		if _slots.size() < count:
 			_slots.resize(count)
 		spawn_rows(spell, tag, actor, origin, direction, count, lifetime, _slots)

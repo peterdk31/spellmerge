@@ -993,10 +993,15 @@ func set_native(on: bool) -> void:
 	_kernel = kernel
 
 
-## The constants the native kernel checks its own copies against: this script's, and the few it
-## takes from other scripts, by the names the kernel gives them.
+## The constants the native kernel checks its own copies against: this script's (with those of the
+## manager it extends, for a script that extends it), and the few it takes from other scripts, by
+## the names the kernel gives them.
 func native_constants() -> Dictionary:
-	var constants: Dictionary = (get_script() as Script).get_script_constant_map()
+	var constants: Dictionary = {}
+	var script: Script = get_script() as Script
+	while script != null:
+		constants.merge(script.get_script_constant_map())
+		script = script.get_base_script()
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
 			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE})
 	return constants

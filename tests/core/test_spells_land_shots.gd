@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## A carrier whose shot is one pool row (`Carrier.rows_only`: the atom's flying shots, the rune's
 ## still ones, the orbit's circling ones) makes a launch's rows together and sets them up in one
 ## `Spells._land_shots` (the atom also spawns them in one `ProjectileManager.spawn_batch`). It must
-## leave exactly what one shot at a time leaves (`Carrier.together` false): every array of the
+## leave exactly what one shot at a time leaves: every array of the
 ## manager and every record of the runtime. Every card is cast, the carriers from a staff and as a
 ## payload fired by a shot, with cards that give the shots each behaviour, timers (lifecycle
 ## rows), a staff spread (its random draws), at the desktop cap and at a small one (where a launch
@@ -85,6 +85,15 @@ const SPREAD: float = 12.0
 const SCRATCH: Array[String] = ["spells._one_slot"]
 
 
+## A manager that never has room for a launch's shots together, so every launch goes one shot at
+## a time (`Carrier.launch`'s path at the cap); nothing else differs.
+class OneAtATime:
+	extends ManagerScript
+
+	func has_room_for(_count: int) -> bool:
+		return false
+
+
 var _registry: Node
 ## The targets, the same nodes for both runs (the records keep their instance ids).
 var _targets: Array[Node2D] = []
@@ -99,10 +108,6 @@ func before_each() -> void:
 		target.position = Vector2(160.0 + 40.0 * float(i % 3), 80.0 + 60.0 * float(i / 3))
 		root.add_child(target)
 		_targets.append(target)
-
-
-func after_each() -> void:
-	Carrier.together = true
 
 
 func test_every_card_is_cast() -> void:
@@ -145,9 +150,9 @@ func _compare(one: Dictionary, together: Dictionary, what: String) -> void:
 
 ## Cast every staff of set `set_index` from the four wizards and step; returns a snapshot.
 func _run(together: bool, cap: int, set_index: int) -> Dictionary:
-	Carrier.together = together
 	var bus := EventsScript.new()
-	var manager := ManagerScript.new()
+	# One at a time is the path a launch takes when the pool has no room for all its shots.
+	var manager: ManagerScript = ManagerScript.new() if together else OneAtATime.new()
 	manager.events = bus
 	manager.set_cap(cap)
 	manager.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript

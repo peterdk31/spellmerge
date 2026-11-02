@@ -80,6 +80,7 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## The kinds the director runs in the swarm: an enemy whose id one of these names.
 const KINDS: Array[SwarmKind] = [
@@ -152,6 +153,13 @@ var promoted_count: int = 0
 ## stack as full actors do, which tests comparing a swarmer with a full actor ask for).
 var spacing: float = SPACING_SHARE
 
+## The native kernel (`SwarmKernel`, native/README.md): the spacing and the move onto the floor
+## (`_space`, `_keep_in`) in C++, the same to the bit, or null to run them here. `native` switches it
+## (tests run both: test_swarm_steps.gd, test_native_swarm.gd).
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
+
 ## The randomness of the seeds. Tests seed it.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
@@ -212,6 +220,7 @@ var _asked: int = 0
 
 func _init() -> void:
 	rng.randomize()
+	set_native(native)
 	_grow(START_ROOM)
 	_slot_nodes.resize(TARGET_SLOTS)
 	_slot_refs.resize(TARGET_SLOTS)
@@ -220,6 +229,20 @@ func _init() -> void:
 	_cand_nodes.resize(MAX_CANDIDATES)
 	_cand_team.resize(MAX_CANDIDATES)
 	_cand_offset.resize(MAX_CANDIDATES)
+
+
+## Use the native kernel when `on` and the module is loaded (see `native`).
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = NativeScript.swarm_kernel() if on else null
+	if _kernel == null:
+		return
+	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
+	if not _kernel.call(&"configure", {"WALL_CELL": WALL_CELL}):
+		wrong.append("the swarm's numbers")
+	if not wrong.is_empty():
+		push_error("Swarm: the native SwarmKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		_kernel = null
 
 
 ## The kind the swarm runs `data` as (prepared from it), or null when the enemy is not a swarmer.
@@ -392,8 +415,11 @@ func step(delta: float) -> void:
 		look.call(&"step", delta)
 	# The rows move as the spacing's hash is filled (`_space`), then the push, the floor and the
 	# walls, and each node's `position`, in one pass (`_keep_in`).
-	_space()
-	_keep_in()
+	if _kernel != null:
+		_kernel.call(&"space_and_keep_in", self)
+	else:
+		_space()
+		_keep_in()
 	moved += 1
 
 

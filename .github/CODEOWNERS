@@ -17,3 +17,8 @@
 /docs/SECURITY-CHECKLIST.md  @peterdk31
 /docs/SETUP-APP.md           @peterdk31
 /addons/                     @peterdk31
+# The native module's build (native/README.md): its SCons script runs in the job that builds the
+# shipped game, and its profile says which engine classes the C++ can reach. Its sources are the
+# bot's (smbot.rules limits what they may include and call).
+/native/SConstruct           @peterdk31
+/native/build_profile.json   @peterdk31

@@ -55,6 +55,7 @@ BOT_PATHS = (
     "CLAUDE.md",
     "llms.txt",
     "core/",
+    "native/",  # the native module's C++ (native/README.md): Claude's and the owner's only
     "project.godot",
     "export_presets.cfg",
     "tests/build.json",  # the build settings and exported-build tests (smbot.config)
@@ -70,6 +71,24 @@ CONTRIBUTOR_NAMES = frozenset({".gitkeep"})
 BOT_TYPES = CONTRIBUTOR_TYPES | {".md", ".txt", ".cfg", ".godot", ".html", ".css"}
 BOT_NAMES = CONTRIBUTOR_NAMES | {".gitignore", ".gitattributes", ".gdignore"}
 BOT_TOOL_TYPES = frozenset({".sh", ".py"})
+# The native module (native/README.md): C++ sources and its SCons build, in native/ only. CI builds
+# it from source; what it builds is never committed (binaries stay banned, see check_content).
+NATIVE_DIR = "native/"
+BOT_NATIVE_TYPES = frozenset({".cpp", ".h"})
+BOT_NATIVE_NAMES = frozenset({"SConstruct"})
+# What the module's C++ may include (check_native_source): the engine classes its build profile
+# names (native/build_profile.json, owner-only), godot-cpp's core and variant headers, a few
+# standard headers and its own.
+NATIVE_CLASS_HEADERS = frozenset({"ref_counted", "object", "node2d", "random_number_generator"})
+NATIVE_STD_HEADERS = frozenset({"cmath", "cstdint", "type_traits", "utility"})
+_NATIVE_INCLUDE = re.compile(r"^\s*#\s*include\s*([<\"])([^>\"]+)[>\"]", re.MULTILINE)
+# What it may not call: programs, files, sockets, loading code, threads, inline assembly, and the
+# engine by name (a call by name reaches any API the includes leave out).
+_NATIVE_BANNED = re.compile(
+    r"\b(system|popen|fork|execl|execlp|execle|execv|execvp|execve|socket|connect|dlopen|dlsym|LoadLibrary\w*|"
+    r"GetProcAddress|CreateProcess\w*|ShellExecute\w*|fopen|freopen|getenv)\s*\(|\bstd::thread\b|\b(asm|__asm__)\b|"
+    r"(->|\.)\s*(call|callv|call_deferred)\s*\(|\bget_singleton\b|\bClassDB::instantiate\b|"
+    r"\bgdextension_interface::(?!object_get_instance_from_id\b)\w+")
 ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
@@ -336,6 +355,7 @@ def check_file_type(change: Change, role: str) -> list[Finding]:
     name, suffix = PurePosixPath(path).name, _suffix(path)
     if role == BOT:
         allowed = (name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
+                   or (path.startswith(NATIVE_DIR) and (suffix in BOT_NATIVE_TYPES or name in BOT_NATIVE_NAMES))
                    or (path.startswith(ISSUE_FORMS) and suffix in (".yml", ".yaml")))
     else:
         allowed = name in CONTRIBUTOR_NAMES or suffix in CONTRIBUTOR_TYPES
@@ -391,13 +411,39 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
     if suffix == ".svg":
         findings += _check_svg(path, text)
     if suffix == ".gdextension" or "type=\"GDExtension\"" in text:
-        findings.append(Finding("banned-api", "error", path, 1, "Native code (GDExtension) is not allowed.",
-                                "Remove the GDExtension; write the feature in typed GDScript."))
+        findings.append(Finding("banned-api", "error", path, 1,
+                                "A GDExtension is never committed: ci/build/native.sh writes the one the game loads.",
+                                "Remove the file; native code is the native module's (native/README.md), built by CI."))
     if suffix in SCRIPT_TYPES:
         findings += check_banned_apis(path, text)
+    if path.startswith(NATIVE_DIR) and suffix in BOT_NATIVE_TYPES:
+        findings += check_native_source(path, text)
     if suffix == ".gd":
         findings += check_typed(path, text, "error" if role == BOT else "warning")
     findings += check_license(path, text)
+    return findings
+
+
+def check_native_source(path: str, text: str) -> list[Finding]:
+    """The module's C++ (native/README.md) includes only allowed headers and calls none of _NATIVE_BANNED."""
+    findings = []
+    for m in _NATIVE_INCLUDE.finditer(text):
+        quote, header = m.group(1), m.group(2)
+        cls = re.fullmatch(r"godot_cpp/classes/(\w+)\.hpp", header)
+        allowed = ((quote == '"' and re.fullmatch(r"\w+\.h", header) is not None)
+                   or header in NATIVE_STD_HEADERS or header in ("gdextension_interface.h", "godot_cpp/godot.hpp")
+                   or re.fullmatch(r"godot_cpp/(core|variant)/\w+\.hpp", header) is not None
+                   or (cls is not None and cls.group(1) in NATIVE_CLASS_HEADERS))
+        if not allowed:
+            findings.append(Finding("native-source", "error", path, _line_of(text, m.start()),
+                                    f"The native module may not include <{header}>.",
+                                    "Use the engine classes in native/build_profile.json (the owner adds one there and "
+                                    "in NATIVE_CLASS_HEADERS), godot-cpp's core and variant headers, or a header of its own."))
+    for m in _NATIVE_BANNED.finditer(text):
+        findings.append(Finding("native-source", "error", path, _line_of(text, m.start()),
+                                f"The native module may not call this (found `{m.group(0).strip()}`): it only "
+                                "computes on the arrays the game hands it.",
+                                "Remove the call; anything that reaches the system or the engine by name stays in GDScript."))
     return findings
 
 
@@ -464,6 +510,21 @@ def check_issue_form(path: str, text: str) -> list[Finding]:
     return findings
 
 
+# The one place GDScript makes the native module's classes (native/README.md): naming such a class
+# in GDScript would not parse where the module is not built, so this file instantiates it by name,
+# with a literal name of one of the module's own classes.
+NATIVE_FILE = "core/native/native.gd"
+NATIVE_CLASSES = frozenset({"ShotKernel", "SwarmKernel", "SwarmLookKernel"})
+_NATIVE_INSTANTIATE = re.compile(r"\bClassDB\s*\.\s*instantiate\s*\(\s*&?[\"'](\w+)[\"']\s*\)")
+
+
+def _is_native_instantiate(path: str, text: str, start: int) -> bool:
+    if path != NATIVE_FILE:
+        return False
+    m = _NATIVE_INSTANTIATE.match(text, start)
+    return m is not None and m.group(1) in NATIVE_CLASSES
+
+
 def check_banned_apis(path: str, text: str) -> list[Finding]:
     relaxed = path.startswith(("core/", "tests/"))
     findings = []
@@ -473,6 +534,8 @@ def check_banned_apis(path: str, text: str) -> list[Finding]:
         for m in api.pattern.finditer(text):
             if path == LINKS_FILE and m.group(0).strip().endswith("shell_open"):
                 continue  # checked by check_links_file
+            if api.id == "dynamic-code" and _is_native_instantiate(path, text, m.start()):
+                continue
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"{api.message} (found `{m.group(0).strip()}`)", api.fix))
     if path == LINKS_FILE:

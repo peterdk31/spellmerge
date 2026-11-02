@@ -11,4 +11,6 @@ const RunnerScript := preload("res://tests/benchmark/projectile_timing_runner.gd
 func _initialize() -> void:
 	# The root joins the scene tree only after _initialize returns: wait one frame.
 	await process_frame
-	root.add_child(RunnerScript.new())
+	var runner: Node = RunnerScript.new()
+	runner.set(&"compare", true)
+	root.add_child(runner)

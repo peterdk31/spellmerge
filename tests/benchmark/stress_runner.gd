@@ -262,6 +262,9 @@ var _look_draw_usec: int = 0
 var _look_draw_frames: int = 0
 
 
+## False with `--no-native`: the swarm and its look run their GDScript too.
+var _native: bool = true
+
 func _ready() -> void:
 	OS.add_logger(_log)
 	_logging = true
@@ -278,6 +281,12 @@ func _ready() -> void:
 	scenarios = scenarios_for(scenarios_from_args(OS.get_cmdline_user_args() + OS.get_cmdline_args(), scenarios), OS.has_feature("web"))
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	profile = profile or args.has("--profile")
+	# `--no-native` runs the projectile manager's and the swarm's GDScript in place of the native
+	# module (native/README.md).
+	if args.has("--no-native"):
+		_native = false
+		_projectiles.set(&"native", false)
+	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
 	for arg in args:
 		if arg.begins_with("--swarm="):
 			swarm_override = arg.trim_prefix("--swarm=").to_int()
@@ -448,9 +457,11 @@ func _start_swarm() -> bool:
 	_swarm_node.name = "Swarm"
 	world.add_child(_swarm_node)
 	_swarm = SwarmScript.new()
+	_swarm.native = _native
 	_swarm.start(_swarm_node, ENEMY_AREA)
 	# Its look, as the director gives it (horde.gd, `_start_swarm`): a child of the same node.
 	var look := TimedLook.new()
+	look.native = _native
 	look.runner = self
 	look.setup(_swarm)
 	_swarm_node.add_child(look)

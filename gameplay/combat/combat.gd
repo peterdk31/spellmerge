@@ -900,7 +900,12 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	var node: Node2D = _nodes[row]
 	var damage: float = profile.damage
 	var strength: float = profile.knockback
-	var direction: Vector2 = (_position_of(node) - position).normalized()
+	# Away from the hit, measured to the hurt circle's centre (shots, beams and swings strike it at
+	# hand height), not the feet: a swing up at a body pushes it up, not down onto the caster. A
+	# hit on the very spot the body stands (a blast it sets off where its dash ends) has no way to
+	# push it.
+	var feet: Vector2 = _position_of(node)
+	var direction: Vector2 = Vector2.ZERO if feet.is_equal_approx(position) else (feet + _hurt_offset[row] - position).normalized()
 	if _hex_left[row] > 0.0:
 		direction = -direction
 		strength *= HEX_PULL_SHARE

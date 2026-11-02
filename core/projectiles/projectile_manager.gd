@@ -257,6 +257,16 @@ const HIT_WORK: int = 40
 const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
+## The threat grid (see `threat`): built from this many live shots (below, one pass is cheaper),
+## its cells at least THREAT_CELL pixels and at most THREAT_GRID_MAX a side, and a shot whose path
+## covers more than THREAT_SPAN_MAX cells is tried by every query instead of filed.
+const THREAT_GRID_FROM: int = 256
+const THREAT_CELL: float = 128.0
+const THREAT_GRID_MAX: int = 64
+const THREAT_SPAN_MAX: int = 16
+## The grid pays from about this many asks in a step (its build is about two passes'): fewer asks
+## in this step and the last, and each is one pass.
+const THREAT_GRID_ASKS: int = 3
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
 const RAY_SEGMENTS: int = 8
 ## The most points of its last step a swing's or beam's guard tests a shot at (`_guard_samples`).
@@ -423,6 +433,16 @@ const TRAIL_QUADS: Array[Vector3i] = [
 	Vector3i(TRAIL_Q_JAG, TRAIL_JAGS, 1),
 	Vector3i(TRAIL_Q_CORE, 1, 0),
 ]
+## The trail meshes the pool picks (performance, 2026-11-02): every quad of a trail's mesh runs its
+## vertex stage, drawn or folded, so the mesh has only as many slots as the pool's shares can fill.
+## Thinned particles come every `spark_stride`-th moment (a power of two up to SPARK_STRIDE_MAX,
+## the shader's uniform), so the mesh has TRAIL_SPARKS / stride particle slots; with no share for
+## the tails it keeps only the DASH_STREAK_SLOTS tail slots a dash draws its streaks on. The stride
+## moves only once the share is past the next one or under SPARK_STRIDE_LOW of it (each move picks
+## other moments, so it should not flicker). With everything shared the mesh is the full one.
+const SPARK_STRIDE_MAX: int = 64
+const SPARK_STRIDE_LOW: float = 0.4
+const DASH_STREAK_SLOTS: int = 32
 ## What holds a trail row, when it is not a shot's slot.
 const ROW_FREE: int = -1
 const ROW_FADING: int = -2
@@ -767,6 +787,8 @@ var _enemy_rune_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_rune_room: int = 0
 ## The mesh every trail instance is drawn as (`trail_mesh`), made once.
 static var _trail_mesh: ArrayMesh = null
+## The thinner trail meshes, by `_trail_mesh_key` (the full one is `_trail_mesh`).
+static var _trail_meshes: Dictionary = {}
 ## Trails (see TRAIL_SAMPLES): each shot's row (-1 for none), and per row its samples (`trail_data`
 ## in the shader), the number of its newest sample, how many it keeps, how far it has gone, its
 ## last point, what holds it (a slot or ROW_*), and, once its shot is gone (or for a caster's
@@ -855,6 +877,33 @@ var guard_slots: PackedInt32Array = PackedInt32Array()
 ## The shot `threat` found last (-1 for none), and the way off its line (unit; ZERO for none).
 var threat_slot: int = -1
 var threat_away: Vector2 = Vector2.ZERO
+## The pool's particle stride and whether the trails keep their full tail slots (see
+## SPARK_STRIDE_MAX), as the trail batches draw them now. Read only.
+var spark_stride: int = 1
+var full_tails: bool = true
+## The threat grid (see `threat`): the step and horizon it was built for (-1: none; any spawn,
+## deflection or card move throws it away), its cells (THREAT_CELL or wider), each cell's shots as a
+## list (`_threat_head` per cell, then `_threat_slot` and `_threat_next` per entry, -1 ends it), the
+## shots whose paths cover too many cells (checked by every query), and which shots a query
+## already tried (`_threat_seen`, stamped).
+var _threat_step: int = -1
+## Asks in the step `_threat_ask_step` and in the one before it (whether the grid pays).
+var _threat_ask_step: int = -1
+var _threat_asks: int = 0
+var _threat_asks_before: int = 0
+var _threat_horizon: float = 0.0
+var _threat_cell: float = THREAT_CELL
+var _threat_x: float = 0.0
+var _threat_y: float = 0.0
+var _threat_w: int = 0
+var _threat_h: int = 0
+var _threat_head: PackedInt32Array = PackedInt32Array()
+var _threat_slot: PackedInt32Array = PackedInt32Array()
+var _threat_next: PackedInt32Array = PackedInt32Array()
+var _threat_over: PackedInt32Array = PackedInt32Array()
+var _threat_over_count: int = 0
+var _threat_seen: PackedInt32Array = PackedInt32Array()
+var _threat_stamp: int = 0
 
 
 func _init() -> void:
@@ -915,17 +964,27 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## quad from the trail's data, or folds it away; a vertex says which quad and corner it is in its
 ## UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75. Made once, shared by every trail
 ## batch.
-static func trail_mesh() -> ArrayMesh:
-	if _trail_mesh != null:
+static func trail_mesh(spark_slots: int = TRAIL_SPARKS, full_tail: bool = true) -> ArrayMesh:
+	spark_slots = clampi(spark_slots, 1, TRAIL_SPARKS)
+	var full: bool = spark_slots == TRAIL_SPARKS and full_tail
+	if full and _trail_mesh != null:
 		return _trail_mesh
+	var key: int = _trail_mesh_key(spark_slots, full_tail)
+	if not full and _trail_meshes.has(key):
+		return _trail_meshes[key]
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)]
 	for entry: Vector3i in TRAIL_QUADS:
-		for n in entry.y:
-			var slot: int = entry.y - 1 - n if entry.z == 1 else n
+		var slots: int = entry.y
+		if entry.x == TRAIL_Q_SPARK_LIGHT or entry.x == TRAIL_Q_SPARK:
+			slots = spark_slots
+		elif entry.x == TRAIL_Q_TAIL and not full_tail:
+			slots = DASH_STREAK_SLOTS
+		for n in slots:
+			var slot: int = slots - 1 - n if entry.z == 1 else n
 			var base: int = verts.size()
 			for corner: Vector2 in corners:
 				verts.append(corner)
@@ -938,9 +997,34 @@ static func trail_mesh() -> ArrayMesh:
 	arrays[Mesh.ARRAY_TEX_UV] = uvs
 	arrays[Mesh.ARRAY_COLOR] = colors
 	arrays[Mesh.ARRAY_INDEX] = indices
-	_trail_mesh = ArrayMesh.new()
-	_trail_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return _trail_mesh
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	if full:
+		_trail_mesh = mesh
+	else:
+		_trail_meshes[key] = mesh
+	return mesh
+
+
+static func _trail_mesh_key(spark_slots: int, full_tail: bool) -> int:
+	return spark_slots * 2 + (1 if full_tail else 0)
+
+
+## The particle slots a trail mesh needs at `stride` (every moment of TRAIL_KEEP covered).
+static func spark_slots_for(stride: int) -> int:
+	return ceili(float(TRAIL_SPARKS) / float(maxi(stride, 1)))
+
+
+## The stride the pool thins particles by at `share`, moving from `current` only once it must (see
+## SPARK_STRIDE_MAX): the largest power of two whose share of the moments is still all wanted.
+static func spark_stride_for(share: float, current: int) -> int:
+	var at: float = float(current) * share
+	if current >= 1 and at <= 1.0 and (at >= SPARK_STRIDE_LOW or current >= SPARK_STRIDE_MAX):
+		return current
+	var stride: int = 1
+	while stride < SPARK_STRIDE_MAX and float(stride * 2) * share <= 1.0:
+		stride *= 2
+	return stride
 
 
 func _apply_textures() -> void:
@@ -962,6 +1046,7 @@ func _process(_delta: float) -> void:
 ## first, while the arrays still have the old size: a smaller cap than the shots' highest slot
 ## then ends them all (`shot_ended`) instead of reading past the shrunk arrays.
 func set_cap(value: int) -> void:
+	_threat_step = -1
 	if _cap > 0 and _alive.size() == _cap:
 		clear()
 	_cap = maxi(value, 1)
@@ -1090,6 +1175,7 @@ func get_cap() -> int:
 ## The area the projectiles live in. Also sizes the target grid.
 func set_bounds(rect: Rect2) -> void:
 	_bounds = rect
+	_threat_step = -1
 	_fit_draw_bounds()
 	_grid_x = rect.position.x
 	_grid_y = rect.position.y
@@ -1751,6 +1837,7 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		return false
 	if not offset.is_finite() or not is_finite(seconds):
 		return false
+	_threat_step = -1
 	if seconds <= 0.0:
 		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
 		_base[slot] += to - _pos[slot]
@@ -2040,6 +2127,7 @@ func is_deflecting(slot: int) -> bool:
 func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or by < 0 or not normal.is_finite():
 		return false
+	_threat_step = -1
 	var out: Vector2 = normal.normalized() if not normal.is_zero_approx() else Vector2.ZERO
 	if _motion[slot] == MOTION_ORBIT:
 		_vel[slot] = _orbit_tangent(slot)
@@ -2166,44 +2254,182 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 ## included), or -1.0 for none; `threat_slot` is its slot and `threat_away` the unit way off its
 ## line on the side `point` already is (away from a still one). The shots of `own` (an actor id,
 ## -1 for none) are skipped, as they pass their caster. Straight shots move on their velocity; an
-## orbit is skipped (it circles its caster). One pass over the live shots, allocation-free; an AI
-## asks on its reaction timer, not every step.
+## orbit is skipped (it circles its caster). Of two shots that get there at the same moment, the
+## lower slot is the one. Allocation-free; an AI asks on its reaction timer, not every step.
+##
+## Many AIs ask in one step, so with THREAT_GRID_FROM shots or more, once a step (or the one before
+## it) has THREAT_GRID_ASKS asks, an ask builds the threat grid (performance, 2026-11-02: one pass
+## over 3,000 shots was 1.4 ms an ask, about 10 ms a step for 200 enemies): each shot is filed
+## under the cells of the box round its path for the horizon, widened by its radius, and an ask
+## tries only the shots filed under the cells its own circle's box touches, with the same exact test. So it finds what one pass over every
+## shot finds. A spawn, a deflection or a card's move throws the grid away (they change a path
+## between steps); a longer horizon than the grid's builds it again.
 func threat(point: Vector2, radius: float, team: int, own: int = -1, horizon: float = 1.0) -> float:
 	threat_slot = -1
 	threat_away = Vector2.ZERO
 	if not point.is_finite() or not (radius > 0.0):
 		return -1.0
 	var best: float = INF
-	for slot in _high:
-		if _alive[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
-			continue
-		if _motion[slot] == MOTION_ORBIT:
-			continue
-		var reach: float = radius + _radius[slot]
-		var rel: Vector2 = point - _pos[slot]
-		var vel: Vector2 = _vel[slot]
-		var still: bool = _motion[slot] == MOTION_STILL or _state[slot] == S_STUCK or _state[slot] == S_FROZEN or _state[slot] == S_HELD or vel.length_squared() < 1.0
-		var when: float = -1.0
-		if rel.length_squared() <= reach * reach:
-			when = 0.0
-		elif not still:
-			var speed2: float = vel.length_squared()
-			var along: float = rel.dot(vel) / speed2
-			if along <= 0.0 or along > minf(horizon, _life[slot]):
+	if _threat_ask_step != _step_index:
+		_threat_asks_before = _threat_asks if _threat_ask_step == _step_index - 1 else 0
+		_threat_asks = 0
+		_threat_ask_step = _step_index
+	_threat_asks += 1
+	if _count < THREAT_GRID_FROM or (_threat_step != _step_index and _threat_asks < THREAT_GRID_ASKS and _threat_asks_before < THREAT_GRID_ASKS):
+		# `_threat_try` written out: a call a shot costs a third more over 3,000 shots.
+		var best_away: Vector2 = Vector2.ZERO
+		for slot in _high:
+			if _alive[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
 				continue
-			if (rel - vel * along).length_squared() > reach * reach:
+			if _motion[slot] == MOTION_ORBIT:
 				continue
-			when = along
-		if when < 0.0 or when >= best:
-			continue
-		best = when
-		threat_slot = slot
-		if still or vel.length_squared() < 1.0:
-			threat_away = rel.normalized() if rel != Vector2.ZERO else Vector2.RIGHT
-		else:
-			var side: Vector2 = rel - vel * (rel.dot(vel) / vel.length_squared())
-			threat_away = side.normalized() if side.length_squared() > 0.01 else vel.orthogonal().normalized()
+			var reach: float = radius + _radius[slot]
+			var rel: Vector2 = point - _pos[slot]
+			var vel: Vector2 = _vel[slot]
+			var state: int = _state[slot]
+			var still: bool = _motion[slot] == MOTION_STILL or state == S_STUCK or state == S_FROZEN or state == S_HELD or vel.length_squared() < 1.0
+			var when: float = -1.0
+			if rel.length_squared() <= reach * reach:
+				when = 0.0
+			elif not still:
+				var along: float = rel.dot(vel) / vel.length_squared()
+				if along <= 0.0 or along > minf(horizon, _life[slot]):
+					continue
+				if (rel - vel * along).length_squared() > reach * reach:
+					continue
+				when = along
+			# Slots run upward, so of two as soon the first one stays.
+			if when < 0.0 or when >= best:
+				continue
+			best = when
+			threat_slot = slot
+			if still:
+				best_away = rel.normalized() if rel != Vector2.ZERO else Vector2.RIGHT
+			else:
+				var side: Vector2 = rel - vel * (rel.dot(vel) / vel.length_squared())
+				best_away = side.normalized() if side.length_squared() > 0.01 else vel.orthogonal().normalized()
+		threat_away = best_away
+		return best if threat_slot >= 0 else -1.0
+	if _threat_step != _step_index or horizon > _threat_horizon:
+		_build_threat_grid(horizon)
+	_threat_stamp += 1
+	var stamp: int = _threat_stamp
+	for n in _threat_over_count:
+		best = _threat_try(_threat_over[n], point, radius, team, own, horizon, best)
+	var size: float = _threat_cell
+	var x0: int = clampi(floori((point.x - radius - _threat_x) / size), 0, _threat_w - 1)
+	var x1: int = clampi(floori((point.x + radius - _threat_x) / size), 0, _threat_w - 1)
+	var y0: int = clampi(floori((point.y - radius - _threat_y) / size), 0, _threat_h - 1)
+	var y1: int = clampi(floori((point.y + radius - _threat_y) / size), 0, _threat_h - 1)
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var entry: int = _threat_head[y * _threat_w + x]
+			while entry >= 0:
+				var slot: int = _threat_slot[entry]
+				entry = _threat_next[entry]
+				if _threat_seen[slot] == stamp:
+					continue
+				_threat_seen[slot] = stamp
+				best = _threat_try(slot, point, radius, team, own, horizon, best)
 	return best if threat_slot >= 0 else -1.0
+
+
+## `threat`'s exact test of the shot in `slot`: when it comes within `radius` (plus its own) of
+## `point`, if sooner than `best` (or as soon, from a lower slot); then it becomes `threat_slot`
+## and `threat_away` its way off. Returns the new best.
+func _threat_try(slot: int, point: Vector2, radius: float, team: int, own: int, horizon: float, best: float) -> float:
+	if _alive[slot] == 0 or (_team[slot] == team and team != ActorsScript.NONE) or (_actor[slot] == own and own >= 0):
+		return best
+	if _motion[slot] == MOTION_ORBIT:
+		return best
+	var reach: float = radius + _radius[slot]
+	var rel: Vector2 = point - _pos[slot]
+	var vel: Vector2 = _vel[slot]
+	var state: int = _state[slot]
+	var still: bool = _motion[slot] == MOTION_STILL or state == S_STUCK or state == S_FROZEN or state == S_HELD or vel.length_squared() < 1.0
+	var when: float = -1.0
+	if rel.length_squared() <= reach * reach:
+		when = 0.0
+	elif not still:
+		var speed2: float = vel.length_squared()
+		var along: float = rel.dot(vel) / speed2
+		if along <= 0.0 or along > minf(horizon, _life[slot]):
+			return best
+		if (rel - vel * along).length_squared() > reach * reach:
+			return best
+		when = along
+	if when < 0.0 or when > best or (when == best and slot > threat_slot):
+		return best
+	threat_slot = slot
+	if still:
+		threat_away = rel.normalized() if rel != Vector2.ZERO else Vector2.RIGHT
+	else:
+		var side: Vector2 = rel - vel * (rel.dot(vel) / vel.length_squared())
+		threat_away = side.normalized() if side.length_squared() > 0.01 else vel.orthogonal().normalized()
+	return when
+
+
+## File every live shot that `threat` could find under the cells of its path's box for `horizon`
+## seconds (see `threat`), in one pass: each cell's list grows at its head. Its cells cover the
+## bounds, THREAT_CELL wide or wider so there are at most THREAT_GRID_MAX a side; a path is clamped
+## to them (a query outside is clamped the same way, so nothing it could meet is missed).
+func _build_threat_grid(horizon: float) -> void:
+	_threat_step = _step_index
+	_threat_horizon = horizon
+	var size: float = maxf(THREAT_CELL, maxf(_bounds.size.x, _bounds.size.y) / float(THREAT_GRID_MAX))
+	_threat_cell = size
+	_threat_x = _bounds.position.x
+	_threat_y = _bounds.position.y
+	_threat_w = clampi(ceili(_bounds.size.x / size), 1, THREAT_GRID_MAX)
+	_threat_h = clampi(ceili(_bounds.size.y / size), 1, THREAT_GRID_MAX)
+	var cells: int = _threat_w * _threat_h
+	if _threat_head.size() < cells:
+		_threat_head.resize(cells)
+	if _threat_seen.size() < _cap:
+		_threat_seen.resize(_cap)
+		_threat_seen.fill(0)
+		_threat_over.resize(_cap)
+	if _threat_slot.size() < _cap * 4:
+		_threat_slot.resize(_cap * 4)
+		_threat_next.resize(_cap * 4)
+	_threat_head.fill(-1)
+	_threat_over_count = 0
+	var room: int = _threat_slot.size()
+	var used: int = 0
+	var w: int = _threat_w
+	var w1: int = w - 1
+	var h1: int = _threat_h - 1
+	var x_at: float = _threat_x
+	var y_at: float = _threat_y
+	for slot in _high:
+		if _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
+			continue
+		var at: Vector2 = _pos[slot]
+		var to: Vector2 = at
+		var state: int = _state[slot]
+		if _motion[slot] != MOTION_STILL and state != S_STUCK and state != S_FROZEN and state != S_HELD:
+			to = at + _vel[slot] * minf(horizon, maxf(_life[slot], 0.0))
+		var r: float = _radius[slot]
+		var x0: int = clampi(floori((minf(at.x, to.x) - r - x_at) / size), 0, w1)
+		var x1: int = clampi(floori((maxf(at.x, to.x) + r - x_at) / size), 0, w1)
+		var y0: int = clampi(floori((minf(at.y, to.y) - r - y_at) / size), 0, h1)
+		var y1: int = clampi(floori((maxf(at.y, to.y) + r - y_at) / size), 0, h1)
+		var span: int = (x1 - x0 + 1) * (y1 - y0 + 1)
+		if span > THREAT_SPAN_MAX:
+			_threat_over[_threat_over_count] = slot
+			_threat_over_count += 1
+			continue
+		if used + span > room:
+			room = maxi(room * 2, used + span)
+			_threat_slot.resize(room)
+			_threat_next.resize(room)
+		for y in range(y0, y1 + 1):
+			var row: int = y * w
+			for x in range(x0, x1 + 1):
+				_threat_slot[used] = slot
+				_threat_next[used] = _threat_head[row + x]
+				_threat_head[row + x] = used
+				used += 1
 
 
 ## How many points of its last step a guard tests a shot at: one for a shot that moves less than
@@ -2331,6 +2557,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_drop_moves(slot)
 	_forget_all(slot)
 	_orbit_centre[slot] = Vector2.INF
+	_threat_step = -1
 	_trail[slot] = -1 if motion == MOTION_STILL else _open_row(slot, origin)
 	_state[slot] = S_IDLE
 	_alive[slot] = 1
@@ -3907,6 +4134,15 @@ func _share_pool(asked: int, trails: int) -> void:
 	var cap: float = float(maxi(particle_cap, 0))
 	particle_share = 1.0 if asked <= 0 else minf(1.0, cap / float(asked))
 	trail_share = 1.0 if trails <= 0 else clampf((cap - float(asked)) / float(trails), 0.0, 1.0)
+	var stride: int = spark_stride_for(particle_share, spark_stride)
+	var tails: bool = trail_share > 0.0
+	if stride != spark_stride or tails != full_tails:
+		spark_stride = stride
+		full_tails = tails
+		var mesh: ArrayMesh = trail_mesh(spark_slots_for(stride), tails)
+		for node: MultiMeshInstance2D in [_draw_node, _orbit_node, _enemy_node]:
+			node.multimesh.mesh = mesh
+			(node.material as ShaderMaterial).set_shader_parameter(&"spark_stride", float(stride))
 	_set_shares(_draw_node)
 	_set_shares(_rune_node)
 	_set_shares(_orbit_node)

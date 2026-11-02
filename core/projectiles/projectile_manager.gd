@@ -940,7 +940,7 @@ func _init() -> void:
 
 
 ## Use the native kernel when `on` and the module is loaded (see `native`). A kernel built against
-## other constants than these is refused with an error, and the GDScript runs.
+## other constants or members than these is refused with an error, and the GDScript runs.
 func set_native(on: bool) -> void:
 	native = on
 	_kernel = null
@@ -949,20 +949,22 @@ func set_native(on: bool) -> void:
 	var kernel: Object = NativeScript.shot_kernel()
 	if kernel == null:
 		return
-	if not kernel.call(&"check", {
-		"MOTION_STRAIGHT": MOTION_STRAIGHT, "MOTION_STILL": MOTION_STILL, "MOTION_ORBIT": MOTION_ORBIT,
-		"F_SELF": F_SELF, "F_SELF_LIVE": F_SELF_LIVE, "F_GHOST": F_GHOST,
-		"S_IDLE": S_IDLE, "S_MOVING": S_MOVING, "S_DONE": S_DONE, "S_STUCK": S_STUCK, "S_EXPIRE": S_EXPIRE,
-		"S_FROZEN": S_FROZEN, "GRID_CELL": GRID_CELL, "WALL_CELL": WALL_CELL, "MAX_WALL_VISITS": MAX_WALL_VISITS,
-		"S_HELD": S_HELD, "S_RETURNING": S_RETURNING, "S_WAITING": S_WAITING, "B_HOMING": B_HOMING,
-		"B_SPIRAL": B_SPIRAL, "B_MOVE": B_MOVE, "AFTER_HITS": AFTER_HITS, "HOMING_PERIOD": HOMING_PERIOD,
-		"HOMING_DRIFT": SpellLimits.HOMING_DRIFT, "S_GONE": S_GONE, "F_TURNED": F_TURNED, "F_WAVE": F_WAVE,
-		"CASTER_WIZARD": CASTER_WIZARD, "CASTER_POINT": CASTER_POINT, "SPIRAL_PERIOD": SPIRAL_PERIOD,
-		"RETURN_BEND": RETURN_BEND, "B_GROWTH": B_GROWTH, "B_LINGER": B_LINGER, "B_ORBIT": B_ORBIT, "B_RETURN": B_RETURN,
-	}):
-		push_error("Projectiles: the native ShotKernel was built against other constants; running the GDScript")
+	# The kernel holds copies of constants: every one must be this script's (and a few from other
+	# scripts), and every member it reads must be here, of its type; it lists any that is not.
+	var wrong: PackedStringArray = kernel.call(&"check", native_constants()) + kernel.call(&"check_fields", self)
+	if not wrong.is_empty():
+		push_error("Projectiles: the native ShotKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		return
 	_kernel = kernel
+
+
+## The constants the native kernel checks its own copies against: this script's, and the few it
+## takes from other scripts, by the names the kernel gives them.
+func native_constants() -> Dictionary:
+	var constants: Dictionary = (get_script() as Script).get_script_constant_map()
+	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
+			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE})
+	return constants
 
 
 ## Whether the native kernel runs the step (`native` is on and the module is loaded).
@@ -2713,52 +2715,60 @@ func _pass_hits(top: int, delta: float) -> void:
 	var limit: Rect2 = _bounds.grow(BOUNDS_MARGIN)
 	var resume: int = _resume if _resume < top else 0
 	_starved_at = -1
+	var n: int = 0
 	if _kernel != null and not _any_solid:
-		if _cand_target.size() < _targets.size():
-			_cand_target.resize(_targets.size())
-			_cand_along.resize(_targets.size())
-			_cand_point.resize(_targets.size())
-		if _target_mark.size() < _targets.size():
-			_target_mark.resize(_targets.size())
-			_target_entry.resize(_targets.size())
-		var n: int = 0
-		while n < top:
-			var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
-			if handed < 0:
-				break
-			n = handed >> 1
-			var slot: int = n + resume
-			if slot >= top:
-				slot -= top
-			if handed & 1 == 0:
-				_hit_slot(slot, delta, limit)
-			else:
-				_hit_found(slot)
-			n += 1
-			# The shots after it that the kernel would hand straight back (to end, waiting for their
-			# passes) take their turns here, without a call each.
-			while n < top:
-				slot = n + resume
-				if slot >= top:
-					slot -= top
-				if not _kernel_hands_back(slot):
-					break
-				_hit_slot(slot, delta, limit)
-				n += 1
-			# A hit handler may have added targets: the kernel's scratch must hold them all.
-			if _cand_target.size() < _targets.size() or _target_mark.size() < _targets.size():
-				_cand_target.resize(maxi(_cand_target.size(), _targets.size()))
-				_cand_along.resize(_cand_target.size())
-				_cand_point.resize(_cand_target.size())
-				_target_mark.resize(maxi(_target_mark.size(), _targets.size()))
-				_target_entry.resize(_target_mark.size())
-	else:
-		for n in top:
-			var slot: int = n + resume
-			if slot >= top:
-				slot -= top
-			_hit_slot(slot, delta, limit)
+		n = _pass_hits_native(top, delta, limit, resume)
+	# Every shot the kernel did not reach (all of them without it).
+	while n < top:
+		_hit_slot(_wrapped(n + resume, top), delta, limit)
+		n += 1
 	_resume = maxi(_starved_at, 0)
+
+
+## The hit pass with the native kernel (`ShotKernel.hits`): it takes the shots that need nothing
+## of GDScript, and each it hands back (an end, a wall, hits found) takes its turn here, then the
+## kernel goes on after it. Returns the shot the pass got to: `top`, or where the kernel failed (it
+## logged why; `_pass_hits` does the rest).
+func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int:
+	var n: int = 0
+	while n < top:
+		# The kernel's scratch holds every target (a hit handler may have added some).
+		_fit_hit_scratch()
+		var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
+		if handed == -1:
+			return top
+		if handed < -1:
+			return -2 - handed
+		n = handed >> 1
+		var slot: int = _wrapped(n + resume, top)
+		if handed & 1 == 0:
+			_hit_slot(slot, delta, limit)
+		else:
+			_hit_found(slot)
+		n += 1
+		# The shots after it that the kernel would hand straight back take their turns here, without
+		# a call each (a crowd of homing shots on their search step, say).
+		while n < top and _kernel_hands_back(_wrapped(n + resume, top)):
+			_hit_slot(_wrapped(n + resume, top), delta, limit)
+			n += 1
+	return top
+
+
+## `n` wrapped round `top` once (the hit pass starts at `_resume`).
+static func _wrapped(n: int, top: int) -> int:
+	return n - top if n >= top else n
+
+
+## Size the native hit pass's scratch for every target (`_cand_*`, `_target_mark`, `_target_entry`).
+func _fit_hit_scratch() -> void:
+	var targets: int = _targets.size()
+	if _cand_target.size() < targets:
+		_cand_target.resize(targets)
+		_cand_along.resize(targets)
+		_cand_point.resize(targets)
+	if _target_mark.size() < targets:
+		_target_mark.resize(targets)
+		_target_entry.resize(targets)
 
 
 ## Whether the native hit pass would hand the shot in `slot` straight back for its state: one to
@@ -4033,35 +4043,9 @@ func _sample_trails() -> void:
 	if tick == _trail_tick:
 		return
 	_trail_tick = tick
-	# `_trail_sample` and `_drawn_at` written out: this runs for every flying shot every other step
-	# (two calls a shot less: 2.1 -> 1.1 ms a sample at 3,000 shots).
 	var now: float = sim_time
-	if _kernel != null:
-		if _kernel.call(&"sample_shots", self, now):
-			_trail_dirty = true
-	for slot in _high if _kernel == null else 0:
-		var row: int = _trail[slot]
-		if row < 0 or _alive[slot] == 0:
-			continue
-		var at: Vector2 = _pos[slot]
-		if _motion[slot] == MOTION_ORBIT:
-			at = _drawn_at(slot, at)
-		var kept: int = _trail_kept[row]
-		if kept > 0:
-			var moved: float = at.distance_to(_trail_last[row])
-			if moved > TRAIL_JUMP:
-				kept = 0
-			else:
-				_trail_odo[row] += moved
-		var newest: int = _trail_newest[row] + 1
-		var i: int = row * TRAIL_STRIDE + (newest % TRAIL_SAMPLES) * 4
-		_trail_data[i] = at.x
-		_trail_data[i + 1] = at.y
-		_trail_data[i + 2] = _trail_odo[row]
-		_trail_data[i + 3] = now
-		_trail_newest[row] = newest
-		_trail_kept[row] = mini(kept + 1, TRAIL_SAMPLES)
-		_trail_last[row] = at
+	var sampled: bool = _kernel.call(&"sample_shots", self, now) if _kernel != null else _sample_shots(now)
+	if sampled:
 		_trail_dirty = true
 	var n: int = 0
 	while n < _loose_count:
@@ -4084,6 +4068,39 @@ func _sample_trails() -> void:
 		n += 1
 	while _trail_high > 0 and _trail_holder[_trail_high - 1] == ROW_FREE:
 		_trail_high -= 1
+
+
+## `_sample_trails`' loop over the flying shots (what `ShotKernel.sample_shots` does natively): each
+## takes its point at `now`. Returns true when one did (the trails need sending).
+func _sample_shots(now: float) -> bool:
+	# `_trail_sample` and `_drawn_at` written out: this runs for every flying shot every other step
+	# (two calls a shot less: 2.1 -> 1.1 ms a sample at 3,000 shots).
+	var sampled: bool = false
+	for slot in _high:
+		var row: int = _trail[slot]
+		if row < 0 or _alive[slot] == 0:
+			continue
+		var at: Vector2 = _pos[slot]
+		if _motion[slot] == MOTION_ORBIT:
+			at = _drawn_at(slot, at)
+		var kept: int = _trail_kept[row]
+		if kept > 0:
+			var moved: float = at.distance_to(_trail_last[row])
+			if moved > TRAIL_JUMP:
+				kept = 0
+			else:
+				_trail_odo[row] += moved
+		var newest: int = _trail_newest[row] + 1
+		var i: int = row * TRAIL_STRIDE + (newest % TRAIL_SAMPLES) * 4
+		_trail_data[i] = at.x
+		_trail_data[i + 1] = at.y
+		_trail_data[i + 2] = _trail_odo[row]
+		_trail_data[i + 3] = now
+		_trail_newest[row] = newest
+		_trail_kept[row] = mini(kept + 1, TRAIL_SAMPLES)
+		_trail_last[row] = at
+		sampled = true
+	return sampled
 
 
 ## Size `_trail_data` for the rows in use: a power of two, at least MIN_TRAIL_ROWS.
@@ -4129,7 +4146,8 @@ func update_draw(fraction: float = -1.0) -> void:
 	_set_sim_time(_enemy_node, fraction)
 	_set_sim_time(_enemy_rune_node, fraction)
 	_upload_trails()
-	# The native kernel counts and writes every shot when no shot is solid (`_write_stones`).
+	# The native kernel counts and writes every shot when no shot is solid (`_write_stones`); either
+	# way `_draw_out` says what was written, into the kernel's buffers or the manager's.
 	var kernel_draw: bool = _kernel != null and not _any_solid
 	if kernel_draw:
 		_kernel.call(&"count_draw", self)
@@ -4142,15 +4160,6 @@ func update_draw(fraction: float = -1.0) -> void:
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
 	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY], _cap * (1 + TRAIL_ROWS_PER_SLOT))
 	_enemy_rune_room = _fit_batch(_enemy_rune_node.multimesh, _enemy_rune_buffer, _enemy_rune_room, counts[BATCH_ENEMY_RUNE])
-	var out: int = 0
-	var rune_out: int = 0
-	var orbit_out: int = 0
-	var enemy_out: int = 0
-	var enemy_rune_out: int = 0
-	var asked: int = 0
-	var trails: int = 0
-	var shots_out: int = 0
-	var enemy_shots: int = 0
 	var draw_buffer: PackedFloat32Array = _draw_buffer
 	var rune_buffer: PackedFloat32Array = _rune_buffer
 	var orbit_buffer: PackedFloat32Array = _orbit_buffer
@@ -4158,28 +4167,59 @@ func update_draw(fraction: float = -1.0) -> void:
 	var enemy_rune_buffer: PackedFloat32Array = _enemy_rune_buffer
 	if kernel_draw:
 		_kernel.call(&"draw_shots", self, fraction)
-		out = _draw_out[BATCH_BOLT]
-		rune_out = _draw_out[BATCH_RUNE]
-		orbit_out = _draw_out[BATCH_ORBIT]
-		enemy_out = _draw_out[BATCH_ENEMY]
-		enemy_rune_out = _draw_out[BATCH_ENEMY_RUNE]
-		asked = _draw_out[BATCHES]
-		trails = _draw_out[BATCHES + 1]
-		shots_out = _draw_out[BATCHES + 2]
-		enemy_shots = _draw_out[BATCHES + 3]
 		draw_buffer = _kernel.call(&"buffer", BATCH_BOLT)
 		rune_buffer = _kernel.call(&"buffer", BATCH_RUNE)
 		orbit_buffer = _kernel.call(&"buffer", BATCH_ORBIT)
 		enemy_buffer = _kernel.call(&"buffer", BATCH_ENEMY)
 		enemy_rune_buffer = _kernel.call(&"buffer", BATCH_ENEMY_RUNE)
-	for slot in _high if not kernel_draw else 0:
+	else:
+		_draw_shots(fraction)
+	var out: int = _draw_out[BATCH_BOLT]
+	var rune_out: int = _draw_out[BATCH_RUNE]
+	var orbit_out: int = _draw_out[BATCH_ORBIT]
+	var enemy_out: int = _draw_out[BATCH_ENEMY]
+	var enemy_rune_out: int = _draw_out[BATCH_ENEMY_RUNE]
+	var shots_out: int = _draw_out[BATCHES + 2]
+	if out > 0:
+		multimesh.buffer = draw_buffer
+	multimesh.visible_instance_count = out
+	if rune_out > 0:
+		_rune_node.multimesh.buffer = rune_buffer
+	_rune_node.multimesh.visible_instance_count = rune_out
+	if orbit_out > 0:
+		_orbit_node.multimesh.buffer = orbit_buffer
+	_orbit_node.multimesh.visible_instance_count = orbit_out
+	if enemy_out > 0:
+		_enemy_node.multimesh.buffer = enemy_buffer
+	_enemy_node.multimesh.visible_instance_count = enemy_out
+	if enemy_rune_out > 0:
+		_enemy_rune_node.multimesh.buffer = enemy_rune_buffer
+	_enemy_rune_node.multimesh.visible_instance_count = enemy_rune_out
+	drawn_enemy = _draw_out[BATCHES + 3]
+	drawn = shots_out
+	drawn_trails = out + rune_out + orbit_out + enemy_out + enemy_rune_out - shots_out
+	_share_pool(_draw_out[BATCHES], _draw_out[BATCHES + 1])
+
+
+## `update_draw`'s writing (what `ShotKernel.draw_shots` does natively): every live shot, then every
+## loose trail, into the manager's batch buffers at `fraction` of the last step; `_draw_out` gets
+## the instances written per batch (BATCH_*), the particles asked for, the trail cost, the shots
+## drawn and the enemy shots drawn. `_count_batches` brought each shot's drawn data up to date.
+func _draw_shots(fraction: float) -> void:
+	var out: int = 0
+	var rune_out: int = 0
+	var orbit_out: int = 0
+	var enemy_out: int = 0
+	var enemy_rune_out: int = 0
+	var asked: int = 0
+	var trails: int = 0
+	for slot in _high:
 		if _alive[slot] == 0:
 			continue
 		var motion: int = _motion[slot]
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		if motion == MOTION_ORBIT:
 			at = _drawn_at(slot, at)
-		# `_count_batches` brought the slot's drawn data up to date.
 		var batch: int = _drawn_batch[slot]
 		var size: float = _drawn_size[slot]
 		var look_data: Color = _drawn_color[slot]
@@ -4206,11 +4246,10 @@ func update_draw(fraction: float = -1.0) -> void:
 		else:
 			_write_trail(_draw_buffer, out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			out += 1
-	if not kernel_draw:
-		shots_out = out + rune_out + orbit_out + enemy_out + enemy_rune_out
-		enemy_shots = enemy_out + enemy_rune_out
+	_draw_out[BATCHES + 2] = out + rune_out + orbit_out + enemy_out + enemy_rune_out
+	_draw_out[BATCHES + 3] = enemy_out + enemy_rune_out
 	# The trails held by no live shot: cooling where their shot ended, or following a caster.
-	for n in _loose_count if not kernel_draw else 0:
+	for n in _loose_count:
 		var row: int = _loose[n]
 		var caster: int = _trail_caster[row]
 		var head: Vector2 = _trail_last[row]
@@ -4228,25 +4267,13 @@ func update_draw(fraction: float = -1.0) -> void:
 		else:
 			_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, row, head, flags, data, _trail_core[row])
 			enemy_out += 1
-	if out > 0:
-		multimesh.buffer = draw_buffer
-	multimesh.visible_instance_count = out
-	if rune_out > 0:
-		_rune_node.multimesh.buffer = rune_buffer
-	_rune_node.multimesh.visible_instance_count = rune_out
-	if orbit_out > 0:
-		_orbit_node.multimesh.buffer = orbit_buffer
-	_orbit_node.multimesh.visible_instance_count = orbit_out
-	if enemy_out > 0:
-		_enemy_node.multimesh.buffer = enemy_buffer
-	_enemy_node.multimesh.visible_instance_count = enemy_out
-	if enemy_rune_out > 0:
-		_enemy_rune_node.multimesh.buffer = enemy_rune_buffer
-	_enemy_rune_node.multimesh.visible_instance_count = enemy_rune_out
-	drawn_enemy = enemy_shots
-	drawn = shots_out
-	drawn_trails = out + rune_out + orbit_out + enemy_out + enemy_rune_out - shots_out
-	_share_pool(asked, trails)
+	_draw_out[BATCH_BOLT] = out
+	_draw_out[BATCH_RUNE] = rune_out
+	_draw_out[BATCH_ORBIT] = orbit_out
+	_draw_out[BATCH_ENEMY] = enemy_out
+	_draw_out[BATCH_ENEMY_RUNE] = enemy_rune_out
+	_draw_out[BATCHES] = asked
+	_draw_out[BATCHES + 1] = trails
 
 
 ## Write the rune quad of the still shot in `slot` drawn at `at` into `buffer` from instance

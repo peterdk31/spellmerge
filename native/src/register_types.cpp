@@ -20,9 +20,15 @@ static void initialize_spellmerge(ModuleInitializationLevel p_level) {
 	}
 	GDREGISTER_CLASS(ShotKernel);
 	GDREGISTER_CLASS(SwarmKernel);
+	GDREGISTER_CLASS(SwarmLookKernel);
 }
 
 static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
+	if (p_level != MODULE_INITIALIZATION_LEVEL_SCENE) {
+		return;
+	}
+	ShotKernel::free_names();
+	SwarmKernel::free_names();
 }
 
 extern "C" {

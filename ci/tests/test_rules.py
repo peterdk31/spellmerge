@@ -83,6 +83,21 @@ class BannedApiTest(unittest.TestCase):
         self.assertTrue(banned('ClassDB.instantiate(name)', rules.NATIVE_FILE))
         self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
 
+    def test_native_sources_compute_only(self) -> None:
+        def native(text: str) -> list[str]:
+            return [f.message for f in rules.check_native_source("native/src/k.cpp", text)]
+        good = ('#include "k.h"\n#include <cmath>\n#include <godot_cpp/variant/vector2.hpp>\n'
+                '#include <godot_cpp/classes/node2d.hpp>\n#include <godot_cpp/core/class_db.hpp>\n'
+                'Object *o = (Object *)::godot::gdextension_interface::object_get_instance_from_id(id);\n'
+                'node->set_position(p); double far = std::sqrt(x);\n')
+        self.assertEqual(native(good), [])
+        for bad in ['#include <godot_cpp/classes/os.hpp>', '#include <godot_cpp/classes/http_request.hpp>',
+                    '#include <cstdlib>', '#include "../../secret.h"', 'system("rm -rf /");', 'FILE *f = fopen(p, "r");',
+                    'void *h = dlopen("x", 0);', 'obj->call("execute", args);', 'Engine::get_singleton();',
+                    'std::thread t(f);', 'asm("nop");', '::godot::gdextension_interface::classdb_construct_object(n);']:
+            with self.subTest(bad=bad):
+                self.assertTrue(native(good + bad + "\n"), f"not flagged: {bad}")
+
     def test_reports_line_numbers(self) -> None:
         found = rules.check_banned_apis("a.gd", 'extends Node\n\nfunc _ready() -> void:\n\tOS.execute("x", [])\n')
         self.assertEqual(found[0].line, 4)
@@ -248,13 +263,21 @@ class RepoTest(unittest.TestCase):
     def test_native_sources_are_claudes_only(self) -> None:
         self.write("native/src/shot_kernel.cpp", "int x = 1;\n")
         self.write("native/src/shot_kernel.h", "#pragma once\n")
-        self.write("native/SConstruct", "Default([])\n")
         self.commit()
         self.assertEqual(self.check(BOT), [])
         found = self.check()
-        for path in ("native/src/shot_kernel.cpp", "native/src/shot_kernel.h", "native/SConstruct"):
+        for path in ("native/src/shot_kernel.cpp", "native/src/shot_kernel.h"):
             self.assertIn(("bot-path", "error", path), found)
             self.assertIn(("file-type", "error", path), found)
+
+    def test_the_native_build_is_the_owners(self) -> None:
+        # Its SCons script runs in the job that builds the game; its profile says what the C++ reaches.
+        self.write("native/SConstruct", "Default([])\n")
+        self.write("native/build_profile.json", '{"enabled_classes": ["OS"]}\n')
+        self.commit()
+        found = self.check(BOT)
+        for path in ("native/SConstruct", "native/build_profile.json"):
+            self.assertIn(("protected-path", "error", path), found)
 
     def test_native_types_only_in_native(self) -> None:
         self.write("core/spells/fast.cpp", "int x = 1;\n")

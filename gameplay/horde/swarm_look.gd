@@ -143,7 +143,7 @@ var _ghost_source: Sprite2D = null
 var _ghost_of: int = 0
 
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-## The native kernel (`SwarmKernel`, native/README.md): the rows' step and the batches' writing in
+## The native kernel (`SwarmLookKernel`, native/README.md): the rows' step and the batches' writing in
 ## C++, the same to the bit, or null to run them here. `native` switches it.
 var native: bool = true:
 	set = set_native
@@ -155,13 +155,14 @@ var _k: float = 0.0
 var _last_usec: int = 0
 
 
-## Draw `of_swarm`'s rows from now on.
 ## Use the native kernel when `on` and the module is loaded (see `native`). The kernel is handed the
 ## numbers below once, so they stay here only.
 func set_native(on: bool) -> void:
 	native = on
-	_kernel = NativeScript.swarm_kernel() if on else null
-	if _kernel != null and not _kernel.call(&"configure", {
+	_kernel = NativeScript.swarm_look_kernel() if on else null
+	if _kernel == null:
+		return
+	var numbers: Dictionary = {
 		"HOP_SPEED_SQ": CreatureLook.HOP_SPEED * CreatureLook.HOP_SPEED, "HOP_RATE": CreatureLook.HOP_RATE,
 		"HOP_HEIGHT": CreatureLook.HOP_HEIGHT, "HOP_IDLE": CreatureLook.HOP_IDLE, "SNAP_SQ": Face.SNAP * Face.SNAP,
 		"MAX_LAG": Face.MAX_LAG, "LOOK_LEAN": Face.LOOK_LEAN, "IDLE_AFTER": Face.IDLE_AFTER, "LAG": Face.LAG,
@@ -169,11 +170,16 @@ func set_native(on: bool) -> void:
 		"FLAG_HURT": FLAG_HURT, "BLINK_COLUMN": Face.BLINK_COLUMN, "WORRIED": Face.Mood.WORRIED,
 		"RAISED": Face.Mood.RAISED, "STRIDE": STRIDE, "BLINK_EVERY": Face.BLINK_EVERY, "BLINK_TIME": Face.BLINK_TIME,
 		"GLANCE_EVERY": Face.GLANCE_EVERY, "RAISE_EVERY": Face.RAISE_EVERY,
-	}):
-		push_error("SwarmLook: the native SwarmKernel refused the look's numbers; running the GDScript")
+	}
+	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
+	if not _kernel.call(&"configure", numbers):
+		wrong.append("the look's numbers")
+	if not wrong.is_empty():
+		push_error("SwarmLook: the native SwarmLookKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		_kernel = null
 
 
+## Draw `of_swarm`'s rows from now on.
 func setup(of_swarm: Object) -> void:
 	swarm = of_swarm
 	_take_kinds()
@@ -210,7 +216,7 @@ func step(delta: float) -> void:
 	_take_kinds()
 	_take_rows()
 	if _kernel != null and "ran" in swarm and "down" in swarm:
-		_kernel.call(&"look_step", self, delta)
+		_kernel.call(&"look_step", self)
 		return
 	var count: int = _count
 	var positions: PackedVector2Array = swarm.positions

@@ -235,8 +235,13 @@ func _init() -> void:
 func set_native(on: bool) -> void:
 	native = on
 	_kernel = NativeScript.swarm_kernel() if on else null
-	if _kernel != null and not _kernel.call(&"configure", {"WALL_CELL": WALL_CELL}):
-		push_error("Swarm: the native SwarmKernel refused the swarm's numbers; running the GDScript")
+	if _kernel == null:
+		return
+	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
+	if not _kernel.call(&"configure", {"WALL_CELL": WALL_CELL}):
+		wrong.append("the swarm's numbers")
+	if not wrong.is_empty():
+		push_error("Swarm: the native SwarmKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		_kernel = null
 
 

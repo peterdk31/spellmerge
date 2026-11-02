@@ -13,9 +13,9 @@
 #                                 script only warns, so it never keeps the build back.
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #
-# Every mode first builds the native module (ci/build/native.sh: Linux for --quick, the web for
-# --web, Linux, the web and Windows for a full build) and fails without it; the exports are
-# checked for it. NATIVE=0 leaves it out, for local builds only.
+# Every mode first builds the native module (ci/build/native.sh: Linux for --quick, Linux and the
+# web for --web, all three for a full build) and fails without it; the exports are checked for it.
+# NATIVE=0 leaves it out, for local builds only.
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
 #                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
@@ -466,7 +466,9 @@ fi
 stamp
 trap reset_build_info EXIT
 if ((WEB)); then
-  setup_native web
+  # Linux too: the editor that imports and exports here runs on Linux, and it fails on an extension
+  # with no library for its own platform.
+  setup_native linux web
   step "Importing"
   godot_checked import "$GODOT" --headless --path . --import
   export_preset Web

@@ -9,7 +9,10 @@ extends SceneTree
 ##
 ## The scene: walls; enemies that walk and are hit, some owned by an enemy actor; four wizards
 ## that walk with their anchors; bolts, runes and orbits of the four hat ramps and of the enemy
-## ramp, with card looks, piercing, bouncing, homing, growing, lingering, returning and ghost shots; hit
+## ramp, with card looks, piercing, bouncing, homing, growing, lingering, returning and ghost shots,
+## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
+## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
+## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
 ## handlers that spawn shots and remove a target now and then; cooling trails and a dash.
 ##
 ## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it, as in
@@ -91,15 +94,25 @@ func _teardown() -> void:
 	_holders.clear()
 
 
-## A kernel built against other constants is refused, and the manager runs its GDScript.
+## A kernel built against other constants or members is refused, and the manager runs its GDScript:
+## the kernel names every constant and member that does not match.
 func _test_the_constants_are_checked() -> void:
 	var kernel: Object = NativeScript.shot_kernel()
 	_check(kernel != null, "the module makes a ShotKernel")
 	if kernel == null:
 		return
-	_check(not kernel.call(&"check", {"S_DONE": ManagerScript.S_DONE + 1}), "a changed constant is caught")
-	_check(not kernel.call(&"check", {}), "a missing constant is caught")
 	var mgr := ManagerScript.new()
+	var constants: Dictionary = mgr.native_constants()
+	_check((kernel.call(&"check", constants) as PackedStringArray).is_empty(), "the manager's constants match the kernel's")
+	_check((kernel.call(&"check_fields", mgr) as PackedStringArray).is_empty(), "the manager has every member the kernel reads")
+	var changed: Dictionary = constants.duplicate()
+	changed["EMITTING_MASK"] = int(changed["EMITTING_MASK"]) + 1
+	changed.erase("S_DONE")
+	var wrong: String = ", ".join(kernel.call(&"check", changed) as PackedStringArray)
+	_check("EMITTING_MASK" in wrong and "S_DONE" in wrong, "a changed and a missing constant are named (%s)" % wrong)
+	var stranger := Node2D.new()
+	_check("_pos" in ", ".join(kernel.call(&"check_fields", stranger) as PackedStringArray), "a missing member is named")
+	stranger.free()
 	_check(mgr.is_native(), "a new manager runs the native kernel")
 	mgr.native = false
 	_check(not mgr.is_native(), "native off runs the GDScript")
@@ -211,7 +224,8 @@ func _drive(side: int, step: int) -> void:
 			slot = m.spawn(caster, from, velocity, rng.randf_range(0.3, 2.5), rng.randf_range(1.0, 9.0), ManagerScript.ACTOR_LAYERS, rng.randi() % 4, 1 if kind != 9 else 2)
 		if slot < 0:
 			continue
-		m.set_look(slot, rng.randi() & ((1 << 22) - 1) if rng.randf() < 0.6 else 0)
+		# Any look bits, the enemy ramp's flag among them (`ramp_look`), so a new kind is covered too.
+		m.set_look(slot, rng.randi() & ((1 << ManagerScript.LOOK_MAX_KINDS) - 1) if rng.randf() < 0.6 else 0)
 		if rng.randf() < 0.4:
 			m.set_core(slot, Color(rng.randf(), rng.randf(), rng.randf()))
 		match kind:
@@ -232,6 +246,19 @@ func _drive(side: int, step: int) -> void:
 				m.set_return(slot)
 				if rng.randf() < 0.5:
 					m.set_homing(slot, 2.5, 140.0)
+		# Rarer kinds, from the same draws on both sides.
+		var extra: float = rng.randf()
+		if extra < 0.05 and kind == 3:
+			m.set_spiral(slot, 6.0)
+		elif extra < 0.1:
+			m.set_sticky(slot, 0.4)
+		elif extra < 0.14:
+			m.freeze_shot(slot, rng.randf_range(0.05, 0.3))
+		elif extra < 0.17 and kind == 1 and slot > 0 and m.is_alive(slot - 1):
+			# An orbit round the shot before it, for as long as that one flies.
+			m.set_caster_shot(slot, slot - 1)
+		elif extra < 0.2 and kind == 0 and step % 25 < 5:
+			m.set_solid(slot, Vector2.from_angle(rng.randf() * TAU), 3, 10.0)
 
 
 func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
@@ -289,7 +316,8 @@ func _compare_draw(step: int) -> void:
 		var count_b: int = (b.get(nodes[batch]) as MultiMeshInstance2D).multimesh.visible_instance_count
 		_check(count_a == count_b, "step %d batch %d: the same instances (%d / %d)" % [step, batch, count_a, count_b])
 		var buffer_a: PackedFloat32Array = a.get(OWN_BUFFERS[batch])
-		var buffer_b: PackedFloat32Array = b._kernel.call(&"buffer", batch)
+		# The native side drew into the kernel's buffers, or into its own while a solid shot lived.
+		var buffer_b: PackedFloat32Array = b._kernel.call(&"buffer", batch) if not b._any_solid else b.get(OWN_BUFFERS[batch])
 		var floats: int = mini(count_a, count_b) * ManagerScript.DRAW_STRIDE
 		if buffer_a.size() < floats or buffer_b.size() < floats:
 			_failures.append("step %d batch %d: a buffer too small" % [step, batch])

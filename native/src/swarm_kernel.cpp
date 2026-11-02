@@ -25,28 +25,86 @@ namespace {
 constexpr double TAU_D = 6.2831853071795864769252867666;
 constexpr double PI_D = 3.1415926535897932384626433833;
 
+// The members the kernels read: C++ name, GDScript member, type (one list each, so `check_fields`
+// sees every name a kernel uses). The look reads the swarm's rows through its `swarm`; those are in
+// the swarm's list, checked by the swarm's kernel.
+#define SWARM_FIELDS(X) \
+	X(positions, "positions", PACKED_VECTOR2_ARRAY) \
+	X(velocities, "velocities", PACKED_VECTOR2_ARRAY) \
+	X(ran, "ran", PACKED_FLOAT64_ARRAY) \
+	X(radius, "_radius", PACKED_FLOAT32_ARRAY) \
+	X(give, "_give", PACKED_FLOAT32_ARRAY) \
+	X(push, "_push", PACKED_VECTOR2_ARRAY) \
+	X(next, "_next", PACKED_INT32_ARRAY) \
+	X(cell_of, "_cell_of", PACKED_INT32_ARRAY) \
+	X(cell_head, "_cell_head", PACKED_INT32_ARRAY) \
+	X(seeds, "seeds", PACKED_INT32_ARRAY) \
+	X(cell, "_cell", FLOAT) \
+	X(grid_w, "_grid_w", INT) \
+	X(grid_h, "_grid_h", INT) \
+	X(arena, "_arena", RECT2) \
+	X(spacing, "spacing", FLOAT) \
+	X(moved, "moved", INT) \
+	X(count, "count", INT) \
+	X(nodes, "nodes", ARRAY) \
+	X(has_walls, "_has_walls", BOOL) \
+	X(walls, "_walls", PACKED_BYTE_ARRAY) \
+	X(wall_w, "_wall_w", INT) \
+	X(wall_h, "_wall_h", INT) \
+	X(kinds, "kinds", PACKED_INT32_ARRAY) \
+	X(aims, "aims", PACKED_VECTOR2_ARRAY) \
+	X(down, "down", PACKED_BYTE_ARRAY)
+#define LOOK_FIELDS(X) \
+	X(hop_time, "_hop_time", PACKED_FLOAT64_ARRAY) \
+	X(lift, "_lift", PACKED_FLOAT64_ARRAY) \
+	X(hurt_left, "_hurt_left", PACKED_FLOAT64_ARRAY) \
+	X(eye_point, "_eye_point", PACKED_VECTOR2_ARRAY) \
+	X(brow_point, "_brow_point", PACKED_VECTOR2_ARRAY) \
+	X(placed, "_placed", PACKED_BYTE_ARRAY) \
+	X(mood_left, "_mood_left", PACKED_FLOAT64_ARRAY) \
+	X(still_for, "_still_for", PACKED_FLOAT64_ARRAY) \
+	X(blink_in, "_blink_in", PACKED_FLOAT64_ARRAY) \
+	X(blink_left, "_blink_left", PACKED_FLOAT64_ARRAY) \
+	X(glance_in, "_glance_in", PACKED_FLOAT64_ARRAY) \
+	X(glance_left, "_glance_left", PACKED_FLOAT64_ARRAY) \
+	X(glance_x, "_glance_x", PACKED_INT32_ARRAY) \
+	X(raise_in, "_raise_in", PACKED_FLOAT64_ARRAY) \
+	X(raise_left, "_raise_left", PACKED_FLOAT64_ARRAY) \
+	X(rng_state, "_rng_state", PACKED_INT64_ARRAY) \
+	X(eye_column, "_eye_column", PACKED_INT32_ARRAY) \
+	X(brow_column, "_brow_column", PACKED_INT32_ARRAY) \
+	X(eyes_at, "_eyes_at", PACKED_VECTOR2_ARRAY) \
+	X(brows_at, "_brows_at", PACKED_VECTOR2_ARRAY) \
+	X(hold_shown, "_hold_shown", PACKED_BYTE_ARRAY) \
+	X(style, "_style", PACKED_INT32_ARRAY) \
+	X(resting, "_resting", PACKED_INT32_ARRAY) \
+	X(anchor, "_anchor", PACKED_VECTOR2_ARRAY) \
+	X(rng, "_rng", OBJECT) \
+	X(k_delta, "_k_delta", FLOAT) \
+	X(k, "_k", FLOAT) \
+	X(count_l, "_count", INT) \
+	X(batches, "_batches", ARRAY) \
+	X(buffers, "_buffers", ARRAY) \
+	X(filled, "_filled", PACKED_INT32_ARRAY) \
+	X(first, "_first", PACKED_INT32_ARRAY) \
+	X(order, "_order", PACKED_INT32_ARRAY) \
+	X(has_hurt, "_has_hurt", PACKED_BYTE_ARRAY) \
+	X(flash_left, "_flash_left", PACKED_FLOAT32_ARRAY) \
+	X(squash, "_squash", PACKED_FLOAT32_ARRAY)
+
 struct SwarmNames {
-	StringName positions, velocities, ran, radius, give, push, next, cell_of, cell_head, seeds, cell, grid_w, grid_h;
-	StringName arena, spacing, moved, count, nodes, has_walls, walls, wall_w, wall_h;
-	StringName kinds, aims, down, hop_time, lift, hurt_left, eye_point, brow_point, placed, mood_left, still_for;
-	StringName blink_in, blink_left, glance_in, glance_left, glance_x, raise_in, raise_left, rng_state, eye_column;
-	StringName brow_column, eyes_at, brows_at, hold_shown, style, resting, anchor, rng, k_delta, k, count_l;
-	StringName batches, buffers, filled, first, order, has_hurt, flash_left, squash, swarm;
+#define SW_DECLARE(id, gd, type) StringName id;
+	SWARM_FIELDS(SW_DECLARE)
+	LOOK_FIELDS(SW_DECLARE)
+#undef SW_DECLARE
+	StringName swarm;
 	SwarmNames() :
-			positions("positions"), velocities("velocities"), ran("ran"), radius("_radius"), give("_give"),
-			push("_push"), next("_next"), cell_of("_cell_of"), cell_head("_cell_head"), seeds("seeds"),
-			cell("_cell"), grid_w("_grid_w"), grid_h("_grid_h"), arena("_arena"), spacing("spacing"),
-			moved("moved"), count("count"), nodes("nodes"), has_walls("_has_walls"), walls("_walls"),
-			wall_w("_wall_w"), wall_h("_wall_h"),
-			kinds("kinds"), aims("aims"), down("down"), hop_time("_hop_time"), lift("_lift"),
-			hurt_left("_hurt_left"), eye_point("_eye_point"), brow_point("_brow_point"), placed("_placed"),
-			mood_left("_mood_left"), still_for("_still_for"), blink_in("_blink_in"), blink_left("_blink_left"),
-			glance_in("_glance_in"), glance_left("_glance_left"), glance_x("_glance_x"), raise_in("_raise_in"),
-			raise_left("_raise_left"), rng_state("_rng_state"), eye_column("_eye_column"),
-			brow_column("_brow_column"), eyes_at("_eyes_at"), brows_at("_brows_at"), hold_shown("_hold_shown"),
-			style("_style"), resting("_resting"), anchor("_anchor"), rng("_rng"), k_delta("_k_delta"), k("_k"),
-			count_l("_count"), batches("_batches"), buffers("_buffers"), filled("_filled"), first("_first"),
-			order("_order"), has_hurt("_has_hurt"), flash_left("_flash_left"), squash("_squash"), swarm("swarm") {}
+			swarm("swarm") {
+#define SW_INIT(id, gd, type) id = StringName(gd);
+		SWARM_FIELDS(SW_INIT)
+		LOOK_FIELDS(SW_INIT)
+#undef SW_INIT
+	}
 };
 
 SwarmNames *swarm_names = nullptr;
@@ -58,6 +116,11 @@ const SwarmNames &sn() {
 	return *swarm_names;
 }
 
+#define SW_CHECK(id, gd, type)                                         \
+	if (object->get(k.id).get_type() != Variant::type) {               \
+		wrong.push_back(String("member ") + gd + " missing or not " #type); \
+	}
+
 bool take(const Dictionary &config, const char *key, double &out) {
 	if (!config.has(key)) {
 		return false;
@@ -68,17 +131,35 @@ bool take(const Dictionary &config, const char *key, double &out) {
 
 } // namespace
 
+SwarmKernel::SwarmKernel() {
+	sn();
+}
+
+void SwarmKernel::free_names() {
+	delete swarm_names;
+	swarm_names = nullptr;
+}
+
 bool SwarmKernel::configure(const Dictionary &config) {
-	// The swarm hands over its wall cell; the look the rest.
-	if (config.has("WALL_CELL")) {
-		_wall_cell = config["WALL_CELL"];
-		_swarm_ready = true;
-	}
+	_ready = take(config, "WALL_CELL", _wall_cell);
+	return _ready;
+}
+
+PackedStringArray SwarmKernel::check_fields(Object *object) const {
+	PackedStringArray wrong;
+	ERR_FAIL_NULL_V(object, wrong);
+	const SwarmNames &k = sn();
+	SWARM_FIELDS(SW_CHECK)
+	return wrong;
+}
+
+SwarmLookKernel::SwarmLookKernel() {
+	sn();
+}
+
+bool SwarmLookKernel::configure(const Dictionary &config) {
 	double blink_column = 0.0, worried = 0.0, raised = 0.0, stride = 0.0;
-	if (!config.has("HOP_SPEED_SQ")) {
-		return _swarm_ready;
-	}
-	const bool ok = take(config, "HOP_SPEED_SQ", _hop_speed_sq) && take(config, "HOP_RATE", _hop_rate) &&
+	_ready = take(config, "HOP_SPEED_SQ", _hop_speed_sq) && take(config, "HOP_RATE", _hop_rate) &&
 			take(config, "HOP_HEIGHT", _hop_height) && take(config, "HOP_IDLE", _hop_idle) &&
 			take(config, "SNAP_SQ", _snap_sq) && take(config, "MAX_LAG", _max_lag) &&
 			take(config, "LOOK_LEAN", _lean) && take(config, "IDLE_AFTER", _idle_after) &&
@@ -88,7 +169,7 @@ bool SwarmKernel::configure(const Dictionary &config) {
 			take(config, "WORRIED", worried) && take(config, "RAISED", raised) && take(config, "STRIDE", stride) &&
 			config.has("BLINK_EVERY") && config.has("BLINK_TIME") && config.has("GLANCE_EVERY") &&
 			config.has("RAISE_EVERY");
-	if (!ok) {
+	if (!_ready) {
 		return false;
 	}
 	_blink_column = (int64_t)blink_column;
@@ -99,13 +180,20 @@ bool SwarmKernel::configure(const Dictionary &config) {
 	_blink_time = config["BLINK_TIME"];
 	_glance_every = config["GLANCE_EVERY"];
 	_raise_every = config["RAISE_EVERY"];
-	_look_ready = true;
 	return true;
+}
+
+PackedStringArray SwarmLookKernel::check_fields(Object *object) const {
+	PackedStringArray wrong;
+	ERR_FAIL_NULL_V(object, wrong);
+	const SwarmNames &k = sn();
+	LOOK_FIELDS(SW_CHECK)
+	return wrong;
 }
 
 // `Swarm._space()` and `Swarm._keep_in()`, in that order.
 void SwarmKernel::space_and_keep_in(Object *s) {
-	ERR_FAIL_COND(!_swarm_ready);
+	ERR_FAIL_COND(!_ready);
 	const SwarmNames &k = sn();
 	Arr<PackedVector2Array> positions, velocities, push;
 	Arr<PackedFloat64Array> ran;
@@ -261,8 +349,8 @@ void SwarmKernel::space_and_keep_in(Object *s) {
 
 // `SwarmLook.step`'s loop over the rows, with `_blink`, `_idle_habits` and `_wait` (the look's
 // own generator, its state kept per row).
-void SwarmKernel::look_step(Object *l, double delta) {
-	ERR_FAIL_COND(!_look_ready);
+void SwarmLookKernel::look_step(Object *l) {
+	ERR_FAIL_COND(!_ready);
 	const SwarmNames &k = sn();
 	Object *s = l->get(k.swarm);
 	ERR_FAIL_NULL(s);
@@ -319,9 +407,9 @@ void SwarmKernel::look_step(Object *l, double delta) {
 		return every * rng->randf_range(0.7, 1.3);
 	};
 	for (int64_t row = 0; row < count; row++) {
-		double seconds = delta;
+		// The swarm's `ran`: the seconds the row really stepped (the step's, or less round a local stop).
+		double seconds = ran[row];
 		Vector2 velocity = velocities[row];
-		seconds = ran[row];
 		if (seconds <= 0.0) {
 			if (hold_shown[row] != 0) {
 				continue;
@@ -435,8 +523,8 @@ void SwarmKernel::look_step(Object *l, double delta) {
 }
 
 // `SwarmLook.draw_rows` up to the renderer (see the header).
-void SwarmKernel::draw_rows(Object *l) {
-	ERR_FAIL_COND(!_look_ready);
+void SwarmLookKernel::draw_rows(Object *l) {
+	ERR_FAIL_COND(!_ready);
 	const SwarmNames &k = sn();
 	Object *s = l->get(k.swarm);
 	ERR_FAIL_NULL(s);
@@ -527,7 +615,13 @@ void SwarmKernel::draw_rows(Object *l) {
 
 void SwarmKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("configure", "config"), &SwarmKernel::configure);
+	ClassDB::bind_method(D_METHOD("check_fields", "swarm"), &SwarmKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("space_and_keep_in", "swarm"), &SwarmKernel::space_and_keep_in);
-	ClassDB::bind_method(D_METHOD("look_step", "look", "delta"), &SwarmKernel::look_step);
-	ClassDB::bind_method(D_METHOD("draw_rows", "look"), &SwarmKernel::draw_rows);
+}
+
+void SwarmLookKernel::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("configure", "config"), &SwarmLookKernel::configure);
+	ClassDB::bind_method(D_METHOD("check_fields", "look"), &SwarmLookKernel::check_fields);
+	ClassDB::bind_method(D_METHOD("look_step", "look"), &SwarmLookKernel::look_step);
+	ClassDB::bind_method(D_METHOD("draw_rows", "look"), &SwarmLookKernel::draw_rows);
 }

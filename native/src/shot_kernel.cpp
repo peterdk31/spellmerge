@@ -111,64 +111,151 @@ constexpr int THREAT_SPAN_MAX = 16;
 // What `hits` hands back to GDScript for the shot it stopped at (its n x 2 plus one of these).
 constexpr int64_t YIELD_WHOLE = 0; // the whole shot: its end, the bounds, a wall
 constexpr int64_t YIELD_FOUND = 1; // its hits (`_cand_*`, `_cand_found` of them), then what it left
+// What `hits` returns on an error (bad sizes) at its n-th shot: HANDED_ERROR - n. The manager then
+// takes every shot from n on itself.
+constexpr int64_t HANDED_ERROR = -2;
+
+// Every member of the manager a kernel reads: its C++ name, the GDScript member and its type. One
+// list, so `check_fields` sees each name the kernel uses (a renamed member fails there, not silently).
+#define MANAGER_FIELDS(X) \
+	X(alive, "_alive", PACKED_BYTE_ARRAY) \
+	X(freeze, "_freeze", PACKED_FLOAT32_ARRAY) \
+	X(life, "_life", PACKED_FLOAT32_ARRAY) \
+	X(skip_left, "_skip_left", PACKED_FLOAT32_ARRAY) \
+	X(pos, "_pos", PACKED_VECTOR2_ARRAY) \
+	X(prev, "_prev", PACKED_VECTOR2_ARRAY) \
+	X(state, "_state", PACKED_BYTE_ARRAY) \
+	X(motion, "_motion", PACKED_BYTE_ARRAY) \
+	X(vel, "_vel", PACKED_VECTOR2_ARRAY) \
+	X(flags, "_flags", PACKED_INT32_ARRAY) \
+	X(layers, "_layers", PACKED_INT32_ARRAY) \
+	X(actor, "_actor", PACKED_INT32_ARRAY) \
+	X(radius, "_radius", PACKED_FLOAT32_ARRAY) \
+	X(skip_id, "_skip_id", PACKED_INT64_ARRAY) \
+	X(mem_head, "_mem_head", PACKED_INT32_ARRAY) \
+	X(target_pos, "_target_pos", PACKED_VECTOR2_ARRAY) \
+	X(target_radius, "_target_radius", PACKED_FLOAT32_ARRAY) \
+	X(target_owner, "_target_owner", PACKED_INT32_ARRAY) \
+	X(target_layer, "_target_layer", PACKED_INT32_ARRAY) \
+	X(target_id, "_target_id", PACKED_INT64_ARRAY) \
+	X(target_next, "_target_next", PACKED_INT32_ARRAY) \
+	X(target_mark, "_target_mark", PACKED_INT32_ARRAY) \
+	X(target_entry, "_target_entry", PACKED_INT32_ARRAY) \
+	X(cell_head, "_cell_head", PACKED_INT32_ARRAY) \
+	X(cell_count, "_cell_count", PACKED_INT32_ARRAY) \
+	X(cell_box, "_cell_box", PACKED_VECTOR4_ARRAY) \
+	X(cell_filled, "_cell_filled", PACKED_INT32_ARRAY) \
+	X(mem_id, "_mem_id", PACKED_INT64_ARRAY) \
+	X(mem_target, "_mem_target", PACKED_INT32_ARRAY) \
+	X(mem_seen, "_mem_seen", PACKED_INT32_ARRAY) \
+	X(mem_next, "_mem_next", PACKED_INT32_ARRAY) \
+	X(cand_target, "_cand_target", PACKED_INT32_ARRAY) \
+	X(cand_along, "_cand_along", PACKED_FLOAT32_ARRAY) \
+	X(cand_point, "_cand_point", PACKED_VECTOR2_ARRAY) \
+	X(wall_cells, "_wall_cells", PACKED_BYTE_ARRAY) \
+	X(wall_w, "_wall_w", INT) \
+	X(wall_h, "_wall_h", INT) \
+	X(has_walls, "_has_walls", BOOL) \
+	X(bounds, "_bounds", RECT2) \
+	X(grid_x, "_grid_x", FLOAT) \
+	X(grid_y, "_grid_y", FLOAT) \
+	X(grid_w, "_grid_w", INT) \
+	X(grid_h, "_grid_h", INT) \
+	X(max_target_radius, "_max_target_radius", FLOAT) \
+	X(grid_fill, "_grid_fill", INT) \
+	X(mem_step, "_mem_step", INT) \
+	X(work_left, "_work_left", INT) \
+	X(starved_at, "_starved_at", INT) \
+	X(mark_stamp, "_mark_stamp", INT) \
+	X(mem_free, "_mem_free", INT) \
+	X(cand_found, "_cand_found", INT) \
+	X(high, "_high", INT) \
+	X(sim_time, "sim_time", FLOAT) \
+	X(trail, "_trail", PACKED_INT32_ARRAY) \
+	X(born, "_born", PACKED_FLOAT32_ARRAY) \
+	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
+	X(trail_kept, "_trail_kept", PACKED_INT32_ARRAY) \
+	X(trail_last, "_trail_last", PACKED_VECTOR2_ARRAY) \
+	X(trail_odo, "_trail_odo", PACKED_FLOAT32_ARRAY) \
+	X(trail_newest, "_trail_newest", PACKED_INT32_ARRAY) \
+	X(trail_data, "_trail_data", PACKED_FLOAT32_ARRAY) \
+	X(seq, "_seq", PACKED_INT64_ARRAY) \
+	X(drawn_seq, "_drawn_seq", PACKED_INT64_ARRAY) \
+	X(drawn_radius, "_drawn_radius", PACKED_FLOAT32_ARRAY) \
+	X(drawn_look, "_drawn_look", PACKED_INT32_ARRAY) \
+	X(drawn_batch, "_drawn_batch", PACKED_BYTE_ARRAY) \
+	X(drawn_color, "_drawn_color", PACKED_COLOR_ARRAY) \
+	X(drawn_size, "_drawn_size", PACKED_FLOAT32_ARRAY) \
+	X(drawn_particles, "_drawn_particles", PACKED_INT32_ARRAY) \
+	X(look, "_look", PACKED_INT32_ARRAY) \
+	X(ramp, "_ramp", PACKED_INT32_ARRAY) \
+	X(core, "_core", PACKED_COLOR_ARRAY) \
+	X(batch_counts, "_batch_counts", PACKED_INT32_ARRAY) \
+	X(loose, "_loose", PACKED_INT32_ARRAY) \
+	X(loose_count, "_loose_count", INT) \
+	X(trail_ramp, "_trail_ramp", PACKED_INT32_ARRAY) \
+	X(trail_caster, "_trail_caster", PACKED_INT32_ARRAY) \
+	X(trail_flags, "_trail_flags", PACKED_INT32_ARRAY) \
+	X(trail_holder, "_trail_holder", PACKED_INT32_ARRAY) \
+	X(trail_color, "_trail_color", PACKED_COLOR_ARRAY) \
+	X(trail_core, "_trail_core", PACKED_COLOR_ARRAY) \
+	X(anchors, "_anchors", PACKED_VECTOR2_ARRAY) \
+	X(draw_out, "_draw_out", PACKED_INT32_ARRAY) \
+	X(draw_room, "_draw_room", INT) \
+	X(rune_room, "_rune_room", INT) \
+	X(orbit_room, "_orbit_room", INT) \
+	X(enemy_room, "_enemy_room", INT) \
+	X(enemy_rune_room, "_enemy_rune_room", INT) \
+	X(team, "_team", PACKED_INT32_ARRAY) \
+	X(threat_slot, "threat_slot", INT) \
+	X(threat_away, "threat_away", VECTOR2) \
+	X(threat_cell, "_threat_cell", FLOAT) \
+	X(threat_x, "_threat_x", FLOAT) \
+	X(threat_y, "_threat_y", FLOAT) \
+	X(threat_w, "_threat_w", INT) \
+	X(threat_h, "_threat_h", INT) \
+	X(threat_head, "_threat_head", PACKED_INT32_ARRAY) \
+	X(threat_slot_list, "_threat_slot", PACKED_INT32_ARRAY) \
+	X(threat_next, "_threat_next", PACKED_INT32_ARRAY) \
+	X(threat_over, "_threat_over", PACKED_INT32_ARRAY) \
+	X(threat_over_count, "_threat_over_count", INT) \
+	X(threat_seen, "_threat_seen", PACKED_INT32_ARRAY) \
+	X(threat_stamp, "_threat_stamp", INT) \
+	X(growth, "_growth", PACKED_FLOAT32_ARRAY) \
+	X(radius0, "_radius0", PACKED_FLOAT32_ARRAY) \
+	X(hold, "_hold", PACKED_FLOAT32_ARRAY) \
+	X(linger, "_linger", PACKED_FLOAT32_ARRAY) \
+	X(span, "_span", PACKED_FLOAT32_ARRAY) \
+	X(caster_slot, "_caster_slot", PACKED_INT32_ARRAY) \
+	X(caster_at, "_caster_at", PACKED_VECTOR2_ARRAY) \
+	X(orbit_angle, "_orbit_angle", PACKED_FLOAT32_ARRAY) \
+	X(orbit_speed, "_orbit_speed", PACKED_FLOAT32_ARRAY) \
+	X(orbit_radius, "_orbit_radius", PACKED_FLOAT32_ARRAY) \
+	X(wave, "_wave", PACKED_FLOAT32_ARRAY) \
+	X(wave_age, "_wave_age", PACKED_FLOAT32_ARRAY) \
+	X(base, "_base", PACKED_VECTOR2_ARRAY) \
+	X(speed, "_speed", PACKED_FLOAT32_ARRAY) \
+	X(members, "_members", PACKED_INT32_ARRAY) \
+	X(step_index, "_step_index", INT) \
+	X(home_at, "_home_at", PACKED_VECTOR2_ARRAY) \
+	X(home_range, "_home_range", PACKED_FLOAT32_ARRAY) \
+	X(home_target, "_home_target", PACKED_INT64_ARRAY) \
+	X(turn, "_turn", PACKED_FLOAT32_ARRAY) \
+	X(kinds, "_kinds", PACKED_INT32_ARRAY) \
+	X(wait_state, "_wait_state", PACKED_BYTE_ARRAY) \
+	X(wait_from, "_wait_from", PACKED_BYTE_ARRAY) \
+	X(targets, "_targets", ARRAY) \
+	X(target_team, "_target_team", PACKED_INT32_ARRAY)
 
 struct Names {
-	StringName alive, freeze, life, skip_left, pos, prev, state, motion, vel;
-	StringName flags, layers, actor, radius, skip_id, mem_head;
-	StringName target_pos, target_radius, target_owner, target_layer, target_id, target_next, target_mark, target_entry;
-	StringName cell_head, cell_count, cell_box, cell_filled;
-	StringName mem_id, mem_target, mem_seen, mem_next;
-	StringName cand_target, cand_along, cand_point;
-	StringName wall_cells, wall_w, wall_h, has_walls, bounds, grid_x, grid_y, grid_w, grid_h;
-	StringName max_target_radius, grid_fill, mem_step, work_left, starved_at, mark_stamp, mem_free, cand_found;
-	StringName high, sim_time, trail, born, orbit_centre, trail_kept, trail_last, trail_odo, trail_newest, trail_data;
-	StringName seq, drawn_seq, drawn_radius, drawn_look, drawn_batch, drawn_color, drawn_size, drawn_particles;
-	StringName look, ramp, core, batch_counts, loose, loose_count, trail_ramp, trail_caster, trail_flags, trail_holder;
-	StringName trail_color, trail_core, anchors, draw_out, draw_room, rune_room, orbit_room, enemy_room, enemy_rune_room;
-	StringName team, threat_slot, threat_away, threat_cell, threat_x, threat_y, threat_w, threat_h, threat_head;
-	StringName threat_slot_list, threat_next, threat_over, threat_over_count, threat_seen, threat_stamp;
-	StringName growth, radius0, hold, linger, span, caster_slot, caster_at, orbit_angle, orbit_speed, orbit_radius;
-	StringName wave, wave_age, base, speed, mem_head_n;
-	StringName members, step_index, home_at, home_range, home_target, turn, kinds, wait_state, wait_from, targets, target_team;
-	Names() :
-			alive("_alive"), freeze("_freeze"), life("_life"), skip_left("_skip_left"), pos("_pos"), prev("_prev"),
-			state("_state"), motion("_motion"), vel("_vel"),
-			flags("_flags"), layers("_layers"), actor("_actor"), radius("_radius"), skip_id("_skip_id"), mem_head("_mem_head"),
-			target_pos("_target_pos"), target_radius("_target_radius"), target_owner("_target_owner"),
-			target_layer("_target_layer"), target_id("_target_id"), target_next("_target_next"),
-			target_mark("_target_mark"), target_entry("_target_entry"),
-			cell_head("_cell_head"), cell_count("_cell_count"), cell_box("_cell_box"), cell_filled("_cell_filled"),
-			mem_id("_mem_id"), mem_target("_mem_target"), mem_seen("_mem_seen"), mem_next("_mem_next"),
-			cand_target("_cand_target"), cand_along("_cand_along"), cand_point("_cand_point"),
-			wall_cells("_wall_cells"), wall_w("_wall_w"), wall_h("_wall_h"), has_walls("_has_walls"), bounds("_bounds"),
-			grid_x("_grid_x"), grid_y("_grid_y"), grid_w("_grid_w"), grid_h("_grid_h"),
-			max_target_radius("_max_target_radius"), grid_fill("_grid_fill"), mem_step("_mem_step"),
-			work_left("_work_left"), starved_at("_starved_at"), mark_stamp("_mark_stamp"), mem_free("_mem_free"),
-			cand_found("_cand_found"),
-			high("_high"), sim_time("sim_time"), trail("_trail"), born("_born"), orbit_centre("_orbit_centre"),
-			trail_kept("_trail_kept"), trail_last("_trail_last"), trail_odo("_trail_odo"), trail_newest("_trail_newest"),
-			trail_data("_trail_data"),
-			seq("_seq"), drawn_seq("_drawn_seq"), drawn_radius("_drawn_radius"), drawn_look("_drawn_look"),
-			drawn_batch("_drawn_batch"), drawn_color("_drawn_color"), drawn_size("_drawn_size"),
-			drawn_particles("_drawn_particles"),
-			look("_look"), ramp("_ramp"), core("_core"), batch_counts("_batch_counts"), loose("_loose"),
-			loose_count("_loose_count"), trail_ramp("_trail_ramp"), trail_caster("_trail_caster"),
-			trail_flags("_trail_flags"), trail_holder("_trail_holder"),
-			trail_color("_trail_color"), trail_core("_trail_core"), anchors("_anchors"), draw_out("_draw_out"),
-			draw_room("_draw_room"), rune_room("_rune_room"), orbit_room("_orbit_room"), enemy_room("_enemy_room"),
-			enemy_rune_room("_enemy_rune_room"),
-			team("_team"), threat_slot("threat_slot"), threat_away("threat_away"), threat_cell("_threat_cell"),
-			threat_x("_threat_x"), threat_y("_threat_y"), threat_w("_threat_w"), threat_h("_threat_h"),
-			threat_head("_threat_head"), threat_slot_list("_threat_slot"), threat_next("_threat_next"),
-			threat_over("_threat_over"), threat_over_count("_threat_over_count"), threat_seen("_threat_seen"),
-			threat_stamp("_threat_stamp"),
-			growth("_growth"), radius0("_radius0"), hold("_hold"), linger("_linger"), span("_span"),
-			caster_slot("_caster_slot"), caster_at("_caster_at"), orbit_angle("_orbit_angle"),
-			orbit_speed("_orbit_speed"), orbit_radius("_orbit_radius"), wave("_wave"), wave_age("_wave_age"),
-			base("_base"), speed("_speed"), mem_head_n("_mem_head"),
-			members("_members"), step_index("_step_index"), home_at("_home_at"), home_range("_home_range"),
-			home_target("_home_target"), turn("_turn"), kinds("_kinds"), wait_state("_wait_state"),
-			wait_from("_wait_from"), targets("_targets"), target_team("_target_team") {}
+#define SM_DECLARE(id, gd, type) StringName id;
+	MANAGER_FIELDS(SM_DECLARE)
+#undef SM_DECLARE
+	Names() {
+#define SM_INIT(id, gd, type) id = StringName(gd);
+		MANAGER_FIELDS(SM_INIT)
+#undef SM_INIT
+	}
 };
 
 Names *names = nullptr;
@@ -670,51 +757,111 @@ ShotKernel::ShotKernel() {
 	}
 }
 
-bool ShotKernel::check(const Dictionary &constants) const {
-	Dictionary mine;
-	mine["MOTION_STRAIGHT"] = MOTION_STRAIGHT;
-	mine["MOTION_STILL"] = MOTION_STILL;
-	mine["MOTION_ORBIT"] = MOTION_ORBIT;
-	mine["F_SELF"] = F_SELF;
-	mine["F_SELF_LIVE"] = F_SELF_LIVE;
-	mine["F_GHOST"] = F_GHOST;
-	mine["S_IDLE"] = S_IDLE;
-	mine["S_MOVING"] = S_MOVING;
-	mine["S_DONE"] = S_DONE;
-	mine["S_STUCK"] = S_STUCK;
-	mine["S_EXPIRE"] = S_EXPIRE;
-	mine["S_FROZEN"] = S_FROZEN;
-	mine["GRID_CELL"] = GRID_CELL;
-	mine["WALL_CELL"] = WALL_CELL;
-	mine["MAX_WALL_VISITS"] = MAX_WALL_VISITS;
-	mine["S_HELD"] = S_HELD;
-	mine["S_RETURNING"] = S_RETURNING;
-	mine["S_WAITING"] = S_WAITING;
-	mine["B_HOMING"] = B_HOMING;
-	mine["B_SPIRAL"] = B_SPIRAL;
-	mine["B_MOVE"] = B_MOVE;
-	mine["AFTER_HITS"] = AFTER_HITS;
-	mine["HOMING_PERIOD"] = HOMING_PERIOD;
-	mine["HOMING_DRIFT"] = HOMING_DRIFT;
-	mine["S_GONE"] = S_GONE;
-	mine["F_TURNED"] = F_TURNED;
-	mine["F_WAVE"] = F_WAVE;
-	mine["CASTER_WIZARD"] = CASTER_WIZARD;
-	mine["CASTER_POINT"] = CASTER_POINT;
-	mine["SPIRAL_PERIOD"] = SPIRAL_PERIOD;
-	mine["RETURN_BEND"] = RETURN_BEND;
-	mine["B_GROWTH"] = B_GROWTH;
-	mine["B_LINGER"] = B_LINGER;
-	mine["B_ORBIT"] = B_ORBIT;
-	mine["B_RETURN"] = B_RETURN;
-	const Array keys = mine.keys();
-	for (int64_t i = 0; i < keys.size(); i++) {
-		const Variant key = keys[i];
-		if (!constants.has(key) || constants[key] != mine[key]) {
-			return false;
+void ShotKernel::free_names() {
+	delete names;
+	names = nullptr;
+}
+
+// Every constant above that the GDScript also holds, by its GDScript name (PI and TAU are
+// GDScript's; HOMING_DRIFT, RAMP_ENEMY and TEAM_NONE come from other scripts, see `set_native`).
+struct Constant {
+	const char *name;
+	double value;
+};
+const Constant CONSTANTS[] = {
+	{ "PI", (double)PI_D },
+	{ "TAU", (double)TAU_D },
+	{ "MOTION_STRAIGHT", (double)MOTION_STRAIGHT },
+	{ "MOTION_STILL", (double)MOTION_STILL },
+	{ "MOTION_ORBIT", (double)MOTION_ORBIT },
+	{ "F_SELF", (double)F_SELF },
+	{ "F_SELF_LIVE", (double)F_SELF_LIVE },
+	{ "F_GHOST", (double)F_GHOST },
+	{ "S_IDLE", (double)S_IDLE },
+	{ "S_MOVING", (double)S_MOVING },
+	{ "S_DONE", (double)S_DONE },
+	{ "S_STUCK", (double)S_STUCK },
+	{ "S_EXPIRE", (double)S_EXPIRE },
+	{ "S_FROZEN", (double)S_FROZEN },
+	{ "GRID_CELL", (double)GRID_CELL },
+	{ "WALL_CELL", (double)WALL_CELL },
+	{ "MAX_WALL_VISITS", (double)MAX_WALL_VISITS },
+	{ "S_HELD", (double)S_HELD },
+	{ "S_RETURNING", (double)S_RETURNING },
+	{ "S_WAITING", (double)S_WAITING },
+	{ "S_GONE", (double)S_GONE },
+	{ "F_TURNED", (double)F_TURNED },
+	{ "F_WAVE", (double)F_WAVE },
+	{ "CASTER_WIZARD", (double)CASTER_WIZARD },
+	{ "CASTER_POINT", (double)CASTER_POINT },
+	{ "SPIRAL_PERIOD", (double)SPIRAL_PERIOD },
+	{ "RETURN_BEND", (double)RETURN_BEND },
+	{ "B_GROWTH", (double)B_GROWTH },
+	{ "B_LINGER", (double)B_LINGER },
+	{ "B_ORBIT", (double)B_ORBIT },
+	{ "B_RETURN", (double)B_RETURN },
+	{ "B_HOMING", (double)B_HOMING },
+	{ "B_SPIRAL", (double)B_SPIRAL },
+	{ "B_MOVE", (double)B_MOVE },
+	{ "AFTER_HITS", (double)AFTER_HITS },
+	{ "HOMING_PERIOD", (double)HOMING_PERIOD },
+	{ "HOMING_DRIFT", (double)HOMING_DRIFT },
+	{ "AFTER_HOMING_MASK", (double)AFTER_HOMING_MASK },
+	{ "TRAIL_SAMPLES", (double)TRAIL_SAMPLES },
+	{ "TRAIL_STRIDE", (double)TRAIL_STRIDE },
+	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
+	{ "ORBIT_GROW", (double)ORBIT_GROW },
+	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
+	{ "TRAIL_ORBIT", (double)TRAIL_ORBIT },
+	{ "TRAIL_COST", (double)TRAIL_COST },
+	{ "ROW_CASTER", (double)ROW_CASTER },
+	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
+	{ "KIND_BOLT", (double)KIND_BOLT },
+	{ "KIND_RUNE", (double)KIND_RUNE },
+	{ "KIND_STEPS", (double)KIND_STEPS },
+	{ "RUNE_TRACE", (double)RUNE_TRACE },
+	{ "TRACE_FROM", (double)TRACE_FROM },
+	{ "TRACE_SPAN", (double)TRACE_SPAN },
+	{ "BATCH_BOLT", (double)BATCH_BOLT },
+	{ "BATCH_RUNE", (double)BATCH_RUNE },
+	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
+	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
+	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
+	{ "BATCHES", (double)BATCHES },
+	{ "LOOK_GRID", (double)LOOK_GRID },
+	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
+	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
+	{ "SPECK_RADIUS", (double)SPECK_RADIUS },
+	{ "LOOK_ENEMY_RAMP", (double)LOOK_ENEMY_RAMP },
+	{ "EMITTING_MASK", (double)EMITTING_MASK },
+	{ "PARTICLES_PER_SHOT_MAX", (double)PARTICLES_PER_SHOT_MAX },
+	{ "RAMP_ENEMY", (double)RAMP_ENEMY },
+	{ "TEAM_NONE", (double)TEAM_NONE },
+	{ "THREAT_SPAN_MAX", (double)THREAT_SPAN_MAX }
+};
+
+PackedStringArray ShotKernel::check(const Dictionary &constants) const {
+	PackedStringArray wrong;
+	for (const Constant &c : CONSTANTS) {
+		if (!constants.has(c.name)) {
+			wrong.push_back(String("no constant ") + c.name);
+		} else if ((double)constants[c.name] != c.value) {
+			wrong.push_back(String(c.name) + " is " + String(constants[c.name]) + ", the kernel's " + String::num(c.value));
 		}
 	}
-	return true;
+	return wrong;
+}
+
+PackedStringArray ShotKernel::check_fields(Object *manager) const {
+	PackedStringArray wrong;
+	ERR_FAIL_NULL_V(manager, wrong);
+#define SM_CHECK(id, gd, type)                                       \
+	if (manager->get(names->id).get_type() != Variant::type) {       \
+		wrong.push_back(String("member ") + gd + " missing or not " #type); \
+	}
+	MANAGER_FIELDS(SM_CHECK)
+#undef SM_CHECK
+	return wrong;
 }
 
 // `_pass_common`.
@@ -765,11 +912,12 @@ void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 // the hit work charged). The first that needs GDScript stops the walk and is returned as
 // n x 2 + YIELD_WHOLE (GDScript does all of that shot: its end, the bounds, a wall) or
 // n x 2 + YIELD_FOUND (it found `_cand_found` targets in `_cand_*`: GDScript hits them). -1 when
-// every shot is done. The manager calls again from n + 1. Not for a pass with solid shots.
+// every shot is done, HANDED_ERROR - n on an error (the manager does the rest). The manager calls
+// again from n + 1. Not for a pass with solid shots.
 int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, const Rect2 &limit, double delta) {
 	HitPass h;
 	h.load(m);
-	ERR_FAIL_COND_V(top > h.state.n || top > h.pos.n, -1);
+	ERR_FAIL_COND_V(top > h.state.n || top > h.pos.n, HANDED_ERROR - n);
 	const int64_t starved_before = h.starved_at;
 	const bool any_targets = h.target_id.n > 0;
 	for (; n < top; n++) {
@@ -793,7 +941,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			}
 			if (!h.targets_loaded) {
 				h.load_targets(m);
-				ERR_FAIL_COND_V(h.cand_target.n < h.target_id.n || h.target_mark.n < h.target_id.n, -1);
+				ERR_FAIL_COND_V(h.cand_target.n < h.target_id.n || h.target_mark.n < h.target_id.n, HANDED_ERROR - n);
 			}
 			h.catch_up_homing(slot, delta);
 			// As `_hit_slot` after `_catch_up`: the shot is done whatever comes next (a hand-back
@@ -820,7 +968,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			}
 			if (!h.targets_loaded) {
 				h.load_targets(m);
-				ERR_FAIL_COND_V(h.cand_target.n < h.target_id.n || h.target_mark.n < h.target_id.n, -1);
+				ERR_FAIL_COND_V(h.cand_target.n < h.target_id.n || h.target_mark.n < h.target_id.n, HANDED_ERROR - n);
 			}
 			const int64_t found = h.scan(slot);
 			if (found > 0) {
@@ -912,8 +1060,6 @@ inline void write_quad(float *b, const Vector2 &dir, double diameter, const Vect
 
 } // namespace
 
-// `_sample_trails`, its loop over the flying shots (the caller does the tick and the loose rows):
-// returns true when a row took a point (the trails need sending).
 // `_pass_homing` (not catching up): turn every homing shot, and let each whose search is due wait
 // for its turn in the hit pass (`_wait`), where the search sees what the hits before it changed.
 void ShotKernel::homing_pass(Object *m, int64_t first, int64_t count, double delta) {
@@ -1159,6 +1305,8 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 	return true;
 }
 
+// `_sample_trails`, its loop over the flying shots (the caller does the tick and the loose rows):
+// returns true when a row took a point (the trails need sending).
 bool ShotKernel::sample_shots(Object *m, double now) {
 	const Names &k = *names;
 	Arr<PackedInt32Array> trail, trail_kept, trail_newest;
@@ -1640,9 +1788,9 @@ double ShotKernel::threat_query(Object *m, const Vector2 &point, double radius, 
 
 void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
+	ClassDB::bind_method(D_METHOD("check_fields", "manager"), &ShotKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("pass_common", "manager", "top", "delta"), &ShotKernel::pass_common);
 	ClassDB::bind_method(D_METHOD("hits", "manager", "n", "top", "resume", "limit", "delta"), &ShotKernel::hits);
-	ClassDB::bind_method(D_METHOD("homing_pass", "manager", "first", "count", "delta"), &ShotKernel::homing_pass);
 	ClassDB::bind_method(D_METHOD("run_pass", "manager", "kind", "first", "count", "delta"), &ShotKernel::run_pass);
 	ClassDB::bind_method(D_METHOD("sample_shots", "manager", "now"), &ShotKernel::sample_shots);
 	ClassDB::bind_method(D_METHOD("count_draw", "manager"), &ShotKernel::count_draw);
@@ -1651,5 +1799,4 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("threat_scan", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_scan);
 	ClassDB::bind_method(D_METHOD("threat_fill", "manager", "horizon"), &ShotKernel::threat_fill);
 	ClassDB::bind_method(D_METHOD("threat_query", "manager", "point", "radius", "team", "own", "horizon"), &ShotKernel::threat_query);
-	ClassDB::bind_method(D_METHOD("version"), &ShotKernel::version);
 }

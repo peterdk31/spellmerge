@@ -91,11 +91,11 @@ jobs:
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Cache the native module's tools (Linux only; ci/build/native.sh checks their pins)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/spellmerge-native
-          key: native-linux-${{ hashFiles('ci/build/godot.env') }}
+          key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
@@ -276,11 +276,11 @@ jobs:
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Cache the native module's tools (Linux only; ci/build/native.sh checks their pins)
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.cache/spellmerge-native
-          key: native-linux-${{ hashFiles('ci/build/godot.env') }}
+          key: native-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq xvfb

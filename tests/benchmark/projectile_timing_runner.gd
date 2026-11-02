@@ -28,8 +28,10 @@ extends Node
 ## godot --headless --path . --script res://tests/benchmark/test_projectile_timing.gd
 ## build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
 ##
-## Every timing runs twice when the native module is loaded (native/README.md): with the native
-## kernel and with the GDScript it stands for (`Projectiles.native`); the `BENCH:` lines say which.
+## The timings are of the native kernel when the module is loaded (native/README.md); with `compare`
+## (the command line script sets it) every timing runs again with the GDScript it stands for
+## (`Projectiles.native`). The `BENCH:` lines say which. The exported runs time the native kernel
+## only, so the web run stays inside its timeout (tests/build.json).
 ##
 ## The node prints `test_projectile_timing: OK` and `TIMING OK` (what the web CI step waits
 ## for), or the `... FAILED` lines and `TIMING FAILED`, and quits with 0 or 1.
@@ -63,13 +65,18 @@ var _targets: Array[Node2D] = []
 var _hits: int = 0
 ## Whether this round times the native kernel.
 var _native: bool = false
+## Time the GDScript too, beside the native kernel (see the class doc).
+var compare: bool = false
 
 
 func _ready() -> void:
 	# The root is still setting up its children: wait one frame before adding nodes to it.
 	await get_tree().process_frame
 	print("BENCH: native module %s" % ("loaded" if NativeScript.loaded() else "not built"))
-	for native in ([true, false] if NativeScript.loaded() else [false]):
+	var rounds: Array[bool] = [NativeScript.loaded()]
+	if compare and NativeScript.loaded():
+		rounds.append(false)
+	for native in rounds:
 		_native = native
 		for cap in [ManagerScript.DEFAULT_CAP_WEB, ManagerScript.DEFAULT_CAP_DESKTOP]:
 			_run_cap(cap)

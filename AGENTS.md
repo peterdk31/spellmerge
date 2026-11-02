@@ -16,13 +16,13 @@ A contributor's PR is only taken in once these pass and the author has signed th
 
 These cover only security and copyright. Everything else is guidance.
 
-1. **Don't touch protected paths.** Owner-only: `.github/` (except the issue forms), `ci/`, `.claude/`, `addons/`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`. Maintained by Claude: `docs/DESIGN.md` (with the owner's direction), `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/`, `tools/`, `core/`, `native/`, `project.godot`, `export_presets.cfg`, `tests/build.json`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
+1. **Don't touch protected paths.** Owner-only: `.github/` (except the issue forms), `ci/`, `.claude/`, `addons/`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `native/SConstruct`, `native/build_profile.json`. Maintained by Claude: `docs/DESIGN.md` (with the owner's direction), `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/`, `tools/`, `core/`, `native/`, `project.godot`, `export_presets.cfg`, `tests/build.json`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
 2. **Allowed file types only:** `.png` and `.svg` images, `.ogg` audio, `.gd`, `.tscn`, `.tres`, `.json` and other Godot text files (`.import`, `.uid`, `.gdshader`, `.gdshaderinc`), plus REUSE `.license` files. Claude's PRs may also add C++ sources (`.cpp`, `.h`, `SConstruct`) in `native/`. No binaries, archives, executables, symlinks or submodules: the native module is built from source by `ci/build/native.sh`, never committed.
 3. **Size limits:** 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else.
 4. **No banned APIs** in `.gd`, `.tscn` or `.tres`:
    - starting programs or opening URLs (`OS.execute`, `OS.create_process`, `OS.shell_open`, ...)
    - networking and HTTP (`HTTPRequest`, `StreamPeerTCP`, `WebSocketPeer`, `IP`, ...)
-   - `JavaScriptBridge`, and native code outside the native module (no `.gdextension`, no `GDExtensionManager`). The module in `native/` is the exception, by the owner's decision of 2026-11-02 ([native/README.md](native/README.md)): Claude's and the owner's only, built from source.
+   - `JavaScriptBridge`, and native code outside the native module (no `.gdextension`, no `GDExtensionManager`). The module in `native/` is the exception, by the owner's decision of 2026-11-02 ([native/README.md](native/README.md)): Claude's and the owner's only, built from source, its C++ limited to computing on the arrays the game hands it (allowed includes, no system or by-name engine calls; `smbot.rules`).
    - creating or swapping code at runtime (`GDScript.new`, `Expression`, `set_script`, `ClassDB.instantiate`; only `core/native/native.gd` makes the native module's classes by name)
    - calling singletons by name (`OS.call`, `Engine.get_singleton`)
    - `@tool` scripts and editor plugins

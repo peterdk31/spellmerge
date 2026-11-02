@@ -13,9 +13,10 @@
 # its tag and commit, SCons from its hash-checked wheel, and for the web Emscripten at the version
 # Godot's own web templates were built with (a different one makes a module the game can't load).
 # A tool already in the cache at its pin is used as it is; one missing is fetched once. CI keeps
-# the cache between runs (native-linux-* and native-web-* in the workflows): the commits, the
-# wheel's hash and that no tracked source was edited are checked again on every run; the
-# compilers emsdk installed are trusted from the cache like the rest of the runner.
+# the cache between runs (`native-*` in the workflows; only the daily build saves it, every other
+# job restores it): on every run the commits and the wheel's hash are checked again, godot-cpp's
+# tree is checked for edits and cleaned of everything else, and SCons is unpacked fresh. The
+# toolchain emsdk installed (clang, node) is not hashed: it is trusted as emsdk downloaded it.
 # Needs a C++ compiler (g++ or clang) for linux, MinGW-w64 for windows (x86_64-w64-mingw32-g++;
 # on Ubuntu `apt-get install g++-mingw-w64-x86-64-posix`, as the workflows do), git, and Python 3.10+.
 # Every platform asked for must build: a failure fails the script.
@@ -44,8 +45,11 @@ setup_godot_cpp() {
   fi
   local head; head=$(git -C "$GODOT_CPP" rev-parse HEAD)
   [[ "$head" == "$GODOT_CPP_COMMIT" ]] || { echo "godot-cpp in $GODOT_CPP is at $head, not the pinned $GODOT_CPP_COMMIT" >&2; exit 1; }
-  # A restored cache must not bring edited sources (what it generates and builds is ignored by git).
+  # A restored cache must not bring edited sources, nor anything that is not the pinned tree: the
+  # tracked files are checked, and everything else (what an earlier build generated) is removed, so
+  # every run builds godot-cpp from the pinned sources alone (seconds, with build_profile.json).
   git -C "$GODOT_CPP" diff --quiet HEAD || { echo "godot-cpp in $GODOT_CPP has edited files" >&2; exit 1; }
+  git -C "$GODOT_CPP" clean -xdfq
 }
 
 setup_scons() {
@@ -93,8 +97,14 @@ for platform in "${platforms[@]}"; do
         echo "windows needs MinGW-w64 (x86_64-w64-mingw32-g++; Ubuntu: apt-get install g++-mingw-w64-x86-64-posix)" >&2
         exit 1
       }
-      # The C++ runtime is linked in (godot-cpp's use_static_cpp), so the DLL needs no MinGW DLLs.
-      scons platform=windows target=template_release arch=x86_64 use_mingw=yes ;;
+      # The C++ runtime is linked in (godot-cpp's use_static_cpp), so the DLL needs no MinGW DLLs:
+      # checked, as a player's Windows has none of them.
+      scons platform=windows target=template_release arch=x86_64 use_mingw=yes
+      dll=native/bin/libspellmerge.windows.template_release.x86_64.dll
+      if x86_64-w64-mingw32-objdump -p "$dll" | grep -iE 'DLL Name: *(libstdc|libgcc|libwinpthread)'; then
+        echo "$dll needs MinGW's runtime DLLs (above); it must link them in" >&2
+        exit 1
+      fi ;;
     *) echo "unknown platform $platform (linux, web, windows)" >&2; exit 2 ;;
   esac
 done

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: Projectile caps doubled: 1,000 web, 6,000 desktop (owner)
+
+- **Asked:** the owner: "After the new native code it should be possible to raise the projectile counts." `ProjectileManager.DEFAULT_CAP_WEB` 500 -> 1,000, `DEFAULT_CAP_DESKTOP` 3,000 -> 6,000.
+- **The manager is no longer the limit** (`test_projectile_timing`, headless on a shared 4-core box, native): at 6,000 shots a step is 0.33 ms with no targets, 0.9 ms with fresh hits in the crowd, 1.1 ms steady, 1.3 ms all orbiting; `update_draw` 0.77 ms. Its GDScript at 3,000 was 2.8, 3.2, 3.8, 5.1 and 5.8 ms. At 10,000 the native step is still 0.6 to 1.4 ms and `update_draw` 1.5 ms.
+- **What more shots cost now is their hits:** each hit runs Combat's, Spells' and Feel's handlers in GDScript. The stress run (headless, game logic only): desktop scenario (200 enemies) 3,000 -> 6,000 shots, avg 80 -> 86 ms a frame, a physics step's scripts 24.4 -> 26.0 ms (the frame is the 200 actors, as before). Web scenario (100 enemies), a physics step's scripts: 10.3 to 10.6 ms at 500, 12.4 to 13.4 ms at 1,000, 13.1 ms at 1,500 (frame times swung up to 50% run to run on this box, so the step's scripts are the figure to read). WASM scripts run 2 to 3x slower, so 1,500 would put the web step near its budget; 1,000 is the estimate until the next web stress run reads it, as with 500 (2026-10-23).
+- **Not measured: the GPU.** The trail batches cost about 6 ms a frame at 3,000 shots with cards on the RTX A3000 (2026-11-02, "More shots") and grow with the shots, so 6,000 may cost about 12 ms there. If a real GPU cannot hold it, lower the desktop cap or thin the trails further; the effect-quality setting is the place for a per-machine cap.
+- **The horde scenarios keep 500 shots** (`stress_runner.gd`'s `HORDE_SHOTS`), so their curve (docs/milestones/horde.md, horde-swarm.md) stays comparable: the enemies are what they measure.
+
 ## 2026-11-02: No automatic reverts (owner)
 
 - **Rule (owner):** "Remove the rule about it rolling back merges if the daily build fails." A daily build that fails is not released, and the Daily log says so; nothing is reverted automatically. The owner rolls a merge back with `/revert` when that is the fix.

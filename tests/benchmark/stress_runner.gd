@@ -3,8 +3,9 @@ extends Node
 ## (Flow, Combat, the projectile manager, the spell runtime, Feel and the HUD), with
 ## enemies and shots kept at the numbers of the PLAN's stress scenario (docs/PLAN.md,
 ## "Performance budgets"):
-##  - web: 100 enemies, shots at the web cap (500 since the first web run; the PLAN said 1,000),
-##  - desktop: 200 enemies, 3,000 shots,
+##  - web: 100 enemies, shots at the web cap (`DEFAULT_CAP_WEB`: 500 from the first web run,
+##    1,000 with the native kernel, as the PLAN first said),
+##  - desktop: 200 enemies, shots at the desktop cap (`DEFAULT_CAP_DESKTOP`: 3,000, then 6,000),
 ## both with four players and full effects (every hit sends its particles, reactions
 ## and numbers). Between them run two diagnostic variants of the web scenario, to explain the
 ## web frame time (docs/DECISIONS.md, 2026-10-23): one with the render loop off (nothing is
@@ -18,8 +19,9 @@ extends Node
 ## swarmers (the imp's data with no staff: they only chase and hurt by touch, as the horde's
 ## swarm enemies do) and a share (`staffed`, 10%) of staff enemies (the imp as above), against
 ## the same four bots, in the usual room (the 1280x720 horde arena is H2's). `horde` (600
-## enemies) is the desktop's, `horde, web` (500) the web's; both keep the web cap of shots (500),
-## as the `web` scenario does with 100 enemies, so the enemies are what differs. They are not in the default run
+## enemies) is the desktop's, `horde, web` (500) the web's; both keep 500 shots (`HORDE_SHOTS`, the
+## web cap when their curve was measured), so the enemies are what differs and the curve in
+## docs/milestones/horde.md and horde-swarm.md stays comparable. They are not in the default run
 ## (`scenarios`): they take longer than the rest together, and the exported runs have fixed
 ## timeouts (tests/build.json). `stress.gd -- --horde` runs them (`HORDE`), alone. They pass
 ## like the others plus a frame line (`p95_line_ms`): a provisional line from the first
@@ -29,7 +31,7 @@ extends Node
 ## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
-## The shots the spells make are never enough for 500 or 3,000, so each physics step
+## The shots the spells make are never enough for the caps, so each physics step
 ## the runner tops the projectile manager up to the target with plain shots owned by the
 ## players in turn (at most TOP_UP_PER_STEP a step); the manager's cap is set to the
 ## target, so the oldest shot of the richest owner is dropped past it, as in play.
@@ -66,21 +68,24 @@ const PLAYERS: int = 4
 ## enemies needs the swarm work described there (H6). Not checked in a web build, whose WASM
 ## and software renderer are several times slower.
 const P95_LINE_HORDE_MS: float = 600.0
+## The shots the horde scenarios keep in the air: the web cap when their curve was measured
+## (docs/milestones/horde.md), so a raised cap does not move it.
+const HORDE_SHOTS: int = 500
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
-## whether hit particles start. The web scenarios follow the web cap on purpose (the web
-## budget is that cap); the PLAN's 1,000 is the older figure to compare against. `desktop_only`
+## whether hit particles start. The web and desktop scenarios follow the caps on purpose (each
+## budget is its cap). `desktop_only`
 ## scenarios are left out of a web build (`scenarios_for`). A horde scenario (`staffed`: the
 ## share of its enemies that carry a staff, the rest are swarmers) has a frame line,
 ## `p95_line_ms`: its 95th percentile frame must stay under it.
 const SCENARIOS: Array[Dictionary] = [
 	{"label": "web", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB},
-	{"label": "desktop", "enemies": 200, "shots": 3000, "desktop_only": true},
+	{"label": "desktop", "enemies": 200, "shots": ProjectileManagerScript.DEFAULT_CAP_DESKTOP, "desktop_only": true},
 	{"label": "web, render loop off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "render": false},
 	{"label": "web, hit particles off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "particles": false},
-	{"label": "horde", "enemies": 600, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
-	{"label": "horde, web", "enemies": 500, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS},
-	{"label": "horde, swarm", "enemies": 1016, "swarm": 1000, "staff_enemies": 16, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
-	{"label": "horde, swarm, web size", "enemies": 525, "swarm": 500, "staff_enemies": 25, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "p95_line_ms": P95_LINE_HORDE_MS},
+	{"label": "horde", "enemies": 600, "shots": HORDE_SHOTS, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
+	{"label": "horde, web", "enemies": 500, "shots": HORDE_SHOTS, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS},
+	{"label": "horde, swarm", "enemies": 1016, "swarm": 1000, "staff_enemies": 16, "shots": HORDE_SHOTS, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
+	{"label": "horde, swarm, web size", "enemies": 525, "swarm": 500, "staff_enemies": 25, "shots": HORDE_SHOTS, "p95_line_ms": P95_LINE_HORDE_MS},
 ]
 ## The horde scenarios, run by `stress.gd -- --horde` instead of the default ones.
 const HORDE: Array[int] = [4, 5]

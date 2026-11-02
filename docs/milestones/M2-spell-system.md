@@ -137,7 +137,7 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
 - **Shots per cast:** at most **24** from one cast, after split, nova and `shot_mult` multiply. The compiler clamps the count and says so in the description.
 - **Trigger depth:** a trigger may hold a spell whose own trigger holds another, at most **2** levels below the cast (depth 3 in all). The builder offers no deeper slot.
 - **Trigger fires per player per step:** at most **32**. Extra fires in that step are dropped, not queued, so an on-hit cascade can never snowball across frames. Each trigger also has `max_fires` per shot; a timer fires at most 4 times.
-- **The global projectile cap** is 500 on web (1,000 until the first web run, docs/DECISIONS.md, 2026-10-23) and stays 3,000 on desktop, and drops the oldest shot of whoever owns the most. At the cap, effects degrade (fewer particles per hit) instead of lagging. `feel` keeps its `PARTICLE_LIMIT`; components declare no particles in M2, so the validator has no particle count to check yet.
+- **The global projectile cap** is 1,000 on web and 6,000 on desktop since the native kernel (docs/DECISIONS.md, 2026-11-02; web 1,000, then 500 from the first web run, 2026-10-23; desktop 3,000), and drops the oldest shot of whoever owns the most. At the cap, effects degrade (fewer particles per hit) instead of lagging. `feel` keeps its `PARTICLE_LIMIT`; components declare no particles in M2, so the validator has no particle count to check yet.
 - These numbers are first guesses for the stress benchmark (part 25) to confirm or lower. They are constants in `core/spells/limits.gd`. Tests check that a spell at every limit still compiles and that one over a limit is refused or clamped.
 
 ### Building spells, without anyone waiting

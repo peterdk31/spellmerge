@@ -157,7 +157,7 @@ A modifier or infusion affects **only the next carrier**, not every carrier of a
 
 These are not build rules: they keep a frame from running away, never refuse or change a build, and are documented in `core/spells/limits.gd` and `core/projectiles`.
 
-- **The projectile pool** (500 on web, 3,000 on desktop) is the pre-allocated buffer every shot lives in. When it is full, the oldest shot **of the player who owns the most** is dropped, so one player's huge cast eats its own shots first, not a teammate's. One cast never spawns more shots than the pool holds.
+- **The projectile pool** (1,000 on web, 6,000 on desktop; 500 and 3,000 before the native kernel) is the pre-allocated buffer every shot lives in. When it is full, the oldest shot **of the player who owns the most** is dropped, so one player's huge cast eats its own shots first, not a teammate's. One cast never spawns more shots than the pool holds.
 - **Per-step work caps** (held spells fired and chain jumps per player per physics step, ray hits per step) stay: extra work in that step is dropped, never queued, so a cascade cannot snowball across frames. They are set high enough that no normal staff meets them, and the stress run reports when one is met.
 - **Removed:** `MAX_COMPLEXITY`, `MAX_SHOTS` per cast, `MAX_MODIFIERS`, `MAX_DEPTH`, `MAX_TIMER_FIRES`, `MAX_CHAIN_JUMPS`, `MAX_DAMAGE` and the speed, radius and pierce clamps. Payload depth is bounded by the staff's slots (use once).
 

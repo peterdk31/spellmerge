@@ -2,8 +2,8 @@ extends Node
 ## Measures what the per-step fire pacing (`Spells.fire_shots_per_step`, `SpellLimits.FIRE_SHOTS_PER_STEP`:
 ## the shots trigger fires may make in a step; a fire past it waits for the next) costs and saves: four seats cast trigger-heavy staffs of the real cards at a crowd that never
 ## dies, with eight enemy casters on the shared budget, in a walled room, and the runner steps the
-## projectile manager and the spell runtime by hand. For each projectile cap (web 500, desktop
-## 3,000) and each budget in FIRE_CAPS it prints one `BENCH:` line: the step time (the manager's
+## projectile manager and the spell runtime by hand. For each projectile cap (web 1,000, desktop
+## 6,000) and each budget in FIRE_CAPS it prints one `BENCH:` line: the step time (the manager's
 ## and the runtime's step together; average, p95, max), the payloads fired and made to wait per
 ## step, and the shots in flight. Triggers have no per-shot count and nothing is dropped (owner,
 ## 2026-10-29), so the pacing is all that spreads a cascade over steps. It gates nothing.

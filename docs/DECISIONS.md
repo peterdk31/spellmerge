@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: The decoy, reviewed: its own timer, its own hurt, its sight, no telegraph (owner)
+
+- **Asked:** the owner had the decoy change (#514) reviewed for fit, then: "Fix it all!"
+- **Each decoy keeps its own timer:** an ended entity took the last timer entry of its tag with it, not its own, so with two decoys of one staff the standing one went quiet (and the ended one's entry ticked on, from an actor id the next actor might reopen). Entities now names the entity's key (`Spells.entity_key`) while it sends `entity_ended`, and only that key's entries leave (`_lc_leave_key`).
+- **A decoy placed again** starts with an empty intent: with no foe about it aims the way it was placed, not where its row's last decoy aimed.
+- **A body that went down** (its aim cleared) keeps the way it had for its timer's payload, not an infinite one.
+- **`on hurt` on a decoy** fires when the decoy is hurt (owner), not its wizard: a carrier that is a body of its own (`LC_ACTOR`) is hurt when that body is.
+- **No telegraph on a decoy** (owner: only the casts the AI presses itself are telegraphed, "exactly how it should be"): a decoy casts nothing of its own; what its triggers fire comes on the card's clock, an enemy's decoy too, as a familiar's sprinkler or a timer on an enemy's shot or rune does. A windup on the decoy was built and taken out again in this PR as a special case. The card rules test now also tries `on hurt` with an enemy shooter, so a body of the carrier's own is hurt.
+- **It aims at what it can see:** the nearest foe behind a wall is passed over for the nearest of the nearer ones with a clear line (at most 8 line checks per ring of the AI's look); with none in view it keeps the nearest.
+- **It turns:** a copy of a living staff shows the head sheet's column for its aim, as the staff it copies does.
+- **Its card text** (owner): "Distract your enemies with a convincing illusion", no longer a still copy that enemies go for first.
+
 ## 2026-11-02: A decoy is an actor that aims itself (owner)
 
 - **Found:** a decoy's timer fired only outward from its wizard through the decoy (a point, `LC_POINT`), so `timer · decoy · bolt` shot where the wizard faced when placing it and never at the foes round it. The owner wanted it to aim itself without a rule of its own.

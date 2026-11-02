@@ -271,6 +271,11 @@ func live_leave(tag: int, every: bool) -> void:
 	_rt._lc_leave(tag, every)
 
 
+## The entity with `key` (`request_entity`'s) of `tag` ended: its entries leave, no other's.
+func live_leave_key(tag: int, key: int) -> void:
+	_rt._lc_leave_key(tag, key)
+
+
 # --- Moves and entities ------------------------------------------------------------
 
 ## The moves of a caster or of the shot that cast a carrier (`CasterMoves`).

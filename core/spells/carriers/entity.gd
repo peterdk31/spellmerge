@@ -63,8 +63,10 @@ func _entity_caster() -> int:
 
 
 ## An entity of this actor ended where it stood (`entity_ended`, handed on by `Spells`): its `blast` and its `on expire` payload happen
-## there (the end point), then it stops counting as a live shot.
-func entity_ended(actor: int, position: Vector2, tag: int) -> void:
+## there (the end point), then it stops counting as a live shot. `key` is the one it was asked for
+## under (`Spells.entity_key`, named by Entities as it sends the end): that entity's timer and
+## `on hurt` leave, no other's of its tag; 0 when unknown (then one of the tag's leaves).
+func entity_ended(actor: int, position: Vector2, tag: int, key: int = 0) -> void:
 	if not SpellTag.is_spell_tag(tag) or actor != SpellTag.caster_of(tag):
 		return
 	var count: int = _entities.get(tag, 0)
@@ -74,7 +76,10 @@ func entity_ended(actor: int, position: Vector2, tag: int) -> void:
 		_entities.erase(tag)
 	else:
 		_entities[tag] = count - 1
-	kit.live_leave(tag, false)
+	if key != 0:
+		kit.live_leave_key(tag, key)
+	else:
+		kit.live_leave(tag, false)
 	var spell: CompiledSpell = kit.spell_of(tag)
 	if spell != null and position.is_finite():
 		kit.blast(spell, tag, actor, position)

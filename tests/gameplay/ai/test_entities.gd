@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_test_decoy_runs_out()
 	_test_decoy_copies_its_wizard()
 	_test_a_decoy_is_placed_again()
+	_test_a_decoy_placed_again_aims_the_way_it_was_placed()
 	_test_familiar_circles_its_wizard()
 	_test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended()
 	_test_cap_ends_the_oldest()
@@ -239,6 +240,29 @@ func _test_a_decoy_is_placed_again() -> void:
 	_check(again == first, "the row's actor is placed again, not made anew")
 	_check(again.is_inside_tree() and again.id >= 0 and is_equal_approx(again.health.health, EntitiesScript.DECOY_HEALTH), "in the world with an id and full health")
 	_check(_world.combat.is_registered(again), "and hurtable again")
+
+
+## A decoy placed again with no foe about aims the way it was placed, not where its row's last
+## decoy aimed. Regression: the controller's last aim stayed in the actor's intent.
+func _test_a_decoy_placed_again_aims_the_way_it_was_placed() -> void:
+	_setup(1)
+	_world.players[0].position = Vector2(-400.0, 0.0)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	var decoy: Actor = _entities.decoy_of(0)
+	if decoy == null:
+		_check(false, "a decoy")
+		return
+	var imp: Actor = _imp(Vector2(0.0, 120.0))
+	_run(1)
+	_check(decoy.aim.dot(Vector2.DOWN) > 0.99, "it aims at the imp below it (%s)" % decoy.aim)
+	_world.bus.entity_end_requested.emit(0, TAG)
+	_world.enemies.erase(imp)
+	imp.free()
+	_world.players[0].position = Vector2(400.0, 0.0)
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
+	_run(2)
+	_check(_entities.decoy_of(0) == decoy, "the row's actor again")
+	_check(decoy.aim.dot(Vector2.LEFT) > 0.99, "with no foe it aims the way it was placed, away from its wizard (%s)" % decoy.aim)
 
 
 func _test_familiar_circles_its_wizard() -> void:

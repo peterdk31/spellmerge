@@ -26,7 +26,7 @@ extends "res://tests/support/suite.gd"
 ## there is chosen by what the card does (its `ModifierBase.Behaviour` or `TriggerBase.Event`, read
 ## from the enums), never by the card's id or the carrier's: homing gets a target off the line,
 ## bounce a wall, ghost a wall with a target behind it, shield and deflect an enemy that shoots at
-## the wizard, on kill a target that dies, on hurt the wizard hurt, on reaction a target with a
+## the wizard, on kill a target that dies, on hurt the wizard hurt or an enemy that shoots (a body of the carrier's own is hurt when it is: a decoy), on reaction a target with a
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
 ## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
@@ -227,7 +227,8 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 		TriggerBase.Event.WALL:
 			return [WALL]
 		TriggerBase.Event.HURT:
-			return [HURT]
+			# The wizard hurt, or a carrier that is a body of its own (a decoy) shot at.
+			return [HURT, SHOOTER]
 		TriggerBase.Event.REACTION:
 			return [REACTING]
 	return []

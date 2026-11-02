@@ -112,7 +112,7 @@ const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
 ## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
 ## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
 ## Y, the most shots: a fire nova split three times (216 shots) whose every shot, when it ends,
-## fires a frost nova split three times (216 each): far past the projectile cap (3000 on
+## fires a frost nova split three times (216 each): far past the projectile cap (6,000 on
 ## desktop), which it holds for about three seconds; 67.5 mana. Two payload levels only: a
 ## third would queue a million shots, minutes of backlog at `SpellLimits.FIRE_SHOTS_PER_STEP`.
 ## B, a decoy turret: every 0.5 s it fires a homing fire, frost and lightning bolt (the

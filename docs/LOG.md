@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: Projectile caps doubled with the native kernel (owner session)
+
+`DEFAULT_CAP_WEB` 500 -> 1,000 and `DEFAULT_CAP_DESKTOP` 3,000 -> 6,000. The native manager at 6,000 shots steps in 0.3 to 1.3 ms (its GDScript took 2.8 to 5.8 ms at 3,000); what more shots cost now is the hits' GDScript handlers, which hold the web at 1,000 (step scripts about 10.5 -> 13 ms headless). The stress run follows both caps; the horde scenarios keep 500 shots (`HORDE_SHOTS`). The GPU cost of 6,000 trails is not measured. Details: docs/DECISIONS.md.
+
 ## 2026-11-02: More shots: the dodge check, trail meshes by the pool, three catch-up steps (owner session)
 
 `Projectiles.threat` shares a per-step grid of shot paths between the AIs' asks (8 asks at 3,000 shots: 11.3 -> 5.4 ms); the trail batches draw a mesh with only the slots the spark pool's shares can fill (particles thinned by a stride, tails cut to a dash's streak slots with no tail share; RTX A3000 at 3,000 shots: trails about 19 -> 6 ms; pixel-identical with the pool full or empty); the engine catches up at most 3 physics steps a frame (was 8). Desktop stress, headless: 343 -> 93 ms a frame, the step 40 -> 26 ms. Tests: `test_projectiles_threat` (grid against the pass, changes within a step), `test_projectile_looks` (meshes and stride), `test_physics_settings`; `test_projectiles_targets` no longer counts the engine's catch-up steps (fingerprint recorded again on main's manager). Details and what was dropped: docs/DECISIONS.md.

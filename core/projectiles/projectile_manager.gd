@@ -1,8 +1,8 @@
 extends Node2D
 ## The projectile manager: one autoload ("Projectiles") that simulates every
 ## spell projectile in bulk and draws them all in one batch. Projectiles are
-## rows in packed arrays, never nodes, so thousands cost little (PLAN budgets:
-## 500 on the web, 3,000 on desktop).
+## rows in packed arrays, never nodes, so thousands cost little (caps: 1,000 on
+## the web, 6,000 on desktop; DEFAULT_CAP_WEB, DEFAULT_CAP_DESKTOP).
 ##
 ##     Projectiles.add_target(enemy, 10.0, Projectiles.LAYER_ENEMY, actor_id)
 ##     Projectiles.spawn(caster, origin, direction * 300.0, 1.5, 4.0, Projectiles.ACTOR_LAYERS)
@@ -235,9 +235,14 @@ const SPIRAL_PERIOD: float = 0.5
 
 ## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
 ## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
-## catch up with up to 8 steps per frame (docs/DECISIONS.md, 2026-10-23), so it is 500.
-const DEFAULT_CAP_WEB: int = 500
-const DEFAULT_CAP_DESKTOP: int = 3000
+## catch up with up to 8 steps per frame (docs/DECISIONS.md, 2026-10-23), so it went to 500,
+## and desktop's was 3,000. With the native kernel (native/, 2026-11-02) the manager at 6,000
+## shots costs less than its GDScript did at 3,000, so both doubled: what more shots cost now is
+## the hits they make (the handlers in Combat, Spells and Feel are GDScript), which is what holds
+## the web at 1,000 (docs/DECISIONS.md, 2026-11-02, "Projectile caps doubled"). The GDScript
+## fallback is not sized for them; every build has the module.
+const DEFAULT_CAP_WEB: int = 1000
+const DEFAULT_CAP_DESKTOP: int = 6000
 ## How many recently hit targets a piercing projectile remembers; also the most
 ## hits one projectile can register in a single step.
 ## Remembered hits (see `_remember`) made room for at first; more are made when needed.

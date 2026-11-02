@@ -140,6 +140,12 @@ func land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: i
 	return _rt._land_shot(slot, spell, tag, source, chain, prev)
 
 
+## `land_shot` for each of the first `count` shots in `slots` (as `ProjectileManager.spawn_batch`
+## wrote them; -1 for one not made), in turn: how many were made.
+func land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
+	return _rt._land_shots(slots, count, spell, tag, source, chain, prev)
+
+
 ## The two halves of `land_shot`, for a carrier that sets the shot up in between (a wall): the
 ## behaviours the projectile manager runs, then the shot's record (`chain` jumps left after `prev`).
 func apply_travel(slot: int, spell: CompiledSpell) -> void:

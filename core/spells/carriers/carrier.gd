@@ -179,16 +179,32 @@ func bind(runtime_kit: CarrierKit, _staff_poses: StaffPoses) -> void:
 	kit = runtime_kit
 
 
+## The slots of a launch made together (`launch`), kept between launches.
+var _slots: PackedInt32Array = PackedInt32Array()
+
+
 ## One launch of `spell` from `origin` along `direction` (`Spells._launch`): how many shots, rows or
 ## moves it made (0 when none could start). `lifetime` is the carrier's (a held one's is longer),
 ## `chain` the jumps its hits carry and `prev` the target they jump from. By default `spell.shots`
 ## leave in a fan (or round a ring), each made by `shoot`. The carrier that runs nothing (id &"")
 ## makes none: the runtime falls back to it, unbound, for a carrier id no carrier has.
+##
+## A carrier whose shot is one pool row and nothing more (`rows_only`: the atom's flying shots, the
+## rune's still ones, the orbit's circling ones) makes them together when the pool has a free slot
+## for each: every row first, in order (`spawn_rows`, the spread drawn per shot as before), then all
+## of them set up in one `land_shots`, which reads what the launch's shots share once. The same
+## shots and records as one at a time (test_spells_land_shots). With no room for each, a spawn may
+## drop a shot, maybe one of the launch not yet set up, so they go one at a time.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
 	if id() == &"":
 		return 0
-	var made: int = 0
 	var count: int = spell.shots
+	if count >= 2 and rows_only() and kit.projectiles != null and kit.projectiles.has_room_for(count):
+		if _slots.size() < count:
+			_slots.resize(count)
+		spawn_rows(spell, tag, actor, origin, direction, count, lifetime, _slots)
+		return kit.land_shots(_slots, count, spell, tag, source, chain, prev)
+	var made: int = 0
 	for n in count:
 		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
 		made += shoot(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, source, lifetime, chain, prev)
@@ -196,12 +212,34 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 
 
 ## Shot `n` of `count` of one launch, along `heading` (`direction` is the launch's aim): 1 when it
-## was made. By default a shot flying along `heading`.
-func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
+## was made. By default its pool row (`spawn_row`), set up (`land_shot`).
+func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, heading: Vector2, n: int, count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
 	if id() == &"":
 		return 0
-	var slot: int = kit.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
+	var slot: int = spawn_row(spell, tag, actor, origin, direction, heading, n, count, lifetime)
 	return kit.land_shot(slot, spell, tag, source, chain, prev)
+
+
+## The pool row of shot `n` of `count` (see `shoot`): its slot, or -1 when the manager refused it.
+## By default a shot flying along `heading`.
+func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, lifetime: float) -> int:
+	return kit.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
+
+
+## The rows of a launch of `count` shots made together (`launch`), their slots written to `slots`
+## (-1 for one refused): by default `spawn_row` for each, along its heading in the fan, in order
+## (the spread drawn per shot, as one at a time). A carrier may make them faster, the same rows.
+func spawn_rows(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, count: int, lifetime: float, slots: PackedInt32Array) -> void:
+	for n in count:
+		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
+		slots[n] = spawn_row(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, lifetime)
+
+
+## True when this carrier's `shoot` is its `spawn_row` set up by `land_shot` and nothing else, so a
+## launch may make its rows together (`launch`). False for a carrier whose `shoot` does more (a
+## beam, a swing, a slam, a body of its own): it goes one at a time.
+func rows_only() -> bool:
+	return false
 
 
 # --- Its end: when it is going ------------------------------------------------------

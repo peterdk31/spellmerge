@@ -318,6 +318,8 @@ var _cast_count: PackedInt32Array = PackedInt32Array()
 var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
 var _echo_spell: CompiledSpell = null
+## One slot, for the one-shot forms of `_land_shots`, `_travel_shots` and `_register_shots`.
+var _one_slot: PackedInt32Array = PackedInt32Array([-1])
 
 ## Who casts the launch being fired: the actor's body (CASTER_WIZARD, a staff's own cast), the
 ## point it starts from (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or an
@@ -965,13 +967,23 @@ func _carrier_of(spell: CompiledSpell) -> Carrier:
 ## A shot a carrier spawned in `slot` (-1 when the manager refused it) takes its cards (`_apply_travel`)
 ## and its record, and does not hit `source` for a while: 1 when it was made.
 func _land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
-	if slot < 0:
-		return 0
-	_apply_travel(slot, spell)
-	_register(slot, tag, spell, chain, prev)
+	_one_slot[0] = slot
+	return _land_shots(_one_slot, 1, spell, tag, source, chain, prev)
+
+
+## `_land_shot` for each of the first `count` shots in `slots` (-1 for one not made): how many were
+## made. A launch's shots (`Carrier.launch`) are set up together: their cards, then their records
+## (`_travel_shots`, `_register_shots`, each reading what the shots share once), then the source's
+## exclusion. Each shot still gets its cards before its record, and every list a shot joins (a
+## behaviour's, the lifecycle's, the zappers', the magnets') gets them in the order of `slots`.
+func _land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
+	_travel_shots(slots, count, spell)
+	var made: int = _register_shots(slots, count, tag, spell, chain, prev)
 	if source != null:
-		projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
-	return 1
+		for n in count:
+			if slots[n] >= 0:
+				projectiles.exclude(slots[n], source, SpellLimits.SOURCE_EXCLUSION)
+	return made
 
 
 ## Sends a ray: until `_ray_end`, every hit with no shot slot is this one (`_on_hit`, `hit_profile`,
@@ -1081,43 +1093,55 @@ func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vect
 ## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
 ## a rune, an orbit and a wall's shots from the staff and a chain jump alike (rules R1b). Each
 ## setter takes what the shot can do and refuses the rest (rules R4h: a rune does not move, an
-## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
+## orbit does not fly). A plain shot costs a few comparisons and no setter call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
-	if spell.homing_range > 0.0:
-		projectiles.set_homing_curve(slot, spell.homing_curve, spell.homing_range)
-	if spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0:
-		projectiles.set_return(slot)
-	if spell.behaviours.is_empty():
+	_one_slot[0] = slot
+	_travel_shots(_one_slot, 1, spell)
+
+
+## `_apply_travel` for each of the first `count` shots in `slots` (-1 for none), the spell's
+## behaviours read once.
+func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) -> void:
+	var homing: bool = spell.homing_range > 0.0
+	var returns: bool = spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0
+	var plain: bool = spell.behaviours.is_empty()
+	if plain and not homing and not returns:
 		return
 	var bounce: float = spell.behaviour(ModifierBase.Behaviour.BOUNCE)
-	if bounce > 0.0:
-		projectiles.set_bounce(slot, roundi(bounce))
-	if spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0:
-		projectiles.set_ghost(slot)
+	var ghost: bool = spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0
 	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
-	if spiral > 0.0:
-		projectiles.set_spiral(slot, spiral)
 	var linger: float = spell.behaviour(ModifierBase.Behaviour.LINGER)
-	if linger > 0.0:
-		projectiles.set_linger(slot, linger)
 	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
-	if growth > 1.0:
-		projectiles.set_growth(slot, growth)
 	var sticky: float = spell.behaviour(ModifierBase.Behaviour.STICKY)
-	if sticky > 0.0:
-		projectiles.set_sticky(slot, sticky)
-	_apply_shield(slot, spell)
-
-
-## A shot with `shield` blocks that many enemy shots.
-func _apply_shield(slot: int, spell: CompiledSpell) -> void:
-	if slot < 0 or spell.behaviours.is_empty():
-		return
+	# A shot with `shield` blocks that many enemy shots; with deflect it turns them back.
 	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
-	if shield > 0.0:
-		projectiles.set_shield(slot, roundi(shield))
-	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-		projectiles.set_deflect(slot, true)
+	var deflect: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
+	for n in count:
+		var slot: int = slots[n]
+		if slot < 0:
+			continue
+		if homing:
+			projectiles.set_homing_curve(slot, spell.homing_curve, spell.homing_range)
+		if returns:
+			projectiles.set_return(slot)
+		if plain:
+			continue
+		if bounce > 0.0:
+			projectiles.set_bounce(slot, roundi(bounce))
+		if ghost:
+			projectiles.set_ghost(slot)
+		if spiral > 0.0:
+			projectiles.set_spiral(slot, spiral)
+		if linger > 0.0:
+			projectiles.set_linger(slot, linger)
+		if growth > 1.0:
+			projectiles.set_growth(slot, growth)
+		if sticky > 0.0:
+			projectiles.set_sticky(slot, sticky)
+		if shield > 0.0:
+			projectiles.set_shield(slot, roundi(shield))
+		if deflect:
+			projectiles.set_deflect(slot, true)
 
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
@@ -1413,62 +1437,86 @@ func _staff_spread(tag: int, spell: CompiledSpell) -> float:
 
 ## Gives the manager's shot in `slot` its record and counts it.
 func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> void:
-	projectiles.set_core(slot, spell.tint)
-	projectiles.set_look(slot, spell.look)
-	projectiles.set_form(slot, spell.form_id, spell.body)
+	_one_slot[0] = slot
+	_register_shots(_one_slot, 1, tag, spell, chain, prev)
+
+
+## `_register` for each of the first `count` shots in `slots` (-1 for none), in turn, with what is
+## the same for all of them read once: its looks (`ProjectileManager.set_looks`), the echo, the
+## shot that cast it (no shot ends while a launch is set up), its trigger rows. Returns how many
+## shots there were.
+func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
+	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, spell.body)
 	if _rec_seq.size() < projectiles.get_cap():
-		var size: int = projectiles.get_cap()
-		var old_size: int = _rec_seq.size()
-		_rec_seq.resize(size)
-		for at in range(old_size, size):
-			_rec_seq[at] = -1
-		_rec_chain.resize(size)
-		_rec_prev.resize(size)
-		_rec_zapper.resize(size)
-		_rec_magnet.resize(size)
-		_rec_zap_rolls.resize(size)
-		_rec_zapped_count.resize(size)
-		_rec_zapped.resize(size * ZAP_MEMORY)
-		_rec_zapped_at.resize(size * ZAP_MEMORY)
-		_rec_due_body.resize(size * ZAP_DUE)
-		_rec_due_at.resize(size * ZAP_DUE)
-		_rec_due_count.resize(size)
-		_rec_relay.resize(size)
-		_rec_zap.resize(size)
-	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
-	_rec_zap[slot] = spell.echo_zap_hit if spell == _echo_spell else null
-	if _caster != CASTER_WIZARD:
-		# A payload's shot: an orbit circles the shot that cast it and a returning one flies back
-		# to it, or to the point it was cast from.
-		var shot: int = _caster_shot()
-		if shot >= 0:
-			projectiles.set_caster_shot(slot, shot)
-		elif projectiles.is_cast_by_wizard(slot):
-			projectiles.set_caster_point(slot, projectiles.get_position_of(slot))
-	_rec_seq[slot] = projectiles.get_seq_of(slot)
-	_rec_chain[slot] = chain
-	_rec_prev[slot] = prev
-	shot_started(tag)
-	var life: float = projectiles.get_life_of(slot)
-	var at: Vector2 = projectiles.get_position_of(slot)
-	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
-	if spell.zap_chance > 0.0 and spell.zap_reach > 0.0:
-		# A fresh shot: it has rolled for no body yet, and has no zap waiting.
-		_rec_zap_rolls[slot] = 0
-		_rec_zapped_count[slot] = 0
-		_rec_due_count[slot] = 0
-		if _rec_zapper[slot] == 0:
-			if _zapper_count == _zappers.size():
-				_zappers.resize(_zappers.size() * 2)
-			_zappers[_zapper_count] = slot
-			_zapper_count += 1
-			_rec_zapper[slot] = 1
-	if spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0 and _rec_magnet[slot] == 0:
-		if _magnet_count == _magnets.size():
-			_magnets.resize(_magnets.size() * 2)
-		_magnets[_magnet_count] = slot
-		_magnet_count += 1
-		_rec_magnet[slot] = 1
+		_grow_records(projectiles.get_cap())
+	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null
+	var zap_relay: HitProfile = spell.echo_zap_hit if spell == _echo_spell else null
+	# A payload's shot: an orbit circles the shot that cast it and a returning one flies back to it,
+	# or to the point it was cast from.
+	var payload: bool = _caster != CASTER_WIZARD
+	var caster_shot: int = _caster_shot() if payload else -1
+	var lifecycle: bool = _lc_rows(spell) > 0
+	var zaps: bool = spell.zap_chance > 0.0 and spell.zap_reach > 0.0
+	var magnet: bool = spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0
+	var made: int = 0
+	for n in count:
+		var slot: int = slots[n]
+		if slot < 0:
+			continue
+		made += 1
+		_rec_relay[slot] = relay
+		_rec_zap[slot] = zap_relay
+		if payload:
+			if caster_shot >= 0:
+				projectiles.set_caster_shot(slot, caster_shot)
+			elif projectiles.is_cast_by_wizard(slot):
+				projectiles.set_caster_point(slot, projectiles.get_position_of(slot))
+		var seq: int = projectiles.get_seq_of(slot)
+		_rec_seq[slot] = seq
+		_rec_chain[slot] = chain
+		_rec_prev[slot] = prev
+		shot_started(tag)
+		if lifecycle:
+			_lc_join(spell, tag, LC_SLOT, slot, seq, true, projectiles.get_life_of(slot), projectiles.get_position_of(slot), projectiles.get_velocity_of(slot))
+		if zaps:
+			# A fresh shot: it has rolled for no body yet, and has no zap waiting.
+			_rec_zap_rolls[slot] = 0
+			_rec_zapped_count[slot] = 0
+			_rec_due_count[slot] = 0
+			if _rec_zapper[slot] == 0:
+				if _zapper_count == _zappers.size():
+					_zappers.resize(_zappers.size() * 2)
+				_zappers[_zapper_count] = slot
+				_zapper_count += 1
+				_rec_zapper[slot] = 1
+		if magnet and _rec_magnet[slot] == 0:
+			if _magnet_count == _magnets.size():
+				_magnets.resize(_magnets.size() * 2)
+			_magnets[_magnet_count] = slot
+			_magnet_count += 1
+			_rec_magnet[slot] = 1
+	return made
+
+
+## Room in the shots' records for `size` slots (the manager's cap); a new slot has no record.
+func _grow_records(size: int) -> void:
+	var old_size: int = _rec_seq.size()
+	_rec_seq.resize(size)
+	for at in range(old_size, size):
+		_rec_seq[at] = -1
+	_rec_chain.resize(size)
+	_rec_prev.resize(size)
+	_rec_zapper.resize(size)
+	_rec_magnet.resize(size)
+	_rec_zap_rolls.resize(size)
+	_rec_zapped_count.resize(size)
+	_rec_zapped.resize(size * ZAP_MEMORY)
+	_rec_zapped_at.resize(size * ZAP_MEMORY)
+	_rec_due_body.resize(size * ZAP_DUE)
+	_rec_due_at.resize(size * ZAP_DUE)
+	_rec_due_count.resize(size)
+	_rec_relay.resize(size)
+	_rec_zap.resize(size)
 
 
 ## One beam (a chain jump of any ray): counted while it is cast, with its context set

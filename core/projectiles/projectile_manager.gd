@@ -2049,6 +2049,25 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
+## `set_core`, `set_look` and `set_form` for each of the first `count` shots in `slots` (-1 for
+## none), checked once: one launch's shots share them.
+func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int) -> void:
+	var core_ok: bool = is_finite(color.r) and is_finite(color.g) and is_finite(color.b)
+	var core: Color = Color(color.r, color.g, color.b, 1.0)
+	var look_ok: bool = look >= 0 and look < 1 << (LOOK_COUNT - 1)
+	var kind: int = clampi(body, 0, KIND_MAX)
+	for n in count:
+		var slot: int = slots[n]
+		if slot < 0 or slot >= _cap or _alive[slot] == 0:
+			continue
+		if core_ok:
+			_core[slot] = core
+		if look_ok:
+			_look[slot] = look
+		_form_id[slot] = form
+		_body[slot] = kind
+
+
 ## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
 ## `shot_trail.gdshader` draws along its path. Returns false for an empty slot or a look with a
 ## bit for a kind that does not exist.
@@ -2625,6 +2644,66 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 		_drop_one()
 	_free_count -= 1
 	var slot: int = _free_slots[_free_count]
+	# What the actor table says of the caster now; the shot keeps it for its life. A caster that
+	# is no open actor has no team, the enemy ramp and the shared budget.
+	var table: ActorsScript = actors if actors != null else _auto_actors
+	if table == null or not is_instance_valid(table):
+		table = actor_table()
+	if table != null and table.is_open(caster):
+		_write_row(slot, caster, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion, table.team_of(caster), table.ramp_of(caster), table.budget_of(caster))
+	else:
+		_write_row(slot, caster, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion, ActorsScript.NONE, ActorsScript.NONE, ActorsScript.SHARED)
+	return slot
+
+
+## Whether the pool has a free slot for each of `count` new shots (`spawn_batch` makes them then).
+func has_room_for(count: int) -> bool:
+	return count <= _free_count
+
+
+## Straight shots of one launch at once (a nova's ring, a fan): `velocities.size()` of them, as
+## `spawn` with each velocity in turn would make them, their slots written to `slots` (sized by
+## the caller, at least as long; -1 for one not made). Returns how many it handled: every one, or
+## -1 when it made none because the pool has no free slot for each (at the cap a spawn drops
+## another shot, which could be one of these not yet set up by the caller: spawn them one by one
+## then, each set up before the next). The caster's team, ramp and budget are read once.
+func spawn_batch(caster: int, origin: Vector2, velocities: PackedVector2Array, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, slots: PackedInt32Array) -> int:
+	var count: int = velocities.size()
+	if not is_caster(caster) or not (lifetime > 0.0) or not origin.is_finite() or slots.size() < count:
+		return -1
+	if count > _free_count:
+		return -1
+	if _has_walls and (_cell_at(origin) & ROOM_CELL) != 0:
+		# Born inside a room wall, as `_spawn_row`: each counts as ended, none takes a slot.
+		wall_hits += count
+		for n in count:
+			slots[n] = -1
+		return count
+	var table: ActorsScript = actors if actors != null else _auto_actors
+	if table == null or not is_instance_valid(table):
+		table = actor_table()
+	var team: int = ActorsScript.NONE
+	var ramp: int = ActorsScript.NONE
+	var budget: int = ActorsScript.SHARED
+	if table != null and table.is_open(caster):
+		team = table.team_of(caster)
+		ramp = table.ramp_of(caster)
+		budget = table.budget_of(caster)
+	for n in count:
+		var velocity: Vector2 = velocities[n]
+		if not velocity.is_finite():
+			slots[n] = -1
+			continue
+		_free_count -= 1
+		var slot: int = _free_slots[_free_count]
+		_write_row(slot, caster, origin, velocity, lifetime, radius, hit_layers, pierce, tag, MOTION_STRAIGHT, team, ramp, budget)
+		slots[n] = slot
+	return count
+
+
+## Write a new shot into the free `slot` (taken off the free list by the caller), with the
+## caster's `team`, `ramp` and `budget` as the actor table gave them.
+func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int, team: int, ramp: int, budget: int) -> void:
 	_pos[slot] = origin
 	_prev[slot] = origin
 	_vel[slot] = velocity if motion == MOTION_STRAIGHT else Vector2.ZERO
@@ -2638,19 +2717,9 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_actor[slot] = caster
-	# What the actor table says of the caster now; the shot keeps it for its life. A caster that
-	# is no open actor has no team, the enemy ramp and the shared budget.
-	var table: ActorsScript = actors if actors != null else _auto_actors
-	if table == null or not is_instance_valid(table):
-		table = actor_table()
-	if table != null and table.is_open(caster):
-		_team[slot] = table.team_of(caster)
-		_ramp[slot] = table.ramp_of(caster)
-		_budget[slot] = table.budget_of(caster)
-	else:
-		_team[slot] = ActorsScript.NONE
-		_ramp[slot] = ActorsScript.NONE
-		_budget[slot] = ActorsScript.SHARED
+	_team[slot] = team
+	_ramp[slot] = ramp
+	_budget[slot] = budget
 	_layers[slot] = hit_layers | ACTOR_LAYERS
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
@@ -2696,7 +2765,6 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_own_tail[owner_index] = slot
 	if slot >= _high:
 		_high = slot + 1
-	return slot
 
 
 ## Move every projectile by `delta` seconds, find hits and send the events.

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: Sandbox storm, a launch's shots made together, repeat hits (owner session)
+
+- **Asked:** the owner: a benchmark of many shots that hit, with the sandbox's dev staff (splits and novas) at dummies, "for you to use"; then the batched spawn "if it will give more performance".
+- **The benchmark:** `tests/benchmark/sandbox_storm.gd` holds the sandbox's Y build (Flow.SANDBOX_START_CARDS) among the training dummies and prints the shots, the hits on each dummy, the frame and (`--profile`, `--profile-signals`) each script's and listener's time. What it found (headless, ~12,600 shots made a second, ~60 hits a step): making the paced on-expire shots was ~19 us a shot (7.5 in `spawn`, 11.5 in `Spells._land_shot`), 5.6 ms a step; a hit on a dummy ~68 us in Combat's handler, 23 us of it Feel's.
+- **A launch's shots made together:** the atom carrier (atom, bolt, nova; the only carrier with the plain `shoot`) spawns a launch with room for all its shots in one `ProjectileManager.spawn_batch` (the caster's team, ramp and budget read once) and sets them up in one `Spells._land_shots` (the spell's behaviours, looks, echo, caster shot and trigger rows read once; `set_looks`). The same shots, headings (the spread's draws come first, in order), slots, records and order of setup; `test_spells_land_shots` compares every array of the manager and the runtime, byte for byte, with `CarrierAtom.together` off, and fails when one setter is left out. With no room for all (at the cap a spawn drops a shot, which could be one of the launch not yet set up) it goes one by one as before. Storm: Spells' step 5.6 -> 2.3-2.4 ms, the frame 33 -> 14-17 ms (catch-up steps 1.7 -> 0.9 a frame). The row writing stays GDScript; a native batch would cut the rest of the 7.5 us.
+- **Repeat hits:** a hit that repeats the last one Feel flashed, held and heard (same actor, body, attacker and kind, no physics frame or Feel step between) skips those three; its spray and shake stay (`test_feel_repeat_hits`). Feel's hit 23 -> 15 us. The training dummy hears `Actor.damaged`, not every hit on the bus.
+- **Next, measured:** Combat's own hit path (~45 us a hit: four events and the element logic), Feel's impact and expiry effects (~2.6 ms a frame, past the 256 effect slots).
+
 ## 2026-11-02: Trail meshes by shape: lightning and dashes in batches of their own (owner)
 
 - **Asked:** the owner: "Can the shot trail be made cheaper without losing its effect?", then to do it (one trail mesh per kind of trail), and the per-trail work on the CPU and several tail pixels per quad "if it is worth it".

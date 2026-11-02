@@ -2,6 +2,28 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: The decoy, reviewed: its own timer, its own hurt, its sight, no telegraph (owner)
+
+- **Asked:** the owner had the decoy change (#514) reviewed for fit, then: "Fix it all!"
+- **Each decoy keeps its own timer:** an ended entity took the last timer entry of its tag with it, not its own, so with two decoys of one staff the standing one went quiet (and the ended one's entry ticked on, from an actor id the next actor might reopen). Entities now names the entity's key (`Spells.entity_key`) while it sends `entity_ended`, and only that key's entries leave (`_lc_leave_key`).
+- **A decoy placed again** starts with an empty intent: with no foe about it aims the way it was placed, not where its row's last decoy aimed.
+- **A body that went down** (its aim cleared) keeps the way it had for its timer's payload, not an infinite one.
+- **`on hurt` on a decoy** fires when the decoy is hurt (owner), not its wizard: a carrier that is a body of its own (`LC_ACTOR`) is hurt when that body is.
+- **No telegraph on a decoy** (owner: only the casts the AI presses itself are telegraphed, "exactly how it should be"): a decoy casts nothing of its own; what its triggers fire comes on the card's clock, an enemy's decoy too, as a familiar's sprinkler or a timer on an enemy's shot or rune does. A windup on the decoy was built and taken out again in this PR as a special case. The card rules test now also tries `on hurt` with an enemy shooter, so a body of the carrier's own is hurt.
+- **It aims at what it can see:** the nearest foe behind a wall is passed over for the nearest of the nearer ones with a clear line (at most 8 line checks per ring of the AI's look); with none in view it keeps the nearest.
+- **It turns:** a copy of a living staff shows the head sheet's column for its aim, as the staff it copies does.
+- **Its card text** (owner): "Distract your enemies with a convincing illusion", no longer a still copy that enemies go for first.
+
+## 2026-11-02: A decoy is an actor that aims itself (owner)
+
+- **Found:** a decoy's timer fired only outward from its wizard through the decoy (a point, `LC_POINT`), so `timer · decoy · bolt` shot where the wizard faced when placing it and never at the foes round it. The owner wanted it to aim itself without a rule of its own.
+- **Rule:** a payload fired from an actor's body goes the way that actor aims now (`Spells._lc_fire`, `LC_ACTOR`). A decoy is an actor (`Entities`; done from the backlog's "decoys and familiars as actors", for the decoy only): Health, Hurtbox, Mover, a Caster with no cards (it tells the systems where it is and aims), a `DecoyLook` and a `DecoyController` that aims at the nearest standing actor of another team (`AIBrain.nearest_foe`, the AI's own look). Its trigger's entry follows its body (`Spells.entity_body`, named by Entities while the spawn is asked for). The familiar stays a point and keeps the sprinkler rule (R4 F8).
+- **The dash too** (owner: fine as long as a plain dash still goes the way the wizard walks, which is untouched): a timer on a dash fires along the caster's aim now, not the aim at the cast.
+- **No lure** (owner): enemies and swarmers chase a decoy when it is the nearest actor of another team, as any; `Entities.lure` and `DECOY_LURE` are gone.
+- **Homing on a decoy** (owner): the decoy now `STEERS`; it creeps toward its target within its homing reach at `SpellLimits.HOMING_DRIFT` (24 px/s), the homing rune's rule, so one can always walk away from it. Without homing it stands.
+- **What follows from being an actor** (not asked, kept because they are the actor rules): it belongs to its caster (`Actor.belongs_to`: its hurt circle is a projectile target owned by its caster, so the caster's shots pass it, as before, and a payload it fires does not hit it); everything else hurts it, area hits now too; hits push it (its Mover); it has health, `DECOY_HEALTH` 15 (three bolts), instead of breaking after any three hits (a beam's ticks or a nova used to count as hits); its break is no kill. The payload stays its caster's (the tag): kills, mana and `on hit` are the wizard's, as before.
+- **Pool:** each Entities row makes its decoy actor the first time it holds one and keeps it; an ended decoy leaves the tree and is placed again under a fresh id. It is `downable`, so Combat never frees it: Entities ends it when its health is gone.
+
 ## 2026-11-02: The native module: the projectile manager's hot loops in C++ (owner session)
 
 - **Asked:** the owner: "implement the native code performance optimization options. The rule about not using eg. gdextension does not count anymore." The 2026-11-02 pass below had found GDScript's per-shot floor; beyond it was native code or visual-only shots.

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the live-carrier clock (rules R4d, owner 2026-10-29): every carrier that lasts keeps
 ## a timer and hears `on hurt` while it lives, and fires from where it is now (a shot, a beam's
-## tip, a rain's spot, a decoy, the caster's body during a dash); the first timer tick and the
+## tip, a rain's spot, a decoy, the caster's body during a dash; from a body, along its aim now); the first timer tick and the
 ## first arc zap come after the interval or half the carrier's life, whichever is shorter. It
 ## runs a real projectile manager and event bus, stepped by hand, with cards built in code.
 ##
@@ -198,6 +198,33 @@ func test_a_timer_on_a_decoy_fires_from_it_until_it_ends() -> void:
 	check_equal(_runes().size(), 1, "an ended decoy ticks no more")
 
 
+## Two decoys of one staff share a tag: the one that ends takes its own timer with it, not the
+## other's (Entities names its key, `Spells.entity_key`, as it sends the end). Regression: the
+## last entry of the tag left, so the decoy still standing went quiet and the ended one ticked on.
+func test_an_ended_decoy_takes_only_its_own_timer() -> void:
+	_build([&"on_timer", &"decoy", &"rune"])
+	var tag: int = _spells.current_tag(0, 0, 0)
+	var keys: Array[int] = []
+	_bus.entity_spawn_requested.connect(func(_caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: keys.append(_spells.entity_key))
+	_spells.cast_staff(0, 0, Vector2(30, 40), Vector2.RIGHT, 10.0)
+	# Past the cast's delay (both cards' cooldowns, 1 s); the first has ticked twice by then.
+	_tick(61)
+	_spells.cast_staff(0, 0, Vector2(30, 140), Vector2.RIGHT, 10.0)
+	check_equal(keys.size(), 2, "two decoys asked for")
+	if keys.size() != 2:
+		return
+	_spells.entity_key = keys[0]
+	_bus.entity_ended.emit(0, &"decoy", Vector2(30, 40), tag)
+	_spells.entity_key = 0
+	_tick(31)
+	var later: Array[Vector2] = []
+	for at in _runes():
+		if at.y > 100.0:
+			later.append(at)
+	check_equal(_runes().size(), 3, "two ticks of the first before it ended, then one of the second's")
+	check_equal(later.size(), 1, "the decoy still standing ticks from where it stands (%s)" % [_runes()])
+
+
 func test_two_timers_on_a_decoy_each_fire_their_own_payload() -> void:
 	_build([&"on_timer", &"on_timer_2", &"decoy", &"rune", &"rune"])
 	var tag: int = _spells.current_tag(0, 0, 0)
@@ -219,6 +246,47 @@ func test_a_timer_on_a_dash_fires_from_the_caster_as_it_moves() -> void:
 	var runes: Array[Vector2] = _runes()
 	check_equal(runes.size(), 1, "a 0.4 s dash ticks at 0.2 s")
 	check(runes.size() == 1 and runes[0].is_equal_approx(Vector2(15, 0)), "from where the caster is then (%s)" % [runes])
+
+
+## A payload fired from an actor's body goes the way that actor aims now (owner, 2026-11-02): the
+## dash goes along +x, but the caster aims down when its timer ticks, so the shot flies down.
+func test_a_timer_on_a_dash_fires_along_the_casters_aim_now() -> void:
+	_mgr.set_anchor(0, Vector2.ZERO)
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	_build([&"on_timer", &"dash", &"short"])
+	_cast()
+	_tick(6)
+	_mgr.set_anchor(0, Vector2(15, 0))
+	_spells.set_aim(0, Vector2(15, 0), Vector2.DOWN)
+	_tick(7)
+	var ways: Array[Vector2] = []
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
+			if spell != null and spell.form_id == &"short":
+				ways.append(_mgr.get_velocity_of(slot).normalized())
+	check_equal(ways.size(), 1, "a 0.4 s dash ticks at 0.2 s")
+	check(ways.size() == 1 and ways[0].dot(Vector2.DOWN) > 0.99, "its shot flies the way the caster aims now, not along the dash (%s)" % [ways])
+
+
+## A caster that goes down mid-dash has its aim cleared (`clear_aim`, INF): the timer's payload
+## keeps the dash's way. Regression: it flew along an infinite way.
+func test_a_timer_on_a_dash_keeps_its_way_when_the_caster_goes_down() -> void:
+	_mgr.set_anchor(0, Vector2.ZERO)
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	_build([&"on_timer", &"dash", &"short"])
+	_cast()
+	_tick(6)
+	_spells.clear_aim(0)
+	_tick(7)
+	var ways: Array[Vector2] = []
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
+			if spell != null and spell.form_id == &"short":
+				ways.append(_mgr.get_velocity_of(slot))
+	check_equal(ways.size(), 1, "the dash ticked")
+	check(ways.size() == 1 and ways[0].is_finite() and ways[0].normalized().dot(Vector2.RIGHT) > 0.99, "its shot flies along the dash's way (%s)" % [ways])
 
 
 func test_on_hurt_on_a_dash_fires_only_while_it_moves() -> void:

@@ -245,7 +245,7 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
-## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
+## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a rain's spot and a familiar's orb,
 ## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
 ## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
@@ -346,8 +346,13 @@ var _blasting: bool = false
 ## `cast_staff`'s `walk`): a dash it casts itself is turned by it.
 var _walk_turn: PackedFloat32Array = PackedFloat32Array()
 ## While `entity_spawn_requested` is sent, the key of the entity it asks for (0 at other times):
-## Entities keeps it and hands it back with `familiar_at`. `_entity_keys` counts them out.
+## Entities keeps it and hands it back with `familiar_at`, and names it here again while it sends
+## that entity's `entity_ended`, so the entity that ended leaves, not another of its tag.
+## `_entity_keys` counts them out.
 var entity_key: int = 0
+## The actor id of the body Entities made for that request (a decoy is an actor), set by Entities
+## while `entity_spawn_requested` is sent; -1 for none (a familiar is a point).
+var entity_body: int = -1
 var _entity_keys: int = 0
 ## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
@@ -1858,6 +1863,17 @@ func _lc_leave(tag: int, every: bool) -> void:
 		i -= 1
 
 
+## The entity with `key` (`entity_key`) of `tag` ended: its entries leave, and no other entity's
+## of that tag (each decoy is its own body; each familiar its own orb).
+func _lc_leave_key(tag: int, key: int) -> void:
+	var i: int = _lc_count - 1
+	while i >= 0:
+		if _lc_tag[i] == tag and _lc_tied[i] == 0 and _lc_seq[i] == key and (_lc_kind[i] == LC_ACTOR or _lc_kind[i] == LC_POINT):
+			_lc_remove(i)
+		i -= 1
+
+
+
 ## Where live carrier `i` is now, or `Vector2.INF` when the row it follows is gone.
 func _lc_where(i: int) -> Vector2:
 	var ref: int = _lc_ref[i]
@@ -1896,8 +1912,9 @@ func _step_live(delta: float) -> void:
 
 
 ## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
-## (`_heading`), else outward from its caster's body through it, else its `_lc_way`. Its shot casts
-## the payload while it flies, else the point does.
+## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
+## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies,
+## else the point does.
 func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
@@ -1911,6 +1928,12 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	var way: Vector2 = _lc_way[i]
 	if slot >= 0:
 		way = _heading(spell, slot, at, actor)
+	elif _lc_kind[i] == LC_ACTOR:
+		# An actor's body (a wizard's dash, a decoy): the way that actor aims now.
+		var body: int = _lc_ref[i]
+		# A body that went down has its aim cleared (INF, `clear_aim`): its way stays as it was.
+		if body >= 0 and body < ACTORS and _aim_seen[body] != 0 and _aim_dir[body].is_finite():
+			way = _aim_dir[body]
 	else:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
@@ -2334,7 +2357,8 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
 ## the actor was hurt (a wizard or an enemy alike, actors G3b), whatever the carrier is (a shot, a
-## beam, a dash, an entity...; `_lc_tag`).
+## beam, a dash, an entity...; `_lc_tag`). A carrier that is a body of its own (a decoy, an actor:
+## `LC_ACTOR`) is hurt when that body is (owner, 2026-11-02); a dash's body is its caster's.
 func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: StringName) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
@@ -2344,7 +2368,8 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		var tag: int = _lc_tag[i]
 		var spell: CompiledSpell = _profiles.get(tag)
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
-		if trigger == null or trigger.event != TriggerBase.Event.HURT or SpellTag.caster_of(tag) != actor:
+		var body: int = _lc_ref[i] if _lc_kind[i] == LC_ACTOR else SpellTag.caster_of(tag)
+		if trigger == null or trigger.event != TriggerBase.Event.HURT or body != actor:
 			continue
 		var at: Vector2 = _lc_where(i)
 		if at.is_finite():
@@ -2843,7 +2868,7 @@ func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int) -> void:
 	var carrier: CarrierEntity = _carriers.get(kind) as CarrierEntity
 	if carrier != null:
-		carrier.entity_ended(actor, position, tag)
+		carrier.entity_ended(actor, position, tag, entity_key)
 
 # The carriers and the staff animations, for their looks (`gameplay/feel`, the actor's look), `ai`,
 # the actor's mover and the tests: each is read from the object that keeps it.

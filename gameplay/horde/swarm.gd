@@ -26,8 +26,8 @@ extends RefCounted
 ## actor-table id (promotion, part S3). The look (`look`) is told of each step, hit and removal.
 ##
 ## **The step** (`step(delta)`, one for all rows, in physics steps):
-## - **Chase** as `AIController` chases: the nearest standing actor of another team, a decoy in
-##   its lure range first (`Entities.lure`), a teammate that hurt it for `AIController.GRUDGE_TIME`
+## - **Chase** as `AIController` chases: the nearest standing actor of another team (a decoy is
+##   one), a teammate that hurt it for `AIController.GRUDGE_TIME`
 ##   (its grudge). The actors of other teams are read from the actor table a few times a second
 ##   (`_read_candidates`: the few that Combat has registered), not from the projectile manager's
 ##   grid, which a look without a range would walk whole (every swarmer is a target in it).
@@ -440,14 +440,10 @@ func _think(i: int, node: Node2D, id: int, delta: float, origin: Vector2) -> voi
 	_set_target(i, _find_target(i, node, id, origin))
 
 
-## A decoy in lure range, else the nearest standing actor of another team (as the AI looks).
+## The nearest standing actor of another team (as the AI looks).
 func _find_target(i: int, node: Node2D, id: int, origin: Vector2) -> Node2D:
 	lookup_count += 1
 	var here: Vector2 = positions[i] + origin
-	if entities != null and is_instance_valid(entities):
-		var decoy: Node2D = entities.lure(here)
-		if decoy != null:
-			return decoy
 	var team: int = actors.team_of(id) if actors != null else ActorsScript.TEAM_ENEMIES
 	var from: Vector2 = here + kinds_list[kinds[i]].body_offset
 	var best: Node2D = null
@@ -550,12 +546,7 @@ func _read_targets(origin: Vector2) -> void:
 
 ## The AI's test: a freed node, a down actor and a dying one are no targets.
 func _chaseable(node: Variant) -> bool:
-	if not is_instance_valid(node):
-		return false
-	if node is Actor:
-		var other: Actor = node as Actor
-		return not other.is_down() and not other.is_dying()
-	return not (node.has_method("is_downed") and node.is_downed())
+	return AIBrain.can_target(node)
 
 
 func _feet_of(node: Node2D) -> Vector2:

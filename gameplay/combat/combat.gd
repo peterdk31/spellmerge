@@ -1478,13 +1478,17 @@ func _register(node: Node2D, body: int, health: float, radius: float, contact: i
 
 
 ## The row's body as a projectile target, unless it is down: a wizard on LAYER_PLAYER, the rest
-## by team (the layers merge later), owned by the actor it casts as, so its own shots skip it.
+## by team (the layers merge later), owned by the actor it casts as (or the actor it belongs to:
+## `Actor.belongs_to`, a decoy's caster), so those shots skip it.
 func _add_target(row: int) -> void:
 	if projectiles == null or _is_down(row):
 		return
 	var wizards: bool = _body[row] == BODY_ACTOR and _team(row) == ActorsScript.TEAM_WIZARDS
 	var layer: int = ProjectileManagerScript.LAYER_PLAYER if wizards else ProjectileManagerScript.LAYER_ENEMY
-	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, _cast_id(row), _hurt_offset[row])
+	var owner: int = _cast_id(row)
+	if _body[row] == BODY_ACTOR and (_nodes[row] as Actor).belongs_to != ActorsScript.NONE:
+		owner = (_nodes[row] as Actor).belongs_to
+	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, owner, _hurt_offset[row])
 
 
 ## Forget the row: its target, its node and, if Combat opened it, its actor id. O(1).

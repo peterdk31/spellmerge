@@ -41,7 +41,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 
 ## From the actors rework (phase G, 2026-10-28)
 
-- **Decoys and familiars as actors** (a decoy: Health and Hurtbox, no controller; a familiar: a Caster and an orbiting controller), if Entities' pooled rows start to need the actor kit.
+- **Familiars as actors** (a Caster and an orbiting controller), if Entities' pooled rows start to need the actor kit. The decoy became one on 2026-11-02 (docs/DECISIONS.md).
 - **AI teammates** for fewer than four players, and **bosses a player can take over**: a controller each, nothing new in the body.
 - **More teams** (enemy factions that fight each other) and more than five ramps: the actor table has room; the shot shader's ramp field grows from two bits and a flag.
 

@@ -122,6 +122,10 @@ var possessed_by: Possession = null
 ## instead of a new id (the swarm's promotion, docs/milestones/horde-swarm.md: a swarmer's id stays
 ## with the full actor that replaces it). Set before adding the actor; used once.
 var take_id: int = ActorsScript.NONE
+## The actor whose body this one belongs to (a decoy belongs to its caster), or NONE: that actor's
+## shots pass it as they pass its own body (its hurt circle is a projectile target owned by that
+## actor: `Caster.own_hurtbox`, Combat). Set before adding the actor.
+var belongs_to: int = ActorsScript.NONE
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
 ## open (see `open_caster_number`), else -1.

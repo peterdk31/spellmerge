@@ -40,7 +40,7 @@ func test_it_has_the_playgrounds_numbers() -> void:
 	var card: FormBase = _card()
 	check_equal(card.mana_cost, 0.0, "it costs no mana")
 	check_equal(card.arc, 90.0, "a 90° arc")
-	check_equal(card.ray_length, 24.0, "24 px of reach")
+	check_equal(card.ray_length, 32.0, "32 px of reach (24 in the playground; one tile after the first playtest)")
 	check(is_equal_approx(card.wind_up, 0.12), "a 0.12 s wind-up")
 	check(is_equal_approx(card.lifetime, 0.06), "a 0.06 s sweep")
 	check(is_equal_approx(card.cooldown, 0.3), "a 0.3 s delay")
@@ -84,6 +84,31 @@ func test_it_knocks_the_imp_away_from_the_hand() -> void:
 	arena.run(1.0)
 	check(imp.global_position.length() > 30.0, "the imp is batted away (now %s)" % imp.global_position)
 	arena.free_all()
+
+
+func test_it_knocks_a_raised_hurtbox_along_the_aim() -> void:
+	# Regression: a real enemy's hit circle sits above its feet (bone husk: 14 px up). Combat
+	# pushed from the hit point toward the feet, so a swing aimed up pulled the imp down onto the
+	# caster, and one aimed right pushed it mostly down.
+	var offset := Vector2(0.0, -14.0)
+	var up := ArenaScript.new(root)
+	up.pushable = true
+	var above: Node2D = up.add_imp(Vector2(0.0, -6.0), ArenaScript.IMP_HEALTH, offset)
+	up.install_cards(0, 0, ["swing"])
+	up.cast(0, 0, Vector2.UP)
+	up.run(1.0)
+	check(up.lost(above) > 0, "the swing up hits the imp above")
+	check(above.global_position.y < -20.0, "and bats it up, away from the caster (now %s)" % above.global_position)
+	up.free_all()
+	var right := ArenaScript.new(root)
+	right.pushable = true
+	var beside: Node2D = right.add_imp(Vector2(20.0, 14.0), ArenaScript.IMP_HEALTH, offset)
+	right.install_cards(0, 0, ["swing"])
+	right.cast(0, 0, Vector2.RIGHT)
+	right.run(1.0)
+	var moved: Vector2 = beside.global_position - Vector2(20.0, 14.0)
+	check(moved.x > 10.0 and absf(moved.y) < moved.x * 0.25, "a swing right bats it right, not down (moved %s)" % moved)
+	right.free_all()
 
 
 func test_heavy_bats_it_further() -> void:

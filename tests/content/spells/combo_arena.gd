@@ -97,12 +97,13 @@ func _init(root: Node) -> void:
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))
 
 
-## Puts an imp at `at`; it can be hurt and killed, and shots can hit it.
-func add_imp(at: Vector2, health: float = IMP_HEALTH) -> Node2D:
+## Puts an imp at `at`; it can be hurt and killed, and shots can hit it. Its hit circle is
+## `offset` from `at` (a real enemy's hurtbox sits above its feet).
+func add_imp(at: Vector2, health: float = IMP_HEALTH, offset: Vector2 = Vector2.ZERO) -> Node2D:
 	var imp := _own(Node2D.new()) as Node2D
 	_root.add_child(imp)
 	imp.global_position = at
-	combat.register_actor(imp, health, IMP_RADIUS)
+	combat.register_actor(imp, health, IMP_RADIUS, 0, offset)
 	imps.append(imp)
 	return imp
 

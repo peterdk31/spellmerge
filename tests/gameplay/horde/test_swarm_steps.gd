@@ -5,14 +5,15 @@ extends "res://tests/support/suite.gd"
 ## and node writes into one pass. It must move every swarmer exactly as before: a scripted crowd
 ## (mites and husks round four wizards, a wall in the way, hits with knockback, frost bolts that
 ## chill and freeze, local stops, kills and new swarmers) ends with the very rows and look it ended
-## with before the change. The fingerprint below was recorded on the swarm before S4.
+## with before the change. The fingerprint below was recorded on the swarm before S4, and again when
+## Combat's push began to be measured to the hurt circle's centre, not the feet (2026-11-02).
 ##
 ## godot --headless --path . --script res://tests/gameplay/horde/test_swarm_steps.gd
 
 const Fixture := preload("res://tests/gameplay/horde/swarm_fixture.gd")
 
 ## Rows, steps run, and a hash of every row's numbers and of every look value, before S4.
-const RECORDED: Array[int] = [160, 90, 802667918, 180775624]
+const RECORDED: Array[int] = [160, 90, 547740575, 913715797]
 const SWARMERS: int = 160
 const STEPS: int = 90
 ## The stress room's enemy area round the fixture's origin.

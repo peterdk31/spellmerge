@@ -583,7 +583,15 @@ func _consume_knockback(row: int, delta: float) -> Vector2:
 ## that is not registered or is down, or a chill on a frozen actor.
 func apply_status(caster: int, actor: Variant, status_id: StringName, duration: float, strength: float) -> bool:
 	var row: int = _row_of(actor)
-	if row == ActorsScript.NONE or duration <= 0.0 or _is_down(row):
+	if row == ActorsScript.NONE:
+		return false
+	return _apply_status_row(caster, row, status_id, duration, strength)
+
+
+## `apply_status` on a row already known to hold a body (a spell's hit, which has its row): the
+## same, less the lookup of the actor.
+func _apply_status_row(caster: int, row: int, status_id: StringName, duration: float, strength: float) -> bool:
+	if duration <= 0.0 or not is_instance_valid(_nodes[row]) or _is_down(row):
 		return false
 	var froze: bool = false
 	match status_id:
@@ -910,7 +918,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 		direction = -direction
 		strength *= HEX_PULL_SHARE
 	var jump_share: float = _shock_share[row] if _shock_left[row] > 0.0 else 0.0
-	var jump_from: Vector2 = _position_of(node) + _hurt_offset[row]
+	var jump_from: Vector2 = feet + _hurt_offset[row]
 	# (Read now: a body the hit kills has no row, and so no team, after it.)
 	var team: int = _team(row)
 	# The reaction is chosen from the statuses the target had when the hit arrived.
@@ -956,7 +964,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 			reacted = true
 		elif status_id != &"" and not (i == 0 and discharged):
 			# (A discharge replaces the first status, so a lightning hit does not charge again at once.)
-			apply_status(by, row, status_id, duration, power)
+			_apply_status_row(by, row, status_id, duration, power)
 
 
 ## True when `by`'s heal is for the row `row`: the same team (an actor of no team heals nobody).
@@ -1032,11 +1040,14 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: fl
 ## Allocation-free.
 func _reaction_for(row: int, element_id: StringName) -> ReactionRow:
 	var table: ReactionTable = reactions if reactions != null else REACTIONS
+	# (The element's rows by status: most elements react with a few statuses, so only those are
+	# looked at, in REACTING_STATUSES' order.)
+	var by_status: Dictionary = table.for_element(element_id)
+	if by_status.is_empty():
+		return null
 	for status in REACTING_STATUSES:
-		if _status_on(row, status):
-			var found: ReactionRow = table.find(status, element_id)
-			if found != null:
-				return found
+		if by_status.has(status) and _status_on(row, status):
+			return by_status[status] as ReactionRow
 	return null
 
 

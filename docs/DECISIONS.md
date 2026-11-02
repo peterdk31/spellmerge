@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: A cheaper elemental hit in Combat (owner session)
+
+- **Asked:** the owner: "Let's look at combat then", after the trail work found Combat's `_on_projectile_hit` at about 68 us a hit in the sandbox storm.
+- **Where the time is:** timed part by part in the storm (40,000 hits, the timers themselves about 0.4 us each): the row and the spell's profile 4 us; before the hit lands 13 us, 9 of it the reaction lookup; the hit 45 us, of which Feel's `damage_dealt` 17, the actor's own `damaged` 10 (the training dummy's number label), the health 3, `hit_landed` and `actor_hurt` 5; the statuses 8 (every hit puts its status on: a frost bolt on a frozen dummy finds it frozen). So Combat's own work is about a third of a hit, its listeners the rest.
+- **The reaction table indexed:** `ReactionTable.find` walked all 16 rows reading two properties of each, for every reacting status on the target, on every elemental hit. It keeps its rows by element, then by status (`for_element`; the first row of a pair wins, as the walk found it), rebuilt when the number of rows or the array changes (tests add rows to a table after it is made); a row is not edited after the table has been searched (no code does). `_reaction_for` asks only for the statuses the element reacts with, in REACTING_STATUSES' order, so the same row is found.
+- **The status by its row:** a spell's hit knows its row; `_apply_status_row` is `apply_status` without the lookup of the actor (an id or a node, through a Variant), with the same checks (a body still there, not down). `_apply_spell` reads the body's position once.
+- **Measured:** `tests/benchmark/combat_hit.gd` (new; Combat alone, nothing else listening; fastest of 15 passes, three runs each in turn): frost on frozen 19.8 -> 16.9 us, fire on burning 20.0 -> 17.4 us; plain 10.4 and storm on hexed 19.5 us unchanged (neither walked the table: plain has no element, and storm's statuses already reacted early in the walk).
+- **Left:** the rest of Combat's hit is many small reads (the team twice, the body's validity and health checks, three events sent even with no listener) of about 1 us each. The larger costs are the listeners in other areas: Feel's `damage_dealt` and an actor's `damaged` (an enemy's AI, look and face each hear it).
+
 ## 2026-11-02: Cheaper trail vertices (owner session)
 
 - **Asked:** the owner: "optimize performance more for shots/tails".

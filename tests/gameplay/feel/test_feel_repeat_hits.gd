@@ -90,3 +90,25 @@ func test_another_attacker_kind_or_step_is_a_hit_of_its_own() -> void:
 	check_equal(registry.asked.size(), 4, "after Feel stepped the same hit is heard again")
 	_hit(by, _wizard(3))
 	check_equal(registry.asked.size(), 5, "another body is heard")
+
+
+## Feel keeps the `Actors` autoload once found (performance, 2026-11-02: every hit asks for it),
+## and finds the table again when another takes its place.
+func test_the_actor_table_is_kept_while_it_is_there() -> void:
+	feel.actors = null
+	var auto: ActorSeats.ActorsScript = ActorSeats.autoload()
+	check(auto != null, "the tests run with the autoload")
+	check(feel._actor_table() == auto, "the autoload")
+	check(feel._actor_table() == auto, "and again, kept")
+	var index: int = auto.get_index()
+	root.remove_child(auto)
+	var other: ActorSeats.ActorsScript = ActorSeats.table()
+	other.name = "Actors"
+	root.add_child(other)
+	check(feel._actor_table() == other, "a table that took its place")
+	root.remove_child(other)
+	other.free()
+	check(feel._actor_table() == null, "none while there is none")
+	root.add_child(auto)
+	root.move_child(auto, index)
+	check(feel._actor_table() == auto, "the autoload once it is back")

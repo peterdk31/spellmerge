@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: The hit's listeners: Feel and the actors (owner session)
+
+- **Asked:** the owner: "Look at both" (Feel's `damage_dealt` and the enemies' `damaged`, the largest parts of a hit after Combat's own).
+- **Feel:** timed part by part in the sandbox storm (96% of its hits are repeats, which skip the flash, hold and sound): the repeat check 2 us, the hit's colours 4 (most of it the actor table), the kind's look 3, the spray, shake and sound 6. `_actor_table` found the `Actors` autoload with `get_node_or_null` on every call (the hat ramp and the hold ask for it on every hit); it keeps it while it is valid and in the tree, and looks again otherwise, as Combat's `_table` does. 14 -> 13 us a hit. Left: the kind's look read from the preset's dictionary (a cache would save about 1.5 us and go stale if a preset were edited in place); the per-hit camera refresh (the frame's shake does not look for a new camera).
+- **An enemy's `damaged`:** its AI's grudge (one team check for a wizard's hit), its look's pose (changes the sprite only when the pose does) and its face's mood: 1.6 us a hit together for every stray kind. Left.
+- **The training dummy's numbers:** a hit set a label's text, position, fade and visibility at once; in a storm a dummy takes several hits a frame on 8 labels, so most of it was overwritten before a draw. A hit keeps its number and queues one deferred write a frame (deferred calls run after the physics step and before drawing), which writes each new label's text once and places it by its age with the step's own formula (`_place_number`): at the hit's age that is where the hit put it, and a step between the hit and the write already moved it there. So every drawn frame is as before. A hit 2.9 -> 1.4 us at the listener; with the frame's work about 9 us less a hit.
+
 ## 2026-11-02: A cheaper elemental hit in Combat (owner session)
 
 - **Asked:** the owner: "Let's look at combat then", after the trail work found Combat's `_on_projectile_hit` at about 68 us a hit in the sandbox storm.

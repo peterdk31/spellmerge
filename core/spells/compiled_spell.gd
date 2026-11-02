@@ -147,6 +147,22 @@ func chain_length() -> int:
 	return 1 + payload.spells[0].chain_length()
 
 
+## True when its hit does nothing of its own besides its payload and chain: no siphon, possess,
+## pull or blast (`Spells._on_hit_effects`). Worked out once (performance, 2026-11-02: every hit
+## asks); the compiler is done with a spell before it is fired, and nothing changes it after.
+func plain_hit() -> bool:
+	if _plain_hit < 0:
+		_plain_hit = 1
+		for kind: int in PLAIN_HIT_BEHAVIOURS:
+			if behaviour(kind) > 0.0:
+				_plain_hit = 0
+	return _plain_hit == 1
+
+
+const PLAIN_HIT_BEHAVIOURS: Array[int] = [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.BLAST]
+var _plain_hit: int = -1
+
+
 ## True when one of its triggers goes off on `event` (a `TriggerBase.Event`).
 func fires_on(event: int) -> bool:
 	for trigger in triggers:

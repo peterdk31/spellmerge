@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: Spells' hit and Feel's impacts; no bundled events (owner session)
+
+- **Asked:** the owner: how much bundling the hit events per frame would save and whether it is an "ugly" optimization; then "look into" Spells' `_on_hit` and Feel's spray.
+- **Bundling, not done:** a signal and its listener cost 0.35 us against 0.02 us an item in one call a frame with arrays; a hit makes about 10 deliveries, a shot's end 2, so about 0.3 ms of a 12-15 ms storm frame. The rest of a listener's work only shrinks where it can be shared across a frame's hits, and those hits depend on each other in order (a kill, a status a reaction reads, an on-hit card's shots), so a bundle would keep the per-hit loop. Every hit event in `core/events`, its listeners and dozens of tests would change for it. What we do instead: one event per hit, and a listener that has costly per-hit work keeps it and does it once a frame (the training dummy's numbers).
+- **Where the time is** (timed part by part in the storm, about 1,000 frames): Spells' hit 16.8 us (its relay 2.3, the heading and what a chain carries 4.8, its siphon, possess, pull and blast checks and the carrier's own part 5.5, its payloads 1.7); Feel's impact 13.4 us (the form's look 2.5, the manager's facts read by name 3, the burst 2.75); Feel's shot end 4.9 us; Spells' shot end 4.4 us (its blast check and the wall and expire triggers, already lean).
+- **Spells' hit:** the heading goes only to a payload on hit, so it is worked out only for a spell that `fires_on(HIT)`; what a chain carries only when it has jumps left (still read before the hit's effects and payloads, which may spawn into the slot). `CompiledSpell.plain_hit()` (worked out on first use: only the compiler writes a compiled spell, before it is fired) is true with no siphon, possess, pull or blast, and `_on_hit_effects` then runs only the carrier's own part. `_relay` takes the spell `_on_hit` looked up. 11.6 -> 7.8 us a call.
+- **Feel:** `projectiles` was a plain `Node`, read by name with `in` checks (`impact_form`, `impact_core`, `impact_body`, `expired_on_wall`, `tint_of`) for a manager that might not have them; every caller, test or game, gives it the projectile manager, so it is typed as one. Its shot end 3.6 -> 3.2 us; its impact within the noise. The spray itself (`show_effect`, a write of 13 arrays) was left.
+
 ## 2026-11-02: The hit's listeners: Feel and the actors (owner session)
 
 - **Asked:** the owner: "Look at both" (Feel's `damage_dealt` and the enemies' `damaged`, the largest parts of a hit after Combat's own).

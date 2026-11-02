@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: Spells' hit and Feel's impacts (owner session)
+
+Spells' `_on_hit` works out a hit's heading only for a spell with a payload on hit and what a chain carries only while it has jumps left, and skips the siphon, possess, pull and blast checks for a plain hit (`CompiledSpell.plain_hit`, worked out once); `_relay` takes the spell it already has. Feel's `projectiles` is typed as the projectile manager, so its `impact_*` facts are read as members, not by name. Sandbox storm, per call: Spells' hit 11.6 -> 7.8 us, Feel's shot end 3.6 -> 3.2 us; Feel's impact and Spells' shot end about the same. About 0.35 ms a frame in the storm. Bundling the hit events per frame was measured and not done (0.33 us a delivery, about 0.3 ms a storm frame). Tests: `test_staff_compiler` (a plain hit). Details: docs/DECISIONS.md.
+
 ## 2026-11-02: The hit's listeners: Feel and the actors (owner session)
 
 Feel's `damage_dealt` (about 14 us a hit in the sandbox storm) found the `Actors` autoload by path on every hit: it keeps it now while it is in the tree (`_actor_table`), 14 -> 13 us. An enemy's own `damaged` listeners (its AI, look and face) cost 1.6 us a hit together, so they were left. The training dummy's damage numbers are written to their labels once a frame, before it is drawn (`DummyLook._write_new_numbers`), not on every hit: a hit 2.9 -> 1.4 us, and with the frame's work about 9 us less a hit. Combat's hit in the storm, the dummy's listener included, about 55 -> 50 us. Tests: `test_feel_repeat_hits` (the kept table follows the autoload), `test_dummies` (the labels are written before the frame is drawn). Details: docs/DECISIONS.md.

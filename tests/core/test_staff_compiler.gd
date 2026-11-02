@@ -517,3 +517,17 @@ func test_reach_stretches_a_carriers_range_and_two_multiply() -> void:
 	check(is_equal_approx(twice.ray_length, 80.0 * 1.6 * 1.6), "two reach cards multiply: %s" % twice.ray_length)
 	var staff: CompiledStaff = _compile("reach far_rune")
 	check(staff.wasted.has(0), "a rune has no range: reach is wasted")
+
+
+## A spell whose hit siphons, possesses, pulls or blasts nothing is a plain hit, which Spells
+## skips those checks for on every hit (performance, 2026-11-02); any of them makes it not one.
+func test_a_plain_hit_is_a_hit_with_no_effect_of_its_own() -> void:
+	check(_compile("bolt").casts[0].group.spells[0].plain_hit(), "a bolt")
+	check(_compile("shield bolt").casts[0].group.spells[0].plain_hit(), "a shield is no effect of the hit")
+	check(not _compile("blast bolt").casts[0].group.spells[0].plain_hit(), "a blast")
+	for kind: int in [ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL]:
+		var card: ModifierBase = _modifier(StringName("effect_%d" % kind))
+		card.behaviour = kind
+		card.behaviour_strength = 1.0
+		var spell: CompiledSpell = _compile("effect_%d bolt" % kind).casts[0].group.spells[0]
+		check(spell.behaviour(kind) > 0.0 and not spell.plain_hit(), "behaviour %d" % kind)

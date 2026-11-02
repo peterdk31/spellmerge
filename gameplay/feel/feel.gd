@@ -301,7 +301,9 @@ const POSSESS_SOUND: StringName = &"possess"
 ## autoloads are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
-var projectiles: Node = null
+## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
+## shot's end reads them; performance, 2026-11-02).
+var projectiles: ProjectileManagerScript = null
 ## The combat autoload, asked only `status_left(enemy, id)` to know when a status ends.
 var combat: Node = null
 ## The spell runtime, asked only for its live beams (`beam_*`) to draw them every frame.
@@ -598,10 +600,10 @@ func _ready() -> void:
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
-		projectiles = get_node_or_null("/root/Projectiles")
+		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells")
-	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
+	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
 
 
@@ -1195,14 +1197,13 @@ func _on_caster_move_finished(caster: int, mode: StringName, position: Vector2, 
 func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
 	if projectiles == null or not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
-	if bool(projectiles.get("expired_on_wall")) or not ("impact_body" in projectiles):
+	if projectiles.expired_on_wall:
 		return
 	# Only a flying or orbiting body pops: a still one (a rune, a wall's stone) goes off its own way.
-	var body: int = projectiles.impact_body as int
+	var body: int = projectiles.impact_body
 	if body != ProjectileManagerScript.KIND_BOLT and body != ProjectileManagerScript.KIND_ORBIT:
 		return
-	var heading: Vector2 = projectiles.get("impact_heading") as Vector2 if "impact_heading" in projectiles else Vector2.RIGHT
-	show_effect(KIND_BURST, position, heading, projectiles.impact_core as Color, _ramp_of(caster), projectiles.impact_look as int, POP_ZOOM, POP_SECONDS)
+	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
@@ -1222,7 +1223,7 @@ func _on_shot_deflected(caster: int, position: Vector2, _tag: int, shot: int) ->
 ## `impact_form` says which carrier blocked): the cue `parry`, a big four-point star in Spark gold
 ## and a local stop on the parrying actor alone. Other blocks show nothing of their own.
 func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
-	if projectiles == null or not ("impact_form" in projectiles) or (projectiles.impact_form as StringName) != &"swing":
+	if projectiles == null or projectiles.impact_form != &"swing":
 		return
 	if not position.is_finite():
 		return
@@ -1236,15 +1237,14 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> 
 ## a `cue` plays it where it ends on no body (`on_body` false), as big as its card's radius.
 func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, on_body: bool) -> void:
 	var form: StringName = &""
-	if projectiles != null and "impact_form" in projectiles:
-		form = projectiles.impact_form as StringName
-	var look: Dictionary = _form_look(form, false)
-	var size: float = look.get("size", preset.wall_spark_size) as float
 	var core: Color = Color.WHITE
 	var bits: int = 0
-	if projectiles != null and "impact_core" in projectiles:
-		core = projectiles.impact_core as Color
-		bits = projectiles.impact_look as int
+	if projectiles != null:
+		form = projectiles.impact_form
+		core = projectiles.impact_core
+		bits = projectiles.impact_look
+	var look: Dictionary = _form_look(form, false)
+	var size: float = look.get("size", preset.wall_spark_size) as float
 	if form == &"rune":
 		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, ramp, bits, 3, RUNE_BURST_SECONDS)
 		return
@@ -1867,8 +1867,8 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	material.set_shader_parameter(&"beam_look", look)
 	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 	var body: Color = Color.WHITE
-	if projectiles != null and projectiles.has_method("tint_of"):
-		body = projectiles.call("tint_of", caster) as Color
+	if projectiles != null:
+		body = projectiles.tint_of(caster)
 	_form_body[slot] = body
 	_form_left[slot] = seconds
 	_form_total[slot] = seconds
@@ -1998,8 +1998,8 @@ func _draw_live_beams() -> void:
 		# of stretching them.
 		var caster: int = beams.call("beam_caster", i)
 		var body: Color = Color.WHITE
-		if projectiles != null and projectiles.has_method("tint_of"):
-			body = projectiles.call("tint_of", caster) as Color
+		if projectiles != null:
+			body = projectiles.tint_of(caster)
 		var tint: Color = beams.call("beam_tint", i)
 		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))

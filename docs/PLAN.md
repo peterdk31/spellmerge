@@ -39,7 +39,7 @@ Weekly, Claude picks a recently finished feature and re-examines it critically (
 
 Development keeps going; checks inform rather than block (owner, 2026-10-21).
 
-- **Hard gates are few:** a broken build (it doesn't build, a test or smoke test fails, errors in the log) and the security and copyright rules. Only these stop a release or revert a merge.
+- **Hard gates are few:** a broken build (it doesn't build, a test or smoke test fails, errors in the log) and the security and copyright rules. Only these stop a release. Nothing is reverted automatically (owner, 2026-11-02): the owner rolls a merge back with `/revert`.
 - **Development itself always flows.** After each session the next one starts at once. An empty queue (the end of a milestone, say) starts a planning session instead of stopping, and a session that ends in an error is retried.
 - **What stops development:** a milestone checkpoint (below), the owner's switches (kill switch, Control panel pauses, `/pause`, quiet hours), a usage limit (it resumes by itself at the reset), a rejected Claude token, 3 errors in a row (until `/resume`), and planning that finds nothing left to do (until new work arrives or the Sunday planning). A cooldown or a usage limit schedules its own wake-up, so nothing depends on GitHub's unreliable hourly schedule.
 - **Every hard gate and every stop notifies the owner** when it trips: the Daily log post, an alarm issue or the checkpoint issue mentions them. A usage limit is the exception: it resumes by itself and is only logged.
@@ -112,12 +112,12 @@ Everything runs as GitHub Actions on GitHub's servers, free for public repos; no
 
 ### Per PR (`checks.yml`, seconds, no secrets)
 
-Runs the hard rules check and the automation's unit tests. There is no build per PR, and the preview build after each merge is the web build only (no tests): a merge is checked by the next daily run, whose bisect reverts it if it broke the build.
+Runs the hard rules check and the automation's unit tests. There is no build per PR, and the preview build after each merge is the web build only (no tests): a merge is checked by the next daily run, which does not release a broken build and says so in the Daily log.
 
 ### Daily run (`daily.yml`, 03:00 UTC, `main` only, has the Claude token)
 
 1. **Community intake** (see Community intake): new issues, discussions and outside PRs are gathered, Claude decides each one with read-only tools, attached files are checked with no secrets, and a script labels, replies, closes and queues.
-2. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
+2. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, nothing is released and the Daily log says why; nothing is reverted automatically (owner, 2026-11-02).
 3. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
 4. **Log**: post a summary to the day's Daily log issue.
 
@@ -174,7 +174,7 @@ Scheduled issues go before `docs/NEXT.md`, by priority (`p1` crashes, blockers a
 
 ### Merge script
 
-Claude's own PRs merge only through the merge script: the final review approved, the hard rules still pass from main's copy of the rules, the head commit is unchanged, and the required checks passed. A PR that breaks the daily smoke test is reverted automatically, with a comment explaining why.
+Claude's own PRs merge only through the merge script: the final review approved, the hard rules still pass from main's copy of the rules, the head commit is unchanged, and the required checks passed. A PR that breaks the daily build keeps main from being released until it is fixed or rolled back (`/revert`); nothing is reverted automatically.
 
 ## Game design
 

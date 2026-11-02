@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-02: No automatic reverts (owner)
+
+- **Rule (owner):** "Remove the rule about it rolling back merges if the daily build fails." A daily build that fails is not released, and the Daily log says so; nothing is reverted automatically. The owner rolls a merge back with `/revert` when that is the fix.
+- **Why:** the bisect reverted the day's merges newest first and kept every revert up to the first passing build, so a breaking merge took the innocent merges after it with it; with the native module's Windows build compiled for the first time on a daily run, one failure there would have rolled back a whole day of work.
+- **Gone:** the daily workflow's `revert-bisect` and `revert-apply` jobs, its `retry` input (the re-run after reverts) and `ci/smbot/revert.py`. `/revert` (`smbot.commands`) stays.
+
 ## 2026-11-02: The decoy, reviewed: its own timer, its own hurt, its sight, no telegraph (owner)
 
 - **Asked:** the owner had the decoy change (#514) reviewed for fit, then: "Fix it all!"

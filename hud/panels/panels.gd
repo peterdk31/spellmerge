@@ -57,6 +57,9 @@ extends CanvasLayer
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
 ##   it. Another player's `pause` does nothing while it is open.
+## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
+##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
+##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -73,6 +76,7 @@ const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 const HordePanelScript := preload("res://hud/panels/horde/horde_panel.gd")
+const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -129,6 +133,8 @@ var _break_row: PanelContainer = null
 var _break_label: Label = null
 ## Seconds of the break left; counted down here from `build_break_started`, display only.
 var _break_left: float = 0.0
+## The frame rate readout (see the top).
+var _fps: FpsCounterScript = null
 
 
 func _ready() -> void:
@@ -233,6 +239,15 @@ func _ready() -> void:
 	_horde.pause_open = _pause_menu.is_open
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
+	# The frame rate readout: over everything, at the bottom middle.
+	_fps = FpsCounterScript.new()
+	_fps.name = "FpsCounter"
+	root_control.add_child(_fps)
+	_fps.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN))
+	_fps.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_fps.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_fps.visible = _pause_menu.show_fps
+	_pause_menu.show_fps_changed.connect(_on_show_fps_changed)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
@@ -362,6 +377,17 @@ func _on_reload_style_changed(on_button: bool) -> void:
 	var style: StaffRowScript.Style = StaffRowScript.Style.BUTTON if on_button else StaffRowScript.Style.NEXT_CAST
 	for panel in _panels:
 		panel.set_reload_style(style)
+
+
+func _on_show_fps_changed(on: bool) -> void:
+	_fps.visible = on
+	if on:
+		_fps.refresh()
+
+
+## The frame rate readout (for tests and screenshots).
+func get_fps_counter() -> FpsCounterScript:
+	return _fps
 
 
 ## The horde HUD (for tests and screenshots).

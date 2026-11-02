@@ -20,14 +20,22 @@ func on_hit(spell: CompiledSpell, tag: int, actor: int, target: Node, _position:
 		return
 	var caster: int = kit.projectiles.caster_shot_of(slot) if slot >= 0 and not kit.projectiles.is_cast_by_wizard(slot) else -1
 	var node := target as Node2D
+	if node == null:
+		return
+	# Where the target stood, read before it is moved: a body moves the moment it hears the request.
+	var there: Vector2 = node.global_position
+	var from: Vector2 = kit.projectiles.get_anchor(actor) if caster < 0 else kit.projectiles.get_position_of(caster)
+	if not from.is_finite():
+		return
 	if caster < 0:
-		var anchor: Vector2 = kit.projectiles.get_anchor(actor)
-		if node != null and anchor.is_finite():
-			kit.events.target_move_requested.emit(actor, target, anchor)
-			kit.events.caster_move_requested.emit(actor, &"swap", node.global_position - anchor, SpellLimits.SWAP_SECONDS, tag)
-			kit.moves().shield(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
-	elif node != null:
-		var from: Vector2 = kit.projectiles.get_position_of(caster)
 		kit.events.target_move_requested.emit(actor, target, from)
-		kit.projectiles.move_shot(caster, node.global_position - from, 0.0)
+		kit.events.caster_move_requested.emit(actor, &"swap", there - from, SpellLimits.SWAP_SECONDS, tag)
+		kit.moves().shield(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
+	else:
+		kit.events.target_move_requested.emit(actor, target, from)
+		kit.projectiles.move_shot(caster, there - from, 0.0)
 		kit.moves().shield(spell, tag, actor, caster, 0.0)
+	# The trade shows at both of its ends, each facing the other.
+	var apart: float = from.distance_to(there)
+	kit.events.form_shown.emit(actor, spell.form_id, from, from.direction_to(there), apart, spell.tint, spell.look)
+	kit.events.form_shown.emit(actor, spell.form_id, there, there.direction_to(from), apart, spell.tint, spell.look)

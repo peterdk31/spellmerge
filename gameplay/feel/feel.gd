@@ -164,6 +164,13 @@ const KIND_STATUS: int = 15
 ## rubble and dust, drawn by the flares' shader in a batch of its own under the bodies (`FLOOR_Z`). Below KIND_BURST, where
 ## the shots' kinds are, which never come to that shader.
 const KIND_QUAKE: int = 3
+## Columns of light on a spot (parts of cues: where a teleport leaves and lands, where a rain falls),
+## below KIND_BURST too: light pulled up off it, and light struck down onto it. A column is as high
+## as half the effect's square (12 px a zoom step); their seconds.
+const KIND_RISE: int = 1
+const KIND_FALL: int = 2
+const RISE_SECONDS: float = 0.45
+const FALL_SECONDS: float = 0.5
 ## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
@@ -214,17 +221,13 @@ const CUE_EFFECTS: Dictionary = {
 	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
 	&"debris": [KIND_DEBRIS, 2.0, DEBRIS_SECONDS],
 	&"scorch": [KIND_SCORCH, 2.0, SCORCH_SECONDS],
+	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
+	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 }
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
-## The moments `form_shown` names that are a cue each (`content/cues`), played with its `length`
-## as the cue's size: a nova's ring leaving the caster, and the telegraph of a rain (a ring closing
-## on where it falls for the `length` seconds until then, so nobody is hit by one they could not
-## see coming). A slam's impact (`slam`) plays the cue its card's impact look names; its wind-up
-## shows only on the staff (the rising, glowing staff: a ring there distracted from the strike).
-const FORM_CUES: Dictionary = {&"nova": &"nova", &"rain": &"telegraph"}
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
 ## A dash's dust where it left (its way is the caster's trail, drawn by the projectile manager
@@ -559,6 +562,7 @@ func _ready() -> void:
 	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
+	events.carrier_ended.connect(_on_carrier_ended)
 	events.cue_shown.connect(_on_cue_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	events.discharge_arc.connect(_on_discharge_arc)
@@ -1142,10 +1146,11 @@ func _on_caster_move_finished(caster: int, mode: StringName, position: Vector2, 
 func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
 	if projectiles == null or not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
-	if bool(projectiles.get("expired_on_wall")) or not ("impact_form" in projectiles):
+	if bool(projectiles.get("expired_on_wall")) or not ("impact_body" in projectiles):
 		return
-	var form: StringName = projectiles.impact_form as StringName
-	if form != &"bolt" and form != &"orbit":
+	# Only a flying or orbiting body pops: a still one (a rune, a wall's stone) goes off its own way.
+	var body: int = projectiles.impact_body as int
+	if body != ProjectileManagerScript.KIND_BOLT and body != ProjectileManagerScript.KIND_ORBIT:
 		return
 	var heading: Vector2 = projectiles.get("impact_heading") as Vector2 if "impact_heading" in projectiles else Vector2.RIGHT
 	show_effect(KIND_BURST, position, heading, projectiles.impact_core as Color, _ramp_of(caster), projectiles.impact_look as int, POP_ZOOM, POP_SECONDS)
@@ -1175,9 +1180,9 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> 
 	play_cue(&"parry", caster, position)
 
 
-## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
-## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
-## adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
+## The payoff of a shot: a flare in the shot's colour, shaped by the card the shot is (the
+## projectile manager's `impact_form` while the impact is sent, its card's impact look; a rune goes
+## off, a nova's adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
 ## hat colour would show (staffs F7: one look for every spell). A carrier whose impact look names
 ## a `cue` plays it where it ends on no body (`on_body` false), as big as its card's radius.
 func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, on_body: bool) -> void:
@@ -1283,6 +1288,14 @@ func cue_of(id: StringName) -> CueBase:
 
 func _on_cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
 	play_cue(cue, caster, at, direction, size, tint, look)
+
+
+## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a
+## decoy or familiar going): the cue its card's impact look names, `size` big.
+func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
+	var cue: StringName = StringName(str(_form_look(form, false).get("cue", "")))
+	if cue != &"":
+		play_cue(cue, caster, at, direction, size, tint, look)
 
 
 ## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.
@@ -1724,11 +1737,13 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 	if player < 0 or player >= ActorsScript.SEATS:
 		return
 	var slot: int = player
-	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
-	# long thin flare, a nova a wide burst, a rune and an orbit gather in (the build-up).
+	# Each form has its own flash on the wizard, its card's cast look: the spark's size and seconds (a
+	# nova's, a rune's, a wall's bigger), and a ring with it (a nova's flashing out; a rune's, an
+	# orbit's, a teleport's, a swap's gathering in, the build-up).
 	var look: Dictionary = _form_look(spell_id, true)
 	var aim: Vector2 = direction if direction != Vector2.ZERO else Vector2.RIGHT
-	show_effect(KIND_CAST, origin, aim, Color.WHITE, slot, 0, 1, CAST_SECONDS)
+	var zoom: int = clampi(roundi((look.get("size", 0.5) as float) * 2.0), 1, 3)
+	show_effect(KIND_CAST, origin, aim, Color.WHITE, slot, 0, zoom, look.get("seconds", CAST_SECONDS) as float)
 	if look.get("ring", false) as bool:
 		var gather: bool = (look.get("grow", 0.5) as float) < 0.0
 		show_effect(KIND_RING_IN if gather else KIND_RING_OUT, origin, aim, Color.WHITE, slot, 0, 1, RING_SECONDS)
@@ -1737,21 +1752,19 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
-## A beam (drawn by `shot_beam.gdshader` in the element's ramp), a dash, and the moments that are
-## cues (FORM_CUES, and a slam's impact), each with the cast's cards, in the caster's ramp: an
-## enemy's look the same, in the enemy ramp (staffs F7). The beam and the dash keep state of their
-## own (a beam's slot while it fades, where a dash left until it lands), so they stay in code.
+## A carrier showed itself: the cue its card's cast look names (a nova's ring, a rain's telegraph
+## with `length` its seconds, where a teleport leaves, each end of a swap, a decoy or familiar
+## appearing), then a beam (drawn by `shot_beam.gdshader` in the element's ramp) or a dash, each
+## with the cast's cards, in the caster's ramp: an enemy's look the same, in the enemy ramp (staffs
+## F7). The beam and the dash keep state of their own (a beam's slot while it fades, where a dash
+## left until it lands), so they stay in code. A slam's strike is its end (`carrier_ended`); its
+## wind-up shows only on the staff (the rising, glowing staff: a ring there distracted from it).
 func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
-	var cue: StringName = FORM_CUES.get(form, &"") as StringName
-	if form == &"slam":
-		# A slam's impact is where its carrier ends: the cue its card's impact look names, as big as
-		# its ring (`length`).
-		cue = StringName(str(_form_look(form, false).get("cue", "")))
+	var cue: StringName = StringName(str(_form_look(form, true).get("cue", "")))
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look)
-		return
 	var ramp: int = _ramp_of(caster)
 	if form == &"zap":
 		# A zap or a zap shot's spark: lightning in the shot's colours (its infusion's, else its caster's).

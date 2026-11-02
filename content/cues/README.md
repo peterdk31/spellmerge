@@ -4,14 +4,14 @@ A cue is one moment's look and feel as data: the flashes Feel draws, and its sha
 
 Something plays a cue by name: Feel's `play_cue(id, caster, at, dir, size, tint, look, target)`, or the `cue_shown` event from another area. `size` is in pixels (an explosion's radius, a ground strike's reach); a part with `reach` is that many times it. A telegraph's `size` is seconds instead: a part with `lasts_size` lasts that long.
 
-Cards name the cues they play: a carrier's `impact_look` `cue` (`FormBase`; played where its shot ends on no body, as big as its `radius`, and at a slam's impact, as big as its ring) and a modifier's `cue` (`ModifierBase`; played when its behaviour goes off, as `blast` does).
+Cards name the cues they play: a carrier's `cast_look` `cue` (`FormBase`; played where the carrier shows itself, `form_shown`) and its `impact_look` `cue` (played where its shot ends on no body, as big as its `radius`, and where a carrier with no shot ends, `carrier_ended`: a slam's impact, as big as its ring, a teleport's landing, a rain's fall) and a modifier's `cue` (`ModifierBase`; played when its behaviour goes off, as `blast` does).
 
 | Cue | Played by | What it is |
 |---|---|---|
 | `blast` | the blast card's `cue`: core/spells, wherever a `blast` goes off | the ragged shell, fragments and rubble past the radius, a scorch; shake and a punch away from the caster |
 | `fireball` | an exploding barrel (not built yet) | the rising fireball, fragments, a scorch; shake and a punch |
 | `quake` | a carrier whose impact look's `cue` names it (none yet) | cracks in the floor, stone chips, the caster held, a shake and a punch down the screen |
-| `slam` | the slam card's impact look `cue`, at the slam's impact (Feel's `form_shown` `slam`) | a white-hot star, then the quake's cracks, chips, hold, shake and punch |
+| `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks, chips, hold, shake and punch |
 | `parry` | Feel, for a swing's block (`shot_blocked` while the blocking carrier is a swing) | a big four-point star in exactly Spark gold, the parrying actor held alone |
 | `deflect` | Feel, for `shot_deflected`, aimed the way the shot now flies | a big white-hot cross in the deflecting actor's colours |
 | `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killer and the shot held, a shake (Feel adds the ghost and the puff) |
@@ -19,7 +19,13 @@ Cards name the cues they play: a carrier's `impact_look` `cue` (`FormBase`; play
 | `player_downed` | Feel, for `player_downed` (it names no position, so this cue draws nothing) | the game-wide stop and a big shake |
 | `self_hit` | Feel, for a hit of an actor by its own spell | a ring in exactly pink, so it is never taken for an enemy's hit |
 | `heal` | Feel, for `heal_dealt` | a soft ring in exactly green, no stop and no shake |
-| `nova` | Feel, for `form_shown` `nova` (`FORM_CUES`) | the ring leaving the caster, 120 px across |
-| `telegraph` | Feel, for `form_shown` `rain` (`FORM_CUES`) | a ring closing on where a rain falls, for the seconds until then (`size`) |
+| `nova` | the nova card's cast look `cue`, at `form_shown` `nova` | the ring leaving the caster, 120 px across |
+| `telegraph` | the rain card's cast look `cue`, at `form_shown` `rain` | a ring closing on where a rain falls, for the seconds until then (`size`) |
+| `rainfall` | the rain card's impact look `cue`, at `carrier_ended` where it falls | a column of light struck down (`fall`) and a spray |
+| `vanish` | the teleport card's cast look `cue`, where it leaves | a column of light pulled up off the spot (`rise`) |
+| `appear` | the teleport card's impact look `cue`, at `carrier_ended` where it lands | a column struck down (`fall`), a spray, a small shake and punch |
+| `trade` | the swap card's cast look `cue`, at each end of its trade | a column struck down and a small one pulled up, their rings crossing |
+| `conjure` | the decoy's and familiar's cast look `cue`, where one appears | a column struck down and a puff |
+| `dismiss` | the decoy's and familiar's impact look `cue`, at `carrier_ended` where one goes | a column pulled up and a puff |
 
 To add one: copy `quake.tres`, give it a new `id` and file name, pick its parts from `CueBase.EFFECTS`, and play it by name. `tests/content/test_cues.gd` checks every cue file (`CueBase.problems()`). Moments with a life of their own (beams, dashes, swing trails, statuses, ghosts) are not cues.

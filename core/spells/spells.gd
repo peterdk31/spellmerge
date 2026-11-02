@@ -1415,6 +1415,7 @@ func _staff_spread(tag: int, spell: CompiledSpell) -> float:
 func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> void:
 	projectiles.set_core(slot, spell.tint)
 	projectiles.set_look(slot, spell.look)
+	projectiles.set_form(slot, spell.form_id, spell.body)
 	if _rec_seq.size() < projectiles.get_cap():
 		var size: int = projectiles.get_cap()
 		var old_size: int = _rec_seq.size()

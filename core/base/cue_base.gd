@@ -30,7 +30,7 @@ extends Resource
 ## step of its zoom is).
 const EFFECTS: Array[StringName] = [
 	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff", &"chips",
-	&"quake", &"shell", &"fireball", &"debris", &"scorch",
+	&"quake", &"shell", &"fireball", &"debris", &"scorch", &"rise", &"fall",
 ]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]

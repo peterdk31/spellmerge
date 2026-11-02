@@ -47,7 +47,10 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 ## at the aim point (its end point, rules R1d and R4g).
 func land(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, generation: int, point: Vector2, heading: Vector2, echoed: bool = false) -> void:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
-	kit.strike_round(spell, tag, actor, point, heading, maxf(spell.radius, SpellLimits.RAIN_SPLASH), spell.echo_hit if echoed else null)
+	var splash: float = maxf(spell.radius, SpellLimits.RAIN_SPLASH)
+	if kit.events != null:
+		kit.events.carrier_ended.emit(actor, spell.form_id, point, heading, splash, spell.tint, spell.look)
+	kit.strike_round(spell, tag, actor, point, heading, splash, spell.echo_hit if echoed else null)
 	kit.blast(spell, tag, actor, point)
 	if group != null and not group.is_empty():
 		kit.fire(group, actor, staff, generation, point, heading, null, SpellRuntime.CASTER_POINT)

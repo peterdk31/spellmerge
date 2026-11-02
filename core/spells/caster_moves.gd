@@ -121,7 +121,8 @@ func step(delta: float) -> void:
 		kit.shot_ended(tag)
 
 
-## A move by the carrier `tag` ended at `at`: a teleport strikes what is where it landed
+## A move by the carrier `tag` ended at `at`: it is shown ending there (`carrier_ended`, its card's
+## impact cue: where a teleport lands), a teleport strikes what is where it landed
 ## (`Carrier.on_move_end`), its `blast` goes off there and its `on expire` payload leaves from there,
 ## cast by `caster` (the wizard, the shot that moved, or the point).
 func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
@@ -129,6 +130,8 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	var actor: int = SpellTag.caster_of(tag)
 	if spell == null or not at.is_finite():
 		return
+	if kit.events != null:
+		kit.events.carrier_ended.emit(actor, spell.form_id, at, heading, spell.radius, spell.tint, spell.look)
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.blast(spell, tag, actor, at)
 	for trigger in spell.triggers:

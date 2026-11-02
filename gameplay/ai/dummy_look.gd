@@ -10,7 +10,10 @@ extends ActorLook
 ## What it shows, all about its actor, with the scene's labels `%Dps`, `%Status` and `%Number`:
 ## - **Damage numbers:** each hit on the actor (`Actor.damaged`, which Combat sends right after
 ##   `damage_dealt`: only this actor's hits, not every hit on anyone) rises from its head for NUMBER_TIME
-##   seconds, from a pool of NUMBER_COUNT labels (the oldest is reused when all are up).
+##   seconds, from a pool of NUMBER_COUNT labels (the oldest is reused when all are up). A hit
+##   keeps its number, and the new ones are written to their labels once a frame, before it is
+##   drawn (`_write_new_numbers`; performance, 2026-11-02: a storm of shots hits a dummy several
+##   times a frame, and each write of a label was most of a hit's cost in the sandbox).
 ## - **Damage per second** over the last DPS_WINDOW seconds, in DPS_BUCKETS buckets, read from
 ##   the drop of its health in Combat each step, so burn ticks (which send no `damage_dealt` on a
 ##   target that lives) count too; while a streak is younger than the window it is divided by the
@@ -63,6 +66,10 @@ var _reaction_left: float = 0.0
 var _numbers: Array[Label] = []
 var _number_left: PackedFloat32Array = PackedFloat32Array()
 var _number_x: PackedFloat32Array = PackedFloat32Array()
+var _number_amount: PackedFloat32Array = PackedFloat32Array()
+## 1 for a label whose number is not written yet, and whether that write is queued.
+var _number_new: PackedByteArray = PackedByteArray()
+var _numbers_queued: bool = false
 var _next_number: int = 0
 
 @onready var _dps_label: Label = %Dps
@@ -86,6 +93,10 @@ func setup(owner_actor: Actor) -> void:
 	_number_left.fill(0.0)
 	_number_x.resize(NUMBER_COUNT)
 	_number_x.fill(0.0)
+	_number_amount.resize(NUMBER_COUNT)
+	_number_amount.fill(0.0)
+	_number_new.resize(NUMBER_COUNT)
+	_number_new.fill(0)
 	# Combat registers the actor with its full health once it is in the tree (the Hurtbox).
 	_health = actor.health.max_health if actor.health != null else -1.0
 	actor.damaged.connect(_on_damaged)
@@ -112,11 +123,7 @@ func step(delta: float) -> void:
 		if _number_left[i] <= 0.0:
 			continue
 		_number_left[i] = maxf(_number_left[i] - delta, 0.0)
-		var label: Label = _numbers[i]
-		var age: float = 1.0 - _number_left[i] / NUMBER_TIME
-		label.position = NUMBER_START + Vector2(_number_x[i], -NUMBER_RISE * age)
-		label.modulate.a = 1.0 - age * age
-		label.visible = _number_left[i] > 0.0
+		_place_number(i)
 	_refresh_left -= delta
 	if _refresh_left <= 0.0:
 		_refresh_left = REFRESH
@@ -150,8 +157,34 @@ func shown_numbers() -> PackedStringArray:
 	var shown: PackedStringArray = PackedStringArray()
 	for i in NUMBER_COUNT:
 		if _number_left[i] > 0.0:
-			shown.append(_numbers[i].text)
+			shown.append(_number_text(_number_amount[i]))
 	return shown
+
+
+## A damage number's text: to a tenth (an atom's speck shows 0.3, a bolt 5).
+static func _number_text(amount: float) -> String:
+	return ("%.1f" % amount).trim_suffix(".0")
+
+
+## Number `i`'s label where its age puts it: rising and fading, hidden once it is gone.
+func _place_number(i: int) -> void:
+	var label: Label = _numbers[i]
+	var age: float = 1.0 - _number_left[i] / NUMBER_TIME
+	label.position = NUMBER_START + Vector2(_number_x[i], -NUMBER_RISE * age)
+	label.modulate.a = 1.0 - age * age
+	label.visible = _number_left[i] > 0.0
+
+
+## The numbers hit since the last write, each written to its label once (a label reused within
+## the frame shows its last hit, as it would have). Queued by `_on_damaged`, run before drawing.
+func _write_new_numbers() -> void:
+	_numbers_queued = false
+	for i in NUMBER_COUNT:
+		if _number_new[i] == 0:
+			continue
+		_number_new[i] = 0
+		_numbers[i].text = _number_text(_number_amount[i])
+		_place_number(i)
 
 
 func _show() -> void:
@@ -180,15 +213,14 @@ func _take_health() -> void:
 func _on_damaged(_by: int, amount: float) -> void:
 	if amount <= 0.0:
 		return
-	var label: Label = _numbers[_next_number]
 	_number_left[_next_number] = NUMBER_TIME
 	_number_x[_next_number] = NUMBER_SPREAD * float(_next_number % 3 - 1)
-	# To a tenth: an atom's speck shows 0.3, a bolt 5.
-	label.text = ("%.1f" % amount).trim_suffix(".0")
-	label.position = NUMBER_START + Vector2(_number_x[_next_number], 0.0)
-	label.modulate.a = 1.0
-	label.visible = true
+	_number_amount[_next_number] = amount
+	_number_new[_next_number] = 1
 	_next_number = (_next_number + 1) % NUMBER_COUNT
+	if not _numbers_queued:
+		_numbers_queued = true
+		_write_new_numbers.call_deferred()
 
 
 func _on_reaction_triggered(_caster: int, reaction_id: StringName, position: Vector2, _shot: int) -> void:

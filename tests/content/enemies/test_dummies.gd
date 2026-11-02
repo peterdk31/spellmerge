@@ -95,6 +95,24 @@ func test_damage_numbers_show_each_hit() -> void:
 	check_equal(_look(dummy).shown_numbers().size(), DummyLook.NUMBER_COUNT, "the pool reuses the oldest label")
 
 
+## The numbers are written to their labels once a frame, before it is drawn (performance,
+## 2026-11-02): each new label then shows its hit at the start of its rise, and a label reused
+## within the frame shows its last hit.
+func test_damage_numbers_reach_their_labels_before_the_frame_is_drawn() -> void:
+	var dummy := _training()
+	for i in DummyLook.NUMBER_COUNT + 2:
+		combat.call("hit", 0, dummy, 10 + i)
+	await process_frame
+	var look: DummyLook = _look(dummy)
+	var texts := PackedStringArray()
+	for i in DummyLook.NUMBER_COUNT:
+		var label := look.get_node("Number%d" % (i + 1)) as Label
+		texts.append(label.text)
+		check(label.visible and is_equal_approx(label.modulate.a, 1.0), "label %d shown, not faded yet" % i)
+		check_equal(label.position, DummyLook.NUMBER_START + Vector2(DummyLook.NUMBER_SPREAD * float(i % 3 - 1), 0.0), "label %d at the start of its rise" % i)
+	check_equal(texts, PackedStringArray(["18", "19", "12", "13", "14", "15", "16", "17"]), "each label its last hit's number")
+
+
 func test_dps_covers_the_last_five_seconds() -> void:
 	var dummy := _training()
 	# 10 damage every half second for 5 seconds: 20 per second.

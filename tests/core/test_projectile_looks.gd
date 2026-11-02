@@ -369,15 +369,20 @@ func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void
 	for entry: Vector3i in ManagerScript.TRAIL_QUADS:
 		quads += entry.y
 	var arrays: Array = mesh.surface_get_arrays(0)
-	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for every slot of every kind")
-	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
+	var per: int = ManagerScript.TRAIL_QUAD_VERTICES
+	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * per, "a quad for every slot of every kind")
+	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 3, "one triangle each")
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
-	check_equal(floori(uvs[(quads - 1) * 4].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
+	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
 	var first_pixel: int = 1 + ManagerScript.TRAIL_SAMPLES + ManagerScript.TRAIL_SPARKS
-	check_equal(floori(uvs[first_pixel * 4].y), ManagerScript.TRAIL_Q_SPARK, "the particles' pixels after every light")
-	check_equal(floori(uvs[first_pixel * 4].x), ManagerScript.TRAIL_SPARKS - 1, "the oldest first")
+	check_equal(floori(uvs[first_pixel * per].y), ManagerScript.TRAIL_Q_SPARK, "the particles' pixels after every light")
+	check_equal(floori(uvs[first_pixel * per].x), ManagerScript.TRAIL_SPARKS - 1, "the oldest first")
 	check(ManagerScript.TRAIL_SPARKS >= int(ManagerScript.TRAIL_KEEP * 60.0) + 1, "a particle slot for every moment a trail keeps")
+	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
+	check(trail.code.contains("box = vec4(q_lo, q_hi)") and trail.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
+	check_equal(trail.code.count("samples_before(row"), 1, "the path is searched from one place")
+	check(trail.code.contains("if (search) {"), "and only by a slot that may still draw")
 	for batch in ManagerScript.BATCHES:
 		var shape: int = ManagerScript.BATCH_MESH[batch]
 		if shape >= 0:
@@ -626,7 +631,7 @@ func test_each_trail_mesh_shape_keeps_its_order_and_its_slots() -> void:
 	for shape: int in [ManagerScript.TRAIL_MESH_PLAIN, ManagerScript.TRAIL_MESH_JAG, ManagerScript.TRAIL_MESH_DASH]:
 		var kinds: PackedInt32Array = PackedInt32Array()
 		var uvs: PackedVector2Array = ManagerScript.trail_mesh(4, false, shape).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-		for i in range(0, uvs.size(), 4):
+		for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
 			var kind: int = floori(uvs[i].y)
 			if kinds.is_empty() or kinds[kinds.size() - 1] != kind:
 				kinds.append(kind)
@@ -671,7 +676,7 @@ func test_lightning_and_dashes_have_batches_of_their_own() -> void:
 func _slots_of(mesh: ArrayMesh, kind: int) -> int:
 	var uvs: PackedVector2Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
 	var count: int = 0
-	for i in range(0, uvs.size(), 4):
+	for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
 		count += 1 if floori(uvs[i].y) == kind else 0
 	return count
 

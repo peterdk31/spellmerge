@@ -9,6 +9,8 @@ extends SceneTree
 ##   ... -- --plain                   no lightning and no dashes (one batch per layer: a change of
 ##                                    batching cannot move one trail over another)
 ##   ... -- --no-time                 save the frames only
+##   ... -- --only=some               run one scenario (few, some, many)
+##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -44,6 +46,8 @@ var _rng := RandomNumberGenerator.new()
 var _frames_dir: String = ""
 var _plain: bool = false
 var _time: bool = true
+var _only: String = ""
+var _timed: int = TIMED_FRAMES
 
 
 func _initialize() -> void:
@@ -55,6 +59,10 @@ func _initialize() -> void:
 			_plain = true
 		elif arg == "--no-time":
 			_time = false
+		elif arg.begins_with("--only="):
+			_only = arg.substr(7)
+		elif arg.begins_with("--timed="):
+			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
 
 
@@ -63,7 +71,8 @@ func _run() -> void:
 	RenderingServer.viewport_set_measure_render_time(root.get_viewport_rid(), true)
 	print("BENCH: trail gpu on %s" % RenderingServer.get_video_adapter_name())
 	for scenario: Dictionary in SCENARIOS:
-		await _scenario(scenario)
+		if _only.is_empty() or scenario["label"] == _only:
+			await _scenario(scenario)
 	_teardown()
 	print("TRAIL GPU OK")
 	quit(0)
@@ -110,7 +119,7 @@ func _scenario(scenario: Dictionary) -> void:
 			var image: Image = root.get_texture().get_image()
 			image.save_png("%s/%s_%d.png" % [_frames_dir, label, f])
 	var times: PackedFloat64Array = PackedFloat64Array()
-	for f in TIMED_FRAMES if _time else 0:
+	for f in _timed if _time else 0:
 		_step(WARM_STEPS + SAVED_FRAMES + f, shots)
 		_mgr.update_draw(1.0)
 		await process_frame
@@ -119,7 +128,7 @@ func _scenario(scenario: Dictionary) -> void:
 		print("BENCH: trail gpu %s: frames saved" % label)
 		return
 	# The first frames after a change of mesh compile and upload: leave a quarter out.
-	times = times.slice(TIMED_FRAMES / 4)
+	times = times.slice(_timed / 4)
 	var sorted: PackedFloat64Array = times.duplicate()
 	sorted.sort()
 	print("BENCH: trail gpu %s: %d shots (%d drawn, %d trail instances, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; shares particles %.2f, tails %.2f, stride %d" % [

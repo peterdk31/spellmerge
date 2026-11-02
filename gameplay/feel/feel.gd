@@ -309,6 +309,8 @@ var spells: Node = null
 ## The actor table, which says the ramp, seat and budget of a caster (actors G3b). Only tests set
 ## it; otherwise the "Actors" autoload.
 var actors: ActorsScript = null
+## The "Actors" autoload once found (`_actor_table`), while it is still there.
+var _auto_actors: ActorsScript = null
 ## Tests turn this off: no Engine.time_scale changes.
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
@@ -1723,12 +1725,19 @@ func _hat_ramp_of(target: Node) -> int:
 	return ramp if ProjectileManagerScript.is_hat_ramp(ramp) else -1
 
 
-## The actor table: `actors`, else the "Actors" autoload.
+## The actor table: `actors`, else the "Actors" autoload, kept once found while it is still in the
+## tree (performance, 2026-11-02: every hit asks for it, and a lookup by path was the largest part
+## of Feel's work for a hit).
 func _actor_table() -> ActorsScript:
 	if actors != null:
 		return actors if is_instance_valid(actors) else null
+	if _auto_actors != null and is_instance_valid(_auto_actors) and _auto_actors.is_inside_tree():
+		return _auto_actors
+	_auto_actors = null
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
+	if tree != null and tree.root != null:
+		_auto_actors = tree.root.get_node_or_null(^"Actors") as ActorsScript
+	return _auto_actors
 
 
 ## The budget of `caster` (its seat, or SHARED: no actor too), for what Feel keeps per budget.

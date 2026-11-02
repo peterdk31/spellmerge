@@ -2,6 +2,18 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: The hit's listeners: Feel and the actors (owner session)
+
+Feel's `damage_dealt` (about 14 us a hit in the sandbox storm) found the `Actors` autoload by path on every hit: it keeps it now while it is in the tree (`_actor_table`), 14 -> 13 us. An enemy's own `damaged` listeners (its AI, look and face) cost 1.6 us a hit together, so they were left. The training dummy's damage numbers are written to their labels once a frame, before it is drawn (`DummyLook._write_new_numbers`), not on every hit: a hit 2.9 -> 1.4 us, and with the frame's work about 9 us less a hit. Combat's hit in the storm, the dummy's listener included, about 55 -> 50 us. Tests: `test_feel_repeat_hits` (the kept table follows the autoload), `test_dummies` (the labels are written before the frame is drawn). Details: docs/DECISIONS.md.
+
+## 2026-11-02: A cheaper elemental hit in Combat (owner session)
+
+Where a hit's time goes in the sandbox storm (about 72 us a hit, timed part by part): Combat's own work about 34 us, its listeners the rest (Feel's `damage_dealt` 17 us, the training dummy's `damaged` 10 us, `hit_landed` and `actor_hurt` 5 us). In Combat, an elemental hit walked every row of the reaction table, reading each row's properties: `ReactionTable` now keeps its rows by element and status (`for_element`, rebuilt when its rows change), and a hit puts its status on by its row (`_apply_status_row`, no lookup of the actor), and reads the body's position once. `tests/benchmark/combat_hit.gd` (new): frost on a frozen body and fire on a burning one 20 -> 17 us a hit (-14%); a plain bolt and storm on a hexed body unchanged (10.4 and 19.5 us). Tests: `test_spell_components` (the index follows its rows). Details: docs/DECISIONS.md.
+
+## 2026-11-02: Cheaper trail vertices (owner session)
+
+`shot_trail.gdshader`: the path search (12 texel fetches, most of a vertex's work) runs only for a slot that may still draw (a particle that was given off, a tail pixel while the trail has a tail, a step of lightning's line), and each quad of a trail's mesh is one triangle (`TRAIL_QUAD_VERTICES` 3, cut to its box in the fragment stage), so a quarter fewer vertices. Every frame of `tests/benchmark/trail_gpu.gd` is pixel-identical to before. llvmpipe GPU time, medians of runs taken in turn: 400 shots 76 -> 47 ms (the search 76 -> 51, the triangles 51 -> 47), 60 shots 33 -> 25 ms; 3,000 shots unchanged (about 105 ms: the pool has already thinned those meshes to a few slots). `trail_gpu.gd` takes `--only=` and `--timed=`. Tests: `test_projectile_looks` (the mesh's triangles). Details: docs/DECISIONS.md.
+
 ## 2026-11-02: Sandbox storm and a launch's shots made together (owner session)
 
 `tests/benchmark/sandbox_storm.gd` (new): the sandbox's split-and-nova build held among the training dummies, printing shots, hits per dummy and, with `--profile`/`--profile-signals`, where a step goes. Using it: the atom carrier makes a launch's shots together (`ProjectileManager.spawn_batch`, `set_looks`, `Spells._land_shots`), the same result as one by one (`test_spells_land_shots`, every array byte for byte); Spells' step 5.6 -> 2.3 ms and the frame 33 -> 14-17 ms in the storm. Feel skips the flash, hold and sound of a repeat hit (23 -> 15 us a hit; `test_feel_repeat_hits`), and the training dummy hears only its own hits. Details: docs/DECISIONS.md.

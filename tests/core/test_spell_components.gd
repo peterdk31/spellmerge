@@ -68,6 +68,36 @@ func test_reaction_table_finds_a_pair_in_order() -> void:
 	check(table.find(&"burn", &"void") == null, "a pair with no row gives null")
 
 
+## The table is searched by an index (performance, 2026-11-02): a row added after a search, or
+## another array of rows, is still found, and the first row of a pair wins, as a walk of the rows did.
+func test_reaction_table_index_follows_its_rows() -> void:
+	var table := ReactionTable.new()
+	check(table.for_element(&"storm").is_empty(), "an empty table: no reactions")
+	var first := ReactionRow.new()
+	first.status_id = &"chill"
+	first.element_id = &"storm"
+	table.rows.append(first)
+	check(table.find(&"chill", &"storm") == first, "found")
+	var later := ReactionRow.new()
+	later.status_id = &"burn"
+	later.element_id = &"storm"
+	table.rows.append(later)
+	check(table.find(&"burn", &"storm") == later, "a row added after a search is found")
+	var twin := ReactionRow.new()
+	twin.status_id = &"chill"
+	twin.element_id = &"storm"
+	table.rows.append(twin)
+	check(table.find(&"chill", &"storm") == first, "the first row of a pair wins")
+	check_equal(table.for_element(&"storm").size(), 2, "the element's rows by status")
+	var other := ReactionRow.new()
+	other.status_id = &"hex"
+	other.element_id = &"fire"
+	var rows: Array[ReactionRow] = [other, null, first]
+	table.rows = rows
+	check(table.find(&"hex", &"fire") == other, "another array of rows is searched")
+	check(table.find(&"burn", &"storm") == null, "and only it")
+
+
 func test_registry_finds_components_but_not_the_reaction_table() -> void:
 	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
 	registry.scan(FIXTURE.path_join("content"), FIXTURE.path_join("audio"))

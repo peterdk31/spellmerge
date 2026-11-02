@@ -455,6 +455,8 @@ const TRAIL_TAIL_PIXELS: int = 128
 const TRAIL_JAGS: int = 16
 ## The quads of a trail's mesh in draw order: (kind, slots, 1 when drawn oldest first). The
 ## lights are added, so only the head's goes first (void's dark heart dims what is under it).
+## Vertices a quad of a trail's mesh has (one triangle round its box; see `trail_mesh`).
+const TRAIL_QUAD_VERTICES: int = 3
 const TRAIL_QUADS: Array[Vector3i] = [
 	Vector3i(TRAIL_Q_HEAD_LIGHT, 1, 0),
 	Vector3i(TRAIL_Q_PIECE_LIGHT, TRAIL_SAMPLES, 0),
@@ -1059,7 +1061,10 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## quads, each told in its UV which quad kind (TRAIL_Q_*) and slot it is, in TRAIL_QUADS' order
 ## (the lights first, then the pixels, oldest first and the core last). The shader places every
 ## quad from the trail's data, or folds it away; a vertex says which quad and corner it is in its
-## UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75. Each is made once and shared by the
+## UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75. A quad is one triangle of
+## TRAIL_QUAD_VERTICES vertices, twice its box each way, which the fragment stage cuts to the box:
+## each vertex runs the whole vertex stage, so three cost a quarter less than a square's four
+## (performance, 2026-11-02; the pixels are the same). Each is made once and shared by the
 ## batches of its `shape` (TRAIL_MESH_*), and holds only the quads its trails can draw
 ## (`trail_mesh_slots`).
 static func trail_mesh(spark_slots: int = TRAIL_SPARKS, full_tail: bool = true, shape: int = TRAIL_MESH_JAG) -> ArrayMesh:
@@ -1071,7 +1076,7 @@ static func trail_mesh(spark_slots: int = TRAIL_SPARKS, full_tail: bool = true, 
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
-	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)]
+	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, 1.0)]
 	for entry: Vector3i in TRAIL_QUADS:
 		var slots: int = trail_mesh_slots(entry.x, spark_slots, full_tail, shape)
 		for n in slots:
@@ -1081,7 +1086,7 @@ static func trail_mesh(spark_slots: int = TRAIL_SPARKS, full_tail: bool = true, 
 				verts.append(corner)
 				uvs.append(Vector2(float(slot) + 0.25 + 0.5 * corner.x, float(entry.x) + 0.25 + 0.5 * corner.y))
 				colors.append(Color.WHITE)
-			indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+			indices.append_array(PackedInt32Array([base, base + 1, base + 2]))
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts

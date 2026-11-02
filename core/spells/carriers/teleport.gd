@@ -56,6 +56,10 @@ func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way:
 		if gap <= distance and actor >= 0 and actor < _landed_at.size():
 			_landed_at[actor] = _teleport_homing.keep
 		distance = minf(distance, maxf(gap, 0.0))
+	# Where it leaves shows now, as it is aimed (a teleport is over at once); where it lands shows at
+	# its end point (`carrier_ended`, `CasterMoves.end`).
+	if kit.events != null:
+		kit.events.form_shown.emit(actor, spell.form_id, origin, way, distance, spell.tint, spell.look)
 	return Vector3(way.x, way.y, distance)
 
 

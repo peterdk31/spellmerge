@@ -385,6 +385,30 @@ func test_a_familiar_casts_what_its_timer_gives_it() -> void:
 	check_equal(_mgr.get_count(), 2, "and again every tick")
 
 
+func test_a_familiar_shows_where_it_appears_and_ends_where_it_goes() -> void:
+	var tag: int = _build(0, [&"familiar", &"bolt"])
+	var ended: Array = []
+	_bus.carrier_ended.connect(func(player: int, form: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		ended.append([player, form, at, size]))
+	_cast()
+	check(_shown.size() == 1 and _shown[0][1] == &"familiar" and _shown[0][2].is_equal_approx(_spawns[0][2]), "it shows where it is made: %s" % [_shown])
+	_bus.entity_ended.emit(0, &"familiar", Vector2(30, 40), tag)
+	check(ended.size() == 1 and ended[0][1] == &"familiar" and ended[0][2].is_equal_approx(Vector2(30, 40)), "and ends where it went: %s" % [ended])
+
+
+func test_a_rain_ends_where_it_falls() -> void:
+	_build(0, [&"rain", &"bolt"])
+	var ended: Array = []
+	_bus.carrier_ended.connect(func(player: int, form: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		ended.append([player, form, at, size]))
+	_cast()
+	_tick(20)
+	check_equal(ended.size(), 0, "nothing before it falls")
+	_tick(12)
+	check(ended.size() == 1 and ended[0][1] == &"rain" and is_equal_approx(ended[0][2].x, SpellLimits.RAIN_REACH), "it ends on its aim point: %s" % [ended])
+	check(ended.size() == 1 and ended[0][3] >= SpellLimits.RAIN_SPLASH, "as big as its splash")
+
+
 func test_entity_events_for_another_player_are_ignored() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()

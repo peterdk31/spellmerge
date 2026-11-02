@@ -31,11 +31,17 @@ func before_each() -> void:
 func test_its_card_names_its_impact_cue_and_its_wind_up_draws_no_ring() -> void:
 	var card: FormBase = feel.registry.get_resource(&"spells", &"slam") as FormBase
 	check_equal(card.impact_look.get("cue"), &"slam", "slam.tres names the cue `slam`")
-	check(not FeelScript.FORM_CUES.has(&"slam_mark"), "no cue for its wind-up")
+	check(not card.cast_look.has("cue"), "no cue for its wind-up")
+
+
+func test_its_strike_shown_is_no_cue_its_end_is() -> void:
+	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 0, "showing the slam plays no cue (its card's cast look names none)")
+	check_equal(feel.trauma(), 0.0, "and no shake")
 
 
 func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
-	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no expanding ring (too uniform)")
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips off the floor")
@@ -44,7 +50,7 @@ func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
 
 
 func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> void:
-	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a quake where it struck")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "sized by its radius")
 	feel.step(0.05)
@@ -60,14 +66,14 @@ func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> vo
 
 
 func test_the_slammer_is_held_as_its_staff_lands_hit_or_miss() -> void:
-	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check(is_equal_approx(feel.actors.held_left(0), feel.cue_of(&"slam").hold), "the slammer holds")
 	check_equal(feel.actors.held_left(1), 0.0, "nobody else does")
 
 
 func test_the_shake_setting_turns_its_shake_off() -> void:
 	feel.shake_enabled = false
-	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
+	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.trauma(), 0.0, "no shake")
 	check_equal(feel.kick(), Vector2.ZERO, "no punch")
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "the floor mark still shows")

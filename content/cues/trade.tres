@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"trade"
+parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"rise", "zoom": 1, "way": &"right"}])
+shake = 0.08

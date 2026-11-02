@@ -303,6 +303,8 @@ const BATCHES: int = 5
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
+## A standing stone (a wall's, `shot_rune.gdshader`): a still body a card can ask for (`set_form`).
+const KIND_STONE: int = 4
 ## The kind travels in the alpha of the custom data as 1 - (kind + bend) / KIND_STEPS, so it
 ## has room for kinds 0 to KIND_MAX, and the bend code (below 0.5) rounds away when it is read.
 const KIND_STEPS: float = 16.0
@@ -506,10 +508,14 @@ var dropped: int = 0
 ## The slot of the shot whose event is being sent, else -1: inside the manager only (a shot that
 ## just ended still answers its own event's handlers). Listeners get it as the event's `shot`.
 var _event_slot: int = -1
-## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
-## or `&"beam"`, whoever cast it, and the carrier's while `block_shot` sends `shot_blocked` (a
-## swing's: a parry) (any time outside these: `&""`). For looks only.
+## The form of the shot whose `projectile_impact` is being sent: its card's id (`set_form`; `&"bolt"`,
+## `&"rune"` or `&"orbit"` by its body for a shot no card set), `&"beam"` or a strike's card, and
+## the carrier's while `block_shot` sends `shot_blocked` (a swing's: a parry) (any time outside
+## these: `&""`). For looks only.
 var impact_form: StringName = &""
+## The body (KIND_*) of the shot whose `projectile_impact` or `projectile_expired` is being sent, 0
+## for none (a ray, a strike) and outside them: a still body goes off in its own way. For looks only.
+var impact_body: int = 0
 ## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
 ## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
 ## beam and outside an impact). For looks only.
@@ -568,6 +574,10 @@ var _pierce: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt64Array = PackedInt64Array()
 ## MOTION_STRAIGHT or MOTION_STILL per slot.
 var _motion: PackedByteArray = PackedByteArray()
+## The body a card asked for per slot (`set_form`: a KIND_* its motion draws, 0 for its motion's own),
+## and the id of the card it is (`&""` for none), for its looks.
+var _body: PackedByteArray = PackedByteArray()
+var _form_id: Array[StringName] = []
 ## Orbit shots: radius from the anchor, current angle and angular speed (rad/s).
 var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
 var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
@@ -1113,6 +1123,8 @@ func set_cap(value: int) -> void:
 	_pierce.resize(_cap)
 	_tag.resize(_cap)
 	_motion.resize(_cap)
+	_body.resize(_cap)
+	_form_id.resize(_cap)
 	_orbit_radius.resize(_cap)
 	_orbit_angle.resize(_cap)
 	_orbit_speed.resize(_cap)
@@ -2006,6 +2018,17 @@ func set_look(slot: int, look: int) -> bool:
 	return true
 
 
+## Name the card the shot in `slot` is (`form`: its impacts are told as it, `impact_form`) and the
+## body it asks for (`body`: a KIND_*, 0 for its motion's own; only a still body on a still shot
+## counts, KIND_STONE). False for an empty slot.
+func set_form(slot: int, form: StringName, body: int = 0) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_form_id[slot] = form
+	_body[slot] = clampi(body, 0, KIND_MAX)
+	return true
+
+
 ## The packed look of the shot in `slot`, 0 for an empty slot or a plain shot.
 func get_look_of(slot: int) -> int:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
@@ -2565,6 +2588,8 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_prev[slot] = origin
 	_vel[slot] = velocity if motion == MOTION_STRAIGHT else Vector2.ZERO
 	_motion[slot] = motion
+	_body[slot] = 0
+	_form_id[slot] = &""
 	_turn[slot] = 0.0
 	_home_at[slot] = Vector2.INF
 	_home_range[slot] = 0.0
@@ -4287,9 +4312,10 @@ func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2
 		step = solid.across * solid.gap * _radius[slot]
 		at -= _solid_half(slot, solid)
 	var code: float = trace_code(sim_time - _born[slot])
+	var kind: int = _kind_of(slot)
 	# A batch holds the cap at most: stones past it are not drawn.
 	for n in mini(stones, buffer.size() / DRAW_STRIDE - out):
-		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], KIND_RUNE, 0.0, code)
+		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
 		out += 1
 	return out
 
@@ -4373,10 +4399,11 @@ func _batch_of(slot: int) -> int:
 	return BATCH_BOLT
 
 
-## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE or KIND_ORBIT), by its motion.
+## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE, KIND_ORBIT or KIND_STONE): its motion's,
+## or the still body its card asked for (`set_form`) when it is still.
 func _kind_of(slot: int) -> int:
 	if _motion[slot] == MOTION_STILL:
-		return KIND_RUNE
+		return KIND_STONE if _body[slot] == KIND_STONE else KIND_RUNE
 	if _motion[slot] == MOTION_ORBIT:
 		return KIND_ORBIT
 	return KIND_BOLT
@@ -4620,11 +4647,13 @@ func _expire(slot: int) -> void:
 	if events != null:
 		_event_slot = slot
 		impact_form = _form_of(slot)
+		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_heading = _vel[slot].normalized()
 		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_form = &""
+		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_heading = Vector2.ZERO
@@ -5180,16 +5209,20 @@ func _grow_memory(size: int) -> void:
 func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 	if events != null and not velocity.is_zero_approx():
 		impact_form = _form_of(slot)
+		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_form = &""
+		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
 
 
-## The form of the shot in `slot`, by its body.
+## The form of the shot in `slot`: its card's (`set_form`), else by its body.
 func _form_of(slot: int) -> StringName:
+	if _form_id[slot] != &"":
+		return _form_id[slot]
 	var kind: int = _kind_of(slot)
 	if kind == KIND_RUNE:
 		return &"rune"
@@ -5227,10 +5260,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_kill(slot, false)
 	if events != null and is_instance_valid(node):
 		impact_form = _form_of(slot)
+		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		events.projectile_impact.emit(caster, node, at, heading)
 		impact_form = &""
+		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
 		_event_slot = slot

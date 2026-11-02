@@ -27,6 +27,13 @@ render_mode blend_premul_alpha;
 //                 the impact, white-hot and cooling to dark stone, a glow on the floor, rubble
 //                 thrown up that lands and lies, dust rolling out along the floor; its reach is
 //                 QUAKE_REACH x zoom pixels
+//   K_RISE        light pulled up off a spot (where a teleport leaves): a white-hot column that
+//                 thins to a line and lifts off the top, motes drawn in off the floor and up it,
+//                 a flat ring gathering in; the spot is the effect's middle, the column above it
+//   K_FALL        light struck down onto a spot (where a teleport lands, a rain falls): a streak
+//                 falling the column to the floor in its first FALL_STRIKE, then the whole column
+//                 flashing and thinning away, a cross, a flat ring thrown out, motes flung along
+//                 the floor
 // Lightning (K_ARC) and statuses (K_STATUS) have shaders and batches of their own.
 //
 // PARTICLES ARE GEOMETRY (as in `shot_trail.gdshader`; the owner, 2026-10-29): an effect is one
@@ -55,6 +62,11 @@ const float RUNE_REACH = 14.4;
 // The floor batch's kind (KIND_QUAKE in gameplay/feel/feel.gd): below K_BURST, where the shots'
 // kinds are, which never come to this shader.
 const float K_QUAKE = 3.0;
+// The columns (KIND_RISE and KIND_FALL in gameplay/feel/feel.gd): below K_BURST too. A fall's
+// streak takes this share of its life to reach the floor.
+const float K_RISE = 1.0;
+const float K_FALL = 2.0;
+const float FALL_STRIKE = 0.18;
 // A quake's reach per zoom in pixels, its cracks, the share of its life its rubble flies, and how
 // flat the floor is seen (y over x).
 const float QUAKE_REACH = 8.0;
@@ -177,6 +189,28 @@ Spark effect_spark(float kind, float n, float a, float ease, float z, Look L) {
 		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * reach * (0.3 + 1.0 * roll) - vec2(0.0, roll * z);
 		S.run = 2.0;
 		S.rgb = a < 0.25 ? BONE_SHADOW : STONE_LIGHT;
+	} else if (kind == K_RISE) {
+		// Motes drawn in off a flat ring on the floor, faster as they near the middle, then up the
+		// column; hottest as they meet it.
+		float ang = i / 14.0 * 6.2832 + hash_seeded(i, 60.0, 31.0, s) * 0.4;
+		float from = (5.0 + 4.0 * hash_seeded(i, 61.0, 31.0, s)) * z;
+		float pull = min(a / 0.4, 1.0);
+		float left = 1.0 - pull * pull;
+		float up = max(a - 0.3, 0.0) / 0.7;
+		float high = (5.0 + 6.0 * hash_seeded(i, 62.0, 31.0, s)) * z;
+		S.shown = n < 14.0 && a < 0.6 + 0.35 * hash_seeded(i, 63.0, 31.0, s);
+		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * from * left - vec2(0.0, up * up * high);
+		S.rgb = ramp_of(L, abs(a - 0.4) * 1.6);
+	} else if (kind == K_FALL) {
+		// Once it strikes: motes flung out along the floor from its foot, slowing and cooling, a few
+		// kicked up on the way.
+		float t = max(a - FALL_STRIKE, 0.0) / (1.0 - FALL_STRIKE);
+		float ang = i / 16.0 * 6.2832 + (hash_seeded(i, 64.0, 31.0, s) - 0.5) * 0.5;
+		float far = (4.0 + 8.0 * hash_seeded(i, 65.0, 31.0, s)) * z * (1.0 - (1.0 - t) * (1.0 - t));
+		float kick = hash_seeded(i, 66.0, 31.0, s) < 0.3 ? 16.0 * t * (1.0 - t) * z : 0.0;
+		S.shown = a > FALL_STRIKE && t < 0.5 + 0.5 * hash_seeded(i, 67.0, 31.0, s);
+		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * far - vec2(0.0, kick);
+		S.rgb = ramp_of(L, t);
 	}
 	S.at = floor(at + 0.5);
 	return S;
@@ -215,13 +249,16 @@ void vertex() {
 	bool glows = kind != K_CHIPS && kind != K_DASH;
 	if (quad == Q_LIGHT || quad == Q_SHAPE) {
 		// The flash and its light: a1 the light's two falloffs (how bright, how far: x of the
-		// distance from a0.y, y of the distance), a0.x 1 for a diamond (the rune's) instead of a
-		// circle; a0.yzw the cross's arms, the dotted disc's and the ring's reach (-1 for none).
+		// distance from a0.y, y of the distance), a0.x 1 for a diamond (the rune's) or 2 for a flat
+		// ring on the floor instead of a circle; a0.yzw the cross's arms, the dotted disc's and the
+		// ring's reach (-1 for none); a2 a column: its half width (-1 for none), top, foot, and 1
+		// when it is dotted.
 		float k = 1.0;
 		float metric = 0.0;
 		float arm = -1.0;
 		float disc = -1.0;
 		float ring = -1.0;
+		vec4 column = vec4(-1.0, 0.0, 0.0, 0.0);
 		float salt = 32.0;
 		vec4 lit = vec4(0.0, 1.0, 0.0, 1.0);
 		vec3 first = vec3(0.0);
@@ -272,15 +309,50 @@ void vertex() {
 			k = max(1.0 - a * 2.5, 0.0);
 			k *= k;
 			lit = vec4(0.8, QUAKE_REACH * z * 0.6, 0.0, 1.0);
+		} else if (kind == K_RISE) {
+			// The column swells, thins to a line and its foot lifts off, pulled up out of the top;
+			// a flat ring gathers in under it.
+			float top = 1.0 - o.y;
+			float wide = a < 0.15 ? a / 0.15 : max(1.0 - (a - 0.15) / 0.6, 0.0);
+			float foot = a < 0.5 ? 2.0 * z : mix(2.0 * z, top, (a - 0.5) / 0.35);
+			column = a < 0.85 ? vec4(floor(1.5 * z * wide + 0.5), top, foot, a > 0.5 ? 1.0 : 0.0) : column;
+			metric = 2.0;
+			ring = a < 0.7 ? mix(9.0 * z, z, ease) : -1.0;
+			first = L.hot;
+			second = a < 0.4 ? L.hi : L.mid;
+			k = 1.0 - a;
+			lit = vec4(0.7, 2.0 * z, 0.45, 7.0 * z);
+		} else if (kind == K_FALL) {
+			// A streak falls the column to the floor; then the whole column flashes and thins away,
+			// with a cross where it struck and a flat ring thrown out from it.
+			float top = 1.0 - o.y;
+			float strike = min(a / FALL_STRIKE, 1.0);
+			float t = max(a - FALL_STRIKE, 0.0) / (1.0 - FALL_STRIKE);
+			float foot = mix(top, 2.0 * z, strike * strike);
+			if (a < FALL_STRIKE) {
+				column = vec4(0.0, max(foot - 8.0 * z, top), foot, 0.0);
+			} else if (t < 0.5) {
+				column = vec4(floor(2.0 * z * (1.0 - t / 0.5) + 0.5), top, foot, t > 0.25 ? 1.0 : 0.0);
+			}
+			arm = a >= FALL_STRIKE && t < 0.25 ? round(2.0 * z * (1.0 - t / 0.25)) : -1.0;
+			metric = 2.0;
+			ring = a >= FALL_STRIKE ? mix(2.0 * z, 11.0 * z, 1.0 - (1.0 - t) * (1.0 - t)) : -1.0;
+			first = L.hot;
+			second = ramp_of(L, t);
+			k = a < FALL_STRIKE ? 0.5 * strike : (1.0 - t) * (1.0 - t);
+			lit = vec4(0.9, 2.0 * z, 0.5, 8.0 * z);
 		}
 		bool quake = kind == K_QUAKE;
-		shown = glows && (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || quake);
+		shown = glows && (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake);
 		q_lo = -o;
 		q_hi = size - o;
 		if (quad == Q_LIGHT) {
+			// A column's light is round its line (metric 3), not round the middle.
+			bool lined = column.x >= 0.0;
 			m = M_LIGHT;
-			a0 = vec4(metric, ring < 0.0 ? 0.0 : ring, k * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0), 0.0);
+			a0 = vec4(lined ? 3.0 : metric, ring < 0.0 || lined ? 0.0 : ring, k * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0), 0.0);
 			a1 = lit;
+			a2 = column;
 			k0 = vec4(L.glow, 1.0);
 		} else if (quake) {
 			// The cracks: their reach, the age and seed, and the ramp they cool down.
@@ -294,8 +366,10 @@ void vertex() {
 			m = M_SHAPE;
 			a0 = vec4(metric, arm, disc, ring);
 			a1 = vec4(salt, a, s, 0.0);
+			a2 = column;
 			k0 = vec4(first, 1.0);
 			k1 = vec4(second, 1.0);
+			k2 = vec4(L.mid, 1.0);
 		}
 	} else if (quad == Q_SPARK) {
 		Spark S = effect_spark(kind, slot, a, ease, z, L);
@@ -363,8 +437,9 @@ void vertex() {
 void fragment() {
 	vec2 d = floor(px);
 	vec4 colour = vec4(0.0);
-	// Its distance from the middle: round, or a diamond's (v0.x).
-	float r = v0.x > 0.5 ? abs(d.x) + abs(d.y) : length(d);
+	// Its distance from the middle: round, a diamond's (v0.x 1), on a floor seen flat (v0.x 2) or
+	// from a column's line (v0.x 3: the light round one, v2 its top and foot).
+	float r = v0.x > 2.5 ? length(vec2(d.x, max(v2.y - d.y, 0.0) + max(d.y - v2.z, 0.0))) : (v0.x > 1.5 ? length(vec2(d.x, d.y / QUAKE_FLAT)) : (v0.x > 0.5 ? abs(d.x) + abs(d.y) : length(d)));
 	if (mode < M_LIGHT + 0.5) {
 		// The light: v0.z x (v1.x falloff from the ring at v0.y over v1.y, v1.z falloff over v1.w).
 		float lit = v0.z * (v1.x * falloff(abs(r - v0.y), v1.y) + v1.z * falloff(r, v1.w));
@@ -393,13 +468,25 @@ void fragment() {
 		}
 	} else if (mode < M_SHAPE + 0.5) {
 		// The flash: a dotted disc of reach v0.z in c0, a ring at v0.w in c1 fraying with the age
-		// v1.y (its hash salt v1.x, seed v1.z), a cross of arms v0.y (white-hot c0 in the middle).
+		// v1.y (its hash salt v1.x, seed v1.z; a flat one a little thicker, so its top and bottom
+		// stay whole), a column v2 (white-hot c0 down its middle, dotted when v2.w is 1), a cross
+		// of arms v0.y (white-hot c0 in the middle).
 		if (v0.z >= 0.0 && r <= v0.z && mod(d.x + d.y, 2.0) == 0.0) {
 			colour = c0;
 		}
 		float bucket = floor(atan(d.y, d.x) * v0.w / 2.0);
-		if (v0.w >= 0.0 && abs(r - v0.w) < 0.5 && hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
+		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 0.85 : 0.5) && hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
 			colour = c1;
+		}
+		// A column narrows and frays into its top third; across, white-hot in its middle, then c1,
+		// its rim c2.
+		float span = max(v2.z - v2.y, 1.0);
+		float up = clamp((d.y - v2.y) / (span * 0.35), 0.0, 1.0);
+		float half_w = floor(v2.x * (0.35 + 0.65 * up) + 0.5);
+		bool frayed = up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25;
+		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && !frayed && (v2.w < 0.5 || mod(d.y, 2.0) == 0.0)) {
+			float e = abs(d.x);
+			colour = e <= max(floor(half_w * 0.4), 0.0) ? c0 : (e < half_w || half_w < 1.0 ? c1 : c2);
 		}
 		if (v0.y >= 0.0 && ((d.x == 0.0 && abs(d.y) <= v0.y) || (d.y == 0.0 && abs(d.x) <= v0.y))) {
 			colour = d.x == 0.0 && d.y == 0.0 ? c0 : c1;

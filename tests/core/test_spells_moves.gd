@@ -243,6 +243,53 @@ func test_swap_trades_places_with_the_target() -> void:
 	check(_moves.size() == 1 and _moves[0][1] == &"swap" and _moves[0][2].is_equal_approx(Vector2(70, -4)) and _moves[0][4] == tag, "and the caster to the target (the way from its anchor): %s" % [_moves])
 
 
+## Regression: an actor's mover puts the target where it is asked at once, and the swap read the
+## target's place after that, so the caster was asked to move nowhere (a decoy only landed on it).
+func test_a_swap_reads_the_targets_place_before_it_moves() -> void:
+	_mgr.set_anchor(0, Vector2(-10, 4))
+	_build(0, [&"swap"])
+	var enemy: Node2D = _target(Vector2(60, 0))
+	_bus.target_move_requested.connect(func(_player: int, target: Node, to: Vector2) -> void:
+		(target as Node2D).global_position = to)
+	_spells.cast_staff(0, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(enemy.global_position.is_equal_approx(Vector2(-10, 4)), "the target went to where the caster stood")
+	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(70, -4)), "and the caster still to where the target stood: %s" % [_moves])
+
+
+func test_a_swap_shows_at_both_ends_of_its_trade() -> void:
+	_mgr.set_anchor(0, Vector2(-10, 4))
+	_build(0, [&"swap"])
+	_target(Vector2(60, 0))
+	var shown: Array = []
+	_bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		shown.append([caster, form, origin, direction, length]))
+	_spells.cast_staff(0, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check_equal(shown.size(), 2, "once for each end")
+	if shown.size() == 2:
+		var ends: Array[Vector2] = [shown[0][2], shown[1][2]]
+		check(ends.has(Vector2(-10, 4)) and ends.has(Vector2(60, 0)), "where the caster and the target stood: %s" % [ends])
+		check(shown[0][1] == &"swap" and shown[0][0] == 0, "as the swap card's, of its caster")
+		check(is_equal_approx(shown[0][4], Vector2(-10, 4).distance_to(Vector2(60, 0))), "the way between them as its length")
+		check((shown[0][2] + shown[0][3] * shown[0][4]).is_equal_approx(shown[1][2]), "each facing the other")
+
+
+func test_a_teleport_shows_where_it_leaves_and_ends_where_it_lands() -> void:
+	var tag: int = _build(0, [&"teleport"])
+	var shown: Array = []
+	var ended: Array = []
+	_bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		shown.append([caster, form, origin, direction, length]))
+	_bus.carrier_ended.connect(func(caster: int, form: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+		ended.append([caster, form, at]))
+	_cast()
+	check(shown.size() == 1 and shown[0][1] == &"teleport" and shown[0][2].is_equal_approx(Vector2.ZERO) and shown[0][3].is_equal_approx(Vector2.RIGHT) and is_equal_approx(shown[0][4], 100.0), "it shows where it leaves, its way and distance: %s" % [shown])
+	check_equal(ended.size(), 0, "nothing lands before the body has moved")
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	check(ended.size() == 1 and ended[0][0] == 0 and ended[0][1] == &"teleport" and ended[0][2].is_equal_approx(Vector2(90, 5)), "and ends where the body landed: %s" % [ended])
+
+
 func test_a_swap_with_no_caster_place_moves_nobody() -> void:
 	_mgr.clear_anchor(0)
 	_build(0, [&"swap"])

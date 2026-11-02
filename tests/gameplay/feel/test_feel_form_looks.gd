@@ -88,7 +88,7 @@ func test_the_looks_are_data_on_the_cards_not_in_the_preset() -> void:
 		check(registry.get_resource(&"spells", form) is FormBase, "%s is a carrier card" % form)
 		check(not _card_look(form, false).is_empty(), "%s has an impact flare" % form)
 	check(not _card_look(&"nova", true).is_empty(), "a nova has a cast flash of its own")
-	check(_card_look(&"bolt", true).is_empty(), "a bolt takes the plain cast flash")
+	check(not _card_look(&"bolt", true).has("ring"), "a bolt's is the plain spark, with no ring")
 
 
 func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:

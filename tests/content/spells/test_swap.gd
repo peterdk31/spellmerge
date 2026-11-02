@@ -24,13 +24,16 @@ func _combo(id: String) -> Dictionary:
 
 ## Casts `cards` from `seat` with an imp `imp_at` away on the aim. Returns the moves asked of the
 ## caster as [actor, mode, to, seconds] and, in `target_moves`, those asked of targets as [actor, to].
-func _moves(cards: Array, imp_at: Vector2, seat: int = 0, target_moves: Array = []) -> Array:
+## `move_targets` puts the target where it is asked at once, as an actor's mover does.
+func _moves(cards: Array, imp_at: Vector2, seat: int = 0, target_moves: Array = [], move_targets: bool = false) -> Array:
 	var arena := ArenaScript.new(root)
 	var moves: Array = []
 	arena.bus.caster_move_requested.connect(func(actor: int, mode: StringName, to: Vector2, seconds: float, _tag: int) -> void:
 		moves.append([actor, mode, to, seconds]))
-	arena.bus.target_move_requested.connect(func(actor: int, _target: Node, to: Vector2) -> void:
-		target_moves.append([actor, to]))
+	arena.bus.target_move_requested.connect(func(actor: int, target: Node, to: Vector2) -> void:
+		target_moves.append([actor, to])
+		if move_targets and target is Node2D:
+			(target as Node2D).global_position = to)
 	arena.place_caster(seat, Vector2.ZERO)
 	arena.add_imp(imp_at)
 	arena.install_cards(seat, 0, cards)
@@ -70,6 +73,20 @@ func test_a_hit_trades_places() -> void:
 	check(moves[0][3] > 0.0, "the swap takes time (%s s)" % [moves[0][3]])
 	var back: Vector2 = target_moves[0][1]
 	check(back.length() < 1.0, "the imp goes to where the caster stood (%s)" % [back])
+
+
+## Regression: the target was moved before its place was read, so with a target that moves at once
+## (a decoy, an enemy: every actor's mover) the caster's move came out zero and the target only
+## landed on the caster.
+func test_a_target_that_moves_at_once_still_trades_places() -> void:
+	var target_moves: Array = []
+	var moves: Array = _moves(["swap"], Vector2(100, 0), 0, target_moves, true)
+	check_equal(moves.size(), 1, "the caster is moved once")
+	if moves.is_empty() or target_moves.is_empty():
+		return
+	var to: Vector2 = moves[0][2]
+	check(to.distance_to(Vector2(100, 0)) < 30.0, "the caster still goes to where the imp stood (%s)" % [to])
+	check((target_moves[0][1] as Vector2).length() < 1.0, "and the imp to where the caster stood")
 
 
 func test_a_miss_trades_nobody() -> void:

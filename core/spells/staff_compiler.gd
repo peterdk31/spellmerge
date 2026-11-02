@@ -17,6 +17,8 @@ const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behav
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+## The shot bodies a form card may ask for (`FormBase.SHOT_BODIES`), as the projectile manager's kinds.
+const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE}
 const TARGET_CASTER: int = -1
 const TARGET_POINT: int = -2
 
@@ -368,6 +370,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.wind_up = form.wind_up
 		spell.staff_pose = form.packed_pose()
 		spell.spread = form.spread
+		spell.body = BODIES.get(form.shot_body, 0)
 		damage = form.base_damage
 		mana = form.mana_cost
 		cooldown = form.cooldown

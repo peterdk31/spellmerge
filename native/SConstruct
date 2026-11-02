@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+# SPDX-FileCopyrightText: 2026 peterdk31 and Spellmerge contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# Builds the native module (native/README.md) with godot-cpp. Run by ci/build/native.sh, which
+# fetches the pinned godot-cpp and SCons and passes godot_cpp=<its folder>:
+#   ci/build/native.sh [linux|windows|web ...]
+import os
+
+godot_cpp = ARGUMENTS.get("godot_cpp", os.environ.get("GODOT_CPP", ""))
+if not godot_cpp:
+    raise SystemExit("godot_cpp=<path to godot-cpp> is needed (ci/build/native.sh passes it)")
+
+# The API of the pinned Godot (ci/build/godot.env); an extension built for it loads in 4.7 and later.
+# Only the engine classes the module uses are generated (build_profile.json): a full godot-cpp is
+# about a thousand files and minutes of compiling.
+# godot-cpp reads the profile from the command line's variables only.
+ARGUMENTS.setdefault("build_profile", File("build_profile.json").abspath)
+env = SConscript(os.path.join(godot_cpp, "SConstruct"), {"api_version": "4.7"})
+
+env.Append(CPPPATH=["src/"])
+sources = Glob("src/*.cpp")
+
+library = env.SharedLibrary(
+    "bin/libspellmerge{}{}".format(env["suffix"], env["SHLIBSUFFIX"]),
+    source=sources,
+)
+env.NoCache(library)
+Default(library)

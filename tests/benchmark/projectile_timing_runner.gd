@@ -28,12 +28,16 @@ extends Node
 ## godot --headless --path . --script res://tests/benchmark/test_projectile_timing.gd
 ## build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
 ##
+## Every timing runs twice when the native module is loaded (native/README.md): with the native
+## kernel and with the GDScript it stands for (`Projectiles.native`); the `BENCH:` lines say which.
+##
 ## The node prints `test_projectile_timing: OK` and `TIMING OK` (what the web CI step waits
 ## for), or the `... FAILED` lines and `TIMING FAILED`, and quits with 0 or 1.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 const DT: float = 1.0 / 60.0
 ## How far round a shot homing looks (the Homing card's reach).
@@ -57,13 +61,18 @@ var _actors: ActorSeats.ActorsScript
 var _casters: PackedInt32Array = PackedInt32Array()
 var _targets: Array[Node2D] = []
 var _hits: int = 0
+## Whether this round times the native kernel.
+var _native: bool = false
 
 
 func _ready() -> void:
 	# The root is still setting up its children: wait one frame before adding nodes to it.
 	await get_tree().process_frame
-	for cap in [ManagerScript.DEFAULT_CAP_WEB, ManagerScript.DEFAULT_CAP_DESKTOP]:
-		_run_cap(cap)
+	print("BENCH: native module %s" % ("loaded" if NativeScript.loaded() else "not built"))
+	for native in ([true, false] if NativeScript.loaded() else [false]):
+		_native = native
+		for cap in [ManagerScript.DEFAULT_CAP_WEB, ManagerScript.DEFAULT_CAP_DESKTOP]:
+			_run_cap(cap)
 	_teardown()
 	if _failures.is_empty():
 		print("test_projectile_timing: OK")
@@ -98,6 +107,7 @@ func _run_cap(cap: int) -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_mgr = ManagerScript.new()
+	_mgr.native = _native
 	_actors = ActorSeats.ActorsScript.new()
 	_casters = ActorSeats.seat_wizards(_actors, PLAYERS)
 	_mgr.set("actors", _actors)
@@ -344,4 +354,4 @@ func _log(what: String, total_us: float, calls: int, unit: String) -> void:
 	var share: String = ""
 	if calls == 1:
 		share = ", %.1f%% of a 60 FPS frame" % (total_us / 1000.0 / FRAME_MS * 100.0)
-	print("BENCH: cap %d: %s: %.0f us total, %.3f us %s%s" % [_mgr.get_cap(), what, total_us, each_us, unit, share])
+	print("BENCH: %s cap %d: %s: %.0f us total, %.3f us %s%s" % ["native" if _native else "gdscript", _mgr.get_cap(), what, total_us, each_us, unit, share])

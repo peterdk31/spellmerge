@@ -7,9 +7,14 @@ extends "res://tests/support/suite.gd"
 ## chill and freeze, local stops, kills and new swarmers) ends with the very rows and look it ended
 ## with before the change. The fingerprint below was recorded on the swarm before S4.
 ##
+## The crowd plays twice: with the native kernel (`Swarm.native`, `SwarmLook.native`; native/README.md)
+## and with the GDScript it stands for, each against the recording. Without the module only the
+## GDScript plays (SPELLMERGE_NATIVE=required fails then).
+##
 ## godot --headless --path . --script res://tests/gameplay/horde/test_swarm_steps.gd
 
 const Fixture := preload("res://tests/gameplay/horde/swarm_fixture.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## Rows, steps run, and a hash of every row's numbers and of every look value, before S4.
 const RECORDED: Array[int] = [160, 90, 802667918, 180775624]
@@ -28,14 +33,25 @@ func after_each() -> void:
 
 
 func test_a_scripted_crowd_moves_and_looks_as_before() -> void:
-	var found: Array[int] = _play()
+	var found: Array[int] = _play(false)
 	check_equal(found, RECORDED, "the rows and the look end as they did before S4")
 
 
-## The scripted crowd (see the class doc); its fingerprint.
-func _play() -> Array[int]:
+func test_the_native_kernel_moves_and_looks_the_same() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded")
+		return
+	var found: Array[int] = _play(true)
+	check_equal(found, RECORDED, "with the native kernel, the rows and the look end as recorded")
+
+
+## The scripted crowd (see the class doc), natively or not; its fingerprint.
+func _play(native: bool) -> Array[int]:
 	_run = Fixture.new(root)
+	_run.swarm.native = native
+	check(native == (_run.swarm._kernel != null), "the swarm runs the kernel only when asked")
 	var look := SwarmLook.new()
+	look.native = native
 	look.real_time = false
 	look.setup(_run.swarm)
 	_run.horde.add_child(look)

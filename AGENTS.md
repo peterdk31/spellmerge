@@ -16,14 +16,14 @@ A contributor's PR is only taken in once these pass and the author has signed th
 
 These cover only security and copyright. Everything else is guidance.
 
-1. **Don't touch protected paths.** Owner-only: `.github/` (except the issue forms), `ci/`, `.claude/`, `addons/`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`. Maintained by Claude: `docs/DESIGN.md` (with the owner's direction), `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/`, `tools/`, `core/`, `project.godot`, `export_presets.cfg`, `tests/build.json`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
-2. **Allowed file types only:** `.png` and `.svg` images, `.ogg` audio, `.gd`, `.tscn`, `.tres`, `.json` and other Godot text files (`.import`, `.uid`, `.gdshader`, `.gdshaderinc`), plus REUSE `.license` files. No binaries, archives, executables, symlinks or submodules.
+1. **Don't touch protected paths.** Owner-only: `.github/` (except the issue forms), `ci/`, `.claude/`, `addons/`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`. Maintained by Claude: `docs/DESIGN.md` (with the owner's direction), `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/`, `tools/`, `core/`, `native/`, `project.godot`, `export_presets.cfg`, `tests/build.json`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
+2. **Allowed file types only:** `.png` and `.svg` images, `.ogg` audio, `.gd`, `.tscn`, `.tres`, `.json` and other Godot text files (`.import`, `.uid`, `.gdshader`, `.gdshaderinc`), plus REUSE `.license` files. Claude's PRs may also add C++ sources (`.cpp`, `.h`, `SConstruct`) in `native/`. No binaries, archives, executables, symlinks or submodules: the native module is built from source by `ci/build/native.sh`, never committed.
 3. **Size limits:** 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else.
 4. **No banned APIs** in `.gd`, `.tscn` or `.tres`:
    - starting programs or opening URLs (`OS.execute`, `OS.create_process`, `OS.shell_open`, ...)
    - networking and HTTP (`HTTPRequest`, `StreamPeerTCP`, `WebSocketPeer`, `IP`, ...)
-   - `JavaScriptBridge`, GDExtension, native code
-   - creating or swapping code at runtime (`GDScript.new`, `Expression`, `set_script`, `ClassDB.instantiate`)
+   - `JavaScriptBridge`, and native code outside the native module (no `.gdextension`, no `GDExtensionManager`). The module in `native/` is the exception, by the owner's decision of 2026-11-02 ([native/README.md](native/README.md)): Claude's and the owner's only, built from source.
+   - creating or swapping code at runtime (`GDScript.new`, `Expression`, `set_script`, `ClassDB.instantiate`; only `core/native/native.gd` makes the native module's classes by name)
    - calling singletons by name (`OS.call`, `Engine.get_singleton`)
    - `@tool` scripts and editor plugins
    - file access outside `user://`, and loading from a computed path. Write `load("res://...")` or `preload(...)` with a literal path; dynamic loading is done by `core/registry`.
@@ -43,6 +43,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 - **No single "the player":** everything that acts is an **actor** (`gameplay/actor/`: a body of components driven by one controller) and takes its actor id; a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Never assume an actor id is a seat. Nobody ever waits for another player.
 - **Areas never call each other directly;** they talk through `core/` events.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager; respect particle limits.
+- **Native kernels mirror their GDScript to the bit.** The projectile manager's and the horde swarm's hot loops also run in C++ (`native/`: `ShotKernel`, `SwarmKernel`); the GDScript stays as the reference and the fallback. Change a loop in one and you change it in the other; `tests/core/test_native_kernel.gd` and `tests/gameplay/horde/test_native_swarm.gd` compare them byte for byte ([native/README.md](native/README.md)).
 - **Tests:** code changes come with tests; every bug fix comes with a regression test that would have caught it.
 - **Godot gotchas:** commit the `.uid` files Godot creates; save scenes and resources as text (`.tscn`, `.tres`); no editor plugins.
 - **A new shader is compiled before play:** list a shot shader in `core/projectiles/shader_warmup.gd`, or call `ShaderWarmup.want(shader, how)` where an area first uses its shader; a test fails for any `.gdshader` left out (core/README.md, "The shot shaders").
@@ -54,7 +55,8 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 
 ```sh
 tools/check.sh                     # the same hard rules CI runs, on your changes
-ci/build/build.sh --quick --tests  # import, smoke test and every unit test, spell validator included (downloads the pinned Godot once)
+ci/build/build.sh --quick --tests  # the native module, import, smoke test and every unit test, spell validator included (downloads the pinned Godot and the native tools once)
+ci/build/native.sh linux           # only the native module, after changing native/ (then tools/ptest.sh)
 tools/ptest.sh                     # the same unit tests in parallel, about a minute (after one build.sh --quick)
 python3 -m unittest discover -s ci/tests -t ci   # the automation's own tests, when you change ci/
 python3 -m unittest discover -s tools            # the tools' tests (the Spell atlas data), when you change tools/ or the spell content

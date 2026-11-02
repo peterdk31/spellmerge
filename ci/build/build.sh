@@ -12,6 +12,10 @@
 #                                 --screenshots it takes them too, for the gallery; a failed
 #                                 script only warns, so it never keeps the build back.
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
+#
+# Every mode first builds the native module (ci/build/native.sh: Linux for --quick, the web for
+# --web, Linux, the web and Windows for a full build) and fails without it; the exports are
+# checked for it. NATIVE=0 leaves it out, for local builds only.
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
 #                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
@@ -112,6 +116,42 @@ setup_godot() {
   mv "$TOOLS/templates/"* "$TEMPLATES_DIR/"
   echo "$want" > "$stamp"
   "$GODOT" --version
+}
+
+# The native module (native/README.md): every build has it (owner, 2026-11-02). It is built from
+# source for the platforms this run needs, before the import, so the editor, the tests and the
+# exports load it; a platform that does not build fails the run (Windows needs MinGW-w64, see
+# ci/build/native.sh). The tests that compare it with the GDScript must then find it
+# (SPELLMERGE_NATIVE=required), and the exports are checked for it (`check_native_export`).
+# NATIVE=0 builds without it, for a local look at the GDScript only; CI never sets it.
+declare -A NATIVE_LIBS=(
+  [linux]=native/bin/libspellmerge.linux.template_release.x86_64.so
+  [web]=native/bin/libspellmerge.web.template_release.wasm32.nothreads.wasm
+  [windows]=native/bin/libspellmerge.windows.template_release.x86_64.dll
+)
+setup_native() { # setup_native <platform...>
+  if [[ "${NATIVE:-1}" == 0 ]]; then
+    [[ -z "${CI:-}" ]] || { echo "::error::NATIVE=0 is for local builds only: every CI build has the native module"; exit 1; }
+    step "Native module: off (NATIVE=0, local only)"
+    rm -f native/spellmerge.gdextension
+    return
+  fi
+  rm -f native/spellmerge.gdextension
+  step "Native module ($*)"
+  ci/build/native.sh "$@" || { echo "::error::the native module did not build (ci/build/native.sh $*)"; exit 1; }
+  local platform
+  for platform in "$@"; do
+    [[ -f "${NATIVE_LIBS[$platform]}" ]] || { echo "::error::no native library for $platform (${NATIVE_LIBS[$platform]})"; exit 1; }
+  done
+  grep -q '^linux' native/spellmerge.gdextension && export SPELLMERGE_NATIVE=required
+  return 0
+}
+
+# check_native_export <platform> <export dir>: the export carries the platform's native library.
+check_native_export() {
+  [[ "${NATIVE:-1}" == 0 ]] && return 0
+  local lib; lib=$(basename "${NATIVE_LIBS[$1]}")
+  [[ -f "$2/$lib" ]] || { echo "::error::the $1 export has no native module ($lib in $2)"; exit 1; }
 }
 
 # Runs Godot and fails if it exits non-zero or logs any error.
@@ -293,6 +333,24 @@ export_preset() { # export_preset <preset>: a release export to the preset's exp
   mkdir -p "$(dirname "$out")"
   godot_checked "export-${preset,,}" "$GODOT" --headless --path . --export-release "$preset" "$out"
   [[ -s "$out" ]] || { echo "::error::$preset export produced no $out"; exit 1; }
+  case "$preset" in
+    Web*) check_native_export web "$(dirname "$out")" ;;
+    Windows*) check_native_export windows "$(dirname "$out")" ;;
+    Linux*) check_native_export linux "$(dirname "$out")" ;;
+  esac
+}
+
+# check_native_loaded <linux|web>: the exported test runs say the native module ran (the timing
+# and stress runners print `BENCH: native module loaded` / `on`), and none says it did not.
+check_native_loaded() {
+  [[ "${NATIVE:-1}" == 0 ]] && return 0
+  local logs=(build/logs/*-"$1".log)
+  if grep -l -E "BENCH: native module (not built|off)" "${logs[@]}" 2>/dev/null; then
+    echo "::error::an exported $1 test run ran without the native module (logs above)"
+    exit 1
+  fi
+  grep -q -E "BENCH: native module (loaded|on)" "${logs[@]}" 2>/dev/null \
+    || { echo "::error::no exported $1 test run said the native module ran (BENCH: native module ...)"; exit 1; }
 }
 
 export_all() {
@@ -320,6 +378,7 @@ export_all() {
       grep -q -- "$linux_ok" "build/logs/$name-linux.log" \
         || { echo "::error::$label did not print '$linux_ok' in the Linux Test export"; exit 1; }
     done <<<"$runs"
+    check_native_loaded linux
   fi
 
   step "Boot smoke test (web build in headless Chrome)"
@@ -345,6 +404,7 @@ export_all() {
     PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args="$arg" --expect "$web_ok" \
       --timeout "$web_timeout" 2>&1 | tee "build/logs/$name-web.log"
   done <<<"$runs"
+  check_native_loaded web
 }
 
 zip_dir() { # zip_dir <dir> <zip>: sorted entries, fixed timestamps, file modes kept
@@ -395,6 +455,7 @@ touch build/.gdignore # keeps Godot from importing the exported files as game as
 setup_godot
 mkdir -p build/logs
 if ((QUICK)); then
+  setup_native linux
   import_and_smoke
   ((TESTS)) && unit_tests
   ((SHOTS)) && screenshots
@@ -405,6 +466,7 @@ fi
 stamp
 trap reset_build_info EXIT
 if ((WEB)); then
+  setup_native web
   step "Importing"
   godot_checked import "$GODOT" --headless --path . --import
   export_preset Web
@@ -415,6 +477,7 @@ if ((WEB)); then
   step "Done: dist/ (web only, unchecked)"
   exit 0
 fi
+setup_native linux web windows
 import_and_smoke
 unit_tests
 screenshots

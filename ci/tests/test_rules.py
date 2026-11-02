@@ -75,6 +75,14 @@ class BannedApiTest(unittest.TestCase):
             self.assertEqual(banned("var res = load(path)", path), [])
             self.assertTrue(banned('OS.execute("x", [])', path))
 
+    def test_the_native_loader_may_make_the_modules_classes_only(self) -> None:
+        good = 'static func shot_kernel() -> Object:\n\treturn ClassDB.instantiate(&"ShotKernel")\n'
+        self.assertEqual(banned(good, rules.NATIVE_FILE), [])
+        self.assertTrue(banned(good, "core/spells/x.gd"))
+        self.assertTrue(banned(good.replace("ShotKernel", "HTTPRequest"), rules.NATIVE_FILE))
+        self.assertTrue(banned('ClassDB.instantiate(name)', rules.NATIVE_FILE))
+        self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
+
     def test_reports_line_numbers(self) -> None:
         found = rules.check_banned_apis("a.gd", 'extends Node\n\nfunc _ready() -> void:\n\tOS.execute("x", [])\n')
         self.assertEqual(found[0].line, 4)
@@ -236,6 +244,25 @@ class RepoTest(unittest.TestCase):
         self.assertIn(("binary", "error", "content/relics/a/data.json"), found)
         self.assertIn(("file-size", "error", "audio/music/long.ogg"), found)
         self.assertIn(("file-type", "error", "content/relics/a/a.gdextension"), found)
+
+    def test_native_sources_are_claudes_only(self) -> None:
+        self.write("native/src/shot_kernel.cpp", "int x = 1;\n")
+        self.write("native/src/shot_kernel.h", "#pragma once\n")
+        self.write("native/SConstruct", "Default([])\n")
+        self.commit()
+        self.assertEqual(self.check(BOT), [])
+        found = self.check()
+        for path in ("native/src/shot_kernel.cpp", "native/src/shot_kernel.h", "native/SConstruct"):
+            self.assertIn(("bot-path", "error", path), found)
+            self.assertIn(("file-type", "error", path), found)
+
+    def test_native_types_only_in_native(self) -> None:
+        self.write("core/spells/fast.cpp", "int x = 1;\n")
+        self.write("native/bin/libspellmerge.so", b"\x7fELF\0\0\0\0")
+        self.commit()
+        found = self.check(BOT)
+        self.assertIn(("file-type", "error", "core/spells/fast.cpp"), found)
+        self.assertIn(("binary", "error", "native/bin/libspellmerge.so"), found)
 
     def test_godot_shaders_and_shader_includes_are_allowed(self) -> None:
         # The shot shaders share code through includes (the owner, 2026-10-29).

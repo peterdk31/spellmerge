@@ -55,6 +55,7 @@ BOT_PATHS = (
     "CLAUDE.md",
     "llms.txt",
     "core/",
+    "native/",  # the native module's C++ (native/README.md): Claude's and the owner's only
     "project.godot",
     "export_presets.cfg",
     "tests/build.json",  # the build settings and exported-build tests (smbot.config)
@@ -70,6 +71,11 @@ CONTRIBUTOR_NAMES = frozenset({".gitkeep"})
 BOT_TYPES = CONTRIBUTOR_TYPES | {".md", ".txt", ".cfg", ".godot", ".html", ".css"}
 BOT_NAMES = CONTRIBUTOR_NAMES | {".gitignore", ".gitattributes", ".gdignore"}
 BOT_TOOL_TYPES = frozenset({".sh", ".py"})
+# The native module (native/README.md): C++ sources and its SCons build, in native/ only. CI builds
+# it from source; what it builds is never committed (binaries stay banned, see check_content).
+NATIVE_DIR = "native/"
+BOT_NATIVE_TYPES = frozenset({".cpp", ".h"})
+BOT_NATIVE_NAMES = frozenset({"SConstruct"})
 ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
@@ -336,6 +342,7 @@ def check_file_type(change: Change, role: str) -> list[Finding]:
     name, suffix = PurePosixPath(path).name, _suffix(path)
     if role == BOT:
         allowed = (name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
+                   or (path.startswith(NATIVE_DIR) and (suffix in BOT_NATIVE_TYPES or name in BOT_NATIVE_NAMES))
                    or (path.startswith(ISSUE_FORMS) and suffix in (".yml", ".yaml")))
     else:
         allowed = name in CONTRIBUTOR_NAMES or suffix in CONTRIBUTOR_TYPES
@@ -391,8 +398,9 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
     if suffix == ".svg":
         findings += _check_svg(path, text)
     if suffix == ".gdextension" or "type=\"GDExtension\"" in text:
-        findings.append(Finding("banned-api", "error", path, 1, "Native code (GDExtension) is not allowed.",
-                                "Remove the GDExtension; write the feature in typed GDScript."))
+        findings.append(Finding("banned-api", "error", path, 1,
+                                "A GDExtension is never committed: ci/build/native.sh writes the one the game loads.",
+                                "Remove the file; native code is the native module's (native/README.md), built by CI."))
     if suffix in SCRIPT_TYPES:
         findings += check_banned_apis(path, text)
     if suffix == ".gd":
@@ -464,6 +472,21 @@ def check_issue_form(path: str, text: str) -> list[Finding]:
     return findings
 
 
+# The one place GDScript makes the native module's classes (native/README.md): naming such a class
+# in GDScript would not parse where the module is not built, so this file instantiates it by name,
+# with a literal name of one of the module's own classes.
+NATIVE_FILE = "core/native/native.gd"
+NATIVE_CLASSES = frozenset({"ShotKernel", "SwarmKernel"})
+_NATIVE_INSTANTIATE = re.compile(r"\bClassDB\s*\.\s*instantiate\s*\(\s*&?[\"'](\w+)[\"']\s*\)")
+
+
+def _is_native_instantiate(path: str, text: str, start: int) -> bool:
+    if path != NATIVE_FILE:
+        return False
+    m = _NATIVE_INSTANTIATE.match(text, start)
+    return m is not None and m.group(1) in NATIVE_CLASSES
+
+
 def check_banned_apis(path: str, text: str) -> list[Finding]:
     relaxed = path.startswith(("core/", "tests/"))
     findings = []
@@ -473,6 +496,8 @@ def check_banned_apis(path: str, text: str) -> list[Finding]:
         for m in api.pattern.finditer(text):
             if path == LINKS_FILE and m.group(0).strip().endswith("shell_open"):
                 continue  # checked by check_links_file
+            if api.id == "dynamic-code" and _is_native_instantiate(path, text, m.start()):
+                continue
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"{api.message} (found `{m.group(0).strip()}`)", api.fix))
     if path == LINKS_FILE:

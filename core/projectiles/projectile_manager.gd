@@ -198,6 +198,7 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## A shot with a non-zero tag ended; see "Ends" above.
 signal shot_ended(tag: int)
@@ -771,6 +772,9 @@ var _rune_room: int = 0
 var _orbit_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
 var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
+## What the native kernel's drawing wrote (`ShotKernel.draw_shots`): the instances of each batch
+## (BATCH_*), then the particles asked for, the trail cost, the shots drawn and the enemy shots drawn.
+var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -904,6 +908,18 @@ var _threat_over: PackedInt32Array = PackedInt32Array()
 var _threat_over_count: int = 0
 var _threat_seen: PackedInt32Array = PackedInt32Array()
 var _threat_stamp: int = 0
+## The native module's kernel (`ShotKernel`, core/native, native/README.md): the step's common and
+## hit passes in C++, or null to run them here. Each of its methods does what the GDScript it
+## stands for does, to the bit, on these same arrays (it writes them in place for the length of a
+## call); the GDScript stays the reference and the fallback where the module is not built.
+## `native` switches it off and on (tests step both and compare: test_native_kernel.gd).
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
+## The first shot the hit pass left untested (the budget ran out), and how many targets the native
+## hit pass found for the shot it handed back (`_hit_found`).
+var _starved_at: int = -1
+var _cand_found: int = 0
 
 
 func _init() -> void:
@@ -920,6 +936,38 @@ func _init() -> void:
 	_anchors.fill(Vector2.INF)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
+	set_native(native)
+
+
+## Use the native kernel when `on` and the module is loaded (see `native`). A kernel built against
+## other constants than these is refused with an error, and the GDScript runs.
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = null
+	if not on:
+		return
+	var kernel: Object = NativeScript.shot_kernel()
+	if kernel == null:
+		return
+	if not kernel.call(&"check", {
+		"MOTION_STRAIGHT": MOTION_STRAIGHT, "MOTION_STILL": MOTION_STILL, "MOTION_ORBIT": MOTION_ORBIT,
+		"F_SELF": F_SELF, "F_SELF_LIVE": F_SELF_LIVE, "F_GHOST": F_GHOST,
+		"S_IDLE": S_IDLE, "S_MOVING": S_MOVING, "S_DONE": S_DONE, "S_STUCK": S_STUCK, "S_EXPIRE": S_EXPIRE,
+		"S_FROZEN": S_FROZEN, "GRID_CELL": GRID_CELL, "WALL_CELL": WALL_CELL, "MAX_WALL_VISITS": MAX_WALL_VISITS,
+		"S_HELD": S_HELD, "S_RETURNING": S_RETURNING, "S_WAITING": S_WAITING, "B_HOMING": B_HOMING,
+		"B_SPIRAL": B_SPIRAL, "B_MOVE": B_MOVE, "AFTER_HITS": AFTER_HITS, "HOMING_PERIOD": HOMING_PERIOD,
+		"HOMING_DRIFT": SpellLimits.HOMING_DRIFT, "S_GONE": S_GONE, "F_TURNED": F_TURNED, "F_WAVE": F_WAVE,
+		"CASTER_WIZARD": CASTER_WIZARD, "CASTER_POINT": CASTER_POINT, "SPIRAL_PERIOD": SPIRAL_PERIOD,
+		"RETURN_BEND": RETURN_BEND, "B_GROWTH": B_GROWTH, "B_LINGER": B_LINGER, "B_ORBIT": B_ORBIT, "B_RETURN": B_RETURN,
+	}):
+		push_error("Projectiles: the native ShotKernel was built against other constants; running the GDScript")
+		return
+	_kernel = kernel
+
+
+## Whether the native kernel runs the step (`native` is on and the module is loaded).
+func is_native() -> bool:
+	return _kernel != null
 
 
 func _ready() -> void:
@@ -2276,6 +2324,8 @@ func threat(point: Vector2, radius: float, team: int, own: int = -1, horizon: fl
 		_threat_ask_step = _step_index
 	_threat_asks += 1
 	if _count < THREAT_GRID_FROM or (_threat_step != _step_index and _threat_asks < THREAT_GRID_ASKS and _threat_asks_before < THREAT_GRID_ASKS):
+		if _kernel != null:
+			return _kernel.call(&"threat_scan", self, point, radius, team, own, horizon)
 		# `_threat_try` written out: a call a shot costs a third more over 3,000 shots.
 		var best_away: Vector2 = Vector2.ZERO
 		for slot in _high:
@@ -2312,6 +2362,8 @@ func threat(point: Vector2, radius: float, team: int, own: int = -1, horizon: fl
 		return best if threat_slot >= 0 else -1.0
 	if _threat_step != _step_index or horizon > _threat_horizon:
 		_build_threat_grid(horizon)
+	if _kernel != null:
+		return _kernel.call(&"threat_query", self, point, radius, team, own, horizon)
 	_threat_stamp += 1
 	var stamp: int = _threat_stamp
 	for n in _threat_over_count:
@@ -2392,6 +2444,9 @@ func _build_threat_grid(horizon: float) -> void:
 	if _threat_slot.size() < _cap * 4:
 		_threat_slot.resize(_cap * 4)
 		_threat_next.resize(_cap * 4)
+	# The native kernel fills it when its entries fit (they nearly always do).
+	if _kernel != null and _kernel.call(&"threat_fill", self, horizon) >= 0:
+		return
 	_threat_head.fill(-1)
 	_threat_over_count = 0
 	var room: int = _threat_slot.size()
@@ -2603,10 +2658,16 @@ func step(delta: float) -> void:
 	var top: int = _high
 	_stepping = true
 	_work_left = WORK_PER_STEP
-	_pass_common(top, delta)
+	if _kernel != null:
+		_kernel.call(&"pass_common", self, top, delta)
+	else:
+		_pass_common(top, delta)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
-			_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
+			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit,
+			# return, homing, spiral); it says false for the others.
+			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
+				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
 	_pass_hits(top, delta)
 	for kind in range(AFTER_HITS, BEHAVIOURS):
 		if _member_count[kind] > 0:
@@ -2645,69 +2706,134 @@ func _pass_common(top: int, delta: float) -> void:
 
 
 ## Pass 3: every shot in turn (from `_resume`, see WORK_PER_STEP): its end if a pass marked one,
-## then the bounds, the walls on its path and its hits.
+## then the bounds, the walls on its path and its hits (`_hit_slot`). The native kernel walks the
+## shots that need nothing of GDScript (no end, no wall, no hit) and hands back each one that does,
+## in turn, so the events are sent in the same order (a pass with solid shots runs here).
 func _pass_hits(top: int, delta: float) -> void:
 	var limit: Rect2 = _bounds.grow(BOUNDS_MARGIN)
 	var resume: int = _resume if _resume < top else 0
-	var starved_at: int = -1
-	for n in top:
-		var slot: int = n + resume
-		if slot >= top:
-			slot -= top
-		# A hit handler may have dropped or reused this slot (S_IDLE): a projectile spawned
-		# during this step waits for the next one.
-		var state: int = _state[slot]
-		if state == S_IDLE:
-			continue
-		_state[slot] = S_DONE
-		if state >= S_STUCK:
-			if state == S_WAITING:
-				_catch_up(slot, delta)
-				state = _state[slot]
-				_state[slot] = S_DONE
-			if state == S_EXPIRE:
-				_expire(slot)
-				continue
-			if state == S_GONE:
-				_kill(slot)
-				continue
-			if state == S_STUCK or state == S_FROZEN:
-				continue
-		if not limit.has_point(_pos[slot]):
+	_starved_at = -1
+	if _kernel != null and not _any_solid:
+		if _cand_target.size() < _targets.size():
+			_cand_target.resize(_targets.size())
+			_cand_along.resize(_targets.size())
+			_cand_point.resize(_targets.size())
+		if _target_mark.size() < _targets.size():
+			_target_mark.resize(_targets.size())
+			_target_entry.resize(_targets.size())
+		var n: int = 0
+		while n < top:
+			var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
+			if handed < 0:
+				break
+			n = handed >> 1
+			var slot: int = n + resume
+			if slot >= top:
+				slot -= top
+			if handed & 1 == 0:
+				_hit_slot(slot, delta, limit)
+			else:
+				_hit_found(slot)
+			n += 1
+			# The shots after it that the kernel would hand straight back (to end, waiting for their
+			# passes) take their turns here, without a call each.
+			while n < top:
+				slot = n + resume
+				if slot >= top:
+					slot -= top
+				if not _kernel_hands_back(slot):
+					break
+				_hit_slot(slot, delta, limit)
+				n += 1
+			# A hit handler may have added targets: the kernel's scratch must hold them all.
+			if _cand_target.size() < _targets.size() or _target_mark.size() < _targets.size():
+				_cand_target.resize(maxi(_cand_target.size(), _targets.size()))
+				_cand_along.resize(_cand_target.size())
+				_cand_point.resize(_cand_target.size())
+				_target_mark.resize(maxi(_target_mark.size(), _targets.size()))
+				_target_entry.resize(_target_mark.size())
+	else:
+		for n in top:
+			var slot: int = n + resume
+			if slot >= top:
+				slot -= top
+			_hit_slot(slot, delta, limit)
+	_resume = maxi(_starved_at, 0)
+
+
+## Whether the native hit pass would hand the shot in `slot` straight back for its state: one to
+## end, or waiting for passes other than its homing search alone (the kernel catches that up).
+func _kernel_hands_back(slot: int) -> bool:
+	var state: int = _state[slot]
+	if state < S_STUCK:
+		return false
+	return state != S_WAITING or _wait_from[slot] != B_HOMING or (_kinds[slot] & AFTER_HOMING_MASK) != 0
+
+
+## One shot's turn in the hit pass (see `_pass_hits`).
+func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
+	# A hit handler may have dropped or reused this slot (S_IDLE): a projectile spawned
+	# during this step waits for the next one.
+	var state: int = _state[slot]
+	if state == S_IDLE:
+		return
+	_state[slot] = S_DONE
+	if state >= S_STUCK:
+		if state == S_WAITING:
+			_catch_up(slot, delta)
+			state = _state[slot]
+			_state[slot] = S_DONE
+		if state == S_EXPIRE:
+			_expire(slot)
+			return
+		if state == S_GONE:
 			_kill(slot)
-			continue
-		# A shot that meets a wall is cut short there: it can still hit what is
-		# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
-		# solid one is a wall and stops at one (`_step_solid`).
-		var walled: bool = false
-		if _any_solid and _solids.has(slot):
-			_step_solid(slot, _solids[slot])
-		elif _has_walls and _motion[slot] != MOTION_ORBIT and (_flags[slot] & F_GHOST) == 0:
-			var cut: float = _wall_hit(_prev[slot], _pos[slot])
-			if cut >= 0.0 and _any_solid:
-				cut = _past_own_solid(slot, cut)
-			if cut >= 0.0:
-				walled = true
-				_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
-		if _layers[slot] != 0 and not _targets.is_empty():
-			if _work_left <= 0:
-				if walled:
-					_wall_end(slot)
-				elif starved_at < 0:
-					starved_at = slot
-				continue
-			# A piercing shot passes through every target on its path this step, each hit once
-			# (it remembers it). A hit handler may end it or even reuse the slot.
-			var seq: int = _seq[slot]
-			_hit_test(slot)
-			# What its path no longer touches it may hit again.
-			if _alive[slot] != 0 and _seq[slot] == seq:
-				_forget_left(slot)
-		# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
-		# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
-		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
-			_wall_end(slot)
-	_resume = maxi(starved_at, 0)
+			return
+		if state == S_STUCK or state == S_FROZEN:
+			return
+	if not limit.has_point(_pos[slot]):
+		_kill(slot)
+		return
+	# A shot that meets a wall is cut short there: it can still hit what is
+	# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
+	# solid one is a wall and stops at one (`_step_solid`).
+	var walled: bool = false
+	if _any_solid and _solids.has(slot):
+		_step_solid(slot, _solids[slot])
+	elif _has_walls and _motion[slot] != MOTION_ORBIT and (_flags[slot] & F_GHOST) == 0:
+		var cut: float = _wall_hit(_prev[slot], _pos[slot])
+		if cut >= 0.0 and _any_solid:
+			cut = _past_own_solid(slot, cut)
+		if cut >= 0.0:
+			walled = true
+			_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
+	if _layers[slot] != 0 and not _targets.is_empty():
+		if _work_left <= 0:
+			if walled:
+				_wall_end(slot)
+			elif _starved_at < 0:
+				_starved_at = slot
+			return
+		# A piercing shot passes through every target on its path this step, each hit once
+		# (it remembers it). A hit handler may end it or even reuse the slot.
+		var seq: int = _seq[slot]
+		_hit_test(slot)
+		# What its path no longer touches it may hit again.
+		if _alive[slot] != 0 and _seq[slot] == seq:
+			_forget_left(slot)
+	# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
+	# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
+	if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
+		_wall_end(slot)
+
+
+## The rest of a shot's turn once the native hit pass found `_cand_found` targets on its path (it
+## did what `_hit_test` does before its hits): hit them, then forget what its path left.
+func _hit_found(slot: int) -> void:
+	var seq: int = _seq[slot]
+	_hit_candidates(slot, _cand_found)
+	if _alive[slot] != 0 and _seq[slot] == seq:
+		_forget_left(slot)
 
 
 # --- Shot behaviours, stepped in passes (2026-10-28) ---------------------------------------
@@ -2749,6 +2875,9 @@ const B_SHIELD: int = 8
 ## How many behaviours there are; the passes of B_* below AFTER_HITS run before the hit pass.
 const BEHAVIOURS: int = 9
 const AFTER_HITS: int = B_SHIELD
+## The behaviours after homing that run before the hits: a waiting homing shot with none of them is
+## caught up by the native hit pass itself (`_kernel_hands_back`).
+const AFTER_HOMING_MASK: int = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1)) - 1)
 ## The pass of each behaviour, by B_* (`_init` makes `_passes` from it).
 const BEHAVIOUR_PASSES: Array[StringName] = [
 	&"_pass_stuck", &"_pass_growth", &"_pass_linger", &"_pass_orbit", &"_pass_return",
@@ -3907,7 +4036,10 @@ func _sample_trails() -> void:
 	# `_trail_sample` and `_drawn_at` written out: this runs for every flying shot every other step
 	# (two calls a shot less: 2.1 -> 1.1 ms a sample at 3,000 shots).
 	var now: float = sim_time
-	for slot in _high:
+	if _kernel != null:
+		if _kernel.call(&"sample_shots", self, now):
+			_trail_dirty = true
+	for slot in _high if _kernel == null else 0:
 		var row: int = _trail[slot]
 		if row < 0 or _alive[slot] == 0:
 			continue
@@ -3997,7 +4129,12 @@ func update_draw(fraction: float = -1.0) -> void:
 	_set_sim_time(_enemy_node, fraction)
 	_set_sim_time(_enemy_rune_node, fraction)
 	_upload_trails()
-	_count_batches()
+	# The native kernel counts and writes every shot when no shot is solid (`_write_stones`).
+	var kernel_draw: bool = _kernel != null and not _any_solid
+	if kernel_draw:
+		_kernel.call(&"count_draw", self)
+	else:
+		_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	# The bolts' and the enemies' batches also draw the loose trails (more than the cap).
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT], _cap * (1 + TRAIL_ROWS_PER_SLOT))
@@ -4012,7 +4149,30 @@ func update_draw(fraction: float = -1.0) -> void:
 	var enemy_rune_out: int = 0
 	var asked: int = 0
 	var trails: int = 0
-	for slot in _high:
+	var shots_out: int = 0
+	var enemy_shots: int = 0
+	var draw_buffer: PackedFloat32Array = _draw_buffer
+	var rune_buffer: PackedFloat32Array = _rune_buffer
+	var orbit_buffer: PackedFloat32Array = _orbit_buffer
+	var enemy_buffer: PackedFloat32Array = _enemy_buffer
+	var enemy_rune_buffer: PackedFloat32Array = _enemy_rune_buffer
+	if kernel_draw:
+		_kernel.call(&"draw_shots", self, fraction)
+		out = _draw_out[BATCH_BOLT]
+		rune_out = _draw_out[BATCH_RUNE]
+		orbit_out = _draw_out[BATCH_ORBIT]
+		enemy_out = _draw_out[BATCH_ENEMY]
+		enemy_rune_out = _draw_out[BATCH_ENEMY_RUNE]
+		asked = _draw_out[BATCHES]
+		trails = _draw_out[BATCHES + 1]
+		shots_out = _draw_out[BATCHES + 2]
+		enemy_shots = _draw_out[BATCHES + 3]
+		draw_buffer = _kernel.call(&"buffer", BATCH_BOLT)
+		rune_buffer = _kernel.call(&"buffer", BATCH_RUNE)
+		orbit_buffer = _kernel.call(&"buffer", BATCH_ORBIT)
+		enemy_buffer = _kernel.call(&"buffer", BATCH_ENEMY)
+		enemy_rune_buffer = _kernel.call(&"buffer", BATCH_ENEMY_RUNE)
+	for slot in _high if not kernel_draw else 0:
 		if _alive[slot] == 0:
 			continue
 		var motion: int = _motion[slot]
@@ -4046,10 +4206,11 @@ func update_draw(fraction: float = -1.0) -> void:
 		else:
 			_write_trail(_draw_buffer, out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			out += 1
-	var shots_out: int = out + rune_out + orbit_out + enemy_out + enemy_rune_out
-	var enemy_shots: int = enemy_out + enemy_rune_out
+	if not kernel_draw:
+		shots_out = out + rune_out + orbit_out + enemy_out + enemy_rune_out
+		enemy_shots = enemy_out + enemy_rune_out
 	# The trails held by no live shot: cooling where their shot ended, or following a caster.
-	for n in _loose_count:
+	for n in _loose_count if not kernel_draw else 0:
 		var row: int = _loose[n]
 		var caster: int = _trail_caster[row]
 		var head: Vector2 = _trail_last[row]
@@ -4068,19 +4229,19 @@ func update_draw(fraction: float = -1.0) -> void:
 			_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, row, head, flags, data, _trail_core[row])
 			enemy_out += 1
 	if out > 0:
-		multimesh.buffer = _draw_buffer
+		multimesh.buffer = draw_buffer
 	multimesh.visible_instance_count = out
 	if rune_out > 0:
-		_rune_node.multimesh.buffer = _rune_buffer
+		_rune_node.multimesh.buffer = rune_buffer
 	_rune_node.multimesh.visible_instance_count = rune_out
 	if orbit_out > 0:
-		_orbit_node.multimesh.buffer = _orbit_buffer
+		_orbit_node.multimesh.buffer = orbit_buffer
 	_orbit_node.multimesh.visible_instance_count = orbit_out
 	if enemy_out > 0:
-		_enemy_node.multimesh.buffer = _enemy_buffer
+		_enemy_node.multimesh.buffer = enemy_buffer
 	_enemy_node.multimesh.visible_instance_count = enemy_out
 	if enemy_rune_out > 0:
-		_enemy_rune_node.multimesh.buffer = _enemy_rune_buffer
+		_enemy_rune_node.multimesh.buffer = enemy_rune_buffer
 	_enemy_rune_node.multimesh.visible_instance_count = enemy_rune_out
 	drawn_enemy = enemy_shots
 	drawn = shots_out
@@ -4840,7 +5001,12 @@ func _hit_test(slot: int) -> bool:
 				t = _target_next[t]
 	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
 		_flags[slot] |= F_SELF_LIVE
-	# Hit them nearest first. A hit handler may end the shot or take its slot; a stuck one stops.
+	return _hit_candidates(slot, found)
+
+
+## Hit the `found` targets `_hit_test` kept for the shot in `slot` (`_cand_*`), nearest first;
+## returns true when it hit any. A hit handler may end the shot or take its slot; a stuck one stops.
+func _hit_candidates(slot: int, found: int) -> bool:
 	var seq: int = _seq[slot]
 	var hit: bool = false
 	for n in found:

@@ -236,6 +236,12 @@ func _test_projectile_hit_uses_profile() -> void:
 	_check(_damage == [[1, enemy, 5]], "projectile_hit with tag 7 deals the profile's damage for the shooter")
 	_check(_combat.health_of(enemy) == 15, "health 20 minus 5")
 	_check(_combat.knockback_of(enemy).x > 0.0, "pushed away from the hit position")
+	# Regression: measured to the hit circle's centre, not the feet: a hit under a raised circle
+	# (but above the feet) pushes up, away from the hit.
+	var raised := _enemy(20, Vector2(100.0, 0.0))
+	_combat.register_actor(raised, 20.0, 10.0, 0, Vector2(0.0, -14.0))
+	_bus.projectile_hit.emit(1, raised, Vector2(100.0, -6.0), 7, -1)
+	_check(_combat.knockback_of(raised).y < 0.0 and is_zero_approx(_combat.knockback_of(raised).x), "a hit below a raised hit circle pushes it up (%s)" % _combat.knockback_of(raised))
 
 
 func _test_projectile_hit_without_profile_is_ignored() -> void:

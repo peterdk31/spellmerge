@@ -146,7 +146,8 @@ func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
 	var wizard := _wizard(0, Vector2(100.0, 0.0))
 	var profile := _profile(2)
 	profile.knockback = 200.0
-	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile), -1)
+	# Level with its hit circle (its hurtbox sits above its feet): the push is measured from there.
+	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0) + wizard.hurtbox.offset, _tag(profile), -1)
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2(200.0, 0.0), "pushed away from the hit")
 	_combat.consume_knockback(_wizards[0], 1.0)
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2.ZERO, "the push fades like an enemy's")
@@ -334,7 +335,7 @@ func test_a_hexed_wizard_is_pulled_toward_a_spell_hit() -> void:
 	_combat.apply_status(0, 0, &"hex", 5.0, 50.0)
 	var profile := _profile(2)
 	profile.knockback = 200.0
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0), _enemy_tag(profile), -1)
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0) + wizard.hurtbox.offset, _enemy_tag(profile), -1)
 	check_equal(_combat.knockback_of(0), Vector2(-100.0, 0.0), "pulled toward the hit at half the push (actors G5: the enemy's rule)")
 
 

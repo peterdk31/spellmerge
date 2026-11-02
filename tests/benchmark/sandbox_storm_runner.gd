@@ -18,13 +18,18 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--stay`.
+## projectile manager's GDScript), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
+## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
+## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
+## counts; in a window (or under xvfb-run) the renderer runs too.
 ##
 ## The wizard is placed among the dummies at the start and kept up (mana full, revived and
 ## protected), since the shooting dummy in the other lane shoots back.
 
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
+const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 
 const PLAYER: int = 0
@@ -36,6 +41,8 @@ const STAFF_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"
 const STORM_AT: Vector2 = Vector2(168.0, 150.0)
 ## Game seconds counted.
 const SECONDS: float = 12.0
+## The events whose listeners `--profile-signals` times: every event a shot's hit or end sends.
+const PROFILED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
 ## Seconds between the updates of the window's line.
 const SHOW_EVERY: float = 0.25
 
@@ -51,6 +58,10 @@ var _projectiles: Node = null
 var _combat: Node = null
 var _spells: Node = null
 var _probe: Node = null
+var _tree_profile: Node = null
+var _draw_usec: int = 0
+var _draw_max_usec: int = 0
+var _draw_frames: int = 0
 var _label: Label = null
 var _wizard: Actor = null
 var _downed: Downed = null
@@ -155,6 +166,16 @@ func _start() -> void:
 	_waited_at = int(_spells.get("fires_waited")) if _spells != null else 0
 	_probe = ProbeScript.new()
 	add_child(_probe)
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	if args.has("--profile") or args.has("--profile-signals"):
+		_tree_profile = TreeProfileScript.new()
+		add_child(_tree_profile)
+		if args.has("--profile-signals"):
+			var names: Array[StringName] = []
+			for name: StringName in PROFILED_SIGNALS:
+				if _events.has_signal(name):
+					names.append(name)
+			_tree_profile.call(&"time_signals", _events, names)
 	_active = true
 
 
@@ -178,10 +199,19 @@ func _physics_process(delta: float) -> void:
 			_finish(_failures())
 
 
-## The storm's button: held while the run counts (for good with `--stay`), let go after.
+## The storm's button: held while the run counts (for good with `--stay`), let go after. While it
+## counts, the manager's drawing is timed once more here (`update_draw` is safe to call again: it
+## writes the same batches), as the manager's own `_process` gives no clock of its own.
 func _process(_delta: float) -> void:
 	if not _active:
 		return
+	if not _reported:
+		var start: int = Time.get_ticks_usec()
+		_projectiles.call(&"update_draw")
+		var usec: int = Time.get_ticks_usec() - start
+		_draw_usec += usec
+		_draw_max_usec = maxi(_draw_max_usec, usec)
+		_draw_frames += 1
 	var hold: bool = stay or _elapsed < seconds
 	if hold != _held:
 		_input.call("send_virtual", PLAYER, STAFF_ACTIONS[STORM_STAFF], 1.0 if hold else 0.0)
@@ -252,8 +282,14 @@ func _report() -> void:
 		print("BENCH: storm: dummy %d (%s at %s): %d hits, %.0f damage" % [i + 1, id, at, _dummy_hits[i], _damage_of(i)])
 	print("BENCH: storm: %d hits on dummies in all (%.0f a second, %.2f%% of the shots made), %.0f damage" % [
 		_hits, float(_hits) / seconds, 100.0 * float(_hits) / maxf(1.0, float(made)), damage])
+	var frames: float = maxf(1.0, float(_draw_frames))
+	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots and %d trails drawn at the end" % [
+		float(_draw_usec) / frames / 1000.0, float(_draw_max_usec) / 1000.0, _draw_frames,
+		int(_projectiles.get("drawn")), int(_projectiles.get("drawn_trails"))])
 	if _probe != null:
 		_probe.call("report")
+	if _tree_profile != null:
+		_tree_profile.call(&"report")
 
 
 func _failures() -> Array[String]:

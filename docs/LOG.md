@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-02: More shots: the dodge check, trail meshes by the pool, three catch-up steps (owner session)
+
+`Projectiles.threat` shares a per-step grid of shot paths between the AIs' asks (8 asks at 3,000 shots: 11.3 -> 5.4 ms); the trail batches draw a mesh with only the slots the spark pool's shares can fill (particles thinned by a stride, tails cut to a dash's streak slots with no tail share; RTX A3000 at 3,000 shots: trails about 19 -> 6 ms; pixel-identical with the pool full or empty); the engine catches up at most 3 physics steps a frame (was 8). Desktop stress, headless: 343 -> 93 ms a frame, the step 40 -> 26 ms. Tests: `test_projectiles_threat` (grid against the pass, changes within a step), `test_projectile_looks` (meshes and stride), `test_physics_settings`; `test_projectiles_targets` no longer counts the engine's catch-up steps (fingerprint recorded again on main's manager). Details and what was dropped: docs/DECISIONS.md.
+
 ## 2026-11-01: The sandbox staff's cog head (owner session)
 
 The `dev` staff has a head of its own (`content/wizard/staffs/dev/head.svg`): an upright eight-tooth cog in the player colour round a gold hub, on a straight shaft with a gold butt, 16 directions by 4 player ramps like the starter sheets; `tip` 18. Sandbox wizards now show it on all four buttons instead of the default curl head. `test_wizard_art.gd` holds it to the same sheet contract.

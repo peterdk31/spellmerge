@@ -51,6 +51,12 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // every shot's particles and of every tail that is drawn this frame. Tails go first.
 uniform float particle_share = 1.0;
 uniform float trail_share = 1.0;
+// How the pool thins particles (set by the projectile manager with the trail mesh it draws; a
+// power of two, 1 is every moment): only every `spark_stride`-th moment of a trail may give off a
+// particle (each trail at its own phase, so trails do not pulse together), at `spark_stride` times
+// the chance, so as many are born as before from `spark_stride` times fewer particle slots
+// (performance, 2026-11-02: a folded slot costs as much as a drawn one in the vertex stage).
+uniform float spark_stride = 1.0;
 // The paths, and the moment the heads are drawn at (the simulation clock less what the drawing
 // lags behind the last step), in the samples' clock.
 uniform sampler2D trail_data : filter_nearest;
@@ -253,7 +259,7 @@ float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 		return 0.0;
 	}
 	if (kinds.w < 0.5) {
-		return !dash && j < 0.5 && th(id, j, 151.0, row) < TIP[ROW_TWINKLE].w * particle_share ? -1.0 : -2.0;
+		return !dash && j < 0.5 && th(id, j, 151.0, row) < TIP[ROW_TWINKLE].w * particle_share * spark_stride ? -1.0 : -2.0;
 	}
 	float i = min(floor(th(id, j, 152.0, row) * kinds.w), kinds.w - 1.0);
 	float word = i < 4.0 ? kinds.x : (i < 8.0 ? kinds.y : kinds.z);
@@ -262,7 +268,7 @@ float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 	if (dash) {
 		rate = look == L_EMBERS || look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0);
 	}
-	return th(id, j, 153.0, row) < rate * particle_share ? look : -2.0;
+	return th(id, j, 153.0, row) < rate * particle_share * spark_stride ? look : -2.0;
 }
 
 // The particle `j` born at moment `id`, as it is now: where (`pos`, and `tip` for a line), its
@@ -440,7 +446,14 @@ void vertex() {
 	// A particle's slot: its moment back from now, and which of the moment's.
 	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
 	bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
-	float id = floor(trail_now * BIRTHS) - (streak_slot ? floor(slot * 0.5) : slot);
+	// A particle slot's moment: the `slot`-th of the trail's moments back from now (every
+	// `spark_stride`-th, at the row's phase). A dash's streaks (on the piece and tail slots) are
+	// two a moment, never thinned.
+	float id = floor(trail_now * BIRTHS) - floor(slot * 0.5);
+	if (!streak_slot) {
+		float phase = row < 0.0 ? 0.0 : mod(row, spark_stride);
+		id = (floor((floor(trail_now * BIRTHS) + phase) / spark_stride) - slot) * spark_stride - phase;
+	}
 	// A tail pixel's number (its place on the path: one every `gap` pixels, from the shot's pace
 	// over its whole kept path, so it holds still while the shot flies), and the ends of a step of
 	// lightning's line.

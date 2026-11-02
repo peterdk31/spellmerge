@@ -25,9 +25,11 @@ const STEPS: int = 90
 ## The crowd's hits on the manager before S5 (count and hash of every hit and query, in order),
 ## recorded again on main's manager and Combat as they were before S5 when main's homing and atom
 ## changes came in (2026-10-31): a change to how shots fly changes this hash, so record it again
-## on the code before the change, never from the code under test.
-const RECORDED_HITS: int = 7282
-const RECORDED_HASH: int = 3052657089
+## on the code before the change, never from the code under test. Recorded again on main's manager
+## (60826bb9) when the test stopped the engine stepping its manager in the frame it waits for
+## (2026-11-02: that frame's catch-up steps had been counted in, 8 of them at the old engine limit).
+const RECORDED_HITS: int = 6938
+const RECORDED_HASH: int = 3361975059
 
 var _bus: EventsScript
 var _mgr: ManagerScript
@@ -52,6 +54,9 @@ func before_each() -> void:
 	_mgr.actors = _actors
 	_mgr.events = _bus
 	root.add_child(_mgr)
+	# Stepped by hand only: in the frame the crowd waits for, the engine would also step it, as
+	# many times as it catches up (`max_physics_steps_per_frame`), and the hits with it.
+	_mgr.set_physics_process(false)
 	_mgr.set_cap(SHOTS)
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
 	_holder = own(Node2D.new()) as Node2D

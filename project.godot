@@ -190,6 +190,10 @@ leave={
 ]
 }
 
+[physics]
+
+common/max_physics_steps_per_frame=3
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

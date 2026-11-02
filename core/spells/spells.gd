@@ -2224,7 +2224,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 		return
 	# `relay` takes on what the actor hit last cast, before Combat reads this hit's profile (Spells
 	# hears `projectile_hit` first: its autoload comes before Combat's).
-	_relay(target, tag, shot)
+	_relay(spell, target, tag, shot)
 	var slot: int = shot
 	var chain: int = spell.chain_jumps
 	var prev: int = 0
@@ -2240,17 +2240,21 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 		if _same(slot):
 			chain = _rec_chain[slot]
 			prev = _rec_prev[slot]
-		heading = _heading(spell, slot, position, actor)
+		# (Only a payload on hit goes the way the shot went: performance, 2026-11-02.)
+		if spell.fires_on(TriggerBase.Event.HIT):
+			heading = _heading(spell, slot, position, actor)
 	# A chain goes on hitting as the hit it jumps from did (an echo's half, a relay's merge); a
-	# zap's jumps as its shot does.
+	# zap's jumps as its shot does. (Read before the hit's effects and payloads, which may spawn
+	# into its slot.)
 	var carried: HitProfile = null
 	var carried_zap: HitProfile = null
-	var from: int = _ray.zap_slot if by_ray else slot
-	if from >= 0 and _same(from):
-		carried = _rec_relay[from]
-		carried_zap = _rec_zap[from]
-	elif by_ray:
-		carried = _ray.hit
+	if chain > 0:
+		var from: int = _ray.zap_slot if by_ray else slot
+		if from >= 0 and _same(from):
+			carried = _rec_relay[from]
+			carried_zap = _rec_zap[from]
+		elif by_ray:
+			carried = _ray.hit
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, actor, target, position, slot)
 	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot)
@@ -2264,6 +2268,11 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 ## end, a pulling shot's for the arrival). What a blast strikes moves nothing (that would move
 ## again at every arrival, rules R4 F2): only the carrier's own hits do (`_blasting`).
 func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, position: Vector2, slot: int) -> void:
+	if spell.plain_hit():
+		# No siphon, possess, pull or blast: only the carrier's own part.
+		if not _blasting:
+			_carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
+		return
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
 		_refund(actor, SpellTag.staff_of(tag), refund)
@@ -2435,9 +2444,8 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 ## An actor that never cast an infused carrier gives nothing. A ray with it (a beam or a
 ## jump of one; rules R4f) keeps what it took on in `_ray.hit` for its later hits, a live beam
 ## for as long as it is on (`_bm_hit`). Allocates two profiles per such hit, never per frame.
-func _relay(target: Node, tag: int, shot: int) -> void:
-	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0 or not is_instance_valid(target):
+func _relay(spell: CompiledSpell, target: Node, tag: int, shot: int) -> void:
+	if spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0 or not is_instance_valid(target):
 		return
 	var donor_actor: int = projectiles.target_owner_of(target)
 	if donor_actor < 0 or donor_actor >= ACTORS:

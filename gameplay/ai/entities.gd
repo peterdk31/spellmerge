@@ -9,13 +9,20 @@ extends Node2D
 ## sorts it into the pool's two parts; its team says whom a familiar casts at; its ramp colours
 ## both; its body (`Actors.node_of`) is what a decoy copies and a familiar circles.
 ##
-## A **decoy** is a still copy of its caster's body (the `Sprite` and its `Hat`, copied at
-## spawn, a little see-through). Every shot but its owner's hits it and wears it down (G3c: it is
-## a `core/projectiles` target owned by its owner, so the owner's own shots pass it as they pass
-## its body: on LAYER_PLAYER for a seated owner, LAYER_ENEMY for another), and enemies within
-## DECOY_LURE of a seated owner's decoy chase it before any wizard (`lure`, asked by `ai.gd`). It
-## ends after DECOY_HITS hits or when its time runs out; where it ended is its end point. A decoy
-## whose card has a shield or deflect guards itself (rules R4g): every step Spells turns away
+## A **decoy** is an actor (gameplay/actor; owner, 2026-11-02): a copy of its caster's body
+## (`DecoyLook`: the `Sprite` and its `Hat`, copied at spawn) with Health (DECOY_HEALTH), a
+## Hurtbox, a Mover, a Caster with no cards (it tells the systems where it is and aims) and a
+## `DecoyController`, which aims it at the nearest standing actor of another team, so what its
+## card's triggers cast goes at its foes (core/spells fires a payload from an actor's body along
+## that actor's aim). Its team is its owner's, and it belongs to its owner (`Actor.belongs_to`): its
+## owner's shots pass it as they pass the owner's body; everything else hurts it (G3c). The other
+## teams find it as they find any actor of another team (no lure: it is chased when it is the
+## nearest). Homing on its card makes it creep toward its target within its homing reach, at
+## SpellLimits.HOMING_DRIFT (as a homing rune creeps). It ends when its Health is used up (it is
+## `downable`: Entities ends it instead of letting it die) or its time runs out; where it ended is
+## its end point. Each row makes its decoy actor the first time it holds one and keeps it: an ended
+## decoy leaves the tree and is placed again later. Entities steps its decoys itself, in `step`. A
+## decoy whose card has a shield or deflect guards itself (rules R4g): every step Spells turns away
 ## (`CarrierDecoy.guard_decoy`) the other teams' shots within DECOY_GUARD of its body, deflecting them
 ## or stopping them while its shield charges last, as a swing's guard does; each is a block.
 ##
@@ -29,7 +36,7 @@ extends Node2D
 ##
 ## An **enemy's** decoy and familiar (staffs F8d: an enemy that casts a staff with those cards)
 ## are the same in the enemy ramp: the decoy copies the enemy's `Sprite` and the familiar circles
-## the enemy. Enemies never chase an unseated owner's decoy (`lure`). The AI names its node for
+## the enemy. The AI names its node for
 ## its actor (`set_enemy`) and, when it dies or leaves, ends its entities where they are
 ## (`enemy_gone`), so not even a `hold` one outlives it.
 ##
@@ -43,7 +50,7 @@ extends Node2D
 ##
 ## Swap (`target_move_requested`) is heard by each enemy itself (`ai.gd`), not here.
 ##
-## Nothing here allocates per frame; drawing is the pooled decoy nodes and one batch of the
+## Nothing here allocates per frame; drawing is the decoy actors and one batch of the
 ## familiars, drawn by the shots' shader as orbit shots (the glow look, 2026-10-27): a small
 ## white-hot core in its owner's ramp and a tail that bends round its circle. All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -68,8 +75,8 @@ const POOL_SIZE: int = PLAYER_ROWS + ENEMY_ROWS
 ## Every owner there is: the actor ids.
 const ACTORS: int = ActorsScript.ACTORS
 
-## Hits a decoy takes before it breaks.
-const DECOY_HITS: int = 3
+## A decoy's health (three of a bolt's hits).
+const DECOY_HEALTH: float = 15.0
 ## The decoy's hit circle and where it sits from the feet: the wizard's own (Combat's numbers
 ## for a wizard, see flow.gd).
 const DECOY_RADIUS: float = 8.0
@@ -77,13 +84,6 @@ const DECOY_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## How far from its body's centre a guarding decoy turns shots away: twice its hit circle, so a
 ## shot is met a step before it would hit.
 const DECOY_GUARD: float = DECOY_RADIUS * 2.0
-## An enemy this close to a decoy chases the decoy rather than any wizard.
-const DECOY_LURE: float = 240.0
-## How far the copy has fallen apart (`shot_sprite.gdshader`'s dissolve: its pixels in its player's
-## colour, part of them gone, with a glow), so it never reads as a second wizard; never
-## see-through (the glow look, 2026-10-27).
-const DECOY_DISSOLVE: float = 0.3
-const DECOY_GLOW: float = 0.6
 
 ## The familiar circles this far from the wizard's body, this fast (radians a second).
 const FAMILIAR_ORBIT: float = 20.0
@@ -93,8 +93,7 @@ const FAMILIAR_CENTRE: Vector2 = Vector2(0.0, -14.0)
 ## A familiar is drawn as an orbit shot of this hit radius (its zoom, see `look_zoom`).
 const FAMILIAR_SIZE: float = 3.0
 ## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
-## style, a familiar an orbit shot drawn whole with its tail bent round its circle.
-const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
+## style (`DecoyLook`), a familiar an orbit shot drawn whole with its tail bent round its circle.
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
 ## A creature's telegraph (`creature_look.gd`), compiled before the first room (shader_warmup.gd).
 const TELEGRAPH_SHADER: Shader = preload("res://gameplay/ai/telegraph.gdshader")
@@ -115,6 +114,9 @@ var spells: SpellsScript = null
 ## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
 ## autoload.
 var actors: ActorsScript = null
+## Combat, for the decoy actors (they register their hurt circle there). Only tests set it;
+## otherwise the decoys find the "Combat" autoload.
+var combat: Node = null
 
 ## Per row. `_kind` is &"" for a free row. `_owner` is the actor that cast it (the events'
 ## `caster`), `_ramp` its ramp at spawn (the familiar's colours).
@@ -123,7 +125,6 @@ var _owner: PackedInt32Array = PackedInt32Array()
 var _ramp: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt32Array = PackedInt32Array()
 var _left: PackedFloat32Array = PackedFloat32Array()
-var _hits: PackedInt32Array = PackedInt32Array()
 ## A decoy's shield charges left, and 1 when it deflects (its guard, rules R4g).
 var _shield: PackedInt32Array = PackedInt32Array()
 var _deflect: PackedByteArray = PackedByteArray()
@@ -142,64 +143,11 @@ var _enemies: Array[Node2D] = []
 var _centre_at: PackedVector2Array = PackedVector2Array()
 var _centre_slot: PackedInt32Array = PackedInt32Array()
 var _centre_seq: PackedInt64Array = PackedInt64Array()
-## One pooled node per row, used when the row is a decoy.
-var _decoys: Array[Decoy] = []
+## The decoy actor of each row, made the first time the row holds a decoy (null before), in the
+## tree while the row is a decoy.
+var _decoys: Array[Actor] = []
 var _spawned: int = 0
 var _live: int = 0
-
-
-## A decoy as other code sees it: a Node2D that enemies may chase and shots may hit. It is
-## "downed" while its row is free, so the AI drops it at once (`ai.gd`'s `_is_valid_target`).
-class Decoy extends Node2D:
-	var active: bool = false
-	var sprite: Sprite2D = null
-	var hat: Sprite2D = null
-
-	func _init() -> void:
-		sprite = Sprite2D.new()
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		sprite.material = _material()
-		add_child(sprite)
-		hat = Sprite2D.new()
-		hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		hat.material = _material()
-		sprite.add_child(hat)
-		visible = false
-
-	func _material() -> ShaderMaterial:
-		var material := ShaderMaterial.new()
-		material.shader = SPRITE_SHADER
-		material.set_shader_parameter(&"core_override", Color.WHITE)
-		material.set_shader_parameter(&"dissolve", DECOY_DISSOLVE)
-		material.set_shader_parameter(&"sprite_glow", DECOY_GLOW)
-		return material
-
-	## Turn the copy to `colour` (its player's).
-	func tint(colour: Color) -> void:
-		(sprite.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", colour)
-		(hat.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", colour)
-
-	func is_downed() -> bool:
-		return not active
-
-	## Look like `wizard` does now (its `Sprite`, and a `Sprite/Hat` if it has one); plain when it
-	## has none.
-	func copy_look(wizard: Node2D) -> void:
-		var from: Sprite2D = wizard.get_node_or_null("Sprite") as Sprite2D if wizard != null else null
-		_copy(sprite, from)
-		_copy(hat, from.get_node_or_null("Hat") as Sprite2D if from != null else null)
-
-	func _copy(to: Sprite2D, from: Sprite2D) -> void:
-		to.texture = from.texture if from != null else null
-		if from == null:
-			return
-		to.hframes = from.hframes
-		to.vframes = from.vframes
-		to.frame = from.frame
-		to.flip_h = from.flip_h
-		to.position = from.position
-		to.offset = from.offset
-		to.centered = from.centered
 
 
 ## The familiars' batch and its buffer, and the seconds its shader animates from.
@@ -235,16 +183,12 @@ func _init() -> void:
 		_centre_at.append(Vector2.INF)
 		_centre_slot.append(-1)
 		_centre_seq.append(0)
-		var decoy := Decoy.new()
-		decoy.name = "Decoy%d" % row
-		_decoys.append(decoy)
-		add_child(decoy)
+		_decoys.append(null)
 	_enemies.resize(ACTORS)
 	_owner.resize(POOL_SIZE)
 	_ramp.resize(POOL_SIZE)
 	_tag.resize(POOL_SIZE)
 	_left.resize(POOL_SIZE)
-	_hits.resize(POOL_SIZE)
 	_shield.resize(POOL_SIZE)
 	_deflect.resize(POOL_SIZE)
 	_key.resize(POOL_SIZE)
@@ -266,7 +210,6 @@ func _ready() -> void:
 		return
 	events.entity_spawn_requested.connect(_on_spawn_requested)
 	events.entity_end_requested.connect(_on_end_requested)
-	events.projectile_hit.connect(_on_projectile_hit)
 	events.room_entered.connect(_on_room_entered)
 	events.ai_view_changed.connect(_on_ai_view_changed)
 	events.run_ended.connect(_on_run_ended)
@@ -294,6 +237,17 @@ func step(delta: float) -> void:
 			_step_familiar(row, delta)
 			if _key[row] != 0 and spells != null:
 				spells.familiar_at(_key[row], _position[row])
+			continue
+		var decoy: Actor = _decoys[row]
+		decoy.step(delta)
+		if decoy.is_inside_tree() and Engine.is_in_physics_frame():
+			decoy.move_and_slide()
+		else:
+			# A test's step (`move_and_slide` would move it by the frame's time, not `delta`).
+			decoy.position += decoy.velocity * delta
+		_position[row] = decoy.global_position
+		if decoy.health != null and decoy.health.is_depleted():
+			_end(row, true)
 		elif (_shield[row] > 0 or _deflect[row] != 0) and spells != null:
 			_shield[row] = CarrierDecoy.of(spells).guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
 	queue_redraw()
@@ -320,6 +274,14 @@ func positions_of(caster: int, tag: int) -> PackedVector2Array:
 	return out
 
 
+## The oldest live decoy actor of the owner actor `caster`, or null (tests and the sheets).
+func decoy_of(caster: int) -> Actor:
+	for row in _rows_by_age():
+		if _kind[row] == DECOY and _owner[row] == caster:
+			return _decoys[row]
+	return null
+
+
 ## How many entities of `kind` the owner actor `owner` has.
 func count_owned(kind: StringName, owner: int) -> int:
 	var found: int = 0
@@ -343,22 +305,6 @@ func enemy_gone(caster: int) -> void:
 	for row in POOL_SIZE:
 		if _kind[row] != &"" and _owner[row] == caster:
 			_end(row, true)
-
-
-## The nearest live decoy of a seated owner within DECOY_LURE of `point`, or null (never an
-## enemy's).
-## `ai.gd` asks it when it looks for a target. Allocation-free.
-func lure(point: Vector2) -> Node2D:
-	var best: Node2D = null
-	var best_sq: float = DECOY_LURE * DECOY_LURE
-	for row in PLAYER_ROWS:
-		if _kind[row] != DECOY:
-			continue
-		var d: float = point.distance_squared_to(_position[row])
-		if d <= best_sq:
-			best_sq = d
-			best = _decoys[row]
-	return best
 
 
 ## End every entity quietly (no `entity_ended`).
@@ -392,7 +338,6 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_ramp[row] = _ramp_of(owner)
 	_tag[row] = tag
 	_left[row] = seconds if seconds > 0.0 else INF
-	_hits[row] = DECOY_HITS
 	_shield[row] = CarrierDecoy.of(spells).decoy_shield(tag) if kind == DECOY and spells != null else 0
 	_deflect[row] = 1 if kind == DECOY and spells != null and CarrierDecoy.of(spells).decoy_deflects(tag) else 0
 	_angle[row] = 0.0
@@ -412,16 +357,7 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 			_centre_seq[row] = projectiles.get_seq_of(anchor)
 			_centre_at[row] = projectiles.get_position_of(anchor)
 	if kind == DECOY:
-		var decoy: Decoy = _decoys[row]
-		decoy.position = at
-		decoy.copy_look(wizard)
-		var colour: Color = ProjectileManagerScript.ramp_color(_ramp[row])
-		decoy.tint(colour.lerp(Color.WHITE, 0.4))
-		decoy.active = true
-		decoy.visible = true
-		if projectiles != null:
-			var layer: int = ProjectileManagerScript.LAYER_ENEMY if enemy else ProjectileManagerScript.LAYER_PLAYER
-			projectiles.add_target(decoy, DECOY_RADIUS, layer, owner, DECOY_OFFSET)
+		_place_decoy(row, owner, tag, at, wizard)
 	else:
 		_caster[row] = wizard
 		if wizard != null:
@@ -434,23 +370,83 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	queue_redraw()
 
 
+## Place row `row`'s decoy actor (made the first time) at `at` for `owner`: a copy of `body` on
+## `owner`'s team, belonging to it, full of health, aiming the way it was cast (from `body`), and
+## creeping toward its target when the card with `tag` homes. Spells hears its actor id
+## (`Spells.entity_body`), so its triggers cast from it along its aim.
+func _place_decoy(row: int, owner: int, tag: int, at: Vector2, body: Node2D) -> void:
+	var decoy: Actor = _decoys[row]
+	if decoy == null:
+		decoy = _make_decoy(row)
+	var mind: DecoyController = decoy.get_node(^"Mind") as DecoyController
+	mind.team = _team_of(owner)
+	mind.reach = CarrierDecoy.of(spells).homing_reach(tag) if spells != null else 0.0
+	mind.started(decoy)
+	decoy.belongs_to = owner
+	decoy.ramp = _ramp[row]
+	decoy.position = at
+	decoy.velocity = Vector2.ZERO
+	if body != null:
+		var from: Vector2 = at - (body.global_position if body.is_inside_tree() else body.position)
+		if not from.is_zero_approx():
+			decoy.aim = from.normalized()
+	(decoy.get_node(^"Health") as Health).reset(DECOY_HEALTH)
+	var look: DecoyLook = decoy.get_node(^"Look") as DecoyLook
+	look.copy_look(body)
+	look.tint(ProjectileManagerScript.ramp_color(_ramp[row]).lerp(Color.WHITE, 0.4))
+	add_child(decoy)
+	# Entities steps it (`step`), not its own physics callback.
+	decoy.set_physics_process(false)
+	if spells != null and decoy.id >= 0:
+		spells.entity_body = decoy.id
+
+
+## The decoy actor of row `row`, made once: its components and its controller.
+func _make_decoy(row: int) -> Actor:
+	var decoy := Actor.new()
+	decoy.name = "Decoy%d" % row
+	decoy.downable = true
+	decoy.events = events
+	decoy.projectiles = projectiles
+	decoy.spells = spells
+	decoy.actors = _actor_table()
+	if combat != null:
+		decoy.combat = combat
+	var health := Health.new()
+	health.name = "Health"
+	health.max_health = DECOY_HEALTH
+	decoy.add_child(health)
+	var hurtbox := Hurtbox.new()
+	hurtbox.radius = DECOY_RADIUS
+	hurtbox.offset = DECOY_OFFSET
+	decoy.add_child(hurtbox)
+	var mover := Mover.new()
+	mover.speed = SpellLimits.HOMING_DRIFT
+	mover.body_radius = DECOY_RADIUS
+	decoy.add_child(mover)
+	decoy.add_child(Caster.new())
+	var look := DecoyLook.new()
+	look.name = "Look"
+	decoy.add_child(look)
+	var mind := DecoyController.new()
+	mind.name = "Mind"
+	decoy.add_child(mind)
+	_decoys[row] = decoy
+	return decoy
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		# The decoys out of the tree are no children: they go with Entities.
+		for decoy in _decoys:
+			if decoy != null and decoy.get_parent() == null:
+				decoy.free()
+
+
 func _on_end_requested(caster: int, tag: int) -> void:
 	for row in POOL_SIZE:
 		if _kind[row] != &"" and _owner[row] == caster and _tag[row] == tag:
 			_end(row, true)
-
-
-## Every hit wears a decoy down, whoever cast it (G3c); its own caster's shots never reach it
-## (`core/projectiles` skips the targets a caster owns).
-func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag_hit: int, _shot: int) -> void:
-	if not target is Decoy:
-		return
-	var row: int = _decoys.find(target as Decoy)
-	if row < 0 or _kind[row] != DECOY:
-		return
-	_hits[row] -= 1
-	if _hits[row] <= 0:
-		_end(row, true)
 
 
 ## The sandbox's "AI view" switch (enemy AI AI8): every enemy's look shows what its AI does.
@@ -498,12 +494,11 @@ func _end(row: int, announce: bool) -> void:
 	_kind[row] = &""
 	_caster[row] = null
 	_live -= 1
-	var decoy: Decoy = _decoys[row]
-	if decoy.active:
-		decoy.active = false
-		decoy.visible = false
-		if projectiles != null:
-			projectiles.remove_target(decoy)
+	var decoy: Actor = _decoys[row]
+	if decoy != null and decoy.get_parent() == self:
+		_position[row] = decoy.global_position
+		# Out of the tree: its id, hurt circle and caster close, and nothing aims at it any more.
+		remove_child(decoy)
 	if announce and events != null:
 		events.entity_ended.emit(_owner[row], kind, _position[row], _tag[row])
 	queue_redraw()

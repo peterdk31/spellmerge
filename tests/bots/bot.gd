@@ -15,7 +15,7 @@ extends RefCounted
 ## (`CastSense`), never a card: it fires the staff that hurts and reaches, walks round walls
 ## (`AISight`), dodges shots and the telegraphs aimed at it, and when getting away is urgent it
 ## taps whichever staff's next cast moves the caster (no button is "the dash"). It holds no grudge
-## (a teammate's blast never makes it fight a teammate) and is lured by no decoy.
+## (a teammate's blast never makes it fight a teammate).
 ## Idler: stands still; it only opens its builder.
 ##
 ## Builder: `build_random(seed)` builds a random staff into staff 3 (BUILD_STAFF, LB, empty at the

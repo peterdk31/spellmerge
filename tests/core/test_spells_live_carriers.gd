@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the live-carrier clock (rules R4d, owner 2026-10-29): every carrier that lasts keeps
 ## a timer and hears `on hurt` while it lives, and fires from where it is now (a shot, a beam's
-## tip, a rain's spot, a decoy, the caster's body during a dash); the first timer tick and the
+## tip, a rain's spot, a decoy, the caster's body during a dash; from a body, along its aim now); the first timer tick and the
 ## first arc zap come after the interval or half the carrier's life, whichever is shorter. It
 ## runs a real projectile manager and event bus, stepped by hand, with cards built in code.
 ##
@@ -219,6 +219,27 @@ func test_a_timer_on_a_dash_fires_from_the_caster_as_it_moves() -> void:
 	var runes: Array[Vector2] = _runes()
 	check_equal(runes.size(), 1, "a 0.4 s dash ticks at 0.2 s")
 	check(runes.size() == 1 and runes[0].is_equal_approx(Vector2(15, 0)), "from where the caster is then (%s)" % [runes])
+
+
+## A payload fired from an actor's body goes the way that actor aims now (owner, 2026-11-02): the
+## dash goes along +x, but the caster aims down when its timer ticks, so the shot flies down.
+func test_a_timer_on_a_dash_fires_along_the_casters_aim_now() -> void:
+	_mgr.set_anchor(0, Vector2.ZERO)
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	_build([&"on_timer", &"dash", &"short"])
+	_cast()
+	_tick(6)
+	_mgr.set_anchor(0, Vector2(15, 0))
+	_spells.set_aim(0, Vector2(15, 0), Vector2.DOWN)
+	_tick(7)
+	var ways: Array[Vector2] = []
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			var spell: CompiledSpell = _spells.profile(_mgr.get_tag_of(slot))
+			if spell != null and spell.form_id == &"short":
+				ways.append(_mgr.get_velocity_of(slot).normalized())
+	check_equal(ways.size(), 1, "a 0.4 s dash ticks at 0.2 s")
+	check(ways.size() == 1 and ways[0].dot(Vector2.DOWN) > 0.99, "its shot flies the way the caster aims now, not along the dash (%s)" % [ways])
 
 
 func test_on_hurt_on_a_dash_fires_only_while_it_moves() -> void:

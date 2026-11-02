@@ -33,7 +33,7 @@ const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 ## How it plays (null: its home actor's data's profile, else the shared default).
 @export var profile: AIProfile = null
 
-## The decoys (`Entities.lure`). Only tests set it, before the actor is added; otherwise the
+## Entities (its team board, its decoys and familiars). Only tests set it, before the actor is added; otherwise the
 ## "Entities" autoload is used.
 var entities: EntitiesScript = null
 ## The team board. Only tests set it, before the actor is added; otherwise `Entities.board`.

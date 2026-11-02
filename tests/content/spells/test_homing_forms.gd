@@ -110,6 +110,9 @@ func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach(
 		if form.carrier == &"rain":
 			_check_rain(form, at)
 			continue
+		if not Carriers.of(form.carrier).hits():
+			# A decoy hits nothing: homing makes it creep toward its target (test_decoy.gd).
+			continue
 		# A lone shot on its line misses it, so a hit below is the homing's doing.
 		if form.shots == 1 and form.spread <= 0.0:
 			check(not _hits(0, [form.id] as Array[StringName], target, seconds), "a plain %s misses a target %s px off at %s degrees" % [form.id, roundi(at.length()), OFF_AIM])

@@ -245,7 +245,7 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
-## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash) or a point (a rain's spot, a decoy, and a familiar's orb,
+## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a rain's spot and a familiar's orb,
 ## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
 ## it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
@@ -348,6 +348,9 @@ var _walk_turn: PackedFloat32Array = PackedFloat32Array()
 ## While `entity_spawn_requested` is sent, the key of the entity it asks for (0 at other times):
 ## Entities keeps it and hands it back with `familiar_at`. `_entity_keys` counts them out.
 var entity_key: int = 0
+## The actor id of the body Entities made for that request (a decoy is an actor), set by Entities
+## while `entity_spawn_requested` is sent; -1 for none (a familiar is a point).
+var entity_body: int = -1
 var _entity_keys: int = 0
 ## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
@@ -1896,8 +1899,9 @@ func _step_live(delta: float) -> void:
 
 
 ## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
-## (`_heading`), else outward from its caster's body through it, else its `_lc_way`. Its shot casts
-## the payload while it flies, else the point does.
+## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
+## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies,
+## else the point does.
 func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
@@ -1911,6 +1915,11 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	var way: Vector2 = _lc_way[i]
 	if slot >= 0:
 		way = _heading(spell, slot, at, actor)
+	elif _lc_kind[i] == LC_ACTOR:
+		# An actor's body (a wizard's dash, a decoy): the way that actor aims now.
+		var body: int = _lc_ref[i]
+		if body >= 0 and body < ACTORS and _aim_seen[body] != 0:
+			way = _aim_dir[body]
 	else:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():

@@ -539,6 +539,84 @@ func test_at_the_cap_the_trails_thin_first() -> void:
 	check(is_equal_approx(_shader_share(mgr._rune_node, &"particle_share"), mgr.particle_share), "for every batch")
 
 
+## The trail mesh has only the slots the pool can fill (performance, 2026-11-02): every quad of
+## it runs the vertex stage, drawn or not. Thinned particles come every `spark_stride`-th moment,
+## so the mesh has a stride's share of particle slots; with no share for the tails it keeps only
+## the tail slots a dash draws its streaks on. Under the cap it is the full mesh.
+func test_the_trail_mesh_has_the_slots_the_pool_fills() -> void:
+	mgr.particle_cap = 1000
+	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
+	mgr.update_draw(1.0)
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(), "under the cap: the full mesh")
+	check_equal(mgr.spark_stride, 1, "every moment")
+	mgr.particle_cap = 100
+	mgr.update_draw(1.0)
+	check_equal(mgr.trail_share, 0.0, "the particles (120) fill the pool: no tail")
+	check_equal(mgr.spark_stride, 1, "a share of %.2f is more than half the moments" % mgr.particle_share)
+	check_equal(_tail_slots(mgr._draw_node.multimesh.mesh), ManagerScript.DASH_STREAK_SLOTS, "the tail keeps a dash's streak slots only")
+	mgr.particle_cap = 30
+	mgr.update_draw(1.0)
+	check(is_equal_approx(mgr.particle_share, 0.25), "a quarter of the particles")
+	check_equal(mgr.spark_stride, 4, "come from every fourth moment")
+	check_equal(_shader_share(mgr._draw_node, &"spark_stride"), 4.0, "the shader is told")
+	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), ManagerScript.spark_slots_for(4), "a quarter of the particle slots")
+	for node: MultiMeshInstance2D in [mgr._orbit_node, mgr._enemy_node]:
+		check(node.multimesh.mesh == mgr._draw_node.multimesh.mesh, "every trail batch draws the same mesh")
+		check_equal(_shader_share(node, &"spark_stride"), 4.0, "with the same stride")
+	mgr.particle_cap = 1000
+	mgr.update_draw(1.0)
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(), "back under the cap: the full mesh again")
+	check_equal(_shader_share(mgr._draw_node, &"spark_stride"), 1.0, "every moment again")
+
+
+func test_the_spark_stride_moves_only_when_it_must() -> void:
+	check_equal(ManagerScript.spark_stride_for(1.0, 1), 1, "everything shared: every moment")
+	check_equal(ManagerScript.spark_stride_for(0.3, 1), 2, "0.3: every other moment (0.6 of them wanted)")
+	check_equal(ManagerScript.spark_stride_for(0.45, 2), 2, "0.45 at 2 is 0.9 of the moments: stays")
+	check_equal(ManagerScript.spark_stride_for(0.55, 2), 1, "0.55 at 2 would want more than every moment: back to 1")
+	check_equal(ManagerScript.spark_stride_for(0.22, 2), 2, "0.22 at 2 is 0.44: stays (no flicker round a power of two)")
+	check_equal(ManagerScript.spark_stride_for(0.19, 2), 4, "0.19 at 2 is under 0.4: every fourth")
+	check_equal(ManagerScript.spark_stride_for(0.0, 1), ManagerScript.SPARK_STRIDE_MAX, "none shared: the thinnest")
+	check_equal(ManagerScript.spark_stride_for(0.0, ManagerScript.SPARK_STRIDE_MAX), ManagerScript.SPARK_STRIDE_MAX, "and it stays there")
+	var stride: int = 1
+	while stride <= ManagerScript.SPARK_STRIDE_MAX:
+		check(ManagerScript.spark_slots_for(stride) * stride >= ManagerScript.TRAIL_SPARKS, "at %d the slots still cover every moment a particle lives" % stride)
+		stride *= 2
+
+
+func test_a_thin_trail_mesh_keeps_its_order_and_the_dash() -> void:
+	var thin: ArrayMesh = ManagerScript.trail_mesh(4, false)
+	check(thin == ManagerScript.trail_mesh(4, false), "each mesh made once")
+	check(thin != ManagerScript.trail_mesh(), "and apart from the full one")
+	check_equal(_slots_of(thin, ManagerScript.TRAIL_Q_PIECE_LIGHT), ManagerScript.TRAIL_SAMPLES, "every piece slot (a dash's streak lights)")
+	check_equal(_tail_slots(thin), ManagerScript.DASH_STREAK_SLOTS, "a dash's streak slots of the tail")
+	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
+	check(trail.code.contains("dash && slot < %d.0" % ManagerScript.DASH_STREAK_SLOTS), "the shader draws a dash's streaks on that many slots")
+	check(trail.code.contains("uniform float spark_stride"), "and thins particles by the stride")
+	var kinds: PackedInt32Array = PackedInt32Array()
+	var uvs: PackedVector2Array = thin.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+	for i in range(0, uvs.size(), 4):
+		var kind: int = floori(uvs[i].y)
+		if kinds.is_empty() or kinds[kinds.size() - 1] != kind:
+			kinds.append(kind)
+	var order := PackedInt32Array()
+	for entry: Vector3i in ManagerScript.TRAIL_QUADS:
+		order.append(entry.x)
+	check_equal(kinds, order, "the kinds in the full mesh's order")
+
+
+func _slots_of(mesh: ArrayMesh, kind: int) -> int:
+	var uvs: PackedVector2Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+	var count: int = 0
+	for i in range(0, uvs.size(), 4):
+		count += 1 if floori(uvs[i].y) == kind else 0
+	return count
+
+
+func _tail_slots(mesh: ArrayMesh) -> int:
+	return _slots_of(mesh, ManagerScript.TRAIL_Q_TAIL)
+
+
 func test_four_players_share_one_pool() -> void:
 	mgr.particle_cap = 240
 	for player in 4:

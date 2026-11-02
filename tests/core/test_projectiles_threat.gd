@@ -79,3 +79,82 @@ func test_a_still_shot_on_the_point() -> void:
 	mgr.spawn(WIZ, Vector2(5.0, 0.0), Vector2.ZERO, 3.0, 6.0, ManagerScript.ACTOR_LAYERS, 0, 0, ManagerScript.MOTION_STILL)
 	check_equal(mgr.threat(Vector2.ZERO, 10.0, ActorsScript.TEAM_ENEMIES, IMP), 0.0, "standing on a rune is a threat now")
 	check(mgr.threat_away.x < -0.9, "step away from it: %s" % mgr.threat_away)
+
+
+## With THREAT_GRID_FROM shots or more an ask goes through the threat grid (performance,
+## 2026-11-02). It must find what one pass over every shot finds (the same exact test, in slot
+## order), for every kind of shot: fast ones whose paths span many cells, still ones, ones whose
+## life ends first, near the bounds and outside them.
+func test_the_grid_finds_what_one_pass_finds() -> void:
+	_compare_with_one_pass(900, true)
+
+
+## Below THREAT_GRID_FROM shots every ask is one pass (written out in `threat`): the same answers.
+func test_one_pass_matches_the_exact_test() -> void:
+	_compare_with_one_pass(ManagerScript.THREAT_GRID_FROM - 20, false)
+
+
+func _compare_with_one_pass(shots: int, grid: bool) -> void:
+	mgr.set_cap(1200)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 2026_11_02
+	var casters: Array[int] = [WIZ, WIZ + 1, IMP, OTHER_IMP]
+	for i in shots:
+		var at := Vector2(rng.randf_range(-950.0, 950.0), rng.randf_range(-950.0, 950.0))
+		var speed: float = [0.0, 60.0, 250.0, 900.0, 3000.0][i % 5]
+		var motion: int = ManagerScript.MOTION_STILL if speed == 0.0 else ManagerScript.MOTION_STRAIGHT
+		mgr.spawn(casters[i % 4], at, Vector2.from_angle(rng.randf() * TAU) * speed, rng.randf_range(0.2, 4.0), rng.randf_range(1.0, 12.0), ManagerScript.ACTOR_LAYERS, 0, 0, motion)
+	check_equal(mgr.get_count() >= ManagerScript.THREAT_GRID_FROM, grid, "shots for the grid or not: %d" % mgr.get_count())
+	mgr.step(1.0 / 60.0)
+	var asked: int = 0
+	var found: int = 0
+	var gridded: int = 0
+	for q in 400:
+		var point := Vector2(rng.randf_range(-1100.0, 1100.0), rng.randf_range(-1100.0, 1100.0))
+		var radius: float = rng.randf_range(4.0, 40.0)
+		var team: int = [ActorsScript.TEAM_ENEMIES, ActorsScript.TEAM_WIZARDS, ActorsScript.NONE][q % 3]
+		var own: int = [IMP, WIZ, -1][q % 3]
+		var horizon: float = [0.9, 0.9, 0.3, 2.0][q % 4]
+		var when: float = mgr.threat(point, radius, team, own, horizon)
+		var slot: int = mgr.threat_slot
+		var away: Vector2 = mgr.threat_away
+		gridded += 1 if mgr._threat_step == mgr._step_index else 0
+		# The same exact test over every slot, in order.
+		mgr.threat_slot = -1
+		var best: float = INF
+		for s in mgr._high:
+			best = mgr._threat_try(s, point, radius, team, own, horizon, best)
+		var want: float = best if mgr.threat_slot >= 0 else -1.0
+		asked += 1
+		found += 1 if slot >= 0 else 0
+		if not (when == want and slot == mgr.threat_slot and away.is_equal_approx(mgr.threat_away)):
+			check(false, "ask %d at %s r %.1f: grid %s slot %d, one pass %s slot %d" % [q, point, radius, when, slot, want, mgr.threat_slot])
+			return
+	check(found > 20, "the asks found shots, not only none: %d of %d" % [found, asked])
+	if grid:
+		check(gridded > 300, "most asks went through the grid: %d of %d" % [gridded, asked])
+	else:
+		check_equal(gridded, 0, "no ask went through the grid")
+
+
+## A shot spawned, deflected or moved by a card after the grid was built in a step is still seen
+## by the next ask in that step.
+func test_the_grid_sees_changes_within_a_step() -> void:
+	mgr.set_cap(600)
+	for i in 400:
+		mgr.spawn(WIZ, Vector2(-900.0 + float(i), 900.0), Vector2(0.0, 50.0), 3.0, 2.0, ManagerScript.ACTOR_LAYERS)
+	mgr.step(1.0 / 60.0)
+	for n in ManagerScript.THREAT_GRID_ASKS:
+		check_equal(mgr.threat(Vector2.ZERO, 10.0, ActorsScript.TEAM_ENEMIES, IMP), -1.0, "nothing heads for the point yet")
+	check_equal(mgr._threat_step, mgr._step_index, "the asks built the grid")
+	var slot: int = mgr.spawn(WIZ, Vector2(-200.0, 0.0), Vector2(200.0, 0.0), 3.0, 4.0, ManagerScript.ACTOR_LAYERS)
+	mgr.threat(Vector2.ZERO, 10.0, ActorsScript.TEAM_ENEMIES, IMP)
+	check_equal(mgr.threat_slot, slot, "a shot spawned after the grid was built")
+	var away: int = mgr.spawn(WIZ, Vector2(0.0, -200.0), Vector2(0.0, -200.0), 3.0, 4.0, ManagerScript.ACTOR_LAYERS)
+	mgr.step(1.0 / 60.0)
+	check(mgr.is_alive(away), "the shot flying away is alive")
+	check_equal(mgr.threat(Vector2(0.0, 50.0), 10.0, ActorsScript.TEAM_ENEMIES, IMP), -1.0, "it flies away from the point")
+	check_equal(mgr._threat_step, mgr._step_index, "a step after a busy one builds the grid at its first ask")
+	mgr.deflect_shot(away, OTHER_IMP, Vector2(0.0, 1.0), 0)
+	mgr.threat(Vector2(0.0, 50.0), 10.0, ActorsScript.TEAM_WIZARDS, WIZ)
+	check_equal(mgr.threat_slot, away, "deflected back toward the point, it is seen in the same step")

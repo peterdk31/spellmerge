@@ -6,6 +6,18 @@ extends Node2D
 ## lands, bounces once, lies still and cools through its ramp's shades). The CPU writes a row once
 ## and never touches it again: there is no per-frame simulation.
 ##
+## **Kinds are data** (`MoteKind`, `content/motes/`): how one flies and how many a burst throws.
+## The pool takes them when it is made and hands their numbers to the shader (`kind_motion`,
+## `kind_sway`), so a new kind is a new file. A spell's kinds come from its cards' looks
+## (`kinds_of_look`): a shot sheds the kinds that name its look layers (`shed`).
+##
+## **Colours are never here.** A mote cools through a ramp of four shades (white-hot, light, base,
+## shadow) named by its source (`spell_source`, `table_source`): a spell's motes take the shot's
+## own ramp, picked in the shader by the shot shaders' rule (`look_of` in `shot_look.gdshaderinc`:
+## the caster's hat ramp for a plain core, else the palette material nearest its core, or the
+## exact colour); any other colours (a room's walls, `RoomBase.surface_colors`) go into the ramp
+## table (`ramp_table`, a texture of RAMPS rows) and are named by their row.
+##
 ## The pool is a ring of `cap` rows (the "Particles" setting, `MoteCap` in core/settings): a new
 ## mote takes the next row and overwrites the oldest. The ring is cut into CHUNK-row chunks, one
 ## `MultiMeshInstance2D` each (made by `Batches.multimesh()`, so it is never culled; made the first
@@ -16,9 +28,8 @@ extends Node2D
 ## FRAME_ROWS are written between two steps: a burst past that is cut short (a flood of wall hits
 ## costs a bounded part of a frame; P1c measures the number).
 ##
-## Kinds are rows of the tables below (GRAVITY, DRAG, ...), mirrored in the shader's K_* constants,
-## and `flight` is the shader's `mote_flight` line for line (tests/gameplay/feel/test_motes.gd
-## compares them). `mote_land` gives where and when a mote comes to rest, for the floor marks (P2b).
+## `flight` is the shader's `mote_flight` line for line; `mote_land` gives where and when a mote
+## comes to rest, for the floor marks (P2b).
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -29,63 +40,41 @@ const CHUNK: int = 1024
 const DRAW_STRIDE: int = 16
 ## The longest life a mote has (s); a chunk with nothing newer is hidden.
 const LIFE_MAX: float = 4.0
-## What a kind and a ramp are divided by in the row's colour (the shader's CODE).
-const CODE: float = 16.0
 ## The most motes written between two steps (about 0.6 ms of a frame).
 const FRAME_ROWS: int = 384
-
-## The kinds, by their index in KIND_NAMES (a cue names a kind by its name).
-const EMBER: int = 0
-const SPARK: int = 1
-const CHIP: int = 2
-const SHARD: int = 3
-const ASH: int = 4
-const SPLINTER: int = 5
-const KIND_NAMES: Array[StringName] = [&"ember", &"spark", &"chip", &"shard", &"ash", &"splinter"]
-## Per kind (the shader's K_* constants): down the height (px/s/s; below 0 it rises), drag along
-## the floor (1/s), the share of its fall's speed a landing bounces back, a sideways sway (px) and
-## its rate (rad/s), the glow while it is hot (0 none), the shade it starts at (0 white-hot,
-## 1 light, 2 base, 3 shadow).
-## An ember rises, sways, glows and cools; a spark is fast, short and glows; a chip is stone that
-## falls and lies; a shard is ice that falls and glints; ash drifts slowly and sinks; a splinter is
-## wood (staff bodies).
-const GRAVITY: Array[float] = [-12.0, 220.0, 320.0, 300.0, 18.0, 300.0]
-const DRAG: Array[float] = [2.0, 3.5, 2.5, 2.5, 1.2, 2.5]
-const BOUNCE: Array[float] = [0.0, 0.35, 0.3, 0.4, 0.0, 0.25]
-const WOBBLE: Array[float] = [1.5, 0.0, 0.0, 0.0, 3.0, 0.0]
-const WOBBLE_RATE: Array[float] = [7.0, 0.0, 0.0, 0.0, 3.0, 0.0]
-const GLOW: Array[float] = [1.0, 1.0, 0.0, 0.4, 0.0, 0.0]
-const SHADE_FROM: Array[float] = [0.0, 0.0, 1.0, 1.0, 2.0, 1.0]
-## The share of a kind's motes that are a 2x2 chunk rather than one pixel (CPU only).
-const BIG_SHARE: Array[float] = [0.0, 0.0, 0.3, 0.0, 0.0, 0.5]
-
-## The ramps a mote cools through (the shader's `ramp_shade`): 0-3 the players' hat ramps,
-## RAMP_ENEMY the enemies' (Blight), the materials of the shot shaders' SHADES from RAMP_FIRE on
-## (Fire, Spark, Ice, Void, Arc, Bone), then Stone and Wood (docs/STYLE.md).
-const RAMP_ENEMY: int = 4
-const RAMP_FIRE: int = 5
-const RAMP_SPARK: int = 6
-const RAMP_ICE: int = 7
-const RAMP_VOID: int = 8
-const RAMP_ARC: int = 9
-const RAMP_BONE: int = 10
-const RAMP_STONE: int = 11
-const RAMP_WOOD: int = 12
-## The materials' shades (shadow, base, light each), as `shot_palette.gdshaderinc`'s SHADES has
-## them: a core colour takes the ramp of the nearest (`ramp_of_core`).
-const MATERIAL_SHADES: Array[Color] = [
-	Color(0.561, 0.176, 0.165), Color(0.878, 0.349, 0.184), Color(1.0, 0.635, 0.235),
-	Color(0.722, 0.502, 0.122), Color(0.949, 0.761, 0.188), Color(1.0, 0.953, 0.651),
-	Color(0.122, 0.439, 0.502), Color(0.310, 0.839, 0.863), Color(0.769, 0.965, 0.949),
-	Color(0.290, 0.078, 0.314), Color(0.627, 0.188, 0.604), Color(0.878, 0.541, 0.847),
-	Color(0.247, 0.420, 0.063), Color(0.706, 0.910, 0.165), Color(0.933, 1.0, 0.651),
-	Color(0.639, 0.624, 0.722), Color(0.831, 0.816, 0.878), Color(0.957, 0.945, 0.918),
-]
+## The most kinds the shader holds (its `kind_motion` and `kind_sway` arrays).
+const MAX_KINDS: int = 16
+## Rows of the ramp table (colours other than a spell's), and its shades a row.
+const RAMPS: int = 64
+const SHADES: int = 4
+## A source (a row's first colour channel): 0-3 a hat ramp, ENEMY_SOURCE the enemies', plus
+## EXACT_SOURCE for a shot of an exact colour; from TABLE_SOURCE on, a row of the ramp table.
+const ENEMY_SOURCE: int = 4
+const EXACT_SOURCE: int = 8
+const TABLE_SOURCE: int = 16
+## A look's flags (core/projectiles: LOOK_ENEMY_RAMP, and Feel's EXACT), and its layers' bits.
+const LOOK_ENEMY_RAMP: int = 1 << 22
+const LOOK_EXACT: int = 1 << 23
+const LOOK_LAYERS: int = 21
+## A row's second colour channel: the kind, plus BIG for a 2x2 chunk.
+const BIG: int = 16
+## What a row's colour channels are divided by, so every one is between 0 and 1 (the shader's
+## SOURCE_CODE, KIND_CODE, HEIGHT_MAX; LIFE_MAX for the life). The life and the height are
+## written in steps of 1/255 of their most (the height in quarter pixels), so a renderer that
+## keeps the colour as bytes reads the same numbers `flight` does.
+const SOURCE_CODE: float = 128.0
+const KIND_CODE: float = 32.0
+const HEIGHT_MAX: float = 63.75
 
 ## Uploads of a chunk's buffer since this pool was made (for tests and the benchmarks).
 var uploads: int = 0
 
 var _cap: int = 0
+## The kinds, in the order the shader holds them, and for each look layer (0-21) the kinds that
+## are its motes; the surface kinds.
+var _kinds: Array[MoteKind] = []
+var _layer_kinds: Array[PackedInt32Array] = []
+var _surface_kinds: PackedInt32Array = PackedInt32Array()
 ## The next row a mote takes.
 var _next: int = 0
 ## Per chunk: its batch (null until its first mote), its rows, written since the last upload, and
@@ -98,14 +87,21 @@ var _newest: PackedFloat32Array = PackedFloat32Array()
 var _now: float = 0.0
 ## Motes that may still be written before the next step (FRAME_ROWS).
 var _rows_left: int = FRAME_ROWS
+## The ramp table: its image and texture, the row of each set of colours, and the next row a new
+## set takes (the oldest when it is full).
+var _ramp_image: Image = null
+var _ramp_texture: ImageTexture = null
+var _ramp_rows: Dictionary = {}
+var _next_ramp: int = 0
 var _material: ShaderMaterial = null
 var _mesh: ArrayMesh = null
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
-## A pool of `cap` rows (above 0), its batches drawn at `z`.
-func _init(cap: int, z: int) -> void:
+## A pool of `cap` rows (above 0) of the kinds `kinds` (at most MAX_KINDS; a kind with problems
+## is left out), its batches drawn at `z`.
+func _init(cap: int, z: int, kinds: Array[MoteKind]) -> void:
 	top_level = true
 	_cap = maxi(cap, 1)
 	_z = z
@@ -118,6 +114,10 @@ func _init(cap: int, z: int) -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
 	_mesh = _quad()
+	_ramp_image = Image.create_empty(SHADES, RAMPS, false, Image.FORMAT_RGBA8)
+	_ramp_texture = ImageTexture.create_from_image(_ramp_image)
+	_material.set_shader_parameter(&"ramp_table", _ramp_texture)
+	_take_kinds(kinds)
 
 
 ## How many motes the ring holds.
@@ -125,23 +125,108 @@ func cap() -> int:
 	return _cap
 
 
-## Throw `count` motes of `kind` (EMBER to SPLINTER) from `at` (where they show; their ground point
-## is `height` pixels below it): along the floor within `spread` degrees round `dir` (all round with
-## 360 or no `dir`), at a speed in `speed` (x to y, px/s), up at a speed in `up`, living a time in
-## `life` (s, at most LIFE_MAX), cooling through `ramp` (RAMP_*). Fewer when the frame's FRAME_ROWS
-## run out.
-func burst(kind: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, ramp: int, height: float = 0.0) -> void:
+## The kinds, in the order the rows name them.
+func kinds() -> Array[MoteKind]:
+	return _kinds
+
+
+## The index of the kind `id`, or -1.
+func kind_index(id: StringName) -> int:
+	for i in _kinds.size():
+		if _kinds[i].id == id:
+			return i
+	return -1
+
+
+## The kinds a shot of the look `look` sheds (its cards' layers; LOOK_* bits, layer n is bit
+## n - 1): every kind that names one of them, else the kinds of layer 0.
+func kinds_of_look(look: int) -> PackedInt32Array:
+	var found := PackedInt32Array()
+	for layer in range(1, LOOK_LAYERS + 1):
+		if (look >> (layer - 1)) & 1 == 1:
+			for k in _layer_kinds[layer]:
+				if not found.has(k):
+					found.append(k)
+	if found.is_empty():
+		found = _layer_kinds[0].duplicate()
+	return found
+
+
+## The surface kinds (what a struck wall sheds).
+func surface_kinds() -> PackedInt32Array:
+	return _surface_kinds
+
+
+## The source of a spell's motes: the ramp of a shot of its caster's `ramp` (0-3 a hat ramp,
+## anything else the enemies') with the look `look` (its flags: the enemy ramp, an exact colour).
+static func spell_source(ramp: int, look: int) -> int:
+	var who: int = ramp if ramp >= 0 and ramp < ENEMY_SOURCE and (look & LOOK_ENEMY_RAMP) == 0 else ENEMY_SOURCE
+	return who + (EXACT_SOURCE if (look & LOOK_EXACT) != 0 else 0)
+
+
+## The source of motes in `colours` (light, base, shadow; a fourth first is the white-hot, else
+## the light): their row of the ramp table, written the first time.
+func table_source(colours: PackedColorArray) -> int:
+	if colours.is_empty():
+		return -1
+	var shades: PackedColorArray = colours if colours.size() >= SHADES else PackedColorArray([colours[0]]) + colours
+	if _ramp_rows.has(shades):
+		return TABLE_SOURCE + int(_ramp_rows[shades])
+	var row: int = _next_ramp
+	_next_ramp = (_next_ramp + 1) % RAMPS
+	for key: Variant in _ramp_rows.keys():
+		if int(_ramp_rows[key]) == row:
+			_ramp_rows.erase(key)
+	_ramp_rows[shades] = row
+	for shade in SHADES:
+		_ramp_image.set_pixel(shade, row, shades[mini(shade, shades.size() - 1)])
+	_ramp_texture.update(_ramp_image)
+	return TABLE_SOURCE + row
+
+
+## The colour of shade `shade` (0 white-hot ... 3 shadow) of the ramp table's row for `source`
+## (for tests).
+func table_shade(source: int, shade: int) -> Color:
+	return _ramp_image.get_pixel(shade, source - TABLE_SOURCE)
+
+
+## A shot of the look `look` and core colour `core`, of an actor of `ramp`, sheds its motes at
+## `at`: each kind of its cards (`kinds_of_look`) throws its share of its burst (`scale` of its
+## count, split between them) along `dir`, in the shot's own ramp.
+func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
+	var found: PackedInt32Array = kinds_of_look(look)
+	var source: int = spell_source(ramp, look)
+	for k in found:
+		throw(k, at, dir, source, core, scale / float(found.size()))
+
+
+## Throw a burst of kind `k` (its count times `scale`, at least one; its speed, spread, up, life
+## and height) from `at` along `dir`, from `source` (`spell_source`, `table_source`) with the core
+## colour `core` (a spell's; white for none).
+func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: float = 1.0) -> void:
+	if k < 0 or k >= _kinds.size() or source < 0:
+		return
+	var kind: MoteKind = _kinds[k]
+	burst(k, at, dir, maxi(roundi(float(kind.count) * scale), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
+
+
+## Throw `count` motes of kind `k` from `at` (where they show; their ground point is `height`
+## pixels below it): along the floor within `spread` degrees round `dir` (all round with 360 or no
+## `dir`), at a speed in `speed` (x to y, px/s), up at a speed in `up`, living a time in `life`
+## (s, at most LIFE_MAX), cooling through the ramp of `source` with the core colour `core`. Fewer
+## when the frame's FRAME_ROWS run out.
+func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
 	count = mini(count, _rows_left)
-	if count <= 0 or not at.is_finite() or kind < 0 or kind >= KIND_NAMES.size():
+	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
 		return
 	_rows_left -= count
 	var aim: float = dir.angle() if dir != Vector2.ZERO else 0.0
 	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
+	height = _step255(height, HEIGHT_MAX)
 	var ground: Vector2 = at + Vector2(0.0, height)
-	var big: float = BIG_SHARE[kind]
-	var shade: float = SHADE_FROM[kind]
-	var coded_kind: float = float(kind) / CODE
-	var coded_ramp: float = float(clampi(ramp, 0, RAMP_WOOD)) / CODE
+	var big: float = _kinds[k].big_share
+	var coded_source: float = float(source) / SOURCE_CODE
+	var coded_height: float = height / HEIGHT_MAX
 	var chunk: int = -1
 	var buffer: PackedFloat32Array
 	for n in count:
@@ -160,13 +245,14 @@ func burst(kind: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spr
 		buffer[i + 4] = v.y
 		buffer[i + 5] = _rng.randf_range(up.x, up.y)
 		buffer[i + 7] = ground.y
-		buffer[i + 8] = coded_kind
-		buffer[i + 9] = coded_ramp
-		buffer[i + 10] = clampf(_rng.randf_range(life.x, life.y), 0.02, LIFE_MAX) / LIFE_MAX
-		buffer[i + 11] = _rng.randf()
-		buffer[i + 12] = height
-		buffer[i + 13] = 2.0 if big > 0.0 and _rng.randf() < big else 1.0
-		buffer[i + 14] = shade
+		buffer[i + 8] = coded_source
+		buffer[i + 9] = float(k + (BIG if big > 0.0 and _rng.randf() < big else 0)) / KIND_CODE
+		buffer[i + 10] = _step255(clampf(_rng.randf_range(life.x, life.y), 0.02, LIFE_MAX), LIFE_MAX) / LIFE_MAX
+		buffer[i + 11] = coded_height
+		buffer[i + 12] = core.r
+		buffer[i + 13] = core.g
+		buffer[i + 14] = core.b
+		buffer[i + 15] = _rng.randf()
 
 
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those
@@ -187,6 +273,11 @@ func step(now: float) -> void:
 			node.visible = true
 		elif node.visible and now - _newest[c] > LIFE_MAX:
 			node.visible = false
+
+
+## A shader parameter of the motes' material (for tests).
+func shader_parameter(name: StringName) -> Variant:
+	return _material.get_shader_parameter(name)
 
 
 ## Chunks with a batch made, and those drawn now (for tests).
@@ -216,7 +307,7 @@ func next_row() -> int:
 func mote_at(row: int, now: float) -> Vector3:
 	var buffer: PackedFloat32Array = _buffers[row / CHUNK]
 	var i: int = (row % CHUNK) * DRAW_STRIDE
-	return flight(Vector2(buffer[i + 3], buffer[i + 7]), Vector2(buffer[i], buffer[i + 4]), buffer[i + 12], buffer[i + 5], now - buffer[i + 1], _kind_of(buffer, i), buffer[i + 11])
+	return flight(Vector2(buffer[i + 3], buffer[i + 7]), Vector2(buffer[i], buffer[i + 4]), buffer[i + 11] * HEIGHT_MAX, buffer[i + 5], now - buffer[i + 1], _kind_of(buffer, i), buffer[i + 15])
 
 
 ## Where and when mote `row` comes to rest on the floor: its point (x, y) and the clock time (z);
@@ -224,12 +315,12 @@ func mote_at(row: int, now: float) -> Vector3:
 func mote_land(row: int) -> Vector3:
 	var buffer: PackedFloat32Array = _buffers[row / CHUNK]
 	var i: int = (row % CHUNK) * DRAW_STRIDE
-	var kind: int = _kind_of(buffer, i)
-	var rest: float = rest_time(kind, buffer[i + 12], buffer[i + 5])
-	var life: float = buffer[i + 10] * LIFE_MAX
-	if rest >= life:
+	var k: int = _kind_of(buffer, i)
+	var h0: float = buffer[i + 11] * HEIGHT_MAX
+	var rest: float = rest_time(k, h0, buffer[i + 5])
+	if rest >= buffer[i + 10] * LIFE_MAX:
 		return Vector3(INF, INF, INF)
-	var at: Vector3 = flight(Vector2(buffer[i + 3], buffer[i + 7]), Vector2(buffer[i], buffer[i + 4]), buffer[i + 12], buffer[i + 5], rest, kind, buffer[i + 11])
+	var at: Vector3 = flight(Vector2(buffer[i + 3], buffer[i + 7]), Vector2(buffer[i], buffer[i + 4]), h0, buffer[i + 5], rest, k, buffer[i + 15])
 	return Vector3(at.x, at.y, buffer[i + 1] + rest)
 
 
@@ -239,28 +330,29 @@ func row_data(row: int) -> PackedFloat32Array:
 	return _buffers[row / CHUNK].slice(i, i + DRAW_STRIDE)
 
 
-## Seconds after its birth a mote of `kind` born `h0` above the floor, going up at `vz`, comes to
-## rest (after its one bounce); INF for a kind that never falls.
-static func rest_time(kind: int, h0: float, vz: float) -> float:
-	var g: float = GRAVITY[kind]
+## Seconds after its birth a mote of kind `k` born `h0` above the floor, going up at `vz`, comes
+## to rest (after its one bounce); INF for a kind that never falls.
+func rest_time(k: int, h0: float, vz: float) -> float:
+	var g: float = _kinds[k].gravity
 	if g <= 0.0:
 		return INF
 	var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g
-	var rebound: float = (g * land - vz) * BOUNCE[kind]
+	var rebound: float = (g * land - vz) * _kinds[k].bounce
 	return land + 2.0 * rebound / g
 
 
-## The shader's `mote_flight`: where a mote of `kind` is `t` seconds after its birth at the ground
-## point `from` with the velocity `vel`, the height `h0` and the height's velocity `vz`: its ground
-## point (x, y) and its height (z).
-static func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, kind: int, seed: float) -> Vector3:
-	var g: float = GRAVITY[kind]
+## The shader's `mote_flight`: where a mote of kind `k` is `t` seconds after its birth at the
+## ground point `from` with the velocity `vel`, the height `h0` and the height's velocity `vz`:
+## its ground point (x, y) and its height (z).
+func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int, seed: float) -> Vector3:
+	var kind: MoteKind = _kinds[k]
+	var g: float = kind.gravity
 	var land: float = 1.0e9
 	var rest: float = 1.0e9
 	var rebound: float = 0.0
 	if g > 0.0:
 		land = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g
-		rebound = (g * land - vz) * BOUNCE[kind]
+		rebound = (g * land - vz) * kind.bounce
 		rest = land + 2.0 * rebound / g
 	var tm: float = minf(maxf(t, 0.0), rest)
 	var h: float = 0.0
@@ -269,33 +361,49 @@ static func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, 
 	elif tm < rest:
 		var s: float = tm - land
 		h = rebound * s - 0.5 * g * s * s
-	var drag: float = DRAG[kind]
+	var drag: float = kind.drag
 	var along: float = (1.0 - exp(-drag * tm)) / drag if drag > 0.0 else tm
 	var ground: Vector2 = from + vel * along
 	var phase: float = seed * 6.2832
-	ground.x += WOBBLE[kind] * (sin(tm * WOBBLE_RATE[kind] + phase) - sin(phase))
+	ground.x += kind.wobble * (sin(tm * kind.wobble_rate + phase) - sin(phase))
 	return Vector3(ground.x, ground.y, maxf(h, 0.0))
 
 
-## The ramp a shot of core colour `core` cools through: its caster's `ramp` (0-3 a hat ramp, else
-## the enemies') for a plain (white) core, else the material whose shade is nearest, as the shot
-## shaders pick it (`look_of` in `shot_look.gdshaderinc`).
-static func ramp_of_core(core: Color, ramp: int) -> int:
-	if core.r > 0.99 and core.g > 0.99 and core.b > 0.99:
-		return ramp if ramp >= 0 and ramp < RAMP_ENEMY else RAMP_ENEMY
-	var best: int = 0
-	var near: float = INF
-	for i in MATERIAL_SHADES.size():
-		var shade: Color = MATERIAL_SHADES[i]
-		var d: float = Vector3(core.r - shade.r, core.g - shade.g, core.b - shade.b).length()
-		if d < near:
-			near = d
-			best = i / 3
-	return RAMP_FIRE + best
-
-
 func _kind_of(buffer: PackedFloat32Array, i: int) -> int:
-	return clampi(roundi(buffer[i + 8] * CODE), 0, KIND_NAMES.size() - 1)
+	return roundi(buffer[i + 9] * KIND_CODE) % BIG
+
+
+## `value` (0 to `most`) in steps of 1/255 of `most`.
+static func _step255(value: float, most: float) -> float:
+	return roundf(clampf(value, 0.0, most) / most * 255.0) / 255.0 * most
+
+
+## Keep the kinds with no problems (MAX_KINDS at most), index them by look layer and hand their
+## numbers to the shader.
+func _take_kinds(kinds: Array[MoteKind]) -> void:
+	_layer_kinds.resize(LOOK_LAYERS + 1)
+	for layer in LOOK_LAYERS + 1:
+		_layer_kinds[layer] = PackedInt32Array()
+	var motion := PackedVector4Array()
+	var sway := PackedVector4Array()
+	motion.resize(MAX_KINDS)
+	sway.resize(MAX_KINDS)
+	for kind in kinds:
+		if kind == null or not kind.problems().is_empty():
+			continue
+		if _kinds.size() >= MAX_KINDS:
+			push_warning("Motes: more than %d mote kinds; '%s' is left out" % [MAX_KINDS, kind.id])
+			continue
+		var k: int = _kinds.size()
+		_kinds.append(kind)
+		motion[k] = Vector4(kind.gravity, kind.drag, kind.bounce, kind.glow)
+		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), 0.0)
+		if kind.surface:
+			_surface_kinds.append(k)
+		for layer in kind.look_layers:
+			_layer_kinds[layer].append(k)
+	_material.set_shader_parameter(&"kind_motion", motion)
+	_material.set_shader_parameter(&"kind_sway", sway)
 
 
 ## Chunk `c`'s rows, making its batch the first time.

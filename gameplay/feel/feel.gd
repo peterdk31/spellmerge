@@ -55,8 +55,10 @@ extends Node
 ##
 ## Motes (docs/milestones/spell-spectacle.md, P1a): single-pixel particles with no game logic in
 ## a ring of chunked batches (`mote.gd`, `mote.gdshader`), as many as the "Particles" setting
-## (`MoteCap`, `mote_cap_changed`; none with it off). A shot ending on a wall throws its chips and
-## a few sparks as motes; the other sources come with the cues (P1b).
+## (`MoteCap`, `mote_cap_changed`; none with it off). Their kinds are data (`MoteKind`,
+## content/motes) and come from the spells: a shot ending on a wall sheds the kinds of its cards'
+## look layers in its own ramp, and the wall the surface kinds in the room's colours
+## (`RoomBase.surface_colors`, read on `room_entered`). The other sources come with the cues (P1b).
 ##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
@@ -96,10 +98,9 @@ const FLOOR_Z: int = FORM_Z - 1
 ## Motes draw under the floor marks, the beams and every flash and telegraph
 ## (docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
 const MOTE_Z: int = FORM_Z - 2
-## A shot ending on a wall throws this many stone chips and sparks of its own as motes (P1a; the
-## chips effect, KIND_CHIPS, shows instead with the "Particles" setting off).
-const WALL_CHIP_MOTES: int = 10
-const WALL_SPARK_MOTES: int = 4
+## The folders of the mote kinds and the rooms in the registry.
+const MOTE_FOLDER: StringName = &"motes"
+const ROOM_FOLDER: StringName = &"rooms"
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
@@ -404,6 +405,10 @@ var _swing_trails: SwingTrailsScript = null
 ## (`MoteCap.default_cap()` until the setting changes it; see `set_mote_cap`). Read only.
 var _motes: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
+## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
+## and their source in the motes' ramp table (-1 for none).
+var _surface_colors: PackedColorArray = PackedColorArray()
+var _surface_source: int = -1
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
@@ -611,6 +616,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.mote_cap_changed.connect(_on_mote_cap_changed)
+	events.room_entered.connect(_on_room_entered)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
@@ -1189,13 +1195,11 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_aim = direction
 		_show_impact(caster, ramp, position, direction, true)
 		return
-	# Stone chips knocked back off the surface: motes (and a few sparks of the shot's own), or the
-	# chips effect with the "Particles" setting off.
+	# Knocked back off the surface: the shot's own motes and the wall's, or the chips effect with
+	# the "Particles" setting off.
 	if particles_enabled:
 		if _motes != null:
-			var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
-			_motes.burst(MotesScript.CHIP, position, -direction, WALL_CHIP_MOTES, Vector2(30.0, 110.0), 150.0, Vector2(20.0, 80.0), Vector2(1.0, 2.5), MotesScript.RAMP_STONE, 4.0)
-			_motes.burst(MotesScript.SPARK, position, -direction, WALL_SPARK_MOTES, Vector2(80.0, 180.0), 110.0, Vector2(10.0, 50.0), Vector2(0.15, 0.35), MotesScript.ramp_of_core(core, ramp), 4.0)
+			_shed_on_wall(ramp, position, -direction)
 		else:
 			show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
 	_show_impact(caster, ramp, position, direction, false)
@@ -1555,6 +1559,25 @@ func _on_effect_slots_changed(slots: int) -> void:
 	set_effect_slots(slots)
 
 
+## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
+## projectile manager's `impact_look` and `impact_core` while the impact is sent) and the wall's
+## surface motes in the room's colours, thrown along `away` (back off the wall).
+func _shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
+	var look: int = projectiles.impact_look if projectiles != null else 0
+	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
+	_motes.shed(at, away, core, ramp, look)
+	if _surface_source >= 0:
+		for k in _motes.surface_kinds():
+			_motes.throw(k, at, away, _surface_source, Color.WHITE)
+
+
+## The room's colours for its walls' motes (`RoomBase.surface_colors`).
+func _on_room_entered(room_id: StringName) -> void:
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
+	_surface_source = _motes.table_source(_surface_colors) if _motes != null else -1
+
+
 ## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
 ## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
 ## number taken.
@@ -1577,10 +1600,23 @@ func _make_motes(cap: int) -> void:
 		remove_child(_motes)
 		_motes = null
 	if cap > 0:
-		_motes = MotesScript.new(cap, MOTE_Z)
+		_motes = MotesScript.new(cap, MOTE_Z, _mote_kinds())
 		_motes.name = "Motes"
 		add_child(_motes)
 		_motes.step(_clock)
+		_surface_source = _motes.table_source(_surface_colors)
+	else:
+		_surface_source = -1
+
+
+## The mote kinds of the registry (content/motes), in id order.
+func _mote_kinds() -> Array[MoteKind]:
+	var kinds: Array[MoteKind] = []
+	if registry != null:
+		for found: Resource in registry.get_all(MOTE_FOLDER):
+			if found is MoteKind:
+				kinds.append(found as MoteKind)
+	return kinds
 
 
 func _on_mote_cap_changed(cap: int) -> void:

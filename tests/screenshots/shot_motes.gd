@@ -1,40 +1,52 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of motes (gameplay/feel/mote.gd; docs/milestones/spell-spectacle.md, P1a): a burst
-## of each kind on the crypt floor (ember, spark, chip, shard, ash, splinter, then a wall hit's
-## chips and sparks as Feel throws them), at 0.05, 0.3, 0.8 and 1.8 s after they were thrown, one
-## row each, at 2x (`motes_kinds`). The pool runs on a clock of its own, so every row is the same
-## burst at that moment.
+## Screenshots of motes (gameplay/feel/mote.gd; docs/milestones/spell-spectacle.md, P1a), as the
+## game makes them: one column for each element card (a shot of its look layer and tint sheds
+## its motes, `Motes.shed`), one for a plain shot of player 1, and the crypt arena's walls' chips
+## in the colours sampled from its art (`RoomBase.surface_colors`). Each row is the same bursts
+## 0.05, 0.3, 0.8 and 1.8 s after they were thrown, at 2x (`motes_kinds`). The pool runs on a
+## clock of its own, with the content's kinds.
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const TIMES: Array[float] = [0.05, 0.3, 0.8, 1.8]
 const ROW_TOP: int = 120
 const ROW_HEIGHT: int = 110
-const COLUMN: float = 80.0
 const BORN: float = 1.0
+const Y: float = 200.0
+## Each burst this many times its kind's count, so the sheet shows its spread.
+const SCALE: float = 4.0
 
 
 func take() -> void:
+	if not need(["Registry"]):
+		return
+	var registry: Node = root.get_node("Registry")
 	lay_floor()
-	var motes: MotesScript = MotesScript.new(8192, 0)
+	var kinds: Array[MoteKind] = []
+	for found: Resource in registry.call("get_all", &"motes"):
+		kinds.append(found as MoteKind)
+	var motes: MotesScript = MotesScript.new(8192, 0, kinds)
 	root.add_child(motes)
 	motes.step(BORN)
-	var y: float = 200.0
-	var x: float = 60.0
-	motes.burst(MotesScript.EMBER, Vector2(x, y), Vector2.UP, 30, Vector2(10.0, 40.0), 360.0, Vector2(10.0, 30.0), Vector2(0.8, 2.0), MotesScript.RAMP_FIRE)
-	x += COLUMN
-	motes.burst(MotesScript.SPARK, Vector2(x, y), Vector2.UP, 30, Vector2(60.0, 160.0), 360.0, Vector2(20.0, 70.0), Vector2(0.2, 0.6), MotesScript.RAMP_SPARK, 6.0)
-	x += COLUMN
-	motes.burst(MotesScript.CHIP, Vector2(x, y), Vector2.UP, 30, Vector2(20.0, 80.0), 360.0, Vector2(40.0, 100.0), Vector2(1.5, 2.5), MotesScript.RAMP_STONE, 6.0)
-	x += COLUMN
-	motes.burst(MotesScript.SHARD, Vector2(x, y), Vector2.UP, 30, Vector2(20.0, 80.0), 360.0, Vector2(40.0, 100.0), Vector2(1.5, 2.5), MotesScript.RAMP_ICE, 6.0)
-	x += COLUMN
-	motes.burst(MotesScript.ASH, Vector2(x, y), Vector2.UP, 30, Vector2(5.0, 25.0), 360.0, Vector2(10.0, 30.0), Vector2(1.5, 2.5), MotesScript.RAMP_STONE, 10.0)
-	x += COLUMN
-	motes.burst(MotesScript.SPLINTER, Vector2(x, y), Vector2.UP, 30, Vector2(20.0, 80.0), 360.0, Vector2(40.0, 100.0), Vector2(1.5, 2.5), MotesScript.RAMP_WOOD, 6.0)
-	x += COLUMN
-	# A bolt of player 1 ending on a wall to its right, as Feel throws it.
-	motes.burst(MotesScript.CHIP, Vector2(x, y), Vector2.LEFT, 10, Vector2(30.0, 110.0), 150.0, Vector2(20.0, 80.0), Vector2(1.0, 2.5), MotesScript.RAMP_STONE, 4.0)
-	motes.burst(MotesScript.SPARK, Vector2(x, y), Vector2.LEFT, 4, Vector2(80.0, 180.0), 110.0, Vector2(10.0, 50.0), Vector2(0.15, 0.35), 0, 4.0)
+	var shots: Array[Array] = []
+	for found: Resource in registry.call("get_all", &"spells"):
+		var element := found as ElementBase
+		if element != null and element.look_layer > 0:
+			shots.append([element.tint, 1 << (element.look_layer - 1)])
+	shots.append([Color.WHITE, 0])
+	var column: float = SCREEN.x / float(shots.size() + 1)
+	var x: float = column * 0.5
+	for shot: Array in shots:
+		motes.shed(Vector2(x, Y), Vector2.UP, shot[0] as Color, 0, int(shot[1]), SCALE)
+		x += column
+	# A wall to the right of a plain bolt of player 1: its motes and the wall's chips, back off it.
+	var room := registry.call("get_resource", &"rooms", &"arena_01") as RoomBase
+	if room == null:
+		fail("the crypt arena is needed for its wall colours")
+		return
+	var source: int = motes.table_source(room.surface_colors())
+	for k in motes.surface_kinds():
+		motes.throw(k, Vector2(x, Y), Vector2.LEFT, source, Color.WHITE, SCALE * 0.5)
+	motes.shed(Vector2(x, Y), Vector2.LEFT, Color.WHITE, 0, 0)
 	var sheet := Image.create_empty(int(SCREEN.x), ROW_HEIGHT * TIMES.size(), false, Image.FORMAT_RGBA8)
 	for i in TIMES.size():
 		motes.step(BORN + TIMES[i])

@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"fleck"
+look_layers = PackedInt32Array(2)
+gravity = 300.0
+drag = 2.5
+bounce = 0.4
+glow = 0.4
+shade_from = 1
+count = 6
+speed = Vector2(40.0, 120.0)
+up = Vector2(20.0, 70.0)
+life = Vector2(1.0, 2.0)
+spread = 140.0
+height = 4.0

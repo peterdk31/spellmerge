@@ -6,54 +6,51 @@ render_mode blend_premul_alpha, world_vertex_coords;
 
 // Motes (gameplay/feel/mote.gd; docs/milestones/spell-spectacle.md, P1): single pixels (or a 2x2
 // chunk) thrown from a point, with no game logic. A mote's whole flight comes from its row,
-// written once by the CPU, and the time since its birth: it flies with drag, rises or falls by a
-// fake height, lands, bounces once, lies still, and cools step by step through its ramp's
-// shades (no partial alpha; docs/STYLE.md), then is gone. Blending is premultiplied: the pixel
-// is opaque, the glow round a hot one light added to what is below.
+// written once by the CPU, its kind's numbers and the time since its birth: it flies with drag,
+// rises or falls by a fake height, lands, bounces once, lies still, and cools step by step
+// through its ramp's shades (no partial alpha; docs/STYLE.md), then is gone. Blending is
+// premultiplied: the pixel is opaque, the glow round a hot one light added to what is below.
+//
+// Nothing here is a kind or a colour of its own:
+// - the kinds' numbers are data (`MoteKind`, content/motes), handed over by mote.gd as
+//   `kind_motion` (gravity, drag, bounce, glow) and `kind_sway` (sway, its rate, first shade);
+// - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
+//   and its caster's ramp; any other ramp (a room's walls) is a row of `ramp_table` (white-hot,
+//   light, base, shadow across).
 //
 // A row (Motes.DRAW_STRIDE floats; the batch sits untransformed at the origin, so the transform
 // carries data, in full floats on every renderer):
 //   MODEL_MATRIX[0].xy  its velocity along the floor (px/s)
 //   MODEL_MATRIX[1].x   its birth, on `sim_time`'s clock (s)
 //   MODEL_MATRIX[1].y   its height's velocity, up (px/s)
-//   MODEL_MATRIX[3].xy  its ground point at birth (where it is drawn: that, raised by its height)
-//   COLOR               kind / CODE, ramp / CODE, life / LIFE_MAX, a seed (0-1)
-//   INSTANCE_CUSTOM     its height at birth (px), its size (1 or 2), its first shade (0 white-hot,
-//                       1 light, 2 base, 3 shadow), unused
-// The colour and custom data are small numbers only: the compatibility renderer may keep them
-// as half floats.
+//   MODEL_MATRIX[3].xy  its ground point at birth (it is drawn there, raised by its height)
+//   COLOR               its source / SOURCE_CODE (0-3 a hat ramp, 4 the enemies', +8 an exact
+//                       colour; from 16 a row of the ramp table), (kind + 16 for a 2x2 chunk) /
+//                       KIND_CODE, its life / LIFE_MAX, its height at birth / HEIGHT_MAX
+//   INSTANCE_CUSTOM     the core colour (a spell's), a seed (0-1)
+// The colour and custom data are between 0 and 1 and need no more than bytes: a renderer may
+// keep them as half floats or bytes.
 //
-// The kinds' numbers (K_*) are mote.gd's tables (GRAVITY, DRAG, ...), and `mote_flight` is
-// `Motes.flight` line for line; tests/gameplay/feel/test_motes.gd fails when the two differ.
+// `mote_flight` is `Motes.flight` line for line.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+#include "res://core/projectiles/shot_look.gdshaderinc"
 
-uniform float sim_time = 0.0;
-uniform float glow_strength = 1.0;
+uniform vec4 kind_motion[16];
+uniform vec4 kind_sway[16];
+uniform sampler2D ramp_table : filter_nearest;
 
-// The longest life a mote has, and what its kind and ramp are divided by in COLOR.
+// Motes.LIFE_MAX, SOURCE_CODE, KIND_CODE, HEIGHT_MAX, MAX_KINDS, BIG, EXACT_SOURCE, TABLE_SOURCE.
 const float LIFE_MAX = 4.0;
-const float CODE = 16.0;
+const float SOURCE_CODE = 128.0;
+const float KIND_CODE = 32.0;
+const float HEIGHT_MAX = 63.75;
+const int MAX_KINDS = 16;
+const float BIG = 16.0;
+const float EXACT_SOURCE = 8.0;
+const float TABLE_SOURCE = 16.0;
 // How far a hot mote's glow reaches past its pixel.
 const float GLOW_REACH = 2.0;
-// The kinds (Motes.KIND_NAMES): ember, spark, chip, shard, ash, splinter.
-const int KINDS = 6;
-// Down the height (px/s/s; below 0 it rises), drag along the floor (1/s), the share of its
-// fall's speed a landing bounces back, a sideways sway (px) and its rate (rad/s), the glow while
-// it is hot, and the shade it starts at.
-const float K_GRAVITY[6] = float[](-12.0, 220.0, 320.0, 300.0, 18.0, 300.0);
-const float K_DRAG[6] = float[](2.0, 3.5, 2.5, 2.5, 1.2, 2.5);
-const float K_BOUNCE[6] = float[](0.0, 0.35, 0.3, 0.4, 0.0, 0.25);
-const float K_WOBBLE[6] = float[](1.5, 0.0, 0.0, 0.0, 3.0, 0.0);
-const float K_WOBBLE_RATE[6] = float[](7.0, 0.0, 0.0, 0.0, 3.0, 0.0);
-const float K_GLOW[6] = float[](1.0, 1.0, 0.0, 0.4, 0.0, 0.0);
-const float K_SHADE_FROM[6] = float[](0.0, 0.0, 1.0, 1.0, 2.0, 1.0);
-// The ramps (Motes.RAMP_*): 0-3 the players', 4 the enemies' (Blight), 5-10 the materials of
-// SHADES (Fire, Spark, Ice, Void, Arc, Bone), 11 Stone, 12 Wood (docs/STYLE.md).
-const int RAMP_STONE = 11;
-const vec3 WOOD_SHADOW = vec3(0.239, 0.165, 0.180);
-const vec3 WOOD_BASE = vec3(0.478, 0.290, 0.208);
-const vec3 WOOD_LIGHT = vec3(0.698, 0.478, 0.290);
 
 // The mote's pixel (its top-left), its size, colour and glow, and the world pixel drawn.
 varying flat vec2 m_at;
@@ -62,34 +59,17 @@ varying flat vec3 m_rgb;
 varying flat float m_glow;
 varying vec2 m_px;
 
-// Shade `shade` (0 white-hot, 1 light, 2 base, 3 shadow) of `ramp`. Stone and Wood have no
-// white-hot. Stone is one step lighter than the material (Bone shadow, Stone light, Stone shadow):
-// the floor is Stone base, which a chip must never be.
-vec3 ramp_shade(int ramp, int shade) {
-	if (ramp < 5) {
-		return shade == 0 ? BONE_LIGHT : (shade == 1 ? P_LIGHT[ramp] : (shade == 2 ? P_BASE[ramp] : P_SHADOW[ramp]));
-	}
-	if (ramp < RAMP_STONE) {
-		int m = (ramp - 5) * 3;
-		return shade == 0 ? mix(SHADES[m + 2], vec3(1.0), 0.5) : SHADES[m + 3 - shade];
-	}
-	if (ramp == RAMP_STONE) {
-		return shade <= 1 ? BONE_SHADOW : (shade == 2 ? STONE_LIGHT : STONE_SHADOW);
-	}
-	return shade <= 1 ? WOOD_LIGHT : (shade == 2 ? WOOD_BASE : WOOD_SHADOW);
-}
-
 // Where a mote of kind `k` is `t` seconds after its birth at the ground point `from` with the
 // velocity `vel`, the height `h0` and the height's velocity `vz`: its ground point (xy) and its
 // height (z). A falling kind lands, bounces once and then lies still.
-vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float seed) {
-	float g = K_GRAVITY[k];
+vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float s) {
+	float g = kind_motion[k].x;
 	float land = 1.0e9;
 	float rest = 1.0e9;
 	float rebound = 0.0;
 	if (g > 0.0) {
 		land = (vz + sqrt(vz * vz + 2.0 * g * max(h0, 0.0))) / g;
-		rebound = (g * land - vz) * K_BOUNCE[k];
+		rebound = (g * land - vz) * kind_motion[k].z;
 		rest = land + 2.0 * rebound / g;
 	}
 	float tm = min(max(t, 0.0), rest);
@@ -97,14 +77,14 @@ vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float 
 	if (tm < land) {
 		h = h0 + vz * tm - 0.5 * g * tm * tm;
 	} else if (tm < rest) {
-		float s = tm - land;
-		h = rebound * s - 0.5 * g * s * s;
+		float q = tm - land;
+		h = rebound * q - 0.5 * g * q * q;
 	}
-	float drag = K_DRAG[k];
+	float drag = kind_motion[k].y;
 	float along = drag > 0.0 ? (1.0 - exp(-drag * tm)) / drag : tm;
 	vec2 ground = from + vel * along;
-	float phase = seed * 6.2832;
-	ground.x += K_WOBBLE[k] * (sin(tm * K_WOBBLE_RATE[k] + phase) - sin(phase));
+	float phase = s * 6.2832;
+	ground.x += kind_sway[k].x * (sin(tm * kind_sway[k].y + phase) - sin(phase));
 	return vec3(ground, max(h, 0.0));
 }
 
@@ -113,31 +93,48 @@ void vertex() {
 	float born = MODEL_MATRIX[1].x;
 	float vz = MODEL_MATRIX[1].y;
 	vec2 from = MODEL_MATRIX[3].xy;
-	int k = clamp(int(COLOR.r * CODE + 0.5), 0, KINDS - 1);
-	int ramp = clamp(int(COLOR.g * CODE + 0.5), 0, 12);
+	float source = floor(COLOR.r * SOURCE_CODE + 0.5);
+	float coded = floor(COLOR.g * KIND_CODE + 0.5);
+	int k = clamp(int(mod(coded, BIG)), 0, MAX_KINDS - 1);
+	float size = coded >= BIG ? 2.0 : 1.0;
 	float life = COLOR.b * LIFE_MAX;
-	float seed = COLOR.a;
-	float h0 = INSTANCE_CUSTOM.r;
-	float size = INSTANCE_CUSTOM.g > 1.5 ? 2.0 : 1.0;
-	float shade_from = INSTANCE_CUSTOM.b;
+	float h0 = COLOR.a * HEIGHT_MAX;
+	float s = INSTANCE_CUSTOM.a;
 	float t = sim_time - born;
 	bool alive = life > 0.0 && t >= 0.0 && t < life;
-	vec3 at = mote_flight(from, vel, h0, vz, t, k, seed);
-	vec2 pixel = floor(at.xy - vec2(0.0, at.z));
-	// Cooling: evenly from its first shade down to shadow over its life.
-	float u = clamp(t / max(life, 0.001), 0.0, 1.0);
-	int shade = int(min(shade_from + floor(u * (4.0 - shade_from)), 3.0));
-	float glow = shade <= 1 ? K_GLOW[k] * glow_strength : 0.0;
-	float reach = glow > 0.0 ? GLOW_REACH : 0.0;
-	vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
-	vec2 p = mix(pixel - reach, pixel + size + reach, corner);
-	// Folded away when it is not alive (an unused row has no life).
-	VERTEX = alive ? p : vec2(0.0);
-	m_px = p;
-	m_at = pixel;
-	m_size = size;
-	m_rgb = ramp_shade(ramp, shade);
-	m_glow = glow;
+	VERTEX = vec2(0.0);
+	m_px = vec2(0.0);
+	m_at = vec2(0.0);
+	m_size = 1.0;
+	m_rgb = vec3(0.0);
+	m_glow = 0.0;
+	// An unused row has no life: folded away, with none of the work below.
+	if (alive) {
+		vec3 at = mote_flight(from, vel, h0, vz, t, k, s);
+		vec2 pixel = floor(at.xy - vec2(0.0, at.z));
+		// Cooling: evenly from its first shade down to shadow over its life.
+		float shade_from = kind_sway[k].z;
+		int shade = int(min(shade_from + floor(t / life * (4.0 - shade_from)), 3.0));
+		vec3 rgb;
+		if (source >= TABLE_SOURCE) {
+			rgb = texelFetch(ramp_table, ivec2(shade, int(source - TABLE_SOURCE)), 0).rgb;
+		} else {
+			// The shot's own ramp, as the shot shaders pick it.
+			bool exact = source >= EXACT_SOURCE;
+			Look L = look_of(INSTANCE_CUSTOM.rgb, mod(source, EXACT_SOURCE), 1.0, vec3(0.0, 0.0, exact ? 128.0 : 0.0), s, false);
+			rgb = shade == 0 ? L.hot : (shade == 1 ? L.hi : (shade == 2 ? L.mid : L.lo));
+		}
+		float lit = shade <= 1 ? kind_motion[k].w * glow_strength : 0.0;
+		float reach = lit > 0.0 ? GLOW_REACH : 0.0;
+		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
+		vec2 p = mix(pixel - reach, pixel + size + reach, corner);
+		VERTEX = p;
+		m_px = p;
+		m_at = pixel;
+		m_size = size;
+		m_rgb = rgb;
+		m_glow = lit;
+	}
 }
 
 void fragment() {

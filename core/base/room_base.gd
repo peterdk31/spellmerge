@@ -18,3 +18,105 @@ extends Resource
 ## Where a sandbox room puts its dummies, in room pixels (staffs B7): the training dummy first,
 ## then the shooting dummy. Empty in every other room.
 @export var dummy_spawns: PackedVector2Array = PackedVector2Array()
+## The colours of what its walls shed when struck (Feel's surface motes: chips), lightest first:
+## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
+## so new tiles change the chips with no edit here; set it only when the sample looks wrong.
+@export var debris_colors: PackedColorArray = PackedColorArray()
+
+## The wall art's colours that count, at most; a colour on fewer pixels than this share of the
+## most common one is left out (a speck of trim).
+const SURFACE_SHADES: int = 3
+const SURFACE_MIN_SHARE: float = 0.1
+## The layer of the walls' bodies (as Flow tells the projectile manager).
+const WALL_LAYER: int = 1
+
+## `surface_colors()` once worked out (empty until then).
+var _surface: PackedColorArray = PackedColorArray()
+
+
+## The colours its walls shed, lightest first (light, base, shadow; always three, a colour
+## repeated when the art has fewer): `debris_colors` when set, else sampled once from the art of
+## its scene. The sample is the colours of the sprites on its wall bodies (static bodies on the
+## wall layer), most common first, leaving out the floor's own colour (the `Floor` sprite's most
+## common one), so debris lying on the floor always shows. Empty when there is no art to read.
+func surface_colors() -> PackedColorArray:
+	if not debris_colors.is_empty():
+		return _three(debris_colors)
+	if _surface.is_empty() and scene != null:
+		_surface = _three(sample_surface(scene.instantiate()))
+	return _surface
+
+
+## The wall colours of the layout `layout` (see `surface_colors`), most common first; frees it.
+static func sample_surface(layout: Node) -> PackedColorArray:
+	var found := PackedColorArray()
+	if layout == null:
+		return found
+	var floor_main: int = -1
+	var floor_sprite := layout.get_node_or_null("Floor") as Sprite2D
+	if floor_sprite != null:
+		var floor_counts: Dictionary = _count_colours(floor_sprite.texture, {})
+		floor_main = _most_common(floor_counts)
+	var counts: Dictionary = {}
+	for node: Node in layout.find_children("*", "StaticBody2D", true, false):
+		if ((node as StaticBody2D).collision_layer & WALL_LAYER) == 0:
+			continue
+		for child: Node in node.get_children():
+			if child is Sprite2D:
+				_count_colours((child as Sprite2D).texture, counts)
+	layout.free()
+	counts.erase(floor_main)
+	var most: int = 0
+	for rgba: int in counts:
+		most = maxi(most, int(counts[rgba]))
+	while found.size() < SURFACE_SHADES and not counts.is_empty():
+		var top: int = _most_common(counts)
+		if float(counts[top]) < float(most) * SURFACE_MIN_SHARE:
+			break
+		found.append(Color.hex(top))
+		counts.erase(top)
+	return found
+
+
+## `colours` as three shades, lightest first: light, base, shadow.
+static func _three(colours: PackedColorArray) -> PackedColorArray:
+	var sorted: Array[Color] = []
+	for colour in colours:
+		sorted.append(colour)
+	sorted.sort_custom(func(a: Color, b: Color) -> bool: return a.get_luminance() > b.get_luminance())
+	match sorted.size():
+		0:
+			return PackedColorArray()
+		1:
+			return PackedColorArray([sorted[0], sorted[0], sorted[0]])
+		2:
+			return PackedColorArray([sorted[0], sorted[0], sorted[1]])
+	return PackedColorArray([sorted[0], sorted[1], sorted[2]])
+
+
+## Adds the opaque pixels of `texture` to `counts` (RGBA32 -> pixels) and returns it.
+static func _count_colours(texture: Texture2D, counts: Dictionary) -> Dictionary:
+	if texture == null:
+		return counts
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty():
+		return counts
+	if image.is_compressed():
+		image.decompress()
+	for y in image.get_height():
+		for x in image.get_width():
+			var pixel: Color = image.get_pixel(x, y)
+			if pixel.a >= 0.5:
+				var rgba: int = Color(pixel.r, pixel.g, pixel.b, 1.0).to_rgba32()
+				counts[rgba] = int(counts.get(rgba, 0)) + 1
+	return counts
+
+
+static func _most_common(counts: Dictionary) -> int:
+	var best: int = -1
+	var most: int = 0
+	for rgba: int in counts:
+		if int(counts[rgba]) > most:
+			most = int(counts[rgba])
+			best = rgba
+	return best

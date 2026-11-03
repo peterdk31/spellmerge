@@ -87,7 +87,7 @@ func _feel() -> Array:
 func _kinds_of_rows(motes: MotesScript, from: int, to: int) -> Array[StringName]:
 	var found: Array[StringName] = []
 	for row in range(from, to):
-		var k: int = roundi(motes.row_data(row)[9] * MotesScript.KIND_CODE) % MotesScript.BIG
+		var k: int = roundi(motes.row_data(row)[9] * MotesScript.KIND_CODE)
 		var id: StringName = motes.kinds()[k].id
 		if not found.has(id):
 			found.append(id)
@@ -206,9 +206,61 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
 	check(code.contains("uniform vec4 kind_motion[%d];" % MotesScript.MAX_KINDS) and code.contains("uniform vec4 kind_sway[%d];" % MotesScript.MAX_KINDS), "the shader holds as many")
 	var constants: Dictionary = (MotesScript as GDScript).get_script_constant_map()
-	for name: String in ["LIFE_MAX", "SOURCE_CODE", "KIND_CODE", "HEIGHT_MAX", "BIG", "EXACT_SOURCE", "TABLE_SOURCE"]:
+	for name: String in ["LIFE_MAX", "SOURCE_CODE", "KIND_CODE", "HEIGHT_MAX", "EXACT_SOURCE", "TABLE_SOURCE"]:
 		var mine: float = float(constants[name])
 		check(code.contains("const float %s = %s;" % [name, ("%.2f" % mine).trim_suffix("0") if not is_equal_approx(mine, roundf(mine)) else "%.1f" % mine]), "the shader's %s is mote.gd's (%s)" % [name, mine])
+	check(code.contains("const int SHAPE_SIZE = %d;" % MoteKind.SHAPE_SIZE), "the shader's SHAPE_SIZE is MoteKind's")
+	check(code.contains("uniform vec4 kind_shape[%d];" % MotesScript.MAX_KINDS), "and holds every kind's shape")
+
+
+func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
+	var kind := _kind(&"shaped")
+	kind.shape = PackedStringArray(["##o", ".o./o#o/.o.", "##/##", "."])
+	var m: int = MoteKind.SHAPE_SIZE / 2
+	var streak: PackedByteArray = kind.shape_pixels(0)
+	check_equal(streak[m * MoteKind.SHAPE_SIZE + m - 1], MoteKind.PIXEL_BODY, "a streak: a pixel behind")
+	check_equal(streak[m * MoteKind.SHAPE_SIZE + m], MoteKind.PIXEL_BODY, "its middle on the mote")
+	check_equal(streak[m * MoteKind.SHAPE_SIZE + m + 1], MoteKind.PIXEL_HOT, "a bright head ahead")
+	check_equal(streak.count(MoteKind.PIXEL_NONE), MoteKind.SHAPE_SIZE * MoteKind.SHAPE_SIZE - 3, "and nothing else")
+	var plus: PackedByteArray = kind.shape_pixels(1)
+	check_equal(plus[m * MoteKind.SHAPE_SIZE + m], MoteKind.PIXEL_BODY, "a plus: its middle on the mote")
+	check_equal(plus[(m - 1) * MoteKind.SHAPE_SIZE + m], MoteKind.PIXEL_HOT, "its rim above")
+	var chunk: PackedByteArray = kind.shape_pixels(2)
+	check(chunk[m * MoteKind.SHAPE_SIZE + m] == MoteKind.PIXEL_BODY and chunk[(m + 1) * MoteKind.SHAPE_SIZE + m + 1] == MoteKind.PIXEL_BODY, "a 2x2 chunk: the mote and right and down of it")
+	check_equal(kind.shape_pixels(3).count(MoteKind.PIXEL_NONE), MoteKind.SHAPE_SIZE * MoteKind.SHAPE_SIZE, "an empty frame (a blink)")
+	check_equal(kind.problems(), PackedStringArray(), "a fine shape")
+	var motes: MotesScript = _pool(1024, [_kind(&"first", 0), kind])
+	check_equal(motes.shape_value(1, 0, m + 1, m), MoteKind.PIXEL_HOT, "the atlas holds the kind's frames")
+	check_equal(motes.shape_value(1, 1, m, m - 1), MoteKind.PIXEL_HOT, "each in its own square")
+	check_equal(motes.shape_value(0, 0, m, m), MoteKind.PIXEL_BODY, "a kind with no shape of its own: one pixel")
+	check(motes.shader_parameter(&"shape_atlas") is Texture2D, "the shader reads the atlas")
+
+
+func test_a_shapes_frames_play_as_its_kind_says() -> void:
+	var looped := _kind(&"looped")
+	looped.shape = PackedStringArray(["o", "#"])
+	looped.shape_play = "loop"
+	looped.shape_rate = 12.0
+	var turning := _kind(&"turning")
+	turning.shape = PackedStringArray(["##o"])
+	turning.shape_play = "pick"
+	turning.shape_turns = true
+	var motes: MotesScript = _pool(1024, [looped, turning])
+	var shapes: PackedVector4Array = motes.shader_parameter(&"kind_shape")
+	check_equal(shapes[0], Vector4(2.0, 1.0, 12.0, 0.0), "two frames, looping 12 a second, not turning")
+	check_equal(shapes[1], Vector4(1.0, 2.0, 8.0, 1.0), "one frame, picked, turning with its flight")
+
+
+func test_a_broken_shape_is_named() -> void:
+	var kind := _kind(&"broken")
+	kind.shape = PackedStringArray(["######", "x", "./././././."])
+	kind.shape_play = "spin"
+	check_equal(kind.problems().size(), 4, "too wide, an unknown mark, too many rows, an unknown play: %s" % [kind.problems()])
+	kind.shape = PackedStringArray(["...", "."])
+	kind.shape_play = "life"
+	check_equal(kind.problems().size(), 1, "a shape that draws nothing: %s" % [kind.problems()])
+	kind.shape = PackedStringArray(["#", "#", "#", "#", "#", "#", "#", "#", "#"])
+	check_equal(kind.problems().size(), 1, "more frames than the atlas holds: %s" % [kind.problems()])
 
 
 func test_a_shot_sheds_the_kinds_of_its_cards() -> void:

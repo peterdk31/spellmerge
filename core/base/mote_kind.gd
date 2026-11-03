@@ -36,8 +36,23 @@ extends Resource
 @export_range(0.0, 2.0, 0.1) var glow: float = 0.0
 ## The shade it starts at: 0 white-hot, 1 light, 2 base, 3 shadow. It cools to shadow over its life.
 @export_range(0, 3) var shade_from: int = 1
-## The share of its motes that are a 2x2 chunk rather than one pixel.
-@export_range(0.0, 1.0, 0.05) var big_share: float = 0.0
+
+@export_group("Shape")
+## What one looks like: one or more frames of up to SHAPE_SIZE x SHAPE_SIZE pixels, centred on
+## the mote (the middle column and row; the left and upper of two), rows split by "/". "#" is a
+## pixel in its shade, "o" one in the shade hotter (a highlight), "." or " " none. A frame may be
+## empty (a blink), not every frame. `".o./o#o/.o."` is a plus with a bright rim, `"##o"` a
+## streak with a bright head.
+@export var shape: PackedStringArray = PackedStringArray(["#"])
+## How its frames play: `life` through them evenly over its life, `loop` round them
+## `shape_rate` a second (each mote from its own frame), `pick` one at random for each mote,
+## kept.
+@export_enum("life", "loop", "pick") var shape_play: String = "life"
+## Frames a second when they loop.
+@export_range(0.0, 30.0, 0.5) var shape_rate: float = 8.0
+## The shape turns with the way the mote flies (8 ways; +x of the shape is ahead). A mote at rest
+## keeps the way it was thrown.
+@export var shape_turns: bool = false
 
 @export_group("Burst")
 ## How many one burst throws (a shot with several kinds splits this between them).
@@ -54,8 +69,43 @@ extends Resource
 @export_range(0.0, 32.0, 1.0) var height: float = 4.0
 
 
+## The most pixels a shape is across and down, and the most frames it has (the shader's
+## SHAPE_SIZE and the room in `Motes`' shape atlas).
+const SHAPE_SIZE: int = 5
+const SHAPE_FRAMES: int = 8
+## How `shape_play` is told to the shader.
+const SHAPE_PLAYS: Array[String] = ["life", "loop", "pick"]
+## A shape's pixel: none, in its shade, one shade hotter.
+const PIXEL_NONE: int = 0
+const PIXEL_BODY: int = 1
+const PIXEL_HOT: int = 2
+
+
 func kind() -> StringName:
 	return &"mote"
+
+
+## Frame `frame` of the shape as SHAPE_SIZE x SHAPE_SIZE pixels (PIXEL_*), row by row, the
+## mote's own pixel in the middle (row and column SHAPE_SIZE / 2).
+func shape_pixels(frame: int) -> PackedByteArray:
+	var pixels := PackedByteArray()
+	pixels.resize(SHAPE_SIZE * SHAPE_SIZE)
+	if frame < 0 or frame >= shape.size():
+		return pixels
+	var rows: PackedStringArray = shape[frame].split("/")
+	var middle: int = SHAPE_SIZE / 2
+	var top: int = middle - (rows.size() - 1) / 2
+	for r in rows.size():
+		var row: String = rows[r]
+		var left: int = middle - (row.length() - 1) / 2
+		for c in row.length():
+			var x: int = left + c
+			var y: int = top + r
+			if x < 0 or y < 0 or x >= SHAPE_SIZE or y >= SHAPE_SIZE:
+				continue
+			var mark: String = row[c]
+			pixels[y * SHAPE_SIZE + x] = PIXEL_BODY if mark == "#" else (PIXEL_HOT if mark == "o" else PIXEL_NONE)
+	return pixels
 
 
 ## What is wrong with this kind, in words; empty when it is fine.
@@ -74,4 +124,28 @@ func problems() -> PackedStringArray:
 		found.append("%s: speed, up and life go from the least (x) to the most (y)" % id)
 	if life.x <= 0.0 or life.y > 4.0:
 		found.append("%s: life is above 0 and at most 4 s" % id)
+	found.append_array(_shape_problems())
+	return found
+
+
+func _shape_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	if shape.is_empty() or shape.size() > SHAPE_FRAMES:
+		found.append("%s: a shape has 1 to %d frames" % [id, SHAPE_FRAMES])
+	if not SHAPE_PLAYS.has(shape_play):
+		found.append("%s: shape_play '%s' is not one of %s" % [id, shape_play, SHAPE_PLAYS])
+	var drawn: bool = false
+	for frame in shape:
+		var rows: PackedStringArray = frame.split("/")
+		if rows.size() > SHAPE_SIZE:
+			found.append("%s: shape frame '%s' is more than %d rows" % [id, frame, SHAPE_SIZE])
+		for row in rows:
+			if row.length() > SHAPE_SIZE:
+				found.append("%s: shape row '%s' is more than %d pixels" % [id, row, SHAPE_SIZE])
+			for mark in row:
+				if not "#o. ".contains(mark):
+					found.append("%s: shape mark '%s' is not one of # o . (space)" % [id, mark])
+				drawn = drawn or mark == "#" or mark == "o"
+	if not shape.is_empty() and not drawn:
+		found.append("%s: its shape draws nothing" % id)
 	return found

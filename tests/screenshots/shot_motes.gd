@@ -1,13 +1,13 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of motes (gameplay/feel/mote.gd; docs/milestones/spell-spectacle.md, P1a), as the
 ## game makes them: one column for each element card (a shot of its look layer and tint sheds
-## its motes, `Motes.shed`), one for a plain shot of player 1, and the crypt arena's walls' chips
+## its motes, `Motes.shed`, in their shapes), one for a plain shot of player 1, and the crypt arena's walls' chips
 ## in the colours sampled from its art (`RoomBase.surface_colors`). Each row is the same bursts
-## 0.05, 0.3, 0.8 and 1.8 s after they were thrown, at 2x (`motes_kinds`). The pool runs on a
+## 0.05, 0.12, 0.3, 0.8 and 1.8 s after they were thrown, at 2x (`motes_kinds`). The pool runs on a
 ## clock of its own, with the content's kinds.
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
-const TIMES: Array[float] = [0.05, 0.3, 0.8, 1.8]
+const TIMES: Array[float] = [0.05, 0.12, 0.3, 0.8, 1.8]
 const ROW_TOP: int = 120
 const ROW_HEIGHT: int = 110
 const BORN: float = 1.0

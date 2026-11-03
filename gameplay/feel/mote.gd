@@ -8,7 +8,9 @@ extends Node2D
 ##
 ## **Kinds are data** (`MoteKind`, `content/motes/`): how one flies and how many a burst throws.
 ## The pool takes them when it is made and hands their numbers to the shader (`kind_motion`,
-## `kind_sway`), so a new kind is a new file. A spell's kinds come from its cards' looks
+## `kind_sway`, `kind_shape`) and their shapes' frames (`shape_atlas`, a texture of
+## MoteKind.SHAPE_SIZE squares, a kind's frames along a row), so a new kind, or a new shape, is a
+## new file. A spell's kinds come from its cards' looks
 ## (`kinds_of_look`): a shot sheds the kinds that name its look layers (`shed`).
 ##
 ## **Colours are never here.** A mote cools through a ramp of four shades (white-hot, light, base,
@@ -56,14 +58,12 @@ const TABLE_SOURCE: int = 16
 const LOOK_ENEMY_RAMP: int = 1 << 22
 const LOOK_EXACT: int = 1 << 23
 const LOOK_LAYERS: int = 21
-## A row's second colour channel: the kind, plus BIG for a 2x2 chunk.
-const BIG: int = 16
 ## What a row's colour channels are divided by, so every one is between 0 and 1 (the shader's
-## SOURCE_CODE, KIND_CODE, HEIGHT_MAX; LIFE_MAX for the life). The life and the height are
+## SOURCE_CODE, KIND_CODE, HEIGHT_MAX; LIFE_MAX for the life; the second channel is the kind). The life and the height are
 ## written in steps of 1/255 of their most (the height in quarter pixels), so a renderer that
 ## keeps the colour as bytes reads the same numbers `flight` does.
 const SOURCE_CODE: float = 128.0
-const KIND_CODE: float = 32.0
+const KIND_CODE: float = 16.0
 const HEIGHT_MAX: float = 63.75
 
 ## Uploads of a chunk's buffer since this pool was made (for tests and the benchmarks).
@@ -93,6 +93,8 @@ var _ramp_image: Image = null
 var _ramp_texture: ImageTexture = null
 var _ramp_rows: Dictionary = {}
 var _next_ramp: int = 0
+## The shapes' frames: SHAPE_SIZE squares, a kind's along its row (`shape_value`).
+var _shape_image: Image = null
 var _material: ShaderMaterial = null
 var _mesh: ArrayMesh = null
 var _z: int = 0
@@ -224,7 +226,6 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
 	height = _step255(height, HEIGHT_MAX)
 	var ground: Vector2 = at + Vector2(0.0, height)
-	var big: float = _kinds[k].big_share
 	var coded_source: float = float(source) / SOURCE_CODE
 	var coded_height: float = height / HEIGHT_MAX
 	var chunk: int = -1
@@ -246,7 +247,7 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		buffer[i + 5] = _rng.randf_range(up.x, up.y)
 		buffer[i + 7] = ground.y
 		buffer[i + 8] = coded_source
-		buffer[i + 9] = float(k + (BIG if big > 0.0 and _rng.randf() < big else 0)) / KIND_CODE
+		buffer[i + 9] = float(k) / KIND_CODE
 		buffer[i + 10] = _step255(clampf(_rng.randf_range(life.x, life.y), 0.02, LIFE_MAX), LIFE_MAX) / LIFE_MAX
 		buffer[i + 11] = coded_height
 		buffer[i + 12] = core.r
@@ -370,7 +371,14 @@ func flight(from: Vector2, vel: Vector2, h0: float, vz: float, t: float, k: int,
 
 
 func _kind_of(buffer: PackedFloat32Array, i: int) -> int:
-	return roundi(buffer[i + 9] * KIND_CODE) % BIG
+	return clampi(roundi(buffer[i + 9] * KIND_CODE), 0, MAX_KINDS - 1)
+
+
+## The shape atlas's pixel (MoteKind.PIXEL_*) of kind `k`'s frame `frame` at `x`, `y` of its
+## square (the mote's own pixel in the middle) (for tests).
+func shape_value(k: int, frame: int, x: int, y: int) -> int:
+	var size: int = MoteKind.SHAPE_SIZE
+	return roundi(_shape_image.get_pixel(frame * size + x, k * size + y).r * 2.0)
 
 
 ## `value` (0 to `most`) in steps of 1/255 of `most`.
@@ -386,8 +394,12 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_layer_kinds[layer] = PackedInt32Array()
 	var motion := PackedVector4Array()
 	var sway := PackedVector4Array()
+	var shapes := PackedVector4Array()
 	motion.resize(MAX_KINDS)
 	sway.resize(MAX_KINDS)
+	shapes.resize(MAX_KINDS)
+	var size: int = MoteKind.SHAPE_SIZE
+	_shape_image = Image.create_empty(size * MoteKind.SHAPE_FRAMES, size * MAX_KINDS, false, Image.FORMAT_RGBA8)
 	for kind in kinds:
 		if kind == null or not kind.problems().is_empty():
 			continue
@@ -398,12 +410,21 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_kinds.append(kind)
 		motion[k] = Vector4(kind.gravity, kind.drag, kind.bounce, kind.glow)
 		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), 0.0)
+		shapes[k] = Vector4(float(kind.shape.size()), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0)
+		for frame in kind.shape.size():
+			var pixels: PackedByteArray = kind.shape_pixels(frame)
+			for y in size:
+				for x in size:
+					var value: float = float(pixels[y * size + x]) * 0.5
+					_shape_image.set_pixel(frame * size + x, k * size + y, Color(value, value, value, 1.0))
 		if kind.surface:
 			_surface_kinds.append(k)
 		for layer in kind.look_layers:
 			_layer_kinds[layer].append(k)
 	_material.set_shader_parameter(&"kind_motion", motion)
 	_material.set_shader_parameter(&"kind_sway", sway)
+	_material.set_shader_parameter(&"kind_shape", shapes)
+	_material.set_shader_parameter(&"shape_atlas", ImageTexture.create_from_image(_shape_image))
 
 
 ## Chunk `c`'s rows, making its batch the first time.

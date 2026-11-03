@@ -13,7 +13,10 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //
 // Nothing here is a kind or a colour of its own:
 // - the kinds' numbers are data (`MoteKind`, content/motes), handed over by mote.gd as
-//   `kind_motion` (gravity, drag, bounce, glow) and `kind_sway` (sway, its rate, first shade);
+//   `kind_motion` (gravity, drag, bounce, glow), `kind_sway` (sway, its rate, first shade) and
+//   `kind_shape` (frames, how they play: 0 life, 1 loop, 2 pick; frames a second; 1 when it turns
+//   with its flight), and their shapes as `shape_atlas`: SHAPE_SIZE squares, a kind's frames
+//   along its row, each pixel 0 none, 0.5 its shade, 1 the shade hotter;
 // - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
 //   and its caster's ramp; any other ramp (a room's walls) is a row of `ramp_table` (white-hot,
 //   light, base, shadow across).
@@ -25,8 +28,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   MODEL_MATRIX[1].y   its height's velocity, up (px/s)
 //   MODEL_MATRIX[3].xy  its ground point at birth (it is drawn there, raised by its height)
 //   COLOR               its source / SOURCE_CODE (0-3 a hat ramp, 4 the enemies', +8 an exact
-//                       colour; from 16 a row of the ramp table), (kind + 16 for a 2x2 chunk) /
-//                       KIND_CODE, its life / LIFE_MAX, its height at birth / HEIGHT_MAX
+//                       colour; from 16 a row of the ramp table), its kind / KIND_CODE, its
+//                       life / LIFE_MAX, its height at birth / HEIGHT_MAX
 //   INSTANCE_CUSTOM     the core colour (a spell's), a seed (0-1)
 // The colour and custom data are between 0 and 1 and need no more than bytes: a renderer may
 // keep them as half floats or bytes.
@@ -38,25 +41,34 @@ render_mode blend_premul_alpha, world_vertex_coords;
 
 uniform vec4 kind_motion[16];
 uniform vec4 kind_sway[16];
+uniform vec4 kind_shape[16];
 uniform sampler2D ramp_table : filter_nearest;
+uniform sampler2D shape_atlas : filter_nearest;
 
-// Motes.LIFE_MAX, SOURCE_CODE, KIND_CODE, HEIGHT_MAX, MAX_KINDS, BIG, EXACT_SOURCE, TABLE_SOURCE.
+// Motes.LIFE_MAX, SOURCE_CODE, KIND_CODE, HEIGHT_MAX, MAX_KINDS, EXACT_SOURCE, TABLE_SOURCE;
+// MoteKind.SHAPE_SIZE.
 const float LIFE_MAX = 4.0;
 const float SOURCE_CODE = 128.0;
-const float KIND_CODE = 32.0;
+const float KIND_CODE = 16.0;
 const float HEIGHT_MAX = 63.75;
 const int MAX_KINDS = 16;
-const float BIG = 16.0;
+const int SHAPE_SIZE = 5;
 const float EXACT_SOURCE = 8.0;
 const float TABLE_SOURCE = 16.0;
-// How far a hot mote's glow reaches past its pixel.
+// How far a hot mote's glow reaches past its shape.
 const float GLOW_REACH = 2.0;
+// How far before now its way is read, to turn its shape (s).
+const float TURN_LOOK = 0.03;
 
-// The mote's pixel (its top-left), its size, colour and glow, and the world pixel drawn.
+// The mote's pixel (its shape's middle), its shade and the shade hotter, its glow, its shape (the
+// atlas's square: kind's row, frame's column), the way it is turned (cos, sin; 1, 0 unturned),
+// and the world pixel drawn.
 varying flat vec2 m_at;
-varying flat float m_size;
 varying flat vec3 m_rgb;
+varying flat vec3 m_hot;
 varying flat float m_glow;
+varying flat vec2 m_cell;
+varying flat vec2 m_turn;
 varying vec2 m_px;
 
 // Where a mote of kind `k` is `t` seconds after its birth at the ground point `from` with the
@@ -88,15 +100,24 @@ vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float 
 	return vec3(ground, max(h, 0.0));
 }
 
+// Shade `shade` (0 white-hot ... 3 shadow) of the ramp of `source` (with the core colour `c`).
+vec3 mote_shade(float source, vec3 c, float s, int shade) {
+	if (source >= TABLE_SOURCE) {
+		return texelFetch(ramp_table, ivec2(shade, int(source - TABLE_SOURCE)), 0).rgb;
+	}
+	// The shot's own ramp, as the shot shaders pick it.
+	bool exact = source >= EXACT_SOURCE;
+	Look L = look_of(c, mod(source, EXACT_SOURCE), 1.0, vec3(0.0, 0.0, exact ? 128.0 : 0.0), s, false);
+	return shade == 0 ? L.hot : (shade == 1 ? L.hi : (shade == 2 ? L.mid : L.lo));
+}
+
 void vertex() {
 	vec2 vel = MODEL_MATRIX[0].xy;
 	float born = MODEL_MATRIX[1].x;
 	float vz = MODEL_MATRIX[1].y;
 	vec2 from = MODEL_MATRIX[3].xy;
 	float source = floor(COLOR.r * SOURCE_CODE + 0.5);
-	float coded = floor(COLOR.g * KIND_CODE + 0.5);
-	int k = clamp(int(mod(coded, BIG)), 0, MAX_KINDS - 1);
-	float size = coded >= BIG ? 2.0 : 1.0;
+	int k = clamp(int(floor(COLOR.g * KIND_CODE + 0.5)), 0, MAX_KINDS - 1);
 	float life = COLOR.b * LIFE_MAX;
 	float h0 = COLOR.a * HEIGHT_MAX;
 	float s = INSTANCE_CUSTOM.a;
@@ -105,45 +126,67 @@ void vertex() {
 	VERTEX = vec2(0.0);
 	m_px = vec2(0.0);
 	m_at = vec2(0.0);
-	m_size = 1.0;
 	m_rgb = vec3(0.0);
+	m_hot = vec3(0.0);
 	m_glow = 0.0;
+	m_cell = vec2(0.0);
+	m_turn = vec2(1.0, 0.0);
 	// An unused row has no life: folded away, with none of the work below.
 	if (alive) {
 		vec3 at = mote_flight(from, vel, h0, vz, t, k, s);
-		vec2 pixel = floor(at.xy - vec2(0.0, at.z));
+		vec2 seen = at.xy - vec2(0.0, at.z);
+		vec2 pixel = floor(seen);
 		// Cooling: evenly from its first shade down to shadow over its life.
 		float shade_from = kind_sway[k].z;
 		int shade = int(min(shade_from + floor(t / life * (4.0 - shade_from)), 3.0));
-		vec3 rgb;
-		if (source >= TABLE_SOURCE) {
-			rgb = texelFetch(ramp_table, ivec2(shade, int(source - TABLE_SOURCE)), 0).rgb;
-		} else {
-			// The shot's own ramp, as the shot shaders pick it.
-			bool exact = source >= EXACT_SOURCE;
-			Look L = look_of(INSTANCE_CUSTOM.rgb, mod(source, EXACT_SOURCE), 1.0, vec3(0.0, 0.0, exact ? 128.0 : 0.0), s, false);
-			rgb = shade == 0 ? L.hot : (shade == 1 ? L.hi : (shade == 2 ? L.mid : L.lo));
+		// Its frame: through them over its life, round them, or its own.
+		vec4 shape = kind_shape[k];
+		float frames = max(shape.x, 1.0);
+		float frame = shape.y < 0.5 ? floor(t / life * frames) : (shape.y < 1.5 ? floor(t * shape.z + s * frames) : floor(s * frames));
+		frame = mod(clamp(frame, 0.0, 1.0e6), frames);
+		// Turned with its way (8 ways), read over the last moment; at rest, the way it was thrown.
+		vec2 turn = vec2(1.0, 0.0);
+		float reach = float(SHAPE_SIZE / 2);
+		if (shape.w > 0.5) {
+			vec3 before = mote_flight(from, vel, h0, vz, t - TURN_LOOK, k, s);
+			vec2 way = seen - (before.xy - vec2(0.0, before.z));
+			if (dot(way, way) < 0.0025) {
+				way = vel;
+			}
+			float angle = round(atan(way.y, way.x) / 0.7854) * 0.7854;
+			turn = vec2(cos(angle), sin(angle));
+			reach += 1.0;
 		}
 		float lit = shade <= 1 ? kind_motion[k].w * glow_strength : 0.0;
-		float reach = lit > 0.0 ? GLOW_REACH : 0.0;
+		reach += lit > 0.0 ? GLOW_REACH : 0.0;
 		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
-		vec2 p = mix(pixel - reach, pixel + size + reach, corner);
+		vec2 p = mix(pixel - reach, pixel + 1.0 + reach, corner);
 		VERTEX = p;
 		m_px = p;
 		m_at = pixel;
-		m_size = size;
-		m_rgb = rgb;
+		m_rgb = mote_shade(source, INSTANCE_CUSTOM.rgb, s, shade);
+		m_hot = mote_shade(source, INSTANCE_CUSTOM.rgb, s, max(shade - 1, 0));
 		m_glow = lit;
+		m_cell = vec2(frame, float(k)) * float(SHAPE_SIZE);
+		m_turn = turn;
 	}
 }
 
 void fragment() {
 	vec2 d = floor(m_px) - m_at;
-	if (all(greaterThanEqual(d, vec2(0.0))) && all(lessThan(d, vec2(m_size)))) {
+	// The shape's pixel this one is: turned back by its way, to the nearest pixel.
+	vec2 q = round(vec2(m_turn.x * d.x + m_turn.y * d.y, -m_turn.y * d.x + m_turn.x * d.y));
+	float half_size = float(SHAPE_SIZE / 2);
+	float mark = 0.0;
+	if (abs(q.x) <= half_size && abs(q.y) <= half_size) {
+		mark = texelFetch(shape_atlas, ivec2(m_cell + q + half_size), 0).r;
+	}
+	if (mark > 0.75) {
+		COLOR = vec4(m_hot, 1.0);
+	} else if (mark > 0.25) {
 		COLOR = vec4(m_rgb, 1.0);
 	} else {
 		// The glow round a hot mote: light added, no alpha.
-		vec2 c = clamp(d, vec2(0.0), vec2(m_size - 1.0));
-		COLOR = vec4(m_rgb * m_glow * 0.5 * falloff(length(d - c), GLOW_REACH + 1.0), 0.0);
+		COLOR = vec4(m_rgb * m_glow * 0.5 * falloff(length(d), half_size + GLOW_REACH), 0.0);
 	}
 }

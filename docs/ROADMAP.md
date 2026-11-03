@@ -14,6 +14,8 @@ A fifth, by the owner on 2026-10-30: **Horde**, a separate game mode against a g
 
 A sixth, by the owner on 2026-11-01: **an enemy AI that plays whatever staffs it holds** (it reads what each staff casts next), with profiles, phases for bosses, dodging, channelled casts, teamwork, bots on the same AI and an enemy arena ([M2-enemy-ai.md](milestones/M2-enemy-ai.md), phase AI). It is the baseline; designing new enemies and bosses on it stays M3 and later.
 
+A seventh, by the owner on 2026-11-03: **spell spectacle**, three drawn-only layers built ahead of M4's polish: motes (tens of thousands of single-pixel particles with no game logic), floor marks that stay for the room, and spell light ([spell-spectacle.md](milestones/spell-spectacle.md), phase P). It changes no rule, damage or cap.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

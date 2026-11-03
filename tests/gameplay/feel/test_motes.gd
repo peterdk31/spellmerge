@@ -215,7 +215,18 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 
 func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
 	var kind := _kind(&"shaped")
-	kind.shape = PackedStringArray(["##o", ".o./o#o/.o.", "##/##", "."])
+	kind.shape = """
+		##o
+
+		.o.
+		o#o
+		.o.
+
+		##
+		##
+
+		.
+	"""
 	var m: int = MoteKind.SHAPE_SIZE / 2
 	var streak: PackedByteArray = kind.shape_pixels(0)
 	check_equal(streak[m * MoteKind.SHAPE_SIZE + m - 1], MoteKind.PIXEL_BODY, "a streak: a pixel behind")
@@ -228,6 +239,11 @@ func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
 	var chunk: PackedByteArray = kind.shape_pixels(2)
 	check(chunk[m * MoteKind.SHAPE_SIZE + m] == MoteKind.PIXEL_BODY and chunk[(m + 1) * MoteKind.SHAPE_SIZE + m + 1] == MoteKind.PIXEL_BODY, "a 2x2 chunk: the mote and right and down of it")
 	check_equal(kind.shape_pixels(3).count(MoteKind.PIXEL_NONE), MoteKind.SHAPE_SIZE * MoteKind.SHAPE_SIZE, "an empty frame (a blink)")
+	check_equal(kind.shape_frames().size(), 4, "frames apart by blank lines, the indent and the lines round them left out")
+	var ragged := _kind(&"ragged")
+	ragged.shape = "o..\n#"
+	var corner: PackedByteArray = ragged.shape_pixels(0)
+	check(corner[m * MoteKind.SHAPE_SIZE + m - 1] == MoteKind.PIXEL_HOT and corner[(m + 1) * MoteKind.SHAPE_SIZE + m - 1] == MoteKind.PIXEL_BODY, "rows start at the left as written (the # under the o), the picture centred on its middle column: %s" % [corner])
 	check_equal(kind.problems(), PackedStringArray(), "a fine shape")
 	var motes: MotesScript = _pool(1024, [_kind(&"first", 0), kind])
 	check_equal(motes.shape_value(1, 0, m + 1, m), MoteKind.PIXEL_HOT, "the atlas holds the kind's frames")
@@ -238,11 +254,11 @@ func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
 
 func test_a_shapes_frames_play_as_its_kind_says() -> void:
 	var looped := _kind(&"looped")
-	looped.shape = PackedStringArray(["o", "#"])
+	looped.shape = "o\n\n#"
 	looped.shape_play = "loop"
 	looped.shape_rate = 12.0
 	var turning := _kind(&"turning")
-	turning.shape = PackedStringArray(["##o"])
+	turning.shape = "##o"
 	turning.shape_play = "pick"
 	turning.shape_turns = true
 	var motes: MotesScript = _pool(1024, [looped, turning])
@@ -253,13 +269,13 @@ func test_a_shapes_frames_play_as_its_kind_says() -> void:
 
 func test_a_broken_shape_is_named() -> void:
 	var kind := _kind(&"broken")
-	kind.shape = PackedStringArray(["######", "x", "./././././."])
+	kind.shape = "######\n\nx\n\n.\n.\n.\n.\n.\n."
 	kind.shape_play = "spin"
 	check_equal(kind.problems().size(), 4, "too wide, an unknown mark, too many rows, an unknown play: %s" % [kind.problems()])
-	kind.shape = PackedStringArray(["...", "."])
+	kind.shape = "...\n\n."
 	kind.shape_play = "life"
 	check_equal(kind.problems().size(), 1, "a shape that draws nothing: %s" % [kind.problems()])
-	kind.shape = PackedStringArray(["#", "#", "#", "#", "#", "#", "#", "#", "#"])
+	kind.shape = "\n\n".join(PackedStringArray(["#", "#", "#", "#", "#", "#", "#", "#", "#"]))
 	check_equal(kind.problems().size(), 1, "more frames than the atlas holds: %s" % [kind.problems()])
 
 

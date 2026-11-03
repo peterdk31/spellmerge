@@ -13,7 +13,15 @@ wobble = 1.0
 wobble_rate = 4.0
 glow = 1.0
 shade_from = 0
-shape = PackedStringArray(".o./o#o/.o.", "o", "#")
+shape = "
+.o.
+o#o
+.o.
+
+o
+
+#
+"
 shape_play = "life"
 shape_rate = 8.0
 shape_turns = false

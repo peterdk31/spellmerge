@@ -11,7 +11,12 @@ drag = 4.0
 bounce = 0.0
 glow = 0.6
 shade_from = 1
-shape = PackedStringArray("#", "##/##")
+shape = "
+#
+
+##
+##
+"
 shape_play = "pick"
 shape_rate = 8.0
 shape_turns = false

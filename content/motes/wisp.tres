@@ -13,7 +13,11 @@ wobble = 4.0
 wobble_rate = 5.0
 glow = 0.5
 shade_from = 1
-shape = PackedStringArray("#o", "o")
+shape = "
+#o
+
+o
+"
 shape_play = "life"
 shape_rate = 8.0
 shape_turns = true

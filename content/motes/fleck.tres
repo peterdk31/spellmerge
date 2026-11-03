@@ -11,7 +11,17 @@ drag = 2.5
 bounce = 0.4
 glow = 0.4
 shade_from = 1
-shape = PackedStringArray("#", "#", "#", ".o./o#o/.o.")
+shape = "
+#
+
+#
+
+#
+
+.o.
+o#o
+.o.
+"
 shape_play = "loop"
 shape_rate = 6.0
 shape_turns = false

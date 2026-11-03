@@ -38,12 +38,18 @@ extends Resource
 @export_range(0, 3) var shade_from: int = 1
 
 @export_group("Shape")
-## What one looks like: one or more frames of up to SHAPE_SIZE x SHAPE_SIZE pixels, centred on
-## the mote (the middle column and row; the left and upper of two), rows split by "/". "#" is a
-## pixel in its shade, "o" one in the shade hotter (a highlight), "." or " " none. A frame may be
-## empty (a blink), not every frame. `".o./o#o/.o."` is a plus with a bright rim, `"##o"` a
-## streak with a bright head.
-@export var shape: PackedStringArray = PackedStringArray(["#"])
+## What one looks like, drawn as text: one or more frames, each a picture of up to SHAPE_SIZE x
+## SHAPE_SIZE pixels, one row a line, frames apart by a blank line. "#" is a pixel in its shade,
+## "o" one in the shade hotter (a highlight), "." none. Rows start at the left as written; the
+## picture is centred on the mote (its middle column and row; the left and upper of two). A frame
+## of dots is a blink; not every frame may be one. A plus with a bright rim, then a pixel:
+##
+##     .o.
+##     o#o
+##     .o.
+##
+##     #
+@export_multiline var shape: String = "#"
 ## How its frames play: `life` through them evenly over its life, `loop` round them
 ## `shape_rate` a second (each mote from its own frame), `pick` one at random for each mote,
 ## kept.
@@ -85,19 +91,40 @@ func kind() -> StringName:
 	return &"mote"
 
 
+## The shape's frames, each its rows (lines with no spaces round them).
+func shape_frames() -> Array[PackedStringArray]:
+	var frames: Array[PackedStringArray] = []
+	var rows := PackedStringArray()
+	for line in shape.replace("\r", "").split("\n"):
+		var row: String = line.strip_edges()
+		if row.is_empty():
+			if not rows.is_empty():
+				frames.append(rows)
+				rows = PackedStringArray()
+		else:
+			rows.append(row)
+	if not rows.is_empty():
+		frames.append(rows)
+	return frames
+
+
 ## Frame `frame` of the shape as SHAPE_SIZE x SHAPE_SIZE pixels (PIXEL_*), row by row, the
 ## mote's own pixel in the middle (row and column SHAPE_SIZE / 2).
 func shape_pixels(frame: int) -> PackedByteArray:
 	var pixels := PackedByteArray()
 	pixels.resize(SHAPE_SIZE * SHAPE_SIZE)
-	if frame < 0 or frame >= shape.size():
+	var frames: Array[PackedStringArray] = shape_frames()
+	if frame < 0 or frame >= frames.size():
 		return pixels
-	var rows: PackedStringArray = shape[frame].split("/")
+	var rows: PackedStringArray = frames[frame]
+	var wide: int = 0
+	for row in rows:
+		wide = maxi(wide, row.length())
 	var middle: int = SHAPE_SIZE / 2
 	var top: int = middle - (rows.size() - 1) / 2
+	var left: int = middle - (wide - 1) / 2
 	for r in rows.size():
 		var row: String = rows[r]
-		var left: int = middle - (row.length() - 1) / 2
 		for c in row.length():
 			var x: int = left + c
 			var y: int = top + r
@@ -130,22 +157,23 @@ func problems() -> PackedStringArray:
 
 func _shape_problems() -> PackedStringArray:
 	var found := PackedStringArray()
-	if shape.is_empty() or shape.size() > SHAPE_FRAMES:
-		found.append("%s: a shape has 1 to %d frames" % [id, SHAPE_FRAMES])
+	var frames: Array[PackedStringArray] = shape_frames()
+	if frames.is_empty() or frames.size() > SHAPE_FRAMES:
+		found.append("%s: a shape has 1 to %d frames, apart by a blank line" % [id, SHAPE_FRAMES])
 	if not SHAPE_PLAYS.has(shape_play):
 		found.append("%s: shape_play '%s' is not one of %s" % [id, shape_play, SHAPE_PLAYS])
 	var drawn: bool = false
-	for frame in shape:
-		var rows: PackedStringArray = frame.split("/")
+	for f in frames.size():
+		var rows: PackedStringArray = frames[f]
 		if rows.size() > SHAPE_SIZE:
-			found.append("%s: shape frame '%s' is more than %d rows" % [id, frame, SHAPE_SIZE])
+			found.append("%s: shape frame %d is more than %d rows" % [id, f + 1, SHAPE_SIZE])
 		for row in rows:
 			if row.length() > SHAPE_SIZE:
 				found.append("%s: shape row '%s' is more than %d pixels" % [id, row, SHAPE_SIZE])
 			for mark in row:
-				if not "#o. ".contains(mark):
-					found.append("%s: shape mark '%s' is not one of # o . (space)" % [id, mark])
+				if not "#o.".contains(mark):
+					found.append("%s: shape mark '%s' is not one of # o ." % [id, mark])
 				drawn = drawn or mark == "#" or mark == "o"
-	if not shape.is_empty() and not drawn:
+	if not frames.is_empty() and not drawn:
 		found.append("%s: its shape draws nothing" % id)
 	return found

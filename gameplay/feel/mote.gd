@@ -410,8 +410,9 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_kinds.append(kind)
 		motion[k] = Vector4(kind.gravity, kind.drag, kind.bounce, kind.glow)
 		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), 0.0)
-		shapes[k] = Vector4(float(kind.shape.size()), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0)
-		for frame in kind.shape.size():
+		var frames: int = kind.shape_frames().size()
+		shapes[k] = Vector4(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0)
+		for frame in frames:
 			var pixels: PackedByteArray = kind.shape_pixels(frame)
 			for y in size:
 				for x in size:

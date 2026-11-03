@@ -424,3 +424,184 @@ func test_with_particles_off_there_are_no_motes_and_the_chips_effect_shows() -> 
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "and the room's walls still shed")
 	check_equal(feel.set_mote_cap(1 << 20), MoteCap.STOPS[-1], "never past the top stop")
+
+
+# --- P1b: the sources ---------------------------------------------------------------------------
+
+
+## The rows written by `call` (a Callable taking nothing), as the kinds (by id) they are.
+func _shed_by(motes: MotesScript, call: Callable) -> Array[StringName]:
+	var before: int = motes.next_row()
+	call.call()
+	motes.step(0.0)
+	return _kinds_of_rows(motes, before, motes.next_row())
+
+
+## A body that dies: a node with a `Sprite` of a 2x1 sheet whose shown frame is in `colours`.
+func _body(colours: PackedColorArray) -> Node2D:
+	var image := Image.create_empty(8, 4, false, Image.FORMAT_RGBA8)
+	image.fill(Color.MAGENTA)
+	for x in 4:
+		for y in 4:
+			image.set_pixel(4 + x, y, colours[mini(y, colours.size() - 1)])
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = ImageTexture.create_from_image(image)
+	sprite.hframes = 2
+	sprite.frame = 1
+	var body := Node2D.new()
+	body.add_child(sprite)
+	root.add_child(body)
+	return own(body) as Node2D
+
+
+func test_a_hit_on_a_body_sheds_the_shots_kinds_back_along_its_way() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	feel.projectiles.impact_look = FROST_LOOK
+	feel.projectiles.impact_core = Color("8fd3ff")
+	var target: Node2D = _body(PackedColorArray([Color.GRAY]))
+	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.projectile_impact.emit(1, target, Vector2(50.0, 50.0), Vector2.RIGHT))
+	check_equal(kinds, [&"fleck"], "a frost shot's flecks")
+	for row in motes.next_row():
+		check(motes.row_data(row)[0] <= 0.0, "mote %d flies back the way the shot came" % row)
+	feel.particles_enabled = false
+	check_equal(_shed_by(motes, func() -> void: bus.projectile_impact.emit(1, target, Vector2(50.0, 50.0), Vector2.RIGHT)), [] as Array[StringName], "none with particles off (the stress benchmark)")
+
+
+func test_a_shot_whose_life_runs_out_puffs_its_kinds() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	feel.projectiles.impact_body = ProjectilesScript.KIND_BOLT
+	feel.projectiles.impact_look = FIRE_LOOK
+	feel.projectiles.impact_heading = Vector2.DOWN
+	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [&"ember"], "a fire bolt puffs embers")
+	feel.projectiles.expired_on_wall = true
+	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [] as Array[StringName], "one that ended on a wall already shed there")
+
+
+func test_a_reaction_throws_a_ring_in_its_colour() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
+	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
+	var tint: Color = feel.preset.reaction_colors.get(&"shatter", Color.WHITE) as Color
+	var speeds: Array[float] = []
+	for row in motes.next_row():
+		var data: PackedFloat32Array = motes.row_data(row)
+		check(roundi(data[8] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
+		check(Color(data[12], data[13], data[14]).is_equal_approx(tint), "the reaction's")
+		speeds.append(Vector2(data[0], data[4]).length())
+	check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
+
+
+func test_an_enemy_death_sheds_the_killing_shots_kinds_and_its_own_colours() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var shot: int = feel.projectiles.spawn(0, Vector2.ZERO, Vector2.RIGHT * 100.0, 1.0)
+	feel.projectiles.set_look(shot, FIRE_LOOK)
+	var art := PackedColorArray([Color("d8d0b8"), Color("a09478"), Color("5c5444")])
+	var enemy: Node2D = _body(art)
+	var before: int = motes.next_row()
+	bus.enemy_died.emit(1, enemy, Vector2(40.0, 40.0), shot)
+	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+	check(kinds.has(&"ember") and kinds.has(&"chip"), "the killing shot's embers and the body's chips, got %s" % [kinds])
+	var chips: int = 0
+	for row in range(before, motes.next_row()):
+		var data: PackedFloat32Array = motes.row_data(row)
+		if motes.kinds()[roundi(data[9] * MotesScript.KIND_CODE)].id != &"chip":
+			continue
+		chips += 1
+		var source: int = roundi(data[8] * MotesScript.SOURCE_CODE)
+		check(source >= MotesScript.TABLE_SOURCE and motes.table_shade(source, 1).is_equal_approx(art[0]) and motes.table_shade(source, 3).is_equal_approx(art[2]), "a chip in the colours of the frame the body shows, not the room's or the sheet's")
+	var boss_cue: CueBase = registry.get_resource(&"cues", &"boss_death") as CueBase
+	var death_cue: CueBase = registry.get_resource(&"cues", &"enemy_death") as CueBase
+	check(chips > 0 and boss_cue != null and death_cue != null, "chips were thrown")
+
+
+func test_the_dense_cues_throw_their_kinds() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	bus.room_entered.emit(ARENA)
+	for id: StringName in [&"blast", &"fireball", &"slam", &"quake", &"nova", &"enemy_death", &"boss_death"]:
+		var before: int = motes.next_row()
+		feel.play_cue(id, 0, Vector2(100.0, 100.0), Vector2.RIGHT, 48.0, Color.WHITE, FIRE_LOOK)
+		var written: int = motes.next_row() - before
+		var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+		check(written >= 8, "%s throws motes, got %d" % [id, written])
+		if id != &"quake" and id != &"nova":
+			check(kinds.has(&"ember") and kinds.has(&"chip"), "%s: its cards' and the ground's, got %s" % [id, kinds])
+		motes.step(0.0)
+	feel.particles_enabled = false
+	var at: int = motes.next_row()
+	feel.play_cue(&"blast", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 48.0)
+	check_equal(motes.next_row(), at, "none with particles off")
+
+
+func test_a_parts_reach_is_as_far_as_its_motes_glide() -> void:
+	var motes: MotesScript = _pool(4096)
+	var k: int = motes.kind_index(&"chip")
+	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 200, 40.0, 360.0, 1.0, false)
+	var drag: float = motes.kinds()[k].drag
+	var farthest: float = 0.0
+	for row in motes.next_row():
+		var data: PackedFloat32Array = motes.row_data(row)
+		farthest = maxf(farthest, Vector2(data[0], data[4]).length() / drag)
+	check(farthest <= 40.0 + 0.01 and farthest > 30.0, "they glide out to the reach at the most, got %s" % farthest)
+
+
+func test_the_particle_amount_scales_every_burst() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var k: int = motes.kind_index(&"chip")
+	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, -1.0, 1.0, false)
+	check_equal(motes.next_row(), 40, "at Full, as many as asked")
+	motes.step(0.0)
+	bus.mote_density_changed.emit(2.0)
+	check_equal(feel.mote_density, 2.0, "the setting taken")
+	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, -1.0, 1.0, false)
+	check_equal(motes.next_row(), 120, "at Double, twice")
+	motes.step(0.0)
+	bus.mote_density_changed.emit(0.5)
+	var thrown: int = 0
+	for i in 40:
+		var at: int = motes.next_row()
+		motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 3, 0.0, -1.0, 1.0, false)
+		thrown += motes.next_row() - at
+		motes.step(0.0)
+	check(thrown > 40 and thrown < 80, "at Half, half on average (a share of a mote now and then), got %d of 120" % thrown)
+	bus.mote_density_changed.emit(0.0)
+	var at_none: int = motes.next_row()
+	feel.play_cue(&"blast", 0, Vector2.ZERO, Vector2.RIGHT, 48.0)
+	check_equal(motes.next_row(), at_none, "at None, none")
+	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
+	check_equal(feel.motes().density, 0.0, "a new ring keeps the amount")
+	check_equal(feel.set_mote_density(0.7), 0.5, "snapped to a stop")
+
+
+func test_every_kind_a_cue_names_is_there() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var named: int = 0
+	for found: Resource in registry.get_all(&"cues"):
+		var cue := found as CueBase
+		for part: Dictionary in cue.parts:
+			if StringName(part.get("part", "")) != &"motes":
+				continue
+			named += 1
+			var kind: StringName = StringName(part.get("kind", "spell"))
+			check(CueBase.MOTE_GROUPS.has(kind) or motes.kind_index(kind) >= 0, "%s names the mote kind '%s', which is in content/motes" % [cue.id, kind])
+	check(named >= 7, "the cues throw motes, %d parts" % named)

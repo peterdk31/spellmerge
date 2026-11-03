@@ -36,6 +36,7 @@ var _shakes: Array[bool] = []
 var _caps: Array[int] = []
 ## Every `mote_cap_changed` the bus sent, from before the Hud binds.
 var _mote_caps: Array[int] = []
+var _densities: Array[float] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -52,6 +53,7 @@ func _initialize() -> void:
 	_test_the_screen_shake_switch()
 	_test_the_max_shots_slider()
 	_test_the_particles_slider()
+	_test_the_particle_amount_slider()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
@@ -89,6 +91,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
+	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -111,6 +114,7 @@ func _teardown() -> void:
 	_shakes.clear()
 	_caps.clear()
 	_mote_caps.clear()
+	_densities.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -311,7 +315,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -378,6 +382,42 @@ func _test_the_particles_slider() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(_menu().mote_cap == 0, "a later menu starts with the saved cap")
 	_check(_mote_caps == [0], "and tells feel when the Hud binds, got %s" % [_mote_caps])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Particle amount (spell spectacle P1b) starts at Full and sends nothing; left and right step
+## through None, Half, Full and Double and tell feel, accept steps up and wraps, and the choice is
+## saved: a menu bound to the same save later starts with it and tells feel.
+func _test_the_particle_amount_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_densities.is_empty(), "nothing is sent at the default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("MoteDensity")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	var at: int = MoteDensity.index_of(MoteDensity.DEFAULT)
+	_check(row.text.ends_with("Particle amount: Full") and is_equal_approx(bar.value, float(at)), "Full at the start, in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_right")
+	_frame()
+	_check(is_equal_approx(_menu().mote_density, 2.0) and _densities == [2.0], "right asks for Double, got %s" % [_densities])
+	_check(row.text.ends_with("Particle amount: Double") and is_equal_approx(bar.value, float(at + 1)), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	for i in MoteDensity.STOPS.size():
+		_tap(0, &"move_left")
+		_frame()
+	_check(_menu().mote_density == 0.0 and _densities.back() == 0.0, "left goes down to None")
+	_check(is_equal_approx(float(SaveFile.new(SAVE_PATH).get_setting(&"mote_density", -1.0)), 0.0), "the save remembers it")
+	_press(0, "MoteDensity")
+	_check(is_equal_approx(_menu().mote_density, 0.5), "accept steps up")
+	_menu().mote_density = MoteDensity.STOPS[-1]
+	_press(0, "MoteDensity")
+	_check(_menu().mote_density == 0.0, "accept at the top wraps to None")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().mote_density == 0.0 and _densities == [0.0], "a later menu starts with the saved amount and tells feel, got %s" % [_densities])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

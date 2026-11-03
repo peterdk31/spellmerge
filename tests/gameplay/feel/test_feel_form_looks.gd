@@ -52,6 +52,9 @@ func before_each() -> void:
 	feel.registry = registry
 	feel.preset = preset
 	root.add_child(feel)
+	# The effects only: a wall's chips are an effect of the batch with the "Particles" setting off
+	# (with it on they are motes, test_motes.gd).
+	feel.set_mote_cap(0)
 
 
 ## The look the carrier card `form` brings (`FormBase.cast_look` or `impact_look`).

@@ -38,6 +38,8 @@ signal effect_slots_changed(slots: int)
 signal screen_shake_changed(enabled: bool)
 ## Sender: hud. The "Max shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the global cap on live shots (`ShotCap` in core/settings). Heard by core/projectiles, which applies it at once (`set_cap`: the shots in the air end).
 signal projectile_cap_changed(cap: int)
+## Sender: hud. The "Particles" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: how many motes may be in the world at once (`MoteCap` in core/settings; 0 is off). Heard by feel, which remakes its mote ring (the motes in the air end).
+signal mote_cap_changed(cap: int)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).

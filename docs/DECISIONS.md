@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-03: Motes: the pool, the shader and the Particles setting (spell spectacle P1a, owner session)
+
+- **Asked:** the owner-lane task "Spell spectacle: the mote pool (P1a)" (docs/milestones/spell-spectacle.md, approved 2026-11-03).
+- **The row:** the flight is worked out in the vertex stage from the row and `sim_time`, so the CPU writes a row once. The numbers that need full precision (the birth time, the ground point, the velocities) travel in the instance transform's six used floats; the colour and custom data carry only small numbers (the kind and ramp / 16, the life / 4 s, a seed, the height, the size, the first shade), because the compatibility renderer (the web's) may keep those as half floats. Checked on llvmpipe in the compatibility renderer (`tests/screenshots/shot_motes.gd`).
+- **Chunks made when first used:** a chunk's batch and its 64 KB of rows are made the first time a mote lands in it, so a pool of 32,768 that only ever sees wall chips costs one or two batches, and a test's Feel makes none. A chunk's rows are an element of an Array of `PackedFloat32Array`, written in place (GDScript shares a packed array by reference, measured: no copy per write); `step` hands the whole chunk to `multimesh.buffer` once a frame when it was written.
+- **One layer, not two:** the plan drew landed motes at `FLOOR_Z` and flying ones at `FORM_Z - 2`. A row cannot change batch when it lands, and two batches over the same rows would double the vertices, so every mote draws at `MOTE_Z` (`FORM_Z - 2`), under the floor marks, the beams, the flashes and every telegraph. P2b turns the landed ones into floor stamps anyway.
+- **Stone is lighter than the floor:** a chip cooling through Stone light, base and shadow was invisible for a third of its life on the crypt's Stone base floor; Stone motes cool through Bone shadow, Stone light and Stone shadow.
+- **Wall chips replace the chips effect** while the setting is on (ten chips that bounce and lie, four sparks in the shot's ramp); with it off the old `KIND_CHIPS` effect shows, so a wall hit always shows something. The cue part `chips` (blast, slam) is unchanged until P1b.
+- **A frame's rows:** writing a mote costs about 1.5 us in GDScript (14 floats and six random numbers; 21 us a wall hit), so a flood of wall hits could take milliseconds. At most `Motes.FRAME_ROWS` (384, about 0.6 ms) are written between two steps and a burst past that is cut short: a visual budget, nothing a rule reads. The plan's gate is 0.5 ms of spawns a frame in the storm; P1c measures and sets it (or moves the write to the native module).
+- **The setting:** `MoteCap` in core/settings, Off, 8,192, 16,384, 32,768 (words Off, Low, Medium, High), 8,192 on the web and 32,768 on desktop until P1c measures them; `mote_cap_changed` (hud to feel) remakes the ring. `mote_density` waits for P1b, where the sources are data.
+- **Not done here:** the cue part `motes`, the other sources and the measurements (P1b, P1c).
+
 ## 2026-11-02: Spells' hit and Feel's impacts; no bundled events (owner session)
 
 - **Asked:** the owner: how much bundling the hit events per frame would save and whether it is an "ugly" optimization; then "look into" Spells' `_on_hit` and Feel's spray.

@@ -53,6 +53,11 @@ extends Node
 ## moves when it casts is its carrier card's `staff_pose`, drawn by its look (ActorLook), not here.
 ## None of this touches the cast itself.
 ##
+## Motes (docs/milestones/spell-spectacle.md, P1a): single-pixel particles with no game logic in
+## a ring of chunked batches (`mote.gd`, `mote.gdshader`), as many as the "Particles" setting
+## (`MoteCap`, `mote_cap_changed`; none with it off). A shot ending on a wall throws its chips and
+## a few sparks as motes; the other sources come with the cues (P1b).
+##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
 ## Flow frees the world on every Play and restart.
@@ -75,6 +80,7 @@ const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader
 const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -87,6 +93,13 @@ const ENEMY_FORMS: int = 4
 const FORM_Z: int = 18
 ## Marks on the floor (a quake) draw just under the beams and rings, under the enemies (40).
 const FLOOR_Z: int = FORM_Z - 1
+## Motes draw under the floor marks, the beams and every flash and telegraph
+## (docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
+const MOTE_Z: int = FORM_Z - 2
+## A shot ending on a wall throws this many stone chips and sparks of its own as motes (P1a; the
+## chips effect, KIND_CHIPS, shows instead with the "Particles" setting off).
+const WALL_CHIP_MOTES: int = 10
+const WALL_SPARK_MOTES: int = 4
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
@@ -387,6 +400,10 @@ var _flash_material: ShaderMaterial = null
 var _live_beams: Array[MeshInstance2D] = []
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
+## The motes (`mote.gd`; null with the "Particles" setting off), and how many it holds
+## (`MoteCap.default_cap()` until the setting changes it; see `set_mote_cap`). Read only.
+var _motes: MotesScript = null
+var mote_cap: int = MoteCap.default_cap()
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
@@ -532,6 +549,8 @@ func _ready() -> void:
 		_live_paths.append(_make_beam_path())
 	_swing_trails = SwingTrailsScript.new(swing_mesh())
 	add_child(_swing_trails)
+	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
+	_make_motes(mote_cap)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -591,6 +610,7 @@ func _ready() -> void:
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
+	events.mote_cap_changed.connect(_on_mote_cap_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
@@ -649,6 +669,8 @@ func step(real_delta: float) -> void:
 	_draw_live_beams()
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
+	if _motes != null:
+		_motes.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1167,9 +1189,15 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_aim = direction
 		_show_impact(caster, ramp, position, direction, true)
 		return
-	# Stone chips knocked back off the surface.
+	# Stone chips knocked back off the surface: motes (and a few sparks of the shot's own), or the
+	# chips effect with the "Particles" setting off.
 	if particles_enabled:
-		show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
+		if _motes != null:
+			var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
+			_motes.burst(MotesScript.CHIP, position, -direction, WALL_CHIP_MOTES, Vector2(30.0, 110.0), 150.0, Vector2(20.0, 80.0), Vector2(1.0, 2.5), MotesScript.RAMP_STONE, 4.0)
+			_motes.burst(MotesScript.SPARK, position, -direction, WALL_SPARK_MOTES, Vector2(80.0, 180.0), 110.0, Vector2(10.0, 50.0), Vector2(0.15, 0.35), MotesScript.ramp_of_core(core, ramp), 4.0)
+		else:
+			show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
 	_show_impact(caster, ramp, position, direction, false)
 
 
@@ -1525,6 +1553,38 @@ func set_effect_slots(slots: int) -> int:
 
 func _on_effect_slots_changed(slots: int) -> void:
 	set_effect_slots(slots)
+
+
+## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
+## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
+## number taken.
+func set_mote_cap(cap: int) -> int:
+	var taken: int = clampi(cap, 0, MoteCap.STOPS[-1])
+	if taken != mote_cap or (_motes == null) != (taken == 0):
+		_make_motes(taken)
+	return mote_cap
+
+
+## The motes (null with the setting off; for tests and the benchmarks).
+func motes() -> MotesScript:
+	return _motes
+
+
+func _make_motes(cap: int) -> void:
+	mote_cap = cap
+	if _motes != null:
+		_motes.queue_free()
+		remove_child(_motes)
+		_motes = null
+	if cap > 0:
+		_motes = MotesScript.new(cap, MOTE_Z)
+		_motes.name = "Motes"
+		add_child(_motes)
+		_motes.step(_clock)
+
+
+func _on_mote_cap_changed(cap: int) -> void:
+	set_mote_cap(cap)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:

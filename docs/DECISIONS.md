@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Motes: where they come from (spell spectacle P1b, owner session)
+
+- **Asked:** the owner-lane task "Spell spectacle: mote sources (P1b)": the plan's events table, the `motes` cue part, motes in the existing cues, `mote_density`.
+- **No new kinds:** the plan named `ash`, `splinter` and `shard` besides the first ones. With the owner's rule that kinds come from the cards' look layers (P1a), a cue's motes are its cards' kinds (`kind: spell`, so a fire blast throws embers and a frost one flecks) or the surface kinds (`kind: surface`, chips); a part may still name one kind by id. `shard` is P1a's `fleck` (frost); ash and splinters wait until a card or surface needs them.
+- **What breaks sheds its own colours:** the plan's "splinters and embers" for a death became one rule with the walls: a body that dies is a surface that broke, so its death cue's chips take the colours of its own art (`RoomBase.colours_of_art`: the frame it shows, by the walls' rule, read once per texture and kept), and its spell motes are the killing shot's cards (`enemy_died`'s `shot`, read while the event is sent). A boss throws more (its cue's counts).
+- **Sources:** a body hit sheds the shot's kinds back along its way (half their count, `FeelPreset.hit_mote_share`), a bolt or orbit whose life runs out puffs them (`expire_mote_share`), and a reaction throws a ring of the reacting shot's kinds in the reaction's exact colour (`reaction_mote_count` 16 and `reaction_mote_reach` 22 px, times its power). Blast, fireball, slam, quake, nova and both deaths have `motes` parts. P1c measures and tunes the numbers.
+- **`reach` is how far they glide:** a part's `reach` times the cue's size sets the kinds' top speed so a mote of its drag glides that far (speed / drag), keeping the kind's slow-to-fast ratio, so a blast's motes land within its radius whatever kind it throws.
+- **The chips effect stands in for motes,** in cues as on walls: with motes on, a cue's `chips` part is left out and its `motes` parts throw them; with "Particles" off the old effect shows.
+- **The amount:** `MoteDensity` (None, Half, Full, Double; Full by default), the pause menu's "Particle amount" row, `mote_density_changed`. It scales every burst in `Motes.burst` (wall hits too); a share of a mote is thrown that often (`floor(count x density + random)`), so Half keeps the average and a one-mote burst still throws half the time.
+
 ## 2026-11-03: Motes: the pool, kinds as data, colours from spells and rooms (spell spectacle P1a, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle: the mote pool (P1a)" (docs/milestones/spell-spectacle.md, approved 2026-11-03). After a first version with the kinds as tables in mote.gd mirrored in the shader and Stone chips, the owner: "It needs to be easy to change/add motes and different kinds should emerge from the spells", and colours "should also not be hardcoded, since the current tiles are just placeholders".

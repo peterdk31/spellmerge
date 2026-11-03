@@ -605,3 +605,12 @@ func test_every_kind_a_cue_names_is_there() -> void:
 			var kind: StringName = StringName(part.get("kind", "spell"))
 			check(CueBase.MOTE_GROUPS.has(kind) or motes.kind_index(kind) >= 0, "%s names the mote kind '%s', which is in content/motes" % [cue.id, kind])
 	check(named >= 7, "the cues throw motes, %d parts" % named)
+
+
+func test_with_motes_on_a_cues_chips_effect_gives_way_to_its_motes() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
+	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect")
+	check(feel.motes().next_row() > 0, "its motes instead")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")

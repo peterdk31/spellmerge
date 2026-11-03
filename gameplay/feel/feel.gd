@@ -1338,6 +1338,9 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 		if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
 			continue
+		# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
+		if int(row[0]) == KIND_CHIPS and _motes != null:
+			continue
 		var seconds: float = float(part.get("seconds", row[2]))
 		if bool(part.get("lasts_size", false)):
 			if size <= 0.0:

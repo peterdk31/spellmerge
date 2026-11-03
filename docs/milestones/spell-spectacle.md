@@ -1,6 +1,6 @@
 # Spell spectacle: motes, floor marks and spell light
 
-**Status: proposed, waiting for the owner's go.** This is polish, which ROADMAP places in M4, so building any of it before then needs an owner exception like the ones in [ROADMAP.md](../ROADMAP.md). The plan changes no damage, hit, rule or card behaviour: everything below is drawn and nothing is simulated. Making the terrain react to spells (burning ground, breakable walls) is a gameplay change and stays out of scope; [DESIGN.md](../DESIGN.md) would need the owner's direction first.
+**Status: approved by the owner on 2026-11-03** (an exception to the milestone order, recorded in [ROADMAP.md](../ROADMAP.md); this is polish, which ROADMAP places in M4). The tasks are in the owner lane of [NEXT.md](../NEXT.md). The open questions under P3 are still the owner's to answer before P3b. The plan changes no damage, hit, rule or card behaviour: everything below is drawn and nothing is simulated. Making the terrain react to spells (burning ground, breakable walls) is a gameplay change and stays out of scope; [DESIGN.md](../DESIGN.md) would need the owner's direction first.
 
 ## Why
 
@@ -82,6 +82,7 @@ A `MoteBurst` dictionary in a cue's `parts` (`"part": "motes"`), so a card or cu
 1. **P1a: the pool, the shader and the setting.** `mote.gd` (child of Feel, like `swing_trails.gd`), `mote.gdshader`, `core/settings/mote_cap.gd` and the pause menu's "Particles" slider, the tests above. Only the wall chips are wired up, as the first source.
 2. **P1b: sources.** The events table, the `motes` cue part in `core/base/cue_base.gd`, motes added to the existing cues' `.tres`, and a screenshot sheet of each kind.
 3. **P1c: measure and tune.** The benchmarks above, the defaults set from them, and a DECISIONS entry.
+4. **P1d: the trails' shed particles as motes (an experiment, measured).** The trail shader keeps the tail line, which has to follow a path that bends after the shot is fired. The sparks and card particles a trail leaves behind no longer depend on the shot once they are dropped, which is what a mote is. Spawning them as motes lets the trail mesh drop those particle slots (DECISIONS, 2026-11-02: the mesh's vertex count is the cost, drawn or folded), but each dropped particle becomes a CPU write: about 30 a second per shot, or about 180,000 rows a second at 6,000 shots. So try it only below a live-shot threshold, with the trail shader keeping its own particles above it. Measure both sides: the trail GPU benchmark (`tests/benchmark/trail_gpu.gd`) at 60, 400 and 3,000 shots, and the storm's CPU time. Merge only if the GPU time saved is larger than the CPU time added, and the look is the same (screenshot sheet before and after). Either way, record the result in DECISIONS. After P1b.
 
 ---
 
@@ -183,7 +184,8 @@ One "Effects" group in the pause menu holds what is there (`effect_slots`) and t
 ## Order and dependencies
 
 ```
-P1a ─┬─ P1b ── P1c
+P1a ─┬─ P1b ─┬─ P1c
+     │       └─ P1d
      └─ P2b
 P2a ─── P2b
 P3a ─── P3b

@@ -3,7 +3,7 @@ extends SceneTree
 ## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
 ## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Max shots, Screen shake and Show FPS; `back` (B)
+## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Max shots, Screen shake and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
 ## open builder; in the horde's build break (the game paused until every player is ready) the
 ## menu opens and closes and leaves the game paused, also when the break ends while it is open
@@ -34,6 +34,8 @@ var _slots: Array[int] = []
 var _shakes: Array[bool] = []
 ## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
 var _caps: Array[int] = []
+## Every `mote_cap_changed` the bus sent, from before the Hud binds.
+var _mote_caps: Array[int] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -49,6 +51,7 @@ func _initialize() -> void:
 	_test_the_effect_slots_slider()
 	_test_the_screen_shake_switch()
 	_test_the_max_shots_slider()
+	_test_the_particles_slider()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
@@ -85,6 +88,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
+	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -106,6 +110,7 @@ func _teardown() -> void:
 	_slots.clear()
 	_shakes.clear()
 	_caps.clear()
+	_mote_caps.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -306,7 +311,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -334,6 +339,45 @@ func _test_the_screen_shake_switch() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(not _menu().screen_shake, "a later menu starts with it off")
 	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Particles (spell spectacle P1a) starts at the platform's cap and sends nothing; left and right
+## step through Off, Low, Medium and High and tell feel, accept steps up and wraps, and the choice
+## is saved: a menu bound to the same save later starts with it and tells feel.
+func _test_the_particles_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_mote_caps.is_empty(), "nothing is sent at the platform's cap")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("MoteCap")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	var at: int = MoteCap.index_of(MoteCap.default_cap())
+	_check(MoteCap.STOPS[at] == MoteCap.default_cap() and at > 0, "the platform's cap is a stop above Off")
+	_check(row.text.ends_with("Particles: %s" % MoteCap.WORDS[at]) and is_equal_approx(bar.value, float(at)), "the platform's cap at the start, in words and on the bar")
+	_focus.focus(0, row)
+	for i in MoteCap.STOPS.size():
+		_tap(0, &"move_left")
+		_frame()
+	_check(_menu().mote_cap == 0 and _mote_caps.back() == 0, "left goes down to Off, got %s" % [_mote_caps])
+	_check(row.text.ends_with("Particles: Off") and is_equal_approx(bar.value, 0.0), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"mote_cap", -1)) == 0, "the save remembers it")
+	var sent: int = _mote_caps.size()
+	_tap(0, &"move_left")
+	_frame()
+	_check(_mote_caps.size() == sent, "past the end nothing is sent")
+	_press(0, "MoteCap")
+	_check(_menu().mote_cap == MoteCap.STOPS[1] and _mote_caps.back() == MoteCap.STOPS[1], "accept steps up")
+	_menu().mote_cap = MoteCap.STOPS[-1]
+	_press(0, "MoteCap")
+	_check(_menu().mote_cap == 0, "accept at the top wraps to Off")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().mote_cap == 0, "a later menu starts with the saved cap")
+	_check(_mote_caps == [0], "and tells feel when the Hud binds, got %s" % [_mote_caps])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 
@@ -478,7 +522,7 @@ func _test_the_effect_slots_slider() -> void:
 	_focus.focus(0, row)
 	_tap(0, &"move_down")
 	_frame()
-	_check(_focus.focused(0) == _menu().button("ShotCap"), "down leaves the slider")
+	_check(_focus.focused(0) == _menu().button("MoteCap"), "down leaves the slider")
 	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "all on the Settings page")
 
 

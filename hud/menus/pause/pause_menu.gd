@@ -19,14 +19,19 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Max shots: 6000", "Screen shake: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
 ##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
-##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now). "Screen shake: On" (or Off), the
+##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now).
+##   "Particles" (docs/milestones/spell-spectacle.md, P1a) is a slider like "Max shots" through
+##   `MoteCap.STOPS` (core/settings: Off, Low, Medium, High), from the platform's cap
+##   (`MoteCap.default_cap()`); each move sends `mote_cap_changed`, which feel applies (its motes
+##   in the air end), and is saved (`mote_cap`); a saved cap other than the default is sent again
+##   when the menu is bound. "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
 ##   when the menu is bound, so it holds between plays. "Max shots" (owner, 2026-11-02) is a
@@ -96,6 +101,8 @@ const SHAKE_TEXT: String = "Screen shake: %s"
 const SHAKE_SETTING: StringName = &"screen_shake"
 const SHOT_CAP_TEXT: String = "Max shots: %d"
 const SHOT_CAP_SETTING: StringName = &"projectile_cap"
+const MOTE_CAP_TEXT: String = "Particles: %s"
+const MOTE_CAP_SETTING: StringName = &"mote_cap"
 const FPS_TEXT: String = "Show FPS: %s"
 const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
@@ -127,6 +134,8 @@ var effect_slots: int = EffectSlots.DEFAULT
 var screen_shake: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
 var shot_cap: int = ShotCap.default_cap()
+## The "Particles" setting (see the top): the platform's cap by default.
+var mote_cap: int = MoteCap.default_cap()
 ## The "Show FPS" setting (see the top): off by default.
 var show_fps: bool = false
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
@@ -163,6 +172,8 @@ var ai_view: bool = false
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
 @onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
+@onready var _motes: Button = _add(Page.SETTINGS, "MoteCap", MOTE_CAP_TEXT % MoteCap.word_of(mote_cap))
+@onready var _motes_bar: HSlider = _add_slider(_motes, 0, MoteCap.STOPS.size() - 1, 1, MoteCap.index_of(mote_cap), MOTE_CAP_TEXT % "Medium")
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
@@ -187,6 +198,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 		save = SaveFile.new()
 	_load_shake()
 	_load_shot_cap()
+	_load_mote_cap()
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
@@ -291,6 +303,10 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 	if control == _effects and direction.x != 0:
 		_set_effect_slots(effect_slots + direction.x * EffectSlots.STEP)
 		return _effects
+	if control == _motes and direction.x != 0:
+		var stop: int = clampi(MoteCap.index_of(mote_cap) + direction.x, 0, MoteCap.STOPS.size() - 1)
+		_set_mote_cap(MoteCap.STOPS[stop])
+		return _motes
 	if control == _shots and direction.x != 0:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
@@ -470,6 +486,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_show_fullscreen()
 	elif control == _effects:
 		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
+	elif control == _motes:
+		_set_mote_cap(MoteCap.STOPS[(MoteCap.index_of(mote_cap) + 1) % MoteCap.STOPS.size()])
 	elif control == _shots:
 		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
 	elif control == _shake:
@@ -533,6 +551,32 @@ func _show_shot_cap(cap: int) -> void:
 	shot_cap = cap
 	_shots.set_meta(BASE_TEXT_META, SHOT_CAP_TEXT % cap)
 	_shots_bar.value = ShotCap.index_of(cap)
+	_mark_focus()
+
+
+## Read the saved particles cap and show it; feel is told only when it is not the platform's (feel's
+## own default).
+func _load_mote_cap() -> void:
+	var saved: int = MoteCap.snap(int(save.get_setting(MOTE_CAP_SETTING, MoteCap.default_cap())))
+	_show_mote_cap(saved)
+	if saved != MoteCap.default_cap() and _events != null:
+		_events.mote_cap_changed.emit(saved)
+
+
+## Move the "Particles" slider to `cap` (a stop): show it, save it and tell feel.
+func _set_mote_cap(cap: int) -> void:
+	if cap == mote_cap:
+		return
+	_show_mote_cap(cap)
+	save.set_setting(MOTE_CAP_SETTING, cap)
+	if _events != null:
+		_events.mote_cap_changed.emit(cap)
+
+
+func _show_mote_cap(cap: int) -> void:
+	mote_cap = cap
+	_motes.set_meta(BASE_TEXT_META, MOTE_CAP_TEXT % MoteCap.word_of(cap))
+	_motes_bar.value = MoteCap.index_of(cap)
 	_mark_focus()
 
 

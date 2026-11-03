@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"murk"
+look_layers = PackedInt32Array(4)
+gravity = 40.0
+drag = 4.0
+bounce = 0.0
+glow = 0.6
+shade_from = 1
+shape = "
+#
+
+##
+##
+"
+shape_play = "pick"
+shape_rate = 8.0
+shape_turns = false
+count = 5
+speed = Vector2(15.0, 45.0)
+up = Vector2(5.0, 20.0)
+life = Vector2(0.6, 1.2)
+spread = 360.0
+height = 4.0

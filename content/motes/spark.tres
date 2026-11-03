@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"spark"
+look_layers = PackedInt32Array(0, 5)
+gravity = 220.0
+drag = 3.5
+bounce = 0.35
+glow = 1.0
+shade_from = 0
+shape = "
+##o
+
+#o
+
+o
+"
+shape_play = "life"
+shape_rate = 8.0
+shape_turns = true
+count = 4
+speed = Vector2(80.0, 180.0)
+up = Vector2(10.0, 50.0)
+life = Vector2(0.15, 0.4)
+spread = 110.0
+height = 4.0

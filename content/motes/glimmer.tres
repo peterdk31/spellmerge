@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"glimmer"
+look_layers = PackedInt32Array(6)
+gravity = -20.0
+drag = 3.0
+bounce = 0.0
+wobble = 1.0
+wobble_rate = 4.0
+glow = 1.0
+shade_from = 0
+shape = "
+.o.
+o#o
+.o.
+
+o
+
+#
+"
+shape_play = "life"
+shape_rate = 8.0
+shape_turns = false
+count = 5
+speed = Vector2(10.0, 30.0)
+up = Vector2(5.0, 15.0)
+life = Vector2(0.6, 1.2)
+spread = 360.0
+height = 4.0

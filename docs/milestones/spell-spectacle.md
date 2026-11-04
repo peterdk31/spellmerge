@@ -1,6 +1,6 @@
 # Spell spectacle: motes, floor marks and spell light
 
-**Status: approved by the owner on 2026-11-03** (an exception to the milestone order, recorded in [ROADMAP.md](../ROADMAP.md); this is polish, which ROADMAP places in M4). The tasks are in the owner lane of [NEXT.md](../NEXT.md). The open questions under P3 are still the owner's to answer before P3b. The plan changes no damage, hit, rule or card behaviour: everything below is drawn and nothing is simulated. Making the terrain react to spells (burning ground, breakable walls) is a gameplay change and stays out of scope; [DESIGN.md](../DESIGN.md) would need the owner's direction first.
+**Status: approved by the owner on 2026-11-03.** P1a-P1d, P2a, P2b and P3a are built and merged (#527-#530, #536); what comes after P1 and P2 is in [spell-spectacle-2.md](spell-spectacle-2.md) (one particle system, spectacle by card). **Originally:** (an exception to the milestone order, recorded in [ROADMAP.md](../ROADMAP.md); this is polish, which ROADMAP places in M4). The tasks are in the owner lane of [NEXT.md](../NEXT.md). The open questions under P3 are still the owner's to answer before P3b. The plan changes no damage, hit, rule or card behaviour: everything below is drawn and nothing is simulated. Making the terrain react to spells (burning ground, breakable walls) is a gameplay change and stays out of scope; [DESIGN.md](../DESIGN.md) would need the owner's direction first.
 
 ## Why
 

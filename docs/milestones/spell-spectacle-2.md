@@ -137,6 +137,8 @@ The owner asked for every other system that can be replaced to be added. A surve
 
 **Built** (owner/cues-new-moments): item 13 (the cues `level_up`, `gem_pickup`, `revive`, `shield_block`, `pull` (a body a magnet newly catches) and `wave_start`, each `cue_shown` from its area; `CueBase.every` throttles a cue per actor; DECISIONS, 2026-11-04, part two) and item 4 (a `light` part, `SpellLight.flash`; a cue with one lights by it alone, its flashes coded unlit).
 
+**Built** (owner/cues-shader-motes): item 10 (a swing's sparks and card particles and a beam's splash and card particles are births in the trails' format, `gameplay/feel/births.gd`, given off after the trails' so the native kernel writes them and they take their spell's cards' motes, `swing_tag`, `beam_tag`; the swing and beam shaders keep only their line, pieces and light) and item 11 (a status is shown as its element card: a glow in its `tint`, its motes from a slow emitter, `status_mote_rate`; freeze as the chill it deepens from at full depth, whiter and with more motes; `status_looks` gone); DECISIONS, 2026-11-05, with the web storm's figures (a beam build, the storm's new `--cards`).
+
 **Order inside S6:** 1, 2, 7 and 8 need only parts that exist (plus an `arc` entry); then 5, 6, 13 and 14; 4 is a new part type; 9 needs a following `CueContext`; 3, 10 and 11 come after S4, which sets what a mote row costs. S3's own new special case (spray and puff thrown as motes inside `show_effect`) goes when hit flashes become cues (`hit`, and a puff for a hit with no way), under the same storm check as 2.
 
 ## Order

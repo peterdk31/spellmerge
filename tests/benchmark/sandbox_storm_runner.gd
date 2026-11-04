@@ -40,6 +40,7 @@ const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
 
 const PLAYER: int = 0
 ## The staff that holds the split-and-nova build (Y; Flow.SANDBOX_START_CARDS).
@@ -78,7 +79,9 @@ var _draw_usec: int = 0
 var _draw_max_usec: int = 0
 var _draw_frames: int = 0
 var _mote_frames: int = 0
-var _births: int = 0
+var _births_at: int = 0
+var _settles_at: int = 0
+var _skipped_at: int = 0
 var _label: Label = null
 var _wizard: Actor = null
 var _downed: Downed = null
@@ -129,7 +132,7 @@ func _ready() -> void:
 				_feel.call(&"set_mote_density", arg.trim_prefix("--mote-density=").to_float())
 		var pool: Node = _motes()
 		if pool != null:
-			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), pool.z_index, pool.call(&"kinds"), _feel.call(&"ramp_table")))
+			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), FeelScript.MOTE_Z, pool.call(&"kinds"), _feel.call(&"ramp_table")))
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
 	if args.has("--no-trail-motes"):
@@ -200,6 +203,9 @@ func _start() -> void:
 		_mote_uploads_at = int(motes.get(&"uploads"))
 		_mote_usec_at = int(motes.get(&"usec"))
 		_mote_calls_at = int(motes.get(&"calls"))
+		_births_at = int(motes.get(&"births"))
+		_settles_at = int(motes.get(&"settles"))
+		_skipped_at = int(motes.get(&"settles_skipped"))
 	_probe = ProbeScript.new()
 	add_child(_probe)
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -246,9 +252,10 @@ func _process(_delta: float) -> void:
 		_projectiles.call(&"update_draw")
 		var usec: int = Time.get_ticks_usec() - start
 		_draw_usec += usec
+		# The births are counted by the motes that took them (Feel's step, before this one): this
+		# second `update_draw` finds no moment past the first's, so it hands out none.
 		if bool(_projectiles.get("sparks_as_motes")):
 			_mote_frames += 1
-			_births += int(_projectiles.get("spark_birth_count"))
 		_draw_max_usec = maxi(_draw_max_usec, usec)
 		_draw_frames += 1
 	var hold: bool = stay or _elapsed < seconds
@@ -342,8 +349,10 @@ func _report() -> void:
 			var calls: float = float(int(motes.get(&"calls")) - _mote_calls_at)
 			print("BENCH: storm motes: CPU %.3f ms a frame, %.3f ms a 60th of a second (%.2f us a mote written), in %.0f calls a frame (the timer's own cost is in it: mote_write.gd)" % [
 				usec / frames / 1000.0, usec / sixtieths / 1000.0, usec / maxf(1.0, float(written)), calls / frames])
-	print("BENCH: storm draw: trail particles as motes in %d of the frames, %.1f births a frame there" % [
-		_mote_frames, float(_births) / maxf(1.0, float(_mote_frames))])
+	if motes != null:
+		print("BENCH: storm draw: trail particles as motes in %d of the frames, %.1f births a frame there; %.1f settled motes a frame, %.1f past the frame's SETTLE_ROWS" % [
+			_mote_frames, float(int(motes.get(&"births")) - _births_at) / maxf(1.0, float(_mote_frames)),
+			float(int(motes.get(&"settles")) - _settles_at) / frames, float(int(motes.get(&"settles_skipped")) - _skipped_at) / frames])
 	if _probe != null:
 		_probe.call("report")
 	if _tree_profile != null:

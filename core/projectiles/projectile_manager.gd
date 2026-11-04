@@ -4427,20 +4427,7 @@ func _give_off_sparks(fraction: float) -> void:
 		if _motion[slot] == MOTION_ORBIT:
 			at = _drawn_at(slot, at)
 			back = -_orbit_tangent(slot)
-		var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
-		spark_births[i + SPARK_X] = at.x
-		spark_births[i + SPARK_Y] = at.y
-		back = back.normalized()
-		spark_births[i + SPARK_BACK_X] = back.x
-		spark_births[i + SPARK_BACK_Y] = back.y
-		spark_births[i + SPARK_KIND] = float(kind)
-		spark_births[i + SPARK_RAMP] = float(_ramp[slot])
-		spark_births[i + SPARK_LOOK] = float(_look[slot])
-		spark_births[i + SPARK_CORE] = _core[slot].r
-		spark_births[i + SPARK_CORE + 1] = _core[slot].g
-		spark_births[i + SPARK_CORE + 2] = _core[slot].b
-		spark_birth_count += 1
-		if spark_birth_count >= SPARK_BIRTHS_MAX:
+		if not _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot]):
 			return
 
 
@@ -4475,20 +4462,28 @@ func _give_off_dash_sparks(moments: int) -> void:
 			var from: Vector2 = at + side * (_spark_rng.randf() - 0.5) * 10.0
 			if feet:
 				from = at + Vector2((_spark_rng.randf() - 0.5) * 8.0, (7.0 if kind == LOOK_FLECKS else 8.0) + (_spark_rng.randf() - 0.5) * 2.0)
-			var b: int = spark_birth_count * SPARK_BIRTH_STRIDE
-			spark_births[b + SPARK_X] = from.x
-			spark_births[b + SPARK_Y] = from.y
-			spark_births[b + SPARK_BACK_X] = back.x
-			spark_births[b + SPARK_BACK_Y] = back.y
-			spark_births[b + SPARK_KIND] = float(kind)
-			spark_births[b + SPARK_RAMP] = float(_trail_ramp[row])
-			spark_births[b + SPARK_LOOK] = float(_trail_look[row])
-			spark_births[b + SPARK_CORE] = _trail_core[row].r
-			spark_births[b + SPARK_CORE + 1] = _trail_core[row].g
-			spark_births[b + SPARK_CORE + 2] = _trail_core[row].b
-			spark_birth_count += 1
-			if spark_birth_count >= SPARK_BIRTHS_MAX:
+			if not _add_birth(from, back, kind, _trail_ramp[row], _trail_look[row], _trail_core[row]):
 				return
+
+
+## One birth (SPARK_BIRTH_STRIDE floats; see there): a particle of look kind `kind` at `at`, given
+## off back along `back`, from a shot (or a dash) of the caster's `ramp`, the look `look` and the
+## core colour `core`. A shot's and a dash's are written the same way, here. Returns false once
+## the frame's SPARK_BIRTHS_MAX are taken.
+func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color) -> bool:
+	var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
+	spark_births[i + SPARK_X] = at.x
+	spark_births[i + SPARK_Y] = at.y
+	spark_births[i + SPARK_BACK_X] = back.x
+	spark_births[i + SPARK_BACK_Y] = back.y
+	spark_births[i + SPARK_KIND] = float(kind)
+	spark_births[i + SPARK_RAMP] = float(ramp)
+	spark_births[i + SPARK_LOOK] = float(look)
+	spark_births[i + SPARK_CORE] = core.r
+	spark_births[i + SPARK_CORE + 1] = core.g
+	spark_births[i + SPARK_CORE + 2] = core.b
+	spark_birth_count += 1
+	return spark_birth_count < SPARK_BIRTHS_MAX
 
 
 static func _bit_count(bits: int) -> int:

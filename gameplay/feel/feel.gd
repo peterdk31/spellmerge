@@ -53,29 +53,16 @@ extends Node
 ## moves when it casts is its carrier card's `staff_pose`, drawn by its look (ActorLook), not here.
 ## None of this touches the cast itself.
 ##
-## Motes (docs/milestones/spell-spectacle.md, P1a): single-pixel particles with no game logic in
-## a ring of chunked batches (`mote.gd`, `mote.gdshader`), as many as the "Particles" setting
-## (`MoteCap`, `mote_cap_changed`; none with it off). Their kinds are data (`MoteKind`,
-## content/motes) and come from the spells: a shot ending on a wall sheds the kinds of its cards'
-## look layers in its own ramp, and the wall the surface kinds in the room's colours
-## (`RoomBase.surface_colors`, read on `room_entered`). The other sources (P1b): a hit on a body
-## sheds the shot's kinds back along its way, a bolt or orbit whose life runs out a puff of them,
-## a reaction a ring of the reacting shot's kinds in the reaction's colour, and a cue its `motes`
-## parts (`CueBase`: the cue's cards' kinds in its ramp, or the surface kinds in the colours of
-## what broke, a body that died sampled from its own art). Every count is times the "Particle
-## amount" setting (`MoteDensity`, `mote_density_changed`).
+## Motes, floor marks and spell light (docs/milestones/spell-spectacle.md) are the spectacle's
+## (`spectacle.gd`, a child of Feel; docs/milestones/spell-spectacle-2.md, S1): Feel's handlers
+## tell it when (a hit sheds motes, a wall throws chips, a reaction a ring) and it says what, and
+## it owns their settings and the room they are in. `motes()`, `marks()`, `light()` and the
+## `set_*` of their settings are forwards to it.
 ##
-## Floor marks (docs/milestones/spell-spectacle.md, P2a): a cue's `mark` parts stamp scorches,
-## cracks and frost into the room's mark layer (`marks.gd`, `mark.gdshader`), a texture over the
-## floor and under every body that stays until the next room (`room_entered` wipes it and fits it
-## to the room's bounds and walls). Their kinds are data (`MarkKind`, content/marks) and their
-## colours the floor's own (`RoomBase.floor_colors`) or the spell's. The "Floor marks" setting
-## (`FloorMarks`, `floor_marks_changed`) turns the layer off: no nodes at all.
-##
-## Spell light (docs/milestones/spell-spectacle.md, P3a): shots light the world round them
-## (`spell_light.gd`: a small light buffer the projectile batches draw into again, applied at
-## LIGHT_Z in three steps), while the "Spell light" setting is on (`SpellLightSetting`,
-## `spell_light_changed`; no nodes with it off).
+## A cue (`play_cue`, `CueBase`) is played part by part through a table of part players by part
+## type (`add_cue_part`): Feel's own flashes (`effect`) and the spectacle's `motes` and `mark`
+## parts, each handed the part and the cue's `CueContext` (one kept per depth, so a cue allocates
+## nothing). A new kind of part is a player added to the table and a row in `CueBase.PART_TYPES`.
 ##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
@@ -103,6 +90,8 @@ const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -115,20 +104,11 @@ const ENEMY_FORMS: int = 4
 const FORM_Z: int = 18
 ## Marks on the floor (a quake) draw just under the beams and rings, under the enemies (40).
 const FLOOR_Z: int = FORM_Z - 1
-## Motes draw under the floor marks, the beams and every flash and telegraph
-## (docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
-const MOTE_Z: int = FORM_Z - 2
-## The floor marks lie on the room's floor (RoomBase.FLOOR_Z) and under every body (0).
-const MARK_Z: int = RoomBase.FLOOR_Z + 1
-## The folder of the mark kinds in the registry, and a mark part's radius with no size to go by.
-const MARK_FOLDER: StringName = &"marks"
-const MARK_RADIUS: float = 8.0
-## Spell light is applied just under the motes: above the room and every body (a body layer is
-## at most a few), under every spell, flash and telegraph (`spell_light.gd`; P3a).
-const LIGHT_Z: int = MOTE_Z - 1
-## The folders of the mote kinds and the rooms in the registry.
-const MOTE_FOLDER: StringName = &"motes"
-const ROOM_FOLDER: StringName = &"rooms"
+## Where the spectacle draws (`spectacle.gd`): the motes under the beams and every flash and
+## telegraph, the floor marks on the floor under every body, spell light just under the motes.
+const MOTE_Z: int = SpectacleScript.MOTE_Z
+const MARK_Z: int = SpectacleScript.MARK_Z
+const LIGHT_Z: int = SpectacleScript.LIGHT_Z
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
@@ -342,10 +322,19 @@ const POSSESS_SOUND: StringName = &"possess"
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
-var registry: RegistryScript = null
+## The registry and the projectile manager are handed on to the spectacle whenever they change.
+var registry: RegistryScript = null:
+	set(value):
+		registry = value
+		if _spectacle != null:
+			_spectacle.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
-var projectiles: ProjectileManagerScript = null
+var projectiles: ProjectileManagerScript = null:
+	set(value):
+		projectiles = value
+		if _spectacle != null:
+			_spectacle.projectiles = value
 ## The combat autoload, asked only `status_left(enemy, id)` to know when a status ends.
 var combat: Node = null
 ## The spell runtime, asked only for its live beams (`beam_*`) to draw them every frame.
@@ -359,7 +348,11 @@ var _auto_actors: ActorsScript = null
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
 ## skipped as when the pool is empty; flashes, numbers and sound stay).
-var particles_enabled: bool = true
+var particles_enabled: bool = true:
+	set(value):
+		particles_enabled = value
+		if _spectacle != null:
+			_spectacle.particles_enabled = value
 
 var preset: FeelPresetScript = null
 var shake_enabled: bool = true:
@@ -429,35 +422,29 @@ var _flash_material: ShaderMaterial = null
 var _live_beams: Array[MeshInstance2D] = []
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
-## The motes (`mote.gd`; null with the "Particles" setting off), and how many it holds
-## (`MoteCap.default_cap()` until the setting changes it; see `set_mote_cap`). Read only.
-var _motes: MotesScript = null
-var mote_cap: int = MoteCap.default_cap()
-## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
-var mote_density: float = MoteDensity.DEFAULT
-## The source of the surface kinds while a cue plays for a body that died (the colours of its art;
-## -1: the room's walls), and the colours of each body art read so far (texture -> colours).
-var _cue_surface: int = -1
-var _art_colors: Dictionary = {}
-## Spell light (`spell_light.gd`; null with the "Spell light" setting off, or with no projectile
-## manager), and the setting (see `set_spell_light`). Read only.
-var _light: SpellLightScript = null
-## The room's ambient light (`RoomBase.ambient`), for the spell light (P3b).
-var _ambient: float = 1.0
-var spell_light: bool = SpellLightSetting.default_on()
-## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
-## and their source in the ramp table (-1 for none).
-var _surface_colors: PackedColorArray = PackedColorArray()
-var _surface_source: int = -1
-## The ramp table (`ramp_table.gd`) the motes and the floor marks share: a surface's colours and a
-## body's art, one row each, so a mote and the mark it leaves read the same colours.
-var _ramp_table: RampTableScript = RampTableScript.new()
-## The floor marks (`marks.gd`; null with the "Floor marks" setting off), and the setting
-## (`FloorMarks.default_on()` until it changes; see `set_floor_marks`). Read only.
-var _marks: MarksScript = null
-var floor_marks: bool = FloorMarks.default_on()
-## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
-var _mark_room: StringName = &""
+## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
+var _spectacle: SpectacleScript = null
+## Its settings, read through Feel (read only; their `set_*` below).
+var mote_cap: int:
+	get:
+		return _spectacle.mote_cap if _spectacle != null else MoteCap.default_cap()
+var mote_density: float:
+	get:
+		return _spectacle.mote_density if _spectacle != null else MoteDensity.DEFAULT
+var floor_marks: bool:
+	get:
+		return _spectacle.floor_marks if _spectacle != null else FloorMarks.default_on()
+var spell_light: bool:
+	get:
+		return _spectacle.spell_light if _spectacle != null else SpellLightSetting.default_on()
+## The players of a cue's parts by part type (`add_cue_part`; a part with no `part` is an
+## `effect`), the cue contexts kept for them (one per depth of a cue played inside a cue's part),
+## and the parts of a type no player plays, skipped (`unknown_cue_parts`, warned once per type).
+var _cue_parts: Dictionary = {}
+var _cue_contexts: Array[CueContextScript] = []
+var _cue_depth: int = 0
+var unknown_cue_parts: int = 0
+var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
@@ -603,13 +590,16 @@ func _ready() -> void:
 		_live_paths.append(_make_beam_path())
 	_swing_trails = SwingTrailsScript.new(swing_mesh())
 	add_child(_swing_trails)
-	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
-	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
-	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
-	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
-	_make_motes(mote_cap)
-	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
-	set_floor_marks(floor_marks)
+	_spectacle = SpectacleScript.new()
+	_spectacle.name = "Spectacle"
+	_spectacle.events = events
+	_spectacle.registry = registry
+	_spectacle.particles_enabled = particles_enabled
+	add_child(_spectacle)
+	add_cue_part(&"effect", _play_effect_part)
+	var parts: Dictionary = _spectacle.cue_parts()
+	for type: StringName in parts:
+		add_cue_part(type, parts[type] as Callable)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -669,12 +659,6 @@ func _ready() -> void:
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
-	events.mote_cap_changed.connect(_on_mote_cap_changed)
-	events.mote_density_changed.connect(_on_mote_density_changed)
-	events.spell_light_changed.connect(_on_spell_light_changed)
-	events.room_entered.connect(_on_room_entered)
-	events.room_entered.connect(_fit_marks)
-	events.floor_marks_changed.connect(set_floor_marks)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
@@ -689,7 +673,7 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
-	_make_light(spell_light)
+	_spectacle.attach(projectiles)
 
 
 func _exit_tree() -> void:
@@ -734,28 +718,10 @@ func step(real_delta: float) -> void:
 	_draw_live_beams()
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
-	_trail_motes()
-	if _motes != null:
-		_motes.step(_clock)
-	if _marks != null:
-		_marks.step(_clock)
+	_spectacle.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
-
-
-## The shots' trail particles as motes (spell spectacle P1d): the projectile manager hands them out
-## while there are motes (`spark_motes`), and they are thrown before the motes step. With
-## `particles_enabled` off (the stress benchmark's "no particles") the trails stay without their
-## particle slots and none are thrown: no trail particles at all, not the shader's instead.
-func _trail_motes() -> void:
-	if projectiles == null:
-		return
-	var on: bool = _motes != null
-	if projectiles.spark_motes != on:
-		projectiles.spark_motes = on
-	if on and particles_enabled and projectiles.spark_birth_count > 0:
-		_motes.give_off(projectiles.spark_births, projectiles.spark_birth_count)
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
@@ -1083,8 +1049,8 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	# A puff and a ring in the reaction's own colour, bigger for a stronger reaction.
 	show_effect(KIND_PUFF, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(preset.reaction_burst_size * power), 1, 15), preset.reaction_seconds * 2.0)
 	_show_ring(position, tint, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power * 2.0)
-	if _motes != null and particles_enabled:
-		_reaction_motes(caster, position, shot, tint, power)
+	if _spectacle.motes_on():
+		_spectacle.reaction_motes(_ramp_of(caster), position, projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0, tint, float(preset.reaction_mote_count) * power, preset.reaction_mote_reach * power)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
@@ -1280,15 +1246,15 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_at = position
 		_impact_aim = direction
 		# Its cards' motes back along the way it came, in its own ramp.
-		if _motes != null and particles_enabled and projectiles != null:
-			_motes.shed(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share)
+		if projectiles != null:
+			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share)
 		_show_impact(caster, ramp, position, direction, true)
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's, or the chips effect with
 	# the "Particles" setting off.
 	if particles_enabled:
-		if _motes != null:
-			_shed_on_wall(ramp, position, -direction)
+		if _spectacle.pool != null:
+			_spectacle.shed_on_wall(ramp, position, -direction)
 		else:
 			show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
 	_show_impact(caster, ramp, position, direction, false)
@@ -1326,8 +1292,8 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: in
 		return
 	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
 	# And a puff of its cards' motes, on along the way it flew.
-	if _motes != null and particles_enabled:
-		_motes.shed(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share)
+	if _spectacle.motes_on():
+		_spectacle.shed_end(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
@@ -1387,52 +1353,39 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 ## off by `caster` (NONE for none: the enemy ramp; its body is where `away` punches from) along
 ## `dir`, `size` pixels big (what a part's `reach` is times; the seconds a `lasts_size` part
 ## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
-## on `target` (an actor, for `hold_target`). Draws its parts, then its weight: holds, the game-wide stop, shake and punch
-## (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1) -> void:
+## on `target` (an actor, for `hold_target`), sent by `shot`, for what broke in the colours of the
+## ramp-table source `surface` (a dying body's art; -1: the room's walls). Plays its parts, each by
+## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
+## punch (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
 	if cue == null:
 		return
-	var ramp: int = _ramp_of(caster)
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
+	if _cue_depth == _cue_contexts.size():
+		_cue_contexts.append(CueContextScript.new())
+	var context: CueContextScript = _cue_contexts[_cue_depth]
+	context.caster = caster
+	context.ramp = _ramp_of(caster)
+	context.at = at
+	context.aim = aim
+	context.size = size
+	context.tint = tint
+	context.look = look
+	context.target = target
+	context.shot = shot
+	context.surface = surface
+	_cue_depth += 1
 	for part: Dictionary in cue.parts:
-		if StringName(part.get("part", "")) == &"motes":
-			if _motes != null and particles_enabled:
-				_cue_motes(part, at, aim, size, tint, ramp, look)
+		var type: StringName = StringName(part.get("part", "effect"))
+		var player: Variant = _cue_parts.get(type)
+		if player == null:
+			_unknown_cue_part(id, type)
 			continue
-		if StringName(part.get("part", "")) == &"mark":
-			_stamp_part(part, at, aim, size, tint, ramp, look)
-			continue
-		var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
-		if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
-			continue
-		# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
-		if int(row[0]) == KIND_CHIPS and _motes != null:
-			continue
-		var seconds: float = float(part.get("seconds", row[2]))
-		if bool(part.get("lasts_size", false)):
-			if size <= 0.0:
-				continue
-			seconds = size
-		var zoom: int = int(part.get("zoom", 1))
-		if part.has("reach"):
-			zoom = roundi(size * float(part["reach"]) / float(row[1]))
-		var way: Vector2 = aim
-		match StringName(part.get("way", "aim")):
-			&"back":
-				way = -aim
-			&"right":
-				way = Vector2.RIGHT
-			&"up":
-				way = Vector2.UP
-		if part.has("color"):
-			show_effect(int(row[0]), at, way, part["color"] as Color, 0, EXACT, zoom, seconds)
-		elif bool(part.get("plain", false)):
-			show_effect(int(row[0]), at, way, Color.WHITE, 0, 0, zoom, seconds)
-		else:
-			show_effect(int(row[0]), at, way, tint, ramp, look, zoom, seconds)
+		(player as Callable).call(part, context)
+	_cue_depth -= 1
 	var table: ActorsScript = _actor_table()
 	if table != null:
 		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold, true)
@@ -1456,6 +1409,55 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 					way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
+
+
+## Play a cue's parts of the type `type` (`CueBase.PART_TYPES`) with `player`, a Callable taking
+## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. Feel's
+## own flashes are `effect`, the spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
+func add_cue_part(type: StringName, player: Callable) -> void:
+	_cue_parts[type] = player
+
+
+## Whether a cue part of the type `type` has a player.
+func has_cue_part(type: StringName) -> bool:
+	return _cue_parts.has(type)
+
+
+## A part of the cue `id` of a type nothing plays: skipped and counted, and warned of once per type
+## (`CueBase.problems` names it in content; this is for a part a player was taken away from).
+func _unknown_cue_part(id: StringName, type: StringName) -> void:
+	unknown_cue_parts += 1
+	if not _unknown_part_warned.has(type):
+		_unknown_part_warned[type] = true
+		push_warning("Feel: cue '%s' has a part of the type '%s', which nothing plays" % [id, type])
+
+
+## A cue's flash (`CueBase`: a part with no `part`, or `"part": "effect"`) played with `cue`: its
+## effect at the cue's point along its way, sized by its `zoom` or the cue's size times its
+## `reach`, for its seconds (or the cue's size with `lasts_size`), in its exact `color`, plain, or
+## the cue's ramp, tint and cards.
+func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
+	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
+	if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
+		return
+	# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
+	if int(row[0]) == KIND_CHIPS and _spectacle.pool != null:
+		return
+	var seconds: float = float(part.get("seconds", row[2]))
+	if bool(part.get("lasts_size", false)):
+		if cue.size <= 0.0:
+			return
+		seconds = cue.size
+	var zoom: int = int(part.get("zoom", 1))
+	if part.has("reach"):
+		zoom = roundi(cue.size * float(part["reach"]) / float(row[1]))
+	var way: Vector2 = cue.way_of(part)
+	if part.has("color"):
+		show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds)
+	elif bool(part.get("plain", false)):
+		show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds)
+	else:
+		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds)
 
 
 ## The cue `id` (`content/cues/<id>.tres`), or null when there is none or no registry yet. Read
@@ -1664,260 +1666,56 @@ func _on_effect_slots_changed(slots: int) -> void:
 	set_effect_slots(slots)
 
 
-## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
-## projectile manager's `impact_look` and `impact_core` while the impact is sent) and the wall's
-## surface motes in the room's colours, thrown along `away` (back off the wall).
-func _shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
-	var look: int = projectiles.impact_look if projectiles != null else 0
-	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
-	_motes.shed(at, away, core, ramp, look)
-	if _surface_source >= 0:
-		for k in _motes.surface_kinds():
-			_motes.throw(k, at, away, _surface_source, Color.WHITE)
+# --- The spectacle (spectacle.gd): forwards for the tests, the benchmarks and the menus ---------
 
-
-## The room's colours for its walls' motes (`RoomBase.surface_colors`).
-func _on_room_entered(room_id: StringName) -> void:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
-	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
-	_ambient = room.ambient if room != null else 1.0
-	if _light != null:
-		_light.set_ambient(_ambient)
-	_surface_source = _ramp_table.source(_surface_colors)
-
-
-## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
-## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
-## number taken.
-func set_mote_cap(cap: int) -> int:
-	var taken: int = clampi(cap, 0, MoteCap.STOPS[-1])
-	if taken != mote_cap or (_motes == null) != (taken == 0):
-		_make_motes(taken)
-	return mote_cap
+## The spectacle node.
+func spectacle() -> SpectacleScript:
+	return _spectacle
 
 
 ## The motes (null with the setting off; for tests and the benchmarks).
 func motes() -> MotesScript:
-	return _motes
-
-
-## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made
-## with it, so its table sources are the marks').
-func ramp_table() -> RampTableScript:
-	return _ramp_table
-
-
-## Use `pool` as the motes from now on, in place of the ones made for the setting (its cap is the
-## setting's now; null turns them off). For the benchmarks, which hand Feel a pool that times its
-## own calls (tests/benchmark/timed_motes.gd).
-func use_motes(pool: MotesScript) -> void:
-	if _motes != null:
-		_motes.queue_free()
-		remove_child(_motes)
-		_motes = null
-	_motes = pool
-	mote_cap = pool.cap() if pool != null else 0
-	if pool != null:
-		_motes.name = "Motes"
-		_motes.density = mote_density
-		add_child(_motes)
-		_motes.step(_clock)
-		_motes.settle_into(_marks)
-	_surface_source = _ramp_table.source(_surface_colors)
-
-
-func _make_motes(cap: int) -> void:
-	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table) if cap > 0 else null)
-
-
-## The mote kinds of the registry (content/motes), in id order.
-func _mote_kinds() -> Array[MoteKind]:
-	var kinds: Array[MoteKind] = []
-	if registry != null:
-		for found: Resource in registry.get_all(MOTE_FOLDER):
-			if found is MoteKind:
-				kinds.append(found as MoteKind)
-	return kinds
-
-
-func _on_mote_cap_changed(cap: int) -> void:
-	set_mote_cap(cap)
-
-
-## The "Particle amount" setting: the share of its count every burst of motes throws (snapped by
-## `MoteDensity.snap`). Returns the share taken.
-func set_mote_density(density: float) -> float:
-	mote_density = MoteDensity.snap(density)
-	if _motes != null:
-		_motes.density = mote_density
-	return mote_density
-
-
-func _on_mote_density_changed(density: float) -> void:
-	set_mote_density(density)
-
-
-## A cue's `motes` part (`CueBase`) at `at` along `aim`, the cue `size` big, in the ramp `ramp`
-## with `tint` and the cards of `look`: the kinds it names thrown as it says.
-func _cue_motes(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint: Color, ramp: int, look: int) -> void:
-	var way: Vector2 = aim
-	match StringName(part.get("way", "aim")):
-		&"back":
-			way = -aim
-		&"right":
-			way = Vector2.RIGHT
-		&"up":
-			way = Vector2.UP
-	var reach: float = size * float(part["reach"]) if part.has("reach") and size > 0.0 else 0.0
-	var spread: float = float(part.get("spread", -1.0))
-	var up: float = float(part.get("up", 1.0))
-	var ring: bool = bool(part.get("ring", false))
-	var named: StringName = StringName(part.get("kind", "spell"))
-	var kinds: PackedInt32Array
-	match named:
-		&"spell":
-			kinds = _motes.kinds_of_look(look)
-		&"surface":
-			kinds = _motes.surface_kinds()
-		_:
-			var k: int = _motes.kind_index(named)
-			if k < 0:
-				return
-			kinds = PackedInt32Array([k])
-	var spell: int = MotesScript.spell_source(ramp, look)
-	var surface: int = _cue_surface if _cue_surface >= 0 else _surface_source
-	var count: int = int(part.get("count", -1))
-	for k in kinds:
-		var source: int = surface if _motes.kinds()[k].surface else spell
-		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
-		_motes.throw_part(k, at, way, source, Color.WHITE if _motes.kinds()[k].surface else tint, each, reach, spread, up, ring)
-
-
-## A reaction's motes: a ring of the reacting shot's kinds (`shot`'s look, read while the event is
-## sent; layer 0's for none) in the reaction's colour `tint`, `power` times as many and as far.
-func _reaction_motes(caster: int, at: Vector2, shot: int, tint: Color, power: float) -> void:
-	var look: int = projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0
-	var kinds: PackedInt32Array = _motes.kinds_of_look(look)
-	var source: int = MotesScript.spell_source(_ramp_of(caster), MotesScript.LOOK_EXACT)
-	var each: int = maxi(roundi(float(preset.reaction_mote_count) * power / float(kinds.size())), 1)
-	for k in kinds:
-		_motes.throw_part(k, at, Vector2.RIGHT, source, tint, each, preset.reaction_mote_reach * power, 360.0, 1.0, true)
-
-
-## The ramp table's source for the colours of a body's own art (the frame it shows as, read once
-## per texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
-## neither motes nor floor marks to show it.
-func _body_source(body: Node) -> int:
-	if _motes == null and _marks == null:
-		return -1
-	var sprite: Sprite2D = _body_sprite(body)
-	if sprite == null or sprite.texture == null:
-		return -1
-	var colours: Variant = _art_colors.get(sprite.texture)
-	if colours == null:
-		colours = RoomBase.colours_of_art(sprite.texture, _frame_rect(sprite))
-		_art_colors[sprite.texture] = colours
-	return _ramp_table.source(colours as PackedColorArray)
-
-
-## The part of its texture `sprite` shows: its region, or its frame of a sheet.
-static func _frame_rect(sprite: Sprite2D) -> Rect2i:
-	if sprite.region_enabled:
-		return Rect2i(sprite.region_rect)
-	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
-	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
-
-
-## The "Floor marks" setting: on makes the mark layer (fitted to the room it was last told of),
-## off frees it and every mark with it.
-func set_floor_marks(on: bool) -> void:
-	floor_marks = on
-	if on and _marks == null:
-		var kinds: Array[MarkKind] = []
-		if registry != null:
-			for found: Resource in registry.get_all(MARK_FOLDER):
-				if found is MarkKind:
-					kinds.append(found as MarkKind)
-		_marks = MarksScript.new(MARK_Z, kinds)
-		_marks.name = "Marks"
-		_marks.set_ramp_table(_ramp_table.texture())
-		add_child(_marks)
-		if _mark_room != &"":
-			_fit_marks(_mark_room)
-	elif not on and _marks != null:
-		_marks.queue_free()
-		remove_child(_marks)
-		_marks = null
-	if _motes != null:
-		_motes.settle_into(_marks)
+	return _spectacle.pool if _spectacle != null else null
 
 
 ## The floor marks (null with the setting off; for tests and the benchmarks).
 func marks() -> MarksScript:
-	return _marks
-
-
-## A new room: the mark layer is wiped and fitted to its bounds and walls (the projectile
-## manager's, set before `room_entered`) and takes its floor's colours.
-func _fit_marks(room_id: StringName) -> void:
-	_mark_room = room_id
-	if _marks == null:
-		return
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
-	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
-	_marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
-	_marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
-
-
-## Stamp a cue's mark part (`CueBase`, "part": "mark") at `at`: its mark, or with `cards` the
-## marks of the cards of `look` when they have any; `size` x its `reach` pixels round (or its
-## `radius`), turned at random or along `aim`, in the colours of a spell of `ramp` with `tint`
-## and of the cue's surface (a dying body's art, else the room's walls).
-func _stamp_part(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint: Color, ramp: int, look: int) -> void:
-	if _marks == null:
-		return
-	var radius: float = float(part.get("radius", MARK_RADIUS))
-	if part.has("reach") and size > 0.0:
-		radius = size * float(part["reach"])
-	var source: int = MotesScript.spell_source(ramp, look)
-	var turn: float = aim.angle() if StringName(part.get("rot", "random")) == &"aim" else _marks.random_turn()
-	var found: PackedInt32Array = _marks.kinds_of_look(look) if bool(part.get("cards", false)) else PackedInt32Array()
-	if found.is_empty():
-		found.append(_marks.kind_index(StringName(part.get("mark", ""))))
-	var surface: int = _cue_surface if _cue_surface >= 0 else _surface_source
-	for k in found:
-		_marks.stamp(k, at, radius, turn, source, tint, surface)
-
-
-## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).
-## Returns the setting.
-func set_spell_light(on: bool) -> bool:
-	if on != spell_light or (_light == null) == on:
-		_make_light(on)
-	return spell_light
+	return _spectacle.marks if _spectacle != null else null
 
 
 ## Spell light (null with the setting off; for tests and the benchmarks).
 func light() -> SpellLightScript:
-	return _light
+	return _spectacle.light if _spectacle != null else null
 
 
-func _make_light(on: bool) -> void:
-	spell_light = on
-	if _light != null:
-		_light.release()
-		remove_child(_light)
-		_light.queue_free()
-		_light = null
-	if on and projectiles != null:
-		_light = SpellLightScript.new(projectiles, LIGHT_Z)
-		_light.name = "SpellLight"
-		_light.set_ambient(_ambient)
-		add_child(_light)
+## The colour table the motes and the floor marks share.
+func ramp_table() -> RampTableScript:
+	return _spectacle.ramp_table()
 
 
-func _on_spell_light_changed(on: bool) -> void:
-	set_spell_light(on)
+## Use `pool` as the motes (`Spectacle.use_motes`; the benchmarks' timed pool).
+func use_motes(pool: MotesScript) -> void:
+	_spectacle.use_motes(pool)
+
+
+## The "Particles" setting (`Spectacle.set_mote_cap`). Returns the number taken.
+func set_mote_cap(cap: int) -> int:
+	return _spectacle.set_mote_cap(cap)
+
+
+## The "Particle amount" setting (`Spectacle.set_mote_density`). Returns the share taken.
+func set_mote_density(density: float) -> float:
+	return _spectacle.set_mote_density(density)
+
+
+## The "Floor marks" setting (`Spectacle.set_floor_marks`).
+func set_floor_marks(on: bool) -> void:
+	_spectacle.set_floor_marks(on)
+
+
+## The "Spell light" setting (`Spectacle.set_spell_light`). Returns the setting.
+func set_spell_light(on: bool) -> bool:
+	return _spectacle.set_spell_light(on)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:
@@ -2063,9 +1861,9 @@ func _step_effects(real_delta: float) -> void:
 	if scorches > 0:
 		_blast_floor_node.multimesh.buffer = _blast_floor_buffer
 	_blast_floor_node.multimesh.visible_instance_count = scorches
-	# Spell light draws the same rows (P3b; `SpellLight.light_effects`).
-	if _light != null:
-		_light.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
+	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_effects`).
+	if _spectacle != null:
+		_spectacle.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
 
 
 ## How many effects are showing (for tests and the sheets).
@@ -2166,9 +1964,8 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	if projectiles != null and shot >= 0:
 		look = projectiles.get_look_of(shot)
 		core = projectiles.get_core_of(shot)
-	_cue_surface = _body_source(enemy)
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot)
-	_cue_surface = -1
+	# What broke is the body: its surface kinds and marks in the colours of its own art.
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(_body_sprite(enemy)))
 	if particles_enabled and not upgraded:
 		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 
@@ -2340,8 +2137,8 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 
 
 func _draw_live_beams() -> void:
-	if _light != null:
-		_light.light_beams_begin()
+	if _spectacle != null:
+		_spectacle.light_beams_begin()
 	var count: int = 0
 	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
 	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
@@ -2428,9 +2225,9 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
-		# Spell light along the same path (P3b; `SpellLight.light_beam`).
-		if _light != null:
-			_light.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
+		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
+		if _spectacle != null:
+			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
 
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments

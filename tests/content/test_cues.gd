@@ -77,3 +77,16 @@ func test_a_motes_part_names_what_is_wrong() -> void:
 	check_equal(cue.problems(), PackedStringArray(), "a motes part needs no effect, and takes its own keys")
 	cue.parts = [{"part": &"motes", "zoom": 2}, {"part": &"motes", "way": &"sideways"}, {"part": &"motes", "count": 0}, {"part": &"motes", "spread": 400.0}, {"part": &"motes", "kind": &""}]
 	check_equal(cue.problems().size(), 5, "one a part: %s" % [cue.problems()])
+
+
+## A part's type is a row of CueBase.PART_TYPES (docs/milestones/spell-spectacle-2.md, S1): a type
+## no row names is a problem, and a flash may say its type (`effect`) or leave it out.
+func test_a_parts_type_is_one_of_the_part_types() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test"
+	cue.parts = [{"part": &"effect", "effect": &"burst"}, {"effect": &"burst"}]
+	check_equal(cue.problems(), PackedStringArray(), "a flash, its type said or not")
+	cue.parts = [{"part": &"sparkles", "effect": &"burst"}]
+	check_equal(cue.problems().size(), 1, "an unknown type: %s" % [cue.problems()])
+	for type: StringName in CueBase.PART_TYPES:
+		check((CueBase.PART_TYPES[type] as Array).has("part"), "a %s part may say its type" % type)

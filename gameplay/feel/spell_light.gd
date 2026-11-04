@@ -1,7 +1,7 @@
 extends Node
 ## Spell light (docs/milestones/spell-spectacle.md, P3a, P3b): shots, effects, beams and the
-## room's own lights light the floor, the walls and the bodies round them. A child of Feel, made
-## only while the "Spell light" setting is on (`SpellLightSetting`, `spell_light_changed`); with
+## room's own lights light the floor, the walls and the bodies round them. A child of the
+## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Spell light" setting is on (`SpellLightSetting`, `spell_light_changed`); with
 ## it off none of these nodes exist.
 ##
 ## - **The light buffer:** a SubViewport a DOWNSCALE-th of the view each way, cleared to black
@@ -14,7 +14,7 @@ extends Node
 ##     the batch uploads, with a quad of its own (the batch's MultiMesh is not shared: it holds
 ##     the trails' mesh, hundreds of quads a shot, drawn or folded; DECISIONS, 2026-11-02).
 ##   - Feel's effects (flares, rings, casts, arcs, blasts): `light_effects` hands over the buffers
-##     Feel just uploaded. How much each effect kind lights is EFFECT_LIGHT and BLAST_LIGHT (data
+##     Feel just uploaded (Feel calls the spectacle's, which calls this). How much each effect kind lights is EFFECT_LIGHT and BLAST_LIGHT (data
 ##     here, by Feel's KIND_* codes; a test names each one), fading out over its life.
 ##   - Live beams: `light_beam` hands over the path Feel just gave the beam's own shader; each is
 ##     a band of light along it.

@@ -21,11 +21,7 @@ static func default_cap() -> int:
 
 ## The index in STOPS of the stop nearest `cap` (the lower one on a tie).
 static func index_of(cap: int) -> int:
-	var best: int = 0
-	for i in STOPS.size():
-		if absi(STOPS[i] - cap) < absi(STOPS[best] - cap):
-			best = i
-	return best
+	return SettingStops.nearest(STOPS, float(cap))
 
 
 ## `cap` snapped to the nearest stop.

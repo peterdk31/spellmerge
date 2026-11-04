@@ -30,7 +30,7 @@ A home for motes, marks and light, and for whatever drawn-only effect comes next
 - **Stepped settings share one helper** (`index_of`, `snap`, `word_of` over `STOPS` and `WORDS`) for MoteCap, MoteDensity and ShotCap.
 - Tests: the existing ones run unchanged through the forwards; a test plays a cue with a part type added at run time; a test that `play_cue` errors on an unknown part.
 
-No look changes: the screenshot sheets (`shot_motes`, `shot_mote_sources`, `shot_marks`) are pixel for pixel the same before and after.
+No look changes: the screenshot sheets (`shot_motes`, `shot_mote_sources`, `shot_marks`) are pixel for pixel the same before and after. **Built** (DECISIONS, 2026-11-04, "The spectacle node and cue parts by type"): the sheets are not the same from run to run on any branch (real-time clocks), so the check is a trace of every mote and mark row over a fixed list of events, the same on main and after S1. The spectacle does not listen to the hit events itself; Feel's handlers still call it, in their order. An unknown part type is warned of, not an error.
 
 ## S2: Spectacle by card (the owner's Q2)
 

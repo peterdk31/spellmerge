@@ -148,12 +148,13 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
 3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`, and its looks, all
    data on the card (`FormBase`): a `staff_pose` (`tests/core/test_staff_poses.gd` fails without
-   one), a `cast_look` and an `impact_look` (`tests/content/spells/test_carrier_looks.gd` fails
-   without them, or with a key nothing reads), and a `shot_body` if its still shots are not runes.
-   A look's `cue` names a cue in `content/cues/` (one file per moment; parts from `CueBase.EFFECTS`).
-   A carrier with no shot to draw tells its moments for them: `form_shown` with its card's id
-   (`spell.form_id`) where it shows itself, which plays the cast look's cue, and `carrier_ended`
-   where it ends, which plays the impact look's (a carrier that moves its caster gets this from
+   one), its cues (`cast_cue`, the flash on the staff, `cast` by default; `shown_cue`, where it
+   shows itself; `impact_cue`, where its shots strike, `impact` by default; `end_cue`, where a
+   carrier with no shot ends; `tests/content/spells/test_carrier_looks.gd` fails for a cue that is
+   not in `content/cues/`: one file per moment, parts from `CueBase.EFFECTS`), and a `shot_body` if
+   its still shots are not runes. A carrier with no shot to draw tells its moments for them:
+   `form_shown` with its card's id (`spell.form_id`) where it shows itself, which plays its
+   `shown_cue`, and `carrier_ended` where it ends, which plays its `end_cue` (a carrier that moves its caster gets this from
    `CasterMoves.end`). Feel names no carrier: nothing there changes.
 4. If its look strikes one point near the caster (a slam's impact), give it `STRIKES_POINT` and
    draw that look at `strike_point` (override it for a point off the aim; the runtime stops it at a

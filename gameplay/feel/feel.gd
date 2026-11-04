@@ -29,8 +29,9 @@ extends Node
 ## pillar it knocks stone chips back. Where a shot lands it shows an effect in the shot's own
 ## ramp and cards (see "Effects" below).
 ##
-## On `spell_cast` it shows a cast flash at the staff tip in the player's colours (and a ring
-## for a carrier whose cast look has one), and kicks the camera a little against the aim.
+## On `spell_cast` it plays the carrier card's `cast_cue` at the staff tip in the player's colours
+## (`cast` unless the card names another: a flash, a ring for a ring carrier, and a little kick of
+## the camera against the aim); where a shot strikes, its card's `impact_cue` (S6 2).
 ##
 ## A deflected shot (`shot_deflected`) flashes big and white where it turned, in its new caster's
 ## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_form` is
@@ -233,6 +234,15 @@ const CUE_EFFECTS: Dictionary = {
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 	&"arc": [KIND_ARC, 4.0, RING_SECONDS, true],
 }
+## What `_form_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
+const CUE_CAST: int = 0
+const CUE_SHOWN: int = 1
+const CUE_IMPACT: int = 2
+const CUE_END: int = 3
+const CUE_RADIUS: int = 4
+const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
+## `play_cue`'s ramp when not given: the caster's.
+const CASTER_RAMP: int = -100
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
@@ -525,9 +535,8 @@ var _impact_aim: Vector2 = Vector2.ZERO
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
-## The looks read from the carrier cards, by card id (see `_form_look`).
-var _cast_look_cache: Dictionary = {}
-var _impact_look_cache: Dictionary = {}
+## The cues and radius read from the carrier cards, by card id (see `_form_cues_of`).
+var _form_cues: Dictionary = {}
 ## The cues read from `content/cues`, by id (see `cue_of`).
 var _cue_cache: Dictionary = {}
 
@@ -1147,11 +1156,11 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		# Its cards' motes back along the way it came, in its own ramp.
 		if projectiles != null:
 			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, projectiles.impact_tag)
-		_show_impact(caster, ramp, position, direction, true)
+		_show_impact(caster, position, direction)
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's.
 	_spectacle.shed_on_wall(ramp, position, -direction)
-	_show_impact(caster, ramp, position, direction, false)
+	_show_impact(caster, position, direction)
 
 
 ## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
@@ -1196,33 +1205,23 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> 
 	play_cue(&"parry", caster, position)
 
 
-## The payoff of a shot: a flare in the shot's colour, shaped by the card the shot is (the
-## projectile manager's `impact_form` while the impact is sent, its card's impact look; a rune goes
-## off, a nova's adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
-## hat colour would show (staffs F7: one look for every spell). A carrier whose impact look names
-## a `cue` plays it where it ends on no body (`on_body` false), as big as its card's radius.
-func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, on_body: bool) -> void:
+## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (the
+## projectile manager's `impact_form` while the impact is sent; `impact`, a flare, for none), in the
+## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's ramp:
+## an enemy's lands the same way, in the enemy ramp (staffs F7: one look for every spell). As big as
+## the card's radius: a rune goes off in `rune_burst`, a nova's adds a ring (`impact_ring`).
+func _show_impact(caster: int, position: Vector2, direction: Vector2) -> void:
 	var form: StringName = &""
 	var core: Color = Color.WHITE
 	var bits: int = 0
+	var tag: int = 0
 	if projectiles != null:
 		form = projectiles.impact_form
 		core = projectiles.impact_core
 		bits = projectiles.impact_look
-	var look: Dictionary = _form_look(form, false)
-	var size: float = look.get("size", preset.wall_spark_size) as float
-	if form == &"rune":
-		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, ramp, bits, 3, RUNE_BURST_SECONDS)
-		# A rune lies on the floor: its cue plays where it goes off, on a body or not.
-		if look.has("cue"):
-			play_cue(StringName(look["cue"]), caster, position, direction, look.get("radius", 0.0) as float, core, bits)
-		return
-	var zoom: int = clampi(roundi(size * 2.0), 1, 3)
-	show_effect(KIND_BURST, position, direction, core, ramp, bits, zoom, BURST_SECONDS)
-	if look.get("ring", false) as bool:
-		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
-	if look.has("cue") and not on_body:
-		play_cue(StringName(look["cue"]), caster, position, direction, look.get("radius", 0.0) as float, core, bits)
+		tag = projectiles.impact_tag
+	var cues: Array = _form_cues_of(form)
+	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag)
 
 
 ## Play the cue `id` (a `CueBase`, `content/cues/<id>.tres`; `cue_shown` calls this) at `at`, set
@@ -1231,10 +1230,12 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 ## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
 ## on `target` (an actor, for `hold_target`), sent by `shot`, for what broke in the colours of the
 ## ramp-table source `surface` (a dying body's art; -1: the room's walls), of the spell of `tag` (its
-## cards' motes and marks; 0: the tag of `shot`, if any). Plays its parts, each by
+## cards' motes and marks; 0: the tag of `shot`, if any), in `ramp` (a hat ramp, or the enemy ramp:
+## for a moment of a seat or of a hit body rather than of the caster's spell, a seat's cast; CASTER_RAMP:
+## the caster's, `Actors.ramp_of`). Plays its parts, each by
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
 ## punch (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0) -> void:
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, ramp: int = CASTER_RAMP) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
@@ -1245,7 +1246,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		_cue_contexts.append(CueContextScript.new())
 	var context: CueContextScript = _cue_contexts[_cue_depth]
 	context.caster = caster
-	context.ramp = _ramp_of(caster)
+	context.ramp = _ramp_of(caster) if ramp == CASTER_RAMP else ramp
 	context.at = at
 	context.aim = aim
 	context.size = size
@@ -1277,10 +1278,11 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		_trauma = minf(_trauma + cue.shake, 1.0)
 		var way: Vector2 = Vector2.DOWN
 		match cue.kick_way:
+			# Back or along its way only when it has one (a cast with no aim kicks nowhere).
 			&"back":
-				way = -aim
+				way = -aim if dir != Vector2.ZERO else Vector2.ZERO
 			&"aim":
-				way = aim
+				way = aim if dir != Vector2.ZERO else Vector2.ZERO
 			&"away":
 				var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
 				if body != null and body.global_position.distance_to(at) > 1.0:
@@ -1345,6 +1347,8 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 		show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
 	elif bool(part.get("bare", false)):
 		show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+	elif bool(part.get("no_cards", false)):
+		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, 0, zoom, seconds, length)
 	else:
 		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds, length)
 
@@ -1375,9 +1379,9 @@ func _cue_tag() -> int:
 
 
 ## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a
-## decoy or familiar going): the cue its card's impact look names, `size` big.
+## decoy or familiar going): its card's `end_cue`, `size` big.
 func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
-	var cue: StringName = StringName(str(_form_look(form, false).get("cue", "")))
+	var cue: StringName = _form_cues_of(form)[CUE_END] as StringName
 	if cue != &"":
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 
@@ -1871,47 +1875,36 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 
 
-## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
-## has none or there is no registry. Read once per card id, then kept: a cast allocates nothing.
-func _form_look(form: StringName, cast: bool) -> Dictionary:
-	var cache: Dictionary = _cast_look_cache if cast else _impact_look_cache
-	var cached: Variant = cache.get(form)
+## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
+## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
+## 0) for an id that is no carrier card. Read once per card id, then kept: a cast or a hit allocates
+## nothing. With no registry yet, or no form id, the defaults are answered but not kept.
+func _form_cues_of(form: StringName) -> Array:
+	var cached: Variant = _form_cues.get(form)
 	if cached != null:
-		return cached as Dictionary
-	var look: Dictionary = {}
-	# No registry yet, or no form id yet: answer plain but keep nothing, so a later card still counts.
+		return cached as Array
 	if registry == null or form == &"":
-		return look
+		return NO_FORM_CUES
 	var card: Resource = registry.get_resource(&"spells", form)
+	var cues: Array = NO_FORM_CUES
 	if card is FormBase:
-		look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
-		# Its cue is as big as the card's radius.
-		if look.has("cue"):
-			look["radius"] = (card as FormBase).radius
-	cache[form] = look
-	return look
+		cues = (card as FormBase).look_cues()
+	_form_cues[form] = cues
+	return cues
 
 
+## A seat cast a spell (`spell_cast`, a seat's own staffs only): its carrier card's `cast_cue` at the
+## staff tip, in the seat's hat ramp, along its aim (the cast flash, a ring for a ring carrier, the
+## camera kicked back), from the actor the seat drives.
 func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
 	if player < 0 or player >= ActorsScript.SEATS:
 		return
-	var slot: int = player
-	# Each form has its own flash on the wizard, its card's cast look: the spark's size and seconds (a
-	# nova's, a rune's, a wall's bigger), and a ring with it (a nova's flashing out; a rune's, an
-	# orbit's, a teleport's, a swap's gathering in, the build-up).
-	var look: Dictionary = _form_look(spell_id, true)
-	var aim: Vector2 = direction if direction != Vector2.ZERO else Vector2.RIGHT
-	var zoom: int = clampi(roundi((look.get("size", 0.5) as float) * 2.0), 1, 3)
-	show_effect(KIND_CAST, origin, aim, Color.WHITE, slot, 0, zoom, look.get("seconds", CAST_SECONDS) as float)
-	if look.get("ring", false) as bool:
-		var gather: bool = (look.get("grow", 0.5) as float) < 0.0
-		show_effect(KIND_RING_IN if gather else KIND_RING_OUT, origin, aim, Color.WHITE, slot, 0, 1, RING_SECONDS)
-	if shake_enabled and direction != Vector2.ZERO:
-		_refresh_camera()
-		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
+	var table: ActorsScript = _actor_table()
+	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
+	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, player)
 
 
-## A carrier showed itself: the cue its card's cast look names (a nova's ring, a rain's telegraph
+## A carrier showed itself: its card's `shown_cue` (a nova's ring, a rain's telegraph
 ## with `length` its seconds, where a teleport leaves, each end of a swap, a decoy or familiar
 ## appearing, a dash's dust and lightning arc, S5), then a beam (drawn by `shot_beam.gdshader` in
 ## the element's ramp) with the cast's cards, in the caster's ramp: an enemy's look the same, in the
@@ -1921,7 +1914,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
-	var cue: StringName = StringName(str(_form_look(form, true).get("cue", "")))
+	var cue: StringName = _form_cues_of(form)[CUE_SHOWN] as StringName
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)

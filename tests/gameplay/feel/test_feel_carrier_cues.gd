@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The carriers' moments in gameplay/feel are cues their cards name: `form_shown` plays a card's
-## `cast_look` cue where the carrier shows itself (where a teleport leaves, each end of a swap,
-## a decoy or familiar appearing), `carrier_ended` its `impact_look` cue where a carrier with no
+## `shown_cue` where the carrier shows itself (where a teleport leaves, each end of a swap,
+## a decoy or familiar appearing), `carrier_ended` its `end_cue` where a carrier with no
 ## shot ends (a teleport landing, a rain falling, a slam's strike, a decoy going). The cues use the
 ## columns of light (`rise`, `fall`) drawn by `shot_effect.gdshader`.
 ##
@@ -39,7 +39,7 @@ func _card(id: StringName) -> FormBase:
 
 
 func test_a_teleport_rises_off_where_it_leaves() -> void:
-	check_equal(_card(&"teleport").cast_look.get("cue"), &"vanish", "teleport.tres names the cue `vanish`")
+	check_equal(_card(&"teleport").shown_cue, &"vanish", "teleport.tres names the cue `vanish`")
 	bus.form_shown.emit(0, &"teleport", Vector2(10, 10), Vector2.RIGHT, 96.0, FROST, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_RISE), 1, "a column of light pulled up off the spot")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 0, "its ring is the column's own, flat on the floor")
@@ -48,7 +48,7 @@ func test_a_teleport_rises_off_where_it_leaves() -> void:
 
 
 func test_a_teleport_strikes_down_where_it_lands() -> void:
-	check_equal(_card(&"teleport").impact_look.get("cue"), &"appear", "teleport.tres names the cue `appear`")
+	check_equal(_card(&"teleport").end_cue, &"appear", "teleport.tres names the cue `appear`")
 	bus.carrier_ended.emit(0, &"teleport", Vector2(106, 10), Vector2.RIGHT, 1.0, FROST, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_FALL), 1, "a column of light struck down onto the spot")
 	check(feel.effect_info(FeelScript.KIND_FALL)["at"].is_equal_approx(Vector2(106, 10)), "where it landed")
@@ -77,8 +77,8 @@ func test_a_rain_falls_where_it_lands() -> void:
 func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 	const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 	var sparks: int = 1 << (ProjectilesScript.LOOK_SPARKS - 1)
-	check_equal(_card(&"dash").cast_look.get("cue"), &"dash_start", "dash.tres names the cue `dash_start`")
-	check_equal(_card(&"dash").impact_look.get("cue"), &"dash_land", "and `dash_land`")
+	check_equal(_card(&"dash").shown_cue, &"dash_start", "dash.tres names the cue `dash_start`")
+	check_equal(_card(&"dash").end_cue, &"dash_land", "and `dash_land`")
 	# The dust is in the room's colours: a room is entered.
 	bus.room_entered.emit(&"arena_01")
 	var motes: Node = feel.motes()

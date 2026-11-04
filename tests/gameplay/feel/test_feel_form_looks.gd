@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## flash at the staff and, for a ring carrier, a ring (a nova's flashes out, a rune's and an
 ## orbit's gather in), an effect where its shot lands in the shot's own colours and cards (a
 ## rune goes off in a burst of its own), a beam that opens wide and thins, and an enemy's shot
-## that always shows the same ember mark no player's flare resembles.
+## that always shows the same ember mark no player's flare resembles. The cast and the impact are
+## the cues the carrier card names (`FormBase.cast_cue`, `impact_cue`; S6 2).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -54,10 +55,11 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-## The look the carrier card `form` brings (`FormBase.cast_look` or `impact_look`).
-func _card_look(form: StringName, cast: bool) -> Dictionary:
+## The cue the carrier card `form` names for its cast or its impact (`FormBase.cast_cue`,
+## `impact_cue`).
+func _card_cue(form: StringName, cast: bool) -> CueBase:
 	var card: FormBase = registry.get_resource(&"spells", form) as FormBase
-	return card.cast_look if cast else card.impact_look
+	return feel.cue_of(card.cast_cue if cast else card.impact_cue)
 
 
 func _cast(player: int, form: StringName) -> void:
@@ -82,13 +84,17 @@ func _kinds() -> Array[int]:
 			feel.effects_of(FeelScript.KIND_RING_IN), feel.effects_of(FeelScript.KIND_RUNE_BURST)] as Array[int]
 
 
-func test_the_looks_are_data_on_the_cards_not_in_the_preset() -> void:
+func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 	check(not ("cast_looks" in preset) and not ("impact_looks" in preset), "the preset has no per-form looks")
+	check(not ("wall_spark_size" in preset) and not ("cast_kick_pixels" in preset), "nor a flare's size or a cast's kick")
 	for form in FORMS:
 		check(registry.get_resource(&"spells", form) is FormBase, "%s is a carrier card" % form)
-		check(not _card_look(form, false).is_empty(), "%s has an impact flare" % form)
-	check(not _card_look(&"nova", true).is_empty(), "a nova has a cast flash of its own")
-	check(not _card_look(&"bolt", true).has("ring"), "a bolt's is the plain spark, with no ring")
+		check(_card_cue(form, true) != null, "%s has a cast cue" % form)
+		check(_card_cue(form, false) != null, "%s has an impact cue" % form)
+	check_equal(_card_cue(&"nova", true).id, &"cast_nova", "a nova has a cast flash of its own")
+	check_equal(_card_cue(&"bolt", true).parts.size(), 1, "a bolt's is the plain spark, with no ring")
+	check_equal(FormBase.new().cast_cue, &"cast", "a card naming none casts `cast`")
+	check_equal(FormBase.new().impact_cue, &"impact", "and lands in `impact`")
 
 
 func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:
@@ -112,8 +118,8 @@ func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
 func test_a_new_carrier_card_brings_its_own_look() -> void:
 	var card := FormBase.new()
 	card.id = &"test_wave"
-	card.cast_look = {"seconds": 0.5, "size": 2.0, "grow": -1.0, "ring": true}
-	card.impact_look = {"seconds": 0.3, "size": 1.5, "ring": true}
+	card.cast_cue = &"cast_gather"
+	card.impact_cue = &"impact_ring"
 	registry.extra = card
 	_cast(0, &"test_wave")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "its cast gathers a ring in, as the card says")
@@ -122,32 +128,34 @@ func test_a_new_carrier_card_brings_its_own_look() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "and a ring, as the card says")
 
 
-func test_a_carrier_whose_look_names_a_cue_plays_it_where_it_ends() -> void:
+func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strikes() -> void:
 	var card := FormBase.new()
 	card.id = &"test_meteor"
 	card.radius = 12.0
-	card.impact_look = {"seconds": 0.2, "size": 1.0, "cue": &"quake"}
+	card.impact_cue = &"quake"
 	registry.extra = card
-	_impact(0, &"test_meteor", Color.WHITE, 0, own(Node2D.new()) as Node2D)
-	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 0, "not where it hits a body")
 	_impact(0, &"test_meteor")
-	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "the floor cracks where it ends")
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "the floor cracks where it ends on a wall")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(12.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "as big as its radius")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"quake").shake), "with the ground's shake")
 	check(is_equal_approx(actors.held_left(0), feel.cue_of(&"quake").hold), "and its caster held")
+	_impact(0, &"test_meteor", Color.WHITE, 0, own(Node2D.new()) as Node2D)
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 2, "and where it strikes a body: one rule for every impact")
 	_impact(0, &"bolt")
-	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a carrier without it leaves no mark")
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 2, "a carrier without it leaves no mark")
 
 
-func test_a_look_missed_for_want_of_a_registry_is_not_kept() -> void:
+func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
 	_cast(0, &"nova")
-	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no registry: the plain cast flash")
-	check(feel._form_look(&"", false).is_empty(), "no form id, no look")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no registry: no cue to play")
+	check_equal(feel._form_cues_of(&"nova"), FeelScript.NO_FORM_CUES, "the defaults")
+	check_equal(feel._form_cues_of(&""), FeelScript.NO_FORM_CUES, "no form id, the defaults")
 	feel.registry = registry
 	_cast(0, &"nova")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "once the registry is there the nova has its ring")
-	check(not feel._form_look(&"nova", false).is_empty(), "and its flare")
+	check_equal(feel._form_cues_of(&"nova")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
+	check_equal(feel._form_cues_of(&"fire_bolt"), FeelScript.NO_FORM_CUES, "an id that is no carrier card: the defaults")
 
 
 func test_each_form_ends_its_own_way() -> void:
@@ -340,3 +348,31 @@ func test_the_effect_slots_setting_sizes_the_batch() -> void:
 	check_equal(feel.set_effect_slots(5000), EffectSlots.MAX, "a number past the top is the top")
 	check_equal(feel.set_effect_slots(1), EffectSlots.MIN, "below the bottom, the bottom")
 	check_equal(feel.set_effect_slots(300), 320, "between steps, the nearest step")
+
+
+func test_a_casts_kick_is_its_cues() -> void:
+	var cue: CueBase = feel.cue_of(&"cast_bolt")
+	check(cue.kick > 0.0 and cue.kick_way == &"back", "a cast cue kicks the camera back")
+	_cast(0, &"bolt")
+	check(feel.kick().is_equal_approx(Vector2.UP * cue.kick), "against the aim (down), by the cue's pixels")
+	feel.step(1.0)
+	bus.spell_cast.emit(0, &"bolt", Vector2(10, 10), Vector2.ZERO)
+	check_equal(feel.kick(), Vector2.ZERO, "a cast with no aim kicks nowhere")
+	check_equal(feel.effects_of(FeelScript.KIND_CAST), 1, "but still flashes")
+
+
+func test_a_rings_impact_has_the_shots_colour_but_not_its_cards() -> void:
+	var frost := Color("4fd6dc")
+	var look: int = ProjectilesScript.pack_look(PackedInt32Array([ProjectilesScript.LOOK_FLECKS]))
+	_impact(1, &"nova", frost, look)
+	check_equal(feel.effect_dress(FeelScript.KIND_BURST), [frost, look], "its burst: the colour and the cards")
+	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [frost, 0], "its ring: the colour only (`no_cards`)")
+
+
+func test_an_impact_cue_is_of_the_shots_spell() -> void:
+	var tags: Array[int] = []
+	feel.add_cue_part(&"mark", func(_part: Dictionary, cue: FeelScript.CueContextScript) -> void: tags.append(cue.tag))
+	projectiles.impact_tag = 77
+	_impact(0, &"rune")
+	projectiles.impact_tag = 0
+	check_equal(tags, [77] as Array[int], "a rune's burst leaves its scar by the cards of the shot's spell (`impact_tag`)")

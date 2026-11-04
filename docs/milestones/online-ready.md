@@ -56,15 +56,37 @@ Still to change once decision 3 is answered: rule 6's online variant (the pause 
 
 The danger is that determinism breaks silently: a forgotten field or a read of real time crashes nothing, it shows weeks later as a desync nobody can trace. The simulation is about 60 scripts with some 800 members (the projectile manager alone 252), so anything kept by hand rots. The rules (the owner, 2026-11-04: "It should NOT become increasingly difficult to develop the game"):
 
-1. **State is declared once; nobody writes hash or save code.** Every simulation script lists its members in `STATE` (what the game is) or `DERIVED` (caches and anything rebuilt from state). Hashing, saving and loading walk `STATE` generically (N1, N10). A test fails on any member in neither list, naming the file, the member and the fix. A new member costs one word, and forgetting it is impossible.
+1. **State is everything not declared otherwise; nobody writes hash or save code.** Every member of a simulation script is state unless the script lists it in `DERIVED` (caches, references to nodes and services, anything rebuilt from state). Hashing, saving and loading walk the state generically (N1, N10). Forgetting to list a cache is safe: it is only hashed and saved needlessly; if it holds something that cannot be saved (a node) or that parts between runs, a test names it. Most new members (a timer, a counter) cost nothing at all.
 2. **One input path.** Devices, bots, replays and, later, the network all produce `InputFrame`s; the game never knows which. Gameplay code never touches netcode, and online play runs the same path every test, bot and replay runs daily (N2).
-3. **Game logic gets time and chance from one place.** Each step receives a `SimContext`: the tick, `DT`, this tick's commands and a random source. Chance is a hash of (run seed, purpose, actor, tick, counter), not one shared generator, so a new roll in one system never shifts another's. The tick runs areas in a written order; whatever is iterated goes in id order, never by tree or signal-connection order (N3).
+3. **Game logic gets time and chance from one place, without new plumbing.** `step(delta)` keeps its signature (the delta is always the tick's `DT`), and the tick and chance come from a `sim` service, found and swapped in tests like `combat`, `spells` and `projectiles` today. Chance is a hash of (run seed, purpose, key, tick, counter), not one shared generator, so a new roll in one system never shifts another's. The tick runs areas in a written order; whatever is iterated goes in id order, never by tree or signal-connection order (N3).
 4. **The simulation/view line is a folder, enforced by a test.** Feel, looks, HUD and the camera stay free (real time, particles, anything) as long as they only read the game. Simulation folders get the rules automatically (N9). Most daily work, content and visuals, pays nothing: cards and enemies are data, and data cannot desync.
 5. **Desyncs are cheap to find.** Per-area hashes, the first tick that parts, and a diff of the two snapshots down to the member's name (N1). Bug reports carry a replay, which makes ordinary bug fixing easier than today: the payback for the whole phase.
 6. **New content is covered by itself.** A test finds every card, enemy and room, replays a short fight with each twice and through a snapshot (N12), as `test_card_rules.gd` plays every card on every carrier.
 7. **What is not done.** No rewrite of the areas into another architecture (such as an entity-component system), no fixed-point maths (floats stay; only trig goes through `DMath`, N7), no native kernel the benchmark does not ask for (each is code written twice), and every rule a test with a fix-it message rather than a line in a README, since every session starts cold.
 
-For whoever writes gameplay code, the new costs are: classify each new member (one word, enforced) and take time and chance from the context.
+For whoever writes gameplay code, the new costs are: list a new cache or node reference in `DERIVED` (a test says when), and take chance from `sim` rather than a `RandomNumberGenerator`. The costs, part by part, are in "What it costs".
+
+## What it costs (performance and maintenance, reviewed 2026-11-04)
+
+The owner asked: will it cost performance, and will the code be worse off or harder to maintain? The honest answer, part by part. Where a cost is uncertain, it is measured before the part merges (done-when 9 and 10), and the part is changed or dropped if it does not hold.
+
+| Part | Frame time in a normal build | Code and maintenance |
+|---|---|---|
+| N1 hash, desync report | **None:** hashing never runs in a normal build's tick (tests, replays and later the netcode only, then once a second). Packed arrays are hashed by the engine's `hash()` in one call, not element by element | `DERIVED` lists on caches; the walker and the report are new code in `core/sim/`, used only by tests and tools |
+| N2 input frames, replays | **None** worth measuring (a few bytes a seat a tick). Aim quantised to 1/65,536 of a turn, invisible | **Simpler:** `player.gd` stops reading devices, so bots fill frames instead of faking devices. The HUD is unchanged: the bus holds `*_requested` events to the next tick by itself |
+| N2b first look | None | A script and a written result |
+| N3 one clock | **Likely a gain:** one tick calling steps replaces several engine callbacks (`_process`, `_physics_process` per area), and GDScript calls are what actors already pay most for | **Better:** one written order instead of an order implied by the scene tree. One-time churn: every seeded outcome changes once when chance moves to hashes (combo test numbers, the clips' `hashes.json`), redone in the same PR |
+| N4 hit-stop in ticks | None | **Simpler:** no `Engine.time_scale` games, and no real-time clock in Feel's stop |
+| N5 actor ids | None (int keys either way) | Neutral |
+| N6 own body movement | **Uncertain:** Godot's slide is C++; ours is GDScript for up to 200 actors (circles against a grid, a few cells each). Godot's physics bodies and broadphase for actors also go away. Measured on the stress run; a kernel only if the numbers ask | **A real cost:** a collision rule we own and must keep right (corners, sliding along walls). Kept tiny: circles against the wall grid only, as the swarm already does. **Done only if N2b shows Godot's slide parts between platforms** |
+| N7 DMath | **Small:** a polynomial in GDScript is slower than the engine's `sin`, but few sim calls are hot (two trig calls in `ShotKernel`, two in `SwarmKernel`, where C++ makes it as fast as the library). Measured | **A real cost:** `DMath.rotated(v, a)` reads worse than `v.rotated(a)`. **Only the functions N2b shows parting**, and N9's test asks for `DMath` only for those |
+| N8 CI across platforms | None | CI time on the daily build only |
+| N9 sim/view test | None | **Better:** the rules are a test with a fix-it message, not a README line |
+| N10 snapshots | None at rest (taken only on a join, a test or a seek) | One `restore_nodes()` hook per area that makes nodes; the rest is the walker |
+| N11 session settings | None | Neutral: the shot cap moves from a per-machine setting to a run's rules |
+| N12 content coverage | None | Test time grows with content: a PR runs only the content it touches, the daily build runs all |
+
+**In short:** in normal play the game should be no slower and maybe a little faster (N3); the two parts that could cost frame time (N6, N7) are measured and only built if N2b shows they are needed. The code gets simpler in four places (input, one clock, hit-stop, rules as tests), stays the same in most, and gets two lasting costs (a `DERIVED` list on caches; possibly `DMath` and our own slide). The one-time churn (seeded outcomes, the ~800 members reviewed once) lands early, in N1 and N3.
 
 ## Done when
 
@@ -74,9 +96,10 @@ For whoever writes gameplay code, the new costs are: classify each new member (o
 4. A snapshot taken at any tick and restored gives the same hashes from there on (N10).
 5. Every setting the simulation reads is a session setting, and a replay carries it (N11).
 6. A test fails when simulation code reads real time, `Engine.time_scale`, live input, the camera or the viewport, or uses an instance id as more than an equality key (N9).
-7. A test fails when a simulation script has a member in neither `STATE` nor `DERIVED` (N1), and when a member put in `DERIVED` is really state (N10's round trip).
+7. A member that is not state but is missing from `DERIVED` is named by a test when it matters (it cannot be saved, or it parts between runs), and a member wrongly in `DERIVED` is named by N10's round trip.
 8. Every card, enemy and room is replayed and round-tripped by itself, with no test written for it (N12).
-9. The stress runs are no slower than before phase N (numbers in docs/DECISIONS.md).
+9. The stress runs are no slower than before phase N (numbers in docs/DECISIONS.md), on desktop and on the web.
+10. Hashing, snapshots and the desync report cost nothing in a normal build's tick (they are off).
 
 ## Parts
 
@@ -84,19 +107,19 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 ### N1: the state hash and the determinism harness
 
-- **Declared state.** Every simulation script (the simulation folders, listed in `core/sim/README.md` from N1 on; N9 enforces the line) gets `const STATE: Array[StringName]` and `const DERIVED: Array[StringName]`, splitting all its members. A `STATE` member is a value, a packed array, an array or dictionary of values, or an object that is itself declared (an actor's components, a brain, a caster's staffs), walked in turn. Constants are not members; references to nodes and services are `DERIVED` (set up again, never saved).
-- **`core/sim/state_walk.gd` (`StateWalk`):** the one generic walker over `STATE` (the script's own members by name, `get`), used by the hash here and by save and load in N10. Floats by their bits; packed arrays as one block (only alive slots where a script says which, `STATE_SLOTS`); dictionaries in key order.
+- **State by default.** In every simulation script (the simulation folders, listed in `core/sim/README.md` from N1 on; N9 enforces the line) every member is state, except those it lists in `const DERIVED: Array[StringName]`: caches, references to nodes and services, anything rebuilt from state. A state member is a value, a packed array, an array or dictionary of values, or an object of another simulation script, walked in turn (an actor's components, a brain, a caster's staffs).
+- **`core/sim/state_walk.gd` (`StateWalk`):** the one generic walker (the script's own members by name: `get_script_property_list` and `get`), used by the hash here and by save and load in N10. Packed arrays in one engine call each; dictionaries in key order. It runs only in tests, tools, replays and later the netcode, never in a normal build's tick.
 - **`core/sim/sim_hash.gd` (`SimHash`):** one 64-bit hash per area and one for the whole game, from `StateWalk`. Areas do not reach into each other: the tick (N3) hands `SimHash` its areas.
-- **`tests/core/test_state_declared.gd`:** reads every simulation script's members (`get_script_property_list`) and fails on any member in neither list, or in both: "`gameplay/combat/combat.gd`: `_foo` is not declared; add it to STATE (what the game is) or DERIVED (rebuilt from state)". The first PR declares today's ~800 members; that list is reviewed once, area by area.
+- **`tests/core/test_state_declared.gd`:** walks every simulation script's state and fails on a member it cannot save (a node or service not in `DERIVED`: "`gameplay/combat/combat.gd`: `_foo` holds a Node; add it to DERIVED, it is set up again, not saved") and on a `DERIVED` name that is no member (after a rename). The first PR lists today's caches and references; the ~800 members are reviewed once, area by area.
 - **The desync report (`core/sim/desync.gd`):** given two runs, the first tick whose hashes part, which areas part, and each differing member by name with both values. Used by every determinism test, N2b and N8, and later the netcode.
-- `tests/core/test_determinism.gd`: two runs of a scripted fight (bots, a horde wave, the sandbox storm) agree at every tick. It runs per tick in tests only; in a build it is off, or every 60 ticks.
-- Cost measured on the stress run (hashing 3,000 shots is a packed-array pass; native if needed).
+- `tests/core/test_determinism.gd`: two runs of a scripted fight (bots, a horde wave, the sandbox storm) agree at every tick. A member that parts between two runs on one machine (a cache filled in a different order, a timing stat) is named by the desync report and goes into `DERIVED` or is fixed.
+- The hash's cost is measured once on the stress run, for the netcode's once-a-second check later.
 
 ### N2: input frames and replays
 
 - `core/sim/input_frame.gd` (`InputFrame`): one seat's input for one tick: move and aim quantised (move to a signed byte per axis, aim to a 16-bit angle or the "keep" value), held and pressed bits for the four staffs, and that tick's commands (the HUD's `*_requested` events, joins and leaves). `to_bytes` / `from_bytes` with a strict decoder (no `bytes_to_var` with objects).
 - `PlayerController` builds its intent from its seat's `InputFrame` for that tick, never from `InputManager` directly. The local input layer (the mouse into a world aim, the press buffer, the stick deadzones) moves in front of the frame. Bots fill frames too.
-- HUD commands go through a `Commands` queue and apply on the next tick, never in the middle of one.
+- HUD commands apply at the start of the next tick, never in the middle of one: the bus holds the `*_requested` events the simulation listens to and sends them when the tick starts, so the HUD's code does not change.
 - `core/sim/replay.gd`: records a run's seed, content version and frames to `user://replays/`, and plays it back. A bug report can attach one (a later intake task).
 - Fixes A8.
 
@@ -109,8 +132,8 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 ### N3: one clock, one context
 
 - `core/sim/tick.gd` (`Tick`, autoload): the tick counter and the only driver of the simulation. Each physics frame it runs one tick, in a written order: input frames, commands, Flow, Coop's rules, actors (by id), Spells, projectiles, Combat, the swarm. Nothing in the simulation has its own `_process` or `_physics_process`; each area's step is called by the tick.
-- **`core/sim/sim_context.gd` (`SimContext`):** handed to every step: `tick`, `DT` (constant), this tick's commands and `chance`. Simulation code takes time and chance only from it.
-- **Chance by hash (`SimContext.chance`):** `value(purpose, key, counter) -> float` and friends, a hash of (run seed, purpose, key, tick, counter). No shared generator holds state, so a new roll in one system never shifts another's, and nothing about the random state needs saving. Spells' scatter, the brain, the swarm and the AI move onto it; their `RandomNumberGenerator`s go.
+- **No new parameter:** `step(delta)` keeps its signature everywhere; the delta is always `Tick.DT` (a test checks it). The tick number and chance come from the `sim` service (`core/sim/sim.gd`), set on areas and actors the way `combat`, `spells` and `projectiles` are, so tests swap it.
+- **Chance by hash (`sim.chance(purpose, key, counter) -> float`, and `chance_int`, `chance_range`):** integer mixing of (run seed, purpose, key, tick, counter), a few integer operations, no allocation, as cheap as `RandomNumberGenerator.randf()`. No shared generator holds state, so a new roll in one system never shifts another's, and nothing about the random state needs saving. Spells' scatter, the brain and the AI move onto it; their `RandomNumberGenerator`s go. Feel and the looks keep their own generators (view).
 - **Order by id:** what the simulation iterates (actors, targets, a dictionary's keys) it iterates by id; event listeners in the simulation never depend on connection order for an outcome (a listener that changes state does so through the tick's order, or the event names the one listener).
 - Flow's timers, Coop's revive and Horde's breaks move from `_process` to the tick. Coop's camera stays in `_process` (view).
 - A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes `DT`, as today; online, the netcode decides how many ticks to run.
@@ -127,7 +150,9 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Actor ids stay "lowest free first" (already deterministic).
 - Fixes A5.
 
-### N6: our own body movement
+### N6: our own body movement (only if N2b asks for it)
+
+Built only if N2b shows Godot's `move_and_slide` parting between platforms; otherwise it stays, and N8 keeps watching it.
 
 - The actor's move against walls is our own circle-against-grid slide, on the wall grid the projectile manager already keeps (room walls and solid shots), the way the swarm moves onto its floor. `move_and_slide` and the bodies' physics shapes leave the simulation.
 - Body-against-body pushing stays Combat's push.
@@ -138,7 +163,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 - `core/sim/dmath.gd` (`DMath`): `sin`, `cos`, `atan2`, `from_angle`, `rotated`, `angle` from `+ - * / sqrt` only (polynomials, the same in GDScript and `native/`). Simulation code uses `DMath`; view code may keep the engine's.
 - `native/SConstruct` builds with `-ffp-contract=off` and without fast-math on every platform (a protected file: the owner's change, listed in the PR).
-- Fixes A6 and A7. Sized by N2b: if Godot's own builds already agree across the three platforms, `DMath` covers only what N2b finds; the compile flags go in either way.
+- Fixes A6 and A7. Sized by N2b: if Godot's own builds already agree across the three platforms, `DMath` covers only what N2b finds, and N9's test asks for `DMath` only for those functions; the compile flags go in either way. The hot calls in `native/` use the same polynomial, so the kernels stay as fast.
 
 ### N8: the same game on every platform
 
@@ -150,7 +175,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 - Every script is either simulation or view, by folder (simulation: `core/sim`, `core/spells`, `core/projectiles`, `core/actors`, `gameplay/actor` except the looks, `gameplay/ai` except the looks, `gameplay/combat`, `gameplay/coop` rules, `gameplay/flow`, `gameplay/horde` except `swarm_look.gd`, `gameplay/player` controllers, `gameplay/progression`, `gameplay/rewards`, `gameplay/run`, `gameplay/difficulty`; view: `gameplay/feel`, every look, `hud/`, the camera). The list lives in `core/sim/README.md`.
 - `tests/core/test_sim_rules.gd` reads every simulation script and fails on `Time.`, `Engine.time_scale`, `Input.`, `InputManager` outside the frame builder, `get_viewport`, `Camera2D`, `_process`, global `randf`/`randi`/`randomize`, and `get_instance_id` (other than in equality keys the test allows by name). AGENTS.md gets the rule ("Simulation code runs on the tick").
-- Proves done-when 6. It also fails on `RandomNumberGenerator` and `_physics_process` in simulation scripts (N3).
+- Proves done-when 6. It also fails on `RandomNumberGenerator`, `_process` and `_physics_process` in simulation scripts (N3).
 
 ### N10: snapshots
 
@@ -169,7 +194,8 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 ### N12: new content is covered by itself
 
 - `tests/core/test_content_determinism.gd` finds every card, enemy, boss and room through the registry, as `test_card_rules.gd` finds every card and carrier: for each, a short scripted fight (bots with that card in a staff; that enemy in the arena; that room) runs twice and through a snapshot at a random tick, and must agree at every tick.
-- A new card, enemy or room is covered the day it is added, with no test written for it. Kept within the test budget by short fights and `tools/ptest.sh`'s parallel runs.
+- A new card, enemy or room is covered the day it is added, with no test written for it.
+- Test time: a PR runs the fights of the content it touches (by file); the daily build runs them all, in `tools/ptest.sh`'s parallel runs. A fight is a few game seconds headless.
 
 ## After phase N: the netcode (a sketch, not approved)
 

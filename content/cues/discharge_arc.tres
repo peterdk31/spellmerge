@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"discharge_arc"
+parts = Array[Dictionary]([{"effect": &"arc", "seconds": 0.25}])
+color = Color(0, 0.9411765, 1, 1)

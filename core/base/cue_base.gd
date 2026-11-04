@@ -29,6 +29,8 @@ extends Resource
 ##   `if_cards`   true: played only when the cue has cards (a look layer; an element's flare)
 ##   `if_layer`   a look layer (1 to MoteKind.LOOK_LAYERS; the LOOK_* kinds of core/projectiles):
 ##                played only when the cue's cards have it (lightning's arc: 5)
+##   `if_size_over`, `if_size_upto`  played only when the cue's size is over this, or this or less
+##                (a zap's spark into the air, 22 px at the most, burns out sooner than a zap)
 ## The `arc` effect is drawn along its length: the cue's `size` x its `reach` (1 when not given)
 ## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
 ## A part with `"part": "motes"` throws motes instead (docs/milestones/spell-spectacle.md, P1; Feel's
@@ -86,7 +88,7 @@ const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "way", "particles", "if_cards", "if_layer"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
 const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
@@ -173,6 +175,8 @@ func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: part %d takes one of color, plain and bare" % [id, i])
 	if part.has("if_layer") and (int(part["if_layer"]) < 1 or int(part["if_layer"]) > MoteKind.LOOK_LAYERS):
 		found.append("%s: part %d's if_layer is not a look layer (1-%d)" % [id, i, MoteKind.LOOK_LAYERS])
+	if part.has("if_size_over") and part.has("if_size_upto") and float(part["if_size_upto"]) <= float(part["if_size_over"]):
+		found.append("%s: part %d's if_size_over and if_size_upto leave no size it plays at" % [id, i])
 	return found
 
 

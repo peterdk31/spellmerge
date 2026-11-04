@@ -67,9 +67,6 @@ extends Resource
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
-## The jagged arc of lightning a discharge draws from the enemy struck to each enemy zapped
-## (`discharge_arc`), in the colour of the reaction `discharge`: seconds it shows.
-@export_range(0.0, 0.5, 0.01) var arc_seconds: float = 0.25
 ## What a character with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
 ## `hex`, `static`; the glow look, 2026-10-27): an effect that follows it, giving off the
 ## particles of a look kind (`look`: a `LOOK_*` of core/projectiles, the element's own: burn

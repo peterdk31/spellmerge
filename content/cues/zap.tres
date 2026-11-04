@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"zap"
+parts = Array[Dictionary]([{"effect": &"arc", "seconds": 0.25, "if_size_over": 22.0}, {"effect": &"arc", "seconds": 0.15, "if_size_upto": 22.0}])

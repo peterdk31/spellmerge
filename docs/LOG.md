@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Every moment a cue: reactions, possession, arcs (spell spectacle 2, S6 items 1, 7, 8, owner session)
+
+Three more of Feel's moments are cue files now. Each element reaction has its own cue (`reaction_<id>`: a puff, a ring and a ring of the shot's motes in the reaction's colour, a hold, shake and its sound), and a cue may now carry a colour and a strength of its own (`color`, `power`), applied by one rule; ten reaction fields left the Feel preset. A possession's rings are `possess_start` and `possess_end`. A discharge's arc is `discharge_arc`, and a zap plays its card's own cue `zap` (a spark into the air burns out sooner by a size gate on its part). The reactions' and possession's sheets are the same to the pixel as before; the arcs' sheet plays the cue. Tests in the feel suites; details in docs/DECISIONS.md.
+
 ## 2026-11-04: Do shots need tails? A Tails switch, and the dash as cues and motes (spell spectacle 2, S5, owner session)
 
 A "Tails: On/Off" switch in the pause menu's Settings (saved; on by default) turns the shots' tails off: shots are drawn as their cores and lights, no path is sampled or sent, and the motes get the tails' budget (twice today's births in a busy fight). Measured on llvmpipe: the trail batches' GPU time is about a third at 60 shots and under half at 400 and 3,000; the storm's frame 8.3-8.5 -> 7.1 ms. A dash's start and landing are now its card's cues (`dash_start`, `dash_land`: dust, lightning's arc, a ring, its element's flare, its cards' motes and marks), its streaks are a mote kind given off along its path, and its trail is not drawn; Feel keeps no dash state. The owner plays with the switch and picks what the game keeps (S5 step 4).

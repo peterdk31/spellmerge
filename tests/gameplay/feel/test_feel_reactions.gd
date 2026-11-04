@@ -146,7 +146,9 @@ func test_a_discharge_arc_shows_a_jagged_line_between_both_ends_and_fades() -> v
 	check_equal(arc["at"], from, "it starts at the struck enemy")
 	check((arc["dir"] as Vector2).is_equal_approx(Vector2.RIGHT), "toward the zapped one")
 	check_equal(arc["zoom"], 20, "as long as the gap: 80 px is 20 steps of 4 (the shader jags it)")
-	check_equal(arc["core"], _colour_of(&"discharge"), "in the discharge's colour")
+	check_equal(arc["core"], _feel.cue_of(FeelScript.DISCHARGE_ARC).color, "in its cue's colour (S6 item 8)")
+	check_equal(arc["core"], _colour_of(&"discharge"), "the discharge's")
+	check(is_equal_approx(arc["seconds"] as float, 0.25), "for its cue's seconds")
 	check((arc["look"] as int) & FeelScript.EXACT != 0, "exactly that colour")
 	for i in 20:
 		_feel.step(STEP)

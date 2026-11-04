@@ -255,9 +255,8 @@ const DASH_ACROSS: float = 32.0
 ## ARC_ACROSS across (the shader's).
 const ARC_MARGIN: float = 12.0
 const ARC_ACROSS: float = 56.0
-## A zap no longer than this is a zap shot's spark into the air (SpellLimits.ZAP_SPARK_LONGEST): it
-## burns out sooner.
-const SPARK_LONGEST: float = 22.0
+## The cue of a discharge's arc (`discharge_arc`; content/cues).
+const DISCHARGE_ARC: StringName = &"discharge_arc"
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
 const STATUS_RISE: float = 8.0
@@ -971,14 +970,11 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	_label_id[slot] = reaction_id
 
 
-## A discharge jumped from `from` to `to`: a jagged line of lightning between them, re-rolled
-## as it flickers, that burns out (an effect, KIND_ARC), in the discharge's colour.
-func _on_discharge_arc(_player: int, from: Vector2, to: Vector2) -> void:
-	if preset.arc_seconds <= 0.0 or from.is_equal_approx(to):
-		return
-	var cue: CueBase = cue_of(&"reaction_discharge")
-	var tint: Color = cue.color if cue != null and cue.color.a > 0.0 else Color.WHITE
-	show_effect(KIND_ARC, from, from.direction_to(to), tint, 0, EXACT, 1, preset.arc_seconds, from.distance_to(to))
+## A discharge jumped from `from` to `to`: the cue `discharge_arc` from the one to the other, as
+## long as the gap (a jagged line of lightning in the discharge's colour that burns out; its `arc`
+## part, KIND_ARC).
+func _on_discharge_arc(caster: int, from: Vector2, to: Vector2) -> void:
+	play_cue(DISCHARGE_ARC, caster, from, to - from, from.distance_to(to))
 
 
 ## Discharge arcs showing right now (for tests).
@@ -1326,6 +1322,9 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	if bool(part.get("if_cards", false)) and layers == 0:
 		return
 	if part.has("if_layer") and (layers >> (int(part["if_layer"]) - 1)) & 1 == 0:
+		return
+	# Only at some sizes (a zap's short spark into the air against a zap at a body).
+	if (part.has("if_size_over") and cue.size <= float(part["if_size_over"])) or (part.has("if_size_upto") and cue.size > float(part["if_size_upto"])):
 		return
 	var seconds: float = float(part.get("seconds", row[2]))
 	if bool(part.get("lasts_size", false)):
@@ -1877,7 +1876,8 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 
 
 ## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
-## has none or there is no registry. Read once per card id, then kept: a cast allocates nothing.
+## has none or there is no registry; a modifier that shows itself (`form_shown` `zap`) brings its
+## own `cue` as its cast look. Read once per card id, then kept: a cast allocates nothing.
 func _form_look(form: StringName, cast: bool) -> Dictionary:
 	var cache: Dictionary = _cast_look_cache if cast else _impact_look_cache
 	var cached: Variant = cache.get(form)
@@ -1893,6 +1893,9 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 		# Its cue is as big as the card's radius.
 		if look.has("cue"):
 			look["radius"] = (card as FormBase).radius
+	elif card is ModifierBase and cast and (card as ModifierBase).cue != &"":
+		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
+		look = {"cue": (card as ModifierBase).cue}
 	cache[form] = look
 	return look
 
@@ -1930,11 +1933,6 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)
-	if form == &"zap":
-		# A zap or a zap shot's spark: lightning in the shot's colours (its infusion's, else its caster's).
-		if length > 0.0 and direction != Vector2.ZERO and preset.arc_seconds > 0.0:
-			show_effect(KIND_ARC, origin, direction, tint, ramp, look, 1, preset.arc_seconds * (1.0 if length > SPARK_LONGEST else 0.6), length)
-		return
 	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
 	var seconds: float = preset.beam_seconds

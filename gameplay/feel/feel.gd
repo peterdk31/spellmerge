@@ -442,6 +442,8 @@ var _art_colors: Dictionary = {}
 ## Spell light (`spell_light.gd`; null with the "Spell light" setting off, or with no projectile
 ## manager), and the setting (see `set_spell_light`). Read only.
 var _light: SpellLightScript = null
+## The room's ambient light (`RoomBase.ambient`), for the spell light (P3b).
+var _ambient: float = 1.0
 var spell_light: bool = SpellLightSetting.default_on()
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the ramp table (-1 for none).
@@ -604,6 +606,7 @@ func _ready() -> void:
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	_make_motes(mote_cap)
 	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
 	set_floor_marks(floor_marks)
@@ -1677,6 +1680,9 @@ func _shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
+	_ambient = room.ambient if room != null else 1.0
+	if _light != null:
+		_light.set_ambient(_ambient)
 	_surface_source = _ramp_table.source(_surface_colors)
 
 
@@ -1906,6 +1912,7 @@ func _make_light(on: bool) -> void:
 	if on and projectiles != null:
 		_light = SpellLightScript.new(projectiles, LIGHT_Z)
 		_light.name = "SpellLight"
+		_light.set_ambient(_ambient)
 		add_child(_light)
 
 
@@ -2056,6 +2063,9 @@ func _step_effects(real_delta: float) -> void:
 	if scorches > 0:
 		_blast_floor_node.multimesh.buffer = _blast_floor_buffer
 	_blast_floor_node.multimesh.visible_instance_count = scorches
+	# Spell light draws the same rows (P3b; `SpellLight.light_effects`).
+	if _light != null:
+		_light.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
 
 
 ## How many effects are showing (for tests and the sheets).
@@ -2330,6 +2340,8 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 
 
 func _draw_live_beams() -> void:
+	if _light != null:
+		_light.light_beams_begin()
 	var count: int = 0
 	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
 	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
@@ -2416,6 +2428,9 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
+		# Spell light along the same path (P3b; `SpellLight.light_beam`).
+		if _light != null:
+			_light.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
 
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments

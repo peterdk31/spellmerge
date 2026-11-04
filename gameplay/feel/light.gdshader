@@ -4,27 +4,44 @@ shader_type canvas_item;
 // (the light buffer's canvas transform is the camera's, scaled down).
 render_mode blend_add, world_vertex_coords;
 
-// Shot light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a): one soft
-// round light per live shot, drawn into the light buffer, a small screen-sized texture cleared
-// to black every frame. The rows are the projectile manager's own (its batch's buffer, handed
-// over as it is uploaded: `mirror_batch`), drawn with a quad of size 1 at the origin:
-//   trail rows   (`rune_rows` false; shot_trail.gdshader): MODEL_MATRIX[0].x the trail's row
-//                (below 0: none), MODEL_MATRIX[1].y its flags (TF_*), MODEL_MATRIX[3].xy the
-//                head. Only a live shot's head gives light, not a trail left behind or a dash.
-//   rune rows    (`rune_rows` true; shot_rune.gdshader): a real transform, a square quad of the
-//                rune's size round its centre.
-// The colour is the shot's glow (`look_of` in shot_look.gdshaderinc: its ramp, the enemies' for
-// an enemy shot). The light's shape is soft; light_apply.gdshader cuts what it adds to the world
-// into three steps.
+// Spell light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a, P3b): one
+// soft round light per row, drawn into the light buffer, a small screen-sized texture cleared to
+// black every frame, with a quad of size 1 at the origin. The rows are someone else's, handed
+// over as they are uploaded (nothing is written twice), read as `rows` says (ROWS_* in
+// spell_light.gd):
+//   ROWS_TRAIL  the projectile manager's trail rows (shot_trail.gdshader): MODEL_MATRIX[0].x the
+//               trail's row (below 0: none), MODEL_MATRIX[1].y its flags (TF_*),
+//               MODEL_MATRIX[3].xy the head. Only a live shot's head gives light, not a trail
+//               left behind or a dash. Every shot, the enemies' too (one rule).
+//   ROWS_RUNE   its rune rows (shot_rune.gdshader): a real transform, a square quad of the
+//               rune's size round its centre.
+//   ROWS_EFFECT Feel's effect rows (shot_effect, shot_blast, shot_arc): a real transform (its
+//               square, or an arc's length and width) round its centre, INSTANCE_CUSTOM.a its
+//               kind and how far through its life it is (Feel's EFFECT_FROM, EFFECT_SPAN). Each
+//               kind's light is `kind_light` (0: none), fading out over its life.
+//   ROWS_SPOT   the room's light spots (core/base/light_spot.gd), written by spell_light.gd: a
+//               transform scaled by the reach, COLOR its colour and strength, INSTANCE_CUSTOM.x
+//               its flicker and .y a seed.
+// A shot's or an effect's colour is its glow (`look_of` in shot_look.gdshaderinc: its ramp, the
+// enemies' for an enemy shot). The light's shape is soft; light_apply.gdshader cuts what it adds
+// to the world into steps.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-// The batch's rows are runes (a real transform) rather than trails.
-uniform bool rune_rows = false;
+const int ROWS_TRAIL = 0;
+const int ROWS_RUNE = 1;
+const int ROWS_EFFECT = 2;
+const int ROWS_SPOT = 3;
+uniform int rows = 0;
 // How bright a light is at its middle (the buffer adds them, up to 1 a channel).
 uniform float shot_strength = 0.9;
 uniform float rune_strength = 0.55;
+// Each effect kind's light (by its code: Feel's KIND_*, less KIND_SHELL for a blast).
+uniform float kind_light[16];
+// An effect's light reaches this many times its half size, and this much past it (px).
+uniform float effect_reach = 1.0;
+uniform float effect_pad = 10.0;
 
 // TRAIL_HEAD and TRAIL_DASH (TRAIL_* in projectile_manager.gd): the shot lives, a wizard's dash.
 const float TF_HEAD = 1.0;
@@ -35,6 +52,11 @@ const float SHOT_REACH_ZOOM = 6.0;
 const float SPECK_REACH = 14.0;
 // A rune's light reaches this many times its quad's half size.
 const float RUNE_REACH = 1.5;
+// Feel's EFFECT_FROM and EFFECT_SPAN: how an effect's life is coded after its kind.
+const float EFFECT_FROM = 0.02;
+const float EFFECT_SPAN = 0.42;
+// A light spot's flicker: steps a second.
+const float SPOT_RATE = 7.0;
 
 // Where in the light the pixel is (-1 to 1 across), and the light's colour.
 varying vec2 spot;
@@ -44,28 +66,49 @@ void vertex() {
 	vec2 corner = UV * 2.0 - 1.0;
 	spot = corner;
 	vec2 centre = MODEL_MATRIX[3].xy;
-	float reach = 0.0;
-	float strength = 0.0;
-	if (rune_rows) {
-		reach = length(MODEL_MATRIX[0].xy) * 0.5 * RUNE_REACH;
-		strength = rune_strength;
+	// The light's half size along its two ways (x along MODEL_MATRIX[0], y along [1]).
+	vec2 half_size = vec2(0.0);
+	vec2 way = vec2(1.0, 0.0);
+	vec3 colour = vec3(0.0);
+	if (rows == ROWS_RUNE) {
+		float reach = length(MODEL_MATRIX[0].xy) * 0.5 * RUNE_REACH;
+		half_size = vec2(reach);
+		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * rune_strength;
+	} else if (rows == ROWS_EFFECT) {
+		float code = (1.0 - INSTANCE_CUSTOM.a) * 16.0;
+		float kind = floor(code);
+		float through = clamp((code - kind - EFFECT_FROM) / EFFECT_SPAN, 0.0, 1.0);
+		float strength = kind_light[int(clamp(kind, 0.0, 15.0))] * (1.0 - through);
+		if (strength > 0.0) {
+			vec2 along = MODEL_MATRIX[0].xy;
+			way = length(along) > 0.0 ? normalize(along) : vec2(1.0, 0.0);
+			half_size = vec2(length(along), length(MODEL_MATRIX[1].xy)) * 0.5 * effect_reach + vec2(effect_pad);
+			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * strength;
+		}
+	} else if (rows == ROWS_SPOT) {
+		float reach = length(MODEL_MATRIX[0].xy);
+		float step_of = floor(TIME * SPOT_RATE + INSTANCE_CUSTOM.y * 13.0);
+		float dip = INSTANCE_CUSTOM.x * fract(sin(step_of * 12.9898 + INSTANCE_CUSTOM.y * 78.233) * 43758.5453);
+		half_size = vec2(reach);
+		colour = COLOR.rgb * COLOR.a * (1.0 - dip);
 	} else {
 		float row = MODEL_MATRIX[0].x;
 		float flags = MODEL_MATRIX[1].y;
 		if (row >= 0.0 && flag_set(flags, TF_HEAD) && !flag_set(flags, TF_DASH)) {
 			float red = floor(COLOR.r * 255.0 + 0.5);
-			reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
-			strength = shot_strength;
+			float reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
+			half_size = vec2(reach);
+			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * shot_strength;
 		}
 	}
-	if (reach <= 0.0) {
+	if (half_size.x <= 0.0 || dot(colour, colour) <= 0.0) {
 		// Folded away: no light.
 		VERTEX = vec2(0.0);
 		lamp = vec3(0.0);
 	} else {
-		Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false);
-		lamp = L.glow * strength;
-		VERTEX = centre + corner * reach;
+		lamp = colour;
+		vec2 across = vec2(-way.y, way.x);
+		VERTEX = centre + way * corner.x * half_size.x + across * corner.y * half_size.y;
 	}
 }
 

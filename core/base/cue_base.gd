@@ -130,6 +130,7 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d has a count or reach of 0 or less, or an up below 0" % [id, i])
 	if float(part.get("spread", 0.0)) < 0.0 or float(part.get("spread", 0.0)) > 360.0:
 		found.append("%s: motes part %d's spread is not 0 to 360 degrees" % [id, i])
+	return found
 
 
 ## What is wrong with the mark part `part` (number `i`). Whether its mark exists is the

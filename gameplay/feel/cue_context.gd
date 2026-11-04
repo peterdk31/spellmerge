@@ -29,6 +29,9 @@ var surface: int = -1
 var body: Color = Color(0.0, 0.0, 0.0, 0.0)
 ## The tag of the spell it is of (its cards' motes and marks, `card_kinds.gd`; 0 for none).
 var tag: int = 0
+## The body it follows (`Feel.play_cue`'s `follow`; null: it stays where it played): its flashes
+## move with it, `at` minus the body's position from it, while they last (S6, item 9).
+var follow: Node2D = null
 ## The cue's own colour (`CueBase.color`: what its parts with no colour of their own are in
 ## exactly; alpha 0 for none) and its `power` (what its sizes, counts, holds and shake are times).
 var color: Color = Color(0.0, 0.0, 0.0, 0.0)

@@ -34,8 +34,14 @@ extends Resource
 ##                played only when the cue's cards have it (lightning's arc: 5)
 ##   `if_size_over`, `if_size_upto`  played only when the cue's size is over this, or this or less
 ##                (a zap's spark into the air, 22 px at the most, burns out sooner than a zap)
+## The `poof` effect is a staff's cloud (living staffs H4: bone clouds that swell to their biggest
+## at 35% of its seconds and dot away, a few sparks in the ramp; a puff with Feel's `POOF` look).
 ## The `arc` effect is drawn along its length: the cue's `size` x its `reach` (1 when not given)
 ## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
+## A cue played on a body (`Feel.play_cue`'s `follow`: a staff's poof, a possession's ring) follows
+## it: its flashes move with the body while they last, where they were played from it, and end
+## when it is gone. Its motes, marks and lights stay where it played (they fly, lie and glow in
+## the room).
 ## A part with `"part": "motes"` throws motes instead (docs/milestones/spell-spectacle.md, P1; Feel's
 ## `mote.gd`, left out with the "Particles" setting or particles off), each count times the
 ## "Particle amount" setting:
@@ -104,7 +110,7 @@ extends Resource
 ## step of its zoom is).
 const EFFECTS: Array[StringName] = [
 	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff",
-	&"quake", &"shell", &"fireball", &"rise", &"fall", &"arc",
+	&"quake", &"shell", &"fireball", &"rise", &"fall", &"arc", &"poof",
 ]
 ## The effects drawn along a length (the cue's size x reach) rather than at a zoom.
 const LENGTH_EFFECTS: Array[StringName] = [&"arc"]

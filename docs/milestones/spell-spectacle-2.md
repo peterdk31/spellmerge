@@ -86,11 +86,28 @@ Today a mote is a row and every row is a GDScript write. Instead, one row could 
 
 Merged only if the storm's CPU drops and the GPU time on llvmpipe and the Intel UHD does not grow more than that; the result goes in DECISIONS either way. After S3, so fewer callers write rows.
 
+## S5: Tails as motes (an experiment, measured; the owner, 2026-11-04)
+
+The owner asked whether the trail shader could be turned off completely, with motes drawing what it draws, and whether that would be faster. After S3 the trail shader draws only the tail line and the dashes' streaks. The tail follows the path a shot really took (it bends after the shot is fired: homing, orbits, bounces), so the manager uploads every shot's recent positions each frame (`trail_data`) and the shader draws a line through them.
+
+**As motes:** each shot drops one mote a frame where it is, with no speed and a short life, so the motes stay put and cool out along the path, bends included. A new mote kind is stretched along the shot's way (a fast shot moves about 7 px a frame at 60 FPS, so one-pixel motes would read as dots).
+
+**What it could save and cost:**
+- CPU saved: the trail rows' upload in `update_draw` (0.4-0.9 ms a frame in the storm).
+- CPU added: one mote row a shot a frame, 3,000-6,000 a frame, far past `FRAME_ROWS` (256) and 7-15 ms in GDScript. So the native module writes the tail rows in the step (`ShotKernel`, about 0.1 ms for 6,000 shots), with the GDScript as its reference, byte for byte as for every kernel.
+- GPU: about the same or more, not clearly less. At 3,000 shots a 0.3 s tail is about 54,000 live motes (216,000 vertices) against the trails' 170,000 after P1d. It saves vertices only with short or sparse tails.
+
+**Steps, each stopping the experiment if it doesn't pay:**
+1. **The ceiling:** a "no trails" switch in `trail_gpu.gd` and the storm runner; the GPU and the CPU a frame with no trails at all, at 60, 400 and 3,000 shots. If even that is small, the experiment ends here.
+2. **The look without trails:** a screenshot sheet of the trails sheet's shots with motes only and no trails, for the owner's eyes.
+3. **Tail motes:** the stretched kind and the native tail rows, measured against today's trails (GPU and CPU, the storm and `trail_gpu.gd`), with a sheet before and after. Merged only if it is cheaper and the owner likes the look; the result goes in DECISIONS either way.
+
 ## Order
 
 ```
 S1 ─┬─ S2
-    └─ S3 ─── S4
+    └─ S3 ─┬─ S4
+           └─ S5
 ```
 
-S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 after S3. Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.
+S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 and S5 after S3 (S5's first two steps are quick and come first). Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.

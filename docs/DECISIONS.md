@@ -8,6 +8,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Done:** docs/DESIGN.md says online co-op comes later and adds "One game, the same everywhere" (same inputs, same game, on every platform; logic on the tick; nobody waits online). The plan is [milestones/online-ready.md](milestones/online-ready.md) (phase N, N1–N10), waiting for approval.
 - **Why lockstep (inputs only), not sending state:** up to about 3,000 shots, 200 actors and a 500+ swarm are far too much state to send every tick; an input frame per seat is a few bytes. Lockstep needs a bit-identical simulation, which is what phase N builds.
 - **Why host-ordered lockstep (later):** in plain lockstep everyone waits for the slowest machine, against pillar 2; with the host fixing each tick's frames and repeating a late seat's last frame, only the slow player suffers.
+- **Revised the same day (owner: yes to the feasibility review):** a first cross-platform measurement (N2b) moves ahead of the costly parts, since whether Godot's own builds agree across Linux, Windows and the web is the plan's main unknown; settings the simulation reads, starting with the per-platform shot cap, become session settings (N11); the netcode sketch states its limits (good under about 80 ms ping, the slowest machine sets the pace, the same build everywhere).
 - **Not changed:** hard rule 4 still bans networking. The netcode is a later phase with its own owner exception, kept to one owner-only folder like `native/`.
 
 ## 2026-11-04: The motes' trail births in native code (owner session)

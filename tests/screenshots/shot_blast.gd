@@ -28,6 +28,7 @@ func take() -> void:
 	var events: Node = root.get_node("Events")
 	# Feel on the frames' own time (--fixed-fps), so each column is the moment it names.
 	feel.set("drive_engine", false)
+	_enter_room()
 	actors.clear()
 	lay_floor()
 	var cells: Array = []
@@ -53,3 +54,12 @@ func take() -> void:
 	var image: Image = await grab()
 	save(image, "blast")
 	save_crop(image, on_screen(Vector2(200.0, 50.0)), "blast_4x", Vector2i(140, 45), 4)
+
+
+## The room as Flow gives it (shot_marks.gd's way): the projectile manager's bounds, then
+## `room_entered`, so Feel's floor marks (a blast's scorch, S3) and the walls' colours are fitted.
+func _enter_room() -> void:
+	var projectiles: Node = root.get_node_or_null("Projectiles")
+	if projectiles != null:
+		projectiles.call("set_bounds", Rect2(Vector2.ZERO, Vector2(640.0, 384.0)))
+	root.get_node("Events").emit_signal(&"room_entered", &"arena_01")

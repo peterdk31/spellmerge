@@ -18,8 +18,7 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--no-trail-motes` (the trails draw their own particles, never
-## Feel's motes; spell spectacle P1d), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## projectile manager's GDScript), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
@@ -135,8 +134,6 @@ func _ready() -> void:
 			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), FeelScript.MOTE_Z, pool.call(&"kinds"), _feel.call(&"ramp_table")))
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
-	if args.has("--no-trail-motes"):
-		_projectiles.set(&"spark_motes_below", 0)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
 		return
@@ -254,7 +251,7 @@ func _process(_delta: float) -> void:
 		_draw_usec += usec
 		# The births are counted by the motes that took them (Feel's step, before this one): this
 		# second `update_draw` finds no moment past the first's, so it hands out none.
-		if bool(_projectiles.get("sparks_as_motes")):
+		if bool(_projectiles.get("spark_motes")):
 			_mote_frames += 1
 		_draw_max_usec = maxi(_draw_max_usec, usec)
 		_draw_frames += 1

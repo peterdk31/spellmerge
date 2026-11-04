@@ -12,13 +12,13 @@ Cards name the cues they play: a carrier's `cast_look` `cue` (`FormBase`; played
 
 | Cue | Played by | What it is |
 |---|---|---|
-| `blast` | the blast card's `cue`: core/spells, wherever a `blast` goes off | the ragged shell, fragments and rubble past the radius, a scorch flash and a scorch mark (frost for a frost card), its cards' motes and the ground's chips out to its radius; shake and a punch away from the caster |
-| `fireball` | an exploding barrel (not built yet) | the rising fireball, fragments, a scorch flash and mark, its cards' motes and the ground's chips; shake and a punch |
-| `quake` | a carrier whose impact look's `cue` names it (none yet) | cracks in the floor (a flash and a crack mark that stays), stone chips and the ground's chip motes, the caster held, a shake and a punch down the screen |
-| `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks and crack mark, chips (and chip motes, with a few of its cards' motes), hold, shake and punch |
+| `blast` | the blast card's `cue`: core/spells, wherever a `blast` goes off | the ragged shell, a scorch mark (frost for a frost card), its cards' motes and the ground's chips out to its radius (its fragments and rubble since S3); shake and a punch away from the caster |
+| `fireball` | an exploding barrel (not built yet) | the rising fireball, a scorch mark, its cards' motes and the ground's chips (its fragments); shake and a punch |
+| `quake` | a carrier whose impact look's `cue` names it (none yet) | cracks in the floor (a flash and a crack mark that stays), the ground's chip motes, the caster held, a shake and a punch down the screen |
+| `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks and crack mark, chip motes (with a few of its cards' motes), hold, shake and punch |
 | `parry` | Feel, for a swing's block (`shot_blocked` while the blocking carrier is a swing) | a big four-point star in exactly Spark gold, the parrying actor held alone |
 | `deflect` | Feel, for `shot_deflected`, aimed the way the shot now flies | a big white-hot cross in the deflecting actor's colours |
-| `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killing shot's cards' motes and chips in the colours of the body's own art, ichor in those colours on the floor, the killer and the shot held, a shake (Feel adds the ghost and the puff) |
+| `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killing shot's cards' motes and chips in the colours of the body's own art, ichor in those colours on the floor, the killer and the shot held, a shake (Feel breaks the body into motes of its art and adds the puff) |
 | `boss_death` | Feel, for `enemy_died` of an enemy whose data says `boss` | the same as `enemy_death` with many more motes and a bigger pool of ichor, and the game-wide stop |
 | `player_downed` | Feel, for `player_downed` (it names no position, so this cue draws nothing) | the game-wide stop and a big shake |
 | `self_hit` | Feel, for a hit of an actor by its own spell | a ring in exactly pink, so it is never taken for an enemy's hit |

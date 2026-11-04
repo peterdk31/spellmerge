@@ -28,7 +28,7 @@ extends PanelContainer
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
 ##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now).
 ##   "Particles" (docs/milestones/spell-spectacle.md, P1a) is a slider like "Max shots" through
-##   `MoteCap.STOPS` (core/settings: Off, Low, Medium, High), from the platform's cap
+##   `MoteCap.STOPS` (core/settings: Minimal, Low, Medium, High), from the platform's cap
 ##   (`MoteCap.default_cap()`); each move sends `mote_cap_changed`, which feel applies (its motes
 ##   in the air end), and is saved (`mote_cap`); a saved cap other than the default is sent again
 ##   when the menu is bound. "Particle amount" (P1b) is a slider the same way through

@@ -393,9 +393,14 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 ## Throw kind `k`'s burst as a cue's part says (`CueBase`, a `motes` part): `count` motes (its
 ## own count when below 0), flying out to `reach` pixels at the most (its own speed when 0; the
 ## farthest a mote of its drag glides), within `spread` degrees (its own when below 0), `up` times
-## its own speed up, all as fast as the fastest when `ring` (a ring going out).
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool) -> void:
+## its own speed up, all as fast as the fastest when `ring` (a ring going out). `often` for a source
+## of many a frame (a hit's spray): it stops once only the frame's MOMENT_ROWS are left, as `shed`.
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
+		return
+	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
+	if often and _rows_left <= MOMENT_ROWS:
+		cut += 1
 		return
 	var kind: MoteKind = _kinds[k]
 	var speed: Vector2 = kind.speed
@@ -405,7 +410,9 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 		speed = Vector2(top * (kind.speed.x / maxf(kind.speed.y, 0.001)), top)
 	if ring:
 		speed.x = speed.y * 0.9
+	_keep = MOMENT_ROWS if often else 0
 	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life, source, core, kind.height)
+	_keep = 0
 
 
 ## Throw `count` motes (times `density`) of kind `k` from `at` (where they show; their ground
@@ -739,3 +746,21 @@ static func _quad() -> ArrayMesh:
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
+
+
+## A body breaking into motes of kind `k` (S3, a death; `Spectacle.break_body`): one mote shown at
+## each of `points` (world positions of its art's pixels), as high above the floor at `feet` (its
+## art's lowest pixel) as that pixel is, flung out from `centre` at `speed` (slowest,
+## fastest) within `spread` degrees and `up` up, in the colours of `source`. A death is a moment,
+## like a cue: it may take the frame's last rows (MOMENT_ROWS).
+func crumble(k: int, points: PackedVector2Array, feet: float, centre: Vector2, speed: Vector2, spread: float, up: Vector2, source: int, core: Color) -> void:
+	if k < 0 or k >= _kinds.size() or source < 0:
+		return
+	var kind: MoteKind = _kinds[k]
+	for p in points:
+		if _rows_left <= 0:
+			cut += 1
+			break
+		var out: Vector2 = p - centre
+		burst(k, p, out if out != Vector2.ZERO else Vector2.UP, 1, speed, spread, up, kind.life, source, core, clampf(feet - p.y, 0.0, HEIGHT_MAX))
+

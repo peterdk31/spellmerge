@@ -402,7 +402,7 @@ func _test_the_spell_light_switch() -> void:
 
 
 ## Particles (spell spectacle P1a) starts at the platform's cap and sends nothing; left and right
-## step through Off, Low, Medium and High and tell feel, accept steps up and wraps, and the choice
+## step through Minimal, Low, Medium and High (no Off since S3) and tell feel, accept steps up and wraps, and the choice
 ## is saved: a menu bound to the same save later starts with it and tells feel.
 func _test_the_particles_slider() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
@@ -414,16 +414,16 @@ func _test_the_particles_slider() -> void:
 	var row: Button = _menu().button("MoteCap")
 	var bar: HSlider = row.get_node("Bar") as HSlider
 	var at: int = MoteCap.index_of(MoteCap.default_cap())
-	_check(MoteCap.STOPS[at] == MoteCap.default_cap() and at > 0, "the platform's cap is a stop above Off")
+	_check(MoteCap.STOPS[at] == MoteCap.default_cap() and at > 0, "the platform's cap is a stop above Minimal")
 	_check(row.text.ends_with("Particles: %s" % MoteCap.WORDS[at]) and is_equal_approx(bar.value, float(at)), "the platform's cap at the start, in words and on the bar")
 	_focus.focus(0, row)
 	for i in MoteCap.STOPS.size():
 		_tap(0, &"move_left")
 		_frame()
-	_check(_menu().mote_cap == 0 and _mote_caps.back() == 0, "left goes down to Off, got %s" % [_mote_caps])
-	_check(row.text.ends_with("Particles: Off") and is_equal_approx(bar.value, 0.0), "and shows it")
+	_check(_menu().mote_cap == MoteCap.STOPS[0] and _mote_caps.back() == MoteCap.STOPS[0], "left goes down to Minimal, got %s" % [_mote_caps])
+	_check(row.text.ends_with("Particles: Minimal") and is_equal_approx(bar.value, 0.0), "and shows it")
 	_check(_focus.focused(0) == row, "the focus stays on the slider")
-	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"mote_cap", -1)) == 0, "the save remembers it")
+	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"mote_cap", -1)) == MoteCap.STOPS[0], "the save remembers it")
 	var sent: int = _mote_caps.size()
 	_tap(0, &"move_left")
 	_frame()
@@ -432,10 +432,16 @@ func _test_the_particles_slider() -> void:
 	_check(_menu().mote_cap == MoteCap.STOPS[1] and _mote_caps.back() == MoteCap.STOPS[1], "accept steps up")
 	_menu().mote_cap = MoteCap.STOPS[-1]
 	_press(0, "MoteCap")
-	_check(_menu().mote_cap == 0, "accept at the top wraps to Off")
+	_check(_menu().mote_cap == MoteCap.STOPS[0], "accept at the top wraps to Minimal")
 	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().mote_cap == 0, "a later menu starts with the saved cap")
-	_check(_mote_caps == [0], "and tells feel when the Hud binds, got %s" % [_mote_caps])
+	_check(_menu().mote_cap == MoteCap.STOPS[0], "a later menu starts with the saved cap")
+	_check(_mote_caps == [MoteCap.STOPS[0]], "and tells feel when the Hud binds, got %s" % [_mote_caps])
+	_teardown()
+	# A cap saved as Off before S3 (0) loads as Minimal.
+	var old: SaveFile = SaveFile.new(SAVE_PATH)
+	old.set_setting(&"mote_cap", 0)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().mote_cap == MoteCap.STOPS[0] and _mote_caps.back() == MoteCap.STOPS[0], "a saved Off loads as Minimal, got %s" % [_mote_caps])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

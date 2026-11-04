@@ -23,9 +23,9 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 	_leave(start)
 
 
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool) -> void:
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false) -> void:
 	var start: int = _enter()
-	super(k, at, dir, source, core, count, reach, spread, up, ring)
+	super(k, at, dir, source, core, count, reach, spread, up, ring, often)
 	_leave(start)
 
 

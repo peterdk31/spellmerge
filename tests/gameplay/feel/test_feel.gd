@@ -63,8 +63,6 @@ func _initialize() -> void:
 	_test_death_puff_is_limited()
 	_test_muzzle_flash_follows_aim_and_colour()
 	_test_muzzle_flash_stays_small()
-	_test_death_animation()
-	_test_death_animation_starts_at_rest_scale()
 	_teardown()
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
@@ -520,46 +518,6 @@ func _test_muzzle_flash_follows_aim_and_colour() -> void:
 	_check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 5.0), "at the staff tip")
 
 
-func _test_death_animation() -> void:
-	_setup()
-	var texture := load("res://art/vfx/hit_spark.svg") as Texture2D
-	var enemy := Node2D.new()
-	enemy.position = Vector2(40, 30)
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	sprite.texture = texture
-	enemy.add_child(sprite)
-	root.add_child(enemy)
-	_bus.enemy_died.emit(0, enemy, enemy.position, -1)
-	enemy.free()
-	_check(_feel.live_ghosts() == 1, "a death starts an animation although the enemy is freed")
-	var copy: Sprite2D = _feel.ghost(0)
-	_check(copy.global_position == Vector2(40, 30) and copy.texture == texture, "the copy sits where the enemy was")
-	var dissolve: ShaderMaterial = copy.material as ShaderMaterial
-	_check(dissolve != null and dissolve.shader == FeelScript.SPRITE_SHADER, "drawn by the shots' sprite shader")
-	var start: float = dissolve.get_shader_parameter(&"dissolve") as float
-	_feel.step(0.1875)
-	_check((dissolve.get_shader_parameter(&"dissolve") as float) > start, "the copy falls apart pixel by pixel")
-	_check(copy.scale == Vector2.ONE and copy.modulate.a == 1.0, "never stretched nor faded: whole pixels go")
-	for i in 4:
-		_feel.step(STEP)
-	_check(_feel.live_ghosts() == 0 and not copy.visible, "the animation ends")
-	for i in 40:
-		var many := Node2D.new()
-		var s := Sprite2D.new()
-		s.name = "Sprite"
-		s.texture = texture
-		many.add_child(s)
-		root.add_child(many)
-		_bus.enemy_died.emit(0, many, Vector2.ZERO, -1)
-		many.free()
-	_check(_feel.live_ghosts() == FeelScript.GHOST_SLOTS, "death animations stay within their limit")
-	var bare := Node2D.new()
-	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
-	_bus.enemy_died.emit(0, bare, Vector2.ZERO, -1)
-	bare.free()
-
-
 func _test_death_puff_is_limited() -> void:
 	_setup()
 	_feel.set_effect_slots(EffectSlots.MIN)
@@ -569,23 +527,3 @@ func _test_death_puff_is_limited() -> void:
 	for i in 30:
 		_feel.step(STEP)
 	_check(_feel.live_effects() == 0, "the puffs end")
-
-
-func _test_death_animation_starts_at_rest_scale() -> void:
-	_setup()
-	var enemy := Node2D.new()
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	sprite.texture = load("res://art/vfx/hit_spark.svg") as Texture2D
-	sprite.centered = false
-	sprite.scale = Vector2(2.0, 2.0)
-	enemy.add_child(sprite)
-	root.add_child(enemy)
-	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
-	_feel.step(0.015625)
-	_check(sprite.scale != Vector2(2.0, 2.0), "the enemy is squashed when it is killed")
-	_bus.enemy_died.emit(0, enemy, Vector2.ZERO, -1)
-	enemy.free()
-	var copy: Sprite2D = _feel.ghost(0)
-	_check(copy.scale.is_equal_approx(Vector2(2.0, 2.0)), "the copy starts at the rest scale, not the squashed one")
-	_check(not copy.centered, "the copy keeps the sprite's centring")

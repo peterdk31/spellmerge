@@ -467,7 +467,6 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	feel.projectiles.impact_core = Color("e0592f")
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember"], "before any room: only the shot's own")
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect besides")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
 	bus.room_entered.emit(ARENA)
@@ -483,17 +482,21 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	check_equal(motes.uploads, 1, "uploaded on the next frame")
 
 
-func test_with_particles_off_there_are_no_motes_and_the_chips_effect_shows() -> void:
+## S3: there is no Off. The smallest "Particles" stop is a Minimal ring, and a 0 (a cap saved as
+## Off before S3) is taken as it: the motes, and nothing drawn instead of them, always.
+func test_particles_has_no_off_its_least_is_a_minimal_ring() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	bus.room_entered.emit(ARENA)
+	check_equal(MoteCap.STOPS[0], 2048, "the Minimal stop")
+	check_equal(MoteCap.word_of(0), "Minimal", "a saved 0 reads as Minimal")
 	bus.mote_cap_changed.emit(0)
-	check(feel.motes() == null, "no motes")
-	check(feel.find_child("Motes", true, false) == null, "and no nodes")
-	check_equal(feel.mote_cap, 0, "the setting taken")
+	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[0], "a 0 is the Minimal ring")
+	check_equal(feel.mote_cap, MoteCap.STOPS[0], "the setting taken")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "the chips effect instead")
+	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "a wall still sheds its chips as motes")
+	check_equal(feel.live_effects(), 1, "and only the shot's burst is an effect")
 	feel.step(0.016)
 	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
 	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[1], "on again at the new cap")
@@ -515,8 +518,6 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(timed, 0, timed.next_row()).has(&"chip"), "a wall hit sheds into it, in the room's colours")
 	check(int(timed.get(&"usec")) >= 0 and timed.written > 0, "and it counts what it wrote")
-	feel.use_motes(null)
-	check(feel.motes() == null and feel.find_child("Motes", true, false) == null and feel.mote_cap == 0, "null turns the motes off")
 
 
 # --- P1b: the sources ---------------------------------------------------------------------------
@@ -585,13 +586,17 @@ func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
 	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
 	var tint: Color = feel.preset.reaction_colors.get(&"shatter", Color.WHITE) as Color
-	var speeds: Array[float] = []
-	for row in motes.next_row():
-		var data: PackedFloat32Array = motes.row_data(row)
-		check(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
-		check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(tint), "the reaction's")
-		speeds.append(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length())
-	check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
+	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own.
+	var puff: int = feel.preset.puff_mote_count
+	check(motes.next_row() > puff, "the puff's sparks, then the reaction's ring")
+	for group: Vector2i in [Vector2i(0, puff), Vector2i(puff, motes.next_row())]:
+		var speeds: Array[float] = []
+		for row in range(group.x, group.y):
+			var data: PackedFloat32Array = motes.row_data(row)
+			check(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
+			check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(tint), "the reaction's")
+			speeds.append(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length())
+		check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
 
 
 func test_an_enemy_death_sheds_the_killing_shots_kinds_and_its_own_colours() -> void:
@@ -700,12 +705,11 @@ func test_every_kind_a_cue_names_is_there() -> void:
 	check(named >= 7, "the cues throw motes, %d parts" % named)
 
 
-func test_with_motes_on_a_cues_chips_effect_gives_way_to_its_motes() -> void:
+func test_a_cues_chips_are_its_motes() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect")
-	check(feel.motes().next_row() > 0, "its motes instead")
+	check(feel.motes().next_row() > 0, "its motes")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
 
 
@@ -799,9 +803,6 @@ func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:
 	check(shots.spark_motes, "with particles off (the stress benchmark's \"no particles\") the trails keep no particle slots")
 	check_equal(feel.motes().next_row(), before, "and none are thrown: no trail particles at all")
 	feel.particles_enabled = true
-	feel.set_mote_cap(0)
-	feel.step(1.0 / 60.0)
-	check(not shots.spark_motes, "no motes: the shader draws them again")
 
 
 ## A birth for `give_off` (BIRTH_STRIDE floats) at `at`, given off back along `back`, of the look
@@ -954,3 +955,92 @@ func test_the_numbers_shared_with_core_agree() -> void:
 	check_equal(ProjectilesScript.SPARK_TAG, ProjectilesScript.SPARK_CORE + 3, "a birth's tag follows its core colour")
 	check_equal(MotesScript.BIRTH_STRIDE, ProjectilesScript.SPARK_TAG + 2, "and a birth ends with its tag's two floats")
 	check(ProjectilesScript.SPARK_TAG_BITS < 24 and (SpellTag.FLAG << 1) >> ProjectilesScript.SPARK_TAG_BITS < 1 << 24, "each of the tag's floats holds its part whole")
+
+
+## S3: a hit's spray and a puff throw their sparks as motes (the effect draws only the flash): the
+## preset's count of its kind along the hit's way, or all round as a ring; a staff's poof (a puff
+## with the POOF bit) throws none, and a spray leaves the moments' rows alone, as a shed does.
+func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	check_equal(motes.next_row(), feel.preset.spray_mote_count, "a spray's sparks")
+	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [feel.preset.spray_mote_kind], "of the preset's kind")
+	for row in motes.next_row():
+		check(motes.row_data(row)[MotesScript.ROW_VX] > 0.0, "spark %d flies on along the hit" % row)
+	motes.step(0.0)
+	var before: int = motes.next_row()
+	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, FeelScript.PUFF_SECONDS)
+	check_equal(motes.next_row() - before, feel.preset.puff_mote_count, "a puff's sparks")
+	var left: int = 0
+	for row in range(before, motes.next_row()):
+		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
+	check(left > 0 and left < feel.preset.puff_mote_count, "all round")
+	before = motes.next_row()
+	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
+	check_equal(motes.next_row(), before, "a poof throws none")
+	motes.step(0.0)
+	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
+	before = motes.next_row()
+	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	check_equal(motes.next_row(), before, "a spray leaves the moments' rows alone")
+
+
+## S3: a dead body breaks into motes of its own art (the white-hot copy that fell apart pixel by
+## pixel before): about the preset's share of its pixels, each a surface mote in its art's colours,
+## shown where that pixel was (inside the body's frame), resting on its feet; a bigger body more,
+## up to the preset's most; at its rest scale even when killed mid-squash.
+func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var husk: Texture2D = load("res://content/enemies/bone_husk/idle.svg") as Texture2D
+	var body := _body_of(husk, Vector2(200.0, 150.0), 1.0)
+	var pixels: int = RoomBase.pixels_of_art(husk).size()
+	check(pixels > 50, "the husk's art has pixels: %d" % pixels)
+	var before: int = motes.next_row()
+	feel.spectacle().break_body(body, body.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
+	var made_count: int = motes.next_row() - before
+	check_equal(made_count, roundi(float(pixels) * feel.preset.death_mote_share), "its share of the art's pixels")
+	check_equal(_kinds_of_rows(motes, before, motes.next_row()), [feel.preset.death_mote_kind], "of the preset's kind")
+	var source: int = feel.spectacle().body_source(body)
+	var frame := Rect2(Vector2(200.0, 150.0) - Vector2(16.0, 16.0), Vector2(32.0, 32.0))
+	for row in range(before, motes.next_row()):
+		var data: PackedFloat32Array = motes.row_data(row)
+		check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), source, "mote %d in the art's colours" % row)
+		var shown: Vector3 = motes.mote_at(row, data[MotesScript.ROW_BORN])
+		check(frame.grow(0.5).has_point(Vector2(shown.x, shown.y - shown.z)), "mote %d shown where its pixel was: %s" % [row, shown])
+	body.get_parent().free()
+	motes.step(0.0)
+	var big := _body_of(husk, Vector2(300.0, 150.0), 2.0)
+	before = motes.next_row()
+	feel.spectacle().break_body(big, big.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
+	check_equal(motes.next_row() - before, mini(roundi(float(pixels) * feel.preset.death_mote_share * 4.0), feel.preset.death_mote_most), "twice as big: four times the motes, up to the most")
+	big.get_parent().free()
+	# Through the event, killed mid-squash: from the rest scale.
+	motes.step(0.0)
+	var squashed := _body_of(husk, Vector2(100.0, 100.0), 1.0)
+	bus.damage_dealt.emit(0, squashed.get_parent(), 1, Vector2.ZERO)
+	feel.step(0.015625)
+	check(squashed.scale != Vector2.ONE, "squashed when it is killed")
+	before = motes.next_row()
+	bus.enemy_died.emit(0, squashed.get_parent(), Vector2(100.0, 100.0), -1)
+	check(feel.spectacle().broken_from() == husk, "the death broke the body's art")
+	check((feel.spectacle().broken_at() as Vector2).is_equal_approx(Vector2(100.0, 100.0)), "where it stood")
+	check(motes.next_row() - before >= roundi(float(pixels) * feel.preset.death_mote_share), "at its rest scale, not the squashed one's fewer")
+	squashed.get_parent().free()
+
+
+## A body showing `texture` at `at`, drawn `scale` times as big (its `Sprite`).
+func _body_of(texture: Texture2D, at: Vector2, scale: float) -> Sprite2D:
+	var body := Node2D.new()
+	body.global_position = at
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = texture
+	sprite.scale = Vector2.ONE * scale
+	body.add_child(sprite)
+	root.add_child(body)
+	return sprite

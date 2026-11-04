@@ -64,8 +64,9 @@ var projectiles: ProjectileManagerScript = null
 ## Feel's switch for the stress benchmark (`Feel.particles_enabled`): off, no motes are thrown.
 var particles_enabled: bool = true
 
-## The motes (null with the "Particles" setting off), and how many they hold
-## (`MoteCap.default_cap()` until the setting changes it). Read only.
+## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
+## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
+## Read only.
 var pool: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
@@ -91,8 +92,13 @@ var _surface_source: int = -1
 ## their indices in the pool (`_take_surface_kinds`).
 var _surface_ids: Array[StringName] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
-## The colours of each body art read so far (texture -> colours).
+## The colours of each body art read so far (texture -> colours), and the pixels of each frame of
+## one ([texture, frame rect] -> PackedVector2Array; `break_body`).
 var _art_colors: Dictionary = {}
+var _art_pixels: Dictionary = {}
+## The art and the place of the last body broken (`broken_from`, `broken_at`; for tests).
+var _broken_from: Texture2D = null
+var _broken_at: Vector2 = Vector2.INF
 ## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
 var _mark_room: StringName = &""
 ## Feel's clock at the last step.
@@ -200,6 +206,69 @@ func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float
 		pool.throw_part(k, at, Vector2.RIGHT, source, tint, each, reach, 360.0, 1.0, true)
 
 
+## The sparks of a flash that sprays them (a hit's spray, a puff; S3): `count` motes of the kind
+## `kind` at `at` along `way` within `spread` degrees (all round as a ring with `ring`), out to
+## `reach` pixels, in the colours the flash is in (the `core` of a caster of `ramp`, the cards of
+## `look`, exact with its LOOK_EXACT bit). One of many a frame: it leaves the moments' rows alone.
+func flash_motes(kind: StringName, at: Vector2, way: Vector2, core: Color, ramp: int, look: int, count: int, reach: float, spread: float, ring: bool) -> void:
+	if pool == null or not particles_enabled or count <= 0:
+		return
+	pool.throw_part(pool.kind_index(kind), at, way, MotesScript.spell_source(ramp, look), core, count, reach, spread, 1.0, ring, true)
+
+
+## A body breaking into motes (S3: a death, in place of the white-hot copy that fell apart pixel by
+## pixel): about `share` of the pixels of the art `sprite` shows (times the area of `to_world`'s
+## scale, at most `most`), each a mote of the surface kind `kind` (a body is a surface that broke)
+## in its art's colours, from where that pixel was (`to_world`: the sprite's world transform, at its
+## rest scale), falling to the body's feet, flung out from its middle at `speed` (px/s, slowest and
+## fastest) and `up`.
+func break_body(sprite: Sprite2D, to_world: Transform2D, kind: StringName, share: float, most: int, speed: Vector2, up: Vector2) -> void:
+	if sprite == null or sprite.texture == null:
+		return
+	_broken_from = sprite.texture
+	_broken_at = to_world.origin
+	if pool == null or not particles_enabled or share <= 0.0:
+		return
+	var source: int = body_source(sprite)
+	var k: int = pool.kind_index(kind)
+	if source < 0 or k < 0:
+		return
+	var rect: Rect2i = _frame_rect(sprite)
+	var key: Array = [sprite.texture, rect]
+	var pixels: Variant = _art_pixels.get(key)
+	if pixels == null:
+		pixels = RoomBase.pixels_of_art(sprite.texture, rect)
+		_art_pixels[key] = pixels
+	var art: PackedVector2Array = pixels as PackedVector2Array
+	if art.is_empty():
+		return
+	var scale: Vector2 = to_world.get_scale().abs()
+	var want: int = clampi(roundi(float(art.size()) * share * scale.x * scale.y), 1, most)
+	var step: float = float(art.size()) / float(want)
+	var size: Vector2 = Vector2(rect.size)
+	var corner: Vector2 = sprite.offset - (size * 0.5 if sprite.centered else Vector2.ZERO)
+	var points := PackedVector2Array()
+	points.resize(want)
+	var feet: float = -INF
+	for i in want:
+		var p: Vector2 = art[mini(floori((float(i) + 0.5) * step), art.size() - 1)]
+		if sprite.flip_h:
+			p.x = size.x - 1.0 - p.x
+		var world: Vector2 = to_world * (corner + p + Vector2(0.5, 0.5))
+		points[i] = world
+		feet = maxf(feet, world.y)
+	pool.crumble(k, points, feet, to_world * (corner + size * 0.5), speed, 360.0, up, source, Color.WHITE)
+
+
+## The art the last body broken was drawn with, and where its sprite was (for tests).
+func broken_from() -> Texture2D:
+	return _broken_from
+
+
+func broken_at() -> Vector2:
+	return _broken_at
+
+
 ## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per
 ## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
 ## neither motes nor floor marks to show it.
@@ -297,19 +366,19 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 
 # --- Settings ----------------------------------------------------------------------------------
 
-## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
-## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
-## number taken.
+## The "Particles" setting: how many motes the ring holds (from `MoteCap`'s Minimal stop to its
+## top one; a 0, Off before S3, is Minimal). A new size remakes the ring, ending the motes in the
+## air. Returns the number taken.
 func set_mote_cap(cap: int) -> int:
-	var taken: int = clampi(cap, 0, MoteCap.STOPS[-1])
-	if taken != mote_cap or (pool == null) != (taken == 0):
+	var taken: int = clampi(cap, MoteCap.STOPS[0], MoteCap.STOPS[-1])
+	if taken != mote_cap or pool == null:
 		_make_motes(taken)
 	return mote_cap
 
 
 ## Use `motes` as the pool from now on, in place of the one made for the setting (its cap is the
-## setting's now; null turns them off). For the benchmarks, which hand one that times its own
-## calls (tests/benchmark/timed_motes.gd).
+## setting's now). For the benchmarks, which hand one that times its own calls
+## (tests/benchmark/timed_motes.gd); null (the stress benchmark's "no particles") leaves none.
 func use_motes(motes: MotesScript) -> void:
 	if pool != null:
 		pool.queue_free()
@@ -337,7 +406,7 @@ func ramp_table() -> RampTableScript:
 
 
 func _make_motes(cap: int) -> void:
-	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table) if cap > 0 else null)
+	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table))
 
 
 ## The mote kinds of the registry (content/motes), in id order.

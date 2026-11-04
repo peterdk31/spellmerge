@@ -28,7 +28,7 @@ func take() -> void:
 		return
 	var feel: Node = root.get_node("Feel")
 	feel.set("drive_engine", false)
-	(feel.call(&"spectacle") as Node).call(&"_on_room_entered", &"arena_01")
+	_enter_room()
 	await _sheet(SOURCES, "mote_sources")
 	await _sheet(CUES, "mote_cues")
 
@@ -113,3 +113,12 @@ func _body(texture: Texture2D, at: Vector2) -> Sprite2D:
 	body.add_child(sprite)
 	root.add_child(body)
 	return sprite
+
+
+## The room as Flow gives it (shot_marks.gd's way): the projectile manager's bounds, then
+## `room_entered`, so Feel's floor marks (a blast's scorch, S3) and the walls' colours are fitted.
+func _enter_room() -> void:
+	var projectiles: Node = root.get_node_or_null("Projectiles")
+	if projectiles != null:
+		projectiles.call("set_bounds", Rect2(Vector2.ZERO, Vector2(640.0, 384.0)))
+	root.get_node("Events").emit_signal(&"room_entered", &"arena_01")

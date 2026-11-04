@@ -205,11 +205,12 @@ func test_a_swarmer_dies_with_the_dissolve_of_its_body_as_drawn() -> void:
 	var at: Vector2 = node.global_position
 	run.combat.hit(-1, node, 100.0)
 	check(not is_instance_valid(node) or node.is_queued_for_deletion(), "the swarmer died")
-	check_equal(feel.call(&"live_ghosts"), 1, "Feel's death animation starts")
-	var ghost: Sprite2D = feel.call(&"ghost", 0) as Sprite2D
+	# Its body breaks into motes of its art as drawn at its death (S3; the hurt pose after the
+	# killing hit), where it stood.
 	var strip: Texture2D = hurt if hurt != null else sprite.texture
-	check(ghost.texture == strip, "from the body as drawn at its death (the hurt pose after the killing hit)")
-	check_equal(ghost.global_position, at + sprite.position, "where the swarmer stood")
+	var spectacle: Node = feel.call(&"spectacle") as Node
+	check(spectacle.call(&"broken_from") == strip, "from the body as drawn at its death (the hurt pose after the killing hit)")
+	check((spectacle.call(&"broken_at") as Vector2).distance_to(at + sprite.position) < 1.0, "where the swarmer stood")
 	scene.free()
 
 

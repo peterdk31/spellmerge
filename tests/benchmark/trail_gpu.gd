@@ -18,10 +18,10 @@ extends SceneTree
 ##                                    default, the desktop's)
 ##   ... -- --marks                   the floor mark scene instead (P1c for P2a; `_mark_scene`):
 ##                                    frames with 300 new stamps and frames with none, by turns
-##   ... -- --trail-motes             the trails' particles as motes (spell spectacle P1d): the
-##                                    trails drop their particle slots and a mote pool (Feel's,
-##                                    gameplay/feel/mote.gd) throws them; the births' and the throws'
-##                                    CPU time is printed too. At every count unless --motes-below=N.
+##   ... -- --trail-motes             with a mote pool (Feel's, gameplay/feel/mote.gd) throwing the
+##                                    trails' particles (P1d; since S3 the trails draw none of their
+##                                    own): the births' and the throws' CPU time is printed too, and
+##                                    the motes are in the GPU time.
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -86,7 +86,6 @@ var _spell_light: SpellLightScript = null
 var _motes_only: bool = false
 var _marks_only: bool = false
 var _use_motes: bool = false
-var _motes_below: int = 1 << 30
 var _motes: MotesScript = null
 var _mote_kinds: Array[MoteKind] = []
 
@@ -110,8 +109,6 @@ func _initialize() -> void:
 			_marks_only = true
 		elif arg == "--trail-motes":
 			_use_motes = true
-		elif arg.begins_with("--motes-below="):
-			_motes_below = arg.substr(14).to_int()
 		elif arg.begins_with("--timed="):
 			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
@@ -177,7 +174,6 @@ func _scenario(scenario: Dictionary) -> void:
 		_motes = MotesScript.new(MOTE_CAP, MOTE_Z, _mote_kinds)
 		root.add_child(_motes)
 		_mgr.spark_motes = true
-		_mgr.spark_motes_below = _motes_below
 	# Stepped and drawn by hand only (see the top).
 	_mgr.set_physics_process(false)
 	_mgr.set_process(false)
@@ -228,9 +224,9 @@ func _scenario(scenario: Dictionary) -> void:
 	times = times.slice(_timed / 4)
 	var sorted: PackedFloat64Array = times.duplicate()
 	sorted.sort()
-	print("BENCH: trail gpu %s: %d shots (%d drawn, %d trail instances, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; shares particles %.2f, tails %.2f, stride %d" % [
+	print("BENCH: trail gpu %s: %d shots (%d drawn, %d trail instances, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; shares particles %.2f, tails %.2f" % [
 		label, shots, _mgr.drawn, _mgr.drawn + _mgr.drawn_trails, _vertices(), sorted[sorted.size() / 2],
-		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share, _mgr.trail_share, _mgr.spark_stride])
+		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share, _mgr.trail_share])
 	draw_times = draw_times.slice(_timed / 4)
 	draw_times.sort()
 	wall_times = wall_times.slice(_timed / 4)
@@ -240,8 +236,8 @@ func _scenario(scenario: Dictionary) -> void:
 	if _motes != null:
 		mote_times = mote_times.slice(_timed / 4)
 		mote_times.sort()
-		print("BENCH: trail gpu %s: motes %s, %.1f births a frame, throwing them CPU median %.3f ms, %d mote chunks shown" % [
-			label, "on" if _mgr.sparks_as_motes else "off (over --motes-below)", float(births) / float(_timed), mote_times[mote_times.size() / 2], _motes.chunks_shown()])
+		print("BENCH: trail gpu %s: %.1f births a frame, throwing them CPU median %.3f ms, %d mote chunks shown" % [
+			label, float(births) / float(_timed), mote_times[mote_times.size() / 2], _motes.chunks_shown()])
 	if not light_times.is_empty():
 		light_times = light_times.slice(_timed / 4)
 		light_times.sort()

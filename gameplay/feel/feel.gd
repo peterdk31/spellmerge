@@ -13,15 +13,14 @@ extends Node
 ##   not feel like lag); kills hold at once. Only a downed player and a boss kill drop
 ##   Engine.time_scale (real time); overlapping stops do not add up: the longest one wins.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
-## - an effect (see "Effects" below): sparks sprayed on along the hit, or a puff all
-##   round for a hit with no way. A kill turns its killing blow's spray into a bigger
-##   puff, so it costs one slot, not two.
+## - an effect (see "Effects" below): a spray along the hit (a white-hot cross, and its sparks
+##   as motes), or a puff all round for a hit with no way. A kill turns its killing blow's
+##   spray into a bigger puff, so it costs one slot, not two.
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node, on every hit
 ##   sprite however many (one shared flash material; no limit, owner 2026-10-31; a sprite that is
 ##   gone is skipped).
-## - a white-hot ring where an enemy dies, and a death animation: a copy of the dead
-##   enemy's `Sprite` turns white-hot and falls apart pixel by pixel (the enemy itself is
-##   freed at once).
+## - a white-hot ring where an enemy dies, and its body breaks into motes of its own art's
+##   colours that fall and settle (S3, `Spectacle.break_body`; the enemy itself is freed at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
@@ -43,8 +42,9 @@ extends Node
 ## hit whose caster is the hit actor itself is a self-hit.
 ##
 ## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
-## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shaders
-## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_CHIPS;
+## every flare, spray, puff, ring, arc and status is drawn by the shots' own shaders (the sparks of
+## a spray and a puff, and every chip, are motes since S3)
+## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
 ## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
@@ -77,13 +77,12 @@ const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
-## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
+## batches (flares, arcs, statuses, explosions).
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
 const EFFECT_SHADER: Shader = preload("res://core/projectiles/shot_effect.gdshader")
 const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
 const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
-const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
@@ -160,14 +159,10 @@ const REACTION_LABEL_NEAR: float = 40.0
 const SPRAY_REF_DAMAGE: int = 5
 const SPRAY_MIN_SIZE: float = 0.7
 const SPRAY_MAX_SIZE: float = 1.6
-## Death animations at once; past that the oldest slot is taken over. They draw above the
-## room and the wizards, under the shots and effects.
-const GHOST_SLOTS: int = 8
 ## A body without a `Sprite` child (a swarmer's bare node, docs/milestones/horde-swarm.md) names
 ## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
-## showing the body as it is drawn now (or null), which the death animation copies instead.
+## showing the body as it is drawn now (or null), which a death breaks into motes instead.
 const SPRITE_GIVER: StringName = &"sprite_giver"
-const GHOST_Z: int = 21
 ## The effects drawn with the shot shaders (see "Effects" above): the kinds they know (K_* in
 ## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
 ## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
@@ -179,7 +174,6 @@ const KIND_CAST: int = 8
 const KIND_DASH: int = 9
 const KIND_SPRAY: int = 11
 const KIND_PUFF: int = 12
-const KIND_CHIPS: int = 13
 const KIND_ARC: int = 14
 const KIND_STATUS: int = 15
 ## The ground struck (a part of the cues `quake` and `slam`): cracks cooling from white-hot,
@@ -206,25 +200,20 @@ const POOF_ZOOM: int = 2
 const POOF_ALONG: float = 4.0
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
-const CHIPS_SECONDS: float = 0.5
 ## A quake's seconds (its cracks cool and crumble away at the end), and its reach per zoom in
 ## pixels (QUAKE_REACH in the shader): its zoom is the reach struck times QUAKE_PAST over that.
 const QUAKE_SECONDS: float = 1.4
 const QUAKE_REACH: float = 8.0
 const QUAKE_PAST: float = 1.5
 ## An explosion's parts (the cues `blast` and `fireball`), drawn by `shot_blast.gdshader` (its B_*: these less
-## KIND_SHELL) in a batch of their own, the scorch in another under the bodies (`FLOOR_Z`): the
-## ragged shell (blast's), the rising fireball (an exploding barrel's), the fragments and rubble
-## flung past the radius, the scorch. Their seconds (the shader's; keep them equal), and the
+## KIND_SHELL) in a batch of their own: the ragged shell (blast's) and the rising fireball (an
+## exploding barrel's); their fragments and rubble are motes and their scorch a floor mark (S3,
+## the cues' `motes` and `mark` parts). Their seconds (the shader's; keep them equal), and the
 ## square each is drawn in: BLAST_SPAN radii each way.
 const KIND_SHELL: int = 16
 const KIND_FIREBALL: int = 17
-const KIND_DEBRIS: int = 18
-const KIND_SCORCH: int = 19
 const SHELL_SECONDS: float = 0.5
 const FIREBALL_SECONDS: float = 1.2
-const DEBRIS_SECONDS: float = 1.6
-const SCORCH_SECONDS: float = 2.6
 const BLAST_SPAN: float = 2.2
 ## What a cue's part can name (`CueBase.EFFECTS`): its effect kind, the pixels a step of its zoom
 ## is (for a part's `reach`: a ring's radius, a flare's half width, a quake's reach, an
@@ -237,12 +226,9 @@ const CUE_EFFECTS: Dictionary = {
 	&"cast": [KIND_CAST, 12.0, CAST_SECONDS],
 	&"spray": [KIND_SPRAY, 12.0, SPRAY_SECONDS],
 	&"puff": [KIND_PUFF, 12.0, PUFF_SECONDS],
-	&"chips": [KIND_CHIPS, 12.0, CHIPS_SECONDS],
 	&"quake": [KIND_QUAKE, QUAKE_REACH, QUAKE_SECONDS],
 	&"shell": [KIND_SHELL, 2.0, SHELL_SECONDS],
 	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
-	&"debris": [KIND_DEBRIS, 2.0, DEBRIS_SECONDS],
-	&"scorch": [KIND_SCORCH, 2.0, SCORCH_SECONDS],
 	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 }
@@ -298,7 +284,7 @@ const EFFECT_Q_SHAPE: int = 4
 ## BLAST_PIECES pieces (chunks, lobes, puffs, embers), each part using what it needs.
 const BLAST_Q_LIGHT: int = 0
 const BLAST_Q_PIECE: int = 1
-const BLAST_PIECES: int = 24
+const BLAST_PIECES: int = 22
 const BLAST_QUADS: Array[Vector3i] = [
 	Vector3i(BLAST_Q_LIGHT, 1, 0),
 	Vector3i(BLAST_Q_PIECE, BLAST_PIECES, 0),
@@ -503,8 +489,6 @@ var _floor_buffer: PackedFloat32Array = PackedFloat32Array()
 ## An explosion's parts, and its scorch under the bodies (`shot_blast.gdshader`).
 var _blast_node: MultiMeshInstance2D = null
 var _blast_buffer: PackedFloat32Array = PackedFloat32Array()
-var _blast_floor_node: MultiMeshInstance2D = null
-var _blast_floor_buffer: PackedFloat32Array = PackedFloat32Array()
 static var _blast_mesh: ArrayMesh = null
 var _effect_kind: PackedInt32Array = PackedInt32Array()
 var _effect_at: PackedVector2Array = PackedVector2Array()
@@ -545,12 +529,6 @@ var _kind_own: bool = false
 var _kind_shot: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
-## Death animations: sprites made once (drawn by `shot_sprite.gdshader`'s dissolve), seconds left
-## and seconds they started with (parallel arrays of GHOST_SLOTS).
-var _ghosts: Array[Sprite2D] = []
-var _ghost_left: PackedFloat32Array = PackedFloat32Array()
-var _ghost_total: PackedFloat32Array = PackedFloat32Array()
-var _next_ghost: int = 0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
@@ -619,22 +597,6 @@ func _ready() -> void:
 	_label_left.resize(REACTION_SLOTS)
 	_label_total.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
-	for i in GHOST_SLOTS:
-		var ghost := Sprite2D.new()
-		ghost.top_level = true
-		ghost.visible = false
-		ghost.z_index = GHOST_Z
-		var dissolve := ShaderMaterial.new()
-		dissolve.shader = SPRITE_SHADER
-		# The shots' sprite shader, as itself: a white core leaves its colours be.
-		dissolve.set_shader_parameter(&"core_override", Color.WHITE)
-		dissolve.set_shader_parameter(&"sprite_glow", 0.8)
-		ghost.material = dissolve
-		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(ghost)
-		_ghosts.append(ghost)
-	_ghost_left.resize(GHOST_SLOTS)
-	_ghost_total.resize(GHOST_SLOTS)
 	for i in SOUND_VOICES:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
@@ -721,7 +683,6 @@ func step(real_delta: float) -> void:
 	_spectacle.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
-	_step_ghosts(real_delta)
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
@@ -746,54 +707,14 @@ func _step_reactions(real_delta: float) -> void:
 		at -= 1
 
 
-## Dissolve the death animations: white-hot, then pixel by pixel gone.
-func _step_ghosts(real_delta: float) -> void:
-	for i in GHOST_SLOTS:
-		if _ghost_left[i] <= 0.0:
-			continue
-		_ghost_left[i] -= real_delta
-		var ghost: Sprite2D = _ghosts[i]
-		if _ghost_left[i] <= 0.0:
-			ghost.visible = false
-			continue
-		var progress: float = 1.0 - _ghost_left[i] / _ghost_total[i]
-		(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", maxf(progress, 0.01))
-
-
-## Start a death animation from a copy of the dead node's `Sprite` child, where that
-## sprite is. Nothing happens for a node without one.
-func _start_ghost(dead: Node) -> void:
-	if preset.death_anim_seconds <= 0.0 or dead == null or not is_instance_valid(dead):
-		return
-	var source: Sprite2D = _body_sprite(dead)
-	if source == null or source.texture == null:
-		return
-	var slot: int = _next_ghost
-	_next_ghost = (_next_ghost + 1) % GHOST_SLOTS
-	var ghost: Sprite2D = _ghosts[slot]
-	ghost.texture = source.texture
-	ghost.hframes = source.hframes
-	ghost.vframes = source.vframes
-	ghost.frame = source.frame
-	ghost.region_enabled = source.region_enabled
-	ghost.region_rect = source.region_rect
-	ghost.offset = source.offset
-	ghost.flip_h = source.flip_h
-	ghost.flip_v = source.flip_v
-	ghost.centered = source.centered
-	ghost.global_position = source.global_position
-	ghost.global_rotation = source.global_rotation
-	ghost.modulate = Color.WHITE
-	# At the rest scale: a sprite killed mid-squash would otherwise pop.
-	var rest: Vector2 = source.global_scale
-	var at: int = _find_reaction(source.get_instance_id(), _actor_of(dead))
-	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
-		rest = rest / source.scale * _react_scale[at]
-	ghost.scale = rest
-	(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", 0.01)
-	ghost.visible = true
-	_ghost_left[slot] = preset.death_anim_seconds
-	_ghost_total[slot] = preset.death_anim_seconds
+## The world transform a dead body's art is broken from (S3, `Spectacle.break_body`): its sprite's,
+## at its rest scale (a body killed mid-squash would otherwise break squashed).
+func _rest_transform(sprite: Sprite2D, dead: Node) -> Transform2D:
+	var rest: Vector2 = sprite.global_scale
+	var at: int = _find_reaction(sprite.get_instance_id(), _actor_of(dead))
+	if at >= 0 and sprite.scale.x != 0.0 and sprite.scale.y != 0.0:
+		rest = rest / sprite.scale * _react_scale[at]
+	return Transform2D(sprite.global_rotation, rest, 0.0, sprite.global_position)
 
 
 ## The Sprite2D a body shows as: its `Sprite` child, or for a body drawn by another node (a
@@ -902,20 +823,6 @@ func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 ## Sprites flashing right now (for tests).
 func reacting_sprites() -> int:
 	return _react_count
-
-
-## Death animations showing right now (for tests).
-func live_ghosts() -> int:
-	var count: int = 0
-	for i in GHOST_SLOTS:
-		if _ghost_left[i] > 0.0:
-			count += 1
-	return count
-
-
-## The death animation sprite in `slot` (for tests).
-func ghost(slot: int) -> Sprite2D:
-	return _ghosts[slot]
 
 
 ## Current camera kick in pixels (for tests).
@@ -1250,13 +1157,8 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, projectiles.impact_tag)
 		_show_impact(caster, ramp, position, direction, true)
 		return
-	# Knocked back off the surface: the shot's own motes and the wall's, or the chips effect with
-	# the "Particles" setting off.
-	if particles_enabled:
-		if _spectacle.pool != null:
-			_spectacle.shed_on_wall(ramp, position, -direction)
-		else:
-			show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
+	# Knocked back off the surface: the shot's own motes and the wall's.
+	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction, false)
 
 
@@ -1442,9 +1344,6 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 	if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
 		return
-	# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
-	if int(row[0]) == KIND_CHIPS and _spectacle.pool != null:
-		return
 	var seconds: float = float(part.get("seconds", row[2]))
 	if bool(part.get("lasts_size", false)):
 		if cue.size <= 0.0:
@@ -1552,8 +1451,6 @@ func _make_effects() -> void:
 	_floor_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
 	_floor_node.z_index = FLOOR_Z
 	_blast_node = _make_effect_batch(BLAST_SHADER, blast_mesh())
-	_blast_floor_node = _make_effect_batch(BLAST_SHADER, blast_mesh())
-	_blast_floor_node.z_index = FLOOR_Z
 	_size_effects(effect_slots)
 
 
@@ -1627,14 +1524,13 @@ func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
 func _size_effects(slots: int) -> void:
 	effect_slots = slots
-	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node, _blast_node, _blast_floor_node]:
+	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node, _blast_node]:
 		node.multimesh.visible_instance_count = 0
 		node.multimesh.instance_count = slots
 	_effect_buffer.resize(slots * EFFECT_STRIDE)
 	_arc_buffer.resize(slots * EFFECT_STRIDE)
 	_floor_buffer.resize(slots * EFFECT_STRIDE)
 	_blast_buffer.resize(slots * EFFECT_STRIDE)
-	_blast_floor_buffer.resize(slots * EFFECT_STRIDE)
 	_status_buffer.resize(slots * EFFECT_STRIDE)
 	_effect_kind.resize(slots)
 	_effect_at.resize(slots)
@@ -1755,7 +1651,20 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
 		_effect_length[slot] = steps * 4.0
+	elif kind == KIND_SPRAY or (kind == KIND_PUFF and look & POOF == 0):
+		_flash_motes(kind, at, _effect_dir[slot], core, ramp, look, _effect_zoom[slot])
 	return slot
+
+
+## A spray's or a puff's sparks, as motes (S3; the flash is the effect's): the preset's numbers,
+## `zoom` steps big.
+func _flash_motes(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int) -> void:
+	if preset == null or _spectacle == null:
+		return
+	var puff: bool = kind == KIND_PUFF
+	var count: int = preset.puff_mote_count if puff else preset.spray_mote_count
+	var reach: float = (preset.puff_mote_reach if puff else preset.spray_mote_reach) * float(zoom)
+	_spectacle.flash_motes(preset.spray_mote_kind, at, dir, core, ramp, look, count, reach, 360.0 if puff else preset.spray_mote_spread, puff)
 
 
 ## Age the effects by `real_delta` and write the live ones into their batches, oldest first.
@@ -1767,12 +1676,10 @@ func _step_effects(real_delta: float) -> void:
 	(_status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_blast_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
-	(_blast_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	var out: int = 0
 	var arcs: int = 0
 	var floors: int = 0
 	var blasts: int = 0
-	var scorches: int = 0
 	var statuses: int = 0
 	for n in effect_slots:
 		var slot: int = (_next_effect + n) % effect_slots
@@ -1804,10 +1711,6 @@ func _step_effects(real_delta: float) -> void:
 			buffer = _floor_buffer
 			i = floors * EFFECT_STRIDE
 			floors += 1
-		elif kind == KIND_SCORCH:
-			buffer = _blast_floor_buffer
-			i = scorches * EFFECT_STRIDE
-			scorches += 1
 		elif kind >= KIND_SHELL:
 			buffer = _blast_buffer
 			i = blasts * EFFECT_STRIDE
@@ -1862,9 +1765,6 @@ func _step_effects(real_delta: float) -> void:
 	if blasts > 0:
 		_blast_node.multimesh.buffer = _blast_buffer
 	_blast_node.multimesh.visible_instance_count = blasts
-	if scorches > 0:
-		_blast_floor_node.multimesh.buffer = _blast_floor_buffer
-	_blast_floor_node.multimesh.visible_instance_count = scorches
 	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_effects`).
 	if _spectacle != null:
 		_spectacle.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
@@ -1950,13 +1850,17 @@ func _ramp_of(caster: int) -> int:
 	return table.ramp_of(caster) if table != null else ActorsScript.NONE
 
 
-## A death: its ghost, the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
+## A death: its body breaks into motes of its own art (S3; the white-hot copy that fell apart
+## pixel by pixel before), the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
 ## the kill, the dead body is freed at once) or, for a boss, `boss_death`, which also stops the
 ## whole game; and a puff. The puff is the killing blow's own spray turned into a bigger one when
 ## it is at this spot (one slot, and the hit's sound gives way to the death's), else a new puff
 ## in the enemy colour after the cue's ring.
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
-	_start_ghost(enemy)
+	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
+	var body: Sprite2D = _body_sprite(enemy)
+	if body != null:
+		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
 	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
 	if upgraded and _hit_voice >= 0:
@@ -2332,6 +2236,7 @@ func _upgrade_hit(position: Vector2, zoom: int) -> bool:
 	_effect_zoom[slot] = zoom
 	_effect_age[slot] = 0.0
 	_effect_seconds[slot] = PUFF_SECONDS
+	_flash_motes(KIND_PUFF, _effect_at[slot], _effect_dir[slot], _effect_core[slot], _effect_ramp[slot], _effect_look[slot], zoom)
 	return true
 
 

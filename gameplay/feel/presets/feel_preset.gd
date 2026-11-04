@@ -28,11 +28,30 @@ extends Resource
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
 ## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
+## The sparks of a hit's spray and of a puff (a hit with no way, a kill, a reaction) are motes
+## (S3, docs/milestones/spell-spectacle-2.md; the effect drew them before, and draws the flash
+## still): `spray_mote_count` of the kind `spray_mote_kind` along the hit's way within
+## `spray_mote_spread` degrees, out to `spray_mote_reach` pixels a zoom step; a puff
+## `puff_mote_count` of them all round, out to `puff_mote_reach` pixels a step.
+@export var spray_mote_kind: StringName = &"spark"
+## A dead body breaks into motes (S3; `Spectacle.break_body`): `death_mote_share` of its art's
+## pixels (times its scale's area, at most `death_mote_most`), each a mote of the surface kind
+## `death_mote_kind` in its art's colours, flung out from its middle at `death_mote_speed` px/s
+## (slowest, fastest) and `death_mote_up` up, falling to its feet.
+@export var death_mote_kind: StringName = &"chip"
+@export_range(0.0, 1.0, 0.01) var death_mote_share: float = 0.3
+@export_range(0, 512) var death_mote_most: int = 160
+@export var death_mote_speed: Vector2 = Vector2(8.0, 46.0)
+@export var death_mote_up: Vector2 = Vector2(0.0, 40.0)
+@export_range(0, 64) var spray_mote_count: int = 10
+@export_range(0.0, 64.0, 1.0) var spray_mote_reach: float = 15.0
+@export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
+@export_range(0, 64) var puff_mote_count: int = 14
+@export_range(0.0, 64.0, 1.0) var puff_mote_reach: float = 12.0
 @export var enemy_hit_color: Color = Color("e0592f")
-## A shot that ends on a wall or pillar knocks Stone chips back off the surface, `wall_chip_size`
-## times as far (rounded to a whole zoom); `wall_spark_size` is the size of a shot's flare when
-## its carrier card names none.
-@export_range(0.3, 2.0, 0.1) var wall_chip_size: float = 0.9
+## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
+## spectacle's surface kinds); `wall_spark_size` is the size of a shot's flare when its carrier
+## card names none.
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
@@ -47,8 +66,6 @@ extends Resource
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
-## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
-@export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0

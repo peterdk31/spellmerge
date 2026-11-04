@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: One particle system (spell spectacle 2, S3, owner session)
+
+Every particle is a mote now. "Particles" has no Off (its least is a Minimal ring of 2,048), so the old stand-ins are gone: the chips effect, the trail shader's card particles (it keeps the tail, lightning's line and a dash's streaks; a dash's cards are motes too, the owner's ask), the hit spray's and puff's sparks (the effects draw only their flash), and an explosion's debris and scorch effects (its surface motes and scorch mark). A dead body breaks into motes of its own art in place of the white-hot copy that fell apart. Sheets: `shot_deaths.gd` (new), the trails, dashes, blasts and mote sources. Details and figures: docs/DECISIONS.md.
+
 ## 2026-11-04: Spell light from effects, beams and torches; a room's ambient (spell spectacle P3b, owner session)
 
 Feel's effects (bursts, rings, casts, hits, arcs, blasts) and live beams now light the room round them, drawn from the rows and paths Feel already uploads; the crypt's torches are light spots (a marker with metadata, coloured by the flame's art), and every shot lights, the enemies' too. A room has an `ambient` (the sandbox's is 0.85, the owner's pick); the light's steps are a switch (`bands`: 3 steps by default, 0 smooth), with a sheet for the owner to choose between them. STYLE.md now says the world may take light from spells. Tests in test_light.gd; the light pass measured the same as P3a's on llvmpipe.

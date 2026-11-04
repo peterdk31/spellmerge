@@ -61,6 +61,9 @@ var floor_marks: bool = FloorMarks.default_on()
 ## Spell light (null with the setting off, or with no projectile manager), and the setting.
 var light: SpellLightScript = null
 var spell_light: bool = SpellLightSetting.default_on()
+## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
+## for a light made later. Read only.
+var ambient: float = 1.0
 
 ## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
 ## row each, so a mote and the mark it leaves read the same colours.
@@ -81,6 +84,7 @@ func _ready() -> void:
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
+	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	_make_motes(mote_cap)
 	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
 	set_floor_marks(floor_marks)
@@ -358,15 +362,39 @@ func _make_light(on: bool) -> void:
 	if on and projectiles != null:
 		light = SpellLightScript.new(projectiles, LIGHT_Z)
 		light.name = "SpellLight"
+		light.set_ambient(ambient)
 		add_child(light)
+
+
+## Feel's effect rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows
+## each), lit by the spell light while it is on (P3b; `SpellLight.light_effects`).
+func light_effects(flare_rows: PackedFloat32Array, flares: int, blast_rows: PackedFloat32Array, blasts: int, arc_rows: PackedFloat32Array, arcs: int, slots: int) -> void:
+	if light != null:
+		light.light_effects(flare_rows, flares, blast_rows, blasts, arc_rows, arcs, slots)
+
+
+## Before Feel draws its live beams: none lit until `light_beam` lights one (P3b).
+func light_beams_begin() -> void:
+	if light != null:
+		light.light_beams_begin()
+
+
+## Live beam `i`'s light along the path Feel just gave its shader (`SpellLight.light_beam`).
+func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float) -> void:
+	if light != null:
+		light.light_beam(i, path, points, player, look, core, fade)
 
 
 # --- The room ------------------------------------------------------------------------------------
 
-## A new room: its colours for its walls' motes (`RoomBase.surface_colors`).
+## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
+## (`RoomBase.ambient`, P3b).
 func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
+	ambient = room.ambient if room != null else 1.0
+	if light != null:
+		light.set_ambient(ambient)
 	_surface_source = _ramp_table.source(_surface_colors)
 
 

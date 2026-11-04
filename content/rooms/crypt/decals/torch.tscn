@@ -35,3 +35,7 @@ texture_filter = 1
 sprite_frames = ExtResource("3_flame")
 autoplay = "default"
 centered = false
+
+[node name="Light" type="Marker2D" parent="." groups=["light_spot"]]
+position = Vector2(16, 10)
+metadata/light_art = NodePath("../Flame")

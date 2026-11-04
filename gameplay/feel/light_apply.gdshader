@@ -2,12 +2,14 @@
 shader_type canvas_item;
 
 // Spell light on the world (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md,
-// P3a): one rect over the whole view, drawn above the room and the bodies and under every shot,
-// effect and telegraph, that multiplies what is under it by `ambient` plus the light buffer's
-// light. The light is cut into three steps by its brightest channel (dim: none; lit; bright), in
-// its own hue, so a lit floor changes by whole bands, like a shade step, never by a smooth
-// gradient. Where it is dim and the ambient is 1.0 nothing is drawn: the room looks as it does
-// without spell light until something glows.
+// P3a, P3b): one rect over the whole view, drawn above the room and the bodies and under every
+// shot, effect and telegraph, that multiplies what is under it by `ambient` plus the light
+// buffer's light, in the light's own hue. How the light is cut is `bands`, by its brightest
+// channel: 3 (the default) is three steps (dim: none; lit; bright), so a lit floor changes by
+// whole bands, like a shade step; 2 is one step; more are more steps between `lit_from` and
+// `bright_from`; 0 is no steps, a smooth gradient through the same light (through the steps'
+// corners). The owner's choice between the two is open (2026-11-04). Where nothing is lit and the ambient is 1.0
+// nothing is drawn: the room looks as it does without spell light until something glows.
 //
 // It multiplies by reading the screen, not by blending: a multiply blend cannot brighten (its
 // factor is clamped to 1 in an 8-bit target, the web's included), and light added on top would
@@ -24,15 +26,39 @@ uniform float lit_from = 0.16;
 uniform float bright_from = 0.45;
 uniform float lit_gain = 0.22;
 uniform float bright_gain = 0.45;
+// The steps the light comes in (see above): 0 smooth, else that many (dim counted), at least 2.
+uniform int bands = 3;
+
+// The light a pixel adds for a light of brightest channel `most`.
+float gain_of(float most) {
+	if (bands <= 0) {
+		// The same light with no steps: a line through the steps' corners (none to lit at
+		// lit_from, to bright at bright_from), then flat.
+		if (most < lit_from) {
+			return most / lit_from * lit_gain;
+		}
+		return mix(lit_gain, bright_gain, clamp((most - lit_from) / (bright_from - lit_from), 0.0, 1.0));
+	}
+	// Steps at lit_from .. bright_from, their gains lit_gain .. bright_gain, evenly between.
+	int steps = max(bands - 1, 1);
+	float gain = 0.0;
+	for (int k = 0; k < steps; k++) {
+		float share = steps > 1 ? float(k) / float(steps - 1) : 0.0;
+		if (most >= mix(lit_from, bright_from, share)) {
+			gain = mix(lit_gain, bright_gain, share);
+		}
+	}
+	return gain;
+}
 
 void fragment() {
 	vec3 shine = texture(light_buffer, SCREEN_UV).rgb;
 	float most = max(shine.r, max(shine.g, shine.b));
-	float gain = most >= bright_from ? bright_gain : (most >= lit_from ? lit_gain : 0.0);
-	if (gain <= 0.0 && ambient >= 1.0) {
+	float gain = gain_of(most);
+	if (gain < 0.004 && ambient >= 1.0) {
 		discard;
 	}
-	vec3 hue = gain > 0.0 ? shine / most : vec3(0.0);
+	vec3 hue = gain > 0.0 && most > 0.0 ? shine / most : vec3(0.0);
 	vec3 under = texture(screen, SCREEN_UV).rgb;
 	COLOR = vec4(under * (vec3(ambient) + hue * gain), 1.0);
 }

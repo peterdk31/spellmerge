@@ -1861,6 +1861,9 @@ func _step_effects(real_delta: float) -> void:
 	if scorches > 0:
 		_blast_floor_node.multimesh.buffer = _blast_floor_buffer
 	_blast_floor_node.multimesh.visible_instance_count = scorches
+	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_effects`).
+	if _spectacle != null:
+		_spectacle.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
 
 
 ## How many effects are showing (for tests and the sheets).
@@ -2134,6 +2137,8 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 
 
 func _draw_live_beams() -> void:
+	if _spectacle != null:
+		_spectacle.light_beams_begin()
 	var count: int = 0
 	# The beams' rows (`Spells.carrier(&"beam")`, a `CarrierBeam`).
 	var beams: Object = spells.call("carrier", &"beam") if spells != null and spells.has_method("carrier") else null
@@ -2220,6 +2225,9 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
+		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
+		if _spectacle != null:
+			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
 
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments

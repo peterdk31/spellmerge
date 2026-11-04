@@ -1,11 +1,13 @@
 extends "res://tests/support/suite.gd"
-## Spell light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a): a light
-## buffer the projectile batches draw into again and a rect that applies it to the world. Its
-## batches mirror the manager's (each is handed the rows the batch uploads; nothing is written
-## twice), the rect sits above every body and under every spell, flash and telegraph, the buffer
-## follows the view at a quarter of its size, both shaders are warmed, and with the "Spell light"
-## setting off no node of it exists. How it looks is checked by eye
-## (tests/screenshots/shot_spell_light.gd): headless runs draw nothing.
+## Spell light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a, P3b): a
+## light buffer the projectile batches, Feel's effects, the live beams and the room's light spots
+## draw into, and a rect that applies it to the world. Its batches mirror the manager's (each is
+## handed the rows the batch uploads; nothing is written twice), every shot lights (the enemies'
+## too), Feel hands its effect rows and beam paths over, a torch is a light spot coloured by its
+## art, a room sets the ambient, the steps are a switch, the rect sits above every body and under
+## every spell, flash and telegraph, the buffer follows the view at a quarter of its size, the
+## shaders are warmed, and with the "Spell light" setting off no node of it exists. How it looks is
+## checked by eye (tests/screenshots/shot_spell_light.gd): headless runs draw nothing.
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -16,6 +18,9 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const TORCH := preload("res://content/rooms/crypt/decals/torch.tscn")
+const SANDBOX := preload("res://content/rooms/crypt/sandbox.tres")
+const ARENA := preload("res://content/rooms/crypt/arena_01.tres")
 
 ## The scenes with bodies and room art: everything in them is drawn under the light.
 const BODY_SCENES: Array[PackedScene] = [
@@ -194,8 +199,193 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 	var shade: ShaderMaterial = light.apply.material as ShaderMaterial
 	check(shade.get_shader_parameter(&"light_buffer") is ViewportTexture, "the rect reads the light buffer")
 	var ambient: Variant = shade.get_shader_parameter(&"ambient")
-	check(ambient == null or is_equal_approx(float(ambient), 1.0), "the ambient is 1.0: the room as it is")
+	check(ambient == null or is_equal_approx(float(ambient), 1.0), "the ambient is 1.0 with no room: the room as it is")
 	for batch in ProjectilesScript.BATCHES:
 		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
 		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		check(bool(material.get_shader_parameter(&"rune_rows")) == (ProjectilesScript.BATCH_MESH[batch] < 0), "batch %d reads its rows as %s" % [batch, "runes" if ProjectilesScript.BATCH_MESH[batch] < 0 else "trails"])
+		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.BATCH_MESH[batch] < 0 else SpellLightScript.ROWS_TRAIL
+		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "trails"])
+	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
+
+
+## The shader's ROWS_* and its row-reading constants are the script's and Feel's.
+func test_the_light_shader_reads_rows_as_the_script_says() -> void:
+	var code: String = SpellLightScript.LIGHT_SHADER.code
+	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_EFFECT", SpellLightScript.ROWS_EFFECT], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT]]:
+		check(code.contains("const int %s = %d;" % [pair[0], pair[1]]), "the shader's %s is %d" % pair)
+	check(code.contains("const float EFFECT_FROM = %s;" % str(FeelScript.EFFECT_FROM)), "the shader's EFFECT_FROM is Feel's")
+	check(code.contains("const float EFFECT_SPAN = %s;" % str(FeelScript.EFFECT_SPAN)), "the shader's EFFECT_SPAN is Feel's")
+	check(SpellLightScript.BEAM_SHADER.code.contains("const int BEAM_POINTS = %d;" % SpellLightScript.BEAM_POINTS), "the beam light's BEAM_POINTS")
+	check_equal(SpellLightScript.BEAM_POINTS, FeelScript.LIVE_BEAM_POINTS, "a beam's light holds every point of a live beam")
+	check_equal(SpellLightScript.STRIDE, FeelScript.EFFECT_STRIDE, "an effect row is a light row")
+
+
+## Which effects light is data by Feel's KIND_* codes: every code named is the kind it says.
+func test_each_lit_effect_kind_is_feels() -> void:
+	var flares: Dictionary = {FeelScript.KIND_BURST: 1, FeelScript.KIND_RING_OUT: 1, FeelScript.KIND_RING_IN: 1, FeelScript.KIND_RUNE_BURST: 1, FeelScript.KIND_CAST: 1, FeelScript.KIND_SPRAY: 1, FeelScript.KIND_PUFF: 1, FeelScript.KIND_ARC: 1}
+	for code: int in SpellLightScript.EFFECT_LIGHT:
+		check(flares.has(code), "effect code %d is a lit Feel kind" % code)
+	for code: int in flares:
+		check(SpellLightScript.EFFECT_LIGHT.has(code), "Feel kind %d lights" % code)
+	check(not SpellLightScript.EFFECT_LIGHT.has(FeelScript.KIND_CHIPS) and not SpellLightScript.EFFECT_LIGHT.has(FeelScript.KIND_DASH), "chips and a dash do not light")
+	check(SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SHELL - FeelScript.KIND_SHELL) and SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_FIREBALL - FeelScript.KIND_SHELL), "a blast and a fireball light")
+	check(not SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SCORCH - FeelScript.KIND_SHELL), "a scorch does not")
+	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.EFFECT_LIGHT)
+	check_equal(lights.size(), 16, "16 kinds to the shader")
+	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_CHIPS] == 0.0, "by code")
+
+
+## Feel's effects light: the light's effect batches draw the rows Feel just uploaded.
+func test_feels_effects_are_handed_to_the_light() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	feel.show_effect(FeelScript.KIND_BURST, Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
+	feel.show_effect(FeelScript.KIND_SHELL, Vector2(200.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 6, 0.5)
+	feel.show_effect(FeelScript.KIND_ARC, Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
+	feel._process(1.0 / 60.0)
+	for kind: int in [SpellLightScript.EFFECTS_FLARE, SpellLightScript.EFFECTS_BLAST, SpellLightScript.EFFECTS_ARC]:
+		var multimesh: MultiMesh = light.effects[kind].multimesh
+		check_equal(multimesh.visible_instance_count, 1, "effect batch %d lights its one effect" % kind)
+		check_equal(multimesh.instance_count, feel.effect_slots, "as many rows as Feel's slots")
+		check_equal(int((light.effects[kind].material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_EFFECT, "read as effect rows")
+	var row: PackedFloat32Array = light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer
+	check(is_equal_approx(row[3], 100.0) and is_equal_approx(row[7], 100.0), "the burst's row is Feel's: where it is")
+	feel._process(1.0)
+	check_equal(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.visible_instance_count, 0, "an effect that ended no longer lights")
+
+
+## A live beam lights along the path Feel gives its shader; a beam that is gone does not.
+func test_a_beam_lights_along_its_path() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	var path := PackedVector3Array()
+	path.resize(SpellLightScript.BEAM_POINTS)
+	path[0] = Vector3(10.0, 20.0, 0.0)
+	path[1] = Vector3(110.0, 20.0, 100.0)
+	path[2] = Vector3(110.0, 70.0, 150.0)
+	light.light_beams_begin()
+	light.light_beam(1, path, 3, 2, 0, Color(0.9, 0.5, 0.1), 0.5)
+	check_equal(light.beams.size(), 2, "a light per beam slot")
+	var beam: MeshInstance2D = light.beams[1]
+	check(beam.visible and beam.get_parent() == light.viewport, "drawn into the light buffer")
+	var shade: ShaderMaterial = beam.material as ShaderMaterial
+	check(shade.shader == SpellLightScript.BEAM_SHADER, "by the beam light shader")
+	check(shade.get_shader_parameter(&"beam_path") == path and int(shade.get_shader_parameter(&"beam_points")) == 3, "along the beam's own path")
+	check_equal(int(shade.get_shader_parameter(&"beam_player")), 2, "in its caster's ramp")
+	check(is_equal_approx(float(shade.get_shader_parameter(&"beam_fade")), 0.5), "fading as it fades")
+	check((beam.mesh as ArrayMesh).custom_aabb.size.x >= 100000.0, "its mesh's box is the world: never culled")
+	light.light_beams_begin()
+	check(not beam.visible, "not lit until Feel lights it again")
+
+
+## Every shot lights by one rule, an enemy's too: its row is in the light batch, a live head.
+func test_an_enemy_shot_lights_like_any() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var manager: ProjectilesScript = made[2]
+	var enemy: int = ActorSeats.enemy(feel.actors as ActorSeats.ActorsScript)
+	var slot: int = manager.spawn(enemy, Vector2(240.0, 160.0), Vector2(60.0, 0.0), 2.0, 4.0, ProjectilesScript.LAYER_PLAYER)
+	check(slot >= 0, "an enemy shot")
+	manager.step(1.0 / 60.0)
+	manager.update_draw(1.0)
+	var at: Vector2 = manager.get_position_of(slot)
+	var found: bool = false
+	for batch in ProjectilesScript.BATCHES:
+		var mirror: MultiMesh = manager.batch_mirror(batch)
+		var buffer: PackedFloat32Array = mirror.buffer
+		for n in mirror.visible_instance_count:
+			var i: int = n * SpellLightScript.STRIDE
+			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and buffer[i] >= 0.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
+				found = true
+	check(found, "the enemy shot's live head is in a light batch, so it lights")
+
+
+## A torch is a light spot (data on a plain node: rooms carry no scripts), lit in its flame's
+## colour while it is in the tree, and gone with it.
+func test_a_torch_lights_in_its_flames_colour() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	light.follow()
+	check_equal(light.spot_count(), 0, "no spots with no room")
+	var torch: Node2D = TORCH.instantiate() as Node2D
+	torch.position = Vector2(64.0, 32.0)
+	root.add_child(torch)
+	light.follow()
+	check_equal(light.spot_count(), 1, "the torch lights")
+	var spot: Node = torch.get_tree().get_nodes_in_group(LightSpot.GROUP)[0]
+	check_equal(LightSpot.problems(spot), PackedStringArray(), "the torch's spot is whole")
+	var flame: AnimatedSprite2D = torch.get_node("Flame") as AnimatedSprite2D
+	var colours: PackedColorArray = RoomBase.colours_of_art(flame.sprite_frames.get_frame_texture(flame.animation, 0))
+	check(not colours.is_empty() and LightSpot.colour_of(spot).is_equal_approx(colours[0]), "its colour is the flame art's lightest")
+	var row: PackedFloat32Array = light.spots.multimesh.buffer
+	check(Vector2(row[3], row[7]).is_equal_approx((spot as Node2D).global_position), "where its spot is")
+	check(is_equal_approx(row[0], LightSpot.reach_of(spot)), "as far as its reach")
+	check(Color(row[8], row[9], row[10]).is_equal_approx(colours[0]), "in the flame's colour")
+	check(is_equal_approx(row[11], LightSpot.DEFAULT_STRENGTH), "at its strength")
+	check_equal(int((light.spots.material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_SPOT, "read as spots")
+	torch.free()
+	light.follow()
+	check_equal(light.spot_count(), 0, "a torch gone lights no more")
+
+
+## A spot's numbers are its metadata; a tint stands in for its art; broken data is named.
+func test_a_light_spots_data_is_read_and_checked() -> void:
+	var spot := Marker2D.new()
+	spot.add_to_group(LightSpot.GROUP)
+	check(not LightSpot.problems(spot).is_empty(), "no art and no tint is a problem")
+	spot.set_meta(LightSpot.TINT, Color(0.2, 0.4, 1.0))
+	spot.set_meta(LightSpot.REACH, 80.0)
+	check_equal(LightSpot.problems(spot), PackedStringArray(), "a tint is enough")
+	check(LightSpot.colour_of(spot).is_equal_approx(Color(0.2, 0.4, 1.0)), "the tint's colour")
+	check(is_equal_approx(LightSpot.reach_of(spot), 80.0) and is_equal_approx(LightSpot.flicker_of(spot), LightSpot.DEFAULT_FLICKER), "its reach, and the default flicker")
+	spot.set_meta(LightSpot.STRENGTH, 3.0)
+	check(not LightSpot.problems(spot).is_empty(), "a strength past 1 is a problem")
+	spot.free()
+
+
+## Every light spot in the rooms' and decals' scenes is whole.
+func test_every_light_spot_in_the_content_is_whole() -> void:
+	var seen: int = 0
+	for path: String in ["res://content/rooms/crypt/arena_01.tscn", "res://content/rooms/crypt/sandbox.tscn", "res://content/rooms/horde/horde.tscn", "res://content/rooms/crypt/decals/torch.tscn"]:
+		var scene: Node = (load(path) as PackedScene).instantiate()
+		for node: Node in scene.find_children("*", "", true, false):
+			if node.is_in_group(LightSpot.GROUP):
+				seen += 1
+				check_equal(LightSpot.problems(node), PackedStringArray(), "%s: %s" % [path, scene.get_path_to(node)])
+		scene.free()
+	check(seen >= 5, "the torches are light spots, got %d" % seen)
+
+
+## A room sets the light's ambient (the sandbox's 0.85, the owner's pick; others 1.0), and the
+## light keeps it when the setting is turned off and on.
+func test_a_room_sets_the_ambient() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	check(is_equal_approx(ARENA.ambient, 1.0), "a room is as drawn by default")
+	check(is_equal_approx(SANDBOX.ambient, 0.85), "the sandbox is a little darker (the owner, 2026-11-04)")
+	bus.room_entered.emit(SANDBOX.id)
+	check(is_equal_approx(feel.light().ambient, 0.85), "the sandbox's ambient")
+	check(is_equal_approx(float((feel.light().apply.material as ShaderMaterial).get_shader_parameter(&"ambient")), 0.85), "to the rect")
+	bus.spell_light_changed.emit(false)
+	bus.spell_light_changed.emit(true)
+	check(is_equal_approx(feel.light().ambient, 0.85), "kept through the setting")
+	bus.room_entered.emit(ARENA.id)
+	check(is_equal_approx(feel.light().ambient, 1.0), "the arena's")
+
+
+## The steps are a switch: 3 by default (dim, lit, bright), 0 smooth; the shader's default too.
+func test_the_steps_are_a_switch() -> void:
+	var made: Array = _feel()
+	var light: SpellLightScript = (made[1] as FeelScript).light()
+	var shade: ShaderMaterial = light.apply.material as ShaderMaterial
+	check_equal(light.bands, 3, "three steps by default")
+	check_equal(int(shade.get_shader_parameter(&"bands")), 3, "to the rect")
+	check(SpellLightScript.APPLY_SHADER.code.contains("uniform int bands = %d;" % SpellLightScript.DEFAULT_BANDS), "the shader's default is the script's")
+	light.set_bands(0)
+	check_equal(int(shade.get_shader_parameter(&"bands")), 0, "smooth")
+	light.set_bands(1)
+	check_equal(light.bands, 2, "at least one step past dim")

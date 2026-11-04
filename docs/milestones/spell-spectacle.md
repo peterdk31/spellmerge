@@ -155,6 +155,8 @@ Shots, blasts, flares and beams also draw into a **light buffer**, a low-resolut
 
 ### Open questions for the owner
 
+**Answered by the owner on 2026-11-04** (DECISIONS, "Spell light: effects, beams, torches and a room's ambient"): (1) yes, the world can take light from spells (STYLE.md has the line; whether the light comes in steps or smooth is the owner's next pick, from the sheet `tests/screenshots/shot_spell_light_rooms.gd`, so the line names the light's `bands` rather than three steps); (2) a room's `ambient` is its own (`RoomBase.ambient`, 1.0 by default) and the sandbox's is 0.85; (3) yes, enemy shots light too. The questions as they were:
+
 1. STYLE.md allows soft glow only on shots ("never baked into an asset"). Spell light would be the world taking light from shots, and STYLE.md needs a line saying so, with the three-step banding as the rule.
 2. Should rooms be darker (ambient below 1.0) so spells read as light sources? This is a big change to the look, and readability with four players matters more than mood.
 3. Do enemy shots light the room too? Yes by default (one rule for every spell), but a dark room with many enemy shots could tell the player too much or too little.
@@ -175,7 +177,7 @@ Shots, blasts, flares and beams also draw into a **light buffer**, a low-resolut
 ### PRs
 
 1. **P3a: the buffer, shot light and the multiply.** With ambient fixed at 1.0, the room looks the same until something glows.
-2. **P3b: effects, beams and torches.** Also the room's `ambient`, after the owner answers question 2.
+2. **P3b: effects, beams and torches.** Also the room's `ambient`, after the owner answers question 2. Built (DECISIONS, 2026-11-04, "Spell light: effects, beams, torches and a room's ambient"): Feel hands its effect rows and live beam paths to the light; torches are light spots (data on a plain node: `core/base/light_spot.gd`); `RoomBase.ambient`; the steps a switch (`bands`).
 
 ---
 

@@ -26,6 +26,11 @@ extends Resource
 ## layer: a scorch, a crack), lightest first: light, base, shadow. Empty (the default): sampled
 ## from the room's `Floor` sprite (`floor_colors`); set it only when the sample looks wrong.
 @export var floor_mark_colors: PackedColorArray = PackedColorArray()
+## The room's light where no spell or torch lights it (Feel's spell light, docs/milestones/
+## spell-spectacle.md, P3b): 1.0 (the default) is the room as its art is drawn, below it darker,
+## so spells and torches read as the light in it. Only drawn while the "Spell light" setting is
+## on; at most 1.0 (light only brightens past it).
+@export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
 
 ## The wall art's colours that count, at most; a colour on fewer pixels than this share of the
 ## most common one is left out (a speck of trim).

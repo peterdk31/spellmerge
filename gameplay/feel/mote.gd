@@ -68,6 +68,9 @@ const HEIGHT_MAX: float = 63.75
 
 ## Uploads of a chunk's buffer since this pool was made (for tests and the benchmarks).
 var uploads: int = 0
+## Every burst's count is times this (the "Particle amount" setting, `MoteDensity`; 0 throws
+## none). A share of a mote is thrown that often, so the average holds.
+var density: float = 1.0
 
 var _cap: int = 0
 ## The kinds, in the order the shader holds them, and for each look layer (0-21) the kinds that
@@ -212,12 +215,32 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 	burst(k, at, dir, maxi(roundi(float(kind.count) * scale), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
 
 
-## Throw `count` motes of kind `k` from `at` (where they show; their ground point is `height`
-## pixels below it): along the floor within `spread` degrees round `dir` (all round with 360 or no
-## `dir`), at a speed in `speed` (x to y, px/s), up at a speed in `up`, living a time in `life`
-## (s, at most LIFE_MAX), cooling through the ramp of `source` with the core colour `core`. Fewer
-## when the frame's FRAME_ROWS run out.
+## Throw kind `k`'s burst as a cue's part says (`CueBase`, a `motes` part): `count` motes (its
+## own count when below 0), flying out to `reach` pixels at the most (its own speed when 0; the
+## farthest a mote of its drag glides), within `spread` degrees (its own when below 0), `up` times
+## its own speed up, all as fast as the fastest when `ring` (a ring going out).
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool) -> void:
+	if k < 0 or k >= _kinds.size() or source < 0:
+		return
+	var kind: MoteKind = _kinds[k]
+	var speed: Vector2 = kind.speed
+	if reach > 0.0:
+		# A mote slowed by drag d from speed v glides v / d; with no drag, v for its life.
+		var top: float = reach * kind.drag if kind.drag > 0.0 else reach / maxf(kind.life.y, 0.05)
+		speed = Vector2(top * (kind.speed.x / maxf(kind.speed.y, 0.001)), top)
+	if ring:
+		speed.x = speed.y * 0.9
+	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life, source, core, kind.height)
+
+
+## Throw `count` motes (times `density`) of kind `k` from `at` (where they show; their ground
+## point is `height` pixels below it): along the floor within `spread` degrees round `dir` (all
+## round with 360 or no `dir`), at a speed in `speed` (x to y, px/s), up at a speed in `up`, living
+## a time in `life` (s, at most LIFE_MAX), cooling through the ramp of `source` with the core
+## colour `core`. Fewer when the frame's FRAME_ROWS run out.
 func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
+	if density != 1.0:
+		count = floori(float(count) * density + _rng.randf())
 	count = mini(count, _rows_left)
 	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
 		return

@@ -58,7 +58,12 @@ extends Node
 ## (`MoteCap`, `mote_cap_changed`; none with it off). Their kinds are data (`MoteKind`,
 ## content/motes) and come from the spells: a shot ending on a wall sheds the kinds of its cards'
 ## look layers in its own ramp, and the wall the surface kinds in the room's colours
-## (`RoomBase.surface_colors`, read on `room_entered`). The other sources come with the cues (P1b).
+## (`RoomBase.surface_colors`, read on `room_entered`). The other sources (P1b): a hit on a body
+## sheds the shot's kinds back along its way, a bolt or orbit whose life runs out a puff of them,
+## a reaction a ring of the reacting shot's kinds in the reaction's colour, and a cue its `motes`
+## parts (`CueBase`: the cue's cards' kinds in its ramp, or the surface kinds in the colours of
+## what broke, a body that died sampled from its own art). Every count is times the "Particle
+## amount" setting (`MoteDensity`, `mote_density_changed`).
 ##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
@@ -405,6 +410,12 @@ var _swing_trails: SwingTrailsScript = null
 ## (`MoteCap.default_cap()` until the setting changes it; see `set_mote_cap`). Read only.
 var _motes: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
+## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
+var mote_density: float = MoteDensity.DEFAULT
+## The source of the surface kinds while a cue plays for a body that died (the colours of its art;
+## -1: the room's walls), and the colours of each body art read so far (texture -> colours).
+var _cue_surface: int = -1
+var _art_colors: Dictionary = {}
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the motes' ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
@@ -616,6 +627,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.mote_cap_changed.connect(_on_mote_cap_changed)
+	events.mote_density_changed.connect(_on_mote_density_changed)
 	events.room_entered.connect(_on_room_entered)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
@@ -723,12 +735,7 @@ func _step_ghosts(real_delta: float) -> void:
 func _start_ghost(dead: Node) -> void:
 	if preset.death_anim_seconds <= 0.0 or dead == null or not is_instance_valid(dead):
 		return
-	var source := dead.get_node_or_null("Sprite") as Sprite2D
-	if source == null and dead.has_meta(SPRITE_GIVER):
-		# A body drawn by another node (a swarmer): that node's Sprite2D for it as it shows now.
-		var giver: Variant = dead.get_meta(SPRITE_GIVER)
-		if is_instance_valid(giver) and (giver as Object).has_method(&"sprite_of"):
-			source = (giver as Object).call(&"sprite_of", dead) as Sprite2D
+	var source: Sprite2D = _body_sprite(dead)
 	if source == null or source.texture == null:
 		return
 	var slot: int = _next_ghost
@@ -757,6 +764,19 @@ func _start_ghost(dead: Node) -> void:
 	ghost.visible = true
 	_ghost_left[slot] = preset.death_anim_seconds
 	_ghost_total[slot] = preset.death_anim_seconds
+
+
+## The Sprite2D a body shows as: its `Sprite` child, or for a body drawn by another node (a
+## swarmer) that node's Sprite2D for it as it shows now; null for none.
+func _body_sprite(body: Node) -> Sprite2D:
+	if body == null or not is_instance_valid(body):
+		return null
+	var source := body.get_node_or_null("Sprite") as Sprite2D
+	if source == null and body.has_meta(SPRITE_GIVER):
+		var giver: Variant = body.get_meta(SPRITE_GIVER)
+		if is_instance_valid(giver) and (giver as Object).has_method(&"sprite_of"):
+			source = (giver as Object).call(&"sprite_of", body) as Sprite2D
+	return source
 
 
 ## Start the white flash and the squash (wide and low) of the hit node's `Sprite` child, if it
@@ -999,6 +1019,8 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	# A puff and a ring in the reaction's own colour, bigger for a stronger reaction.
 	show_effect(KIND_PUFF, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(preset.reaction_burst_size * power), 1, 15), preset.reaction_seconds * 2.0)
 	_show_ring(position, tint, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power * 2.0)
+	if _motes != null and particles_enabled:
+		_reaction_motes(caster, position, shot, tint, power)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
@@ -1193,6 +1215,9 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
+		# Its cards' motes back along the way it came, in its own ramp.
+		if _motes != null and particles_enabled and projectiles != null:
+			_motes.shed(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share)
 		_show_impact(caster, ramp, position, direction, true)
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's, or the chips effect with
@@ -1236,6 +1261,9 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: in
 	if body != ProjectileManagerScript.KIND_BOLT and body != ProjectileManagerScript.KIND_ORBIT:
 		return
 	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
+	# And a puff of its cards' motes, on along the way it flew.
+	if _motes != null and particles_enabled:
+		_motes.shed(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
@@ -1303,8 +1331,15 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	var ramp: int = _ramp_of(caster)
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	for part: Dictionary in cue.parts:
+		if StringName(part.get("part", "")) == &"motes":
+			if _motes != null and particles_enabled:
+				_cue_motes(part, at, aim, size, tint, ramp, look)
+			continue
 		var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 		if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
+			continue
+		# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
+		if int(row[0]) == KIND_CHIPS and _motes != null:
 			continue
 		var seconds: float = float(part.get("seconds", row[2]))
 		if bool(part.get("lasts_size", false)):
@@ -1602,6 +1637,7 @@ func _make_motes(cap: int) -> void:
 	if cap > 0:
 		_motes = MotesScript.new(cap, MOTE_Z, _mote_kinds())
 		_motes.name = "Motes"
+		_motes.density = mote_density
 		add_child(_motes)
 		_motes.step(_clock)
 		_surface_source = _motes.table_source(_surface_colors)
@@ -1621,6 +1657,89 @@ func _mote_kinds() -> Array[MoteKind]:
 
 func _on_mote_cap_changed(cap: int) -> void:
 	set_mote_cap(cap)
+
+
+## The "Particle amount" setting: the share of its count every burst of motes throws (snapped by
+## `MoteDensity.snap`). Returns the share taken.
+func set_mote_density(density: float) -> float:
+	mote_density = MoteDensity.snap(density)
+	if _motes != null:
+		_motes.density = mote_density
+	return mote_density
+
+
+func _on_mote_density_changed(density: float) -> void:
+	set_mote_density(density)
+
+
+## A cue's `motes` part (`CueBase`) at `at` along `aim`, the cue `size` big, in the ramp `ramp`
+## with `tint` and the cards of `look`: the kinds it names thrown as it says.
+func _cue_motes(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint: Color, ramp: int, look: int) -> void:
+	var way: Vector2 = aim
+	match StringName(part.get("way", "aim")):
+		&"back":
+			way = -aim
+		&"right":
+			way = Vector2.RIGHT
+		&"up":
+			way = Vector2.UP
+	var reach: float = size * float(part["reach"]) if part.has("reach") and size > 0.0 else 0.0
+	var spread: float = float(part.get("spread", -1.0))
+	var up: float = float(part.get("up", 1.0))
+	var ring: bool = bool(part.get("ring", false))
+	var named: StringName = StringName(part.get("kind", "spell"))
+	var kinds: PackedInt32Array
+	match named:
+		&"spell":
+			kinds = _motes.kinds_of_look(look)
+		&"surface":
+			kinds = _motes.surface_kinds()
+		_:
+			var k: int = _motes.kind_index(named)
+			if k < 0:
+				return
+			kinds = PackedInt32Array([k])
+	var spell: int = MotesScript.spell_source(ramp, look)
+	var surface: int = _cue_surface if _cue_surface >= 0 else _surface_source
+	var count: int = int(part.get("count", -1))
+	for k in kinds:
+		var source: int = surface if _motes.kinds()[k].surface else spell
+		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
+		_motes.throw_part(k, at, way, source, Color.WHITE if _motes.kinds()[k].surface else tint, each, reach, spread, up, ring)
+
+
+## A reaction's motes: a ring of the reacting shot's kinds (`shot`'s look, read while the event is
+## sent; layer 0's for none) in the reaction's colour `tint`, `power` times as many and as far.
+func _reaction_motes(caster: int, at: Vector2, shot: int, tint: Color, power: float) -> void:
+	var look: int = projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0
+	var kinds: PackedInt32Array = _motes.kinds_of_look(look)
+	var source: int = MotesScript.spell_source(_ramp_of(caster), MotesScript.LOOK_EXACT)
+	var each: int = maxi(roundi(float(preset.reaction_mote_count) * power / float(kinds.size())), 1)
+	for k in kinds:
+		_motes.throw_part(k, at, Vector2.RIGHT, source, tint, each, preset.reaction_mote_reach * power, 360.0, 1.0, true)
+
+
+## The motes' source for the colours of a body's own art (the frame it shows as, read once per
+## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then).
+func _body_source(body: Node) -> int:
+	if _motes == null:
+		return -1
+	var sprite: Sprite2D = _body_sprite(body)
+	if sprite == null or sprite.texture == null:
+		return -1
+	var colours: Variant = _art_colors.get(sprite.texture)
+	if colours == null:
+		colours = RoomBase.colours_of_art(sprite.texture, _frame_rect(sprite))
+		_art_colors[sprite.texture] = colours
+	return _motes.table_source(colours as PackedColorArray)
+
+
+## The part of its texture `sprite` shows: its region, or its frame of a sheet.
+static func _frame_rect(sprite: Sprite2D) -> Rect2i:
+	if sprite.region_enabled:
+		return Rect2i(sprite.region_rect)
+	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
+	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:
@@ -1859,7 +1978,16 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
 	if upgraded and _hit_voice >= 0:
 		_voices[_hit_voice].stop()
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, shot)
+	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
+	# kinds in the colours of the body's own art.
+	var look: int = 0
+	var core: Color = Color.WHITE
+	if projectiles != null and shot >= 0:
+		look = projectiles.get_look_of(shot)
+		core = projectiles.get_core_of(shot)
+	_cue_surface = _body_source(enemy)
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot)
+	_cue_surface = -1
 	if particles_enabled and not upgraded:
 		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 

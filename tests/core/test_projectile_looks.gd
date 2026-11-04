@@ -410,10 +410,9 @@ func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
-	var first_pixel: int = 1 + ManagerScript.TRAIL_SAMPLES + ManagerScript.TRAIL_SPARKS
-	check_equal(floori(uvs[first_pixel * per].y), ManagerScript.TRAIL_Q_SPARK, "the particles' pixels after every light")
-	check_equal(floori(uvs[first_pixel * per].x), ManagerScript.TRAIL_SPARKS - 1, "the oldest first")
-	check(ManagerScript.TRAIL_SPARKS >= int(ManagerScript.TRAIL_KEEP * 60.0) + 1, "a particle slot for every moment a trail keeps")
+	var first_pixel: int = 1 + ManagerScript.TRAIL_SAMPLES
+	check_equal(floori(uvs[first_pixel * per].y), ManagerScript.TRAIL_Q_TAIL, "the tail's pixels after every light (no card particle slots: they are motes, S3)")
+	check_equal(floori(uvs[first_pixel * per].x), ManagerScript.TRAIL_TAIL_PIXELS - 1, "the oldest first")
 	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
 	check(trail.code.contains("box = vec4(q_lo, q_hi)") and trail.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
 	check_equal(trail.code.count("samples_before(row"), 1, "the path is searched from one place")
@@ -421,10 +420,10 @@ func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void
 	for batch in ManagerScript.BATCHES:
 		var shape: int = ManagerScript.BATCH_MESH[batch]
 		if shape >= 0:
-			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.TRAIL_SPARKS, true, shape), "trail batch %d draws its shape's full mesh" % batch)
-	check(mesh == ManagerScript.trail_mesh(ManagerScript.TRAIL_SPARKS, true, ManagerScript.TRAIL_MESH_JAG), "the full mesh is lightning's, which has every kind")
+			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(true, shape), "trail batch %d draws its shape's full mesh" % batch)
+	check(mesh == ManagerScript.trail_mesh(true, ManagerScript.TRAIL_MESH_JAG), "the full mesh is lightning's, which has every kind")
 	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
-	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_PIECE_LIGHT", ManagerScript.TRAIL_Q_PIECE_LIGHT], ["Q_SPARK_LIGHT", ManagerScript.TRAIL_Q_SPARK_LIGHT], ["Q_SPARK", ManagerScript.TRAIL_Q_SPARK], ["Q_TAIL", ManagerScript.TRAIL_Q_TAIL], ["Q_JAG", ManagerScript.TRAIL_Q_JAG], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
+	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_PIECE_LIGHT", ManagerScript.TRAIL_Q_PIECE_LIGHT], ["Q_TAIL", ManagerScript.TRAIL_Q_TAIL], ["Q_JAG", ManagerScript.TRAIL_Q_JAG], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
 		check(shader.code.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
 	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
 	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
@@ -590,74 +589,48 @@ func test_at_the_cap_the_trails_thin_first() -> void:
 
 
 ## The trail mesh has only the slots the pool can fill (performance, 2026-11-02): every quad of
-## it runs the vertex stage, drawn or not. Thinned particles come every `spark_stride`-th moment,
-## so the mesh has a stride's share of particle slots; with no share for the tails a shot's mesh
-## has no tail slots and only the newest pieces' lights (a dash's keeps its streak slots). Under
-## the cap it is each shape's full mesh.
+## it runs the vertex stage, drawn or not. With no share for the tails a shot's mesh has no tail
+## slots and only the newest pieces' lights (a dash's keeps its streak slots). Under the cap it is
+## each shape's full mesh. No mesh has card particle slots (S3: they are motes).
 func test_the_trail_mesh_has_the_slots_the_pool_fills() -> void:
 	mgr.particle_cap = 1000
 	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.update_draw(1.0)
-	var full: ArrayMesh = ManagerScript.trail_mesh(ManagerScript.TRAIL_SPARKS, true, ManagerScript.TRAIL_MESH_PLAIN)
+	var full: ArrayMesh = ManagerScript.trail_mesh(true, ManagerScript.TRAIL_MESH_PLAIN)
 	check(mgr._draw_node.multimesh.mesh == full, "under the cap: the full mesh")
-	check_equal(mgr.spark_stride, 1, "every moment")
 	mgr.particle_cap = 100
 	mgr.update_draw(1.0)
 	check_equal(mgr.trail_share, 0.0, "the particles (120) fill the pool: no tail")
-	check_equal(mgr.spark_stride, 1, "a share of %.2f is more than half the moments" % mgr.particle_share)
 	check_equal(_tail_slots(mgr._draw_node.multimesh.mesh), 0, "no tail slots for a shot")
 	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_PIECE_LIGHT), ManagerScript.TRAIL_PIECES_NO_TAIL, "only the newest pieces' lights")
 	check_equal(_tail_slots(mgr._nodes[ManagerScript.BATCH_DASH].multimesh.mesh), ManagerScript.DASH_STREAK_SLOTS, "a dash keeps its streak slots")
-	mgr.particle_cap = 30
-	mgr.update_draw(1.0)
-	check(is_equal_approx(mgr.particle_share, 0.25), "a quarter of the particles")
-	check_equal(mgr.spark_stride, 4, "come from every fourth moment")
-	check_equal(_shader_share(mgr._draw_node, &"spark_stride"), 4.0, "the shader is told")
-	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), ManagerScript.spark_slots_for(4), "a quarter of the particle slots")
 	for batch in ManagerScript.BATCHES:
 		var shape: int = ManagerScript.BATCH_MESH[batch]
 		if shape >= 0:
-			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.spark_slots_for(4), false, shape), "trail batch %d draws its shape's thin mesh" % batch)
-			check_equal(_shader_share(mgr._nodes[batch], &"spark_stride"), 4.0, "with the same stride")
+			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(false, shape), "trail batch %d draws its shape's thin mesh" % batch)
 	mgr.particle_cap = 1000
 	mgr.update_draw(1.0)
 	check(mgr._draw_node.multimesh.mesh == full, "back under the cap: the full mesh again")
-	check_equal(_shader_share(mgr._draw_node, &"spark_stride"), 1.0, "every moment again")
-
-
-func test_the_spark_stride_moves_only_when_it_must() -> void:
-	check_equal(ManagerScript.spark_stride_for(1.0, 1), 1, "everything shared: every moment")
-	check_equal(ManagerScript.spark_stride_for(0.3, 1), 2, "0.3: every other moment (0.6 of them wanted)")
-	check_equal(ManagerScript.spark_stride_for(0.45, 2), 2, "0.45 at 2 is 0.9 of the moments: stays")
-	check_equal(ManagerScript.spark_stride_for(0.55, 2), 1, "0.55 at 2 would want more than every moment: back to 1")
-	check_equal(ManagerScript.spark_stride_for(0.22, 2), 2, "0.22 at 2 is 0.44: stays (no flicker round a power of two)")
-	check_equal(ManagerScript.spark_stride_for(0.19, 2), 4, "0.19 at 2 is under 0.4: every fourth")
-	check_equal(ManagerScript.spark_stride_for(0.0, 1), ManagerScript.SPARK_STRIDE_MAX, "none shared: the thinnest")
-	check_equal(ManagerScript.spark_stride_for(0.0, ManagerScript.SPARK_STRIDE_MAX), ManagerScript.SPARK_STRIDE_MAX, "and it stays there")
-	var stride: int = 1
-	while stride <= ManagerScript.SPARK_STRIDE_MAX:
-		check(ManagerScript.spark_slots_for(stride) * stride >= ManagerScript.TRAIL_SPARKS, "at %d the slots still cover every moment a particle lives" % stride)
-		stride *= 2
 
 
 ## Each shape's mesh holds what its trails can draw, in the full mesh's order (`trail_mesh_slots`):
 ## a dash's no core and no jagged line, its streak slots on the pieces and the tail whatever the
 ## tails' share; a shot's no jagged line (lightning's alone has it).
 func test_each_trail_mesh_shape_keeps_its_order_and_its_slots() -> void:
-	var thin: ArrayMesh = ManagerScript.trail_mesh(4, false, ManagerScript.TRAIL_MESH_PLAIN)
-	check(thin == ManagerScript.trail_mesh(4, false, ManagerScript.TRAIL_MESH_PLAIN), "each mesh made once")
-	check(thin != ManagerScript.trail_mesh(4, false, ManagerScript.TRAIL_MESH_JAG), "and apart from another shape's")
+	var thin: ArrayMesh = ManagerScript.trail_mesh(false, ManagerScript.TRAIL_MESH_PLAIN)
+	check(thin == ManagerScript.trail_mesh(false, ManagerScript.TRAIL_MESH_PLAIN), "each mesh made once")
+	check(thin != ManagerScript.trail_mesh(false, ManagerScript.TRAIL_MESH_JAG), "and apart from another shape's")
 	check_equal(_slots_of(thin, ManagerScript.TRAIL_Q_JAG), 0, "a shot's has no jagged line")
-	check_equal(_slots_of(ManagerScript.trail_mesh(4, true, ManagerScript.TRAIL_MESH_PLAIN), ManagerScript.TRAIL_Q_TAIL), ManagerScript.TRAIL_TAIL_PIXELS, "a full tail")
-	check_equal(_slots_of(ManagerScript.trail_mesh(4, false, ManagerScript.TRAIL_MESH_JAG), ManagerScript.TRAIL_Q_JAG), ManagerScript.TRAIL_JAGS, "lightning's has its jagged line")
+	check_equal(_slots_of(ManagerScript.trail_mesh(true, ManagerScript.TRAIL_MESH_PLAIN), ManagerScript.TRAIL_Q_TAIL), ManagerScript.TRAIL_TAIL_PIXELS, "a full tail")
+	check_equal(_slots_of(ManagerScript.trail_mesh(false, ManagerScript.TRAIL_MESH_JAG), ManagerScript.TRAIL_Q_JAG), ManagerScript.TRAIL_JAGS, "lightning's has its jagged line")
 	for full_tail: bool in [true, false]:
-		var dash: ArrayMesh = ManagerScript.trail_mesh(4, full_tail, ManagerScript.TRAIL_MESH_DASH)
+		var dash: ArrayMesh = ManagerScript.trail_mesh(full_tail, ManagerScript.TRAIL_MESH_DASH)
 		check_equal(_slots_of(dash, ManagerScript.TRAIL_Q_PIECE_LIGHT), ManagerScript.DASH_STREAK_SLOTS, "a dash's streak lights")
 		check_equal(_tail_slots(dash), ManagerScript.DASH_STREAK_SLOTS, "a dash's streak slots of the tail")
 		check_equal(_slots_of(dash, ManagerScript.TRAIL_Q_CORE) + _slots_of(dash, ManagerScript.TRAIL_Q_HEAD_LIGHT) + _slots_of(dash, ManagerScript.TRAIL_Q_JAG), 0, "no core, no head light, no jagged line")
 	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
 	check(trail.code.contains("dash && slot < %d.0" % ManagerScript.DASH_STREAK_SLOTS), "the shader draws a dash's streaks on that many slots")
-	check(trail.code.contains("uniform float spark_stride"), "and thins particles by the stride")
+	check(not trail.code.contains("spark_stride") and not trail.code.contains("LOOK TABLE"), "and no card particles of its own (S3)")
 	check(trail.code.contains("quad == Q_JAG && lightning && !dash"), "only lightning's shot draws the jagged line")
 	check(trail.code.contains("(live && !dash)"), "a dash has no core")
 	var order := PackedInt32Array()
@@ -665,7 +638,7 @@ func test_each_trail_mesh_shape_keeps_its_order_and_its_slots() -> void:
 		order.append(entry.x)
 	for shape: int in [ManagerScript.TRAIL_MESH_PLAIN, ManagerScript.TRAIL_MESH_JAG, ManagerScript.TRAIL_MESH_DASH]:
 		var kinds: PackedInt32Array = PackedInt32Array()
-		var uvs: PackedVector2Array = ManagerScript.trail_mesh(4, false, shape).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
+		var uvs: PackedVector2Array = ManagerScript.trail_mesh(false, shape).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
 		for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
 			var kind: int = floori(uvs[i].y)
 			if kinds.is_empty() or kinds[kinds.size() - 1] != kind:
@@ -773,27 +746,21 @@ func test_a_kept_look_follows_set_look_growth_and_a_new_shot_in_the_slot() -> vo
 	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "it is drawn in the enemy ramp, not the old shot's")
 
 
-## Trail particles as motes (spell spectacle P1d): while something takes them and fewer than
-## `spark_motes_below` shots are drawn, a shot's trail mesh has no particle slots (a dash's keeps
-## its own) and the particles come out as births instead; past the threshold (and an eighth more,
-## once on) the shader draws them again.
-func test_trail_particles_become_births_under_the_threshold() -> void:
+## Trail particles are motes (spell spectacle P1d; since S3 the only way they are drawn): no trail
+## mesh has particle slots, and while something takes them (`spark_motes`) the particles come out
+## as births; while nothing does, none are rolled.
+func test_trail_particles_are_births() -> void:
 	_lasting(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
-	check(not mgr.sparks_as_motes, "nothing takes them: the shader draws them")
-	check_equal(mgr.spark_birth_count, 0, "and no births")
+	check_equal(mgr.spark_birth_count, 0, "nothing takes them: no births")
 	mgr.spark_motes = true
-	mgr.spark_motes_below = 30
 	var births: int = 0
 	for n in 30:
 		mgr.step(1.0 / 60.0)
 		mgr.update_draw(1.0)
 		births += mgr.spark_birth_count
-	check(mgr.sparks_as_motes, "20 shots under 30: motes")
-	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), 0, "no particle slots in a shot's mesh")
-	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK_LIGHT), 0, "nor their lights")
-	check_equal(_slots_of(mgr._nodes[ManagerScript.BATCH_DASH].multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), ManagerScript.TRAIL_SPARKS, "a dash keeps its particles")
+	check(not ManagerScript.TRAIL_QUADS.any(func(entry: Vector3i) -> bool: return entry.x == 2 or entry.x == 3), "no mesh has particle slots (S3)")
 	# 20 shots x 30 moments at embers' rate (0.45): 270 expected.
 	check(births > 180 and births < 360, "about one in rate x moments x shots: %d" % births)
 	var b: PackedFloat32Array = mgr.spark_births
@@ -801,22 +768,44 @@ func test_trail_particles_become_births_under_the_threshold() -> void:
 	var found: bool = false
 	for n in mgr.spark_birth_count:
 		found = true
-		check_equal(int(b[n * stride + 4]), ManagerScript.LOOK_EMBERS, "of the shot's kind")
-		check_equal(int(b[n * stride + 5]), mgr._ramp_of(0), "in its caster's ramp")
-		check_equal(int(b[n * stride + 6]), ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "with its look")
-		check(Vector2(b[n * stride + 2], b[n * stride + 3]).is_equal_approx(Vector2.LEFT), "given off back along the shot")
-		check(b[n * stride] >= 20.0 and b[n * stride + 1] >= 40.0, "where a shot is")
+		check_equal(int(b[n * stride + ManagerScript.SPARK_KIND]), ManagerScript.LOOK_EMBERS, "of the shot's kind")
+		check_equal(int(b[n * stride + ManagerScript.SPARK_RAMP]), mgr._ramp_of(0), "in its caster's ramp")
+		check_equal(int(b[n * stride + ManagerScript.SPARK_LOOK]), ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "with its look")
+		check(Vector2(b[n * stride + ManagerScript.SPARK_BACK_X], b[n * stride + ManagerScript.SPARK_BACK_Y]).is_equal_approx(Vector2.LEFT), "given off back along the shot")
+		check(b[n * stride + ManagerScript.SPARK_X] >= 20.0 and b[n * stride + ManagerScript.SPARK_Y] >= 40.0, "where a shot is")
 	check(found, "the last frame had births")
-	_lasting(12, 1, PackedInt32Array())
-	mgr.step(1.0 / 60.0)
-	mgr.update_draw(1.0)
-	check(mgr.sparks_as_motes, "32 shots: still under 30 + an eighth (33)")
-	_lasting(1, 1, PackedInt32Array())
-	mgr.step(1.0 / 60.0)
-	mgr.update_draw(1.0)
-	check(not mgr.sparks_as_motes, "33 shots: the shader's again")
-	check_equal(mgr.spark_birth_count, 0, "with no births")
-	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.spark_slots_for(mgr.spark_stride), mgr.full_tails, ManagerScript.TRAIL_MESH_PLAIN), "and its particle slots back")
+
+
+## A dash gives off its cards' particles as births too (S3: the trail shader drew them before):
+## fire's embers and frost's flecks from its feet at DASH_FEET_RATE of the moments, its other kinds
+## from beside its body; a dash of no cards only its streaks (the shader's), and no births.
+func test_a_dash_gives_off_its_cards_as_births() -> void:
+	mgr.spark_motes = true
+	mgr.set_anchor(0, Vector2(100.0, 100.0))
+	mgr.follow_caster(0, Color.WHITE, 0, 1.0)
+	var births: int = 0
+	for n in 20:
+		mgr.set_anchor(0, Vector2(100.0 + 4.0 * n, 100.0))
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		births += mgr.spark_birth_count
+	check_equal(births, 0, "a plain dash: no births")
+	mgr.set_anchor(1, Vector2(100.0, 200.0))
+	mgr.follow_caster(1, Color.RED, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), 1.0)
+	births = 0
+	var feet: bool = true
+	for n in 30:
+		mgr.set_anchor(1, Vector2(100.0 + 4.0 * n, 200.0))
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		births += mgr.spark_birth_count
+		for i in mgr.spark_birth_count:
+			var at: int = i * ManagerScript.SPARK_BIRTH_STRIDE
+			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS and mgr.spark_births[at + ManagerScript.SPARK_Y] > 205.0
+			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_BACK_X] < -0.9
+	# 30 moments at DASH_FEET_RATE (0.5): 15 expected.
+	check(births >= 6 and births <= 25, "a fire dash's embers at its feet's rate: %d in 30" % births)
+	check(feet, "from its feet, given off back along the dash")
 
 
 ## A plain shot gives off the shader's twinkle (kind 0), as does a shot whose only kind is the weave
@@ -849,23 +838,13 @@ func test_births_follow_the_kinds_rates_and_the_share() -> void:
 	check(births < 340, "thinned by the share: %d" % births)
 
 
-## The manager's rates are the trail shader's (TIP[row].w, by look kind through `kind_row`).
-func test_spark_rates_are_the_shaders() -> void:
+## The rates are the manager's alone since S3 (the trail shader's TIP table is gone): one a look
+## kind, the weave none.
+func test_spark_rates_are_the_managers() -> void:
 	var code: String = (load("res://core/projectiles/shot_trail.gdshader") as Shader).code
-	var start: int = code.find("const vec4 TIP[ROWS] = vec4[](")
-	check(start >= 0, "the shader has its TIP table")
-	var body: String = code.substr(start, code.find(");", start) - start)
-	var rows: Array[float] = []
-	var at: int = body.find("vec4(", 10)
-	while at >= 0:
-		var inner: String = body.substr(at + 5, body.find(")", at) - at - 5)
-		var parts: PackedStringArray = inner.split(",")
-		rows.append(parts[3].strip_edges().to_float() if parts.size() == 4 else parts[0].strip_edges().to_float())
-		at = body.find("vec4(", at + 5)
-	check_equal(rows.size(), 25, "one rate a row")
-	for kind in ManagerScript.LOOK_COUNT:
-		var row: int = kind + (3 if kind > 12 else 0)
-		check(is_equal_approx(ManagerScript.SPARK_RATES[kind], rows[row]), "kind %d: %.2f, the shader's %.2f" % [kind, ManagerScript.SPARK_RATES[kind], rows[row]])
+	check(not code.contains("TIP[ROWS]"), "the shader has no rates of its own")
+	check_equal(ManagerScript.SPARK_RATES.size(), ManagerScript.LOOK_COUNT, "a rate a look kind")
+	check_equal(ManagerScript.SPARK_RATES[ManagerScript.LOOK_WEAVE], 0.0, "the weave gives off nothing")
 
 
 ## `count` shots of `player` with the look kinds `kinds` that last (10 s).

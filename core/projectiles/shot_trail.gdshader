@@ -6,17 +6,16 @@ render_mode blend_premul_alpha, world_vertex_coords;
 
 // A shot in flight and its trail (the projectile manager's trail batches; core/README.md, "The
 // shot shaders"; the owner, 2026-10-28: "the tail of projectiles turn with the projectile"): a
-// shot leaves its tail and its card particles in the world, where it was, as the mockup does.
+// shot leaves its tail in the world, where it was, as the mockup does.
 // The projectile manager keeps each shot's path in `trail_data`, one row per trail of
 // TRAIL_SAMPLES texels (x, y, odometer, time; TRAIL_ROWS_PER_LINE rows to a line of the
 // texture, `trail_texel`), a ring written 30 times a second and at every
 // bounce and end. Each pixel of travel (a very fast shot's every 2-4, `gap`) leaves one tail pixel there, which drifts a little and
 // cools through the ramp in its own time (0.1-0.3 s), so the tail bends with any path and frays
-// at its end by itself; each 60th of a second may give off a particle of one of the shot's kinds
-// from where the shot was then, which moves on its own from there (embers rise, flecks hang,
-// gusts blow back and curl, sparks jump, void pulls in to the shot). The pixel's or particle's
-// number is its place on the path (the odometer) or its moment, so it stays the same pixel from
-// frame to frame. A trail outlives its shot by its longest life, so a tail cools where it ended.
+// at its end by itself. The card particles a shot gives off are not drawn here: they are motes
+// (S3, docs/milestones/spell-spectacle-2.md; the projectile manager hands them out as births,
+// `spark_births`, and Feel's motes throw them). A pixel's number is its place on the path (the
+// odometer), a dash's streak's its moment, so it stays the same pixel from frame to frame. A trail outlives its shot by its longest life, so a tail cools where it ended.
 // Everything is drawn on the world's pixel grid, axis-aligned: the core is a `+` whatever way
 // the shot flies, and a line is one pixel per step, as the mockup draws it.
 //
@@ -31,15 +30,11 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   Q_HEAD_LIGHT  the core's light (and void's dark heart);
 //   Q_PIECE_LIGHT a piece of the path between two samples, the tail's light round it (a dash:
 //                 the light of a speed streak instead);
-//   Q_SPARK_LIGHT the light of the particle born at moment `slot` back from now;
-//   Q_SPARK       that particle's pixel (a one-pixel line for a streak, a small star or cross);
 //   Q_TAIL        tail pixel `slot` back from the head along the path (a dash: a speed streak);
 //   Q_JAG         a 4-pixel step of the jagged line lightning draws behind its shot;
 //   Q_CORE        the core: a white-hot `+`, pierce's run, void's dark heart.
 // The mesh draws the lights first (added; the head's first, as its dark heart dims what is
 // under it), then the pixels, oldest first and the core last, so the newest is on top.
-// The particle kinds are DATA, not code: one row each in the tables below (LOOK TABLE), read by
-// one routine (`spark`), so a new kind is a new row.
 // A quad is one triangle (performance, 2026-11-02: every vertex runs the whole vertex stage, and
 // three are a quarter less than four): its corners are the box's low corner and twice the box
 // along each axis, so the box is inside it, and the fragment stage cuts it to the box (`box`), a
@@ -52,16 +47,9 @@ render_mode blend_premul_alpha, world_vertex_coords;
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-// The spark pool's share (set by the projectile manager, 1.0 is everything): the fraction of
-// every shot's particles and of every tail that is drawn this frame. Tails go first.
-uniform float particle_share = 1.0;
+// The pool's share of the tails (set by the projectile manager, 1.0 is everything): the fraction
+// of every tail that is drawn this frame.
 uniform float trail_share = 1.0;
-// How the pool thins particles (set by the projectile manager with the trail mesh it draws; a
-// power of two, 1 is every moment): only every `spark_stride`-th moment of a trail may give off a
-// particle (each trail at its own phase, so trails do not pulse together), at `spark_stride` times
-// the chance, so as many are born as before from `spark_stride` times fewer particle slots
-// (performance, 2026-11-02: a folded slot costs as much as a drawn one in the vertex stage).
-uniform float spark_stride = 1.0;
 // The paths, and the moment the heads are drawn at (the simulation clock less what the drawing
 // lags behind the last step), in the samples' clock.
 uniform sampler2D trail_data : filter_nearest;
@@ -89,8 +77,6 @@ const float TAIL_GAP_MAX = 4.0;
 // The quad kinds (TRAIL_Q_* in projectile_manager.gd), in UV.y.
 const float Q_HEAD_LIGHT = 0.0;
 const float Q_PIECE_LIGHT = 1.0;
-const float Q_SPARK_LIGHT = 2.0;
-const float Q_SPARK = 3.0;
 const float Q_TAIL = 4.0;
 const float Q_JAG = 5.0;
 const float Q_CORE = 6.0;
@@ -103,61 +89,26 @@ const float M_LINE = 3.0;
 // A neighbour or a line that is not there.
 const vec2 FAR = vec2(1.0e7);
 
-// ---- LOOK TABLE: one row per particle kind ----
-// The rows are:
-//   0       a plain shot's twinkle
-//   1-12    the look kinds by number (L_*; 11, the weave, gives off nothing)
-//   13-15   a dash's own: its speed streaks, and fire and frost from its feet
-//   16, 17  the kinds L_HOPS (chain) and L_WAKE (faster), moved up past the dash's rows
-//   18-24   the kinds 15-21 the same way (kind + 3): weight, ripple, curl, zig, double, converge, drift
-// A particle `j` born at moment `id` where the shot was (`at`, flying along `dir`, `side` its
-// left) with its numbers h(n) in [0, 1) (`th`) and `ago` seconds old, `u` of its life:
-//   life                   LIFE_BACK.x + LIFE_BACK.y h
-//   start  at (or the shot, CIRCLE.w 1) + dir (LIFE_BACK.z + LIFE_BACK.w h)
-//          + (h - 0.5, h - 0.5) JITTER.xy + the same re-rolled every frame x JITTER.z
-//          + side (h - 0.5) JITTER.w
-//   thrown v = -dir (VELOCITY.x + VELOCITY.y h) + side (h - 0.5) VELOCITY.z
-//          + ((h - 0.5) VELOCITY.w, -(UP_DRAG.x + UP_DRAG.y h)), slowed by UP_DRAG.z each 60th
-//          of a second (1 none), and turning at (h - 0.5) UP_DRAG.w radians a second
-//   floats (h - 0.5, h - 0.5) CIRCLE.z ago, and up (CIRCLE.x + CIRCLE.y h) ago
-//   circles at (RADIUS.x + RADIUS.y h + RADIUS.z u) (x zoom if SPIN.x) (1 - u)^RADIUS.w, at the
-//          angle h 2 pi + SPIN.y ago + SPIN.z u (1.2 + h) either way
-//   drawn  a pixel, or with SPIN.w a one-pixel line back to - v TIP.x - dir TIP.y (2 + zoom);
-//          a small cross round it in ARM.z while u is in ARM.x-ARM.y (for a share SHOW.w)
-//   shown  when (frame + id BLINK.x + j BLINK.y + BLINK.z) mod BLINK.w >= SHOW.x, its number
-//          re-rolled every frame >= SHOW.y, and u > SHOW.z
-//   colour COLOURS[u x ARM.w steps] (SHADES 0-17, 18 the shot's light, 19 and 20 the player's
-//          light and base)
-//   light  TIP.z (1 - 0.75 u) (SHINE.x falloff(r, SHINE.y) + SHINE.z falloff(r, SHINE.w))
-//   given off by TIP.w of the moments (one of the shot's kinds picked at random; a dash twice
-//          as often, its feet always).
-const int ROW_TWINKLE = 0;
-const int ROW_DASH_STREAK = 13;
-const int ROW_DASH_EMBER = 14;
-const int ROW_DASH_FLECK = 15;
-const int ROW_HOPS = 16;
-const int ROW_WAKE = 17;
-const int ROWS = 25;
-//                                  twinkle                embers                    flecks                    gusts                    pull                      sparks                    motes                    glints                    streaks              burst                orbiters             weave                glitter              dash streak            dash ember             dash fleck             hops                   wake
-const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0), vec4(0.3, 0.2, 0.0, -4.0), vec4(0.2, 0.15, 0.0, -2.0), vec4(0.45, 0.3, 0.0, -2.0), vec4(0.5, 0.1, 0.0, -4.0), vec4(0.35, 0.2, 0.0, -2.0), vec4(0.22, 0.1, 0.0, -2.0), vec4(0.4, 0.1, 0.0, -4.0), vec4(0.3, 0.1, 10.0, 4.0), vec4(0.7, 0.2, 0.0, -3.0));
-const vec4 JITTER[ROWS] = vec4[](vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0), vec4(3.0, 3.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 7.0), vec4(0.0), vec4(0.0, 0.0, 6.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 13.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 5.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 3.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 4.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 2.0));
-const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 110.0, 0.0), vec4(110.0, 60.0, 20.0, 0.0), vec4(0.0), vec4(0.0), vec4(22.0, 20.0, 0.0, 0.0), vec4(20.0, 10.0, 80.0, 0.0), vec4(8.0, 0.0, 44.0, 0.0), vec4(45.0, 10.0, 0.0, 0.0), vec4(-8.0, 0.0, 0.0, 0.0));
-const vec4 UP_DRAG[ROWS] = vec4[](vec4(0.0, 0.0, 1.0, 0.0), vec4(10.0, 24.0, 0.97, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 9.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.94, 0.0), vec4(-16.0, -14.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 11.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0));
-const vec4 CIRCLE[ROWS] = vec4[](vec4(6.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 4.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(14.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(4.0, 8.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0));
-const vec4 RADIUS[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(6.0, 6.0, 0.0, 1.4), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(2.0, 0.0, 6.0, 0.0), vec4(4.5, 0.0, 0.0, 0.0), vec4(0.0), vec4(2.5, 1.5, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(1.0, 0.0, 9.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0));
-const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0), vec4(0.14, 0.0, 0.9, 1.0), vec4(0.04, 0.0, 0.9, 0.7), vec4(0.12, 0.0, 0.5, 0.4), vec4(0.0, 0.0, 0.9, 1.0), vec4(0.07, 0.0, 0.9, 1.0), vec4(0.06, 0.0, 0.8, 0.5), vec4(0.0, 1.0, 0.5, 0.5), vec4(0.0, 0.0, 0.9, 1.0), vec4(0.0, 0.0, 0.5, 0.4));
-const vec4 SHINE[ROWS] = vec4[](vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 3.0, 0.0, 1.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0));
-const vec4 BLINK[ROWS] = vec4[](vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 3.0, 6.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 2.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 5.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 3.0));
-const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(1.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(1.0, 0.0, -1.0, 0.0));
-const vec4 ARM[ROWS] = vec4[](vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(0.0, 0.2, 8.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(0.35, 0.6, 17.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0));
-const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(18.0, 17.0, 4.0, 4.0), vec4(18.0, 17.0, 16.0, 15.0), vec4(16.0, 15.0, 15.0, 15.0), vec4(17.0, 16.0, 15.0, 15.0), vec4(18.0, 17.0, 16.0, 16.0), vec4(17.0, 5.0, 4.0, 4.0), vec4(16.0, 16.0, 15.0, 15.0), vec4(17.0, 5.0, 4.0, 4.0), vec4(4.0, 3.0, 3.0, 3.0));
-
-// How long a trail with each kind draws its particles (seconds; x a shot, y a dash): the trail's
-// window is the longest of its kinds' and its tail's (a dash's at least 0.18 s; a plain shot's,
-// with no kind among 1-9, its twinkles' 0.6 s), so a kind that lives longer than its trail's
-// window (void's pull, a shield's sparks) is cut there, as the mockup's trails are.
-const vec2 WINDOW[22] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.5), vec2(0.35), vec2(0.7), vec2(0.6), vec2(0.5), vec2(0.3), vec2(0.5), vec2(0.4), vec2(0.9));
+// ---- A dash's speed streaks ----
+// The only particles a trail still draws (S3, docs/milestones/spell-spectacle-2.md: every other
+// particle a trail gave off is a mote now, thrown from the births the projectile manager hands out,
+// `spark_births`): two a moment along a wizard's dash, each a one-pixel line thrown back along the
+// way it went from beside its body, in its player's light then base colour, with a small light.
+// A streak `j` born at moment `id` (its numbers h(n) from STREAK_SALT on), `ago` seconds old:
+//   life   STREAK_LIFE.x + STREAK_LIFE.y h
+//   start  where the dash was + dir (STREAK_LIFE.z + STREAK_LIFE.w h) + side (h - 0.5) STREAK_SIDE
+//   flies  back along the dash at STREAK_SPEED.x + STREAK_SPEED.y h px/s; its line runs back to
+//          STREAK_TIP of its flight
+//   light  STREAK_GLOW (1 - 0.75 u) x (STREAK_SHINE.x falloff(r, STREAK_SHINE.y))
+const vec4 STREAK_LIFE = vec4(0.1, 0.08, -4.0, 8.0);
+const float STREAK_SIDE = 13.0;
+const vec2 STREAK_SPEED = vec2(60.0, 50.0);
+const float STREAK_TIP = 0.025;
+const float STREAK_GLOW = 0.4;
+const vec2 STREAK_SHINE = vec2(0.16, 3.0);
+const float STREAK_SALT = 460.0;
+// A dash's streaks are drawn this long back at most (their longest life, rounded up).
+const float STREAK_WINDOW = 0.18;
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
 // mode, three numbers and three colours.
@@ -229,92 +180,30 @@ float dragged(float ago, float drag) {
 	return drag * (1.0 - pow(drag, f)) / (1.0 - drag) / 60.0;
 }
 
-// Component `i` (0-3) of `v`.
-float pick4(vec4 v, float i) {
-	return i < 0.5 ? v.x : (i < 1.5 ? v.y : (i < 2.5 ? v.z : v.w));
-}
-
-// Colour `i` of a table row: SHADES 0-17, 18 the shot's light, 19 and 20 its player's.
-vec3 tone(float i, Look L) {
-	int k = int(i + 0.5);
-	int pi = int(L.player);
-	return k < 18 ? SHADES[k] : (k == 18 ? L.hi : (k == 19 ? P_LIGHT[pi] : P_BASE[pi]));
-}
-
-// The trail's window (WINDOW): how far back from now its particles are drawn.
-float trail_window(vec3 b, bool dash, float tail) {
-	float longest = dash ? max(tail, 0.18) : tail;
-	bool any = false;
-	for (int k = 1; k <= 21; k++) {
-		if (bit_set(b, float(k))) {
-			longest = max(longest, dash ? WINDOW[k].y : WINDOW[k].x);
-			any = any || k <= 9;
-		}
-	}
-	if (!any && !dash) {
-		longest = max(longest, WINDOW[0].x);
-	}
-	return min(longest, TRAIL_LONGEST);
-}
-
-// The kind given off by particle `j` born at moment `id`, or -2 for none: one of the shot's
-// kinds, picked at random, each at its own rate (TIP.w); a plain shot's twinkle is -1. A dash
-// gives off two speed streaks (kind 0) and its cards at twice a shot's rate, fire and frost
-// always.
-int kind_row(float kind) {
-	return int(kind + (kind > 12.5 ? 3.5 : 0.5));
-}
-
-float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
-	if (dash && j < 1.5) {
-		return 0.0;
-	}
-	if (kinds.w < 0.5) {
-		return !dash && j < 0.5 && th(id, j, 151.0, row) < TIP[ROW_TWINKLE].w * particle_share * spark_stride ? -1.0 : -2.0;
-	}
-	float i = min(floor(th(id, j, 152.0, row) * kinds.w), kinds.w - 1.0);
-	float word = i < 4.0 ? kinds.x : (i < 8.0 ? kinds.y : kinds.z);
-	float look = mod(floor(word / exp2(mod(i, 4.0) * 5.0) + 0.001), 32.0);
-	float rate = TIP[kind_row(look)].w;
-	if (dash) {
-		rate = look == L_EMBERS || look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0);
-	}
-	return th(id, j, 153.0, row) < rate * particle_share * spark_stride ? look : -2.0;
-}
-
-// The particle `j` born at moment `id`, as it is now: where (`pos`, and `tip` for a line), its
-// colours (alpha 0 for hidden) and its light.
-struct Spark {
+// A dash's speed streak `j` born at moment `id`, as it is now: alive, where (`pos`, and `tip` for
+// its line), its colour and its light. `k` is the sample before its moment (`samples_before`, by
+// time), `head_end` the path's newest end.
+struct Streak {
 	bool alive;
 	vec2 pos;
 	vec2 tip;
-	bool line;
 	vec4 rgb;
-	vec4 arm;
 	float glow;
-	vec4 light;
 };
 
-// One routine for every kind, driven by its row of the LOOK TABLE. `kind` is the one it was given
-// off as (`trail_kind`, -2 for none), `head_end` the path's newest end, `target` where the shot is
-// (or was last: void pulls in to it, shields circle it), `k` the sample before its moment
-// (`samples_before`, by time).
-Spark spark(float row, float newest, float skip, vec4 head_end, float kind, vec2 target, bool dash, float id, float j, float k, Look L) {
-	Spark S;
+Streak streak(float row, float newest, float skip, vec4 head_end, float id, float j, float k, Look L) {
+	Streak S;
 	S.alive = false;
 	S.pos = vec2(0.0);
 	S.tip = vec2(0.0);
-	S.line = false;
 	S.rgb = vec4(0.0);
-	S.arm = vec4(0.0);
 	S.glow = 0.0;
-	S.light = vec4(0.0);
 	float t = id / BIRTHS;
 	float ago = trail_now - t;
-	// The piece it was born on, and where on it.
-	if (kind < -1.5 || k < 0.0) {
+	if (k < 0.0) {
 		return S;
 	}
+	// The piece it was born on, and where on it.
 	vec4 A = trail_texel(row, newest, k);
 	vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
 	vec2 ab = B.xy - A.xy;
@@ -322,70 +211,22 @@ Spark spark(float row, float newest, float skip, vec4 head_end, float kind, vec2
 	vec2 dir = len > 0.001 ? ab / len : vec2(1.0, 0.0);
 	vec2 side = vec2(-dir.y, dir.x);
 	vec2 at = mix(A.xy, B.xy, clamp((t - A.w) / max(B.w - A.w, 0.0001), 0.0, 1.0));
-	// Its row: a shot's kinds circle the shot; a dash's circle where they were born, from beside
-	// its body, and its fire and frost fall from its feet.
-	int r = kind < 0.0 ? ROW_TWINKLE : kind_row(kind);
-	vec2 base = at;
-	vec2 centre = target;
-	if (dash) {
-		centre = at;
-		if (kind < 0.5) {
-			r = ROW_DASH_STREAK;
-		} else if (kind == L_EMBERS || kind == L_FLECKS) {
-			r = kind == L_EMBERS ? ROW_DASH_EMBER : ROW_DASH_FLECK;
-			base = at + vec2(0.0, r == ROW_DASH_FLECK ? 7.0 : 8.0) + (vec2(th(id, j, 135.0, row), th(id, j, 136.0, row)) - 0.5) * vec2(8.0, 2.0);
-		} else {
-			base = at + side * (th(id, j, 141.0, row) - 0.5) * 10.0;
-		}
-	}
-	float hs = 200.0 + 20.0 * float(r);
-	vec4 lb = LIFE_BACK[r];
-	float life = lb.x + lb.y * th(id, j, hs, row);
+	float hs = STREAK_SALT;
+	float life = STREAK_LIFE.x + STREAK_LIFE.y * th(id, j, hs, row);
 	if (ago >= life) {
 		return S;
 	}
 	float u = ago / life;
-	float z = L.zoom;
-	float frame = floor(trail_now * 60.0);
-	vec4 jit = JITTER[r];
-	vec4 vel = VELOCITY[r];
-	vec4 ud = UP_DRAG[r];
-	vec4 ci = CIRCLE[r];
-	vec4 ra = RADIUS[r];
-	vec4 sp = SPIN[r];
-	vec4 tp = TIP[r];
-	vec2 pos = mix(base, centre, ci.w) + dir * (lb.z + lb.w * th(id, j, hs + 1.0, row));
-	pos += (vec2(th(id, j, hs + 2.0, row), th(id, j, hs + 3.0, row)) - 0.5) * jit.xy;
-	pos += (vec2(th(id, frame, hs + 4.0, row), th(id, frame, hs + 5.0, row)) - 0.5) * jit.z;
-	pos += side * (th(id, j, hs + 6.0, row) - 0.5) * jit.w;
-	vec2 v = -dir * (vel.x + vel.y * th(id, j, hs + 7.0, row)) + side * (th(id, j, hs + 8.0, row) - 0.5) * vel.z;
-	v += vec2((th(id, j, hs + 9.0, row) - 0.5) * vel.w, -(ud.x + ud.y * th(id, j, hs + 10.0, row)));
-	float curl = (th(id, j, hs + 11.0, row) - 0.5) * ud.w;
-	float turn = curl * ago;
-	vec2 v_now = vec2(v.x * cos(turn) - v.y * sin(turn), v.x * sin(turn) + v.y * cos(turn));
-	if (abs(curl) < 0.01) {
-		pos += v * (ud.z < 0.999 ? dragged(ago, ud.z) : ago);
-	} else {
-		pos += vec2(v.x * sin(turn) - v.y * (1.0 - cos(turn)), v.x * (1.0 - cos(turn)) + v.y * sin(turn)) / curl;
-	}
-	pos += (vec2(th(id, j, hs + 12.0, row), th(id, j, hs + 13.0, row)) - 0.5) * ci.z * ago;
-	pos.y -= (ci.x + ci.y * th(id, j, hs + 14.0, row)) * ago;
-	float ang = th(id, j, hs + 15.0, row) * 6.2832 + sp.y * ago + sp.z * u * (th(id, j, hs + 16.0, row) < 0.5 ? -1.0 : 1.0) * (1.2 + th(id, j, hs + 17.0, row));
-	float radius = (ra.x + ra.y * th(id, j, hs + 18.0, row) + ra.z * u) * (sp.x > 0.5 ? z : 1.0) * pow(max(1.0 - u, 0.0001), ra.w);
-	pos += vec2(cos(ang), sin(ang)) * radius;
-	vec4 bl = BLINK[r];
-	vec4 sh = SHOW[r];
-	vec4 arm = ARM[r];
-	bool shown = mod(frame + id * bl.x + j * bl.y + bl.z, bl.w) >= sh.x && th(id, frame, hs + 19.0, row) >= sh.y && u > sh.z;
-	float steps = arm.w;
+	vec2 v = -dir * (STREAK_SPEED.x + STREAK_SPEED.y * th(id, j, hs + 7.0, row));
+	vec2 pos = at + dir * (STREAK_LIFE.z + STREAK_LIFE.w * th(id, j, hs + 1.0, row));
+	pos += side * (th(id, j, hs + 6.0, row) - 0.5) * STREAK_SIDE;
+	pos += v * ago;
+	int pi = int(L.player);
 	S.alive = true;
 	S.pos = pos;
-	S.line = sp.w > 0.5;
-	S.tip = pos - v_now * tp.x - dir * tp.y * (2.0 + z);
-	S.rgb = shown ? vec4(tone(pick4(COLOURS[r], min(floor(u * steps), steps - 1.0)), L), 1.0) : vec4(0.0);
-	S.arm = shown && u >= arm.x && u < arm.y && th(id, j, hs + 20.0, row) < sh.w ? vec4(tone(arm.z, L), 1.0) : vec4(0.0);
-	S.glow = tp.z * (1.0 - 0.75 * u);
-	S.light = SHINE[r];
+	S.tip = pos - v * STREAK_TIP;
+	S.rgb = vec4(u < 0.5 ? P_LIGHT[pi] : P_BASE[pi], 1.0);
+	S.glow = STREAK_GLOW * (1.0 - 0.75 * u);
 	return S;
 }
 
@@ -447,17 +288,10 @@ void vertex() {
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
 	bool shown = false;
-	// A particle's slot: its moment back from now, and which of the moment's.
-	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
-	bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
-	// A particle slot's moment: the `slot`-th of the trail's moments back from now (every
-	// `spark_stride`-th, at the row's phase). A dash's streaks (on the piece and tail slots) are
-	// two a moment, never thinned.
+	// A dash's streak slot (its piece and tail slots, two a moment): its moment back from now, and
+	// which of the moment's.
+	bool is_streak = dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL);
 	float id = floor(trail_now * BIRTHS) - floor(slot * 0.5);
-	if (!streak_slot) {
-		float phase = row < 0.0 ? 0.0 : mod(row, spark_stride);
-		id = (floor((floor(trail_now * BIRTHS) + phase) / spark_stride) - slot) * spark_stride - phase;
-	}
 	// A tail pixel's number (its place on the path: one every `gap` pixels, from the shot's pace
 	// over its whole kept path, so it holds still while the shot flies), and the ends of a step of
 	// lightning's line.
@@ -470,56 +304,45 @@ void vertex() {
 	float n = (ceil(o_top / gap) - 1.0 - slot) * gap;
 	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
 	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
-	// A particle slot's particle: which of the moment's, and the kind it was given off as (-2 for
-	// none: not born, or outside the path or the trail's window).
-	float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
-	float kind = -2.0;
-	if (is_spark) {
+	// Whether a streak slot has a streak: born, on the path, and not past its window.
+	float j = mod(slot, 2.0);
+	bool born = false;
+	if (is_streak) {
 		float t = id / BIRTHS;
 		float ago = trail_now - t;
-		if (ago >= 0.0 && ago <= trail_window(b, dash, tail) && t < t_top) {
-			kind = trail_kind(id, j, dash, L.emits, row);
-		}
+		born = ago >= 0.0 && ago <= STREAK_WINDOW && t < t_top;
 	}
 	// The one search of the path: the pieces the quad's moment, pixel or step ends are on. Only a
 	// slot that may still draw searches (performance, 2026-11-02: the search is most of a vertex's
-	// work, and most particle slots have no particle): a particle that was given off, a tail
-	// pixel while the trail has a tail, a step of lightning's line. The head, the core and the
-	// pieces' lights never read it.
-	bool search = is_spark ? kind > -1.5 : (quad == Q_TAIL ? !dash && tail > 0.0 : quad == Q_JAG && lightning && !dash);
+	// work): a streak that was born, a tail pixel while the trail has a tail, a step of lightning's
+	// line. The head, the core and the pieces' lights never read it.
+	bool search = is_streak ? born : (quad == Q_TAIL ? !dash && tail > 0.0 : quad == Q_JAG && lightning && !dash);
 	vec2 before = vec2(-1.0);
 	if (search) {
-		vec2 key = is_spark ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
-		before = samples_before(row, newest, skip, count - 1.0, key, is_spark);
+		vec2 key = is_streak ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
+		before = samples_before(row, newest, skip, count - 1.0, key, is_streak);
 	}
-	if (is_spark) {
-		Spark S = spark(row, newest, skip, head_end, kind, target, dash, id, j, before.x, L);
+	if (is_streak) {
+		Streak S = streak(row, newest, skip, head_end, id, j, born ? before.x : -1.0, L);
 		if (S.alive) {
 			vec2 px = floor(S.pos);
-			if (quad == Q_SPARK_LIGHT || quad == Q_PIECE_LIGHT) {
+			if (quad == Q_PIECE_LIGHT) {
 				m = M_GLOW;
 				shown = true;
-				float reach = max(S.light.y, S.light.w);
+				float reach = STREAK_SHINE.y;
 				q_lo = px + 0.5 - reach;
 				q_hi = px + 0.5 + reach;
 				a0 = vec4(px + 0.5, 0.0, 1.0);
-				a1 = vec4(S.glow * flicker * S.light.x, S.light.y, S.glow * flicker * S.light.z, S.light.w);
+				a1 = vec4(S.glow * flicker * STREAK_SHINE.x, STREAK_SHINE.y, 0.0, 1.0);
 				k0 = vec4(hue, 1.0);
-			} else if (S.line) {
+			} else {
 				m = M_LINE;
-				shown = S.rgb.a > 0.0;
+				shown = true;
 				q_lo = min(S.pos, S.tip) - 1.0;
 				q_hi = max(S.pos, S.tip) + 1.0;
 				a0 = vec4(S.pos, S.tip);
 				a2 = vec4(1.0e9, 0.0, 0.0, 0.0);
 				k0 = S.rgb;
-			} else {
-				shown = S.rgb.a > 0.0 || S.arm.a > 0.0;
-				q_lo = px - 1.0;
-				q_hi = px + 2.0;
-				a0 = vec4(px, 1.0, 1.0);
-				k0 = S.rgb;
-				k1 = S.arm;
 			}
 		}
 	} else if (quad == Q_HEAD_LIGHT || quad == Q_CORE) {

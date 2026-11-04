@@ -914,6 +914,10 @@ func test_tails_off_draws_the_cores_alone() -> void:
 	mgr.tailless_particle_cap = 3
 	mgr.update_draw(1.0)
 	check(is_equal_approx(mgr.particle_share, 0.5), "and then by it: %.2f" % mgr.particle_share)
+	mgr.events.tailless_motes_changed.emit(6)
+	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the tailless pool")
+	mgr.update_draw(1.0)
+	check_equal(mgr.particle_share, 1.0, "and the births thin by it")
 	mgr.set_tails_enabled(true)
 	var again: int = mgr.spawn(0, Vector2(100.0, 250.0), Vector2(120.0, 0.0), 5.0)
 	check(mgr.get_trail_of(again) >= 0, "on again: a new shot takes its row")

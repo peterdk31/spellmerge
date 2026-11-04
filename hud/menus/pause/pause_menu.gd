@@ -46,6 +46,11 @@ extends PanelContainer
 ##   S5: "do shots need tails?") flips on `accept`, from `ShotTails.DEFAULT`, sends
 ##   `shot_tails_changed`, which the projectile manager applies at once, and is saved
 ##   (`shot_tails`); a saved choice other than the default is sent again when the menu is bound.
+##   "Tailless motes" (a dev slider beside it, S5 step 4: "no tails, more motes") steps the same
+##   way as "Particle amount" through `TaillessMotes.STOPS` (2048, 4096, 8192: the births' pool
+##   with the tails off), from `TaillessMotes.DEFAULT`; each move sends `tailless_motes_changed`,
+##   which the projectile manager and feel apply, and is saved (`tailless_motes`), sent again when
+##   bound if it is not the default. It changes nothing while the tails are on.
 ##   "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
@@ -126,6 +131,8 @@ const LIGHT_TEXT: String = "Spell light: %s"
 const LIGHT_SETTING: StringName = &"spell_light"
 const TAILS_TEXT: String = "Tails: %s"
 const TAILS_SETTING: StringName = &"shot_tails"
+const TAILLESS_TEXT: String = "Tailless motes: %s"
+const TAILLESS_SETTING: StringName = &"tailless_motes"
 const FPS_TEXT: String = "Show FPS: %s"
 const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
@@ -169,6 +176,8 @@ var show_fps: bool = false
 var spell_light: bool = SpellLightSetting.default_on()
 ## The "Tails" dev switch (see the top): on by default.
 var shot_tails: bool = ShotTails.DEFAULT
+## The "Tailless motes" dev setting (see the top): `TaillessMotes.DEFAULT` by default.
+var tailless_motes: int = TaillessMotes.DEFAULT
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
@@ -210,6 +219,8 @@ var ai_view: bool = false
 @onready var _marks: Button = _add(Page.SETTINGS, "FloorMarks", MARKS_TEXT % ("On" if floor_marks else "Off"))
 @onready var _light: Button = _add(Page.SETTINGS, "SpellLight", LIGHT_TEXT % ("On" if spell_light else "Off"))
 @onready var _tails: Button = _add(Page.SETTINGS, "ShotTails", TAILS_TEXT % ("On" if shot_tails else "Off"))
+@onready var _tailless: Button = _add(Page.SETTINGS, "TaillessMotes", TAILLESS_TEXT % TaillessMotes.word_of(tailless_motes))
+@onready var _tailless_bar: HSlider = _add_slider(_tailless, 0, TaillessMotes.STOPS.size() - 1, 1, TaillessMotes.index_of(tailless_motes), TAILLESS_TEXT % TaillessMotes.STOPS[-1])
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
@@ -239,6 +250,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_floor_marks()
 	_load_light()
 	_load_tails()
+	_load_tailless_motes()
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
@@ -351,6 +363,10 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var step: int = clampi(MoteDensity.index_of(mote_density) + direction.x, 0, MoteDensity.STOPS.size() - 1)
 		_set_mote_density(MoteDensity.STOPS[step])
 		return _density
+	if control == _tailless and direction.x != 0:
+		var pick: int = clampi(TaillessMotes.index_of(tailless_motes) + direction.x, 0, TaillessMotes.STOPS.size() - 1)
+		_set_tailless_motes(TaillessMotes.STOPS[pick])
+		return _tailless
 	if control == _shots and direction.x != 0:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
@@ -542,6 +558,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_light(not spell_light)
 	elif control == _tails:
 		_set_tails(not shot_tails)
+	elif control == _tailless:
+		_set_tailless_motes(TaillessMotes.STOPS[(TaillessMotes.index_of(tailless_motes) + 1) % TaillessMotes.STOPS.size()])
 	elif control == _shake:
 		_set_shake(not screen_shake)
 	elif control == _fps:
@@ -668,6 +686,33 @@ func _show_mote_cap(cap: int) -> void:
 	mote_cap = cap
 	_motes.set_meta(BASE_TEXT_META, MOTE_CAP_TEXT % MoteCap.word_of(cap))
 	_motes_bar.value = MoteCap.index_of(cap)
+	_mark_focus()
+
+
+## Read the saved "Tailless motes" pool and show it; the manager and feel are told only when it
+## is not the default.
+func _load_tailless_motes() -> void:
+	var saved: int = TaillessMotes.snap(int(save.get_setting(TAILLESS_SETTING, TaillessMotes.DEFAULT)))
+	_show_tailless_motes(saved)
+	if saved != TaillessMotes.DEFAULT and _events != null:
+		_events.tailless_motes_changed.emit(saved)
+
+
+## Move the "Tailless motes" slider to `pool` (a stop): show it, save it and tell the manager and
+## feel.
+func _set_tailless_motes(pool: int) -> void:
+	if pool == tailless_motes:
+		return
+	_show_tailless_motes(pool)
+	save.set_setting(TAILLESS_SETTING, pool)
+	if _events != null:
+		_events.tailless_motes_changed.emit(pool)
+
+
+func _show_tailless_motes(pool: int) -> void:
+	tailless_motes = pool
+	_tailless.set_meta(BASE_TEXT_META, TAILLESS_TEXT % TaillessMotes.word_of(pool))
+	_tailless_bar.value = TaillessMotes.index_of(pool)
 	_mark_focus()
 
 

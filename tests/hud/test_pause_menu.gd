@@ -41,6 +41,7 @@ var _densities: Array[float] = []
 var _floor_marks: Array[bool] = []
 var _lights: Array[bool] = []
 var _tails: Array[bool] = []
+var _tailless: Array[int] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -61,6 +62,7 @@ func _initialize() -> void:
 	_test_the_floor_marks_switch()
 	_test_the_spell_light_switch()
 	_test_the_tails_switch()
+	_test_the_tailless_motes_slider()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
@@ -102,6 +104,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
 	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
 	_bus.shot_tails_changed.connect(func(on: bool) -> void: _tails.append(on))
+	_bus.tailless_motes_changed.connect(func(pool: int) -> void: _tailless.append(pool))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -128,6 +131,7 @@ func _teardown() -> void:
 	_floor_marks.clear()
 	_lights.clear()
 	_tails.clear()
+	_tailless.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -328,7 +332,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotTails", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotTails", "TaillessMotes", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -423,6 +427,41 @@ func _test_the_tails_switch() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(not _menu().shot_tails, "a later menu starts with the saved choice")
 	_check(_tails == [false], "and tells the manager when the Hud binds, got %s" % [_tails])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Tailless motes (S5 step 4: a dev slider) starts at the default pool and sends nothing; left
+## and right step through the stops and tell the manager and feel, accept steps up and wraps, and
+## the choice is saved: a menu bound to the same save later starts with it and tells them.
+func _test_the_tailless_motes_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_tailless.is_empty(), "nothing is sent at the default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("TaillessMotes")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	_check(row.text.ends_with("Tailless motes: 2048") and is_equal_approx(bar.value, 0.0), "2048 at the start, in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_right")
+	_frame()
+	_check(_menu().tailless_motes == 4096 and _tailless == [4096], "right asks for 4096, got %s" % [_tailless])
+	_check(row.text.ends_with("Tailless motes: 4096") and is_equal_approx(bar.value, 1.0), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	_tap(0, &"move_right")
+	_frame()
+	_tap(0, &"move_right")
+	_frame()
+	_check(_menu().tailless_motes == 8192 and _tailless == [4096, 8192], "right stops at the top, got %s" % [_tailless])
+	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"tailless_motes", -1)) == 8192, "the save remembers it")
+	_press(0, "TaillessMotes")
+	_check(_menu().tailless_motes == 2048, "accept at the top wraps to the default")
+	_press(0, "TaillessMotes")
+	_check(_menu().tailless_motes == 4096, "accept steps up")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().tailless_motes == 4096 and _tailless == [4096], "a later menu starts with the saved pool and tells them, got %s" % [_tailless])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

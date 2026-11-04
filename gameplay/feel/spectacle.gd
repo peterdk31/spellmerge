@@ -71,6 +71,8 @@ var pool: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
 var mote_density: float = MoteDensity.DEFAULT
+## The "Tailless motes" dev setting (`TaillessMotes`): the motes' rows a frame follow its pool.
+var tailless_motes: int = TaillessMotes.DEFAULT
 ## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
 var marks: MarksScript = null
 var floor_marks: bool = FloorMarks.default_on()
@@ -117,6 +119,7 @@ func _ready() -> void:
 		return
 	events.mote_cap_changed.connect(set_mote_cap)
 	events.mote_density_changed.connect(set_mote_density)
+	events.tailless_motes_changed.connect(set_tailless_motes)
 	events.spell_light_changed.connect(set_spell_light)
 	events.room_entered.connect(_on_room_entered)
 	events.room_entered.connect(_fit_marks)
@@ -394,6 +397,7 @@ func use_motes(motes: MotesScript) -> void:
 	if motes != null:
 		pool.name = "Motes"
 		pool.density = mote_density
+		pool.frame_rows = TaillessMotes.frame_rows_of(tailless_motes)
 		add_child(pool)
 		pool.step(_clock)
 		pool.settle_into(marks)
@@ -431,6 +435,17 @@ func set_mote_density(density: float) -> float:
 	if pool != null:
 		pool.density = mote_density
 	return mote_density
+
+
+## The "Tailless motes" dev setting: the motes may write `TaillessMotes.frame_rows_of(births)`
+## rows a frame, so the bigger births' pool the projectile manager takes with the tails off is
+## drawn. Returns the rows a frame.
+func set_tailless_motes(births: int) -> int:
+	tailless_motes = TaillessMotes.snap(births)
+	var rows: int = TaillessMotes.frame_rows_of(tailless_motes)
+	if pool != null:
+		pool.frame_rows = rows
+	return rows
 
 
 ## The "Floor marks" setting: on makes the mark layer (fitted to the room it was last told of),

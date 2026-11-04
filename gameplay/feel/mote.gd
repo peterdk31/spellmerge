@@ -159,6 +159,10 @@ var _now: float = 0.0
 ## leaves (MOMENT_ROWS while a shed or a wall's throw writes), and the settles left (SETTLE_ROWS a
 ## frame, kept up to SETTLE_MOST).
 var _rows_left: int = FRAME_ROWS
+## The rows a frame (FRAME_ROWS; the "Tailless motes" dev slider raises it, so a bigger tailless
+## pool's births are written: `TaillessMotes.frame_rows_of`, set by the spectacle). The moments
+## keep their MOMENT_ROWS of it.
+var frame_rows: int = FRAME_ROWS
 var _keep: int = 0
 var _settles_left: int = SETTLE_MOST
 ## Rows written since the pool was made: a mote's serial (the mark layer forgets a settle whose
@@ -508,7 +512,7 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 ## with nothing alive, and move the shader's clock on.
 func step(now: float) -> void:
 	_now = now
-	_rows_left = FRAME_ROWS
+	_rows_left = frame_rows
 	_settles_left = mini(_settles_left + SETTLE_ROWS, SETTLE_MOST)
 	if _marks != null:
 		_marks.forget_settles_before(_serial - _cap)

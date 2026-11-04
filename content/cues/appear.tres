@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"appear"
-parts = Array[Dictionary]([{"effect": &"fall", "zoom": 3, "way": &"right"}, {"effect": &"spray", "zoom": 1, "way": &"up", "particles": true}])
+parts = Array[Dictionary]([{"effect": &"fall", "zoom": 3, "way": &"right"}, {"effect": &"spray", "zoom": 1, "way": &"up", "particles": true}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 15.0, "spread": 92.0, "way": &"up"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 30.0, "spread": 360.0, "up": 0.3}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])
 shake = 0.15
 kick = 1.5

@@ -244,7 +244,7 @@ func test_a_death_plays_its_cue() -> void:
 	check(is_equal_approx(feel.actors.held_left(0), cue.hold), "the killer held")
 	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
 	check_equal(feel.stop_left, 0.0, "the game runs on")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "and a puff of its own (no hit to take over)")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "and its puff")
 
 
 func test_a_downed_wizard_plays_its_cue() -> void:
@@ -322,3 +322,83 @@ func test_a_parts_way_comes_from_the_cue() -> void:
 	check_equal(cue.way_of({"way": &"back"}), Vector2.UP, "back")
 	check_equal(cue.way_of({"way": &"right"}), Vector2.RIGHT, "right")
 	check_equal(cue.way_of({"way": &"up"}), Vector2.UP, "up")
+
+
+## S6 2: a cue is read once for playing (`CuePlan`): each part prepared once by its type's
+## `prepare`, then played from that; a new part player reads the cues again.
+func test_a_cues_parts_are_prepared_once() -> void:
+	var prepared: Array[int] = [0]
+	var played: Array = []
+	feel.add_cue_part(&"test_part", func(made: Variant, _cue: RefCounted) -> void: played.append(made),
+		func(part: Dictionary) -> Variant:
+			prepared[0] += 1
+			return int(part["size_x"]) * 10)
+	_made([{"part": &"test_part", "size_x": 3}, {"effect": &"burst", "zoom": 2}])
+	for i in 3:
+		_cue(&"test_cue")
+	check_equal(prepared[0], 1, "prepared once")
+	check_equal(played, [30, 30, 30], "and played from what it made")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 3, "a flash part is prepared too, and plays")
+	check_equal(feel.effect_info(FeelScript.KIND_BURST).get("zoom"), 2, "with its keys")
+	feel.add_cue_part(&"test_part", func(made: Variant, _cue: RefCounted) -> void: played.append(-1),
+		func(_part: Dictionary) -> Variant: return 0)
+	_cue(&"test_cue")
+	check_equal(played.back(), -1, "a new player reads the cue again")
+
+
+func test_a_flash_part_is_read_into_typed_fields() -> void:
+	var flash: FeelScript.CuePlanScript.Flash = FeelScript.CuePlanScript.flash_of({"effect": &"ring_out", "zoom": 3, "way": &"up", "no_cards": true, "if_layer": 5}, FeelScript.CUE_EFFECTS)
+	check_equal(flash.kind, FeelScript.KIND_RING_OUT, "its effect")
+	check_equal(flash.zoom, 3.0, "its zoom")
+	check_equal(flash.way, FeelScript.CuePlanScript.WAY_UP, "its way")
+	check_equal(flash.paint, FeelScript.CuePlanScript.PAINT_NO_CARDS, "its colours")
+	check(flash.gated and flash.if_layer == 5, "and its gate")
+	check(FeelScript.CuePlanScript.flash_of({"effect": &"nothing"}, FeelScript.CUE_EFFECTS) == null, "an effect Feel has not: none")
+
+
+## A cue with an `every` plays at most that often for one actor, parts and weight (S6, item 13: a
+## gem picked up in a horde, hundreds a second); another actor's play is its own.
+func test_a_cue_with_every_plays_at_most_that_often_per_actor() -> void:
+	var cue: CueBase = _made([{"effect": &"burst", "zoom": 1, "seconds": 2.0}])
+	cue.every = 0.5
+	cue.shake = 0.2
+	check(cue.problems().is_empty(), "a valid cue: %s" % [cue.problems()])
+	bus.cue_shown.emit(0, &"test_cue", Vector2(10.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	var trauma: float = feel._trauma
+	bus.cue_shown.emit(0, &"test_cue", Vector2(20.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "played once for actor 0")
+	check_equal(feel._trauma, trauma, "and its weight once")
+	bus.cue_shown.emit(1, &"test_cue", Vector2(30.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 2, "actor 1's is its own")
+	feel.step(0.25)
+	bus.cue_shown.emit(0, &"test_cue", Vector2(40.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 2, "not again within its every")
+	feel.step(0.26)
+	bus.cue_shown.emit(0, &"test_cue", Vector2(50.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 3, "again once its every is over")
+	cue.every = -1.0
+	check(not cue.problems().is_empty(), "an every below 0 is a problem")
+
+
+## The moments that had no look (S6, item 13) each have a cue file, played by name from their area.
+func test_the_new_moments_have_cues() -> void:
+	for id: StringName in [&"level_up", &"gem_pickup", &"revive", &"shield_block", &"pull", &"wave_start"]:
+		var cue: CueBase = feel.cue_of(id)
+		check(cue != null, "%s is a cue file" % id)
+		if cue != null:
+			check(not cue.parts.is_empty(), "%s shows something" % id)
+	check(feel.cue_of(&"gem_pickup").every > 0.0, "a gem pickup is throttled")
+
+
+## A light part's keys are checked like any part's (S6, item 4).
+func test_a_light_part_is_checked() -> void:
+	var cue: CueBase = _made([{"part": &"light", "radius": 30.0, "strength": 1.0, "seconds": 0.3, "bare": true}])
+	check(cue.problems().is_empty(), "a valid light part: %s" % [cue.problems()])
+	check(cue.lights(), "it lights")
+	for bad: Dictionary in [{"part": &"light", "strength": 3.0}, {"part": &"light", "seconds": 0.0}, {"part": &"light", "radius": -1.0}, {"part": &"light", "bare": true, "plain": true}, {"part": &"light", "zoom": 2}]:
+		var wrong := CueBase.new()
+		wrong.id = &"wrong"
+		wrong.parts = [bad]
+		check(not wrong.problems().is_empty(), "%s is a problem" % [bad])
+	check(not feel.cue_of(&"blast").lights(), "a cue with no light part lights by its flashes")
+	check(feel.has_cue_part(&"light"), "a light part has a player")

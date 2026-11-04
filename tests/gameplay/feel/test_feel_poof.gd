@@ -1,18 +1,49 @@
 extends "res://tests/support/suite.gd"
-## The poof's cloud (living staffs H4): `staff_shown` draws a puff with the POOF look along the
-## staff (its middle POOF_ALONG from the hand along the aim), POOF_SECONDS long, that moves with
-## the actor.
+## The staff swap (living staffs H4; a cue since S6 item 9, docs/milestones/spell-spectacle-2.md):
+## `staff_shown` plays the cue `staff_swap` along the whole new staff (its line: from the staff's
+## lower end behind the hand along the aim to its tip, so a part can play anywhere on it), following the body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
+## its body frame by frame exactly as the old poof's did, and ends when the body goes; the live cue
+## shows something at StaffLook's swap of the body and face.
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_feel_poof.gd
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 const STEP: float = 1.0 / 60.0
+const STAFF: int = 2
+
+
+## The real cues, and one made in the test in place of a real one.
+class CuesRegistry:
+	extends RegistryScript
+	var extra: CueBase = null
+
+	func get_resource(folder: StringName, id: StringName) -> Resource:
+		if extra != null and folder == &"cues" and id == extra.id:
+			return extra
+		return super(folder, id)
+
+
+## The spell runtime as Feel asks it about a staff: its current build's first spell.
+class FakeSpells:
+	extends Node
+	var spell: CompiledSpell = CompiledSpell.new()
+	var asked: Array = []
+
+	func current_tag(actor: int, slot: int, _node: int = 0) -> int:
+		asked.append([actor, slot])
+		return 77
+
+	func profile(tag: int) -> CompiledSpell:
+		return spell if tag == 77 else null
+
 
 var _bus: EventsScript
 var _feel: FeelScript
+var _registry: CuesRegistry
 
 
 func before_each() -> void:
@@ -21,11 +52,15 @@ func before_each() -> void:
 	_feel.events = _bus
 	_feel.drive_engine = false
 	_feel.preset = FeelPresetScript.new()
+	_registry = own(CuesRegistry.new()) as CuesRegistry
+	_registry.scan()
+	_feel.registry = _registry
 	root.add_child(_feel)
 
 
 func _staff() -> Actor:
 	var body := own(Actor.new()) as Actor
+	body.id = 5
 	body.hand_offset = Vector2(0.0, -12.0)
 	body.aim = Vector2.UP
 	body.position = Vector2(50.0, 60.0)
@@ -34,21 +69,115 @@ func _staff() -> Actor:
 	return body
 
 
-func test_a_staff_shown_draws_a_poof_on_the_staff_that_follows_it() -> void:
+func _swap_cue(parts: Array[Dictionary]) -> void:
+	var cue := CueBase.new()
+	cue.id = FeelScript.STAFF_SWAP
+	cue.parts = parts
+	_registry.extra = cue
+	_feel.forget_cues()
+
+
+func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() -> void:
+	_swap_cue([{"effect": &"burst", "zoom": 1, "seconds": 0.2, "along": 1.0}, {"effect": &"ring_out", "zoom": 1, "seconds": 0.2}])
 	var body := _staff()
-	_bus.staff_shown.emit(7, body, 1)
-	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_PUFF)
-	check(not shown.is_empty(), "a puff shows")
+	var tip: Vector2 = body.muzzle_position()
+	_bus.staff_shown.emit(body.id, body, STAFF)
+	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT).get("at"), body.butt_position().round(), "the cue's point is the staff's lower end")
+	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
+	check(not shown.is_empty(), "its flash shows")
 	if shown.is_empty():
 		return
-	check(((shown["look"] as int) & FeelScript.POOF) != 0, "with the poof look")
-	check(is_equal_approx(shown["seconds"] as float, FeelScript.POOF_SECONDS), "for the poof's seconds")
-	check_equal(shown["dir"], Vector2.UP, "along the staff")
-	var middle: Vector2 = body.global_position + body.hand_offset + Vector2.UP * FeelScript.POOF_ALONG
-	check_equal(shown["at"], middle.round(), "on the staff's middle")
-	body.position += Vector2(20.0, 0.0)
-	_feel.step(STEP)
-	check_equal((_feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).x, middle.x + 20.0, "and moves with it")
-	for i in roundi(FeelScript.POOF_SECONDS / STEP) + 2:
+	check_equal(shown["at"], tip.round(), "its line runs to the tip: a part along 1 plays there")
+	check_equal(shown["dir"], Vector2.UP, "along the aim")
+	# Frame by frame, the body walking: the flash stays on the tip it was played at.
+	var frames: int = 0
+	while not _feel.effect_info(FeelScript.KIND_BURST).is_empty():
+		body.position += Vector2(1.5, -0.5)
 		_feel.step(STEP)
-	check(_feel.effect_info(FeelScript.KIND_PUFF).is_empty(), "then it is gone")
+		frames += 1
+		var info: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
+		if not info.is_empty():
+			check_equal(info["at"], (tip + Vector2(1.5, -0.5) * frames).round(), "on the tip at frame %d" % frames)
+		if frames > 60:
+			break
+	check(absi(frames - roundi(0.2 / STEP)) <= 1, "for its seconds (%d frames)" % frames)
+
+
+## The poof as the old code drew it (before S6 item 9) against the same look as a followed cue's
+## flash: the same rows, frame by frame, while the body moves and turns.
+func test_a_followed_flash_moves_as_the_old_poof_did() -> void:
+	var body := _staff()
+	var ramp: int = int(_feel.call("_ramp_of", -1))
+	var offset: Vector2 = body.hand_offset + body.aim * 4.0
+	var old: int = _feel.show_effect(FeelScript.KIND_PUFF, body.global_position + offset, body.aim, Color.WHITE, ramp, FeelScript.POOF, 2, FeelScript.POOF_SECONDS, 0.0, body)
+	var offsets: PackedVector2Array = _feel.get("_effect_offset") as PackedVector2Array
+	offsets[old] = offset
+	_feel.set("_effect_offset", offsets)
+	_swap_cue([{"effect": &"poof", "zoom": 2, "bare": true}])
+	_feel.play_cue(FeelScript.STAFF_SWAP, -1, body.global_position + offset, body.aim, 0.0, Color.WHITE, 0, -1, -1, -1, 0, true, FeelScript.NO_BODY, FeelScript.CASTER_RAMP, body)
+	var new: int = (old + 1) % _feel.effect_slots
+	for frame in roundi(FeelScript.POOF_SECONDS / STEP) + 2:
+		for field: String in ["_effect_at", "_effect_dir", "_effect_core", "_effect_ramp", "_effect_zoom", "_effect_look", "_effect_seconds", "_effect_age", "_effect_offset", "_effect_kind"]:
+			var values: Variant = _feel.get(field)
+			check_equal(values[new], values[old], "%s at frame %d" % [field, frame])
+		check_equal((_feel.get("_effect_follow") as Array)[new], (_feel.get("_effect_follow") as Array)[old], "following at frame %d" % frame)
+		body.position += Vector2(2.0, 1.0)
+		body.aim = body.aim.rotated(0.3)
+		_feel.step(STEP)
+
+
+func test_a_followed_flash_ends_when_its_body_goes() -> void:
+	_swap_cue([{"effect": &"burst", "zoom": 1, "seconds": 1.0}])
+	var body := _staff()
+	_bus.staff_shown.emit(body.id, body, STAFF)
+	check(not _feel.effect_info(FeelScript.KIND_BURST).is_empty(), "it shows")
+	body.free()
+	_feel.step(STEP)
+	check(_feel.effect_info(FeelScript.KIND_BURST).is_empty(), "and goes with the body")
+
+
+func test_it_is_in_the_new_staffs_colour_and_cards() -> void:
+	_swap_cue([{"effect": &"burst", "zoom": 1}])
+	var spells := own(FakeSpells.new()) as FakeSpells
+	spells.spell.tint = Color(0.2, 0.6, 1.0)
+	spells.spell.look = 0b10010
+	_feel.spells = spells
+	var body := _staff()
+	_bus.staff_shown.emit(body.id, body, STAFF)
+	check_equal(spells.asked, [[body.id, STAFF]], "asked for the build of the staff put on show")
+	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
+	check(not shown.is_empty() and shown["core"] == Color(0.2, 0.6, 1.0), "in its spell's colour")
+	check(not shown.is_empty() and shown["look"] == 0b10010, "with its cards")
+
+
+## The live cue (one of the looks the owner picks from: staff_swap, staff_swap_b, staff_swap_c)
+## shows a flash at the moment StaffLook swaps the body and face (SWAP_AT of POOF_TIME), and each
+## look is a sound cue.
+func test_the_looks_show_at_the_swap() -> void:
+	var swap: float = StaffLook.POOF_TIME * StaffLook.SWAP_AT
+	for id: StringName in [&"staff_swap", &"staff_swap_b", &"staff_swap_c"]:
+		var cue: CueBase = _feel.cue_of(id)
+		check(cue != null, "%s exists" % id)
+		if cue == null:
+			continue
+		check(cue.problems().is_empty(), "%s is a sound cue: %s" % [id, cue.problems()])
+		# A flash or a light that lasts past the swap (motes fly free from the press).
+		var at_swap: bool = false
+		for part: Dictionary in cue.parts:
+			var type: StringName = StringName(part.get("part", "effect"))
+			if type != &"motes" and float(part.get("seconds", 0.2)) >= swap - STEP:
+				at_swap = true
+		check(at_swap, "%s shows something at the swap" % id)
+
+
+## `along` is a fraction of the cue's line: a part outside 0 to 1 is a problem, and every part
+## type may say it (a motes part may also say `line`).
+func test_along_and_line_are_part_keys() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test_line"
+	var good: Array[Dictionary] = [{"effect": &"burst", "along": 0.5}, {"part": &"motes", "line": true, "along": 0.0}, {"part": &"light", "along": 1.0}]
+	cue.parts = good
+	check(cue.problems().is_empty(), "along on a flash, motes and a light, line on motes: %s" % [cue.problems()])
+	var bad: Array[Dictionary] = [{"effect": &"burst", "along": 1.5}]
+	cue.parts = bad
+	check(not cue.problems().is_empty(), "along past the line's end is a problem")

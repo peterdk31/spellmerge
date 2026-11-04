@@ -49,7 +49,7 @@ func take() -> void:
 			combat.call("apply_status", caster, imps[i], id, SECONDS, 5.0)
 	await _snap(centre, "statuses_4x", 4)
 	await _snap(centre, "statuses_1x", 1)
-	events.call("emit_signal", "reaction_triggered", caster, &"shatter", centre + Vector2(GAP * 0.5, 0.0))
+	events.call("emit_signal", "reaction_triggered", caster, &"shatter", centre + Vector2(GAP * 0.5, 0.0), -1)
 	await _snap(centre, "status_reaction_1x", 1)
 
 

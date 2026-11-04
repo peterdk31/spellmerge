@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"shield_block"
+parts = Array[Dictionary]([{"effect": &"burst", "zoom": 2, "seconds": 0.15, "bare": true}, {"effect": &"ring_out", "zoom": 1, "seconds": 0.2, "bare": true, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 6, "radius": 20.0, "spread": 160.0, "way": &"back", "bare": true}])
+shake = 0.05
+sound = &"shield_block"

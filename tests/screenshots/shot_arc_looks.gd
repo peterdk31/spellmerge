@@ -5,7 +5,9 @@ extends "res://tests/support/screenshot.gd"
 ##   1-4  a zap 60 px long, 1, 3, 6 and 10 frames old
 ##   5    a zap 30 px long, up and to the right, 2 frames old
 ##   6    a spark into the air (16 px), 2 frames old
-## `arc_looks` at 1x and `arc_looks_4x` (the plain and fire rows, columns 1-3).
+## `arc_looks` at 1x and `arc_looks_4x` (the plain and fire rows, columns 1-3). Each zap is the zap
+## card's cue (`zap`, content/cues; S6), as `form_shown` plays it, by the actor id of the row's seat (no actor is open here, so the plain row
+## is in the ramp Feel gives an unknown actor, not seat 0's blue as before the cue).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -44,8 +46,7 @@ func take() -> void:
 				var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
 				var at := Vector2(column[0] as float, 35.0 + e * ROW)
 				var length: float = column[1] as float
-				var seconds: float = 0.25 * (1.0 if length > FeelScript.SPARK_LONGEST else 0.6)
-				feel.call("show_effect", FeelScript.KIND_ARC, at, column[2] as Vector2, tint, e % 4, look, 1, seconds, length)
+				feel.call("play_cue", &"zap", e % 4, at, column[2] as Vector2, length, tint, look)
 		await process_frame
 	var image: Image = await grab()
 	if int(feel.call("live_arcs")) < 30:

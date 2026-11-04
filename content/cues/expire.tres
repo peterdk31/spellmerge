@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"expire"
+parts = Array[Dictionary]([{"effect": &"burst", "zoom": 1, "seconds": 0.2}, {"part": &"motes", "kind": &"spell", "share": 1.0}, {"part": &"motes", "kind": &"spark", "count": 4, "radius": 8.0, "spread": 160.0, "way": &"back", "life": 0.6, "often": true}])

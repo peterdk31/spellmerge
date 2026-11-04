@@ -127,7 +127,8 @@ vec3 shade4(vec3 a, vec3 b, vec3 c, vec3 d, float u) {
 	return u < 0.25 ? a : (u < 0.5 ? b : (u < 0.75 ? c : d));
 }
 
-// The kind (0-15) and the code beside it (0-0.45) in an instance's custom data alpha.
+// The kind (0-15) and the code beside it (0-0.45 above the kind; below it, -0.45-0, for an effect
+// that does not light the room: Feel's unlit effects, S6 item 4) in an instance's custom data alpha.
 float coded_kind(float custom_a) {
 	return floor((1.0 - custom_a) * 16.0 + 0.5);
 }
@@ -137,7 +138,8 @@ float coded_code(float custom_a) {
 	return coded - floor(coded + 0.5);
 }
 
-// How far through its life an effect (or a rune's trace) is, from its code.
+// How far through its life an effect (or a rune's trace) is, from its code (either side of its kind).
 float coded_age(float code) {
-	return code > 0.01 ? clamp((code - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) : 1.0;
+	float a = abs(code);
+	return a > 0.01 ? clamp((a - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) : 1.0;
 }

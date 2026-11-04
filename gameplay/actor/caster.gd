@@ -282,6 +282,11 @@ func tip() -> float:
 	return staff_of(current).tip
 
 
+## Pixels the staff on show runs on behind the hand (`StaffBase.butt`).
+func butt() -> float:
+	return staff_of(current).butt
+
+
 ## Put staff `at` on show (`current`); another than the one shown sends `staff_shown` (the poof).
 func _show(at: int) -> void:
 	if at == current:

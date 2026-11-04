@@ -24,8 +24,27 @@ var shot: int = -1
 ## The ramp-table source of what broke, for the surface kinds and marks (a dying body's art;
 ## -1: the room's walls).
 var surface: int = -1
+## The own colour of the body the cue is of (a dying enemy's `EnemyBase.hit_color`), for its
+## `body` flashes; alpha 0 for none.
+var body: Color = Color(0.0, 0.0, 0.0, 0.0)
 ## The tag of the spell it is of (its cards' motes and marks, `card_kinds.gd`; 0 for none).
 var tag: int = 0
+## The body it follows (`Feel.play_cue`'s `follow`; null: it stays where it played): its flashes
+## move with it, `at` minus the body's position from it, while they last (S6, item 9).
+var follow: Node2D = null
+## The cue's own colour (`CueBase.color`: what its parts with no colour of their own are in
+## exactly; alpha 0 for none) and its `power` (what its sizes, counts, holds and shake are times).
+var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+var power: float = 1.0
+
+
+## Where a part not prepared into fields plays (a light; `CueBase`'s `along`): its fraction of the cue's line from its point (0, the
+## default: the point itself; 1: the line's end), the line being the cue's way for its `size`
+## pixels (a staff from its grip to its tip).
+func point_of(part: Dictionary) -> Vector2:
+	if not part.has("along"):
+		return at
+	return at + aim * size * clampf(float(part["along"]), 0.0, 1.0)
 
 
 ## The way a part (a Dictionary with an optional `way`, `CueBase.WAYS`) points: along the cue's

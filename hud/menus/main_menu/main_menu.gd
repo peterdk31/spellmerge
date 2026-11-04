@@ -30,6 +30,11 @@ const STRESS_NODE: String = "StressRunner"
 const TIMING_ARGUMENT: String = "--projectile-timing"
 const TIMING_RUNNER: String = "res://tests/benchmark/projectile_timing_runner.gd"
 const TIMING_NODE: String = "ProjectileTimingRunner"
+## The sandbox storm (`--storm`, tests/benchmark/sandbox_storm_runner.gd): in the Web Test export it
+## is the storm on a real GPU in a browser (the owner's harness, tests/benchmark/README.md).
+const STORM_ARGUMENT: String = "--storm"
+const STORM_RUNNER: String = "res://tests/benchmark/sandbox_storm_runner.gd"
+const STORM_NODE: String = "SandboxStormRunner"
 
 ## The event bus. Only tests set this, before adding the node; otherwise the
 ## "Events" autoload is used.
@@ -73,6 +78,7 @@ func _ready() -> void:
 	_start_four_bot_test(args)
 	_start_stress_test(args)
 	_start_timing_test(args)
+	_start_storm(args)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -97,6 +103,11 @@ func _start_stress_test(args: PackedStringArray) -> bool:
 ## The same for the projectile timings (`--projectile-timing`).
 func _start_timing_test(args: PackedStringArray) -> bool:
 	return _start_runner(args, TIMING_ARGUMENT, TIMING_NODE)
+
+
+## The same for the sandbox storm (`--storm`).
+func _start_storm(args: PackedStringArray) -> bool:
+	return _start_runner(args, STORM_ARGUMENT, STORM_NODE)
 
 
 func _start_runner(args: PackedStringArray, argument: String, node_name: String) -> bool:
@@ -135,6 +146,9 @@ func _runner_script(node_name: String) -> GDScript:
 		TIMING_NODE:
 			if ResourceLoader.exists(TIMING_RUNNER):
 				return load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
+		STORM_NODE:
+			if ResourceLoader.exists(STORM_RUNNER):
+				return load("res://tests/benchmark/sandbox_storm_runner.gd") as GDScript
 	return null
 
 

@@ -10,7 +10,10 @@ extends RefCounted
 const STOPS: Array[int] = [0, 8192, 16384, 32768]
 ## The words the menu shows for each stop.
 const WORDS: Array[String] = ["Off", "Low", "Medium", "High"]
-## The platforms' defaults (P1c sets them from measurements).
+## The platforms' defaults, measured in P1c (docs/DECISIONS.md, 2026-11-04): the web's ring of
+## 8,192 costs about nothing on a laptop's Intel UHD, the desktop's 32,768 about 2 ms of it when
+## full, and the sandbox storm's sheds and cues (Motes.FRAME_ROWS a frame, the longest life 2.5 s)
+## fill most of the desktop's.
 const DEFAULT_WEB: int = 8192
 const DEFAULT_DESKTOP: int = 32768
 

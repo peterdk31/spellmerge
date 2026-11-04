@@ -11,7 +11,8 @@ extends RefCounted
 const STOPS: Array[float] = [0.0, 0.5, 1.0, 2.0]
 ## The words the menu shows for each stop.
 const WORDS: Array[String] = ["None", "Half", "Full", "Double"]
-## The default share (P1c sets it from measurements).
+## The default share (kept at Full by P1c's measurements: a burst's cost is mostly its call,
+## and a storm is bounded by Motes.FRAME_ROWS whatever the share).
 const DEFAULT: float = 1.0
 
 

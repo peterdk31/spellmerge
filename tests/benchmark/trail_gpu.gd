@@ -13,6 +13,11 @@ extends SceneTree
 ##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
 ##   ... -- --light                   with spell light (gameplay/feel/spell_light.gd, P3a) on the
 ##                                    shots: its light buffer's GPU time is printed too
+##   ... -- --motes                   the mote scenes instead (P1c; `_mote_scene`): no shots, and
+##                                    the mote ring full of motes in flight (none, the web's
+##                                    default, the desktop's)
+##   ... -- --marks                   the floor mark scene instead (P1c for P2a; `_mark_scene`):
+##                                    frames with 300 new stamps and frames with none, by turns
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -29,6 +34,9 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MarksScript := preload("res://gameplay/feel/marks.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 ## Where spell light is applied (Feel's LIGHT_Z).
 const LIGHT_Z: int = 15
 
@@ -43,6 +51,19 @@ const SCENARIOS: Array[Dictionary] = [
 	{"label": "some", "shots": 400},
 	{"label": "many", "shots": 3000},
 ]
+## The mote scenes (`--motes`): the ring's size, each row a mote in flight.
+const MOTE_SCENES: Array[Dictionary] = [
+	{"label": "no motes", "motes": 0},
+	{"label": "motes web", "motes": MoteCap.DEFAULT_WEB},
+	{"label": "motes desktop", "motes": MoteCap.DEFAULT_DESKTOP},
+	{"label": "motes desktop, no glow", "motes": MoteCap.DEFAULT_DESKTOP, "glow": false},
+]
+## The mark scene (`--marks`): stamps on a frame with stamps, on a room the arena's size.
+const MARK_STAMPS: int = 300
+const MARK_ROOM := Rect2(0.0, 0.0, 704.0, 448.0)
+## Frames in a run of the mark scene, and those left out at a run's start.
+const MARK_RUN: int = 12
+const MARK_SKIP: int = 4
 
 var _mgr: ManagerScript = null
 var _bus: EventsScript = null
@@ -55,6 +76,8 @@ var _only: String = ""
 var _timed: int = TIMED_FRAMES
 var _light: bool = false
 var _spell_light: SpellLightScript = null
+var _motes_only: bool = false
+var _marks_only: bool = false
 
 
 func _initialize() -> void:
@@ -70,6 +93,10 @@ func _initialize() -> void:
 			_only = arg.substr(7)
 		elif arg == "--light":
 			_light = true
+		elif arg == "--motes":
+			_motes_only = true
+		elif arg == "--marks":
+			_marks_only = true
 		elif arg.begins_with("--timed="):
 			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
@@ -79,9 +106,15 @@ func _run() -> void:
 	await process_frame
 	RenderingServer.viewport_set_measure_render_time(root.get_viewport_rid(), true)
 	print("BENCH: trail gpu on %s" % RenderingServer.get_video_adapter_name())
-	for scenario: Dictionary in SCENARIOS:
-		if _only.is_empty() or scenario["label"] == _only:
-			await _scenario(scenario)
+	if _motes_only:
+		for scene: Dictionary in MOTE_SCENES:
+			await _mote_scene(scene)
+	elif _marks_only:
+		await _mark_scene()
+	else:
+		for scenario: Dictionary in SCENARIOS:
+			if _only.is_empty() or scenario["label"] == _only:
+				await _scenario(scenario)
 	_teardown()
 	print("TRAIL GPU OK")
 	quit(0)
@@ -223,3 +256,107 @@ func _spawn() -> void:
 			kinds.append(kind)
 	_mgr.set_look(slot, ManagerScript.pack_look(kinds))
 	_mgr.set_core(slot, Color.from_hsv(_rng.randf(), 0.7, 1.0))
+
+
+## A mote scene (`--motes`): a pool of `scene.motes` rows with the real kinds (content/motes), every
+## row a mote in flight (thrown a frame's FRAME_ROWS at a time, living 3.5 to 4 s, so all are in
+## the air or lying while timed), and no shots. Prints the frame's GPU time and the vertices the
+## motes send (every row of a shown chunk runs the vertex stage, alive or not).
+func _mote_scene(scene: Dictionary) -> void:
+	_teardown()
+	var label: String = scene["label"]
+	var cap: int = scene["motes"]
+	var registry: RegistryScript = RegistryScript.new()
+	registry.scan()
+	var kinds: Array[MoteKind] = []
+	for found: Resource in registry.get_all(&"motes"):
+		if found is MoteKind:
+			kinds.append(found as MoteKind)
+	registry.free()
+	var motes: MotesScript = null
+	var now: float = 0.0
+	if cap > 0:
+		motes = MotesScript.new(cap, 0, kinds)
+		root.add_child(motes)
+		_rng.seed = 20261104
+		var left: int = cap
+		while left > 0:
+			motes.step(now)
+			var n: int = mini(left, MotesScript.FRAME_ROWS)
+			var at := Vector2(_rng.randf_range(40.0, 600.0), _rng.randf_range(40.0, 320.0))
+			motes.burst(_rng.randi_range(0, kinds.size() - 1), at, Vector2.RIGHT, n, Vector2(20.0, 160.0), 360.0, Vector2(10.0, 90.0), Vector2(3.5, MotesScript.LIFE_MAX), 0, Color(1.0, 0.6, 0.2))
+			left -= n
+		motes.step(now)
+		if not bool(scene.get("glow", true)):
+			# The glow's pixels round a hot mote (more fragments a mote) off: the rest is the
+			# vertex stage and the motes' own pixels.
+			((motes.get_child(0) as MultiMeshInstance2D).material as ShaderMaterial).set_shader_parameter(&"glow_strength", 0.0)
+	var times: PackedFloat64Array = PackedFloat64Array()
+	for f in _timed:
+		now += DT
+		if motes != null:
+			motes.step(now)
+		await process_frame
+		times.append(RenderingServer.viewport_get_measured_render_time_gpu(root.get_viewport_rid()))
+	var vertices: int = (motes.chunks_shown() * MotesScript.CHUNK * 4) if motes != null else 0
+	if motes != null:
+		motes.free()
+	times = times.slice(_timed / 4)
+	times.sort()
+	print("BENCH: trail gpu %s: %d motes in flight (%d vertices a frame), GPU median %.2f ms, p95 %.2f ms" % [
+		label, cap, vertices, times[times.size() / 2], times[int(float(times.size()) * 0.95)]])
+
+
+## The mark scene (`--marks`): a floor mark layer (gameplay/feel/marks.gd) the arena's size with
+## the real kinds (content/marks), and runs of MARK_RUN frames by turns with MARK_STAMPS new stamps
+## each and with none (a GPU time is read some frames late, so the first frames of a run are left
+## out). Prints the layer viewport's GPU time on a frame with stamps, the layer's renders on the
+## frames with none (a viewport that did not render keeps its last time, so its time says
+## nothing there: it should render none), and the whole frame's GPU time on each.
+func _mark_scene() -> void:
+	_teardown()
+	var registry: RegistryScript = RegistryScript.new()
+	registry.scan()
+	var kinds: Array[MarkKind] = []
+	for found: Resource in registry.get_all(&"marks"):
+		if found is MarkKind:
+			kinds.append(found as MarkKind)
+	registry.free()
+	var marks: MarksScript = MarksScript.new(-1, kinds)
+	root.add_child(marks)
+	marks.enter(MARK_ROOM, null, 16.0)
+	marks.set_floor_colors(PackedColorArray([Color(0.45, 0.42, 0.5), Color(0.3, 0.28, 0.35), Color(0.18, 0.16, 0.22)]))
+	RenderingServer.viewport_set_measure_render_time(marks.viewport().get_viewport_rid(), true)
+	_rng.seed = 20261104
+	var stamp_layer: PackedFloat64Array = PackedFloat64Array()
+	var stamp_frame: PackedFloat64Array = PackedFloat64Array()
+	var none_frame: PackedFloat64Array = PackedFloat64Array()
+	var none_renders: int = 0
+	var none_frames: int = 0
+	for f in _timed * 2:
+		var stamping: bool = (f / MARK_RUN) % 2 == 0
+		if stamping:
+			for n in MARK_STAMPS:
+				var at := Vector2(_rng.randf_range(16.0, MARK_ROOM.size.x - 16.0), _rng.randf_range(16.0, MARK_ROOM.size.y - 16.0))
+				marks.stamp(_rng.randi_range(0, kinds.size() - 1), at, _rng.randf_range(4.0, 24.0), marks.random_turn(), 0, Color(1.0, 0.6, 0.2))
+		var renders: int = marks.renders
+		marks.step()
+		await process_frame
+		var layer: float = RenderingServer.viewport_get_measured_render_time_gpu(marks.viewport().get_viewport_rid())
+		var frame: float = RenderingServer.viewport_get_measured_render_time_gpu(root.get_viewport_rid())
+		if f < MARK_RUN * 2 or f % MARK_RUN < MARK_SKIP:
+			continue
+		if stamping:
+			stamp_layer.append(layer)
+			stamp_frame.append(frame)
+		else:
+			none_frame.append(frame)
+			none_renders += marks.renders - renders
+			none_frames += 1
+	marks.free()
+	for list: PackedFloat64Array in [stamp_layer, stamp_frame, none_frame]:
+		list.sort()
+	print("BENCH: trail gpu marks: %d stamps a frame: layer GPU median %.2f ms (p95 %.2f), whole frame median %.2f ms; no stamps: %d layer renders in %d frames, whole frame median %.2f ms; layer %dx%d (%.1f MB)" % [
+		MARK_STAMPS, stamp_layer[stamp_layer.size() / 2], stamp_layer[int(float(stamp_layer.size()) * 0.95)], stamp_frame[stamp_frame.size() / 2],
+		none_renders, none_frames, none_frame[none_frame.size() / 2],
+		int(MARK_ROOM.size.x), int(MARK_ROOM.size.y), MARK_ROOM.size.x * MARK_ROOM.size.y * 4.0 / 1048576.0])

@@ -26,11 +26,19 @@ extends Node
 ##
 ## The wizard is placed among the dummies at the start and kept up (mana full, revived and
 ## protected), since the shooting dummy in the other lane shoots back.
+##
+## Motes (docs/milestones/spell-spectacle.md, P1c): `--motes=N` sets Feel's "Particles" cap (0
+## turns motes off; the platform's default otherwise) and `--mote-density=X` its "Particle amount".
+## Feel is handed a timed pool (`timed_motes.gd`), and the report's `BENCH: storm motes` line
+## gives the motes written, the bursts the frame's FRAME_ROWS cut, the chunks uploaded and the
+## CPU time of the mote pool's calls, each a frame and per 60th of a game second (a frame at
+## 60 FPS; a headless run draws more frames than that).
 
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
+const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
 
 const PLAYER: int = 0
 ## The staff that holds the split-and-nova build (Y; Flow.SANDBOX_START_CARDS).
@@ -57,6 +65,12 @@ var _input: Node = null
 var _projectiles: Node = null
 var _combat: Node = null
 var _spells: Node = null
+var _feel: Node = null
+var _motes_written_at: int = 0
+var _motes_cut_at: int = 0
+var _mote_uploads_at: int = 0
+var _mote_usec_at: int = 0
+var _mote_calls_at: int = 0
 var _probe: Node = null
 var _tree_profile: Node = null
 var _draw_usec: int = 0
@@ -93,6 +107,7 @@ func _ready() -> void:
 	_projectiles = root.get_node_or_null("Projectiles")
 	_combat = root.get_node_or_null("Combat")
 	_spells = root.get_node_or_null("Spells")
+	_feel = root.get_node_or_null("Feel")
 	if _events == null or _flow == null or _input == null or _projectiles == null or _combat == null:
 		_finish(["the Events, Flow, PlayerInput, Projectiles and Combat autoloads must exist"])
 		return
@@ -103,6 +118,15 @@ func _ready() -> void:
 			seconds = maxf(arg.trim_prefix("--seconds=").to_float(), 1.0)
 		elif arg.begins_with("--cap="):
 			_projectiles.call("set_cap", maxi(arg.trim_prefix("--cap=").to_int(), 1))
+	if _feel != null:
+		for arg in args:
+			if arg.begins_with("--motes="):
+				_feel.call(&"set_mote_cap", maxi(arg.trim_prefix("--motes=").to_int(), 0))
+			elif arg.begins_with("--mote-density="):
+				_feel.call(&"set_mote_density", arg.trim_prefix("--mote-density=").to_float())
+		var pool: Node = _motes()
+		if pool != null:
+			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), pool.z_index, pool.call(&"kinds")))
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
@@ -164,6 +188,13 @@ func _start() -> void:
 	_seq_at = int(_projectiles.get("_next_seq"))
 	_dropped_at = int(_projectiles.get("dropped"))
 	_waited_at = int(_spells.get("fires_waited")) if _spells != null else 0
+	var motes: Node = _motes()
+	if motes != null:
+		_motes_written_at = int(motes.get(&"written"))
+		_motes_cut_at = int(motes.get(&"cut"))
+		_mote_uploads_at = int(motes.get(&"uploads"))
+		_mote_usec_at = int(motes.get(&"usec"))
+		_mote_calls_at = int(motes.get(&"calls"))
 	_probe = ProbeScript.new()
 	add_child(_probe)
 	var args: PackedStringArray = OS.get_cmdline_user_args()
@@ -286,10 +317,32 @@ func _report() -> void:
 	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots and %d trails drawn at the end" % [
 		float(_draw_usec) / frames / 1000.0, float(_draw_max_usec) / 1000.0, _draw_frames,
 		int(_projectiles.get("drawn")), int(_projectiles.get("drawn_trails"))])
+	var motes: Node = _motes()
+	if motes == null:
+		print("BENCH: storm motes: off")
+	else:
+		var sixtieths: float = seconds * 60.0
+		var written: int = int(motes.get(&"written")) - _motes_written_at
+		var usec: float = float(int(motes.get(&"usec")) - _mote_usec_at)
+		print("BENCH: storm motes: cap %d, density %.1f, FRAME_ROWS %d: %.0f written a frame (%.0f a 60th of a second, %d in all), %.0f bursts cut short by the frame's rows a frame, %.2f chunks uploaded a frame, %d of %d chunks shown at the end" % [
+			int(motes.call(&"cap")), float(motes.get(&"density")), TimedMotesScript.FRAME_ROWS,
+			float(written) / frames, float(written) / sixtieths, written,
+			float(int(motes.get(&"cut")) - _motes_cut_at) / frames,
+			float(int(motes.get(&"uploads")) - _mote_uploads_at) / frames,
+			int(motes.call(&"chunks_shown")), int(motes.call(&"chunks_made"))])
+		if motes.get(&"usec") != null:
+			var calls: float = float(int(motes.get(&"calls")) - _mote_calls_at)
+			print("BENCH: storm motes: CPU %.3f ms a frame, %.3f ms a 60th of a second (%.2f us a mote written), in %.0f calls a frame (the timer's own cost is in it: mote_write.gd)" % [
+				usec / frames / 1000.0, usec / sixtieths / 1000.0, usec / maxf(1.0, float(written)), calls / frames])
 	if _probe != null:
 		_probe.call("report")
 	if _tree_profile != null:
 		_tree_profile.call(&"report")
+
+
+## Feel's motes (null with them off).
+func _motes() -> Node:
+	return _feel.call(&"motes") as Node if _feel != null else null
 
 
 func _failures() -> Array[String]:

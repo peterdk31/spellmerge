@@ -1673,14 +1673,17 @@ func motes() -> MotesScript:
 	return _motes
 
 
-func _make_motes(cap: int) -> void:
-	mote_cap = cap
+## Use `pool` as the motes from now on, in place of the ones made for the setting (its cap is the
+## setting's now; null turns them off). For the benchmarks, which hand Feel a pool that times its
+## own calls (tests/benchmark/timed_motes.gd).
+func use_motes(pool: MotesScript) -> void:
 	if _motes != null:
 		_motes.queue_free()
 		remove_child(_motes)
 		_motes = null
-	if cap > 0:
-		_motes = MotesScript.new(cap, MOTE_Z, _mote_kinds())
+	_motes = pool
+	mote_cap = pool.cap() if pool != null else 0
+	if pool != null:
 		_motes.name = "Motes"
 		_motes.density = mote_density
 		add_child(_motes)
@@ -1688,6 +1691,10 @@ func _make_motes(cap: int) -> void:
 		_surface_source = _motes.table_source(_surface_colors)
 	else:
 		_surface_source = -1
+
+
+func _make_motes(cap: int) -> void:
+	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds()) if cap > 0 else null)
 
 
 ## The mote kinds of the registry (content/motes), in id order.

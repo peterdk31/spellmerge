@@ -31,6 +31,8 @@ extends Resource
 ##                ramp and colour; `surface`: the surface kinds, in the colours of what broke (the
 ##                room's walls, or the art of a body that died); or a kind's id (content/motes),
 ##                coloured as its own kind is
+##   `colours`    `spell` or `surface`: the colours they cool through, in place of their kind's
+##                (ash, a kind no card names, in the colours of what burned)
 ##   `count`      how many in all, split between the kinds (each kind's own count when not given)
 ##   `reach`      they fly out to the cue's `size` x reach pixels at the most (the kinds' own speed
 ##                when not given, or when the cue has no size)
@@ -63,7 +65,7 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "way", "particles"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "count", "reach", "spread", "up", "ring", "way"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "spread", "up", "ring", "way"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
@@ -151,6 +153,8 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d has a count or reach of 0 or less, or an up below 0" % [id, i])
 	if float(part.get("spread", 0.0)) < 0.0 or float(part.get("spread", 0.0)) > 360.0:
 		found.append("%s: motes part %d's spread is not 0 to 360 degrees" % [id, i])
+	if part.has("colours") and not MOTE_GROUPS.has(StringName(part["colours"])):
+		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
 	return found
 
 

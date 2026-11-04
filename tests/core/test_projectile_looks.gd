@@ -791,7 +791,8 @@ func test_a_dash_gives_off_its_cards_as_births() -> void:
 		births += mgr.spark_birth_count
 	check_equal(births, 0, "a plain dash: no births")
 	mgr.set_anchor(1, Vector2(100.0, 200.0))
-	mgr.follow_caster(1, Color.RED, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), 1.0)
+	var tag: int = SpellTag.make(1, 2, 3, 1)
+	mgr.follow_caster(1, Color.RED, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), 1.0, tag)
 	births = 0
 	var feet: bool = true
 	for n in 30:
@@ -803,9 +804,10 @@ func test_a_dash_gives_off_its_cards_as_births() -> void:
 			var at: int = i * ManagerScript.SPARK_BIRTH_STRIDE
 			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS and mgr.spark_births[at + ManagerScript.SPARK_Y] > 205.0
 			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_BACK_X] < -0.9
+			feet = feet and ManagerScript.spark_tag(mgr.spark_births, at) == tag
 	# 30 moments at DASH_FEET_RATE (0.5): 15 expected.
 	check(births >= 6 and births <= 25, "a fire dash's embers at its feet's rate: %d in 30" % births)
-	check(feet, "from its feet, given off back along the dash")
+	check(feet, "from its feet, given off back along the dash, with its cast's tag (its cards' motes, S2)")
 
 
 ## A plain shot gives off the shader's twinkle (kind 0), as does a shot whose only kind is the weave

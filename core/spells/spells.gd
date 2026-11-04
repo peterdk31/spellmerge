@@ -201,6 +201,9 @@ var events: EventsScript = null
 ## `begin_generation`, remove them, and only then call `begin_generation` (which clears it)
 ## or `shot_ended` again for them. Part 6 does exactly that.
 var revoked_tags: PackedInt64Array = PackedInt64Array()
+## The tag of the spell whose `cue_shown` is being sent (a blast's), 0 outside it, so the cue's
+## motes and marks can be its cards' (gameplay/feel; spell-spectacle-2.md, S2). For looks only.
+var cue_tag: int = 0
 
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.
 var registry: Node = null
@@ -700,6 +703,22 @@ func component_kind(id: StringName) -> StringName:
 ## The spell registered under `tag`, or null when its generation is gone.
 func profile(tag: int) -> CompiledSpell:
 	return _profiles.get(tag)
+
+
+## The cards of the spell registered under `tag`, as plain ids: its form, then its infusions and its
+## modifiers in slot order, each once (empty when its generation is gone). For looks only:
+## gameplay/feel's motes and marks by card (docs/milestones/spell-spectacle-2.md, S2).
+func cards_of(tag: int) -> Array[StringName]:
+	var cards: Array[StringName] = []
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null:
+		return cards
+	if spell.form_id != &"":
+		cards.append(spell.form_id)
+	for id in spell.element_ids + spell.modifier_ids:
+		if id != &"" and not cards.has(id):
+			cards.append(id)
+	return cards
 
 
 ## Registers every spell of `compiled` under a new generation of this actor's staff and
@@ -1243,7 +1262,9 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius <= 0.0 or events == null or not at.is_finite():
 		return
+	cue_tag = tag
 	events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
+	cue_tag = 0
 	var chain: int = spell.chain_jumps
 	var prev: int = 0
 	if tag == _ray.tag:
@@ -1398,7 +1419,9 @@ func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
 	var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if blast > 0.0 and events != null and at.is_finite():
+		cue_tag = tag
 		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
+		cue_tag = 0
 	if at.is_finite():
 		_strike_round(spell, tag, actor, at, Vector2.RIGHT, maxf(spell.radius, blast), null, true)
 	# After the strike, which can reach the caster itself and would spend the barrier.

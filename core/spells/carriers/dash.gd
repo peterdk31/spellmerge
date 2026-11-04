@@ -91,7 +91,7 @@ func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way
 	kit.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
 	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
 	kit.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
-	kit.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
+	kit.projectiles.follow_caster(actor, spell.tint, spell.look, seconds, tag)
 	_start_pass(spell, tag, actor, -1, seconds, chain, prev)
 	kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
 

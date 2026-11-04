@@ -4,12 +4,17 @@ extends Resource
 ## logic that Feel throws where things happen. One file per kind in `content/motes/<id>.tres`;
 ## the registry finds it by its `id`, so a new kind is a new file and no list is edited.
 ##
-## A kind belongs to the cards' looks: it is the motes of every card whose `look_layer` it names
-## (`look_layers`), so a fire shot sheds the kind that names fire's layer and a new card brings
-## its motes through the look it already has. A shot whose cards name no kind's layer sheds the
-## kinds of layer 0. A `surface` kind belongs to no card: it is what a struck surface (a wall)
-## sheds, in the colours of the room's art (`RoomBase.surface_colors`). Its colours are never
-## here: a spell's motes cool through the shot's own ramp, a surface's through the room's.
+## A kind belongs to cards (docs/milestones/spell-spectacle-2.md, S2): it is the motes of every
+## card it names by id (`cards`: a form, an element or a modifier), and of every card whose
+## `look_layer` it names (`look_layers`) that no kind names by id. So a card gets motes of its
+## own with one new file naming it (the card's file is not touched), a card that no kind names
+## sheds its look layer's, and a shot whose cards have none sheds the kinds of layer 0. A spell
+## sheds every kind of its cards, its burst split between them. A `surface` kind belongs to no
+## card: it is what a struck surface (a wall) sheds, in the colours of the room's art
+## (`RoomBase.surface_colors`; a room may name its own, `RoomBase.surface_kinds`). A kind that
+## names none of these is thrown only where something names it (a cue's `motes` part, a room's
+## `surface_kinds`). Its colours are never here: a spell's motes cool through the shot's own
+## ramp, a surface's through the room's.
 ##
 ## The numbers say how one flies (`gameplay/feel/mote.gdshader` works the flight out from them,
 ## `Motes.flight` the same on the CPU) and how many a burst throws, how fast and for how long.
@@ -21,8 +26,12 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 
 ## Unique name, also its file name.
 @export var id: StringName = &""
+## The cards (forms, elements, modifiers: their ids) this kind is the motes of, whatever their look
+## layer.
+@export var cards: Array[StringName] = []
 ## The cards' look layers (`look_layer` of an element or modifier; the LOOK_* kinds of
-## core/projectiles) this kind is the motes of; 0 for a shot with no layer that has a kind.
+## core/projectiles) this kind is the motes of, for the cards no kind names by id; 0 for a shot
+## with no layer that has a kind.
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
@@ -149,10 +158,11 @@ func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if id == &"":
 		found.append("a mote kind needs an id")
-	if surface and not look_layers.is_empty():
-		found.append("%s: a surface kind belongs to no card, so it names no look layers" % id)
-	if not surface and look_layers.is_empty():
-		found.append("%s: a spell's kind names the look layers it is the motes of (0 for a shot with none)" % id)
+	if surface and (not look_layers.is_empty() or not cards.is_empty()):
+		found.append("%s: a surface kind belongs to no card, so it names no cards and no look layers" % id)
+	for card in cards:
+		if card == &"":
+			found.append("%s: a card it names has no id" % id)
 	for layer in look_layers:
 		if layer < 0 or layer > LOOK_LAYERS:
 			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, LOOK_LAYERS])

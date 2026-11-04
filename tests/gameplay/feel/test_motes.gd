@@ -219,6 +219,9 @@ func test_every_mote_kind_in_the_content_is_valid() -> void:
 		check_equal(kind.resource_path.get_file(), "%s.tres" % id, "%s is in its own file" % id)
 		plain = plain or kind.look_layers.has(0)
 		surface = surface or kind.surface
+		# Every card a kind names by id is a card (spell-spectacle-2.md, S2).
+		for card in kind.cards:
+			check(registry.get_resource(&"spells", card) != null, "%s names the card %s, which exists" % [id, card])
 	check(plain, "a kind for a shot with no layer that has one")
 	check(surface, "a kind for struck walls")
 	var broken := MoteKind.new()
@@ -227,6 +230,13 @@ func test_every_mote_kind_in_the_content_is_valid() -> void:
 	broken.look_layers = PackedInt32Array([1])
 	broken.life = Vector2(2.0, 1.0)
 	check_equal(broken.problems().size(), 2, "a surface kind with layers and a life backwards: %s" % [broken.problems()])
+	broken.look_layers = PackedInt32Array()
+	broken.life = Vector2(1.0, 2.0)
+	broken.cards = [&"fire"]
+	check_equal(broken.problems().size(), 1, "a surface kind naming a card: %s" % [broken.problems()])
+	var named := _kind(&"named", 0)
+	named.look_layers = PackedInt32Array()
+	check_equal(named.problems(), PackedStringArray(), "a kind that names nothing is fine: only what names it throws it")
 
 
 func test_the_shader_is_handed_each_kinds_numbers() -> void:
@@ -239,19 +249,20 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 	var broken := _kind(&"", 0)
 	var motes: MotesScript = _pool(1024, [_kind(&"first", 0), broken, fast])
 	check_equal(motes.kinds().size(), 2, "a kind with problems is left out")
-	var motion: PackedVector4Array = motes.shader_parameter(&"kind_motion")
-	var sway: PackedVector4Array = motes.shader_parameter(&"kind_sway")
-	check_equal(motion.size(), MotesScript.MAX_KINDS, "room for every kind")
-	check_equal(motion[1], Vector4(500.0, 7.0, 0.3, 0.7), "gravity, drag, bounce, glow of the second kind")
-	check_equal(sway[1], Vector4(3.0, 9.0, 2.0, 0.0), "its sway, rate and first shade")
+	var table: Texture2D = motes.shader_parameter(&"kind_table")
+	check(table != null and table.get_width() == MotesScript.KIND_COLUMNS and table.get_height() >= 2, "a row a kind, KIND_COLUMNS across")
+	check_equal(motes.kind_numbers(1)[0], Vector4(500.0, 7.0, 0.3, 0.7), "gravity, drag, bounce, glow of the second kind")
+	check_equal(motes.kind_numbers(1)[1], Vector4(3.0, 9.0, 2.0, 0.0), "its sway, rate and first shade")
+	check_equal(table.get_image().get_format(), Image.FORMAT_RGBAF, "in full floats, as the GDScript flight reads them")
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
-	check(code.contains("uniform vec4 kind_motion[%d];" % MotesScript.MAX_KINDS) and code.contains("uniform vec4 kind_sway[%d];" % MotesScript.MAX_KINDS), "the shader holds as many")
+	check(code.contains("uniform sampler2D kind_table") and code.contains("const int MAX_KINDS = %d;" % MotesScript.MAX_KINDS), "the shader reads the table, and MAX_KINDS is mote.gd's")
+	check(MotesScript.KIND_CODE + 1.0 >= float(MotesScript.MAX_KINDS), "a row's kind code tells every kind apart")
 	var constants: Dictionary = (MotesScript as GDScript).get_script_constant_map()
 	for name: String in ["LIFE_MAX", "SOURCE_CODE", "KIND_CODE", "HEIGHT_MAX", "EXACT_SOURCE", "TABLE_SOURCE"]:
 		var mine: float = float(constants[name])
 		check(code.contains("const float %s = %s;" % [name, ("%.2f" % mine).trim_suffix("0") if not is_equal_approx(mine, roundf(mine)) else "%.1f" % mine]), "the shader's %s is mote.gd's (%s)" % [name, mine])
 	check(code.contains("const int SHAPE_SIZE = %d;" % MoteKind.SHAPE_SIZE), "the shader's SHAPE_SIZE is MoteKind's")
-	check(code.contains("uniform vec4 kind_shape[%d];" % MotesScript.MAX_KINDS), "and holds every kind's shape")
+	check(code.contains("vec4 shape = texelFetch(kind_table, ivec2(2, k), 0);"), "and reads every kind's shape from its row")
 
 
 func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
@@ -312,10 +323,10 @@ func test_a_shapes_reach_is_as_far_as_its_pixels() -> void:
 	block.shape_turns = true
 	check_equal(MotesScript.reach_of(block), 3, "turned, its corners reach past the square")
 	var motes: MotesScript = _pool(1024, [dot, chunk, block])
-	var sway: PackedVector4Array = motes.shader_parameter(&"kind_sway")
-	check(sway[0].w == 0.0 and sway[1].w == 1.0 and sway[2].w == 3.0, "the shader is handed each kind's reach: %s" % [sway])
+	var reaches: Array[float] = [motes.kind_numbers(0)[1].w, motes.kind_numbers(1)[1].w, motes.kind_numbers(2)[1].w]
+	check_equal(reaches, [0.0, 1.0, 3.0] as Array[float], "the shader is handed each kind's reach")
 	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
-	check(code.contains("reach = lit > 0.0 ? reach + GLOW_REACH : kind_sway[k].w;"), "and draws a mote with no glow that far")
+	check(code.contains("reach = lit > 0.0 ? reach + GLOW_REACH : sway.w;"), "and draws a mote with no glow that far")
 
 
 func test_a_shapes_frames_play_as_its_kind_says() -> void:
@@ -328,9 +339,8 @@ func test_a_shapes_frames_play_as_its_kind_says() -> void:
 	turning.shape_play = "pick"
 	turning.shape_turns = true
 	var motes: MotesScript = _pool(1024, [looped, turning])
-	var shapes: PackedVector4Array = motes.shader_parameter(&"kind_shape")
-	check_equal(shapes[0], Vector4(2.0, 1.0, 12.0, 0.0), "two frames, looping 12 a second, not turning")
-	check_equal(shapes[1], Vector4(1.0, 2.0, 8.0, 1.0), "one frame, picked, turning with its flight")
+	check_equal(motes.kind_numbers(0)[2], Vector4(2.0, 1.0, 12.0, 0.0), "two frames, looping 12 a second, not turning")
+	check_equal(motes.kind_numbers(1)[2], Vector4(1.0, 2.0, 8.0, 1.0), "one frame, picked, turning with its flight")
 
 
 func test_a_broken_shape_is_named() -> void:
@@ -914,14 +924,14 @@ func test_the_flight_is_the_shaders_line_for_line() -> void:
 	var script: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gd")
 	var pairs: Array[PackedStringArray] = [
 		PackedStringArray(["land = (vz + sqrt(vz * vz + 2.0 * g * max(h0, 0.0))) / g;", "land = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g"]),
-		PackedStringArray(["rebound = (g * land - vz) * kind_motion[k].z;", "rebound = (g * land - vz) * kind.bounce"]),
+		PackedStringArray(["rebound = (g * land - vz) * motion.z;", "rebound = (g * land - vz) * kind.bounce"]),
 		PackedStringArray(["rest = land + 2.0 * rebound / g;", "rest = land + 2.0 * rebound / g"]),
 		PackedStringArray(["float tm = min(max(t, 0.0), rest);", "var tm: float = minf(maxf(t, 0.0), rest)"]),
 		PackedStringArray(["h = h0 + vz * tm - 0.5 * g * tm * tm;", "h = h0 + vz * tm - 0.5 * g * tm * tm"]),
 		PackedStringArray(["h = rebound * q - 0.5 * g * q * q;", "h = rebound * s - 0.5 * g * s * s"]),
 		PackedStringArray(["float along = drag > 0.0 ? (1.0 - exp(-drag * tm)) / drag : tm;", "var along: float = (1.0 - exp(-drag * tm)) / drag if drag > 0.0 else tm"]),
 		PackedStringArray(["float phase = s * 6.2832;", "var phase: float = seed * 6.2832"]),
-		PackedStringArray(["ground.x += kind_sway[k].x * (sin(tm * kind_sway[k].y + phase) - sin(phase));", "ground.x += kind.wobble * (sin(tm * kind.wobble_rate + phase) - sin(phase))"]),
+		PackedStringArray(["ground.x += sway.x * (sin(tm * sway.y + phase) - sin(phase));", "ground.x += kind.wobble * (sin(tm * kind.wobble_rate + phase) - sin(phase))"]),
 	]
 	for pair in pairs:
 		check(shader.contains(pair[0]), "the shader's mote_flight has: %s" % pair[0])
@@ -942,7 +952,9 @@ func test_the_numbers_shared_with_core_agree() -> void:
 	check_equal(MotesScript.LOOK_LAYERS, ProjectilesScript.LOOK_COUNT - 1, "a layer for every look kind past the plain shot")
 	check_equal(MotesScript.LIFE_MAX, MoteKind.LIFE_MAX, "the longest life")
 	check(MotesScript.TABLE_SOURCE >= MotesScript.ENEMY_SOURCE + 1 + MotesScript.EXACT_SOURCE, "a table row is past every spell's source (the enemies' exact one included)")
-	check_equal(MotesScript.BIRTH_STRIDE, ProjectilesScript.SPARK_CORE + 3, "a birth ends with its core colour")
+	check_equal(ProjectilesScript.SPARK_TAG, ProjectilesScript.SPARK_CORE + 3, "a birth's tag follows its core colour")
+	check_equal(MotesScript.BIRTH_STRIDE, ProjectilesScript.SPARK_TAG + 2, "and a birth ends with its tag's two floats")
+	check(ProjectilesScript.SPARK_TAG_BITS < 24 and (SpellTag.FLAG << 1) >> ProjectilesScript.SPARK_TAG_BITS < 1 << 24, "each of the tag's floats holds its part whole")
 
 
 ## S3: a hit's spray and a puff throw their sparks as motes (the effect draws only the flash): the

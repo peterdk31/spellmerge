@@ -478,13 +478,16 @@ const DASH_STREAK_SLOTS: int = 32
 ## particles a shot (or a dash) gives off are handed out as births (`spark_births`) for Feel's motes
 ## to throw, while something takes them (`spark_motes`). A birth is SPARK_BIRTH_STRIDE floats:
 ## where (x, y), the way back along the shot (x, y), the look kind it is of (LOOK_*; 0 a plain
-## shot's twinkle), the caster's ramp, the shot's look and its core colour (r, g, b). The pool's
-## share thins them, so the births a frame stay about as many as the pool's particles live
-## (PARTICLE_CAP over their life), whatever the shot count. Measured (DECISIONS, 2026-11-04,
+## shot's twinkle), the caster's ramp, the shot's look, its core colour (r, g, b) and its tag (so
+## the motes can take its spell's cards' kinds; spell-spectacle-2.md, S2; a dash's is its cast's).
+## The pool's share thins them, so the births a frame stay about as many as the pool's particles
+## live (PARTICLE_CAP over their life), whatever the shot count. Measured (DECISIONS, 2026-11-04,
 ## "Trail particles as motes"): cheaper than the shader's at 60, 400 and 3,000 shots.
-const SPARK_BIRTH_STRIDE: int = 10
+const SPARK_BIRTH_STRIDE: int = 12
 ## Where a birth's numbers are: where (x, y), the way back (x, y), the look kind, the caster's
-## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE).
+## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE), and the shot's tag in two
+## floats (SPARK_TAG its low SPARK_TAG_BITS bits, SPARK_TAG + 1 the rest: a float holds every
+## integer only up to 2^24, and a spell's tag is above it; `spark_tag` reads it back).
 const SPARK_X: int = 0
 const SPARK_Y: int = 1
 const SPARK_BACK_X: int = 2
@@ -493,6 +496,8 @@ const SPARK_KIND: int = 4
 const SPARK_RAMP: int = 5
 const SPARK_LOOK: int = 6
 const SPARK_CORE: int = 7
+const SPARK_TAG: int = 10
+const SPARK_TAG_BITS: int = 12
 ## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
@@ -586,6 +591,9 @@ var impact_body: int = 0
 ## beam and outside an impact). For looks only.
 var impact_core: Color = Color.WHITE
 var impact_look: int = 0
+## The tag of that shot (0 for a beam, a strike and outside an impact), so its motes and marks can
+## be its spell's cards' (spell-spectacle-2.md, S2). For looks only.
+var impact_tag: int = 0
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_form`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -878,6 +886,8 @@ var _trail_caster: PackedInt32Array = PackedInt32Array()
 ## Each row's ramp (`Actors.ramp_of` of its caster when the row began; see `look_color`).
 var _trail_ramp: PackedInt32Array = PackedInt32Array()
 var _trail_look: PackedInt32Array = PackedInt32Array()
+## The spell tag of a caster's trail (a dash's cast; `follow_caster`), for its births (S2, S3).
+var _trail_tag: PackedInt64Array = PackedInt64Array()
 var _trail_core: PackedColorArray = PackedColorArray()
 var _trail_zoom: PackedInt32Array = PackedInt32Array()
 var _trail_flags: PackedInt32Array = PackedInt32Array()
@@ -1297,6 +1307,7 @@ func set_cap(value: int) -> void:
 	_trail_ramp.resize(rows)
 	_trail_color.resize(rows)
 	_trail_look.resize(rows)
+	_trail_tag.resize(rows)
 	_trail_core.resize(rows)
 	_trail_zoom.resize(rows)
 	_trail_flags.resize(rows)
@@ -3846,6 +3857,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	impact_form = form
 	impact_core = Color.WHITE
 	impact_look = 0
+	impact_tag = 0
 	events.projectile_impact.emit(caster, target, point, heading)
 	impact_form = &""
 	events.projectile_hit.emit(caster, target, point, tag, -1)
@@ -4011,6 +4023,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
+			impact_tag = 0
 			events.projectile_impact.emit(caster, node, points[i], heads[i])
 			impact_form = &""
 			impact_core = Color.WHITE
@@ -4028,6 +4041,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
+			impact_tag = 0
 			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
 			impact_form = &""
 			impact_core = Color.WHITE
@@ -4036,6 +4050,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &"beam"
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		events.projectile_impact.emit(caster, null, end, end_heading)
 		impact_form = &""
 		impact_core = Color.WHITE
@@ -4192,11 +4207,11 @@ func _let_loose(row: int, until: float) -> void:
 
 
 ## Draw an actor's dash (a wizard's, an enemy's): a trail that follows `caster`'s anchor (see
-## `set_anchor`) for `seconds`, in its ramp's colours with the card particles of `look` in the
-## ramp of `core`, then cools like a shot's. Returns its row, or -1 when there is no anchor or no
-## free row. The path is the caster's own, so a dash that slides along a wall or homes is drawn
+## `set_anchor`) for `seconds`, in its ramp's colours, giving off the card particles of `look` in
+## the ramp of `core` as births (motes, S3) of the spell tagged `tag` (its cards' motes, S2), then
+## cools like a shot's. Returns its row, or -1 when there is no anchor or no free row. The path is the caster's own, so a dash that slides along a wall or homes is drawn
 ## where it went.
-func follow_caster(caster: int, core: Color, look: int, seconds: float) -> int:
+func follow_caster(caster: int, core: Color, look: int, seconds: float, tag: int = 0) -> int:
 	if not is_caster(caster) or caster < 0 or not _anchors[caster].is_finite() or not (seconds >= 0.0):
 		return -1
 	var row: int = _open_row(ROW_CASTER, _anchors[caster])
@@ -4205,6 +4220,7 @@ func follow_caster(caster: int, core: Color, look: int, seconds: float) -> int:
 	_trail_caster[row] = caster
 	_trail_ramp[row] = _ramp_of(caster)
 	_trail_look[row] = look
+	_trail_tag[row] = tag
 	_trail_core[row] = Color(core.r, core.g, core.b, 1.0)
 	_trail_zoom[row] = 1
 	_trail_flags[row] = TRAIL_DASH
@@ -4427,7 +4443,7 @@ func _give_off_sparks(fraction: float) -> void:
 		if _motion[slot] == MOTION_ORBIT:
 			at = _drawn_at(slot, at)
 			back = -_orbit_tangent(slot)
-		if not _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot]):
+		if not _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot], _tag[slot]):
 			return
 
 
@@ -4462,15 +4478,15 @@ func _give_off_dash_sparks(moments: int) -> void:
 			var from: Vector2 = at + side * (_spark_rng.randf() - 0.5) * 10.0
 			if feet:
 				from = at + Vector2((_spark_rng.randf() - 0.5) * 8.0, (7.0 if kind == LOOK_FLECKS else 8.0) + (_spark_rng.randf() - 0.5) * 2.0)
-			if not _add_birth(from, back, kind, _trail_ramp[row], _trail_look[row], _trail_core[row]):
+			if not _add_birth(from, back, kind, _trail_ramp[row], _trail_look[row], _trail_core[row], _trail_tag[row]):
 				return
 
 
 ## One birth (SPARK_BIRTH_STRIDE floats; see there): a particle of look kind `kind` at `at`, given
 ## off back along `back`, from a shot (or a dash) of the caster's `ramp`, the look `look` and the
-## core colour `core`. A shot's and a dash's are written the same way, here. Returns false once
-## the frame's SPARK_BIRTHS_MAX are taken.
-func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color) -> bool:
+## core colour `core`, of the spell tagged `tag` (S2). A shot's and a dash's are written the same
+## way, here. Returns false once the frame's SPARK_BIRTHS_MAX are taken.
+func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> bool:
 	var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
 	spark_births[i + SPARK_X] = at.x
 	spark_births[i + SPARK_Y] = at.y
@@ -4482,8 +4498,15 @@ func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, cor
 	spark_births[i + SPARK_CORE] = core.r
 	spark_births[i + SPARK_CORE + 1] = core.g
 	spark_births[i + SPARK_CORE + 2] = core.b
+	spark_births[i + SPARK_TAG] = float(tag & ((1 << SPARK_TAG_BITS) - 1))
+	spark_births[i + SPARK_TAG + 1] = float(tag >> SPARK_TAG_BITS)
 	spark_birth_count += 1
 	return spark_birth_count < SPARK_BIRTHS_MAX
+
+
+## The tag of the birth that starts at `i` in `births` (SPARK_TAG's two floats).
+static func spark_tag(births: PackedFloat32Array, i: int) -> int:
+	return int(births[i + SPARK_TAG]) | (int(births[i + SPARK_TAG + 1]) << SPARK_TAG_BITS)
 
 
 static func _bit_count(bits: int) -> int:
@@ -4917,12 +4940,14 @@ func _expire(slot: int) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = tag
 		impact_heading = _vel[slot].normalized()
 		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		impact_heading = Vector2.ZERO
 		_event_slot = -1
 	if tag != 0:
@@ -5479,11 +5504,13 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = _tag[slot]
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 
 
 ## The form of the shot in `slot`: its card's (`set_form`), else by its body.
@@ -5530,11 +5557,13 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = tag
 		events.projectile_impact.emit(caster, node, at, heading)
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		_event_slot = slot
 		events.projectile_hit.emit(caster, node, at, tag, slot)
 		_event_slot = -1

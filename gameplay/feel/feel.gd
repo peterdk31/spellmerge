@@ -635,7 +635,7 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
-	_spectacle.attach(projectiles)
+	_spectacle.attach(projectiles, spells)
 
 
 func _exit_tree() -> void:
@@ -957,7 +957,7 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	show_effect(KIND_PUFF, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(preset.reaction_burst_size * power), 1, 15), preset.reaction_seconds * 2.0)
 	_show_ring(position, tint, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power * 2.0)
 	if _spectacle.motes_on():
-		_spectacle.reaction_motes(_ramp_of(caster), position, projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0, tint, float(preset.reaction_mote_count) * power, preset.reaction_mote_reach * power)
+		_spectacle.reaction_motes(_ramp_of(caster), position, projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0, tint, float(preset.reaction_mote_count) * power, preset.reaction_mote_reach * power, projectiles.get_tag_of(shot) if projectiles != null and shot >= 0 else 0)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
@@ -1154,7 +1154,7 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_aim = direction
 		# Its cards' motes back along the way it came, in its own ramp.
 		if projectiles != null:
-			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share)
+			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, projectiles.impact_tag)
 		_show_impact(caster, ramp, position, direction, true)
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's.
@@ -1195,7 +1195,7 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: in
 	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
 	# And a puff of its cards' motes, on along the way it flew.
 	if _spectacle.motes_on():
-		_spectacle.shed_end(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share)
+		_spectacle.shed_end(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share, _tag)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
@@ -1256,10 +1256,11 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 ## `dir`, `size` pixels big (what a part's `reach` is times; the seconds a `lasts_size` part
 ## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
 ## on `target` (an actor, for `hold_target`), sent by `shot`, for what broke in the colours of the
-## ramp-table source `surface` (a dying body's art; -1: the room's walls). Plays its parts, each by
+## ramp-table source `surface` (a dying body's art; -1: the room's walls), of the spell of `tag` (its
+## cards' motes and marks; 0: the tag of `shot`, if any). Plays its parts, each by
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
 ## punch (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1) -> void:
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
@@ -1279,6 +1280,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.target = target
 	context.shot = shot
 	context.surface = surface
+	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
 	_cue_depth += 1
 	for part: Dictionary in cue.parts:
 		var type: StringName = StringName(part.get("part", "effect"))
@@ -1374,7 +1376,9 @@ func cue_of(id: StringName) -> CueBase:
 
 
 func _on_cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
-	play_cue(cue, caster, at, direction, size, tint, look)
+	# The spell runtime's tag of the spell it shows the cue of (its cards' motes and marks).
+	var tag: Variant = spells.get(&"cue_tag") if spells != null else null
+	play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag if tag is int else 0)
 
 
 ## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a

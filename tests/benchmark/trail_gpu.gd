@@ -11,6 +11,8 @@ extends SceneTree
 ##   ... -- --no-time                 save the frames only
 ##   ... -- --only=some               run one scenario (few, some, many)
 ##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
+##   ... -- --light                   with spell light (gameplay/feel/spell_light.gd, P3a) on the
+##                                    shots: its light buffer's GPU time is printed too
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -26,6 +28,9 @@ extends SceneTree
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+## Where spell light is applied (Feel's LIGHT_Z).
+const LIGHT_Z: int = 15
 
 const ROOM := Rect2(0.0, 0.0, 640.0, 360.0)
 const DT: float = 1.0 / 60.0
@@ -48,6 +53,8 @@ var _plain: bool = false
 var _time: bool = true
 var _only: String = ""
 var _timed: int = TIMED_FRAMES
+var _light: bool = false
+var _spell_light: SpellLightScript = null
 
 
 func _initialize() -> void:
@@ -61,6 +68,8 @@ func _initialize() -> void:
 			_time = false
 		elif arg.begins_with("--only="):
 			_only = arg.substr(7)
+		elif arg == "--light":
+			_light = true
 		elif arg.begins_with("--timed="):
 			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
@@ -79,6 +88,10 @@ func _run() -> void:
 
 
 func _teardown() -> void:
+	if _spell_light != null:
+		_spell_light.release()
+		_spell_light.free()
+		_spell_light = null
 	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
@@ -99,6 +112,10 @@ func _scenario(scenario: Dictionary) -> void:
 	var shots: int = scenario["shots"]
 	_mgr.set_cap(maxi(shots + 64, 256))
 	root.add_child(_mgr)
+	if _light:
+		_spell_light = SpellLightScript.new(_mgr, LIGHT_Z)
+		root.add_child(_spell_light)
+		RenderingServer.viewport_set_measure_render_time(_spell_light.viewport.get_viewport_rid(), true)
 	# Stepped and drawn by hand only (see the top).
 	_mgr.set_physics_process(false)
 	_mgr.set_process(false)
@@ -119,11 +136,22 @@ func _scenario(scenario: Dictionary) -> void:
 			var image: Image = root.get_texture().get_image()
 			image.save_png("%s/%s_%d.png" % [_frames_dir, label, f])
 	var times: PackedFloat64Array = PackedFloat64Array()
+	var light_times: PackedFloat64Array = PackedFloat64Array()
+	var draw_times: PackedFloat64Array = PackedFloat64Array()
+	var wall_times: PackedFloat64Array = PackedFloat64Array()
+	var last: int = Time.get_ticks_usec()
 	for f in _timed if _time else 0:
 		_step(WARM_STEPS + SAVED_FRAMES + f, shots)
+		var before: int = Time.get_ticks_usec()
 		_mgr.update_draw(1.0)
+		draw_times.append(float(Time.get_ticks_usec() - before) / 1000.0)
 		await process_frame
+		var now: int = Time.get_ticks_usec()
+		wall_times.append(float(now - last) / 1000.0)
+		last = now
 		times.append(RenderingServer.viewport_get_measured_render_time_gpu(root.get_viewport_rid()))
+		if _spell_light != null:
+			light_times.append(RenderingServer.viewport_get_measured_render_time_gpu(_spell_light.viewport.get_viewport_rid()))
 	if times.is_empty():
 		print("BENCH: trail gpu %s: frames saved" % label)
 		return
@@ -134,6 +162,17 @@ func _scenario(scenario: Dictionary) -> void:
 	print("BENCH: trail gpu %s: %d shots (%d drawn, %d trail instances, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; shares particles %.2f, tails %.2f, stride %d" % [
 		label, shots, _mgr.drawn, _mgr.drawn + _mgr.drawn_trails, _vertices(), sorted[sorted.size() / 2],
 		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share, _mgr.trail_share, _mgr.spark_stride])
+	draw_times = draw_times.slice(_timed / 4)
+	draw_times.sort()
+	wall_times = wall_times.slice(_timed / 4)
+	wall_times.sort()
+	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; a whole frame median %.1f ms (wall clock)" % [
+		label, draw_times[draw_times.size() / 2], wall_times[wall_times.size() / 2]])
+	if not light_times.is_empty():
+		light_times = light_times.slice(_timed / 4)
+		light_times.sort()
+		print("BENCH: trail gpu %s: spell light buffer GPU median %.2f ms, p95 %.2f ms (the apply pass is in the frame's)" % [
+			label, light_times[light_times.size() / 2], light_times[int(float(light_times.size()) * 0.95)]])
 
 
 ## The vertices the batches send the GPU this frame: each batch's instances x its mesh's vertices.

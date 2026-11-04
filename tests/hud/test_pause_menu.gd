@@ -39,6 +39,7 @@ var _mote_caps: Array[int] = []
 var _densities: Array[float] = []
 ## Every `floor_marks_changed` the bus sent, from before the Hud binds.
 var _floor_marks: Array[bool] = []
+var _lights: Array[bool] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -57,6 +58,7 @@ func _initialize() -> void:
 	_test_the_particles_slider()
 	_test_the_particle_amount_slider()
 	_test_the_floor_marks_switch()
+	_test_the_spell_light_switch()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
@@ -96,6 +98,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
 	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
+	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -120,6 +123,7 @@ func _teardown() -> void:
 	_mote_caps.clear()
 	_densities.clear()
 	_floor_marks.clear()
+	_lights.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -320,7 +324,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -372,6 +376,27 @@ func _test_the_floor_marks_switch() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(_menu().floor_marks == (not start), "a later menu starts with it")
 	_check(_floor_marks == [not start], "and tells feel when the Hud binds, got %s" % [_floor_marks])
+
+
+## Spell light (spell spectacle P3a) starts at the platform's default and sends nothing; accept
+## flips it and tells feel, and the choice is saved: a menu bound to the same save later starts
+## with it and tells feel.
+func _test_the_spell_light_switch() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_lights.is_empty(), "nothing is sent at the platform's default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var start: bool = SpellLightSetting.default_on()
+	var word: String = "On" if start else "Off"
+	_check(_menu().button("SpellLight").text.ends_with("Spell light: %s" % word), "the default at the start")
+	_press(0, "SpellLight")
+	_check(_menu().spell_light == not start and _lights == [not start], "accept flips it and tells feel, got %s" % [_lights])
+	_check(bool(SaveFile.new(SAVE_PATH).get_setting(&"spell_light", start)) == not start, "the save remembers it")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().spell_light == not start, "a later menu starts with the saved choice")
+	_check(_lights == [not start], "and tells feel when the Hud binds, got %s" % [_lights])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

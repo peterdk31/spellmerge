@@ -28,12 +28,8 @@ extends Resource
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
 ## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
-## The sparks of a hit's spray and of a puff (a hit with no way, a kill, a reaction) are motes
-## (S3, docs/milestones/spell-spectacle-2.md; the effect drew them before, and draws the flash
-## still): `spray_mote_count` of the kind `spray_mote_kind` along the hit's way within
-## `spray_mote_spread` degrees, out to `spray_mote_reach` pixels a zoom step; a puff
-## `puff_mote_count` of them all round, out to `puff_mote_reach` pixels a step.
-@export var spray_mote_kind: StringName = &"spark"
+## The spray itself and its sparks are the cue `hit` (a hit with no way, and a kill, `hit_puff`;
+## content/cues, S6 2), `size` zoom steps big.
 ## A dead body breaks into motes (S3; `Spectacle.break_body`): `death_mote_share` of its art's
 ## pixels (times its scale's area, at most `death_mote_most`), each a mote of the surface kind
 ## `death_mote_kind` in its art's colours, flung out from its middle at `death_mote_speed` px/s
@@ -43,11 +39,6 @@ extends Resource
 @export_range(0, 512) var death_mote_most: int = 160
 @export var death_mote_speed: Vector2 = Vector2(8.0, 46.0)
 @export var death_mote_up: Vector2 = Vector2(0.0, 40.0)
-@export_range(0, 64) var spray_mote_count: int = 10
-@export_range(0.0, 64.0, 1.0) var spray_mote_reach: float = 15.0
-@export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
-@export_range(0, 64) var puff_mote_count: int = 14
-@export_range(0.0, 64.0, 1.0) var puff_mote_reach: float = 12.0
 @export var enemy_hit_color: Color = Color("e0592f")
 ## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
 ## spectacle's surface kinds); its flare is its carrier card's `impact_cue` (`impact` for none).

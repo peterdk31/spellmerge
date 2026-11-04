@@ -43,11 +43,15 @@ extends Resource
 ##   `count`      how many in all, split between the kinds (each kind's own count when not given)
 ##   `reach`      they fly out to the cue's `size` x reach pixels at the most (the kinds' own speed
 ##                when not given, or when the cue has no size)
+##   `radius`     they fly out to this many pixels at the most, with no `reach` or when the cue has
+##                no size (a spray's sparks: 15)
 ##   `spread`     degrees round the way (the kind's own when not given; 360 all round)
 ##   `up`         times the kind's own speed up (1 when not given)
 ##   `ring`       true: all go out as fast, a ring
 ##   `way`        as an effect's
 ##   `below`      thrown from this many pixels below the cue's point (a body's feet: 8)
+##   `often`      true: a moment of many a frame (a hit's spray), which stops once only the frame's
+##                rows the rarer moments keep are left (`Motes.MOMENT_ROWS`), as a shot's shed does
 ## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
 ## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
 ##   `mark`       the mark kind's id (`MarkKind`, content/marks; required, unless `cards`)
@@ -77,7 +81,7 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "way", "particles", "if_cards", "if_layer"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "spread", "up", "ring", "way", "below"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "often"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
@@ -167,8 +171,8 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 	var found := PackedStringArray()
 	if StringName(part.get("kind", "spell")) == &"":
 		found.append("%s: motes part %d names no kind" % [id, i])
-	if int(part.get("count", 1)) < 1 or float(part.get("reach", 1.0)) <= 0.0 or float(part.get("up", 1.0)) < 0.0:
-		found.append("%s: motes part %d has a count or reach of 0 or less, or an up below 0" % [id, i])
+	if int(part.get("count", 1)) < 1 or float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0 or float(part.get("up", 1.0)) < 0.0:
+		found.append("%s: motes part %d has a count, reach or radius of 0 or less, or an up below 0" % [id, i])
 	if float(part.get("spread", 0.0)) < 0.0 or float(part.get("spread", 0.0)) > 360.0:
 		found.append("%s: motes part %d's spread is not 0 to 360 degrees" % [id, i])
 	if part.has("colours") and not MOTE_GROUPS.has(StringName(part["colours"])):

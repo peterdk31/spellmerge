@@ -209,16 +209,6 @@ func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float
 		pool.throw_part(k, at, Vector2.RIGHT, source, tint, each, reach, 360.0, 1.0, true)
 
 
-## The sparks of a flash that sprays them (a hit's spray, a puff; S3): `count` motes of the kind
-## `kind` at `at` along `way` within `spread` degrees (all round as a ring with `ring`), out to
-## `reach` pixels, in the colours the flash is in (the `core` of a caster of `ramp`, the cards of
-## `look`, exact with its LOOK_EXACT bit). One of many a frame: it leaves the moments' rows alone.
-func flash_motes(kind: StringName, at: Vector2, way: Vector2, core: Color, ramp: int, look: int, count: int, reach: float, spread: float, ring: bool) -> void:
-	if pool == null or not particles_enabled or count <= 0:
-		return
-	pool.throw_part(pool.kind_index(kind), at, way, MotesScript.spell_source(ramp, look), core, count, reach, spread, 1.0, ring, true)
-
-
 ## A body breaking into motes (S3: a death, in place of the white-hot copy that fell apart pixel by
 ## pixel): about `share` of the pixels of the art `sprite` shows (times the area of `to_world`'s
 ## scale, at most `most`), each a mote of the surface kind `kind` (a body is a surface that broke)
@@ -312,12 +302,14 @@ func _trail_motes() -> void:
 # --- Cue parts -------------------------------------------------------------------------------
 
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
-## cue's size times its `reach` out, in the cue's ramp with its tint and the cards of its look.
+## cue's size times its `reach` out (or its `radius` in pixels), in the cue's ramp with its tint and
+## the cards of its look; one `often` (a hit's spray, S6 2) leaves the moments' rows alone.
 func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
 	var way: Vector2 = cue.way_of(part)
-	var reach: float = cue.size * float(part["reach"]) if part.has("reach") and cue.size > 0.0 else 0.0
+	var reach: float = cue.size * float(part["reach"]) if part.has("reach") and cue.size > 0.0 else float(part.get("radius", 0.0))
+	var often: bool = bool(part.get("often", false))
 	var spread: float = float(part.get("spread", -1.0))
 	var up: float = float(part.get("up", 1.0))
 	var ring: bool = bool(part.get("ring", false))
@@ -345,7 +337,7 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell")
 		var source: int = surface if walls else spell
 		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring, often)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with

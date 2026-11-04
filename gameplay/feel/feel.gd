@@ -241,6 +241,9 @@ const CUE_IMPACT: int = 2
 const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
+## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
+## effects' own step, CUE_EFFECTS).
+const HIT_STEP: float = 12.0
 ## `play_cue`'s ramp when not given: the caster's.
 const CASTER_RAMP: int = -100
 ## A status effect lasts until its status ends (Feel ends it).
@@ -438,6 +441,9 @@ var _cue_parts: Dictionary = {}
 var _cue_contexts: Array[CueContextScript] = []
 var _cue_depth: int = 0
 var unknown_cue_parts: int = 0
+## The slot of the last flash a cue's part showed (-1 for none): a hit's spray, which a kill turns
+## into its puff (`_upgrade_hit`).
+var _cue_effect: int = -1
 var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
@@ -1342,15 +1348,15 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 		zoom = roundi(cue.size * float(part["reach"]) / float(row[1]))
 	var way: Vector2 = cue.way_of(part)
 	if part.has("color"):
-		show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds, length)
+		_cue_effect = show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds, length)
 	elif bool(part.get("plain", false)):
-		show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
+		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
 	elif bool(part.get("bare", false)):
-		show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
 	elif bool(part.get("no_cards", false)):
-		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, 0, zoom, seconds, length)
+		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, 0, zoom, seconds, length)
 	else:
-		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds, length)
+		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds, length)
 
 
 ## The cue `id` (`content/cues/<id>.tres`), or null when there is none or no registry yet. Read
@@ -1648,20 +1654,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
 		_effect_length[slot] = steps * 4.0
-	elif kind == KIND_SPRAY or (kind == KIND_PUFF and look & POOF == 0):
-		_flash_motes(kind, at, _effect_dir[slot], core, ramp, look, _effect_zoom[slot])
 	return slot
-
-
-## A spray's or a puff's sparks, as motes (S3; the flash is the effect's): the preset's numbers,
-## `zoom` steps big.
-func _flash_motes(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int) -> void:
-	if preset == null or _spectacle == null:
-		return
-	var puff: bool = kind == KIND_PUFF
-	var count: int = preset.puff_mote_count if puff else preset.spray_mote_count
-	var reach: float = (preset.puff_mote_reach if puff else preset.spray_mote_reach) * float(zoom)
-	_spectacle.flash_motes(preset.spray_mote_kind, at, dir, core, ramp, look, count, reach, 360.0 if puff else preset.spray_mote_spread, puff)
 
 
 ## Age the effects by `real_delta` and write the live ones into their batches, oldest first.
@@ -1871,8 +1864,8 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		core = projectiles.get_core_of(shot)
 	# What broke is the body: its surface kinds and marks in the colours of its own art.
 	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(_body_sprite(enemy)))
-	if particles_enabled and not upgraded:
-		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
+	if not upgraded:
+		play_cue(&"hit_puff", ActorsScript.NONE, position, Vector2.ZERO, zoom * HIT_STEP, preset.enemy_hit_color, 0, ActorsScript.NONE, -1, -1, 0, 0)
 
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
@@ -2191,28 +2184,28 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + shake, 1.0)
-	if position != Vector2.INF and particles_enabled:
+	if position != Vector2.INF:
+		# The cue `hit` (a spray and its sparks along the way the shot flew) or, with no way,
+		# `hit_puff`, `size` steps of HIT_STEP pixels big, in the hit body's colours.
 		var from: Vector2 = position if at == Vector2.INF else at
 		var zoom: int = clampi(roundi(size), 1, 3)
-		if aim != Vector2.ZERO:
-			_hit_effect = show_effect(KIND_SPRAY, from, aim, tint, player, 0, zoom, SPRAY_SECONDS)
-		else:
-			_hit_effect = show_effect(KIND_PUFF, from, Vector2.RIGHT, tint, player, 0, zoom, PUFF_SECONDS)
+		_cue_effect = -1
+		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, player)
+		_hit_effect = _cue_effect
 		_hit_position = position
 	_hit_voice = _play(sound)
 
 
-## Turns the last hit's effect into a puff `zoom` big, as new, when it is still showing at
-## `position` (a killing blow's spray becomes the death's puff: one slot). Returns true when it did.
+## Turns the last hit's spray into the cue `hit_puff` `zoom` steps big, in its colours, when it is
+## still showing at `position` (a killing blow's spray becomes the death's puff: the spray ends as
+## the puff starts). Returns true when it did.
 func _upgrade_hit(position: Vector2, zoom: int) -> bool:
 	var slot: int = _hit_effect
 	if slot < 0 or _hit_position != position or _effect_seconds[slot] <= 0.0:
 		return false
-	_effect_kind[slot] = KIND_PUFF
-	_effect_zoom[slot] = zoom
-	_effect_age[slot] = 0.0
-	_effect_seconds[slot] = PUFF_SECONDS
-	_flash_motes(KIND_PUFF, _effect_at[slot], _effect_dir[slot], _effect_core[slot], _effect_ramp[slot], _effect_look[slot], zoom)
+	_effect_seconds[slot] = 0.0
+	_hit_effect = -1
+	play_cue(&"hit_puff", ActorsScript.NONE, _effect_at[slot], Vector2.ZERO, zoom * HIT_STEP, _effect_core[slot], _effect_look[slot], ActorsScript.NONE, -1, -1, 0, _effect_ramp[slot])
 	return true
 
 

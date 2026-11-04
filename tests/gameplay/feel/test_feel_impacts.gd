@@ -188,3 +188,32 @@ func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
 	check_equal(feel.get_child_count(), children, "no nodes for hits: one batch draws them all")
 	for child in feel.get_children():
 		check(not child is CPUParticles2D and not child is Line2D or child in feel._live_beams, "no particle nodes and no lines but the beams: %s" % child)
+
+
+## S6 2: a hit's look is the cue `hit` (and `hit_puff` with no way, or for a kill), so it is data:
+## a cue file with other parts changes every hit, and Feel draws no spray of its own.
+func test_a_hits_look_is_its_cue() -> void:
+	var plain: CueBase = feel.cue_of(&"hit")
+	check(plain != null and plain.parts[0]["effect"] == &"spray", "a spray, from content/cues/hit.tres")
+	var other := CueBase.new()
+	other.id = &"hit"
+	other.parts = [{"effect": &"ring_out", "reach": 1.0}] as Array[Dictionary]
+	feel._cue_cache[&"hit"] = other
+	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "no spray of Feel's own")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "the cue's ring instead")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], preset.enemy_hit_color, "in the hit's colours")
+	feel._cue_cache[&"hit"] = plain
+
+
+## A killing blow's spray turns into the puff (`hit_puff`) where it was, in its colours and the size
+## the death asks for: the spray ends as the puff starts, so one effect stays.
+func test_a_kill_turns_the_spray_into_the_puff_cue() -> void:
+	var enemy: Node2D = _enemy()
+	_strike(1, enemy, Vector2(30.0, 40.0), Vector2.RIGHT, 5)
+	var slot: int = feel._hit_effect
+	check(slot >= 0 and feel._effect_kind[slot] == FeelScript.KIND_SPRAY, "the hit's spray is remembered")
+	bus.enemy_died.emit(1, enemy, enemy.global_position, -1)
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "the spray is gone")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "a puff in its place")
+	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(30.0, 40.0)), "where the spray was")

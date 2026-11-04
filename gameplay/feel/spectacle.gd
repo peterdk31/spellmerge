@@ -7,9 +7,10 @@ extends Node
 ## the mark layer's fit), and plays a cue's `motes` and `mark` parts (`cue_parts`, which Feel adds
 ## to its table of part players).
 ##
-## Feel says when: its hit, end and wall handlers call `shed_hit`, `shed_end` and
-## `shed_on_wall` with what it already worked out (the caster's ramp, the
-## preset's shares, the shot's tag), in the order it draws them, and `step` once a frame. The
+## Feel says when: its hit and wall handlers call `shed_hit` and `shed_on_wall` with what it
+## already worked out (the caster's ramp, the preset's shares, the shot's tag), in the order it
+## draws them, a shot's end plays its cue (`expire`, a `motes` part with a `share`; S6), and `step`
+## runs once a frame. The
 ## spectacle says what: which kinds (a spell's, from its cards: `card_kinds.gd`; S2), in which
 ## colours, where they settle. Nothing here changes a fight.
 ##
@@ -41,6 +42,13 @@ const MOTE_FOLDER: StringName = &"motes"
 const MARK_FOLDER: StringName = &"marks"
 const ROOM_FOLDER: StringName = &"rooms"
 const MARK_RADIUS: float = 8.0
+## A `light` part's reach (px) when it names none and the cue has no size, how bright it is and
+## how long it lasts when it does not say (S6, item 4).
+const LIGHT_RADIUS: float = 40.0
+const LIGHT_STRENGTH: float = 1.0
+const LIGHT_SECONDS: float = 0.3
+## The look bit of an exact colour (Feel's EXACT: kind 24 of the shot look).
+const EXACT: int = 1 << 23
 
 ## What a shot's spell sheds, from its cards (`card_kinds.gd`; spell-spectacle-2.md, S2).
 var cards: CardKindsScript = CardKindsScript.new()
@@ -144,12 +152,14 @@ func step(now: float) -> void:
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
+	if light != null:
+		light.step_cues(now)
 
 
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
 ## Callable taking the part and the cue's `CueContext`.
 func cue_parts() -> Dictionary:
-	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part]}
+	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part], &"light": [play_light_part]}
 
 
 # --- Where motes come from (Feel calls these, in the order it draws) ------------------------
@@ -164,13 +174,6 @@ func motes_on() -> bool:
 func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
 	if pool != null and particles_enabled and not pool.shed_closed():
 		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
-
-
-## A shot's (of the tag `tag`) life ran out at `at`: a puff of its cards' motes on along
-## `heading`, `share` of their count.
-func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
-	if pool != null and particles_enabled and not pool.shed_closed():
-		pool.shed_kinds(cards.motes_of(tag, look), at, heading, core, ramp, look, share)
 
 
 ## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
@@ -291,12 +294,14 @@ func _trail_motes() -> void:
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
 ## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
 ## the cue's ramp with its tint and the cards of its look; its count and reach times the cue's power.
-## One `often` (a hit's sparks, S6 2) leaves the moments' rows alone.
+## One of many a frame (`often`, a hit's sparks, S6 2; and any with a `share`, a shot's end) is
+## skipped, before its kinds are looked up, once the frame has only the moments' rows left; one with
+## a `share` throws each kind its own count times the share (and the power), split between the
+## kinds, as they shed.
 func play_motes_part(prepared: Variant, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
 	var part: MotesPart = prepared as MotesPart if prepared is MotesPart else prepare_motes_part(prepared as Dictionary)
-	# One of many a frame (a hit's sparks) throws nothing once the frame's rows are the moments'.
 	if part.often and pool.shed_closed():
 		return
 	var way: Vector2 = cue.aim
@@ -332,8 +337,14 @@ func play_motes_part(prepared: Variant, cue: CueContextScript) -> void:
 	var exact: bool = colour.a > 0.0
 	var spell: int = MotesScript.spell_source(cue.ramp, MotesScript.LOOK_EXACT if exact else cue.look)
 	var core: Color = colour if exact else cue.tint
+	if part.body and not exact:
+		# The body's own colour (a death puff's sparks), in no one's ramp and without the cards.
+		spell = MotesScript.spell_source(0, 0)
+		core = cue.body if cue.body.a > 0.0 else Color.WHITE
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var count: int = part.count
+	var shed: bool = part.share >= 0.0
+	var share: float = part.share * cue.power / float(maxi(kinds.size(), 1))
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var of_surface: bool = named == &"surface" or part.colours == &"surface"
@@ -342,9 +353,12 @@ func play_motes_part(prepared: Variant, cue: CueContextScript) -> void:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
 		var walls: bool = of_surface or (pool.kinds()[k].surface and part.colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
+		if shed:
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true)
+			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
-		var share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
-		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(share * cue.power), 1)
+		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
+		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
 		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often)
 
 
@@ -360,7 +374,9 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.spread = float(part.get("spread", -1.0))
 	made.up = float(part.get("up", 1.0))
 	made.ring = bool(part.get("ring", false))
-	made.often = bool(part.get("often", false))
+	made.share = float(part.get("share", -1.0))
+	made.often = bool(part.get("often", false)) or made.share >= 0.0
+	made.body = bool(part.get("body", false))
 	made.way = StringName(part.get("way", "aim"))
 	made.below = float(part.get("below", 0.0))
 	made.color = part["color"] as Color if part.has("color") else Color(0.0, 0.0, 0.0, 0.0)
@@ -390,6 +406,32 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	for k in found:
 		marks.stamp(k, cue.at, radius, turn, source, cue.tint, surface)
+
+
+## A cue's `light` part (CueBase; S6, item 4), played with `cue`: the room lit round the cue's point
+## while Spell light is on, out to its `radius` pixels (or the cue's size times its `reach`; either
+## times the cue's power), `strength` bright, fading over its `seconds`, in its exact `color`,
+## plain, in the caster's ramp alone (`bare`), in the cue's own colour, or in the cue's ramp, tint
+## and cards: as a flash would be.
+func play_light_part(part: Dictionary, cue: CueContextScript) -> void:
+	if light == null:
+		return
+	var reach: float = float(part.get("radius", LIGHT_RADIUS))
+	if part.has("reach") and cue.size > 0.0:
+		reach = cue.size * float(part["reach"])
+	reach *= cue.power
+	var strength: float = float(part.get("strength", LIGHT_STRENGTH))
+	var seconds: float = float(part.get("seconds", LIGHT_SECONDS))
+	if part.has("color"):
+		light.flash(cue.at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
+	elif bool(part.get("plain", false)):
+		light.flash(cue.at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
+	elif bool(part.get("bare", false)):
+		light.flash(cue.at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
+	elif cue.color.a > 0.0:
+		light.flash(cue.at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
+	else:
+		light.flash(cue.at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
 
 
 # --- Settings ----------------------------------------------------------------------------------
@@ -596,6 +638,10 @@ class MotesPart:
 	var up: float = 1.0
 	var ring: bool = false
 	var often: bool = false
+	## Its `share` (-1: none; a shed's, which is `often` too).
+	var share: float = -1.0
+	## In the body's own colour (`CueContext.body`), as a flash's `body`.
+	var body: bool = false
 	var way: StringName = &"aim"
 	var below: float = 0.0
 	var color: Color = Color(0.0, 0.0, 0.0, 0.0)

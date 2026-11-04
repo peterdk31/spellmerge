@@ -249,7 +249,8 @@ const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
 ## effects' own step, CUE_EFFECTS).
 const HIT_STEP: float = 12.0
-## `play_cue`'s ramp when not given: the caster's.
+## `play_cue`'s body colour when there is none (alpha 0), and its ramp when not given: the caster's.
+const NO_BODY := Color(0.0, 0.0, 0.0, 0.0)
 const CASTER_RAMP: int = -100
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
@@ -257,9 +258,6 @@ const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
-## A shot whose life runs out goes off in a small pop (the mockup's): a flare this big.
-const POP_ZOOM: int = 1
-const POP_SECONDS: float = 0.2
 ## A dash effect is drawn along its length (at most DASH_LONGEST: the length travels in the zoom's
 ## place, 4 px a step), DASH_MARGIN longer at each end and DASH_ACROSS across (the shader's).
 const DASH_LONGEST: float = 252.0
@@ -282,7 +280,8 @@ const EFFECT_Z: int = 50
 ## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const EFFECT_GRID: float = 24.0
 const EFFECT_STRIDE: int = 16
-## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is.
+## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is, above
+## the kind, or below it for an effect that does not light the room (`_effect_unlit`).
 const EFFECT_FROM: float = 0.02
 const EFFECT_SPAN: float = 0.42
 ## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`, PARTICLES ARE
@@ -446,8 +445,8 @@ var _cue_plans: Dictionary = {}
 var _cue_contexts: Array[CueContextScript] = []
 var _cue_depth: int = 0
 var unknown_cue_parts: int = 0
-## The slot of the last flash a cue's part showed (-1 for none): a hit's spray, which a kill turns
-## into its puff (`_upgrade_hit`).
+## The slot of the last flash a cue's part showed (-1 for none): a hit's spray, whose sound a kill
+## at its spot silences (`_hit_effect`).
 var _cue_effect: int = -1
 var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
@@ -518,6 +517,12 @@ var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
 var _effect_length: PackedFloat32Array = PackedFloat32Array()
 ## The character an effect follows (a status), or null, and how far above it the effect sits.
 var _effect_follow: Array[Node2D] = []
+## 1 for an effect that does not light the room by its kind (S6, item 4: shown by a cue with a
+## `light` part, which lights instead); its row says so by the sign of its age code.
+var _effect_unlit: PackedByteArray = PackedByteArray()
+## Whether the cue whose parts are playing now lights by its own `light` part (`play_cue`), so the
+## effects it shows are unlit.
+var _cue_unlit: bool = false
 ## Where a followed effect sits from its node (a status rises above it, a poof sits on the staff).
 var _effect_offset: PackedVector2Array = PackedVector2Array()
 var _next_effect: int = 0
@@ -551,6 +556,11 @@ var _last_usec: int = 0
 var _form_cues: Dictionary = {}
 ## The cues read from `content/cues`, by id (see `cue_of`).
 var _cue_cache: Dictionary = {}
+## The cues that play at most `every` seconds apart (`CueBase.every`): each one's first index in
+## `_cue_next_at` by id, and there, by actor (its id + 1: none first), the clock time (`_clock`)
+## from which it may play again. Grown once per such cue, then written in place.
+var _cue_every_at: Dictionary = {}
+var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
@@ -860,12 +870,13 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	var size: float = 1.0
 	var colours: int = 0
 	if target != null and is_instance_valid(target):
-		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in ember.
+		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in their own
+		# colour (`EnemyBase.hit_color`).
 		var ramp: int = _hat_ramp_of(target)
 		if ramp >= 0:
 			colours = ramp
 		else:
-			tint = preset.enemy_hit_color
+			tint = _hit_color_of(target)
 		# The shot that did this hit told us where it struck and which way it flew.
 		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
@@ -1163,22 +1174,17 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 	_show_impact(caster, ramp, position, direction)
 
 
-## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
-## was (the mockup's); one that ended on a wall already showed its impact, and a rune's going off
-## is its own burst.
-func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
-	if projectiles == null or not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
+## A bolt or orbit shot whose life ran out goes off: the cue `expire` (a small pop of its own
+## colours where it was and a puff of its cards' motes on along the way it flew, a share of their
+## count; S6), with the shot's own look while the event is sent. One that ended on a wall already
+## showed its impact, and a still one (a rune, a wall's stone) goes off its own way.
+func _on_projectile_expired(caster: int, position: Vector2, tag: int, shot: int) -> void:
+	if projectiles == null or projectiles.expired_on_wall:
 		return
-	if projectiles.expired_on_wall:
-		return
-	# Only a flying or orbiting body pops: a still one (a rune, a wall's stone) goes off its own way.
 	var body: int = projectiles.impact_body
 	if body != ProjectileManagerScript.KIND_BOLT and body != ProjectileManagerScript.KIND_ORBIT:
 		return
-	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
-	# And a puff of its cards' motes, on along the way it flew.
-	if _spectacle.motes_on():
-		_spectacle.shed_end(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share, _tag)
+	play_cue(&"expire", caster, position, projectiles.impact_heading, 0.0, projectiles.impact_core, projectiles.impact_look, ActorsScript.NONE, shot, -1, tag)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
@@ -1221,7 +1227,7 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 		bits = projectiles.impact_look
 		tag = projectiles.impact_tag
 	var cues: Array = _form_cues_of(form)
-	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, ramp)
+	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, ramp)
 
 
 ## Play the cue `id` (a `CueBase`, `content/cues/<id>.tres`; `cue_shown` calls this) at `at`, set
@@ -1235,10 +1241,13 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 ## the caster's, `Actors.ramp_of`). Plays its parts, each by
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
 ## punch (both off with the screen shake setting) and its sound; with `weight` false, its parts
-## only (a reaction repeated within REACTION_REPEAT). Its `power` is applied here and in the parts'
-## players, by one rule (`CueBase`): times its sizes and counts, its holds, shake and punch. An
-## unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, ramp: int = CASTER_RAMP) -> void:
+## only (a reaction repeated within REACTION_REPEAT). `body_color` is the own colour of the body
+## the cue is of (a dying enemy's `EnemyBase.hit_color`), for its `body` flashes (alpha 0: none).
+## Its `power` is applied here and in the parts' players, by one rule (`CueBase`): times its sizes
+## and counts, its holds, shake and punch. A cue with an `every` played again for the same actor
+## sooner than that plays nothing (`_cue_due`). An unknown cue plays nothing. A cue is read once for
+## playing (`_plan_of`, `CuePlan`).
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, body_color: Color = Color(0.0, 0.0, 0.0, 0.0), ramp: int = CASTER_RAMP) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
@@ -1246,6 +1255,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		plan = _plan_of(id)
 		if plan == null:
 			return
+	if plan.every > 0.0 and not _cue_due(plan.cue, caster):
+		return
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	if _cue_depth == _cue_contexts.size():
 		_cue_contexts.append(CueContextScript.new())
@@ -1260,10 +1271,14 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.target = target
 	context.shot = shot
 	context.surface = surface
+	context.body = body_color
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
 	context.color = plan.color
 	context.power = plan.power
 	_cue_depth += 1
+	# A cue with a `light` part lights by it alone: the flashes it shows light nothing (S6, item 4).
+	var unlit_before: bool = _cue_unlit
+	_cue_unlit = plan.lights
 	var prepared: Array = plan.prepared
 	var n: int = 0
 	for player: Callable in plan.players:
@@ -1271,6 +1286,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		n += 1
 	for type: StringName in plan.unknown:
 		_unknown_cue_part(id, type)
+	_cue_unlit = unlit_before
 	_cue_depth -= 1
 	if not weight or not plan.weighted:
 		return
@@ -1300,6 +1316,23 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
+
+
+## Whether the cue `cue` (which has an `every`) may play for `caster` now, and if so, not again for
+## its `every` seconds. Allocates only the first time a cue with an `every` plays.
+func _cue_due(cue: CueBase, caster: int) -> bool:
+	var first: Variant = _cue_every_at.get(cue.id)
+	if first == null:
+		first = _cue_next_at.size()
+		_cue_every_at[cue.id] = first
+		_cue_next_at.resize(int(first) + ActorsScript.ACTORS + 1)
+		for i in ActorsScript.ACTORS + 1:
+			_cue_next_at[int(first) + i] = -INF
+	var at: int = int(first) + caster + 1
+	if _clock < _cue_next_at[at]:
+		return false
+	_cue_next_at[at] = _clock + cue.every
+	return true
 
 
 ## Play a cue's parts of the type `type` (`CueBase.PART_TYPES`) with `player`, a Callable taking
@@ -1382,6 +1415,8 @@ func _play_flash(prepared: Variant, cue: CueContextScript) -> void:
 		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
 	elif paint == CuePlanScript.PAINT_BARE:
 		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+	elif paint == CuePlanScript.PAINT_BODY:
+		_cue_effect = show_effect(flash.kind, cue.at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, 0, zoom, seconds, length)
 	elif cue.color.a > 0.0:
 		_cue_effect = show_effect(flash.kind, cue.at, way, cue.color, 0, EXACT, zoom, seconds, length)
 	else:
@@ -1598,6 +1633,8 @@ func _size_effects(slots: int) -> void:
 	_effect_length.resize(slots)
 	_effect_follow.resize(slots)
 	_effect_follow.fill(null)
+	_effect_unlit.resize(slots)
+	_effect_unlit.fill(0)
 	_effect_offset.resize(slots)
 	_next_effect = 0
 	# The statuses shown lost their effects; the next step shows them again.
@@ -1700,6 +1737,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_effect_length[slot] = 0.0
 	_effect_follow[slot] = follow
 	_effect_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
+	_effect_unlit[slot] = 1 if _cue_unlit else 0
 	if kind == KIND_DASH or kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
@@ -1789,7 +1827,10 @@ func _step_effects(real_delta: float) -> void:
 		buffer[i + 13] = core.g
 		buffer[i + 14] = core.b
 		var code: int = kind - KIND_SHELL if kind >= KIND_SHELL else kind
-		buffer[i + 15] = 1.0 - (float(code) + EFFECT_FROM + EFFECT_SPAN * through) / 16.0
+		# Its age beside its kind; below the kind for an effect that does not light (spell light
+		# reads the sign, the effect shaders the size: `coded_age`).
+		var age: float = EFFECT_FROM + EFFECT_SPAN * through
+		buffer[i + 15] = 1.0 - (float(code) + (-age if _effect_unlit[slot] != 0 else age)) / 16.0
 	if out > 0:
 		_effect_node.multimesh.buffer = _effect_buffer
 	_effect_node.multimesh.visible_instance_count = out
@@ -1891,19 +1932,17 @@ func _ramp_of(caster: int) -> int:
 
 
 ## A death: its body breaks into motes of its own art (S3; the white-hot copy that fell apart
-## pixel by pixel before), the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
-## the kill, the dead body is freed at once) or, for a boss, `boss_death`, which also stops the
-## whole game; and a puff. The puff is the killing blow's own spray turned into a bigger one when
-## it is at this spot (one slot, and the hit's sound gives way to the death's), else a new puff
-## in the enemy colour after the cue's ring.
+## pixel by pixel before), then the cue `enemy_death` (a white-hot ring, its motes and mark, and a
+## puff in the body's own colour; the killer and the shot hold for the kill, the dead body is freed
+## at once) or, for a boss, `boss_death`, which also stops the whole game. The killing blow's sound
+## gives way to the death's.
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
 	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
 	var body: Sprite2D = _body_sprite(enemy)
 	if body != null:
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
-	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
-	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
-	if upgraded and _hit_voice >= 0:
+	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
+	if _hit_voice >= 0 and _hit_effect >= 0 and _hit_position == position and _effect_seconds[_hit_effect] > 0.0:
 		_voices[_hit_voice].stop()
 	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
 	# kinds in the colours of the body's own art.
@@ -1912,10 +1951,9 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	if projectiles != null and shot >= 0:
 		look = projectiles.get_look_of(shot)
 		core = projectiles.get_core_of(shot)
-	# What broke is the body: its surface kinds and marks in the colours of its own art.
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(_body_sprite(enemy)))
-	if not upgraded:
-		play_cue(&"hit_puff", ActorsScript.NONE, position, Vector2.ZERO, zoom * HIT_STEP, preset.enemy_hit_color, 0, ActorsScript.NONE, -1, -1, 0, true, 0)
+	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
+	# its own colour.
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
 
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
@@ -1948,7 +1986,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		return
 	var table: ActorsScript = _actor_table()
 	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
-	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, player)
+	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
 
 
 ## A carrier showed itself: its card's `shown_cue` (a nova's ring, a rain's telegraph
@@ -2237,23 +2275,10 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 		var from: Vector2 = position if at == Vector2.INF else at
 		var zoom: int = clampi(roundi(size), 1, 3)
 		_cue_effect = -1
-		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, true, player)
+		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
 		_hit_effect = _cue_effect
 		_hit_position = position
 	_hit_voice = _play(sound)
-
-
-## Turns the last hit's spray into the cue `hit_puff` `zoom` steps big, in its colours, when it is
-## still showing at `position` (a killing blow's spray becomes the death's puff: the spray ends as
-## the puff starts). Returns true when it did.
-func _upgrade_hit(position: Vector2, zoom: int) -> bool:
-	var slot: int = _hit_effect
-	if slot < 0 or _hit_position != position or _effect_seconds[slot] <= 0.0:
-		return false
-	_effect_seconds[slot] = 0.0
-	_hit_effect = -1
-	play_cue(&"hit_puff", ActorsScript.NONE, _effect_at[slot], Vector2.ZERO, zoom * HIT_STEP, _effect_core[slot], _effect_look[slot], ActorsScript.NONE, -1, -1, 0, true, _effect_ramp[slot])
-	return true
 
 
 ## Plays a sound; returns the voice used, or -1 for none.
@@ -2311,6 +2336,14 @@ func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> 
 
 
 ## True for the death of a boss: an enemy whose data says `boss`.
+## The own colour of a body that is no wizard: its enemy data's `hit_color`, or the default for a
+## body with none (a swarmer, a stand-in).
+static func _hit_color_of(body: Node) -> Color:
+	if body is Actor and (body as Actor).data != null:
+		return (body as Actor).data.hit_color
+	return EnemyBase.DEFAULT_HIT_COLOR
+
+
 static func _is_boss(enemy: Node) -> bool:
 	return enemy is Actor and (enemy as Actor).data != null and (enemy as Actor).data.boss
 

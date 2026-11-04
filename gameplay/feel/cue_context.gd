@@ -24,6 +24,9 @@ var shot: int = -1
 ## The ramp-table source of what broke, for the surface kinds and marks (a dying body's art;
 ## -1: the room's walls).
 var surface: int = -1
+## The own colour of the body the cue is of (a dying enemy's `EnemyBase.hit_color`), for its
+## `body` flashes; alpha 0 for none.
+var body: Color = Color(0.0, 0.0, 0.0, 0.0)
 ## The tag of the spell it is of (its cards' motes and marks, `card_kinds.gd`; 0 for none).
 var tag: int = 0
 ## The cue's own colour (`CueBase.color`: what its parts with no colour of their own are in

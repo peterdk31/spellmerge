@@ -211,7 +211,7 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 ## The shader's ROWS_* and its row-reading constants are the script's and Feel's.
 func test_the_light_shader_reads_rows_as_the_script_says() -> void:
 	var code: String = SpellLightScript.LIGHT_SHADER.code
-	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_EFFECT", SpellLightScript.ROWS_EFFECT], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT]]:
+	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_EFFECT", SpellLightScript.ROWS_EFFECT], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
 		check(code.contains("const int %s = %d;" % [pair[0], pair[1]]), "the shader's %s is %d" % pair)
 	check(code.contains("const float EFFECT_FROM = %s;" % str(FeelScript.EFFECT_FROM)), "the shader's EFFECT_FROM is Feel's")
 	check(code.contains("const float EFFECT_SPAN = %s;" % str(FeelScript.EFFECT_SPAN)), "the shader's EFFECT_SPAN is Feel's")
@@ -252,6 +252,63 @@ func test_feels_effects_are_handed_to_the_light() -> void:
 	check(is_equal_approx(row[3], 100.0) and is_equal_approx(row[7], 100.0), "the burst's row is Feel's: where it is")
 	feel._process(1.0)
 	check_equal(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.visible_instance_count, 0, "an effect that ended no longer lights")
+
+
+## The kind and the age code beside it in an effect row's last float (Feel's coding): [kind, code].
+func _coded(a: float) -> Array:
+	var coded: float = (1.0 - a) * 16.0
+	var kind: float = floorf(coded + 0.5)
+	return [int(kind), coded - kind]
+
+
+## A cue's `light` part (S6, item 4) lights round its point in its colour for its seconds, fading;
+## and a cue with one lights by it alone: its flashes' rows are coded unlit (their age below their
+## kind), while another cue's flashes light by their kinds as before.
+func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	var heal: CueBase = feel.cue_of(&"heal")
+	check(heal != null and heal.lights(), "the heal lights by its own light part")
+	feel.play_cue(&"heal", 0, Vector2(100.0, 50.0))
+	feel._process(1.0 / 60.0)
+	check_equal(light.cue_light_count(), 1, "one cue light")
+	var rows: PackedFloat32Array = light.cue_lights.multimesh.buffer
+	check(is_equal_approx(rows[3], 100.0) and is_equal_approx(rows[7], 50.0), "at the cue's point")
+	check(is_equal_approx(rows[0], 44.0) and is_equal_approx(rows[5], 44.0), "out to its radius")
+	check(rows[15] > 0.9 and rows[15] <= 1.0, "as bright as it says, fading: %f" % rows[15])
+	check(is_equal_approx(rows[12], 0.4196078), "in its exact colour")
+	var flare: Array = _coded(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer[15])
+	check_equal(flare[0], FeelScript.KIND_RING_OUT, "its ring is a flare row")
+	check(flare[1] < 0.0, "coded unlit: its age below its kind")
+	feel._process(1.0)
+	check_equal(light.cue_light_count(), 0, "gone after its seconds")
+	feel.play_cue(&"possess_start", 0, Vector2(100.0, 50.0))
+	feel._process(1.0 / 60.0)
+	check_equal(light.cue_light_count(), 0, "a cue with no light part makes no cue light")
+	flare = _coded(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer[15])
+	check_equal(flare[0], FeelScript.KIND_RING_IN, "its ring")
+	check(flare[1] > 0.0, "lights by its kind, as before")
+
+
+## The cue lights' rows are the spell light's own: a new one past CUE_LIGHTS takes the oldest's
+## place, and with the setting off a light part does nothing.
+func test_cue_lights_are_bounded_and_off_with_the_setting() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	for i in SpellLightScript.CUE_LIGHTS + 5:
+		light.flash(Vector2(i, 0.0), 20.0, 1.0, 5.0, Color.WHITE, 0, 0, 0.0)
+	light.step_cues(0.1)
+	check_equal(light.cue_light_count(), SpellLightScript.CUE_LIGHTS, "at most CUE_LIGHTS")
+	light.flash(Vector2.ZERO, 0.0, 1.0, 5.0, Color.WHITE, 0, 0, 0.0)
+	light.flash(Vector2.ZERO, 20.0, 0.0, 5.0, Color.WHITE, 0, 0, 0.0)
+	light.step_cues(0.1)
+	check_equal(light.cue_light_count(), SpellLightScript.CUE_LIGHTS, "no reach or no strength lights nothing")
+	feel.set_spell_light(false)
+	feel.play_cue(&"heal", 0, Vector2(100.0, 50.0))
+	feel._process(1.0 / 60.0)
+	check(feel.light() == null, "no light with the setting off, and the light part plays nothing")
 
 
 ## A live beam lights along the path Feel gives its shader; a beam that is gone does not.

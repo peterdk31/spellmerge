@@ -21,7 +21,7 @@ Players in the spell builder never block the others: the rest keep playing.
 - **Known gaps:** no reward, no next room and no way back to the menu (M3); the numbers are constants in `flow.gd`, tuned at C1.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
-  - Sends: `room_entered`, `room_cleared`, `wave_started`, `build_break_started`, `sandbox_changed`, `horde_started`, `horde_ended`, `door_voted`.
+  - Sends: `room_entered`, `room_cleared`, `wave_started` (and with it `cue_shown` `wave_start`, `WAVE_START_CUE`, on every standing wizard, as its actor; S6, item 13), `build_break_started`, `sandbox_changed`, `horde_started`, `horde_ended`, `door_voted`.
   - Listens to: `enemy_died`, `run_started`, `player_downed`, `player_joined`, `player_left`, and from the HUD `play_requested`, `sandbox_spawn_requested`, `sandbox_requested`, `sandbox_action_requested`, `horde_requested` and `door_vote_requested` (`door_voted` is flow's announced result of the vote; `room_entered` follows `play_requested`).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 

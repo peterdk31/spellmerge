@@ -25,6 +25,9 @@ extends Resource
 ##   `plain`      true: white in no one's ramp, without the cards (stone chips)
 ##   `bare`       true: in the caster's ramp, without the cards (a dash's landing ring, a cast's flash)
 ##   `no_cards`   true: in the cue's ramp and tint, without the cards (a nova's impact ring)
+##   `body`       true: in the own colour of the body the cue is of (a dying enemy's
+##                `EnemyBase.hit_color`: its death puff, S6), in no one's ramp and without the
+##                cards; plain white when the cue has no body colour
 ##   `way`        `aim` (the cue's direction, the default), `back` (against it), `right` or `up`
 ##   `particles`  true: left out while particles are off (the stress benchmark)
 ##   `if_cards`   true: played only when the cue has cards (a look layer; an element's flare)
@@ -57,6 +60,12 @@ extends Resource
 ##                rows the rarer moments keep are left (`Motes.MOMENT_ROWS`), as a shot's shed does
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint (not for
 ##                what cools through a surface's colours)
+##   `body`       true: in the own colour of the body the cue is of, as a flash's `body` (a death
+##                puff's sparks)
+##   `share`      each kind thrown its own count times this, the share split between the kinds,
+##                as one of many a frame (a shot's end, S6: `expire`; `often` too): it leaves the moments' rows
+##                to the moments and is skipped once only those are left (`Motes.shed_closed`).
+##                Takes no `count`, `reach`, `radius` or `ring`: the kinds fly as they shed
 ## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
 ## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
 ##   `mark`       the mark kind's id (`MarkKind`, content/marks; required, unless `cards`)
@@ -66,6 +75,17 @@ extends Resource
 ##   `cards`      true: the marks of the cue's cards instead when they have any (a frost blast
 ##                leaves frost where a plain one leaves its scorch); with no `mark`, only theirs
 ##                (a frost dash's landing leaves frost, a plain one nothing)
+## A part with `"part": "light"` lights the room round the cue's point while the "Spell light" setting
+## is on (S6, item 4; gameplay/feel/spell_light.gd), fading to nothing over its seconds. Its keys
+## (LIGHT_KEYS):
+##   `strength`   how bright at first (1 when not given; 2 at the most)
+##   `reach`      how far it reaches from the cue's: `size` x reach pixels
+##   `radius`     how far in pixels, when the cue has no size (or with no `reach`; 40 when neither)
+##   `seconds`    how long it lasts (0.3 when not given)
+##   `color`, `plain`, `bare`  its colour, as a flash's
+## A cue with a light part lights by its light parts alone: its flashes do not light the room by
+## their kinds as they otherwise do (`SpellLight.EFFECT_LIGHT`), so content says how a rune or a
+## heal lights.
 ## Its weight: `shake` (screen trauma, 0 to 1, on top of anything else's), `kick` pixels of camera
 ## punch `kick_way` (`down` the screen, `away` from the caster's body towards the cue, `back`
 ## against the cue's direction, `aim` along it: these two only when it has one, a cast's kick back),
@@ -78,8 +98,13 @@ extends Resource
 ## motes part that names no colour (nor `plain`, nor `bare`) of its own, and of what Feel draws of the
 ## moment in code (a reaction's name). `power` scales how strong it plays, by one rule (`Feel.play_cue`):
 ## times every flash's size (its zoom, or its size from `reach`), every motes part's count and how
-## far they fly, every mark's radius, its holds, shake and punch; never a part's seconds, nor an
+## far they fly, every mark's radius and every light's reach, its holds, shake and punch; never a part's seconds, nor an
 ## arc's length (where it runs). A reaction's cues differ in their colour and power only.
+##
+## How often (S6, item 13): `every` seconds is the least time between two plays of the cue for the
+## same actor (the one it is of; none counts as one more), so a moment that comes by the hundred (a
+## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
+## weight. 0 (the default) plays every time.
 
 ## The flashes a part can name (Feel maps each to its effect kind, and says how many pixels a
 ## step of its zoom is).
@@ -92,11 +117,12 @@ const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often", "share", "body"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
+const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
-const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
+const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS}
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
 const MOTE_GROUPS: Array[StringName] = [&"spell", &"surface"]
 const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
@@ -115,10 +141,27 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 ## Its own colour (none while its alpha is 0), and how strong it plays (see above).
 @export var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 @export_range(0.1, 4.0, 0.05) var power: float = 1.0
+## The least seconds between two plays for the same actor (see above); 0 every time.
+@export_range(0.0, 5.0, 0.01) var every: float = 0.0
+
+
+## Whether 0 for not yet known, then 1 or 2: the cue has a `light` part (`lights`).
+var _lights: int = 0
 
 
 func kind() -> StringName:
 	return &"cue"
+
+
+## Whether it has a `light` part, so it lights by its light parts alone (its flashes unlit). Read
+## from its parts once.
+func lights() -> bool:
+	if _lights == 0:
+		_lights = 1
+		for part: Dictionary in parts:
+			if StringName(part.get("part", "effect")) == &"light":
+				_lights = 2
+	return _lights == 2
 
 
 ## What is wrong with this cue, one line each (empty when nothing is): an unknown effect, way or
@@ -129,6 +172,8 @@ func problems() -> PackedStringArray:
 		found.append("a cue needs an id")
 	if power <= 0.0:
 		found.append("%s: power %s is 0 or less" % [id, power])
+	if every < 0.0:
+		found.append("%s: every %s is below 0" % [id, every])
 	if not KICK_WAYS.has(kick_way):
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():
@@ -157,6 +202,8 @@ func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringA
 			return _mote_problems(i, part)
 		&"mark":
 			return _mark_problems(i, part)
+		&"light":
+			return _light_problems(i, part)
 	return PackedStringArray()
 
 
@@ -175,8 +222,8 @@ func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
 	if LENGTH_EFFECTS.has(effect) and (part.has("zoom") or part.has("lasts_size")):
 		found.append("%s: part %d's %s is drawn along the cue's size: it takes no zoom or lasts_size" % [id, i, effect])
-	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) + int(bool(part.get("no_cards", false))) > 1:
-		found.append("%s: part %d takes one of color, plain, bare and no_cards" % [id, i])
+	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) + int(bool(part.get("no_cards", false))) + int(bool(part.get("body", false))) > 1:
+		found.append("%s: part %d takes one of color, plain, bare, no_cards and body" % [id, i])
 	if part.has("if_layer") and (int(part["if_layer"]) < 1 or int(part["if_layer"]) > MoteKind.LOOK_LAYERS):
 		found.append("%s: part %d's if_layer is not a look layer (1-%d)" % [id, i, MoteKind.LOOK_LAYERS])
 	if part.has("if_size_over") and part.has("if_size_upto") and float(part["if_size_upto"]) <= float(part["if_size_over"]):
@@ -198,6 +245,12 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
 		found.append("%s: motes part %d's below is not 0 to 32 pixels" % [id, i])
+	if part.has("share"):
+		if float(part["share"]) <= 0.0:
+			found.append("%s: motes part %d's share is 0 or less" % [id, i])
+		for key: String in ["count", "reach", "radius", "ring"]:
+			if part.has(key):
+				found.append("%s: motes part %d sheds a share of its kinds, so it takes no %s" % [id, i, key])
 	return found
 
 
@@ -211,4 +264,18 @@ func _mark_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: mark part %d's rot '%s' is not one of %s" % [id, i, part["rot"], MARK_ROTS])
 	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0:
 		found.append("%s: mark part %d has a reach or radius of 0 or less" % [id, i])
+	return found
+
+
+## What is wrong with the light part `part` (number `i`): a number out of its range, or more than
+## one of its colours.
+func _light_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	var strength: float = float(part.get("strength", 1.0))
+	if strength <= 0.0 or strength > 2.0:
+		found.append("%s: light part %d's strength is not above 0 and at most 2" % [id, i])
+	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0 or float(part.get("seconds", 1.0)) <= 0.0:
+		found.append("%s: light part %d has a reach, radius or seconds of 0 or less" % [id, i])
+	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) > 1:
+		found.append("%s: light part %d takes one of color, plain and bare" % [id, i])
 	return found

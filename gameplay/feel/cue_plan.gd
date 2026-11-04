@@ -33,12 +33,14 @@ class Flash:
 	var gated: bool = false
 
 ## A flash's colours: the cue's (its tint and cards, or its own colour when it has one), its own
-## exact `color`, `plain`, `bare`, and the cue's without the cards (`no_cards`).
+## exact `color`, `plain`, `bare`, the cue's without the cards (`no_cards`), and the body's own
+## colour (`body`: `CueContext.body`, white without one).
 const PAINT_CUE: int = 0
 const PAINT_COLOR: int = 1
 const PAINT_PLAIN: int = 2
 const PAINT_BARE: int = 3
 const PAINT_NO_CARDS: int = 4
+const PAINT_BODY: int = 5
 ## A part's way (`CueBase.WAYS`).
 const WAY_AIM: int = 0
 const WAY_BACK: int = 1
@@ -56,8 +58,11 @@ var unknown: Array[StringName] = []
 ## Whether it has any weight (a hold, the game-wide stop, shake, a punch or a sound), and its own
 ## colour and power (`CueBase`), read once.
 var weighted: bool = false
-## Whether it holds anyone (`hold`, `hold_target`).
+## Whether it holds anyone (`hold`, `hold_target`), lights by a `light` part (its flashes then light
+## nothing: `CueBase.lights`), and plays at most `every` seconds apart for an actor.
 var holds: bool = false
+var lights: bool = false
+var every: float = 0.0
 var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 var power: float = 1.0
 
@@ -79,6 +84,8 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 	plan.color = of.color
 	plan.power = of.power
 	plan.holds = of.hold > 0.0 or of.hold_target > 0.0
+	plan.lights = of.lights()
+	plan.every = of.every
 	plan.weighted = of.hold > 0.0 or of.hold_target > 0.0 or of.stop_game > 0.0 or of.shake > 0.0 or of.kick > 0.0 or of.sound != &""
 	return plan
 
@@ -105,6 +112,8 @@ static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
 		flash.paint = PAINT_PLAIN
 	elif bool(part.get("bare", false)):
 		flash.paint = PAINT_BARE
+	elif bool(part.get("body", false)):
+		flash.paint = PAINT_BODY
 	elif bool(part.get("no_cards", false)):
 		flash.paint = PAINT_NO_CARDS
 	match StringName(part.get("way", "aim")):

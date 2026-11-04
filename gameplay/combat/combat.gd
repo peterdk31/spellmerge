@@ -76,6 +76,14 @@ const DISCHARGE: StringName = &"discharge"
 ## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, a
 ## slam's ring (`burst`), a reaction's damage, damage over time, and a heal.
 const KIND_SHOT: StringName = &"shot"
+## The cues of a barrier's block (played on the shielded actor, turned back the way the hit came)
+## and of a body caught by a pull (on the body, the way it is pulled, as the puller's); content's
+## looks (content/cues; S6, item 13).
+const SHIELD_BLOCK_CUE: StringName = &"shield_block"
+const PULL_CUE: StringName = &"pull"
+## A body pulled within this many steps of its last pull is still caught: no new PULL_CUE (a
+## magnet that pulls every other step, `SpellLimits.MAX_PULLS_PER_STEP`, catches it once).
+const PULL_GAP_STEPS: int = 6
 const KIND_RAY: StringName = &"ray"
 const KIND_SWING: StringName = &"swing"
 const KIND_BURST: StringName = &"burst"
@@ -184,6 +192,10 @@ var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
 var _hurt_offset: PackedVector2Array = PackedVector2Array()
 var _knock: PackedVector2Array = PackedVector2Array()
+## The step (`_steps`) each row was last pulled in (`pull`), so a body newly caught plays PULL_CUE.
+var _pulled_at: PackedInt32Array = PackedInt32Array()
+## Steps taken (`step`).
+var _steps: int = 0
 var _contact_left: PackedFloat32Array = PackedFloat32Array()
 
 # Statuses (a time left of 0 means the status is off).
@@ -301,6 +313,8 @@ func _init() -> void:
 	_shield_left.resize(ACTORS)
 	_hurt_offset.resize(ACTORS)
 	_knock.resize(ACTORS)
+	_pulled_at.resize(ACTORS)
+	_pulled_at.fill(-(1 << 30))
 	_last_kind.resize(ACTORS)
 	_last_name.resize(ACTORS)
 
@@ -691,7 +705,8 @@ func shield(actor: Variant) -> int:
 ## pixels per second, through the push Combat keeps (whoever moves the actor already adds it).
 ## With a finite `to`, within `radius` of the line from `position` to `to`, toward the nearest
 ## point of the line (a beam's magnet). A pull replaces the push an actor had, so a magnet each
-## step does not pile speed up. `caster` is who pulls (a pull does no damage). With `foes_only`,
+## step does not pile speed up. `caster` is who pulls (a pull does no damage); a body it newly
+## catches (not pulled in the last PULL_GAP_STEPS steps) plays PULL_CUE. With `foes_only`,
 ## actors on the caster's team (the caster too) are left alone, their push and slam arming
 ## included; a caster with no team pulls everyone.
 func pull(caster: int, position: Vector2, radius: float, strength: float, foes_only: bool = false, to: Vector2 = Vector2.INF) -> void:
@@ -712,6 +727,10 @@ func pull(caster: int, position: Vector2, radius: float, strength: float, foes_o
 		var toward: Vector2 = (Geometry2D.get_closest_point_to_segment(body, position, end) - body).normalized()
 		_knock[row] = toward * strength
 		_slam[row] = 0
+		# A body caught by a pull it was not in lately: the moment's cue (S6, item 13).
+		if _pulled_at[row] < _steps - PULL_GAP_STEPS and events != null:
+			events.cue_shown.emit(caster, PULL_CUE, body, toward, 0.0, Color.WHITE, 0)
+		_pulled_at[row] = _steps
 	_give_scratch()
 
 
@@ -777,6 +796,8 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 			_shield_left[row] = 0.0
 		if events != null:
 			events.shield_blocked.emit(actor, where, _shield_tag[row])
+			# Its look is content's (S6, item 13): turned back the way the hit came.
+			events.cue_shown.emit(actor, SHIELD_BLOCK_CUE, where + _hurt_offset[row], -direction, 0.0, Color.WHITE, 0)
 		return false
 	var discharge_share: float = 0.0
 	var team: int = _team(row)
@@ -1241,6 +1262,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 ## contact hurts. Called every physics frame; tests call it with fixed deltas. Knockback is not
 ## applied here (see the top).
 func step(delta: float) -> void:
+	_steps += 1
 	stepping.emit()
 	# Drop bodies freed from outside (backwards: a freed row takes the last one's place).
 	var n: int = _live.size() - 1

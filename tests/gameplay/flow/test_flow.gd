@@ -21,6 +21,8 @@ var _spells: SpellsScript
 var _entered: Array[StringName] = []
 var _cleared: Array[StringName] = []
 var _waves: Array[int] = []
+## The actors each `wave_start` cue was played as (S6, item 13).
+var _wave_cues: Array[int] = []
 
 
 func _initialize() -> void:
@@ -39,6 +41,9 @@ func _initialize() -> void:
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
 	_events.connect("wave_started", func(number: int) -> void: _waves.append(number))
+	_events.connect("cue_shown", func(caster: int, cue: StringName, _at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void:
+		if cue == FlowScript.WAVE_START_CUE:
+			_wave_cues.append(caster))
 	_test_restart_delay_is_under_three_seconds()
 	for count: int in [1, 2, 4]:
 		_test_play_starts_the_room(count)
@@ -89,6 +94,7 @@ func _setup(count: int) -> void:
 	_entered.clear()
 	_cleared.clear()
 	_waves.clear()
+	_wave_cues.clear()
 
 
 ## End the run and free every device, so the next test starts clean.
@@ -419,6 +425,11 @@ func _test_waves_grow_in_the_same_room() -> void:
 		_flow.step(0.5)
 		_check(_flow.world == world, "%d players: wave 2 stands in the same world" % count)
 		_check(_waves == [1, 2] and _flow.wave == 2, "%d players: wave_started(2) was sent, got %s" % [count, _waves])
+		_check(_wave_cues.size() == count * 2, "%d players: each wave played wave_start on every wizard, got %s" % [count, _wave_cues])
+		var ids: Array[int] = []
+		for index in count:
+			ids.append(int((_flow.get_wizard(index) as Actor).id))
+		_check(_wave_cues.slice(count).all(func(id: int) -> bool: return ids.has(id)), "%d players: as each wizard's actor" % count)
 		_check(_flow.state == FlowScript.State.RUNNING, "%d players: running again" % count)
 		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: wave 2 has %d enemies" % [count, FlowScript.wave_size(2)])
 		_check(FlowScript.wave_size(2) > FlowScript.wave_size(1), "wave 2 is bigger than wave 1")

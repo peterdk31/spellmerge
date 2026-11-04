@@ -55,6 +55,10 @@ const SEATS: int = 4
 ## The cards every wizard's bag holds at the start of a horde run (and a joiner's).
 ## The cards of Flow's HORDE_START_CARDS (owner, 2026-10-31: a dash staff and a swing staff).
 const START_BAG: Array[StringName] = [&"dash", &"swing"]
+## The cues of a level-up (on every standing wizard) and of gems picked up (on the wizard that
+## picked them; each played at most its `every` apart, CueBase), content's looks (S6, item 13).
+const LEVEL_UP_CUE: StringName = &"level_up"
+const GEM_CUE: StringName = &"gem_pickup"
 ## Cards in one level-up offer.
 const OFFER_SIZE: int = 3
 ## The most horde enemies alive at once, whatever the curve says. Set by the swarm stress run (S4,
@@ -358,6 +362,7 @@ func step(delta: float) -> void:
 	if _gems != null and not _break_on:
 		var picked: int = _gems.step(delta, _wizard_at, _standing, PICKUP_RADIUS)
 		if picked > 0:
+			_show_on_wizards(GEM_CUE, _gems.picked_by)
 			_gain(picked)
 	_status_left -= delta
 	if _status_left <= 0.0:
@@ -559,6 +564,7 @@ func _gain(amount: int) -> void:
 ## A level-up: a build break unless one is on, and an offer for every joined seat (or one more
 ## waiting behind its open one); in a break, a seat that got one is not ready any more.
 func _level_up() -> void:
+	_show_on_wizards(LEVEL_UP_CUE)
 	if not _break_on and not over:
 		_start_break()
 	for seat in SEATS:
@@ -571,6 +577,19 @@ func _level_up() -> void:
 			got = _offer(seat)
 		if got and _break_on and _is_ready[seat]:
 			_set_ready(seat, false)
+
+
+## The cue `cue` (content/cues; S6, item 13) on every standing wizard, or with `only`, on those
+## whose entry (by seat) is above 0: the moment's look is content's (`cue_shown`).
+func _show_on_wizards(cue: StringName, only: PackedInt32Array = PackedInt32Array()) -> void:
+	if events == null:
+		return
+	for seat in SEATS:
+		if _standing[seat] == 0 or (not only.is_empty() and (seat >= only.size() or only[seat] <= 0)):
+			continue
+		var wizard: Node2D = _wizard_of(seat)
+		if wizard != null:
+			events.cue_shown.emit(actors.home_of_seat(seat), cue, wizard.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
 
 
 ## Opens a new offer for `seat` from the cards not in its bag; with every card owned, none.

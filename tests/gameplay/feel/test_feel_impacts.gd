@@ -72,7 +72,21 @@ func test_a_spray_is_aimed_the_way_the_shot_flew_for_every_player() -> void:
 
 func test_an_enemy_is_hit_in_ember() -> void:
 	_strike(1, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], preset.enemy_hit_color, "ember")
+	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], EnemyBase.DEFAULT_HIT_COLOR, "ember")
+
+
+## An enemy's colour is its data's (S6 item 14): a hit's spray and its death cue's puff are in its
+## `EnemyBase.hit_color`, not a preset's.
+func test_an_enemy_is_hit_and_dies_in_its_own_data_s_colour() -> void:
+	var enemy: Actor = own(Actor.new()) as Actor
+	enemy.data = EnemyBase.new()
+	enemy.data.hit_color = Color("3b9bd9")
+	enemy.id = ActorSeats.enemy(actors)  # an actor of the enemy ramp, not a wizard's
+	root.add_child(enemy)
+	_strike(1, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
+	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], Color("3b9bd9"), "the spray in its own colour")
+	bus.enemy_died.emit(1, enemy, enemy.global_position, -1)
+	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], Color("3b9bd9"), "and its death's puff")
 
 
 func test_a_wizard_is_hit_in_its_own_colours() -> void:
@@ -109,13 +123,22 @@ func test_an_impact_is_used_once_and_only_for_its_target() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "it is a puff")
 
 
-func test_a_killing_blow_keeps_one_effect_and_the_colour() -> void:
+## A kill's puff is a part of its death cue (S6): in the body's own colour, beside the killing
+## blow's spray (which no longer turns into it).
+func test_a_killing_blow_s_puff_is_the_death_cue_s_in_the_body_s_colour() -> void:
 	var enemy: Node2D = _enemy()
 	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "the kill turns the hit's spray")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "into one bigger puff, not a second effect")
-	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], preset.enemy_hit_color, "still ember")
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "the hit's spray plays on")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "the death cue's puff")
+	check_equal(feel.effect_dress(FeelScript.KIND_PUFF), [EnemyBase.DEFAULT_HIT_COLOR, 0], "in ember, no one's ramp, no cards")
+	var cue: CueBase = feel.cue_of(&"enemy_death")
+	var puffs: int = 0
+	for part: Dictionary in cue.parts:
+		if StringName(part.get("effect", "")) == &"puff" and bool(part.get("body", false)):
+			puffs += 1
+			check_equal(feel.effect_info(FeelScript.KIND_PUFF)["zoom"], int(part["zoom"]), "as big as the cue says")
+	check_equal(puffs, 1, "the cue has one puff in the body's colour")
 
 
 func test_sprays_stay_inside_the_effect_slots_with_four_players() -> void:
@@ -172,12 +195,13 @@ func test_a_contact_hit_does_not_take_a_refused_shots_direction() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "but a puff")
 
 
-func test_a_kill_keeps_the_effect_where_the_shot_struck() -> void:
+func test_a_kill_keeps_the_spray_where_the_shot_struck_and_puffs_at_the_body() -> void:
 	var enemy: Node2D = _enemy()
 	enemy.global_position = Vector2(100.0, 50.0)
 	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the bigger puff stays where the shot struck")
+	check((feel.effect_info(FeelScript.KIND_SPRAY)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the spray stays where the shot struck")
+	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(100.0, 50.0)), "the death cue's puff is at the body")
 
 
 func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
@@ -190,31 +214,21 @@ func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
 		check(not child is CPUParticles2D and not child is Line2D or child in feel._live_beams, "no particle nodes and no lines but the beams: %s" % child)
 
 
-## S6 2: a hit's look is the cue `hit` (and `hit_puff` with no way, or for a kill), so it is data:
-## a cue file with other parts changes every hit, and Feel draws no spray of its own.
+## S6 2: a hit's look is the cue `hit` (and `hit_puff` with no way), so it is data: a cue file
+## with other parts changes every hit, and Feel draws no spray of its own.
 func test_a_hits_look_is_its_cue() -> void:
 	var plain: CueBase = feel.cue_of(&"hit")
 	check(plain != null and plain.parts[0]["effect"] == &"spray", "a spray, from content/cues/hit.tres")
+	var enemy: Node2D = _enemy()
+	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
+	var colour: Color = feel.effect_info(FeelScript.KIND_SPRAY)["core"]
 	var other := CueBase.new()
 	other.id = &"hit"
 	other.parts = [{"effect": &"ring_out", "reach": 1.0}] as Array[Dictionary]
 	feel.forget_cues()
 	feel._cue_cache[&"hit"] = other
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "no spray of Feel's own")
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "no spray of Feel's own")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "the cue's ring instead")
-	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], preset.enemy_hit_color, "in the hit's colours")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], colour, "in the hit's colours")
 	feel.forget_cues()
-
-
-## A killing blow's spray turns into the puff (`hit_puff`) where it was, in its colours and the size
-## the death asks for: the spray ends as the puff starts, so one effect stays.
-func test_a_kill_turns_the_spray_into_the_puff_cue() -> void:
-	var enemy: Node2D = _enemy()
-	_strike(1, enemy, Vector2(30.0, 40.0), Vector2.RIGHT, 5)
-	var slot: int = feel._hit_effect
-	check(slot >= 0 and feel._effect_kind[slot] == FeelScript.KIND_SPRAY, "the hit's spray is remembered")
-	bus.enemy_died.emit(1, enemy, enemy.global_position, -1)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "the spray is gone")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "a puff in its place")
-	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(30.0, 40.0)), "where the spray was")

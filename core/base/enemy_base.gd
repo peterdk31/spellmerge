@@ -22,6 +22,12 @@ extends Resource
 ## The body's scale (1: as drawn); a boss is bigger.
 @export var size: float = 1.0
 
+## Its own colour when hit (Feel): the spray of a hit on its body and its death's puff, in the
+## palette ramp nearest it; not its spell's colours (those are its shots'). Ember for every enemy so
+## far, and for a body with no enemy data (a swarmer, a stand-in).
+const DEFAULT_HIT_COLOR: Color = Color("e0592f")
+@export var hit_color: Color = DEFAULT_HIT_COLOR
+
 # Enemy AI (docs/milestones/M2-enemy-ai.md, "The enemy's data"): an enemy holds 1-4 staffs of
 # player cards and casts them like a wizard, paying each staff's own mana. The AI reads what each
 # staff casts next (`CastSense`), so a new enemy type is a sprite and staffs, with no code. Without

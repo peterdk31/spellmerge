@@ -5,7 +5,8 @@ extends ActorComponent
 ## instead of dying (`Actor.set_down`): it stands where it fell, casts nothing, holds no orbit or
 ## beam, its hurtbox is off and shots fly past it, and `player_downed(seat)` is sent. A teammate
 ## who stays beside it long enough revives it (`coop` calls `revive(reviver)`): it stands with
-## REVIVE_HEALTH and `player_revived(seat, reviver)` is sent.
+## REVIVE_HEALTH and `player_revived(seat, reviver)` is sent, and the cue REVIVE_CUE is played on
+## it (`cue_shown`; content/cues, S6 item 13).
 ##
 ## The seat is the one of the actor's home controller (`seat()`: the wizard's own PlayerController),
 ## whoever drives the body now, so a seat is downed and revived only through its own wizard.
@@ -19,6 +20,8 @@ extends ActorComponent
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
+## The cue played on a revived actor (`revive`).
+const REVIVE_CUE: StringName = &"revive"
 ## Health after a revive.
 const REVIVE_HEALTH: float = 50.0
 ## Seconds a wizard who joins mid-run (or stands up for a new wave) cannot be hurt.
@@ -80,6 +83,8 @@ func revive(reviver: int) -> bool:
 		actor.health.reset(REVIVE_HEALTH)
 	if actor.events != null:
 		actor.events.player_revived.emit(seat(), reviver)
+		# The moment's look is content's (S6, item 13).
+		actor.events.cue_shown.emit(actor.id, REVIVE_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
 	return true
 
 

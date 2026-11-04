@@ -301,11 +301,10 @@ const EFFECT_QUADS: Array[Vector3i] = [
 ## How long a muzzle flash is compared with its width.
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
-## A possession's ring on the possessed actor (`possess_started`, `possess_ended`): its zoom and
-## seconds, and the sound when it starts.
-const POSSESS_ZOOM: int = 2
-const POSSESS_SECONDS: float = 0.35
-const POSSESS_SOUND: StringName = &"possess"
+## The cues of a possession starting and ending, on the possessed body (`possess_started`,
+## `possess_ended`; content/cues).
+const POSSESS_START: StringName = &"possess_start"
+const POSSESS_END: StringName = &"possess_end"
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -2154,28 +2153,26 @@ func _on_staff_shown(caster: int, actor: Node, _staff: int) -> void:
 		_effect_offset[slot] = offset
 
 
-## A possession started: a ring closes on the possessed actor in the driver's ramp, with the sound
-## `possess`.
+## A possession started: the cue `possess_start` on the possessed actor's body (a ring closing in
+## the driver's ramp, the sound `possess`).
 func _on_possess_started(caster: int, actor: int) -> void:
-	if _show_possession(caster, actor, KIND_RING_IN):
-		_play(POSSESS_SOUND)
+	_cue_on_body(POSSESS_START, caster, actor)
 
 
-## A possession ended: a ring in the driver's ramp goes out from the actor let go (if it is there).
+## A possession ended: the cue `possess_end` on the body let go, if it is still there (a ring going
+## out in the driver's ramp).
 func _on_possess_ended(caster: int, actor: int) -> void:
-	_show_possession(caster, actor, KIND_RING_OUT)
+	_cue_on_body(POSSESS_END, caster, actor)
 
 
-## A ring of `kind` on the body of `actor` (at its drawn body), in the ramp of `caster`. False
-## when the body is gone.
-func _show_possession(caster: int, actor: int, kind: int) -> bool:
+## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`); nothing when the
+## body is gone.
+func _cue_on_body(id: StringName, caster: int, actor: int) -> void:
 	var table: ActorsScript = _actor_table()
 	var body: Node2D = table.node_of(actor) as Node2D if table != null and actor != ActorsScript.NONE else null
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
-		return false
-	var at: Vector2 = body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO)
-	show_effect(kind, at, Vector2.RIGHT, Color.WHITE, _ramp_of(caster), 0, POSSESS_ZOOM, POSSESS_SECONDS)
-	return true
+		return
+	play_cue(id, caster, body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO), Vector2.ZERO, 0.0, Color.WHITE, 0, actor)
 
 
 func _on_player_downed(player: int) -> void:

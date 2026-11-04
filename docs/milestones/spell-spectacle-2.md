@@ -131,7 +131,7 @@ The owner asked for every other system that can be replaced to be added. A surve
 
 **Stays code (not moments):** the telegraphs (exact readability: reach, lane width and progress; at most their numbers move into enemy data), beams while they last, shot bodies and the swing's line, the hit flash and squash, body looks (dash afterimages, faces, the decoy), text (reaction names, the downed note), UI drawn in the world (the reticle, revive and protect rings, possession bars, damage numbers), the large batches (the swarm, the gems), and hit-stop and shake (already cue and preset data).
 
-**Built** (owner/cues-moments): item 1 (reactions: `reaction_<id>` cues with the cue's own `color` and `power`; docs/DECISIONS.md).
+**Built** (owner/cues-moments): item 1 (reactions: `reaction_<id>` cues with the cue's own `color` and `power`; docs/DECISIONS.md), item 7 (`possess_start`, `possess_end`).
 
 **Order inside S6:** 1, 2, 7 and 8 need only parts that exist (plus an `arc` entry); then 5, 6, 13 and 14; 4 is a new part type; 9 needs a following `CueContext`; 3, 10 and 11 come after S4, which sets what a mote row costs. S3's own new special case (spray and puff thrown as motes inside `show_effect`) goes when hit flashes become cues (`hit`, and a puff for a hit with no way), under the same storm check as 2.
 

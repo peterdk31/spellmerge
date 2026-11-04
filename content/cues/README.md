@@ -27,6 +27,8 @@ Cards name the cues they play: a carrier's `cast_look` `cue` (`FormBase`; played
 | `heal` | Feel, for `heal_dealt` | a soft ring in exactly green, no stop and no shake |
 | `reaction_<id>` | Feel, for `reaction_triggered` of that reaction (`shatter`, `thaw`, `flare`, `kindle`, `stillness`, `rift`, `overload`, `superconduct`, and lightning's `discharge`) | a puff bigger than a hit's, a ring and a ring of the reacting shot's motes, all in exactly the reaction's own `color`; its caster held, shake and the sound `reaction_<id>`, as strong as its `power` (shatter 1.3 the most, discharge 0.7 the least). Feel shows the reaction's name in the cue's colour, and plays the hold, shake and sound at most every 0.3 s per reaction |
 | `reaction` | Feel, for a reaction with no cue of its own | the same in white |
+| `possess_start` | Feel, for `possess_started`, on the possessed actor's body | a ring closing in the driver's ramp (`bare`), the sound `possess` |
+| `possess_end` | Feel, for `possess_ended`, on the body let go (when it is still there) | a ring going out in the driver's ramp |
 | `nova` | the nova card's cast look `cue`, at `form_shown` `nova` | the ring leaving the caster, 120 px across, a ring of its cards' motes, and a burn ring on the floor round the caster |
 | `rune_burst` | the rune card's impact look `cue`, where a rune goes off (on a body or not: a rune lies on the floor) | a rune's scar on the floor, as big as the rune |
 | `telegraph` | the rain card's cast look `cue`, at `form_shown` `rain` | a ring closing on where a rain falls, for the seconds until then (`size`) |

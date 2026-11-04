@@ -23,8 +23,6 @@ extends Resource
 @export_range(0.0, 32.0, 0.5) var max_shake_pixels: float = 6.0
 ## Trauma lost per second.
 @export_range(0.1, 10.0, 0.1) var shake_decay: float = 2.5
-## How much bigger (rounded to a whole zoom) a death's puff is than a hit's.
-@export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
 ## The spray of a hit on a character (an effect along the way the shot flew), bigger or smaller
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
 ## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.

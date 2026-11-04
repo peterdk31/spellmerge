@@ -109,13 +109,22 @@ func test_an_impact_is_used_once_and_only_for_its_target() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "it is a puff")
 
 
-func test_a_killing_blow_keeps_one_effect_and_the_colour() -> void:
+## A kill's puff is a part of its death cue (S6): in the body's own colour, beside the killing
+## blow's spray (which no longer turns into it).
+func test_a_killing_blow_s_puff_is_the_death_cue_s_in_the_body_s_colour() -> void:
 	var enemy: Node2D = _enemy()
 	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "the kill turns the hit's spray")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "into one bigger puff, not a second effect")
-	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], preset.enemy_hit_color, "still ember")
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "the hit's spray plays on")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "the death cue's puff")
+	check_equal(feel.effect_dress(FeelScript.KIND_PUFF), [preset.enemy_hit_color, 0], "in ember, no one's ramp, no cards")
+	var cue: CueBase = feel.cue_of(&"enemy_death")
+	var puffs: int = 0
+	for part: Dictionary in cue.parts:
+		if StringName(part.get("effect", "")) == &"puff" and bool(part.get("body", false)):
+			puffs += 1
+			check_equal(feel.effect_info(FeelScript.KIND_PUFF)["zoom"], int(part["zoom"]), "as big as the cue says")
+	check_equal(puffs, 1, "the cue has one puff in the body's colour")
 
 
 func test_sprays_stay_inside_the_effect_slots_with_four_players() -> void:
@@ -172,12 +181,13 @@ func test_a_contact_hit_does_not_take_a_refused_shots_direction() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "but a puff")
 
 
-func test_a_kill_keeps_the_effect_where_the_shot_struck() -> void:
+func test_a_kill_keeps_the_spray_where_the_shot_struck_and_puffs_at_the_body() -> void:
 	var enemy: Node2D = _enemy()
 	enemy.global_position = Vector2(100.0, 50.0)
 	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the bigger puff stays where the shot struck")
+	check((feel.effect_info(FeelScript.KIND_SPRAY)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the spray stays where the shot struck")
+	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(100.0, 50.0)), "the death cue's puff is at the body")
 
 
 func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:

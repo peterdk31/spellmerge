@@ -358,7 +358,7 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_setup()
 	_hit(0, Vector2(7.0, 7.0))
 	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0), -1)
-	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 1, "a killing blow's puff becomes the death puff: one slot, not two")
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 2, "the hit's puff and the death cue's own (S6)")
 	_check(_feel.effects_of(FeelScript.KIND_RING_OUT) == 1, "and a white-hot ring")
 	_feel.step(STEP)
 	_feel.set_effect_slots(EffectSlots.MIN)

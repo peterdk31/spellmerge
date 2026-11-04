@@ -79,6 +79,17 @@ func test_a_motes_part_names_what_is_wrong() -> void:
 	check_equal(cue.problems().size(), 5, "one a part: %s" % [cue.problems()])
 
 
+## A flash's colour is one of its own, plain, the caster's ramp alone (`bare`) or the body's own
+## (`body`, S6: a death's puff).
+func test_a_flash_takes_one_colour() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test"
+	cue.parts = [{"effect": &"puff", "body": true}]
+	check_equal(cue.problems(), PackedStringArray(), "a flash in the body's colour")
+	cue.parts = [{"effect": &"puff", "body": true, "plain": true}, {"effect": &"puff", "body": true, "color": Color.RED}]
+	check_equal(cue.problems().size(), 2, "body beside another colour: %s" % [cue.problems()])
+
+
 ## A motes part with a `share` sheds (S6: a shot's end): a share above 0, and none of the keys that
 ## size a moment's burst (its count, reach, radius, ring), which a shed does not take.
 func test_a_shed_share_takes_no_burst_keys() -> void:

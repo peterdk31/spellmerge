@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Spell light from effects, beams and torches; a room's ambient (spell spectacle P3b, owner session)
+
+Feel's effects (bursts, rings, casts, hits, arcs, blasts) and live beams now light the room round them, drawn from the rows and paths Feel already uploads; the crypt's torches are light spots (a marker with metadata, coloured by the flame's art), and every shot lights, the enemies' too. A room has an `ambient` (the sandbox's is 0.85, the owner's pick); the light's steps are a switch (`bands`: 3 steps by default, 0 smooth), with a sheet for the owner to choose between them. STYLE.md now says the world may take light from spells. Tests in test_light.gd; the light pass measured the same as P3a's on llvmpipe.
+
 ## 2026-11-04: Settled motes and the other floor marks (spell spectacle P2b, owner session)
 
 Chips and frost's flecks now leave a one-pixel speck in the floor mark layer where they come to rest, in their own colours, once they lie still (`MoteKind.settles` names the mark; `Marks.settle` keeps them in a wheel of time slots, at most 512 stamped a frame). The motes and marks share one ramp table (`gameplay/feel/ramp_table.gd`). New marks: a burn ring round a nova's caster, a rune's scar where a rune goes off (new cue `rune_burst`, on the rune card), ichor in a dying body's own colours (enemy and boss deaths; a new `surface` colour source), and char, lightning's card mark. Tests: `test_marks` (a speck where and when a mote rests, the caps, the settings, the new cues); screenshot sheet `shot_marks.gd`. Details: docs/DECISIONS.md.

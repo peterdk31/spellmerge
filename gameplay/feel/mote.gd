@@ -47,6 +47,7 @@ const BatchesScript := preload("res://core/projectiles/batches.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 ## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
 const CHUNK: int = 1024
@@ -115,6 +116,11 @@ const HEIGHT_MAX: float = 63.75
 ## off, not thrown. A birth's floats and where its numbers are: core/projectiles' SPARK_*.
 const TRAIL_SPEED: float = 0.3
 const BIRTH_STRIDE: int = ProjectilesScript.SPARK_BIRTH_STRIDE
+## The native births (`MoteKernel`, `give_off`): a pair's key is its spell's tag times PAIR_LAYERS
+## plus its look kind plus one (the streak's kind is -1); a settle handed back is SETTLE_STRIDE
+## numbers (the mark, the point x and y, the time, the source, the core r, g, b, the serial).
+const PAIR_LAYERS: int = 64
+const SETTLE_STRIDE: int = 9
 
 ## Uploads of a chunk's buffer since this pool was made, the motes written, the bursts the frame's
 ## FRAME_ROWS cut short or left out, the trail births given off, and the settling motes handed to
@@ -180,6 +186,31 @@ var _material: ShaderMaterial = null
 var _mesh: ArrayMesh = null
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## The native kernel (`MoteKernel`, native/README.md): the trails' births written in C++, the same
+## to the bit, or null to write them here. `native` switches it.
+var native: bool = true:
+	set = set_native
+var _kernel: Object = null
+## Each kind's burst and flight numbers, for the kernel (made with the kinds).
+var _k_speed: PackedVector2Array = PackedVector2Array()
+var _k_up: PackedVector2Array = PackedVector2Array()
+var _k_life: PackedVector2Array = PackedVector2Array()
+var _k_spread: PackedFloat64Array = PackedFloat64Array()
+var _k_height: PackedFloat64Array = PackedFloat64Array()
+var _k_gravity: PackedFloat64Array = PackedFloat64Array()
+var _k_bounce: PackedFloat64Array = PackedFloat64Array()
+var _k_drag: PackedFloat64Array = PackedFloat64Array()
+var _k_wobble: PackedFloat64Array = PackedFloat64Array()
+var _k_wobble_rate: PackedFloat64Array = PackedFloat64Array()
+## The native births' pairs (`MoteKernel.key_births`): each birth's pair, the pairs' keys, and the
+## kinds of each pair (from `_pair_from`, `_pair_size` of them, in `_pair_kinds`); the settles the
+## kernel hands back (SETTLE_STRIDE numbers each).
+var _birth_pair: PackedInt32Array = PackedInt32Array()
+var _pair_key: PackedInt64Array = PackedInt64Array()
+var _pair_from: PackedInt32Array = PackedInt32Array()
+var _pair_size: PackedInt32Array = PackedInt32Array()
+var _pair_kinds: PackedInt32Array = PackedInt32Array()
+var _settle_out: PackedFloat64Array = PackedFloat64Array()
 
 
 ## A pool of `cap` rows (above 0) of the kinds `kinds` (at most MAX_KINDS; a kind with problems
@@ -201,6 +232,43 @@ func _init(cap: int, z: int, kinds: Array[MoteKind], table: RampTableScript = nu
 	_table = table if table != null else RampTableScript.new()
 	_material.set_shader_parameter(&"ramp_table", _table.texture())
 	_take_kinds(kinds)
+	_birth_pair.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
+	_pair_key.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
+	_pair_from.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
+	_pair_size.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
+	_pair_kinds.resize(64)
+	_settle_out.resize(SETTLE_MOST * SETTLE_STRIDE)
+	set_native(native)
+
+
+## Write the trails' births with the native kernel when `on` and the module is loaded (see
+## `native`). The kernel is handed the numbers it needs and checks the members it reads.
+func set_native(on: bool) -> void:
+	native = on
+	_kernel = NativeScript.mote_kernel() if on else null
+	if _kernel == null:
+		return
+	var numbers: Dictionary = {
+		"CHUNK": CHUNK, "DRAW_STRIDE": DRAW_STRIDE, "BIRTH_STRIDE": BIRTH_STRIDE, "SETTLE_STRIDE": SETTLE_STRIDE,
+		"ROW_VX": ROW_VX, "ROW_BORN": ROW_BORN, "ROW_X": ROW_X, "ROW_VY": ROW_VY, "ROW_VZ": ROW_VZ, "ROW_Y": ROW_Y,
+		"ROW_SOURCE": ROW_SOURCE, "ROW_KIND": ROW_KIND, "ROW_LIFE": ROW_LIFE, "ROW_HEIGHT": ROW_HEIGHT,
+		"ROW_CORE": ROW_CORE, "ROW_SEED": ROW_SEED,
+		"SPARK_X": ProjectilesScript.SPARK_X, "SPARK_Y": ProjectilesScript.SPARK_Y,
+		"SPARK_BACK_X": ProjectilesScript.SPARK_BACK_X, "SPARK_BACK_Y": ProjectilesScript.SPARK_BACK_Y,
+		"SPARK_KIND": ProjectilesScript.SPARK_KIND, "SPARK_RAMP": ProjectilesScript.SPARK_RAMP,
+		"SPARK_LOOK": ProjectilesScript.SPARK_LOOK, "SPARK_CORE": ProjectilesScript.SPARK_CORE,
+		"SPARK_TAG": ProjectilesScript.SPARK_TAG, "SPARK_TAG_BITS": ProjectilesScript.SPARK_TAG_BITS,
+		"SPARK_STREAK": ProjectilesScript.SPARK_STREAK, "PAIR_LAYERS": PAIR_LAYERS,
+		"ENEMY_SOURCE": ENEMY_SOURCE, "EXACT_SOURCE": EXACT_SOURCE, "LOOK_ENEMY_RAMP": LOOK_ENEMY_RAMP,
+		"LOOK_EXACT": LOOK_EXACT, "LIFE_MAX": LIFE_MAX, "HEIGHT_MAX": HEIGHT_MAX, "SOURCE_CODE": SOURCE_CODE,
+		"KIND_CODE": KIND_CODE, "TRAIL_SPEED": TRAIL_SPEED,
+	}
+	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
+	if not _kernel.call(&"configure", numbers):
+		wrong.append("the motes' numbers")
+	if not wrong.is_empty():
+		push_error("Motes: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
+		_kernel = null
 
 
 ## How many motes the ring holds.
@@ -351,6 +419,10 @@ func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color,
 ## Each is a one-mote `burst`, so a trail's mote is written, counted and settled as every other.
 func give_off(given: PackedFloat32Array, count: int) -> void:
 	count = mini(count, given.size() / BIRTH_STRIDE)
+	_ready_chunks()
+	if _kernel != null:
+		_give_off_native(given, count)
+		return
 	for n in count:
 		if _rows_left <= 0:
 			cut += count - n
@@ -375,6 +447,52 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), int(given[b + ProjectilesScript.SPARK_LOOK])),
 			Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2]),
 			kind.height)
+
+
+## `give_off` in the native kernel: it names each birth's (tag, kind) pair, the kinds of each pair
+## are looked up here once (a script's lookup, `card_kinds.gd`), the kernel writes the rows, and
+## the marks of the motes that settle are handed to the mark layer here.
+func _give_off_native(given: PackedFloat32Array, count: int) -> void:
+	count = mini(count, _birth_pair.size())
+	var pairs: int = _kernel.call(&"key_births", self, given, count)
+	var at: int = 0
+	for p in pairs:
+		var key: int = _pair_key[p]
+		var layer: int = key % PAIR_LAYERS - 1
+		var found: PackedInt32Array
+		if layer == ProjectilesScript.SPARK_STREAK:
+			found = _dash_kinds
+		elif _cards != null:
+			found = _cards.layer_motes(key / PAIR_LAYERS, layer)
+		else:
+			found = kinds_of_layer(layer)
+		var size: int = found.size()
+		_pair_from[p] = at
+		_pair_size[p] = size
+		if _pair_kinds.size() < at + size:
+			_pair_kinds.resize(maxi(at + size, _pair_kinds.size() * 2))
+		for i in size:
+			_pair_kinds[at + i] = found[i]
+		at += size
+	var handed: int = _kernel.call(&"give_off", self, given, count, _marks != null)
+	for s in handed:
+		var o: int = s * SETTLE_STRIDE
+		_marks.settle(int(_settle_out[o]), Vector2(_settle_out[o + 1], _settle_out[o + 2]), _settle_out[o + 3],
+			int(_settle_out[o + 4]), Color(_settle_out[o + 5], _settle_out[o + 6], _settle_out[o + 7]), int(_settle_out[o + 8]))
+
+
+## Make the chunks the frame's rows left may still reach from the next row (the native kernel
+## writes rows but makes no nodes).
+func _ready_chunks() -> void:
+	var left: int = mini(_rows_left, _cap)
+	var row: int = _next
+	while left > 0:
+		var c: int = row / CHUNK
+		if _nodes[c] == null:
+			_chunk(c)
+		var span: int = mini(mini(CHUNK, _cap - c * CHUNK) - (row - c * CHUNK), left)
+		left -= span
+		row = (row + span) % _cap
 
 
 ## The kinds a dash gives off along its path (`MoteKind.dash_path`). Kept: read it, never change it.
@@ -693,6 +811,16 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			continue
 		var k: int = _kinds.size()
 		_kinds.append(kind)
+		_k_speed.append(kind.speed)
+		_k_up.append(kind.up)
+		_k_life.append(kind.life)
+		_k_spread.append(kind.spread)
+		_k_height.append(kind.height)
+		_k_gravity.append(kind.gravity)
+		_k_bounce.append(kind.bounce)
+		_k_drag.append(kind.drag)
+		_k_wobble.append(kind.wobble)
+		_k_wobble_rate.append(kind.wobble_rate)
 		var frames: int = kind.shape_frames().size()
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))

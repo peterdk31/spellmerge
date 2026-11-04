@@ -86,21 +86,17 @@ Today a mote is a row and every row is a GDScript write. Instead, one row could 
 
 Merged only if the storm's CPU drops and the GPU time on llvmpipe and the Intel UHD does not grow more than that; the result goes in DECISIONS either way. After S3, so fewer callers write rows.
 
-## S5: Tails as motes (an experiment, measured; the owner, 2026-11-04)
+## S5: Do shots need tails? (the owner, 2026-11-04)
 
-The owner asked whether the trail shader could be turned off completely, with motes drawing what it draws, and whether that would be faster. After S3 the trail shader draws only the tail line and the dashes' streaks. The tail follows the path a shot really took (it bends after the shot is fired: homing, orbits, bounces), so the manager uploads every shot's recent positions each frame (`trail_data`) and the shader draws a line through them.
+The owner asked whether the shots need tails at all now that they shed motes. After S3 the trail shader draws only the tail line and the dashes' streaks; the tails have been the shots' largest GPU cost (DECISIONS, 2026-11-02: their vertex count, drawn or folded), and the manager uploads every shot's recent positions for them each frame (`trail_data`). Without tails, that budget could go to motes instead: more births a shot in busy fights, so a fight of thousands of shots keeps the look of a fight of tens (the owner: "This might also allow us to increase motes in busier fights, so the visual look will stay the same for more projectiles").
 
-**As motes:** each shot drops one mote a frame where it is, with no speed and a short life, so the motes stay put and cool out along the path, bends included. A new mote kind is stretched along the shot's way (a fast shot moves about 7 px a frame at 60 FPS, so one-pixel motes would read as dots).
+**What a tail does that motes don't:** it shows at a glance which way a shot flies and how fast, which matters most for dodging enemy shots with small (3-5 px) cores and four players; and it carries the caster's colour (staffs B6a). Motes drift and scatter. At high shot counts the spark pool's share thins each shot's births, so in the busiest fights most shots would show nothing behind them unless the motes get the budget the tails leave. The owner chose "long cooling tails" for the carriers' look on 2026-10-27; this asks that again.
 
-**What it could save and cost:**
-- CPU saved: the trail rows' upload in `update_draw` (0.4-0.9 ms a frame in the storm).
-- CPU added: one mote row a shot a frame, 3,000-6,000 a frame, far past `FRAME_ROWS` (256) and 7-15 ms in GDScript. So the native module writes the tail rows in the step (`ShotKernel`, about 0.1 ms for 6,000 shots), with the GDScript as its reference, byte for byte as for every kernel.
-- GPU: about the same or more, not clearly less. At 3,000 shots a 0.3 s tail is about 54,000 live motes (216,000 vertices) against the trails' 170,000 after P1d. It saves vertices only with short or sparse tails.
-
-**Steps, each stopping the experiment if it doesn't pay:**
-1. **The ceiling:** a "no trails" switch in `trail_gpu.gd` and the storm runner; the GPU and the CPU a frame with no trails at all, at 60, 400 and 3,000 shots. If even that is small, the experiment ends here.
-2. **The look without trails:** a screenshot sheet of the trails sheet's shots with motes only and no trails, for the owner's eyes.
-3. **Tail motes:** the stretched kind and the native tail rows, measured against today's trails (GPU and CPU, the storm and `trail_gpu.gd`), with a sheet before and after. Merged only if it is cheaper and the owner likes the look; the result goes in DECISIONS either way.
+**Steps:**
+1. **The ceiling:** a "no tails" switch on the projectile manager (`tails_enabled`), in `trail_gpu.gd` and the storm runner: the GPU and the CPU a frame with no tails at 60, 400 and 3,000 shots, against today's. With no tails the manager writes no trail rows and draws no trail batches (the dashes' streaks are part of the question too: measured on and off).
+2. **Motes with the tails' budget:** with tails off, the births' share no longer thins with the shot count as the spark pool's share does now, up to what the measured GPU and the motes' CPU allow (a frame's rows, `FRAME_ROWS`; the native module writing births if GDScript is the limit). Measured the same way.
+3. **A dev switch to play with:** "Tails: on / off" in the pause menu's dev rows (as the other dev switches), saved, so the owner can play the sandbox and a horde fight with tails off, enemy shots included. A screenshot sheet is not enough: whether shots read is about motion.
+4. **The owner decides:** no tails; short tails; tails only where they matter most (enemy shots, fast shots); or tails below a shot count and none above it. The pick is built in its own PR; DECISIONS records the figures either way.
 
 ## Order
 
@@ -110,4 +106,4 @@ S1 ─┬─ S2
            └─ S5
 ```
 
-S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 and S5 after S3 (S5's first two steps are quick and come first). Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.
+S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 and S5 after S3 (S5's first steps are quick and come first). Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.

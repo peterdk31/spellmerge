@@ -4,7 +4,7 @@ The vision and pillars. **Owner-only:** only peterdk31 changes this file. Claude
 
 ## The game
 
-Spellmerge is a 2D top-down action roguelite for 1–4 local co-op players, where the build comes from spells you assemble mid-run, in the spirit of Noita's wands and Ember Knights' co-op.
+Spellmerge is a 2D top-down action roguelite for 1–4 co-op players (local co-op now, online co-op later: the owner, 2026-11-04), where the build comes from spells you assemble mid-run, in the spirit of Noita's wands and Ember Knights' co-op.
 
 *Merge spells. Cause chaos. Together.*
 
@@ -42,6 +42,14 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 4. Unpicked rewards carry over as an unspent icon.
 5. Shared decisions are made by walking (the door rule).
 6. Only the real pause menu stops the game, and any player can open it.
+
+## One game, the same everywhere
+
+Chosen by the owner on 2026-11-04, so online co-op can be added ([docs/milestones/online-ready.md](milestones/online-ready.md)):
+
+- **The same inputs give the same game,** to the bit, on every platform (Linux, Windows, the web). Online co-op will send only the players' inputs.
+- **All game logic runs on the simulation's tick,** never on real time, live input, the camera or anything drawn; what is drawn never feeds back into the game.
+- **Nobody waits online either:** a slow connection hurts only its own player, never the others (pillar 2).
 
 ## What makes it fun
 

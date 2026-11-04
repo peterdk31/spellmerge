@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Online co-op later; the simulation becomes deterministic first (owner)
+
+- **Asked:** the owner: "Real online play is wanted. I hereby grant permission to change the design, such that it is possible to add. So I think we should follow your suggestion and tighten determinism. Make a plan."
+- **Done:** docs/DESIGN.md says online co-op comes later and adds "One game, the same everywhere" (same inputs, same game, on every platform; logic on the tick; nobody waits online). The plan is [milestones/online-ready.md](milestones/online-ready.md) (phase N, N1–N10), waiting for approval.
+- **Why lockstep (inputs only), not sending state:** up to about 3,000 shots, 200 actors and a 500+ swarm are far too much state to send every tick; an input frame per seat is a few bytes. Lockstep needs a bit-identical simulation, which is what phase N builds.
+- **Why host-ordered lockstep (later):** in plain lockstep everyone waits for the slowest machine, against pillar 2; with the host fixing each tick's frames and repeating a late seat's last frame, only the slow player suffers.
+- **Not changed:** hard rule 4 still bans networking. The netcode is a later phase with its own owner exception, kept to one owner-only folder like `native/`.
+
 ## 2026-11-04: The motes' trail births in native code (owner session)
 
 - **Asked:** the owner, after the "Tailless motes" dev slider (2048/4096/8192, #547): "Build the native code now." The births were the motes' part that grows with the pool (S5: at 3,000 shots the births' CPU 1.8 ms at a pool of 2,048 and 2.9 ms at 4,096).

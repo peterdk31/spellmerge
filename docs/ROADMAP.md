@@ -16,6 +16,8 @@ A sixth, by the owner on 2026-11-01: **an enemy AI that plays whatever staffs it
 
 A seventh, by the owner on 2026-11-03: **spell spectacle**, three drawn-only layers built ahead of M4's polish: motes (tens of thousands of single-pixel particles with no game logic), floor marks that stay for the room, and spell light ([spell-spectacle.md](milestones/spell-spectacle.md), phase P). It changes no rule, damage or cap.
 
+An eighth, by the owner on 2026-11-04: **online-ready**, a deterministic simulation (the same inputs give the same game on every platform), input frames and replays, one tick clock, and snapshots, so online co-op can be added later ([online-ready.md](milestones/online-ready.md), phase N). It builds no netcode; networking stays banned until its own owner exception. Draft: waiting for the owner's approval and place in the order.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

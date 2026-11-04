@@ -1,6 +1,6 @@
 # Shot scale: toward 100,000 live shots
 
-**Status: proposed, waiting for the owner.** Asked by the owner on 2026-11-04 ("Can we optimize the hit logic per bullet to increase the amount to like 100000 bullets at a time?"). Nothing below is scheduled until the owner answers the open questions at the end. No rule, damage or card behaviour changes. Every part is measured before and after, and caps are raised only to what a measurement holds.
+**Status: proposed; the owner's direction of 2026-11-04 is in.** Asked by the owner on 2026-11-04 ("Can we optimize the hit logic per bullet to increase the amount to like 100000 bullets at a time?"), then: "Don't mind what has been decided earlier. Bundle hit events if needed and add threads!" ([DECISIONS.md](../DECISIONS.md), 2026-11-04). So bundled hit events (H3b) and threads in the kernel (H5) are in the plan. Q1 and Q3 at the end are still open. No damage or card behaviour changes. The one exception is the order of effects within a step once hits are bundled (H3b), and that change is designed and tested. Every part is measured before and after, and caps are raised only to what a measurement holds.
 
 ## Where we are
 
@@ -12,16 +12,16 @@ Facts from the code and [DECISIONS.md](../DECISIONS.md) (2026-11-02):
 - **What holds the caps is the hits.** A hit costs about 40 µs of GDScript across Combat, Spells and Feel (Spells about 8 µs, Feel's impact about 13 µs, Combat's damage and its listeners, the actors). At 16.7 ms a frame, that means **a few hundred hits a step at most, whatever the shot count.**
 - **The hit budget hides the limit.** `WORK_PER_STEP` is 6,000 units and a hit costs `HIT_WORK` (40), so about 150 hits a step. Past it, shots still move but aren't tested until a later step. With far more shots, more of them are deferred, and fast ones skip targets.
 - **The GPU:** trails cost about 6 ms a frame at 3,000 shots with cards on an RTX A3000, and grow with the shot count.
-- **The owner's decision on bundling (2026-11-02):** hit events stay one event per hit. Bundling saves only the signal call (about 0.3 ms a frame), because hits depend on each other in order (a kill, a status a reaction reads, an on-hit card's shots). The rule instead: a listener with costly per-hit work keeps the hit and does the work once a frame. **This plan keeps that decision.**
+- **Bundling, decided against on 2026-11-02 and reversed on 2026-11-04.** The earlier finding was that bundling saves only the signal calls (about 0.3 ms a frame) as long as each listener still handles hits one by one in order. That still holds, so H3b only pays where a listener actually shares work across a step's hits. That's why H3b's design below changes the order of effects within a step.
 
 ## What 100,000 means
 
 Shot count and hit count are separate costs:
 
 - **Shots that fly:** cost is per shot per step, in C++ (move, walls, grid lookups) and on the GPU (drawing). This scales to 100,000 with the parts below.
-- **Shots that hit:** cost is per hit, in GDScript. At roughly 40 µs a hit, 100,000 shots in a crowd would make thousands of hits a step, far past a frame. No optimisation of the hit test changes this. Only cheaper hits do (H3), or fewer hits per shot, which is a design question (Q1).
+- **Shots that hit:** cost is per hit, in GDScript. At roughly 40 µs a hit, 100,000 shots in a crowd would make thousands of hits a step, far past a frame. No optimisation of the hit test changes this. Only cheaper hits do (H3, H3b), or fewer hits per shot, which is a design question (Q1).
 
-So the realistic goal is **100,000 shots in flight on desktop, with hits capped by a budget that keeps the frame**. Expected from the numbers above: about 20,000–40,000 on desktop with everything hitting at full detail. The web stays near its cap: it has no threads, WASM scripts run 2–3× slower, and the GPU is weaker.
+So the realistic goal is **100,000 shots in flight on desktop, with hits capped by a budget that keeps the frame**. Expected from the numbers above: about 20,000–40,000 on desktop with everything hitting at full detail. With bundled hits (H3b), the per-hit cost drops to what each listener can't share, so the number rises with how much H0 shows is shareable. The web stays near its cap: it has no threads, WASM scripts run 2–3× slower, and the GPU is weaker.
 
 ## Parts
 
@@ -31,21 +31,34 @@ So the realistic goal is **100,000 shots in flight on desktop, with hits capped 
 | H1 | **Fewer hand-backs** | `native/src/shot_kernel.cpp`, `core/projectiles/` | The kernel hands back a run of hits in one call, in shot order, and GDScript sends their events one by one as now. Same events, same order, fewer crossings. |
 | H2 | **The hit budget by time** | `core/projectiles/` | `WORK_PER_STEP` is sized from H0's per-hit cost, so the budget means the same milliseconds as shots grow. A test checks no shot waits more than one step under a full crowd. |
 | H3 | **Cheaper hits** | `gameplay/combat/`, `gameplay/feel/`, `core/spells/` | Each listener's per-hit work, timed in H0, moved to once a frame where it can be shared (the bundling decision's own rule). Candidates: Feel's spray, burst and sound per target per frame; the manager's facts Feel reads; Combat's per-hit table lookups. Each listener has its own PR and before/after numbers. |
+| H3b | **Bundled hit events** | `core/events/`, `core/projectiles/`, `gameplay/combat/`, `core/spells/`, `gameplay/feel/`, tests | The step's hits go out as one batch (packed arrays: caster, target, point, heading, tag, shot), resolved in phases. The design is below. Done if H3 leaves the hits as the largest part of a step. |
 | H4 | **Draw cost by count** | `core/projectiles/`, `core/settings/` | Above a count set by the effect-quality setting, the newest shots draw without trails and with a simpler look, and `PARTICLE_CAP` sparks go to hits first. One batch per kind, as now. Measured on a real GPU. |
-| H5 | **Threads in the kernel (desktop)** | `native/`, and the owner's `ci/smbot/rules.py` and `native/build_profile.json` | Needs the owner (Q2): both files are the owner's. The common pass and the hit pass split into chunks of shots on Godot's `WorkerThreadPool`. Each chunk only reads the target grid and writes its own shots, and results merge in shot order, so they stay byte-identical to the GDScript (`test_native_kernel.gd`). The web runs one chunk. |
+| H5 | **Threads in the kernel (desktop)** | `native/`, and the owner's `ci/smbot/rules.py` and `native/build_profile.json` | Approved by the owner on 2026-11-04. Both files are the owner's: the PR changes them with the owner's approval and the owner merges it. `WorkerThreadPool` goes in the build profile, and the rules allow it and nothing else (still no `std::thread`, no system calls). The common pass and the hit pass split into chunks of shots on Godot's `WorkerThreadPool`. Each chunk only reads the target grid and writes its own shots, and results merge in shot order, so they stay byte-identical to the GDScript (`test_native_kernel.gd`). The web runs one chunk. |
 | H6 | **Shots-first queries** | `core/projectiles/`, `native/` | Only if H0 or H5 shows the target lookup still costs a lot when shots far outnumber targets: each target walks the shot grid (`_shot_head`, built for shields today) instead of each shot walking the target grid. Same hits, same order (sorted by shot), checked by the recording tests. |
 | H7 | **Caps** | `core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS | The desktop and web defaults raised to what the stress run holds at 60 FPS. The slider's top raised past 50,000 if H0 shows a machine can use it. |
 
-**Order:** H0 first. H1, H2 and H4 in parallel after it. H3 one listener at a time, biggest first. H5 after the owner's answer. H6 only if measured. H7 last. Each part is one PR that follows the native contract (native/README.md): the GDScript stays the reference, and the side-by-side and recording tests pass byte for byte.
+**Order:** H0 first. H1, H2 and H4 in parallel after it. H3 one listener at a time, biggest first, then H3b if the hits still lead. H5 in parallel with H3. H6 only if measured. H7 last. Each part is one PR that follows the native contract (native/README.md): the GDScript stays the reference, and the side-by-side and recording tests pass byte for byte.
+
+## H3b: bundled hit events
+
+Today each hit is one `projectile_hit` (and one `projectile_impact`), and Combat, Spells and Feel each handle it before the next hit goes out. Bundling only pays if a listener can share work across the step's hits, so the batch is resolved **in phases**, each over every hit of the step in hit order:
+
+1. **Combat:** damage, statuses, reactions and kills, hit by hit in order, as today. A hit on a target killed earlier in the same batch is skipped, as it would be by a freed node. Lookups are shared across the batch (the target's row, its team, its hit profile).
+2. **Spells:** on-hit cards, chains and payloads, in hit order. They read the state after all of the step's damage, not after their own hit. **This is the one rule change:** a reaction or trigger can see a status that a later hit in the same step applied. Shots spawned by on-hit cards fly from the next step, as they do now.
+3. **Feel:** one look, sound and flash per target per batch (the strongest hit's), plus sparks up to its budget.
+
+- **One entry point.** Every sender of hits (blasts, melee carriers, the manager) sends a batch, and a single hit is a batch of one, so no listener keeps two paths. `projectile_hit` and `projectile_impact` become `projectile_hits` and `projectile_impacts` in `core/events/events.gd`, with the batch's arrays reused, not allocated per step.
+- **The native hit pass fills the batch.** It writes hits into the batch's arrays and hands back only for walls and ends, so H1 folds into it.
+- **Tests.** The recording tests (`test_projectiles_step_exact.gd` and the hit traces) are recorded again, and the PR lists every changed trace with its reason. The card-rules tests (`test_card_rules.gd`, `test_card_rules_swarm.gd`) must still show no silent no-ops. A new test fires two hits in one step where the second applies a status the first one's reaction reads, and checks the new order.
+- **One PR per listener after the event change**, so each is timed before and after: first the event and Combat, then Spells, then Feel and the rest.
 
 ## Not in this plan
 
-- **Bundled hit events.** The owner decided against them (2026-11-02). If H0 shows the signal calls themselves matter at this scale, that's a new question for the owner, with the numbers.
 - **Compute shaders on the GPU.** The web renderer (`gl_compatibility`) has none, and hits would need reading back to the CPU every step.
 - **A shot that skips card rules.** Every card works on every carrier with no silent no-ops ([M2-rules.md](M2-rules.md)). Making cheap shots that ignore cards would break that.
 
 ## Open questions for the owner
 
 - **Q1 (design):** 100,000 shots, or 100,000 hits? Shots in flight are reachable on desktop. Hits are bounded by a frame (above). Are many shots that mostly miss, or spells that make fewer, bigger shots, what you're after? Is that much on screen still readable for 1–4 players in 32×32 pixel art ([DESIGN.md](../DESIGN.md))?
-- **Q2 (rules):** may the native module use threads (Godot's `WorkerThreadPool`, desktop only)? Today `check_native_source` forbids threads, and `WorkerThreadPool` isn't in `native/build_profile.json`. H5 depends on this answer.
+- **Q2 (rules): answered** (owner, 2026-11-04): threads are allowed in the native module, through `WorkerThreadPool`, on desktop.
 - **Q3 (targets):** what does 60 FPS have to hold on? Desktop and web defaults, and the GPU to measure H4 on.

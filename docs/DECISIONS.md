@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Bundled hit events and threads in the native module allowed (owner)
+
+- **Asked:** the owner, on the plan for about 100,000 live shots ([shot-scale.md](milestones/shot-scale.md)): "Don't mind what has been decided earlier. Bundle hit events if needed and add threads!"
+- **Reverses "no bundled events" (2026-11-02, below).** A step's hits may go out as one batch, resolved in phases (Combat, then Spells, then Feel), when the measurements show the hits are still the largest part of a step after each listener has been made cheaper (shot-scale.md, H3b). Within one step, an on-hit card or reaction then sees the state after all of the step's damage, not only after its own hit. Every changed recording is listed with its reason in the PR that changes it.
+- **Threads:** the native module may use Godot's `WorkerThreadPool` on desktop (shot-scale.md, H5). Still no `std::thread` and no system calls. `ci/smbot/rules.py` and `native/build_profile.json` stay the owner's files: the PR that changes them has the owner's approval and the owner merges it. Results are merged in shot order, so the kernel stays byte-identical to its GDScript. The web runs one chunk.
+
 ## 2026-11-04: Spell light: the light buffer and shot light (spell spectacle P3a, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle: the light buffer and shot light (P3a)" (docs/milestones/spell-spectacle.md, P3). Effects, beams, torches and a room's ambient are P3b, after the owner's answers to the plan's P3 questions; STYLE.md is unchanged (question 1).

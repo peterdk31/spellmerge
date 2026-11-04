@@ -135,3 +135,25 @@ func test_a_bad_moment_is_ignored() -> void:
 	bus.carrier_ended.emit(0, &"teleport", Vector2(INF, 0.0), Vector2.RIGHT, 1.0, FROST, 0)
 	bus.carrier_ended.emit(-5, &"teleport", Vector2.ZERO, Vector2.RIGHT, 1.0, FROST, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_FALL), 0, "no column for a point off the map or a caster that is none")
+
+
+func test_a_zap_plays_its_cards_cue_as_long_as_the_zap() -> void:
+	# A modifier that shows itself names its own cue (S6 item 8): `form_shown` `zap` names the zap
+	# card, and its cue draws the arc in the shot's colours, for 0.25 s.
+	var card: ModifierBase = registry.get_resource(&"spells", &"zap") as ModifierBase
+	check_equal(card.cue, &"zap", "zap.tres names the cue `zap`")
+	bus.form_shown.emit(1, &"zap", Vector2(10, 20), Vector2.RIGHT, 60.0, FROST, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_ARC, 1), 1, "one arc in the caster's ramp")
+	var arc: Dictionary = feel.effect_info(FeelScript.KIND_ARC)
+	check(arc["at"].is_equal_approx(Vector2(10, 20)), "from where it zapped")
+	check_equal(arc["core"], FROST, "in its shot's colour")
+	check_equal(arc["zoom"], 15, "as long as the zap: 60 px is 15 steps of 4")
+	check(is_equal_approx(arc["seconds"] as float, 0.25), "a zap's seconds")
+
+
+func test_a_zaps_spark_into_the_air_burns_out_sooner() -> void:
+	bus.form_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 16.0, FROST, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_ARC), 1, "one spark (`if_size_upto` 22), not both parts")
+	check(is_equal_approx(feel.effect_info(FeelScript.KIND_ARC)["seconds"] as float, 0.15), "0.6 of a zap's seconds, as before the cue")
+	bus.form_shown.emit(0, &"zap", Vector2.ZERO, Vector2.UP, 0.0, FROST, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_ARC), 1, "a zap of no length shows nothing")

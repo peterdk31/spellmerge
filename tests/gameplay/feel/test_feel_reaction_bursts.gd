@@ -65,20 +65,48 @@ func _status_on(enemy: Enemy, id: StringName, player: int = 0) -> void:
 
 
 func test_a_reaction_stops_longer_and_shakes_more_than_a_plain_hit() -> void:
-	var preset: FeelPresetScript = _feel.preset
 	var death: CueBase = _feel.cue_of(&"enemy_death")
-	check(death != null and preset.reaction_stop_seconds >= death.hold, "at least as long as a death's stop")
-	check(death != null and preset.reaction_shake > death.shake * 0.5, "a strong shake")
+	var flare: CueBase = _feel.cue_of(&"reaction_flare")
+	check(death != null and flare != null, "the cues are there")
+	if death == null or flare == null:
+		return
+	check(flare.hold * flare.power >= death.hold, "at least as long as a death's stop")
+	check(flare.shake * flare.power > death.shake * 0.5, "a strong shake")
 	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO, -1)
-	check(_actors.held_left(0) >= preset.reaction_stop_seconds, "its caster is held for the reaction")
+	check(_actors.held_left(0) >= flare.hold * flare.power - 0.0001, "its caster is held for the reaction, times its power")
 	check_equal(_feel.stop_left, 0.0, "and the game runs on")
-	check(_feel.trauma() >= preset.reaction_shake, "and shake")
+	check(_feel.trauma() >= flare.shake * flare.power - 0.0001, "and shake, times its power")
 
 
-func test_every_reaction_has_a_power_and_a_colour() -> void:
-	var preset: FeelPresetScript = FeelPresetScript.new()
-	for id: StringName in preset.reaction_colors:
-		check(preset.reaction_power.has(id), "%s has a power" % id)
+func test_a_stronger_reaction_plays_its_cue_bigger() -> void:
+	# The power rule (`play_cue`, S6): a reaction's cues differ in colour and power, and power is
+	# times every flash's size. Shatter (1.3) against stillness (0.9), the same parts.
+	var strong: CueBase = _feel.cue_of(&"reaction_shatter")
+	var weak: CueBase = _feel.cue_of(&"reaction_stillness")
+	check(strong.power > weak.power, "shatter is the stronger")
+	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO, -1)
+	var big: int = _feel.effect_info(FeelScript.KIND_RING_OUT)["zoom"] as int
+	_bus.reaction_triggered.emit(1, &"stillness", Vector2(80.0, 0.0), -1)
+	var small: int = _feel.effect_info(FeelScript.KIND_RING_OUT)["zoom"] as int
+	check(big > small, "its ring is the bigger (%d, %d)" % [big, small])
+	check_equal(big, 4, "shatter's ring as before the cues (2.9 x 1.3, rounded)")
+	check_equal(small, 3, "stillness's ring as before the cues (2.9 x 0.9, rounded)")
+
+
+func test_a_repeated_reaction_shows_again_without_its_weight() -> void:
+	_bus.reaction_triggered.emit(0, &"thaw", Vector2.ZERO, -1)
+	var shake: float = _feel.trauma()
+	var rings: int = _feel.effects_of(FeelScript.KIND_RING_OUT)
+	_bus.reaction_triggered.emit(0, &"thaw", Vector2(60.0, 0.0), -1)
+	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), rings + 1, "its looks every time")
+	check(is_equal_approx(_feel.trauma(), shake), "its shake at most every REACTION_REPEAT seconds")
+
+
+func test_a_reaction_with_no_cue_of_its_own_plays_the_plain_one() -> void:
+	_bus.reaction_triggered.emit(0, &"steam", Vector2.ZERO, -1)
+	var plain: CueBase = _feel.cue_of(FeelScript.REACTION_CUE)
+	check(plain != null, "there is a plain reaction cue")
+	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT)["core"], plain.color, "its ring in the plain cue's colour")
 
 
 func test_the_puff_is_bigger_than_a_hit_and_the_ring_ends() -> void:

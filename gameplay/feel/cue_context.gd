@@ -26,6 +26,10 @@ var shot: int = -1
 var surface: int = -1
 ## The tag of the spell it is of (its cards' motes and marks, `card_kinds.gd`; 0 for none).
 var tag: int = 0
+## The cue's own colour (`CueBase.color`: what its parts with no colour of their own are in
+## exactly; alpha 0 for none) and its `power` (what its sizes, counts, holds and shake are times).
+var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+var power: float = 1.0
 
 
 ## The way a part (a Dictionary with an optional `way`, `CueBase.WAYS`) points: along the cue's

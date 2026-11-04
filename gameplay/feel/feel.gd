@@ -177,7 +177,6 @@ const KIND_RING_OUT: int = 5
 const KIND_RING_IN: int = 6
 const KIND_RUNE_BURST: int = 7
 const KIND_CAST: int = 8
-const KIND_DASH: int = 9
 const KIND_SPRAY: int = 11
 const KIND_PUFF: int = 12
 const KIND_ARC: int = 14
@@ -197,8 +196,8 @@ const FALL_SECONDS: float = 0.5
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
 ## The look bit that turns a puff into a staff's poof (kind 22 in the shader; living staffs H4):
-## bone clouds swelling and shrinking along the staff, a few sparks in the player's colour (the
-## cue part effect `poof`).
+## bone clouds swelling and shrinking along the staff (the cue part effect `poof`; a cue that names
+## it throws its own sparks, as a motes part).
 const POOF: int = 1 << 21
 ## The poof's own seconds (a `poof` part's when it gives none): StaffLook's POOF_TIME, the swap at
 ## 35% of them.
@@ -262,13 +261,9 @@ const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
-## A dash effect is drawn along its length (at most DASH_LONGEST: the length travels in the zoom's
-## place, 4 px a step), DASH_MARGIN longer at each end and DASH_ACROSS across (the shader's).
-const DASH_LONGEST: float = 252.0
-const DASH_MARGIN: float = 12.0
-const DASH_ACROSS: float = 32.0
-## A discharge arc is drawn like a dash: its length in the zoom's place, ARC_MARGIN past each end,
-## ARC_ACROSS across (the shader's).
+## A discharge arc is drawn along its length (at most ARC_LONGEST: the length travels in the
+## zoom's place, 4 px a step), ARC_MARGIN past each end, ARC_ACROSS across (the shader's).
+const ARC_LONGEST: float = 252.0
 const ARC_MARGIN: float = 12.0
 const ARC_ACROSS: float = 56.0
 ## The cue of a discharge's arc (`discharge_arc`; content/cues).
@@ -288,16 +283,14 @@ const EFFECT_STRIDE: int = 16
 ## the kind, or below it for an effect that does not light the room (`_effect_unlit`).
 const EFFECT_FROM: float = 0.02
 const EFFECT_SPAN: float = 0.42
-## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`, PARTICLES ARE
-## GEOMETRY there): its light, its card particles, its sparks, a poof's clouds and its flash.
+## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`): its light, a
+## poof's clouds and its flash. An effect's sparks and card particles are motes, thrown by its
+## cue's motes parts (S6, item 3), not quads of its mesh.
 const EFFECT_Q_LIGHT: int = 0
-const EFFECT_Q_PARTICLE: int = 1
-const EFFECT_Q_SPARK: int = 2
 const EFFECT_Q_CLOUD: int = 3
 const EFFECT_Q_SHAPE: int = 4
 ## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the light
-## first, then the particles (the newest on top), the sparks and clouds (the first on top), the
-## flash last. 12 particles (MAX_PARTICLES in the shot shaders), 16 sparks (a rune's), 4 clouds.
+## first, then the clouds (the first on top), the flash last: 4 clouds.
 ## The blast mesh's quads (`blast_mesh`; Q_* in `shot_blast.gdshader`): its light, then
 ## BLAST_PIECES pieces (chunks, lobes, puffs, embers), each part using what it needs.
 const BLAST_Q_LIGHT: int = 0
@@ -309,8 +302,6 @@ const BLAST_QUADS: Array[Vector3i] = [
 ]
 const EFFECT_QUADS: Array[Vector3i] = [
 	Vector3i(EFFECT_Q_LIGHT, 1, 0),
-	Vector3i(EFFECT_Q_PARTICLE, 12, 0),
-	Vector3i(EFFECT_Q_SPARK, 16, 1),
 	Vector3i(EFFECT_Q_CLOUD, 4, 1),
 	Vector3i(EFFECT_Q_SHAPE, 1, 0),
 ]
@@ -1759,8 +1750,8 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_effect_follow[slot] = follow
 	_effect_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
 	_effect_unlit[slot] = 1 if _cue_unlit else 0
-	if kind == KIND_DASH or kind == KIND_ARC:
-		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
+	if kind == KIND_ARC:
+		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
 		_effect_length[slot] = steps * 4.0
 	return slot
@@ -1831,10 +1822,9 @@ func _step_effects(real_delta: float) -> void:
 			d = _effect_zoom[slot] * 4.0 * BLAST_SPAN
 			along = d
 		if _effect_length[slot] > 0.0:
-			# A dash or an arc: from where it starts along its way, a margin past each end.
-			var arc: bool = kind == KIND_ARC
-			d = ARC_ACROSS if arc else DASH_ACROSS
-			along = _effect_length[slot] + 2.0 * (ARC_MARGIN if arc else DASH_MARGIN)
+			# An arc: from where it starts along its way, a margin past each end.
+			d = ARC_ACROSS
+			along = _effect_length[slot] + 2.0 * ARC_MARGIN
 			at += dir * _effect_length[slot] * 0.5
 		buffer[i] = dir.x * along
 		buffer[i + 1] = dir.y * d

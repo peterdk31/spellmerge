@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"parry"
-parts = Array[Dictionary]([{"effect": &"burst", "zoom": 5, "seconds": 0.35, "color": Color(0.9490196, 0.7607843, 0.1882353, 1), "way": &"right"}])
+parts = Array[Dictionary]([{"effect": &"burst", "zoom": 5, "seconds": 0.35, "color": Color(0.9490196, 0.7607843, 0.1882353, 1), "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 12, "radius": 48.0, "spread": 360.0, "color": Color(0.9490196, 0.7607843, 0.1882353, 1)}])
 hold = 0.06
 sound = &"parry"

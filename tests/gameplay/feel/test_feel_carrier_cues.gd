@@ -85,7 +85,6 @@ func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 	var written: int = int(motes.get(&"written"))
 	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, sparks)
 	check(int(motes.get(&"written")) > written, "dust where player 3 left (motes)")
-	check_equal(feel.effects_of(FeelScript.KIND_DASH), 0, "no dust flash of its own")
 	check_equal(feel.effects_of(FeelScript.KIND_ARC, 2), 1, "lightning (its sparks) arcs along its way")
 	check(feel.effect_info(FeelScript.KIND_ARC)["at"].is_equal_approx(Vector2(10, 20)), "from where it left")
 	feel.step(1.0)

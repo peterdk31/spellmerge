@@ -185,6 +185,31 @@ static func _count_colours(texture: Texture2D, counts: Dictionary, region: Rect2
 	return counts
 
 
+## The pixels of `texture` (within `region` when it has one) that show (alpha at least a half),
+## as positions in the region, every `step`-th of them in reading order: what a body's art is made
+## of, for it to break into (S3, a death's motes). Empty for no texture.
+static func pixels_of_art(texture: Texture2D, region: Rect2i = Rect2i(), step: int = 1) -> PackedVector2Array:
+	var found := PackedVector2Array()
+	if texture == null:
+		return found
+	var image: Image = texture.get_image()
+	if image == null or image.is_empty():
+		return found
+	if image.is_compressed():
+		image.decompress()
+	var area := Rect2i(Vector2i.ZERO, image.get_size())
+	if region.has_area():
+		area = area.intersection(region)
+	var n: int = 0
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			if image.get_pixel(x, y).a >= 0.5:
+				if n % maxi(step, 1) == 0:
+					found.append(Vector2(x - area.position.x, y - area.position.y))
+				n += 1
+	return found
+
+
 static func _most_common(counts: Dictionary) -> int:
 	var best: int = -1
 	var most: int = 0

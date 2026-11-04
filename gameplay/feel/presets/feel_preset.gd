@@ -34,6 +34,15 @@ extends Resource
 ## `spray_mote_spread` degrees, out to `spray_mote_reach` pixels a zoom step; a puff
 ## `puff_mote_count` of them all round, out to `puff_mote_reach` pixels a step.
 @export var spray_mote_kind: StringName = &"spark"
+## A dead body breaks into motes (S3; `Spectacle.break_body`): `death_mote_share` of its art's
+## pixels (times its scale's area, at most `death_mote_most`), each a mote of the surface kind
+## `death_mote_kind` in its art's colours, flung out from its middle at `death_mote_speed` px/s
+## (slowest, fastest) and `death_mote_up` up, falling to its feet.
+@export var death_mote_kind: StringName = &"chip"
+@export_range(0.0, 1.0, 0.01) var death_mote_share: float = 0.3
+@export_range(0, 512) var death_mote_most: int = 160
+@export var death_mote_speed: Vector2 = Vector2(8.0, 46.0)
+@export var death_mote_up: Vector2 = Vector2(0.0, 40.0)
 @export_range(0, 64) var spray_mote_count: int = 10
 @export_range(0.0, 64.0, 1.0) var spray_mote_reach: float = 15.0
 @export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
@@ -57,8 +66,6 @@ extends Resource
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
-## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
-@export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0

@@ -973,3 +973,62 @@ func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 	before = motes.next_row()
 	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
 	check_equal(motes.next_row(), before, "a spray leaves the moments' rows alone")
+
+
+## S3: a dead body breaks into motes of its own art (the white-hot copy that fell apart pixel by
+## pixel before): about the preset's share of its pixels, each a surface mote in its art's colours,
+## shown where that pixel was (inside the body's frame), resting on its feet; a bigger body more,
+## up to the preset's most; at its rest scale even when killed mid-squash.
+func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var husk: Texture2D = load("res://content/enemies/bone_husk/idle.svg") as Texture2D
+	var body := _body_of(husk, Vector2(200.0, 150.0), 1.0)
+	var pixels: int = RoomBase.pixels_of_art(husk).size()
+	check(pixels > 50, "the husk's art has pixels: %d" % pixels)
+	var before: int = motes.next_row()
+	feel.spectacle().break_body(body, body.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
+	var made_count: int = motes.next_row() - before
+	check_equal(made_count, roundi(float(pixels) * feel.preset.death_mote_share), "its share of the art's pixels")
+	check_equal(_kinds_of_rows(motes, before, motes.next_row()), [feel.preset.death_mote_kind], "of the preset's kind")
+	var source: int = feel.spectacle().body_source(body)
+	var frame := Rect2(Vector2(200.0, 150.0) - Vector2(16.0, 16.0), Vector2(32.0, 32.0))
+	for row in range(before, motes.next_row()):
+		var data: PackedFloat32Array = motes.row_data(row)
+		check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), source, "mote %d in the art's colours" % row)
+		var shown: Vector3 = motes.mote_at(row, data[MotesScript.ROW_BORN])
+		check(frame.grow(0.5).has_point(Vector2(shown.x, shown.y - shown.z)), "mote %d shown where its pixel was: %s" % [row, shown])
+	body.get_parent().free()
+	motes.step(0.0)
+	var big := _body_of(husk, Vector2(300.0, 150.0), 2.0)
+	before = motes.next_row()
+	feel.spectacle().break_body(big, big.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
+	check_equal(motes.next_row() - before, mini(roundi(float(pixels) * feel.preset.death_mote_share * 4.0), feel.preset.death_mote_most), "twice as big: four times the motes, up to the most")
+	big.get_parent().free()
+	# Through the event, killed mid-squash: from the rest scale.
+	motes.step(0.0)
+	var squashed := _body_of(husk, Vector2(100.0, 100.0), 1.0)
+	bus.damage_dealt.emit(0, squashed.get_parent(), 1, Vector2.ZERO)
+	feel.step(0.015625)
+	check(squashed.scale != Vector2.ONE, "squashed when it is killed")
+	before = motes.next_row()
+	bus.enemy_died.emit(0, squashed.get_parent(), Vector2(100.0, 100.0), -1)
+	check(feel.spectacle().broken_from() == husk, "the death broke the body's art")
+	check((feel.spectacle().broken_at() as Vector2).is_equal_approx(Vector2(100.0, 100.0)), "where it stood")
+	check(motes.next_row() - before >= roundi(float(pixels) * feel.preset.death_mote_share), "at its rest scale, not the squashed one's fewer")
+	squashed.get_parent().free()
+
+
+## A body showing `texture` at `at`, drawn `scale` times as big (its `Sprite`).
+func _body_of(texture: Texture2D, at: Vector2, scale: float) -> Sprite2D:
+	var body := Node2D.new()
+	body.global_position = at
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = texture
+	sprite.scale = Vector2.ONE * scale
+	body.add_child(sprite)
+	root.add_child(body)
+	return sprite

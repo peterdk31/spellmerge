@@ -19,9 +19,8 @@ extends Node
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node, on every hit
 ##   sprite however many (one shared flash material; no limit, owner 2026-10-31; a sprite that is
 ##   gone is skipped).
-## - a white-hot ring where an enemy dies, and a death animation: a copy of the dead
-##   enemy's `Sprite` turns white-hot and falls apart pixel by pixel (the enemy itself is
-##   freed at once).
+## - a white-hot ring where an enemy dies, and its body breaks into motes of its own art's
+##   colours that fall and settle (S3, `Spectacle.break_body`; the enemy itself is freed at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
@@ -78,13 +77,12 @@ const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
-## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
+## batches (flares, arcs, statuses, explosions).
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
 const EFFECT_SHADER: Shader = preload("res://core/projectiles/shot_effect.gdshader")
 const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
 const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
-const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
@@ -161,14 +159,10 @@ const REACTION_LABEL_NEAR: float = 40.0
 const SPRAY_REF_DAMAGE: int = 5
 const SPRAY_MIN_SIZE: float = 0.7
 const SPRAY_MAX_SIZE: float = 1.6
-## Death animations at once; past that the oldest slot is taken over. They draw above the
-## room and the wizards, under the shots and effects.
-const GHOST_SLOTS: int = 8
 ## A body without a `Sprite` child (a swarmer's bare node, docs/milestones/horde-swarm.md) names
 ## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
-## showing the body as it is drawn now (or null), which the death animation copies instead.
+## showing the body as it is drawn now (or null), which a death breaks into motes instead.
 const SPRITE_GIVER: StringName = &"sprite_giver"
-const GHOST_Z: int = 21
 ## The effects drawn with the shot shaders (see "Effects" above): the kinds they know (K_* in
 ## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
 ## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
@@ -535,12 +529,6 @@ var _kind_own: bool = false
 var _kind_shot: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
-## Death animations: sprites made once (drawn by `shot_sprite.gdshader`'s dissolve), seconds left
-## and seconds they started with (parallel arrays of GHOST_SLOTS).
-var _ghosts: Array[Sprite2D] = []
-var _ghost_left: PackedFloat32Array = PackedFloat32Array()
-var _ghost_total: PackedFloat32Array = PackedFloat32Array()
-var _next_ghost: int = 0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
@@ -609,22 +597,6 @@ func _ready() -> void:
 	_label_left.resize(REACTION_SLOTS)
 	_label_total.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
-	for i in GHOST_SLOTS:
-		var ghost := Sprite2D.new()
-		ghost.top_level = true
-		ghost.visible = false
-		ghost.z_index = GHOST_Z
-		var dissolve := ShaderMaterial.new()
-		dissolve.shader = SPRITE_SHADER
-		# The shots' sprite shader, as itself: a white core leaves its colours be.
-		dissolve.set_shader_parameter(&"core_override", Color.WHITE)
-		dissolve.set_shader_parameter(&"sprite_glow", 0.8)
-		ghost.material = dissolve
-		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		add_child(ghost)
-		_ghosts.append(ghost)
-	_ghost_left.resize(GHOST_SLOTS)
-	_ghost_total.resize(GHOST_SLOTS)
 	for i in SOUND_VOICES:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
@@ -711,7 +683,6 @@ func step(real_delta: float) -> void:
 	_spectacle.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
-	_step_ghosts(real_delta)
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
@@ -736,54 +707,14 @@ func _step_reactions(real_delta: float) -> void:
 		at -= 1
 
 
-## Dissolve the death animations: white-hot, then pixel by pixel gone.
-func _step_ghosts(real_delta: float) -> void:
-	for i in GHOST_SLOTS:
-		if _ghost_left[i] <= 0.0:
-			continue
-		_ghost_left[i] -= real_delta
-		var ghost: Sprite2D = _ghosts[i]
-		if _ghost_left[i] <= 0.0:
-			ghost.visible = false
-			continue
-		var progress: float = 1.0 - _ghost_left[i] / _ghost_total[i]
-		(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", maxf(progress, 0.01))
-
-
-## Start a death animation from a copy of the dead node's `Sprite` child, where that
-## sprite is. Nothing happens for a node without one.
-func _start_ghost(dead: Node) -> void:
-	if preset.death_anim_seconds <= 0.0 or dead == null or not is_instance_valid(dead):
-		return
-	var source: Sprite2D = _body_sprite(dead)
-	if source == null or source.texture == null:
-		return
-	var slot: int = _next_ghost
-	_next_ghost = (_next_ghost + 1) % GHOST_SLOTS
-	var ghost: Sprite2D = _ghosts[slot]
-	ghost.texture = source.texture
-	ghost.hframes = source.hframes
-	ghost.vframes = source.vframes
-	ghost.frame = source.frame
-	ghost.region_enabled = source.region_enabled
-	ghost.region_rect = source.region_rect
-	ghost.offset = source.offset
-	ghost.flip_h = source.flip_h
-	ghost.flip_v = source.flip_v
-	ghost.centered = source.centered
-	ghost.global_position = source.global_position
-	ghost.global_rotation = source.global_rotation
-	ghost.modulate = Color.WHITE
-	# At the rest scale: a sprite killed mid-squash would otherwise pop.
-	var rest: Vector2 = source.global_scale
-	var at: int = _find_reaction(source.get_instance_id(), _actor_of(dead))
-	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
-		rest = rest / source.scale * _react_scale[at]
-	ghost.scale = rest
-	(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", 0.01)
-	ghost.visible = true
-	_ghost_left[slot] = preset.death_anim_seconds
-	_ghost_total[slot] = preset.death_anim_seconds
+## The world transform a dead body's art is broken from (S3, `Spectacle.break_body`): its sprite's,
+## at its rest scale (a body killed mid-squash would otherwise break squashed).
+func _rest_transform(sprite: Sprite2D, dead: Node) -> Transform2D:
+	var rest: Vector2 = sprite.global_scale
+	var at: int = _find_reaction(sprite.get_instance_id(), _actor_of(dead))
+	if at >= 0 and sprite.scale.x != 0.0 and sprite.scale.y != 0.0:
+		rest = rest / sprite.scale * _react_scale[at]
+	return Transform2D(sprite.global_rotation, rest, 0.0, sprite.global_position)
 
 
 ## The Sprite2D a body shows as: its `Sprite` child, or for a body drawn by another node (a
@@ -892,20 +823,6 @@ func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 ## Sprites flashing right now (for tests).
 func reacting_sprites() -> int:
 	return _react_count
-
-
-## Death animations showing right now (for tests).
-func live_ghosts() -> int:
-	var count: int = 0
-	for i in GHOST_SLOTS:
-		if _ghost_left[i] > 0.0:
-			count += 1
-	return count
-
-
-## The death animation sprite in `slot` (for tests).
-func ghost(slot: int) -> Sprite2D:
-	return _ghosts[slot]
 
 
 ## Current camera kick in pixels (for tests).
@@ -1929,13 +1846,17 @@ func _ramp_of(caster: int) -> int:
 	return table.ramp_of(caster) if table != null else ActorsScript.NONE
 
 
-## A death: its ghost, the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
+## A death: its body breaks into motes of its own art (S3; the white-hot copy that fell apart
+## pixel by pixel before), the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
 ## the kill, the dead body is freed at once) or, for a boss, `boss_death`, which also stops the
 ## whole game; and a puff. The puff is the killing blow's own spray turned into a bigger one when
 ## it is at this spot (one slot, and the hit's sound gives way to the death's), else a new puff
 ## in the enemy colour after the cue's ring.
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
-	_start_ghost(enemy)
+	# The body breaks into motes of its own art (S3), from where it stood at its rest scale.
+	var body: Sprite2D = _body_sprite(enemy)
+	if body != null:
+		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
 	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
 	if upgraded and _hit_voice >= 0:

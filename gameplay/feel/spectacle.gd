@@ -73,8 +73,13 @@ var _ramp_table: RampTableScript = RampTableScript.new()
 ## and their source in the ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
 var _surface_source: int = -1
-## The colours of each body art read so far (texture -> colours).
+## The colours of each body art read so far (texture -> colours), and the pixels of each frame of
+## one ([texture, frame rect] -> PackedVector2Array; `break_body`).
 var _art_colors: Dictionary = {}
+var _art_pixels: Dictionary = {}
+## The art and the place of the last body broken (`broken_from`, `broken_at`; for tests).
+var _broken_from: Texture2D = null
+var _broken_at: Vector2 = Vector2.INF
 ## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
 var _mark_room: StringName = &""
 ## Feel's clock at the last step.
@@ -179,6 +184,59 @@ func flash_motes(kind: StringName, at: Vector2, way: Vector2, core: Color, ramp:
 	if pool == null or not particles_enabled or count <= 0:
 		return
 	pool.throw_part(pool.kind_index(kind), at, way, MotesScript.spell_source(ramp, look), core, count, reach, spread, 1.0, ring, true)
+
+
+## A body breaking into motes (S3: a death, in place of the white-hot copy that fell apart pixel by
+## pixel): about `share` of the pixels of the art `sprite` shows (times the area of `to_world`'s
+## scale, at most `most`), each a mote of the surface kind `kind` (a body is a surface that broke)
+## in its art's colours, from where that pixel was (`to_world`: the sprite's world transform, at its
+## rest scale), falling to the body's feet, flung out from its middle at `speed` (px/s, slowest and
+## fastest) and `up`.
+func break_body(sprite: Sprite2D, to_world: Transform2D, kind: StringName, share: float, most: int, speed: Vector2, up: Vector2) -> void:
+	if sprite == null or sprite.texture == null:
+		return
+	_broken_from = sprite.texture
+	_broken_at = to_world.origin
+	if pool == null or not particles_enabled or share <= 0.0:
+		return
+	var source: int = body_source(sprite)
+	var k: int = pool.kind_index(kind)
+	if source < 0 or k < 0:
+		return
+	var rect: Rect2i = _frame_rect(sprite)
+	var key: Array = [sprite.texture, rect]
+	var pixels: Variant = _art_pixels.get(key)
+	if pixels == null:
+		pixels = RoomBase.pixels_of_art(sprite.texture, rect)
+		_art_pixels[key] = pixels
+	var art: PackedVector2Array = pixels as PackedVector2Array
+	if art.is_empty():
+		return
+	var scale: Vector2 = to_world.get_scale().abs()
+	var want: int = clampi(roundi(float(art.size()) * share * scale.x * scale.y), 1, most)
+	var step: float = float(art.size()) / float(want)
+	var size: Vector2 = Vector2(rect.size)
+	var corner: Vector2 = sprite.offset - (size * 0.5 if sprite.centered else Vector2.ZERO)
+	var points := PackedVector2Array()
+	points.resize(want)
+	var feet: float = -INF
+	for i in want:
+		var p: Vector2 = art[mini(floori((float(i) + 0.5) * step), art.size() - 1)]
+		if sprite.flip_h:
+			p.x = size.x - 1.0 - p.x
+		var world: Vector2 = to_world * (corner + p + Vector2(0.5, 0.5))
+		points[i] = world
+		feet = maxf(feet, world.y)
+	pool.crumble(k, points, feet, to_world * (corner + size * 0.5), speed, 360.0, up, source, Color.WHITE)
+
+
+## The art the last body broken was drawn with, and where its sprite was (for tests).
+func broken_from() -> Texture2D:
+	return _broken_from
+
+
+func broken_at() -> Vector2:
+	return _broken_at
 
 
 ## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per

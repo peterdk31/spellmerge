@@ -497,6 +497,16 @@ const DASH_STREAK_SLOTS: int = 32
 ## whose CPU measures dearer than its GPU saves.
 const SPARK_MOTES_BELOW: int = 1 << 20
 const SPARK_BIRTH_STRIDE: int = 10
+## Where a birth's numbers are: where (x, y), the way back (x, y), the look kind, the caster's
+## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE).
+const SPARK_X: int = 0
+const SPARK_Y: int = 1
+const SPARK_BACK_X: int = 2
+const SPARK_BACK_Y: int = 3
+const SPARK_KIND: int = 4
+const SPARK_RAMP: int = 5
+const SPARK_LOOK: int = 6
+const SPARK_CORE: int = 7
 ## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (the trail shader's TIP[row].w, by
@@ -4457,17 +4467,17 @@ func _give_off_sparks(fraction: float) -> void:
 			at = _drawn_at(slot, at)
 			back = -_orbit_tangent(slot)
 		var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
-		spark_births[i] = at.x
-		spark_births[i + 1] = at.y
+		spark_births[i + SPARK_X] = at.x
+		spark_births[i + SPARK_Y] = at.y
 		back = back.normalized()
-		spark_births[i + 2] = back.x
-		spark_births[i + 3] = back.y
-		spark_births[i + 4] = float(kind)
-		spark_births[i + 5] = float(_ramp[slot])
-		spark_births[i + 6] = float(_look[slot])
-		spark_births[i + 7] = _core[slot].r
-		spark_births[i + 8] = _core[slot].g
-		spark_births[i + 9] = _core[slot].b
+		spark_births[i + SPARK_BACK_X] = back.x
+		spark_births[i + SPARK_BACK_Y] = back.y
+		spark_births[i + SPARK_KIND] = float(kind)
+		spark_births[i + SPARK_RAMP] = float(_ramp[slot])
+		spark_births[i + SPARK_LOOK] = float(_look[slot])
+		spark_births[i + SPARK_CORE] = _core[slot].r
+		spark_births[i + SPARK_CORE + 1] = _core[slot].g
+		spark_births[i + SPARK_CORE + 2] = _core[slot].b
 		spark_birth_count += 1
 		if spark_birth_count >= SPARK_BIRTHS_MAX:
 			return

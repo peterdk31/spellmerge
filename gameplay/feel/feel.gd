@@ -742,14 +742,16 @@ func step(real_delta: float) -> void:
 
 
 ## The shots' trail particles as motes (spell spectacle P1d): the projectile manager hands them out
-## while there are motes (`spark_motes`), and they are thrown before the motes step.
+## while there are motes (`spark_motes`), and they are thrown before the motes step. With
+## `particles_enabled` off (the stress benchmark's "no particles") the trails stay without their
+## particle slots and none are thrown: no trail particles at all, not the shader's instead.
 func _trail_motes() -> void:
 	if projectiles == null:
 		return
-	var on: bool = _motes != null and particles_enabled
+	var on: bool = _motes != null
 	if projectiles.spark_motes != on:
 		projectiles.spark_motes = on
-	if on and projectiles.spark_birth_count > 0:
+	if on and particles_enabled and projectiles.spark_birth_count > 0:
 		_motes.give_off(projectiles.spark_births, projectiles.spark_birth_count)
 
 

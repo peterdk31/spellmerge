@@ -79,8 +79,8 @@ func problems() -> PackedStringArray:
 		if not SHADES.has(shade):
 			found.append("%s: a mark's shade is one of %s (STYLE.md), not '%s'" % [id, SHADES, shade])
 	for layer in look_layers:
-		if layer < 0 or layer > 21:
-			found.append("%s: look layer %d is not a LOOK_* kind (0-21)" % [id, layer])
+		if layer < 0 or layer > MoteKind.LOOK_LAYERS:
+			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, MoteKind.LOOK_LAYERS])
 	if lines < 1 or lines > 8:
 		found.append("%s: a crack or a rune has 1 to 8 lines" % id)
 	return found

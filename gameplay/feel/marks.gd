@@ -32,7 +32,9 @@ extends Node2D
 ## in a wheel of SETTLE_SLOTS time slots, each SETTLE_SLOT long, and is stamped once its slot is
 ## past (never before it lies still; up to a slot late, under the still mote). At most
 ## SETTLED_PER_FRAME are stamped a frame and at most SETTLE_SLOT_ROWS wait in a slot; the rest
-## just fade with their motes (`settles_faded`). Their colours, and a surface's (`surface`), are
+## just fade with their motes (`settles_faded`). A settle may carry its mote's serial: once the
+## motes say that mote is gone (`forget_settles_before`, the ring wrote over it before it rested)
+## it fades too, so no mark is left where nothing was seen to land. Their colours, and a surface's (`surface`), are
 ## the ramp table's that the motes use (`set_ramp_table`).
 
 const SHADER: Shader = preload("res://gameplay/feel/mark.gdshader")
@@ -93,8 +95,11 @@ var _live: bool = false
 ## the clock's start), and whether the clock is known yet (the first `step` with one).
 var _settle: PackedFloat32Array = PackedFloat32Array()
 var _settle_count: PackedInt32Array = PackedInt32Array()
+var _settle_serial: PackedInt64Array = PackedInt64Array()
 var _settle_done: int = -1
 var _settle_started: bool = false
+## Settles whose serial is below this are gone (`forget_settles_before`).
+var _settle_forget: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
@@ -110,6 +115,7 @@ func _init(z: int, kinds: Array[MarkKind]) -> void:
 	_pending.resize(PENDING_MAX * DRAW_STRIDE)
 	_settle.resize(SETTLE_SLOTS * SETTLE_SLOT_ROWS * SETTLE_STRIDE)
 	_settle_count.resize(SETTLE_SLOTS)
+	_settle_serial.resize(SETTLE_SLOTS * SETTLE_SLOT_ROWS)
 	_take_kinds(kinds)
 
 
@@ -220,9 +226,10 @@ func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: C
 
 ## A mote that comes to rest at `at` at the clock time `when` leaves the mark of kind `k` there,
 ## in its own colours (`source`, a spell's or a ramp table row, with the core colour `core`),
-## stamped once the clock is past `when`'s slot (`step`). Nothing before the first `step` with a
-## clock, or with no room.
-func settle(k: int, at: Vector2, when: float, source: int, core: Color) -> void:
+## stamped once the clock is past `when`'s slot (`step`). `serial` names the mote (its row's
+## serial, `forget_settles_before`; -1 for one never forgotten). Nothing before the first `step`
+## with a clock, or with no room.
+func settle(k: int, at: Vector2, when: float, source: int, core: Color, serial: int = -1) -> void:
 	if not _settle_started or _viewport == null or k < 0 or k >= _kinds.size() or not at.is_finite() or not is_finite(when):
 		return
 	var slot: int = clampi(floori(when / SETTLE_SLOT), _settle_done + 1, _settle_done + SETTLE_SLOTS)
@@ -232,6 +239,7 @@ func settle(k: int, at: Vector2, when: float, source: int, core: Color) -> void:
 		settles_faded += 1
 		return
 	_settle_count[ring] = n + 1
+	_settle_serial[ring * SETTLE_SLOT_ROWS + n] = serial
 	var i: int = (ring * SETTLE_SLOT_ROWS + n) * SETTLE_STRIDE
 	_settle[i] = at.x
 	_settle[i + 1] = at.y
@@ -240,6 +248,11 @@ func settle(k: int, at: Vector2, when: float, source: int, core: Color) -> void:
 	_settle[i + 4] = core.r
 	_settle[i + 5] = core.g
 	_settle[i + 6] = core.b
+
+
+## The motes of serials below `serial` are gone (overwritten in their ring): their settles fade.
+func forget_settles_before(serial: int) -> void:
+	_settle_forget = serial
 
 
 ## Settled motes waiting for their slot (for tests).
@@ -306,6 +319,10 @@ func settle_due(now: float) -> void:
 		settles_faded += n - drawn_here
 		budget -= drawn_here
 		for m in drawn_here:
+			var serial: int = _settle_serial[ring * SETTLE_SLOT_ROWS + m]
+			if serial >= 0 and serial < _settle_forget:
+				settles_faded += 1
+				continue
 			var i: int = (ring * SETTLE_SLOT_ROWS + m) * SETTLE_STRIDE
 			var source: int = int(_settle[i + 3])
 			stamp(int(_settle[i + 2]), Vector2(_settle[i], _settle[i + 1]), 1.0, 0.0, source, Color(_settle[i + 4], _settle[i + 5], _settle[i + 6]), source)
@@ -363,7 +380,7 @@ func shader_parameter(name: StringName) -> Variant:
 ## Keep the kinds with no problems (MAX_KINDS at most), index them by look layer and hand their
 ## numbers to the shader.
 func _take_kinds(kinds: Array[MarkKind]) -> void:
-	_layer_kinds.resize(22)
+	_layer_kinds.resize(MoteKind.LOOK_LAYERS + 1)
 	for layer in _layer_kinds.size():
 		_layer_kinds[layer] = PackedInt32Array()
 	var forms := PackedVector4Array()

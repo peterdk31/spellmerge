@@ -116,6 +116,8 @@ func test_the_rising_fireball_is_a_cue_of_its_own() -> void:
 
 
 func test_the_quake_strikes_the_ground_and_holds_its_caster() -> void:
+	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
+	feel.set_mote_cap(0)
 	_cue(&"quake", Vector2(20.0, 0.0), 16.0)
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a mark on the floor")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out past its reach")
@@ -146,6 +148,8 @@ func test_a_part_sizes_by_zoom_or_by_the_cues_size() -> void:
 
 
 func test_a_part_can_take_an_exact_colour_or_be_plain() -> void:
+	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
+	feel.set_mote_cap(0)
 	_made([{"effect": &"burst", "color": Color.RED}, {"effect": &"chips", "plain": true}])
 	bus.cue_shown.emit(1, &"test_cue", Vector2.ZERO, Vector2.ZERO, 0.0, Color.BLUE, 5)
 	check_equal(feel.effect_dress(FeelScript.KIND_BURST), [Color.RED, FeelScript.EXACT], "its own colour, exactly")
@@ -192,6 +196,8 @@ func test_the_nova_is_a_ring_120_px_across_for_a_quarter_second() -> void:
 
 
 func test_the_slam_is_a_star_and_the_ground_struck() -> void:
+	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
+	feel.set_mote_cap(0)
 	_cue(&"slam", Vector2(20.0, 0.0), 16.0)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effect_info(FeelScript.KIND_BURST).get("zoom"), 3, "3 steps big")

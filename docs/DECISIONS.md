@@ -2,6 +2,22 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Motes: where they come from (spell spectacle P1b, owner session)
+
+- **Asked:** the owner-lane task "Spell spectacle: mote sources (P1b)": the plan's events table, the `motes` cue part, motes in the existing cues, `mote_density`.
+- **No new kinds:** the plan named `ash`, `splinter` and `shard` besides the first ones. With the owner's rule that kinds come from the cards' look layers (P1a), a cue's motes are its cards' kinds (`kind: spell`, so a fire blast throws embers and a frost one flecks) or the surface kinds (`kind: surface`, chips); a part may still name one kind by id. `shard` is P1a's `fleck` (frost); ash and splinters wait until a card or surface needs them.
+- **What breaks sheds its own colours:** the plan's "splinters and embers" for a death became one rule with the walls: a body that dies is a surface that broke, so its death cue's chips take the colours of its own art (`RoomBase.colours_of_art`: the frame it shows, by the walls' rule, read once per texture and kept), and its spell motes are the killing shot's cards (`enemy_died`'s `shot`, read while the event is sent). A boss throws more (its cue's counts).
+- **Sources:** a body hit sheds the shot's kinds back along its way (half their count, `FeelPreset.hit_mote_share`), a bolt or orbit whose life runs out puffs them (`expire_mote_share`), and a reaction throws a ring of the reacting shot's kinds in the reaction's exact colour (`reaction_mote_count` 16 and `reaction_mote_reach` 22 px, times its power). Blast, fireball, slam, quake, nova and both deaths have `motes` parts. P1c measures and tunes the numbers.
+- **`reach` is how far they glide:** a part's `reach` times the cue's size sets the kinds' top speed so a mote of its drag glides that far (speed / drag), keeping the kind's slow-to-fast ratio, so a blast's motes land within its radius whatever kind it throws.
+- **The chips effect stands in for motes,** in cues as on walls: with motes on, a cue's `chips` part is left out and its `motes` parts throw them; with "Particles" off the old effect shows.
+- **The amount:** `MoteDensity` (None, Half, Full, Double; Full by default), the pause menu's "Particle amount" row, `mote_density_changed`. It scales every burst in `Motes.burst` (wall hits too); a share of a mote is thrown that often (`floor(count x density + random)`), so Half keeps the average and a one-mote burst still throws half the time.
+
+## 2026-11-04: The trail texture holds 64 rows a line (owner session)
+
+- **The bug:** with Max shots at 10,000 or more on the owner's web build, after the sandbox's LB storm every fire bolt's tail was short and at a wrong angle; below 10,000 never. The storm holds every trail row (`TRAIL_ROWS_PER_SLOT` x the cap = 20,000), and `trail_data` had one texture line per row (32 texels wide), so it grew to 32 x 32,768, past the 16,384 most GPUs and WebGL take, and the shader read the wrong samples from then on (the texture stays at its largest size). Not seen at the default caps (1,000 web, 6,000 desktop: 2,048 and 16,384 lines).
+- **The fix:** `TRAIL_ROWS_PER_LINE` (64) rows side by side on a line: 2,048 texels wide (the smallest maximum WebGL guarantees) and rows / 64 lines high, 2,048 x 2,048 at the top cap (50,000). `trail_texel` finds row r's sample s at (r % 64 x 32 + s, r / 64). The texels are in the same order, so `_trail_data`, its writers and the native kernel are unchanged; only the image's size and the shader's address are new.
+- **Not done:** the texture still never shrinks after a storm, and freed rows are reused last freed first; neither is wrong, only memory (a 2,048 x 2,048 RGBAF texture is 64 MB at the top cap).
+
 ## 2026-11-04: Floor marks: the layer, the stamp batch and three marks (spell spectacle P2a, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle: the floor mark layer (P2a)" (docs/milestones/spell-spectacle.md).

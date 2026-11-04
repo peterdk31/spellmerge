@@ -34,6 +34,15 @@ extends Resource
 ## its carrier card names none.
 @export_range(0.3, 2.0, 0.1) var wall_chip_size: float = 0.9
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
+## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
+## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
+## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A reaction throws
+## a ring of `reaction_mote_count` of the reacting shot's kinds in its colour, out to
+## `reaction_mote_reach` pixels, both times its `reaction_power`. A cue's motes are its own data.
+@export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
+@export_range(0.0, 4.0, 0.05) var expire_mote_share: float = 1.0
+@export_range(0, 64) var reaction_mote_count: int = 16
+@export_range(0.0, 64.0, 1.0) var reaction_mote_reach: float = 22.0
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08

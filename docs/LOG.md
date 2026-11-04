@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Trails at a high Max shots (owner session)
+
+Reported by the owner on the web build: with Max shots at 10,000 or more, every fire bolt after the sandbox's LB storm had a short tail at a wrong angle. The storm holds every trail row (2 x the cap), and the trail texture was one line per row, 32 texels wide: 20,000 rows made it 32 x 32,768, past the 16,384 a GPU takes. The texture now holds 64 rows a line (2,048 texels wide; 2,048 x 2,048 at the top cap of 50,000), read by `trail_texel` in `shot_trail.gdshader`; `_trail_data` is laid out as before, so the native kernel is unchanged. Regression test: `test_the_trail_texture_fits_a_gpu_at_a_high_cap`.
+
 ## 2026-11-04: Floor marks, the layer (spell spectacle P2a, owner session)
 
 Feel has a floor mark layer (`gameplay/feel/marks.gd`): a viewport over the room, one texel a pixel, never cleared until the next room, rendered only on a frame a mark lands. A cue's new `mark` part stamps a mark into it through one batch (`mark.gdshader`); the shapes are worked out from data (`MarkKind`, `content/marks/`: a scorch blot, forking cracks, a frost rime) in the floor's own colours (`RoomBase.floor_colors`, sampled from its art) or the spell's ramp, clipped by the walls. Blast and fireball leave a scorch (frost with a frost card), slam and quake a crack. The rooms' floors moved to z -2 so the marks lie under every body. The pause menu has "Floor marks: On/Off" (`FloorMarks`, `floor_marks_changed`, saved). Tests: `test_marks`, `test_cues`, `test_pause_menu`, `test_events`; screenshot sheet `shot_marks.gd`. Details: docs/DECISIONS.md.

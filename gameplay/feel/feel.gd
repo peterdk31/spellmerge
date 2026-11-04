@@ -727,6 +727,7 @@ func step(real_delta: float) -> void:
 	_draw_live_beams()
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
+	_trail_motes()
 	if _motes != null:
 		_motes.step(_clock)
 	if _marks != null:
@@ -734,6 +735,18 @@ func step(real_delta: float) -> void:
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
+
+
+## The shots' trail particles as motes (spell spectacle P1d): the projectile manager hands them out
+## while there are motes (`spark_motes`), and they are thrown before the motes step.
+func _trail_motes() -> void:
+	if projectiles == null:
+		return
+	var on: bool = _motes != null and particles_enabled
+	if projectiles.spark_motes != on:
+		projectiles.spark_motes = on
+	if on and projectiles.spark_birth_count > 0:
+		_motes.give_off(projectiles.spark_births, projectiles.spark_birth_count)
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.

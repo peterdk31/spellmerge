@@ -9,7 +9,9 @@ extends "res://tests/support/screenshot.gd"
 ##           corner
 ##   bottom  a dash (the caster's trail, `follow_caster`) along a curve, as a wizard that walks
 ##           round while it dashes: the streaks and cards are where it went
-## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows).
+## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows). The shots'
+## card particles are Feel's motes (spell spectacle P1d, under the manager's `spark_motes_below`);
+## `shot_trails_shader.gd` draws the same with the trail shader's own particles, as before P1d.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -26,6 +28,9 @@ const COLUMN: float = 106.0
 ## down, the dashes half done.
 const STEPS: int = 24
 
+## The trail shader draws the shots' particles (no motes), and the sheet's name.
+var shader_particles: bool = false
+var sheet: String = "trails"
 var _shots: Node = null
 var _targets: Array[Node2D] = []
 
@@ -37,6 +42,8 @@ func take() -> void:
 	lay_floor()
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 300)
+	if shader_particles:
+		_shots.set("spark_motes_below", 0)
 	# The wall the middle row bounces off.
 	_shots.call("set_walls", [Rect2(0.0, 120.0, SCREEN.x, 8.0)] as Array[Rect2])
 	var speed: float = float(BOLT.get("speed"))
@@ -78,8 +85,8 @@ func take() -> void:
 	if drawn < 12:
 		fail("only %d trails were drawn" % drawn)
 		return
-	save(image, "trails")
-	save_crop(image, Vector2(160.0, 110.0), "trails_4x", Vector2i(160, 100))
+	save(image, sheet)
+	save_crop(image, Vector2(160.0, 110.0), sheet + "_4x", Vector2i(160, 100))
 
 
 ## Where dasher `e` is `t` of the way through its dash: a quarter circle, as a wizard that dashes

@@ -71,6 +71,10 @@ const LOOK_LAYERS: int = 21
 const SOURCE_CODE: float = 128.0
 const KIND_CODE: float = 16.0
 const HEIGHT_MAX: float = 63.75
+## A trail particle's speed (and its speed up), as a share of its kind's burst (`give_off`): given
+## off, not thrown. And the floats of a birth (core/projectiles' SPARK_BIRTH_STRIDE).
+const TRAIL_SPEED: float = 0.3
+const BIRTH_STRIDE: int = 10
 
 ## Uploads of a chunk's buffer since this pool was made, the motes written, and the bursts the
 ## frame's FRAME_ROWS cut short or left out (for tests and the benchmarks).
@@ -227,6 +231,62 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 	for k in found:
 		var kind: MoteKind = _kinds[k]
 		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
+
+
+## The shots' trail particles (spell spectacle P1d): the births `births` holds (`count` of them,
+## core/projectiles' `spark_births`, BIRTH_STRIDE floats each), one mote each: a kind of its look
+## kind's layer (`kinds_of_layer`), given off back along the shot within its kind's spread at
+## TRAIL_SPEED of its burst speed and speed up, in the shot's own ramp. The rows are written here
+## rather than by a one-mote `burst` each (a birth costs about a third as much).
+func give_off(births: PackedFloat32Array, count: int) -> void:
+	count = mini(count, births.size() / BIRTH_STRIDE)
+	if density != 1.0:
+		count = floori(float(count) * density + _rng.randf())
+	count = mini(count, _rows_left)
+	if count <= 0:
+		return
+	_rows_left -= count
+	var chunk: int = -1
+	var buffer: PackedFloat32Array
+	for n in count:
+		var b: int = n * BIRTH_STRIDE
+		var found: PackedInt32Array = kinds_of_layer(int(births[b + 4]))
+		if found.is_empty():
+			continue
+		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
+		var kind: MoteKind = _kinds[k]
+		var row: int = _next
+		_next = (_next + 1) % _cap
+		var c: int = row / CHUNK
+		if c != chunk:
+			chunk = c
+			buffer = _chunk(c)
+			_dirty[c] = 1
+		var half: float = deg_to_rad(kind.spread) * 0.5
+		var v: Vector2 = Vector2(births[b + 2], births[b + 3]).rotated(_rng.randf_range(-half, half)) * (_rng.randf_range(kind.speed.x, kind.speed.y) * TRAIL_SPEED)
+		var height: float = _step255(kind.height, HEIGHT_MAX)
+		var i: int = (row - c * CHUNK) * DRAW_STRIDE
+		buffer[i] = v.x
+		buffer[i + 1] = _now
+		buffer[i + 3] = births[b]
+		buffer[i + 4] = v.y
+		buffer[i + 5] = _rng.randf_range(kind.up.x, kind.up.y) * TRAIL_SPEED
+		buffer[i + 7] = births[b + 1] + height
+		buffer[i + 8] = float(spell_source(int(births[b + 5]), int(births[b + 6]))) / SOURCE_CODE
+		buffer[i + 9] = float(k) / KIND_CODE
+		buffer[i + 10] = _step255(clampf(_rng.randf_range(kind.life.x, kind.life.y), 0.02, LIFE_MAX), LIFE_MAX) / LIFE_MAX
+		buffer[i + 11] = height / HEIGHT_MAX
+		buffer[i + 12] = births[b + 7]
+		buffer[i + 13] = births[b + 8]
+		buffer[i + 14] = births[b + 9]
+		buffer[i + 15] = _rng.randf()
+
+
+## The kinds of look layer `layer` (a look kind, LOOK_*), else those of layer 0.
+func kinds_of_layer(layer: int) -> PackedInt32Array:
+	if layer > 0 and layer <= LOOK_LAYERS and not _layer_kinds[layer].is_empty():
+		return _layer_kinds[layer]
+	return _layer_kinds[0]
 
 
 ## Throw a burst of kind `k` (its count times `scale`, at least one; its speed, spread, up, life

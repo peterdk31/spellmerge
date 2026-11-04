@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: The motes' trail births in native code (owner session)
+
+- **Asked:** the owner, after the "Tailless motes" dev slider (2048/4096/8192, #547): "Build the native code now." The births were the motes' part that grows with the pool (S5: at 3,000 shots the births' CPU 1.8 ms at a pool of 2,048 and 2.9 ms at 4,096).
+- **Done:** `MoteKernel` (`native/src/mote_kernel.cpp`) writes a frame's births in one call, as `Motes.give_off` and its one-mote `burst` do, to the bit (`test_native_motes.gd`: two pools side by side, every chunk's rows, counters, random state and settles compared after each frame; a mutation in the settles' point and one in the angle's rounding each fail it). A spell's kinds come from a script (`card_kinds.gd`), so the kernel first names each birth's (tag, kind) pair (`key_births`, a frame's births come from few spells) and GDScript looks each pair up once; the marks of the settling motes come back in a list for `Marks.settle`. The chunks the frame's rows can reach are made first in GDScript (`_ready_chunks`; the kernel makes no nodes). Cues, hits and deaths still write through GDScript `burst` (tens of motes in a call, a few calls a frame).
+- **Measured** (headless, 400 births, the best of 40): GDScript 948 us (2.37 us a birth), native 107 us (0.27 us). The GPU cost of the motes is unchanged: at a pool above 2,048 the GPU may now be the limit (llvmpipe at 3,000 shots: 31 ms at 2,048, 39 at 4,096).
+- **Owner's file:** a new kernel class is one line in `ci/smbot/rules.py` (`NATIVE_CLASSES`); the build profile needed nothing new.
+
 ## 2026-11-04: Do shots need tails? The ceiling, the motes with the tails' budget, a Tails switch, and the dash as cues and motes (spell spectacle 2, S5, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle 2: do shots need tails? (S5)" (docs/milestones/spell-spectacle-2.md), steps 1-3 and 5; step 4 (what the game keeps) is the owner's pick after playing with the switch.

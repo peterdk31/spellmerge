@@ -2,7 +2,8 @@ extends RefCounted
 ## The native module (native/README.md): Spellmerge's own C++, built from source for each platform
 ## and loaded as a GDExtension (`native/spellmerge.gdextension`, written by `ci/build/native.sh`).
 ## It holds only faster versions of GDScript the game already has (the projectile manager's hot
-## loops, `ShotKernel`; the horde swarm's, `SwarmKernel` and `SwarmLookKernel`), so the game runs
+## loops, `ShotKernel`; the horde swarm's, `SwarmKernel` and `SwarmLookKernel`; the motes' trail
+## births, `MoteKernel`), so the game runs
 ## the same without it: a checkout where it was never built (slower). This file is the one place
 ## that asks whether it is there.
 ##
@@ -37,6 +38,13 @@ static func swarm_look_kernel() -> Object:
 	if not _loaded_or_tell():
 		return null
 	return ClassDB.instantiate(&"SwarmLookKernel")
+
+
+## A new `MoteKernel` (the motes' trail births), or null when the module is not loaded.
+static func mote_kernel() -> Object:
+	if not _loaded_or_tell():
+		return null
+	return ClassDB.instantiate(&"MoteKernel")
 
 
 ## Whether the native module is loaded.

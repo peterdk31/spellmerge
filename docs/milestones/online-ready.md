@@ -62,7 +62,7 @@ The danger is that determinism breaks silently: a forgotten field or a read of r
 4. **The simulation/view line is a folder, enforced by a test.** Feel, looks, HUD and the camera stay free (real time, particles, anything) as long as they only read the game. Simulation folders get the rules automatically (N9). Most daily work, content and visuals, pays nothing: cards and enemies are data, and data cannot desync.
 5. **Desyncs are cheap to find.** Per-area hashes, the first tick that parts, and a diff of the two snapshots down to the member's name (N1). Bug reports carry a replay, which makes ordinary bug fixing easier than today: the payback for the whole phase.
 6. **New content is covered by itself.** A test finds every card, enemy and room, replays a short fight with each twice and through a snapshot (N12), as `test_card_rules.gd` plays every card on every carrier.
-7. **What is not done.** No rewrite of the areas into another architecture (such as an entity-component system), no fixed-point maths (floats stay; only trig goes through `DMath`, N7), no native kernel the benchmark does not ask for (each is code written twice), and every rule a test with a fix-it message rather than a line in a README, since every session starts cold.
+7. **What is not done.** No rewrite of the areas into another architecture (such as an entity-component system), no fixed-point maths (floats stay; only trig goes through `DMath`, N7), no native kernel beyond N6 and N7 that the benchmark does not ask for, and every rule a test with a fix-it message rather than a line in a README, since every session starts cold.
 
 For whoever writes gameplay code, the new costs are: list a new cache or node reference in `DERIVED` (a test says when), and take chance from `sim` rather than a `RandomNumberGenerator`. The costs, part by part, are in "What it costs".
 
@@ -78,15 +78,15 @@ The owner asked: will it cost performance, and will the code be worse off or har
 | N3 one clock | **Likely a gain:** one tick calling steps replaces several engine callbacks (`_process`, `_physics_process` per area), and GDScript calls are what actors already pay most for | **Better:** one written order instead of an order implied by the scene tree. One-time churn: every seeded outcome changes once when chance moves to hashes (combo test numbers, the clips' `hashes.json`), redone in the same PR |
 | N4 hit-stop in ticks | None | **Simpler:** no `Engine.time_scale` games, and no real-time clock in Feel's stop |
 | N5 actor ids | None (int keys either way) | Neutral |
-| N6 own body movement | **Uncertain:** Godot's slide is C++; ours is GDScript for up to 200 actors (circles against a grid, a few cells each). Godot's physics bodies and broadphase for actors also go away. Measured on the stress run; a kernel only if the numbers ask | **A real cost:** a collision rule we own and must keep right (corners, sliding along walls). Kept tiny: circles against the wall grid only, as the swarm already does. **Done only if N2b shows Godot's slide parts between platforms** |
-| N7 DMath | **Small:** a polynomial in GDScript is slower than the engine's `sin`, but few sim calls are hot (two trig calls in `ShotKernel`, two in `SwarmKernel`, where C++ makes it as fast as the library). Measured | **A real cost:** `DMath.rotated(v, a)` reads worse than `v.rotated(a)`. **Only the functions N2b shows parting**, and N9's test asks for `DMath` only for those |
+| N6 own body movement (C++) | **Likely a gain:** one native call moves every actor against the wall grid, and Godot's physics bodies and broadphase for actors go away. Measured on the stress run | **A real cost, kept small:** a collision rule we own (corners, sliding along walls), in one C++ file with no GDScript twin. Circles against the wall grid only, as the swarm already does |
+| N7 DMath (C++) | **None:** one native call per use costs about what the engine's own `sin` does, and inside the kernels it is a plain inline function | `DMath.rotated(v, a)` reads a little worse than `v.rotated(a)`, but the rule is simple: simulation code calls no engine trig at all |
 | N8 CI across platforms | None | CI time on the daily build only |
 | N9 sim/view test | None | **Better:** the rules are a test with a fix-it message, not a README line |
 | N10 snapshots | None at rest (taken only on a join, a test or a seek) | One `restore_nodes()` hook per area that makes nodes; the rest is the walker |
 | N11 session settings | None | Neutral: the shot cap moves from a per-machine setting to a run's rules |
 | N12 content coverage | None | Test time grows with content: a PR runs only the content it touches, the daily build runs all |
 
-**In short:** in normal play the game should be no slower and maybe a little faster (N3); the two parts that could cost frame time (N6, N7) are measured and only built if N2b shows they are needed. The code gets simpler in four places (input, one clock, hit-stop, rules as tests), stays the same in most, and gets two lasting costs (a `DERIVED` list on caches; possibly `DMath` and our own slide). The one-time churn (seeded outcomes, the ~800 members reviewed once) lands early, in N1 and N3.
+**In short:** in normal play the game should be no slower and maybe a little faster (N3); N6 and N7 are C++ from the start (the owner, 2026-11-04), so they should cost nothing and N6 likely saves time. The code gets simpler in four places (input, one clock, hit-stop, rules as tests), stays the same in most, and gets two lasting costs (a `DERIVED` list on caches; `DMath` and our own slide, both C++ the game now needs). The one-time churn (seeded outcomes, the ~800 members reviewed once) lands early, in N1 and N3.
 
 ## Done when
 
@@ -103,7 +103,7 @@ The owner asked: will it cost performance, and will the code be worse off or har
 
 ## Parts
 
-Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11 in parallel (N2b's result decides how much of N6 and N7 is needed), then N8, N9, N10, N12.
+Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11 in parallel, then N8, N9, N10, N12. N6 and N7 do not wait for N2b's result.
 
 ### N1: the state hash and the determinism harness
 
@@ -127,7 +127,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 - A cheap measurement, before the costly parts: one recorded sandbox fight and one horde wave (N2), replayed headless on Linux, under Windows (Wine, or a Windows machine by hand) and in the web build (headless Chromium through Playwright), with N1's hash per area at every tick.
 - No CI job yet (that is N8): a script under `tests/` and a written result in docs/DECISIONS.md: the first tick and area that part on each platform, or that none does.
-- It decides N7's size (only the functions that differ get a `DMath` version) and tells whether N6 is needed now or is only a guard. If the platforms part somewhere ugly (inside the engine's own code), the owner hears it here, before N6 and N7 are spent.
+- It shows what parts besides trig and the body move, which N6 and N7 take out of the engine anyway: if the platforms part somewhere else (inside the engine's own code), the owner hears it here, early.
 
 ### N3: one clock, one context
 
@@ -150,20 +150,27 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Actor ids stay "lowest free first" (already deterministic).
 - Fixes A5.
 
-### N6: our own body movement (only if N2b asks for it)
+### N6: our own body movement, in C++
 
-Built only if N2b shows Godot's `move_and_slide` parting between platforms; otherwise it stays, and N8 keeps watching it.
+C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 
-- The actor's move against walls is our own circle-against-grid slide, on the wall grid the projectile manager already keeps (room walls and solid shots), the way the swarm moves onto its floor. `move_and_slide` and the bodies' physics shapes leave the simulation.
+- `BodyKernel` (`native/src/body_kernel.cpp`): one call per tick moves every actor against the wall grid the projectile manager already keeps (room walls and solid shots): circles sliding along the grid's walls, the way the swarm moves onto its floor. It takes the actors' packed arrays (position, wanted move, radius) and the grid, and writes the positions back, as the other kernels do (native/README.md: arrays in place, nothing kept). Its maths is N7's.
+- `move_and_slide` and the bodies' physics shapes leave the simulation; the actor sets its position from the kernel's result.
 - Body-against-body pushing stays Combat's push.
-- Native `ShotKernel`-style kernel only if the benchmark asks for one (bit-for-bit with the GDScript, as every kernel).
-- Fixes A4. The highest-risk part for feel: walking along and into walls is compared in the sandbox and by the bots before it merges.
+- **No GDScript twin.** The kernel is the one implementation; its tests check the behaviour directly (sliding along a wall, into a corner, between two solid shots, at every speed a dash reaches) instead of comparing with a GDScript copy.
+- Fixes A4. The highest-risk part for feel: walking along and into walls is compared with today's in the sandbox and by the bots before it merges.
 
-### N7: deterministic maths
+### N7: deterministic maths, in C++
 
-- `core/sim/dmath.gd` (`DMath`): `sin`, `cos`, `atan2`, `from_angle`, `rotated`, `angle` from `+ - * / sqrt` only (polynomials, the same in GDScript and `native/`). Simulation code uses `DMath`; view code may keep the engine's.
+C++ from the start, whatever N2b finds (the owner, 2026-11-04).
+
+- `native/src/dmath.h`: `sin`, `cos`, `tan`, `atan2`, `exp`, `log`, `pow` from `+ - * / sqrt` only (polynomials with a range reduction, never the C library). The kernels (`ShotKernel`, `SwarmKernel`, `BodyKernel`) call it inline, in place of their `std::` trig.
+- `DMath` (the module's class, made by `core/native/native.gd` like the others): the same functions for GDScript, plus `from_angle`, `rotated`, `angle`, `angle_to` and `lerp_angle` on `Vector2`. Simulation code calls `DMath` and never the engine's trig (N9's test); view code keeps the engine's.
 - `native/SConstruct` builds with `-ffp-contract=off` and without fast-math on every platform (a protected file: the owner's change, listed in the PR).
-- Fixes A6 and A7. Sized by N2b: if Godot's own builds already agree across the three platforms, `DMath` covers only what N2b finds, and N9's test asks for `DMath` only for those functions; the compile flags go in either way. The hot calls in `native/` use the same polynomial, so the kernels stay as fast.
+- **No GDScript twin.** Tests check `DMath` against known values (within a few units in the last place of the engine's results) and that it gives the same bits on every platform (N8).
+- Fixes A6 and A7.
+
+**What C++-only changes in the native contract.** native/README.md says every kernel has a GDScript twin, as reference and fallback, and that the game runs without the module. For N6 and N7 that no longer holds: the simulation needs the module. Every build already has it (the owner, 2026-11-02) and `build.sh` builds it before the tests, so only a checkout that never ran `build.sh` loses anything; the game then refuses to start a run and says why, rather than running a different game. native/README.md says so in N6's PR. The older kernels keep their twins.
 
 ### N8: the same game on every platform
 
@@ -175,7 +182,7 @@ Built only if N2b shows Godot's `move_and_slide` parting between platforms; othe
 
 - Every script is either simulation or view, by folder (simulation: `core/sim`, `core/spells`, `core/projectiles`, `core/actors`, `gameplay/actor` except the looks, `gameplay/ai` except the looks, `gameplay/combat`, `gameplay/coop` rules, `gameplay/flow`, `gameplay/horde` except `swarm_look.gd`, `gameplay/player` controllers, `gameplay/progression`, `gameplay/rewards`, `gameplay/run`, `gameplay/difficulty`; view: `gameplay/feel`, every look, `hud/`, the camera). The list lives in `core/sim/README.md`.
 - `tests/core/test_sim_rules.gd` reads every simulation script and fails on `Time.`, `Engine.time_scale`, `Input.`, `InputManager` outside the frame builder, `get_viewport`, `Camera2D`, `_process`, global `randf`/`randi`/`randomize`, and `get_instance_id` (other than in equality keys the test allows by name). AGENTS.md gets the rule ("Simulation code runs on the tick").
-- Proves done-when 6. It also fails on `RandomNumberGenerator`, `_process` and `_physics_process` in simulation scripts (N3).
+- Proves done-when 6. It also fails on `RandomNumberGenerator`, `_process` and `_physics_process` in simulation scripts (N3), and on the engine's trig (`sin`, `cos`, `tan`, `atan2`, `exp`, `log`, `pow`, `Vector2.angle`, `rotated`, `from_angle`, `angle_to`, `lerp_angle`) there (N7).
 
 ### N10: snapshots
 

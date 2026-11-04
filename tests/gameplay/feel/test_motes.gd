@@ -627,11 +627,11 @@ func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
 	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
 	var tint: Color = feel.cue_of(&"reaction_shatter").color
-	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own.
-	var puff: int = feel.preset.puff_mote_count
+	# Two rings: the puff's sparks (a `spark` motes part of the cue, S6 2) and the reaction's own.
+	var cue: CueBase = feel.cue_of(&"reaction_shatter")
+	var puff: int = roundi(float(cue.parts[1]["count"]) * cue.power * motes.density)
 	check(motes.next_row() > puff, "the puff's sparks, then the reaction's ring")
 	# The cue's power (shatter 1.3) is times its motes part's count: 16 x 1.3, one kind.
-	var cue: CueBase = feel.cue_of(&"reaction_shatter")
 	check_equal(motes.next_row() - puff, roundi(16.0 * cue.power * motes.density), "its ring's count times the cue's power")
 	for group: Vector2i in [Vector2i(0, puff), Vector2i(puff, motes.next_row())]:
 		var speeds: Array[float] = []
@@ -1023,33 +1023,38 @@ func test_the_numbers_shared_with_core_agree() -> void:
 	check(ProjectilesScript.SPARK_TAG_BITS < 24 and (SpellTag.FLAG << 1) >> ProjectilesScript.SPARK_TAG_BITS < 1 << 24, "each of the tag's floats holds its part whole")
 
 
-## S3: a hit's spray and a puff throw their sparks as motes (the effect draws only the flash): the
-## preset's count of its kind along the hit's way, or all round as a ring; a staff's poof (a puff
-## with the POOF bit) throws none, and a spray leaves the moments' rows alone, as a shed does.
+## S6 2: a hit's spray and a puff are the cues `hit` and `hit_puff`, whose motes part throws the
+## sparks (the effect draws only the flash): its count of its kind along the hit's way, or all round
+## as a ring; a flash alone (`show_effect`, a staff's poof) throws none, and a hit's sparks leave
+## the moments' rows alone (`often`), as a shed does.
 func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var motes: MotesScript = feel.motes()
-	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
-	check_equal(motes.next_row(), feel.preset.spray_mote_count, "a spray's sparks")
-	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [feel.preset.spray_mote_kind], "of the preset's kind")
+	var spray: Dictionary = feel.cue_of(&"hit").parts[1]
+	var puff: Dictionary = feel.cue_of(&"hit_puff").parts[1]
+	check(bool(spray["often"]) and bool(puff["often"]), "a hit's sparks are often")
+	feel.play_cue(&"hit", FeelScript.ActorsScript.NONE, Vector2(50.0, 50.0), Vector2.RIGHT, FeelScript.HIT_STEP)
+	check_equal(motes.next_row(), int(spray["count"]), "a spray's sparks")
+	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [spray["kind"]], "of the cue's kind")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] > 0.0, "spark %d flies on along the hit" % row)
 	motes.step(0.0)
 	var before: int = motes.next_row()
-	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, FeelScript.PUFF_SECONDS)
-	check_equal(motes.next_row() - before, feel.preset.puff_mote_count, "a puff's sparks")
+	feel.play_cue(&"hit_puff", FeelScript.ActorsScript.NONE, Vector2(50.0, 50.0), Vector2.ZERO, FeelScript.HIT_STEP * 2.0)
+	check_equal(motes.next_row() - before, int(puff["count"]), "a puff's sparks")
 	var left: int = 0
 	for row in range(before, motes.next_row()):
 		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
-	check(left > 0 and left < feel.preset.puff_mote_count, "all round")
+	check(left > 0 and left < int(puff["count"]), "all round")
 	before = motes.next_row()
 	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
-	check_equal(motes.next_row(), before, "a poof throws none")
+	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	check_equal(motes.next_row(), before, "a flash alone throws none")
 	motes.step(0.0)
 	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
 	before = motes.next_row()
-	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	feel.play_cue(&"hit", FeelScript.ActorsScript.NONE, Vector2(50.0, 50.0), Vector2.RIGHT, FeelScript.HIT_STEP)
 	check_equal(motes.next_row(), before, "a spray leaves the moments' rows alone")
 
 

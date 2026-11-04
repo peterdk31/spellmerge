@@ -139,6 +139,8 @@ var _cap: int = 0
 ## The kinds, in the order the shader holds them, and for each look layer (0-21) the kinds that
 ## are its motes; the surface kinds.
 var _kinds: Array[MoteKind] = []
+## Each kind's index by its id (`kind_index`: a cue's named kind is looked up on every hit, S6 2).
+var _kind_at: Dictionary = {}
 var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
 ## The kinds a dash gives off along its path (`MoteKind.dash_path`; its births of SPARK_STREAK).
@@ -283,10 +285,7 @@ func kinds() -> Array[MoteKind]:
 
 ## The index of the kind `id`, or -1.
 func kind_index(id: StringName) -> int:
-	for i in _kinds.size():
-		if _kinds[i].id == id:
-			return i
-	return -1
+	return _kind_at.get(id, -1) as int
 
 
 ## The kinds that name the card `card` by id (`MoteKind.cards`); empty for none. Kept: read it,
@@ -811,6 +810,8 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			continue
 		var k: int = _kinds.size()
 		_kinds.append(kind)
+		if not _kind_at.has(kind.id):
+			_kind_at[kind.id] = k
 		_k_speed.append(kind.speed)
 		_k_up.append(kind.up)
 		_k_life.append(kind.life)

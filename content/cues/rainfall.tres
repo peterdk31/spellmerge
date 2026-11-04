@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"rainfall"
-parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"spray", "zoom": 1, "way": &"up", "particles": true}])
+parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"spray", "zoom": 1, "way": &"up", "particles": true}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 15.0, "spread": 92.0, "way": &"up"}])
 shake = 0.06

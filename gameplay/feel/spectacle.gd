@@ -159,7 +159,7 @@ func step(now: float) -> void:
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
 ## Callable taking the part and the cue's `CueContext`.
 func cue_parts() -> Dictionary:
-	return {&"motes": play_motes_part, &"mark": play_mark_part, &"light": play_light_part}
+	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part], &"light": [play_light_part]}
 
 
 # --- Where motes come from (Feel calls these, in the order it draws) ------------------------
@@ -197,16 +197,6 @@ func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 ## never change it).
 func surface_kinds() -> PackedInt32Array:
 	return _surface_kinds
-
-
-## The sparks of a flash that sprays them (a hit's spray, a puff; S3): `count` motes of the kind
-## `kind` at `at` along `way` within `spread` degrees (all round as a ring with `ring`), out to
-## `reach` pixels, in the colours the flash is in (the `core` of a caster of `ramp`, the cards of
-## `look`, exact with its LOOK_EXACT bit). One of many a frame: it leaves the moments' rows alone.
-func flash_motes(kind: StringName, at: Vector2, way: Vector2, core: Color, ramp: int, look: int, count: int, reach: float, spread: float, ring: bool) -> void:
-	if pool == null or not particles_enabled or count <= 0:
-		return
-	pool.throw_part(pool.kind_index(kind), at, way, MotesScript.spell_source(ramp, look), core, count, reach, spread, 1.0, ring, true)
 
 
 ## A body breaking into motes (S3: a death, in place of the white-hot copy that fell apart pixel by
@@ -304,59 +294,101 @@ func _trail_motes() -> void:
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
 ## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
 ## the cue's ramp with its tint and the cards of its look; its count and reach times the cue's power.
-## A part with a `share` is one of many a frame (a shot's end): it is skipped, before its kinds are
-## looked up, once the frame has only the moments' rows left, and throws each kind its own count
-## times the share (and the power), split between the kinds, as they shed.
-func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
+## One of many a frame (`often`, a hit's sparks, S6 2; and any with a `share`, a shot's end) is
+## skipped, before its kinds are looked up, once the frame has only the moments' rows left; one with
+## a `share` throws each kind its own count times the share (and the power), split between the
+## kinds, as they shed.
+func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
-	var shed: bool = part.has("share")
-	if shed and pool.shed_closed():
+	if part.often and pool.shed_closed():
 		return
-	var way: Vector2 = cue.way_of(part)
-	var reach: float = float(part.get("radius", 0.0))
-	if part.has("reach") and cue.size > 0.0:
-		reach = cue.size * float(part["reach"])
+	var way: Vector2 = cue.aim
+	var turn: StringName = part.way
+	if turn != &"aim":
+		if turn == &"back":
+			way = -way
+		elif turn == &"right":
+			way = Vector2.RIGHT
+		elif turn == &"up":
+			way = Vector2.UP
+	var reach: float = part.radius
+	if part.reach >= 0.0 and cue.size > 0.0:
+		reach = cue.size * part.reach
 	reach *= cue.power
-	var spread: float = float(part.get("spread", -1.0))
-	var up: float = float(part.get("up", 1.0))
-	var ring: bool = bool(part.get("ring", false))
-	var named: StringName = StringName(part.get("kind", "spell"))
-	var kinds: PackedInt32Array
-	match named:
-		&"spell":
-			kinds = cards.motes_of(cue.tag, cue.look)
-		&"surface":
-			kinds = _surface_kinds
-		_:
-			var k: int = pool.kind_index(named)
-			if k < 0:
-				return
-			kinds = PackedInt32Array([k])
 	# In an exact colour (the part's, else the cue's own), or in the cue's ramp, tint and cards.
-	var colour: Color = part["color"] as Color if part.has("color") else cue.color
+	var colour: Color = part.color if part.color.a > 0.0 else cue.color
 	var exact: bool = colour.a > 0.0
 	var spell: int = MotesScript.spell_source(cue.ramp, MotesScript.LOOK_EXACT if exact else cue.look)
 	var core: Color = colour if exact else cue.tint
+	if part.body and not exact:
+		# The body's own colour (a death puff's sparks), in no one's ramp and without the cards.
+		spell = MotesScript.spell_source(0, 0)
+		core = cue.body if cue.body.a > 0.0 else Color.WHITE
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
-	var count: int = int(part.get("count", -1))
-	var share: float = float(part.get("share", 1.0)) * cue.power / float(maxi(kinds.size(), 1))
+	var at: Vector2 = cue.at
+	if part.below != 0.0:
+		at.y += part.below
+	var named: StringName = part.named
+	if named != &"spell" and named != &"surface":
+		# One kind by its id: looked up once a pool (the pool is made again when its cap changes),
+		# with whether it is a surface kind and its own count.
+		if part.pool_seen != pool:
+			part.pool_seen = pool
+			part.kind_at = pool.kind_index(named)
+			if part.kind_at >= 0:
+				part.kind_surface = pool.kinds()[part.kind_at].surface
+				part.kind_count = pool.kinds()[part.kind_at].count
+		if part.kind_at < 0:
+			return
+		var alone: bool = part.colours == &"surface" or (part.kind_surface and part.colours != &"spell" and not exact)
+		var each: int
+		if part.share >= 0.0:
+			each = maxi(roundi(float(part.kind_count) * part.share * cue.power), 1)
+			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true)
+			return
+		each = -1 if part.count < 0 and cue.power == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.power), 1)
+		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often)
+		return
+	var kinds: PackedInt32Array = cards.motes_of(cue.tag, cue.look) if named == &"spell" else _surface_kinds
+	var count: int = part.count
+	var shed: bool = part.share >= 0.0
+	var share: float = part.share * cue.power / float(maxi(kinds.size(), 1))
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
-	var colours: StringName = StringName(part.get("colours", ""))
-	var of_surface: bool = named == &"surface" or colours == &"surface"
-	var at: Vector2 = cue.at + Vector2(0.0, float(part.get("below", 0.0)))
+	var of_surface: bool = named == &"surface" or part.colours == &"surface"
 	for k in kinds:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
-		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell" and not exact)
+		var walls: bool = of_surface or (pool.kinds()[k].surface and part.colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
 		if shed:
-			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true)
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true)
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often)
+
+
+## A cue's `motes` part read into its typed fields once (`Feel.add_cue_part`'s `prepare`, S6 2: a
+## hit's sparks are played hundreds of times a second).
+func prepare_motes_part(part: Dictionary) -> MotesPart:
+	var made := MotesPart.new()
+	made.named = StringName(part.get("kind", "spell"))
+	made.colours = StringName(part.get("colours", ""))
+	made.count = int(part.get("count", -1))
+	made.reach = float(part["reach"]) if part.has("reach") else -1.0
+	made.radius = float(part.get("radius", 0.0))
+	made.spread = float(part.get("spread", -1.0))
+	made.up = float(part.get("up", 1.0))
+	made.ring = bool(part.get("ring", false))
+	made.share = float(part.get("share", -1.0))
+	made.often = bool(part.get("often", false)) or made.share >= 0.0
+	made.body = bool(part.get("body", false))
+	made.way = StringName(part.get("way", "aim"))
+	made.below = float(part.get("below", 0.0))
+	made.color = part["color"] as Color if part.has("color") else Color(0.0, 0.0, 0.0, 0.0)
+	return made
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
@@ -597,3 +629,33 @@ func _fit_marks(room_id: StringName) -> void:
 	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
 	marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
 	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
+
+
+## A cue's `motes` part as typed fields (`prepare_motes_part`; `CueBase` names each key): its kind
+## (`spell`, `surface` or a kind's id), `colours`, `count` (-1: the kinds' own), `reach` (-1: none),
+## `radius`, `spread` (-1: the kind's own), `up`, `ring`, `often`, `way`, `below`, and its exact
+## `color` (alpha 0: none).
+class MotesPart:
+	extends RefCounted
+	var named: StringName = &"spell"
+	var colours: StringName = &""
+	var count: int = -1
+	var reach: float = -1.0
+	var radius: float = 0.0
+	var spread: float = -1.0
+	var up: float = 1.0
+	var ring: bool = false
+	var often: bool = false
+	## Its `share` (-1: none; a shed's, which is `often` too).
+	var share: float = -1.0
+	## In the body's own colour (`CueContext.body`), as a flash's `body`.
+	var body: bool = false
+	var way: StringName = &"aim"
+	var below: float = 0.0
+	var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+	## A named kind's index in the pool `pool_seen` (-1: none), whether it is a surface kind, and
+	## its own count, kept for that pool.
+	var pool_seen: Object = null
+	var kind_at: int = -1
+	var kind_surface: bool = false
+	var kind_count: int = 1

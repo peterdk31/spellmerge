@@ -21,5 +21,4 @@ carrier = &"atom"
 pierce = 0
 knockback = 10.0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.02, "push": -1, "ease": "out"}, {"phase": "after", "at": 0.05}])
-cast_look = {"seconds": 0.05, "size": 0.25}
-impact_look = {"size": 0.2}
+cast_cue = &"cast_atom"

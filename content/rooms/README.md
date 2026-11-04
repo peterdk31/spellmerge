@@ -15,6 +15,7 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 - Rooms hold layout only. Enemies come from `content/enemies/` through the spawn points and the `gameplay/` systems; do not reference other areas directly.
 - Tiles come from the shared tilesets in `art/tilesets/`; do not add new art here.
 - What its walls shed when struck (Feel's chips) takes the colours of its own art: `RoomBase.surface_colors()` samples the sprites on its wall bodies, leaving out the floor's colour. Set `debris_colors` (light, base, shadow) on its `.tres` only when the sample looks wrong.
+- Its `Floor` sprite is at `z_index` `RoomBase.FLOOR_Z` (-2), so Feel's floor marks (one above it) lie on the floor and under every body (0); `tests/gameplay/feel/test_marks.gd` checks every room. The marks drawn in the floor's own shades take its colours from its art (`RoomBase.floor_colors()`: the `Floor` sprite's most common colours times its modulate); set `floor_mark_colors` (light, base, shadow) only when the sample looks wrong.
 
 ## Allowed files
 

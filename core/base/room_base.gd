@@ -22,16 +22,27 @@ extends Resource
 ## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
 ## so new tiles change the chips with no edit here; set it only when the sample looks wrong.
 @export var debris_colors: PackedColorArray = PackedColorArray()
+## The colours of its floor, for the floor marks drawn in the floor's own shades (Feel's mark
+## layer: a scorch, a crack), lightest first: light, base, shadow. Empty (the default): sampled
+## from the room's `Floor` sprite (`floor_colors`); set it only when the sample looks wrong.
+@export var floor_mark_colors: PackedColorArray = PackedColorArray()
 
 ## The wall art's colours that count, at most; a colour on fewer pixels than this share of the
 ## most common one is left out (a speck of trim).
 const SURFACE_SHADES: int = 3
 const SURFACE_MIN_SHARE: float = 0.1
+## The same for the floor's colours: a floor is mostly one colour, its seams and highlights a few
+## pixels in a hundred (the crypt's shadow is 7 %, its light 1.4 %).
+const FLOOR_MIN_SHARE: float = 0.01
 ## The layer of the walls' bodies (as Flow tells the projectile manager).
 const WALL_LAYER: int = 1
+## The z of a layout's `Floor` sprite: under Feel's floor marks (one above it) and under the
+## bodies (0), so a mark lies on the floor and never over anyone.
+const FLOOR_Z: int = -2
 
-## `surface_colors()` once worked out (empty until then).
+## `surface_colors()` and `floor_colors()` once worked out (empty until then).
 var _surface: PackedColorArray = PackedColorArray()
+var _floor: PackedColorArray = PackedColorArray()
 
 
 ## The colours its walls shed, lightest first (light, base, shadow; always three, a colour
@@ -45,6 +56,43 @@ func surface_colors() -> PackedColorArray:
 	if _surface.is_empty() and scene != null:
 		_surface = _three(sample_surface(scene.instantiate()))
 	return _surface
+
+
+## The colours of its floor, lightest first (light, base, shadow; always three, a colour repeated
+## when the art has fewer): `floor_mark_colors` when set, else sampled once from the `Floor`
+## sprite of its scene, its most common colours as it shows them (times its modulate). Empty
+## when there is no art to read.
+func floor_colors() -> PackedColorArray:
+	if not floor_mark_colors.is_empty():
+		return _three(floor_mark_colors)
+	if _floor.is_empty() and scene != null:
+		_floor = _three(sample_floor(scene.instantiate()))
+	return _floor
+
+
+## The floor colours of the layout `layout` (its `Floor` sprite's, most common first, SURFACE_SHADES
+## at most, none on fewer than FLOOR_MIN_SHARE of the most common's pixels); frees it.
+static func sample_floor(layout: Node) -> PackedColorArray:
+	var found := PackedColorArray()
+	if layout == null:
+		return found
+	var floor_sprite := layout.get_node_or_null("Floor") as Sprite2D
+	var counts: Dictionary = _count_colours(floor_sprite.texture, {}) if floor_sprite != null else {}
+	# As it is shown: a tinted floor's marks are tinted the same.
+	var tint: Color = floor_sprite.modulate * floor_sprite.self_modulate if floor_sprite != null else Color.WHITE
+	layout.free()
+	var most: int = 0
+	for rgba: int in counts:
+		most = maxi(most, int(counts[rgba]))
+	while found.size() < SURFACE_SHADES and not counts.is_empty():
+		var top: int = _most_common(counts)
+		if float(counts[top]) < float(most) * FLOOR_MIN_SHARE:
+			break
+		var colour: Color = Color.hex(top) * tint
+		colour.a = 1.0
+		found.append(colour)
+		counts.erase(top)
+	return found
 
 
 ## The wall colours of the layout `layout` (see `surface_colors`), most common first; frees it.

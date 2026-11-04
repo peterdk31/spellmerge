@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"quake"
-parts = Array[Dictionary]([{"effect": &"quake", "reach": 1.5, "way": &"right"}, {"effect": &"chips", "zoom": 2, "way": &"up", "plain": true, "particles": true}])
+parts = Array[Dictionary]([{"effect": &"quake", "reach": 1.5, "way": &"right"}, {"effect": &"chips", "zoom": 2, "way": &"up", "plain": true, "particles": true}, {"part": &"mark", "mark": &"crack", "reach": 1.0}])
 shake = 0.45
 kick = 3.0
 hold = 0.06

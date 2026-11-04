@@ -2,16 +2,18 @@
 
 A cue is one moment's look and feel as data: the flashes Feel draws, and its shake, camera punch, holds and sound. One `CueBase` file per cue (`core/base/cue_base.gd` documents every key), named `<id>.tres`; the registry finds it by its `id` under `cues`, so a new moment is a new file and no list is edited.
 
+A part may also be a floor mark (`{"part": &"mark", "mark": &"scorch", "reach": 0.9}`; docs/milestones/spell-spectacle.md, P2a): stamped once into the room's mark layer, it stays until the room ends. The mark is a kind in `content/marks/`; with `"cards": true` the cue's cards' marks take its place when they have one (a frost blast leaves frost).
+
 Something plays a cue by name: Feel's `play_cue(id, caster, at, dir, size, tint, look, target)`, or the `cue_shown` event from another area. `size` is in pixels (an explosion's radius, a ground strike's reach); a part with `reach` is that many times it. A telegraph's `size` is seconds instead: a part with `lasts_size` lasts that long.
 
 Cards name the cues they play: a carrier's `cast_look` `cue` (`FormBase`; played where the carrier shows itself, `form_shown`) and its `impact_look` `cue` (played where its shot ends on no body, as big as its `radius`, and where a carrier with no shot ends, `carrier_ended`: a slam's impact, as big as its ring, a teleport's landing, a rain's fall) and a modifier's `cue` (`ModifierBase`; played when its behaviour goes off, as `blast` does).
 
 | Cue | Played by | What it is |
 |---|---|---|
-| `blast` | the blast card's `cue`: core/spells, wherever a `blast` goes off | the ragged shell, fragments and rubble past the radius, a scorch; shake and a punch away from the caster |
-| `fireball` | an exploding barrel (not built yet) | the rising fireball, fragments, a scorch; shake and a punch |
-| `quake` | a carrier whose impact look's `cue` names it (none yet) | cracks in the floor, stone chips, the caster held, a shake and a punch down the screen |
-| `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks, chips, hold, shake and punch |
+| `blast` | the blast card's `cue`: core/spells, wherever a `blast` goes off | the ragged shell, fragments and rubble past the radius, a scorch flash and a scorch mark (frost for a frost card); shake and a punch away from the caster |
+| `fireball` | an exploding barrel (not built yet) | the rising fireball, fragments, a scorch flash and mark; shake and a punch |
+| `quake` | a carrier whose impact look's `cue` names it (none yet) | cracks in the floor (a flash and a crack mark that stays), stone chips, the caster held, a shake and a punch down the screen |
+| `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks and crack mark, chips, hold, shake and punch |
 | `parry` | Feel, for a swing's block (`shot_blocked` while the blocking carrier is a swing) | a big four-point star in exactly Spark gold, the parrying actor held alone |
 | `deflect` | Feel, for `shot_deflected`, aimed the way the shot now flies | a big white-hot cross in the deflecting actor's colours |
 | `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killer and the shot held, a shake (Feel adds the ghost and the puff) |

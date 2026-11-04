@@ -19,6 +19,14 @@ extends Resource
 ##   `plain`      true: white in no one's ramp, without the cards (stone chips)
 ##   `way`        `aim` (the cue's direction, the default), `back` (against it), `right` or `up`
 ##   `particles`  true: left out while particles are off (the stress benchmark)
+## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
+## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
+##   `mark`       the mark kind's id (`MarkKind`, content/marks; required)
+##   `reach`      its radius from the cue's: `size` x reach pixels
+##   `radius`     its radius in pixels, when the cue has no size (or with no `reach`; 8 when neither)
+##   `rot`        `random` (the default) or `aim`: turned the cue's way
+##   `cards`      true: the marks of the cue's cards instead when they have any (a frost blast
+##                leaves frost where a plain one leaves its scorch)
 ## Its weight: `shake` (screen trauma, 0 to 1, on top of anything else's), `kick` pixels of camera
 ## punch `kick_way` (`down` the screen, `away` from the caster's body towards the cue, `back`
 ## against the cue's direction, `aim` along it), `hold` seconds of local stop on the caster and
@@ -36,6 +44,9 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys a part may have.
 const PART_KEYS: Array[String] = ["effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "way", "particles"]
+## The keys a mark part may have, and its turns.
+const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
+const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 
 ## Its name; the registry finds it by this under `cues`, and the file is `<id>.tres`.
 @export var id: StringName = &""
@@ -64,6 +75,9 @@ func problems() -> PackedStringArray:
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():
 		var part: Dictionary = parts[i]
+		if StringName(part.get("part", "")) == &"mark":
+			found.append_array(_mark_problems(i, part))
+			continue
 		var effect: StringName = StringName(part.get("effect", ""))
 		if not EFFECTS.has(effect):
 			found.append("%s: part %d's effect '%s' is not one of %s" % [id, i, effect, EFFECTS])
@@ -78,4 +92,20 @@ func problems() -> PackedStringArray:
 			found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
 		if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or int(part.get("zoom", 1)) < 1:
 			found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
+	return found
+
+
+## What is wrong with the mark part `part` (number `i`). Whether its mark exists is the
+## registry's to say (`tests/content/test_cues.gd`).
+func _mark_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	if StringName(part.get("mark", "")) == &"":
+		found.append("%s: mark part %d names no mark" % [id, i])
+	for key: Variant in part.keys():
+		if not MARK_KEYS.has(String(key)):
+			found.append("%s: mark part %d has an unknown key '%s'" % [id, i, key])
+	if part.has("rot") and not MARK_ROTS.has(StringName(part["rot"])):
+		found.append("%s: mark part %d's rot '%s' is not one of %s" % [id, i, part["rot"], MARK_ROTS])
+	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0:
+		found.append("%s: mark part %d has a reach or radius of 0 or less" % [id, i])
 	return found

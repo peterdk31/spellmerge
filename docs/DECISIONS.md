@@ -2,6 +2,19 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Floor marks: the layer, the stamp batch and three marks (spell spectacle P2a, owner session)
+
+- **Asked:** the owner-lane task "Spell spectacle: the floor mark layer (P2a)" (docs/milestones/spell-spectacle.md).
+- **Under every body means the floor moves down.** The plan put the layer's sprite at `FLOOR_Z - 1` (16), but wizards and enemies outside the horde draw at z 0, and Feel is an autoload drawn before the room, so a sprite of Feel's at z 0 would be under the room's floor. The rooms' `Floor` sprites are now at `RoomBase.FLOOR_Z` (-2) and the marks at -1 (`Feel.MARK_Z`): over the floor, under the bodies (0), the pillar bases and shade, the decals, the motes and Feel's floor flashes. A test checks every room's floor.
+- **Marks are data, like motes** (the owner's rule for motes, 2026-11-03): a `MarkKind` file each in `content/marks/` (form, numbers, where each colour comes from), handed to `mark.gdshader` as uniform arrays. The shapes are computed (a ragged blot, forking cracks, a rime of specks and crosses) at any size, one pixel a line, never a scaled picture.
+- **No hardcoded colour:** a part's colour is the floor's own (`RoomBase.floor_colors()`, sampled from the `Floor` sprite and multiplied by its modulate, since both crypt floors are tinted; `floor_mark_colors` overrides) or the spell's ramp, picked by the shot shaders' `look_of` as the motes do. The floor's shadow is 7 % of the crypt tile's pixels, under the walls' 10 % cut, so the floor sample keeps colours on 1 % or more (`FLOOR_MIN_SHARE`).
+- **Frost comes from the cards, not a frost cue:** there is no frost cue. A mark part with `"cards": true` stamps the marks of the cue's cards (`MarkKind.look_layers`) instead of its own when they have one, so a blast with a frost card leaves frost and a fire or plain one its scorch. The blast and fireball cues leave a scorch (`cards`), slam and quake a crack.
+- **Renders:** the viewport is `CLEAR_MODE_NEVER` and `UPDATE_DISABLED`; a frame with stamps sets `UPDATE_ONCE` and the next step sets `UPDATE_DISABLED` again (the node keeps the mode it was last given, so the step sets it back once the frame's render is done). The batch shows only its frame's rows (`visible_instance_count`), so the wipe of a new room (`CLEAR_MODE_ONCE`) or a later frame never draws old stamps twice.
+- **A flood waits, it is not dropped:** at most 512 stamps are drawn a frame and the rest wait (up to 4,096, a ring; past that one is counted in `left_out`), after the owner's rule that interactions are deferred, never dropped (2026-10-29).
+- **Memory:** one RGBA8 texel a world pixel over the projectile manager's bounds (the room plus its 32 px margin): the crypt arena and sandbox 704x448, about 1.2 MB; the horde 1344x784, about 4.2 MB. A side is at most 4,096 texels (`Marks.MAX_SIDE`); a room bigger than that (the owner's one huge map) would need a tiled layer.
+- **The setting:** "Floor marks: On/Off" in the pause menu's Settings (`FloorMarks` in core/settings, saved as `floor_marks`, `floor_marks_changed`); on for the web and the desktop until P2's measurements say otherwise. Off frees the layer: no nodes.
+- **Not done here:** settled motes and the other marks (P2b); the GPU cost of a 300-stamp frame on llvmpipe and the web export (measured with P1c's benchmarks).
+
 ## 2026-11-03: Motes: the pool, kinds as data, colours from spells and rooms (spell spectacle P1a, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle: the mote pool (P1a)" (docs/milestones/spell-spectacle.md, approved 2026-11-03). After a first version with the kinds as tables in mote.gd mirrored in the shader and Stone chips, the owner: "It needs to be easy to change/add motes and different kinds should emerge from the spells", and colours "should also not be hardcoded, since the current tiles are just placeholders".

@@ -16,6 +16,7 @@ size = Vector2(32, 656)
 [node name="Horde" type="Node2D"]
 
 [node name="Floor" type="Sprite2D" parent="."]
+z_index = -2
 modulate = Color(0.72, 0.7, 0.86, 1)
 texture_filter = 1
 texture_repeat = 2

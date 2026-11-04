@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// An explosion (gameplay/feel/feel.gd, the cue parts `shell`, `fireball`, `debris`, `scorch`; core/README.md, "The shot shaders"): its parts,
+// An explosion (gameplay/feel/feel.gd, the cue parts `shell`, `fireball`; core/README.md, "The shot shaders"): its parts,
 // each an instance of Feel's blast mesh (`Feel.blast_mesh`) in a square BLAST_SPAN x 2 radii
 // across round where it went off, in the ramp and look of what went off; the radius is the
 // zoom x 2 pixels, the age the code beside the kind (`coded_age`). The parts (B_* here,
@@ -12,11 +12,8 @@ render_mode blend_premul_alpha;
 //               crumbling pixel by pixel, with a white-hot pop in the middle
 //   B_FIREBALL  the rising fireball (an exploding barrel): a fireball of five lobes that turn to
 //               smoke, rising up the screen on a stem of smoke, a dust ring rolling out at its foot
-//   B_DEBRIS    fragments and rubble: twelve hot chunks and twelve of stone flung out past the
-//               radius (to twice it), thrown hard on arcs with a streak behind, landing with a hop
-//               and lying until they cool and crumble
-//   B_SCORCH    the scorch (Feel's floor batch, under the bodies): a dark dithered burn round the
-//               middle with embers glowing in it, after one frame of the whole radius lit
+// Its fragments and rubble are motes and its scorch a floor mark since S3
+// (docs/milestones/spell-spectacle-2.md: the cues' `motes` and `mark` parts).
 // Up is up the screen (the floor is seen from above at a slant, so the floor's own lines are
 // squashed to FLOOR_FLAT top to bottom).
 //
@@ -27,7 +24,6 @@ render_mode blend_premul_alpha;
 //   M_LIGHT   the light (added; drawn first)
 //   M_BLOB    a disc: inner, outer and rim colours, a dither that can thin out towards the rim
 //   M_STREAK  a line a few pixels wide (the fireball's stem)
-//   M_PIECE   a flung chunk: its block, the streak behind it, its shadow on the floor
 //   M_SHELL   the ragged shell (its edge and crumbling need the pixel's own way round)
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
@@ -37,12 +33,8 @@ render_mode blend_premul_alpha;
 // seconds (Feel's SHELL_SECONDS and on; keep the two equal).
 const float B_SHELL = 0.0;
 const float B_FIREBALL = 1.0;
-const float B_DEBRIS = 2.0;
-const float B_SCORCH = 3.0;
 const float SHELL_SECONDS = 0.5;
 const float FIREBALL_SECONDS = 1.2;
-const float DEBRIS_SECONDS = 1.6;
-const float SCORCH_SECONDS = 2.6;
 // The square is BLAST_SPAN radii each way (Feel's; keep equal): room for the chunks, which land
 // up to 2.05 radii out, and the fireball's rise.
 const float BLAST_SPAN = 2.2;
@@ -53,14 +45,11 @@ const float Q_PIECE = 1.0;
 const float M_LIGHT = 0.0;
 const float M_BLOB = 1.0;
 const float M_STREAK = 2.0;
-const float M_PIECE = 3.0;
 const float M_SHELL = 4.0;
 // Smoke and a burn: not in the palette (nothing else is smoke), so here.
 const vec3 SMOKE_SHADOW = vec3(0.165, 0.149, 0.220);
 const vec3 SMOKE_BASE = vec3(0.239, 0.224, 0.314);
 const vec3 SMOKE_LIGHT = vec3(0.345, 0.325, 0.431);
-const vec3 BURN_DEEP = vec3(0.043, 0.039, 0.071);
-const vec3 BURN_EDGE = vec3(0.067, 0.059, 0.102);
 
 // An ordered 4 x 4 dither threshold for the pixel `p`, in [0, 1): the scorch, smoke and dust thin
 // out in a pattern, as the mockup's did, not in noise.
@@ -97,24 +86,13 @@ float ease_out3(float x) {
 	return 1.0 - (1.0 - x) * (1.0 - x) * (1.0 - x);
 }
 
-// A flung chunk at `t` seconds: thrown along `way` to land `far` out after `flight` seconds, at
-// most `high` up, most of the way in the first third of its flight, then a hop of 4 px out and 3
-// up where it lands. xy where it is on the floor, z how high above it.
-vec3 chunk_at(vec2 way, float far, float flight, float high, float t) {
-	float u = min(t / flight, 1.0);
-	float hop = t > flight ? min((t - flight) / 0.14, 1.0) : 0.0;
-	float d = far * ease_out3(u) + (t > flight ? 4.0 * ease_out(hop) : 0.0);
-	float up = t < flight ? high * sin(3.1416 * u) : (hop < 1.0 ? 3.0 * sin(3.1416 * hop) : 0.0);
-	return vec3(way.x * d, way.y * d * FLOOR_FLAT, up);
-}
-
 void vertex() {
 	float kind = coded_kind(INSTANCE_CUSTOM.a);
 	float a = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, false);
 	float s = L.seed;
 	float r = L.zoom * 2.0;
-	float life = kind == B_SHELL ? SHELL_SECONDS : (kind == B_FIREBALL ? FIREBALL_SECONDS : (kind == B_DEBRIS ? DEBRIS_SECONDS : SCORCH_SECONDS));
+	float life = kind == B_SHELL ? SHELL_SECONDS : FIREBALL_SECONDS;
 	float t = a * life;
 	vec2 size = vec2(r * 2.0 * BLAST_SPAN);
 	vec2 o = size * 0.5;
@@ -144,16 +122,9 @@ void vertex() {
 			// No bloom in the game: the shell's light carries its glow.
 			k = (1.0 - a) * (1.0 - a) * 1.2;
 			reach = r * 1.15;
-		} else if (kind == B_FIREBALL) {
+		} else {
 			k = max(1.0 - t / 0.3, 0.0);
 			at = vec2(0.0, -rise * 0.5);
-		} else if (kind == B_DEBRIS) {
-			// The flash as the chunks tear free.
-			k = max(1.0 - t / 0.08, 0.0) * 0.8;
-			reach = r * 0.9;
-		} else {
-			// The floor in the radius lit for a frame.
-			k = t < 0.034 ? 0.5 : 0.0;
 		}
 		shown = k > 0.0;
 		m = M_LIGHT;
@@ -170,40 +141,6 @@ void vertex() {
 		k1 = vec4(L.hi, 1.0);
 		k2 = vec4(L.mid, 1.0);
 		a2 = vec4(L.lo, 0.0);
-	} else if (kind == B_DEBRIS) {
-		// Chunk `slot`: the first twelve glow, the rest are stone.
-		bool stone = slot >= 12.0;
-		float j = mod(slot, 12.0);
-		float salt = stone ? 70.0 : 60.0;
-		float turn = j / 12.0 * 6.2832 + (hash_seeded(j, salt, 31.0, s) - 0.5) * 0.5;
-		vec2 way = vec2(cos(turn), sin(turn));
-		float far = r * (1.2 + 0.85 * pow(hash_seeded(j, salt + 1.0, 31.0, s), 0.7));
-		float flight = 0.26 + 0.2 * hash_seeded(j, salt + 2.0, 31.0, s);
-		float high = (6.0 + 16.0 * hash_seeded(j, salt + 3.0, 31.0, s)) * r / 40.0;
-		bool big = hash_seeded(j, salt + 4.0, 31.0, s) < 0.45;
-		vec3 now = chunk_at(way, far, flight, high, t);
-		vec3 back = chunk_at(way, far, flight, high, max(t - 0.084, 0.0));
-		vec2 head = floor(now.xy - vec2(0.0, now.z) + 0.5);
-		vec2 tail = floor(back.xy - vec2(0.0, back.z) + 0.5);
-		bool flying = t < flight;
-		vec3 rgb;
-		if (t < 0.07) {
-			rgb = L.hot;
-		} else if (stone) {
-			rgb = t < 0.2 ? L.hi : (t < flight + 0.14 ? STONE_LIGHT : STONE_BASE);
-		} else {
-			rgb = flying ? heat(L, 0.1 + t / flight * 0.3) : (t - flight < 0.9 ? heat(L, 0.4 + (t - flight) / 0.9 * 0.4) : STONE_SHADOW);
-		}
-		shown = true;
-		m = M_PIECE;
-		a0 = vec4(head, flying ? tail : head);
-		a1 = vec4(floor(now.xy + 0.5), now.z > 2.0 ? 1.0 : 0.0, big ? 1.0 : 0.0);
-		// How much of it is left: it crumbles from 1.15 s.
-		a2 = vec4(t < 1.15 ? 1.0 : 1.0 - (t - 1.15) / 0.45, 0.0, 0.0, 0.0);
-		k0 = vec4(rgb, 1.0);
-		k1 = vec4(stone && t > 0.12 ? STONE_LIGHT : heat(L, 0.4 + t / flight * 0.3), 1.0);
-		q_lo = min(min(head, tail), a1.xy) - 2.0;
-		q_hi = max(max(head, tail), a1.xy) + 3.0;
 	} else if (kind == B_FIREBALL && slot == 0.0) {
 		// The stem of smoke from the floor up to the ball (M_STREAK: a0 its ends, a1.x its
 		// half width, a1.y how much of it is left).
@@ -250,39 +187,6 @@ void vertex() {
 		k2 = vec4(hc + 0.45 < 1.0 ? heat(L, hc + 0.45) : SMOKE_SHADOW, 1.0);
 		q_lo = floor(at - reach) - 1.0;
 		q_hi = floor(at + reach) + 2.0;
-	} else if (kind == B_SCORCH && slot == 0.0) {
-		// The burn: dark, densest in the middle, thinning out to its rim and fading.
-		float sf = t / SCORCH_SECONDS;
-		float reach = r * 0.62;
-		shown = true;
-		a0 = vec4(0.0, 0.0, reach, 0.0);
-		a1 = vec4((1.0 - sf) * 1.1, 1.0, 0.45, 0.0);
-		k0 = vec4(BURN_DEEP, 1.0);
-		k1 = vec4(BURN_EDGE, 1.0);
-		q_lo = vec2(-reach - 1.0);
-		q_hi = vec2(reach + 2.0);
-	} else if (kind == B_SCORCH && slot == 1.0) {
-		// The whole radius lit for one frame.
-		shown = t < 0.034;
-		a0 = vec4(0.0, 0.0, r, 0.0);
-		a1 = vec4(0.5, 0.0, 1.0, 0.0);
-		k0 = vec4(L.lo, 1.0);
-		q_lo = vec2(-r - 1.0);
-		q_hi = vec2(r + 2.0);
-	} else if (kind == B_SCORCH && slot < 16.0) {
-		// Embers glowing in the burn, flickering, cooling out one by one.
-		float i = slot - 2.0;
-		float last = 0.6 + 0.8 * hash_seeded(i, 80.0, 31.0, s);
-		float g = t / last;
-		float turn = hash_seeded(i, 81.0, 31.0, s) * 6.2832;
-		vec2 at = floor(vec2(cos(turn), sin(turn) * FLOOR_FLAT) * r * 0.53 * sqrt(hash_seeded(i, 82.0, 31.0, s)) + 0.5);
-		bool flicker = g > 0.4 && mod(floor(t * 12.0 + i), 5.0) == 0.0;
-		shown = g < 1.0 && !flicker;
-		a0 = vec4(at, 0.6, 0.0);
-		a1 = vec4(1.0, 0.0, 1.0, 0.0);
-		k0 = vec4(heat(L, 0.3 + g * 0.7), 1.0);
-		q_lo = at - 1.0;
-		q_hi = at + 2.0;
 	}
 	// Nothing outside the square.
 	q_lo = max(q_lo, -o);
@@ -329,19 +233,6 @@ void fragment() {
 		float side = rel.x - ab.x * along;
 		bool kept = abs(side) <= v1.x && bayer4(d) < v1.y;
 		colour = kept ? (side < -v1.x * 0.3 ? c1 : c0) : vec4(0.0);
-	} else if (mode < M_PIECE + 0.5) {
-		// A chunk: its block at v0.xy (2 px wide, 2 tall when v1.w), the streak back to v0.zw in
-		// c1 fading to its end, its shadow at v1.xy while it is up (v1.z); v2.x of it is left.
-		vec2 b = d - v0.xy;
-		bool block = b.x >= 0.0 && b.x <= 1.0 && b.y >= 0.0 && b.y <= v1.w;
-		vec2 ab = v0.zw - v0.xy;
-		vec2 rel = d - v0.xy;
-		float along = clamp(dot(rel, ab) / max(dot(ab, ab), 1.0), 0.0, 1.0);
-		float off = length(rel - ab * along);
-		bool streak = dot(ab, ab) > 1.0 && off < 0.6 && hash_seeded(d.x, d.y, 63.0, v0.z) > along;
-		bool shadow = v1.z > 0.5 && all(equal(d, v1.xy));
-		bool left = hash_seeded(d.x, d.y, 64.0, v0.w) < v2.x;
-		colour = !left ? vec4(0.0) : (block ? c0 : (streak ? c1 : (shadow ? vec4(BURN_DEEP, 1.0) : vec4(0.0))));
 	} else {
 		// The ragged shell: v0.x its radius, v0.y the seconds, v0.z the seed. Its edge is noise
 		// round the circle (12 buckets, smoothed, a new draw every 0.1 s) between 88% and 100%

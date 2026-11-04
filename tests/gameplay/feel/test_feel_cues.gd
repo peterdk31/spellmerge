@@ -53,34 +53,28 @@ func _made(parts: Array[Dictionary]) -> CueBase:
 	return cue
 
 
-func test_a_blast_is_the_ragged_shell_fragments_and_a_scorch() -> void:
+## Its fragments and rubble are motes and its scorch a floor mark since S3 (test_motes.gd,
+## test_marks.gd): the cue's effect is the shell alone.
+func test_a_blast_is_the_ragged_shell() -> void:
 	_cue(&"blast")
 	check_equal(feel.effects_of(FeelScript.KIND_SHELL), 1, "the ragged shell")
-	check_equal(feel.effects_of(FeelScript.KIND_DEBRIS), 1, "fragments and rubble")
-	check_equal(feel.effects_of(FeelScript.KIND_SCORCH), 1, "a scorch")
+	check_equal(feel.live_effects(), 1, "and no other effect")
 	check_equal(feel.effects_of(FeelScript.KIND_FIREBALL), 0, "no fireball")
 	check_equal(feel.effect_info(FeelScript.KIND_SHELL).get("zoom"), 20, "its radius is the zoom x 2")
 
 
-func test_the_scorch_is_under_the_bodies_and_the_rest_over_them() -> void:
+func test_the_shell_is_over_the_bodies() -> void:
 	_cue(&"blast")
 	feel.step(0.02)
-	check_equal(feel._blast_node.multimesh.visible_instance_count, 2, "shell and fragments in the blast batch")
-	check_equal(feel._blast_floor_node.multimesh.visible_instance_count, 1, "the scorch in the floor batch")
-	check(feel._blast_floor_node.z_index < 40 and feel._blast_node.z_index > 40, "under the enemies (entities.gd DRAW_Z 40), and over them")
+	check_equal(feel._blast_node.multimesh.visible_instance_count, 1, "the shell in the blast batch")
+	check(feel._blast_node.z_index > 40, "over the enemies (entities.gd DRAW_Z 40)")
 	check_equal(feel._effect_node.multimesh.visible_instance_count, 0, "nothing in the flares' batch")
 
 
 func test_each_part_lasts_its_own_seconds() -> void:
 	_cue(&"blast")
 	feel.step(FeelScript.SHELL_SECONDS + 0.01)
-	check_equal(feel.effects_of(FeelScript.KIND_SHELL), 0, "the shell is gone first")
-	check_equal(feel.effects_of(FeelScript.KIND_DEBRIS), 1, "the fragments still lie there")
-	feel.step(FeelScript.DEBRIS_SECONDS)
-	check_equal(feel.effects_of(FeelScript.KIND_DEBRIS), 0, "then crumble")
-	check_equal(feel.effects_of(FeelScript.KIND_SCORCH), 1, "the scorch is last")
-	feel.step(FeelScript.SCORCH_SECONDS)
-	check_equal(feel.effects_of(FeelScript.KIND_SCORCH), 0, "and fades")
+	check_equal(feel.effects_of(FeelScript.KIND_SHELL), 0, "the shell is gone after its seconds")
 
 
 func test_a_blast_shakes_and_punches_away_from_its_caster() -> void:
@@ -111,8 +105,6 @@ func test_the_rising_fireball_is_a_cue_of_its_own() -> void:
 	_cue(&"fireball")
 	check_equal(feel.effects_of(FeelScript.KIND_FIREBALL), 1, "the rising fireball")
 	check_equal(feel.effects_of(FeelScript.KIND_SHELL), 0, "not the shell")
-	check_equal(feel.effects_of(FeelScript.KIND_DEBRIS), 1, "with fragments")
-	check_equal(feel.effects_of(FeelScript.KIND_SCORCH), 1, "and a scorch")
 
 
 func test_the_quake_strikes_the_ground_and_holds_its_caster() -> void:
@@ -203,9 +195,9 @@ func test_the_slam_is_a_star_and_the_ground_struck() -> void:
 
 func test_particles_off_leaves_out_the_parts_that_say_so() -> void:
 	feel.particles_enabled = false
-	_cue(&"blast")
-	check_equal(feel.effects_of(FeelScript.KIND_DEBRIS), 0, "no fragments")
-	check_equal(feel.effects_of(FeelScript.KIND_SHELL), 1, "the shell still shows")
+	_cue(&"appear")
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "no spray")
+	check_equal(feel.effects_of(FeelScript.KIND_FALL), 1, "the column still shows")
 
 
 func test_holds_and_the_game_stop_are_the_cues() -> void:
@@ -234,7 +226,7 @@ func test_kick_ways() -> void:
 func test_a_big_cue_draws_bigger_and_a_small_one_smaller() -> void:
 	_cue(&"blast", Vector2.ZERO, 100.0)
 	check_equal(feel.effect_info(FeelScript.KIND_SHELL).get("zoom"), 50, "100 px: zoom 50")
-	feel.step(FeelScript.SCORCH_SECONDS + 0.1)
+	feel.step(FeelScript.SHELL_SECONDS + 0.1)
 	_cue(&"blast", Vector2.ZERO, 1.0)
 	check_equal(feel.effect_info(FeelScript.KIND_SHELL).get("zoom"), 1, "the smallest is zoom 1")
 

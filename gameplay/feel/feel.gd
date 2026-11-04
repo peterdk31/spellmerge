@@ -212,18 +212,14 @@ const QUAKE_SECONDS: float = 1.4
 const QUAKE_REACH: float = 8.0
 const QUAKE_PAST: float = 1.5
 ## An explosion's parts (the cues `blast` and `fireball`), drawn by `shot_blast.gdshader` (its B_*: these less
-## KIND_SHELL) in a batch of their own, the scorch in another under the bodies (`FLOOR_Z`): the
-## ragged shell (blast's), the rising fireball (an exploding barrel's), the fragments and rubble
-## flung past the radius, the scorch. Their seconds (the shader's; keep them equal), and the
+## KIND_SHELL) in a batch of their own: the ragged shell (blast's) and the rising fireball (an
+## exploding barrel's); their fragments and rubble are motes and their scorch a floor mark (S3,
+## the cues' `motes` and `mark` parts). Their seconds (the shader's; keep them equal), and the
 ## square each is drawn in: BLAST_SPAN radii each way.
 const KIND_SHELL: int = 16
 const KIND_FIREBALL: int = 17
-const KIND_DEBRIS: int = 18
-const KIND_SCORCH: int = 19
 const SHELL_SECONDS: float = 0.5
 const FIREBALL_SECONDS: float = 1.2
-const DEBRIS_SECONDS: float = 1.6
-const SCORCH_SECONDS: float = 2.6
 const BLAST_SPAN: float = 2.2
 ## What a cue's part can name (`CueBase.EFFECTS`): its effect kind, the pixels a step of its zoom
 ## is (for a part's `reach`: a ring's radius, a flare's half width, a quake's reach, an
@@ -239,8 +235,6 @@ const CUE_EFFECTS: Dictionary = {
 	&"quake": [KIND_QUAKE, QUAKE_REACH, QUAKE_SECONDS],
 	&"shell": [KIND_SHELL, 2.0, SHELL_SECONDS],
 	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
-	&"debris": [KIND_DEBRIS, 2.0, DEBRIS_SECONDS],
-	&"scorch": [KIND_SCORCH, 2.0, SCORCH_SECONDS],
 	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 }
@@ -296,7 +290,7 @@ const EFFECT_Q_SHAPE: int = 4
 ## BLAST_PIECES pieces (chunks, lobes, puffs, embers), each part using what it needs.
 const BLAST_Q_LIGHT: int = 0
 const BLAST_Q_PIECE: int = 1
-const BLAST_PIECES: int = 24
+const BLAST_PIECES: int = 22
 const BLAST_QUADS: Array[Vector3i] = [
 	Vector3i(BLAST_Q_LIGHT, 1, 0),
 	Vector3i(BLAST_Q_PIECE, BLAST_PIECES, 0),
@@ -501,8 +495,6 @@ var _floor_buffer: PackedFloat32Array = PackedFloat32Array()
 ## An explosion's parts, and its scorch under the bodies (`shot_blast.gdshader`).
 var _blast_node: MultiMeshInstance2D = null
 var _blast_buffer: PackedFloat32Array = PackedFloat32Array()
-var _blast_floor_node: MultiMeshInstance2D = null
-var _blast_floor_buffer: PackedFloat32Array = PackedFloat32Array()
 static var _blast_mesh: ArrayMesh = null
 var _effect_kind: PackedInt32Array = PackedInt32Array()
 var _effect_at: PackedVector2Array = PackedVector2Array()
@@ -1538,8 +1530,6 @@ func _make_effects() -> void:
 	_floor_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
 	_floor_node.z_index = FLOOR_Z
 	_blast_node = _make_effect_batch(BLAST_SHADER, blast_mesh())
-	_blast_floor_node = _make_effect_batch(BLAST_SHADER, blast_mesh())
-	_blast_floor_node.z_index = FLOOR_Z
 	_size_effects(effect_slots)
 
 
@@ -1613,14 +1603,13 @@ func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
 func _size_effects(slots: int) -> void:
 	effect_slots = slots
-	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node, _blast_node, _blast_floor_node]:
+	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node, _blast_node]:
 		node.multimesh.visible_instance_count = 0
 		node.multimesh.instance_count = slots
 	_effect_buffer.resize(slots * EFFECT_STRIDE)
 	_arc_buffer.resize(slots * EFFECT_STRIDE)
 	_floor_buffer.resize(slots * EFFECT_STRIDE)
 	_blast_buffer.resize(slots * EFFECT_STRIDE)
-	_blast_floor_buffer.resize(slots * EFFECT_STRIDE)
 	_status_buffer.resize(slots * EFFECT_STRIDE)
 	_effect_kind.resize(slots)
 	_effect_at.resize(slots)
@@ -1766,12 +1755,10 @@ func _step_effects(real_delta: float) -> void:
 	(_status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_blast_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
-	(_blast_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	var out: int = 0
 	var arcs: int = 0
 	var floors: int = 0
 	var blasts: int = 0
-	var scorches: int = 0
 	var statuses: int = 0
 	for n in effect_slots:
 		var slot: int = (_next_effect + n) % effect_slots
@@ -1803,10 +1790,6 @@ func _step_effects(real_delta: float) -> void:
 			buffer = _floor_buffer
 			i = floors * EFFECT_STRIDE
 			floors += 1
-		elif kind == KIND_SCORCH:
-			buffer = _blast_floor_buffer
-			i = scorches * EFFECT_STRIDE
-			scorches += 1
 		elif kind >= KIND_SHELL:
 			buffer = _blast_buffer
 			i = blasts * EFFECT_STRIDE
@@ -1861,9 +1844,6 @@ func _step_effects(real_delta: float) -> void:
 	if blasts > 0:
 		_blast_node.multimesh.buffer = _blast_buffer
 	_blast_node.multimesh.visible_instance_count = blasts
-	if scorches > 0:
-		_blast_floor_node.multimesh.buffer = _blast_floor_buffer
-	_blast_floor_node.multimesh.visible_instance_count = scorches
 	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_effects`).
 	if _spectacle != null:
 		_spectacle.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)

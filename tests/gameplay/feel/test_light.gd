@@ -229,7 +229,6 @@ func test_each_lit_effect_kind_is_feels() -> void:
 		check(SpellLightScript.EFFECT_LIGHT.has(code), "Feel kind %d lights" % code)
 	check(not SpellLightScript.EFFECT_LIGHT.has(FeelScript.KIND_DASH), "a dash does not light")
 	check(SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SHELL - FeelScript.KIND_SHELL) and SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_FIREBALL - FeelScript.KIND_SHELL), "a blast and a fireball light")
-	check(not SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SCORCH - FeelScript.KIND_SHELL), "a scorch does not")
 	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.EFFECT_LIGHT)
 	check_equal(lights.size(), 16, "16 kinds to the shader")
 	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_DASH] == 0.0, "by code")

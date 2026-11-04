@@ -3,10 +3,11 @@ extends "res://tests/support/screenshot.gd"
 ## P3a): shots lighting the crypt arena's floor, walls and pillars round them, in three steps.
 ## The same still frame three times: `spell_light_off` (the setting off: the room as it was),
 ## `spell_light_on` (ambient 1.0, as the game draws it now: light only brightens) and
-## `spell_light_ambient_07` (a dev look at a darker room, ambient 0.7, P3b's open question); and
-## each at 3x round the middle (`..._3x`). The shots: the four players' plain bolts, a fire, a
-## frost, a storm and a lightning bolt, a bigger fire bolt, an enemy's bolt and a rune, some
-## beside the walls and the pillars. Blasts, beams and torches give no light yet (P3b).
+## `spell_light_ambient_07` (a dev look at a darker room, ambient 0.7); and each at 3x round the
+## middle (`..._3x`). The shots: the four players' plain bolts, a fire, a frost, a storm and a
+## lightning bolt, a bigger fire bolt, an enemy's bolt and a rune, some beside the walls and the
+## pillars; the arena's torches light too (P3b). The owner's picks of a room's ambient and of the
+## light's steps are drawn by shot_spell_light_rooms.gd.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

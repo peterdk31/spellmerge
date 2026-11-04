@@ -7,8 +7,8 @@ shader_type canvas_item;
 // buffer's light, in the light's own hue. How the light is cut is `bands`, by its brightest
 // channel: 3 (the default) is three steps (dim: none; lit; bright), so a lit floor changes by
 // whole bands, like a shade step; 2 is one step; more are more steps between `lit_from` and
-// `bright_from`; 0 is no steps, a smooth gradient up to the bright step's light (the owner's
-// choice between the two is open, 2026-11-04). Where nothing is lit and the ambient is 1.0
+// `bright_from`; 0 is no steps, a smooth gradient through the same light (through the steps'
+// corners). The owner's choice between the two is open (2026-11-04). Where nothing is lit and the ambient is 1.0
 // nothing is drawn: the room looks as it does without spell light until something glows.
 //
 // It multiplies by reading the screen, not by blending: a multiply blend cannot brighten (its
@@ -32,7 +32,12 @@ uniform int bands = 3;
 // The light a pixel adds for a light of brightest channel `most`.
 float gain_of(float most) {
 	if (bands <= 0) {
-		return clamp(most / bright_from, 0.0, 1.0) * bright_gain;
+		// The same light with no steps: a line through the steps' corners (none to lit at
+		// lit_from, to bright at bright_from), then flat.
+		if (most < lit_from) {
+			return most / lit_from * lit_gain;
+		}
+		return mix(lit_gain, bright_gain, clamp((most - lit_from) / (bright_from - lit_from), 0.0, 1.0));
 	}
 	// Steps at lit_from .. bright_from, their gains lit_gain .. bright_gain, evenly between.
 	int steps = max(bands - 1, 1);

@@ -585,10 +585,13 @@ func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var motes: MotesScript = feel.motes()
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
 	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
-	var tint: Color = feel.preset.reaction_colors.get(&"shatter", Color.WHITE) as Color
+	var tint: Color = feel.cue_of(&"reaction_shatter").color
 	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own.
 	var puff: int = feel.preset.puff_mote_count
 	check(motes.next_row() > puff, "the puff's sparks, then the reaction's ring")
+	# The cue's power (shatter 1.3) is times its motes part's count: 16 x 1.3, one kind.
+	var cue: CueBase = feel.cue_of(&"reaction_shatter")
+	check_equal(motes.next_row() - puff, roundi(16.0 * cue.power * motes.density), "its ring's count times the cue's power")
 	for group: Vector2i in [Vector2i(0, puff), Vector2i(puff, motes.next_row())]:
 		var speeds: Array[float] = []
 		for row in range(group.x, group.y):

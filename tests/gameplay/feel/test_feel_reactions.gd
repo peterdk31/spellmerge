@@ -17,10 +17,15 @@ class AskingRegistry:
 	extends RegistryScript
 	## The sound ids feel asked for.
 	var asked: Array[StringName] = []
+	## The game's registry, for the content (the reactions' cues).
+	var real: RegistryScript = null
 
 	func get_sound(id: StringName) -> AudioStream:
 		asked.append(id)
 		return null
+
+	func get_resource(folder: StringName, id: StringName) -> Resource:
+		return real.get_resource(folder, id) if real != null else null
 
 
 var _bus: EventsScript
@@ -31,6 +36,7 @@ var _registry: AskingRegistry
 func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_registry = own(AskingRegistry.new()) as AskingRegistry
+	_registry.real = root.get_node_or_null("Registry") as RegistryScript
 	_feel = own(FeelScript.new()) as FeelScript
 	_feel.events = _bus
 	_feel.registry = _registry
@@ -100,25 +106,26 @@ func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> v
 	check_equal(_registry.asked.count(&"reaction_flare"), 2, "and the sound comes back later")
 
 
+## The colour of the reaction `id`: its cue's own (`reaction_<id>`, content/cues).
+func _colour_of(id: StringName) -> Color:
+	var cue: CueBase = _feel.cue_of(StringName("reaction_" + String(id)))
+	return cue.color if cue != null else Color(0.0, 0.0, 0.0, 0.0)
+
+
 func test_the_reactions_have_colours_that_differ_at_a_glance() -> void:
-	var preset: FeelPresetScript = FeelPresetScript.new()
-	var ids: Array = preset.reaction_colors.keys()
 	var table: ReactionTable = load("res://content/spells/reactions.tres") as ReactionTable
-	var wanted: Array[StringName] = [&"discharge"]
+	var ids: Array[StringName] = [&"discharge"]
 	for row: ReactionRow in table.rows:
-		if not wanted.has(row.reaction_id):
-			wanted.append(row.reaction_id)
-	for id: StringName in wanted:
-		check(ids.has(id), "%s has a colour" % id)
+		if not ids.has(row.reaction_id):
+			ids.append(row.reaction_id)
 	for id: StringName in ids:
-		check(wanted.has(id), "%s is a reaction that exists" % id)
-	for id: StringName in ids:
-		var colour: Color = preset.reaction_colors[id] as Color
+		check(_colour_of(id).a > 0.0, "%s has a cue with a colour of its own" % id)
+		var colour: Color = _colour_of(id)
 		check(maxf(colour.r, maxf(colour.g, colour.b)) >= 0.6, "%s is bright enough for the dark floor" % id)
 	for a in ids.size():
 		for b in range(a + 1, ids.size()):
-			var one: Color = preset.reaction_colors[ids[a]] as Color
-			var other: Color = preset.reaction_colors[ids[b]] as Color
+			var one: Color = _colour_of(ids[a])
+			var other: Color = _colour_of(ids[b])
 			var apart: float = Vector3(one.r - other.r, one.g - other.g, one.b - other.b).length()
 			check(apart >= 0.45, "%s and %s are far apart in colour (%.2f)" % [ids[a], ids[b], apart])
 
@@ -127,7 +134,7 @@ func test_a_discharge_asks_for_its_sound_and_the_new_reactions_for_theirs() -> v
 	for id: StringName in [&"discharge", &"overload", &"superconduct"]:
 		_bus.reaction_triggered.emit(0, id, Vector2.ZERO, -1)
 		check_equal(_registry.asked.has(StringName("reaction_" + String(id))), true, "reaction_%s was asked for" % id)
-		check(_feel.preset.reaction_colors.has(id), "%s has a colour of its own" % id)
+		check(_colour_of(id).a > 0.0, "%s has a colour of its own" % id)
 
 
 func test_a_discharge_arc_shows_a_jagged_line_between_both_ends_and_fades() -> void:
@@ -139,7 +146,7 @@ func test_a_discharge_arc_shows_a_jagged_line_between_both_ends_and_fades() -> v
 	check_equal(arc["at"], from, "it starts at the struck enemy")
 	check((arc["dir"] as Vector2).is_equal_approx(Vector2.RIGHT), "toward the zapped one")
 	check_equal(arc["zoom"], 20, "as long as the gap: 80 px is 20 steps of 4 (the shader jags it)")
-	check_equal(arc["core"], _feel.preset.reaction_colors[&"discharge"], "in the discharge's colour")
+	check_equal(arc["core"], _colour_of(&"discharge"), "in the discharge's colour")
 	check((arc["look"] as int) & FeelScript.EXACT != 0, "exactly that colour")
 	for i in 20:
 		_feel.step(STEP)
@@ -158,7 +165,7 @@ func test_a_crowd_of_arcs_stays_inside_the_slots() -> void:
 
 func test_a_reaction_keeps_its_own_colour_exactly() -> void:
 	_bus.reaction_triggered.emit(0, &"rift", Vector2(5.0, 5.0), -1)
-	var want: Color = _feel.preset.reaction_colors[&"rift"] as Color
+	var want: Color = _colour_of(&"rift")
 	for kind: int in [FeelScript.KIND_PUFF, FeelScript.KIND_RING_OUT]:
 		var shown: Dictionary = _feel.effect_info(kind)
 		check_equal(shown["core"], want, "kind %d is in the reaction's colour" % kind)

@@ -136,8 +136,9 @@ func test_a_reaction_holds_its_caster_not_the_game() -> void:
 	var caster: Actor = _body(Vector2.ZERO)
 	var other: Actor = _body(Vector2(100.0, 0.0))
 	_world.bus.reaction_triggered.emit(caster.id, &"steam", Vector2.ZERO, -1)
-	var power: float = _feel.preset.reaction_power.get(&"steam", 1.0) as float
-	check(_world.table.held_left(caster.id) >= _feel.preset.reaction_stop_seconds * power - 0.0001, "the caster is held for the reaction")
+	# A reaction with no cue of its own plays the plain `reaction` cue.
+	var cue: CueBase = _feel.cue_of(&"reaction")
+	check(_world.table.held_left(caster.id) >= cue.hold * cue.power - 0.0001, "the caster is held for the reaction")
 	check_equal(_world.table.held_left(other.id), 0.0, "nobody else is")
 	check_equal(_feel.stop_left, 0.0, "the game runs on")
 

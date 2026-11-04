@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Every moment a cue, part one: reactions, possession, arcs (spell spectacle 2, S6 items 1, 7, 8, owner session)
+
+- **Reactions are cues** (item 1): one file a reaction, `content/cues/reaction_<id>.tres` (eight rows' ids and lightning's `discharge`), and a plain white `reaction` for an id with none. Not a `ReactionRow.cue`: a reaction has two rows (one each way), and the rows are combat's data, while how it looks is Feel's; a name by convention keeps both apart and needs no core change. Ten `FeelPreset` fields went (`reaction_colors`, `reaction_power`, `reaction_seconds`, `reaction_shake`, `reaction_stop_seconds`, `reaction_burst_size`, `reaction_ring_size`, `reaction_sound_prefix`, `reaction_mote_count`, `reaction_mote_reach`) and so did `Spectacle.reaction_motes`.
+- **A cue's own `color` and `power`** (CueBase): the plan put a `color` on each part; a cue-level colour is one line a file instead of three, and it is also what Feel tints the reaction's name with (the name stays code). A part's own `color`, `plain` or `bare` still wins. `power` is on the cue (not a `play_cue` argument), so a reaction's strength is data next to its colour, and the rule of what it scales is written once (`play_cue` for holds, shake and punch; the part players for sizes, counts, reach and a mark's radius): never seconds, nor an arc's length (the distance between two points). A fixed `zoom` may now be a fraction, rounded after the power, so every reaction's puff and ring keep their old zoom exactly (2.2 and 2.9 for the old `reaction_burst_size` 2.2 and ring 0.9 x 2 x 1.6); the sheets `shot_reactions` before and after are the same to the pixel.
+- **The repeat throttle stays code**: `play_cue` takes `weight` (false: the parts only), so a reaction repeated within 0.3 s draws again without a second hold, shake or sound, as before.
+- **Motes parts** gained `color` (an exact colour, like a flash's) and `radius` (fixed pixels for a cue with no size; a reaction's ring flies 22 px times its power).
+
 ## 2026-11-04: The motes' trail births in native code (owner session)
 
 - **Asked:** the owner, after the "Tailless motes" dev slider (2048/4096/8192, #547): "Build the native code now." The births were the motes' part that grows with the pool (S5: at 3,000 shots the births' CPU 1.8 ms at a pool of 2,048 and 2.9 ms at 4,096).

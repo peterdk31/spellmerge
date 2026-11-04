@@ -76,6 +76,11 @@ extends Resource
 ## times every flash's size (its zoom, or its size from `reach`), every motes part's count and how
 ## far they fly, every mark's radius, its holds, shake and punch; never a part's seconds, nor an
 ## arc's length (where it runs). A reaction's cues differ in their colour and power only.
+##
+## How often (S6, item 13): `every` seconds is the least time between two plays of the cue for the
+## same actor (the one it is of; none counts as one more), so a moment that comes by the hundred (a
+## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
+## weight. 0 (the default) plays every time.
 
 ## The flashes a part can name (Feel maps each to its effect kind, and says how many pixels a
 ## step of its zoom is).
@@ -111,6 +116,8 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 ## Its own colour (none while its alpha is 0), and how strong it plays (see above).
 @export var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 @export_range(0.1, 4.0, 0.05) var power: float = 1.0
+## The least seconds between two plays for the same actor (see above); 0 every time.
+@export_range(0.0, 5.0, 0.01) var every: float = 0.0
 
 
 func kind() -> StringName:
@@ -125,6 +132,8 @@ func problems() -> PackedStringArray:
 		found.append("a cue needs an id")
 	if power <= 0.0:
 		found.append("%s: power %s is 0 or less" % [id, power])
+	if every < 0.0:
+		found.append("%s: every %s is below 0" % [id, every])
 	if not KICK_WAYS.has(kick_way):
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():

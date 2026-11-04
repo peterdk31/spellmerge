@@ -30,6 +30,8 @@ var count: int = 0
 
 var _at: PackedVector2Array = PackedVector2Array()
 var _value: PackedInt32Array = PackedInt32Array()
+## How many gems each wizard (by its index in the last `step`'s list) picked up in that step.
+var picked_by: PackedInt32Array = PackedInt32Array()
 ## The wizard (an index into the step's wizard list) a gem flies to, or -1 while it lies still.
 var _pulled_by: PackedInt32Array = PackedInt32Array()
 var _clock: float = 0.0
@@ -95,10 +97,13 @@ func total_value() -> int:
 ## Moves the gems by `delta` seconds: a lying gem within `radius` of a wizard in `wizards`
 ## whose `standing` entry is 1 is pulled towards it; a pulled gem flies to its wizard (or lies
 ## down where it is if that wizard is gone or down) and is picked up when it reaches it. Returns
-## the experience picked up.
+## the experience picked up; `picked_by` says how many gems each wizard picked up in it.
 func step(delta: float, wizards: PackedVector2Array, standing: PackedByteArray, radius: float) -> int:
 	_clock += delta
 	self_modulate.a = 1.0 - PULSE_DEPTH * (0.5 + 0.5 * sin(_clock * TAU * PULSE_RATE))
+	if picked_by.size() != wizards.size():
+		picked_by.resize(wizards.size())
+	picked_by.fill(0)
 	var picked: int = 0
 	var reach: float = radius * radius
 	var i: int = 0
@@ -120,6 +125,7 @@ func step(delta: float, wizards: PackedVector2Array, standing: PackedByteArray, 
 		var at: Vector2 = _at[i].move_toward(to, PULL_SPEED * delta)
 		if at.distance_to(to) <= COLLECT_DISTANCE:
 			picked += _value[i]
+			picked_by[by] += 1
 			_remove(i)
 			continue
 		_at[i] = at

@@ -533,6 +533,11 @@ var _cast_look_cache: Dictionary = {}
 var _impact_look_cache: Dictionary = {}
 ## The cues read from `content/cues`, by id (see `cue_of`).
 var _cue_cache: Dictionary = {}
+## The cues that play at most `every` seconds apart (`CueBase.every`): each one's first index in
+## `_cue_next_at` by id, and there, by actor (its id + 1: none first), the clock time (`_clock`)
+## from which it may play again. Grown once per such cue, then written in place.
+var _cue_every_at: Dictionary = {}
+var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 
 
 func _ready() -> void:
@@ -1225,13 +1230,14 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
 ## punch (both off with the screen shake setting) and its sound; with `weight` false, its parts
 ## only (a reaction repeated within REACTION_REPEAT). Its `power` is applied here and in the parts'
-## players, by one rule (`CueBase`): times its sizes and counts, its holds, shake and punch. An
+## players, by one rule (`CueBase`): times its sizes and counts, its holds, shake and punch. A cue
+## with an `every` played again for the same actor sooner than that plays nothing (`_cue_due`). An
 ## unknown cue plays nothing.
 func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
-	if cue == null:
+	if cue == null or (cue.every > 0.0 and not _cue_due(cue, caster)):
 		return
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	if _cue_depth == _cue_contexts.size():
@@ -1285,6 +1291,23 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 					way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
+
+
+## Whether the cue `cue` (which has an `every`) may play for `caster` now, and if so, not again for
+## its `every` seconds. Allocates only the first time a cue with an `every` plays.
+func _cue_due(cue: CueBase, caster: int) -> bool:
+	var first: Variant = _cue_every_at.get(cue.id)
+	if first == null:
+		first = _cue_next_at.size()
+		_cue_every_at[cue.id] = first
+		_cue_next_at.resize(int(first) + ActorsScript.ACTORS + 1)
+		for i in ActorsScript.ACTORS + 1:
+			_cue_next_at[int(first) + i] = -INF
+	var at: int = int(first) + caster + 1
+	if _clock < _cue_next_at[at]:
+		return false
+	_cue_next_at[at] = _clock + cue.every
+	return true
 
 
 ## Play a cue's parts of the type `type` (`CueBase.PART_TYPES`) with `player`, a Callable taking

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Every moment a cue, part two: new moments and a light part (spell spectacle 2, S6 items 13, 4, owner session)
+
+- **New moments are sent by their areas as `cue_shown`** (item 13), not heard by Feel from the areas' own events: flow `wave_start`, horde `level_up` and `gem_pickup`, player `revive`, combat `shield_block` and `pull`. Feel learns no new event and no area knows Feel; a moment with no cue file shows nothing. Each is played as the actor it is of (the wizard's, the shielded actor's, the puller's), so `bare` parts are in its ramp.
+- **The throttle is the cue's** (`CueBase.every`: the least seconds between two plays for one actor, parts and weight left out whole), not code in the horde: one rule for any moment that comes by the hundred, tuned in the file. The horde sends at most one `gem_pickup` a wizard a step (`HordeGems.picked_by`), and the cue says 0.08 s. Reactions keep their own repeat rule (their parts still play; only the weight is throttled).
+- **"A magnet pull" is a body newly caught** by a pull (combat's `pull`, which only the magnet card asks for): a moment per body, not per magnet shot per step. "Newly" is not pulled in the last `PULL_GAP_STEPS` (6) steps, since a magnet beyond `MAX_PULLS_PER_STEP` pulls every other step; `pull`'s `every` 0.1 s keeps a magnet in a crowd to a few rings a second.
+- **A level-up shows behind the pause:** the level-up's break pauses the tree at once, so its cue stands frozen under the picks until the break ends. Left so for the owner to judge (the look could instead play on `horde_break_changed(false)`).
+- **Starter looks only**, from existing parts (rings, columns, bursts, glimmer motes), and sound ids with no `.ogg` yet (silent): the owner tunes them (`shot_moment_cues.gd`).
+
 ## 2026-11-04: Every moment a cue, part one: reactions, possession, arcs (spell spectacle 2, S6 items 1, 7, 8, owner session)
 
 - **Reactions are cues** (item 1): one file a reaction, `content/cues/reaction_<id>.tres` (eight rows' ids and lightning's `discharge`), and a plain white `reaction` for an id with none. Not a `ReactionRow.cue`: a reaction has two rows (one each way), and the rows are combat's data, while how it looks is Feel's; a name by convention keeps both apart and needs no core change. Ten `FeelPreset` fields went (`reaction_colors`, `reaction_power`, `reaction_seconds`, `reaction_shake`, `reaction_stop_seconds`, `reaction_burst_size`, `reaction_ring_size`, `reaction_sound_prefix`, `reaction_mote_count`, `reaction_mote_reach`) and so did `Spectacle.reaction_motes`.

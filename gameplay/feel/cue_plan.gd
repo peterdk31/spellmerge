@@ -15,8 +15,10 @@ class Flash:
 	var seconds: float = 0.0
 	var lasts_size: bool = false
 	var zoom: float = 1.0
-	## Its `reach` (-1 for none), and whether it is drawn along a length (an arc).
+	## Its `reach` (-1 for none), that in steps of its zoom for one sized by it (-1 for none: a
+	## fixed zoom, or one drawn along a length), and whether it is drawn along a length (an arc).
 	var reach: float = -1.0
+	var reach_steps: float = -1.0
 	var along: bool = false
 	## How it is coloured: PAINT_*, and its own `color` for PAINT_COLOR.
 	var paint: int = PAINT_CUE
@@ -29,7 +31,8 @@ class Flash:
 	var if_layer: int = 0
 	var size_over: float = -INF
 	var size_upto: float = INF
-	## Whether any of the four gates above is set (most flashes have none: skipped in one test).
+	## Whether any of the gates on its cards or size is set (most flashes have none: skipped in one
+	## test).
 	var gated: bool = false
 
 ## A flash's colours: the cue's (its tint and cards, or its own colour when it has one), its own
@@ -79,8 +82,12 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 			plan.unknown.append(type)
 			continue
 		var prepare: Callable = (row as Array)[1]
+		var made: Variant = prepare.call(part) if prepare.is_valid() else part
+		# A part its type could not prepare (a flash of an effect Feel has not) plays nothing.
+		if made == null:
+			continue
 		plan.players.append((row as Array)[0] as Callable)
-		plan.prepared.append(prepare.call(part) if prepare.is_valid() else part)
+		plan.prepared.append(made)
 	plan.color = of.color
 	plan.power = of.power
 	plan.holds = of.hold > 0.0 or of.hold_target > 0.0
@@ -105,6 +112,7 @@ static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
 	flash.lasts_size = bool(part.get("lasts_size", false))
 	flash.zoom = float(part.get("zoom", 1.0))
 	flash.reach = float(part["reach"]) if part.has("reach") else -1.0
+	flash.reach_steps = flash.reach / flash.step if flash.reach >= 0.0 and not flash.along else -1.0
 	if part.has("color"):
 		flash.paint = PAINT_COLOR
 		flash.color = part["color"] as Color
@@ -128,5 +136,5 @@ static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
 	flash.if_layer = int(part.get("if_layer", 0))
 	flash.size_over = float(part.get("if_size_over", -INF))
 	flash.size_upto = float(part.get("if_size_upto", INF))
-	flash.gated = flash.particles or flash.if_cards or flash.if_layer > 0 or part.has("if_size_over") or part.has("if_size_upto")
+	flash.gated = flash.if_cards or flash.if_layer > 0 or part.has("if_size_over") or part.has("if_size_upto")
 	return flash

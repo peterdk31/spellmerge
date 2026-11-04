@@ -1284,8 +1284,9 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	for player: Callable in plan.players:
 		player.call(prepared[n], context)
 		n += 1
-	for type: StringName in plan.unknown:
-		_unknown_cue_part(id, type)
+	if not plan.unknown.is_empty():
+		for type: StringName in plan.unknown:
+			_unknown_cue_part(id, type)
 	_cue_unlit = unlit_before
 	_cue_depth -= 1
 	if not weight or not plan.weighted:
@@ -1361,7 +1362,7 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 
 
 ## A cue's flash part (`CueBase`: a part with no `part`, or `"part": "effect"`) read into its typed
-## fields once (`CuePlan.flash_of`; null for an effect Feel has not, which plays nothing).
+## fields once (`CuePlan.flash_of`; null for an effect Feel has not: the plan leaves it out).
 func _prepare_flash(part: Dictionary) -> Variant:
 	return CuePlanScript.flash_of(part, CUE_EFFECTS)
 
@@ -1370,13 +1371,10 @@ func _prepare_flash(part: Dictionary) -> Variant:
 ## along its way, sized by its `zoom` or the cue's size times its `reach` (either times the cue's
 ## power), for its seconds (or the cue's size with `lasts_size`), in its exact `color`, plain, bare,
 ## the cue's own colour, or the cue's ramp and tint with its cards (without them for `no_cards`).
-func _play_flash(prepared: Variant, cue: CueContextScript) -> void:
-	if prepared == null:
+func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
+	if flash.particles and not particles_enabled:
 		return
-	var flash: CuePlanScript.Flash = prepared as CuePlanScript.Flash
 	if flash.gated:
-		if flash.particles and not particles_enabled:
-			return
 		# Only for the cards it names: any card's layer, or one look layer (lightning's arc).
 		var layers: int = cue.look & ((1 << MotesScript.LOOK_LAYERS) - 1)
 		if flash.if_cards and layers == 0:
@@ -1391,23 +1389,28 @@ func _play_flash(prepared: Variant, cue: CueContextScript) -> void:
 		if cue.size <= 0.0:
 			return
 		seconds = cue.size
-	var zoom: int = roundi(flash.zoom * cue.power)
+	var zoom: int
 	var length: float = 0.0
-	if flash.along:
-		# Drawn along its length (an arc): the cue's size times its reach, from the cue's point.
-		length = cue.size * (flash.reach if flash.reach >= 0.0 else 1.0)
-		if length <= 0.0:
-			return
-	elif flash.reach >= 0.0:
-		zoom = roundi(cue.size * flash.reach * cue.power / flash.step)
+	var steps: float = flash.reach_steps
+	if steps >= 0.0:
+		# Sized from the cue's: its size times the part's reach, in steps of the effect's zoom.
+		zoom = roundi(cue.size * steps * cue.power)
+	else:
+		zoom = roundi(flash.zoom * cue.power)
+		if flash.along:
+			# Drawn along its length (an arc): the cue's size times its reach, from the cue's point.
+			length = cue.size * (flash.reach if flash.reach >= 0.0 else 1.0)
+			if length <= 0.0:
+				return
 	var way: Vector2 = cue.aim
 	var turn: int = flash.way
-	if turn == CuePlanScript.WAY_BACK:
-		way = -way
-	elif turn == CuePlanScript.WAY_RIGHT:
-		way = Vector2.RIGHT
-	elif turn == CuePlanScript.WAY_UP:
-		way = Vector2.UP
+	if turn != CuePlanScript.WAY_AIM:
+		if turn == CuePlanScript.WAY_BACK:
+			way = -way
+		elif turn == CuePlanScript.WAY_RIGHT:
+			way = Vector2.RIGHT
+		else:
+			way = Vector2.UP
 	var paint: int = flash.paint
 	if paint == CuePlanScript.PAINT_COLOR:
 		_cue_effect = show_effect(flash.kind, cue.at, way, flash.color, 0, EXACT, zoom, seconds, length)

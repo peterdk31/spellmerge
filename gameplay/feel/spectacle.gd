@@ -171,6 +171,16 @@ func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float
 		pool.throw_part(k, at, Vector2.RIGHT, source, tint, each, reach, 360.0, 1.0, true)
 
 
+## The sparks of a flash that sprays them (a hit's spray, a puff; S3): `count` motes of the kind
+## `kind` at `at` along `way` within `spread` degrees (all round as a ring with `ring`), out to
+## `reach` pixels, in the colours the flash is in (the `core` of a caster of `ramp`, the cards of
+## `look`, exact with its LOOK_EXACT bit). One of many a frame: it leaves the moments' rows alone.
+func flash_motes(kind: StringName, at: Vector2, way: Vector2, core: Color, ramp: int, look: int, count: int, reach: float, spread: float, ring: bool) -> void:
+	if pool == null or not particles_enabled or count <= 0:
+		return
+	pool.throw_part(pool.kind_index(kind), at, way, MotesScript.spell_source(ramp, look), core, count, reach, spread, 1.0, ring, true)
+
+
 ## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per
 ## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
 ## neither motes nor floor marks to show it.

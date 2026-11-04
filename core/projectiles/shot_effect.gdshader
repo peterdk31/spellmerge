@@ -16,9 +16,10 @@ render_mode blend_premul_alpha;
 //   K_DASH        the dust of a wizard's dash where it started (the effect's place); its way is
 //                 the caster's trail (TF_DASH in shot_trail.gdshader) and its landing Feel's
 //                 ring; its square is zoom x 4 pixels plus DASH_MARGIN each end, DASH_ACROSS across
-//   K_SPRAY       a hit on a character: sparks thrown on along the hit's way, cooling
-//   K_PUFF        sparks all round and a dotted white-hot puff (a kill, a reaction, a hit
-//                 with no way); with the POOF bit (kind 22) a staff's personality swap instead
+//   K_SPRAY       a hit on a character: a small white-hot cross where it struck (its sparks
+//                 are motes since S3: Feel throws them with the flash, `_flash_motes`)
+//   K_PUFF        a dotted white-hot puff (a kill, a reaction, a hit with no way; its sparks
+//                 all round are motes since S3); with the POOF bit (kind 22) a staff's personality swap instead
 //                 (living staffs H4): bone clouds along the staff (+x) that swell to their
 //                 biggest at 35% of the effect (where the body changes) and shrink away, and a
 //                 few sparks in the player's colour
@@ -144,15 +145,6 @@ Spark effect_spark(float kind, float n, float a, float ease, float z, Look L) {
 		S.shown = n < 6.0 && a < 0.8;
 		at = vec2(cos(ang) * 1.6, sin(ang)) * reach;
 		S.rgb = a < 0.4 ? L.hi : L.mid;
-	} else if (kind == K_SPRAY || kind == K_PUFF) {
-		// Sparks thrown on along the hit's way, or all round.
-		bool round_about = kind == K_PUFF;
-		float life = 0.5 + 0.5 * hash_seeded(i, 11.0, 31.0, s);
-		float ang = round_about ? i / 14.0 * 6.2832 + (hash_seeded(i, 12.0, 31.0, s) - 0.5) * 0.4 : (hash_seeded(i, 12.0, 31.0, s) - 0.5) * 1.6;
-		float reach = (2.0 + (round_about ? 10.0 : 13.0) * (0.5 + 0.5 * hash_seeded(i, 13.0, 31.0, s)) * ease) * z;
-		S.shown = n < (round_about ? 14.0 : 10.0) && a <= life;
-		at = vec2(cos(ang), sin(ang)) * reach;
-		S.rgb = ramp_of(L, a / life);
 	} else if (kind == K_DASH) {
 		// The dust kicked up where it left, both ways along the floor.
 		float travel = min(a / 0.45, 1.0);

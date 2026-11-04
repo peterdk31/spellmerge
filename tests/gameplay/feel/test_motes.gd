@@ -576,13 +576,17 @@ func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
 	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
 	var tint: Color = feel.preset.reaction_colors.get(&"shatter", Color.WHITE) as Color
-	var speeds: Array[float] = []
-	for row in motes.next_row():
-		var data: PackedFloat32Array = motes.row_data(row)
-		check(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
-		check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(tint), "the reaction's")
-		speeds.append(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length())
-	check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
+	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own.
+	var puff: int = feel.preset.puff_mote_count
+	check(motes.next_row() > puff, "the puff's sparks, then the reaction's ring")
+	for group: Vector2i in [Vector2i(0, puff), Vector2i(puff, motes.next_row())]:
+		var speeds: Array[float] = []
+		for row in range(group.x, group.y):
+			var data: PackedFloat32Array = motes.row_data(row)
+			check(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
+			check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(tint), "the reaction's")
+			speeds.append(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length())
+		check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
 
 
 func test_an_enemy_death_sheds_the_killing_shots_kinds_and_its_own_colours() -> void:
@@ -939,3 +943,33 @@ func test_the_numbers_shared_with_core_agree() -> void:
 	check_equal(MotesScript.LIFE_MAX, MoteKind.LIFE_MAX, "the longest life")
 	check(MotesScript.TABLE_SOURCE >= MotesScript.ENEMY_SOURCE + 1 + MotesScript.EXACT_SOURCE, "a table row is past every spell's source (the enemies' exact one included)")
 	check_equal(MotesScript.BIRTH_STRIDE, ProjectilesScript.SPARK_CORE + 3, "a birth ends with its core colour")
+
+
+## S3: a hit's spray and a puff throw their sparks as motes (the effect draws only the flash): the
+## preset's count of its kind along the hit's way, or all round as a ring; a staff's poof (a puff
+## with the POOF bit) throws none, and a spray leaves the moments' rows alone, as a shed does.
+func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	check_equal(motes.next_row(), feel.preset.spray_mote_count, "a spray's sparks")
+	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [feel.preset.spray_mote_kind], "of the preset's kind")
+	for row in motes.next_row():
+		check(motes.row_data(row)[MotesScript.ROW_VX] > 0.0, "spark %d flies on along the hit" % row)
+	motes.step(0.0)
+	var before: int = motes.next_row()
+	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, FeelScript.PUFF_SECONDS)
+	check_equal(motes.next_row() - before, feel.preset.puff_mote_count, "a puff's sparks")
+	var left: int = 0
+	for row in range(before, motes.next_row()):
+		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
+	check(left > 0 and left < feel.preset.puff_mote_count, "all round")
+	before = motes.next_row()
+	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
+	check_equal(motes.next_row(), before, "a poof throws none")
+	motes.step(0.0)
+	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
+	before = motes.next_row()
+	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	check_equal(motes.next_row(), before, "a spray leaves the moments' rows alone")

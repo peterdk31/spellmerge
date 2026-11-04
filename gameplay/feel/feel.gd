@@ -13,9 +13,9 @@ extends Node
 ##   not feel like lag); kills hold at once. Only a downed player and a boss kill drop
 ##   Engine.time_scale (real time); overlapping stops do not add up: the longest one wins.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
-## - an effect (see "Effects" below): sparks sprayed on along the hit, or a puff all
-##   round for a hit with no way. A kill turns its killing blow's spray into a bigger
-##   puff, so it costs one slot, not two.
+## - an effect (see "Effects" below): a spray along the hit (a white-hot cross, and its sparks
+##   as motes), or a puff all round for a hit with no way. A kill turns its killing blow's
+##   spray into a bigger puff, so it costs one slot, not two.
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node, on every hit
 ##   sprite however many (one shared flash material; no limit, owner 2026-10-31; a sprite that is
 ##   gone is skipped).
@@ -43,7 +43,8 @@ extends Node
 ## hit whose caster is the hit actor itself is a self-hit.
 ##
 ## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
-## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shaders
+## every flare, spray, puff, ring, arc and status is drawn by the shots' own shaders (the sparks of
+## a spray and a puff, and every chip, are motes since S3)
 ## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
 ## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
@@ -1740,7 +1741,20 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
 		_effect_length[slot] = steps * 4.0
+	elif kind == KIND_SPRAY or (kind == KIND_PUFF and look & POOF == 0):
+		_flash_motes(kind, at, _effect_dir[slot], core, ramp, look, _effect_zoom[slot])
 	return slot
+
+
+## A spray's or a puff's sparks, as motes (S3; the flash is the effect's): the preset's numbers,
+## `zoom` steps big.
+func _flash_motes(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int) -> void:
+	if preset == null or _spectacle == null:
+		return
+	var puff: bool = kind == KIND_PUFF
+	var count: int = preset.puff_mote_count if puff else preset.spray_mote_count
+	var reach: float = (preset.puff_mote_reach if puff else preset.spray_mote_reach) * float(zoom)
+	_spectacle.flash_motes(preset.spray_mote_kind, at, dir, core, ramp, look, count, reach, 360.0 if puff else preset.spray_mote_spread, puff)
 
 
 ## Age the effects by `real_delta` and write the live ones into their batches, oldest first.
@@ -2317,6 +2331,7 @@ func _upgrade_hit(position: Vector2, zoom: int) -> bool:
 	_effect_zoom[slot] = zoom
 	_effect_age[slot] = 0.0
 	_effect_seconds[slot] = PUFF_SECONDS
+	_flash_motes(KIND_PUFF, _effect_at[slot], _effect_dir[slot], _effect_core[slot], _effect_ramp[slot], _effect_look[slot], zoom)
 	return true
 
 

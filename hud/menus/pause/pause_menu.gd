@@ -19,7 +19,7 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Spell light: On", "Max shots: 6000", "Screen shake: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
@@ -31,6 +31,9 @@ extends PanelContainer
 ##   `MoteCap.STOPS` (core/settings: Off, Low, Medium, High), from the platform's cap
 ##   (`MoteCap.default_cap()`); each move sends `mote_cap_changed`, which feel applies (its motes
 ##   in the air end), and is saved (`mote_cap`); a saved cap other than the default is sent again
+##   when the menu is bound. "Spell light: On" (or Off; P3a) flips on `accept`, from the
+##   platform's default (`SpellLightSetting.default_on()`), sends `spell_light_changed`, which feel
+##   applies, and is saved (`spell_light`); a saved choice other than the default is sent again
 ##   when the menu is bound. "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
@@ -103,6 +106,8 @@ const SHOT_CAP_TEXT: String = "Max shots: %d"
 const SHOT_CAP_SETTING: StringName = &"projectile_cap"
 const MOTE_CAP_TEXT: String = "Particles: %s"
 const MOTE_CAP_SETTING: StringName = &"mote_cap"
+const LIGHT_TEXT: String = "Spell light: %s"
+const LIGHT_SETTING: StringName = &"spell_light"
 const FPS_TEXT: String = "Show FPS: %s"
 const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
@@ -138,6 +143,8 @@ var shot_cap: int = ShotCap.default_cap()
 var mote_cap: int = MoteCap.default_cap()
 ## The "Show FPS" setting (see the top): off by default.
 var show_fps: bool = false
+## The "Spell light" setting (see the top): the platform's default.
+var spell_light: bool = SpellLightSetting.default_on()
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
@@ -174,6 +181,7 @@ var ai_view: bool = false
 @onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
 @onready var _motes: Button = _add(Page.SETTINGS, "MoteCap", MOTE_CAP_TEXT % MoteCap.word_of(mote_cap))
 @onready var _motes_bar: HSlider = _add_slider(_motes, 0, MoteCap.STOPS.size() - 1, 1, MoteCap.index_of(mote_cap), MOTE_CAP_TEXT % "Medium")
+@onready var _light: Button = _add(Page.SETTINGS, "SpellLight", LIGHT_TEXT % ("On" if spell_light else "Off"))
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
@@ -199,6 +207,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_shake()
 	_load_shot_cap()
 	_load_mote_cap()
+	_load_light()
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
@@ -490,6 +499,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_mote_cap(MoteCap.STOPS[(MoteCap.index_of(mote_cap) + 1) % MoteCap.STOPS.size()])
 	elif control == _shots:
 		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
+	elif control == _light:
+		_set_light(not spell_light)
 	elif control == _shake:
 		_set_shake(not screen_shake)
 	elif control == _fps:
@@ -516,6 +527,25 @@ func _load_shake() -> void:
 	_mark_focus()
 	if not screen_shake and _events != null:
 		_events.screen_shake_changed.emit(false)
+
+
+## Read the saved "Spell light" choice and show it; feel is told only when it is not the default.
+func _load_light() -> void:
+	spell_light = bool(save.get_setting(LIGHT_SETTING, SpellLightSetting.default_on()))
+	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % ("On" if spell_light else "Off"))
+	_mark_focus()
+	if spell_light != SpellLightSetting.default_on() and _events != null:
+		_events.spell_light_changed.emit(spell_light)
+
+
+## Flip the "Spell light" switch: show it, save it and tell feel.
+func _set_light(on: bool) -> void:
+	spell_light = on
+	_light.set_meta(BASE_TEXT_META, LIGHT_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(LIGHT_SETTING, on)
+	if _events != null:
+		_events.spell_light_changed.emit(on)
 
 
 ## Flip the switch: show it, save it and tell feel.

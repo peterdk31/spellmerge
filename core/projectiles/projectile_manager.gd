@@ -816,6 +816,10 @@ var _born: PackedFloat32Array = PackedFloat32Array()
 var _nodes: Array[MultiMeshInstance2D] = []
 var _rooms: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 var _buffers: Array[PackedFloat32Array] = []
+## A second MultiMesh per batch (BATCH_*; null for none) that draws the batch's rows again with a
+## mesh of its own (`mirror_batch`: Feel's spell light). Each frame it is handed the very buffer
+## the batch uploads, so no row is written twice.
+var _mirrors: Array[MultiMesh] = []
 ## The first batches' nodes by name: the hat ramps' bolts, runes and orbits, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
@@ -1031,6 +1035,25 @@ func _ready() -> void:
 	_enemy_rune_node = _nodes[BATCH_ENEMY_RUNE]
 	_apply_textures()
 	_fit_draw_bounds()
+
+
+## Draw batch `batch`'s rows (BATCH_*) again in `multimesh` too, or stop with null (Feel's spell
+## light, docs/milestones/spell-spectacle.md, P3a). `multimesh` takes the batch's instance count and
+## each frame the same buffer the batch uploads (`update_draw`), so it must have the batch's format
+## (TRANSFORM_2D, colours and custom data); its mesh and its node's shader are its own.
+func mirror_batch(batch: int, multimesh: MultiMesh) -> void:
+	if _mirrors.size() < BATCHES:
+		_mirrors.resize(BATCHES)
+	_mirrors[batch] = multimesh
+	if multimesh != null and batch < _nodes.size() and _nodes[batch] != null:
+		var source: MultiMesh = _nodes[batch].multimesh
+		multimesh.instance_count = source.instance_count
+		multimesh.visible_instance_count = 0
+
+
+## The MultiMesh mirroring batch `batch` (`mirror_batch`), or null.
+func batch_mirror(batch: int) -> MultiMesh:
+	return _mirrors[batch] if batch < _mirrors.size() else null
 
 
 ## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)
@@ -1275,6 +1298,9 @@ func set_cap(value: int) -> void:
 	clear()
 	for node in _nodes:
 		node.multimesh.instance_count = 0
+	for mirror in _mirrors:
+		if mirror != null:
+			mirror.instance_count = 0
 
 
 func get_cap() -> int:
@@ -4305,9 +4331,17 @@ func update_draw(fraction: float = -1.0) -> void:
 	for batch in BATCHES:
 		var out: int = _draw_out[batch]
 		var multimesh: MultiMesh = _nodes[batch].multimesh
+		var mirror: MultiMesh = _mirrors[batch] if batch < _mirrors.size() else null
+		if mirror != null and mirror.instance_count != multimesh.instance_count:
+			mirror.instance_count = multimesh.instance_count
 		if out > 0:
-			multimesh.buffer = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
+			var rows: PackedFloat32Array = _kernel.call(&"buffer", batch) if kernel_draw else _buffers[batch]
+			multimesh.buffer = rows
+			if mirror != null:
+				mirror.buffer = rows
 		multimesh.visible_instance_count = out
+		if mirror != null:
+			mirror.visible_instance_count = out
 		instances += out
 	var shots_out: int = _draw_out[BATCHES + 2]
 	drawn_enemy = _draw_out[BATCHES + 3]

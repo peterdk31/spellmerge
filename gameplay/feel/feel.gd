@@ -60,6 +60,11 @@ extends Node
 ## look layers in its own ramp, and the wall the surface kinds in the room's colours
 ## (`RoomBase.surface_colors`, read on `room_entered`). The other sources come with the cues (P1b).
 ##
+## Spell light (docs/milestones/spell-spectacle.md, P3a): shots light the world round them
+## (`spell_light.gd`: a small light buffer the projectile batches draw into again, applied at
+## LIGHT_Z in three steps), while the "Spell light" setting is on (`SpellLightSetting`,
+## `spell_light_changed`; no nodes with it off).
+##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
 ## Flow frees the world on every Play and restart.
@@ -83,6 +88,7 @@ const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshad
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -98,6 +104,9 @@ const FLOOR_Z: int = FORM_Z - 1
 ## Motes draw under the floor marks, the beams and every flash and telegraph
 ## (docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
 const MOTE_Z: int = FORM_Z - 2
+## Spell light is applied just under the motes: above the room and every body (a body layer is
+## at most a few), under every spell, flash and telegraph (`spell_light.gd`; P3a).
+const LIGHT_Z: int = MOTE_Z - 1
 ## The folders of the mote kinds and the rooms in the registry.
 const MOTE_FOLDER: StringName = &"motes"
 const ROOM_FOLDER: StringName = &"rooms"
@@ -405,6 +414,10 @@ var _swing_trails: SwingTrailsScript = null
 ## (`MoteCap.default_cap()` until the setting changes it; see `set_mote_cap`). Read only.
 var _motes: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
+## Spell light (`spell_light.gd`; null with the "Spell light" setting off, or with no projectile
+## manager), and the setting (see `set_spell_light`). Read only.
+var _light: SpellLightScript = null
+var spell_light: bool = SpellLightSetting.default_on()
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
 ## and their source in the motes' ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
@@ -555,6 +568,8 @@ func _ready() -> void:
 	_swing_trails = SwingTrailsScript.new(swing_mesh())
 	add_child(_swing_trails)
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	_make_motes(mote_cap)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
@@ -616,6 +631,7 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.mote_cap_changed.connect(_on_mote_cap_changed)
+	events.spell_light_changed.connect(_on_spell_light_changed)
 	events.room_entered.connect(_on_room_entered)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
@@ -631,6 +647,7 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
+	_make_light(spell_light)
 
 
 func _exit_tree() -> void:
@@ -1621,6 +1638,36 @@ func _mote_kinds() -> Array[MoteKind]:
 
 func _on_mote_cap_changed(cap: int) -> void:
 	set_mote_cap(cap)
+
+
+## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).
+## Returns the setting.
+func set_spell_light(on: bool) -> bool:
+	if on != spell_light or (_light == null) == on:
+		_make_light(on)
+	return spell_light
+
+
+## Spell light (null with the setting off; for tests and the benchmarks).
+func light() -> SpellLightScript:
+	return _light
+
+
+func _make_light(on: bool) -> void:
+	spell_light = on
+	if _light != null:
+		_light.release()
+		remove_child(_light)
+		_light.queue_free()
+		_light = null
+	if on and projectiles != null:
+		_light = SpellLightScript.new(projectiles, LIGHT_Z)
+		_light.name = "SpellLight"
+		add_child(_light)
+
+
+func _on_spell_light_changed(on: bool) -> void:
+	set_spell_light(on)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:

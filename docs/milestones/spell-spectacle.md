@@ -151,6 +151,8 @@ Shots, blasts, flares and beams also draw into a **light buffer**, a low-resolut
 - **Ambient:** a property of the room (`RoomBase.ambient`, by default 1.0, which means no darkening and only added light). With ambient at 1.0, light can only brighten, so a room looks as it does today until spells light it. A darker crypt is an art direction choice for the owner.
 - **Torches:** the crypt's torch decals draw into the same buffer (one quad each), so rooms have light sources of their own.
 
+**As built in P3a** (DECISIONS, 2026-11-04, "Spell light"): two changes to the above. (1) The light batches do not share the shot batches' `MultiMesh`: a MultiMesh holds its mesh, and the trails' mesh is hundreds of vertices a shot, each run drawn or folded. Instead the manager hands each light batch the very buffer its shot batch uploads (`mirror_batch`), drawn with a quad: no row is written twice, four vertices a shot. (2) The rect does not blend with `blend_mul`: a multiply blend is clamped to 1 in an 8-bit target (checked on the compatibility renderer), so it can only darken. It reads the screen under it (`hint_screen_texture`) and draws it times `ambient + light`. It sits at `Feel.LIGHT_Z` (15): the bodies and the room's art are at 6 or below, and the motes (16), floor flashes (17), beams (18), flashes (20), entities (40), shots and effects (50) are above it.
+
 ### Open questions for the owner
 
 1. STYLE.md allows soft glow only on shots ("never baked into an asset"). Spell light would be the world taking light from shots, and STYLE.md needs a line saying so, with the three-step banding as the rule.

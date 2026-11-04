@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Trail particles as motes (spell spectacle P1d, owner session)
+
+The shots' card particles are Feel's motes now: the trail meshes drop their particle slots (a dash keeps its own), the projectile manager rolls the particles the shader would have given off (the same rates, thinned by the spark pool's share) and hands them out as births, and Feel throws one mote each. On llvmpipe the trails send 42-92 % fewer vertices; GPU time 42 -> 16-26 ms at 400 shots, about 85 -> 72 at 3,000, 22-37 -> 13-21 at 60, for 0.3-0.9 ms more CPU a frame; the storm shows no CPU change. On at every count (`SPARK_MOTES_BELOW`); the web and a real GPU are not measured. The motes look like the motes' kinds, not the shader's particles: sheets `shot_trails` and `shot_trails_shader` side by side for the owner. Tests: `test_projectile_looks`, `test_motes`. Details: docs/DECISIONS.md.
+
 ## 2026-11-04: Trails at a high Max shots (owner session)
 
 Reported by the owner on the web build: with Max shots at 10,000 or more, every fire bolt after the sandbox's LB storm had a short tail at a wrong angle. The storm holds every trail row (2 x the cap), and the trail texture was one line per row, 32 texels wide: 20,000 rows made it 32 x 32,768, past the 16,384 a GPU takes. The texture now holds 64 rows a line (2,048 texels wide; 2,048 x 2,048 at the top cap of 50,000), read by `trail_texel` in `shot_trail.gdshader`; `_trail_data` is laid out as before, so the native kernel is unchanged. Regression test: `test_the_trail_texture_fits_a_gpu_at_a_high_cap`.

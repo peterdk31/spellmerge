@@ -614,3 +614,65 @@ func test_with_motes_on_a_cues_chips_effect_gives_way_to_its_motes() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect")
 	check(feel.motes().next_row() > 0, "its motes instead")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
+
+
+## Trail particles as motes (spell spectacle P1d): each birth the projectile manager hands out is
+## one mote of its look kind's layer (layer 0's for a kind with none, a plain shot's twinkle too),
+## given off back along the shot slower than a burst, in the shot's own ramp and core colour.
+func test_a_trails_births_are_one_mote_each() -> void:
+	var motes: MotesScript = _pool(4096)
+	var stride: int = MotesScript.BIRTH_STRIDE
+	check_equal(stride, ProjectilesScript.SPARK_BIRTH_STRIDE, "the manager's layout")
+	var births := PackedFloat32Array()
+	births.resize(stride * 3)
+	var kinds: Array[int] = [ProjectilesScript.LOOK_EMBERS, ProjectilesScript.LOOK_DRIFT, 0]
+	for n in 3:
+		var i: int = n * stride
+		births[i] = 10.0 * n
+		births[i + 1] = 20.0
+		births[i + 2] = -1.0
+		births[i + 4] = float(kinds[n])
+		births[i + 5] = 2.0
+		births[i + 6] = float(FIRE_LOOK)
+		births[i + 7] = 0.9
+		births[i + 8] = 0.3
+		births[i + 9] = 0.1
+	motes.give_off(births, 3)
+	check_equal(motes.next_row(), 3, "one mote a birth")
+	check_equal(_kinds_of_rows(motes, 0, 1), [&"ember"], "fire's embers")
+	check_equal(_kinds_of_rows(motes, 1, 3), [&"spark"], "a layer with no kind, and a twinkle: layer 0's")
+	var ember: MoteKind = motes.kinds()[motes.kind_index(&"ember")]
+	var data: PackedFloat32Array = motes.row_data(0)
+	check(data[0] <= 0.0, "given off back along the shot")
+	check(Vector2(data[0], data[4]).length() <= ember.speed.y * MotesScript.TRAIL_SPEED + 0.01, "slower than a burst")
+	check_equal(roundi(data[8] * MotesScript.SOURCE_CODE), 2, "in the ramp of its caster")
+	check(Color(data[12], data[13], data[14]).is_equal_approx(Color(0.9, 0.3, 0.1)), "with its core colour")
+	motes.give_off(births, 0)
+	check_equal(motes.next_row(), 3, "no births, no motes")
+
+
+## Feel takes the trails' particles while it has motes, and hands them back to the shader when
+## Particles is off.
+func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var shots: ProjectilesScript = feel.projectiles
+	root.add_child(shots)
+	shots.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	for i in 10:
+		var slot: int = shots.spawn(0, Vector2(20.0 + 30.0 * i, 100.0), Vector2(60.0, 0.0), 10.0)
+		shots.set_look(slot, FIRE_LOOK)
+	feel.step(1.0 / 60.0)
+	check(shots.spark_motes, "Feel takes them")
+	var before: int = feel.motes().next_row()
+	var births: int = 0
+	for n in 20:
+		shots.step(1.0 / 60.0)
+		shots.update_draw(1.0)
+		births += shots.spark_birth_count
+		feel.step(1.0 / 60.0)
+	check(births > 0, "the trails gave off particles: %d" % births)
+	check_equal(feel.motes().next_row() - before, births, "each a mote")
+	feel.set_mote_cap(0)
+	feel.step(1.0 / 60.0)
+	check(not shots.spark_motes, "no motes: the shader draws them again")

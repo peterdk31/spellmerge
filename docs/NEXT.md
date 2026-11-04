@@ -46,7 +46,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Spell spectacle: the mote pool (P1a).** (`gameplay/feel/`, `core/settings/`, `hud/menus/pause/`) [spell-spectacle.md](milestones/spell-spectacle.md), P1a: the ring of chunked batches, `mote.gdshader`, `mote_land`, the Particles setting, wall chips as the first source.
 - [ ] **Spell spectacle: mote sources (P1b).** (`gameplay/feel/`, `core/base/cue_base.gd`, `content/cues/`) After P1a.
 - [ ] **Spell spectacle: measure and tune motes (P1c).** (`tests/benchmark/`, `docs/`) After P1b.
-- [ ] **Spell spectacle: trails' shed particles as motes, an experiment (P1d).** (`core/projectiles/` trail shader, `gameplay/feel/`, `tests/benchmark/`) After P1b; merged only if it measures cheaper.
+- [x] **Spell spectacle: trails' shed particles as motes, an experiment (P1d).** (`core/projectiles/` trail shader, `gameplay/feel/`, `tests/benchmark/`) After P1b; merged only if it measures cheaper.
 - [ ] **Spell spectacle: the floor mark layer (P2a).** (`gameplay/feel/`, `core/base/cue_base.gd`, `content/cues/`) Independent of P1.
 - [ ] **Spell spectacle: settled motes and the other marks (P2b).** (`gameplay/feel/`, `content/cues/`) After P1a and P2a.
 - [ ] **Spell spectacle: the light buffer and shot light (P3a).** (`gameplay/feel/`) Independent of P1 and P2.

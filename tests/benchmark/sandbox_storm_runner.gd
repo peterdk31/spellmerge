@@ -18,7 +18,8 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## projectile manager's GDScript), `--no-trail-motes` (the trails draw their own particles, never
+## Feel's motes; spell spectacle P1d), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
@@ -62,6 +63,8 @@ var _tree_profile: Node = null
 var _draw_usec: int = 0
 var _draw_max_usec: int = 0
 var _draw_frames: int = 0
+var _mote_frames: int = 0
+var _births: int = 0
 var _label: Label = null
 var _wizard: Actor = null
 var _downed: Downed = null
@@ -105,6 +108,8 @@ func _ready() -> void:
 			_projectiles.call("set_cap", maxi(arg.trim_prefix("--cap=").to_int(), 1))
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
+	if args.has("--no-trail-motes"):
+		_projectiles.set(&"spark_motes_below", 0)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
 		return
@@ -210,6 +215,9 @@ func _process(_delta: float) -> void:
 		_projectiles.call(&"update_draw")
 		var usec: int = Time.get_ticks_usec() - start
 		_draw_usec += usec
+		if bool(_projectiles.get("sparks_as_motes")):
+			_mote_frames += 1
+			_births += int(_projectiles.get("spark_birth_count"))
 		_draw_max_usec = maxi(_draw_max_usec, usec)
 		_draw_frames += 1
 	var hold: bool = stay or _elapsed < seconds
@@ -286,6 +294,8 @@ func _report() -> void:
 	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots and %d trails drawn at the end" % [
 		float(_draw_usec) / frames / 1000.0, float(_draw_max_usec) / 1000.0, _draw_frames,
 		int(_projectiles.get("drawn")), int(_projectiles.get("drawn_trails"))])
+	print("BENCH: storm draw: trail particles as motes in %d of the frames, %.1f births a frame there" % [
+		_mote_frames, float(_births) / maxf(1.0, float(_mote_frames))])
 	if _probe != null:
 		_probe.call("report")
 	if _tree_profile != null:

@@ -13,6 +13,10 @@ extends SceneTree
 ##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
 ##   ... -- --light                   with spell light (gameplay/feel/spell_light.gd, P3a) on the
 ##                                    shots: its light buffer's GPU time is printed too
+##   ... -- --motes                   the trails' particles as motes (spell spectacle P1d): the
+##                                    trails drop their particle slots and a mote pool (Feel's,
+##                                    gameplay/feel/mote.gd) throws them; the births' and the throws'
+##                                    CPU time is printed too. At every count unless --motes-below=N.
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -29,6 +33,11 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+## Where motes are drawn (Feel's MOTE_Z), and the pool's rows (the desktop default).
+const MOTE_Z: int = 16
+const MOTE_CAP: int = 32768
 ## Where spell light is applied (Feel's LIGHT_Z).
 const LIGHT_Z: int = 15
 
@@ -55,6 +64,10 @@ var _only: String = ""
 var _timed: int = TIMED_FRAMES
 var _light: bool = false
 var _spell_light: SpellLightScript = null
+var _use_motes: bool = false
+var _motes_below: int = 1 << 30
+var _motes: MotesScript = null
+var _mote_kinds: Array[MoteKind] = []
 
 
 func _initialize() -> void:
@@ -70,6 +83,10 @@ func _initialize() -> void:
 			_only = arg.substr(7)
 		elif arg == "--light":
 			_light = true
+		elif arg == "--motes":
+			_use_motes = true
+		elif arg.begins_with("--motes-below="):
+			_motes_below = arg.substr(14).to_int()
 		elif arg.begins_with("--timed="):
 			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
@@ -79,6 +96,12 @@ func _run() -> void:
 	await process_frame
 	RenderingServer.viewport_set_measure_render_time(root.get_viewport_rid(), true)
 	print("BENCH: trail gpu on %s" % RenderingServer.get_video_adapter_name())
+	if _use_motes:
+		var registry := RegistryScript.new()
+		registry.scan()
+		for kind: Resource in registry.get_all(&"motes"):
+			_mote_kinds.append(kind as MoteKind)
+		registry.free()
 	for scenario: Dictionary in SCENARIOS:
 		if _only.is_empty() or scenario["label"] == _only:
 			await _scenario(scenario)
@@ -92,6 +115,9 @@ func _teardown() -> void:
 		_spell_light.release()
 		_spell_light.free()
 		_spell_light = null
+	if _motes != null:
+		_motes.free()
+		_motes = null
 	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
@@ -116,6 +142,11 @@ func _scenario(scenario: Dictionary) -> void:
 		_spell_light = SpellLightScript.new(_mgr, LIGHT_Z)
 		root.add_child(_spell_light)
 		RenderingServer.viewport_set_measure_render_time(_spell_light.viewport.get_viewport_rid(), true)
+	if _use_motes:
+		_motes = MotesScript.new(MOTE_CAP, MOTE_Z, _mote_kinds)
+		root.add_child(_motes)
+		_mgr.spark_motes = true
+		_mgr.spark_motes_below = _motes_below
 	# Stepped and drawn by hand only (see the top).
 	_mgr.set_physics_process(false)
 	_mgr.set_process(false)
@@ -131,6 +162,7 @@ func _scenario(scenario: Dictionary) -> void:
 		for f in SAVED_FRAMES:
 			_step(WARM_STEPS + f, shots)
 			_mgr.update_draw(1.0)
+			_throw_motes(WARM_STEPS + f)
 			await process_frame
 			await process_frame
 			var image: Image = root.get_texture().get_image()
@@ -139,12 +171,18 @@ func _scenario(scenario: Dictionary) -> void:
 	var light_times: PackedFloat64Array = PackedFloat64Array()
 	var draw_times: PackedFloat64Array = PackedFloat64Array()
 	var wall_times: PackedFloat64Array = PackedFloat64Array()
+	var mote_times: PackedFloat64Array = PackedFloat64Array()
+	var births: int = 0
 	var last: int = Time.get_ticks_usec()
 	for f in _timed if _time else 0:
 		_step(WARM_STEPS + SAVED_FRAMES + f, shots)
 		var before: int = Time.get_ticks_usec()
 		_mgr.update_draw(1.0)
 		draw_times.append(float(Time.get_ticks_usec() - before) / 1000.0)
+		births += _mgr.spark_birth_count
+		before = Time.get_ticks_usec()
+		_throw_motes(WARM_STEPS + SAVED_FRAMES + f)
+		mote_times.append(float(Time.get_ticks_usec() - before) / 1000.0)
 		await process_frame
 		var now: int = Time.get_ticks_usec()
 		wall_times.append(float(now - last) / 1000.0)
@@ -168,11 +206,24 @@ func _scenario(scenario: Dictionary) -> void:
 	wall_times.sort()
 	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; a whole frame median %.1f ms (wall clock)" % [
 		label, draw_times[draw_times.size() / 2], wall_times[wall_times.size() / 2]])
+	if _motes != null:
+		mote_times = mote_times.slice(_timed / 4)
+		mote_times.sort()
+		print("BENCH: trail gpu %s: motes %s, %.1f births a frame, throwing them CPU median %.3f ms, %d mote chunks shown" % [
+			label, "on" if _mgr.sparks_as_motes else "off (over --motes-below)", float(births) / float(_timed), mote_times[mote_times.size() / 2], _motes.chunks_shown()])
 	if not light_times.is_empty():
 		light_times = light_times.slice(_timed / 4)
 		light_times.sort()
 		print("BENCH: trail gpu %s: spell light buffer GPU median %.2f ms, p95 %.2f ms (the apply pass is in the frame's)" % [
 			label, light_times[light_times.size() / 2], light_times[int(float(light_times.size()) * 0.95)]])
+
+
+## The trails' particles of the last `update_draw` thrown as motes, and the pool stepped to frame `n`.
+func _throw_motes(n: int) -> void:
+	if _motes == null:
+		return
+	_motes.give_off(_mgr.spark_births, _mgr.spark_birth_count)
+	_motes.step(float(n) * DT)
 
 
 ## The vertices the batches send the GPU this frame: each batch's instances x its mesh's vertices.

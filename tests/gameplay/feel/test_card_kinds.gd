@@ -245,11 +245,20 @@ func test_a_kind_that_names_nothing_is_thrown_only_where_named() -> void:
 	var before: int = feel.motes().next_row()
 	feel.play_cue(&"fireball", 0, Vector2(80.0, 80.0), Vector2.RIGHT, 30.0, Color(1.0, 0.5, 0.2), _look([&"fire"]))
 	var rows: Array[StringName] = []
+	var ash_source: int = -1
 	for row in range(before, feel.motes().next_row()):
-		var id: StringName = feel.motes().kinds()[roundi(feel.motes().row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id
+		var data: PackedFloat32Array = feel.motes().row_data(row)
+		var id: StringName = feel.motes().kinds()[roundi(data[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id
 		if not rows.has(id):
 			rows.append(id)
+		if id == &"ash":
+			ash_source = roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
 	check(rows.has(&"ash"), "a fireball throws ash: %s" % [rows])
+	check(ash_source >= MotesScript.TABLE_SOURCE, "in the colours of what burned (its part's `colours`, a ramp-table row): %d" % ash_source)
+	var cue := CueBase.new()
+	cue.id = &"test"
+	cue.parts = [{"part": &"motes", "kind": &"ash", "colours": &"stone"}]
+	check_equal(cue.problems().size(), 1, "a part's colours are spell or surface: %s" % [cue.problems()])
 
 
 func test_more_kinds_than_the_old_arrays_load_and_draw() -> void:

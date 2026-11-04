@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Every moment a cue: cast, impact and hit looks (spell spectacle 2, S6 item 2, owner session)
+
+A carrier card's looks are cue files now: `cast_cue` (the flash on the staff and the camera kick, `cast` by default), `shown_cue`, `impact_cue` (every strike of its shots, `impact` by default) and `end_cue` replace the `cast_look` and `impact_look` dictionaries, with eleven new cast cues and `impact`, `impact_ring`; a rune goes off by its `rune_burst` cue, with no branch in Feel. A hit's spray and puff are the cues `hit` and `hit_puff`, and a flash no longer throws sparks of its own: cues name their sparks as motes parts (`often` for one of many a frame, `body` for a body's colour). Cues are read once for playing (`cue_plan.gd`), so the hit path reads no part key; on the web storm the change costs about 0.3 ms of a step's scripts (3%). The sheets match main but for the motes' random throws, the nova cast's draw order, and more sparks on a death in a storm.
+
 ## 2026-11-04: Every moment a cue: a shot's end, the death puff, colours as data (spell spectacle 2, S6 items 5, 6, 14, owner session)
 
 A shot whose life runs out plays the cue `expire` (its small flare and a puff of its cards' motes; a motes part with a `share` sheds, one of many a frame, and keeps out of the moments' rows). A death's puff is the last part of `enemy_death` and `boss_death`, in the body's own colour (a flash key `body`); the killing blow's spray no longer turns into it. An enemy's colour when hit is its data (`EnemyBase.hit_color`, ember by default), and the horde gems' look is `gameplay/horde/gem_look.tres`. Three preset fields and two constants went. The deaths', mote sources' and impacts' sheets look the same as before (their motes differ from run to run). Web storm figures in docs/DECISIONS.md.

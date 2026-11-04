@@ -22,7 +22,6 @@ render_mode blend_premul_alpha;
 //                 (living staffs H4): bone clouds along the staff (+x) that swell to their
 //                 biggest at 35% of the effect (where the body changes) and shrink away, and a
 //                 few sparks in the player's colour
-//   K_CHIPS       stone chips knocked back off a wall, falling; stone does not glow
 //   K_QUAKE       a slam's mark on the floor (Feel's floor batch, under the bodies): cracks out from
 //                 the impact, white-hot and cooling to dark stone, a glow on the floor, rubble
 //                 thrown up that lands and lies, dust rolling out along the floor; its reach is
@@ -43,7 +42,7 @@ render_mode blend_premul_alpha;
 // fragment stage only colours a pixel of its own quad, in a few small modes with no loops:
 //   Q_LIGHT     the effect's glow, over its whole square (added; drawn first)
 //   Q_PARTICLE  one of the shot's card particles (`place_particle`), the newest on top
-//   Q_SPARK     a spark (or a chip, or a speck of a dash's dust); the first is on top
+//   Q_SPARK     a spark (or a speck of a dash's dust); the first is on top
 //   Q_CLOUD     one of a poof's bone clouds; the first is on top
 //   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top); a quake's
 //               cracks
@@ -154,14 +153,6 @@ Spark effect_spark(float kind, float n, float a, float ease, float z, Look L) {
 		S.shown = n < (round_about ? 14.0 : 10.0) && a <= life;
 		at = vec2(cos(ang), sin(ang)) * reach;
 		S.rgb = ramp_of(L, a / life);
-	} else if (kind == K_CHIPS) {
-		// Stone chips knocked back off the wall, falling down the screen as they fly; no glow.
-		float ang = (hash_seeded(i, 14.0, 31.0, s) - 0.5) * 2.2;
-		float reach = (2.0 + 9.0 * (0.5 + 0.5 * hash_seeded(i, 15.0, 31.0, s)) * ease) * z;
-		S.shown = n < 7.0 && a < 0.9;
-		at = vec2(cos(ang), sin(ang)) * reach + vec2(0.0, 7.0 * a * a * z);
-		S.run = hash_seeded(i, 16.0, 31.0, s) < 0.4 ? 1.0 : 0.0;
-		S.rgb = a < 0.3 ? STONE_LIGHT : (a < 0.65 ? STONE_BASE : STONE_SHADOW);
 	} else if (kind == K_DASH) {
 		// The dust kicked up where it left, both ways along the floor.
 		float travel = min(a / 0.45, 1.0);
@@ -246,7 +237,7 @@ void vertex() {
 	vec4 k0 = vec4(0.0);
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
-	bool glows = kind != K_CHIPS && kind != K_DASH;
+	bool glows = kind != K_DASH;
 	if (quad == Q_LIGHT || quad == Q_SHAPE) {
 		// The flash and its light: a1 the light's two falloffs (how bright, how far: x of the
 		// distance from a0.y, y of the distance), a0.x 1 for a diamond (the rune's) or 2 for a flat

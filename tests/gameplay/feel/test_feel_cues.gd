@@ -116,12 +116,9 @@ func test_the_rising_fireball_is_a_cue_of_its_own() -> void:
 
 
 func test_the_quake_strikes_the_ground_and_holds_its_caster() -> void:
-	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
-	feel.set_mote_cap(0)
 	_cue(&"quake", Vector2(20.0, 0.0), 16.0)
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a mark on the floor")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out past its reach")
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips")
 	check(is_equal_approx(feel.actors.held_left(0), feel.cue_of(&"quake").hold), "its caster held")
 	check(feel.kick().y > 0.0, "a punch down the screen")
 
@@ -148,12 +145,10 @@ func test_a_part_sizes_by_zoom_or_by_the_cues_size() -> void:
 
 
 func test_a_part_can_take_an_exact_colour_or_be_plain() -> void:
-	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
-	feel.set_mote_cap(0)
-	_made([{"effect": &"burst", "color": Color.RED}, {"effect": &"chips", "plain": true}])
+	_made([{"effect": &"burst", "color": Color.RED}, {"effect": &"ring_out", "plain": true}])
 	bus.cue_shown.emit(1, &"test_cue", Vector2.ZERO, Vector2.ZERO, 0.0, Color.BLUE, 5)
 	check_equal(feel.effect_dress(FeelScript.KIND_BURST), [Color.RED, FeelScript.EXACT], "its own colour, exactly")
-	check_equal(feel.effect_dress(FeelScript.KIND_CHIPS), [Color.WHITE, 0], "white, no cards")
+	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [Color.WHITE, 0], "white, no cards")
 
 
 func test_a_part_faces_the_way_it_says() -> void:
@@ -196,14 +191,11 @@ func test_the_nova_is_a_ring_120_px_across_for_a_quarter_second() -> void:
 
 
 func test_the_slam_is_a_star_and_the_ground_struck() -> void:
-	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
-	feel.set_mote_cap(0)
 	_cue(&"slam", Vector2(20.0, 0.0), 16.0)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effect_info(FeelScript.KIND_BURST).get("zoom"), 3, "3 steps big")
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "cracks in the floor")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out past its reach")
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips")
 	var quake: CueBase = feel.cue_of(&"quake")
 	var slam: CueBase = feel.cue_of(&"slam")
 	check(slam.shake == quake.shake and slam.kick == quake.kick and slam.hold == quake.hold and slam.kick_way == quake.kick_way, "the quake's weight")

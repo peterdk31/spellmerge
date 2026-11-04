@@ -56,7 +56,7 @@ extends Resource
 ## The flashes a part can name (Feel maps each to its effect kind, and says how many pixels a
 ## step of its zoom is).
 const EFFECTS: Array[StringName] = [
-	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff", &"chips",
+	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff",
 	&"quake", &"shell", &"fireball", &"debris", &"scorch", &"rise", &"fall",
 ]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]

@@ -29,10 +29,9 @@ extends Resource
 ## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
 @export var enemy_hit_color: Color = Color("e0592f")
-## A shot that ends on a wall or pillar knocks Stone chips back off the surface, `wall_chip_size`
-## times as far (rounded to a whole zoom); `wall_spark_size` is the size of a shot's flare when
-## its carrier card names none.
-@export_range(0.3, 2.0, 0.1) var wall_chip_size: float = 0.9
+## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
+## spectacle's surface kinds); `wall_spark_size` is the size of a shot's flare when its carrier
+## card names none.
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of

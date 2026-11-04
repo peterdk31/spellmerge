@@ -49,8 +49,9 @@ var projectiles: ProjectileManagerScript = null
 ## Feel's switch for the stress benchmark (`Feel.particles_enabled`): off, no motes are thrown.
 var particles_enabled: bool = true
 
-## The motes (null with the "Particles" setting off), and how many they hold
-## (`MoteCap.default_cap()` until the setting changes it). Read only.
+## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
+## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
+## Read only.
 var pool: MotesScript = null
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
@@ -262,19 +263,19 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 
 # --- Settings ----------------------------------------------------------------------------------
 
-## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
-## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
-## number taken.
+## The "Particles" setting: how many motes the ring holds (from `MoteCap`'s Minimal stop to its
+## top one; a 0, Off before S3, is Minimal). A new size remakes the ring, ending the motes in the
+## air. Returns the number taken.
 func set_mote_cap(cap: int) -> int:
-	var taken: int = clampi(cap, 0, MoteCap.STOPS[-1])
-	if taken != mote_cap or (pool == null) != (taken == 0):
+	var taken: int = clampi(cap, MoteCap.STOPS[0], MoteCap.STOPS[-1])
+	if taken != mote_cap or pool == null:
 		_make_motes(taken)
 	return mote_cap
 
 
 ## Use `motes` as the pool from now on, in place of the one made for the setting (its cap is the
-## setting's now; null turns them off). For the benchmarks, which hand one that times its own
-## calls (tests/benchmark/timed_motes.gd).
+## setting's now). For the benchmarks, which hand one that times its own calls
+## (tests/benchmark/timed_motes.gd); null (the stress benchmark's "no particles") leaves none.
 func use_motes(motes: MotesScript) -> void:
 	if pool != null:
 		pool.queue_free()
@@ -298,7 +299,7 @@ func ramp_table() -> RampTableScript:
 
 
 func _make_motes(cap: int) -> void:
-	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table) if cap > 0 else null)
+	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table))
 
 
 ## The mote kinds of the registry (content/motes), in id order.

@@ -52,9 +52,6 @@ func before_each() -> void:
 	feel.registry = registry
 	feel.preset = preset
 	root.add_child(feel)
-	# The effects only: a wall's chips are an effect of the batch with the "Particles" setting off
-	# (with it on they are motes, test_motes.gd).
-	feel.set_mote_cap(0)
 
 
 ## The look the carrier card `form` brings (`FormBase.cast_look` or `impact_look`).
@@ -189,8 +186,8 @@ func test_an_effect_ends_after_its_seconds() -> void:
 	feel.step(FeelScript.CAST_SECONDS + 0.01)
 	check_equal(feel.effects_of(FeelScript.KIND_CAST), 0, "the cast flash is gone")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "the burst lasts longer")
-	feel.step(FeelScript.CHIPS_SECONDS)
-	check_equal(feel.live_effects(), 0, "and then it is gone too, and the wall's chips")
+	feel.step(FeelScript.BURST_SECONDS)
+	check_equal(feel.live_effects(), 0, "and then it is gone too")
 	check_equal(feel._effect_node.multimesh.visible_instance_count, 0, "nothing is drawn")
 
 
@@ -199,11 +196,9 @@ func test_the_batch_draws_the_live_effects() -> void:
 	_impact(1, &"nova")
 	feel.step(0.01)
 	var multimesh: MultiMesh = feel._effect_node.multimesh
-	check_equal(multimesh.visible_instance_count, 5, "a burst, and a burst and a ring, and the wall's chips for each")
+	check_equal(multimesh.visible_instance_count, 3, "a burst, and a burst and a ring (a wall's chips are motes)")
+	# The first drawn is the oldest: the first wall's burst.
 	var buffer: PackedFloat32Array = multimesh.buffer
-	# The first drawn is the oldest: the first wall's chips, then its burst.
-	check_equal(floori((1.0 - buffer[15]) * 16.0 + 0.5), FeelScript.KIND_CHIPS, "chips first")
-	buffer = buffer.slice(FeelScript.EFFECT_STRIDE)
 	var coded: float = (1.0 - buffer[15]) * 16.0
 	check_equal(floori(coded + 0.5), FeelScript.KIND_BURST, "the kind travels as the shader reads it")
 	check(coded - FeelScript.KIND_BURST > FeelScript.EFFECT_FROM and coded - FeelScript.KIND_BURST < 0.5, "with its age beside it")

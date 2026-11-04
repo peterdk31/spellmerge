@@ -41,25 +41,21 @@ func test_its_strike_shown_is_no_cue_its_end_is() -> void:
 
 
 func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
-	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
-	feel.set_mote_cap(0)
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no expanding ring (too uniform)")
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips off the floor")
+	check(feel.motes().next_row() > 0, "stone chips off the floor, as motes")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"slam").shake), "a shake")
 	check(feel.kick().y > 0.0 and is_zero_approx(feel.kick().x), "a punch down the screen")
 
 
 func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> void:
-	# The chips effect stands in for motes: it shows with them off (test_motes.gd has them on).
-	feel.set_mote_cap(0)
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a quake where it struck")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "sized by its radius")
 	feel.step(0.05)
 	check_equal(feel._floor_node.multimesh.visible_instance_count, 1, "drawn in the floor batch")
-	check_equal(feel._effect_node.multimesh.visible_instance_count, 2, "not with the flashes (star, chips)")
+	check_equal(feel._effect_node.multimesh.visible_instance_count, 1, "not with the flashes (the star; its chips are motes)")
 	check(feel._floor_node.z_index < 40, "under the enemies (entities.gd DRAW_Z)")
 	feel.step(0.5)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 0, "the star is gone")

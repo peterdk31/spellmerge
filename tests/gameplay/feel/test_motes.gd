@@ -457,7 +457,6 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	feel.projectiles.impact_core = Color("e0592f")
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember"], "before any room: only the shot's own")
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect besides")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
 	bus.room_entered.emit(ARENA)
@@ -473,17 +472,21 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	check_equal(motes.uploads, 1, "uploaded on the next frame")
 
 
-func test_with_particles_off_there_are_no_motes_and_the_chips_effect_shows() -> void:
+## S3: there is no Off. The smallest "Particles" stop is a Minimal ring, and a 0 (a cap saved as
+## Off before S3) is taken as it: the motes, and nothing drawn instead of them, always.
+func test_particles_has_no_off_its_least_is_a_minimal_ring() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]
 	var feel: FeelScript = made[1]
 	bus.room_entered.emit(ARENA)
+	check_equal(MoteCap.STOPS[0], 2048, "the Minimal stop")
+	check_equal(MoteCap.word_of(0), "Minimal", "a saved 0 reads as Minimal")
 	bus.mote_cap_changed.emit(0)
-	check(feel.motes() == null, "no motes")
-	check(feel.find_child("Motes", true, false) == null, "and no nodes")
-	check_equal(feel.mote_cap, 0, "the setting taken")
+	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[0], "a 0 is the Minimal ring")
+	check_equal(feel.mote_cap, MoteCap.STOPS[0], "the setting taken")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "the chips effect instead")
+	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "a wall still sheds its chips as motes")
+	check_equal(feel.live_effects(), 1, "and only the shot's burst is an effect")
 	feel.step(0.016)
 	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
 	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[1], "on again at the new cap")
@@ -505,8 +508,6 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(timed, 0, timed.next_row()).has(&"chip"), "a wall hit sheds into it, in the room's colours")
 	check(int(timed.get(&"usec")) >= 0 and timed.written > 0, "and it counts what it wrote")
-	feel.use_motes(null)
-	check(feel.motes() == null and feel.find_child("Motes", true, false) == null and feel.mote_cap == 0, "null turns the motes off")
 
 
 # --- P1b: the sources ---------------------------------------------------------------------------
@@ -690,12 +691,11 @@ func test_every_kind_a_cue_names_is_there() -> void:
 	check(named >= 7, "the cues throw motes, %d parts" % named)
 
 
-func test_with_motes_on_a_cues_chips_effect_gives_way_to_its_motes() -> void:
+func test_a_cues_chips_are_its_motes() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 0, "no chips effect")
-	check(feel.motes().next_row() > 0, "its motes instead")
+	check(feel.motes().next_row() > 0, "its motes")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
 
 
@@ -789,9 +789,6 @@ func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:
 	check(shots.spark_motes, "with particles off (the stress benchmark's \"no particles\") the trails keep no particle slots")
 	check_equal(feel.motes().next_row(), before, "and none are thrown: no trail particles at all")
 	feel.particles_enabled = true
-	feel.set_mote_cap(0)
-	feel.step(1.0 / 60.0)
-	check(not shots.spark_motes, "no motes: the shader draws them again")
 
 
 ## A birth for `give_off` (BIRTH_STRIDE floats) at `at`, given off back along `back`, of the look

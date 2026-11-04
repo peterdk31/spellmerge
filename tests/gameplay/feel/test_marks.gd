@@ -418,12 +418,8 @@ func test_feel_links_settled_motes_to_the_settings() -> void:
 	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
 	bus.floor_marks_changed.emit(true)
 	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "on again: linked again")
-	feel.set_mote_cap(0)
-	check(feel.motes() == null, "particles off: no motes")
-	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
-	check_equal(feel.marks().settling(), 0, "so none settle")
-	feel.set_mote_cap(8192)
-	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "particles on again: linked to the layer")
+	feel.set_mote_cap(MoteCap.STOPS[0])
+	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "a new ring (the Minimal one): linked to the layer")
 
 
 func test_a_new_room_and_the_setting() -> void:

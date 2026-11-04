@@ -44,7 +44,7 @@ extends Node
 ##
 ## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
 ## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shaders
-## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_CHIPS;
+## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
 ## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
@@ -179,7 +179,6 @@ const KIND_CAST: int = 8
 const KIND_DASH: int = 9
 const KIND_SPRAY: int = 11
 const KIND_PUFF: int = 12
-const KIND_CHIPS: int = 13
 const KIND_ARC: int = 14
 const KIND_STATUS: int = 15
 ## The ground struck (a part of the cues `quake` and `slam`): cracks cooling from white-hot,
@@ -206,7 +205,6 @@ const POOF_ZOOM: int = 2
 const POOF_ALONG: float = 4.0
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
-const CHIPS_SECONDS: float = 0.5
 ## A quake's seconds (its cracks cool and crumble away at the end), and its reach per zoom in
 ## pixels (QUAKE_REACH in the shader): its zoom is the reach struck times QUAKE_PAST over that.
 const QUAKE_SECONDS: float = 1.4
@@ -237,7 +235,6 @@ const CUE_EFFECTS: Dictionary = {
 	&"cast": [KIND_CAST, 12.0, CAST_SECONDS],
 	&"spray": [KIND_SPRAY, 12.0, SPRAY_SECONDS],
 	&"puff": [KIND_PUFF, 12.0, PUFF_SECONDS],
-	&"chips": [KIND_CHIPS, 12.0, CHIPS_SECONDS],
 	&"quake": [KIND_QUAKE, QUAKE_REACH, QUAKE_SECONDS],
 	&"shell": [KIND_SHELL, 2.0, SHELL_SECONDS],
 	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
@@ -1250,13 +1247,8 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share)
 		_show_impact(caster, ramp, position, direction, true)
 		return
-	# Knocked back off the surface: the shot's own motes and the wall's, or the chips effect with
-	# the "Particles" setting off.
-	if particles_enabled:
-		if _spectacle.pool != null:
-			_spectacle.shed_on_wall(ramp, position, -direction)
-		else:
-			show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
+	# Knocked back off the surface: the shot's own motes and the wall's.
+	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction, false)
 
 
@@ -1439,9 +1431,6 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 	if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
-		return
-	# The chips effect stands in for motes: with motes on, the cue's `motes` parts throw them.
-	if int(row[0]) == KIND_CHIPS and _spectacle.pool != null:
 		return
 	var seconds: float = float(part.get("seconds", row[2]))
 	if bool(part.get("lasts_size", false)):

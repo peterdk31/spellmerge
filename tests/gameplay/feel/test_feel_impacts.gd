@@ -128,16 +128,6 @@ func test_sprays_stay_inside_the_effect_slots_with_four_players() -> void:
 		check(feel.live_effects() <= feel.effect_slots, "within the effect slots (frame %d)" % frame)
 
 
-## With the "Particles" setting off (no motes; with them on, the chips are motes: test_motes.gd).
-func test_a_wall_hit_knocks_chips_back_off_the_wall() -> void:
-	feel.set_mote_cap(0)
-	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "one spray of chips")
-	var chips: Dictionary = feel.effect_info(FeelScript.KIND_CHIPS)
-	check((chips["dir"] as Vector2).is_equal_approx(Vector2.LEFT), "back the way the shot came")
-	check((chips["at"] as Vector2).is_equal_approx(Vector2(96.0, 100.0)), "at the wall")
-
-
 func test_a_wall_hit_shows_an_effect_in_its_casters_ramp() -> void:
 	for player in 4:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)

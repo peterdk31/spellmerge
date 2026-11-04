@@ -81,7 +81,6 @@ const float K_DASH = 9.0;
 const float K_BEAM = 10.0;
 const float K_SPRAY = 11.0;
 const float K_PUFF = 12.0;
-const float K_CHIPS = 13.0;
 const float K_ARC = 14.0;
 const float K_STATUS = 15.0;
 // An effect's age (or a rune's trace) travels as TRACE_FROM + TRACE_SPAN x the fraction

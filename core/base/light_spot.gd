@@ -18,9 +18,18 @@ extends RefCounted
 ## the sprite `light_art` names (`RoomBase.colours_of_art`; the first frame of an animated one),
 ## so a torch with a blue flame lights blue with no edit. `light_tint` overrides it when the art's
 ## colour reads wrong. A spot does not move once in the tree (room art).
+##
+## The light painted into the art (a torch's additive glow sprites) is in the group `painted_light`
+## (PAINTED): Feel's spell light hides it while it draws the spots' own light, so a torch is not lit
+## twice, and shows it again when the setting is off (docs/milestones/spell-spectacle-2.md, S6
+## item 12):
+##
+##     [node name="Glow" type="Sprite2D" parent="." groups=["painted_light"]]
 
 ## The group a light spot is in.
 const GROUP: StringName = &"light_spot"
+## The group of the light painted into a room's art, which the spots' light takes the place of.
+const PAINTED: StringName = &"painted_light"
 ## The metadata keys and what each is when it is missing.
 const REACH: StringName = &"light_reach"
 const STRENGTH: StringName = &"light_strength"

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The staff swap (living staffs H4; a cue since S6 item 9, docs/milestones/spell-spectacle-2.md):
-## `staff_shown` plays the cue `staff_swap` at the new staff's tip, along the aim, following the
-## body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
+## `staff_shown` plays the cue `staff_swap` along the whole new staff (its line: from the grip along
+## the aim for the staff's length, so a part can play anywhere on it), following the body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
 ## its body frame by frame exactly as the old poof's did, and ends when the body goes; the live cue
 ## shows something at StaffLook's swap of the body and face.
 ##
@@ -77,16 +77,17 @@ func _swap_cue(parts: Array[Dictionary]) -> void:
 	(_feel.get("_cue_cache") as Dictionary).clear()
 
 
-func test_a_staff_shown_plays_staff_swap_at_the_tip_following_the_body() -> void:
-	_swap_cue([{"effect": &"burst", "zoom": 1, "seconds": 0.2}])
+func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() -> void:
+	_swap_cue([{"effect": &"burst", "zoom": 1, "seconds": 0.2, "along": 1.0}, {"effect": &"ring_out", "zoom": 1, "seconds": 0.2}])
 	var body := _staff()
 	var tip: Vector2 = body.muzzle_position()
 	_bus.staff_shown.emit(body.id, body, STAFF)
+	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT).get("at"), body.aim_pivot().round(), "the cue's point is the staff's grip")
 	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
 	check(not shown.is_empty(), "its flash shows")
 	if shown.is_empty():
 		return
-	check_equal(shown["at"], tip.round(), "at the new staff's tip")
+	check_equal(shown["at"], tip.round(), "its line runs to the tip: a part along 1 plays there")
 	check_equal(shown["dir"], Vector2.UP, "along the aim")
 	# Frame by frame, the body walking: the flash stays on the tip it was played at.
 	var frames: int = 0
@@ -167,3 +168,16 @@ func test_the_looks_show_at_the_swap() -> void:
 			if type != &"motes" and float(part.get("seconds", 0.2)) >= swap - STEP:
 				at_swap = true
 		check(at_swap, "%s shows something at the swap" % id)
+
+
+## `along` is a fraction of the cue's line: a part outside 0 to 1 is a problem, and every part
+## type may say it (a motes part may also say `line`).
+func test_along_and_line_are_part_keys() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test_line"
+	var good: Array[Dictionary] = [{"effect": &"burst", "along": 0.5}, {"part": &"motes", "line": true, "along": 0.0}, {"part": &"light", "along": 1.0}]
+	cue.parts = good
+	check(cue.problems().is_empty(), "along on a flash, motes and a light, line on motes: %s" % [cue.problems()])
+	var bad: Array[Dictionary] = [{"effect": &"burst", "along": 1.5}]
+	cue.parts = bad
+	check(not cue.problems().is_empty(), "along past the line's end is a problem")

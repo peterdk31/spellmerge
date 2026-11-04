@@ -201,8 +201,8 @@ const POOF: int = 1 << 21
 ## The poof's own seconds (a `poof` part's when it gives none): StaffLook's POOF_TIME, the swap at
 ## 35% of them.
 const POOF_SECONDS: float = 0.18
-## Another staff on show plays the cue `staff_swap` (S6, item 9) at the new staff's tip, following
-## the body.
+## Another staff on show plays the cue `staff_swap` (S6, item 9) along the new staff, following the
+## body.
 const STAFF_SWAP: StringName = &"staff_swap"
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
@@ -1378,24 +1378,25 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	elif part.has("reach"):
 		zoom = roundi(cue.size * float(part["reach"]) * cue.power / float(row[1]))
 	var way: Vector2 = cue.way_of(part)
+	var at: Vector2 = cue.point_of(part)
 	var bits: int = int(CUE_EFFECT_LOOKS.get(StringName(part.get("effect", "")), 0))
 	var follow: Node2D = cue.follow if cue.follow != null and is_instance_valid(cue.follow) else null
 	var slot: int = -1
 	if part.has("color"):
-		slot = show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT | bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, part["color"] as Color, 0, EXACT | bits, zoom, seconds, length, follow)
 	elif bool(part.get("plain", false)):
-		slot = show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif bool(part.get("bare", false)):
-		slot = show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
 	elif bool(part.get("body", false)):
-		slot = show_effect(int(row[0]), cue.at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif cue.color.a > 0.0:
-		slot = show_effect(int(row[0]), cue.at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
 	else:
-		slot = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look | bits, zoom, seconds, length, follow)
+		slot = show_effect(int(row[0]), at, way, cue.tint, cue.ramp, cue.look | bits, zoom, seconds, length, follow)
 	# A followed cue's flash sits where it was played from its body (S6, item 9).
 	if follow != null and slot >= 0:
-		_effect_offset[slot] = cue.at - follow.global_position
+		_effect_offset[slot] = at - follow.global_position
 
 
 ## The cue `id` (`content/cues/<id>.tres`), or null when there is none or no registry yet. Read
@@ -2193,10 +2194,11 @@ func _pose_form(slot: int, t: float) -> void:
 	material.set_shader_parameter(&"beam_fade", t)
 
 
-## Another staff went on show (the personality swap, living staffs H4): the cue `staff_swap` at the
-## new staff's tip (`Actor.muzzle_position`, where its head changes), along the aim, following the
-## body, in the actor's ramp with the colour and cards of the new staff's first spell (S6, item 9).
-## StaffLook swaps the body and face at 35% of its POOF_TIME: the cue's look is timed to that.
+## Another staff went on show (the personality swap, living staffs H4): the cue `staff_swap` along
+## the whole new staff (the cue's line: played at its grip, `Actor.aim_pivot`, along the aim, its
+## size the staff's length to its tip, `Actor.reach`, so its parts can cover grip to tip), following
+## the body, in the actor's ramp with the colour and cards of the new staff's first spell (S6, item
+## 9). StaffLook swaps the body and face at 35% of its POOF_TIME: the cue's look is timed to that.
 func _on_staff_shown(caster: int, actor: Node, staff: int) -> void:
 	var body: Actor = actor as Actor
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
@@ -2210,8 +2212,7 @@ func _on_staff_shown(caster: int, actor: Node, staff: int) -> void:
 		if spell != null:
 			tint = spell.get(&"tint") as Color
 			look = int(spell.get(&"look"))
-	var at: Vector2 = body.muzzle_position()
-	play_cue(STAFF_SWAP, caster, at, body.aim, 0.0, tint, look, body.id, -1, -1, tag, true, Color(0.0, 0.0, 0.0, 0.0), body)
+	play_cue(STAFF_SWAP, caster, body.aim_pivot(), body.aim, body.reach(), tint, look, body.id, -1, -1, tag, true, Color(0.0, 0.0, 0.0, 0.0), body)
 
 
 ## A possession started: the cue `possess_start` on the possessed actor's body (a ring closing in

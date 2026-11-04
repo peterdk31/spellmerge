@@ -38,6 +38,11 @@ extends Resource
 ## at 35% of its seconds and dot away, a few sparks in the ramp; a puff with Feel's `POOF` look).
 ## The `arc` effect is drawn along its length: the cue's `size` x its `reach` (1 when not given)
 ## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
+## A cue's line (S6, item 9): its way for its `size` pixels from its point (a staff swap is played
+## at the staff's grip, along it, its size the staff's length). A flash, a motes part or a light
+## may say where on it it plays: `along`, 0 (the cue's point, the default) to 1 (the line's end; 0.5
+## its middle). A motes part with `line` true is thrown from all along the line instead of from one
+## point (each mote from a point of it at random): a staff unravelling into motes.
 ## A cue played on a body (`Feel.play_cue`'s `follow`: a staff's poof, a possession's ring) follows
 ## it: its flashes move with the body while they last, where they were played from it, and end
 ## when it is gone. Its motes, marks and lights stay where it played (they fly, lie and glow in
@@ -117,10 +122,10 @@ const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "share"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "share", "along", "line"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
-const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare"]
+const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS}
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
@@ -195,6 +200,8 @@ func problems() -> PackedStringArray:
 ## What else is wrong with the part `i` (`part`) of the type `type`: what its type checks beyond
 ## its keys and its way. A type with nothing more to check needs no line here.
 func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringArray:
+	if part.has("along") and (float(part["along"]) < 0.0 or float(part["along"]) > 1.0):
+		return PackedStringArray(["%s: part %d's along is not from 0 to 1" % [id, i]])
 	match type:
 		&"effect":
 			return _effect_problems(i, part)

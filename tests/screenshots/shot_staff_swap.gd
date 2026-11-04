@@ -1,10 +1,13 @@
 extends "res://tests/support/screenshot.gd"
 ## The staff swap's look (S6, item 9; docs/milestones/spell-spectacle-2.md): the wizard in the
-## sandbox puts its fire staff on show once for each look (no cast), and each is shown as a filmstrip of the frames
-## after the press (FRAMES: the swap of the body and face at 35% of 0.18 s, then what lingers), a
-## row a look, at 1x and at 4x: the old poof (living staffs H4, drawn as its code drew it), then the cue files `staff_swap` (the live one), `staff_swap_b` and `staff_swap_c`, for
-## the owner to pick. Each look is put in Feel's place for `staff_swap` while it plays; nothing
-## else changes. Rows top to bottom: ROWS. Also each row alone (`staff_swap_<row>_4x`).
+## sandbox puts its fire staff on show once for each look (no cast), and each is shown as a
+## filmstrip of the frames after it (FRAMES: the swap of the body and face at 35% of 0.18 s, then
+## what lingers), a row a look, at 1x and at 4x: the old poof (living staffs H4, drawn as its code
+## drew it), then the cue files `staff_swap` (the live one), `staff_swap_b` and `staff_swap_c`, for
+## the owner to pick. Each look covers the whole staff, grip to tip (the cue's line). Each is put in
+## Feel's place for `staff_swap` while it plays; nothing else changes. Rows top to bottom: ROWS.
+## Two staff angles (AIMS): `staff_swap_{1x,4x}` aimed up and right, `staff_swap_upright_{1x,4x}`
+## nearly straight up; also each row alone at 4x (`staff_swap[_upright]_<row>_4x`).
 
 ## The frames after the press each column shows (at 60 a second).
 const FRAMES: Array[int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 15, 20, 28]
@@ -16,6 +19,9 @@ const GAP: int = 2
 ## show (the fire bolt).
 const SPOT: Vector2 = Vector2(96.0, 250.0)
 const SHOWN: int = 1
+## The aims the sheets are taken at, and their names' endings.
+const AIMS: Array[Vector2] = [Vector2(1.0, -1.0), Vector2(0.12, -1.0)]
+const ENDINGS: Array[String] = ["", "_upright"]
 
 
 func take() -> void:
@@ -34,7 +40,6 @@ func take() -> void:
 	if not await wait_for(func() -> bool: return get_first_node_in_group(&"wizards") != null, 600):
 		fail("the sandbox did not start")
 		return
-	input.call("send_virtual_aim", 0, Vector2(1, -1).normalized())
 	var wizard: Node2D = get_first_node_in_group(&"wizards") as Node2D
 	wizard.global_position = SPOT
 	await settle()
@@ -51,40 +56,43 @@ func take() -> void:
 				fail("no cue " + String(id))
 				return
 			looks[id] = cue
-	var cell: Vector2i = HALF * 2
-	var sheet_1x := Image.create((cell.x + GAP) * FRAMES.size(), (cell.y + GAP) * ROWS.size(), false, Image.FORMAT_RGBA8)
-	sheet_1x.fill(Color(0.05, 0.05, 0.07))
 	var caster: Object = wizard.get("caster") as Object
-	for row in ROWS.size():
-		# Back to the dash staff (the look playing then is the last one's), and let it fade.
-		caster.call("_show", 0)
-		for i in 60:
-			await physics_frame
-		cache[&"staff_swap"] = looks[ROWS[row]]
-		# Put the staff on show as a press does (`Caster._show`: the body and face swap, `staff_shown`),
-		# without the cast a press also makes, whose flash and light would hide the look.
-		caster.call("_show", SHOWN)
-		if ROWS[row] == &"old":
-			_old_poof(feel, wizard as Actor)
-		var strip := Image.create((cell.x + GAP) * FRAMES.size(), cell.y, false, Image.FORMAT_RGBA8)
-		strip.fill(Color(0.05, 0.05, 0.07))
-		var frame: int = 0
-		for column in FRAMES.size():
-			while frame <= FRAMES[column]:
+	for a in AIMS.size():
+		var ending: String = ENDINGS[a]
+		input.call("send_virtual_aim", 0, AIMS[a].normalized())
+		var cell: Vector2i = HALF * 2
+		var sheet_1x := Image.create((cell.x + GAP) * FRAMES.size(), (cell.y + GAP) * ROWS.size(), false, Image.FORMAT_RGBA8)
+		sheet_1x.fill(Color(0.05, 0.05, 0.07))
+		for row in ROWS.size():
+			# Back to the dash staff (the look playing then is the last one's), and let it fade.
+			caster.call("_show", 0)
+			for i in 60:
 				await physics_frame
-				await process_frame
-				frame += 1
-			var image: Image = await grab()
-			var crop: Image = _crop(image, on_screen(wizard.global_position + Vector2(4.0, -14.0)))
-			strip.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), 0))
-			sheet_1x.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), row * (cell.y + GAP)))
-		strip.resize(strip.get_width() * 4, strip.get_height() * 4, Image.INTERPOLATE_NEAREST)
-		save(strip, "staff_swap_%s_4x" % ROWS[row])
+			cache[&"staff_swap"] = looks[ROWS[row]]
+			# Put the staff on show as a press does (`Caster._show`: the body and face swap, `staff_shown`),
+			# without the cast a press also makes, whose flash and light would hide the look.
+			caster.call("_show", SHOWN)
+			if ROWS[row] == &"old":
+				_old_poof(feel, wizard as Actor)
+			var strip := Image.create((cell.x + GAP) * FRAMES.size(), cell.y, false, Image.FORMAT_RGBA8)
+			strip.fill(Color(0.05, 0.05, 0.07))
+			var frame: int = 0
+			for column in FRAMES.size():
+				while frame <= FRAMES[column]:
+					await physics_frame
+					await process_frame
+					frame += 1
+				var image: Image = await grab()
+				var crop: Image = _crop(image, on_screen(wizard.global_position + Vector2(4.0, -14.0)))
+				strip.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), 0))
+				sheet_1x.blit_rect(crop, Rect2i(Vector2i.ZERO, cell), Vector2i(column * (cell.x + GAP), row * (cell.y + GAP)))
+			strip.resize(strip.get_width() * 4, strip.get_height() * 4, Image.INTERPOLATE_NEAREST)
+			save(strip, "staff_swap%s_%s_4x" % [ending, ROWS[row]])
+		save(sheet_1x, "staff_swap%s_1x" % ending)
+		var sheet_4x: Image = sheet_1x.duplicate() as Image
+		sheet_4x.resize(sheet_4x.get_width() * 4, sheet_4x.get_height() * 4, Image.INTERPOLATE_NEAREST)
+		save(sheet_4x, "staff_swap%s_4x" % ending)
 	cache.erase(&"staff_swap")
-	save(sheet_1x, "staff_swap_1x")
-	var sheet_4x: Image = sheet_1x.duplicate() as Image
-	sheet_4x.resize(sheet_4x.get_width() * 4, sheet_4x.get_height() * 4, Image.INTERPOLATE_NEAREST)
-	save(sheet_4x, "staff_swap_4x")
 
 
 ## HALF x 2 screen pixels of `image` round the screen point `at`, at one image pixel a screen pixel.

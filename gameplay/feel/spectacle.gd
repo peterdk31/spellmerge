@@ -345,18 +345,19 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var colours: StringName = StringName(part.get("colours", ""))
 	var of_surface: bool = named == &"surface" or colours == &"surface"
-	var at: Vector2 = cue.at + Vector2(0.0, float(part.get("below", 0.0)))
+	var at: Vector2 = cue.point_of(part) + Vector2(0.0, float(part.get("below", 0.0)))
+	var line: Vector2 = cue.line_of(part)
 	for k in kinds:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
 		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
 		if shed:
-			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true)
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true, line)
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring, false, line)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
@@ -398,16 +399,17 @@ func play_light_part(part: Dictionary, cue: CueContextScript) -> void:
 	reach *= cue.power
 	var strength: float = float(part.get("strength", LIGHT_STRENGTH))
 	var seconds: float = float(part.get("seconds", LIGHT_SECONDS))
+	var at: Vector2 = cue.point_of(part)
 	if part.has("color"):
-		light.flash(cue.at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
+		light.flash(at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
 	elif bool(part.get("plain", false)):
-		light.flash(cue.at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
+		light.flash(at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
 	elif bool(part.get("bare", false)):
-		light.flash(cue.at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
+		light.flash(at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
 	elif cue.color.a > 0.0:
-		light.flash(cue.at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
+		light.flash(at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
 	else:
-		light.flash(cue.at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
+		light.flash(at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
 
 
 # --- Settings ----------------------------------------------------------------------------------

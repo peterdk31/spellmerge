@@ -2,9 +2,10 @@ extends Node2D
 ## Motes (docs/milestones/spell-spectacle.md, P1): up to tens of thousands of single-pixel
 ## particles with no game logic, drawn by Feel. A mote is thrown from a point with a velocity
 ## along the floor, a fake height and a velocity up; `gameplay/feel/mote.gdshader` works out its
-## whole flight from its row and the time since its birth (it flies with drag, rises or falls,
-## lands, bounces once, lies still and cools through its ramp's shades). The CPU writes a row once
-## and never touches it again: there is no per-frame simulation.
+## whole flight from its burst's row, its own number in the burst and the time since its birth (it
+## flies with drag, rises or falls, lands, bounces once, lies still and cools through its ramp's
+## shades). The CPU writes a burst's row once and never touches it again: there is no per-frame
+## simulation, and no per-mote write (S4: a burst a row).
 ##
 ## **Kinds are data** (`MoteKind`, `content/motes/`): how one flies and how many a burst throws.
 ## The pool takes them when it is made and hands their numbers to the shader as a texture
@@ -24,23 +25,25 @@ extends Node2D
 ## table (`ramp_table`, a texture of RAMPS rows, `ramp_table.gd`; Feel shares one with the floor
 ## marks) and are named by their row.
 ##
-## The pool is a ring of `cap` rows (the "Particles" setting, `MoteCap` in core/settings): a new
-## mote takes the next row and overwrites the oldest. The ring is cut into CHUNK-row chunks, one
-## `MultiMeshInstance2D` each (made by `Batches.multimesh()`, so it is never culled; made the first
-## time a mote lands in it). `step` uploads only the chunks written since the last frame, so a
-## burst of 300 motes uploads one or two chunks (64 KB each), never the whole ring; a chunk whose
-## motes are all gone (by the longest life each of its bursts could give) is hidden and costs no
-## vertices. Nothing is allocated while playing, past a chunk's first use. A mote costs the CPU
-## about 2.3 us in a fight (its share of the shot's shed and its row; P1c, docs/DECISIONS.md), so
-## at most FRAME_ROWS are written between two steps: a burst past that is cut short, and a shed
-## once they are used up costs next to nothing (a storm's flood of hits stays within its budget).
+## The pool is three rings of rows (sized from `cap`, the "Particles" setting, `MoteCap` in
+## core/settings), one for each size of row (1, QUAD_ROW, BURST_QUADS quads): a new burst takes
+## the next rows of its ring and overwrites the oldest. Each ring is cut into chunks of CHUNK
+## quads, one `MultiMeshInstance2D` each (made by `Batches.multimesh()`, so it is never culled;
+## made the first time a row lands in it). `step` uploads only the chunks written since the last
+## frame, never a whole ring; a chunk whose motes are all gone (by the longest life each of its
+## bursts could give) is hidden and costs no vertices. Nothing is allocated while playing, past a
+## chunk's first use. A burst's call costs the CPU about 2.5 us whatever its size (its row's numbers
+## are packed once, a kind's own kept packed: `_kind_packs`), so at most FRAME_ROWS rows are
+## written between two steps: a burst past that is cut short, and a shed once they are used up
+## costs next to nothing (a storm's flood of hits stays within its budget).
 ##
-## Every row is written by `burst` (`shed`, `throw`, `throw_part` and the trails' `give_off` all
-## end there), at the names ROW_*. `flight` is the shader's `mote_flight` line for line (a test
-## holds the two to it); `mote_land` gives where and when a mote comes to rest. **Settled motes**
-## (P2b): a kind that names a floor mark (`MoteKind.settles`) leaves it where each of its motes
-## comes to rest, at that time (`settle_into` names the mark layer; `Marks.settle` keeps it until
-## then; SETTLE_ROWS a frame in a flood).
+## Every row is written by `_write` (`burst`, `shed`, `throw`, `throw_part`, `crumble` and the
+## trails' `give_off` all end there), at the names ROW_*. `flight` is the shader's `mote_flight`
+## line for line (a test holds the two to it); `mote_land` gives where and when a mote comes to
+## rest. **Settled motes** (P2b): a kind that names a floor mark (`MoteKind.settles`) leaves it
+## where each of its motes comes to rest, at that time (`settle_into` names the mark layer;
+## `Marks.settle` keeps it until then; SETTLE_ROWS a frame in a flood): the CPU works the resting
+## motes out from the same seed and hash (`_land`), only for those.
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -48,26 +51,58 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 
-## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
+## A row is a burst (spell spectacle 2, S4): where, which way, the kind, how many, a seed, the
+## source and the time. Its batch draws a quad per mote it can hold and the vertex shader works out
+## each mote from the row, its quad's number and the seed (`mote_randoms`, the same integer hash on
+## both sides), so a burst of 40 is three rows, not 40 writes. A quad past a row's count is still
+## sent through the vertex stage (folded away), so there are three rings by a row's quads: SINGLES
+## (one) for bursts of fewer than SPLIT motes (a trail's birth, a death's pixel), QUADS (QUAD_ROW)
+## for those of fewer than BURST_QUADS, BURSTS (BURST_QUADS) for the rest.
+const SINGLES: int = 0
+const QUADS: int = 1
+const BURSTS: int = 2
+const RINGS: int = 3
+const SPLIT: int = 3
+const QUAD_ROW: int = 4
+const BURST_QUADS: int = 16
+## Quads in a chunk of each ring (one batch, uploaded whole when any of its rows is written).
 const CHUNK: int = 1024
+## Each ring's rows, as a share of the cap (the motes the setting names): SINGLES cap / 2, QUADS
+## and BURSTS the cap's motes at a full row each.
+const SINGLES_SHARE: int = 2
 ## Floats in a row: the transform (8), the colour (4) and the custom data (4).
 const DRAW_STRIDE: int = 16
-## Where a row's numbers are (mote.gdshader's header says where it reads each): the velocity
-## along the floor (x, y), the birth on Feel's clock, the height's velocity, the ground point at
-## birth (x, y), the source / SOURCE_CODE, the kind / KIND_CODE, the life / LIFE_MAX, the height
-## at birth / HEIGHT_MAX, the core colour (r, g, b) and a seed. 2 and 6 are unused.
-const ROW_VX: int = 0
+## Where a row's numbers are (mote.gdshader's header says where it reads each). The transform's
+## eight floats are full floats; three of them hold two 12-bit numbers each (`_pair`), two a 24-bit
+## seed and the birth. The colour and custom data are 0-1 in byte steps.
+const ROW_AIM: int = 0
 const ROW_BORN: int = 1
+const ROW_SEED: int = 2
 const ROW_X: int = 3
-const ROW_VY: int = 4
-const ROW_VZ: int = 5
+const ROW_SPEED: int = 4
+const ROW_UP: int = 5
+const ROW_LIFE: int = 6
 const ROW_Y: int = 7
 const ROW_SOURCE: int = 8
 const ROW_KIND: int = 9
-const ROW_LIFE: int = 10
+const ROW_COUNT: int = 10
 const ROW_HEIGHT: int = 11
 const ROW_CORE: int = 12
-const ROW_SEED: int = 15
+## A 12-bit number's steps: a way (a 4,096th of a turn), half a spread (a 4,095th of half a turn),
+## a speed (a quarter px/s, 0 to 1,023.75), a speed up (a quarter px/s, -512 to 511.75), a life
+## (a 4,095th of LIFE_MAX).
+const AIM_STEP: float = TAU / 4096.0
+const HALF_STEP: float = PI / 4095.0
+const SPEED_STEP: float = 0.25
+const UP_LOW: float = -512.0
+const LIFE_STEP: float = MoteKind.LIFE_MAX / 4095.0
+## A burst's numbers packed once (`_pack_into`): where each is.
+const PACK_HALF: int = 0
+const PACK_SPEED: int = 1
+const PACK_UP: int = 2
+const PACK_LIFE: int = 3
+const PACK_LONGEST: int = 4
+const PACK_SIZE: int = 5
 ## The longest life a mote has (s; MoteKind's, which checks the kinds against it).
 const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## The most motes written between two steps, and of them the rows a shot's hit, end or wall hit
@@ -77,6 +112,8 @@ const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## rows cost about 2.5 us each, a moment's about 0.5.
 const FRAME_ROWS: int = 256
 const MOMENT_ROWS: int = 128
+## (S4) A burst's rows, not its motes, take the frame's rows; `frame_rows` is FRAME_ROWS unless a
+## benchmark sets it.
 ## The motes that leave a settled mark (`MoteKind.settles`): SETTLE_ROWS more may each frame, and
 ## what a frame leaves unused is kept, up to SETTLE_MOST. Working out where a mote rests and
 ## handing it to the mark layer costs about as much as writing a row (the integration of P1c, P1d
@@ -128,6 +165,11 @@ var settles_skipped: int = 0
 ## Every burst's count is times this (the "Particle amount" setting, `MoteDensity`; 0 throws
 ## none). A share of a mote is thrown that often, so the average holds.
 var density: float = 1.0
+var frame_rows: int = FRAME_ROWS:
+	set(value):
+		frame_rows = value
+		_moment_rows = value * MOMENT_ROWS / FRAME_ROWS
+var _moment_rows: int = MOMENT_ROWS
 
 var _cap: int = 0
 ## The kinds, in the order the shader holds them, and for each look layer (0-21) the kinds that
@@ -143,9 +185,17 @@ var _cards: Object = null
 ## `kinds_of_look`'s answers, by a look's layer bits (a shot's hit or end asks it, hundreds of
 ## times a frame in a storm; there are few looks).
 var _look_kinds: Dictionary[int, PackedInt32Array] = {}
-## The next row a mote takes.
-var _next: int = 0
-## Per chunk: its batch (null until its first mote), its rows, written since the last upload, and
+## Per ring: its rows, rows a chunk, quads a row, its first chunk and the next row a burst takes.
+var _ring_rows: PackedInt32Array = PackedInt32Array([0, 0, 0])
+var _ring_chunk: PackedInt32Array = PackedInt32Array([CHUNK, CHUNK / QUAD_ROW, CHUNK / BURST_QUADS])
+var _ring_quads: PackedInt32Array = PackedInt32Array([1, QUAD_ROW, BURST_QUADS])
+var _ring_first: PackedInt32Array = PackedInt32Array([0, 0, 0])
+var _ring_next: PackedInt32Array = PackedInt32Array([0, 0, 0])
+## Rows written to each ring since the pool was made: a settling mote's serial is its row's (in
+## the ring's serial space), so the mark layer forgets a settle whose row the ring overwrote
+## before it came to rest.
+var _ring_written: PackedInt32Array = PackedInt32Array([0, 0, 0])
+## Per chunk (every ring's, in ring order): its batch (null until its first mote), its rows, written since the last upload, and
 ## the clock time its last mote is gone by (its birth plus the longest life its burst could give).
 var _nodes: Array[MultiMeshInstance2D] = []
 var _buffers: Array[PackedFloat32Array] = []
@@ -159,9 +209,6 @@ var _now: float = 0.0
 var _rows_left: int = FRAME_ROWS
 var _keep: int = 0
 var _settles_left: int = SETTLE_MOST
-## Rows written since the pool was made: a mote's serial (the mark layer forgets a settle whose
-## mote the ring overwrote before it came to rest).
-var _serial: int = 0
 ## The ramp table (its own, or the one Feel shares with the floor marks).
 var _table: RampTableScript = null
 ## The mark layer settled motes go to (null for none), and per kind the mark it leaves (-1 none).
@@ -171,9 +218,14 @@ var _settle_marks: PackedInt32Array = PackedInt32Array()
 var _shape_image: Image = null
 var _kind_image: Image = null
 var _material: ShaderMaterial = null
-var _mesh: ArrayMesh = null
+var _meshes: Array[ArrayMesh] = []
 var _z: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## Per kind its own numbers packed (a shed's and a throw's), and a trail's (TRAIL_SPEED of its
+## speeds); a burst's own, packed for each call.
+var _kind_packs: Array[PackedFloat32Array] = []
+var _trail_packs: Array[PackedFloat32Array] = []
+var _pack: PackedFloat32Array = PackedFloat32Array()
 
 
 ## A pool of `cap` rows (above 0) of the kinds `kinds` (at most MAX_KINDS; a kind with problems
@@ -184,14 +236,19 @@ func _init(cap: int, z: int, kinds: Array[MoteKind], table: RampTableScript = nu
 	_cap = maxi(cap, 1)
 	_z = z
 	_rng.seed = 7
-	var chunks: int = ceili(float(_cap) / CHUNK)
+	var chunks: int = 0
+	for ring in RINGS:
+		_ring_rows[ring] = maxi(_cap / (SINGLES_SHARE if ring == SINGLES else _ring_quads[ring]), 1)
+		_ring_first[ring] = chunks
+		chunks += ceili(float(_ring_rows[ring]) / _ring_chunk[ring])
 	_nodes.resize(chunks)
 	_buffers.resize(chunks)
 	_dirty.resize(chunks)
 	_until.resize(chunks)
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
-	_mesh = _quad()
+	_meshes = [_quads(1), _quads(QUAD_ROW), _quads(BURST_QUADS)]
+	_pack.resize(PACK_SIZE)
 	_table = table if table != null else RampTableScript.new()
 	_material.set_shader_parameter(&"ramp_table", _table.texture())
 	_take_kinds(kinds)
@@ -305,7 +362,7 @@ func settle_mark(k: int) -> int:
 ## count, split between them) along `dir`, in the shot's own ramp. It leaves the frame's last
 ## MOMENT_ROWS to the moments, and writes nothing once only they are left.
 func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _rows_left <= _moment_rows:
 		cut += 1
 		return
 	shed_kinds(kinds_of_look(look), at, dir, core, ramp, look, scale)
@@ -314,7 +371,7 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 ## Whether a shed now writes nothing (only the frame's MOMENT_ROWS are left), counted as cut: ask it
 ## before working out a shed's kinds (`card_kinds.gd`), which costs more than a shed that is cut.
 func shed_closed() -> bool:
-	if _rows_left <= MOMENT_ROWS:
+	if _rows_left <= _moment_rows:
 		cut += 1
 		return true
 	return false
@@ -322,17 +379,16 @@ func shed_closed() -> bool:
 
 ## `shed` with the kinds `found` (a spell's, `card_kinds.gd`; never empty) in place of its look's.
 func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _rows_left <= _moment_rows:
 		cut += 1
 		return
 	if found.is_empty():
 		return
 	var source: int = spell_source(ramp, look)
 	var share: float = scale / float(found.size())
-	_keep = MOMENT_ROWS
+	_keep = _moment_rows
 	for k in found:
-		var kind: MoteKind = _kinds[k]
-		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
+		_write(k, at, dir, maxi(roundi(float(_kinds[k].count) * share), 1), _kind_packs[k], source, core, _kinds[k].height)
 	_keep = 0
 
 
@@ -341,7 +397,7 @@ func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color,
 ## as any burst): a kind of its look kind's layer (`kinds_of_layer`), given off back along the shot
 ## within its kind's spread at TRAIL_SPEED of its burst speed and speed up, in the shot's own ramp.
 ## A shot of a spell gives off its spell's kinds for that layer (`use_cards`).
-## Each is a one-mote `burst`, so a trail's mote is written, counted and settled as every other.
+## Each is a one-mote burst (`_write`, its kind's numbers kept packed), so a trail's mote is written, counted and settled as every other.
 func give_off(given: PackedFloat32Array, count: int) -> void:
 	count = mini(count, given.size() / BIRTH_STRIDE)
 	for n in count:
@@ -358,14 +414,13 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		if found.is_empty():
 			continue
 		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
-		var kind: MoteKind = _kinds[k]
 		births += 1
-		burst(k, Vector2(given[b + ProjectilesScript.SPARK_X], given[b + ProjectilesScript.SPARK_Y]),
+		_write(k, Vector2(given[b + ProjectilesScript.SPARK_X], given[b + ProjectilesScript.SPARK_Y]),
 			Vector2(given[b + ProjectilesScript.SPARK_BACK_X], given[b + ProjectilesScript.SPARK_BACK_Y]),
-			1, kind.speed * TRAIL_SPEED, kind.spread, kind.up * TRAIL_SPEED, kind.life,
+			1, _trail_packs[k],
 			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), int(given[b + ProjectilesScript.SPARK_LOOK])),
 			Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2]),
-			kind.height)
+			_kinds[k].height)
 
 
 ## The kinds of look layer `layer` (a look kind, LOOK_*), else those of layer 0.
@@ -379,14 +434,14 @@ func kinds_of_layer(layer: int) -> PackedInt32Array:
 ## and height) from `at` along `dir`, from `source` (`spell_source`, `table_source`) with the core
 ## colour `core` (a spell's; white for none). Like `shed`, it leaves the frame's last MOMENT_ROWS.
 func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _rows_left <= _moment_rows:
 		cut += 1
 		return
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	var kind: MoteKind = _kinds[k]
-	_keep = MOMENT_ROWS
-	burst(k, at, dir, maxi(roundi(float(kind.count) * scale), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
+	_keep = _moment_rows
+	_write(k, at, dir, maxi(roundi(float(kind.count) * scale), 1), _kind_packs[k], source, core, kind.height)
 	_keep = 0
 
 
@@ -399,7 +454,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
-	if often and _rows_left <= MOMENT_ROWS:
+	if often and _rows_left <= _moment_rows:
 		cut += 1
 		return
 	var kind: MoteKind = _kinds[k]
@@ -410,7 +465,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 		speed = Vector2(top * (kind.speed.x / maxf(kind.speed.y, 0.001)), top)
 	if ring:
 		speed.x = speed.y * 0.9
-	_keep = MOMENT_ROWS if often else 0
+	_keep = _moment_rows if often else 0
 	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life, source, core, kind.height)
 	_keep = 0
 
@@ -423,85 +478,157 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 ## the one place a row is made. A kind that settles leaves its mark where each mote comes to rest
 ## (as many as SETTLE_ROWS allows).
 func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
+	if k < 0 or k >= _kinds.size():
+		return
+	_pack_into(_pack, speed, spread, up, life)
+	_write(k, at, dir, count, _pack, source, core, height)
+
+
+## A burst's numbers as its rows hold them, into `pack` (PACK_* floats): half its spread, its
+## speeds, its speeds up and its lives as 12-bit pairs, and its longest life (s).
+static func _pack_into(pack: PackedFloat32Array, speed: Vector2, spread: float, up: Vector2, life: Vector2) -> void:
+	pack[PACK_HALF] = float(roundi(deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5 / HALF_STEP))
+	pack[PACK_SPEED] = float((roundi(clampf(speed.x, 0.0, 1023.75) / SPEED_STEP) << 12) | roundi(clampf(speed.y, 0.0, 1023.75) / SPEED_STEP))
+	pack[PACK_UP] = float((roundi((clampf(up.x, UP_LOW, -UP_LOW - SPEED_STEP) - UP_LOW) / SPEED_STEP) << 12) | roundi((clampf(up.y, UP_LOW, -UP_LOW - SPEED_STEP) - UP_LOW) / SPEED_STEP))
+	pack[PACK_LIFE] = float((roundi(clampf(life.x, 0.02, LIFE_MAX) / LIFE_STEP) << 12) | roundi(clampf(life.y, 0.02, LIFE_MAX) / LIFE_STEP))
+	pack[PACK_LONGEST] = clampf(life.y, 0.02, LIFE_MAX)
+
+
+## Write `count` motes (times `density`) of kind `k` (valid) from `at` along `dir` with the numbers
+## `pack` (`_pack_into`; a kind's own are kept, `_kind_packs`), `height` px above the floor: the one
+## place rows are made.
+func _write(k: int, at: Vector2, dir: Vector2, count: int, pack: PackedFloat32Array, source: int, core: Color, height: float) -> void:
 	if density != 1.0:
 		count = floori(float(count) * density + _rng.randf())
-	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
+	if count <= 0 or not at.is_finite() or source < 0:
 		return
+	var ring: int = SINGLES if count < SPLIT else (QUADS if count < BURST_QUADS else BURSTS)
+	var quads: int = _ring_quads[ring]
+	var rows: int = (count + quads - 1) / quads
 	var room: int = _rows_left - _keep
-	if count > room:
+	if rows > room:
 		cut += 1
-		count = room
-		if count <= 0:
+		rows = room
+		if rows <= 0:
 			return
+		count = mini(count, rows * quads)
 	# A settle costs about as much as a row, so it takes one of the frame's: the first `settling`
 	# motes of a settling kind leave their marks while rows and SETTLE_ROWS last.
 	var mark: int = _settle_marks[k] if _marks != null and k < _settle_marks.size() else -1
 	var settling: int = 0
 	if mark >= 0:
-		settling = mini(mini(count, _settles_left), room - count)
+		settling = mini(mini(count, _settles_left), room - rows)
 		_settles_left -= settling
 		settles += settling
 		settles_skipped += count - settling
-	_rows_left -= count + settling
+	_rows_left -= rows + settling
 	written += count
-	var aim: float = dir.angle() if dir != Vector2.ZERO else 0.0
-	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
 	# In steps of 1/255 of HEIGHT_MAX (a renderer may keep the row's colour as bytes).
-	height = roundf(clampf(height, 0.0, HEIGHT_MAX) / HEIGHT_MAX * 255.0) / 255.0 * HEIGHT_MAX
-	var ground: Vector2 = at + Vector2(0.0, height)
+	var coded_height: float = roundf(clampf(height, 0.0, HEIGHT_MAX) / HEIGHT_MAX * 255.0) / 255.0
+	height = coded_height * HEIGHT_MAX
+	var coded_aim: float = float(((roundi(dir.angle() / AIM_STEP) & 4095) << 12) | int(pack[PACK_HALF]))
+	var coded_speed: float = pack[PACK_SPEED]
+	var coded_up: float = pack[PACK_UP]
+	var coded_life: float = pack[PACK_LIFE]
 	var coded_source: float = float(source) / SOURCE_CODE
 	var coded_kind: float = float(k) / KIND_CODE
-	var coded_height: float = height / HEIGHT_MAX
-	var shortest: float = clampf(life.x, 0.02, LIFE_MAX)
-	var longest: float = clampf(life.y, 0.02, LIFE_MAX)
+	var until: float = _now + pack[PACK_LONGEST] + LIFE_STEP
+	var per: int = count / rows
+	var extra: int = count - per * rows
+	var chunk_rows: int = _ring_chunk[ring]
+	var first: int = _ring_first[ring]
+	var ring_rows: int = _ring_rows[ring]
 	var chunk: int = -1
 	var buffer: PackedFloat32Array
-	for n in count:
-		var row: int = _next
-		_next = (_next + 1) % _cap
-		var c: int = row / CHUNK
+	var settled: int = 0
+	for r in rows:
+		var row: int = _ring_next[ring]
+		_ring_next[ring] = (row + 1) % ring_rows
+		_ring_written[ring] += 1
+		var c: int = first + row / chunk_rows
 		if c != chunk:
 			chunk = c
 			if _nodes[c] == null:
-				_chunk(c)
+				_chunk(c, ring)
 			buffer = _buffers[c]
 			_dirty[c] = 1
-			# Shown until its last mote is gone (a life is written a 255th of LIFE_MAX up at most).
-			_until[c] = maxf(_until[c], _now + longest + LIFE_MAX / 255.0)
-		var v: Vector2 = Vector2.from_angle(aim + _rng.randf_range(-half, half)) * _rng.randf_range(speed.x, speed.y)
-		var i: int = (row - c * CHUNK) * DRAW_STRIDE
-		buffer[i + ROW_VX] = v.x
+			_until[c] = maxf(_until[c], until)
+		var i: int = (row % chunk_rows) * DRAW_STRIDE
+		var n: int = per + (1 if r < extra else 0)
+		var seed: int = _rng.randi() & 0xFFFFFF
+		buffer[i + ROW_AIM] = coded_aim
 		buffer[i + ROW_BORN] = _now
-		buffer[i + ROW_X] = ground.x
-		buffer[i + ROW_VY] = v.y
-		buffer[i + ROW_VZ] = _rng.randf_range(up.x, up.y)
-		buffer[i + ROW_Y] = ground.y
+		buffer[i + ROW_SEED] = float(seed)
+		buffer[i + ROW_X] = at.x
+		buffer[i + ROW_SPEED] = coded_speed
+		buffer[i + ROW_UP] = coded_up
+		buffer[i + ROW_LIFE] = coded_life
+		buffer[i + ROW_Y] = at.y + height
 		buffer[i + ROW_SOURCE] = coded_source
 		buffer[i + ROW_KIND] = coded_kind
-		# The life in 1/255 steps of LIFE_MAX.
-		buffer[i + ROW_LIFE] = roundf(_rng.randf_range(shortest, longest) / LIFE_MAX * 255.0) / 255.0
+		buffer[i + ROW_COUNT] = float(n) / 255.0
 		buffer[i + ROW_HEIGHT] = coded_height
 		buffer[i + ROW_CORE] = core.r
 		buffer[i + ROW_CORE + 1] = core.g
 		buffer[i + ROW_CORE + 2] = core.b
-		buffer[i + ROW_SEED] = _rng.randf()
-		if n < settling:
-			# Where and when it rests (`mote_land`'s sum), for the mark it leaves there; its serial
-			# lets the layer forget it if the ring writes over it first (`step`).
-			var land: Vector3 = _land(buffer, i, k)
+		# Where and when each settling mote rests (`mote_land`'s sum), for the mark it leaves there;
+		# its serial lets the layer forget it if the ring writes over it first (`step`).
+		var q: int = 0
+		while settled < settling and q < n:
+			var land: Vector3 = _land(buffer, i, k, q)
 			if is_finite(land.z):
-				_marks.settle(mark, Vector2(land.x, land.y).floor(), land.z, source, core, _serial + n)
-	_serial += count
+				_marks.settle(mark, Vector2(land.x, land.y).floor(), land.z, source, core, (ring << MarksScript.SERIAL_BITS) | (_ring_written[ring] - 1))
+			settled += 1
+			q += 1
+
+
+## The hash both sides work a mote's randoms out with (`mote_hash` in mote.gdshader): 32-bit,
+## its multipliers below 2^31 so a 64-bit int never overflows.
+static func mote_hash(x: int) -> int:
+	x &= 0xFFFFFFFF
+	x ^= x >> 16
+	x = (x * 2146121005) & 0xFFFFFFFF
+	x ^= x >> 15
+	x = (x * 739982445) & 0xFFFFFFFF
+	x ^= x >> 12
+	x = (x * 695872825) & 0xFFFFFFFF
+	x ^= x >> 15
+	return x
+
+
+## Mote `q` of a row of seed `seed`: its way (-1 to 1 of the half spread), speed, speed up and life
+## (0 to 1 between the row's two), and its own seed (0 to 1): the shader's `mote_randoms`.
+static func mote_randoms(seed: int, q: int) -> PackedFloat32Array:
+	var h1: int = mote_hash(seed * 16 + q)
+	var h2: int = mote_hash(h1)
+	return PackedFloat32Array([float(h1 >> 20) / 4096.0 * 2.0 - 1.0, float((h1 >> 8) & 4095) / 4096.0,
+		float(h2 >> 20) / 4096.0, float((h2 >> 8) & 4095) / 4096.0, float(((h1 & 255) << 8) | (h2 & 255)) / 65536.0])
+
+
+## Mote `q` of the row at `i` of `buffer` as the shader works it out: its velocity along the floor
+## (x, y), its speed up (z), its life (w) and its seed (`mote_seed`).
+func _mote(buffer: PackedFloat32Array, i: int, q: int) -> Array:
+	var r: PackedFloat32Array = mote_randoms(int(buffer[i + ROW_SEED]), q)
+	var aim: int = int(buffer[i + ROW_AIM])
+	var way: float = float(aim >> 12) * AIM_STEP + r[0] * float(aim & 4095) * HALF_STEP
+	var sp: int = int(buffer[i + ROW_SPEED])
+	var speed: float = lerpf(float(sp >> 12) * SPEED_STEP, float(sp & 4095) * SPEED_STEP, r[1])
+	var u: int = int(buffer[i + ROW_UP])
+	var vz: float = lerpf(float(u >> 12) * SPEED_STEP + UP_LOW, float(u & 4095) * SPEED_STEP + UP_LOW, r[2])
+	var l: int = int(buffer[i + ROW_LIFE])
+	var life: float = lerpf(float(l >> 12) * LIFE_STEP, float(l & 4095) * LIFE_STEP, r[3])
+	return [Vector4(cos(way) * speed, sin(way) * speed, vz, life), r[4]]
 
 
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those
 ## with nothing alive, and move the shader's clock on.
 func step(now: float) -> void:
 	_now = now
-	_rows_left = FRAME_ROWS
+	_rows_left = frame_rows
 	_settles_left = mini(_settles_left + SETTLE_ROWS, SETTLE_MOST)
 	if _marks != null:
-		_marks.forget_settles_before(_serial - _cap)
+		for ring in RINGS:
+			_marks.forget_settles_before(_ring_written[ring] - _ring_rows[ring], ring)
 	_material.set_shader_parameter(&"sim_time", now)
 	for c in _nodes.size():
 		var node: MultiMeshInstance2D = _nodes[c]
@@ -538,53 +665,97 @@ func chunks_shown() -> int:
 	return shown
 
 
-## The row the next mote takes.
-func next_row() -> int:
-	return _next
+## The row the next burst of ring `ring` takes.
+func next_row(ring: int = BURSTS) -> int:
+	return _ring_next[ring]
 
 
-## Where mote `row` is at the clock time `now`: its ground point (x, y) and its height (z); drawn
-## at the ground point raised by its height. Its row is read as written (for tests and P2).
-func mote_at(row: int, now: float) -> Vector3:
-	var buffer: PackedFloat32Array = _buffers[row / CHUNK]
-	var i: int = (row % CHUNK) * DRAW_STRIDE
-	return flight(Vector2(buffer[i + ROW_X], buffer[i + ROW_Y]), Vector2(buffer[i + ROW_VX], buffer[i + ROW_VY]), buffer[i + ROW_HEIGHT] * HEIGHT_MAX, buffer[i + ROW_VZ], now - buffer[i + ROW_BORN], _kind_of(buffer, i), buffer[i + ROW_SEED])
+## The rows written to each ring since the pool was made (x SINGLES, y QUADS, z BURSTS): a mark to
+## list the motes written after it (`motes_since`; for tests).
+func mark() -> Vector3i:
+	return Vector3i(_ring_written[SINGLES], _ring_written[QUADS], _ring_written[BURSTS])
 
 
-## Where and when mote `row` comes to rest on the floor: its point (x, y) and the clock time (z);
-## INF for z when it never does in its life (a kind that rises, or one gone before it lands).
-func mote_land(row: int) -> Vector3:
-	var buffer: PackedFloat32Array = _buffers[row / CHUNK]
-	var i: int = (row % CHUNK) * DRAW_STRIDE
-	return _land(buffer, i, _kind_of(buffer, i))
+## Every mote written since `since` (a `mark`; those the ring has written over since left out),
+## ring by ring, each as the shader works it out: its `ring`, `row` and `q`, `kind`, `source`,
+## `core`, `ground` (its ground point at birth), `height`, `vel` (along the floor), `vz`, `life`,
+## `born` and `seed` (for tests; it allocates).
+func motes_since(since: Vector3i = Vector3i.ZERO) -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	for ring in RINGS:
+		var rows: int = mini(_ring_written[ring] - since[ring], _ring_rows[ring])
+		for n in rows:
+			var row: int = posmod(_ring_next[ring] - rows + n, _ring_rows[ring])
+			var buffer: PackedFloat32Array = _buffers[_ring_first[ring] + row / _ring_chunk[ring]]
+			var i: int = (row % _ring_chunk[ring]) * DRAW_STRIDE
+			for q in roundi(buffer[i + ROW_COUNT] * 255.0):
+				var m: Array = _mote(buffer, i, q)
+				var v: Vector4 = m[0]
+				found.append({"ring": ring, "row": row, "q": q, "kind": _kind_of(buffer, i),
+					"source": roundi(buffer[i + ROW_SOURCE] * SOURCE_CODE),
+					"core": Color(buffer[i + ROW_CORE], buffer[i + ROW_CORE + 1], buffer[i + ROW_CORE + 2]),
+					"ground": Vector2(buffer[i + ROW_X], buffer[i + ROW_Y]), "height": buffer[i + ROW_HEIGHT] * HEIGHT_MAX,
+					"vel": Vector2(v.x, v.y), "vz": v.z, "life": v.w, "born": buffer[i + ROW_BORN], "seed": float(m[1])})
+	return found
 
 
-## `mote_land` of the row at `i` of `buffer`, of kind `k` (the settled marks' too, so the two are
-## one sum): `flight` at the time it comes to rest, its sums written out here (the settles call it
-## in a fight; a test holds its lines to the shader's).
-func _land(buffer: PackedFloat32Array, i: int, k: int) -> Vector3:
+## The rows of ring `ring` (for tests).
+func ring_rows(ring: int) -> int:
+	return _ring_rows[ring]
+
+
+## Mote `q` of row `row` of ring `ring` where it is at the clock time `now`: its ground point
+## (x, y) and its height (z); drawn at the ground point raised by its height (for tests and P2).
+func mote_at(ring: int, row: int, q: int, now: float) -> Vector3:
+	var buffer: PackedFloat32Array = _buffers[_ring_first[ring] + row / _ring_chunk[ring]]
+	var i: int = (row % _ring_chunk[ring]) * DRAW_STRIDE
+	var m: Array = _mote(buffer, i, q)
+	var v: Vector4 = m[0]
+	return flight(Vector2(buffer[i + ROW_X], buffer[i + ROW_Y]), Vector2(v.x, v.y), buffer[i + ROW_HEIGHT] * HEIGHT_MAX, v.z, now - buffer[i + ROW_BORN], _kind_of(buffer, i), m[1])
+
+
+## Where and when mote `q` of row `row` of ring `ring` comes to rest on the floor: its point (x, y)
+## and the clock time (z); INF for z when it never does in its life.
+func mote_land(ring: int, row: int, q: int) -> Vector3:
+	var buffer: PackedFloat32Array = _buffers[_ring_first[ring] + row / _ring_chunk[ring]]
+	var i: int = (row % _ring_chunk[ring]) * DRAW_STRIDE
+	return _land(buffer, i, _kind_of(buffer, i), q)
+
+
+## `mote_land` of mote `q` of the row at `i` of `buffer`, of kind `k` (the settled marks' too, so
+## the two are one sum): `flight` at the time it comes to rest, its sums written out here.
+func _land(buffer: PackedFloat32Array, i: int, k: int, q: int) -> Vector3:
 	var kind: MoteKind = _kinds[k]
 	var g: float = kind.gravity
 	if g <= 0.0:
 		return Vector3(INF, INF, INF)
+	# `mote_randoms` and `_mote` written out (no allocation: the settles call it in a fight).
+	var h1: int = mote_hash(int(buffer[i + ROW_SEED]) * 16 + q)
+	var h2: int = mote_hash(h1)
+	var u: int = int(buffer[i + ROW_UP])
+	var vz: float = lerpf(float(u >> 12) * SPEED_STEP + UP_LOW, float(u & 4095) * SPEED_STEP + UP_LOW, float(h2 >> 20) / 4096.0)
 	var h0: float = buffer[i + ROW_HEIGHT] * HEIGHT_MAX
-	var vz: float = buffer[i + ROW_VZ]
 	var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g
 	var rebound: float = (g * land - vz) * kind.bounce
 	var rest: float = land + 2.0 * rebound / g
-	if rest >= buffer[i + ROW_LIFE] * LIFE_MAX:
+	var l: int = int(buffer[i + ROW_LIFE])
+	if rest >= lerpf(float(l >> 12) * LIFE_STEP, float(l & 4095) * LIFE_STEP, float((h2 >> 8) & 4095) / 4096.0):
 		return Vector3(INF, INF, INF)
+	var aim: int = int(buffer[i + ROW_AIM])
+	var way: float = float(aim >> 12) * AIM_STEP + (float(h1 >> 20) / 4096.0 * 2.0 - 1.0) * float(aim & 4095) * HALF_STEP
+	var sp: int = int(buffer[i + ROW_SPEED])
+	var speed: float = lerpf(float(sp >> 12) * SPEED_STEP, float(sp & 4095) * SPEED_STEP, float((h1 >> 8) & 4095) / 4096.0)
 	var drag: float = kind.drag
-	var along: float = (1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest
-	var phase: float = buffer[i + ROW_SEED] * 6.2832
-	return Vector3(buffer[i + ROW_X] + buffer[i + ROW_VX] * along + kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase)),
-		buffer[i + ROW_Y] + buffer[i + ROW_VY] * along, buffer[i + ROW_BORN] + rest)
+	var along: float = ((1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest) * speed
+	var phase: float = float(((h1 & 255) << 8) | (h2 & 255)) / 65536.0 * 6.2832
+	return Vector3(buffer[i + ROW_X] + cos(way) * along + kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase)),
+		buffer[i + ROW_Y] + sin(way) * along, buffer[i + ROW_BORN] + rest)
 
 
-## The row of mote `row` as the shader reads it (a copy, for tests).
-func row_data(row: int) -> PackedFloat32Array:
-	var i: int = (row % CHUNK) * DRAW_STRIDE
-	return _buffers[row / CHUNK].slice(i, i + DRAW_STRIDE)
+## Row `row` of ring `ring` as the shader reads it (a copy, for tests).
+func row_data(ring: int, row: int) -> PackedFloat32Array:
+	var i: int = (row % _ring_chunk[ring]) * DRAW_STRIDE
+	return _buffers[_ring_first[ring] + row / _ring_chunk[ring]].slice(i, i + DRAW_STRIDE)
 
 
 ## Seconds after its birth a mote of kind `k` born `h0` above the floor, going up at `vz`, comes
@@ -679,6 +850,14 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			continue
 		var k: int = _kinds.size()
 		_kinds.append(kind)
+		var own := PackedFloat32Array()
+		own.resize(PACK_SIZE)
+		_pack_into(own, kind.speed, kind.spread, kind.up, kind.life)
+		_kind_packs.append(own)
+		var trail := PackedFloat32Array()
+		trail.resize(PACK_SIZE)
+		_pack_into(trail, kind.speed * TRAIL_SPEED, kind.spread, kind.up * TRAIL_SPEED, kind.life)
+		_trail_packs.append(trail)
 		var frames: int = kind.shape_frames().size()
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))
@@ -711,17 +890,18 @@ func kind_numbers(k: int) -> Array[Vector4]:
 	return numbers
 
 
-## Chunk `c`'s rows, making its batch the first time.
-func _chunk(c: int) -> PackedFloat32Array:
+## Chunk `c` (of ring `ring`)'s rows, making its batch the first time.
+func _chunk(c: int, ring: int) -> PackedFloat32Array:
 	if _nodes[c] == null:
-		var rows: int = mini(CHUNK, _cap - c * CHUNK)
+		var chunk_rows: int = _ring_chunk[ring]
+		var rows: int = mini(chunk_rows, _ring_rows[ring] - (c - _ring_first[ring]) * chunk_rows)
 		var multimesh: MultiMesh = BatchesScript.multimesh()
 		multimesh.use_colors = true
 		multimesh.use_custom_data = true
-		multimesh.mesh = _mesh
+		multimesh.mesh = _meshes[ring]
 		multimesh.instance_count = rows
 		var buffer := PackedFloat32Array()
-		# Every row starts with no life: folded away.
+		# Every row starts with no motes: folded away.
 		buffer.resize(rows * DRAW_STRIDE)
 		_buffers[c] = buffer
 		var node := MultiMeshInstance2D.new()
@@ -735,14 +915,26 @@ func _chunk(c: int) -> PackedFloat32Array:
 	return _buffers[c]
 
 
-## One quad: the shader places its corners (a vertex's UV is its corner).
-static func _quad() -> ArrayMesh:
+## `quads` quads: the shader places their corners (a vertex's UV is its corner, x plus twice its
+## quad's number).
+static func _quads(quads: int) -> ArrayMesh:
+	var vertices := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colours := PackedColorArray()
+	var indices := PackedInt32Array()
+	for q in quads:
+		var base: int = vertices.size()
+		for corner: Vector2 in [Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN]:
+			vertices.append(corner)
+			uvs.append(corner + Vector2(2.0 * q, 0.0))
+			colours.append(Color.WHITE)
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
-	arrays[Mesh.ARRAY_TEX_UV] = PackedVector2Array([Vector2.ZERO, Vector2.RIGHT, Vector2.ONE, Vector2.DOWN])
-	arrays[Mesh.ARRAY_COLOR] = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
-	arrays[Mesh.ARRAY_INDEX] = PackedInt32Array([0, 1, 2, 0, 2, 3])
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_COLOR] = colours
+	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	return mesh
@@ -756,11 +948,11 @@ static func _quad() -> ArrayMesh:
 func crumble(k: int, points: PackedVector2Array, feet: float, centre: Vector2, speed: Vector2, spread: float, up: Vector2, source: int, core: Color) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
-	var kind: MoteKind = _kinds[k]
+	_pack_into(_pack, speed, spread, up, _kinds[k].life)
 	for p in points:
 		if _rows_left <= 0:
 			cut += 1
 			break
 		var out: Vector2 = p - centre
-		burst(k, p, out if out != Vector2.ZERO else Vector2.UP, 1, speed, spread, up, kind.life, source, core, clampf(feet - p.y, 0.0, HEIGHT_MAX))
+		_write(k, p, out if out != Vector2.ZERO else Vector2.UP, 1, _pack, source, core, feet - p.y)
 

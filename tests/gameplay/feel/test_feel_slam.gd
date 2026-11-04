@@ -44,7 +44,7 @@ func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no expanding ring (too uniform)")
-	check(feel.motes().next_row() > 0, "stone chips off the floor, as motes")
+	check(feel.motes().written > 0, "stone chips off the floor, as motes")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"slam").shake), "a shake")
 	check(feel.kick().y > 0.0 and is_zero_approx(feel.kick().x), "a punch down the screen")
 

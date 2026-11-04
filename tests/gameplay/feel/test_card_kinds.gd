@@ -211,8 +211,8 @@ func test_a_trail_birth_gives_off_its_spells_kinds() -> void:
 		check_equal(ProjectilesScript.spark_tag(births, i), tag, "a spell's tag (above 2^24) is read back whole from its floats")
 	motes.give_off(births, 2)
 	var kinds: Array[StringName] = []
-	for row in 2:
-		kinds.append(motes.kinds()[roundi(motes.row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id)
+	for mote: Dictionary in motes.motes_since():
+		kinds.append(motes.kinds()[int(mote.kind)].id)
 	check_equal(kinds, [&"grit", motes.kinds()[motes.kinds_of_layer(layer)[0]].id] as Array[StringName], "heavy's birth gives off grit, sticky's its layer's")
 
 
@@ -252,17 +252,16 @@ func test_a_kind_that_names_nothing_is_thrown_only_where_named() -> void:
 	check(named, "the fireball cue names it")
 	var world: Array = _feel()
 	var feel: FeelScript = world[1]
-	var before: int = feel.motes().next_row()
+	var before: Vector3i = feel.motes().mark()
 	feel.play_cue(&"fireball", 0, Vector2(80.0, 80.0), Vector2.RIGHT, 30.0, Color(1.0, 0.5, 0.2), _look([&"fire"]))
 	var rows: Array[StringName] = []
 	var ash_source: int = -1
-	for row in range(before, feel.motes().next_row()):
-		var data: PackedFloat32Array = feel.motes().row_data(row)
-		var id: StringName = feel.motes().kinds()[roundi(data[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id
+	for mote: Dictionary in feel.motes().motes_since(before):
+		var id: StringName = feel.motes().kinds()[int(mote.kind)].id
 		if not rows.has(id):
 			rows.append(id)
 		if id == &"ash":
-			ash_source = roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
+			ash_source = mote.source
 	check(rows.has(&"ash"), "a fireball throws ash: %s" % [rows])
 	check(ash_source >= MotesScript.TABLE_SOURCE, "in the colours of what burned (its part's `colours`, a ramp-table row): %d" % ash_source)
 	var cue := CueBase.new()
@@ -283,11 +282,11 @@ func test_more_kinds_than_the_old_arrays_load_and_draw() -> void:
 	check_equal(motes.kinds().size(), 40, "every kind is kept (the shader held 16)")
 	check_equal(motes.kind_numbers(39)[0].x, 139.0, "the last kind's numbers are in its row")
 	motes.burst(39, Vector2.ZERO, Vector2.RIGHT, 1, Vector2(10.0, 10.0), 0.0, Vector2.ZERO, Vector2(1.0, 1.0), 0, Color.WHITE)
-	var data: PackedFloat32Array = motes.row_data(0)
+	var data: PackedFloat32Array = motes.row_data(MotesScript.SINGLES, 0)
 	check_equal(roundi(data[MotesScript.ROW_KIND] * MotesScript.KIND_CODE), 39, "a row names kind 39")
 	# As a renderer that keeps the colour as bytes reads it back.
 	check_equal(roundi(roundf(data[MotesScript.ROW_KIND] * 255.0) / 255.0 * MotesScript.KIND_CODE), 39, "and keeps naming it in bytes")
-	check(motes.mote_land(0).z < INF, "and it flies by its own numbers (mote_land reads them)")
+	check(motes.mote_land(MotesScript.SINGLES, 0, 0).z < INF, "and it flies by its own numbers (mote_land reads them)")
 
 
 func test_a_mark_naming_a_card_is_that_cards_spells_only() -> void:
@@ -328,16 +327,18 @@ func test_a_room_names_its_walls_kinds() -> void:
 	room.surface_kinds = [&"grit", &"no_such_kind"]
 	spectacle.use_room(room)
 	check_equal(spectacle.surface_kinds(), PackedInt32Array([feel.motes().kind_index(&"grit")]), "a room's own (an unknown one left out)")
-	var before: int = feel.motes().next_row()
+	var before: Vector3i = feel.motes().mark()
 	feel.projectiles.impact_look = 0
 	(world[0] as EventsScript).projectile_impact.emit(0, null, Vector2(60.0, 60.0), Vector2.RIGHT)
 	var rows: Array[StringName] = []
-	for row in range(before, feel.motes().next_row()):
-		var id: StringName = feel.motes().kinds()[roundi(feel.motes().row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id
+	var source: int = -1
+	for mote: Dictionary in feel.motes().motes_since(before):
+		var id: StringName = feel.motes().kinds()[int(mote.kind)].id
 		if not rows.has(id):
 			rows.append(id)
+		if id == &"grit":
+			source = mote.source
 	check(rows.has(&"grit") and not rows.has(&"chip"), "a wall hit sheds the room's kinds, not chips: %s" % [rows])
-	var source: int = roundi(feel.motes().row_data(feel.motes().next_row() - 1)[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
 	check(source >= MotesScript.TABLE_SOURCE, "in the walls' colours (a ramp-table row): %d" % source)
 
 
@@ -352,26 +353,26 @@ func test_feel_sheds_a_hits_and_a_cues_spell_kinds() -> void:
 	root.add_child(enemy)
 	own(enemy)
 	var motes: MotesScript = feel.motes()
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
 	feel.projectiles.impact_look = _look([&"fire", &"heavy"])
 	feel.projectiles.impact_tag = tag
 	bus.projectile_impact.emit(0, enemy, Vector2(60.0, 60.0), Vector2.RIGHT)
 	feel.projectiles.impact_tag = 0
 	check(_row_ids(motes, before).has(&"grit"), "a hit of the spell sheds its heavy's grit: %s" % [_row_ids(motes, before)])
-	before = motes.next_row()
+	before = motes.mark()
 	spells.cue_tag = tag
 	bus.cue_shown.emit(0, &"fireball", Vector2(90.0, 60.0), Vector2.RIGHT, 30.0, Color(1.0, 0.5, 0.2), _look([&"fire", &"heavy"]))
 	spells.cue_tag = 0
 	check(_row_ids(motes, before).has(&"grit"), "its blast's cue throws its cards' kinds too: %s" % [_row_ids(motes, before)])
-	before = motes.next_row()
+	before = motes.mark()
 	bus.cue_shown.emit(0, &"fireball", Vector2(90.0, 60.0), Vector2.RIGHT, 30.0, Color(1.0, 0.5, 0.2), _look([&"fire", &"heavy"]))
 	check(not _row_ids(motes, before).has(&"grit"), "a cue with no spell: its look's (heavy's layer has none)")
 
 
-func _row_ids(motes: MotesScript, from: int) -> Array[StringName]:
+func _row_ids(motes: MotesScript, from: Vector3i) -> Array[StringName]:
 	var found: Array[StringName] = []
-	for row in range(from, motes.next_row()):
-		var id: StringName = motes.kinds()[roundi(motes.row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id
+	for mote: Dictionary in motes.motes_since(from):
+		var id: StringName = motes.kinds()[int(mote.kind)].id
 		if not found.has(id):
 			found.append(id)
 	return found

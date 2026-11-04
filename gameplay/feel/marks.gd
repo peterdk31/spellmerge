@@ -98,10 +98,15 @@ var _live: bool = false
 var _settle: PackedFloat32Array = PackedFloat32Array()
 var _settle_count: PackedInt32Array = PackedInt32Array()
 var _settle_serial: PackedInt64Array = PackedInt64Array()
+## A settle's serial: its space (a pool's ring) above SERIAL_BITS, its count below.
+const SERIAL_BITS: int = 40
+const SERIAL_MASK: int = (1 << SERIAL_BITS) - 1
+const SERIAL_SPACES: int = 4
 var _settle_done: int = -1
 var _settle_started: bool = false
-## Settles whose serial is below this are gone (`forget_settles_before`).
-var _settle_forget: int = 0
+## Per serial space (a pool's ring; a serial's bits past SERIAL_BITS), settles whose serial is
+## below this are gone (`forget_settles_before`).
+var _settle_forget: PackedInt64Array = PackedInt64Array([0, 0, 0, 0])
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
@@ -269,9 +274,11 @@ func settle(k: int, at: Vector2, when: float, source: int, core: Color, serial: 
 	_settle[i + 6] = core.b
 
 
-## The motes of serials below `serial` are gone (overwritten in their ring): their settles fade.
-func forget_settles_before(serial: int) -> void:
-	_settle_forget = serial
+## The motes of serials below `serial` in serial space `space` (0 to SERIAL_SPACES - 1: a pool's
+## rings each count their own, a settle's serial is `space << SERIAL_BITS` plus its count) are gone
+## (overwritten in their ring): their settles fade.
+func forget_settles_before(serial: int, space: int = 0) -> void:
+	_settle_forget[space] = serial
 
 
 ## Settled motes waiting for their slot (for tests).
@@ -339,7 +346,7 @@ func settle_due(now: float) -> void:
 		budget -= drawn_here
 		for m in drawn_here:
 			var serial: int = _settle_serial[ring * SETTLE_SLOT_ROWS + m]
-			if serial >= 0 and serial < _settle_forget:
+			if serial >= 0 and (serial & SERIAL_MASK) < _settle_forget[serial >> SERIAL_BITS]:
 				settles_faded += 1
 				continue
 			var i: int = (ring * SETTLE_SLOT_ROWS + m) * SETTLE_STRIDE

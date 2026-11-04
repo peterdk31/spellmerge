@@ -29,6 +29,7 @@ extends Node
 ##
 ## Motes (docs/milestones/spell-spectacle.md, P1c): `--motes=N` sets Feel's "Particles" cap (0
 ## turns motes off; the platform's default otherwise) and `--mote-density=X` its "Particle amount".
+## `--mote-rows=N` sets the pool's rows a frame (`Motes.frame_rows`, FRAME_ROWS by default).
 ## Feel is handed a timed pool (`timed_motes.gd`), and the report's `BENCH: storm motes` line
 ## gives the motes written, the bursts the frame's FRAME_ROWS cut, the chunks uploaded and the
 ## CPU time of the mote pool's calls, each a frame and per 60th of a game second (a frame at
@@ -131,7 +132,11 @@ func _ready() -> void:
 				_feel.call(&"set_mote_density", arg.trim_prefix("--mote-density=").to_float())
 		var pool: Node = _motes()
 		if pool != null:
-			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), FeelScript.MOTE_Z, pool.call(&"kinds"), _feel.call(&"ramp_table")))
+			var timed: Node = TimedMotesScript.new(pool.call(&"cap"), FeelScript.MOTE_Z, pool.call(&"kinds"), _feel.call(&"ramp_table"))
+			for arg in args:
+				if arg.begins_with("--mote-rows="):
+					timed.set(&"frame_rows", maxi(arg.trim_prefix("--mote-rows=").to_int(), 1))
+			_feel.call(&"use_motes", timed)
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
@@ -337,7 +342,7 @@ func _report() -> void:
 		var written: int = int(motes.get(&"written")) - _motes_written_at
 		var usec: float = float(int(motes.get(&"usec")) - _mote_usec_at)
 		print("BENCH: storm motes: cap %d, density %.1f, FRAME_ROWS %d: %.0f written a frame (%.0f a 60th of a second, %d in all), %.0f bursts cut short by the frame's rows a frame, %.2f chunks uploaded a frame, %d of %d chunks shown at the end" % [
-			int(motes.call(&"cap")), float(motes.get(&"density")), TimedMotesScript.FRAME_ROWS,
+			int(motes.call(&"cap")), float(motes.get(&"density")), int(motes.get(&"frame_rows")) if motes.get(&"frame_rows") != null else TimedMotesScript.FRAME_ROWS,
 			float(written) / frames, float(written) / sixtieths, written,
 			float(int(motes.get(&"cut")) - _motes_cut_at) / frames,
 			float(int(motes.get(&"uploads")) - _mote_uploads_at) / frames,

@@ -15,7 +15,9 @@ extends SceneTree
 ##                                    shots: its light buffer's GPU time is printed too
 ##   ... -- --motes                   the mote scenes instead (P1c; `_mote_scene`): no shots, and
 ##                                    the mote ring full of motes in flight (none, the web's
-##                                    default, the desktop's)
+##                                    default, the desktop's), then the sandbox storm's bursts a
+##                                    frame (S4, STORM_MIX: its sizes, so a row's folded quads
+##                                    are paid as in a fight)
 ##   ... -- --marks                   the floor mark scene instead (P1c for P2a; `_mark_scene`):
 ##                                    frames with 300 new stamps and frames with none, by turns
 ##   ... -- --trail-motes             with a mote pool (Feel's, gameplay/feel/mote.gd) throwing the
@@ -64,7 +66,13 @@ const MOTE_SCENES: Array[Dictionary] = [
 	{"label": "motes web", "motes": MoteCap.DEFAULT_WEB},
 	{"label": "motes desktop", "motes": MoteCap.DEFAULT_DESKTOP},
 	{"label": "motes desktop, no glow", "motes": MoteCap.DEFAULT_DESKTOP, "glow": false},
+	{"label": "motes storm mix", "motes": MoteCap.DEFAULT_DESKTOP, "mix": true},
 ]
+## The sandbox storm's bursts a frame (S4: its bursts' sizes counted over a run on main,
+## 2026-11-04): [motes in a burst, bursts a frame], 156 motes a frame in all.
+const STORM_MIX: Array[Vector2] = [Vector2(1, 21.7), Vector2(2, 0.17), Vector2(3, 4.0), Vector2(6, 5.1), Vector2(10, 3.8), Vector2(16, 0.02), Vector2(32, 0.8)]
+## Frames of the storm's mix thrown before it is timed (past the longest life: a steady ring).
+const MIX_WARM: int = 300
 ## The mark scene (`--marks`): stamps on a frame with stamps, on a room the arena's size.
 const MARK_STAMPS: int = 300
 const MARK_ROOM := Rect2(0.0, 0.0, 704.0, 448.0)
@@ -320,7 +328,16 @@ func _mote_scene(scene: Dictionary) -> void:
 	registry.free()
 	var motes: MotesScript = null
 	var now: float = 0.0
-	if cap > 0:
+	var mix: bool = bool(scene.get("mix", false))
+	if mix:
+		motes = MotesScript.new(cap, 0, kinds)
+		root.add_child(motes)
+		_rng.seed = 20261104
+		for f in MIX_WARM:
+			now += DT
+			motes.step(now)
+			_throw_mix(motes, kinds)
+	elif cap > 0:
 		motes = MotesScript.new(cap, 0, kinds)
 		root.add_child(motes)
 		_rng.seed = 20261104
@@ -341,15 +358,34 @@ func _mote_scene(scene: Dictionary) -> void:
 		now += DT
 		if motes != null:
 			motes.step(now)
+			if mix:
+				_throw_mix(motes, kinds)
 		await process_frame
 		times.append(RenderingServer.viewport_get_measured_render_time_gpu(root.get_viewport_rid()))
-	var vertices: int = (motes.chunks_shown() * MotesScript.CHUNK * 4) if motes != null else 0
+	var vertices: int = 0
+	if motes != null:
+		for child in motes.get_children():
+			var batch := child as MultiMeshInstance2D
+			if batch != null and batch.visible:
+				vertices += batch.multimesh.instance_count * (batch.multimesh.mesh as ArrayMesh).surface_get_array_len(0)
 	if motes != null:
 		motes.free()
 	times = times.slice(_timed / 4)
 	times.sort()
 	print("BENCH: trail gpu %s: %d motes in flight (%d vertices a frame), GPU median %.2f ms, p95 %.2f ms" % [
 		label, cap, vertices, times[times.size() / 2], times[int(float(times.size()) * 0.95)]])
+
+
+## A frame of the storm's bursts (STORM_MIX), each of a random kind with its own numbers, from
+## random points of the view.
+func _throw_mix(motes: MotesScript, kinds: Array[MoteKind]) -> void:
+	for size: Vector2 in STORM_MIX:
+		var bursts: int = floori(size.y + _rng.randf())
+		for b in bursts:
+			var k: int = _rng.randi_range(0, kinds.size() - 1)
+			var kind: MoteKind = kinds[k]
+			var at := Vector2(_rng.randf_range(40.0, 600.0), _rng.randf_range(40.0, 320.0))
+			motes.burst(k, at, Vector2.from_angle(_rng.randf() * TAU), int(size.x), kind.speed, kind.spread, kind.up, kind.life, 0, Color(1.0, 0.6, 0.2), kind.height)
 
 
 ## The mark scene (`--marks`): a floor mark layer (gameplay/feel/marks.gd) the arena's size with

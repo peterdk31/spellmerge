@@ -133,7 +133,7 @@ func test_a_wall_hit_shows_an_effect_in_its_casters_ramp() -> void:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)
 	for player in 4:
 		check_equal(feel.effects_of(FeelScript.KIND_BURST, player), 1, "player %d's burst, in its hat ramp" % player)
-	check(feel.motes().next_row() >= 4, "and four sprays of motes off the wall")
+	check(feel.motes().written >= 4, "and four sprays of motes off the wall")
 
 
 func test_an_enemy_shot_on_a_wall_lands_in_the_enemy_ramp() -> void:

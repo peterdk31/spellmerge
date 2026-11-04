@@ -23,16 +23,22 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //   and its caster's ramp; any other ramp (a room's walls) is a row of `ramp_table` (white-hot,
 //   light, base, shadow across).
 //
-// A row (Motes.DRAW_STRIDE floats; the batch sits untransformed at the origin, so the transform
-// carries data, in full floats on every renderer):
-//   MODEL_MATRIX[0].xy  its velocity along the floor (px/s)
+// A row is a burst (Motes.DRAW_STRIDE floats; S4): its batch's mesh has a quad per mote a row can
+// hold (UV.x is a corner plus twice the quad's number q), and mote q of the row is worked out here
+// from the row and `mote_randoms(seed, q)`; the quads past its count are folded away. The batch
+// sits untransformed at the origin, so the transform carries data, in full floats on every
+// renderer (three of them two 12-bit numbers each, hi << 12 | lo):
+//   MODEL_MATRIX[0].x   its way (4,096ths of a turn) | half its spread (4,095ths of half a turn)
 //   MODEL_MATRIX[1].x   its birth, on `sim_time`'s clock (s)
-//   MODEL_MATRIX[1].y   its height's velocity, up (px/s)
-//   MODEL_MATRIX[3].xy  its ground point at birth (it is drawn there, raised by its height)
+//   MODEL_MATRIX[2].x   its seed (24 bits)
+//   MODEL_MATRIX[3].xy  its ground point at birth (each mote is drawn there, raised by its height)
+//   MODEL_MATRIX[0].y   its slowest | fastest speed (quarter px/s)
+//   MODEL_MATRIX[1].y   its least | most speed up (quarter px/s, from -512)
+//   MODEL_MATRIX[2].y   its shortest | longest life (4,095ths of LIFE_MAX)
 //   COLOR               its source / SOURCE_CODE (0-3 a hat ramp, 4 the enemies', +8 an exact
 //                       colour; from 16 a row of the ramp table), its kind / KIND_CODE, its
-//                       life / LIFE_MAX, its height at birth / HEIGHT_MAX
-//   INSTANCE_CUSTOM     the core colour (a spell's), a seed (0-1)
+//                       count / 255 (0 for none), its height at birth / HEIGHT_MAX
+//   INSTANCE_CUSTOM     the core colour (a spell's)
 // The colour and custom data are between 0 and 1 and need no more than bytes: a renderer may
 // keep them as half floats or bytes.
 //
@@ -59,6 +65,30 @@ const float TABLE_SOURCE = 16.0;
 const float GLOW_REACH = 2.0;
 // How far before now its way is read, to turn its shape (s).
 const float TURN_LOOK = 0.03;
+// Motes.AIM_STEP, HALF_STEP, SPEED_STEP, UP_LOW, LIFE_STEP.
+const float AIM_STEP = 6.28318530718 / 4096.0;
+const float HALF_STEP = 3.14159265359 / 4095.0;
+const float SPEED_STEP = 0.25;
+const float UP_LOW = -512.0;
+const float LIFE_STEP = LIFE_MAX / 4095.0;
+
+// Motes.mote_hash.
+uint mote_hash(uint x) {
+	x ^= x >> 16u;
+	x *= 2146121005u;
+	x ^= x >> 15u;
+	x *= 739982445u;
+	x ^= x >> 12u;
+	x *= 695872825u;
+	x ^= x >> 15u;
+	return x;
+}
+
+// The low and high 12-bit numbers of a packed float.
+vec2 unpair(float packed) {
+	uint v = uint(packed);
+	return vec2(float(v >> 12u), float(v & 4095u));
+}
 
 // The mote's pixel (its shape's middle), its shade and the shade hotter, its glow, its shape (the
 // atlas's square: kind's row, frame's column), the way it is turned (cos, sin; 1, 0 unturned),
@@ -113,17 +143,11 @@ vec3 mote_shade(float source, vec3 c, float s, int shade) {
 }
 
 void vertex() {
-	vec2 vel = MODEL_MATRIX[0].xy;
+	float qx = floor(UV.x * 0.5);
+	vec2 corner = vec2(UV.x - 2.0 * qx > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
+	int count = int(floor(COLOR.b * 255.0 + 0.5));
 	float born = MODEL_MATRIX[1].x;
-	float vz = MODEL_MATRIX[1].y;
-	vec2 from = MODEL_MATRIX[3].xy;
-	float source = floor(COLOR.r * SOURCE_CODE + 0.5);
-	int k = clamp(int(floor(COLOR.g * KIND_CODE + 0.5)), 0, MAX_KINDS - 1);
-	float life = COLOR.b * LIFE_MAX;
-	float h0 = COLOR.a * HEIGHT_MAX;
-	float s = INSTANCE_CUSTOM.a;
 	float t = sim_time - born;
-	bool alive = life > 0.0 && t >= 0.0 && t < life;
 	VERTEX = vec2(0.0);
 	m_px = vec2(0.0);
 	m_at = vec2(0.0);
@@ -132,8 +156,30 @@ void vertex() {
 	m_glow = 0.0;
 	m_cell = vec2(0.0);
 	m_turn = vec2(1.0, 0.0);
-	// An unused row has no life: folded away, with none of the work below.
+	// A quad past the row's count, or a row of no motes, is folded away with none of the work below.
+	float life = 0.0;
+	uint h1 = 0u;
+	uint h2 = 0u;
+	if (int(qx) < count && t >= 0.0) {
+		// Motes.mote_randoms.
+		h1 = mote_hash(uint(MODEL_MATRIX[2].x) * 16u + uint(qx));
+		h2 = mote_hash(h1);
+		vec2 lives = unpair(MODEL_MATRIX[2].y) * LIFE_STEP;
+		life = mix(lives.x, lives.y, float((h2 >> 8u) & 4095u) / 4096.0);
+	}
+	bool alive = t < life;
 	if (alive) {
+		vec2 aim = unpair(MODEL_MATRIX[0].x);
+		float heading = aim.x * AIM_STEP + (float(h1 >> 20u) / 4096.0 * 2.0 - 1.0) * aim.y * HALF_STEP;
+		vec2 speeds = unpair(MODEL_MATRIX[0].y) * SPEED_STEP;
+		vec2 vel = vec2(cos(heading), sin(heading)) * mix(speeds.x, speeds.y, float((h1 >> 8u) & 4095u) / 4096.0);
+		vec2 ups = unpair(MODEL_MATRIX[1].y) * SPEED_STEP + UP_LOW;
+		float vz = mix(ups.x, ups.y, float(h2 >> 20u) / 4096.0);
+		float s = float(((h1 & 255u) << 8u) | (h2 & 255u)) / 65536.0;
+		vec2 from = MODEL_MATRIX[3].xy;
+		float source = floor(COLOR.r * SOURCE_CODE + 0.5);
+		int k = clamp(int(floor(COLOR.g * KIND_CODE + 0.5)), 0, MAX_KINDS - 1);
+		float h0 = COLOR.a * HEIGHT_MAX;
 		vec4 motion = texelFetch(kind_table, ivec2(0, k), 0);
 		vec4 sway = texelFetch(kind_table, ivec2(1, k), 0);
 		vec4 shape = texelFetch(kind_table, ivec2(2, k), 0);
@@ -165,7 +211,6 @@ void vertex() {
 		// with none only its shape's pixels (P1c: most motes are a pixel or two, and their
 		// fragments were most of their cost).
 		reach = lit > 0.0 ? reach + GLOW_REACH : sway.w;
-		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
 		vec2 p = mix(pixel - reach, pixel + 1.0 + reach, corner);
 		VERTEX = p;
 		m_px = p;

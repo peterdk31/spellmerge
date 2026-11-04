@@ -332,15 +332,15 @@ func test_a_settled_mote_leaves_its_mark_where_it_rests() -> void:
 	var source: int = motes.table_source(PackedColorArray([Color("c8c3b4"), Color("8a8577"), Color("4e4a42")]))
 	motes.throw(1, Vector2(200.0, 150.0), Vector2.RIGHT, 2, Color.WHITE, 3.0)
 	check_equal(marks.settling(), 0, "embers rise: nothing settles")
-	var first: int = motes.next_row()
+	var first: Vector3i = motes.mark()
 	motes.throw(0, Vector2(200.0, 150.0), Vector2.RIGHT, source, Color.WHITE, 2.0)
-	var thrown: int = motes.next_row() - first
+	var thrown: Array[Dictionary] = motes.motes_since(first)
 	var lands: Array[Vector3] = []
-	for row in range(first, first + thrown):
-		var land: Vector3 = motes.mote_land(row)
+	for mote: Dictionary in thrown:
+		var land: Vector3 = motes.mote_land(mote.ring, mote.row, mote.q)
 		if land.z != INF:
 			lands.append(land)
-	check(thrown > 0 and lands.size() > 0, "chips are thrown (%d) and come to rest (%d)" % [thrown, lands.size()])
+	check(thrown.size() > 0 and lands.size() > 0, "chips are thrown (%d) and come to rest (%d)" % [thrown.size(), lands.size()])
 	check_equal(marks.settling(), lands.size(), "each one that rests in its life waits for its time")
 	var found: Dictionary = {}
 	var t: float = 0.0
@@ -529,11 +529,11 @@ func test_swaying_and_dragless_kinds_settle_where_they_rest() -> void:
 	var marks: MarksScript = pair[1]
 	var lands: Array[Vector3] = []
 	for k in 2:
-		var first: int = motes.next_row()
+		var first: Vector3i = motes.mark()
 		motes.burst(k, Vector2(200.0 + 100.0 * k, 150.0), Vector2.RIGHT, 6, Vector2(20.0, 60.0), 120.0, Vector2(10.0, 50.0), Vector2(2.0, 3.0), 2, Color.WHITE, 4.0)
-		for row in range(first, motes.next_row()):
-			var land: Vector3 = motes.mote_land(row)
-			check(land.z != INF, "row %d rests in its life" % row)
+		for mote: Dictionary in motes.motes_since(first):
+			var land: Vector3 = motes.mote_land(mote.ring, mote.row, mote.q)
+			check(land.z != INF, "mote %d of row %d rests in its life" % [mote.q, mote.row])
 			lands.append(land)
 	var stamped: Array[Vector3] = _stamped_over_time(marks)
 	check_equal(stamped.size(), lands.size(), "one speck a mote")
@@ -568,7 +568,7 @@ func test_a_trails_settling_motes_leave_their_marks() -> void:
 	motes.give_off(given, 4)
 	var resting: int = 0
 	for row in 4:
-		if motes.mote_land(row).z != INF:
+		if motes.mote_land(MotesScript.SINGLES, row, 0).z != INF:
 			resting += 1
 	check(resting > 0, "the flecks come to rest in their lives: %d" % resting)
 	check_equal(marks.settling(), resting, "and each waits to leave its speck")
@@ -601,11 +601,24 @@ func test_a_mote_written_over_before_it_rests_leaves_no_mark() -> void:
 	layer.step(0.0)
 	small.burst(0, Vector2(200.0, 150.0), Vector2.RIGHT, 8, chip.speed, chip.spread, chip.up, chip.life, 2, Color.WHITE, chip.height)
 	check_equal(layer.settling(), 8, "eight chips wait to settle")
-	# The ring (one chunk) is written over by embers before the chips rest.
+	# Their ring (bursts of 4 to 15) is written over by embers before the chips rest; a ring of its
+	# own counts its own rows, so embers in another ring leave them be.
 	var t: float = 0.0
 	for frame in 5:
 		t += 1.0 / 60.0
 		small.step(t)
-		small.burst(1, Vector2(400.0, 150.0), Vector2.RIGHT, 250, ember.speed, ember.spread, ember.up, ember.life, 2, Color.WHITE, ember.height)
+		small.burst(1, Vector2(400.0, 150.0), Vector2.RIGHT, 200 * MotesScript.BURST_QUADS, ember.speed, ember.spread, ember.up, ember.life, 2, Color.WHITE, ember.height)
 	small.step(t)
-	check_equal(_stamped_over_time(layer).size(), 0, "none of the written-over chips leaves a speck")
+	check(layer.settling() > 0 or _stamped_over_time(layer).size() > 0, "embers in another ring: the chips still settle")
+	var other: MarksScript = _layer([speck])
+	small.settle_into(other)
+	other.step(t)
+	small.burst(0, Vector2(200.0, 150.0), Vector2.RIGHT, 8, chip.speed, chip.spread, chip.up, chip.life, 2, Color.WHITE, chip.height)
+	check_equal(other.settling(), 8, "eight chips wait to settle")
+	for frame in 5:
+		t += 1.0 / 60.0
+		small.step(t)
+		for n in 100:
+			small.burst(1, Vector2(400.0, 150.0), Vector2.RIGHT, 8, ember.speed, ember.spread, ember.up, ember.life, 2, Color.WHITE, ember.height)
+	small.step(t)
+	check_equal(_stamped_over_time(other).size(), 0, "none of the written-over chips leaves a speck")

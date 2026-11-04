@@ -87,12 +87,11 @@ func _feel() -> Array:
 	return [bus, feel]
 
 
-## The kinds (by id) of the rows `from` to `to` (not included).
-func _kinds_of_rows(motes: MotesScript, from: int, to: int) -> Array[StringName]:
+## The kinds (by id) of the motes written since `since` (a `Motes.mark`).
+func _kinds_since(motes: MotesScript, since: Vector3i = Vector3i.ZERO) -> Array[StringName]:
 	var found: Array[StringName] = []
-	for row in range(from, to):
-		var k: int = roundi(motes.row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)
-		var id: StringName = motes.kinds()[k].id
+	for mote: Dictionary in motes.motes_since(since):
+		var id: StringName = motes.kinds()[int(mote.kind)].id
 		if not found.has(id):
 			found.append(id)
 	return found
@@ -101,6 +100,7 @@ func _kinds_of_rows(motes: MotesScript, from: int, to: int) -> Array[StringName]
 func test_the_ring_wraps_with_nothing_allocated() -> void:
 	var motes: MotesScript = _pool(2048)
 	# Every chunk's batch is made the first time a mote lands in it.
+	# A ring of 16-mote rows: 2048 motes' rows, two chunks of CHUNK quads.
 	_fill(motes, 2048)
 	check_equal(motes.chunks_made(), 2, "both chunks made")
 	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
@@ -108,20 +108,24 @@ func test_the_ring_wraps_with_nothing_allocated() -> void:
 		motes.burst(1, Vector2(float(n), 0.0), Vector2.ZERO, 100, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(0.2, 1.0), 2, Color("e0592f"))
 		motes.step(float(n) * 0.016)
 	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "10,000 more motes make no object")
-	check_equal(motes.next_row(), (2048 + 10000) % 2048, "the ring wrapped")
+	var rows: int = motes.ring_rows(MotesScript.BURSTS)
+	check_equal(motes.next_row(MotesScript.BURSTS), motes.mark().z % rows, "the ring wrapped")
+	check(motes.mark().z > rows, "past its rows: %d of %d" % [motes.mark().z, rows])
 
 
 func test_writing_past_the_cap_overwrites_the_oldest_row() -> void:
 	var motes: MotesScript = _pool(1024)
-	for n in 1024:
+	var rows: int = motes.ring_rows(MotesScript.SINGLES)
+	check_equal(rows, 1024 / MotesScript.SINGLES_SHARE, "a one-mote burst's ring")
+	for n in rows:
 		_chip(motes, Vector2(0.0, 0.0))
-		if n % 100 == 0:
+		if n % 50 == 0:
 			motes.step(0.0)
-	check_equal(motes.next_row(), 0, "full: the next mote takes the first row")
+	check_equal(motes.next_row(MotesScript.SINGLES), 0, "full: the next mote takes the first row")
 	_chip(motes, Vector2(500.0, 300.0))
-	var at: Vector3 = motes.mote_at(0, 0.0)
+	var at: Vector3 = motes.mote_at(MotesScript.SINGLES, 0, 0, 0.0)
 	check(Vector2(at.x, at.y).is_equal_approx(Vector2(500.0, 304.0)), "the oldest row is the newest mote now (its ground point 4 px below where it shows), got %s" % at)
-	check_equal(motes.mote_at(1, 0.0).x, 0.0, "the next row is still the old mote")
+	check_equal(motes.mote_at(MotesScript.SINGLES, 1, 0, 0.0).x, 0.0, "the next row is still the old mote")
 
 
 func test_only_the_chunks_written_upload() -> void:
@@ -133,25 +137,28 @@ func test_only_the_chunks_written_upload() -> void:
 	check_equal(motes.uploads, 1, "a burst of 150 in one chunk uploads it once")
 	motes.step(0.032)
 	check_equal(motes.uploads, 1, "a frame with no motes uploads nothing")
-	_fill(motes, 750, 0.048)
-	check_equal(motes.next_row(), 900, "900 written")
+	# 16-mote rows: CHUNK / 16 rows a chunk.
+	_fill(motes, MotesScript.CHUNK - 150 - 32 - 10, 0.048)
+	check_equal(motes.next_row(MotesScript.BURSTS), MotesScript.CHUNK / MotesScript.BURST_QUADS - 2, "a chunk's rows but two written")
 	var before: int = motes.uploads
-	motes.burst(0, Vector2.ZERO, Vector2.UP, 200, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	motes.burst(0, Vector2.ZERO, Vector2.UP, 64, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
 	motes.step(0.064)
 	check_equal(motes.uploads - before, 2, "a burst across a chunk's end uploads both chunks")
-	check_equal(motes.chunks_made(), 2, "two of the eight chunks made")
+	check_equal(motes.chunks_made(), 2, "two chunks made")
 
 
 func test_a_frame_writes_at_most_its_rows() -> void:
 	var motes: MotesScript = _pool(8192)
-	motes.burst(0, Vector2.ZERO, Vector2.UP, MotesScript.FRAME_ROWS + 100, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
-	check_equal(motes.next_row(), MotesScript.FRAME_ROWS, "a flood is cut at the frame's rows")
+	var most: int = MotesScript.FRAME_ROWS * MotesScript.BURST_QUADS
+	motes.burst(0, Vector2.ZERO, Vector2.UP, most + 100, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	check_equal(motes.mark(), Vector3i(0, 0, MotesScript.FRAME_ROWS), "a flood is cut at the frame's rows")
+	check_equal(motes.written, most, "BURST_QUADS motes a row")
 	_chip(motes, Vector2.ZERO)
-	check_equal(motes.next_row(), MotesScript.FRAME_ROWS, "and nothing more this frame")
+	check_equal(motes.written, most, "and nothing more this frame")
 	motes.step(0.016)
 	_chip(motes, Vector2.ZERO)
-	check_equal(motes.next_row(), MotesScript.FRAME_ROWS + 1, "the next frame writes again")
-	check_equal(motes.written, MotesScript.FRAME_ROWS + 1, "every mote written is counted")
+	check_equal(motes.mark(), Vector3i(1, 0, MotesScript.FRAME_ROWS), "the next frame writes again")
+	check_equal(motes.written, most + 1, "every mote written is counted")
 	check_equal(motes.cut, 2, "and each burst the frame's rows cut short or left out")
 
 
@@ -162,18 +169,21 @@ func test_a_shed_past_the_frames_rows_writes_nothing() -> void:
 	var motes: MotesScript = _pool(4096)
 	var sheds: int = MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS
 	check(sheds > 0 and MotesScript.MOMENT_ROWS > 0, "the sheds and the moments both have rows")
-	motes.burst(0, Vector2.ZERO, Vector2.UP, sheds, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	motes.burst(0, Vector2.ZERO, Vector2.UP, sheds * MotesScript.BURST_QUADS, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	var written: int = motes.written
 	motes.shed(Vector2.ZERO, Vector2.LEFT, Color.WHITE, 0, FIRE_LOOK)
 	motes.throw(motes.kind_index(&"chip"), Vector2.ZERO, Vector2.LEFT, 0, Color.WHITE)
-	check_equal(motes.next_row(), sheds, "with only the moments' rows left, a shed and a wall's throw take none")
+	check_equal(motes.written, written, "with only the moments' rows left, a shed and a wall's throw take none")
 	check_equal(motes.cut, 2, "both counted as cut")
 	motes.throw_part(motes.kind_index(&"ember"), Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, 360.0, 1.0, false)
-	check_equal(motes.next_row(), sheds + 40, "a cue's part still throws its motes")
-	motes.burst(0, Vector2.ZERO, Vector2.UP, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
-	check_equal(motes.next_row(), MotesScript.FRAME_ROWS, "up to the frame's rows")
+	check_equal(motes.written, written + 40, "a cue's part still throws its motes")
+	check_equal(motes.mark().z, sheds + 3, "in three rows")
+	motes.burst(0, Vector2.ZERO, Vector2.UP, MotesScript.FRAME_ROWS * MotesScript.BURST_QUADS, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	check_equal(motes.mark().z, MotesScript.FRAME_ROWS, "up to the frame's rows")
 	motes.step(0.016)
+	written = motes.written
 	motes.shed(Vector2.ZERO, Vector2.LEFT, Color.WHITE, 0, FIRE_LOOK)
-	check(motes.next_row() > MotesScript.FRAME_ROWS, "the next frame sheds again")
+	check(motes.written > written, "the next frame sheds again")
 
 
 func test_a_looks_kinds_are_kept_and_its_flags_ignored() -> void:
@@ -363,12 +373,11 @@ func test_a_shot_sheds_the_kinds_of_its_cards() -> void:
 	check_equal(motes.kinds_of_look(FIRE_LOOK | BIGGER_LOOK), PackedInt32Array([motes.kind_index(&"ember")]), "the layers that have kinds")
 	check(not motes.kinds_of_look(FIRE_LOOK).has(motes.kind_index(&"chip")), "never a surface kind")
 	motes.shed(Vector2.ZERO, Vector2.LEFT, Color("e0592f"), 2, FIRE_LOOK)
-	var shed: int = motes.next_row()
-	check(shed > 0, "a fire shot sheds")
-	check_equal(_kinds_of_rows(motes, 0, shed), [&"ember"], "embers")
-	var data: PackedFloat32Array = motes.row_data(0)
-	check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), 2, "in the ramp of its caster's shot")
-	check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(Color("e0592f")), "with its core colour")
+	check(motes.written > 0, "a fire shot sheds")
+	check_equal(_kinds_since(motes), [&"ember"], "embers")
+	var mote: Dictionary = motes.motes_since()[0]
+	check_equal(mote.source, 2, "in the ramp of its caster's shot")
+	check((mote.core as Color).is_equal_approx(Color("e0592f")), "with its core colour")
 
 
 func test_a_shot_of_two_layers_splits_its_motes() -> void:
@@ -378,13 +387,13 @@ func test_a_shot_of_two_layers_splits_its_motes() -> void:
 	var motes: MotesScript = _pool(4096, content)
 	var ember: MoteKind = motes.kinds()[motes.kind_index(&"ember")]
 	motes.shed(Vector2.ZERO, Vector2.LEFT, Color("e0592f"), 0, FIRE_LOOK)
-	check_equal(motes.next_row(), ember.count, "one kind: its whole burst")
-	var before: int = motes.next_row()
+	check_equal(motes.written, ember.count, "one kind: its whole burst")
+	var before: Vector3i = motes.mark()
 	motes.shed(Vector2.ZERO, Vector2.LEFT, Color("e0592f"), 0, FIRE_LOOK | LIGHTNING_LOOK)
-	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+	var kinds: Array[StringName] = _kinds_since(motes, before)
 	check(kinds.has(&"ember") and kinds.has(&"spark"), "fire and lightning: embers and sparks, got %s" % [kinds])
 	var spark: MoteKind = motes.kinds()[motes.kind_index(&"spark")]
-	check_equal(motes.next_row() - before, roundi(ember.count * 0.5) + roundi(spark.count * 0.5), "each half its burst")
+	check_equal(motes.written - ember.count, roundi(ember.count * 0.5) + roundi(spark.count * 0.5), "each half its burst")
 
 
 func test_a_spells_source_is_its_casters_ramp_and_flags() -> void:
@@ -435,25 +444,32 @@ func test_mote_land_is_where_its_flight_comes_to_rest() -> void:
 	var motes: MotesScript = _pool(1024)
 	motes.step(2.0)
 	_chip(motes, Vector2(100.0, 100.0))
-	var land: Vector3 = motes.mote_land(0)
+	var single: int = MotesScript.SINGLES
+	var land: Vector3 = motes.mote_land(single, 0, 0)
 	check(land.z > 2.0 and land.z < 2.0 + MotesScript.LIFE_MAX, "it comes to rest in its life, got %s" % land)
-	var rest: Vector3 = motes.mote_at(0, land.z)
+	var rest: Vector3 = motes.mote_at(single, 0, 0, land.z)
 	check(is_zero_approx(rest.z) and Vector2(rest.x, rest.y).is_equal_approx(Vector2(land.x, land.y)), "on the floor where mote_land says, got %s" % rest)
-	check(motes.mote_at(0, land.z + 0.5).is_equal_approx(rest), "and lies still")
+	check(motes.mote_at(single, 0, 0, land.z + 0.5).is_equal_approx(rest), "and lies still")
 	check(land.x > 100.0, "thrown right along the floor")
-	check(motes.mote_at(0, 2.05).z > 0.0, "up in the air at first")
+	check(motes.mote_at(single, 0, 0, 2.05).z > 0.0, "up in the air at first")
 	var g: float = motes.kinds()[0].gravity
 	var first: float = 2.0 + (50.0 + sqrt(50.0 * 50.0 + 2.0 * g * 4.0)) / g
 	check(first < land.z, "it lands before it comes to rest")
-	check(motes.mote_at(0, (first + land.z) * 0.5).z > 0.0, "it bounces up between")
+	check(motes.mote_at(single, 0, 0, (first + land.z) * 0.5).z > 0.0, "it bounces up between")
+	# A burst row: every mote lands where its flight says.
+	motes.burst(0, Vector2(50.0, 80.0), Vector2.UP, 16, Vector2(20.0, 90.0), 300.0, Vector2(10.0, 60.0), Vector2(3.0, 3.5), 0, Color.WHITE, 6.0)
+	for q in 16:
+		var landed: Vector3 = motes.mote_land(MotesScript.BURSTS, 0, q)
+		var there: Vector3 = motes.mote_at(MotesScript.BURSTS, 0, q, landed.z + 0.01)
+		check(is_zero_approx(there.z) and Vector2(there.x, there.y).distance_to(Vector2(landed.x, landed.y)) < 0.01, "mote %d of a row rests where mote_land says: %s, %s" % [q, landed, there])
 
 
 func test_a_mote_that_never_lands_has_no_rest() -> void:
 	var motes: MotesScript = _pool(1024)
 	motes.burst(1, Vector2.ZERO, Vector2.ZERO, 1, Vector2(5.0, 5.0), 360.0, Vector2(20.0, 20.0), Vector2(2.0, 2.0), 0, Color.WHITE)
-	check(is_inf(motes.mote_land(0).z), "a kind that rises never lands")
+	check(is_inf(motes.mote_land(MotesScript.SINGLES, 0, 0).z), "a kind that rises never lands")
 	_chip(motes, Vector2.ZERO, 0.05)
-	check(is_inf(motes.mote_land(1).z), "one gone before it lands has no rest")
+	check(is_inf(motes.mote_land(MotesScript.SINGLES, 1, 0).z), "one gone before it lands has no rest")
 
 
 func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
@@ -466,16 +482,18 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	feel.projectiles.impact_look = FIRE_LOOK
 	feel.projectiles.impact_core = Color("e0592f")
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember"], "before any room: only the shot's own")
-	for row in motes.next_row():
-		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
+	check_equal(_kinds_since(motes), [&"ember"], "before any room: only the shot's own")
+	for mote: Dictionary in motes.motes_since():
+		check((mote.vel as Vector2).x < 0.0, "mote %d flies back off the wall" % mote.q)
 	bus.room_entered.emit(ARENA)
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+	var kinds: Array[StringName] = _kinds_since(motes, before)
 	check(kinds.has(&"ember") and kinds.has(&"chip"), "in a room: the shot's and the wall's, got %s" % [kinds])
-	var chip_row: int = motes.next_row() - 1
-	var source: int = roundi(motes.row_data(chip_row)[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
+	var source: int = -1
+	for mote: Dictionary in motes.motes_since(before):
+		if motes.kinds()[int(mote.kind)].id == &"chip":
+			source = mote.source
 	var room := registry.get_resource(&"rooms", ARENA) as RoomBase
 	check(source >= MotesScript.TABLE_SOURCE and motes.table_shade(source, 3).is_equal_approx(room.surface_colors()[2]), "the chips in the room's wall colours")
 	feel.step(0.016)
@@ -495,13 +513,13 @@ func test_particles_has_no_off_its_least_is_a_minimal_ring() -> void:
 	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[0], "a 0 is the Minimal ring")
 	check_equal(feel.mote_cap, MoteCap.STOPS[0], "the setting taken")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "a wall still sheds its chips as motes")
+	check(_kinds_since(feel.motes()).has(&"chip"), "a wall still sheds its chips as motes")
 	check_equal(feel.live_effects(), 1, "and only the shot's burst is an effect")
 	feel.step(0.016)
 	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
 	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[1], "on again at the new cap")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "and the room's walls still shed")
+	check(_kinds_since(feel.motes()).has(&"chip"), "and the room's walls still shed")
 	check_equal(feel.set_mote_cap(1 << 20), MoteCap.STOPS[-1], "never past the top stop")
 
 
@@ -516,7 +534,7 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 	check(feel.motes() == timed and feel.find_child("Motes", true, false) == timed, "the pool handed is Feel's motes")
 	check_equal(feel.mote_cap, MoteCap.STOPS[1], "its cap is the setting's")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check(_kinds_of_rows(timed, 0, timed.next_row()).has(&"chip"), "a wall hit sheds into it, in the room's colours")
+	check(_kinds_since(timed).has(&"chip"), "a wall hit sheds into it, in the room's colours")
 	check(int(timed.get(&"usec")) >= 0 and timed.written > 0, "and it counts what it wrote")
 
 
@@ -525,10 +543,10 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 
 ## The rows written by `call` (a Callable taking nothing), as the kinds (by id) they are.
 func _shed_by(motes: MotesScript, call: Callable) -> Array[StringName]:
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
 	call.call()
 	motes.step(0.0)
-	return _kinds_of_rows(motes, before, motes.next_row())
+	return _kinds_since(motes, before)
 
 
 ## A body that dies: a node with a `Sprite` of a 2x1 sheet whose shown frame is in `colours`.
@@ -559,8 +577,8 @@ func test_a_hit_on_a_body_sheds_the_shots_kinds_back_along_its_way() -> void:
 	var target: Node2D = _body(PackedColorArray([Color.GRAY]))
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.projectile_impact.emit(1, target, Vector2(50.0, 50.0), Vector2.RIGHT))
 	check_equal(kinds, [&"fleck"], "a frost shot's flecks")
-	for row in motes.next_row():
-		check(motes.row_data(row)[MotesScript.ROW_VX] <= 0.0, "mote %d flies back the way the shot came" % row)
+	for mote: Dictionary in motes.motes_since():
+		check((mote.vel as Vector2).x <= 0.0, "mote %d flies back the way the shot came" % mote.q)
 	feel.particles_enabled = false
 	check_equal(_shed_by(motes, func() -> void: bus.projectile_impact.emit(1, target, Vector2(50.0, 50.0), Vector2.RIGHT)), [] as Array[StringName], "none with particles off (the stress benchmark)")
 
@@ -586,16 +604,22 @@ func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.reaction_triggered.emit(0, &"shatter", Vector2(64.0, 64.0), -1))
 	check_equal(kinds, [&"spark"], "no shot: layer 0's kinds")
 	var tint: Color = feel.preset.reaction_colors.get(&"shatter", Color.WHITE) as Color
-	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own.
+	# Two rings: the puff's sparks (S3: motes, thrown with its flash) and the reaction's own, each
+	# its own rows.
 	var puff: int = feel.preset.puff_mote_count
-	check(motes.next_row() > puff, "the puff's sparks, then the reaction's ring")
-	for group: Vector2i in [Vector2i(0, puff), Vector2i(puff, motes.next_row())]:
-		var speeds: Array[float] = []
-		for row in range(group.x, group.y):
-			var data: PackedFloat32Array = motes.row_data(row)
-			check(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE) >= MotesScript.EXACT_SOURCE, "in an exact colour")
-			check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(tint), "the reaction's")
-			speeds.append(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length())
+	check(motes.written > puff, "the puff's sparks, then the reaction's ring")
+	# A row holds one burst's motes: every row's motes are about as fast.
+	var rows: Dictionary = {}
+	for mote: Dictionary in motes.motes_since():
+		check(int(mote.source) >= MotesScript.EXACT_SOURCE, "in an exact colour")
+		check((mote.core as Color).is_equal_approx(tint), "the reaction's")
+		var key: Vector2i = Vector2i(mote.ring, mote.row)
+		if not rows.has(key):
+			rows[key] = [] as Array[float]
+		(rows[key] as Array[float]).append((mote.vel as Vector2).length())
+	check(rows.size() >= 2, "the two rings' rows: %d" % rows.size())
+	for key: Vector2i in rows:
+		var speeds: Array[float] = rows[key]
 		check(speeds.min() >= speeds.max() * 0.89, "a ring: all about as fast, got %s to %s" % [speeds.min(), speeds.max()])
 
 
@@ -608,17 +632,16 @@ func test_an_enemy_death_sheds_the_killing_shots_kinds_and_its_own_colours() -> 
 	feel.projectiles.set_look(shot, FIRE_LOOK)
 	var art := PackedColorArray([Color("d8d0b8"), Color("a09478"), Color("5c5444")])
 	var enemy: Node2D = _body(art)
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
 	bus.enemy_died.emit(1, enemy, Vector2(40.0, 40.0), shot)
-	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+	var kinds: Array[StringName] = _kinds_since(motes, before)
 	check(kinds.has(&"ember") and kinds.has(&"chip"), "the killing shot's embers and the body's chips, got %s" % [kinds])
 	var chips: int = 0
-	for row in range(before, motes.next_row()):
-		var data: PackedFloat32Array = motes.row_data(row)
-		if motes.kinds()[roundi(data[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id != &"chip":
+	for mote: Dictionary in motes.motes_since(before):
+		if motes.kinds()[int(mote.kind)].id != &"chip":
 			continue
 		chips += 1
-		var source: int = roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
+		var source: int = mote.source
 		check(source >= MotesScript.TABLE_SOURCE and motes.table_shade(source, 1).is_equal_approx(art[0]) and motes.table_shade(source, 3).is_equal_approx(art[2]), "a chip in the colours of the frame the body shows, not the room's or the sheet's")
 	var boss_cue: CueBase = registry.get_resource(&"cues", &"boss_death") as CueBase
 	var death_cue: CueBase = registry.get_resource(&"cues", &"enemy_death") as CueBase
@@ -632,18 +655,19 @@ func test_the_dense_cues_throw_their_kinds() -> void:
 	var motes: MotesScript = feel.motes()
 	bus.room_entered.emit(ARENA)
 	for id: StringName in [&"blast", &"fireball", &"slam", &"quake", &"nova", &"enemy_death", &"boss_death"]:
-		var before: int = motes.next_row()
+		var before: Vector3i = motes.mark()
+		var was: int = motes.written
 		feel.play_cue(id, 0, Vector2(100.0, 100.0), Vector2.RIGHT, 48.0, Color.WHITE, FIRE_LOOK)
-		var written: int = motes.next_row() - before
-		var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+		var written: int = motes.written - was
+		var kinds: Array[StringName] = _kinds_since(motes, before)
 		check(written >= 8, "%s throws motes, got %d" % [id, written])
 		if id != &"quake" and id != &"nova":
 			check(kinds.has(&"ember") and kinds.has(&"chip"), "%s: its cards' and the ground's, got %s" % [id, kinds])
 		motes.step(0.0)
 	feel.particles_enabled = false
-	var at: int = motes.next_row()
+	var at: int = motes.written
 	feel.play_cue(&"blast", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 48.0)
-	check_equal(motes.next_row(), at, "none with particles off")
+	check_equal(motes.written, at, "none with particles off")
 
 
 func test_a_parts_reach_is_as_far_as_its_motes_glide() -> void:
@@ -652,10 +676,9 @@ func test_a_parts_reach_is_as_far_as_its_motes_glide() -> void:
 	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 200, 40.0, 360.0, 1.0, false)
 	var drag: float = motes.kinds()[k].drag
 	var farthest: float = 0.0
-	for row in motes.next_row():
-		var data: PackedFloat32Array = motes.row_data(row)
-		farthest = maxf(farthest, Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length() / drag)
-	check(farthest <= 40.0 + 0.01 and farthest > 30.0, "they glide out to the reach at the most, got %s" % farthest)
+	for mote: Dictionary in motes.motes_since():
+		farthest = maxf(farthest, (mote.vel as Vector2).length() / drag)
+	check(farthest <= 40.0 + MotesScript.SPEED_STEP / drag and farthest > 30.0, "they glide out to the reach at the most, got %s" % farthest)
 
 
 func test_the_particle_amount_scales_every_burst() -> void:
@@ -665,25 +688,25 @@ func test_the_particle_amount_scales_every_burst() -> void:
 	var motes: MotesScript = feel.motes()
 	var k: int = motes.kind_index(&"chip")
 	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, -1.0, 1.0, false)
-	check_equal(motes.next_row(), 40, "at Full, as many as asked")
+	check_equal(motes.written, 40, "at Full, as many as asked")
 	motes.step(0.0)
 	bus.mote_density_changed.emit(2.0)
 	check_equal(feel.mote_density, 2.0, "the setting taken")
 	motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, -1.0, 1.0, false)
-	check_equal(motes.next_row(), 120, "at Double, twice")
+	check_equal(motes.written, 120, "at Double, twice")
 	motes.step(0.0)
 	bus.mote_density_changed.emit(0.5)
 	var thrown: int = 0
 	for i in 40:
-		var at: int = motes.next_row()
+		var at: int = motes.written
 		motes.throw_part(k, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 3, 0.0, -1.0, 1.0, false)
-		thrown += motes.next_row() - at
+		thrown += motes.written - at
 		motes.step(0.0)
 	check(thrown > 40 and thrown < 80, "at Half, half on average (a share of a mote now and then), got %d of 120" % thrown)
 	bus.mote_density_changed.emit(0.0)
-	var at_none: int = motes.next_row()
+	var at_none: int = motes.written
 	feel.play_cue(&"blast", 0, Vector2.ZERO, Vector2.RIGHT, 48.0)
-	check_equal(motes.next_row(), at_none, "at None, none")
+	check_equal(motes.written, at_none, "at None, none")
 	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
 	check_equal(feel.motes().density, 0.0, "a new ring keeps the amount")
 	check_equal(feel.set_mote_density(0.7), 0.5, "snapped to a stop")
@@ -709,7 +732,7 @@ func test_a_cues_chips_are_its_motes() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
-	check(feel.motes().next_row() > 0, "its motes")
+	check(feel.motes().written > 0, "its motes")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
 
 
@@ -735,17 +758,20 @@ func test_a_trails_births_are_one_mote_each() -> void:
 		births[i + ProjectilesScript.SPARK_CORE + 1] = 0.3
 		births[i + ProjectilesScript.SPARK_CORE + 2] = 0.1
 	motes.give_off(births, 3)
-	check_equal(motes.next_row(), 3, "one mote a birth")
-	check_equal(_kinds_of_rows(motes, 0, 1), [&"ember"], "fire's embers")
-	check_equal(_kinds_of_rows(motes, 1, 3), [&"spark"], "a layer with no kind, and a twinkle: layer 0's")
+	check_equal(motes.mark(), Vector3i(3, 0, 0), "one mote a birth, a single row each")
+	var given: Array[Dictionary] = motes.motes_since()
+	var ids: Array[StringName] = []
+	for mote: Dictionary in given:
+		ids.append(motes.kinds()[int(mote.kind)].id)
+	check_equal(ids, [&"ember", &"spark", &"spark"] as Array[StringName], "fire's embers; a layer with no kind, and a twinkle: layer 0's")
 	var ember: MoteKind = motes.kinds()[motes.kind_index(&"ember")]
-	var data: PackedFloat32Array = motes.row_data(0)
-	check(data[MotesScript.ROW_VX] <= 0.0, "given off back along the shot")
-	check(Vector2(data[MotesScript.ROW_VX], data[MotesScript.ROW_VY]).length() <= ember.speed.y * MotesScript.TRAIL_SPEED + 0.01, "slower than a burst")
-	check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), 2, "in the ramp of its caster")
-	check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(Color(0.9, 0.3, 0.1)), "with its core colour")
+	var first: Dictionary = given[0]
+	check((first.vel as Vector2).x <= 0.0, "given off back along the shot")
+	check((first.vel as Vector2).length() <= ember.speed.y * MotesScript.TRAIL_SPEED + MotesScript.SPEED_STEP, "slower than a burst")
+	check_equal(first.source, 2, "in the ramp of its caster")
+	check((first.core as Color).is_equal_approx(Color(0.9, 0.3, 0.1)), "with its core colour")
 	motes.give_off(births, 0)
-	check_equal(motes.next_row(), 3, "no births, no motes")
+	check_equal(motes.written, 3, "no births, no motes")
 
 
 ## A chunk only the trails write to stays drawn while their motes live (it was hidden on the next
@@ -762,7 +788,7 @@ func test_a_chunk_of_trail_motes_is_drawn_while_they_live() -> void:
 	births[ProjectilesScript.SPARK_CORE] = 1.0
 	motes.step(10.0)
 	motes.give_off(births, 1)
-	var life: float = motes.row_data(0)[MotesScript.ROW_LIFE] * MotesScript.LIFE_MAX
+	var life: float = motes.motes_since()[0].life
 	var longest: float = motes.kinds()[motes.kind_index(&"ember")].life.y
 	motes.step(10.05)
 	check_equal(motes.chunks_shown(), 1, "drawn the step after it is written")
@@ -785,7 +811,7 @@ func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:
 		shots.set_look(slot, FIRE_LOOK)
 	feel.step(1.0 / 60.0)
 	check(shots.spark_motes, "Feel takes them")
-	var before: int = feel.motes().next_row()
+	var before: int = feel.motes().written
 	var births: int = 0
 	for n in 20:
 		shots.step(1.0 / 60.0)
@@ -793,15 +819,15 @@ func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:
 		births += shots.spark_birth_count
 		feel.step(1.0 / 60.0)
 	check(births > 0, "the trails gave off particles: %d" % births)
-	check_equal(feel.motes().next_row() - before, births, "each a mote")
+	check_equal(feel.motes().written - before, births, "each a mote")
 	feel.particles_enabled = false
-	before = feel.motes().next_row()
+	before = feel.motes().written
 	for n in 5:
 		shots.step(1.0 / 60.0)
 		shots.update_draw(1.0)
 		feel.step(1.0 / 60.0)
 	check(shots.spark_motes, "with particles off (the stress benchmark's \"no particles\") the trails keep no particle slots")
-	check_equal(feel.motes().next_row(), before, "and none are thrown: no trail particles at all")
+	check_equal(feel.motes().written, before, "and none are thrown: no trail particles at all")
 	feel.particles_enabled = true
 
 
@@ -835,7 +861,12 @@ func test_a_trail_mote_is_written_as_a_bursts() -> void:
 	thrown.step(2.0)
 	trail.give_off(_births([Vector2(40.0, 30.0)] as Array[Vector2], ProjectilesScript.LOOK_EMBERS, 2, FIRE_LOOK, core), 1)
 	thrown.burst(1, Vector2(40.0, 30.0), Vector2.LEFT, 1, ember.speed * MotesScript.TRAIL_SPEED, ember.spread, ember.up * MotesScript.TRAIL_SPEED, ember.life, MotesScript.spell_source(2, FIRE_LOOK), core, ember.height)
-	check_equal(trail.row_data(0), thrown.row_data(0), "the same row")
+	var a: PackedFloat32Array = trail.row_data(MotesScript.SINGLES, 0)
+	var b: PackedFloat32Array = thrown.row_data(MotesScript.SINGLES, 0)
+	# Each pool rolls its own seed; every other number is the same.
+	a[MotesScript.ROW_SEED] = 0.0
+	b[MotesScript.ROW_SEED] = 0.0
+	check_equal(a, b, "the same row")
 	check_equal(trail.written, 1, "counted as written")
 	check_equal(trail.births, 1, "and as a birth")
 
@@ -847,20 +878,18 @@ func test_double_the_particle_amount_doubles_each_birth() -> void:
 	motes.density = 2.0
 	var at: Array[Vector2] = [Vector2(10.0, 20.0), Vector2(300.0, 40.0)]
 	motes.give_off(_births(at, ProjectilesScript.LOOK_EMBERS, 0, FIRE_LOOK, Color.WHITE), 2)
-	check_equal(motes.next_row(), 4, "two motes a birth")
-	for row in 4:
-		var data: PackedFloat32Array = motes.row_data(row)
-		var height: float = data[MotesScript.ROW_HEIGHT] * MotesScript.HEIGHT_MAX
-		var ground := Vector2(data[MotesScript.ROW_X], data[MotesScript.ROW_Y] - height)
-		check(ground.is_equal_approx(at[0]) or ground.is_equal_approx(at[1]), "row %d at a birth handed over: %s" % [row, ground])
+	check_equal(motes.written, 4, "two motes a birth")
+	for mote: Dictionary in motes.motes_since():
+		var ground: Vector2 = (mote.ground as Vector2) - Vector2(0.0, mote.height)
+		check(ground.is_equal_approx(at[0]) or ground.is_equal_approx(at[1]), "row %d at a birth handed over: %s" % [mote.row, ground])
 	motes.density = 0.5
 	motes.step(1.0)
-	var before: int = motes.next_row()
+	var before: int = motes.written
 	var many: Array[Vector2] = []
 	for n in 200:
 		many.append(Vector2(n, 0.0))
 	motes.give_off(_births(many, ProjectilesScript.LOOK_EMBERS, 0, FIRE_LOOK, Color.WHITE), 200)
-	var half: int = motes.next_row() - before
+	var half: int = motes.written - before
 	check(half > 60 and half < 140, "at Half about one in two: %d of 200" % half)
 
 
@@ -868,14 +897,15 @@ func test_double_the_particle_amount_doubles_each_birth() -> void:
 ## with a few more left than that.
 func test_a_shed_never_writes_into_the_moments_rows() -> void:
 	var motes: MotesScript = _pool(4096)
-	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS - 1, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
+	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, (MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS - 1) * MotesScript.BURST_QUADS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
 	var written: int = motes.written
 	motes.shed(Vector2.ZERO, Vector2.RIGHT, Color.WHITE, 0, FIRE_LOOK, 20.0)
-	check_equal(motes.written - written, 1, "the shed writes the one row past the reserve")
+	check_equal(motes.written - written, MotesScript.BURST_QUADS, "the shed writes the one row past the reserve")
+	written = motes.written
 	motes.throw(0, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 20.0)
-	check_equal(motes.written - written, 1, "a wall's throw then writes none")
-	motes.throw_part(0, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, MotesScript.MOMENT_ROWS, 0.0, -1.0, 1.0, false)
-	check_equal(motes.written - written, 1 + MotesScript.MOMENT_ROWS, "and a moment has all of its rows")
+	check_equal(motes.written - written, 0, "a wall's throw then writes none")
+	motes.throw_part(0, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, MotesScript.MOMENT_ROWS * MotesScript.BURST_QUADS, 0.0, -1.0, 1.0, false)
+	check_equal(motes.written - written, MotesScript.MOMENT_ROWS * MotesScript.BURST_QUADS, "and a moment has all of its rows")
 
 
 ## The settled marks a frame: SETTLE_ROWS more each frame, kept up to SETTLE_MOST, each taking a
@@ -898,9 +928,10 @@ func test_settles_are_budgeted_and_take_rows() -> void:
 		motes.burst(0, Vector2(100.0, 100.0), Vector2.RIGHT, 100, Vector2(10.0, 50.0), 360.0, Vector2(10.0, 40.0), Vector2(3.0, 3.0), 0, Color.WHITE, 4.0)
 	chips.call()
 	check_equal(motes.settles, 100, "a quiet room's blast of 100 chips settles them all")
-	var written: int = motes.written
-	motes.burst(1, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(1.0, 1.0), 0, Color.WHITE)
-	check_equal(motes.written - written, MotesScript.FRAME_ROWS - 200, "each settle took a row of the frame's")
+	var rows: int = motes.mark().z
+	check_equal(rows, 7, "in seven rows")
+	motes.burst(1, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS * MotesScript.BURST_QUADS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(1.0, 1.0), 0, Color.WHITE)
+	check_equal(motes.mark().z - rows, MotesScript.FRAME_ROWS - 7 - 100, "each settle took a row of the frame's")
 	var counts: Array[int] = []
 	for frame in 3:
 		motes.step(0.1 * (frame + 1))
@@ -938,8 +969,8 @@ func test_the_flight_is_the_shaders_line_for_line() -> void:
 		check(script.contains(pair[1]), "and Motes.flight its twin: %s" % pair[1])
 	check(script.contains("return land + 2.0 * rebound / g"), "rest_time ends where the flight comes to rest")
 	# `_land` (mote_land and the settled marks) writes the flight out at its rest: the same sums.
-	var land: String = script.substr(script.find("func _land("), script.find("func rest_time(") - script.find("func _land("))
-	for line: String in ["var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g", "var rebound: float = (g * land - vz) * kind.bounce", "var rest: float = land + 2.0 * rebound / g", "var along: float = (1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest", "var phase: float = buffer[i + ROW_SEED] * 6.2832", "kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase))"]:
+	var land: String = script.substr(script.find("func _land("), script.find("## Row `row` of ring") - script.find("func _land("))
+	for line: String in ["var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g", "var rebound: float = (g * land - vz) * kind.bounce", "var rest: float = land + 2.0 * rebound / g", "var along: float = ((1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest) * speed", "kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase))"]:
 		check(land.contains(line), "_land has the flight's line: %s" % line)
 
 
@@ -965,26 +996,27 @@ func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 	var feel: FeelScript = made[1]
 	var motes: MotesScript = feel.motes()
 	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
-	check_equal(motes.next_row(), feel.preset.spray_mote_count, "a spray's sparks")
-	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [feel.preset.spray_mote_kind], "of the preset's kind")
-	for row in motes.next_row():
-		check(motes.row_data(row)[MotesScript.ROW_VX] > 0.0, "spark %d flies on along the hit" % row)
+	check_equal(motes.written, feel.preset.spray_mote_count, "a spray's sparks")
+	check_equal(_kinds_since(motes), [feel.preset.spray_mote_kind], "of the preset's kind")
+	for mote: Dictionary in motes.motes_since():
+		check((mote.vel as Vector2).x > 0.0, "spark %d flies on along the hit" % mote.q)
 	motes.step(0.0)
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
+	var was: int = motes.written
 	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, FeelScript.PUFF_SECONDS)
-	check_equal(motes.next_row() - before, feel.preset.puff_mote_count, "a puff's sparks")
+	check_equal(motes.written - was, feel.preset.puff_mote_count, "a puff's sparks")
 	var left: int = 0
-	for row in range(before, motes.next_row()):
-		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
+	for mote: Dictionary in motes.motes_since(before):
+		left += 1 if (mote.vel as Vector2).x < 0.0 else 0
 	check(left > 0 and left < feel.preset.puff_mote_count, "all round")
-	before = motes.next_row()
+	was = motes.written
 	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
-	check_equal(motes.next_row(), before, "a poof throws none")
+	check_equal(motes.written, was, "a poof throws none")
 	motes.step(0.0)
-	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
-	before = motes.next_row()
+	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, (MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS) * MotesScript.BURST_QUADS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)
+	was = motes.written
 	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
-	check_equal(motes.next_row(), before, "a spray leaves the moments' rows alone")
+	check_equal(motes.written, was, "a spray leaves the moments' rows alone")
 
 
 ## S3: a dead body breaks into motes of its own art (the white-hot copy that fell apart pixel by
@@ -1000,24 +1032,24 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	var body := _body_of(husk, Vector2(200.0, 150.0), 1.0)
 	var pixels: int = RoomBase.pixels_of_art(husk).size()
 	check(pixels > 50, "the husk's art has pixels: %d" % pixels)
-	var before: int = motes.next_row()
+	var before: Vector3i = motes.mark()
+	var was: int = motes.written
 	feel.spectacle().break_body(body, body.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
-	var made_count: int = motes.next_row() - before
+	var made_count: int = motes.written - was
 	check_equal(made_count, roundi(float(pixels) * feel.preset.death_mote_share), "its share of the art's pixels")
-	check_equal(_kinds_of_rows(motes, before, motes.next_row()), [feel.preset.death_mote_kind], "of the preset's kind")
+	check_equal(_kinds_since(motes, before), [feel.preset.death_mote_kind], "of the preset's kind")
 	var source: int = feel.spectacle().body_source(body)
 	var frame := Rect2(Vector2(200.0, 150.0) - Vector2(16.0, 16.0), Vector2(32.0, 32.0))
-	for row in range(before, motes.next_row()):
-		var data: PackedFloat32Array = motes.row_data(row)
-		check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), source, "mote %d in the art's colours" % row)
-		var shown: Vector3 = motes.mote_at(row, data[MotesScript.ROW_BORN])
-		check(frame.grow(0.5).has_point(Vector2(shown.x, shown.y - shown.z)), "mote %d shown where its pixel was: %s" % [row, shown])
+	for mote: Dictionary in motes.motes_since(before):
+		check_equal(mote.source, source, "mote %d in the art's colours" % mote.row)
+		var shown: Vector3 = motes.mote_at(mote.ring, mote.row, mote.q, mote.born)
+		check(frame.grow(0.5).has_point(Vector2(shown.x, shown.y - shown.z)), "mote %d shown where its pixel was: %s" % [mote.row, shown])
 	body.get_parent().free()
 	motes.step(0.0)
 	var big := _body_of(husk, Vector2(300.0, 150.0), 2.0)
-	before = motes.next_row()
+	was = motes.written
 	feel.spectacle().break_body(big, big.get_global_transform(), feel.preset.death_mote_kind, feel.preset.death_mote_share, feel.preset.death_mote_most, feel.preset.death_mote_speed, feel.preset.death_mote_up)
-	check_equal(motes.next_row() - before, mini(roundi(float(pixels) * feel.preset.death_mote_share * 4.0), feel.preset.death_mote_most), "twice as big: four times the motes, up to the most")
+	check_equal(motes.written - was, mini(roundi(float(pixels) * feel.preset.death_mote_share * 4.0), feel.preset.death_mote_most), "twice as big: four times the motes, up to the most")
 	big.get_parent().free()
 	# Through the event, killed mid-squash: from the rest scale.
 	motes.step(0.0)
@@ -1025,11 +1057,11 @@ func test_a_dead_body_breaks_into_motes_of_its_art() -> void:
 	bus.damage_dealt.emit(0, squashed.get_parent(), 1, Vector2.ZERO)
 	feel.step(0.015625)
 	check(squashed.scale != Vector2.ONE, "squashed when it is killed")
-	before = motes.next_row()
+	was = motes.written
 	bus.enemy_died.emit(0, squashed.get_parent(), Vector2(100.0, 100.0), -1)
 	check(feel.spectacle().broken_from() == husk, "the death broke the body's art")
 	check((feel.spectacle().broken_at() as Vector2).is_equal_approx(Vector2(100.0, 100.0)), "where it stood")
-	check(motes.next_row() - before >= roundi(float(pixels) * feel.preset.death_mote_share), "at its rest scale, not the squashed one's fewer")
+	check(motes.written - was >= roundi(float(pixels) * feel.preset.death_mote_share), "at its rest scale, not the squashed one's fewer")
 	squashed.get_parent().free()
 
 

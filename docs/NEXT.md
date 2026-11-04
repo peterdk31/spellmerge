@@ -92,7 +92,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Online-ready: input frames and replays (N2).** (`core/sim/`, `gameplay/player/`, `core/events/`, `tests/bots/`) N2. After N1.
 - [ ] **Online-ready: a first look across platforms (N2b).** (`tests/`, `docs/DECISIONS.md`) N2b. After N2.
 - [ ] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b.
-- [ ] **Online-ready: hit-stop in ticks (N4).** (`gameplay/feel/`, `core/sim/`) N4. After N3.
+- [ ] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3.
 - [ ] **Online-ready: identity without instance ids (N5).** (`core/projectiles/`, `core/spells/`) N5. After N3.
 - [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7's `dmath.h`; the owner edits `native/SConstruct`.
 - [ ] **Online-ready: deterministic maths in C++ (N7).** (`native/`, `core/native/`, `core/sim/`, simulation trig calls) N7, with its GDScript twin. After N3; the owner edits `native/SConstruct`.

@@ -30,6 +30,9 @@ The code already goes a long way:
 | A7 | `native/` kernels | Built by GCC (Linux), MinGW (Windows), Emscripten (web) | Each must keep IEEE rounding (no fast-math, no fused multiply-add contraction) |
 | A8 | `gameplay/player/player.gd` (`_aim`, `_mouse_world`) | The intent is built from live device state each step | Online, a seat's intent must come from a recorded input frame, quantised so what is sent is what is simulated |
 | A9 | Pause (`get_tree().paused`), join and leave | Local-only rules | Online, pausing stops other machines and a joiner needs the current state |
+| A11 | `gameplay/horde/horde.gd` (`rng`: spawns and offers), `gameplay/horde/swarm.gd` (`rng`: each row's seed) | `RandomNumberGenerator.new()`, seeded only by tests | In a real run each starts from a random seed: two runs of the same inputs spawn different hordes (found in the second check, 2026-11-04) |
+| A12 | `gameplay/horde/horde.gd` (`_set_paused`), `hud/menus/pause/pause_menu.gd` | The level-up break and the pause menu pause the scene tree | The tree's pause is not part of the simulation's state: a replay or a snapshot cannot say the game was standing still |
+| A13 | `core/projectiles/projectile_manager.gd` (`_process`, `update_draw`, the sparks' `_spark_rng`) | Drawing code lives in a simulation script | Fine while it only reads the arrays, but N9's test must tell it apart, and nothing may let it write state |
 | A10 | `core/settings/shot_cap.gd` (6,000 on desktop, 1,000 on the web) and any other setting the simulation reads | A per-machine setting that changes the game, not only the look | Two machines with different caps simulate different games |
 
 Not a problem: render interpolation (the projectile manager drawing between steps, Feel's particles and motes, the camera, looks, Face's instance-id seed) is view only, as long as nothing in the simulation reads it back.
@@ -100,6 +103,7 @@ The owner asked: will it cost performance, and will the code be worse off or har
 8. Every card, enemy and room is replayed and round-tripped by itself, with no test written for it (N12).
 9. The stress runs are no slower than before phase N (numbers in docs/DECISIONS.md), on desktop and on the web.
 10. Hashing, snapshots and the desync report cost nothing in a normal build's tick (they are off).
+11. With shot scale's threads (H5), the shot kernel gives the same bits with one thread and with many (rule T2 below).
 
 ## Parts
 
@@ -108,7 +112,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 ### N1: the state hash and the determinism harness
 
 - **State by default.** In every simulation script (the simulation folders, listed in `core/sim/README.md` from N1 on; N9 enforces the line) every member is state, except those it lists in `const DERIVED: Array[StringName]`: caches, references to nodes and services, anything rebuilt from state. A state member is a value, a packed array, an array or dictionary of values, or an object of another simulation script, walked in turn (an actor's components, a brain, a caster's staffs).
-- **`core/sim/state_walk.gd` (`StateWalk`):** the one generic walker (the script's own members by name: `get_script_property_list` and `get`), used by the hash here and by save and load in N10. Packed arrays in one engine call each; dictionaries in key order. It runs only in tests, tools, replays and later the netcode, never in a normal build's tick.
+- **`core/sim/state_walk.gd` (`StateWalk`):** the one generic walker (the script's own members by name: `get_script_property_list` and `get`), used by the hash here and by save and load in N10. It skips `DERIVED` and `VIEW` members (N9). Packed arrays in one engine call each; dictionaries in key order. It runs only in tests, tools, replays and later the netcode, never in a normal build's tick.
 - **`core/sim/sim_hash.gd` (`SimHash`):** one 64-bit hash per area and one for the whole game, from `StateWalk`. Areas do not reach into each other: the tick (N3) hands `SimHash` its areas.
 - **`tests/core/test_state_declared.gd`:** walks every simulation script's state and fails on a member it cannot save (a node or service not in `DERIVED`: "`gameplay/combat/combat.gd`: `_foo` holds a Node; add it to DERIVED, it is set up again, not saved") and on a `DERIVED` name that is no member (after a rename). The first PR lists today's caches and references; the ~800 members are reviewed once, area by area.
 - **The desync report (`core/sim/desync.gd`):** given two runs, the first tick whose hashes part, which areas part, and each differing member by name with both values. Used by every determinism test, N2b and N8, and later the netcode.
@@ -133,15 +137,16 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 - `core/sim/tick.gd` (`Tick`, autoload): the tick counter and the only driver of the simulation. Each physics frame it runs one tick, in a written order: input frames, commands, Flow, Coop's rules, actors (by id), Spells, projectiles, Combat, the swarm. Nothing in the simulation has its own `_process` or `_physics_process`; each area's step is called by the tick.
 - **No new parameter:** `step(delta)` keeps its signature everywhere; the delta is always `Tick.DT` (a test checks it). The tick number and chance come from the `sim` service (`core/sim/sim.gd`), set on areas and actors the way `combat`, `spells` and `projectiles` are, so tests swap it.
-- **Chance by hash (`sim.chance(purpose, key, counter) -> float`, and `chance_int`, `chance_range`):** integer mixing of (run seed, purpose, key, tick, counter), a few integer operations, no allocation, as cheap as `RandomNumberGenerator.randf()`. No shared generator holds state, so a new roll in one system never shifts another's, and nothing about the random state needs saving. Spells' scatter, the brain and the AI move onto it; their `RandomNumberGenerator`s go. Feel and the looks keep their own generators (view).
+- **Chance by hash (`sim.chance(purpose, key, counter) -> float`, and `chance_int`, `chance_range`):** integer mixing of (run seed, purpose, key, tick, counter), a few integer operations, no allocation, as cheap as `RandomNumberGenerator.randf()`. No shared generator holds state, so a new roll in one system never shifts another's, and nothing about the random state needs saving. Spells' scatter, the brain, the AI, the horde's spawns and offers and the swarm's row seeds move onto it; their `RandomNumberGenerator`s go (fixes A11). Feel and the looks keep their own generators (view).
 - **Order by id:** what the simulation iterates (actors, targets, a dictionary's keys) it iterates by id; event listeners in the simulation never depend on connection order for an outcome (a listener that changes state does so through the tick's order, or the event names the one listener).
 - Flow's timers, Coop's revive and Horde's breaks move from `_process` to the tick. Coop's camera stays in `_process` (view).
 - A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes `DT`, as today; online, the netcode decides how many ticks to run.
 - Fixes A2 and A3, and the flaky `test_wave_balance.gd` (docs/BACKLOG.md).
 
-### N4: hit-stop in ticks
+### N4: stops in ticks
 
-- Hit-stop and the downed stop become a number of ticks the simulation stands still (`Tick.hold(ticks)`), started by the simulation events that cause them; Feel only draws them. `Engine.time_scale` is no longer set by the game (the dev time-scale switch, if kept, scales the tick rate on one machine only, offline).
+- Hit-stop and the downed stop become a number of ticks the simulation stands still (`Tick.hold(ticks)`), started by the simulation events that cause them; Feel only draws them.
+- The horde's level-up break and, offline, the pause menu stop the tick (`Tick.stop(reason)` / `Tick.go(reason)`, part of the state) instead of pausing the scene tree for the simulation; the HUD and Feel run on as they do today. Fixes A12. `Engine.time_scale` is no longer set by the game (the dev time-scale switch, if kept, scales the tick rate on one machine only, offline).
 - Fixes A1. Feel's feel is checked side by side with today's in the sandbox before it merges.
 
 ### N5: identity without instance ids
@@ -182,6 +187,7 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 
 - Every script is either simulation or view, by folder (simulation: `core/sim`, `core/spells`, `core/projectiles`, `core/actors`, `gameplay/actor` except the looks, `gameplay/ai` except the looks, `gameplay/combat`, `gameplay/coop` rules, `gameplay/flow`, `gameplay/horde` except `swarm_look.gd`, `gameplay/player` controllers, `gameplay/progression`, `gameplay/rewards`, `gameplay/run`, `gameplay/difficulty`; view: `gameplay/feel`, every look, `hud/`, the camera). The list lives in `core/sim/README.md`.
 - `tests/core/test_sim_rules.gd` reads every simulation script and fails on `Time.`, `Engine.time_scale`, `Input.`, `InputManager` outside the frame builder, `get_viewport`, `Camera2D`, `_process`, global `randf`/`randi`/`randomize`, and `get_instance_id` (other than in equality keys the test allows by name). AGENTS.md gets the rule ("Simulation code runs on the tick").
+- **View code inside a simulation script** (A13: the projectile manager's drawing and sparks) is named in that script's `const VIEW: Array[StringName]` (functions and members). The test skips those functions, the walker skips those members, and the determinism test at different render frame rates (done-when 2) catches a view function that writes state.
 - Proves done-when 6. It also fails on `RandomNumberGenerator`, `_process` and `_physics_process` in simulation scripts (N3), and on the engine's trig (`sin`, `cos`, `tan`, `atan2`, `exp`, `log`, `pow`, `Vector2.angle`, `rotated`, `from_angle`, `angle_to`, `lerp_angle`) there (N7).
 
 ### N10: snapshots
@@ -203,6 +209,24 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - `tests/core/test_content_determinism.gd` finds every card, enemy, boss and room through the registry, as `test_card_rules.gd` finds every card and carrier: for each, a short scripted fight (bots with that card in a staff; that enemy in the arena; that room) runs twice and through a snapshot at a random tick, and must agree at every tick.
 - A new card, enemy or room is covered the day it is added, with no test written for it.
 - Test time: a PR runs the fights of the content it touches (by file); the daily build runs them all, in `tools/ptest.sh`'s parallel runs. A fight is a few game seconds headless.
+
+## With shot scale (threads, 100,000 shots)
+
+[shot-scale.md](shot-scale.md) (proposed, the owner's direction of 2026-11-04 in) adds threads to the shot kernel and aims at 100,000 shots. Checked against this plan on 2026-11-04: they fit, on five rules, written into both plans.
+
+- **T1: the hit budget is fixed work, never measured time.** `WORK_PER_STEP` stays a number of work units in the code, sized once from H0 on the target PC (shot-scale Q3). A budget measured at run time would let a fast machine test more hits a step than a slow one: two different games. (Shot-scale H2 said "by time"; changed.)
+- **T2: threads never change a result.** Chunks of a fixed size (not one per core), each reading only the target grid and writing only its own shots; partial results (hits, the threat grid's sums) combined in chunk order; the hit budget spent at the merge, in shot order. A test runs the kernel with one thread and with several and compares the bits, so the web's single chunk and a 12-core desktop play the same game.
+- **T3: the kernels' maths is `dmath.h`** (N7), threaded or not.
+- **T4: the caps are session rules** (N11). The weakest machine in a session sets the shot cap online, and at 100,000 shots that matters more: every machine simulates every shot. A snapshot of a full room grows to roughly 10 MB (a join only, N10); the hash runs once a second.
+- **T5: what shot scale changes only in the look stays view.** H4's thinner drawing past a count, sparks to hits first, and H3b's one look per target are drawn only; they may use real time and their own generators, in `VIEW` (N9).
+
+**Both help each other.** N1's hash and desync report prove H5's "threaded equals one thread" and the damage check; H3b's re-recorded hit traces and N3's (chance by hash) are recorded again together, once.
+
+**One order for both** (they share `core/projectiles/projectile_manager.gd` and `native/src/shot_kernel.cpp`, so one PR at a time there):
+
+1. N1, with H0 beside it (benchmarks only).
+2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7's kernel side, H5 (T2), H6 if measured, H4, H7 last (after N11).
+3. Beside it, the rest: N2, N2b, N3, then N4, N6, N7's GDScript side, N11; then H3 (one listener at a time) and H3b after N3; then N8, N9, N10, N12.
 
 ## After phase N: the netcode (a sketch, not approved)
 

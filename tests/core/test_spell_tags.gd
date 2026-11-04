@@ -299,3 +299,14 @@ func test_clear_forgets_everything() -> void:
 	_spells.call("clear")
 	check(_spells.call("profile", tag) == null, "no profile")
 	check_equal(_spells.call("current_tag", 0, 0), 0, "no current build")
+
+
+## A tag gives its spell's cards as plain ids (for gameplay/feel's motes by card,
+## docs/milestones/spell-spectacle-2.md, S2): its form, its infusion, its modifiers; none once its
+## generation is gone.
+func test_a_tag_gives_its_spells_cards() -> void:
+	var tag: int = _begin(0, 1, _staff({"form": &"bolt", "element": &"fire", "modifiers": [&"homing", &"pierce"]}))
+	check_equal(_spells.call("cards_of", tag), [&"bolt", &"fire", &"homing", &"pierce"] as Array[StringName], "form, infusion, modifiers")
+	check_equal(_spells.call("cards_of", tag + 4096), [] as Array[StringName], "a tag with no spell: none")
+	_begin(0, 1, _staff({"form": &"nova"}))
+	check_equal(_spells.call("cards_of", tag), [] as Array[StringName], "a rebuilt staff's old tag (no shot in the air): none")

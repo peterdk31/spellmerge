@@ -9,8 +9,9 @@ extends Node
 ##
 ## Feel says when: its hit, end, wall and reaction handlers call `shed_hit`, `shed_end`,
 ## `shed_on_wall` and `reaction_motes` with what it already worked out (the caster's ramp, the
-## preset's shares), in the order it draws them, and `step` once a frame. The spectacle says
-## what: which kinds, in which colours, where they settle. Nothing here changes a fight.
+## preset's shares, the shot's tag), in the order it draws them, and `step` once a frame. The
+## spectacle says what: which kinds (a spell's, from its cards: `card_kinds.gd`; S2), in which
+## colours, where they settle. Nothing here changes a fight.
 ##
 ## A new drawn-only system goes here the same way: made in `_ready`, its setting through its own
 ## event, its cue parts in `cue_parts`.
@@ -24,6 +25,7 @@ const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
+const CardKindsScript := preload("res://gameplay/feel/card_kinds.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -40,9 +42,22 @@ const MARK_FOLDER: StringName = &"marks"
 const ROOM_FOLDER: StringName = &"rooms"
 const MARK_RADIUS: float = 8.0
 
+## What a shot's spell sheds, from its cards (`card_kinds.gd`; spell-spectacle-2.md, S2).
+var cards: CardKindsScript = CardKindsScript.new()
 ## The services: Feel hands down its own (and again whenever it is given new ones).
 var events: EventsScript = null
-var registry: RegistryScript = null
+var registry: RegistryScript = null:
+	set(value):
+		registry = value
+		cards.registry = value
+		cards.clear()
+## The spell runtime, which a shot's tag gives its spell from (`profile`; null for none: every
+## shot's motes by its look). Feel hands it down with the projectile manager (`attach`).
+var spells: Object = null:
+	set(value):
+		spells = value
+		cards.spells = value
+		cards.clear()
 ## The projectile manager: the trails' births, the walls the marks keep off, the batches the light
 ## mirrors (null in some tests: then no light and no trail motes).
 var projectiles: ProjectileManagerScript = null
@@ -72,6 +87,10 @@ var _ramp_table: RampTableScript = RampTableScript.new()
 ## and their source in the ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
 var _surface_source: int = -1
+## The mote kinds the room's walls shed (`RoomBase.surface_kinds`, empty: every surface kind), and
+## their indices in the pool (`_take_surface_kinds`).
+var _surface_ids: Array[StringName] = []
+var _surface_kinds: PackedInt32Array = PackedInt32Array()
 ## The colours of each body art read so far (texture -> colours).
 var _art_colors: Dictionary = {}
 ## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
@@ -98,10 +117,11 @@ func _ready() -> void:
 	events.floor_marks_changed.connect(set_floor_marks)
 
 
-## The projectile manager is known (Feel finds it after its children are made): spell light can
-## be made now.
-func attach(manager: ProjectileManagerScript) -> void:
+## The projectile manager and the spell runtime are known (Feel finds them after its children are
+## made): spell light can be made now.
+func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 	projectiles = manager
+	spells = runtime
 	_make_light(spell_light)
 
 
@@ -109,6 +129,7 @@ func attach(manager: ProjectileManagerScript) -> void:
 ## stepped.
 func step(now: float) -> void:
 	_clock = now
+	cards.new_frame()
 	_trail_motes()
 	if pool != null:
 		pool.step(now)
@@ -129,41 +150,50 @@ func motes_on() -> bool:
 	return pool != null and particles_enabled
 
 
-## A shot hit a body at `at`: its cards' motes (`look`, its `core` colour, in `ramp`) back along
-## `away`, `share` of their count.
-func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float) -> void:
-	if pool != null and particles_enabled:
-		pool.shed(at, away, core, ramp, look, share)
+## A shot (of the tag `tag`) hit a body at `at`: its cards' motes (`look`, its `core` colour, in
+## `ramp`) back along `away`, `share` of their count.
+func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
+	if pool != null and particles_enabled and not pool.shed_closed():
+		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
 
 
-## A shot's life ran out at `at`: a puff of its cards' motes on along `heading`, `share` of
-## their count.
-func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float) -> void:
-	if pool != null and particles_enabled:
-		pool.shed(at, heading, core, ramp, look, share)
+## A shot's (of the tag `tag`) life ran out at `at`: a puff of its cards' motes on along
+## `heading`, `share` of their count.
+func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
+	if pool != null and particles_enabled and not pool.shed_closed():
+		pool.shed_kinds(cards.motes_of(tag, look), at, heading, core, ramp, look, share)
 
 
 ## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
-## projectile manager's `impact_look` and `impact_core` while the impact is sent) and the wall's
-## surface motes in the room's colours, thrown along `away` (back off the wall).
+## projectile manager's `impact_look`, `impact_core` and `impact_tag` while the impact is sent) and
+## the wall's surface motes (the room's, `surface_kinds`) in the room's colours, thrown along
+## `away` (back off the wall).
 func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 	if pool == null or not particles_enabled:
 		return
 	var look: int = projectiles.impact_look if projectiles != null else 0
 	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
-	pool.shed(at, away, core, ramp, look)
+	var tag: int = projectiles.impact_tag if projectiles != null else 0
+	if not pool.shed_closed():
+		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)
 	if _surface_source >= 0:
-		for k in pool.surface_kinds():
+		for k in _surface_kinds:
 			pool.throw(k, at, away, _surface_source, Color.WHITE)
 
 
-## A reaction's motes: a ring of the reacting shot's kinds (`look`, read while the event is sent;
-## layer 0's for none) in the reaction's colour `tint`, from a caster of `ramp`: `count` in all
-## and `reach` pixels out.
-func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float, reach: float) -> void:
+## The mote kinds the room's walls shed: its `surface_kinds`, or every surface kind (read it,
+## never change it).
+func surface_kinds() -> PackedInt32Array:
+	return _surface_kinds
+
+
+## A reaction's motes: a ring of the reacting shot's kinds (its `look` and `tag`, read while the
+## event is sent; layer 0's for none) in the reaction's colour `tint`, from a caster of `ramp`:
+## `count` in all and `reach` pixels out.
+func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float, reach: float, tag: int = 0) -> void:
 	if pool == null or not particles_enabled:
 		return
-	var kinds: PackedInt32Array = pool.kinds_of_look(look)
+	var kinds: PackedInt32Array = cards.motes_of(tag, look)
 	var source: int = MotesScript.spell_source(ramp, MotesScript.LOOK_EXACT)
 	var each: int = maxi(roundi(count / float(kinds.size())), 1)
 	for k in kinds:
@@ -223,9 +253,9 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var kinds: PackedInt32Array
 	match named:
 		&"spell":
-			kinds = pool.kinds_of_look(cue.look)
+			kinds = cards.motes_of(cue.tag, cue.look)
 		&"surface":
-			kinds = pool.surface_kinds()
+			kinds = _surface_kinds
 		_:
 			var k: int = pool.kind_index(named)
 			if k < 0:
@@ -234,10 +264,15 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var spell: int = MotesScript.spell_source(cue.ramp, cue.look)
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var count: int = int(part.get("count", -1))
+	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
+	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
+	var colours: StringName = StringName(part.get("colours", ""))
+	var of_surface: bool = named == &"surface" or colours == &"surface"
 	for k in kinds:
-		var source: int = surface if pool.kinds()[k].surface else spell
+		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell")
+		var source: int = surface if walls else spell
 		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
-		pool.throw_part(k, cue.at, way, source, Color.WHITE if pool.kinds()[k].surface else cue.tint, each, reach, spread, up, ring)
+		pool.throw_part(k, cue.at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
@@ -252,9 +287,9 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 		radius = cue.size * float(part["reach"])
 	var source: int = MotesScript.spell_source(cue.ramp, cue.look)
 	var turn: float = cue.aim.angle() if StringName(part.get("rot", "random")) == &"aim" else marks.random_turn()
-	var found: PackedInt32Array = marks.kinds_of_look(cue.look) if bool(part.get("cards", false)) else PackedInt32Array()
+	var found: PackedInt32Array = cards.marks_of(cue.tag, cue.look) if bool(part.get("cards", false)) else PackedInt32Array()
 	if found.is_empty():
-		found.append(marks.kind_index(StringName(part.get("mark", ""))))
+		found = PackedInt32Array([marks.kind_index(StringName(part.get("mark", "")))])
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	for k in found:
 		marks.stamp(k, cue.at, radius, turn, source, cue.tint, surface)
@@ -288,6 +323,10 @@ func use_motes(motes: MotesScript) -> void:
 		add_child(pool)
 		pool.step(_clock)
 		pool.settle_into(marks)
+	cards.use_motes(pool)
+	if pool != null:
+		pool.use_cards(cards if pool.has_card_kinds() else null)
+	_take_surface_kinds()
 	_surface_source = _ramp_table.source(_surface_colors)
 
 
@@ -340,6 +379,7 @@ func set_floor_marks(on: bool) -> void:
 		marks.queue_free()
 		remove_child(marks)
 		marks = null
+	cards.use_marks(marks)
 	if pool != null:
 		pool.settle_into(marks)
 
@@ -390,12 +430,34 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 ## A new room: its colours for its walls' motes (`RoomBase.surface_colors`) and its ambient light
 ## (`RoomBase.ambient`, P3b).
 func _on_room_entered(room_id: StringName) -> void:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
+
+
+## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its
+## ambient light (`room_entered` calls this; tests too).
+func use_room(room: RoomBase) -> void:
 	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
+	_surface_ids = room.surface_kinds if room != null else ([] as Array[StringName])
+	_take_surface_kinds()
 	ambient = room.ambient if room != null else 1.0
 	if light != null:
 		light.set_ambient(ambient)
 	_surface_source = _ramp_table.source(_surface_colors)
+
+
+## The pool's indices of the room's surface kinds (`RoomBase.surface_kinds`; a kind the pool does not
+## have is left out), or every surface kind of the pool when the room names none.
+func _take_surface_kinds() -> void:
+	_surface_kinds = PackedInt32Array()
+	if pool == null:
+		return
+	if _surface_ids.is_empty():
+		_surface_kinds = pool.surface_kinds()
+		return
+	for id in _surface_ids:
+		var k: int = pool.kind_index(id)
+		if k >= 0 and not _surface_kinds.has(k):
+			_surface_kinds.append(k)
 
 
 ## A new room: the mark layer wiped and fitted to its bounds and walls (the projectile manager's,

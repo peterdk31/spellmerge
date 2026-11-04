@@ -22,6 +22,10 @@ extends Resource
 ## light, base, shadow. Empty (the default): sampled from the room's own art (`surface_colors`),
 ## so new tiles change the chips with no edit here; set it only when the sample looks wrong.
 @export var debris_colors: PackedColorArray = PackedColorArray()
+## The mote kinds its walls shed when struck (`MoteKind` ids, content/motes; spell-spectacle-2.md,
+## S2): a wooden room's splinters where the crypt's walls shed chips. Empty (the default): every
+## `surface` kind. In the walls' colours either way.
+@export var surface_kinds: Array[StringName] = []
 ## The colours of its floor, for the floor marks drawn in the floor's own shades (Feel's mark
 ## layer: a scorch, a crack), lightest first: light, base, shadow. Empty (the default): sampled
 ## from the room's `Floor` sprite (`floor_colors`); set it only when the sample looks wrong.

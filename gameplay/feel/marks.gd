@@ -74,6 +74,8 @@ var settles_faded: int = 0
 
 var _kinds: Array[MarkKind] = []
 var _layer_kinds: Array[PackedInt32Array] = []
+## The kinds that name each card by id (`MarkKind.cards`; spell-spectacle-2.md, S2).
+var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
 var _viewport: SubViewport = null
 var _sprite: Sprite2D = null
 var _batch: MultiMeshInstance2D = null
@@ -142,6 +144,23 @@ func kinds_of_look(look: int) -> PackedInt32Array:
 				if not found.has(k):
 					found.append(k)
 	return found
+
+
+## The kinds that name the card `card` by id (`MarkKind.cards`); empty for none. Kept: read it,
+## never change it.
+func kinds_of_card(card: StringName) -> PackedInt32Array:
+	var found: Variant = _card_kinds.get(card)
+	return found if found != null else PackedInt32Array()
+
+
+## Whether any kind names a card by id.
+func has_card_kinds() -> bool:
+	return not _card_kinds.is_empty()
+
+
+## The kinds that name look layer `layer` (1 to LOOK_LAYERS). Kept: read it, never change it.
+func kinds_named_by_layer(layer: int) -> PackedInt32Array:
+	return _layer_kinds[layer] if layer >= 0 and layer < _layer_kinds.size() else PackedInt32Array()
 
 
 ## Make the layer cover `bounds` (the room's, in world pixels; at most MAX_SIDE across and down)
@@ -399,6 +418,10 @@ func _take_kinds(kinds: Array[MarkKind]) -> void:
 		colours[k] = Vector4(float(MarkKind.SOURCES.find(kind.body_from)), float(MarkKind.SHADES.find(kind.body_shade)), float(MarkKind.SOURCES.find(kind.edge_from)), float(MarkKind.SHADES.find(kind.edge_shade)))
 		for layer in kind.look_layers:
 			_layer_kinds[layer].append(k)
+		for card in kind.cards:
+			if not _card_kinds.has(card):
+				_card_kinds[card] = PackedInt32Array()
+			_card_kinds[card].append(k)
 	_material.set_shader_parameter(&"kind_form", forms)
 	_material.set_shader_parameter(&"kind_colour", colours)
 	set_floor_colors(PackedColorArray())

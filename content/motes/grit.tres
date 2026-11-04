@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"grit"
+cards = Array[StringName]([&"heavy"])
+gravity = 420.0
+drag = 3.0
+bounce = 0.15
+glow = 0.0
+shade_from = 1
+shape = "
+#
+
+##
+"
+shape_play = "pick"
+shape_rate = 8.0
+shape_turns = false
+count = 5
+speed = Vector2(25.0, 80.0)
+up = Vector2(15.0, 45.0)
+life = Vector2(0.8, 1.6)
+spread = 120.0
+height = 3.0

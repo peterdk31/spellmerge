@@ -418,7 +418,8 @@ const TRAIL_COST: int = 4
 ## one at every bounce, jump and end, each with how far the shot had gone and when. The shader
 ## leaves the tail pixels and the card particles along that path in the world, so they bend with
 ## it and stay behind; the rows go to the shader in one texture (`trail_data`, a row of
-## TRAIL_SAMPLES texels x, y, odometer, time per trail). A trail outlives its shot by TRAIL_KEEP
+## TRAIL_SAMPLES texels x, y, odometer, time per trail, TRAIL_ROWS_PER_LINE rows to a line of the
+## texture). A trail outlives its shot by TRAIL_KEEP
 ## seconds (the longest any of it lives), so the tail cools where the shot ended. There are
 ## TRAIL_ROWS_PER_SLOT x the cap rows; a shot that finds none is drawn without a tail. A step
 ## longer than TRAIL_JUMP pixels (a teleport) starts the path afresh.
@@ -431,6 +432,13 @@ const TRAIL_JUMP: float = 96.0
 const TRAIL_STRIDE: int = TRAIL_SAMPLES * 4
 ## The smallest the trail texture gets, in rows (it grows by powers of two with the rows used).
 const MIN_TRAIL_ROWS: int = 64
+## Trail rows side by side on one line of the trail texture: it is TRAIL_ROWS_PER_LINE x
+## TRAIL_SAMPLES texels wide (2,048, a size every GPU and WebGL takes) and the rows used /
+## TRAIL_ROWS_PER_LINE lines high. With one row a line, a cap of 10,000 shots wanted 32,768 lines,
+## past the 16,384 most GPUs take, and every trail read the wrong samples (a web build, 2026-11-04);
+## folded, the top cap (50,000: 100,000 rows) is 2,048 x 2,048. `_trail_data` is the same either
+## way: row r's sample s is texel r * TRAIL_SAMPLES + s of the texture read line by line.
+const TRAIL_ROWS_PER_LINE: int = 64
 ## A trail's flags in its instance (the shader's TF_*): its shot is alive (the core is drawn and
 ## the path runs on to it), an orbit shot (a shorter tail), a wizard's dash (`follow_caster`).
 const TRAIL_HEAD: int = 1
@@ -4247,6 +4255,12 @@ func _sample_shots(now: float) -> bool:
 	return sampled
 
 
+## The trail texture's size in texels for `rows` trail rows (a power of two, at least
+## MIN_TRAIL_ROWS, as `_fit_trail_data` keeps them): TRAIL_ROWS_PER_LINE rows a line.
+static func trail_texture_size(rows: int) -> Vector2i:
+	return Vector2i(TRAIL_ROWS_PER_LINE * TRAIL_SAMPLES, ceili(float(rows) / float(TRAIL_ROWS_PER_LINE)))
+
+
 ## Size `_trail_data` for the rows in use: a power of two, at least MIN_TRAIL_ROWS.
 func _fit_trail_data() -> void:
 	var wanted: int = maxi(_trail_rows, MIN_TRAIL_ROWS)
@@ -4258,15 +4272,17 @@ func _fit_trail_data() -> void:
 		_trail_texture = null
 
 
-## Send the trails to the shader when a row changed: one texture of `_trail_rows` rows.
+## Send the trails to the shader when a row changed: one texture of `_trail_rows` rows, folded
+## TRAIL_ROWS_PER_LINE to a line (`trail_texture_size`).
 func _upload_trails() -> void:
 	if not _trail_dirty or _trail_rows == 0:
 		return
 	_trail_dirty = false
+	var size: Vector2i = trail_texture_size(_trail_rows)
 	if _trail_image == null:
-		_trail_image = Image.create_empty(TRAIL_SAMPLES, _trail_rows, false, Image.FORMAT_RGBAF)
-	_trail_image.set_data(TRAIL_SAMPLES, _trail_rows, false, Image.FORMAT_RGBAF, _trail_data.to_byte_array())
-	if _trail_texture == null or _trail_texture.get_height() != _trail_rows:
+		_trail_image = Image.create_empty(size.x, size.y, false, Image.FORMAT_RGBAF)
+	_trail_image.set_data(size.x, size.y, false, Image.FORMAT_RGBAF, _trail_data.to_byte_array())
+	if _trail_texture == null or _trail_texture.get_size() != Vector2(size):
 		_trail_texture = ImageTexture.create_from_image(_trail_image)
 		for batch in _nodes.size():
 			if BATCH_MESH[batch] >= 0:

@@ -212,3 +212,23 @@ func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
 	check_equal(feel.get_child_count(), children, "no nodes for hits: one batch draws them all")
 	for child in feel.get_children():
 		check(not child is CPUParticles2D and not child is Line2D or child in feel._live_beams, "no particle nodes and no lines but the beams: %s" % child)
+
+
+## S6 2: a hit's look is the cue `hit` (and `hit_puff` with no way), so it is data: a cue file
+## with other parts changes every hit, and Feel draws no spray of its own.
+func test_a_hits_look_is_its_cue() -> void:
+	var plain: CueBase = feel.cue_of(&"hit")
+	check(plain != null and plain.parts[0]["effect"] == &"spray", "a spray, from content/cues/hit.tres")
+	var enemy: Node2D = _enemy()
+	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
+	var colour: Color = feel.effect_info(FeelScript.KIND_SPRAY)["core"]
+	var other := CueBase.new()
+	other.id = &"hit"
+	other.parts = [{"effect": &"ring_out", "reach": 1.0}] as Array[Dictionary]
+	feel.forget_cues()
+	feel._cue_cache[&"hit"] = other
+	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
+	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "no spray of Feel's own")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "the cue's ring instead")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], colour, "in the hit's colours")
+	feel.forget_cues()

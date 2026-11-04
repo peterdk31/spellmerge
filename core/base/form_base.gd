@@ -91,20 +91,21 @@ var _packed_pose: PackedFloat32Array = PackedFloat32Array()
 var _pose_packed: bool = false
 ## Knockback of one hit in pixels per second; 0 for the usual `SpellLimits.KNOCKBACK`.
 @export var knockback: float = 0.0
-## How this carrier looks as it is cast (staffs B6b; `gameplay/feel` reads it, and an empty one
-## gets the plain muzzle flash). Keys, all optional (CAST_LOOK_KEYS): the flash on the wizard's
-## staff, its `seconds` and `size` (0.5 is the plain one, up to 1.5), and a ring with it when `ring`
-## is true, gathering in for a negative `grow`, else flashing out; and `cue`, the id of a cue
-## (`content/cues`) Feel plays where the carrier shows itself (`form_shown`, whoever casts it: a
-## nova's ring, a rain's telegraph, where a teleport leaves, each end of a swap's trade, a decoy or
-## familiar appearing), as big as the event's `length`.
-@export var cast_look: Dictionary = {}
-## How it looks where it ends or hits (IMPACT_LOOK_KEYS): the flare's `size` (an empty one gets the
-## wall spark) and `ring`, and `cue`, a cue Feel plays where it ends on no body: a shot's end, as big
-## as its `radius`, and where a carrier with no shot ends (`carrier_ended`: a teleport or dash
-## landing, a rain falling, a slam's strike, a decoy or familiar going), as big as that event says.
-## A new carrier brings its looks in its own `.tres`; Feel's preset has none of them.
-@export var impact_look: Dictionary = {}
+## The cues this carrier plays at its moments (`content/cues/`, by id; `gameplay/feel` plays them,
+## docs/milestones/spell-spectacle-2.md, S6 2), so how a carrier looks is cue files, not keys of its
+## own: `cast_cue` on its caster's staff when a seat casts it (`spell_cast`: the flash, a ring with
+## it, the camera kicked back; `cast` when not given); `shown_cue` where the carrier shows itself
+## (`form_shown`, whoever casts it: a nova's ring, a rain's telegraph, where a teleport leaves, each
+## end of a swap's trade, a decoy or familiar appearing), as big as the event's `length`; `impact_cue`
+## where its shots strike, on a body or a wall (`projectile_impact`: the flare in the shot's colours
+## and cards; `impact` when not given), as big as its `radius`; and `end_cue` where a carrier with no
+## shot ends (`carrier_ended`: a teleport or dash landing, a rain falling, a slam's strike, a decoy or
+## familiar going), as big as that event says. Empty plays nothing there. A new carrier names its cues
+## in its own `.tres`; Feel's preset has none of them.
+@export var cast_cue: StringName = &"cast"
+@export var shown_cue: StringName = &""
+@export var impact_cue: StringName = &"impact"
+@export var end_cue: StringName = &""
 ## What its shots are drawn as: `&""` for their motion's own body (a flying shot a bolt with its
 ## tail, a still one a rune's diamond, an orbiting one an orbit shot), or a still body of its own for
 ## a still shot: `&"stone"`, a standing ward stone (a wall's). One of SHOT_BODIES; a body its shots'
@@ -112,26 +113,22 @@ var _pose_packed: bool = false
 ## shot shaders") and a name here.
 @export var shot_body: StringName = &""
 const SHOT_BODIES: Array[StringName] = [&"", &"stone"]
-## The keys each look may have (`look_problems`).
-const CAST_LOOK_KEYS: Array[String] = ["seconds", "size", "ring", "grow", "cue"]
-const IMPACT_LOOK_KEYS: Array[String] = ["size", "ring", "cue"]
 
 
 func kind() -> StringName:
 	return &"form"
 
 
-## What is wrong with its looks, one line each (empty when nothing is): a key no look reads, or a
-## cue that is no name.
+## Its cues and how big its impact cue plays, for looks (`gameplay/feel`, which reads no spell
+## field): [cast_cue, shown_cue, impact_cue, end_cue, radius]. A new Array each call.
+func look_cues() -> Array:
+	return [cast_cue, shown_cue, impact_cue, end_cue, radius]
+
+
+## What is wrong with its looks, one line each (empty when nothing is): a body that is none.
+## Whether the cues it names exist is the registry's to say (tests/content/spells/test_carrier_looks.gd).
 func look_problems() -> PackedStringArray:
 	var found := PackedStringArray()
-	for pair: Array in [["cast_look", cast_look, CAST_LOOK_KEYS], ["impact_look", impact_look, IMPACT_LOOK_KEYS]]:
-		var look: Dictionary = pair[1]
-		for key: Variant in look.keys():
-			if not (pair[2] as Array[String]).has(str(key)):
-				found.append("%s: %s has the key '%s', which nothing reads (%s)" % [id, pair[0], key, pair[2]])
-		if look.has("cue") and typeof(look["cue"]) != TYPE_STRING_NAME:
-			found.append("%s: %s's cue should be a cue id (&\"name\")" % [id, pair[0]])
 	if not SHOT_BODIES.has(shot_body):
 		found.append("%s: shot_body '%s' is not one of %s" % [id, shot_body, SHOT_BODIES])
 	return found

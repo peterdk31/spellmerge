@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"cast_atom"
+parts = Array[Dictionary]([{"effect": &"cast", "zoom": 1, "seconds": 0.05, "bare": true}])
+kick = 1.5
+kick_way = &"back"

@@ -69,6 +69,8 @@ func take() -> void:
 			for i in 60:
 				await physics_frame
 			cache[&"staff_swap"] = looks[ROWS[row]]
+			# Read again for playing (Feel keeps a cue's plan, `_plan_of`).
+			(feel.get("_cue_plans") as Dictionary).erase(&"staff_swap")
 			# Put the staff on show as a press does (`Caster._show`: the body and face swap, `staff_shown`),
 			# without the cast a press also makes, whose flash and light would hide the look.
 			caster.call("_show", SHOWN)
@@ -92,7 +94,7 @@ func take() -> void:
 		var sheet_4x: Image = sheet_1x.duplicate() as Image
 		sheet_4x.resize(sheet_4x.get_width() * 4, sheet_4x.get_height() * 4, Image.INTERPOLATE_NEAREST)
 		save(sheet_4x, "staff_swap%s_4x" % ending)
-	cache.erase(&"staff_swap")
+	feel.call("forget_cues")
 
 
 ## HALF x 2 screen pixels of `image` round the screen point `at`, at one image pixel a screen pixel.

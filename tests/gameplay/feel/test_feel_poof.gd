@@ -74,7 +74,7 @@ func _swap_cue(parts: Array[Dictionary]) -> void:
 	cue.id = FeelScript.STAFF_SWAP
 	cue.parts = parts
 	_registry.extra = cue
-	(_feel.get("_cue_cache") as Dictionary).clear()
+	_feel.forget_cues()
 
 
 func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() -> void:
@@ -114,7 +114,7 @@ func test_a_followed_flash_moves_as_the_old_poof_did() -> void:
 	offsets[old] = offset
 	_feel.set("_effect_offset", offsets)
 	_swap_cue([{"effect": &"poof", "zoom": 2, "bare": true}])
-	_feel.play_cue(FeelScript.STAFF_SWAP, -1, body.global_position + offset, body.aim, 0.0, Color.WHITE, 0, -1, -1, -1, 0, true, Color(0.0, 0.0, 0.0, 0.0), body)
+	_feel.play_cue(FeelScript.STAFF_SWAP, -1, body.global_position + offset, body.aim, 0.0, Color.WHITE, 0, -1, -1, -1, 0, true, FeelScript.NO_BODY, FeelScript.CASTER_RAMP, body)
 	var new: int = (old + 1) % _feel.effect_slots
 	for frame in roundi(FeelScript.POOF_SECONDS / STEP) + 2:
 		for field: String in ["_effect_at", "_effect_dir", "_effect_core", "_effect_ramp", "_effect_zoom", "_effect_look", "_effect_seconds", "_effect_age", "_effect_offset", "_effect_kind"]:

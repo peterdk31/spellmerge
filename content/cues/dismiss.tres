@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"dismiss"
-parts = Array[Dictionary]([{"effect": &"rise", "zoom": 2, "way": &"right"}, {"effect": &"puff", "zoom": 1, "way": &"right", "particles": true}])
+parts = Array[Dictionary]([{"effect": &"rise", "zoom": 2, "way": &"right"}, {"effect": &"puff", "zoom": 1, "way": &"right", "particles": true}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 12.0, "spread": 360.0, "ring": true}])

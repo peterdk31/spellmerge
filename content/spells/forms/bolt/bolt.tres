@@ -21,5 +21,4 @@ spread = 0.0
 carrier = &"atom"
 pierce = 0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.03, "push": -3, "stretch": 0.25, "ease": "out"}, {"phase": "after", "at": 0.18}])
-cast_look = {"seconds": 0.12, "size": 0.5}
-impact_look = {"size": 0.45}
+cast_cue = &"cast_bolt"

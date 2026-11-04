@@ -38,19 +38,13 @@ var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 var power: float = 1.0
 
 
-## Where a part plays (`CueBase`'s `along`): its fraction of the cue's line from its point (0, the
+## Where a part not prepared into fields plays (a light; `CueBase`'s `along`): its fraction of the cue's line from its point (0, the
 ## default: the point itself; 1: the line's end), the line being the cue's way for its `size`
 ## pixels (a staff from its grip to its tip).
 func point_of(part: Dictionary) -> Vector2:
 	if not part.has("along"):
 		return at
 	return at + aim * size * clampf(float(part["along"]), 0.0, 1.0)
-
-
-## The line a motes part with `line` is thrown from all along (the cue's way for its size pixels;
-## zero for a part thrown from one point).
-func line_of(part: Dictionary) -> Vector2:
-	return aim * size if bool(part.get("line", false)) else Vector2.ZERO
 
 
 ## The way a part (a Dictionary with an optional `way`, `CueBase.WAYS`) points: along the cue's

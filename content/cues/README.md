@@ -18,12 +18,13 @@ Cards name the cues they play: a carrier's `cast_look` `cue` (`FormBase`; played
 | `slam` | the slam card's impact look `cue`, at the slam's impact (`carrier_ended` `slam`) | a white-hot star, then the quake's cracks and crack mark, chips (and chip motes, with a few of its cards' motes), hold, shake and punch |
 | `parry` | Feel, for a swing's block (`shot_blocked` while the blocking carrier is a swing) | a big four-point star in exactly Spark gold, the parrying actor held alone |
 | `deflect` | Feel, for `shot_deflected`, aimed the way the shot now flies | a big white-hot cross in the deflecting actor's colours |
-| `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killing shot's cards' motes and chips in the colours of the body's own art, the killer and the shot held, a shake (Feel adds the ghost and the puff) |
-| `boss_death` | Feel, for `enemy_died` of an enemy whose data says `boss` | the same as `enemy_death` with many more motes, and the game-wide stop |
+| `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killing shot's cards' motes and chips in the colours of the body's own art, ichor in those colours on the floor, the killer and the shot held, a shake (Feel adds the ghost and the puff) |
+| `boss_death` | Feel, for `enemy_died` of an enemy whose data says `boss` | the same as `enemy_death` with many more motes and a bigger pool of ichor, and the game-wide stop |
 | `player_downed` | Feel, for `player_downed` (it names no position, so this cue draws nothing) | the game-wide stop and a big shake |
 | `self_hit` | Feel, for a hit of an actor by its own spell | a ring in exactly pink, so it is never taken for an enemy's hit |
 | `heal` | Feel, for `heal_dealt` | a soft ring in exactly green, no stop and no shake |
-| `nova` | the nova card's cast look `cue`, at `form_shown` `nova` | the ring leaving the caster, 120 px across, and a ring of its cards' motes |
+| `nova` | the nova card's cast look `cue`, at `form_shown` `nova` | the ring leaving the caster, 120 px across, a ring of its cards' motes, and a burn ring on the floor round the caster |
+| `rune_burst` | the rune card's impact look `cue`, where a rune goes off (on a body or not: a rune lies on the floor) | a rune's scar on the floor, as big as the rune |
 | `telegraph` | the rain card's cast look `cue`, at `form_shown` `rain` | a ring closing on where a rain falls, for the seconds until then (`size`) |
 | `rainfall` | the rain card's impact look `cue`, at `carrier_ended` where it falls | a column of light struck down (`fall`) and a spray |
 | `vanish` | the teleport card's cast look `cue`, where it leaves | a column of light pulled up off the spot (`rise`) |

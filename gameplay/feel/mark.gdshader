@@ -12,12 +12,16 @@ render_mode blend_mix, world_vertex_coords;
 //
 // Nothing here is a kind or a colour of its own:
 // - the kinds are data (`MarkKind`, content/marks), handed over by marks.gd as `kind_form` (form:
-//   0 blot, 1 crack, 2 rime; rough; fill; lines) and `kind_colour` (where the body's colour comes
-//   from, 0 the floor and 1 the spell, its shade, 0 base and 1 shadow; the same for the edge);
+//   0 blot, 1 crack, 2 rime, 3 ring, 4 rune, 5 speck; rough; fill; lines) and `kind_colour` (where
+//   the body's colour comes from, 0 the floor, 1 what made it and 2 the surface, its shade, 0 base
+//   and 1 shadow; the same for the edge);
 // - the floor's colours are the room's own art (`floor_ramp`: light, base, shadow;
 //   `RoomBase.floor_colors`), and none is drawn while they are unknown (`floor_known` 0);
 // - a spell's colours are the shot's own ramp, picked by the shot shaders' `look_of` from its
-//   core colour and its caster's ramp, as the motes pick theirs.
+//   core colour and its caster's ramp, as the motes pick theirs; a source from TABLE_SOURCE on (a
+//   settled mote's from a surface) is a row of `ramp_table`, the motes' table;
+// - a surface's colours (a dying body's own art, a room's walls) are a row of `ramp_table`, none
+//   drawn when it has no such row (`table_rows`).
 // Marks stay off the walls: `floor_mask` is the projectile manager's wall grid, one texel a
 // `mask_cell` square from the layer's corner, white for a wall.
 //
@@ -27,7 +31,8 @@ render_mode blend_mix, world_vertex_coords;
 //   MODEL_MATRIX[1].x   a seed (0-1)
 //   MODEL_MATRIX[3].xy  its middle, in the layer's pixels
 //   COLOR               its kind / KIND_CODE, its source / SOURCE_CODE (0-3 a hat ramp, 4 the
-//                       enemies', +8 an exact colour; Motes.spell_source)
+//                       enemies', +8 an exact colour; Motes.spell_source; from 16 a table row),
+//                       its surface / SOURCE_CODE (a table row; below 16 none)
 //   INSTANCE_CUSTOM     the core colour (a spell's)
 // The colour and custom data are between 0 and 1 and need no more than bytes.
 
@@ -41,12 +46,15 @@ uniform float floor_known = 0.0;
 uniform sampler2D floor_mask : filter_nearest;
 uniform vec2 mask_size = vec2(1.0);
 uniform float mask_cell = 8.0;
+uniform sampler2D ramp_table : filter_nearest;
+uniform float table_rows = 0.0;
 
 // Marks.KIND_CODE, SOURCE_CODE, MAX_KINDS; Motes.EXACT_SOURCE.
 const float KIND_CODE = 16.0;
 const float SOURCE_CODE = 128.0;
 const int MAX_KINDS = 16;
 const float EXACT_SOURCE = 8.0;
+const float TABLE_SOURCE = 16.0;
 // A blot's solid share of its radius; a crack's crushed middle; a rime's crystal squares (px).
 const float BLOT_CORE = 0.6;
 const float CRACK_CRUSH = 0.2;
@@ -64,11 +72,27 @@ varying flat vec4 k_body;
 varying flat vec4 k_edge;
 varying vec2 k_px;
 
-// Shade `shade` (0 base, 1 shadow) from `from` (0 the floor, 1 the spell of `source` with the
-// core colour `c`); its alpha is 0 when it is not known.
-vec4 mark_shade(float from, float shade, float source, vec3 c, float s) {
+// Shade `shade` (0 base, 1 shadow) of the ramp table's row for `source`; alpha 0 for none.
+vec4 mark_table(float source, float shade) {
+	float row = source - TABLE_SOURCE;
+	if (row < 0.0 || row >= table_rows) {
+		return vec4(0.0);
+	}
+	return vec4(texelFetch(ramp_table, ivec2(shade < 0.5 ? 2 : 3, int(row)), 0).rgb, 1.0);
+}
+
+// Shade `shade` (0 base, 1 shadow) from `from` (0 the floor, 1 what made it, the spell of `source`
+// with the core colour `c` or its table row, 2 the surface's table row); its alpha is 0 when it
+// is not known.
+vec4 mark_shade(float from, float shade, float source, float surface, vec3 c, float s) {
 	if (from < 0.5) {
 		return vec4(shade < 0.5 ? floor_ramp[1] : floor_ramp[2], floor_known);
+	}
+	if (from > 1.5) {
+		return mark_table(surface, shade);
+	}
+	if (source >= TABLE_SOURCE) {
+		return mark_table(source, shade);
 	}
 	bool exact = source >= EXACT_SOURCE;
 	Look L = look_of(c, mod(source, EXACT_SOURCE), 1.0, vec3(0.0, 0.0, exact ? 128.0 : 0.0), s, false);
@@ -174,6 +198,61 @@ int mark_rime(vec2 pixel, vec2 q, float r, float h) {
 	return h < 0.45 * (1.0 - u) + 0.08 ? 1 : 0;
 }
 
+// 1 the body, 2 the edge, 0 nothing: a ragged band round the rim, specks thrown in and out of it.
+int mark_ring(vec2 q, float r, float h) {
+	float rim = k_radius * (1.0 - 0.5 * k_form.y * mark_rim(atan(q.y, q.x)));
+	float band = max(2.0, k_radius * 0.14);
+	float off = abs(r - rim);
+	if (off < band * 0.5) {
+		return h < 0.88 ? 1 : 0;
+	}
+	if (off < band * 1.6) {
+		return h < k_form.z * 0.45 * (1.0 - (off - band * 0.5) / (band * 1.1)) ? 2 : 0;
+	}
+	return 0;
+}
+
+// 1 the body, 2 the edge, 0 nothing: a circle at the rim and one inside it, one pixel wide, with
+// `lines` strokes between them, each a tick out from the inner circle with a hook at its end.
+int mark_rune(vec2 q, float r, float h) {
+	float outer = k_radius - 1.0;
+	float inner = k_radius * 0.62;
+	if (abs(r - outer) < 0.6) {
+		return h < 0.9 ? 1 : 0;
+	}
+	if (abs(r - inner) < 0.6) {
+		return h < 0.7 ? 2 : 0;
+	}
+	if (r < inner || r > outer) {
+		return 0;
+	}
+	int n = int(k_form.w);
+	float a = atan(q.y, q.x);
+	for (int i = 0; i < 8; i++) {
+		if (i >= n) {
+			break;
+		}
+		float fi = float(i);
+		float at = (fi + 0.5 * mark_hash(fi, 1.0, 7.0)) * TAU / float(n);
+		float len = (outer - inner) * (0.45 + 0.4 * mark_hash(fi, 2.0, 7.0));
+		vec2 dir = vec2(cos(at), sin(at));
+		vec2 from = dir * inner;
+		vec2 rel = q - from;
+		float along = dot(rel, dir);
+		float across = dot(rel, vec2(-dir.y, dir.x));
+		if (along >= 0.0 && along <= len && abs(across) < 0.6) {
+			return 1;
+		}
+		// The hook: a stroke across the tick's end, to one side.
+		float side = mark_hash(fi, 3.0, 7.0) < 0.5 ? -1.0 : 1.0;
+		float hook = max(2.0, len * 0.4);
+		if (abs(along - len) < 0.6 && across * side >= 0.0 && abs(across) <= hook) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void vertex() {
 	float radius = MODEL_MATRIX[0].x;
 	float turn = MODEL_MATRIX[0].y;
@@ -181,6 +260,7 @@ void vertex() {
 	vec2 centre = MODEL_MATRIX[3].xy;
 	int k = clamp(int(floor(COLOR.r * KIND_CODE + 0.5)), 0, MAX_KINDS - 1);
 	float source = floor(COLOR.g * SOURCE_CODE + 0.5);
+	float surface = floor(COLOR.b * SOURCE_CODE + 0.5);
 	vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
 	// An empty row has no radius: folded away.
 	float reach = radius > 0.0 ? radius + 3.0 : 0.0;
@@ -191,8 +271,8 @@ void vertex() {
 	k_turn = vec2(cos(turn), sin(turn));
 	k_seed = s;
 	k_form = kind_form[k];
-	k_body = mark_shade(kind_colour[k].x, kind_colour[k].y, source, INSTANCE_CUSTOM.rgb, s);
-	k_edge = mark_shade(kind_colour[k].z, kind_colour[k].w, source, INSTANCE_CUSTOM.rgb, s);
+	k_body = mark_shade(kind_colour[k].x, kind_colour[k].y, source, surface, INSTANCE_CUSTOM.rgb, s);
+	k_edge = mark_shade(kind_colour[k].z, kind_colour[k].w, source, surface, INSTANCE_CUSTOM.rgb, s);
 }
 
 void fragment() {
@@ -211,8 +291,14 @@ void fragment() {
 		part = mark_blot(q, r, h);
 	} else if (k_form.x < 1.5) {
 		part = mark_crack(q, r, h);
-	} else {
+	} else if (k_form.x < 2.5) {
 		part = mark_rime(pixel, q, r, h);
+	} else if (k_form.x < 3.5) {
+		part = mark_ring(q, r, h);
+	} else if (k_form.x < 4.5) {
+		part = mark_rune(q, r, h);
+	} else {
+		part = all(equal(pixel + 0.5, k_centre + 0.5)) ? 1 : 0;
 	}
 	vec4 c = part == 1 ? k_body : (part == 2 ? k_edge : vec4(0.0));
 	if (c.a < 0.5) {

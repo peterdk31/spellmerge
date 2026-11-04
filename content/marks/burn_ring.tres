@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MarkKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mark_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"burn_ring"
+form = "ring"
+rough = 0.4
+fill = 0.5
+body_from = "floor"
+body_shade = "shadow"
+edge_from = "spell"
+edge_shade = "shadow"

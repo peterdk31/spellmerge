@@ -21,6 +21,10 @@ extends Resource
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
+## The floor mark (a `MarkKind` id, content/marks) each of its motes leaves where it comes to
+## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled
+## motes); empty for none. Only a kind that falls (gravity above 0) comes to rest.
+@export var settles: StringName = &""
 
 @export_group("Flight")
 ## Down the fake height, in px/s/s; below 0 it rises (an ember), 0 it keeps its height.
@@ -147,6 +151,8 @@ func problems() -> PackedStringArray:
 	for layer in look_layers:
 		if layer < 0 or layer > 21:
 			found.append("%s: look layer %d is not a LOOK_* kind (0-21)" % [id, layer])
+	if settles != &"" and gravity <= 0.0:
+		found.append("%s: only a kind that falls comes to rest, so one that rises leaves no mark" % id)
 	if speed.x > speed.y or up.x > up.y or life.x > life.y:
 		found.append("%s: speed, up and life go from the least (x) to the most (y)" % id)
 	if life.x <= 0.0 or life.y > 4.0:

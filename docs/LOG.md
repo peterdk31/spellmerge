@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Settled motes and the other floor marks (spell spectacle P2b, owner session)
+
+Chips and frost's flecks now leave a one-pixel speck in the floor mark layer where they come to rest, in their own colours, once they lie still (`MoteKind.settles` names the mark; `Marks.settle` keeps them in a wheel of time slots, at most 512 stamped a frame). The motes and marks share one ramp table (`gameplay/feel/ramp_table.gd`). New marks: a burn ring round a nova's caster, a rune's scar where a rune goes off (new cue `rune_burst`, on the rune card), ichor in a dying body's own colours (enemy and boss deaths; a new `surface` colour source), and char, lightning's card mark. Tests: `test_marks` (a speck where and when a mote rests, the caps, the settings, the new cues); screenshot sheet `shot_marks.gd`. Details: docs/DECISIONS.md.
+
 ## 2026-11-04: Trail particles as motes (spell spectacle P1d, owner session)
 
 The shots' card particles are Feel's motes now: the trail meshes drop their particle slots (a dash keeps its own), the projectile manager rolls the particles the shader would have given off (the same rates, thinned by the spark pool's share) and hands them out as births, and Feel throws one mote each. On llvmpipe the trails send 42-92 % fewer vertices; GPU time 42 -> 16-26 ms at 400 shots, about 85 -> 72 at 3,000, 22-37 -> 13-21 at 60, for 0.3-0.9 ms more CPU a frame; the storm shows no CPU change. On at every count (`SPARK_MOTES_BELOW`); the web and a real GPU are not measured. The motes look like the motes' kinds, not the shader's particles: sheets `shot_trails` and `shot_trails_shader` side by side for the owner. Tests: `test_projectile_looks`, `test_motes`. Details: docs/DECISIONS.md.

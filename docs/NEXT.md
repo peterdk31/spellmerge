@@ -48,7 +48,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Spell spectacle: measure and tune motes (P1c).** (`tests/benchmark/`, `docs/`) After P1b.
 - [x] **Spell spectacle: trails' shed particles as motes, an experiment (P1d).** (`core/projectiles/` trail shader, `gameplay/feel/`, `tests/benchmark/`) After P1b; merged only if it measures cheaper.
 - [ ] **Spell spectacle: the floor mark layer (P2a).** (`gameplay/feel/`, `core/base/cue_base.gd`, `content/cues/`) Independent of P1.
-- [ ] **Spell spectacle: settled motes and the other marks (P2b).** (`gameplay/feel/`, `content/cues/`) After P1a and P2a.
+- [x] **Spell spectacle: settled motes and the other marks (P2b).** (`gameplay/feel/`, `content/cues/`) After P1a and P2a.
 - [ ] **Spell spectacle: the light buffer and shot light (P3a).** (`gameplay/feel/`) Independent of P1 and P2.
 - [ ] **Spell spectacle: effects, beams, torches and room ambient (P3b).** (`gameplay/feel/`, `core/base/room_base.gd`, `content/rooms/`, `docs/STYLE.md`) After P3a and the owner's answers to the plan's P3 questions.
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.

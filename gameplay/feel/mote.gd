@@ -18,7 +18,8 @@ extends Node2D
 ## own ramp, picked in the shader by the shot shaders' rule (`look_of` in `shot_look.gdshaderinc`:
 ## the caster's hat ramp for a plain core, else the palette material nearest its core, or the
 ## exact colour); any other colours (a room's walls, `RoomBase.surface_colors`) go into the ramp
-## table (`ramp_table`, a texture of RAMPS rows) and are named by their row.
+## table (`ramp_table`, a texture of RAMPS rows, `ramp_table.gd`; Feel shares one with the floor
+## marks) and are named by their row.
 ##
 ## The pool is a ring of `cap` rows (the "Particles" setting, `MoteCap` in core/settings): a new
 ## mote takes the next row and overwrites the oldest. The ring is cut into CHUNK-row chunks, one
@@ -32,10 +33,14 @@ extends Node2D
 ## once they are used up costs next to nothing (a storm's flood of hits stays within its budget).
 ##
 ## `flight` is the shader's `mote_flight` line for line; `mote_land` gives where and when a mote
-## comes to rest, for the floor marks (P2b).
+## comes to rest. **Settled motes** (P2b): a kind that names a floor mark (`MoteKind.settles`)
+## leaves it where each of its motes comes to rest, at that time (`settle_into` names the mark
+## layer; `Marks.settle` keeps it until then).
 
 const SHADER: Shader = preload("res://gameplay/feel/mote.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
+const MarksScript := preload("res://gameplay/feel/marks.gd")
 
 ## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
 const CHUNK: int = 1024
@@ -53,13 +58,13 @@ const MOMENT_ROWS: int = 128
 ## The most kinds the shader holds (its `kind_motion` and `kind_sway` arrays).
 const MAX_KINDS: int = 16
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
-const RAMPS: int = 64
-const SHADES: int = 4
+const RAMPS: int = RampTableScript.ROWS
+const SHADES: int = RampTableScript.SHADES
 ## A source (a row's first colour channel): 0-3 a hat ramp, ENEMY_SOURCE the enemies', plus
 ## EXACT_SOURCE for a shot of an exact colour; from TABLE_SOURCE on, a row of the ramp table.
 const ENEMY_SOURCE: int = 4
 const EXACT_SOURCE: int = 8
-const TABLE_SOURCE: int = 16
+const TABLE_SOURCE: int = RampTableScript.TABLE_SOURCE
 ## A look's flags (core/projectiles: LOOK_ENEMY_RAMP, and Feel's EXACT), and its layers' bits.
 const LOOK_ENEMY_RAMP: int = 1 << 22
 const LOOK_EXACT: int = 1 << 23
@@ -106,12 +111,11 @@ var _until: PackedFloat32Array = PackedFloat32Array()
 var _now: float = 0.0
 ## Motes that may still be written before the next step (FRAME_ROWS).
 var _rows_left: int = FRAME_ROWS
-## The ramp table: its image and texture, the row of each set of colours, and the next row a new
-## set takes (the oldest when it is full).
-var _ramp_image: Image = null
-var _ramp_texture: ImageTexture = null
-var _ramp_rows: Dictionary = {}
-var _next_ramp: int = 0
+## The ramp table (its own, or the one Feel shares with the floor marks).
+var _table: RampTableScript = null
+## The mark layer settled motes go to (null for none), and per kind the mark it leaves (-1 none).
+var _marks: MarksScript = null
+var _settle_marks: PackedInt32Array = PackedInt32Array()
 ## The shapes' frames: SHAPE_SIZE squares, a kind's along its row (`shape_value`).
 var _shape_image: Image = null
 var _material: ShaderMaterial = null
@@ -121,8 +125,9 @@ var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
 ## A pool of `cap` rows (above 0) of the kinds `kinds` (at most MAX_KINDS; a kind with problems
-## is left out), its batches drawn at `z`.
-func _init(cap: int, z: int, kinds: Array[MoteKind]) -> void:
+## is left out), its batches drawn at `z`, its colours other than a spell's in `table` (a table
+## of its own when null).
+func _init(cap: int, z: int, kinds: Array[MoteKind], table: RampTableScript = null) -> void:
 	top_level = true
 	_cap = maxi(cap, 1)
 	_z = z
@@ -135,9 +140,8 @@ func _init(cap: int, z: int, kinds: Array[MoteKind]) -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
 	_mesh = _quad()
-	_ramp_image = Image.create_empty(SHADES, RAMPS, false, Image.FORMAT_RGBA8)
-	_ramp_texture = ImageTexture.create_from_image(_ramp_image)
-	_material.set_shader_parameter(&"ramp_table", _ramp_texture)
+	_table = table if table != null else RampTableScript.new()
+	_material.set_shader_parameter(&"ramp_table", _table.texture())
 	_take_kinds(kinds)
 
 
@@ -194,27 +198,28 @@ static func spell_source(ramp: int, look: int) -> int:
 ## The source of motes in `colours` (light, base, shadow; a fourth first is the white-hot, else
 ## the light): their row of the ramp table, written the first time.
 func table_source(colours: PackedColorArray) -> int:
-	if colours.is_empty():
-		return -1
-	var shades: PackedColorArray = colours if colours.size() >= SHADES else PackedColorArray([colours[0]]) + colours
-	if _ramp_rows.has(shades):
-		return TABLE_SOURCE + int(_ramp_rows[shades])
-	var row: int = _next_ramp
-	_next_ramp = (_next_ramp + 1) % RAMPS
-	for key: Variant in _ramp_rows.keys():
-		if int(_ramp_rows[key]) == row:
-			_ramp_rows.erase(key)
-	_ramp_rows[shades] = row
-	for shade in SHADES:
-		_ramp_image.set_pixel(shade, row, shades[mini(shade, shades.size() - 1)])
-	_ramp_texture.update(_ramp_image)
-	return TABLE_SOURCE + row
+	return _table.source(colours)
 
 
 ## The colour of shade `shade` (0 white-hot ... 3 shadow) of the ramp table's row for `source`
 ## (for tests).
 func table_shade(source: int, shade: int) -> Color:
-	return _ramp_image.get_pixel(shade, source - TABLE_SOURCE)
+	return _table.shade(source, shade)
+
+
+## Settled motes go to the mark layer `marks` (null for none): each kind that names a mark
+## (`MoteKind.settles`, a kind of `marks`) leaves it where each of its motes comes to rest.
+func settle_into(marks: MarksScript) -> void:
+	_marks = marks
+	_settle_marks.resize(_kinds.size())
+	for k in _kinds.size():
+		var id: StringName = _kinds[k].settles
+		_settle_marks[k] = marks.kind_index(id) if marks != null and id != &"" else -1
+
+
+## The mark kind of `marks` that kind `k`'s motes leave where they rest (-1 for none; for tests).
+func settle_mark(k: int) -> int:
+	return _settle_marks[k] if k >= 0 and k < _settle_marks.size() else -1
 
 
 ## A shot of the look `look` and core colour `core`, of an actor of `ramp`, sheds its motes at
@@ -350,6 +355,11 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 	var longest: float = clampf(life.y, 0.02, LIFE_MAX)
 	var chunk: int = -1
 	var buffer: PackedFloat32Array
+	# A settling kind's numbers, for `mote_land`'s sums done here in its order (read back from the
+	# row, so the point and time are the very ones it gives; about a fifth of its cost).
+	var mark: int = _settle_marks[k] if _marks != null and k < _settle_marks.size() and _kinds[k].gravity > 0.0 else -1
+	var kind: MoteKind = _kinds[k]
+	var g: float = kind.gravity
 	for n in count:
 		var row: int = _next
 		_next = (_next + 1) % _cap
@@ -379,6 +389,18 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		buffer[i + 13] = core.g
 		buffer[i + 14] = core.b
 		buffer[i + 15] = _rng.randf()
+		if mark >= 0:
+			var vz: float = buffer[i + 5]
+			var h0: float = buffer[i + 11] * HEIGHT_MAX
+			var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g
+			var rebound: float = (g * land - vz) * kind.bounce
+			var rest: float = land + 2.0 * rebound / g
+			if rest < buffer[i + 10] * LIFE_MAX:
+				var along: float = (1.0 - exp(-kind.drag * rest)) / kind.drag if kind.drag > 0.0 else rest
+				var still: Vector2 = Vector2(buffer[i + 3], buffer[i + 7]) + Vector2(buffer[i], buffer[i + 4]) * along
+				var phase: float = buffer[i + 15] * 6.2832
+				still.x += kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase))
+				_marks.settle(mark, still.floor(), buffer[i + 1] + rest, source, core)
 
 
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those

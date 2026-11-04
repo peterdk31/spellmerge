@@ -6,6 +6,7 @@
 script = ExtResource("1_base")
 id = &"chip"
 surface = true
+settles = &"speck"
 gravity = 320.0
 drag = 2.5
 bounce = 0.3

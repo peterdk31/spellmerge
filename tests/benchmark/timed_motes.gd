@@ -1,7 +1,7 @@
 extends "res://gameplay/feel/mote.gd"
 ## The mote pool, timing its own calls (P1c, docs/milestones/spell-spectacle.md): the sandbox
 ## storm hands Feel one (`Feel.use_motes`) to measure what motes cost the CPU in a fight. `usec`
-## sums the time of every call from outside (a shed, a throw, a burst, a step); a call made inside
+## sums the time of every call from outside (a shed, a throw, a burst, the trails' give_off, a step); a call made inside
 ## another is in its caller's time. Not used by the game.
 
 ## Microseconds spent in the pool's calls since it was made, and those calls (each adds the
@@ -32,6 +32,12 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
 	var start: int = _enter()
 	super(k, at, dir, count, speed, spread, up, life, source, core, height)
+	_leave(start)
+
+
+func give_off(births: PackedFloat32Array, count: int) -> void:
+	var start: int = _enter()
+	super(births, count)
 	_leave(start)
 
 

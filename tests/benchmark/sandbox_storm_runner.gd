@@ -129,7 +129,7 @@ func _ready() -> void:
 				_feel.call(&"set_mote_density", arg.trim_prefix("--mote-density=").to_float())
 		var pool: Node = _motes()
 		if pool != null:
-			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), pool.z_index, pool.call(&"kinds")))
+			_feel.call(&"use_motes", TimedMotesScript.new(pool.call(&"cap"), pool.z_index, pool.call(&"kinds"), _feel.call(&"ramp_table")))
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
 	if args.has("--no-trail-motes"):

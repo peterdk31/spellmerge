@@ -201,8 +201,10 @@ var events: EventsScript = null
 ## `begin_generation`, remove them, and only then call `begin_generation` (which clears it)
 ## or `shot_ended` again for them. Part 6 does exactly that.
 var revoked_tags: PackedInt64Array = PackedInt64Array()
-## The tag of the spell whose `cue_shown` is being sent (a blast's), 0 outside it, so the cue's
-## motes and marks can be its cards' (gameplay/feel; spell-spectacle-2.md, S2). For looks only.
+## The tag of the spell whose `cue_shown` is being sent (a blast's), or whose `form_shown` or
+## `carrier_ended` a carrier sends (`CarrierKit.set_cue_tag`: a dash's, a move's end), 0 outside
+## them, so the cue's motes and marks can be its cards' (gameplay/feel; spell-spectacle-2.md, S2
+## and S5). For looks only.
 var cue_tag: int = 0
 
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.

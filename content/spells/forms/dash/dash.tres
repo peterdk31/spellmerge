@@ -22,5 +22,5 @@ carrier = &"dash"
 pierce = 0
 ray_length = 80.0
 staff_pose = Array[Dictionary]([{"phase": "strike", "at": 0.5, "push": 3, "glow": 0.3, "mood": "raised"}, {"phase": "after", "at": 0.12}])
-cast_look = {"size": 0.5, "ring": true}
-impact_look = {"size": 0.5, "ring": true}
+cast_look = {"size": 0.5, "ring": true, "cue": &"dash_start"}
+impact_look = {"size": 0.5, "ring": true, "cue": &"dash_land"}

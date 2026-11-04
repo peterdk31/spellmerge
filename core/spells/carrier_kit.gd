@@ -22,6 +22,13 @@ func _init(runtime: SpellRuntime) -> void:
 
 # --- The world -----------------------------------------------------------------
 
+## The looks the next events show are the spell `tag`'s (`SpellRuntime.cue_tag`; 0 for none): set
+## round a `form_shown` or `carrier_ended`, so the cue it plays throws its cards' motes and marks
+## (gameplay/feel; docs/milestones/spell-spectacle-2.md, S2 and S5). For looks only.
+func set_cue_tag(tag: int) -> void:
+	_rt.cue_tag = tag
+
+
 ## The projectile manager the runtime casts into (null before `Spells.bind`).
 var projectiles: ProjectilesScript:
 	get:

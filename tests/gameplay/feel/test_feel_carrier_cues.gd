@@ -70,6 +70,41 @@ func test_a_rain_falls_where_it_lands() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "a splash thrown up")
 
 
+## A dash's moments are cues its card names (spell-spectacle-2.md, S5): `dash_start` where it
+## leaves (dust kicked up at its feet, and lightning arcs along its way), `dash_land` where it lands
+## (a ring in its caster's ramp, a flare of its element, its cards' motes). Its path is the caster's
+## trail and its streaks are motes (the projectile manager's births), so Feel keeps no dash state.
+func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
+	const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+	var sparks: int = 1 << (ProjectilesScript.LOOK_SPARKS - 1)
+	check_equal(_card(&"dash").cast_look.get("cue"), &"dash_start", "dash.tres names the cue `dash_start`")
+	check_equal(_card(&"dash").impact_look.get("cue"), &"dash_land", "and `dash_land`")
+	# The dust is in the room's colours: a room is entered.
+	bus.room_entered.emit(&"arena_01")
+	var motes: Node = feel.motes()
+	var written: int = int(motes.get(&"written"))
+	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, sparks)
+	check(int(motes.get(&"written")) > written, "dust where player 3 left (motes)")
+	check_equal(feel.effects_of(FeelScript.KIND_DASH), 0, "no dust flash of its own")
+	check_equal(feel.effects_of(FeelScript.KIND_ARC, 2), 1, "lightning (its sparks) arcs along its way")
+	check(feel.effect_info(FeelScript.KIND_ARC)["at"].is_equal_approx(Vector2(10, 20)), "from where it left")
+	feel.step(1.0)
+	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_ARC), 0, "a dash with no lightning arcs nowhere")
+	written = int(motes.get(&"written"))
+	bus.carrier_ended.emit(2, &"dash", Vector2(60, 30), Vector2.DOWN, 1.0, FROST, sparks)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a ring in its caster's ramp where it landed")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["look"], 0, "without its cards")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST, 2), 1, "an infused dash lands in a flare of its element")
+	check(int(motes.get(&"written")) > written, "and throws its cards' motes")
+	feel.step(1.0)
+	bus.carrier_ended.emit(2, &"dash", Vector2(60, 30), Vector2.DOWN, 1.0, FROST, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a plain dash lands in its ring")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 0, "with no flare")
+	bus.carrier_ended.emit(ActorSeats.enemy(feel.actors), &"dash", Vector2(60, 30), Vector2.DOWN, 1.0, FROST, 0)
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["ramp"], ActorSeats.ActorsScript.RAMP_ENEMY, "an enemy's dash lands in the enemy ramp (staffs F7)")
+
+
 func test_a_decoy_and_a_familiar_come_and_go() -> void:
 	for id: StringName in [&"decoy", &"familiar"]:
 		feel.step(1.0)

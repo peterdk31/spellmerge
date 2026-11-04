@@ -27,6 +27,7 @@ const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CardKindsScript := preload("res://gameplay/feel/card_kinds.gd")
+const BirthsScript := preload("res://gameplay/feel/births.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -71,6 +72,10 @@ var spells: Object = null:
 var projectiles: ProjectileManagerScript = null
 ## Feel's switch for the stress benchmark (`Feel.particles_enabled`): off, no motes are thrown.
 var particles_enabled: bool = true
+## The motes Feel's own drawings give off this frame (a swing's sparks, a beam's splash, their
+## cards' particles; S6 item 10): births in the trails' format, given off after the trails' in
+## `step`. Feel adds to it only while `motes_on`.
+var births: BirthsScript = BirthsScript.new()
 
 ## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
@@ -148,6 +153,7 @@ func step(now: float) -> void:
 	_clock = now
 	cards.new_frame()
 	_trail_motes()
+	_drawn_motes()
 	if pool != null:
 		pool.step(now)
 	if marks != null:
@@ -287,6 +293,13 @@ func _trail_motes() -> void:
 		projectiles.spark_motes = on
 	if on and particles_enabled and projectiles.spark_birth_count > 0:
 		pool.give_off(projectiles.spark_births, projectiles.spark_birth_count)
+
+
+## What Feel's own drawings gave off this frame (`births`), thrown like the trails' and forgotten.
+func _drawn_motes() -> void:
+	if births.count > 0 and motes_on():
+		pool.give_off(births.rows, births.count)
+	births.clear()
 
 
 # --- Cue parts -------------------------------------------------------------------------------

@@ -3,11 +3,15 @@ extends "res://tests/support/suite.gd"
 ## look"): Feel draws every live swing of core/spells as a mesh of small quads by
 ## `shot_swing.gdshader`, round the swing's hand, in its caster's ramp and its cards, kept in step
 ## with the sweep, and keeps it TRAIL_SECONDS past the sweep's end, after the swing itself is over.
+## Its sparks and card particles are motes given off as its tip passes (spell spectacle 2, S6 item
+## 10): births of its spell (`gameplay/feel/births.gd`).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
+const BirthsScript := preload("res://gameplay/feel/births.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FIRE: Color = Color("e0592f")
@@ -23,6 +27,9 @@ class FakeSwings:
 	var generation: int = 0
 	var age: float = 0.05
 	var origin: Vector2 = Vector2(40.0, 20.0)
+	## How far it has turned (radians, its own turning): waiting at the start of its wind-up.
+	var turned: float = -deg_to_rad(45.0 + SpellLimits.SWING_LEAN)
+	var look: int = 1
 
 	## As the runtime hands Feel its swings (`Spells.carrier(&"swing")`): itself.
 	func carrier(id: StringName) -> Object:
@@ -68,7 +75,13 @@ class FakeSwings:
 		return FIRE
 
 	func swing_look(_at: int) -> int:
-		return 1
+		return look
+
+	func swing_turned(_at: int) -> float:
+		return turned
+
+	func swing_tag(_at: int) -> int:
+		return 77
 
 
 var bus: EventsScript
@@ -164,3 +177,70 @@ func test_a_trail_is_one_mesh_of_small_quads_never_culled() -> void:
 
 func test_the_shader_is_warmed_before_play() -> void:
 	check(preload("res://core/projectiles/shader_warmup.gd").shaders().has(SwingTrailsScript.SHADER), "compiled behind the loading screen")
+
+
+## The births a whole sweep of `swings` gives off, turned in `steps` even steps from the lean
+## before its arc to the lean past it, through a trail of its own: each frame's births, appended.
+func _sweep(steps: int) -> Array[PackedFloat32Array]:
+	var trails := SwingTrailsScript.new(FeelScript.swing_mesh())
+	own(trails)
+	var births := BirthsScript.new(5)
+	var lean: float = deg_to_rad(45.0 + SpellLimits.SWING_LEAN)
+	var frames: Array[PackedFloat32Array] = []
+	var ramp_of: Callable = func(_actor: int) -> int: return 1
+	for n in steps + 1:
+		swings.turned = lerpf(-lean, lean, float(n) / float(steps))
+		births.clear()
+		trails.step(swings, 0.016 * n, ramp_of, 1.0, births)
+		frames.append(births.rows.slice(0, births.count * BirthsScript.STRIDE))
+	return frames
+
+
+func test_a_sweep_gives_off_its_sparks_and_card_particles_as_motes() -> void:
+	var sparks: int = 0
+	var particles: int = 0
+	var infused: int = 0
+	var stride: int = BirthsScript.STRIDE
+	for frame: PackedFloat32Array in _sweep(8):
+		for b in range(0, frame.size(), stride):
+			var at: Vector2 = Vector2(frame[b + ProjectilesScript.SPARK_X], frame[b + ProjectilesScript.SPARK_Y])
+			var way: Vector2 = Vector2(frame[b + ProjectilesScript.SPARK_BACK_X], frame[b + ProjectilesScript.SPARK_BACK_Y])
+			var out: Vector2 = (at - swings.origin).normalized()
+			var off: float = rad_to_deg(absf(Vector2.DOWN.angle_to(out)))
+			check(off <= 45.0 + 0.01, "only where it hits, within its 90 degree arc: %.1f off its aim" % off)
+			check(absf(at.distance_to(swings.origin) - (24.0 - SwingTrailsScript.LINE_IN)) <= 1.01, "from the line at its reach: %.2f" % at.distance_to(swings.origin))
+			check_equal(int(frame[b + ProjectilesScript.SPARK_RAMP]), 1, "in its caster's ramp")
+			check_equal(ProjectilesScript.spark_tag(frame, b), 77, "of its spell, so they take its cards' motes")
+			if int(frame[b + ProjectilesScript.SPARK_KIND]) == 0:
+				sparks += 1
+				check(way.dot(out) > 0.99, "a spark flung outward")
+				if Color(frame[b + ProjectilesScript.SPARK_CORE], frame[b + ProjectilesScript.SPARK_CORE + 1], frame[b + ProjectilesScript.SPARK_CORE + 2]) != Color.WHITE:
+					infused += 1
+			else:
+				particles += 1
+				check_equal(int(frame[b + ProjectilesScript.SPARK_KIND]), ProjectilesScript.LOOK_EMBERS, "a card particle of its look's kind (fire's embers)")
+				check(absf(way.dot(out)) < 0.01, "given off along the arc, back the way the tip came")
+	check(absf(float(sparks) - SwingTrailsScript.SPARKS) <= 6.0, "about SPARKS sparks a sweep: %d" % sparks)
+	check(infused > 0 and infused < sparks / 2, "a share in the infusion's ramp, the rest in the player's: %d of %d" % [infused, sparks])
+	check(particles >= 3 and particles <= 10, "about 6 card particles (4, 2 more a card kind): %d" % particles)
+
+
+func test_a_swing_with_no_cards_gives_off_only_sparks_and_none_with_motes_off() -> void:
+	swings.look = 0
+	for frame: PackedFloat32Array in _sweep(4):
+		for b in range(0, frame.size(), BirthsScript.STRIDE):
+			check_equal(int(frame[b + ProjectilesScript.SPARK_KIND]), 0, "sparks only")
+	var trails := SwingTrailsScript.new(FeelScript.swing_mesh())
+	own(trails)
+	var ramp_of: Callable = func(_actor: int) -> int: return 1
+	swings.turned = -1.0
+	trails.step(swings, 0.0, ramp_of, 1.0, null)
+	swings.turned = 1.0
+	trails.step(swings, 0.016, ramp_of, 1.0, null)
+	check_equal(trails.live(), 1, "with motes off (no births) it still draws its line, giving off nothing")
+
+
+func test_the_shader_draws_only_the_line_and_its_light() -> void:
+	var code: String = SwingTrailsScript.SHADER.code
+	check(not code.contains("shot_particle") and not code.contains("Q_SPARK") and not code.contains("Q_PARTICLE"), "its sparks and card particles are motes (S6 item 10)")
+	check_equal(SwingTrailsScript.SWING_QUADS.size(), 2, "two quads: the light and the line")

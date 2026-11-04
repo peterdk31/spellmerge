@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"conjure"
-parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"puff", "zoom": 2, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 24.0, "spread": 360.0, "ring": true}])
+parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"puff", "zoom": 2, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 24.0, "spread": 360.0, "ring": true}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 20.0, "spread": 360.0, "up": 0.3}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])

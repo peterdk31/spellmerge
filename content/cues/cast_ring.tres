@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"cast_ring"
-parts = Array[Dictionary]([{"effect": &"cast", "zoom": 1, "bare": true}, {"effect": &"ring_out", "bare": true}])
+parts = Array[Dictionary]([{"effect": &"cast", "zoom": 1, "bare": true}, {"effect": &"ring_out", "bare": true}, {"part": &"motes", "kind": &"spark", "count": 3, "radius": 7.0, "spread": 60.0, "way": &"aim", "life": 0.5, "bare": true, "often": true}])
 kick = 1.5
 kick_way = &"back"

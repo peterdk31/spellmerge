@@ -227,11 +227,10 @@ func test_each_lit_effect_kind_is_feels() -> void:
 		check(flares.has(code), "effect code %d is a lit Feel kind" % code)
 	for code: int in flares:
 		check(SpellLightScript.EFFECT_LIGHT.has(code), "Feel kind %d lights" % code)
-	check(not SpellLightScript.EFFECT_LIGHT.has(FeelScript.KIND_DASH), "a dash does not light")
 	check(SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SHELL - FeelScript.KIND_SHELL) and SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_FIREBALL - FeelScript.KIND_SHELL), "a blast and a fireball light")
 	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.EFFECT_LIGHT)
 	check_equal(lights.size(), 16, "16 kinds to the shader")
-	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_DASH] == 0.0, "by code")
+	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_STATUS] == 0.0, "by code")
 
 
 ## Feel's effects light: the light's effect batches draw the rows Feel just uploaded.
@@ -385,6 +384,39 @@ func test_a_torch_lights_in_its_flames_colour() -> void:
 	torch.free()
 	light.follow()
 	check_equal(light.spot_count(), 0, "a torch gone lights no more")
+
+
+## S6 item 12: a torch's painted glow (its sprites in `LightSpot.PAINTED`) is hidden while Spell
+## light draws its spot's light, whether the torch was there first or came after, and shown again
+## when the setting is off; its flame stays.
+func test_a_torchs_painted_glow_is_hidden_while_spell_light_is_on() -> void:
+	# The game's own Feel (the autoload) lights the whole tree too: off for this test.
+	var game_feel: Node = root.get_node_or_null(^"Feel")
+	var game_light: bool = game_feel != null and bool(game_feel.get("spell_light"))
+	if game_light:
+		game_feel.call("set_spell_light", false)
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	bus.spell_light_changed.emit(false)
+	var first: Node2D = TORCH.instantiate() as Node2D
+	root.add_child(first)
+	var painted: Array[CanvasItem] = [first.get_node("Glow") as CanvasItem, first.get_node("Core") as CanvasItem]
+	for item in painted:
+		check(item.is_in_group(LightSpot.PAINTED) and item.visible, "%s: painted light, shown with Spell light off" % item.name)
+	bus.spell_light_changed.emit(true)
+	for item in painted:
+		check(not item.visible, "%s: hidden with Spell light on" % item.name)
+	check((first.get_node("Flame") as CanvasItem).visible and (first.get_node("Bracket") as CanvasItem).visible, "the flame and bracket stay")
+	var later: Node2D = TORCH.instantiate() as Node2D
+	root.add_child(later)
+	check(not (later.get_node("Glow") as CanvasItem).visible and not (later.get_node("Core") as CanvasItem).visible, "a torch that comes while it is on: hidden too")
+	bus.spell_light_changed.emit(false)
+	for item: CanvasItem in painted + [later.get_node("Glow") as CanvasItem, later.get_node("Core") as CanvasItem]:
+		check(item.visible, "%s: shown again with Spell light off" % item.get_path())
+	first.free()
+	later.free()
+	if game_light:
+		game_feel.call("set_spell_light", true)
 
 
 ## A spot's numbers are its metadata; a tint stands in for its art; broken data is named.

@@ -74,6 +74,8 @@ extends Resource
 ##                what cools through a surface's colours)
 ##   `body`       true: in the own colour of the body the cue is of, as a flash's `body` (a death
 ##                puff's sparks)
+##   `bare`       true: in the caster's ramp, without the cards, as a flash's `bare` (a cast's
+##                sparks, in the seat's colours)
 ##   `share`      each kind thrown its own count times this, the share split between the kinds,
 ##                as one of many a frame (a shot's end, S6: `expire`; `often` too): it leaves the moments' rows
 ##                to the moments and is skipped once only those are left (`Motes.shed_closed`).
@@ -130,7 +132,7 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often", "share", "body", "along", "line", "life"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
@@ -257,6 +259,11 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's spread is not 0 to 360 degrees" % [id, i])
 	if part.has("colours") and not MOTE_GROUPS.has(StringName(part["colours"])):
 		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
+	var paints: int = int(part.has("color")) + int(bool(part.get("bare", false))) + int(bool(part.get("body", false)))
+	if paints > 1:
+		found.append("%s: motes part %d has more than one of color, bare and body" % [id, i])
+	if bool(part.get("bare", false)) and StringName(part.get("kind", "spell")) == &"spell":
+		found.append("%s: motes part %d is bare (without the cards) but throws the cards' kinds" % [id, i])
 	if float(part.get("life", 1.0)) <= 0.0 or float(part.get("life", 1.0)) > 4.0:
 		found.append("%s: motes part %d's life is not over 0 and at most 4 times its kinds'" % [id, i])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:

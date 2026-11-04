@@ -731,6 +731,29 @@ func test_a_trails_births_are_one_mote_each() -> void:
 	check_equal(motes.next_row(), 3, "no births, no motes")
 
 
+## A chunk only the trails write to stays drawn while their motes live (it was hidden on the next
+## step once P1c's chunks were hidden by their bursts' lives, which `give_off` did not keep).
+func test_a_chunk_of_trail_motes_is_drawn_while_they_live() -> void:
+	var motes: MotesScript = _pool(4096)
+	var stride: int = MotesScript.BIRTH_STRIDE
+	var births := PackedFloat32Array()
+	births.resize(stride)
+	births[2] = -1.0
+	births[4] = float(ProjectilesScript.LOOK_EMBERS)
+	births[5] = 2.0
+	births[6] = float(FIRE_LOOK)
+	births[7] = 1.0
+	motes.step(10.0)
+	motes.give_off(births, 1)
+	var life: float = motes.row_data(0)[10] * MotesScript.LIFE_MAX
+	motes.step(10.05)
+	check_equal(motes.chunks_shown(), 1, "drawn the step after it is written")
+	motes.step(10.0 + life * 0.9)
+	check_equal(motes.chunks_shown(), 1, "and while its mote lives")
+	motes.step(10.0 + life + 0.1)
+	check_equal(motes.chunks_shown(), 0, "then hidden")
+
+
 ## Feel takes the trails' particles while it has motes, and hands them back to the shader when
 ## Particles is off.
 func test_feel_takes_the_trails_particles_while_it_has_motes() -> void:

@@ -279,7 +279,11 @@ func give_off(births: PackedFloat32Array, count: int) -> void:
 		buffer[i + 7] = births[b + 1] + height
 		buffer[i + 8] = float(spell_source(int(births[b + 5]), int(births[b + 6]))) / SOURCE_CODE
 		buffer[i + 9] = float(k) / KIND_CODE
-		buffer[i + 10] = _step255(clampf(_rng.randf_range(kind.life.x, kind.life.y), 0.02, LIFE_MAX), LIFE_MAX) / LIFE_MAX
+		var life: float = _step255(clampf(_rng.randf_range(kind.life.x, kind.life.y), 0.02, LIFE_MAX), LIFE_MAX)
+		# Shown until this mote is gone, as `burst` keeps it (a chunk only the trails write to
+		# would be hidden on the next step otherwise).
+		_until[c] = maxf(_until[c], _now + life + LIFE_MAX / 255.0)
+		buffer[i + 10] = life / LIFE_MAX
 		buffer[i + 11] = height / HEIGHT_MAX
 		buffer[i + 12] = births[b + 7]
 		buffer[i + 13] = births[b + 8]

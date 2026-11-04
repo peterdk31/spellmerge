@@ -268,7 +268,8 @@ const EFFECT_Z: int = 50
 ## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const EFFECT_GRID: float = 24.0
 const EFFECT_STRIDE: int = 16
-## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is.
+## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is, above
+## the kind, or below it for an effect that does not light the room (`_effect_unlit`).
 const EFFECT_FROM: float = 0.02
 const EFFECT_SPAN: float = 0.42
 ## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`, PARTICLES ARE
@@ -499,6 +500,12 @@ var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
 var _effect_length: PackedFloat32Array = PackedFloat32Array()
 ## The character an effect follows (a status), or null, and how far above it the effect sits.
 var _effect_follow: Array[Node2D] = []
+## 1 for an effect that does not light the room by its kind (S6, item 4: shown by a cue with a
+## `light` part, which lights instead); its row says so by the sign of its age code.
+var _effect_unlit: PackedByteArray = PackedByteArray()
+## Whether the cue whose parts are playing now lights by its own `light` part (`play_cue`), so the
+## effects it shows are unlit.
+var _cue_unlit: bool = false
 ## Where a followed effect sits from its node (a status rises above it, a poof sits on the staff).
 var _effect_offset: PackedVector2Array = PackedVector2Array()
 var _next_effect: int = 0
@@ -1257,6 +1264,9 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.color = cue.color
 	context.power = cue.power
 	_cue_depth += 1
+	# A cue with a `light` part lights by it alone: the flashes it shows light nothing (S6, item 4).
+	var unlit_before: bool = _cue_unlit
+	_cue_unlit = cue.lights()
 	for part: Dictionary in cue.parts:
 		var type: StringName = StringName(part.get("part", "effect"))
 		var player: Variant = _cue_parts.get(type)
@@ -1264,6 +1274,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			_unknown_cue_part(id, type)
 			continue
 		(player as Callable).call(part, context)
+	_cue_unlit = unlit_before
 	_cue_depth -= 1
 	if not weight:
 		return
@@ -1565,6 +1576,8 @@ func _size_effects(slots: int) -> void:
 	_effect_length.resize(slots)
 	_effect_follow.resize(slots)
 	_effect_follow.fill(null)
+	_effect_unlit.resize(slots)
+	_effect_unlit.fill(0)
 	_effect_offset.resize(slots)
 	_next_effect = 0
 	# The statuses shown lost their effects; the next step shows them again.
@@ -1667,6 +1680,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_effect_length[slot] = 0.0
 	_effect_follow[slot] = follow
 	_effect_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
+	_effect_unlit[slot] = 1 if _cue_unlit else 0
 	if kind == KIND_DASH or kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
@@ -1769,7 +1783,10 @@ func _step_effects(real_delta: float) -> void:
 		buffer[i + 13] = core.g
 		buffer[i + 14] = core.b
 		var code: int = kind - KIND_SHELL if kind >= KIND_SHELL else kind
-		buffer[i + 15] = 1.0 - (float(code) + EFFECT_FROM + EFFECT_SPAN * through) / 16.0
+		# Its age beside its kind; below the kind for an effect that does not light (spell light
+		# reads the sign, the effect shaders the size: `coded_age`).
+		var age: float = EFFECT_FROM + EFFECT_SPAN * through
+		buffer[i + 15] = 1.0 - (float(code) + (-age if _effect_unlit[slot] != 0 else age)) / 16.0
 	if out > 0:
 		_effect_node.multimesh.buffer = _effect_buffer
 	_effect_node.multimesh.visible_instance_count = out

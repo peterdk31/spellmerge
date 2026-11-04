@@ -17,8 +17,13 @@ render_mode blend_add, world_vertex_coords;
 //               rune's size round its centre.
 //   ROWS_EFFECT Feel's effect rows (shot_effect, shot_blast, shot_arc): a real transform (its
 //               square, or an arc's length and width) round its centre, INSTANCE_CUSTOM.a its
-//               kind and how far through its life it is (Feel's EFFECT_FROM, EFFECT_SPAN). Each
-//               kind's light is `kind_light` (0: none), fading out over its life.
+//               kind and how far through its life it is (Feel's EFFECT_FROM, EFFECT_SPAN; coded
+//               below the kind for an effect that does not light). Each kind's light is
+//               `kind_light` (0: none), fading out over its life.
+//   ROWS_CUE    the cues' `light` parts (S6 item 4), written by spell_light.gd while they last: a
+//               transform scaled by the reach round the cue's point, COLOR and INSTANCE_CUSTOM.rgb
+//               an effect row's colour (its ramp, cards and core, or an exact colour), and
+//               INSTANCE_CUSTOM.a how bright it is now (it fades over its seconds).
 //   ROWS_SPOT   the room's light spots (core/base/light_spot.gd), written by spell_light.gd: a
 //               transform scaled by the reach, COLOR its colour and strength, INSTANCE_CUSTOM.x
 //               its flicker and .y a seed.
@@ -33,6 +38,7 @@ const int ROWS_TRAIL = 0;
 const int ROWS_RUNE = 1;
 const int ROWS_EFFECT = 2;
 const int ROWS_SPOT = 3;
+const int ROWS_CUE = 4;
 uniform int rows = 0;
 // How bright a light is at its middle (the buffer adds them, up to 1 a channel).
 uniform float shot_strength = 0.9;
@@ -75,16 +81,20 @@ void vertex() {
 		half_size = vec2(reach);
 		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * rune_strength;
 	} else if (rows == ROWS_EFFECT) {
-		float code = (1.0 - INSTANCE_CUSTOM.a) * 16.0;
-		float kind = floor(code);
-		float through = clamp((code - kind - EFFECT_FROM) / EFFECT_SPAN, 0.0, 1.0);
-		float strength = kind_light[int(clamp(kind, 0.0, 15.0))] * (1.0 - through);
+		// Its age below its kind: an effect of a cue that lights by its own `light` part, unlit.
+		float kind = coded_kind(INSTANCE_CUSTOM.a);
+		float code = coded_code(INSTANCE_CUSTOM.a);
+		float through = clamp((code - EFFECT_FROM) / EFFECT_SPAN, 0.0, 1.0);
+		float strength = code > 0.0 ? kind_light[int(clamp(kind, 0.0, 15.0))] * (1.0 - through) : 0.0;
 		if (strength > 0.0) {
 			vec2 along = MODEL_MATRIX[0].xy;
 			way = length(along) > 0.0 ? normalize(along) : vec2(1.0, 0.0);
 			half_size = vec2(length(along), length(MODEL_MATRIX[1].xy)) * 0.5 * effect_reach + vec2(effect_pad);
 			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * strength;
 		}
+	} else if (rows == ROWS_CUE) {
+		half_size = vec2(length(MODEL_MATRIX[0].xy));
+		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * INSTANCE_CUSTOM.a;
 	} else if (rows == ROWS_SPOT) {
 		float reach = length(MODEL_MATRIX[0].xy);
 		float step_of = floor(TIME * SPOT_RATE + INSTANCE_CUSTOM.y * 13.0);

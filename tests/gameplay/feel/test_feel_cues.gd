@@ -356,3 +356,17 @@ func test_the_new_moments_have_cues() -> void:
 		if cue != null:
 			check(not cue.parts.is_empty(), "%s shows something" % id)
 	check(feel.cue_of(&"gem_pickup").every > 0.0, "a gem pickup is throttled")
+
+
+## A light part's keys are checked like any part's (S6, item 4).
+func test_a_light_part_is_checked() -> void:
+	var cue: CueBase = _made([{"part": &"light", "radius": 30.0, "strength": 1.0, "seconds": 0.3, "bare": true}])
+	check(cue.problems().is_empty(), "a valid light part: %s" % [cue.problems()])
+	check(cue.lights(), "it lights")
+	for bad: Dictionary in [{"part": &"light", "strength": 3.0}, {"part": &"light", "seconds": 0.0}, {"part": &"light", "radius": -1.0}, {"part": &"light", "bare": true, "plain": true}, {"part": &"light", "zoom": 2}]:
+		var wrong := CueBase.new()
+		wrong.id = &"wrong"
+		wrong.parts = [bad]
+		check(not wrong.problems().is_empty(), "%s is a problem" % [bad])
+	check(not feel.cue_of(&"blast").lights(), "a cue with no light part lights by its flashes")
+	check(feel.has_cue_part(&"light"), "a light part has a player")

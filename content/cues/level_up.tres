@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"level_up"
-parts = Array[Dictionary]([{"effect": &"rise", "bare": true}, {"effect": &"ring_out", "zoom": 3, "seconds": 0.5, "color": Color(0.9490196, 0.7607843, 0.1882353, 1), "way": &"right"}, {"part": &"motes", "kind": &"glimmer", "count": 16, "radius": 28.0, "spread": 360.0, "up": 1.2, "color": Color(0.9490196, 0.7607843, 0.1882353, 1)}])
+parts = Array[Dictionary]([{"effect": &"rise", "bare": true}, {"effect": &"ring_out", "zoom": 3, "seconds": 0.5, "color": Color(0.9490196, 0.7607843, 0.1882353, 1), "way": &"right"}, {"part": &"motes", "kind": &"glimmer", "count": 16, "radius": 28.0, "spread": 360.0, "up": 1.2, "color": Color(0.9490196, 0.7607843, 0.1882353, 1)}, {"part": &"light", "radius": 64.0, "strength": 1.2, "seconds": 0.6, "color": Color(0.9490196, 0.7607843, 0.1882353, 1)}])
 sound = &"level_up"

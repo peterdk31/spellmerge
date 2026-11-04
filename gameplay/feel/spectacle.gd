@@ -129,6 +129,7 @@ func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 ## stepped.
 func step(now: float) -> void:
 	_clock = now
+	cards.new_frame()
 	_trail_motes()
 	if pool != null:
 		pool.step(now)
@@ -152,14 +153,14 @@ func motes_on() -> bool:
 ## A shot (of the tag `tag`) hit a body at `at`: its cards' motes (`look`, its `core` colour, in
 ## `ramp`) back along `away`, `share` of their count.
 func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
-	if pool != null and particles_enabled:
+	if pool != null and particles_enabled and not pool.shed_closed():
 		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
 
 
 ## A shot's (of the tag `tag`) life ran out at `at`: a puff of its cards' motes on along
 ## `heading`, `share` of their count.
 func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
-	if pool != null and particles_enabled:
+	if pool != null and particles_enabled and not pool.shed_closed():
 		pool.shed_kinds(cards.motes_of(tag, look), at, heading, core, ramp, look, share)
 
 
@@ -173,7 +174,8 @@ func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 	var look: int = projectiles.impact_look if projectiles != null else 0
 	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
 	var tag: int = projectiles.impact_tag if projectiles != null else 0
-	pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)
+	if not pool.shed_closed():
+		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)
 	if _surface_source >= 0:
 		for k in _surface_kinds:
 			pool.throw(k, at, away, _surface_source, Color.WHITE)
@@ -262,10 +264,12 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var spell: int = MotesScript.spell_source(cue.ramp, cue.look)
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var count: int = int(part.get("count", -1))
-	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours.
-	var of_surface: bool = named == &"surface"
+	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
+	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
+	var colours: StringName = StringName(part.get("colours", ""))
+	var of_surface: bool = named == &"surface" or colours == &"surface"
 	for k in kinds:
-		var walls: bool = of_surface or pool.kinds()[k].surface
+		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell")
 		var source: int = surface if walls else spell
 		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
 		pool.throw_part(k, cue.at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring)

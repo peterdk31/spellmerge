@@ -15,7 +15,10 @@ extends RefCounted
 ## build generation is a ring of 8, so after 8 rebuilds a tag can name another spell, and an entry
 ## is used only while `profile(tag)` is still the same spell. The entries are dropped once there are
 ## CACHE_MOST. A shot with no spell (an enemy's attack, a test's), and every shot while no kind
-## names a card, sheds by its look as before, with no lookup at all.
+## names a card, sheds by its look as before, with no lookup at all. In a fight most hits in a
+## frame are of a few spells, so a spell is checked against `profile` once a frame (`new_frame`),
+## and each answer is kept for the rest of the frame by its tag and look: a hit of a tag and look
+## seen this frame is one lookup (about as dear as `kinds_of_look` was).
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
@@ -44,6 +47,8 @@ class SideKinds:
 ## One spell's entry: the spell it was worked out for, and its two sides.
 class Entry:
 	var spell: Object = null
+	## The frame it was last checked against `profile` (CardKinds' `_frame`).
+	var frame: int = -1
 	var motes: SideKinds = null
 	var marks: SideKinds = null
 
@@ -55,6 +60,12 @@ var registry: Object = null
 
 var _motes: MotesScript = null
 var _marks: MarksScript = null
+## Whether any mote kind names a card (else every shot sheds its look's, asking nothing).
+var _card_motes: bool = false
+## `motes_of`'s answers this frame, by its tag and look (one int: `motes_of`).
+var _seen: Dictionary = {}
+## Frames so far (`new_frame`).
+var _frame: int = 0
 var _entries: Dictionary[int, Entry] = {}
 ## A card's look layer (0 for none: a form), read once.
 var _layers: Dictionary[StringName, int] = {}
@@ -63,7 +74,9 @@ var _layers: Dictionary[StringName, int] = {}
 ## The motes are `motes` from now on (null for none): what was worked out for the old ones goes.
 func use_motes(motes: MotesScript) -> void:
 	_motes = motes
+	_card_motes = motes != null and motes.has_card_kinds()
 	_entries.clear()
+	_seen.clear()
 
 
 ## The floor marks are `marks` from now on (null for none).
@@ -76,29 +89,47 @@ func use_marks(marks: MarksScript) -> void:
 func clear() -> void:
 	_entries.clear()
 	_layers.clear()
+	_seen.clear()
+
+
+## A new frame: the last answer kept is not used again (a staff rebuilt since may have taken its
+## tag).
+func new_frame() -> void:
+	if not _seen.is_empty():
+		_seen.clear()
+	_frame += 1
 
 
 ## The mote kinds a shot of the tag `tag` and the look `look` sheds: its spell's cards' (above), or
 ## its look's (`Motes.kinds_of_look`) when it has no spell or no card of it is named. Kept: read
 ## it, never change it.
 func motes_of(tag: int, look: int) -> PackedInt32Array:
-	if not _motes.has_card_kinds():
+	if not _card_motes or tag == 0:
 		return _motes.kinds_of_look(look)
+	# A tag is below 2^25 and a look's layers below 2^21: one int for both.
+	var key: int = tag | ((look & LAYER_BITS) << 25)
+	var seen: Variant = _seen.get(key)
+	if seen != null:
+		return seen
+	var found: PackedInt32Array
 	var entry: Entry = _entry(tag)
 	if entry == null or entry.motes.plain:
-		return _motes.kinds_of_look(look)
-	var bits: int = look & LAYER_BITS
-	var found: Variant = entry.motes.looks.get(bits)
-	if found == null:
-		found = _look_kinds(entry.motes, bits, _motes, true)
-		entry.motes.looks[bits] = found
+		found = _motes.kinds_of_look(look)
+	else:
+		var bits: int = look & LAYER_BITS
+		var known: Variant = entry.motes.looks.get(bits)
+		if known == null:
+			known = _look_kinds(entry.motes, bits, _motes, true)
+			entry.motes.looks[bits] = known
+		found = known
+	_seen[key] = found
 	return found
 
 
 ## The mote kinds a trail birth of look layer `layer` gives off for a shot of the tag `tag`: its
 ## spell's cards' of that layer (`Motes.kinds_of_layer` when it has none of its own). Kept.
 func layer_motes(tag: int, layer: int) -> PackedInt32Array:
-	if not _motes.has_card_kinds():
+	if not _card_motes or tag == 0:
 		return _motes.kinds_of_layer(layer)
 	var entry: Entry = _entry(tag)
 	if entry == null or entry.motes.plain:
@@ -144,16 +175,20 @@ func kept() -> int:
 func _entry(tag: int) -> Entry:
 	if tag == 0 or spells == null:
 		return null
+	var entry: Entry = _entries.get(tag)
+	if entry != null and entry.frame == _frame:
+		return entry
 	var spell: Object = spells.profile(tag)
 	if spell == null:
 		return null
-	var entry: Entry = _entries.get(tag)
 	if entry != null and entry.spell == spell:
+		entry.frame = _frame
 		return entry
 	if _entries.size() >= CACHE_MOST:
 		_entries.clear()
 	entry = Entry.new()
 	entry.spell = spell
+	entry.frame = _frame
 	var cards: Array[StringName] = _cards_of(spell)
 	entry.motes = _side(cards, _motes)
 	entry.marks = _side(cards, _marks)

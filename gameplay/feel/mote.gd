@@ -311,6 +311,15 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 	shed_kinds(kinds_of_look(look), at, dir, core, ramp, look, scale)
 
 
+## Whether a shed now writes nothing (only the frame's MOMENT_ROWS are left), counted as cut: ask it
+## before working out a shed's kinds (`card_kinds.gd`), which costs more than a shed that is cut.
+func shed_closed() -> bool:
+	if _rows_left <= MOMENT_ROWS:
+		cut += 1
+		return true
+	return false
+
+
 ## `shed` with the kinds `found` (a spell's, `card_kinds.gd`; never empty) in place of its look's.
 func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
 	if _rows_left <= MOMENT_ROWS:

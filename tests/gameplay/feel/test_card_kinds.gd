@@ -156,6 +156,8 @@ func test_a_tag_a_rebuilt_staff_reuses_gets_its_new_spell() -> void:
 	# Eight rebuilds later the generation ring is back at 5: the same tag, another spell.
 	check_equal(SpellTag.make(1, 2, 3, 5 + 8), tag, "the generation ring wraps after 8")
 	spells.spells[tag] = _spell(&"bolt", [], [&"sticky"])
+	# A spell is checked once a frame: the next frame sees the new build (a frame late at most).
+	book.new_frame()
 	check_equal(book.motes_of(tag, look), motes.kinds_of_look(look), "the new build's sticky: its layer's, not the old spell's grit")
 	check_equal(book.kept(), 1, "one entry, worked out again")
 

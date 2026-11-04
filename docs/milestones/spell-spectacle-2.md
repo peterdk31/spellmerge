@@ -62,6 +62,8 @@ Tests: a kind naming a card is shed by a shot of that card's spell and by no oth
 
 Measured: the storm with S2 against without, the CPU of Feel's hit handlers in `sandbox_storm.gd -- --motes`.
 
+**Built** (DECISIONS, 2026-11-04, "Spectacle by card"): as above, in `gameplay/feel/card_kinds.gd` (the spectacle's `cards`), with these changes. A spell is checked against `profile(tag)` once a frame, not at every hit, and each answer is kept for the frame by its tag and look, so a hit costs about what the look's lookup did (a rebuild is seen the next frame). The tags reach Feel as `Projectiles.impact_tag` (while a shot's impact or end is sent), `Spells.cue_tag` (while a blast's `cue_shown` is sent), the events' own tag or shot, and the births' `SPARK_TAG` (two floats: a spell's tag is above what a float holds whole). A `motes` cue part gains `colours` (`spell` or `surface`), so the fireball's `ash`, a kind that names nothing, cools through the colours of what burned. Two kinds came with it: `ash` and `grit` (heavy's own, a demo of a card's motes). Marks keep their 16-kind arrays: they are few and none is drawn per mote.
+
 ## S3: One particle system (the owner's Q1)
 
 Every particle is a mote; the old particle paths are removed.

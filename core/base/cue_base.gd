@@ -8,7 +8,12 @@ extends Resource
 ## a telegraph), its element's colour and its cards. Feel's moments with a life of their own
 ## (beams, dashes, swing trails, statuses, ghosts) are not cues.
 ##
-## The cue's `parts` are flashes Feel draws, each a Dictionary:
+## The cue's `parts` are each a Dictionary of a part type (its `part`; PART_TYPES, each with the
+## keys it may have). Feel plays each part by the player of its type (`Feel.add_cue_part`;
+## docs/milestones/spell-spectacle-2.md, S1), so a new kind of part is a row in PART_TYPES (and
+## its checks in `_type_problems`, if it has any) and a player in Feel or its spectacle.
+##
+## A part with no `part` (or `"part": "effect"`) is a flash Feel draws:
 ##   `effect`     one of EFFECTS (required)
 ##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given)
 ##   `reach`      its size from the cue's: `size` x reach pixels (Feel turns pixels into its zoom)
@@ -56,13 +61,14 @@ const EFFECTS: Array[StringName] = [
 ]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
-## The keys a part may have.
-const PART_KEYS: Array[String] = ["effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "way", "particles"]
-## The keys of a `motes` part, and the kinds it names besides a kind's id.
+## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "way", "particles"]
 const MOTE_KEYS: Array[String] = ["part", "kind", "count", "reach", "spread", "up", "ring", "way"]
-const MOTE_GROUPS: Array[StringName] = [&"spell", &"surface"]
-## The keys a mark part may have, and its turns.
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
+## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
+const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
+## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
+const MOTE_GROUPS: Array[StringName] = [&"spell", &"surface"]
 const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 
 ## Its name; the registry finds it by this under `cues`, and the file is `<id>.tres`.
@@ -92,38 +98,53 @@ func problems() -> PackedStringArray:
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():
 		var part: Dictionary = parts[i]
-		if StringName(part.get("part", "")) == &"motes":
-			found.append_array(_mote_problems(i, part))
+		var type: StringName = StringName(part.get("part", "effect"))
+		if not PART_TYPES.has(type):
+			found.append("%s: part %d's type '%s' is not one of %s" % [id, i, type, PART_TYPES.keys()])
 			continue
-		if StringName(part.get("part", "")) == &"mark":
-			found.append_array(_mark_problems(i, part))
-			continue
-		var effect: StringName = StringName(part.get("effect", ""))
-		if not EFFECTS.has(effect):
-			found.append("%s: part %d's effect '%s' is not one of %s" % [id, i, effect, EFFECTS])
+		var keys: Array = PART_TYPES[type]
 		for key: Variant in part.keys():
-			if not PART_KEYS.has(String(key)):
-				found.append("%s: part %d has an unknown key '%s'" % [id, i, key])
+			if not keys.has(String(key)):
+				found.append("%s: %s part %d has an unknown key '%s'" % [id, type, i, key])
 		if part.has("way") and not WAYS.has(StringName(part["way"])):
-			found.append("%s: part %d's way '%s' is not one of %s" % [id, i, part["way"], WAYS])
-		if part.has("zoom") and part.has("reach"):
-			found.append("%s: part %d has both zoom and reach" % [id, i])
-		if part.has("lasts_size") and (part.has("seconds") or part.has("reach")):
-			found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
-		if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or int(part.get("zoom", 1)) < 1:
-			found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
+			found.append("%s: %s part %d's way '%s' is not one of %s" % [id, type, i, part["way"], WAYS])
+		found.append_array(_type_problems(type, i, part))
 	return found
 
 
-## What is wrong with the `motes` part `i` (`part`): an unknown key or way, or a number out of
-## its range. Whether its kind exists is the registry's (tests/gameplay/feel/test_motes.gd).
+## What else is wrong with the part `i` (`part`) of the type `type`: what its type checks beyond
+## its keys and its way. A type with nothing more to check needs no line here.
+func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringArray:
+	match type:
+		&"effect":
+			return _effect_problems(i, part)
+		&"motes":
+			return _mote_problems(i, part)
+		&"mark":
+			return _mark_problems(i, part)
+	return PackedStringArray()
+
+
+## What is wrong with the flash part `i` (`part`): an unknown effect, or sizes that clash or are 0
+## or less.
+func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	var effect: StringName = StringName(part.get("effect", ""))
+	if not EFFECTS.has(effect):
+		found.append("%s: part %d's effect '%s' is not one of %s" % [id, i, effect, EFFECTS])
+	if part.has("zoom") and part.has("reach"):
+		found.append("%s: part %d has both zoom and reach" % [id, i])
+	if part.has("lasts_size") and (part.has("seconds") or part.has("reach")):
+		found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
+	if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or int(part.get("zoom", 1)) < 1:
+		found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
+	return found
+
+
+## What is wrong with the `motes` part `i` (`part`): a kind of no name, or a number out of its
+## range. Whether its kind exists is the registry's (tests/gameplay/feel/test_motes.gd).
 func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 	var found := PackedStringArray()
-	for key: Variant in part.keys():
-		if not MOTE_KEYS.has(String(key)):
-			found.append("%s: motes part %d has an unknown key '%s'" % [id, i, key])
-	if part.has("way") and not WAYS.has(StringName(part["way"])):
-		found.append("%s: motes part %d's way '%s' is not one of %s" % [id, i, part["way"], WAYS])
 	if StringName(part.get("kind", "spell")) == &"":
 		found.append("%s: motes part %d names no kind" % [id, i])
 	if int(part.get("count", 1)) < 1 or float(part.get("reach", 1.0)) <= 0.0 or float(part.get("up", 1.0)) < 0.0:
@@ -139,9 +160,6 @@ func _mark_problems(i: int, part: Dictionary) -> PackedStringArray:
 	var found := PackedStringArray()
 	if StringName(part.get("mark", "")) == &"":
 		found.append("%s: mark part %d names no mark" % [id, i])
-	for key: Variant in part.keys():
-		if not MARK_KEYS.has(String(key)):
-			found.append("%s: mark part %d has an unknown key '%s'" % [id, i, key])
 	if part.has("rot") and not MARK_ROTS.has(StringName(part["rot"])):
 		found.append("%s: mark part %d's rot '%s' is not one of %s" % [id, i, part["rot"], MARK_ROTS])
 	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0:

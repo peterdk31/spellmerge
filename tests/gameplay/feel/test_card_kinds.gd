@@ -30,6 +30,16 @@ class FakeSpells:
 	func profile(tag: int) -> CompiledSpell:
 		return spells.get(tag)
 
+	func cards_of(tag: int) -> Array[StringName]:
+		var cards: Array[StringName] = []
+		var spell: CompiledSpell = spells.get(tag)
+		if spell != null:
+			cards.append(spell.form_id)
+			for id in spell.element_ids + spell.modifier_ids:
+				if not cards.has(id):
+					cards.append(id)
+		return cards
+
 
 var registry: RegistryScript
 

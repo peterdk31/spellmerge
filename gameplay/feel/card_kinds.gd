@@ -3,8 +3,9 @@ extends RefCounted
 ## shot's spell sheds, worked out from its cards. The spectacle owns one and asks it at every hit,
 ## end, wall, trail birth and cue.
 ##
-## A shot's tag (every shot carries one; `core/spells/spell_tag.gd`) gives its spell
-## (`Spells.profile`), and the spell its cards: its form, its infusions and its modifiers. Each
+## A shot's tag (every shot carries one; `core/spells/spell_tag.gd`) gives its spell's cards as plain
+## ids (`Spells.cards_of`: its form, its infusions and its modifiers; nothing here reads a spell's
+## fields), and `Spells.profile` which spell it is now. Each
 ## card's kinds are those that name it by id (`MoteKind.cards`, `MarkKind.cards`), else those that
 ## name its look layer (`look_layers`, today's rule); a spell's are its cards' together, and with
 ## none at all a shot sheds layer 0's motes. So a card gets motes and marks of its own with one new
@@ -53,8 +54,9 @@ class Entry:
 	var marks: SideKinds = null
 
 
-## The spell runtime (anything with `profile(tag) -> CompiledSpell`), and the registry its cards are
-## read from (anything with `get_resource(folder, id)`); null for none (by look only).
+## The spell runtime (anything with `profile(tag)`, only compared, and `cards_of(tag)`), and the
+## registry the cards' look layers are read from (anything with `get_resource(folder, id)`); null
+## for none (by look only).
 var spells: Object = null
 var registry: Object = null
 
@@ -189,24 +191,11 @@ func _entry(tag: int) -> Entry:
 	entry = Entry.new()
 	entry.spell = spell
 	entry.frame = _frame
-	var cards: Array[StringName] = _cards_of(spell)
+	var cards: Array[StringName] = spells.cards_of(tag)
 	entry.motes = _side(cards, _motes)
 	entry.marks = _side(cards, _marks)
 	_entries[tag] = entry
 	return entry
-
-
-## The cards of `spell` (a CompiledSpell): its form, its infusions, its modifiers.
-static func _cards_of(spell: Object) -> Array[StringName]:
-	var cards: Array[StringName] = []
-	var form: StringName = spell.get(&"form_id")
-	if form != &"":
-		cards.append(form)
-	for list: Array[StringName] in [spell.get(&"element_ids"), spell.get(&"modifier_ids")]:
-		for id in list:
-			if id != &"" and not cards.has(id):
-				cards.append(id)
-	return cards
 
 
 ## The side of a spell of the cards `cards` on `kinds` (the motes or the marks; null for none).

@@ -19,14 +19,21 @@ const SIZE: float = 40.0
 const ROWS: Array[StringName] = [&"heavy, no spell", &"heavy's spell", &"fire + heavy", &"fireball, no ash", &"fireball"]
 
 
-## A spell runtime that knows the sheet's spells by tag (the game's knows the staffs' only).
+## A spell runtime that knows the sheet's spells by tag (the game's knows the staffs' only): each a
+## token for `profile` and its cards for `cards_of`.
 class SheetSpells:
 	extends Node
 	var spells: Dictionary = {}
 	var cue_tag: int = 0
 
-	func profile(tag: int) -> CompiledSpell:
-		return spells.get(tag)
+	func profile(tag: int) -> Object:
+		var cards: Variant = spells.get(tag)
+		return self if cards != null else null
+
+	func cards_of(tag: int) -> Array[StringName]:
+		var cards: Array[StringName] = []
+		cards.assign(spells.get(tag, []))
+		return cards
 
 
 var _spells: SheetSpells = null
@@ -45,18 +52,10 @@ func take() -> void:
 	root.add_child(_spells)
 	_heavy_tag = SpellTag.make(0, 0, 1, 0)
 	_fire_heavy_tag = SpellTag.make(0, 0, 2, 0)
-	_spells.spells[_heavy_tag] = _spell([], [&"heavy"])
-	_spells.spells[_fire_heavy_tag] = _spell([&"fire"], [&"heavy"])
+	_spells.spells[_heavy_tag] = [&"bolt", &"heavy"]
+	_spells.spells[_fire_heavy_tag] = [&"bolt", &"fire", &"heavy"]
 	spectacle.set(&"spells", _spells)
 	await _sheet(ROWS, "card_motes")
-
-
-static func _spell(elements: Array[StringName], modifiers: Array[StringName]) -> CompiledSpell:
-	var spell := CompiledSpell.new()
-	spell.form_id = &"bolt"
-	spell.element_ids = elements
-	spell.modifier_ids = modifiers
-	return spell
 
 
 ## One sheet: a row for each of `rows`, a column for each phase.

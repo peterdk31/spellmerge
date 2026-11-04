@@ -705,6 +705,22 @@ func profile(tag: int) -> CompiledSpell:
 	return _profiles.get(tag)
 
 
+## The cards of the spell registered under `tag`, as plain ids: its form, then its infusions and its
+## modifiers in slot order, each once (empty when its generation is gone). For looks only:
+## gameplay/feel's motes and marks by card (docs/milestones/spell-spectacle-2.md, S2).
+func cards_of(tag: int) -> Array[StringName]:
+	var cards: Array[StringName] = []
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null:
+		return cards
+	if spell.form_id != &"":
+		cards.append(spell.form_id)
+	for id in spell.element_ids + spell.modifier_ids:
+		if id != &"" and not cards.has(id):
+			cards.append(id)
+	return cards
+
+
 ## Registers every spell of `compiled` under a new generation of this actor's staff and
 ## returns the tag of its first spell, or 0 for an empty staff (the staff then has no build)
 ## or a bad actor or staff. The staff's generation advances; if its shots from 8 builds ago are

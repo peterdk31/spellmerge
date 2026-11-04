@@ -35,6 +35,7 @@ var _reactions: Array = []
 var _blocked: Array = []
 var _healed: Array = []
 var _applied: Array = []
+var _cues: Array = []
 
 
 func before_each() -> void:
@@ -54,7 +55,7 @@ func before_each() -> void:
 	_combat._ready()
 	_wizards.clear()
 	_next_tag = 0
-	for list: Array in [_landed, _hurt, _kills, _reactions, _blocked, _healed, _applied]:
+	for list: Array in [_landed, _hurt, _kills, _reactions, _blocked, _healed, _applied, _cues]:
 		list.clear()
 	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int) -> void: _landed.append([p, t, a, k]))
 	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
@@ -63,6 +64,7 @@ func before_each() -> void:
 	_bus.shield_blocked.connect(func(p: int, _at: Vector2, tag: int) -> void: _blocked.append([p, tag]))
 	_bus.heal_dealt.connect(func(p: int, t: Node, a: int, _at: Vector2) -> void: _healed.append([p, t, a]))
 	_bus.status_applied.connect(func(p: int, t: Node, id: StringName) -> void: _applied.append([p, t, id]))
+	_bus.cue_shown.connect(func(p: int, id: StringName, at: Vector2, dir: Vector2, _size: float, _tint: Color, _look: int) -> void: _cues.append([p, id, at, dir]))
 
 
 ## A wizard actor of seat `index` from the real scene (actors G7), in the tree at `at`.
@@ -422,6 +424,22 @@ func test_a_barrier_blocks_hits_one_charge_each() -> void:
 	check_equal(wizard.health.health, wizard.health.max_health - 5, "damage")
 
 
+## A block's look is content's (S6, item 13): the cue `shield_block` on the shielded actor, turned
+## back the way the hit came.
+func test_a_blocked_hit_plays_the_shield_block_cue() -> void:
+	var wizard := _wizard(0, Vector2(10.0, 0.0))
+	_bus.wizard_shield_requested.emit(0, 1, 2.0, 77)
+	_combat.hit(EventsScript.NO_PLAYER, wizard, 5, Vector2.RIGHT, 50.0)
+	check_equal(_cues.size(), 1, "one cue")
+	if _cues.size() == 1:
+		check_equal(_cues[0][0], 0, "of the shielded actor")
+		check_equal(_cues[0][1], CombatScript.SHIELD_BLOCK_CUE, "shield_block")
+		check_equal(_cues[0][3], Vector2.LEFT, "turned back the way the hit came")
+	_cues.clear()
+	_combat.hit(EventsScript.NO_PLAYER, wizard, 5)
+	check(_cues.is_empty(), "a hit that lands plays no block")
+
+
 func test_a_barrier_ends_with_its_time_and_stacks() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
 	_combat.give_shield(1, 1, 0.25, 5)
@@ -503,6 +521,29 @@ func test_a_pull_draws_enemies_toward_the_point() -> void:
 	check_equal(_combat.knockback_of(enemy), Vector2(-150.0, 0.0), "pulled toward the point at the strength")
 	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1, Vector2.ZERO)
 	check_equal(_combat.knockback_of(enemy), Vector2(-150.0, 0.0), "pulling each step does not pile speed up")
+
+
+## A body a pull newly catches plays the cue `pull` (S6, item 13) as the puller's, once while it
+## stays caught (a magnet pulls each step, or every other one), and again once it was let go.
+func test_a_body_newly_caught_by_a_pull_plays_its_cue_once() -> void:
+	var enemy := _enemy(Vector2(50.0, 0.0))
+	_projectiles.step(STEP)
+	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1, Vector2.ZERO)
+	check_equal(_cues.size(), 1, "caught: one cue")
+	if _cues.size() == 1:
+		check_equal(_cues[0][0], 0, "as the puller's")
+		check_equal(_cues[0][1], CombatScript.PULL_CUE, "pull")
+		check_equal(_cues[0][3], Vector2.LEFT, "the way it is pulled")
+	for i in 3:
+		_combat.step(STEP)
+		_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1, Vector2.ZERO)
+		_combat.step(STEP)
+	check_equal(_cues.size(), 1, "still caught (pulled every other step): no more")
+	for i in CombatScript.PULL_GAP_STEPS + 1:
+		_combat.step(STEP)
+	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1, Vector2.ZERO)
+	check_equal(_cues.size(), 2, "let go, then caught again: another")
+	check(is_instance_valid(enemy), "the enemy is still there")
 
 
 func test_a_pull_leaves_actors_out_of_reach_and_moves_wizards_too() -> void:

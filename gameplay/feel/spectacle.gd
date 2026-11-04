@@ -42,6 +42,13 @@ const MOTE_FOLDER: StringName = &"motes"
 const MARK_FOLDER: StringName = &"marks"
 const ROOM_FOLDER: StringName = &"rooms"
 const MARK_RADIUS: float = 8.0
+## A `light` part's reach (px) when it names none and the cue has no size, how bright it is and
+## how long it lasts when it does not say (S6, item 4).
+const LIGHT_RADIUS: float = 40.0
+const LIGHT_STRENGTH: float = 1.0
+const LIGHT_SECONDS: float = 0.3
+## The look bit of an exact colour (Feel's EXACT: kind 24 of the shot look).
+const EXACT: int = 1 << 23
 
 ## What a shot's spell sheds, from its cards (`card_kinds.gd`; spell-spectacle-2.md, S2).
 var cards: CardKindsScript = CardKindsScript.new()
@@ -145,12 +152,14 @@ func step(now: float) -> void:
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
+	if light != null:
+		light.step_cues(now)
 
 
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
 ## Callable taking the part and the cue's `CueContext`.
 func cue_parts() -> Dictionary:
-	return {&"motes": play_motes_part, &"mark": play_mark_part}
+	return {&"motes": play_motes_part, &"mark": play_mark_part, &"light": play_light_part}
 
 
 # --- Where motes come from (Feel calls these, in the order it draws) ------------------------
@@ -373,6 +382,32 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	for k in found:
 		marks.stamp(k, cue.at, radius, turn, source, cue.tint, surface)
+
+
+## A cue's `light` part (CueBase; S6, item 4), played with `cue`: the room lit round the cue's point
+## while Spell light is on, out to its `radius` pixels (or the cue's size times its `reach`; either
+## times the cue's power), `strength` bright, fading over its `seconds`, in its exact `color`,
+## plain, in the caster's ramp alone (`bare`), in the cue's own colour, or in the cue's ramp, tint
+## and cards: as a flash would be.
+func play_light_part(part: Dictionary, cue: CueContextScript) -> void:
+	if light == null:
+		return
+	var reach: float = float(part.get("radius", LIGHT_RADIUS))
+	if part.has("reach") and cue.size > 0.0:
+		reach = cue.size * float(part["reach"])
+	reach *= cue.power
+	var strength: float = float(part.get("strength", LIGHT_STRENGTH))
+	var seconds: float = float(part.get("seconds", LIGHT_SECONDS))
+	if part.has("color"):
+		light.flash(cue.at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
+	elif bool(part.get("plain", false)):
+		light.flash(cue.at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
+	elif bool(part.get("bare", false)):
+		light.flash(cue.at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
+	elif cue.color.a > 0.0:
+		light.flash(cue.at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
+	else:
+		light.flash(cue.at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
 
 
 # --- Settings ----------------------------------------------------------------------------------

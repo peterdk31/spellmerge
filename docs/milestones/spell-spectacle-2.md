@@ -76,6 +76,8 @@ Every particle is a mote; the old particle paths are removed.
 
 Measured: `trail_gpu.gd` at 60, 400 and 3,000 shots and the storm, before and after. The trail shader without its particle code should be cheaper still.
 
+**Built** (DECISIONS, 2026-11-04, "One particle system"): Particles' least stop is Minimal (2,048), and nothing has a "motes off" path; the trail shader keeps the tail, lightning's line and a dash's speed streaks (a dash's cards are births like a shot's, the owner's ask); a spray's and a puff's sparks are motes thrown with their flash; an explosion's fragments are its surface motes and its scorch a mark; a dead body breaks into motes of its own art (kept: the owner said it need not look the same, only good). The flashes' and bursts' own sparks, runes' and beams' card particles are still the shaders' (a follow-up). Trail shader 760 to 583 lines, blast shader 368 to 259, Feel 2,423 to 2,328.
+
 ## S4: A burst a row (an experiment, measured)
 
 Today a mote is a row and every row is a GDScript write. Instead, one row could hold a whole burst: where, which way, the kind, the count, the seed, the source and the time. A burst's batch draws a mesh of `BURST_QUADS` quads (16) a row, and the vertex shader works out each mote from the row, its quad's index and the seed, as the trails already work out their particles. A burst of 40 is three rows instead of 40, and the quads past the count are folded away.

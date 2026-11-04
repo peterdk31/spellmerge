@@ -25,6 +25,11 @@ extends Node
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
 ## counts; in a window (or under xvfb-run) the renderer runs too.
 ##
+## On a real GPU in a browser: the Web Test export started with `--storm` (the main menu adds this
+## runner, as it does the stress run's), e.g. the owner's harness `wingpu.sh build/web-test 120
+## "--storm --seconds=10"`; the page's `args` are read like the user arguments. Its frame time is the
+## real one (no `--fixed-fps` there), uncapped when Chrome runs without vsync.
+##
 ## The wizard is placed among the dummies at the start and kept up (mana full, revived and
 ## protected), since the shooting dummy in the other lane shoots back.
 ##
@@ -117,7 +122,7 @@ func _ready() -> void:
 	if _events == null or _flow == null or _input == null or _projectiles == null or _combat == null:
 		_finish(["the Events, Flow, PlayerInput, Projectiles and Combat autoloads must exist"])
 		return
-	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var args: PackedStringArray = _arguments()
 	stay = args.has("--stay")
 	for arg in args:
 		if arg.begins_with("--seconds="):
@@ -208,7 +213,7 @@ func _start() -> void:
 		_skipped_at = int(motes.get(&"settles_skipped"))
 	_probe = ProbeScript.new()
 	add_child(_probe)
-	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var args: PackedStringArray = _arguments()
 	if args.has("--profile") or args.has("--profile-signals"):
 		_tree_profile = TreeProfileScript.new()
 		add_child(_tree_profile)
@@ -357,6 +362,12 @@ func _report() -> void:
 		_probe.call("report")
 	if _tree_profile != null:
 		_tree_profile.call(&"report")
+
+
+## The run's arguments: the user ones (after "--") and the plain ones, which is how a web page's
+## start config (`args`) hands them over in the Web Test export (`--storm`, the main menu).
+static func _arguments() -> PackedStringArray:
+	return OS.get_cmdline_user_args() + OS.get_cmdline_args()
 
 
 ## Feel's motes (null with them off).

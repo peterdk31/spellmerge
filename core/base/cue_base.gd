@@ -54,6 +54,10 @@ extends Resource
 ##   `below`      thrown from this many pixels below the cue's point (a body's feet: 8)
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint (not for
 ##                what cools through a surface's colours)
+##   `share`      each kind thrown its own count times this, the share split between the kinds,
+##                as one of many a frame (a shot's end, S6: `expire`): it leaves the moments' rows
+##                to the moments and is skipped once only those are left (`Motes.shed_closed`).
+##                Takes no `count`, `reach`, `radius` or `ring`: the kinds fly as they shed
 ## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
 ## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
 ##   `mark`       the mark kind's id (`MarkKind`, content/marks; required, unless `cards`)
@@ -89,7 +93,7 @@ const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
 const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "share"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
@@ -194,6 +198,12 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
 		found.append("%s: motes part %d's below is not 0 to 32 pixels" % [id, i])
+	if part.has("share"):
+		if float(part["share"]) <= 0.0:
+			found.append("%s: motes part %d's share is 0 or less" % [id, i])
+		for key: String in ["count", "reach", "radius", "ring"]:
+			if part.has(key):
+				found.append("%s: motes part %d sheds a share of its kinds, so it takes no %s" % [id, i, key])
 	return found
 
 

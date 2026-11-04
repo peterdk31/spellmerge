@@ -25,7 +25,7 @@ func test_every_cue_is_valid_and_named_for_its_file() -> void:
 
 
 func test_the_cues_the_game_names_are_there() -> void:
-	for id: StringName in [&"blast", &"fireball", &"quake", &"slam", &"nova", &"telegraph", &"parry", &"deflect", &"enemy_death", &"boss_death", &"player_downed", &"self_hit", &"heal"]:
+	for id: StringName in [&"blast", &"fireball", &"quake", &"slam", &"nova", &"telegraph", &"parry", &"deflect", &"enemy_death", &"boss_death", &"player_downed", &"self_hit", &"heal", &"expire"]:
 		check(registry.get_resource(&"cues", id) is CueBase, "%s" % id)
 
 
@@ -77,6 +77,17 @@ func test_a_motes_part_names_what_is_wrong() -> void:
 	check_equal(cue.problems(), PackedStringArray(), "a motes part needs no effect, and takes its own keys")
 	cue.parts = [{"part": &"motes", "zoom": 2}, {"part": &"motes", "way": &"sideways"}, {"part": &"motes", "count": 0}, {"part": &"motes", "spread": 400.0}, {"part": &"motes", "kind": &""}]
 	check_equal(cue.problems().size(), 5, "one a part: %s" % [cue.problems()])
+
+
+## A motes part with a `share` sheds (S6: a shot's end): a share above 0, and none of the keys that
+## size a moment's burst (its count, reach, radius, ring), which a shed does not take.
+func test_a_shed_share_takes_no_burst_keys() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test"
+	cue.parts = [{"part": &"motes", "share": 0.5, "spread": 90.0, "up": 0.5, "way": &"back", "color": Color.RED}]
+	check_equal(cue.problems(), PackedStringArray(), "a share with the keys a shed takes")
+	cue.parts = [{"part": &"motes", "share": 0.0}, {"part": &"motes", "share": 1.0, "count": 4, "ring": true}]
+	check_equal(cue.problems().size(), 3, "a share of 0, and a count and a ring beside a share: %s" % [cue.problems()])
 
 
 ## A part's type is a row of CueBase.PART_TYPES (docs/milestones/spell-spectacle-2.md, S1): a type

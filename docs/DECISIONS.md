@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: Every moment a cue, part two: a shot's end, the death puff, colours as data (spell spectacle 2, S6 items 5, 6, 14, owner session)
+
+- **A shot's end is the cue `expire`** (item 5): its small flare is an `effect` part (`burst`, zoom 1, 0.2 s: the old `POP_ZOOM` and `POP_SECONDS`) and its motes a `motes` part with a `share` (1: the old `expire_mote_share`). A `share` makes a motes part a shed, not a moment's burst: each kind its own count times the share, split between the kinds, at its own speed and spread (what `Spectacle.shed_end` threw, now gone), as one of many a frame, so it leaves the moments' rows (`Motes.MOMENT_ROWS`) to the moments and is skipped, before its kinds are looked up, once only those are left. It takes no `count`, `reach`, `radius` or `ring` (`CueBase` says so). Which shots pop stays code: a flying or orbiting body, not one that ended on a wall (its impact showed) nor a still one (a rune goes off its own way).
+
 ## 2026-11-04: Every moment a cue, part one: reactions, possession, arcs (spell spectacle 2, S6 items 1, 7, 8, owner session)
 
 - **Reactions are cues** (item 1): one file a reaction, `content/cues/reaction_<id>.tres` (eight rows' ids and lightning's `discharge`), and a plain white `reaction` for an id with none. Not a `ReactionRow.cue`: a reaction has two rows (one each way), and the rows are combat's data, while how it looks is Feel's; a name by convention keeps both apart and needs no core change. Ten `FeelPreset` fields went (`reaction_colors`, `reaction_power`, `reaction_seconds`, `reaction_shake`, `reaction_stop_seconds`, `reaction_burst_size`, `reaction_ring_size`, `reaction_sound_prefix`, `reaction_mote_count`, `reaction_mote_reach`) and so did `Spectacle.reaction_motes`.

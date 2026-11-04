@@ -243,9 +243,6 @@ const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
-## A shot whose life runs out goes off in a small pop (the mockup's): a flare this big.
-const POP_ZOOM: int = 1
-const POP_SECONDS: float = 0.2
 ## A dash effect is drawn along its length (at most DASH_LONGEST: the length travels in the zoom's
 ## place, 4 px a step), DASH_MARGIN longer at each end and DASH_ACROSS across (the shader's).
 const DASH_LONGEST: float = 252.0
@@ -1144,22 +1141,17 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 	_show_impact(caster, ramp, position, direction, false)
 
 
-## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
-## was (the mockup's); one that ended on a wall already showed its impact, and a rune's going off
-## is its own burst.
-func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
-	if projectiles == null or not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
+## A bolt or orbit shot whose life ran out goes off: the cue `expire` (a small pop of its own
+## colours where it was and a puff of its cards' motes on along the way it flew, a share of their
+## count; S6), with the shot's own look while the event is sent. One that ended on a wall already
+## showed its impact, and a still one (a rune, a wall's stone) goes off its own way.
+func _on_projectile_expired(caster: int, position: Vector2, tag: int, shot: int) -> void:
+	if projectiles == null or projectiles.expired_on_wall:
 		return
-	if projectiles.expired_on_wall:
-		return
-	# Only a flying or orbiting body pops: a still one (a rune, a wall's stone) goes off its own way.
 	var body: int = projectiles.impact_body
 	if body != ProjectileManagerScript.KIND_BOLT and body != ProjectileManagerScript.KIND_ORBIT:
 		return
-	show_effect(KIND_BURST, position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, POP_ZOOM, POP_SECONDS)
-	# And a puff of its cards' motes, on along the way it flew.
-	if _spectacle.motes_on():
-		_spectacle.shed_end(position, projectiles.impact_heading, projectiles.impact_core, _ramp_of(caster), projectiles.impact_look, preset.expire_mote_share, _tag)
+	play_cue(&"expire", caster, position, projectiles.impact_heading, 0.0, projectiles.impact_core, projectiles.impact_look, ActorsScript.NONE, shot, -1, tag)
 
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,

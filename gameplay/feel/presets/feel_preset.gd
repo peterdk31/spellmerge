@@ -56,10 +56,9 @@ extends Resource
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
-## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A cue's motes (a
-## reaction's ring of them among them) are its own data.
+## its spray). A shot's end (the cue `expire`, its `share`) and a cue's motes (a reaction's ring of
+## them among them) are their own data.
 @export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
-@export_range(0.0, 4.0, 0.05) var expire_mote_share: float = 1.0
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08

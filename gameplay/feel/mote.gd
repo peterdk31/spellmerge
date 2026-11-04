@@ -105,15 +105,16 @@ const PACK_LONGEST: int = 4
 const PACK_SIZE: int = 5
 ## The longest life a mote has (s; MoteKind's, which checks the kinds against it).
 const LIFE_MAX: float = MoteKind.LIFE_MAX
-## The most motes written between two steps, and of them the rows a shot's hit, end or wall hit
-## (`shed`, `throw`: hundreds a frame in a storm, a few motes each) leave for the moments
-## (`throw_part`, `burst`: a cue's or a reaction's, tens or a hundred in one burst, so a blast in a
-## storm still throws its motes). Set from the sandbox storm (P1c, docs/DECISIONS.md): the sheds'
-## rows cost about 2.5 us each, a moment's about 0.5.
+## The most rows written between two steps (a row is a burst: up to 1, QUAD_ROW or BURST_QUADS
+## motes), and of them the rows a shot's hit, end or wall hit (`shed`, `throw`: hundreds a frame
+## in a storm, a few motes each) leave for the moments (`throw_part`, `burst`: a cue's or a
+## reaction's, tens or a hundred in one burst, so a blast in a storm still throws its motes). The
+## sandbox storm (S4, docs/DECISIONS.md) writes 368 motes a frame at 256 rows for the CPU 156
+## one-mote rows cost before, and 178 at 128 rows for about two thirds of it; a burst's call costs
+## about 2.5 us whatever its size. Kept at 256: a dead body's crumble is a row a pixel (up to 160).
 const FRAME_ROWS: int = 256
 const MOMENT_ROWS: int = 128
-## (S4) A burst's rows, not its motes, take the frame's rows; `frame_rows` is FRAME_ROWS unless a
-## benchmark sets it.
+## `frame_rows` is FRAME_ROWS unless a benchmark sets it (the moments keep the same share).
 ## The motes that leave a settled mark (`MoteKind.settles`): SETTLE_ROWS more may each frame, and
 ## what a frame leaves unused is kept, up to SETTLE_MOST. Working out where a mote rests and
 ## handing it to the mark layer costs about as much as writing a row (the integration of P1c, P1d

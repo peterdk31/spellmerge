@@ -1,7 +1,9 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of enemy statuses: one ember imp each with burning, chill, freeze, shock, hex and
 ## static, in a row in the live game (`statuses_1x`, as a player sees them, and `statuses_4x`),
-## then a reaction bursting over the row (`status_reaction_1x`).
+## then a reaction bursting over the row (`status_reaction_1x`). A status's particles are its card's
+## motes given off a few a second (spell spectacle 2, S6 item 11), so the row is shown after
+## SHOWN_FRAMES, once they have built up as they do in a fight.
 
 const IMP_SCENE := preload("res://content/enemies/ember_imp/ember_imp.tscn")
 const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"shock", &"hex", &"static"]
@@ -9,6 +11,8 @@ const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"shock", &"hex", 
 const GAP: float = 40.0
 ## Status seconds, long enough to outlast the shots.
 const SECONDS: float = 20.0
+## Frames the statuses show before the first picture (a second).
+const SHOWN_FRAMES: int = 60
 
 
 func take() -> void:
@@ -47,6 +51,7 @@ func take() -> void:
 				combat.call("apply_status", caster, imps[i], &"chill", SECONDS, 30.0)
 		else:
 			combat.call("apply_status", caster, imps[i], id, SECONDS, 5.0)
+	await settle(SHOWN_FRAMES)
 	await _snap(centre, "statuses_4x", 4)
 	await _snap(centre, "statuses_1x", 1)
 	events.call("emit_signal", "reaction_triggered", caster, &"shatter", centre + Vector2(GAP * 0.5, 0.0), -1)

@@ -50,6 +50,11 @@ const LIGHT_STRENGTH: float = 1.0
 const LIGHT_SECONDS: float = 0.3
 ## The look bit of an exact colour (Feel's EXACT: kind 24 of the shot look).
 const EXACT: int = 1 << 23
+## A status's motes (`status_motes`): how far they drift (pixels), their kind's speed up times
+## this, and how flat the oval round the character they leave from is.
+const STATUS_DRIFT: float = 6.0
+const STATUS_UP: float = 0.3
+const STATUS_FLAT: float = 0.8
 
 ## What a shot's spell sheds, from its cards (`card_kinds.gd`; spell-spectacle-2.md, S2).
 var cards: CardKindsScript = CardKindsScript.new()
@@ -118,6 +123,7 @@ var _broken_at: Vector2 = Vector2.INF
 var _mark_room: StringName = &""
 ## Feel's clock at the last step.
 var _clock: float = 0.0
+var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
 func _ready() -> void:
@@ -300,6 +306,28 @@ func _drawn_motes() -> void:
 	if births.count > 0 and motes_on():
 		pool.give_off(births.rows, births.count)
 	births.clear()
+
+
+## A status's motes (spell spectacle 2, S6 item 11): `count` motes of the element card `card`'s
+## kinds (those that name it, else those of its look layer `layer`), each from a random point of
+## an oval `reach` pixels round `at` (a character), drifting out STATUS_DRIFT pixels and a little
+## up (STATUS_UP of its kind's own), cooling from the exact colour `core`. One of many a frame: it
+## leaves the moments' rows alone, as a shed does.
+func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core: Color, count: int) -> void:
+	if count <= 0 or not motes_on() or not at.is_finite():
+		return
+	var found: PackedInt32Array = pool.kinds_of_card(card)
+	if found.is_empty():
+		found = pool.kinds_of_layer(layer)
+	if found.is_empty():
+		return
+	var source: int = MotesScript.spell_source(0, MotesScript.LOOK_EXACT)
+	for n in count:
+		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
+		var angle: float = _rng.randf() * TAU
+		var out: Vector2 = Vector2(cos(angle), sin(angle))
+		var from: Vector2 = at + Vector2(out.x, out.y * STATUS_FLAT) * reach * (0.5 + 0.5 * _rng.randf())
+		pool.throw_part(k, from, out, source, core, 1, STATUS_DRIFT, -1.0, STATUS_UP, false, true)
 
 
 # --- Cue parts -------------------------------------------------------------------------------

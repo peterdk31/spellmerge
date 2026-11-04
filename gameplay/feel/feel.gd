@@ -278,6 +278,8 @@ const ARC_ACROSS: float = 56.0
 const DISCHARGE_ARC: StringName = &"discharge_arc"
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
+## The registry folder the element cards a status is shown as are in (`_status_card`).
+const STATUS_CARD_FOLDER: StringName = &"spells"
 const STATUS_RISE: float = 8.0
 ## A beam is drawn this wide (its core, rim, flares and glow; `shot_beam.gdshader`'s mode 1).
 const BEAM_WIDTH: float = 16.0
@@ -332,6 +334,7 @@ var events: EventsScript = null
 var registry: RegistryScript = null:
 	set(value):
 		registry = value
+		_status_cards.clear()
 		if _spectacle != null:
 			_spectacle.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -492,6 +495,8 @@ var _status_effect: PackedInt32Array = PackedInt32Array()
 var _status_age: PackedFloat32Array = PackedFloat32Array()
 var _status_shown: Array[StringName] = []
 var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
+## The element card each status is shown as (`_status_card`), found once; null for none.
+var _status_cards: Dictionary = {}
 ## The cue of each reaction id (`reaction_<id>`, else REACTION_CUE), found the first time it is
 ## seen (so it allocates once).
 var _reaction_cues: Dictionary = {}
@@ -720,6 +725,7 @@ func step(real_delta: float) -> void:
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
+	_status_motes(real_delta)
 	_spectacle.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
@@ -1092,25 +1098,76 @@ func _status_of(enemy: Node) -> StringName:
 	return &""
 
 
-## Keep status `at` shown: an effect that follows its character, its look's particles round it
-## and a glow in its colour (`status_looks`: `color`, `look`), started again if a crowd of other
-## effects took its slot. Hidden while the character's sprite is.
+## Keep status `at` shown: an effect that follows its character, a glow in its card's colour
+## (`status_color`), started again if a crowd of other effects took its slot. Hidden while the
+## character's sprite is. Its motes are `_status_motes`'.
 func _pose_status(at: int) -> void:
 	var enemy := instance_from_id(_status_enemies[at]) as Node2D
-	var look: Dictionary = preset.status_looks.get(_status_shown[at], {}) as Dictionary
+	var card: ElementBase = _status_card(_status_shown[at])
 	var sprite: CanvasItem = null
 	if enemy != null:
 		sprite = enemy.get_node_or_null("Sprite") as CanvasItem
-	if enemy == null or look.is_empty() or (sprite != null and not sprite.is_visible_in_tree()):
+	if enemy == null or card == null or (sprite != null and not sprite.is_visible_in_tree()):
 		_end_status_effect(at)
 		return
 	var slot: int = _status_effect[at]
 	if slot >= 0 and slot < effect_slots and _effect_seconds[slot] > 0.0 and _effect_follow[slot] == enemy:
 		return
-	var kinds: int = look.get("look", 0) as int
-	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([kinds])) if kinds > 0 else 0
-	var tint: Color = look.get("color", Color.WHITE) as Color
-	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, tint, 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([card.look_layer])) if card.look_layer > 0 else 0
+	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+
+
+## The element card status `id` is shown as (spell spectacle 2, S6 item 11): the element whose
+## `status_id` it is, or for a status no element puts on (freeze), the one of the status it deepens
+## from (`FeelPreset.deep_statuses`). Null for none (an unknown status shows nothing). Found once
+## in the registry's cards.
+func _status_card(id: StringName) -> ElementBase:
+	var from: StringName = preset.deep_statuses.get(id, id) as StringName
+	if _status_cards.has(from):
+		return _status_cards[from] as ElementBase
+	var found: ElementBase = null
+	if registry != null and from != &"":
+		for card: Resource in registry.get_all(STATUS_CARD_FOLDER):
+			if card is ElementBase and (card as ElementBase).status_id == from:
+				found = card as ElementBase
+				break
+	_status_cards[from] = found
+	return found
+
+
+## Whether status `id` is shown at full depth (`FeelPreset.deep_statuses`: freeze).
+func _status_deep(id: StringName) -> bool:
+	return preset.deep_statuses.has(id)
+
+
+## The colour status `id` glows in and its motes cool from: its card's tint, `status_deep_white` of
+## the way to white for a deep one (freeze); white for a status with no card.
+func status_color(id: StringName) -> Color:
+	var card: ElementBase = _status_card(id)
+	if card == null:
+		return Color.WHITE
+	var tint: Color = Color(card.tint.r, card.tint.g, card.tint.b, 1.0)
+	return tint.lerp(Color.WHITE, preset.status_deep_white) if _status_deep(id) else tint
+
+
+## The shown statuses' motes over `real_delta` seconds (S6 item 11; the status shader's particles
+## until then): each gives off its card's motes round its character, `status_mote_rate` a second
+## (`status_deep_motes` times that for a deep one), in its colour.
+func _status_motes(real_delta: float) -> void:
+	if real_delta <= 0.0 or not _spectacle.motes_on():
+		return
+	for at in _status_enemies.size():
+		if _status_effect[at] < 0:
+			continue
+		var enemy := instance_from_id(_status_enemies[at]) as Node2D
+		var id: StringName = _status_shown[at]
+		var card: ElementBase = _status_card(id)
+		if enemy == null or card == null:
+			continue
+		var rate: float = preset.status_mote_rate * (preset.status_deep_motes if _status_deep(id) else 1.0)
+		var count: int = floori(rate * real_delta + _rng.randf())
+		if count > 0:
+			_spectacle.status_motes(card.id, card.look_layer, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
 ## End the effect that shows status `at`, if it still shows it.

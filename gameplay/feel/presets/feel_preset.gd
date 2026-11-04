@@ -52,21 +52,19 @@ extends Resource
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
 ## Camera kick (a cue's `kick`, a cast's among them): pixels given back per second.
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
-## What a character with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
-## `hex`, `static`; the glow look, 2026-10-27): an effect that follows it, giving off the
-## particles of a look kind (`look`: a `LOOK_*` of core/projectiles, the element's own: burn
-## fire's embers, chill and freeze frost's flecks, shock storm's gusts, hex void's pull, static
-## lightning's sparks) round it, with a glow in `color` that pulses.
+## What a character with a status looks like (spell spectacle 2, S6 item 11): its element card's
+## (the element whose `status_id` it is, `ElementBase`): a glow in the card's `tint` that follows
+## it and pulses, and the card's motes (the kinds that name it, else those of its `look_layer`)
+## given off round it, `status_mote_rate` a second. A status no element puts on is shown as the
+## status it deepens from (`deep_statuses`: freeze, which three chills make, as frost's chill) at
+## full depth: its glow `status_deep_white` of the way to white and `status_deep_motes` times the
+## motes, so a frozen character reads apart from a chilled one.
 ## When a character has several, the first in `status_order` is the one shown.
 @export var status_order: Array[StringName] = [&"freeze", &"static", &"shock", &"burn", &"hex", &"chill"]
-@export var status_looks: Dictionary = {
-	&"burn": {"color": Color("ff6a1a"), "look": 1},
-	&"chill": {"color": Color("8fd8ff"), "look": 2},
-	&"freeze": {"color": Color("e8fbff"), "look": 2},
-	&"shock": {"color": Color("fff04a"), "look": 3},
-	&"hex": {"color": Color("a63cff"), "look": 4},
-	&"static": {"color": Color("b4e82a"), "look": 5},
-}
+@export var deep_statuses: Dictionary = {&"freeze": &"chill"}
+@export_range(0.0, 60.0, 0.5) var status_mote_rate: float = 8.0
+@export_range(1.0, 8.0, 0.5) var status_deep_motes: float = 2.0
+@export_range(0.0, 1.0, 0.05) var status_deep_white: float = 0.75
 ## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `swing`, `burst`, `reaction`,
 ## `status`), so a new card feels like something before it has its own sound: `stop` and `shake`
 ## scale `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the

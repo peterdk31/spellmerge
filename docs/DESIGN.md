@@ -41,7 +41,7 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 3. Rewards are rolled per player.
 4. Unpicked rewards carry over as an unspent icon.
 5. Shared decisions are made by walking (the door rule).
-6. Only the real pause menu stops the game, and any player can open it.
+6. Only the real pause menu stops the game, and any player can open it. Online (later) it stops nothing: it opens like the builder, for that player only (the owner, 2026-11-04).
 
 ## One game, the same everywhere
 

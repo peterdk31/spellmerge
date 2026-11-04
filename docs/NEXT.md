@@ -21,7 +21,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Builder tree view, T3: the tree's data.** Done (#505). (`core/spells/` `staff_view`, `tests/core/`) Part T3. After T2.
 - [x] **Builder tree view, T4: one layout for all, bars and card info.** Done (#505). (`hud/builder/radial_builder.gd`, `hud/panels/`, tests, screenshots) Part T4. After T1 and T2.
 - [x] **Builder tree view, T5: the tree view.** Done (#505). (`hud/builder/`, tests, screenshots) Part T5. After T3 and T4.
-- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
+- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included (phase N's online-ready tasks excepted: they run beside it and end before M3). Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
 
@@ -88,6 +88,19 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
 - [x] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
 - [x] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
+- [ ] **Online-ready: the state hash, the declared state and the desync report (N1).** (`core/sim/`, every simulation script's `DERIVED`, `tests/core/`) [online-ready.md](milestones/online-ready.md), N1. After the lane's current work.
+- [ ] **Online-ready: input frames and replays (N2).** (`core/sim/`, `gameplay/player/`, `core/events/`, `tests/bots/`) N2. After N1.
+- [ ] **Online-ready: a first look across platforms (N2b).** (`tests/`, `docs/DECISIONS.md`) N2b. After N2.
+- [ ] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b.
+- [ ] **Online-ready: hit-stop in ticks (N4).** (`gameplay/feel/`, `core/sim/`) N4. After N3.
+- [ ] **Online-ready: identity without instance ids (N5).** (`core/projectiles/`, `core/spells/`) N5. After N3.
+- [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7's `dmath.h`; the owner edits `native/SConstruct`.
+- [ ] **Online-ready: deterministic maths in C++ (N7).** (`native/`, `core/native/`, `core/sim/`, simulation trig calls) N7, with its GDScript twin. After N3; the owner edits `native/SConstruct`.
+- [ ] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3.
+- [ ] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4–N7.
+- [ ] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N4–N7 and N11.
+- [ ] **Online-ready: snapshots (N10).** (`core/sim/`, `restore_nodes()` hooks) N10; may split into N10a and N10b. After N9.
+- [ ] **Online-ready: new content covered by itself (N12).** (`tests/core/`) N12. After N10.
 
 ## Blocked
 

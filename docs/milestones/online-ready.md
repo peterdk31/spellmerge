@@ -1,6 +1,6 @@
 # Online-ready: a deterministic simulation (phase N)
 
-**Status (2026-11-04): draft, waiting for the owner's approval.** Asked by the owner on 2026-11-04: "Real online play is wanted. I hereby grant permission to change the design, such that it is possible to add. So I think we should follow your suggestion and tighten determinism." An exception to the milestone order like phases F–P ([ROADMAP.md](../ROADMAP.md)). The owner's decisions go in "Owner decisions"; what changes while building goes in docs/DECISIONS.md.
+**Status (2026-11-04): approved by the owner** ("Go with your proposals on all four decisions"). The tasks are in the owner lane of [NEXT.md](../NEXT.md), after the lane's current work; phase N does not hold up D3 and C2, and ends before M3 starts. Asked by the owner on 2026-11-04: "Real online play is wanted. I hereby grant permission to change the design, such that it is possible to add. So I think we should follow your suggestion and tighten determinism." An exception to the milestone order like phases F–P ([ROADMAP.md](../ROADMAP.md)). The owner's decisions go in "Owner decisions"; what changes while building goes in docs/DECISIONS.md.
 
 **This phase builds no netcode.** Networking stays banned by hard rule 4 until the netcode phase sketched at the end, which needs its own owner exception (like the native module's of 2026-11-02). Phase N makes the game *ready* for it, and pays off without it: replays, bug reports that replay exactly, and tests that never flake on frame time.
 
@@ -36,12 +36,12 @@ Not a problem: render interpolation (the projectile manager drawing between step
 
 ## Owner decisions
 
-To answer before N1 starts:
+Decided by the owner on 2026-11-04 ("Go with your proposals on all four decisions"):
 
-1. **Where it goes in the order.** Proposal: right after the current owner-lane work, and before M3, so the run structure is born deterministic.
-2. **Hit-stop online (N4).** Proposal: hit-stop stays a game-wide stop, but counted in ticks of the simulation, so every machine stops on the same tick. The alternative, a view-only freeze (the world keeps running under a frozen picture), feels worse.
-3. **Pause online.** Rule 6 says the pause menu stops the game for everyone. Proposal (design change, below): offline it still does; online, the pause menu opens without stopping the game, like the builder.
-4. **The tick rate.** Proposal: 60 ticks a second, fixed, as today.
+1. **Where it goes in the order:** right after the owner lane's current work, and before M3, so the run structure is born deterministic. It runs beside D3 and C2 and does not hold them up.
+2. **Hit-stop online (N4):** hit-stop stays a game-wide stop, counted in ticks of the simulation, so every machine stops on the same tick (not a view-only freeze).
+3. **Pause online:** offline the pause menu still stops the game for everyone; online it opens without stopping the game, like the builder (design rule 6, below).
+4. **The tick rate:** 60 ticks a second, fixed, as today.
 
 ## The design change
 
@@ -50,7 +50,7 @@ Made with the owner's permission of 2026-11-04, in docs/DESIGN.md:
 - "1–4 co-op players (local co-op now, online co-op later)";
 - a new section, **One game, the same everywhere:** the same inputs give the same game, to the bit, on every platform; all game logic runs on the simulation's tick, never on real time, live input, the camera or anything drawn; and nobody waits online either (a slow connection hurts only its own player).
 
-Still to change once decision 3 is answered: rule 6's online variant (the pause menu).
+- and, with decision 3, rule 6's online variant: online the pause menu stops nothing.
 
 ## How it stays easy to develop (the architecture)
 

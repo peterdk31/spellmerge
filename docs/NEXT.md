@@ -21,7 +21,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Builder tree view, T3: the tree's data.** Done (#505). (`core/spells/` `staff_view`, `tests/core/`) Part T3. After T2.
 - [x] **Builder tree view, T4: one layout for all, bars and card info.** Done (#505). (`hud/builder/radial_builder.gd`, `hud/panels/`, tests, screenshots) Part T4. After T1 and T2.
 - [x] **Builder tree view, T5: the tree view.** Done (#505). (`hud/builder/`, tests, screenshots) Part T5. After T3 and T4.
-- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included (phase N's online-ready tasks excepted: they run beside it and end before M3). Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
+- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included (phase N's online-ready and shot scale's tasks excepted: they run beside it, and phase N ends before M3). Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
 
@@ -88,17 +88,29 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
 - [x] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
 - [x] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
-- [ ] **Online-ready: the state hash, the declared state and the desync report (N1).** (`core/sim/`, every simulation script's `DERIVED`, `tests/core/`) [online-ready.md](milestones/online-ready.md), N1. After the lane's current work.
+- Online-ready (phase N) and shot scale (H), in one order ([online-ready.md](milestones/online-ready.md), "With shot scale"). Two lanes inside this lane: the **projectiles lane** (`core/projectiles/projectile_manager.gd`, `native/src/shot_kernel.cpp`) takes one PR at a time; the rest runs beside it. Every part keeps rules T1-T5.
+- [ ] **Online-ready: the state hash, the declared state and the desync report (N1).** (`core/sim/`, every simulation script's `DERIVED` and `VIEW`, `tests/core/`) [online-ready.md](milestones/online-ready.md), N1. After the lane's current work.
+- [ ] **Shot scale: measure at scale (H0).** (`tests/benchmark/`) [shot-scale.md](milestones/shot-scale.md), H0. Beside N1.
+- [ ] **Shot scale: fewer hand-backs (H1).** Projectiles lane. (`native/src/shot_kernel.cpp`, `core/projectiles/`) H1. After H0.
 - [ ] **Online-ready: input frames and replays (N2).** (`core/sim/`, `gameplay/player/`, `core/events/`, `tests/bots/`) N2. After N1.
+- [ ] **Shot scale: the hit budget sized by measurement, and no lost damage (H2).** Projectiles lane. (`core/projectiles/`, `native/`) H2: a fixed budget in work units (T1). After H1.
 - [ ] **Online-ready: a first look across platforms (N2b).** (`tests/`, `docs/DECISIONS.md`) N2b. After N2.
-- [ ] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b.
+- [ ] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b. Re-records the hit traces; H3b's are recorded with them if H3b comes soon after.
+- [ ] **Online-ready: identity without instance ids (N5).** Projectiles lane. (`core/projectiles/`, `core/spells/`) N5. After H2 and N3.
+- [ ] **Online-ready: deterministic maths in C++, the kernel side (N7a).** Projectiles lane. (`native/`: `dmath.h`, the kernels' trig) N7, its C++ part. After N5; the owner edits `native/SConstruct`.
+- [ ] **Shot scale: threads in the kernel (H5).** Projectiles lane. (`native/`, the owner's `ci/smbot/rules.py` and `native/build_profile.json`) H5, with T2's one-against-several test. After N7a and N1; the owner merges it.
+- [ ] **Shot scale: threads on the web (H5w).** Projectiles lane. (`export_presets.cfg`, the owner's `ci/build/native.sh`) H5w, only if the web supports threads. After H5.
+- [ ] **Shot scale: shots-first queries (H6).** Projectiles lane. (`core/projectiles/`, `native/`) H6, only if H0 or H5 measures the need. After H5.
+- [ ] **Shot scale: draw cost by count (H4).** Projectiles lane. (`core/projectiles/`, `core/settings/`) H4, view only (T5). After H6, or H5 when H6 is not needed.
 - [ ] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3.
-- [ ] **Online-ready: identity without instance ids (N5).** (`core/projectiles/`, `core/spells/`) N5. After N3.
-- [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7's `dmath.h`; the owner edits `native/SConstruct`.
-- [ ] **Online-ready: deterministic maths in C++ (N7).** (`native/`, `core/native/`, `core/sim/`, simulation trig calls) N7, with its GDScript twin. After N3; the owner edits `native/SConstruct`.
+- [ ] **Online-ready: deterministic maths, the GDScript side (N7b).** (`core/native/`, `core/sim/dmath.gd`, simulation trig calls) N7: the `DMath` class, its GDScript twin and every simulation trig call. After N7a.
+- [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
 - [ ] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3.
-- [ ] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4–N7.
-- [ ] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N4–N7 and N11.
+- [ ] **Shot scale: cheaper hits (H3).** (`gameplay/combat/`, `gameplay/feel/`, `core/spells/`) H3, one PR per listener, biggest first by H0. After N3.
+- [ ] **Shot scale: bundled hit events (H3b).** (`core/events/`, `core/projectiles/`, `gameplay/combat/`, `core/spells/`, `gameplay/feel/`, tests) H3b, only if H3 leaves the hits as the largest part of a step. After H3; touches the projectile manager, so it waits for the projectiles lane's PR of the moment.
+- [ ] **Shot scale: caps (H7).** Projectiles lane. (`core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS) H7: defaults as session rules (T4). After H4 and N11.
+- [ ] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4, N5, N6 and N7b.
+- [ ] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N8 and N11.
 - [ ] **Online-ready: snapshots (N10).** (`core/sim/`, `restore_nodes()` hooks) N10; may split into N10a and N10b. After N9.
 - [ ] **Online-ready: new content covered by itself (N12).** (`tests/core/`) N12. After N10.
 

@@ -171,6 +171,7 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 
 - `native/src/dmath.h`: `sin`, `cos`, `tan`, `atan2`, `exp`, `log`, `pow` from `+ - * / sqrt` only (polynomials with a range reduction, never the C library). The kernels (`ShotKernel`, `SwarmKernel`, `BodyKernel`) call it inline, in place of their `std::` trig.
 - `DMath` (the module's class, made by `core/native/native.gd` like the others): the same functions for GDScript, plus `from_angle`, `rotated`, `angle`, `angle_to` and `lerp_angle` on `Vector2`. Simulation code calls `DMath` and never the engine's trig (N9's test); view code keeps the engine's.
+- Two PRs: **N7a**, the C++ side (`dmath.h`, the kernels' trig, the build flags), in the projectiles lane before H5; **N7b**, the GDScript side (the `DMath` class, its twin, every simulation trig call).
 - `native/SConstruct` builds with `-ffp-contract=off` and without fast-math on every platform (a protected file: the owner's change, listed in the PR).
 - **A GDScript twin** (`core/sim/dmath.gd`, the same polynomials): the fallback without the module, and the reference the side-by-side test compares with, to the bit. Tests also check it against known values (within a few units in the last place of the engine's results) and that it gives the same bits on every platform (N8).
 - Fixes A6 and A7.
@@ -212,7 +213,7 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 
 ## With shot scale (threads, 100,000 shots)
 
-[shot-scale.md](shot-scale.md) (proposed, the owner's direction of 2026-11-04 in) adds threads to the shot kernel and aims at 100,000 shots. Checked against this plan on 2026-11-04: they fit, on five rules, written into both plans.
+[shot-scale.md](shot-scale.md) (approved by the owner on 2026-11-04, with these rules) adds threads to the shot kernel and aims at 100,000 shots. Checked against this plan on 2026-11-04: they fit, on five rules, written into both plans.
 
 - **T1: the hit budget is fixed work, never measured time.** `WORK_PER_STEP` stays a number of work units in the code, sized once from H0 on the target PC (shot-scale Q3). A budget measured at run time would let a fast machine test more hits a step than a slow one: two different games. (Shot-scale H2 said "by time"; changed.)
 - **T2: threads never change a result.** Chunks of a fixed size (not one per core), each reading only the target grid and writing only its own shots; partial results (hits, the threat grid's sums) combined in chunk order; the hit budget spent at the merge, in shot order. A test runs the kernel with one thread and with several and compares the bits, so the web's single chunk and a 12-core desktop play the same game.
@@ -225,8 +226,10 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 **One order for both** (they share `core/projectiles/projectile_manager.gd` and `native/src/shot_kernel.cpp`, so one PR at a time there):
 
 1. N1, with H0 beside it (benchmarks only).
-2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7's kernel side, H5 (T2), H6 if measured, H4, H7 last (after N11).
-3. Beside it, the rest: N2, N2b, N3, then N4, N6, N7's GDScript side, N11; then H3 (one listener at a time) and H3b after N3; then N8, N9, N10, N12.
+2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7a (the kernel side of N7), H5 (T2), H5w if the web supports threads, H6 if measured, H4, H7 last (after N11).
+3. Beside it, the rest: N2, N2b, N3, then N4, N7b (the GDScript side of N7), N6 (after N7a), N11; then H3 (one listener at a time) and H3b after N3; then N8, N9, N10, N12.
+
+The tasks are in NEXT.md's owner lane in this order.
 
 ## After phase N: the netcode (a sketch, not approved)
 

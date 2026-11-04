@@ -16,7 +16,7 @@ A sixth, by the owner on 2026-11-01: **an enemy AI that plays whatever staffs it
 
 A seventh, by the owner on 2026-11-03: **spell spectacle**, three drawn-only layers built ahead of M4's polish: motes (tens of thousands of single-pixel particles with no game logic), floor marks that stay for the room, and spell light ([spell-spectacle.md](milestones/spell-spectacle.md), phase P). It changes no rule, damage or cap.
 
-An eighth, by the owner on 2026-11-04: **online-ready**, a deterministic simulation (the same inputs give the same game on every platform), input frames and replays, one tick clock, and snapshots, so online co-op can be added later ([online-ready.md](milestones/online-ready.md), phase N). It builds no netcode; networking stays banned until its own owner exception. Approved the same day: after the owner lane's current work, beside D3 and C2 (it does not hold them up), and done before M3 starts.
+An eighth, by the owner on 2026-11-04: **online-ready**, a deterministic simulation (the same inputs give the same game on every platform), input frames and replays, one tick clock, and snapshots, so online co-op can be added later ([online-ready.md](milestones/online-ready.md), phase N). It builds no netcode; networking stays banned until its own owner exception. Approved the same day: after the owner lane's current work, beside D3 and C2 (it does not hold them up), and done before M3 starts. It runs in one order with **shot scale** (threads in the shot kernel, toward 100,000 shots; [shot-scale.md](milestones/shot-scale.md)), approved the same day on five shared rules.
 
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |

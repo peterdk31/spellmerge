@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Every moment a cue: a shot's end, the death puff, colours as data (spell spectacle 2, S6 items 5, 6, 14, owner session)
+
+A shot whose life runs out plays the cue `expire` (its small flare and a puff of its cards' motes; a motes part with a `share` sheds, one of many a frame, and keeps out of the moments' rows). A death's puff is the last part of `enemy_death` and `boss_death`, in the body's own colour (a flash key `body`); the killing blow's spray no longer turns into it. An enemy's colour when hit is its data (`EnemyBase.hit_color`, ember by default), and the horde gems' look is `gameplay/horde/gem_look.tres`. Three preset fields and two constants went. The deaths', mote sources' and impacts' sheets look the same as before (their motes differ from run to run). Web storm figures in docs/DECISIONS.md.
+
 ## 2026-11-04: Every moment a cue: new moments and a light part (spell spectacle 2, S6 items 13, 4, owner session)
 
 Six moments that drew nothing now play cues their areas send (`cue_shown`): a horde level-up (`level_up`, on every standing wizard), gems picked up (`gem_pickup`, on the wizard), a revive (`revive`), a barrier blocking a hit (`shield_block`), a body caught by a magnet (`pull`) and a wave starting (`wave_start`). Each has a starter look from existing parts for the owner to tune (sheet `shot_moment_cues.gd`). A cue can now say how often it may play (`every`, per actor), which keeps a horde's hundreds of gem pickups to a few flashes a second. A cue can also light the room (a `light` part: strength, reach, seconds, colour); a cue with one lights by it alone, its flashes then giving no light of their own. The heal, the level-up and the revive light by theirs (sheet `shot_cue_light.gd`, before and after).

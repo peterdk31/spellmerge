@@ -244,7 +244,7 @@ func test_a_death_plays_its_cue() -> void:
 	check(is_equal_approx(feel.actors.held_left(0), cue.hold), "the killer held")
 	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
 	check_equal(feel.stop_left, 0.0, "the game runs on")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "and a puff of its own (no hit to take over)")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "and its puff")
 
 
 func test_a_downed_wizard_plays_its_cue() -> void:

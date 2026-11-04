@@ -7,9 +7,10 @@ extends Node
 ## the mark layer's fit), and plays a cue's `motes` and `mark` parts (`cue_parts`, which Feel adds
 ## to its table of part players).
 ##
-## Feel says when: its hit, end and wall handlers call `shed_hit`, `shed_end` and
-## `shed_on_wall` with what it already worked out (the caster's ramp, the
-## preset's shares, the shot's tag), in the order it draws them, and `step` once a frame. The
+## Feel says when: its hit and wall handlers call `shed_hit` and `shed_on_wall` with what it
+## already worked out (the caster's ramp, the preset's shares, the shot's tag), in the order it
+## draws them, a shot's end plays its cue (`expire`, a `motes` part with a `share`; S6), and `step`
+## runs once a frame. The
 ## spectacle says what: which kinds (a spell's, from its cards: `card_kinds.gd`; S2), in which
 ## colours, where they settle. Nothing here changes a fight.
 ##
@@ -175,13 +176,6 @@ func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, sha
 		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
 
 
-## A shot's (of the tag `tag`) life ran out at `at`: a puff of its cards' motes on along
-## `heading`, `share` of their count.
-func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
-	if pool != null and particles_enabled and not pool.shed_closed():
-		pool.shed_kinds(cards.motes_of(tag, look), at, heading, core, ramp, look, share)
-
-
 ## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
 ## projectile manager's `impact_look`, `impact_core` and `impact_tag` while the impact is sent) and
 ## the wall's surface motes (the room's, `surface_kinds`) in the room's colours, thrown along
@@ -310,8 +304,14 @@ func _trail_motes() -> void:
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
 ## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
 ## the cue's ramp with its tint and the cards of its look; its count and reach times the cue's power.
+## A part with a `share` is one of many a frame (a shot's end): it is skipped, before its kinds are
+## looked up, once the frame has only the moments' rows left, and throws each kind its own count
+## times the share (and the power), split between the kinds, as they shed.
 func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
+		return
+	var shed: bool = part.has("share")
+	if shed and pool.shed_closed():
 		return
 	var way: Vector2 = cue.way_of(part)
 	var reach: float = float(part.get("radius", 0.0))
@@ -340,6 +340,7 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var core: Color = colour if exact else cue.tint
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var count: int = int(part.get("count", -1))
+	var share: float = float(part.get("share", 1.0)) * cue.power / float(maxi(kinds.size(), 1))
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var colours: StringName = StringName(part.get("colours", ""))
@@ -349,9 +350,12 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
 		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
+		if shed:
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true)
+			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
-		var share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
-		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(share * cue.power), 1)
+		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
+		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
 		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring)
 
 

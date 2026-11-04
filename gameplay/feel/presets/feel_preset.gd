@@ -23,11 +23,10 @@ extends Resource
 @export_range(0.0, 32.0, 0.5) var max_shake_pixels: float = 6.0
 ## Trauma lost per second.
 @export_range(0.1, 10.0, 0.1) var shake_decay: float = 2.5
-## How much bigger (rounded to a whole zoom) a death's puff is than a hit's.
-@export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
 ## The spray of a hit on a character (an effect along the way the shot flew), bigger or smaller
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
-## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
+## whole zoom. An enemy is hit in the ramp nearest its own colour (`EnemyBase.hit_color`); a wizard
+## in its own ramp.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
 ## The sparks of a hit's spray and of a puff (a hit with no way, a kill, a reaction) are motes
 ## (S3, docs/milestones/spell-spectacle-2.md; the effect drew them before, and draws the flash
@@ -49,17 +48,15 @@ extends Resource
 @export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
 @export_range(0, 64) var puff_mote_count: int = 14
 @export_range(0.0, 64.0, 1.0) var puff_mote_reach: float = 12.0
-@export var enemy_hit_color: Color = Color("e0592f")
 ## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
 ## spectacle's surface kinds); `wall_spark_size` is the size of a shot's flare when its carrier
 ## card names none.
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
-## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A cue's motes (a
-## reaction's ring of them among them) are its own data.
+## its spray). A shot's end (the cue `expire`, its `share`) and a cue's motes (a reaction's ring of
+## them among them) are their own data.
 @export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
-@export_range(0.0, 4.0, 0.05) var expire_mote_share: float = 1.0
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08

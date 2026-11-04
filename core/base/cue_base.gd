@@ -24,6 +24,9 @@ extends Resource
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint
 ##   `plain`      true: white in no one's ramp, without the cards (stone chips)
 ##   `bare`       true: in the caster's ramp, without the cards (a dash's landing ring)
+##   `body`       true: in the own colour of the body the cue is of (a dying enemy's
+##                `EnemyBase.hit_color`: its death puff, S6), in no one's ramp and without the
+##                cards; plain white when the cue has no body colour
 ##   `way`        `aim` (the cue's direction, the default), `back` (against it), `right` or `up`
 ##   `particles`  true: left out while particles are off (the stress benchmark)
 ##   `if_cards`   true: played only when the cue has cards (a look layer; an element's flare)
@@ -54,6 +57,10 @@ extends Resource
 ##   `below`      thrown from this many pixels below the cue's point (a body's feet: 8)
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint (not for
 ##                what cools through a surface's colours)
+##   `share`      each kind thrown its own count times this, the share split between the kinds,
+##                as one of many a frame (a shot's end, S6: `expire`): it leaves the moments' rows
+##                to the moments and is skipped once only those are left (`Motes.shed_closed`).
+##                Takes no `count`, `reach`, `radius` or `ring`: the kinds fly as they shed
 ## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
 ## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
 ##   `mark`       the mark kind's id (`MarkKind`, content/marks; required, unless `cards`)
@@ -104,8 +111,8 @@ const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "share"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
@@ -209,8 +216,8 @@ func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
 	if LENGTH_EFFECTS.has(effect) and (part.has("zoom") or part.has("lasts_size")):
 		found.append("%s: part %d's %s is drawn along the cue's size: it takes no zoom or lasts_size" % [id, i, effect])
-	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) > 1:
-		found.append("%s: part %d takes one of color, plain and bare" % [id, i])
+	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) + int(bool(part.get("body", false))) > 1:
+		found.append("%s: part %d takes one of color, plain, bare and body" % [id, i])
 	if part.has("if_layer") and (int(part["if_layer"]) < 1 or int(part["if_layer"]) > MoteKind.LOOK_LAYERS):
 		found.append("%s: part %d's if_layer is not a look layer (1-%d)" % [id, i, MoteKind.LOOK_LAYERS])
 	if part.has("if_size_over") and part.has("if_size_upto") and float(part["if_size_upto"]) <= float(part["if_size_over"]):
@@ -232,6 +239,12 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
 		found.append("%s: motes part %d's below is not 0 to 32 pixels" % [id, i])
+	if part.has("share"):
+		if float(part["share"]) <= 0.0:
+			found.append("%s: motes part %d's share is 0 or less" % [id, i])
+		for key: String in ["count", "reach", "radius", "ring"]:
+			if part.has(key):
+				found.append("%s: motes part %d sheds a share of its kinds, so it takes no %s" % [id, i, key])
 	return found
 
 

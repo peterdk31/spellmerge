@@ -578,6 +578,47 @@ func test_a_shot_whose_life_runs_out_puffs_its_kinds() -> void:
 	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [] as Array[StringName], "one that ended on a wall already shed there")
 
 
+## A shot's end is the cue `expire` (S6): its motes part sheds the shot's kinds as the old
+## `shed_end` did, each its own count times the share (split between the kinds) at its own speed,
+## and as one of many a frame it leaves the moments' rows alone.
+func test_a_shot_s_end_sheds_as_before_and_leaves_the_moments_rows() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	feel.projectiles.impact_body = ProjectilesScript.KIND_BOLT
+	feel.projectiles.impact_look = FIRE_LOOK
+	feel.projectiles.impact_heading = Vector2.DOWN
+	var cue: CueBase = feel.cue_of(&"expire")
+	check(cue != null, "the cue expire is there")
+	if cue == null:
+		return
+	var share: float = 0.0
+	for part: Dictionary in cue.parts:
+		if part.has("share"):
+			share = float(part["share"])
+	check(share > 0.0, "with a share of the shot's motes")
+	var kinds: PackedInt32Array = motes.kinds_of_look(FIRE_LOOK)
+	var want: int = 0
+	for k in kinds:
+		want += maxi(roundi(float(motes.kinds()[k].count) * share / float(kinds.size())), 1)
+	var before: int = motes.next_row()
+	bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)
+	check_equal(motes.next_row() - before, want, "each kind its own count times the share, as shed_end threw")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST, 0), 1, "and its small pop")
+	motes.step(0.0)
+	# Use the frame's rows up to the moments' own: the end throws nothing more, and counts a cut.
+	var filler: int = motes.kind_index(&"ember")
+	while motes._rows_left > MotesScript.MOMENT_ROWS:
+		motes.throw_part(filler, Vector2.ZERO, Vector2.RIGHT, MotesScript.spell_source(0, 0), Color.WHITE, 1, 0.0, -1.0, 1.0, false, true)
+	var cut: int = motes.cut
+	before = motes.next_row()
+	bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)
+	check_equal(motes.next_row(), before, "past the frame's shed rows a shot's end throws nothing")
+	check(motes.cut > cut, "and counts the cut")
+	check_equal(motes._rows_left, MotesScript.MOMENT_ROWS, "the moments keep their rows")
+
+
 func test_a_reaction_throws_a_ring_in_its_colour() -> void:
 	var made: Array = _feel()
 	var bus: EventsScript = made[0]

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="MarkKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mark_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"char"
+look_layers = PackedInt32Array(5)
+form = "crack"
+rough = 0.85
+lines = 7
+body_from = "spell"
+body_shade = "shadow"
+edge_from = "floor"
+edge_shade = "shadow"

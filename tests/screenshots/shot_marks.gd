@@ -3,9 +3,11 @@ extends "res://tests/support/screenshot.gd"
 ## as the game makes them: the crypt arena stands, the projectile manager is given its bounds and
 ## walls as Flow gives them, `room_entered` fits Feel's mark layer to it, and the cues are played
 ## through Feel: a plain blast of player 1, a fire blast and a frost blast (its cards' mark), a
-## slam and a quake (cracks), and a blast against the top wall (clipped by it). Once the flashes
-## and motes are gone, `marks_room` is the room at 1x and `marks_sheet` each mark at 4x, in that
-## order.
+## slam and a quake (cracks), and a blast against the top wall (clipped by it); P2b's below them: a
+## nova's burn ring, a rune's scar, an enemy's and a boss's death (ichor in the surface's colours)
+## and a lightning blast (char). The chips of the slam, the quake and the deaths settle as specks.
+## Once the flashes and motes are gone, `marks_room` is the room at 1x and `marks_sheet` each mark
+## at 4x, in that order.
 
 const ARENA_SCENE := preload("res://content/rooms/crypt/arena_01.tscn")
 const MARGIN: float = 32.0
@@ -17,6 +19,11 @@ const MARKS: Array[Array] = [
 	[&"slam", Vector2(432.0, 230.0), 34.0, Color.WHITE, 0],
 	[&"quake", Vector2(544.0, 230.0), 30.0, Color.WHITE, 0],
 	[&"blast", Vector2(400.0, 44.0), 30.0, Color.WHITE, 0],
+	[&"nova", Vector2(96.0, 312.0), 0.0, Color.WHITE, 0],
+	[&"rune_burst", Vector2(208.0, 312.0), 14.0, Color("b26be0"), 0],
+	[&"enemy_death", Vector2(320.0, 312.0), 0.0, Color.WHITE, 0],
+	[&"blast", Vector2(432.0, 312.0), 22.0, Color("f4e04d"), 1 << 4],
+	[&"boss_death", Vector2(544.0, 312.0), 0.0, Color.WHITE, 0],
 ]
 const HALF := Vector2i(28, 28)
 const ZOOM: int = 4
@@ -39,8 +46,10 @@ func take() -> void:
 	if feel.call("marks") == null:
 		fail("Feel has no mark layer (the Floor marks setting is off?)")
 		return
+	# A frame each: a frame writes at most Motes.FRAME_ROWS motes.
 	for mark: Array in MARKS:
 		feel.call("play_cue", mark[0], 0, mark[1], Vector2.RIGHT, mark[2], mark[3], mark[4])
+		await settle(1)
 	# The flashes, the shake and the motes are gone after a few seconds; the marks stay.
 	await settle(300)
 	var image: Image = await grab()

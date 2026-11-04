@@ -133,7 +133,7 @@ A cue part `"part": "mark"`:
 ### PRs
 
 1. **P2a: the layer and the stamp batch.** The viewport, the sprite, `mark.gdshader`, the `mark` cue part, three marks (`scorch`, `crack`, `frost`) added to the blast, slam and frost cues, and the tests.
-2. **P2b: settled motes and the rest of the marks.** After P1a.
+2. **P2b: settled motes and the rest of the marks.** After P1a. Built (DECISIONS, 2026-11-04, "Settled motes"): which kinds settle is data (`MoteKind.settles` names the mark, a one-pixel `speck`); a settled mote waits in a wheel of 1/30 s slots in `marks.gd` (`settle`) and is stamped once its slot is past; the motes and marks share one ramp table (`ramp_table.gd`), so a chip's speck is in its own colours and ichor in the dying body's (a new `surface` colour source); `char` is lightning's card mark (`cards`), and a rune's scar comes from a new `rune_burst` cue on the rune card.
 
 ---
 

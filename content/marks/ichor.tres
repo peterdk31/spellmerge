@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="MarkKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mark_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"ichor"
+form = "blot"
+rough = 0.7
+fill = 0.8
+body_from = "surface"
+body_shade = "shadow"
+edge_from = "surface"
+edge_shade = "base"

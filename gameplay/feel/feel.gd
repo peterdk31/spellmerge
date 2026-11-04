@@ -101,6 +101,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -443,9 +444,12 @@ var _art_colors: Dictionary = {}
 var _light: SpellLightScript = null
 var spell_light: bool = SpellLightSetting.default_on()
 ## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
-## and their source in the motes' ramp table (-1 for none).
+## and their source in the ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
 var _surface_source: int = -1
+## The ramp table (`ramp_table.gd`) the motes and the floor marks share: a surface's colours and a
+## body's art, one row each, so a mote and the mark it leaves read the same colours.
+var _ramp_table: RampTableScript = RampTableScript.new()
 ## The floor marks (`marks.gd`; null with the "Floor marks" setting off), and the setting
 ## (`FloorMarks.default_on()` until it changes; see `set_floor_marks`). Read only.
 var _marks: MarksScript = null
@@ -730,7 +734,7 @@ func step(real_delta: float) -> void:
 	if _motes != null:
 		_motes.step(_clock)
 	if _marks != null:
-		_marks.step()
+		_marks.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1349,6 +1353,9 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 	var size: float = look.get("size", preset.wall_spark_size) as float
 	if form == &"rune":
 		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, ramp, bits, 3, RUNE_BURST_SECONDS)
+		# A rune lies on the floor: its cue plays where it goes off, on a body or not.
+		if look.has("cue"):
+			play_cue(StringName(look["cue"]), caster, position, direction, look.get("radius", 0.0) as float, core, bits)
 		return
 	var zoom: int = clampi(roundi(size * 2.0), 1, 3)
 	show_effect(KIND_BURST, position, direction, core, ramp, bits, zoom, BURST_SECONDS)
@@ -1655,7 +1662,7 @@ func _shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 func _on_room_entered(room_id: StringName) -> void:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
 	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
-	_surface_source = _motes.table_source(_surface_colors) if _motes != null else -1
+	_surface_source = _ramp_table.source(_surface_colors)
 
 
 ## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
@@ -1680,14 +1687,13 @@ func _make_motes(cap: int) -> void:
 		remove_child(_motes)
 		_motes = null
 	if cap > 0:
-		_motes = MotesScript.new(cap, MOTE_Z, _mote_kinds())
+		_motes = MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table)
 		_motes.name = "Motes"
 		_motes.density = mote_density
 		add_child(_motes)
 		_motes.step(_clock)
-		_surface_source = _motes.table_source(_surface_colors)
-	else:
-		_surface_source = -1
+		_motes.settle_into(_marks)
+	_surface_source = _ramp_table.source(_surface_colors)
 
 
 ## The mote kinds of the registry (content/motes), in id order.
@@ -1764,10 +1770,11 @@ func _reaction_motes(caster: int, at: Vector2, shot: int, tint: Color, power: fl
 		_motes.throw_part(k, at, Vector2.RIGHT, source, tint, each, preset.reaction_mote_reach * power, 360.0, 1.0, true)
 
 
-## The motes' source for the colours of a body's own art (the frame it shows as, read once per
-## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then).
+## The ramp table's source for the colours of a body's own art (the frame it shows as, read once
+## per texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
+## neither motes nor floor marks to show it.
 func _body_source(body: Node) -> int:
-	if _motes == null:
+	if _motes == null and _marks == null:
 		return -1
 	var sprite: Sprite2D = _body_sprite(body)
 	if sprite == null or sprite.texture == null:
@@ -1776,7 +1783,7 @@ func _body_source(body: Node) -> int:
 	if colours == null:
 		colours = RoomBase.colours_of_art(sprite.texture, _frame_rect(sprite))
 		_art_colors[sprite.texture] = colours
-	return _motes.table_source(colours as PackedColorArray)
+	return _ramp_table.source(colours as PackedColorArray)
 
 
 ## The part of its texture `sprite` shows: its region, or its frame of a sheet.
@@ -1799,6 +1806,7 @@ func set_floor_marks(on: bool) -> void:
 					kinds.append(found as MarkKind)
 		_marks = MarksScript.new(MARK_Z, kinds)
 		_marks.name = "Marks"
+		_marks.set_ramp_table(_ramp_table.texture())
 		add_child(_marks)
 		if _mark_room != &"":
 			_fit_marks(_mark_room)
@@ -1806,6 +1814,8 @@ func set_floor_marks(on: bool) -> void:
 		_marks.queue_free()
 		remove_child(_marks)
 		_marks = null
+	if _motes != null:
+		_motes.settle_into(_marks)
 
 
 ## The floor marks (null with the setting off; for tests and the benchmarks).
@@ -1827,7 +1837,8 @@ func _fit_marks(room_id: StringName) -> void:
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") at `at`: its mark, or with `cards` the
 ## marks of the cards of `look` when they have any; `size` x its `reach` pixels round (or its
-## `radius`), turned at random or along `aim`, in the colours of a spell of `ramp` with `tint`.
+## `radius`), turned at random or along `aim`, in the colours of a spell of `ramp` with `tint`
+## and of the cue's surface (a dying body's art, else the room's walls).
 func _stamp_part(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint: Color, ramp: int, look: int) -> void:
 	if _marks == null:
 		return
@@ -1839,8 +1850,9 @@ func _stamp_part(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint:
 	var found: PackedInt32Array = _marks.kinds_of_look(look) if bool(part.get("cards", false)) else PackedInt32Array()
 	if found.is_empty():
 		found.append(_marks.kind_index(StringName(part.get("mark", ""))))
+	var surface: int = _cue_surface if _cue_surface >= 0 else _surface_source
 	for k in found:
-		_marks.stamp(k, at, radius, turn, source, tint)
+		_marks.stamp(k, at, radius, turn, source, tint, surface)
 
 
 ## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).

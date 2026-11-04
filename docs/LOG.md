@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Settled motes and the other floor marks (spell spectacle P2b, owner session)
+
+Chips and frost's flecks now leave a one-pixel speck in the floor mark layer where they come to rest, in their own colours, once they lie still (`MoteKind.settles` names the mark; `Marks.settle` keeps them in a wheel of time slots, at most 512 stamped a frame). The motes and marks share one ramp table (`gameplay/feel/ramp_table.gd`). New marks: a burn ring round a nova's caster, a rune's scar where a rune goes off (new cue `rune_burst`, on the rune card), ichor in a dying body's own colours (enemy and boss deaths; a new `surface` colour source), and char, lightning's card mark. Tests: `test_marks` (a speck where and when a mote rests, the caps, the settings, the new cues); screenshot sheet `shot_marks.gd`. Details: docs/DECISIONS.md.
+
 ## 2026-11-04: Trails at a high Max shots (owner session)
 
 Reported by the owner on the web build: with Max shots at 10,000 or more, every fire bolt after the sandbox's LB storm had a short tail at a wrong angle. The storm holds every trail row (2 x the cap), and the trail texture was one line per row, 32 texels wide: 20,000 rows made it 32 x 32,768, past the 16,384 a GPU takes. The texture now holds 64 rows a line (2,048 texels wide; 2,048 x 2,048 at the top cap of 50,000), read by `trail_texel` in `shot_trail.gdshader`; `_trail_data` is laid out as before, so the native kernel is unchanged. Regression test: `test_the_trail_texture_fits_a_gpu_at_a_high_cap`.

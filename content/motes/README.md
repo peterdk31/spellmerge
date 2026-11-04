@@ -6,6 +6,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 
 - **Kinds come from the spells.** A kind names the cards' look layers it is the motes of (`look_layers`: the `look_layer` of an element or modifier, the LOOK_* kinds of core/projectiles). A shot sheds every kind of its cards' layers, its burst split between them, so a combination sheds a mix and a new card brings its motes through the look layer it already has. A shot whose layers have no kind sheds the kinds of layer 0.
 - **A `surface` kind** belongs to no card: it is what a struck wall sheds.
+- **A kind that falls can settle** (`settles`, a mark kind's id in `content/marks/`; docs/milestones/spell-spectacle.md, P2b): each of its motes leaves that mark in the floor mark layer where it comes to rest, in its own colours, once it lies still. Chips and frost's flecks settle as a `speck`, so debris stays on the floor after it has cooled.
 - **No colours here.** A spell's motes cool through the shot's own ramp (its caster's colours or its card's tint, as the shot shaders pick them); a surface kind's through the room's wall colours (`RoomBase.surface_colors`, sampled from the room's art). A kind says only how many shades it skips at first (`shade_from`) and how strongly it glows while hot.
 - **Its shape is data too, drawn as text.** `shape` is a picture: one row a line, up to 5x5 pixels, centred on the mote (rows start at the left as written); `#` a pixel in its shade, `o` one in the shade hotter (a highlight), `.` none. Several frames are pictures apart by a blank line. In the inspector it is a text box; in the `.tres` it reads like this (fleck's: three plain frames, then a glint):
 
@@ -30,11 +31,11 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 |---|---|---|---|
 | `spark` | 0 (a shot with none), 5 (lightning) | fast and short, glowing | a streak along its flight that shortens over its life (`##o`, then `#o`, then `o`) |
 | `ember` | 1 (fire) | rises, sways and cools | a flickering pixel (`o`, `o`, `#`, `.` looping) |
-| `fleck` | 2 (frost) | falls, glints and lies | a pixel that glints into a plus now and then |
+| `fleck` | 2 (frost) | falls, glints and lies; settles as a `speck` | a pixel that glints into a plus now and then |
 | `wisp` | 3 (storm) | blown along, swaying | a dash along its drift |
 | `murk` | 4 (void) | slow, sinking specks | a pixel or a 2x2 chunk |
 | `glimmer` | 6 (mend) | drifts up softly, glowing | a plus that shrinks to a pixel |
-| `chip` | surface | knocked off a struck wall; bounces once and lies | a pixel, or now and then a 2x2 chunk |
+| `chip` | surface | knocked off a struck wall; bounces once and lies; settles as a `speck` | a pixel, or now and then a 2x2 chunk |
 
 ## Allowed files
 

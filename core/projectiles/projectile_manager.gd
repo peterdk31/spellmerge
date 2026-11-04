@@ -414,7 +414,7 @@ const PARTICLE_CAP: int = 1024
 ## The pool's count while the tails are off (`tails_enabled`; S5): the births a frame then thin
 ## only past this many particles asked, so a fight of thousands of shots keeps more of the look
 ## of a fight of tens. Set from the trail benchmark (DECISIONS, 2026-11-04, "Do shots need tails?").
-const TAILLESS_PARTICLE_CAP: int = 4096
+const TAILLESS_PARTICLE_CAP: int = 2048
 ## What a bolt's trail counts in the pool.
 const TRAIL_COST: int = 4
 ## Trails (the owner, 2026-10-28: tails that stay where the shot was, as in the mockup): every

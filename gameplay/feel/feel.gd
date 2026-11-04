@@ -2195,8 +2195,9 @@ func _pose_form(slot: int, t: float) -> void:
 
 
 ## Another staff went on show (the personality swap, living staffs H4): the cue `staff_swap` along
-## the whole new staff (the cue's line: played at its grip, `Actor.aim_pivot`, along the aim, its
-## size the staff's length to its tip, `Actor.reach`, so its parts can cover grip to tip), following
+## the whole new staff (the cue's line: played at the staff's lower end behind the hand,
+## `Actor.butt_position`, along the aim, its size the staff's length from there to its tip,
+## `Actor.muzzle_position`, so its parts can cover the whole staff), following
 ## the body, in the actor's ramp with the colour and cards of the new staff's first spell (S6, item
 ## 9). StaffLook swaps the body and face at 35% of its POOF_TIME: the cue's look is timed to that.
 func _on_staff_shown(caster: int, actor: Node, staff: int) -> void:
@@ -2212,7 +2213,8 @@ func _on_staff_shown(caster: int, actor: Node, staff: int) -> void:
 		if spell != null:
 			tint = spell.get(&"tint") as Color
 			look = int(spell.get(&"look"))
-	play_cue(STAFF_SWAP, caster, body.aim_pivot(), body.aim, body.reach(), tint, look, body.id, -1, -1, tag, true, Color(0.0, 0.0, 0.0, 0.0), body)
+	var butt: Vector2 = body.butt_position()
+	play_cue(STAFF_SWAP, caster, butt, body.aim, butt.distance_to(body.muzzle_position()), tint, look, body.id, -1, -1, tag, true, Color(0.0, 0.0, 0.0, 0.0), body)
 
 
 ## A possession started: the cue `possess_start` on the possessed actor's body (a ring closing in

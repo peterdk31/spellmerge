@@ -527,8 +527,9 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 ## farthest a mote of its drag glides), within `spread` degrees (its own when below 0), `up` times
 ## its own speed up, all as fast as the fastest when `ring` (a ring going out). `often` for a source
 ## of many a frame (a hit's spray): it stops once only the frame's MOMENT_ROWS are left, as `shed`.
-## With a `line`, each mote is thrown from a point of the line from `at` to `at + line` (a staff).
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO) -> void:
+## With a `line`, each mote is thrown from a point of the line from `at` to `at + line` (a staff);
+## `life` times the kind's own life (a quicker moment).
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
@@ -544,7 +545,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if ring:
 		speed.x = speed.y * 0.9
 	_keep = MOMENT_ROWS if often else 0
-	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life, source, core, kind.height, line)
+	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source, core, kind.height, line)
 	_keep = 0
 
 

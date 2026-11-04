@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The staff swap (living staffs H4; a cue since S6 item 9, docs/milestones/spell-spectacle-2.md):
-## `staff_shown` plays the cue `staff_swap` along the whole new staff (its line: from the grip along
-## the aim for the staff's length, so a part can play anywhere on it), following the body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
+## `staff_shown` plays the cue `staff_swap` along the whole new staff (its line: from the staff's
+## lower end behind the hand along the aim to its tip, so a part can play anywhere on it), following the body, in the colour and cards of the new staff's first spell; a followed cue's flash moves with
 ## its body frame by frame exactly as the old poof's did, and ends when the body goes; the live cue
 ## shows something at StaffLook's swap of the body and face.
 ##
@@ -82,7 +82,7 @@ func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() ->
 	var body := _staff()
 	var tip: Vector2 = body.muzzle_position()
 	_bus.staff_shown.emit(body.id, body, STAFF)
-	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT).get("at"), body.aim_pivot().round(), "the cue's point is the staff's grip")
+	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT).get("at"), body.butt_position().round(), "the cue's point is the staff's lower end")
 	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_BURST)
 	check(not shown.is_empty(), "its flash shows")
 	if shown.is_empty():

@@ -347,17 +347,18 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var of_surface: bool = named == &"surface" or colours == &"surface"
 	var at: Vector2 = cue.point_of(part) + Vector2(0.0, float(part.get("below", 0.0)))
 	var line: Vector2 = cue.line_of(part)
+	var life: float = float(part.get("life", 1.0))
 	for k in kinds:
 		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
 		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
 		if shed:
-			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true, line)
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, spread, up, false, true, line, life)
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring, false, line)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring, false, line, life)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with

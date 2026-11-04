@@ -217,6 +217,26 @@ func test_enough_experience_is_a_level() -> void:
 	check(HordeScript.xp_next(2) > HordeScript.xp_next(1), "the next level needs more")
 
 
+## The moments' looks are content's (S6, item 13): a level-up plays `level_up` on every standing
+## wizard, and a gem picked up plays `gem_pickup` on the wizard that picked it (as its actor's).
+func test_a_level_up_and_a_gem_picked_up_play_their_cues() -> void:
+	var run: Fixture = _make([0, 1])
+	var cues: Array = []
+	run.bus.cue_shown.connect(func(p: int, id: StringName, at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void: cues.append([p, id, at]))
+	run.start()
+	run.bus.player_downed.emit(1)
+	run.level_up()
+	var gems: Array = cues.filter(func(c: Array) -> bool: return c[1] == HordeScript.GEM_CUE)
+	var levels: Array = cues.filter(func(c: Array) -> bool: return c[1] == HordeScript.LEVEL_UP_CUE)
+	check(not gems.is_empty(), "the gems picked up played their cue")
+	var wizard_0: int = run.actors.home_of_seat(0)
+	check(gems.all(func(c: Array) -> bool: return c[0] == wizard_0), "as the wizard's that picked them up")
+	check_equal(levels.size(), 1, "the level-up's cue, on the one wizard standing")
+	if levels.size() == 1:
+		check_equal(levels[0][0], wizard_0, "seat 0's wizard")
+		check_equal(levels[0][2], run.wizards[0].global_position, "where it stands")
+
+
 # --- Offers and picks ---------------------------------------------------------------------------
 
 func test_offers_are_per_seat_and_exclude_owned_cards() -> void:

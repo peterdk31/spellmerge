@@ -21,7 +21,7 @@ Built as part H3 of [docs/milestones/horde.md](../../docs/milestones/horde.md), 
   - **Cost:** no per-frame allocations; the alive count is a counter, a death is checked by its parent, nobody connects to an enemy; the only pass that grows is the gems' (at most `MAX_GEMS` against four wizards).
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area uses `core/` (events, registry, actors), the base classes and the actor kit's `Actor`. Nothing depends on it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
-  - Sends: `horde_status`, `horde_picks_offered`, `horde_pick_taken`, `horde_break_changed`, `horde_ready_changed`, `horde_over`, `bag_set_requested`, `body_replaced` (the swarm's promotion).
+  - Sends: `cue_shown` (S6, item 13): `level_up` (`LEVEL_UP_CUE`) on every standing wizard at a level-up, and `gem_pickup` (`GEM_CUE`) on a wizard that picked up gems in a step (`HordeGems.picked_by`; the cue's `every` keeps it to a few a second), each as the wizard's actor; `horde_status`, `horde_picks_offered`, `horde_pick_taken`, `horde_break_changed`, `horde_ready_changed`, `horde_over`, `bag_set_requested`, `body_replaced` (the swarm's promotion).
   - Listens to: `horde_started`, `horde_ended`, `horde_pick_requested`, `horde_ready_requested`, `enemy_died`, `player_downed`, `player_revived`, `player_joined`, `player_left`; the swarm also `damage_dealt`, `target_move_requested` and `possess_requested`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 

@@ -63,6 +63,17 @@ extends Resource
 ##   `cards`      true: the marks of the cue's cards instead when they have any (a frost blast
 ##                leaves frost where a plain one leaves its scorch); with no `mark`, only theirs
 ##                (a frost dash's landing leaves frost, a plain one nothing)
+## A part with `"part": "light"` lights the room round the cue's point while the "Spell light" setting
+## is on (S6, item 4; gameplay/feel/spell_light.gd), fading to nothing over its seconds. Its keys
+## (LIGHT_KEYS):
+##   `strength`   how bright at first (1 when not given; 2 at the most)
+##   `reach`      how far it reaches from the cue's: `size` x reach pixels
+##   `radius`     how far in pixels, when the cue has no size (or with no `reach`; 40 when neither)
+##   `seconds`    how long it lasts (0.3 when not given)
+##   `color`, `plain`, `bare`  its colour, as a flash's
+## A cue with a light part lights by its light parts alone: its flashes do not light the room by
+## their kinds as they otherwise do (`SpellLight.EFFECT_LIGHT`), so content says how a rune or a
+## heal lights.
 ## Its weight: `shake` (screen trauma, 0 to 1, on top of anything else's), `kick` pixels of camera
 ## punch `kick_way` (`down` the screen, `away` from the caster's body towards the cue, `back`
 ## against the cue's direction, `aim` along it), `hold` seconds of local stop on the caster and
@@ -74,8 +85,13 @@ extends Resource
 ## motes part that names no colour (nor `plain`, nor `bare`) of its own, and of what Feel draws of the
 ## moment in code (a reaction's name). `power` scales how strong it plays, by one rule (`Feel.play_cue`):
 ## times every flash's size (its zoom, or its size from `reach`), every motes part's count and how
-## far they fly, every mark's radius, its holds, shake and punch; never a part's seconds, nor an
+## far they fly, every mark's radius and every light's reach, its holds, shake and punch; never a part's seconds, nor an
 ## arc's length (where it runs). A reaction's cues differ in their colour and power only.
+##
+## How often (S6, item 13): `every` seconds is the least time between two plays of the cue for the
+## same actor (the one it is of; none counts as one more), so a moment that comes by the hundred (a
+## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
+## weight. 0 (the default) plays every time.
 
 ## The flashes a part can name (Feel maps each to its effect kind, and says how many pixels a
 ## step of its zoom is).
@@ -91,8 +107,9 @@ const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
 const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
+const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
-const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
+const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS}
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
 const MOTE_GROUPS: Array[StringName] = [&"spell", &"surface"]
 const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
@@ -111,10 +128,27 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 ## Its own colour (none while its alpha is 0), and how strong it plays (see above).
 @export var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 @export_range(0.1, 4.0, 0.05) var power: float = 1.0
+## The least seconds between two plays for the same actor (see above); 0 every time.
+@export_range(0.0, 5.0, 0.01) var every: float = 0.0
+
+
+## Whether 0 for not yet known, then 1 or 2: the cue has a `light` part (`lights`).
+var _lights: int = 0
 
 
 func kind() -> StringName:
 	return &"cue"
+
+
+## Whether it has a `light` part, so it lights by its light parts alone (its flashes unlit). Read
+## from its parts once.
+func lights() -> bool:
+	if _lights == 0:
+		_lights = 1
+		for part: Dictionary in parts:
+			if StringName(part.get("part", "effect")) == &"light":
+				_lights = 2
+	return _lights == 2
 
 
 ## What is wrong with this cue, one line each (empty when nothing is): an unknown effect, way or
@@ -125,6 +159,8 @@ func problems() -> PackedStringArray:
 		found.append("a cue needs an id")
 	if power <= 0.0:
 		found.append("%s: power %s is 0 or less" % [id, power])
+	if every < 0.0:
+		found.append("%s: every %s is below 0" % [id, every])
 	if not KICK_WAYS.has(kick_way):
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():
@@ -153,6 +189,8 @@ func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringA
 			return _mote_problems(i, part)
 		&"mark":
 			return _mark_problems(i, part)
+		&"light":
+			return _light_problems(i, part)
 	return PackedStringArray()
 
 
@@ -207,4 +245,18 @@ func _mark_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: mark part %d's rot '%s' is not one of %s" % [id, i, part["rot"], MARK_ROTS])
 	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0:
 		found.append("%s: mark part %d has a reach or radius of 0 or less" % [id, i])
+	return found
+
+
+## What is wrong with the light part `part` (number `i`): a number out of its range, or more than
+## one of its colours.
+func _light_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	var strength: float = float(part.get("strength", 1.0))
+	if strength <= 0.0 or strength > 2.0:
+		found.append("%s: light part %d's strength is not above 0 and at most 2" % [id, i])
+	if float(part.get("reach", 1.0)) <= 0.0 or float(part.get("radius", 1.0)) <= 0.0 or float(part.get("seconds", 1.0)) <= 0.0:
+		found.append("%s: light part %d has a reach, radius or seconds of 0 or less" % [id, i])
+	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) > 1:
+		found.append("%s: light part %d takes one of color, plain and bare" % [id, i])
 	return found

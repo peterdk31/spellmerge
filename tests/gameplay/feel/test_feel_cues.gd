@@ -322,3 +322,51 @@ func test_a_parts_way_comes_from_the_cue() -> void:
 	check_equal(cue.way_of({"way": &"back"}), Vector2.UP, "back")
 	check_equal(cue.way_of({"way": &"right"}), Vector2.RIGHT, "right")
 	check_equal(cue.way_of({"way": &"up"}), Vector2.UP, "up")
+
+
+## A cue with an `every` plays at most that often for one actor, parts and weight (S6, item 13: a
+## gem picked up in a horde, hundreds a second); another actor's play is its own.
+func test_a_cue_with_every_plays_at_most_that_often_per_actor() -> void:
+	var cue: CueBase = _made([{"effect": &"burst", "zoom": 1, "seconds": 2.0}])
+	cue.every = 0.5
+	cue.shake = 0.2
+	check(cue.problems().is_empty(), "a valid cue: %s" % [cue.problems()])
+	bus.cue_shown.emit(0, &"test_cue", Vector2(10.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	var trauma: float = feel._trauma
+	bus.cue_shown.emit(0, &"test_cue", Vector2(20.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "played once for actor 0")
+	check_equal(feel._trauma, trauma, "and its weight once")
+	bus.cue_shown.emit(1, &"test_cue", Vector2(30.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 2, "actor 1's is its own")
+	feel.step(0.25)
+	bus.cue_shown.emit(0, &"test_cue", Vector2(40.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 2, "not again within its every")
+	feel.step(0.26)
+	bus.cue_shown.emit(0, &"test_cue", Vector2(50.0, 0.0), Vector2.ZERO, 0.0, Color.WHITE, 0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 3, "again once its every is over")
+	cue.every = -1.0
+	check(not cue.problems().is_empty(), "an every below 0 is a problem")
+
+
+## The moments that had no look (S6, item 13) each have a cue file, played by name from their area.
+func test_the_new_moments_have_cues() -> void:
+	for id: StringName in [&"level_up", &"gem_pickup", &"revive", &"shield_block", &"pull", &"wave_start"]:
+		var cue: CueBase = feel.cue_of(id)
+		check(cue != null, "%s is a cue file" % id)
+		if cue != null:
+			check(not cue.parts.is_empty(), "%s shows something" % id)
+	check(feel.cue_of(&"gem_pickup").every > 0.0, "a gem pickup is throttled")
+
+
+## A light part's keys are checked like any part's (S6, item 4).
+func test_a_light_part_is_checked() -> void:
+	var cue: CueBase = _made([{"part": &"light", "radius": 30.0, "strength": 1.0, "seconds": 0.3, "bare": true}])
+	check(cue.problems().is_empty(), "a valid light part: %s" % [cue.problems()])
+	check(cue.lights(), "it lights")
+	for bad: Dictionary in [{"part": &"light", "strength": 3.0}, {"part": &"light", "seconds": 0.0}, {"part": &"light", "radius": -1.0}, {"part": &"light", "bare": true, "plain": true}, {"part": &"light", "zoom": 2}]:
+		var wrong := CueBase.new()
+		wrong.id = &"wrong"
+		wrong.parts = [bad]
+		check(not wrong.problems().is_empty(), "%s is a problem" % [bad])
+	check(not feel.cue_of(&"blast").lights(), "a cue with no light part lights by its flashes")
+	check(feel.has_cue_part(&"light"), "a light part has a player")

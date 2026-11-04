@@ -464,6 +464,11 @@ func _test_revive_two_players() -> void:
 	var revived: Array = []
 	var on_revived: Callable = func(p: int, r: int) -> void: revived.append([p, r])
 	_events.connect("player_revived", on_revived)
+	var cues: Array = []
+	var on_cue: Callable = func(p: int, id: StringName, at: Vector2, _d: Vector2, _s: float, _t: Color, _l: int) -> void:
+		if id == Downed.REVIVE_CUE:
+			cues.append([p, at])
+	_events.connect("cue_shown", on_cue)
 	_down(0)
 	_check(_wizard(0).is_down(), "revive: wizard 0 is down")
 	# Far away: nothing fills.
@@ -494,6 +499,7 @@ func _test_revive_two_players() -> void:
 	_hold(0.4)
 	_check(not _wizard(0).is_down(), "revive: back up after the hold time")
 	_check(revived == [[0, 1]], "revive: player_revived carries the player and the reviver, got %s" % [revived])
+	_check(cues.size() == 1 and cues[0][0] == _wizard(0).id and cues[0][1] == _wizard(0).global_position, "revive: the cue revive plays on the revived actor (S6), got %s" % [cues])
 	_check(_health(0) == Downed.REVIVE_HEALTH, "revive: the revive health")
 	_check(_coop.revive_progress_of(0) == 0.0 and Downed.of(_wizard(0)).revive_progress() == 0.0, "revive: the ring is cleared")
 	_check(progress.back()[1] == 0.0, "revive: the last progress sent is 0")
@@ -507,6 +513,7 @@ func _test_revive_two_players() -> void:
 	_check(_health(1) == _wizard(1).health.max_health and not _wizard(1).is_down(), "revive: the reviver is unharmed")
 	_events.disconnect("revive_progress", on_progress)
 	_events.disconnect("player_revived", on_revived)
+	_events.disconnect("cue_shown", on_cue)
 	_stop()
 
 

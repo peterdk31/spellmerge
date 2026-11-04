@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Every moment a cue: new moments and a light part (spell spectacle 2, S6 items 13, 4, owner session)
+
+Six moments that drew nothing now play cues their areas send (`cue_shown`): a horde level-up (`level_up`, on every standing wizard), gems picked up (`gem_pickup`, on the wizard), a revive (`revive`), a barrier blocking a hit (`shield_block`), a body caught by a magnet (`pull`) and a wave starting (`wave_start`). Each has a starter look from existing parts for the owner to tune (sheet `shot_moment_cues.gd`). A cue can now say how often it may play (`every`, per actor), which keeps a horde's hundreds of gem pickups to a few flashes a second. A cue can also light the room (a `light` part: strength, reach, seconds, colour); a cue with one lights by it alone, its flashes then giving no light of their own. The heal, the level-up and the revive light by theirs (sheet `shot_cue_light.gd`, before and after).
+
 ## 2026-11-04: Every moment a cue: reactions, possession, arcs (spell spectacle 2, S6 items 1, 7, 8, owner session)
 
 Three more of Feel's moments are cue files now. Each element reaction has its own cue (`reaction_<id>`: a puff, a ring and a ring of the shot's motes in the reaction's colour, a hold, shake and its sound), and a cue may now carry a colour and a strength of its own (`color`, `power`), applied by one rule; ten reaction fields left the Feel preset. A possession's rings are `possess_start` and `possess_end`. A discharge's arc is `discharge_arc`, and a zap plays its card's own cue `zap` (a spark into the air burns out sooner by a size gate on its part). The reactions' and possession's sheets are the same to the pixel as before; the arcs' sheet plays the cue. Tests in the feel suites; details in docs/DECISIONS.md.

@@ -133,6 +133,8 @@ The owner asked for every other system that can be replaced to be added. A surve
 
 **Built** (owner/cues-moments): item 1 (reactions: `reaction_<id>` cues with the cue's own `color` and `power`; docs/DECISIONS.md), item 7 (`possess_start`, `possess_end`), item 8 (`zap`, the zap card's own cue on `form_shown`, and `discharge_arc`; `if_size_over`/`if_size_upto`).
 
+**Built** (owner/cues-new-moments): item 13 (the cues `level_up`, `gem_pickup`, `revive`, `shield_block`, `pull` (a body a magnet newly catches) and `wave_start`, each `cue_shown` from its area; `CueBase.every` throttles a cue per actor; DECISIONS, 2026-11-04, part two) and item 4 (a `light` part, `SpellLight.flash`; a cue with one lights by it alone, its flashes coded unlit).
+
 **Order inside S6:** 1, 2, 7 and 8 need only parts that exist (plus an `arc` entry); then 5, 6, 13 and 14; 4 is a new part type; 9 needs a following `CueContext`; 3, 10 and 11 come after S4, which sets what a mote row costs. S3's own new special case (spray and puff thrown as motes inside `show_effect`) goes when hit flashes become cues (`hit`, and a puff for a hit with no way), under the same storm check as 2.
 
 ## Order

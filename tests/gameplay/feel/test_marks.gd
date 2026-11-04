@@ -275,7 +275,8 @@ func test_a_new_room_and_the_setting() -> void:
 	check_equal(feel.marks().viewport().render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "the layer is wiped")
 	bus.floor_marks_changed.emit(false)
 	check(feel.marks() == null and not feel.floor_marks, "off: no layer")
-	check(feel.find_children("*", "SubViewport", true, false).is_empty(), "and no nodes")
+	# Only the mark layer's nodes: spell light has a viewport of its own under Feel.
+	check(feel.find_child("Marks", true, false) == null and feel.find_children("*", "SubViewport", true, false).all(func(n: Node) -> bool: return feel.light() != null and feel.light().is_ancestor_of(n)), "and no nodes")
 	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
 	feel.step(0.016)
 	bus.floor_marks_changed.emit(true)

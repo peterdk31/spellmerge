@@ -1,12 +1,16 @@
 extends "res://tests/support/suite.gd"
 ## Reactions and statuses in gameplay/feel (#244, part 3): a reaction is a burst bigger than a
 ## plain hit (a ring, a bigger spray, a longer hit-stop, more shake and its sound together), and
-## an enemy with burning, chill, freeze, shock or hex shows it on its sprite, without text.
+## an enemy with burning, chill, freeze, shock or hex shows it on its sprite, without text: a glow
+## in its element card's colour and the card's motes round it (spell spectacle 2, S6 item 11).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+const FIRE := preload("res://content/spells/elements/fire/fire.tres")
+const FROST := preload("res://content/spells/elements/frost/frost.tres")
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
@@ -50,6 +54,10 @@ func before_each() -> void:
 	_feel.actors = _actors
 	_feel.drive_engine = false
 	_feel.preset = FeelPresetScript.new()
+	# A status is shown as its element card: the cards come from the registry.
+	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	_feel.registry = registry
 	root.add_child(_feel)
 
 
@@ -133,8 +141,7 @@ func test_each_status_shows_a_different_colour() -> void:
 		var enemy: Enemy = _enemy()
 		_status_on(enemy, id)
 		check_equal(_feel.status_shown(enemy), id, "%s shows" % id)
-		var preset: FeelPresetScript = _feel.preset
-		var color: Color = (preset.status_looks[id] as Dictionary)["color"] as Color
+		var color: Color = _feel.status_color(id)
 		for other in seen:
 			var apart: float = Vector3(color.r - other.r, color.g - other.g, color.b - other.b).length()
 			check(apart >= 0.3, "%s differs from the others (%.2f)" % [id, apart])
@@ -148,10 +155,8 @@ func test_the_status_follows_the_enemy_and_ends_with_the_status() -> void:
 	_feel.step(STEP)
 	check_equal(_feel.live_statuses(), 1, "one status effect")
 	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_STATUS)
-	var preset: FeelPresetScript = _feel.preset
-	var look: Dictionary = preset.status_looks[&"burn"] as Dictionary
-	check_equal(shown["core"], look["color"], "in the status's colour")
-	check(ProjectileManagerScript.look_has(shown["look"] as int, look["look"] as int), "giving off the element's particles (fire's embers)")
+	check((shown["core"] as Color).is_equal_approx(Color(FIRE.tint.r, FIRE.tint.g, FIRE.tint.b, 1.0)), "in its element card's colour (fire's): %s" % shown["core"])
+	check(ProjectileManagerScript.look_has(shown["look"] as int, FIRE.look_layer), "with the card's look (fire's embers)")
 	enemy.global_position = Vector2(80.0, 30.0)
 	_feel.step(STEP)
 	check_equal((_feel.effect_info(FeelScript.KIND_STATUS)["at"] as Vector2).x, 80.0, "it moved with the enemy")
@@ -214,3 +219,67 @@ func test_without_combat_there_are_no_overlays() -> void:
 	var enemy: Enemy = _enemy()
 	_bus.status_applied.emit(0, enemy, &"burn")
 	check_equal(_feel.live_statuses(), 0, "nothing to read, nothing shown")
+
+
+func test_a_status_is_shown_as_its_element_card() -> void:
+	for id: StringName in [&"burn", &"chill", &"shock", &"hex", &"static"]:
+		var card: Array = _feel._status_card(id)
+		check(not card.is_empty() and card[ElementBase.STATUS_LOOK_STATUS] == id, "%s is the status of a card" % id)
+		var tint: Color = card[ElementBase.STATUS_LOOK_TINT] as Color
+		check(_feel.status_color(id).is_equal_approx(Color(tint.r, tint.g, tint.b, 1.0)), "%s glows in its card's tint" % id)
+	check(_feel._status_card(&"chill")[ElementBase.STATUS_LOOK_CARD] == &"frost", "chill is frost's")
+	check(_feel._status_card(&"freeze") == _feel._status_card(&"chill"), "freeze, which no element puts on, is shown as the chill it deepens from (frost)")
+	check(_feel._status_card(&"nothing").is_empty() and _feel.status_color(&"nothing") == Color.WHITE, "an unknown status has no card")
+	var enemy: Enemy = _enemy()
+	_status_on(enemy, &"nothing")
+	check_equal(_feel.live_statuses(), 0, "and shows nothing")
+
+
+func test_freeze_reads_apart_from_chill() -> void:
+	var chill: Color = _feel.status_color(&"chill")
+	var freeze: Color = _feel.status_color(&"freeze")
+	check(chill.is_equal_approx(Color(FROST.tint.r, FROST.tint.g, FROST.tint.b, 1.0)), "chill in frost's tint")
+	check(freeze.get_luminance() > chill.get_luminance() + 0.15, "freeze far whiter: %s against %s" % [freeze, chill])
+	var chilled: int = _status_motes_over(&"chill", 2.0)
+	var frozen: int = _status_motes_over(&"freeze", 2.0)
+	check(float(frozen) >= float(chilled) * 1.4, "and a frozen body gives off far more motes: %d against %d" % [frozen, chilled])
+
+
+func test_a_status_gives_off_its_cards_motes_slowly_while_it_shows() -> void:
+	var preset: FeelPresetScript = _feel.preset
+	var thrown: int = _status_motes_over(&"burn", 2.0)
+	var expected: float = preset.status_mote_rate * 2.0
+	check(absf(float(thrown) - expected) <= expected * 0.5 + 2.0, "about status_mote_rate a second: %d in 2 s" % thrown)
+	var enemy: Enemy = _enemy()
+	_status_on(enemy, &"burn")
+	_feel.step(STEP)
+	var embers: PackedInt32Array = _feel.motes().kinds_of_layer(FIRE.look_layer)
+	check(not embers.is_empty(), "fire's look layer has kinds (embers)")
+	(enemy.get_node("Sprite") as Sprite2D).visible = false
+	_feel.step(STEP)
+	var written: int = _feel.motes().written
+	for i in 16:
+		_feel.step(STEP)
+	check_equal(_feel.motes().written, written, "none while the body is hidden")
+
+
+## Motes written while one enemy shows status `id` for `seconds` (the frame's other motes aside: no
+## shot flies in this test).
+func _status_motes_over(id: StringName, seconds: float) -> int:
+	var enemy: Enemy = _enemy()
+	_status_on(enemy, id)
+	_feel.step(STEP)
+	var before: int = _feel.motes().written
+	for i in roundi(seconds / STEP):
+		_combat.left[enemy.get_instance_id()] = {id: 3.0}
+		_feel.step(STEP)
+	var thrown: int = _feel.motes().written - before
+	_combat.left.erase(enemy.get_instance_id())
+	for i in 4:
+		_feel.step(STEP)
+	return thrown
+
+
+func test_the_status_shader_draws_only_its_glow() -> void:
+	var code: String = (FeelScript.STATUS_SHADER as Shader).code
+	check(not code.contains("shot_particle") and not code.contains("for ("), "no particle loop: its particles are motes (S6 item 11)")

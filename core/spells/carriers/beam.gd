@@ -895,6 +895,11 @@ func beam_look(at: int) -> int:
 	return _bm_spell[at].look if _bm_spell[at] != null else 0
 
 
+## The spell tag of live beam `at` (its cards' motes, `gameplay/feel`; S6 item 10).
+func beam_tag(at: int) -> int:
+	return _bm_tag[at]
+
+
 func beam_since_hit(at: int) -> float:
 	return kit.clock() - _bm_hit_at[at]
 

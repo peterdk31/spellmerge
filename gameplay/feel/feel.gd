@@ -83,6 +83,7 @@ const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
 const EFFECT_SHADER: Shader = preload("res://core/projectiles/shot_effect.gdshader")
 const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
 const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
+const BirthsScript := preload("res://gameplay/feel/births.gd")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
@@ -120,24 +121,26 @@ const LIVE_BEAM_POINTS: int = 80
 const LIVE_BEAMS: int = 64
 ## How wide a beam that is shown whole (a short beam) is drawn: its core, rim, flares and glow.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
-## The quad kinds of a beam's mesh (`beam_mesh`; Q_* in `shot_beam.gdshader`, PARTICLES ARE
-## GEOMETRY there): the light round each piece of its path, a splash spark's light, its card
-## particles, the splash sparks, each piece's pixels.
+## The quad kinds of a beam's mesh (`beam_mesh`; Q_* in `shot_beam.gdshader`): the light round
+## each piece of its path, each piece's pixels.
 const BEAM_Q_PIECE_LIGHT: int = 0
-const BEAM_Q_SPLASH_LIGHT: int = 1
-const BEAM_Q_PARTICLE: int = 2
-const BEAM_Q_SPLASH: int = 3
-const BEAM_Q_PIECE: int = 4
+const BEAM_Q_PIECE: int = 1
 ## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the
-## lights first, then the particles (the newest on top), the splash (the first on top), the
-## beam's own pixels last. 12 particles (MAX_PARTICLES in the shot shaders), 6 splash sparks.
+## lights first, the beam's own pixels last.
 const BEAM_QUADS: Array[Vector3i] = [
 	Vector3i(BEAM_Q_PIECE_LIGHT, LIVE_BEAM_POINTS - 1, 0),
-	Vector3i(BEAM_Q_SPLASH_LIGHT, 6, 0),
-	Vector3i(BEAM_Q_PARTICLE, 12, 0),
-	Vector3i(BEAM_Q_SPLASH, 6, 1),
 	Vector3i(BEAM_Q_PIECE, LIVE_BEAM_POINTS - 1, 0),
 ]
+## A beam's motes (spell spectacle 2, S6 item 10; the beam shader drew them until then), given off
+## as births (`Spectacle.births`, `_beam_motes`): where it lands, BEAM_SPLASH_RATE sparks a second
+## (the shader's 6, each about a sixth of a second) thrown back off its end while it is more than
+## BEAM_SPLASH_FADE whole; along it, each of its card particles (4, and 2 a card kind, at most
+## BEAM_PARTICLES_MOST, as the shader had them) BEAM_PARTICLE_RATE times a second (the shader's 2.5
+## to 4), from a random point of it, out to either side.
+const BEAM_SPLASH_RATE: float = 36.0
+const BEAM_SPLASH_FADE: float = 0.3
+const BEAM_PARTICLE_RATE: float = 3.25
+const BEAM_PARTICLES_MOST: int = 12
 
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
@@ -270,6 +273,8 @@ const ARC_ACROSS: float = 56.0
 const DISCHARGE_ARC: StringName = &"discharge_arc"
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
+## The registry folder the element cards a status is shown as are in (`_status_card`).
+const STATUS_CARD_FOLDER: StringName = &"spells"
 const STATUS_RISE: float = 8.0
 ## A beam is drawn this wide (its core, rim, flares and glow; `shot_beam.gdshader`'s mode 1).
 const BEAM_WIDTH: float = 16.0
@@ -320,6 +325,7 @@ var events: EventsScript = null
 var registry: RegistryScript = null:
 	set(value):
 		registry = value
+		_status_cards.clear()
 		if _spectacle != null:
 			_spectacle.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -459,6 +465,11 @@ var _form_left: PackedFloat32Array = PackedFloat32Array()
 var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
+## Each one's motes: its caster's shader ramp (`_beam_ramp`), its look, its tint and its spell's tag.
+var _form_ramp: PackedInt32Array = PackedInt32Array()
+var _form_look: PackedInt32Array = PackedInt32Array()
+var _form_tint: PackedColorArray = PackedColorArray()
+var _form_tag: PackedInt64Array = PackedInt64Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
@@ -475,6 +486,9 @@ var _status_effect: PackedInt32Array = PackedInt32Array()
 var _status_age: PackedFloat32Array = PackedFloat32Array()
 var _status_shown: Array[StringName] = []
 var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
+## How each status is shown (`_status_card`: its element card's `status_look()`), found once; an
+## empty Array for none.
+var _status_cards: Dictionary = {}
 ## The cue of each reaction id (`reaction_<id>`, else REACTION_CUE), found the first time it is
 ## seen (so it allocates once).
 var _reaction_cues: Dictionary = {}
@@ -602,6 +616,10 @@ func _ready() -> void:
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
 	_form_length.resize(FORM_SLOTS)
+	_form_ramp.resize(FORM_SLOTS)
+	_form_look.resize(FORM_SLOTS)
+	_form_tint.resize(FORM_SLOTS)
+	_form_tag.resize(FORM_SLOTS)
 	for i in REACTION_SLOTS:
 		var label := Label.new()
 		label.top_level = true
@@ -696,9 +714,10 @@ func step(real_delta: float) -> void:
 	_step_reactions(real_delta)
 	_step_forms(real_delta)
 	_step_effects(real_delta)
-	_draw_live_beams()
+	_draw_live_beams(real_delta)
 	if _swing_trails != null:
-		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
+		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
+	_status_motes(real_delta)
 	_spectacle.step(_clock)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
@@ -1071,25 +1090,82 @@ func _status_of(enemy: Node) -> StringName:
 	return &""
 
 
-## Keep status `at` shown: an effect that follows its character, its look's particles round it
-## and a glow in its colour (`status_looks`: `color`, `look`), started again if a crowd of other
-## effects took its slot. Hidden while the character's sprite is.
+## Keep status `at` shown: an effect that follows its character, a glow in its card's colour
+## (`status_color`), started again if a crowd of other effects took its slot. Hidden while the
+## character's sprite is. Its motes are `_status_motes`'.
 func _pose_status(at: int) -> void:
 	var enemy := instance_from_id(_status_enemies[at]) as Node2D
-	var look: Dictionary = preset.status_looks.get(_status_shown[at], {}) as Dictionary
+	var card: Array = _status_card(_status_shown[at])
 	var sprite: CanvasItem = null
 	if enemy != null:
 		sprite = enemy.get_node_or_null("Sprite") as CanvasItem
-	if enemy == null or look.is_empty() or (sprite != null and not sprite.is_visible_in_tree()):
+	if enemy == null or card.is_empty() or (sprite != null and not sprite.is_visible_in_tree()):
 		_end_status_effect(at)
 		return
 	var slot: int = _status_effect[at]
 	if slot >= 0 and slot < effect_slots and _effect_seconds[slot] > 0.0 and _effect_follow[slot] == enemy:
 		return
-	var kinds: int = look.get("look", 0) as int
-	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([kinds])) if kinds > 0 else 0
-	var tint: Color = look.get("color", Color.WHITE) as Color
-	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, tint, 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+	var layer: int = card[ElementBase.STATUS_LOOK_LAYER] as int
+	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([layer])) if layer > 0 else 0
+	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+
+
+## How status `id` is shown (spell spectacle 2, S6 item 11): the `status_look()` of the element
+## card whose status it is, or for a status no element puts on (freeze), of the one whose status it
+## deepens from (`FeelPreset.deep_statuses`): [status, tint, look layer, card id], ElementBase's
+## STATUS_LOOK_*. Empty for none (an unknown status shows nothing). Found once in the registry's
+## cards.
+func _status_card(id: StringName) -> Array:
+	var from: StringName = preset.deep_statuses.get(id, id) as StringName
+	if _status_cards.has(from):
+		return _status_cards[from] as Array
+	var found: Array = []
+	if registry != null and from != &"":
+		for card: Resource in registry.get_all(STATUS_CARD_FOLDER):
+			if not card is ElementBase:
+				continue
+			var look: Array = (card as ElementBase).status_look()
+			if look[ElementBase.STATUS_LOOK_STATUS] as StringName == from:
+				found = look
+				break
+	_status_cards[from] = found
+	return found
+
+
+## Whether status `id` is shown at full depth (`FeelPreset.deep_statuses`: freeze).
+func _status_deep(id: StringName) -> bool:
+	return preset.deep_statuses.has(id)
+
+
+## The colour status `id` glows in and its motes cool from: its card's tint, `status_deep_white` of
+## the way to white for a deep one (freeze); white for a status with no card.
+func status_color(id: StringName) -> Color:
+	var card: Array = _status_card(id)
+	if card.is_empty():
+		return Color.WHITE
+	var tint: Color = card[ElementBase.STATUS_LOOK_TINT] as Color
+	tint.a = 1.0
+	return tint.lerp(Color.WHITE, preset.status_deep_white) if _status_deep(id) else tint
+
+
+## The shown statuses' motes over `real_delta` seconds (S6 item 11; the status shader's particles
+## until then): each gives off its card's motes round its character, `status_mote_rate` a second
+## (`status_deep_motes` times that for a deep one), in its colour.
+func _status_motes(real_delta: float) -> void:
+	if real_delta <= 0.0 or not _spectacle.motes_on():
+		return
+	for at in _status_enemies.size():
+		if _status_effect[at] < 0:
+			continue
+		var enemy := instance_from_id(_status_enemies[at]) as Node2D
+		var id: StringName = _status_shown[at]
+		var card: Array = _status_card(id)
+		if enemy == null or card.is_empty():
+			continue
+		var rate: float = preset.status_mote_rate * (preset.status_deep_motes if _status_deep(id) else 1.0)
+		var count: int = floori(rate * real_delta + _rng.randf())
+		if count > 0:
+			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
 ## End the effect that shows status `at`, if it still shows it.
@@ -2045,7 +2121,6 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
 	material.set_shader_parameter(&"beam_start", origin)
 	material.set_shader_parameter(&"beam_end", end)
-	material.set_shader_parameter(&"beam_end_dir", direction.normalized())
 	material.set_shader_parameter(&"beam_player", _beam_ramp(ramp))
 	material.set_shader_parameter(&"beam_look", look)
 	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
@@ -2053,13 +2128,17 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	if projectiles != null:
 		body = projectiles.tint_of(caster)
 	_form_body[slot] = body
+	_form_ramp[slot] = _beam_ramp(ramp)
+	_form_look[slot] = look
+	_form_tint[slot] = tint
+	_form_tag[slot] = _cue_tag()
 	_form_left[slot] = seconds
 	_form_total[slot] = seconds
 	node.visible = true
 	_pose_form(slot, 1.0)
 
 
-## Fade the beams.
+## Fade the beams, and give off their motes.
 func _step_forms(real_delta: float) -> void:
 	for i in FORM_SLOTS:
 		if _form_left[i] <= 0.0:
@@ -2068,7 +2147,12 @@ func _step_forms(real_delta: float) -> void:
 		if _form_left[i] <= 0.0:
 			_forms[i].visible = false
 			continue
-		_pose_form(i, _form_left[i] / _form_total[i])
+		var t: float = _form_left[i] / _form_total[i]
+		_pose_form(i, t)
+		var path: PackedVector3Array = _form_paths[i]
+		var from: Vector2 = Vector2(path[0].x, path[0].y)
+		var end: Vector2 = Vector2(path[1].x, path[1].y)
+		_beam_motes(path, 2, path[1].z, end, from.direction_to(end), t, _form_ramp[i], _form_look[i], _form_tint[i], _form_tag[i], real_delta)
 
 
 ## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
@@ -2117,7 +2201,7 @@ func _thin_beam(beams: Object, i: int, all: int) -> void:
 		_thin_keep[n] = 1 if keep else 0
 
 
-func _draw_live_beams() -> void:
+func _draw_live_beams(real_delta: float) -> void:
 	if _spectacle != null:
 		_spectacle.light_beams_begin()
 	var count: int = 0
@@ -2195,7 +2279,6 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
 		material.set_shader_parameter(&"beam_start", origin)
 		material.set_shader_parameter(&"beam_end", end_at)
-		material.set_shader_parameter(&"beam_end_dir", end_dir)
 		material.set_shader_parameter(&"sim_time", _clock)
 		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
 		var grown: float = float(beams.call("beam_growth", i)) if beams.has_method("beam_growth") else 1.0
@@ -2206,9 +2289,41 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
+		_beam_motes(path, used, walked, end_at, end_dir, fade, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, int(beams.call("beam_tag", i)) if beams.has_method("beam_tag") else 0, real_delta)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if _spectacle != null:
 			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
+
+
+## The motes a beam gives off over `seconds` (see BEAM_SPLASH_RATE), into the spectacle's births
+## while motes are on: its path is the first `points` of `path` (x, y and how far along), `length`
+## pixels long, landing at `end_at` going `end_dir`, `fade` whole (1 to 0), of the shader ramp
+## `ramp` (0-3 a hat ramp, -1 the enemies'), the look `look`, the tint `tint`, the spell of `tag`.
+func _beam_motes(path: PackedVector3Array, points: int, length: float, end_at: Vector2, end_dir: Vector2, fade: float, ramp: int, look: int, tint: Color, tag: int, seconds: float) -> void:
+	if seconds <= 0.0 or points < 2 or not _spectacle.motes_on():
+		return
+	var births: BirthsScript = _spectacle.births
+	var core: Color = Color(tint.r, tint.g, tint.b, 1.0)
+	if fade > BEAM_SPLASH_FADE:
+		for n in births.roll(BEAM_SPLASH_RATE * seconds):
+			if not births.add(end_at, -end_dir, 0, ramp, look, core, tag):
+				return
+	var kinds: int = BirthsScript.emitting_count(look)
+	if kinds == 0 or length <= 0.0:
+		return
+	for n in births.roll(float(mini(4 + 2 * kinds, BEAM_PARTICLES_MOST)) * BEAM_PARTICLE_RATE * seconds):
+		var along: float = length * births.dice()
+		var k: int = 1
+		while k < points - 1 and path[k].z < along:
+			k += 1
+		var a: Vector2 = Vector2(path[k - 1].x, path[k - 1].y)
+		var b: Vector2 = Vector2(path[k].x, path[k].y)
+		var span: float = path[k].z - path[k - 1].z
+		var at: Vector2 = a.lerp(b, clampf((along - path[k - 1].z) / span, 0.0, 1.0)) if span > 0.0 else a
+		var way: Vector2 = a.direction_to(b)
+		var out: Vector2 = Vector2(-way.y, way.x) * (1.0 if births.dice() < 0.5 else -1.0)
+		if not births.add(at, out, births.emitting_layer(look), ramp, look, core, tag):
+			return
 
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments

@@ -293,8 +293,8 @@ func _trail_motes() -> void:
 
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
 ## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
-## the cue's ramp with its tint and the cards of its look; its count and reach times the cue's power.
-## One of many a frame (`often`, a hit's sparks, S6 2; and any with a `share`, a shot's end) is
+## the cue's ramp with its tint and the cards of its look (in the caster's ramp alone when `bare`);
+## its count and reach times the cue's power. One of many a frame (`often`, a hit's sparks, S6 2; and any with a `share`, a shot's end) is
 ## skipped, before its kinds are looked up, once the frame has only the moments' rows left; one with
 ## a `share` throws each kind its own count times the share (and the power), split between the
 ## kinds, as they shed.
@@ -317,7 +317,8 @@ func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		reach = cue.size * part.reach
 	reach *= cue.power
 	# In an exact colour (the part's, else the cue's own), or in the cue's ramp, tint and cards.
-	var colour: Color = part.color if part.color.a > 0.0 else cue.color
+	# A bare part keeps to the caster's ramp even in a cue with a colour of its own, as a bare flash.
+	var colour: Color = part.color if part.color.a > 0.0 else (Color(0.0, 0.0, 0.0, 0.0) if part.bare else cue.color)
 	var exact: bool = colour.a > 0.0
 	var spell: int = MotesScript.spell_source(cue.ramp, MotesScript.LOOK_EXACT if exact else cue.look)
 	var core: Color = colour if exact else cue.tint
@@ -325,6 +326,10 @@ func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		# The body's own colour (a death puff's sparks), in no one's ramp and without the cards.
 		spell = MotesScript.spell_source(0, 0)
 		core = cue.body if cue.body.a > 0.0 else Color.WHITE
+	elif part.bare and not exact:
+		# The caster's ramp without the cards (a cast's sparks, in the seat's colours).
+		spell = MotesScript.spell_source(cue.ramp, 0)
+		core = Color.WHITE
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var at: Vector2 = cue.at
 	if part.place >= 0.0:
@@ -391,6 +396,7 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.share = float(part.get("share", -1.0))
 	made.often = bool(part.get("often", false)) or made.share >= 0.0
 	made.body = bool(part.get("body", false))
+	made.bare = bool(part.get("bare", false))
 	made.way = StringName(part.get("way", "aim"))
 	made.below = float(part.get("below", 0.0))
 	made.color = part["color"] as Color if part.has("color") else Color(0.0, 0.0, 0.0, 0.0)
@@ -660,6 +666,8 @@ class MotesPart:
 	var share: float = -1.0
 	## In the body's own colour (`CueContext.body`), as a flash's `body`.
 	var body: bool = false
+	## In the caster's ramp without the cards, as a flash's `bare`.
+	var bare: bool = false
 	var way: StringName = &"aim"
 	var below: float = 0.0
 	var color: Color = Color(0.0, 0.0, 0.0, 0.0)

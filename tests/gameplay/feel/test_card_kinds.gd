@@ -337,7 +337,11 @@ func test_a_room_names_its_walls_kinds() -> void:
 		if not rows.has(id):
 			rows.append(id)
 	check(rows.has(&"grit") and not rows.has(&"chip"), "a wall hit sheds the room's kinds, not chips: %s" % [rows])
-	var source: int = roundi(feel.motes().row_data(feel.motes().next_row() - 1)[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
+	# A grit row's colours (the strike's sparks come after the wall's kinds, S6 item 3).
+	var source: int = -1
+	for row in range(before, feel.motes().next_row()):
+		if feel.motes().kinds()[roundi(feel.motes().row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id == &"grit":
+			source = roundi(feel.motes().row_data(row)[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
 	check(source >= MotesScript.TABLE_SOURCE, "in the walls' colours (a ramp-table row): %d" % source)
 
 

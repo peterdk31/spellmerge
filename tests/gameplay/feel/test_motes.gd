@@ -466,7 +466,7 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	feel.projectiles.impact_look = FIRE_LOOK
 	feel.projectiles.impact_core = Color("e0592f")
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
-	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember"], "before any room: only the shot's own")
+	check_equal(_kinds_of_rows(motes, 0, motes.next_row()), [&"ember", &"spark"], "before any room: only the shot's own, and its burst's sparks")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] < 0.0, "mote %d flies back off the wall" % row)
 	bus.room_entered.emit(ARENA)
@@ -474,7 +474,12 @@ func test_a_wall_hit_sheds_the_shots_motes_and_the_walls() -> void:
 	bus.projectile_impact.emit(1, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
 	check(kinds.has(&"ember") and kinds.has(&"chip"), "in a room: the shot's and the wall's, got %s" % [kinds])
-	var chip_row: int = motes.next_row() - 1
+	# A chip's row (the wall's chips come before the strike's sparks).
+	var chip_row: int = -1
+	for row in range(before, motes.next_row()):
+		if motes.kinds()[roundi(motes.row_data(row)[MotesScript.ROW_KIND] * MotesScript.KIND_CODE)].id == &"chip":
+			chip_row = row
+	check(chip_row >= 0, "a chip was thrown")
 	var source: int = roundi(motes.row_data(chip_row)[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE)
 	var room := registry.get_resource(&"rooms", ARENA) as RoomBase
 	check(source >= MotesScript.TABLE_SOURCE and motes.table_shade(source, 3).is_equal_approx(room.surface_colors()[2]), "the chips in the room's wall colours")
@@ -558,7 +563,8 @@ func test_a_hit_on_a_body_sheds_the_shots_kinds_back_along_its_way() -> void:
 	feel.projectiles.impact_core = Color("8fd3ff")
 	var target: Node2D = _body(PackedColorArray([Color.GRAY]))
 	var kinds: Array[StringName] = _shed_by(motes, func() -> void: bus.projectile_impact.emit(1, target, Vector2(50.0, 50.0), Vector2.RIGHT))
-	check_equal(kinds, [&"fleck"], "a frost shot's flecks")
+	# Its flecks, and the sparks of its impact cue's flash (a `spark` motes part since S6 item 3).
+	check_equal(kinds, [&"fleck", &"spark"], "a frost shot's flecks and the strike's sparks")
 	for row in motes.next_row():
 		check(motes.row_data(row)[MotesScript.ROW_VX] <= 0.0, "mote %d flies back the way the shot came" % row)
 	feel.particles_enabled = false
@@ -573,7 +579,7 @@ func test_a_shot_whose_life_runs_out_puffs_its_kinds() -> void:
 	feel.projectiles.impact_body = ProjectilesScript.KIND_BOLT
 	feel.projectiles.impact_look = FIRE_LOOK
 	feel.projectiles.impact_heading = Vector2.DOWN
-	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [&"ember"], "a fire bolt puffs embers")
+	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [&"ember", &"spark"], "a fire bolt puffs embers, and its pop's sparks")
 	feel.projectiles.expired_on_wall = true
 	check_equal(_shed_by(motes, func() -> void: bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)), [] as Array[StringName], "one that ended on a wall already shed there")
 
@@ -594,17 +600,22 @@ func test_a_shot_s_end_sheds_as_before_and_leaves_the_moments_rows() -> void:
 	if cue == null:
 		return
 	var share: float = 0.0
+	var sparks: int = 0
 	for part: Dictionary in cue.parts:
 		if part.has("share"):
 			share = float(part["share"])
+		elif StringName(part.get("kind", "")) == &"spark":
+			# Its pop's sparks (S6, item 3), as many as the part says (times the amount).
+			sparks = roundi(float(part["count"]) * motes.density)
 	check(share > 0.0, "with a share of the shot's motes")
+	check(sparks > 0, "and its pop's sparks")
 	var kinds: PackedInt32Array = motes.kinds_of_look(FIRE_LOOK)
-	var want: int = 0
+	var want: int = sparks
 	for k in kinds:
 		want += maxi(roundi(float(motes.kinds()[k].count) * share / float(kinds.size())), 1)
 	var before: int = motes.next_row()
 	bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)
-	check_equal(motes.next_row() - before, want, "each kind its own count times the share, as shed_end threw")
+	check_equal(motes.next_row() - before, want, "each kind its own count times the share, as shed_end threw, and the sparks")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST, 0), 1, "and its small pop")
 	motes.step(0.0)
 	# Use the frame's rows up to the moments' own: the end throws nothing more, and counts a cut.
@@ -667,6 +678,64 @@ func test_an_enemy_death_sheds_the_killing_shots_kinds_and_its_own_colours() -> 
 	var boss_cue: CueBase = registry.get_resource(&"cues", &"boss_death") as CueBase
 	var death_cue: CueBase = registry.get_resource(&"cues", &"enemy_death") as CueBase
 	check(chips > 0 and boss_cue != null and death_cue != null, "chips were thrown")
+
+
+## S6 item 3: a flash draws its shape and light only; its sparks, rubble and card particles are its
+## cue's motes. Each cue that shows a flash which threw sparks in the shader throws them as motes.
+func test_a_flashs_sparks_are_its_cues_motes() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var want: Dictionary = {
+		&"impact": &"spark", &"expire": &"spark", &"deflect": &"spark", &"parry": &"spark", &"slam": &"spark",
+		&"shield_block": &"spark", &"gem_pickup": &"spark", &"rune_burst": &"spark", &"cast": &"spark",
+		&"cast_nova": &"spark", &"cast_rune": &"spark", &"cast_wall": &"spark", &"appear": &"spark",
+		&"rainfall": &"spark", &"conjure": &"spark", &"trade": &"spark", &"vanish": &"glimmer",
+		&"dismiss": &"glimmer", &"revive": &"glimmer",
+	}
+	for id: StringName in want:
+		motes.step(0.0)
+		var before: int = motes.next_row()
+		feel.play_cue(id, 0, Vector2(100.0, 100.0), Vector2.RIGHT, 14.0, Color("e0592f"), FIRE_LOOK)
+		var kinds: Array[StringName] = _kinds_of_rows(motes, before, motes.next_row())
+		check(kinds.has(want[id]), "%s throws its flash's %s motes, got %s" % [id, want[id], kinds])
+	# A strike's sparks fly back against the shot, as the shader's did.
+	motes.step(0.0)
+	var from: int = motes.next_row()
+	feel.play_cue(&"impact", 0, Vector2(100.0, 100.0), Vector2.RIGHT)
+	check(motes.next_row() > from, "an impact throws sparks")
+	for row in range(from, motes.next_row()):
+		check(motes.row_data(row)[MotesScript.ROW_VX] <= 0.0, "spark %d flies back against the shot" % row)
+
+
+## A motes part with `bare` is in the caster's ramp without the cards and the cue's tint, as a bare
+## flash (a cast's sparks in the seat's colours, S6 item 3); without it, in the cue's tint.
+func test_a_bare_motes_part_keeps_to_the_casters_ramp() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var fire := Color("e0592f")
+	var cue: CueBase = feel.cue_of(&"cast")
+	var bare: bool = false
+	for part: Dictionary in cue.parts:
+		bare = bare or bool(part.get("bare", false)) and StringName(part.get("part", "")) == &"motes"
+	check(bare, "the cast's sparks are bare")
+	var before: int = motes.next_row()
+	feel.play_cue(&"cast", 2, Vector2(100.0, 100.0), Vector2.RIGHT, 0.0, fire, FIRE_LOOK)
+	check(motes.next_row() > before, "a cast throws its sparks")
+	for row in range(before, motes.next_row()):
+		var data: PackedFloat32Array = motes.row_data(row)
+		check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(Color.WHITE), "spark %d: no tint, the ramp's own colours" % row)
+		check_equal(roundi(data[MotesScript.ROW_SOURCE] * MotesScript.SOURCE_CODE), MotesScript.spell_source(feel.actors.ramp_of(2), 0), "in player 3's ramp")
+	before = motes.next_row()
+	feel.play_cue(&"impact", 2, Vector2(100.0, 100.0), Vector2.RIGHT, 0.0, fire, FIRE_LOOK)
+	var data: PackedFloat32Array = motes.row_data(before)
+	check(Color(data[MotesScript.ROW_CORE], data[MotesScript.ROW_CORE + 1], data[MotesScript.ROW_CORE + 2]).is_equal_approx(fire), "an impact's sparks are in the shot's tint")
+	# Checked: bare takes no other colour, and no cards' kinds.
+	var wrong := CueBase.new()
+	wrong.id = &"wrong"
+	wrong.parts = [{"part": &"motes", "kind": &"spark", "bare": true, "color": Color.RED}, {"part": &"motes", "kind": &"spell", "bare": true}]
+	check_equal(wrong.problems().size(), 2, "bare with a colour, and bare cards: %s" % [wrong.problems()])
 
 
 func test_the_dense_cues_throw_their_kinds() -> void:

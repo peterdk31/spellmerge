@@ -356,8 +356,9 @@ func test_an_effect_is_one_mesh_of_small_quads() -> void:
 	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for every slot of every kind")
 	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
 	check_equal(_quad(mesh, 0), Vector2i(FeelScript.EFFECT_Q_LIGHT, 0), "the light first, under everything")
-	check_equal(_quad(mesh, 1), Vector2i(FeelScript.EFFECT_Q_PARTICLE, 0), "then the particles, the newest on top")
-	check_equal(_quad(mesh, 13), Vector2i(FeelScript.EFFECT_Q_SPARK, 15), "then the sparks, the first on top")
+	check_equal(_quad(mesh, 1), Vector2i(FeelScript.EFFECT_Q_CLOUD, 3), "then a poof's clouds, the first on top")
+	# No sparks or card particles: they are the cues' motes (S6, item 3).
+	check_equal(quads, 6, "the light, four clouds and the flash")
 	check_equal(_quad(mesh, quads - 1), Vector2i(FeelScript.EFFECT_Q_SHAPE, 0), "the flash last, on top")
 	check(feel._effect_node.multimesh.mesh == mesh, "the effect batch draws it")
 	check(feel._arc_node.multimesh.mesh != mesh and feel._status_node.multimesh.mesh != mesh, "the arcs and statuses keep their one quad")

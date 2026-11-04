@@ -6,44 +6,37 @@ render_mode blend_premul_alpha;
 // a square GRID x zoom pixels across, +x along their aim, all in the ramp and look of the shot
 // they come from; the age is the code beside the kind (`coded_age`). Blending is premultiplied: a
 // pixel is opaque, the glow round it light added to what is below.
-//   K_BURST       where a shot lands: a white-hot cross that shrinks, sparks thrown back
-//                 against the flight that cool as they fly, and the shot's card particles
+//   K_BURST       where a shot lands: a white-hot cross that shrinks
 //   K_RING_OUT    a ring that flashes out (a nova's cast)
 //   K_RING_IN     a ring that gathers in (a rune's or orbit's cast)
 //   K_RUNE_BURST  a rune going off: a dotted flash over the diamond, a diamond ring widening
-//                 to twice its size, sparks all round
-//   K_CAST        the staff tip on a cast: a small cross and a few sparks along the aim
-//   K_DASH        the dust of a wizard's dash where it started (the effect's place); its way is
-//                 the caster's trail (TF_DASH in shot_trail.gdshader) and its landing Feel's
-//                 ring; its square is zoom x 4 pixels plus DASH_MARGIN each end, DASH_ACROSS across
-//   K_SPRAY       a hit on a character: a small white-hot cross where it struck (its sparks
-//                 are motes since S3: Feel throws them with the flash, `_flash_motes`)
-//   K_PUFF        a dotted white-hot puff (a kill, a reaction, a hit with no way; its sparks
-//                 all round are motes since S3); with the POOF bit (kind 22) a staff's personality swap instead
-//                 (living staffs H4): bone clouds along the staff (+x) that swell to their
-//                 biggest at 35% of the effect (where the body changes) and shrink away, and a
-//                 few sparks in the player's colour
+//                 to twice its size
+//   K_CAST        the staff tip on a cast: a small cross
+//   K_SPRAY       a hit on a character: a small white-hot cross where it struck
+//   K_PUFF        a dotted white-hot puff (a kill, a reaction, a hit with no way); with the POOF
+//                 bit (kind 22) a staff's personality swap instead (living staffs H4): bone clouds
+//                 along the staff (+x) that swell to their biggest at 35% of the effect (where the
+//                 body changes) and shrink away
 //   K_QUAKE       a slam's mark on the floor (Feel's floor batch, under the bodies): cracks out from
-//                 the impact, white-hot and cooling to dark stone, a glow on the floor, rubble
-//                 thrown up that lands and lies, dust rolling out along the floor; its reach is
-//                 QUAKE_REACH x zoom pixels
+//                 the impact, white-hot and cooling to dark stone, and a glow on the floor; its
+//                 reach is QUAKE_REACH x zoom pixels
 //   K_RISE        light pulled up off a spot (where a teleport leaves): a white-hot column that
-//                 thins to a line and lifts off the top, motes drawn in off the floor and up it,
-//                 a flat ring gathering in; the spot is the effect's middle, the column above it
+//                 thins to a line and lifts off the top, a flat ring gathering in; the spot is the
+//                 effect's middle, the column above it
 //   K_FALL        light struck down onto a spot (where a teleport lands, a rain falls): a streak
 //                 falling the column to the floor in its first FALL_STRIKE, then the whole column
-//                 flashing and thinning away, a cross, a flat ring thrown out, motes flung along
-//                 the floor
+//                 flashing and thinning away, a cross, a flat ring thrown out
 // Lightning (K_ARC) and statuses (K_STATUS) have shaders and batches of their own.
 //
-// PARTICLES ARE GEOMETRY (as in `shot_trail.gdshader`; the owner, 2026-10-29): an effect is one
-// instance of a mesh of small quads (`Feel.effect_mesh`), each told in its UV which QUAD KIND
-// (Q_*) and slot it is. The vertex stage works out what that slot is now and puts its quad round
-// it alone (in the effect's own pixels, so they turn with its aim), or folds it away; the
-// fragment stage only colours a pixel of its own quad, in a few small modes with no loops:
+// No particles: an effect's sparks, rubble, dust and card particles are motes, thrown by the
+// motes parts of the cue that shows it (content/cues; docs/milestones/spell-spectacle-2.md, S6
+// item 3). This shader draws the flash's shape and its light only.
+//
+// An effect is one instance of a mesh of a few quads (`Feel.effect_mesh`), each told in its UV
+// which QUAD KIND (Q_*) and slot it is. The vertex stage puts each quad round what it draws (in
+// the effect's own pixels, so they turn with its aim), or folds it away; the fragment stage only
+// colours a pixel of its own quad, in a few small modes with no loops:
 //   Q_LIGHT     the effect's glow, over its whole square (added; drawn first)
-//   Q_PARTICLE  one of the shot's card particles (`place_particle`), the newest on top
-//   Q_SPARK     a spark (or a speck of a dash's dust); the first is on top
 //   Q_CLOUD     one of a poof's bone clouds; the first is on top
 //   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top); a quake's
 //               cracks
@@ -52,11 +45,8 @@ render_mode blend_premul_alpha;
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
-#include "res://core/projectiles/shot_particle.gdshaderinc"
 
 const float GRID = 24.0;
-const float DASH_MARGIN = 12.0;
-const float DASH_ACROSS = 32.0;
 // A rune's reach at its rest (the 14 px of rune.tres, as `shot_rune.gdshader` draws it at zoom 4).
 const float RUNE_REACH = 14.4;
 // The floor batch's kind (KIND_QUAKE in gameplay/feel/feel.gd): below K_BURST, where the shots'
@@ -67,21 +57,16 @@ const float K_QUAKE = 3.0;
 const float K_RISE = 1.0;
 const float K_FALL = 2.0;
 const float FALL_STRIKE = 0.18;
-// A quake's reach per zoom in pixels, its cracks, the share of its life its rubble flies, and how
-// flat the floor is seen (y over x).
+// A quake's reach per zoom in pixels, its cracks, and how flat the floor is seen (y over x).
 const float QUAKE_REACH = 8.0;
 const float QUAKE_CRACKS = 7.0;
-const float QUAKE_FLIGHT = 0.3;
 const float QUAKE_FLAT = 0.6;
 // The quad kinds (EFFECT_Q_* in gameplay/feel/feel.gd), in UV.y, and the slots of each.
 const float Q_LIGHT = 0.0;
-const float Q_PARTICLE = 1.0;
-const float Q_SPARK = 2.0;
 const float Q_CLOUD = 3.0;
 const float Q_SHAPE = 4.0;
 // The fragment's modes.
 const float M_LIGHT = 0.0;
-const float M_PIXELS = 1.0;
 const float M_CLOUD = 2.0;
 const float M_SHAPE = 3.0;
 const float M_CRACK = 4.0;
@@ -104,101 +89,6 @@ vec3 ramp_of(Look L, float u) {
 	return u < 0.15 ? L.hot : (u < 0.4 ? L.hi : (u < 0.7 ? L.mid : L.lo));
 }
 
-// Spark `n` of an effect of `kind` at age `a`: shown or not, its pixel, a run of more pixels to
-// its right (a chip's second), its colour.
-struct Spark {
-	bool shown;
-	vec2 at;
-	float run;
-	vec3 rgb;
-};
-
-Spark effect_spark(float kind, float n, float a, float ease, float z, Look L) {
-	Spark S;
-	S.shown = false;
-	S.at = vec2(0.0);
-	S.run = 0.0;
-	S.rgb = vec3(0.0);
-	float s = L.seed;
-	float i = n;
-	vec2 at = vec2(0.0);
-	if (kind == K_BURST || kind == K_CAST) {
-		// Sparks thrown back against the flight (along the aim from a staff), cooling as they fly.
-		bool cast = kind == K_CAST;
-		float life = 0.5 + 0.5 * hash_seeded(i, 1.0, 31.0, s);
-		float ang = (cast ? 0.0 : 3.1416) + (hash_seeded(i, 2.0, 31.0, s) - 0.5) * (cast ? 1.0 : 2.8);
-		float reach = (1.5 + (cast ? 6.0 : 10.0) * (0.6 + 0.4 * hash_seeded(i, 3.0, 31.0, s)) * ease) * z;
-		S.shown = n < (cast ? 4.0 : 8.0) && a <= life;
-		at = vec2(cos(ang), sin(ang)) * reach;
-		S.rgb = ramp_of(L, a / life);
-	} else if (kind == K_RUNE_BURST) {
-		// Sparks all round.
-		float ang = i * 0.3927 + (hash_seeded(i, 4.0, 31.0, s) - 0.5) * 0.4;
-		float reach = (4.0 + 26.0 * (0.6 + 0.4 * hash_seeded(i, 5.0, 31.0, s)) * ease);
-		S.shown = a < 0.8;
-		at = vec2(cos(ang), sin(ang)) * reach;
-		S.rgb = ramp_of(L, a);
-	} else if (kind == K_PUFF && bit_set(L.bits, POOF)) {
-		// A poof's sparks in the player's colour, flung wide.
-		float ang = i / 6.0 * 6.2832 + hash_seeded(i, 19.0, 31.0, s);
-		float reach = (4.0 + 6.0 * hash_seeded(i, 20.0, 31.0, s) * ease) * z;
-		S.shown = n < 6.0 && a < 0.8;
-		at = vec2(cos(ang) * 1.6, sin(ang)) * reach;
-		S.rgb = a < 0.4 ? L.hi : L.mid;
-	} else if (kind == K_DASH) {
-		// The dust kicked up where it left, both ways along the floor.
-		float travel = min(a / 0.45, 1.0);
-		float way = hash_seeded(i, 9.0, 51.0, s) < 0.5 ? -1.0 : 1.0;
-		S.shown = n < 6.0 && a < 0.5;
-		at = vec2(way * (1.0 + 9.0 * hash_seeded(i, 4.0, 51.0, s)) * travel, 8.0 - 3.0 * hash_seeded(i, 5.0, 51.0, s) * travel);
-		S.rgb = a < 0.25 ? STONE_LIGHT : STONE_BASE;
-	} else if (kind == K_QUAKE && n < 8.0) {
-		// Rubble thrown up all round, landing on the floor and lying there until it fades.
-		float reach = QUAKE_REACH * z;
-		float ang = i / 8.0 * 6.2832 + (hash_seeded(i, 40.0, 31.0, s) - 0.5) * 0.6;
-		float far = reach * (0.35 + 0.55 * hash_seeded(i, 41.0, 31.0, s));
-		float t = min(a / QUAKE_FLIGHT, 1.0);
-		float high = (2.0 + 2.5 * hash_seeded(i, 42.0, 31.0, s)) * z;
-		S.shown = a < 0.75 || hash_seeded(i, 43.0, 31.0, s) > (a - 0.75) / 0.2;
-		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * far * (1.0 - (1.0 - t) * (1.0 - t)) - vec2(0.0, 4.0 * t * (1.0 - t) * high);
-		S.run = hash_seeded(i, 44.0, 31.0, s) < 0.5 ? 1.0 : 0.0;
-		S.rgb = t < 1.0 ? BONE_BASE : STONE_LIGHT;
-	} else if (kind == K_QUAKE) {
-		// Dust rolling out along the floor, slowing, rising a little as it thins.
-		float reach = QUAKE_REACH * z;
-		float ang = (i - 8.0) / 8.0 * 6.2832 + hash_seeded(i, 45.0, 31.0, s) * 0.5;
-		float roll = 1.0 - pow(1.0 - min(a / 0.6, 1.0), 3.0);
-		S.shown = a < 0.6 && hash_seeded(i, 46.0, 31.0, s) > (a - 0.4) / 0.2;
-		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * reach * (0.3 + 1.0 * roll) - vec2(0.0, roll * z);
-		S.run = 2.0;
-		S.rgb = a < 0.25 ? BONE_SHADOW : STONE_LIGHT;
-	} else if (kind == K_RISE) {
-		// Motes drawn in off a flat ring on the floor, faster as they near the middle, then up the
-		// column; hottest as they meet it.
-		float ang = i / 14.0 * 6.2832 + hash_seeded(i, 60.0, 31.0, s) * 0.4;
-		float from = (5.0 + 4.0 * hash_seeded(i, 61.0, 31.0, s)) * z;
-		float pull = min(a / 0.4, 1.0);
-		float left = 1.0 - pull * pull;
-		float up = max(a - 0.3, 0.0) / 0.7;
-		float high = (5.0 + 6.0 * hash_seeded(i, 62.0, 31.0, s)) * z;
-		S.shown = n < 14.0 && a < 0.6 + 0.35 * hash_seeded(i, 63.0, 31.0, s);
-		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * from * left - vec2(0.0, up * up * high);
-		S.rgb = ramp_of(L, abs(a - 0.4) * 1.6);
-	} else if (kind == K_FALL) {
-		// Once it strikes: motes flung out along the floor from its foot, slowing and cooling, a few
-		// kicked up on the way.
-		float t = max(a - FALL_STRIKE, 0.0) / (1.0 - FALL_STRIKE);
-		float ang = i / 16.0 * 6.2832 + (hash_seeded(i, 64.0, 31.0, s) - 0.5) * 0.5;
-		float far = (4.0 + 8.0 * hash_seeded(i, 65.0, 31.0, s)) * z * (1.0 - (1.0 - t) * (1.0 - t));
-		float kick = hash_seeded(i, 66.0, 31.0, s) < 0.3 ? 16.0 * t * (1.0 - t) * z : 0.0;
-		S.shown = a > FALL_STRIKE && t < 0.5 + 0.5 * hash_seeded(i, 67.0, 31.0, s);
-		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * far - vec2(0.0, kick);
-		S.rgb = ramp_of(L, t);
-	}
-	S.at = floor(at + 0.5);
-	return S;
-}
-
 void vertex() {
 	float kind = coded_kind(INSTANCE_CUSTOM.a);
 	float a = coded_age(coded_code(INSTANCE_CUSTOM.a));
@@ -210,10 +100,6 @@ void vertex() {
 	// The square in pixels, and where its pixel 0 is.
 	vec2 size = vec2(GRID) * z;
 	vec2 o = size * 0.5;
-	if (kind == K_DASH) {
-		size = vec2(z * 4.0 + 2.0 * DASH_MARGIN, DASH_ACROSS);
-		o = vec2(DASH_MARGIN, size.y * 0.5);
-	}
 	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
 	// corner in UV.y (kind + 0.25 or 0.75).
 	float slot = floor(UV.x);
@@ -222,14 +108,13 @@ void vertex() {
 	vec2 q_lo = vec2(0.0);
 	vec2 q_hi = vec2(0.0);
 	bool shown = false;
-	float m = M_PIXELS;
+	float m = M_SHAPE;
 	vec4 a0 = vec4(0.0);
 	vec4 a1 = vec4(0.0);
 	vec4 a2 = vec4(0.0);
 	vec4 k0 = vec4(0.0);
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
-	bool glows = kind != K_DASH;
 	if (quad == Q_LIGHT || quad == Q_SHAPE) {
 		// The flash and its light: a1 the light's two falloffs (how bright, how far: x of the
 		// distance from a0.y, y of the distance), a0.x 1 for a diamond (the rune's) or 2 for a flat
@@ -326,7 +211,7 @@ void vertex() {
 			lit = vec4(0.9, 2.0 * z, 0.5, 8.0 * z);
 		}
 		bool quake = kind == K_QUAKE;
-		shown = glows && (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake);
+		shown = (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake);
 		q_lo = -o;
 		q_hi = size - o;
 		if (quad == Q_LIGHT) {
@@ -354,13 +239,6 @@ void vertex() {
 			k1 = vec4(second, 1.0);
 			k2 = vec4(L.mid, 1.0);
 		}
-	} else if (quad == Q_SPARK) {
-		Spark S = effect_spark(kind, slot, a, ease, z, L);
-		shown = S.shown;
-		q_lo = S.at - 1.0;
-		q_hi = S.at + vec2(S.run + 2.0, 2.0);
-		a0 = vec4(S.at, S.run, 0.0);
-		k0 = vec4(S.rgb, 1.0);
 	} else if (quad == Q_CLOUD && poof) {
 		// A staff's poof: four bone clouds along the staff, biggest at 35%, dotted as they go.
 		float swell = a < 0.35 ? a / 0.35 : 1.0 - (a - 0.35) / 0.65;
@@ -371,29 +249,6 @@ void vertex() {
 		q_lo = floor(c - reach) - 1.0;
 		q_hi = floor(c + reach) + 2.0;
 		a0 = vec4(c, reach, a < 0.7 ? 0.0 : 1.0);
-	} else if (quad == Q_PARTICLE && glows && kind != K_CAST && kind != K_QUAKE) {
-		// The shot's cards: its particles, set off from round the middle at the start.
-		float n = L.emits.w;
-		float count = min(4.0 + 2.0 * n, float(MAX_PARTICLES));
-		float i = slot;
-		float spread = kind == K_RUNE_BURST ? RUNE_REACH : 2.0 * z;
-		float pick = min(floor(hash_seeded(i, 6.0, 31.0, s) * n), n - 1.0);
-		float word = pick < 4.0 ? L.emits.x : (pick < 8.0 ? L.emits.y : L.emits.z);
-		float look = mod(floor(word / exp2(mod(pick, 4.0) * 4.0) + 0.001), 16.0);
-		float ang = hash_seeded(i, 7.0, 31.0, s) * 6.2832;
-		vec2 from = vec2(cos(ang), sin(ang)) * spread * hash_seeded(i, 8.0, 31.0, s);
-		float pa = (a - 0.3 * hash_seeded(i, 9.0, 31.0, s)) / 0.7;
-		if (n > 0.5 && i < count && pa > 0.0 && pa < 1.0) {
-			Particle p = place_particle(look, from, pa, i, 0.0, z, s);
-			vec2 at = floor(p.at);
-			shown = p.shown;
-			q_lo = at - 1.0;
-			q_hi = at + vec2(p.run + 2.0, 2.0);
-			a0 = vec4(at, p.run, p.arm);
-			a1 = vec4(p.extra, 0.0, 0.0);
-			k0 = vec4(p.rgb, 1.0);
-			k1 = vec4(p.arm_rgb, 1.0);
-		}
 	}
 	// Nothing outside the square, as one quad over it would have it.
 	q_lo = max(q_lo, -o);
@@ -427,18 +282,6 @@ void fragment() {
 		// The light: v0.z x (v1.x falloff from the ring at v0.y over v1.y, v1.z falloff over v1.w).
 		float lit = v0.z * (v1.x * falloff(abs(r - v0.y), v1.y) + v1.z * falloff(r, v1.w));
 		colour = vec4(c0.rgb * lit * glow_strength, 0.0);
-	} else if (mode < M_PIXELS + 0.5) {
-		// A spark or a particle: the pixel v0.xy, a run of v0.z to its right, a cross of arms v0.w
-		// in c1, a pixel more at v1.xy.
-		Particle p;
-		p.shown = true;
-		p.at = v0.xy;
-		p.run = v0.z;
-		p.arm = v0.w;
-		p.extra = v1.xy;
-		p.rgb = c0.rgb;
-		p.arm_rgb = c1.rgb;
-		colour = particle_pixel(p, d);
 	} else if (mode < M_CLOUD + 0.5) {
 		// A bone cloud round v0.xy of reach v0.z, lit from the top-left: light on that side,
 		// shadow on the far rim; dotted (v0.w) as it goes.

@@ -25,7 +25,10 @@ extends Node
 ##   it alone: Feel codes its flashes' rows as unlit.
 ## - **The room's lights:** every node in the group `LightSpot.GROUP` (a torch's flame;
 ##   core/base/light_spot.gd: its reach, strength, flicker and the art its colour is read from, as
-##   metadata) is a row of one batch, written only when a spot comes or goes.
+##   metadata) is a row of one batch, written only when a spot comes or goes. The light painted
+##   into the art (the group `LightSpot.PAINTED`: a torch's glow sprites) is hidden while this node
+##   is in the tree, and shown again when it leaves (the setting turned off), so a torch lights
+##   once (S6, item 12).
 ## - **Applying it:** one rect over the whole world at `z` (Feel's LIGHT_Z: above the room and the
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
@@ -216,6 +219,7 @@ func _enter_tree() -> void:
 		tree.node_added.connect(_on_node_changed)
 		tree.node_removed.connect(_on_node_changed)
 	_spots_dirty = true
+	_show_painted(tree, false)
 
 
 func _exit_tree() -> void:
@@ -225,11 +229,27 @@ func _exit_tree() -> void:
 	if tree.node_added.is_connected(_on_node_changed):
 		tree.node_added.disconnect(_on_node_changed)
 		tree.node_removed.disconnect(_on_node_changed)
+	_show_painted(tree, true)
 
 
 func _on_node_changed(node: Node) -> void:
 	if node.is_in_group(LightSpot.GROUP):
 		_spots_dirty = true
+	elif node.is_in_group(LightSpot.PAINTED) and node.is_inside_tree():
+		# A torch come into the room while the light is on: its painted glow is the spot's now.
+		_show_painted_node(node, false)
+
+
+## Show or hide the light painted into the room's art (every node in `LightSpot.PAINTED`).
+func _show_painted(tree: SceneTree, shown: bool) -> void:
+	for node: Node in tree.get_nodes_in_group(LightSpot.PAINTED):
+		_show_painted_node(node, shown)
+
+
+func _show_painted_node(node: Node, shown: bool) -> void:
+	var item := node as CanvasItem
+	if item != null:
+		item.visible = shown
 
 
 ## Stop mirroring the batches (before this node is freed: the setting turned off).

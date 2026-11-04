@@ -233,7 +233,7 @@ func test_an_enemy_shot_lands_like_a_spell_in_the_enemy_ramp() -> void:
 		bus.projectile_impact.emit(enemy, null, Vector2(50, 50), Vector2.RIGHT)
 		var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
 		check(not shown.is_empty() and shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % form)
-		check(shown["core"] != preset.enemy_hit_color, "%s: not in ember" % form)
+		check(shown["core"] != EnemyBase.DEFAULT_HIT_COLOR, "%s: not in ember" % form)
 		feel.step(1.0)
 
 

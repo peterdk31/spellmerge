@@ -8,7 +8,7 @@ Regular enemies: a body, its staffs and how it plays them. Enemies create the "r
 
 ## Contract
 
-- An enemy is one folder with a `.tres` resource on the enemy base class (`EnemyBase`: `id`, `display_name`, `demo`, `max_health`, `move_speed`, `contact_damage`, `scene`, `size`, `staffs`, `profile`, `phases`), a `.tscn` scene (an actor: see the example) and sprites. **No `.gd` per enemy, a boss included:** how it fights comes from its staffs and its profile; a kind of behaviour the AI lacks goes into `gameplay/ai/behaviours/` for every enemy.
+- An enemy is one folder with a `.tres` resource on the enemy base class (`EnemyBase`: `id`, `display_name`, `demo`, `max_health`, `move_speed`, `contact_damage`, `scene`, `size`, `hit_color`, `staffs`, `profile`, `phases`; `hit_color` is its own colour when hit, the spray on its body and its death's puff, ember by default), a `.tscn` scene (an actor: see the example) and sprites. **No `.gd` per enemy, a boss included:** how it fights comes from its staffs and its profile; a kind of behaviour the AI lacks goes into `gameplay/ai/behaviours/` for every enemy.
 - The AI targets every actor of another team (the players, whatever their seat).
 - Every attack has a visible telegraph before it deals damage.
 - Enemy health and count scale with player count; use the scaling the base class provides rather than your own.

@@ -72,7 +72,21 @@ func test_a_spray_is_aimed_the_way_the_shot_flew_for_every_player() -> void:
 
 func test_an_enemy_is_hit_in_ember() -> void:
 	_strike(1, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], preset.enemy_hit_color, "ember")
+	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], EnemyBase.DEFAULT_HIT_COLOR, "ember")
+
+
+## An enemy's colour is its data's (S6 item 14): a hit's spray and its death cue's puff are in its
+## `EnemyBase.hit_color`, not a preset's.
+func test_an_enemy_is_hit_and_dies_in_its_own_data_s_colour() -> void:
+	var enemy: Actor = own(Actor.new()) as Actor
+	enemy.data = EnemyBase.new()
+	enemy.data.hit_color = Color("3b9bd9")
+	enemy.id = ActorSeats.enemy(actors)  # an actor of the enemy ramp, not a wizard's
+	root.add_child(enemy)
+	_strike(1, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
+	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], Color("3b9bd9"), "the spray in its own colour")
+	bus.enemy_died.emit(1, enemy, enemy.global_position, -1)
+	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], Color("3b9bd9"), "and its death's puff")
 
 
 func test_a_wizard_is_hit_in_its_own_colours() -> void:
@@ -117,7 +131,7 @@ func test_a_killing_blow_s_puff_is_the_death_cue_s_in_the_body_s_colour() -> voi
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
 	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "the hit's spray plays on")
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "the death cue's puff")
-	check_equal(feel.effect_dress(FeelScript.KIND_PUFF), [preset.enemy_hit_color, 0], "in ember, no one's ramp, no cards")
+	check_equal(feel.effect_dress(FeelScript.KIND_PUFF), [EnemyBase.DEFAULT_HIT_COLOR, 0], "in ember, no one's ramp, no cards")
 	var cue: CueBase = feel.cue_of(&"enemy_death")
 	var puffs: int = 0
 	for part: Dictionary in cue.parts:

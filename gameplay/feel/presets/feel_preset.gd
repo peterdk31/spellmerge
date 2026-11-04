@@ -25,7 +25,8 @@ extends Resource
 @export_range(0.1, 10.0, 0.1) var shake_decay: float = 2.5
 ## The spray of a hit on a character (an effect along the way the shot flew), bigger or smaller
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
-## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
+## whole zoom. An enemy is hit in the ramp nearest its own colour (`EnemyBase.hit_color`); a wizard
+## in its own ramp.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
 ## The sparks of a hit's spray and of a puff (a hit with no way, a kill, a reaction) are motes
 ## (S3, docs/milestones/spell-spectacle-2.md; the effect drew them before, and draws the flash
@@ -47,7 +48,6 @@ extends Resource
 @export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
 @export_range(0, 64) var puff_mote_count: int = 14
 @export_range(0.0, 64.0, 1.0) var puff_mote_reach: float = 12.0
-@export var enemy_hit_color: Color = Color("e0592f")
 ## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
 ## spectacle's surface kinds); `wall_spark_size` is the size of a shot's flare when its carrier
 ## card names none.

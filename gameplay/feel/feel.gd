@@ -838,12 +838,13 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	var size: float = 1.0
 	var colours: int = 0
 	if target != null and is_instance_valid(target):
-		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in ember.
+		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in their own
+		# colour (`EnemyBase.hit_color`).
 		var ramp: int = _hat_ramp_of(target)
 		if ramp >= 0:
 			colours = ramp
 		else:
-			tint = preset.enemy_hit_color
+			tint = _hit_color_of(target)
 		# The shot that did this hit told us where it struck and which way it flew.
 		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
@@ -1865,7 +1866,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		core = projectiles.get_core_of(shot)
 	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
 	# its own colour.
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, preset.enemy_hit_color)
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
 
 
 ## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
@@ -2258,6 +2259,14 @@ func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> 
 
 
 ## True for the death of a boss: an enemy whose data says `boss`.
+## The own colour of a body that is no wizard: its enemy data's `hit_color`, or the default for a
+## body with none (a swarmer, a stand-in).
+static func _hit_color_of(body: Node) -> Color:
+	if body is Actor and (body as Actor).data != null:
+		return (body as Actor).data.hit_color
+	return EnemyBase.DEFAULT_HIT_COLOR
+
+
 static func _is_boss(enemy: Node) -> bool:
 	return enemy is Actor and (enemy as Actor).data != null and (enemy as Actor).data.boss
 

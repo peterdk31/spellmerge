@@ -223,11 +223,13 @@ func test_without_combat_there_are_no_overlays() -> void:
 
 func test_a_status_is_shown_as_its_element_card() -> void:
 	for id: StringName in [&"burn", &"chill", &"shock", &"hex", &"static"]:
-		var card: ElementBase = _feel._status_card(id)
-		check(card != null and card.status_id == id, "%s is the status of a card" % id)
-		check(_feel.status_color(id).is_equal_approx(Color(card.tint.r, card.tint.g, card.tint.b, 1.0)), "%s glows in its card's tint" % id)
+		var card: Array = _feel._status_card(id)
+		check(not card.is_empty() and card[ElementBase.STATUS_LOOK_STATUS] == id, "%s is the status of a card" % id)
+		var tint: Color = card[ElementBase.STATUS_LOOK_TINT] as Color
+		check(_feel.status_color(id).is_equal_approx(Color(tint.r, tint.g, tint.b, 1.0)), "%s glows in its card's tint" % id)
+	check(_feel._status_card(&"chill")[ElementBase.STATUS_LOOK_CARD] == &"frost", "chill is frost's")
 	check(_feel._status_card(&"freeze") == _feel._status_card(&"chill"), "freeze, which no element puts on, is shown as the chill it deepens from (frost)")
-	check(_feel._status_card(&"nothing") == null and _feel.status_color(&"nothing") == Color.WHITE, "an unknown status has no card")
+	check(_feel._status_card(&"nothing").is_empty() and _feel.status_color(&"nothing") == Color.WHITE, "an unknown status has no card")
 	var enemy: Enemy = _enemy()
 	_status_on(enemy, &"nothing")
 	check_equal(_feel.live_statuses(), 0, "and shows nothing")

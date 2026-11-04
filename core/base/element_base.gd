@@ -28,9 +28,22 @@ extends SpellComponent
 ## and modifiers, mixed at random from its tail; two cards with the same kind add nothing more.
 @export var look_layer: int = 0
 
+## The places in `status_look()`.
+const STATUS_LOOK_STATUS: int = 0
+const STATUS_LOOK_TINT: int = 1
+const STATUS_LOOK_LAYER: int = 2
+const STATUS_LOOK_CARD: int = 3
+
 
 func kind() -> StringName:
 	return &"element"
+
+
+## How a status it puts on is shown, for looks (`gameplay/feel`, which reads no spell field; spell
+## spectacle 2, S6 item 11): [status_id, tint, look_layer, id] (`STATUS_LOOK_*`). A new Array each
+## call.
+func status_look() -> Array:
+	return [status_id, tint, look_layer, id]
 
 
 func ranges() -> Dictionary:

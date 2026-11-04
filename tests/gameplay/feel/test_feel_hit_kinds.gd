@@ -187,6 +187,10 @@ func test_a_possession_rings_the_possessed_actor_in_the_drivers_ramp() -> void:
 	check_equal(feel.effect_info(FeelScript.KIND_RING_IN)["zoom"], 2, "as big as before the cues (S6 item 7)")
 	check((feel.effect_info(FeelScript.KIND_RING_IN)["at"] as Vector2).is_equal_approx((imp.global_position + imp.body_offset).round()), "on its drawn body")
 	check(feel.cue_of(FeelScript.POSSESS_START) != null and feel.cue_of(FeelScript.POSSESS_START).sound == &"possess", "its cue plays the sound possess")
+	# A cue on a body follows it (S6, item 9).
+	imp.position += Vector2(10.0, 0.0)
+	feel.step(1.0 / 60.0)
+	check((feel.effect_info(FeelScript.KIND_RING_IN)["at"] as Vector2).is_equal_approx((imp.global_position + imp.body_offset).round()), "and moves with it")
 	bus.possess_ended.emit(driver.id, imp.id)
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "a ring goes out when it ends")
 	bus.possess_started.emit(driver.id, 300)

@@ -526,7 +526,9 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 ## farthest a mote of its drag glides), within `spread` degrees (its own when below 0), `up` times
 ## its own speed up, all as fast as the fastest when `ring` (a ring going out). `often` for a source
 ## of many a frame (a hit's spray): it stops once only the frame's MOMENT_ROWS are left, as `shed`.
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false) -> void:
+## With a `line`, each mote is thrown from a point of the line from `at` to `at + line` (a staff);
+## `life` times the kind's own life (a quicker moment).
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
@@ -542,7 +544,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if ring:
 		speed.x = speed.y * 0.9
 	_keep = MOMENT_ROWS if often else 0
-	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life, source, core, kind.height)
+	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source, core, kind.height, line)
 	_keep = 0
 
 
@@ -550,10 +552,12 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 ## point is `height` pixels below it): along the floor within `spread` degrees round `dir` (all
 ## round with 360 or no `dir`), at a speed in `speed` (x to y, px/s), up at a speed in `up`, living
 ## a time in `life` (s, at most LIFE_MAX), cooling through the ramp of `source` with the core
-## colour `core`. Fewer when the frame's FRAME_ROWS run out. Every mote is written here: this is
+## colour `core`; with a `line`, each from a point of the line from `at` to `at + line` at random
+## (the native births never pass one, so `MoteKernel` mirrors this with none). Fewer when the
+## frame's FRAME_ROWS run out. Every mote is written here: this is
 ## the one place a row is made. A kind that settles leaves its mark where each mote comes to rest
 ## (as many as SETTLE_ROWS allows).
-func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
+func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0, line: Vector2 = Vector2.ZERO) -> void:
 	if density != 1.0:
 		count = floori(float(count) * density + _rng.randf())
 	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
@@ -603,10 +607,11 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		var i: int = (row - c * CHUNK) * DRAW_STRIDE
 		buffer[i + ROW_VX] = v.x
 		buffer[i + ROW_BORN] = _now
-		buffer[i + ROW_X] = ground.x
+		var from: Vector2 = ground if line == Vector2.ZERO else ground + line * _rng.randf()
+		buffer[i + ROW_X] = from.x
 		buffer[i + ROW_VY] = v.y
 		buffer[i + ROW_VZ] = _rng.randf_range(up.x, up.y)
-		buffer[i + ROW_Y] = ground.y
+		buffer[i + ROW_Y] = from.y
 		buffer[i + ROW_SOURCE] = coded_source
 		buffer[i + ROW_KIND] = coded_kind
 		# The life in 1/255 steps of LIFE_MAX.

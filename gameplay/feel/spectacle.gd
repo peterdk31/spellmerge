@@ -327,8 +327,14 @@ func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		core = cue.body if cue.body.a > 0.0 else Color.WHITE
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var at: Vector2 = cue.at
+	if part.place >= 0.0:
+		# Where on the cue's line (`along`, S6 item 9).
+		at += cue.aim * cue.size * part.place
 	if part.below != 0.0:
 		at.y += part.below
+	# Thrown from all along the cue's line (`line`: a staff coming apart), else from its point.
+	var line: Vector2 = cue.aim * cue.size if part.line else Vector2.ZERO
+	var life: float = part.life
 	var named: StringName = part.named
 	if named != &"spell" and named != &"surface":
 		# One kind by its id: looked up once a pool (the pool is made again when its cap changes),
@@ -345,10 +351,10 @@ func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		var each: int
 		if part.share >= 0.0:
 			each = maxi(roundi(float(part.kind_count) * part.share * cue.power), 1)
-			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true)
+			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true, line, life)
 			return
 		each = -1 if part.count < 0 and cue.power == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.power), 1)
-		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often)
+		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often, line, life)
 		return
 	var kinds: PackedInt32Array = cards.motes_of(cue.tag, cue.look) if named == &"spell" else _surface_kinds
 	var count: int = part.count
@@ -362,12 +368,12 @@ func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		var walls: bool = of_surface or (pool.kinds()[k].surface and part.colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
 		if shed:
-			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true)
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true, line, life)
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often, line, life)
 
 
 ## A cue's `motes` part read into its typed fields once (`Feel.add_cue_part`'s `prepare`, S6 2: a
@@ -388,6 +394,9 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.way = StringName(part.get("way", "aim"))
 	made.below = float(part.get("below", 0.0))
 	made.color = part["color"] as Color if part.has("color") else Color(0.0, 0.0, 0.0, 0.0)
+	made.place = clampf(float(part["along"]), 0.0, 1.0) if part.has("along") else -1.0
+	made.line = bool(part.get("line", false))
+	made.life = float(part.get("life", 1.0))
 	return made
 
 
@@ -430,16 +439,17 @@ func play_light_part(part: Dictionary, cue: CueContextScript) -> void:
 	reach *= cue.power
 	var strength: float = float(part.get("strength", LIGHT_STRENGTH))
 	var seconds: float = float(part.get("seconds", LIGHT_SECONDS))
+	var at: Vector2 = cue.point_of(part)
 	if part.has("color"):
-		light.flash(cue.at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
+		light.flash(at, reach, strength, seconds, part["color"] as Color, 0, EXACT, _clock)
 	elif bool(part.get("plain", false)):
-		light.flash(cue.at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
+		light.flash(at, reach, strength, seconds, Color.WHITE, 0, 0, _clock)
 	elif bool(part.get("bare", false)):
-		light.flash(cue.at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
+		light.flash(at, reach, strength, seconds, Color.WHITE, cue.ramp, 0, _clock)
 	elif cue.color.a > 0.0:
-		light.flash(cue.at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
+		light.flash(at, reach, strength, seconds, cue.color, 0, EXACT, _clock)
 	else:
-		light.flash(cue.at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
+		light.flash(at, reach, strength, seconds, cue.tint, cue.ramp, cue.look, _clock)
 
 
 # --- Settings ----------------------------------------------------------------------------------
@@ -653,6 +663,11 @@ class MotesPart:
 	var way: StringName = &"aim"
 	var below: float = 0.0
 	var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+	## Where on the cue's line it is thrown from (`along`, 0 to 1; -1: the cue's point), whether
+	## from all along the line (`line`), and its `life` (times its kinds' own lives) (S6 item 9).
+	var place: float = -1.0
+	var line: bool = false
+	var life: float = 1.0
 	## A named kind's index in the pool `pool_seen` (-1: none), whether it is a surface kind, and
 	## its own count, kept for that pool.
 	var pool_seen: Object = null

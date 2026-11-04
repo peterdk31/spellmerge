@@ -907,6 +907,30 @@ func test_a_trail_mote_is_written_as_a_bursts() -> void:
 	check_equal(trail.births, 1, "and as a birth")
 
 
+## A burst with a line (a cue's motes part with `line`, S6 item 9: a staff unravelling) throws each
+## mote from a point of the line, spread along all of it; one with none from its point, as before.
+func test_a_burst_with_a_line_is_thrown_from_all_along_it() -> void:
+	var motes: MotesScript = _pool(1024)
+	var at := Vector2(40.0, 30.0)
+	var line := Vector2(30.0, -40.0)
+	motes.burst(0, at, Vector2.RIGHT, 64, Vector2(10.0, 20.0), 360.0, Vector2(0.0, 0.0), Vector2(1.0, 1.0), 0, Color.WHITE, 0.0, line)
+	var nearest: float = 1.0
+	var farthest: float = 0.0
+	for row in 64:
+		var data: PackedFloat32Array = motes.row_data(row)
+		var from := Vector2(data[MotesScript.ROW_X], data[MotesScript.ROW_Y])
+		var t: float = (from - at).dot(line) / line.length_squared()
+		check(from.distance_to(at + line * clampf(t, 0.0, 1.0)) < 0.01 and t >= -0.001 and t <= 1.001, "row %d on the line: %s" % [row, from])
+		nearest = minf(nearest, t)
+		farthest = maxf(farthest, t)
+	check(nearest < 0.15 and farthest > 0.85, "spread along all of it: %.2f to %.2f" % [nearest, farthest])
+	var plain: MotesScript = _pool(1024)
+	plain.burst(0, at, Vector2.RIGHT, 4, Vector2(10.0, 20.0), 360.0, Vector2(0.0, 0.0), Vector2(1.0, 1.0), 0, Color.WHITE)
+	for row in 4:
+		var data: PackedFloat32Array = plain.row_data(row)
+		check_equal(Vector2(data[MotesScript.ROW_X], data[MotesScript.ROW_Y]), at, "with no line, row %d from its point" % row)
+
+
 ## "Particle amount" at Double throws two motes a birth, all at the births handed over (it once
 ## read on past them, into births of earlier frames).
 func test_double_the_particle_amount_doubles_each_birth() -> void:

@@ -197,13 +197,15 @@ const FALL_SECONDS: float = 0.5
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
 ## The look bit that turns a puff into a staff's poof (kind 22 in the shader; living staffs H4):
-## bone clouds swelling and shrinking along the staff, a few sparks in the player's colour.
+## bone clouds swelling and shrinking along the staff, a few sparks in the player's colour (the
+## cue part effect `poof`).
 const POOF: int = 1 << 21
-## The poof: its seconds (the swap is at 35% of them, StaffLook's), its zoom (a quad of
-## EFFECT_GRID x 2 px, the staff's length) and its middle, this far from the hand along the aim.
+## The poof's own seconds (a `poof` part's when it gives none): StaffLook's POOF_TIME, the swap at
+## 35% of them.
 const POOF_SECONDS: float = 0.18
-const POOF_ZOOM: int = 2
-const POOF_ALONG: float = 4.0
+## Another staff on show plays the cue `staff_swap` (S6, item 9) along the new staff, following the
+## body.
+const STAFF_SWAP: StringName = &"staff_swap"
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
 ## A quake's seconds (its cracks cool and crumble away at the end), and its reach per zoom in
@@ -238,6 +240,8 @@ const CUE_EFFECTS: Dictionary = {
 	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 	&"arc": [KIND_ARC, 4.0, RING_SECONDS, true],
+	# A puff with the POOF look bit (a fifth column: look bits the effect always has; living staffs H4).
+	&"poof": [KIND_PUFF, 12.0, POOF_SECONDS, false, POOF],
 }
 ## What `_form_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
 const CUE_CAST: int = 0
@@ -1243,11 +1247,15 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 ## punch (both off with the screen shake setting) and its sound; with `weight` false, its parts
 ## only (a reaction repeated within REACTION_REPEAT). `body_color` is the own colour of the body
 ## the cue is of (a dying enemy's `EnemyBase.hit_color`), for its `body` flashes (alpha 0: none).
+## With `follow` (a body), its flashes move with that body while they last, where they were played
+## from it, and end when it is gone (S6, item 9: a staff's swap, a possession's ring).
 ## Its `power` is applied here and in the parts' players, by one rule (`CueBase`): times its sizes
 ## and counts, its holds, shake and punch. A cue with an `every` played again for the same actor
 ## sooner than that plays nothing (`_cue_due`). An unknown cue plays nothing. A cue is read once for
-## playing (`_plan_of`, `CuePlan`).
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, body_color: Color = Color(0.0, 0.0, 0.0, 0.0), ramp: int = CASTER_RAMP) -> void:
+## playing (`_plan_of`, `CuePlan`). With `follow` (a body), its flashes move with that body while
+## they last, where they were played from it, and end when it is gone (S6, item 9: a staff's swap,
+## a possession's ring).
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, body_color: Color = Color(0.0, 0.0, 0.0, 0.0), ramp: int = CASTER_RAMP, follow: Node2D = null) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
@@ -1272,6 +1280,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.shot = shot
 	context.surface = surface
 	context.body = body_color
+	context.follow = follow if follow != null and is_instance_valid(follow) else null
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
 	context.color = plan.color
 	context.power = plan.power
@@ -1411,19 +1420,28 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 			way = Vector2.RIGHT
 		else:
 			way = Vector2.UP
+	# Where on the cue's line (`along`, S6 item 9), and the body it follows (a staff's swap).
+	var at: Vector2 = cue.at
+	if flash.place >= 0.0:
+		at += cue.aim * cue.size * flash.place
+	var follow: Node2D = cue.follow if cue.follow != null and is_instance_valid(cue.follow) else null
+	var bits: int = flash.bits
 	var paint: int = flash.paint
 	if paint == CuePlanScript.PAINT_COLOR:
-		_cue_effect = show_effect(flash.kind, cue.at, way, flash.color, 0, EXACT, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, flash.color, 0, EXACT | bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_PLAIN:
-		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BARE:
-		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BODY:
-		_cue_effect = show_effect(flash.kind, cue.at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, 0, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif cue.color.a > 0.0:
-		_cue_effect = show_effect(flash.kind, cue.at, way, cue.color, 0, EXACT, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
 	else:
-		_cue_effect = show_effect(flash.kind, cue.at, way, cue.tint, cue.ramp, 0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, at, way, cue.tint, cue.ramp, (0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look) | bits, zoom, seconds, length, follow)
+	# A followed cue's flash sits where it was played from its body (S6, item 9).
+	if follow != null and _cue_effect >= 0:
+		_effect_offset[_cue_effect] = at - follow.global_position
 
 
 ## The cue `id` read for playing (`CuePlan`: its parts' players and prepared parts), made the first
@@ -1768,9 +1786,15 @@ func _step_effects(real_delta: float) -> void:
 			continue
 		_effect_age[slot] += real_delta
 		var through: float = _effect_age[slot] / _effect_seconds[slot]
-		var follow: Node2D = _effect_follow[slot]
-		if follow != null and not is_instance_valid(follow):
-			through = 1.0
+		# Read untyped: a freed body put in a typed variable reads as null, and its effect would
+		# stay on where it was instead of ending (S6, item 9's regression test).
+		var followed: Variant = _effect_follow[slot]
+		var follow: Node2D = null
+		if typeof(followed) == TYPE_OBJECT:
+			if is_instance_valid(followed):
+				follow = followed as Node2D
+			else:
+				through = 1.0
 		if through >= 1.0:
 			_effect_seconds[slot] = 0.0
 			_effect_follow[slot] = null
@@ -2212,16 +2236,27 @@ func _pose_form(slot: int, t: float) -> void:
 	material.set_shader_parameter(&"beam_fade", t)
 
 
-## Another staff went on show (the personality swap, living staffs H4): a poof along the staff,
-## in the actor's ramp, moving with it.
-func _on_staff_shown(caster: int, actor: Node, _staff: int) -> void:
+## Another staff went on show (the personality swap, living staffs H4): the cue `staff_swap` along
+## the whole new staff (the cue's line: played at the staff's lower end behind the hand,
+## `Actor.butt_position`, along the aim, its size the staff's length from there to its tip,
+## `Actor.muzzle_position`, so its parts can cover the whole staff), following
+## the body, in the actor's ramp with the colour and cards of the new staff's first spell (S6, item
+## 9). StaffLook swaps the body and face at 35% of its POOF_TIME: the cue's look is timed to that.
+func _on_staff_shown(caster: int, actor: Node, staff: int) -> void:
 	var body: Actor = actor as Actor
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 		return
-	var offset: Vector2 = body.hand_offset + body.aim * POOF_ALONG
-	var slot: int = show_effect(KIND_PUFF, body.global_position + offset, body.aim, Color.WHITE, _ramp_of(caster), POOF, POOF_ZOOM, POOF_SECONDS, 0.0, body)
-	if slot >= 0:
-		_effect_offset[slot] = offset
+	var tag: int = 0
+	var tint: Color = Color.WHITE
+	var look: int = 0
+	if spells != null and spells.has_method(&"current_tag"):
+		tag = int(spells.call(&"current_tag", body.id, staff))
+		var spell: Object = spells.call(&"profile", tag) as Object if tag != 0 else null
+		if spell != null:
+			tint = spell.get(&"tint") as Color
+			look = int(spell.get(&"look"))
+	var butt: Vector2 = body.butt_position()
+	play_cue(STAFF_SWAP, caster, butt, body.aim, butt.distance_to(body.muzzle_position()), tint, look, body.id, -1, -1, tag, true, NO_BODY, CASTER_RAMP, body)
 
 
 ## A possession started: the cue `possess_start` on the possessed actor's body (a ring closing in
@@ -2236,14 +2271,14 @@ func _on_possess_ended(caster: int, actor: int) -> void:
 	_cue_on_body(POSSESS_END, caster, actor)
 
 
-## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`); nothing when the
-## body is gone.
+## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`), following the
+## body; nothing when the body is gone.
 func _cue_on_body(id: StringName, caster: int, actor: int) -> void:
 	var table: ActorsScript = _actor_table()
 	var body: Node2D = table.node_of(actor) as Node2D if table != null and actor != ActorsScript.NONE else null
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
 		return
-	play_cue(id, caster, body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO), Vector2.ZERO, 0.0, Color.WHITE, 0, actor)
+	play_cue(id, caster, body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO), Vector2.ZERO, 0.0, Color.WHITE, 0, actor, -1, -1, 0, true, NO_BODY, CASTER_RAMP, body)
 
 
 func _on_player_downed(player: int) -> void:

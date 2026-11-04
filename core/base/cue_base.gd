@@ -35,8 +35,20 @@ extends Resource
 ##                played only when the cue's cards have it (lightning's arc: 5)
 ##   `if_size_over`, `if_size_upto`  played only when the cue's size is over this, or this or less
 ##                (a zap's spark into the air, 22 px at the most, burns out sooner than a zap)
+## The `poof` effect is a staff's cloud (living staffs H4: bone clouds that swell to their biggest
+## at 35% of its seconds and dot away, a few sparks in the ramp; a puff with Feel's `POOF` look).
 ## The `arc` effect is drawn along its length: the cue's `size` x its `reach` (1 when not given)
 ## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
+## A cue's line (S6, item 9): its way for its `size` pixels from its point (a staff swap is played
+## at the staff's grip, along it, its size the staff's length). A flash, a motes part or a light
+## may say where on it it plays: `along`, 0 (the cue's point, the default) to 1 (the line's end; 0.5
+## its middle). A motes part with `line` true is thrown from all along the line instead of from one
+## point (each mote from a point of it at random): a staff unravelling into motes.
+## A motes part's `life` is times its kinds' own lives (0.5: a moment over twice as fast).
+## A cue played on a body (`Feel.play_cue`'s `follow`: a staff's poof, a possession's ring) follows
+## it: its flashes move with the body while they last, where they were played from it, and end
+## when it is gone. Its motes, marks and lights stay where it played (they fly, lie and glow in
+## the room).
 ## A part with `"part": "motes"` throws motes instead (docs/milestones/spell-spectacle.md, P1; Feel's
 ## `mote.gd`, left out with the "Particles" setting or particles off), each count times the
 ## "Particle amount" setting:
@@ -110,17 +122,17 @@ extends Resource
 ## step of its zoom is).
 const EFFECTS: Array[StringName] = [
 	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff",
-	&"quake", &"shell", &"fireball", &"rise", &"fall", &"arc",
+	&"quake", &"shell", &"fireball", &"rise", &"fall", &"arc", &"poof",
 ]
 ## The effects drawn along a length (the cue's size x reach) rather than at a zoom.
 const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often", "share", "body"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often", "share", "body", "along", "line", "life"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
-const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare"]
+const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS}
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
@@ -195,6 +207,8 @@ func problems() -> PackedStringArray:
 ## What else is wrong with the part `i` (`part`) of the type `type`: what its type checks beyond
 ## its keys and its way. A type with nothing more to check needs no line here.
 func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringArray:
+	if part.has("along") and (float(part["along"]) < 0.0 or float(part["along"]) > 1.0):
+		return PackedStringArray(["%s: part %d's along is not from 0 to 1" % [id, i]])
 	match type:
 		&"effect":
 			return _effect_problems(i, part)
@@ -243,6 +257,8 @@ func _mote_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: motes part %d's spread is not 0 to 360 degrees" % [id, i])
 	if part.has("colours") and not MOTE_GROUPS.has(StringName(part["colours"])):
 		found.append("%s: motes part %d's colours are not one of %s" % [id, i, MOTE_GROUPS])
+	if float(part.get("life", 1.0)) <= 0.0 or float(part.get("life", 1.0)) > 4.0:
+		found.append("%s: motes part %d's life is not over 0 and at most 4 times its kinds'" % [id, i])
 	if float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
 		found.append("%s: motes part %d's below is not 0 to 32 pixels" % [id, i])
 	if part.has("share"):

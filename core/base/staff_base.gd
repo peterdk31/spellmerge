@@ -36,6 +36,10 @@ extends Resource
 @export var head: Texture2D = null
 ## Pixels from the grip to where shots leave, along the aim; 0 keeps the actor's own reach.
 @export var tip: float = 0.0
+## Pixels the drawn staff runs on behind the grip, against the aim, to its lower end (every head
+## sheet's shaft today: 9-10 px). A moment over the whole staff (the swap's cue, S6 item 9) covers
+## it from there to the tip.
+@export var butt: float = 10.0
 ## The personality: the face's eye style and resting brows (gameplay/actor/face.gd, Face.Style and
 ## Face.Mood, in that order).
 @export_enum("cheer", "eager", "sleepy", "stern", "stray", "stray_one") var face_style: int = 0

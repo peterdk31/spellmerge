@@ -20,6 +20,10 @@ class Flash:
 	var reach: float = -1.0
 	var reach_steps: float = -1.0
 	var along: bool = false
+	## Where on the cue's line it plays (its `along` key, 0 to 1; -1: the cue's point; S6 item 9),
+	## and the look bits its effect always has (CUE_EFFECTS' fifth column: the poof's).
+	var place: float = -1.0
+	var bits: int = 0
 	## How it is coloured: PAINT_*, and its own `color` for PAINT_COLOR.
 	var paint: int = PAINT_CUE
 	var color: Color = Color.WHITE
@@ -98,7 +102,8 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 
 
 ## The flash part `part` as a `Flash`, with `effects` Feel's table of effect names (CUE_EFFECTS:
-## kind, pixels a step, seconds, and a fourth column for one drawn along a length). Null for an
+## kind, pixels a step, seconds, a fourth column true for one drawn along a length, and a fifth of
+## look bits it always has). Null for an
 ## effect not in it (`CueBase.problems` names it in content).
 static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
 	var row: Array = effects.get(StringName(part.get("effect", "")), []) as Array
@@ -108,7 +113,9 @@ static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
 	flash.kind = int(row[0])
 	flash.step = float(row[1])
 	flash.seconds = float(part.get("seconds", row[2]))
-	flash.along = row.size() > 3
+	flash.along = row.size() > 3 and bool(row[3])
+	flash.bits = int(row[4]) if row.size() > 4 else 0
+	flash.place = clampf(float(part["along"]), 0.0, 1.0) if part.has("along") else -1.0
 	flash.lasts_size = bool(part.get("lasts_size", false))
 	flash.zoom = float(part.get("zoom", 1.0))
 	flash.reach = float(part["reach"]) if part.has("reach") else -1.0

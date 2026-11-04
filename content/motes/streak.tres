@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"streak"
+dash_path = true
+gravity = 0.0
+drag = 0.0
+bounce = 0.0
+glow = 0.5
+shade_from = 1
+shape = "
+##o
+
+##o
+
+#o
+"
+shape_play = "life"
+shape_rate = 8.0
+shape_turns = true
+count = 2
+speed = Vector2(200.0, 367.0)
+up = Vector2(0.0, 0.0)
+life = Vector2(0.1, 0.18)
+spread = 8.0
+height = 0.0

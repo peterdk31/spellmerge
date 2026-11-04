@@ -18,7 +18,8 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## projectile manager's GDScript), `--no-tails` (the shots without their tails: the manager's
+## `tails_enabled` off, docs/milestones/spell-spectacle-2.md, S5), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
@@ -139,6 +140,8 @@ func _ready() -> void:
 			_feel.call(&"use_motes", timed)
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
+	if args.has("--no-tails"):
+		_projectiles.call(&"set_tails_enabled", false)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
 		return

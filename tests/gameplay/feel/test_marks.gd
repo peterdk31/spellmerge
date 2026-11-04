@@ -96,6 +96,9 @@ func test_every_mark_kind_is_valid_and_every_cue_names_one() -> void:
 		for part: Dictionary in cue.parts:
 			if StringName(part.get("part", "")) == &"mark":
 				named += 1
+				if not part.has("mark"):
+					check(bool(part.get("cards", false)), "%s: a mark part with no mark takes its cards' marks" % cue_id)
+					continue
 				check(ids.has(StringName(part["mark"])), "%s names the mark '%s', which exists" % [cue_id, part["mark"]])
 	check(named >= 3, "the blast, fireball, slam and quake cues leave marks (%d parts)" % named)
 	for cue_id: StringName in [&"blast", &"slam", &"nova", &"rune_burst", &"enemy_death", &"boss_death"]:
@@ -127,8 +130,8 @@ func test_problems_name_what_is_wrong() -> void:
 	cue.id = &"broken"
 	cue.parts = [{"part": &"mark"}, {"part": &"mark", "mark": &"scorch", "zoom": 2, "rot": &"spin", "radius": 0.0}]
 	check_equal(cue.problems().size(), 4, "no mark; an unknown key, an unknown rot and a radius of 0: %s" % [cue.problems()])
-	cue.parts = [{"part": &"mark", "mark": &"scorch", "reach": 0.9, "cards": true, "rot": &"aim"}]
-	check_equal(cue.problems(), PackedStringArray(), "a fine mark part (it takes no effect)")
+	cue.parts = [{"part": &"mark", "mark": &"scorch", "reach": 0.9, "cards": true, "rot": &"aim"}, {"part": &"mark", "cards": true, "radius": 6.0}]
+	check_equal(cue.problems(), PackedStringArray(), "fine mark parts (they take no effect; with cards the mark may be left out)")
 
 
 func test_the_shader_is_handed_each_kinds_numbers() -> void:
@@ -284,6 +287,13 @@ func test_a_cue_stamps_its_mark_as_big_as_its_reach() -> void:
 	check_equal(marks.pending(), 3, "a cue with no mark part stamps nothing")
 	feel.play_cue(&"blast", 0, Vector2(200.0, 150.0), Vector2.RIGHT, 40.0, Color("f4e04d"), LIGHTNING_LOOK)
 	check_equal(roundi(marks.pending_row(3)[8] * MarksScript.KIND_CODE), marks.kind_index(&"char"), "a lightning blast leaves char")
+	# A dash's landing (S5) names no mark: only its cards' marks.
+	feel.play_cue(&"dash_land", 0, Vector2(200.0, 150.0), Vector2.RIGHT, 1.0, Color("e0592f"), FIRE_LOOK)
+	check_equal(marks.pending(), 4, "a fire dash lands leaving nothing (fire has no mark)")
+	feel.play_cue(&"dash_land", 0, Vector2(200.0, 150.0), Vector2.RIGHT, 1.0, Color("4fd6dc"), FROST_LOOK)
+	check_equal(marks.pending(), 5, "a frost dash lands on frost")
+	check_equal(roundi(marks.pending_row(4)[8] * MarksScript.KIND_CODE), marks.kind_index(&"frost"), "its cards' mark")
+	check_equal(marks.pending_row(4)[0], 6.0, "as big as the part's radius")
 
 
 func test_the_other_marks_come_from_their_cues() -> void:

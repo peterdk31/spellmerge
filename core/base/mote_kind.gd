@@ -35,6 +35,9 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
+## Given off along every dash's path (its speed streaks; docs/milestones/spell-spectacle-2.md,
+## S5), in the dashing actor's colours, whatever its cards (theirs are given off beside it).
+@export var dash_path: bool = false
 ## The floor mark (a `MarkKind` id, content/marks) each of its motes leaves where it comes to
 ## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled
 ## motes); empty for none. Only a kind that falls (gravity above 0) comes to rest.
@@ -160,6 +163,8 @@ func problems() -> PackedStringArray:
 		found.append("a mote kind needs an id")
 	if surface and (not look_layers.is_empty() or not cards.is_empty()):
 		found.append("%s: a surface kind belongs to no card, so it names no cards and no look layers" % id)
+	if dash_path and (surface or not look_layers.is_empty() or not cards.is_empty()):
+		found.append("%s: a dash's path kind belongs to no card and no surface" % id)
 	for card in cards:
 		if card == &"":
 			found.append("%s: a card it names has no id" % id)

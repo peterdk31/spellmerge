@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-04: Do shots need tails? A Tails switch, and the dash as cues and motes (spell spectacle 2, S5, owner session)
+
+A "Tails: On/Off" switch in the pause menu's Settings (saved; on by default) turns the shots' tails off: shots are drawn as their cores and lights, no path is sampled or sent, and the motes get the tails' budget (twice today's births in a busy fight). Measured on llvmpipe: the trail batches' GPU time is about a third at 60 shots and under half at 400 and 3,000; the storm's frame 8.3-8.5 -> 7.1 ms. A dash's start and landing are now its card's cues (`dash_start`, `dash_land`: dust, lightning's arc, a ring, its element's flare, its cards' motes and marks), its streaks are a mote kind given off along its path, and its trail is not drawn; Feel keeps no dash state. The owner plays with the switch and picks what the game keeps (S5 step 4).
+
 ## 2026-11-04: One particle system (spell spectacle 2, S3, owner session)
 
 Every particle is a mote now. "Particles" has no Off (its least is a Minimal ring of 2,048), so the old stand-ins are gone: the chips effect, the trail shader's card particles (it keeps the tail, lightning's line and a dash's streaks; a dash's cards are motes too, the owner's ask), the hit spray's and puff's sparks (the effects draw only their flash), and an explosion's debris and scorch effects (its surface motes and scorch mark). A dead body breaks into motes of its own art in place of the white-hot copy that fell apart. Sheets: `shot_deaths.gd` (new), the trails, dashes, blasts and mote sources. Details and figures: docs/DECISIONS.md.

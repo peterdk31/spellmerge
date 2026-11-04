@@ -6,6 +6,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 
 - **Kinds come from the spells' cards** (docs/milestones/spell-spectacle-2.md, S2). A kind names the cards it is the motes of, by id (`cards`: a form, an element or a modifier), or by their look layer (`look_layers`: the `look_layer` of an element or modifier, the LOOK_* kinds of core/projectiles). A card's motes are the kinds that name it by id; a card no kind names takes the kinds of its look layer. A shot sheds every kind of its spell's cards, its burst split between them, so a combination sheds a mix. A shot whose cards have none sheds the kinds of layer 0. The spell is found through the shot's tag (`gameplay/feel/card_kinds.gd`), so nothing is added to the shot; an enemy's shot, which has no spell, sheds by its look layers.
 - **A `surface` kind** belongs to no card: it is what a struck wall sheds. A room may name its own instead (`RoomBase.surface_kinds`: a wooden room's splinters).
+- **A `dash_path` kind** belongs to no card either: every dash gives it off along its path (its speed streaks; spell-spectacle-2.md, S5), in the dasher's colours, beside its cards' kinds.
 - **A kind may name nothing:** then it is thrown only where something names it, a cue's `motes` part (`{"part": &"motes", "kind": &"ash", "colours": &"surface"}`: the fireball's ash, in the colours of what burned) or a room's `surface_kinds`.
 - **A kind that falls can settle** (`settles`, a mark kind's id in `content/marks/`; docs/milestones/spell-spectacle.md, P2b): each of its motes leaves that mark in the floor mark layer where it comes to rest, in its own colours, once it lies still. Chips and frost's flecks settle as a `speck`, so debris stays on the floor after it has cooled. However it was thrown (a hit, a cue, a trail): a frost bolt's trail leaves specks where its flecks rest. In a flood at most `Motes.SETTLE_ROWS` settle a frame; the rest just fade.
 - **No colours here.** A spell's motes cool through the shot's own ramp (its caster's colours or its card's tint, as the shot shaders pick them); a surface kind's through the room's wall colours (`RoomBase.surface_colors`, sampled from the room's art). A kind says only how many shades it skips at first (`shade_from`) and how strongly it glows while hot.
@@ -38,6 +39,8 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `glimmer` | 6 (mend) | drifts up softly, glowing | a plus that shrinks to a pixel |
 | `chip` | surface | knocked off a struck wall; bounces once and lies; settles as a `speck` | a pixel, or now and then a 2x2 chunk |
 | `grit` | card `heavy` | heavy's own: falls hard, bounces a little and lies (a demo of a card's own motes) | a pixel or two across |
+| `streak` | none (`dash_path`: every dash's path, S5) | a dash's speed streaks, flung back from beside the body in the dasher's colours, short and quick | a line along its flight (`##o`, then `#o`) |
+| `dust` | none (named by the `dash_start` cue) | kicked up off the floor where a dash leaves, in the room's colours; drifts and settles | a pixel |
 | `ash` | none (named by the `fireball` cue) | drifts up, sways and settles slowly, light at first and cooling grey, in the colours of what burned | a pixel, or two on a slant |
 
 ## Allowed files

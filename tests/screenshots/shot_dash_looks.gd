@@ -3,8 +3,10 @@ extends "res://tests/support/screenshot.gd"
 ## row per infusion (plain, fire, frost, storm, void, lightning; the real cards' colours and
 ## looks), each caster dashing 80 px (Dash) to the right and bending down on the way, as
 ## a wizard does that walks while it dashes. The way is the caster's trail (`follow_caster`, the
-## projectile manager): speed streaks in the player's colours and the cards where it went; Feel
-## draws the dust where it left and the ring where it landed (`caster_move_finished`).
+## projectile manager), which gives off its speed streaks (in the player's colours) and its cards'
+## particles as motes where it went (spell-spectacle-2.md, S5: the trail itself is not drawn); the
+## dash card's cues draw the dust where it left (`dash_start`, at `form_shown`) and the ring where
+## it landed (`dash_land`, at `carrier_ended`).
 ## `dash_looks` half way through, `dash_looks_landed` just after the landing, and
 ## `dash_looks_4x` (the plain, fire and frost rows half way).
 
@@ -30,8 +32,12 @@ func take() -> void:
 	var shots: Node = root.get_node("Projectiles")
 	var events: Node = root.get_node("Events")
 	feel.set("drive_engine", false)
+	# Stepped by this script alone (its own _process would step it twice a frame).
+	feel.set_process(false)
 	lay_floor()
 	shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
+	# A room, so the dust is in its colours (the dash's `dash_start` cue, S5).
+	events.emit_signal(&"room_entered", &"arena_01")
 	await settle()
 	var length: float = float(DASH.get("ray_length"))
 	var casters: Array[int] = []
@@ -50,7 +56,8 @@ func take() -> void:
 		casters.append(caster)
 		shots.call("set_anchor", caster, _at(e, 0.0, length))
 		shots.call("follow_caster", caster, tint, look, float(STEPS) / 60.0)
-		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.UP, length, tint, look)
+		# Its way, as the dash carrier sends it (the move's direction, not the aim).
+		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.RIGHT, length, tint, look)
 	for n in STEPS + 4:
 		await physics_frame
 		for e in 6:
@@ -62,9 +69,12 @@ func take() -> void:
 			save_crop(image, Vector2(220.0, 32.0 + ROW), "dash_looks_4x", Vector2i(110, int(ROW * 1.5)))
 		if n == STEPS - 1:
 			for e in 6:
-				events.emit_signal("caster_move_finished", casters[e], &"dash", _at(e, 1.0, length), 0)
-	if int(shots.get("drawn_trails")) < 6:
-		fail("only %d dash trails are showing" % int(shots.get("drawn_trails")))
+				var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
+				var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
+				events.emit_signal("carrier_ended", casters[e], &"dash", _at(e, 1.0, length), Vector2.RIGHT, float(DASH.get("radius")), tint, look)
+	var motes: Node = feel.call("motes")
+	if motes == null or int(motes.get("births")) < 6 * STEPS:
+		fail("the dashes gave off too few streaks as motes")
 		return
 	save(await grab(), "dash_looks_landed")
 

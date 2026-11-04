@@ -19,7 +19,7 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Tails: On", "Max shots: 6000", "Screen shake: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
@@ -42,7 +42,11 @@ extends PanelContainer
 ##   "Spell light: On" (or Off; P3a) flips on `accept`, from the
 ##   platform's default (`SpellLightSetting.default_on()`), sends `spell_light_changed`, which feel
 ##   applies, and is saved (`spell_light`); a saved choice other than the default is sent again
-##   when the menu is bound. "Screen shake: On" (or Off), the
+##   when the menu is bound. "Tails: On" (or Off; a dev switch, docs/milestones/spell-spectacle-2.md,
+##   S5: "do shots need tails?") flips on `accept`, from `ShotTails.DEFAULT`, sends
+##   `shot_tails_changed`, which the projectile manager applies at once, and is saved
+##   (`shot_tails`); a saved choice other than the default is sent again when the menu is bound.
+##   "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
 ##   when the menu is bound, so it holds between plays. "Max shots" (owner, 2026-11-02) is a
@@ -120,6 +124,8 @@ const MARKS_TEXT: String = "Floor marks: %s"
 const MARKS_SETTING: StringName = &"floor_marks"
 const LIGHT_TEXT: String = "Spell light: %s"
 const LIGHT_SETTING: StringName = &"spell_light"
+const TAILS_TEXT: String = "Tails: %s"
+const TAILS_SETTING: StringName = &"shot_tails"
 const FPS_TEXT: String = "Show FPS: %s"
 const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
@@ -161,6 +167,8 @@ var floor_marks: bool = FloorMarks.default_on()
 var show_fps: bool = false
 ## The "Spell light" setting (see the top): the platform's default.
 var spell_light: bool = SpellLightSetting.default_on()
+## The "Tails" dev switch (see the top): on by default.
+var shot_tails: bool = ShotTails.DEFAULT
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
 var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
@@ -201,6 +209,7 @@ var ai_view: bool = false
 @onready var _density_bar: HSlider = _add_slider(_density, 0, MoteDensity.STOPS.size() - 1, 1, MoteDensity.index_of(mote_density), MOTE_DENSITY_TEXT % "Double")
 @onready var _marks: Button = _add(Page.SETTINGS, "FloorMarks", MARKS_TEXT % ("On" if floor_marks else "Off"))
 @onready var _light: Button = _add(Page.SETTINGS, "SpellLight", LIGHT_TEXT % ("On" if spell_light else "Off"))
+@onready var _tails: Button = _add(Page.SETTINGS, "ShotTails", TAILS_TEXT % ("On" if shot_tails else "Off"))
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
@@ -229,6 +238,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_mote_density()
 	_load_floor_marks()
 	_load_light()
+	_load_tails()
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
@@ -530,6 +540,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_floor_marks(not floor_marks)
 	elif control == _light:
 		_set_light(not spell_light)
+	elif control == _tails:
+		_set_tails(not shot_tails)
 	elif control == _shake:
 		_set_shake(not screen_shake)
 	elif control == _fps:
@@ -575,6 +587,26 @@ func _set_light(on: bool) -> void:
 	save.set_setting(LIGHT_SETTING, on)
 	if _events != null:
 		_events.spell_light_changed.emit(on)
+
+
+## Read the saved "Tails" choice and show it; the projectile manager is told only when it is not
+## the default.
+func _load_tails() -> void:
+	shot_tails = bool(save.get_setting(TAILS_SETTING, ShotTails.DEFAULT))
+	_tails.set_meta(BASE_TEXT_META, TAILS_TEXT % ("On" if shot_tails else "Off"))
+	_mark_focus()
+	if shot_tails != ShotTails.DEFAULT and _events != null:
+		_events.shot_tails_changed.emit(shot_tails)
+
+
+## Flip the "Tails" switch: show it, save it and tell the projectile manager.
+func _set_tails(on: bool) -> void:
+	shot_tails = on
+	_tails.set_meta(BASE_TEXT_META, TAILS_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(TAILS_SETTING, on)
+	if _events != null:
+		_events.shot_tails_changed.emit(on)
 
 
 ## Flip the switch: show it, save it and tell feel.

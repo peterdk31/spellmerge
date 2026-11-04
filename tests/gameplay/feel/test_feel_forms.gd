@@ -98,28 +98,6 @@ func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "and gone after its seconds")
 
 
-func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
-	# Its way is the caster's trail (the projectile manager's `follow_caster`), where the wizard
-	# really went (the owner, 2026-10-28: the dash look went the aim's way, not the wizard's).
-	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, SPARKS)
-	check_equal(feel.effects_of(FeelScript.KIND_DASH, 2), 1, "dust where player 3 left")
-	check_equal(feel.effect_dress(FeelScript.KIND_DASH), [FROST, SPARKS], "with the dash's colours and cards")
-	feel.step(0.01)
-	var buffer: PackedFloat32Array = feel._effect_node.multimesh.buffer
-	check(is_equal_approx(buffer[3], 12.0) and is_equal_approx(buffer[7], 20.0), "at its start, whatever the aim")
-	bus.caster_move_finished.emit(2, &"dash", Vector2(60, 30), 0)
-	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a ring where it landed")
-	check_equal(feel.effects_of(FeelScript.KIND_ARC, 2), 1, "lightning (its sparks) arcs from where it left")
-	check_equal(feel.effects_of(FeelScript.KIND_BURST, 2), 1, "and an infused dash lands in a flare of its element")
-	bus.caster_move_finished.emit(2, &"teleport", Vector2(60, 30), 0)
-	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a teleport is not a dash")
-	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 0.0, FROST, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere shows nothing")
-	bus.form_shown.emit(ActorSeats.enemy(actors), &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_DASH), 2, "an enemy's dash shows like a wizard's (staffs F7)")
-	check_equal(feel.effect_info(FeelScript.KIND_DASH)["ramp"], ActorSeats.ActorsScript.RAMP_ENEMY, "in the enemy ramp")
-
-
 func test_a_shot_whose_life_runs_out_pops() -> void:
 	projectiles.events = bus
 	projectiles.spawn(1, Vector2(50, 50), Vector2(100, 0), 0.05)

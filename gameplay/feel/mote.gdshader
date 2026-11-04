@@ -13,7 +13,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //
 // Nothing here is a kind or a colour of its own:
 // - the kinds' numbers are data (`MoteKind`, content/motes), handed over by mote.gd as
-//   `kind_motion` (gravity, drag, bounce, glow), `kind_sway` (sway, its rate, first shade) and
+//   `kind_motion` (gravity, drag, bounce, glow), `kind_sway` (sway, its rate, first shade, how
+//   far its shape reaches from its pixel in any frame and any way it turns: `Motes.reach_of`) and
 //   `kind_shape` (frames, how they play: 0 life, 1 loop, 2 pick; frames a second; 1 when it turns
 //   with its flight), and their shapes as `shape_atlas`: SHAPE_SIZE squares, a kind's frames
 //   along its row, each pixel 0 none, 0.5 its shade, 1 the shade hotter;
@@ -158,7 +159,10 @@ void vertex() {
 			reach += 1.0;
 		}
 		float lit = shade <= 1 ? kind_motion[k].w * glow_strength : 0.0;
-		reach += lit > 0.0 ? GLOW_REACH : 0.0;
+		// A glowing mote's quad holds its glow (as far from its pixel for every shape); one
+		// with none only its shape's pixels (P1c: most motes are a pixel or two, and their
+		// fragments were most of their cost).
+		reach = lit > 0.0 ? reach + GLOW_REACH : kind_sway[k].w;
 		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
 		vec2 p = mix(pixel - reach, pixel + 1.0 + reach, corner);
 		VERTEX = p;

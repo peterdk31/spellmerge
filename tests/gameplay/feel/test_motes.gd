@@ -15,6 +15,7 @@ const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
 const ARENA: StringName = &"arena_01"
 
 ## Look bits of the elements' layers (layer n is bit n - 1).
@@ -125,11 +126,11 @@ func test_only_the_chunks_written_upload() -> void:
 	motes.step(0.0)
 	check_equal(motes.uploads, 0, "nothing written, nothing uploaded")
 	check_equal(motes.chunks_made(), 0, "and no batch made")
-	_fill(motes, 300, 0.016)
-	check_equal(motes.uploads, 1, "a burst of 300 in one chunk uploads it once")
+	_fill(motes, 150, 0.016)
+	check_equal(motes.uploads, 1, "a burst of 150 in one chunk uploads it once")
 	motes.step(0.032)
 	check_equal(motes.uploads, 1, "a frame with no motes uploads nothing")
-	_fill(motes, 600, 0.048)
+	_fill(motes, 750, 0.048)
 	check_equal(motes.next_row(), 900, "900 written")
 	var before: int = motes.uploads
 	motes.burst(0, Vector2.ZERO, Vector2.UP, 200, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
@@ -147,6 +148,37 @@ func test_a_frame_writes_at_most_its_rows() -> void:
 	motes.step(0.016)
 	_chip(motes, Vector2.ZERO)
 	check_equal(motes.next_row(), MotesScript.FRAME_ROWS + 1, "the next frame writes again")
+	check_equal(motes.written, MotesScript.FRAME_ROWS + 1, "every mote written is counted")
+	check_equal(motes.cut, 2, "and each burst the frame's rows cut short or left out")
+
+
+## P1c: a shot's motes cost nothing once only the rows the frame keeps for its moments (cues and
+## reactions) are left (a storm sheds hundreds a frame past them), and the kinds of a look are
+## worked out once.
+func test_a_shed_past_the_frames_rows_writes_nothing() -> void:
+	var motes: MotesScript = _pool(4096)
+	var sheds: int = MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS
+	check(sheds > 0 and MotesScript.MOMENT_ROWS > 0, "the sheds and the moments both have rows")
+	motes.burst(0, Vector2.ZERO, Vector2.UP, sheds, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	motes.shed(Vector2.ZERO, Vector2.LEFT, Color.WHITE, 0, FIRE_LOOK)
+	motes.throw(motes.kind_index(&"chip"), Vector2.ZERO, Vector2.LEFT, 0, Color.WHITE)
+	check_equal(motes.next_row(), sheds, "with only the moments' rows left, a shed and a wall's throw take none")
+	check_equal(motes.cut, 2, "both counted as cut")
+	motes.throw_part(motes.kind_index(&"ember"), Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, 40, 0.0, 360.0, 1.0, false)
+	check_equal(motes.next_row(), sheds + 40, "a cue's part still throws its motes")
+	motes.burst(0, Vector2.ZERO, Vector2.UP, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	check_equal(motes.next_row(), MotesScript.FRAME_ROWS, "up to the frame's rows")
+	motes.step(0.016)
+	motes.shed(Vector2.ZERO, Vector2.LEFT, Color.WHITE, 0, FIRE_LOOK)
+	check(motes.next_row() > MotesScript.FRAME_ROWS, "the next frame sheds again")
+
+
+func test_a_looks_kinds_are_kept_and_its_flags_ignored() -> void:
+	var motes: MotesScript = _pool(4096)
+	var first: PackedInt32Array = motes.kinds_of_look(FIRE_LOOK | LIGHTNING_LOOK)
+	check_equal(motes.kinds_of_look(FIRE_LOOK | LIGHTNING_LOOK), first, "asked again: the same kinds")
+	check_equal(motes.kinds_of_look(FIRE_LOOK | MotesScript.LOOK_EXACT | MotesScript.LOOK_ENEMY_RAMP), motes.kinds_of_look(FIRE_LOOK), "a look's flags are not layers")
+	check_equal(motes.kinds_of_look(0), PackedInt32Array([motes.kind_index(&"spark")]), "a look of no layer: layer 0's, kept apart")
 
 
 func test_a_chunk_with_nothing_alive_is_hidden() -> void:
@@ -154,10 +186,16 @@ func test_a_chunk_with_nothing_alive_is_hidden() -> void:
 	_chip(motes, Vector2.ZERO)
 	motes.step(1.0)
 	check_equal(motes.chunks_shown(), 1, "the chunk written is drawn")
-	motes.step(1.0 + MotesScript.LIFE_MAX * 0.5)
-	check_equal(motes.chunks_shown(), 1, "while a mote in it can be alive")
-	motes.step(1.0 + MotesScript.LIFE_MAX + 0.1)
-	check_equal(motes.chunks_shown(), 0, "then hidden: no vertices")
+	motes.step(2.9)
+	check_equal(motes.chunks_shown(), 1, "while a mote in it can be alive (its life is 3 s)")
+	motes.step(3.1)
+	check_equal(motes.chunks_shown(), 0, "then hidden as its life ends, not LIFE_MAX after: no vertices")
+	motes.step(3.2)
+	motes.burst(0, Vector2.ZERO, Vector2.UP, 2, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 0.5), 0, Color.WHITE)
+	motes.step(3.3)
+	check_equal(motes.chunks_shown(), 1, "a new burst shows it again")
+	motes.step(3.75)
+	check_equal(motes.chunks_shown(), 0, "for as long as that burst's longest life")
 	_chip(motes, Vector2.ZERO)
 	motes.step(6.0)
 	check_equal(motes.chunks_shown(), 1, "and drawn again with a new mote")
@@ -250,6 +288,31 @@ func test_a_shape_is_its_frames_centred_on_the_mote() -> void:
 	check_equal(motes.shape_value(1, 1, m, m - 1), MoteKind.PIXEL_HOT, "each in its own square")
 	check_equal(motes.shape_value(0, 0, m, m), MoteKind.PIXEL_BODY, "a kind with no shape of its own: one pixel")
 	check(motes.shader_parameter(&"shape_atlas") is Texture2D, "the shader reads the atlas")
+
+
+## P1c: a mote with no glow draws a quad only as big as its shape (most are a pixel or two), turned
+## any way; the shader is handed each kind's reach.
+func test_a_shapes_reach_is_as_far_as_its_pixels() -> void:
+	var dot := _kind(&"dot")
+	check_equal(MotesScript.reach_of(dot), 0, "one pixel: no reach")
+	var chunk := _kind(&"chunk")
+	chunk.shape = "#\n\n##\n##"
+	check_equal(MotesScript.reach_of(chunk), 1, "a 2x2 frame: one pixel")
+	var streak := _kind(&"streak")
+	streak.shape = "##o"
+	check_equal(MotesScript.reach_of(streak), 1, "a streak of three across")
+	streak.shape_turns = true
+	check_equal(MotesScript.reach_of(streak), 1, "turned 45 degrees it still ends a pixel out each way")
+	var block := _kind(&"block")
+	block.shape = "#####\n#####\n#####\n#####\n#####"
+	check_equal(MotesScript.reach_of(block), 2, "the whole square")
+	block.shape_turns = true
+	check_equal(MotesScript.reach_of(block), 3, "turned, its corners reach past the square")
+	var motes: MotesScript = _pool(1024, [dot, chunk, block])
+	var sway: PackedVector4Array = motes.shader_parameter(&"kind_sway")
+	check(sway[0].w == 0.0 and sway[1].w == 1.0 and sway[2].w == 3.0, "the shader is handed each kind's reach: %s" % [sway])
+	var code: String = FileAccess.get_file_as_string("res://gameplay/feel/mote.gdshader")
+	check(code.contains("reach = lit > 0.0 ? reach + GLOW_REACH : kind_sway[k].w;"), "and draws a mote with no glow that far")
 
 
 func test_a_shapes_frames_play_as_its_kind_says() -> void:
@@ -424,6 +487,23 @@ func test_with_particles_off_there_are_no_motes_and_the_chips_effect_shows() -> 
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "and the room's walls still shed")
 	check_equal(feel.set_mote_cap(1 << 20), MoteCap.STOPS[-1], "never past the top stop")
+
+
+## P1c: the benchmarks hand Feel a pool of their own (a timed one), which it then uses like its own.
+func test_feel_takes_a_pool_handed_to_it() -> void:
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	bus.room_entered.emit(ARENA)
+	var timed: MotesScript = TimedMotesScript.new(MoteCap.STOPS[1], FeelScript.MOTE_Z, feel.motes().kinds())
+	feel.use_motes(timed)
+	check(feel.motes() == timed and feel.get_node_or_null("Motes") == timed, "the pool handed is Feel's motes")
+	check_equal(feel.mote_cap, MoteCap.STOPS[1], "its cap is the setting's")
+	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
+	check(_kinds_of_rows(timed, 0, timed.next_row()).has(&"chip"), "a wall hit sheds into it, in the room's colours")
+	check(int(timed.get(&"usec")) >= 0 and timed.written > 0, "and it counts what it wrote")
+	feel.use_motes(null)
+	check(feel.motes() == null and feel.get_node_or_null("Motes") == null and feel.mote_cap == 0, "null turns the motes off")
 
 
 # --- P1b: the sources ---------------------------------------------------------------------------

@@ -25,10 +25,11 @@ extends Node2D
 ## `MultiMeshInstance2D` each (made by `Batches.multimesh()`, so it is never culled; made the first
 ## time a mote lands in it). `step` uploads only the chunks written since the last frame, so a
 ## burst of 300 motes uploads one or two chunks (64 KB each), never the whole ring; a chunk whose
-## newest mote is older than LIFE_MAX is hidden and costs no vertices. Nothing is allocated while
-## playing, past a chunk's first use. Writing a mote costs the CPU about 1.5 us, so at most
-## FRAME_ROWS are written between two steps: a burst past that is cut short (a flood of wall hits
-## costs a bounded part of a frame; P1c measures the number).
+## motes are all gone (by the longest life each of its bursts could give) is hidden and costs no
+## vertices. Nothing is allocated while playing, past a chunk's first use. A mote costs the CPU
+## about 2.3 us in a fight (its share of the shot's shed and its row; P1c, docs/DECISIONS.md), so
+## at most FRAME_ROWS are written between two steps: a burst past that is cut short, and a shed
+## once they are used up costs next to nothing (a storm's flood of hits stays within its budget).
 ##
 ## `flight` is the shader's `mote_flight` line for line; `mote_land` gives where and when a mote
 ## comes to rest, for the floor marks (P2b).
@@ -42,8 +43,13 @@ const CHUNK: int = 1024
 const DRAW_STRIDE: int = 16
 ## The longest life a mote has (s); a chunk with nothing newer is hidden.
 const LIFE_MAX: float = 4.0
-## The most motes written between two steps (about 0.6 ms of a frame).
-const FRAME_ROWS: int = 384
+## The most motes written between two steps, and of them the rows a shot's hit, end or wall hit
+## (`shed`, `throw`: hundreds a frame in a storm, a few motes each) leave for the moments
+## (`throw_part`, `burst`: a cue's or a reaction's, tens or a hundred in one burst, so a blast in a
+## storm still throws its motes). Set from the sandbox storm (P1c, docs/DECISIONS.md): the sheds'
+## rows cost about 2.5 us each, a moment's about 0.5.
+const FRAME_ROWS: int = 288
+const MOMENT_ROWS: int = 128
 ## The most kinds the shader holds (its `kind_motion` and `kind_sway` arrays).
 const MAX_KINDS: int = 16
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
@@ -66,8 +72,11 @@ const SOURCE_CODE: float = 128.0
 const KIND_CODE: float = 16.0
 const HEIGHT_MAX: float = 63.75
 
-## Uploads of a chunk's buffer since this pool was made (for tests and the benchmarks).
+## Uploads of a chunk's buffer since this pool was made, the motes written, and the bursts the
+## frame's FRAME_ROWS cut short or left out (for tests and the benchmarks).
 var uploads: int = 0
+var written: int = 0
+var cut: int = 0
 ## Every burst's count is times this (the "Particle amount" setting, `MoteDensity`; 0 throws
 ## none). A share of a mote is thrown that often, so the average holds.
 var density: float = 1.0
@@ -78,14 +87,17 @@ var _cap: int = 0
 var _kinds: Array[MoteKind] = []
 var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
+## `kinds_of_look`'s answers, by a look's layer bits (a shot's hit or end asks it, hundreds of
+## times a frame in a storm; there are few looks).
+var _look_kinds: Dictionary[int, PackedInt32Array] = {}
 ## The next row a mote takes.
 var _next: int = 0
 ## Per chunk: its batch (null until its first mote), its rows, written since the last upload, and
-## the clock time of its last upload.
+## the clock time its last mote is gone by (its birth plus the longest life its burst could give).
 var _nodes: Array[MultiMeshInstance2D] = []
 var _buffers: Array[PackedFloat32Array] = []
 var _dirty: PackedByteArray = PackedByteArray()
-var _newest: PackedFloat32Array = PackedFloat32Array()
+var _until: PackedFloat32Array = PackedFloat32Array()
 ## The clock motes are born on (Feel's, from `step`).
 var _now: float = 0.0
 ## Motes that may still be written before the next step (FRAME_ROWS).
@@ -115,7 +127,7 @@ func _init(cap: int, z: int, kinds: Array[MoteKind]) -> void:
 	_nodes.resize(chunks)
 	_buffers.resize(chunks)
 	_dirty.resize(chunks)
-	_newest.resize(chunks)
+	_until.resize(chunks)
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
 	_mesh = _quad()
@@ -144,8 +156,13 @@ func kind_index(id: StringName) -> int:
 
 
 ## The kinds a shot of the look `look` sheds (its cards' layers; LOOK_* bits, layer n is bit
-## n - 1): every kind that names one of them, else the kinds of layer 0.
+## n - 1): every kind that names one of them, else the kinds of layer 0. The array is kept for
+## the next ask: read it, never change it.
 func kinds_of_look(look: int) -> PackedInt32Array:
+	var layers: int = look & ((1 << LOOK_LAYERS) - 1)
+	var known: Variant = _look_kinds.get(layers)
+	if known != null:
+		return known
 	var found := PackedInt32Array()
 	for layer in range(1, LOOK_LAYERS + 1):
 		if (look >> (layer - 1)) & 1 == 1:
@@ -154,6 +171,7 @@ func kinds_of_look(look: int) -> PackedInt32Array:
 					found.append(k)
 	if found.is_empty():
 		found = _layer_kinds[0].duplicate()
+	_look_kinds[layers] = found
 	return found
 
 
@@ -197,18 +215,28 @@ func table_shade(source: int, shade: int) -> Color:
 
 ## A shot of the look `look` and core colour `core`, of an actor of `ramp`, sheds its motes at
 ## `at`: each kind of its cards (`kinds_of_look`) throws its share of its burst (`scale` of its
-## count, split between them) along `dir`, in the shot's own ramp.
+## count, split between them) along `dir`, in the shot's own ramp. Nothing once only the frame's
+## MOMENT_ROWS are left.
 func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
+	if _rows_left <= MOMENT_ROWS:
+		cut += 1
+		return
 	var found: PackedInt32Array = kinds_of_look(look)
 	var source: int = spell_source(ramp, look)
+	var share: float = scale / float(found.size())
 	for k in found:
-		throw(k, at, dir, source, core, scale / float(found.size()))
+		var kind: MoteKind = _kinds[k]
+		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
 
 
 ## Throw a burst of kind `k` (its count times `scale`, at least one; its speed, spread, up, life
 ## and height) from `at` along `dir`, from `source` (`spell_source`, `table_source`) with the core
-## colour `core` (a spell's; white for none).
+## colour `core` (a spell's; white for none). Like `shed`, nothing once only the frame's
+## MOMENT_ROWS are left.
 func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: float = 1.0) -> void:
+	if _rows_left <= MOMENT_ROWS:
+		cut += 1
+		return
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	var kind: MoteKind = _kinds[k]
@@ -241,16 +269,25 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
 	if density != 1.0:
 		count = floori(float(count) * density + _rng.randf())
-	count = mini(count, _rows_left)
 	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
 		return
+	if count > _rows_left:
+		cut += 1
+		count = _rows_left
+		if count <= 0:
+			return
 	_rows_left -= count
+	written += count
 	var aim: float = dir.angle() if dir != Vector2.ZERO else 0.0
 	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
-	height = _step255(height, HEIGHT_MAX)
+	# `_step255` written out (a call costs as much as a few lines here).
+	height = roundf(clampf(height, 0.0, HEIGHT_MAX) / HEIGHT_MAX * 255.0) / 255.0 * HEIGHT_MAX
 	var ground: Vector2 = at + Vector2(0.0, height)
 	var coded_source: float = float(source) / SOURCE_CODE
+	var coded_kind: float = float(k) / KIND_CODE
 	var coded_height: float = height / HEIGHT_MAX
+	var shortest: float = clampf(life.x, 0.02, LIFE_MAX)
+	var longest: float = clampf(life.y, 0.02, LIFE_MAX)
 	var chunk: int = -1
 	var buffer: PackedFloat32Array
 	for n in count:
@@ -259,8 +296,12 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		var c: int = row / CHUNK
 		if c != chunk:
 			chunk = c
-			buffer = _chunk(c)
+			if _nodes[c] == null:
+				_chunk(c)
+			buffer = _buffers[c]
 			_dirty[c] = 1
+			# Shown until its last mote is gone (a life is written a 255th of LIFE_MAX up at most).
+			_until[c] = maxf(_until[c], _now + longest + LIFE_MAX / 255.0)
 		var v: Vector2 = Vector2.from_angle(aim + _rng.randf_range(-half, half)) * _rng.randf_range(speed.x, speed.y)
 		var i: int = (row - c * CHUNK) * DRAW_STRIDE
 		buffer[i] = v.x
@@ -270,8 +311,9 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		buffer[i + 5] = _rng.randf_range(up.x, up.y)
 		buffer[i + 7] = ground.y
 		buffer[i + 8] = coded_source
-		buffer[i + 9] = float(k) / KIND_CODE
-		buffer[i + 10] = _step255(clampf(_rng.randf_range(life.x, life.y), 0.02, LIFE_MAX), LIFE_MAX) / LIFE_MAX
+		buffer[i + 9] = coded_kind
+		# The life in 1/255 steps of LIFE_MAX (`_step255`, written out: a call a mote costs).
+		buffer[i + 10] = roundf(_rng.randf_range(shortest, longest) / LIFE_MAX * 255.0) / 255.0
 		buffer[i + 11] = coded_height
 		buffer[i + 12] = core.r
 		buffer[i + 13] = core.g
@@ -293,9 +335,8 @@ func step(now: float) -> void:
 			_dirty[c] = 0
 			node.multimesh.buffer = _buffers[c]
 			uploads += 1
-			_newest[c] = now
 			node.visible = true
-		elif node.visible and now - _newest[c] > LIFE_MAX:
+		elif node.visible and now > _until[c]:
 			node.visible = false
 
 
@@ -404,6 +445,30 @@ func shape_value(k: int, frame: int, x: int, y: int) -> int:
 	return roundi(_shape_image.get_pixel(frame * size + x, k * size + y).r * 2.0)
 
 
+## How far from a mote's own pixel kind `kind`'s shape draws, in pixels (0 for one pixel), in any
+## frame and turned any of its 8 ways (the shader turns a pixel back by its way and rounds, as
+## here): the size of its quad when it does not glow, so it costs no fragments past its shape.
+static func reach_of(kind: MoteKind) -> int:
+	var size: int = MoteKind.SHAPE_SIZE
+	var half: int = size / 2
+	var turns: int = 8 if kind.shape_turns else 1
+	var reach: int = 0
+	for frame in kind.shape_frames().size():
+		var pixels: PackedByteArray = kind.shape_pixels(frame)
+		for way in turns:
+			var angle: float = float(way) * 0.7854
+			var turn := Vector2(cos(angle), sin(angle))
+			# Every pixel a turned shape can reach (one more than the square's corner).
+			for dy in range(-half - 1, half + 2):
+				for dx in range(-half - 1, half + 2):
+					var q := Vector2(turn.x * dx + turn.y * dy, -turn.y * dx + turn.x * dy).round()
+					if absf(q.x) > half or absf(q.y) > half:
+						continue
+					if pixels[(int(q.y) + half) * size + int(q.x) + half] != MoteKind.PIXEL_NONE:
+						reach = maxi(reach, maxi(absi(dx), absi(dy)))
+	return reach
+
+
 ## `value` (0 to `most`) in steps of 1/255 of `most`.
 static func _step255(value: float, most: float) -> float:
 	return roundf(clampf(value, 0.0, most) / most * 255.0) / 255.0 * most
@@ -432,7 +497,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		var k: int = _kinds.size()
 		_kinds.append(kind)
 		motion[k] = Vector4(kind.gravity, kind.drag, kind.bounce, kind.glow)
-		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), 0.0)
+		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind)))
 		var frames: int = kind.shape_frames().size()
 		shapes[k] = Vector4(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0)
 		for frame in frames:

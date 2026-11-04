@@ -296,6 +296,9 @@ func play_motes_part(prepared: Variant, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
 	var part: MotesPart = prepared as MotesPart if prepared is MotesPart else prepare_motes_part(prepared as Dictionary)
+	# One of many a frame (a hit's sparks) throws nothing once the frame's rows are the moments'.
+	if part.often and pool.shed_closed():
+		return
 	var way: Vector2 = cue.aim
 	var turn: StringName = part.way
 	if turn == &"back":
@@ -315,10 +318,15 @@ func play_motes_part(prepared: Variant, cue: CueContextScript) -> void:
 	elif named == &"surface":
 		kinds = _surface_kinds
 	else:
-		var k: int = pool.kind_index(named)
-		if k < 0:
+		# A named kind is looked up once a pool (the pool is made again when its cap changes).
+		var at_pool: int = pool.get_instance_id()
+		if part.kind_pool != at_pool:
+			part.kind_pool = at_pool
+			var k: int = pool.kind_index(named)
+			part.kinds = PackedInt32Array([k]) if k >= 0 else PackedInt32Array()
+		if part.kinds.is_empty():
 			return
-		kinds = PackedInt32Array([k])
+		kinds = part.kinds
 	# In an exact colour (the part's, else the cue's own), or in the cue's ramp, tint and cards.
 	var colour: Color = part.color if part.color.a > 0.0 else cue.color
 	var exact: bool = colour.a > 0.0
@@ -591,3 +599,6 @@ class MotesPart:
 	var way: StringName = &"aim"
 	var below: float = 0.0
 	var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+	## A named kind's index in the pool of the instance id `kind_pool` (as one kind), kept.
+	var kinds: PackedInt32Array = PackedInt32Array()
+	var kind_pool: int = 0

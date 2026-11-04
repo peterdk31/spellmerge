@@ -98,12 +98,42 @@ The owner asked whether the shots need tails at all now that they shed motes. Af
 3. **A dev switch to play with:** "Tails: on / off" in the pause menu's dev rows (as the other dev switches), saved, so the owner can play the sandbox and a horde fight with tails off, enemy shots included. A screenshot sheet is not enough: whether shots read is about motion.
 4. **The owner decides:** no tails; short tails; tails only where they matter most (enemy shots, fast shots); or tails below a shot count and none above it. The pick is built in its own PR; DECISIONS records the figures either way.
 
+5. **The dash** (the owner, 2026-11-04: "Can the dash also just be motes? Since a dash can also carry elemental effects", and "could the dash streaks become a cue?"). Its moments become cues and its path becomes motes:
+   - **Moments as cues:** the dust where a dash starts and the ring, Spark's arc and the element's flare where it lands are hardcoded in Feel today (`_on_caster_move_finished`, the `form == &"dash"` branch of `_on_form_shown`). They become two cues, `dash_start` and `dash_land`, named by the dash card's `cast_look` and `impact_look`; their `kind: spell` motes and `cards: true` marks come from the dash's cards (S2), so a fire dash throws embers and may leave a scorch. Feel loses its dash code.
+   - **The path as motes:** a dash bends (the wizard steers it), so its streaks cannot be a cue at one point. S3 makes the dash's particles births like any shot's; the streak look becomes a stretched mote kind (short life, drawn along the way it flies) in those births, so with tails off a dash needs no trail shader at all.
+
+## S6: Every moment a cue (the owner, 2026-11-04)
+
+The owner asked for every other system that can be replaced to be added. A survey of main (2026-11-04) found the drawn moments that are still special-case code in Feel or particles inside shaders. Each one below becomes data: a cue (`content/cues/`), a cue part, a mote kind or a light source, so its look is a file. Ranked by value (the most special-case code removed, the most content made data). Each item is its own commit with a screenshot sheet before and after; the hit path's items are measured in the storm (`play_cue` costs a lookup and a call per part).
+
+| # | Today (main) | Becomes |
+|---|---|---|
+| 1 | Reactions: a puff, a ring and motes in the reaction's colour, shake, hold and sound, from preset dictionaries (`_on_reaction_triggered`, `_show_ring`, `Spectacle.reaction_motes`, six `FeelPreset` fields) | One cue per reaction (`reaction_<id>`, or `ReactionRow.cue`), with a `color` on its parts. A reaction's `power` scales the cue's size; a rule for what `power` scales (counts, hold, shake) is written once in `play_cue`. The repeat throttle and the reaction's name stay code |
+| 2 | Cast and impact looks: the cast flash, ring and camera kick (`_on_spell_cast`) and the impact burst, ring and rune burst (`_show_impact`), from a second mini-format beside `cue` in the forms' `cast_look` and `impact_look` (`size`, `seconds`, `ring`, `grow`) | A form's `cast_look` and `impact_look` become one cue id each, with default cues `cast` and `impact`; the kick becomes cue data. The `form == &"rune"` branch and `wall_spark_size` go. **The hottest path:** measured in the storm before it merges |
+| 3 | Particles inside the flash shader: `effect_spark` (burst, cast, rune burst, poof, quake rubble, rise and fall) and its card particles (`shot_effect.gdshader`) | Motes parts in the cues of 1, 2 and 5; the shader keeps the flash's shape and its light. After S4 (the rows' cost) |
+| 4 | Which effects light the room, by Feel's effect kinds (`SpellLight.EFFECT_LIGHT`, `BLAST_LIGHT`) | A `light` cue part (strength, reach, seconds, colour) through the part table, so content can light a rune or a heal. Today's free mirroring of the effect rows stays the default; the part overrides it |
+| 5 | A bolt or orbit running out of life: a pop and its motes (`_on_projectile_expired`, `POP_*`) | A cue `expire` (a burst part and a motes part with a `share` key) |
+| 6 | The extra puff in `enemy_hit_color` after an enemy's death cue (`_on_enemy_died`, `_upgrade_hit`) | A part of `enemy_death.tres`. After S3 (puffs become motes there) |
+| 7 | Possession: the rings and sound on the possessed body (`possess_started`, `possess_ended`) | Cues `possess_start` and `possess_end` |
+| 8 | Lightning arcs: a discharge's arc and a zap's spark (`discharge_arc`, `form_shown` for zap) | An `arc` effect part (its length the cue's size); the discharge's colour leaves `reaction_colors` |
+| 9 | The staff swap's poof that follows the body (`_on_staff_shown`, `POOF_*`) | A cue `staff_swap`, once `CueContext` can follow a node with an offset. Its timing is tied to `StaffLook`'s swap, so it is checked frame by frame |
+| 10 | Particles in the other shot shaders: the swing's sparks and card particles (`shot_swing.gdshader`) and a beam's splash and card particles at its end (`shot_beam.gdshader`) | Motes through the births, like the trails' (P1d); the swing's line and the beam stay shapes. They give off every frame, so after S4 |
+| 11 | A status's particles around a body (`shot_status.gdshader`'s loop) and the status colours and looks (`FeelPreset.status_order`, `status_looks`) | The glow that follows the body stays code; a status's colour and look come from its element card (`tint`, `look_layer`), and its particles become that card's motes from a slow emitter. Freeze and chill must still read apart |
+| 12 | The torch's painted glow, drawn as well as its light with Spell light on | Hidden while Spell light is on (the `light_spot` is the torch's light); a "mote spot" for embers rising from a torch, if wanted |
+| 13 | Moments with no look at all: a horde level-up, a gem picked up, a revive, a wizard's shield blocking a hit, a magnet pull, a wave starting | Cues, each one `cue_shown` from its area, so content can give them a look. A gem pickup can happen hundreds of times a second in a horde: throttled |
+| 14 | Hardcoded colours: `FeelPreset.enemy_hit_color`, the horde gems' colours | Data (an enemy's ramp, the gems' as content) |
+
+**Stays code (not moments):** the telegraphs (exact readability: reach, lane width and progress; at most their numbers move into enemy data), beams while they last, shot bodies and the swing's line, the hit flash and squash, body looks (dash afterimages, faces, the decoy), text (reaction names, the downed note), UI drawn in the world (the reticle, revive and protect rings, possession bars, damage numbers), the large batches (the swarm, the gems), and hit-stop and shake (already cue and preset data).
+
+**Order inside S6:** 1, 2, 7 and 8 need only parts that exist (plus an `arc` entry); then 5, 6, 13 and 14; 4 is a new part type; 9 needs a following `CueContext`; 3, 10 and 11 come after S4, which sets what a mote row costs. S3's own new special case (spray and puff thrown as motes inside `show_effect`) goes when hit flashes become cues (`hit`, and a puff for a hit with no way), under the same storm check as 2.
+
 ## Order
 
 ```
-S1 ─┬─ S2
-    └─ S3 ─┬─ S4
-           └─ S5
+S1 ─┬─ S2 ──────────┐
+    └─ S3 ─┬─ S4 ─── S6 (3, 10, 11)
+           ├─ S5      │
+           └──────── S6 (the rest, after S2 and S3)
 ```
 
-S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 and S5 after S3 (S5's first steps are quick and come first). Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.
+S1 first, because S2 and S3 both change what Feel does with motes. S2 and S3 can be built side by side after it (S2 is the kinds and their lookup, S3 the old effects and the trail shader). S4 and S5 after S3 (S5's first steps are quick and come first). S6 after S2 and S3; its particle items after S4. Each is one session with tests, a screenshot sheet where anything is drawn, and `tools/check.sh` plus the suite passing.

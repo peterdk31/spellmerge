@@ -26,6 +26,16 @@ extends Node2D
 ##
 ## **Off the walls:** the stamp shader is clipped by the walls (`floor_mask`, one texel a wall
 ## cell of the projectile manager's grid, `set_walls`), built once a room.
+##
+## **Settled motes** (P2b): a mote of a kind that settles (`MoteKind.settles`) is handed over when
+## it is thrown, with where and when it comes to rest (`settle`, from `Motes.mote_land`). It waits
+## in a wheel of SETTLE_SLOTS time slots, each SETTLE_SLOT long, and is stamped once its slot is
+## past (never before it lies still; up to a slot late, under the still mote). At most
+## SETTLED_PER_FRAME are stamped a frame and at most SETTLE_SLOT_ROWS wait in a slot; the rest
+## just fade with their motes (`settles_faded`). A settle may carry its mote's serial: once the
+## motes say that mote is gone (`forget_settles_before`, the ring wrote over it before it rested)
+## it fades too, so no mark is left where nothing was seen to land. Their colours, and a surface's (`surface`), are
+## the ramp table's that the motes use (`set_ramp_table`).
 
 const SHADER: Shader = preload("res://gameplay/feel/mark.gdshader")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
@@ -43,6 +53,14 @@ const KIND_CODE: float = 16.0
 const SOURCE_CODE: float = 128.0
 ## The biggest radius a stamp has (px); a bigger one is drawn this big.
 const MAX_RADIUS: float = 160.0
+## Settled motes stamped in one frame at most; the rest fade with their motes.
+const SETTLED_PER_FRAME: int = 512
+## The settle wheel: its slots' length (s), how many (past Motes.LIFE_MAX), the most a slot holds
+## and the floats a settled mote takes (where, its kind, its source, its core colour).
+const SETTLE_SLOT: float = 1.0 / 30.0
+const SETTLE_SLOTS: int = 128
+const SETTLE_SLOT_ROWS: int = 256
+const SETTLE_STRIDE: int = 8
 ## The longest side of the layer, in texels: a bigger room's layer covers its first MAX_SIDE
 ## pixels across and down (rooms are at most 1,344 px across today; a tiled layer would be next).
 const MAX_SIDE: int = 4096
@@ -51,6 +69,8 @@ const MAX_SIDE: int = 4096
 var renders: int = 0
 ## Stamps left out because PENDING_MAX were waiting (for tests and the benchmarks).
 var left_out: int = 0
+## Settled motes that faded with no stamp (past SETTLED_PER_FRAME, or a full slot; for tests).
+var settles_faded: int = 0
 
 var _kinds: Array[MarkKind] = []
 var _layer_kinds: Array[PackedInt32Array] = []
@@ -71,6 +91,15 @@ var _z: int = 0
 ## A render was asked since the last step (a clear), and one is due at the end of this frame.
 var _asked: bool = false
 var _live: bool = false
+## The settle wheel: per slot its motes and how many; the last slot stamped (a slot number since
+## the clock's start), and whether the clock is known yet (the first `step` with one).
+var _settle: PackedFloat32Array = PackedFloat32Array()
+var _settle_count: PackedInt32Array = PackedInt32Array()
+var _settle_serial: PackedInt64Array = PackedInt64Array()
+var _settle_done: int = -1
+var _settle_started: bool = false
+## Settles whose serial is below this are gone (`forget_settles_before`).
+var _settle_forget: int = 0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
@@ -84,6 +113,9 @@ func _init(z: int, kinds: Array[MarkKind]) -> void:
 	_material.shader = SHADER
 	_rows.resize(STAMPS_PER_FRAME * DRAW_STRIDE)
 	_pending.resize(PENDING_MAX * DRAW_STRIDE)
+	_settle.resize(SETTLE_SLOTS * SETTLE_SLOT_ROWS * SETTLE_STRIDE)
+	_settle_count.resize(SETTLE_SLOTS)
+	_settle_serial.resize(SETTLE_SLOTS * SETTLE_SLOT_ROWS)
 	_take_kinds(kinds)
 
 
@@ -143,10 +175,19 @@ func set_floor_colors(colours: PackedColorArray) -> void:
 	_material.set_shader_parameter(&"floor_known", 0.0 if colours.is_empty() else 1.0)
 
 
-## Wipe every mark: the layer renders once more, cleared, with nothing drawn; the waiting stamps go.
+## The ramp table's texture (`ramp_table.gd`, the one the motes use) that `surface` colours, and
+## a settled mote's own, are read from; null for none, and then such a part is not drawn.
+func set_ramp_table(texture: Texture2D) -> void:
+	_material.set_shader_parameter(&"ramp_table", texture)
+	_material.set_shader_parameter(&"table_rows", float(texture.get_height()) if texture != null else 0.0)
+
+
+## Wipe every mark: the layer renders once more, cleared, with nothing drawn; the waiting stamps
+## and settled motes go.
 func clear() -> void:
 	_pending_head = 0
 	_pending_count = 0
+	_settle_count.fill(0)
 	if _viewport == null:
 		return
 	_batch.multimesh.visible_instance_count = 0
@@ -157,9 +198,10 @@ func clear() -> void:
 
 
 ## Stamp a mark of kind `k` at `at` (world pixels), `radius` pixels round, turned by `turn`
-## radians, in the colours of `source` (`Motes.spell_source`) with the core colour `core` for the
-## parts coloured from the spell. It is drawn at the next `step`.
-func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: Color) -> void:
+## radians, in the colours of `source` (`Motes.spell_source`, or a ramp table row) with the core
+## colour `core` for the parts coloured from the spell, and of `surface` (a ramp table row; -1 for
+## none) for those coloured from the surface. It is drawn at the next `step`.
+func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: Color, surface: int = -1) -> void:
 	if k < 0 or k >= _kinds.size() or not at.is_finite() or radius <= 0.0 or _viewport == null:
 		return
 	if _pending_count >= PENDING_MAX:
@@ -175,10 +217,50 @@ func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: C
 	_pending[i + 7] = middle.y
 	_pending[i + 8] = float(k) / KIND_CODE
 	_pending[i + 9] = float(maxi(source, 0)) / SOURCE_CODE
+	_pending[i + 10] = float(maxi(surface, 0)) / SOURCE_CODE
 	_pending[i + 11] = 1.0
 	_pending[i + 12] = core.r
 	_pending[i + 13] = core.g
 	_pending[i + 14] = core.b
+
+
+## A mote that comes to rest at `at` at the clock time `when` leaves the mark of kind `k` there,
+## in its own colours (`source`, a spell's or a ramp table row, with the core colour `core`),
+## stamped once the clock is past `when`'s slot (`step`). `serial` names the mote (its row's
+## serial, `forget_settles_before`; -1 for one never forgotten). Nothing before the first `step`
+## with a clock, or with no room.
+func settle(k: int, at: Vector2, when: float, source: int, core: Color, serial: int = -1) -> void:
+	if not _settle_started or _viewport == null or k < 0 or k >= _kinds.size() or not at.is_finite() or not is_finite(when):
+		return
+	var slot: int = clampi(floori(when / SETTLE_SLOT), _settle_done + 1, _settle_done + SETTLE_SLOTS)
+	var ring: int = slot % SETTLE_SLOTS
+	var n: int = _settle_count[ring]
+	if n >= SETTLE_SLOT_ROWS:
+		settles_faded += 1
+		return
+	_settle_count[ring] = n + 1
+	_settle_serial[ring * SETTLE_SLOT_ROWS + n] = serial
+	var i: int = (ring * SETTLE_SLOT_ROWS + n) * SETTLE_STRIDE
+	_settle[i] = at.x
+	_settle[i + 1] = at.y
+	_settle[i + 2] = float(k)
+	_settle[i + 3] = float(source)
+	_settle[i + 4] = core.r
+	_settle[i + 5] = core.g
+	_settle[i + 6] = core.b
+
+
+## The motes of serials below `serial` are gone (overwritten in their ring): their settles fade.
+func forget_settles_before(serial: int) -> void:
+	_settle_forget = serial
+
+
+## Settled motes waiting for their slot (for tests).
+func settling() -> int:
+	var n: int = 0
+	for count in _settle_count:
+		n += count
+	return n
 
 
 ## A turn picked at random for a stamp (its shape is its own either way).
@@ -186,10 +268,14 @@ func random_turn() -> float:
 	return _rng.randf() * TAU
 
 
-## Once a frame: draw up to STAMPS_PER_FRAME waiting stamps into the layer (one upload, one
+## Once a frame, at the clock time `now` (below 0 for none): stamp the settled motes whose slot
+## is past, then draw up to STAMPS_PER_FRAME waiting stamps into the layer (one upload, one
 ## render); a frame with none renders nothing, and the viewport reads UPDATE_DISABLED again once
 ## the render asked for the frame before is done.
-func step() -> void:
+func step(now: float = -1.0) -> void:
+	# The clock is learnt even with no room yet, so a room's first frame can settle motes.
+	if now >= 0.0:
+		settle_due(now)
 	if _viewport == null:
 		return
 	var want: bool = _asked or _pending_count > 0
@@ -211,6 +297,36 @@ func step() -> void:
 	_batch.multimesh.visible_instance_count = n
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	renders += 1
+
+
+## Queue the stamps of the settled motes whose slot is past at the clock time `now` and not
+## stamped yet (SETTLED_PER_FRAME at most; the rest fade); `step` draws them. The first call only
+## learns the clock.
+func settle_due(now: float) -> void:
+	var due: int = floori(now / SETTLE_SLOT) - 1
+	if not _settle_started:
+		_settle_started = true
+		_settle_done = due
+		return
+	if due <= _settle_done:
+		return
+	var budget: int = SETTLED_PER_FRAME
+	for slot in range(maxi(_settle_done + 1, due - SETTLE_SLOTS + 1), due + 1):
+		var ring: int = slot % SETTLE_SLOTS
+		var n: int = _settle_count[ring]
+		_settle_count[ring] = 0
+		var drawn_here: int = mini(n, budget)
+		settles_faded += n - drawn_here
+		budget -= drawn_here
+		for m in drawn_here:
+			var serial: int = _settle_serial[ring * SETTLE_SLOT_ROWS + m]
+			if serial >= 0 and serial < _settle_forget:
+				settles_faded += 1
+				continue
+			var i: int = (ring * SETTLE_SLOT_ROWS + m) * SETTLE_STRIDE
+			var source: int = int(_settle[i + 3])
+			stamp(int(_settle[i + 2]), Vector2(_settle[i], _settle[i + 1]), 1.0, 0.0, source, Color(_settle[i + 4], _settle[i + 5], _settle[i + 6]), source)
+	_settle_done = due
 
 
 ## Stamps waiting for a frame (for tests).
@@ -264,7 +380,7 @@ func shader_parameter(name: StringName) -> Variant:
 ## Keep the kinds with no problems (MAX_KINDS at most), index them by look layer and hand their
 ## numbers to the shader.
 func _take_kinds(kinds: Array[MarkKind]) -> void:
-	_layer_kinds.resize(22)
+	_layer_kinds.resize(MoteKind.LOOK_LAYERS + 1)
 	for layer in _layer_kinds.size():
 		_layer_kinds[layer] = PackedInt32Array()
 	var forms := PackedVector4Array()

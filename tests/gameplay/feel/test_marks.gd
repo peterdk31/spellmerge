@@ -7,6 +7,11 @@ extends "res://tests/support/suite.gd"
 ## floor colours. Kinds are data (`MarkKind`, content/marks); every mark a cue names exists. The
 ## layer lies over the room's floor and under every body; with the "Floor marks" setting off
 ## there is no layer and no nodes.
+##
+## P2b: a mote of a kind that settles (`MoteKind.settles`) leaves its mark where `Motes.mote_land`
+## says it comes to rest, never before then and at most a slot after, SETTLED_PER_FRAME a frame at
+## most; the other marks (a nova's burn ring, a rune's scar, a death's ichor in the body's own
+## colours, lightning's char) are stamped by their cues.
 
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -25,6 +30,8 @@ const TOP_WALL := Rect2(0.0, 0.0, 640.0, 32.0)
 ## Look bits of the elements' layers (layer n is bit n - 1).
 const FIRE_LOOK: int = 1 << 0
 const FROST_LOOK: int = 1 << 1
+const LIGHTNING_LOOK: int = 1 << 4
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 
 var registry: RegistryScript
 
@@ -74,7 +81,7 @@ func _feel() -> Array:
 
 func test_every_mark_kind_is_valid_and_every_cue_names_one() -> void:
 	var ids: Array[StringName] = registry.get_ids(&"marks")
-	for id: StringName in [&"scorch", &"crack", &"frost"]:
+	for id: StringName in [&"scorch", &"crack", &"frost", &"speck", &"burn_ring", &"rune_scar", &"ichor", &"char"]:
 		check(ids.has(id), "the %s mark is there" % id)
 	for id in ids:
 		var kind: MarkKind = registry.get_resource(&"marks", id) as MarkKind
@@ -91,9 +98,16 @@ func test_every_mark_kind_is_valid_and_every_cue_names_one() -> void:
 				named += 1
 				check(ids.has(StringName(part["mark"])), "%s names the mark '%s', which exists" % [cue_id, part["mark"]])
 	check(named >= 3, "the blast, fireball, slam and quake cues leave marks (%d parts)" % named)
-	for cue_id: StringName in [&"blast", &"slam"]:
+	for cue_id: StringName in [&"blast", &"slam", &"nova", &"rune_burst", &"enemy_death", &"boss_death"]:
 		var parts: Array[Dictionary] = (registry.get_resource(&"cues", cue_id) as CueBase).parts
 		check(parts.any(func(p: Dictionary) -> bool: return StringName(p.get("part", "")) == &"mark"), "%s leaves a mark" % cue_id)
+	var settling: int = 0
+	for mote_id: StringName in registry.get_ids(&"motes"):
+		var mote: MoteKind = registry.get_resource(&"motes", mote_id) as MoteKind
+		if mote.settles != &"":
+			settling += 1
+			check(ids.has(mote.settles), "%s settles as the mark '%s', which exists" % [mote_id, mote.settles])
+	check(settling >= 2, "the falling kinds settle (the chips, frost's flecks): %d" % settling)
 
 
 func test_problems_name_what_is_wrong() -> void:
@@ -103,6 +117,12 @@ func test_problems_name_what_is_wrong() -> void:
 	kind.edge_from = "sky"
 	kind.look_layers = PackedInt32Array([30])
 	check_equal(kind.problems().size(), 4, "a form, a shade (light is not a mark's), a source and a layer: %s" % [kind.problems()])
+	var ember := MoteKind.new()
+	ember.id = &"ember"
+	ember.look_layers = PackedInt32Array([1])
+	ember.gravity = -10.0
+	ember.settles = &"speck"
+	check_equal(ember.problems().size(), 1, "a mote that rises never comes to rest, so it leaves no mark: %s" % [ember.problems()])
 	var cue := CueBase.new()
 	cue.id = &"broken"
 	cue.parts = [{"part": &"mark"}, {"part": &"mark", "mark": &"scorch", "zoom": 2, "rot": &"spin", "radius": 0.0}]
@@ -131,6 +151,7 @@ func test_the_shader_is_handed_each_kinds_numbers() -> void:
 	for name: String in ["KIND_CODE", "SOURCE_CODE"]:
 		check(code.contains("const float %s = %.1f;" % [name, float((MarksScript as GDScript).get_script_constant_map()[name])]), "the shader's %s is marks.gd's" % name)
 	check(code.contains("const float EXACT_SOURCE = %.1f;" % float(MotesScript.EXACT_SOURCE)), "and its EXACT_SOURCE the motes'")
+	check(code.contains("const float TABLE_SOURCE = %.1f;" % float(MotesScript.TABLE_SOURCE)), "and its TABLE_SOURCE")
 	check(code.contains("const int MAX_KINDS = %d;" % MarksScript.MAX_KINDS), "and MAX_KINDS")
 	for i in MarkKind.FORMS.size():
 		check(code.contains("%d %s" % [i, MarkKind.FORMS[i]]), "the shader says form %d is %s" % [i, MarkKind.FORMS[i]])
@@ -259,8 +280,150 @@ func test_a_cue_stamps_its_mark_as_big_as_its_reach() -> void:
 	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0, Color("4fd6dc"), FROST_LOOK)
 	check_equal(roundi(marks.pending_row(2)[8] * MarksScript.KIND_CODE), marks.kind_index(&"crack"), "a slam cracks the floor whatever its cards")
 	check_equal(marks.pending(), 3, "one stamp a cue")
-	feel.play_cue(&"nova", 0, Vector2(300.0, 150.0))
+	feel.play_cue(&"heal", 0, Vector2(300.0, 150.0))
 	check_equal(marks.pending(), 3, "a cue with no mark part stamps nothing")
+	feel.play_cue(&"blast", 0, Vector2(200.0, 150.0), Vector2.RIGHT, 40.0, Color("f4e04d"), LIGHTNING_LOOK)
+	check_equal(roundi(marks.pending_row(3)[8] * MarksScript.KIND_CODE), marks.kind_index(&"char"), "a lightning blast leaves char")
+
+
+func test_the_other_marks_come_from_their_cues() -> void:
+	var pair: Array = _feel()
+	var feel: FeelScript = pair[1]
+	var marks: MarksScript = feel.marks()
+	feel.play_cue(&"nova", 0, Vector2(300.0, 150.0))
+	check_equal(roundi(marks.pending_row(0)[8] * MarksScript.KIND_CODE), marks.kind_index(&"burn_ring"), "a nova burns a ring round its caster")
+	var rune: FormBase = registry.get_resource(&"spells", &"rune") as FormBase
+	check_equal(StringName(rune.impact_look.get("cue", "")), &"rune_burst", "a rune's impact plays rune_burst")
+	feel.play_cue(&"rune_burst", 0, Vector2(300.0, 150.0), Vector2.RIGHT, rune.radius)
+	check_equal(roundi(marks.pending_row(1)[8] * MarksScript.KIND_CODE), marks.kind_index(&"rune_scar"), "which leaves a rune's scar")
+	check_equal(marks.pending_row(1)[0], roundf(rune.radius), "as big as the rune")
+	feel.play_cue(&"enemy_death", 0, Vector2(300.0, 150.0))
+	var row: PackedFloat32Array = marks.pending_row(2)
+	check_equal(roundi(row[8] * MarksScript.KIND_CODE), marks.kind_index(&"ichor"), "a death leaves ichor")
+	var surface: int = roundi(row[10] * MarksScript.SOURCE_CODE)
+	check(surface >= MotesScript.TABLE_SOURCE, "in the colours of a surface, a row of the ramp table: %d" % surface)
+	check(marks.shader_parameter(&"ramp_table") is Texture2D and marks.shader_parameter(&"table_rows") == float(RampTableScript.ROWS), "which the marks read")
+	var ichor: MarkKind = marks.kinds()[marks.kind_index(&"ichor")]
+	check(ichor.body_from == "surface" and ichor.edge_from == "surface", "ichor is all the surface's colours (the body's own art, not blood)")
+
+
+func _settling_pair(kinds: Array[MoteKind]) -> Array:
+	var speck := _kind(&"speck")
+	speck.form = "speck"
+	speck.body_from = "spell"
+	var marks: MarksScript = _layer([_kind(&"scorch"), speck])
+	var motes: MotesScript = own(MotesScript.new(4096, 0, kinds)) as MotesScript
+	root.add_child(motes)
+	motes.settle_into(marks)
+	motes.step(0.0)
+	marks.step(0.0)
+	return [motes, marks]
+
+
+func test_a_settled_mote_leaves_its_mark_where_it_rests() -> void:
+	var chip: MoteKind = registry.get_resource(&"motes", &"chip") as MoteKind
+	var ember: MoteKind = registry.get_resource(&"motes", &"ember") as MoteKind
+	check_equal(chip.settles, &"speck", "a chip settles as a speck")
+	var pair: Array = _settling_pair([chip, ember] as Array[MoteKind])
+	var motes: MotesScript = pair[0]
+	var marks: MarksScript = pair[1]
+	check_equal(motes.settle_mark(0), marks.kind_index(&"speck"), "the chips' mark is the layer's speck")
+	check_equal(motes.settle_mark(1), -1, "an ember leaves none")
+	var source: int = motes.table_source(PackedColorArray([Color("c8c3b4"), Color("8a8577"), Color("4e4a42")]))
+	motes.throw(1, Vector2(200.0, 150.0), Vector2.RIGHT, 2, Color.WHITE, 3.0)
+	check_equal(marks.settling(), 0, "embers rise: nothing settles")
+	var first: int = motes.next_row()
+	motes.throw(0, Vector2(200.0, 150.0), Vector2.RIGHT, source, Color.WHITE, 2.0)
+	var thrown: int = motes.next_row() - first
+	var lands: Array[Vector3] = []
+	for row in range(first, first + thrown):
+		var land: Vector3 = motes.mote_land(row)
+		if land.z != INF:
+			lands.append(land)
+	check(thrown > 0 and lands.size() > 0, "chips are thrown (%d) and come to rest (%d)" % [thrown, lands.size()])
+	check_equal(marks.settling(), lands.size(), "each one that rests in its life waits for its time")
+	var found: Dictionary = {}
+	var t: float = 0.0
+	while t < MotesScript.LIFE_MAX + 0.5:
+		t += 1.0 / 60.0
+		marks.settle_due(t)
+		for n in marks.pending():
+			var row: PackedFloat32Array = marks.pending_row(n)
+			var at := Vector2(row[3], row[7]) + marks.origin()
+			found[at] = found.get(at, 0) + 1
+			var match_land: bool = false
+			for land in lands:
+				if Vector2(land.x, land.y).floor() == at and t >= land.z and t <= land.z + MarksScript.SETTLE_SLOT + 1.0 / 60.0 + 0.0001:
+					match_land = true
+			check(match_land, "a speck at %s at %.3f s: where a chip rests, once it does, at most a slot later" % [at, t])
+			check_equal(row[0], 1.0, "one pixel")
+			check_equal(roundi(row[8] * MarksScript.KIND_CODE), marks.kind_index(&"speck"), "a speck")
+			check_equal(roundi(row[9] * MarksScript.SOURCE_CODE), source, "in the chip's own colours")
+		marks.step()
+	var stamped: int = 0
+	for at: Vector2 in found:
+		stamped += found[at]
+	check_equal(stamped, lands.size(), "every chip that rests leaves one speck")
+	check_equal(marks.settling(), 0, "and none waits")
+	check_equal(marks.settles_faded, 0, "none faded")
+
+
+func test_settled_motes_are_capped_a_frame() -> void:
+	var pair: Array = _settling_pair([registry.get_resource(&"motes", &"chip") as MoteKind] as Array[MoteKind])
+	var marks: MarksScript = pair[1]
+	for i in MarksScript.SETTLE_SLOT_ROWS + 5:
+		marks.settle(1, Vector2(i % 600, 100.0), 0.5, 2, Color.WHITE)
+	check_equal(marks.settling(), MarksScript.SETTLE_SLOT_ROWS, "a slot holds SETTLE_SLOT_ROWS")
+	check_equal(marks.settles_faded, 5, "the rest fade")
+	for slot in 3:
+		for i in 200:
+			marks.settle(1, Vector2(i, 200.0 + slot), (30.5 + slot) * MarksScript.SETTLE_SLOT, 2, Color.WHITE)
+	marks.settle_due(0.6)
+	check_equal(marks.pending(), MarksScript.SETTLE_SLOT_ROWS, "a frame stamps what is due")
+	marks.step()
+	marks.settle_due(2.0)
+	check_equal(marks.pending(), MarksScript.SETTLED_PER_FRAME, "at most SETTLED_PER_FRAME a frame")
+	check_equal(marks.settles_faded, 5 + 600 - MarksScript.SETTLED_PER_FRAME, "the rest fade with their motes")
+	check_equal(marks.settling(), 0, "and none waits")
+	marks.settle(1, Vector2(10.0, 10.0), 0.1, 2, Color.WHITE)
+	marks.settle_due(2.1)
+	check_equal(marks.pending(), MarksScript.SETTLED_PER_FRAME + 1, "one already due is stamped at the next frame")
+	marks.settle(1, Vector2(10.0, 10.0), 3.0, 2, Color.WHITE)
+	marks.enter(BOUNDS, null, 8.0)
+	check_equal(marks.settling(), 0, "a new room: the waiting motes go")
+	var objects: float = Performance.get_monitor(Performance.OBJECT_COUNT)
+	for frame in 30:
+		for i in 100:
+			marks.settle(1, Vector2(i, frame), 2.2 + frame * 0.02, 2, Color.WHITE)
+		marks.step(2.2 + frame * 0.02)
+	check_equal(Performance.get_monitor(Performance.OBJECT_COUNT), objects, "nothing is made while settling")
+
+
+func test_feel_links_settled_motes_to_the_settings() -> void:
+	var pair: Array = _feel()
+	var bus: EventsScript = pair[0]
+	var feel: FeelScript = pair[1]
+	feel.set_mote_cap(8192)
+	var chip: int = feel.motes().kind_index(&"chip")
+	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "Feel's chips settle into its layer")
+	feel.step(0.016)
+	feel.step(0.016)
+	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
+	check(feel.marks().settling() > 0, "a slam's chips wait to settle: %d" % feel.marks().settling())
+	for i in 300:
+		feel.step(0.016)
+	check_equal(feel.marks().settling(), 0, "and are stamped as Feel's clock passes")
+	bus.floor_marks_changed.emit(false)
+	check_equal(feel.motes().settle_mark(chip), -1, "floor marks off: nothing settles")
+	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
+	bus.floor_marks_changed.emit(true)
+	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "on again: linked again")
+	feel.set_mote_cap(0)
+	check(feel.motes() == null, "particles off: no motes")
+	feel.play_cue(&"slam", 0, Vector2(300.0, 150.0), Vector2.RIGHT, 30.0)
+	check_equal(feel.marks().settling(), 0, "so none settle")
+	feel.set_mote_cap(8192)
+	check_equal(feel.motes().settle_mark(chip), feel.marks().kind_index(&"speck"), "particles on again: linked to the layer")
 
 
 func test_a_new_room_and_the_setting() -> void:
@@ -317,3 +480,136 @@ func test_off_from_the_start_makes_nothing() -> void:
 	feel.play_cue(&"blast", 0, Vector2(200.0, 150.0), Vector2.RIGHT, 40.0)
 	feel.step(0.016)
 	check(feel.marks() == null, "no layer, and a cue's mark part does nothing")
+
+
+func test_a_rooms_first_frame_can_settle_motes() -> void:
+	var marks: MarksScript = own(MarksScript.new(-1, [_kind(&"speck")] as Array[MarkKind])) as MarksScript
+	root.add_child(marks)
+	marks.step(1.0)
+	marks.enter(BOUNDS, null, 8.0)
+	marks.settle(0, Vector2(100.0, 100.0), 1.5, 2, Color.WHITE)
+	check_equal(marks.settling(), 1, "the clock was learnt before the room: a mote thrown as it is entered settles")
+	marks.step(1.6)
+	check_equal(marks.drawn(), 1, "and is stamped once it rests")
+
+
+## The specks a pool's settling motes leave, over the clock from 0 to past their lives: each
+## stamped one's point and the time it was stamped.
+func _stamped_over_time(marks: MarksScript) -> Array[Vector3]:
+	var found: Array[Vector3] = []
+	var t: float = 0.0
+	while t < MotesScript.LIFE_MAX + 0.5:
+		t += 1.0 / 60.0
+		marks.settle_due(t)
+		for n in marks.pending():
+			var row: PackedFloat32Array = marks.pending_row(n)
+			var at := Vector2(row[3], row[7]) + marks.origin()
+			found.append(Vector3(at.x, at.y, t))
+		marks.step()
+	return found
+
+
+## A kind that sways (wobble) or glides with no drag rests where `mote_land` says, as a chip does:
+## the settled marks use the very sum the flight does.
+func test_swaying_and_dragless_kinds_settle_where_they_rest() -> void:
+	var sway := MoteKind.new()
+	sway.id = &"sway"
+	sway.surface = true
+	sway.settles = &"speck"
+	sway.gravity = 300.0
+	sway.drag = 1.5
+	sway.bounce = 0.4
+	sway.wobble = 4.0
+	sway.wobble_rate = 9.0
+	var glide := MoteKind.new()
+	glide.id = &"glide"
+	glide.surface = true
+	glide.settles = &"speck"
+	glide.gravity = 300.0
+	glide.drag = 0.0
+	glide.bounce = 0.2
+	var pair: Array = _settling_pair([sway, glide] as Array[MoteKind])
+	var motes: MotesScript = pair[0]
+	var marks: MarksScript = pair[1]
+	var lands: Array[Vector3] = []
+	for k in 2:
+		var first: int = motes.next_row()
+		motes.burst(k, Vector2(200.0 + 100.0 * k, 150.0), Vector2.RIGHT, 6, Vector2(20.0, 60.0), 120.0, Vector2(10.0, 50.0), Vector2(2.0, 3.0), 2, Color.WHITE, 4.0)
+		for row in range(first, motes.next_row()):
+			var land: Vector3 = motes.mote_land(row)
+			check(land.z != INF, "row %d rests in its life" % row)
+			lands.append(land)
+	var stamped: Array[Vector3] = _stamped_over_time(marks)
+	check_equal(stamped.size(), lands.size(), "one speck a mote")
+	for land in lands:
+		var match_land: bool = false
+		for at in stamped:
+			if Vector2(at.x, at.y) == Vector2(land.x, land.y).floor() and at.z >= land.z and at.z <= land.z + MarksScript.SETTLE_SLOT + 1.0 / 60.0 + 0.0001:
+				match_land = true
+		check(match_land, "a speck where the mote rests (%s), once it does" % land)
+
+
+## A trail's motes settle as any other's (one rule: a kind that settles leaves its mark however it
+## was thrown), so a frost bolt's trail leaves specks where its flecks come to rest.
+func test_a_trails_settling_motes_leave_their_marks() -> void:
+	var fleck: MoteKind = registry.get_resource(&"motes", &"fleck") as MoteKind
+	check_equal(fleck.settles, &"speck", "frost's flecks settle")
+	var pair: Array = _settling_pair([fleck] as Array[MoteKind])
+	var motes: MotesScript = pair[0]
+	var marks: MarksScript = pair[1]
+	var given := PackedFloat32Array()
+	given.resize(4 * MotesScript.BIRTH_STRIDE)
+	for n in 4:
+		var b: int = n * MotesScript.BIRTH_STRIDE
+		given[b + ProjectilesScript.SPARK_X] = 100.0 + 40.0 * n
+		given[b + ProjectilesScript.SPARK_Y] = 120.0
+		given[b + ProjectilesScript.SPARK_BACK_X] = -1.0
+		given[b + ProjectilesScript.SPARK_KIND] = float(fleck.look_layers[0])
+		given[b + ProjectilesScript.SPARK_LOOK] = float(FROST_LOOK)
+		given[b + ProjectilesScript.SPARK_CORE] = 0.6
+		given[b + ProjectilesScript.SPARK_CORE + 1] = 0.8
+		given[b + ProjectilesScript.SPARK_CORE + 2] = 1.0
+	motes.give_off(given, 4)
+	var resting: int = 0
+	for row in 4:
+		if motes.mote_land(row).z != INF:
+			resting += 1
+	check(resting > 0, "the flecks come to rest in their lives: %d" % resting)
+	check_equal(marks.settling(), resting, "and each waits to leave its speck")
+	check_equal(_stamped_over_time(marks).size(), resting, "then leaves it")
+
+
+## A mote the ring writes over before it rests leaves no mark (on the web's small ring a storm
+## wraps it in under half a second): its settle carries its serial, and the motes tell the layer
+## which are gone.
+func test_a_mote_written_over_before_it_rests_leaves_no_mark() -> void:
+	var marks: MarksScript = _layer([_kind(&"speck")])
+	marks.step(0.0)
+	marks.settle(0, Vector2(10.0, 10.0), 0.2, 2, Color.WHITE, 5)
+	marks.settle(0, Vector2(12.0, 10.0), 0.2, 2, Color.WHITE, 12)
+	marks.settle(0, Vector2(14.0, 10.0), 0.2, 2, Color.WHITE)
+	marks.forget_settles_before(10)
+	marks.settle_due(0.5)
+	check_equal(marks.pending(), 2, "the overwritten one fades; a later one and one with no serial are stamped")
+	check_equal(marks.settles_faded, 1, "counted as faded")
+
+	var chip: MoteKind = registry.get_resource(&"motes", &"chip") as MoteKind
+	var ember: MoteKind = registry.get_resource(&"motes", &"ember") as MoteKind
+	var speck := _kind(&"speck")
+	speck.form = "speck"
+	var layer: MarksScript = _layer([speck])
+	var small: MotesScript = own(MotesScript.new(MotesScript.CHUNK, 0, [chip, ember] as Array[MoteKind])) as MotesScript
+	root.add_child(small)
+	small.settle_into(layer)
+	small.step(0.0)
+	layer.step(0.0)
+	small.burst(0, Vector2(200.0, 150.0), Vector2.RIGHT, 8, chip.speed, chip.spread, chip.up, chip.life, 2, Color.WHITE, chip.height)
+	check_equal(layer.settling(), 8, "eight chips wait to settle")
+	# The ring (one chunk) is written over by embers before the chips rest.
+	var t: float = 0.0
+	for frame in 5:
+		t += 1.0 / 60.0
+		small.step(t)
+		small.burst(1, Vector2(400.0, 150.0), Vector2.RIGHT, 250, ember.speed, ember.spread, ember.up, ember.life, 2, Color.WHITE, ember.height)
+	small.step(t)
+	check_equal(_stamped_over_time(layer).size(), 0, "none of the written-over chips leaves a speck")

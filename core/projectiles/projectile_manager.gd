@@ -484,6 +484,36 @@ const TRAIL_QUADS: Array[Vector3i] = [
 const SPARK_STRIDE_MAX: int = 64
 const SPARK_STRIDE_LOW: float = 0.4
 const DASH_STREAK_SLOTS: int = 32
+## Trail particles as motes (spell spectacle P1d, an experiment; docs/milestones/spell-spectacle.md):
+## while fewer than `spark_motes_below` shots are drawn and something takes them (`spark_motes`,
+## Feel's motes), the shots' trails are drawn with no particle slots, and the particles they would
+## have given off are handed out as births (`spark_births`) for the motes to throw. The dashes keep
+## theirs. A birth is SPARK_BIRTH_STRIDE floats: where (x, y), the way back along the shot (x, y),
+## the look kind it is of (LOOK_*; 0 a plain shot's twinkle), the caster's ramp, the shot's look and
+## its core colour (r, g, b). The pool's share still thins them, as it thins the shader's, so the
+## births a frame stay about as many as the pool's particles live (PARTICLE_CAP over their life),
+## whatever the shot count. Measured (DECISIONS, 2026-11-04, "Trail particles as motes"): cheaper at
+## 60, 400 and 3,000 shots, so the threshold is past every cap; it stays a knob for a platform
+## whose CPU measures dearer than its GPU saves.
+const SPARK_MOTES_BELOW: int = 1 << 20
+const SPARK_BIRTH_STRIDE: int = 10
+## Where a birth's numbers are: where (x, y), the way back (x, y), the look kind, the caster's
+## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE).
+const SPARK_X: int = 0
+const SPARK_Y: int = 1
+const SPARK_BACK_X: int = 2
+const SPARK_BACK_Y: int = 3
+const SPARK_KIND: int = 4
+const SPARK_RAMP: int = 5
+const SPARK_LOOK: int = 6
+const SPARK_CORE: int = 7
+## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
+const SPARK_BIRTHS_MAX: int = 1024
+## How often each look kind gives off a particle at a moment (the trail shader's TIP[row].w, by
+## look kind; 0 the plain shot's twinkle, 11 the weave none). A test reads the shader's table.
+const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4]
+## Particle births a second a trail may have (the shader's BIRTHS).
+const SPARK_MOMENTS: float = 60.0
 ## The trail meshes' shapes (`trail_mesh_slots`): a shot's, lightning's (with its jagged line) and a dash's.
 const TRAIL_MESH_PLAIN: int = 0
 const TRAIL_MESH_JAG: int = 1
@@ -934,6 +964,17 @@ var threat_away: Vector2 = Vector2.ZERO
 ## SPARK_STRIDE_MAX), as the trail batches draw them now. Read only.
 var spark_stride: int = 1
 var full_tails: bool = true
+## Trail particles as motes (see SPARK_MOTES_BELOW): whether something takes the births, the shot
+## count under which they are motes, and whether they are now (read only). `spark_births` holds
+## `spark_birth_count` births of the last `update_draw` (reused; read before the next one).
+var spark_motes: bool = false
+var spark_motes_below: int = SPARK_MOTES_BELOW
+var sparks_as_motes: bool = false
+var spark_births: PackedFloat32Array = PackedFloat32Array()
+var spark_birth_count: int = 0
+## The last particle moment handed out, and the dice the births are rolled with.
+var _spark_moment: int = -1
+var _spark_rng := RandomNumberGenerator.new()
 ## The threat grid (see `threat`): the step and horizon it was built for (-1: none; any spawn,
 ## deflection or card move throws it away), its cells (THREAT_CELL or wider), each cell's shots as a
 ## list (`_threat_head` per cell, then `_threat_slot` and `_threat_next` per entry, -1 ends it), the
@@ -975,6 +1016,7 @@ func _init() -> void:
 	for pass_name in BEHAVIOUR_PASSES:
 		_passes.append(Callable(self, pass_name))
 	assert(_passes.size() == BEHAVIOURS, "one pass per behaviour, in the order of B_*")
+	_spark_rng.seed = 20261104
 	_member_count.resize(BEHAVIOURS)
 	_path.resize(RAY_PATH_START)
 	ray_path.resize(RAY_PATH_START)
@@ -1099,7 +1141,7 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## batches of its `shape` (TRAIL_MESH_*), and holds only the quads its trails can draw
 ## (`trail_mesh_slots`).
 static func trail_mesh(spark_slots: int = TRAIL_SPARKS, full_tail: bool = true, shape: int = TRAIL_MESH_JAG) -> ArrayMesh:
-	spark_slots = clampi(spark_slots, 1, TRAIL_SPARKS)
+	spark_slots = clampi(spark_slots, 0, TRAIL_SPARKS)
 	var key: int = _trail_mesh_key(spark_slots, full_tail, shape)
 	if _trail_meshes.has(key):
 		return _trail_meshes[key]
@@ -4334,6 +4376,7 @@ func _upload_trails() -> void:
 
 
 func update_draw(fraction: float = -1.0) -> void:
+	spark_birth_count = 0
 	if _draw_node == null:
 		drawn = 0
 		return
@@ -4380,6 +4423,85 @@ func update_draw(fraction: float = -1.0) -> void:
 	drawn = shots_out
 	drawn_trails = instances - shots_out
 	_share_pool(_draw_out[BATCHES], _draw_out[BATCHES + 1])
+	_give_off_sparks(fraction)
+
+
+## Whether the trails' particles are motes with `shots` shots drawn, from `now` (see
+## SPARK_MOTES_BELOW): under `spark_motes_below`, and once they are, until an eighth past it (so a
+## count round it does not swap the meshes back and forth).
+func spark_motes_as(shots: int, now: bool) -> bool:
+	if not spark_motes or spark_motes_below <= 0:
+		return false
+	return shots < spark_motes_below + (spark_motes_below / 8 if now else 0)
+
+
+## Hand out the particles the drawn shots' trails give off since the last frame, as births
+## (`spark_births`; see SPARK_MOTES_BELOW), when they are motes. The shader's rule, rolled on the
+## CPU: at each moment (SPARK_MOMENTS a second) a flying shot gives off one of its kinds, picked at
+## random, at that kind's rate (SPARK_RATES) times the pool's share. Rolled per birth, not per shot:
+## a random slot at each of `_high` x the share tries a moment, kept at the kind's rate, so the work
+## follows the births (the pool's share bounds them), not the shots.
+func _give_off_sparks(fraction: float) -> void:
+	spark_birth_count = 0
+	var moment: int = floori((sim_time - (1.0 - fraction) * _last_delta) * SPARK_MOMENTS)
+	var moments: int = clampi(moment - _spark_moment, 0, 4) if _spark_moment >= 0 else 1
+	_spark_moment = moment
+	if not sparks_as_motes or moments == 0 or _high == 0:
+		return
+	if spark_births.size() < SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE:
+		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
+	var tries: int = mini(floori(float(_high * moments) * particle_share + _spark_rng.randf()), SPARK_BIRTHS_MAX * 4)
+	for n in tries:
+		var slot: int = _spark_rng.randi_range(0, _high - 1)
+		if _alive[slot] == 0 or _motion[slot] == MOTION_STILL or _trail[slot] < 0:
+			continue
+		var bits: int = _look[slot] & EMITTING_MASK
+		var kind: int = 0
+		if bits != 0:
+			kind = _nth_bit(bits, _spark_rng.randi_range(0, _bit_count(bits) - 1)) + 1
+		if _spark_rng.randf() >= SPARK_RATES[kind]:
+			continue
+		var at: Vector2 = _prev[slot].lerp(_pos[slot], _spark_rng.randf() * fraction)
+		var back: Vector2 = _prev[slot] - _pos[slot]
+		if _motion[slot] == MOTION_ORBIT:
+			at = _drawn_at(slot, at)
+			back = -_orbit_tangent(slot)
+		var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
+		spark_births[i + SPARK_X] = at.x
+		spark_births[i + SPARK_Y] = at.y
+		back = back.normalized()
+		spark_births[i + SPARK_BACK_X] = back.x
+		spark_births[i + SPARK_BACK_Y] = back.y
+		spark_births[i + SPARK_KIND] = float(kind)
+		spark_births[i + SPARK_RAMP] = float(_ramp[slot])
+		spark_births[i + SPARK_LOOK] = float(_look[slot])
+		spark_births[i + SPARK_CORE] = _core[slot].r
+		spark_births[i + SPARK_CORE + 1] = _core[slot].g
+		spark_births[i + SPARK_CORE + 2] = _core[slot].b
+		spark_birth_count += 1
+		if spark_birth_count >= SPARK_BIRTHS_MAX:
+			return
+
+
+static func _bit_count(bits: int) -> int:
+	var n: int = 0
+	while bits != 0:
+		bits &= bits - 1
+		n += 1
+	return n
+
+
+## The place of the `n`-th set bit of `bits` (0 the lowest).
+static func _nth_bit(bits: int, n: int) -> int:
+	var at: int = 0
+	while bits != 0:
+		if bits & 1 == 1:
+			if n == 0:
+				return at
+			n -= 1
+		bits >>= 1
+		at += 1
+	return 0
 
 
 ## `update_draw`'s writing (what `ShotKernel.draw_shots` does natively): every live shot, then every
@@ -4483,12 +4605,15 @@ func _share_pool(asked: int, trails: int) -> void:
 	trail_share = 1.0 if trails <= 0 else clampf((cap - float(asked)) / float(trails), 0.0, 1.0)
 	var stride: int = spark_stride_for(particle_share, spark_stride)
 	var tails: bool = trail_share > 0.0
-	if stride != spark_stride or tails != full_tails:
+	var as_motes: bool = spark_motes_as(drawn, sparks_as_motes)
+	if stride != spark_stride or tails != full_tails or as_motes != sparks_as_motes:
 		spark_stride = stride
 		full_tails = tails
+		sparks_as_motes = as_motes
 		for batch in _nodes.size():
 			if BATCH_MESH[batch] >= 0:
-				_nodes[batch].multimesh.mesh = trail_mesh(spark_slots_for(stride), tails, BATCH_MESH[batch])
+				var slots: int = 0 if as_motes and BATCH_MESH[batch] != TRAIL_MESH_DASH else spark_slots_for(stride)
+				_nodes[batch].multimesh.mesh = trail_mesh(slots, tails, BATCH_MESH[batch])
 				(_nodes[batch].material as ShaderMaterial).set_shader_parameter(&"spark_stride", float(stride))
 	for node in _nodes:
 		_set_shares(node)

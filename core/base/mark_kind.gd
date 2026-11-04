@@ -12,9 +12,11 @@ extends Resource
 ##
 ## **No colours here** (STYLE.md: a mark is at most the shadow and base shades of its material):
 ## each of its two parts, the body and the edge, names where its colour comes from, the room's
-## floor (`floor`: its own art's shades, `RoomBase.floor_colors`) or the spell that made it
-## (`spell`: the shot's ramp, picked by the shot shaders' `look_of`), and which shade (`base` or
-## `shadow`). Pixels are hard: a mark has no partial alpha.
+## floor (`floor`: its own art's shades, `RoomBase.floor_colors`), what made it (`spell`: the
+## shot's ramp, picked by the shot shaders' `look_of`; for a settled mote, the mote's own ramp,
+## a spell's or a surface's) or the surface the cue is about (`surface`: a dying body's own art,
+## else the room's walls; the ramp table's row, as the surface motes take it), and which shade
+## (`base` or `shadow`). Pixels are hard: a mark has no partial alpha.
 ##
 ## **Its shape is worked out by `gameplay/feel/mark.gdshader`** from `form` and three numbers, at
 ## any size, one pixel a line however big (never a picture scaled up):
@@ -24,6 +26,11 @@ extends Resource
 ##   (`rough` how jagged), in the body colour; the crushed middle's specks in the edge colour.
 ## - `rime`: a ragged patch of film specks in the body colour, strewn with small crosses (crystals,
 ##   `fill` how many) in the edge colour.
+## - `ring`: a ragged band round its rim in the body colour (`rough` how ragged), specks thrown
+##   in and out of it in the edge colour (`fill` how many); its middle is untouched.
+## - `rune`: a circle one pixel wide at its rim and one inside it, `lines` strokes between them
+##   (each a tick with a hook), in the body colour; the inner circle's specks in the edge colour.
+## - `speck`: one pixel at its middle in the body colour, whatever its radius (a settled mote).
 
 ## Unique name, also its file name.
 @export var id: StringName = &""
@@ -32,25 +39,25 @@ extends Resource
 ## that belongs to no card (a scorch, a crack).
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## How the shader draws it (see above).
-@export_enum("blot", "crack", "rime") var form: String = "blot"
+@export_enum("blot", "crack", "rime", "ring", "rune", "speck") var form: String = "blot"
 ## How ragged its rim is (or how jagged its lines), 0 a clean circle.
 @export_range(0.0, 1.0, 0.05) var rough: float = 0.4
 ## How thick the speckles of its rim (blot) or its crystals (rime) are.
 @export_range(0.0, 1.0, 0.05) var fill: float = 0.5
-## Lines out from the middle (crack).
+## Lines out from the middle (crack), or strokes round it (rune).
 @export_range(1, 8) var lines: int = 5
 
 @export_group("Colours")
 ## Where the body's colour comes from, and which shade of it.
-@export_enum("floor", "spell") var body_from: String = "floor"
+@export_enum("floor", "spell", "surface") var body_from: String = "floor"
 @export_enum("base", "shadow") var body_shade: String = "shadow"
 ## Where the edge's colour comes from, and which shade of it.
-@export_enum("floor", "spell") var edge_from: String = "spell"
+@export_enum("floor", "spell", "surface") var edge_from: String = "spell"
 @export_enum("base", "shadow") var edge_shade: String = "shadow"
 
 ## The forms, sources and shades as the shader is told them (their index).
-const FORMS: Array[String] = ["blot", "crack", "rime"]
-const SOURCES: Array[String] = ["floor", "spell"]
+const FORMS: Array[String] = ["blot", "crack", "rime", "ring", "rune", "speck"]
+const SOURCES: Array[String] = ["floor", "spell", "surface"]
 const SHADES: Array[String] = ["base", "shadow"]
 
 
@@ -72,8 +79,8 @@ func problems() -> PackedStringArray:
 		if not SHADES.has(shade):
 			found.append("%s: a mark's shade is one of %s (STYLE.md), not '%s'" % [id, SHADES, shade])
 	for layer in look_layers:
-		if layer < 0 or layer > 21:
-			found.append("%s: look layer %d is not a LOOK_* kind (0-21)" % [id, layer])
+		if layer < 0 or layer > MoteKind.LOOK_LAYERS:
+			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, MoteKind.LOOK_LAYERS])
 	if lines < 1 or lines > 8:
-		found.append("%s: a crack has 1 to 8 lines" % id)
+		found.append("%s: a crack or a rune has 1 to 8 lines" % id)
 	return found

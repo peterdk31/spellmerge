@@ -6,6 +6,7 @@
 script = ExtResource("1_base")
 id = &"fleck"
 look_layers = PackedInt32Array(2)
+settles = &"speck"
 gravity = 300.0
 drag = 2.5
 bounce = 0.4

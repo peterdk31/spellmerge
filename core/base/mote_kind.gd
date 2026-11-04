@@ -14,6 +14,11 @@ extends Resource
 ## The numbers say how one flies (`gameplay/feel/mote.gdshader` works the flight out from them,
 ## `Motes.flight` the same on the CPU) and how many a burst throws, how fast and for how long.
 
+## The longest life a mote has (s; the motes write a life as a 255th of it), and the cards' look
+## layers a kind may name (1 to LOOK_LAYERS; 0 a shot with none): core/projectiles' look kinds.
+const LIFE_MAX: float = 4.0
+const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd").LOOK_COUNT - 1
+
 ## Unique name, also its file name.
 @export var id: StringName = &""
 ## The cards' look layers (`look_layer` of an element or modifier; the LOOK_* kinds of
@@ -21,6 +26,10 @@ extends Resource
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
+## The floor mark (a `MarkKind` id, content/marks) each of its motes leaves where it comes to
+## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled
+## motes); empty for none. Only a kind that falls (gravity above 0) comes to rest.
+@export var settles: StringName = &""
 
 @export_group("Flight")
 ## Down the fake height, in px/s/s; below 0 it rises (an ember), 0 it keeps its height.
@@ -145,12 +154,14 @@ func problems() -> PackedStringArray:
 	if not surface and look_layers.is_empty():
 		found.append("%s: a spell's kind names the look layers it is the motes of (0 for a shot with none)" % id)
 	for layer in look_layers:
-		if layer < 0 or layer > 21:
-			found.append("%s: look layer %d is not a LOOK_* kind (0-21)" % [id, layer])
+		if layer < 0 or layer > LOOK_LAYERS:
+			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, LOOK_LAYERS])
+	if settles != &"" and gravity <= 0.0:
+		found.append("%s: only a kind that falls comes to rest, so one that rises leaves no mark" % id)
 	if speed.x > speed.y or up.x > up.y or life.x > life.y:
 		found.append("%s: speed, up and life go from the least (x) to the most (y)" % id)
-	if life.x <= 0.0 or life.y > 4.0:
-		found.append("%s: life is above 0 and at most 4 s" % id)
+	if life.x <= 0.0 or life.y > LIFE_MAX:
+		found.append("%s: life is above 0 and at most %d s" % [id, LIFE_MAX])
 	found.append_array(_shape_problems())
 	return found
 

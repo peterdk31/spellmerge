@@ -22,4 +22,4 @@ carrier = &"rune"
 pierce = 0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift": -2, "push": 3, "stretch": -0.2, "ease": "in"}, {"phase": "after", "at": 0.3}])
 cast_look = {"seconds": 0.22, "size": 1.1, "grow": -0.5, "ring": true}
-impact_look = {"size": 0.7, "ring": true}
+impact_look = {"size": 0.7, "ring": true, "cue": &"rune_burst"}

@@ -45,10 +45,10 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **The staff compiler (staffs A4).** `Spells.compile_staff` and `StaffCompiler` read a staff's cards into its cycle (`CompiledStaff`, `CompiledCast`, `CompiledGroup`; payloads, fallbacks, multicast, wrap-around, use-once, wasted cards with reasons, the numbers of a cast, plain descriptions); `Spells.staff_view` for the builder; `tests/core/test_staff_compiler.gd` holds every example of the design. Additive: the recipe compiler is untouched. The tag's node field is 9 bits (design updated). Owner session, 2026-10-26.
 - [ ] **Spell spectacle: the mote pool (P1a).** (`gameplay/feel/`, `core/settings/`, `hud/menus/pause/`) [spell-spectacle.md](milestones/spell-spectacle.md), P1a: the ring of chunked batches, `mote.gdshader`, `mote_land`, the Particles setting, wall chips as the first source.
 - [ ] **Spell spectacle: mote sources (P1b).** (`gameplay/feel/`, `core/base/cue_base.gd`, `content/cues/`) After P1a.
-- [ ] **Spell spectacle: measure and tune motes (P1c).** (`tests/benchmark/`, `docs/`) After P1b.
-- [ ] **Spell spectacle: trails' shed particles as motes, an experiment (P1d).** (`core/projectiles/` trail shader, `gameplay/feel/`, `tests/benchmark/`) After P1b; merged only if it measures cheaper.
+- [x] **Spell spectacle: measure and tune motes (P1c).** (`tests/benchmark/`, `docs/`) After P1b.
+- [x] **Spell spectacle: trails' shed particles as motes, an experiment (P1d).** (`core/projectiles/` trail shader, `gameplay/feel/`, `tests/benchmark/`) After P1b; merged only if it measures cheaper.
 - [ ] **Spell spectacle: the floor mark layer (P2a).** (`gameplay/feel/`, `core/base/cue_base.gd`, `content/cues/`) Independent of P1.
-- [ ] **Spell spectacle: settled motes and the other marks (P2b).** (`gameplay/feel/`, `content/cues/`) After P1a and P2a.
+- [x] **Spell spectacle: settled motes and the other marks (P2b).** (`gameplay/feel/`, `content/cues/`) After P1a and P2a.
 - [ ] **Spell spectacle: the light buffer and shot light (P3a).** (`gameplay/feel/`) Independent of P1 and P2.
 - [ ] **Spell spectacle: effects, beams, torches and room ambient (P3b).** (`gameplay/feel/`, `core/base/room_base.gd`, `content/rooms/`, `docs/STYLE.md`) After P3a and the owner's answers to the plan's P3 questions.
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.

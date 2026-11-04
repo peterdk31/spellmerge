@@ -771,3 +771,106 @@ func test_a_kept_look_follows_set_look_growth_and_a_new_shot_in_the_slot() -> vo
 	mgr.update_draw(1.0)
 	check_equal(mgr._draw_node.multimesh.visible_instance_count - mgr.drawn_trails, 0, "no live hat-ramp shot is left")
 	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "it is drawn in the enemy ramp, not the old shot's")
+
+
+## Trail particles as motes (spell spectacle P1d): while something takes them and fewer than
+## `spark_motes_below` shots are drawn, a shot's trail mesh has no particle slots (a dash's keeps
+## its own) and the particles come out as births instead; past the threshold (and an eighth more,
+## once on) the shader draws them again.
+func test_trail_particles_become_births_under_the_threshold() -> void:
+	_lasting(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
+	mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check(not mgr.sparks_as_motes, "nothing takes them: the shader draws them")
+	check_equal(mgr.spark_birth_count, 0, "and no births")
+	mgr.spark_motes = true
+	mgr.spark_motes_below = 30
+	var births: int = 0
+	for n in 30:
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		births += mgr.spark_birth_count
+	check(mgr.sparks_as_motes, "20 shots under 30: motes")
+	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), 0, "no particle slots in a shot's mesh")
+	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_SPARK_LIGHT), 0, "nor their lights")
+	check_equal(_slots_of(mgr._nodes[ManagerScript.BATCH_DASH].multimesh.mesh, ManagerScript.TRAIL_Q_SPARK), ManagerScript.TRAIL_SPARKS, "a dash keeps its particles")
+	# 20 shots x 30 moments at embers' rate (0.45): 270 expected.
+	check(births > 180 and births < 360, "about one in rate x moments x shots: %d" % births)
+	var b: PackedFloat32Array = mgr.spark_births
+	var stride: int = ManagerScript.SPARK_BIRTH_STRIDE
+	var found: bool = false
+	for n in mgr.spark_birth_count:
+		found = true
+		check_equal(int(b[n * stride + 4]), ManagerScript.LOOK_EMBERS, "of the shot's kind")
+		check_equal(int(b[n * stride + 5]), mgr._ramp_of(0), "in its caster's ramp")
+		check_equal(int(b[n * stride + 6]), ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "with its look")
+		check(Vector2(b[n * stride + 2], b[n * stride + 3]).is_equal_approx(Vector2.LEFT), "given off back along the shot")
+		check(b[n * stride] >= 20.0 and b[n * stride + 1] >= 40.0, "where a shot is")
+	check(found, "the last frame had births")
+	_lasting(12, 1, PackedInt32Array())
+	mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check(mgr.sparks_as_motes, "32 shots: still under 30 + an eighth (33)")
+	_lasting(1, 1, PackedInt32Array())
+	mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check(not mgr.sparks_as_motes, "33 shots: the shader's again")
+	check_equal(mgr.spark_birth_count, 0, "with no births")
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.spark_slots_for(mgr.spark_stride), mgr.full_tails, ManagerScript.TRAIL_MESH_PLAIN), "and its particle slots back")
+
+
+## A plain shot gives off the shader's twinkle (kind 0), as does a shot whose only kind is the weave
+## (it gives off nothing of its own), and the pool's share thins the births as it thins the shader's
+## particles.
+func test_births_follow_the_kinds_rates_and_the_share() -> void:
+	mgr.spark_motes = true
+	_lasting(20, 0, PackedInt32Array())
+	_lasting(20, 1, PackedInt32Array([ManagerScript.LOOK_WEAVE]))
+	var kinds: Dictionary = {}
+	var births: int = 0
+	for n in 60:
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		births += mgr.spark_birth_count
+		for i in mgr.spark_birth_count:
+			kinds[int(mgr.spark_births[i * ManagerScript.SPARK_BIRTH_STRIDE + 4])] = true
+	check_equal(kinds.keys(), [0], "only twinkles")
+	# 40 x 60 x 0.18 = 432.
+	check(births > 340 and births < 520, "at the twinkle's rate: %d" % births)
+	mgr.particle_cap = 30
+	_lasting(20, 2, PackedInt32Array([ManagerScript.LOOK_DRIFT]))
+	births = 0
+	for n in 60:
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		births += mgr.spark_birth_count
+	check(mgr.particle_share < 0.3, "the pool is over its cap: %.2f" % mgr.particle_share)
+	# (432 + 20 x 60 x 0.4) x 0.25 = 228 at a share of 0.25 (912 unthinned).
+	check(births < 340, "thinned by the share: %d" % births)
+
+
+## The manager's rates are the trail shader's (TIP[row].w, by look kind through `kind_row`).
+func test_spark_rates_are_the_shaders() -> void:
+	var code: String = (load("res://core/projectiles/shot_trail.gdshader") as Shader).code
+	var start: int = code.find("const vec4 TIP[ROWS] = vec4[](")
+	check(start >= 0, "the shader has its TIP table")
+	var body: String = code.substr(start, code.find(");", start) - start)
+	var rows: Array[float] = []
+	var at: int = body.find("vec4(", 10)
+	while at >= 0:
+		var inner: String = body.substr(at + 5, body.find(")", at) - at - 5)
+		var parts: PackedStringArray = inner.split(",")
+		rows.append(parts[3].strip_edges().to_float() if parts.size() == 4 else parts[0].strip_edges().to_float())
+		at = body.find("vec4(", at + 5)
+	check_equal(rows.size(), 25, "one rate a row")
+	for kind in ManagerScript.LOOK_COUNT:
+		var row: int = kind + (3 if kind > 12 else 0)
+		check(is_equal_approx(ManagerScript.SPARK_RATES[kind], rows[row]), "kind %d: %.2f, the shader's %.2f" % [kind, ManagerScript.SPARK_RATES[kind], rows[row]])
+
+
+## `count` shots of `player` with the look kinds `kinds` that last (10 s).
+func _lasting(count: int, player: int, kinds: PackedInt32Array) -> void:
+	var look: int = ManagerScript.pack_look(kinds)
+	for i in count:
+		var slot: int = mgr.spawn(player, Vector2(20.0 + i % 50 * 10.0, 40.0 + i / 50 * 6.0), Vector2(1.0, 0.0), 10.0)
+		mgr.set_look(slot, look)

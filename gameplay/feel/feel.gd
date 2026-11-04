@@ -92,6 +92,7 @@ const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
+const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -436,10 +437,12 @@ var floor_marks: bool:
 var spell_light: bool:
 	get:
 		return _spectacle.spell_light if _spectacle != null else SpellLightSetting.default_on()
-## The players of a cue's parts by part type (`add_cue_part`; a part with no `part` is an
-## `effect`), the cue contexts kept for them (one per depth of a cue played inside a cue's part),
-## and the parts of a type no player plays, skipped (`unknown_cue_parts`, warned once per type).
+## The players of a cue's parts by part type, each [player, prepare] (`add_cue_part`; a part with no
+## `part` is an `effect`), the cues read for playing by id (`CuePlan`, `_plan_of`), the cue contexts
+## kept for them (one per depth of a cue played inside a cue's part), and the parts of a type no
+## player plays, skipped (`unknown_cue_parts`, warned once per type).
 var _cue_parts: Dictionary = {}
+var _cue_plans: Dictionary = {}
 var _cue_contexts: Array[CueContextScript] = []
 var _cue_depth: int = 0
 var unknown_cue_parts: int = 0
@@ -585,10 +588,11 @@ func _ready() -> void:
 	_spectacle.registry = registry
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
-	add_cue_part(&"effect", _play_effect_part)
+	add_cue_part(&"effect", _play_flash, _prepare_flash)
 	var parts: Dictionary = _spectacle.cue_parts()
 	for type: StringName in parts:
-		add_cue_part(type, parts[type] as Callable)
+		var row: Array = parts[type] as Array
+		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable())
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -1152,11 +1156,11 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		# Its cards' motes back along the way it came, in its own ramp.
 		if projectiles != null:
 			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, projectiles.impact_tag)
-		_show_impact(caster, position, direction)
+		_show_impact(caster, ramp, position, direction)
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's.
 	_spectacle.shed_on_wall(ramp, position, -direction)
-	_show_impact(caster, position, direction)
+	_show_impact(caster, ramp, position, direction)
 
 
 ## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
@@ -1203,10 +1207,10 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> 
 
 ## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (the
 ## projectile manager's `impact_form` while the impact is sent; `impact`, a flare, for none), in the
-## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's ramp:
+## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's `ramp`:
 ## an enemy's lands the same way, in the enemy ramp (staffs F7: one look for every spell). As big as
 ## the card's radius: a rune goes off in `rune_burst`, a nova's adds a ring (`impact_ring`).
-func _show_impact(caster: int, position: Vector2, direction: Vector2) -> void:
+func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2) -> void:
 	var form: StringName = &""
 	var core: Color = Color.WHITE
 	var bits: int = 0
@@ -1217,7 +1221,7 @@ func _show_impact(caster: int, position: Vector2, direction: Vector2) -> void:
 		bits = projectiles.impact_look
 		tag = projectiles.impact_tag
 	var cues: Array = _form_cues_of(form)
-	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag)
+	play_cue(cues[CUE_IMPACT] as StringName, caster, position, direction, cues[CUE_RADIUS] as float, core, bits, ActorsScript.NONE, -1, -1, tag, true, ramp)
 
 
 ## Play the cue `id` (a `CueBase`, `content/cues/<id>.tres`; `cue_shown` calls this) at `at`, set
@@ -1237,9 +1241,11 @@ func _show_impact(caster: int, position: Vector2, direction: Vector2) -> void:
 func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, ramp: int = CASTER_RAMP) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
-	var cue: CueBase = cue_of(id)
-	if cue == null:
-		return
+	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
+	if plan == null:
+		plan = _plan_of(id)
+		if plan == null:
+			return
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	if _cue_depth == _cue_contexts.size():
 		_cue_contexts.append(CueContextScript.new())
@@ -1255,22 +1261,23 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.shot = shot
 	context.surface = surface
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
-	context.color = cue.color
-	context.power = cue.power
+	context.color = plan.color
+	context.power = plan.power
 	_cue_depth += 1
-	for part: Dictionary in cue.parts:
-		var type: StringName = StringName(part.get("part", "effect"))
-		var player: Variant = _cue_parts.get(type)
-		if player == null:
-			_unknown_cue_part(id, type)
-			continue
-		(player as Callable).call(part, context)
+	var prepared: Array = plan.prepared
+	var n: int = 0
+	for player: Callable in plan.players:
+		player.call(prepared[n], context)
+		n += 1
+	for type: StringName in plan.unknown:
+		_unknown_cue_part(id, type)
 	_cue_depth -= 1
-	if not weight:
+	if not weight or not plan.weighted:
 		return
-	var power: float = cue.power
-	var table: ActorsScript = _actor_table()
-	if table != null:
+	var cue: CueBase = plan.cue
+	var power: float = plan.power
+	var table: ActorsScript = _actor_table() if plan.holds or cue.kick_way == &"away" else null
+	if table != null and plan.holds:
 		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold * power, true)
 		held = (cue.hold_target > 0.0 and _hold_actor(table, target, cue.hold_target * power, true)) or held
 		if cue.hold_shot and held and projectiles != null and shot >= 0:
@@ -1281,25 +1288,29 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		_refresh_camera()
 		_trauma = minf(_trauma + cue.shake * power, 1.0)
 		var way: Vector2 = Vector2.DOWN
-		match cue.kick_way:
-			# Back or along its way only when it has one (a cast with no aim kicks nowhere).
-			&"back":
-				way = -aim if dir != Vector2.ZERO else Vector2.ZERO
-			&"aim":
-				way = aim if dir != Vector2.ZERO else Vector2.ZERO
-			&"away":
-				var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
-				if body != null and body.global_position.distance_to(at) > 1.0:
-					way = body.global_position.direction_to(at)
+		var kick_way: StringName = cue.kick_way
+		# Back or along its way only when it has one (a cast with no aim kicks nowhere).
+		if kick_way == &"back":
+			way = -aim if dir != Vector2.ZERO else Vector2.ZERO
+		elif kick_way == &"aim":
+			way = aim if dir != Vector2.ZERO else Vector2.ZERO
+		elif kick_way == &"away":
+			var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
+			if body != null and body.global_position.distance_to(at) > 1.0:
+				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
 
 
 ## Play a cue's parts of the type `type` (`CueBase.PART_TYPES`) with `player`, a Callable taking
-## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. Feel's
-## own flashes are `effect`, the spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
-func add_cue_part(type: StringName, player: Callable) -> void:
-	_cue_parts[type] = player
+## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. With
+## `prepare` (a Callable taking the part), each part is prepared once when its cue is first played
+## and `player` takes what it made instead, so a part played often reads no key while it plays
+## (a flash's keys as typed fields: `CuePlan.Flash`). Feel's own flashes are `effect`, the
+## spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
+func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable()) -> void:
+	_cue_parts[type] = [player, prepare]
+	_cue_plans.clear()
 
 
 ## Whether a cue part of the type `type` has a player.
@@ -1316,51 +1327,86 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 		push_warning("Feel: cue '%s' has a part of the type '%s', which nothing plays" % [id, type])
 
 
-## A cue's flash (`CueBase`: a part with no `part`, or `"part": "effect"`) played with `cue`: its
-## effect at the cue's point along its way, sized by its `zoom` or the cue's size times its
-## `reach` (either times the cue's power), for its seconds (or the cue's size with `lasts_size`), in
-## its exact `color`, plain, in the caster's ramp alone (`bare`), in the cue's own colour, or in
-## the cue's ramp, tint and cards.
-func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
-	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
-	if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
+## A cue's flash part (`CueBase`: a part with no `part`, or `"part": "effect"`) read into its typed
+## fields once (`CuePlan.flash_of`; null for an effect Feel has not, which plays nothing).
+func _prepare_flash(part: Dictionary) -> Variant:
+	return CuePlanScript.flash_of(part, CUE_EFFECTS)
+
+
+## A cue's flash (`CuePlan.Flash`, from its part) played with `cue`: its effect at the cue's point
+## along its way, sized by its `zoom` or the cue's size times its `reach` (either times the cue's
+## power), for its seconds (or the cue's size with `lasts_size`), in its exact `color`, plain, bare,
+## the cue's own colour, or the cue's ramp and tint with its cards (without them for `no_cards`).
+func _play_flash(prepared: Variant, cue: CueContextScript) -> void:
+	if prepared == null:
 		return
-	# Only for the cards it names: any card's layer, or one look layer (lightning's arc).
-	var layers: int = cue.look & ((1 << MotesScript.LOOK_LAYERS) - 1)
-	if bool(part.get("if_cards", false)) and layers == 0:
-		return
-	if part.has("if_layer") and (layers >> (int(part["if_layer"]) - 1)) & 1 == 0:
-		return
-	# Only at some sizes (a zap's short spark into the air against a zap at a body).
-	if (part.has("if_size_over") and cue.size <= float(part["if_size_over"])) or (part.has("if_size_upto") and cue.size > float(part["if_size_upto"])):
-		return
-	var seconds: float = float(part.get("seconds", row[2]))
-	if bool(part.get("lasts_size", false)):
+	var flash: CuePlanScript.Flash = prepared as CuePlanScript.Flash
+	if flash.gated:
+		if flash.particles and not particles_enabled:
+			return
+		# Only for the cards it names: any card's layer, or one look layer (lightning's arc).
+		var layers: int = cue.look & ((1 << MotesScript.LOOK_LAYERS) - 1)
+		if flash.if_cards and layers == 0:
+			return
+		if flash.if_layer > 0 and (layers >> (flash.if_layer - 1)) & 1 == 0:
+			return
+		# Only at some sizes (a zap's short spark into the air against a zap at a body).
+		if cue.size <= flash.size_over or cue.size > flash.size_upto:
+			return
+	var seconds: float = flash.seconds
+	if flash.lasts_size:
 		if cue.size <= 0.0:
 			return
 		seconds = cue.size
-	var zoom: int = roundi(float(part.get("zoom", 1.0)) * cue.power)
+	var zoom: int = roundi(flash.zoom * cue.power)
 	var length: float = 0.0
-	if row.size() > 3:
+	if flash.along:
 		# Drawn along its length (an arc): the cue's size times its reach, from the cue's point.
-		length = cue.size * float(part.get("reach", 1.0))
+		length = cue.size * (flash.reach if flash.reach >= 0.0 else 1.0)
 		if length <= 0.0:
 			return
-	elif part.has("reach"):
-		zoom = roundi(cue.size * float(part["reach"]) * cue.power / float(row[1]))
-	var way: Vector2 = cue.way_of(part)
-	if part.has("color"):
-		_cue_effect = show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds, length)
-	elif bool(part.get("plain", false)):
-		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
-	elif bool(part.get("bare", false)):
-		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+	elif flash.reach >= 0.0:
+		zoom = roundi(cue.size * flash.reach * cue.power / flash.step)
+	var way: Vector2 = cue.aim
+	var turn: int = flash.way
+	if turn == CuePlanScript.WAY_BACK:
+		way = -way
+	elif turn == CuePlanScript.WAY_RIGHT:
+		way = Vector2.RIGHT
+	elif turn == CuePlanScript.WAY_UP:
+		way = Vector2.UP
+	var paint: int = flash.paint
+	if paint == CuePlanScript.PAINT_COLOR:
+		_cue_effect = show_effect(flash.kind, cue.at, way, flash.color, 0, EXACT, zoom, seconds, length)
+	elif paint == CuePlanScript.PAINT_PLAIN:
+		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
+	elif paint == CuePlanScript.PAINT_BARE:
+		_cue_effect = show_effect(flash.kind, cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
 	elif cue.color.a > 0.0:
-		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.color, 0, EXACT, zoom, seconds, length)
-	elif bool(part.get("no_cards", false)):
-		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, 0, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, cue.at, way, cue.color, 0, EXACT, zoom, seconds, length)
 	else:
-		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds, length)
+		_cue_effect = show_effect(flash.kind, cue.at, way, cue.tint, cue.ramp, 0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look, zoom, seconds, length)
+
+
+## The cue `id` read for playing (`CuePlan`: its parts' players and prepared parts), made the first
+## time it is played (`play_cue` keeps it by id) and again after a part player changed
+## (`add_cue_part`) or `forget_cues`; null for no cue.
+func _plan_of(id: StringName) -> CuePlanScript:
+	var cue: CueBase = cue_of(id)
+	if cue == null:
+		return null
+	var plan: CuePlanScript = _cue_plans.get(id) as CuePlanScript
+	if plan == null or plan.cue != cue:
+		plan = CuePlanScript.make(cue, _cue_parts) as CuePlanScript
+		_cue_plans[id] = plan
+	return plan
+
+
+## Forget the cues read so far (`cue_of`, and their plans), so the next play reads them again (a
+## cue file changed, or a test's own cue).
+func forget_cues() -> void:
+	_cue_cache.clear()
+	_cue_plans.clear()
 
 
 ## The cue `id` (`content/cues/<id>.tres`), or null when there is none or no registry yet. Read

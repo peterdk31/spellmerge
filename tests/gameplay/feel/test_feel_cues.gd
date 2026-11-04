@@ -322,3 +322,35 @@ func test_a_parts_way_comes_from_the_cue() -> void:
 	check_equal(cue.way_of({"way": &"back"}), Vector2.UP, "back")
 	check_equal(cue.way_of({"way": &"right"}), Vector2.RIGHT, "right")
 	check_equal(cue.way_of({"way": &"up"}), Vector2.UP, "up")
+
+
+## S6 2: a cue is read once for playing (`CuePlan`): each part prepared once by its type's
+## `prepare`, then played from that; a new part player reads the cues again.
+func test_a_cues_parts_are_prepared_once() -> void:
+	var prepared: Array[int] = [0]
+	var played: Array = []
+	feel.add_cue_part(&"test_part", func(made: Variant, _cue: RefCounted) -> void: played.append(made),
+		func(part: Dictionary) -> Variant:
+			prepared[0] += 1
+			return int(part["size_x"]) * 10)
+	_made([{"part": &"test_part", "size_x": 3}, {"effect": &"burst", "zoom": 2}])
+	for i in 3:
+		_cue(&"test_cue")
+	check_equal(prepared[0], 1, "prepared once")
+	check_equal(played, [30, 30, 30], "and played from what it made")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 3, "a flash part is prepared too, and plays")
+	check_equal(feel.effect_info(FeelScript.KIND_BURST).get("zoom"), 2, "with its keys")
+	feel.add_cue_part(&"test_part", func(made: Variant, _cue: RefCounted) -> void: played.append(-1),
+		func(_part: Dictionary) -> Variant: return 0)
+	_cue(&"test_cue")
+	check_equal(played.back(), -1, "a new player reads the cue again")
+
+
+func test_a_flash_part_is_read_into_typed_fields() -> void:
+	var flash: FeelScript.CuePlanScript.Flash = FeelScript.CuePlanScript.flash_of({"effect": &"ring_out", "zoom": 3, "way": &"up", "no_cards": true, "if_layer": 5}, FeelScript.CUE_EFFECTS)
+	check_equal(flash.kind, FeelScript.KIND_RING_OUT, "its effect")
+	check_equal(flash.zoom, 3.0, "its zoom")
+	check_equal(flash.way, FeelScript.CuePlanScript.WAY_UP, "its way")
+	check_equal(flash.paint, FeelScript.CuePlanScript.PAINT_NO_CARDS, "its colours")
+	check(flash.gated and flash.if_layer == 5, "and its gate")
+	check(FeelScript.CuePlanScript.flash_of({"effect": &"nothing"}, FeelScript.CUE_EFFECTS) == null, "an effect Feel has not: none")

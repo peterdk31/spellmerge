@@ -198,12 +198,13 @@ func test_a_hits_look_is_its_cue() -> void:
 	var other := CueBase.new()
 	other.id = &"hit"
 	other.parts = [{"effect": &"ring_out", "reach": 1.0}] as Array[Dictionary]
+	feel.forget_cues()
 	feel._cue_cache[&"hit"] = other
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
 	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "no spray of Feel's own")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "the cue's ring instead")
 	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], preset.enemy_hit_color, "in the hit's colours")
-	feel._cue_cache[&"hit"] = plain
+	feel.forget_cues()
 
 
 ## A killing blow's spray turns into the puff (`hit_puff`) where it was, in its colours and the size

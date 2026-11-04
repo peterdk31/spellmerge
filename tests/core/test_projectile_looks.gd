@@ -343,9 +343,44 @@ func test_when_the_rows_run_out_a_shot_has_its_core_alone() -> void:
 	check_equal(mgr.drawn, 1, "and is still drawn")
 
 
+## Regression (a web build, 2026-11-04: Max shots at 10,000, then the sandbox's LB storm): with a
+## row of the trail texture per trail, 20,000 rows made it 32 x 32,768, past the 16,384 a GPU
+## takes, and every trail after read the wrong samples (a short tail at a wrong angle). Folded,
+## it stays in bounds and a high row's samples are where the shader reads them.
+func test_the_trail_texture_fits_a_gpu_at_a_high_cap() -> void:
+	mgr.set_cap(10000)
+	# Every row held: one cap of shots ended and cooling, one cap flying.
+	for i in 10000:
+		mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 0.02)
+	mgr.step(1.0 / 60.0)
+	mgr.step(1.0 / 60.0)
+	var slot: int = -1
+	for i in 10000:
+		slot = mgr.spawn(0, Vector2(200.0, 150.0), Vector2(0.0, 90.0), 1.0)
+	for i in 4:
+		mgr.step(1.0 / 60.0)
+	check_equal(mgr.get_trail_count(), 20000, "every row is held")
+	mgr.update_draw(1.0)
+	var texture: Texture2D = (mgr._draw_node.material as ShaderMaterial).get_shader_parameter(&"trail_data")
+	check(texture != null, "the trails are sent")
+	if texture == null:
+		return
+	check(texture.get_width() <= 2048 and texture.get_height() <= 2048, "in a texture any GPU takes (%s)" % texture.get_size())
+	var row: int = mgr.get_trail_of(slot)
+	check(row >= 16384, "the last shot holds a row past the old texture's height (%d)" % row)
+	var newest: Vector4 = mgr.get_trail_point(row, 0)
+	var sample: int = mgr._trail_newest[row] % ManagerScript.TRAIL_SAMPLES
+	# Where `trail_texel` in shot_trail.gdshader reads it.
+	var at := Vector2i((row % 64) * ManagerScript.TRAIL_SAMPLES + sample, row / 64)
+	var texel: Color = (mgr._trail_image as Image).get_pixelv(at)
+	check(is_equal_approx(texel.r, newest.x) and is_equal_approx(texel.g, newest.y) and is_equal_approx(texel.a, newest.w), "its newest sample is where the shader reads it (%s, %s)" % [texel, newest])
+	check(absf(newest.x - 200.0) < 0.01 and newest.y > 150.0, "and it is that shot's path (%s)" % newest)
+
+
 func test_the_shader_holds_the_same_trail_numbers() -> void:
 	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
 	check(shader.code.contains("const int TRAIL_SAMPLES = %d;" % ManagerScript.TRAIL_SAMPLES), "the same samples a row")
+	check(shader.code.contains("const int TRAIL_ROWS_PER_LINE = %d;" % ManagerScript.TRAIL_ROWS_PER_LINE), "the same rows a line of the texture")
 	check(shader.code.contains("const float TF_HEAD = %d.0;" % ManagerScript.TRAIL_HEAD), "the same alive flag")
 	check(shader.code.contains("const float TF_ORBIT = %d.0;" % ManagerScript.TRAIL_ORBIT), "the same orbit flag")
 	check(shader.code.contains("const float TF_DASH = %d.0;" % ManagerScript.TRAIL_DASH), "the same dash flag")

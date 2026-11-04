@@ -29,14 +29,33 @@ func test_the_cues_the_game_names_are_there() -> void:
 		check(registry.get_resource(&"cues", id) is CueBase, "%s" % id)
 
 
-## Until a boss has a look of its own, its death is an enemy's and the game-wide stop.
+## The flashes (not the motes) of `cue`'s parts, and how many motes its parts throw in all.
+func _flashes(cue: CueBase) -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	for part in cue.parts:
+		if not part.has("part"):
+			found.append(part)
+	return found
+
+
+func _motes(cue: CueBase) -> int:
+	var count: int = 0
+	for part in cue.parts:
+		if StringName(part.get("part", "")) == &"motes":
+			count += int(part.get("count", 0))
+	return count
+
+
+## Until a boss has a look of its own, its death is an enemy's, with more motes, and the
+## game-wide stop.
 func test_a_boss_death_is_a_death_that_stops_the_game() -> void:
 	var death: CueBase = registry.get_resource(&"cues", &"enemy_death") as CueBase
 	var boss: CueBase = registry.get_resource(&"cues", &"boss_death") as CueBase
 	if death == null or boss == null:
 		check(false, "both death cues are there")
 		return
-	check_equal(boss.parts, death.parts, "the same flashes")
+	check_equal(_flashes(boss), _flashes(death), "the same flashes")
+	check(_motes(boss) > _motes(death) and _motes(death) > 0, "more motes")
 	check(is_equal_approx(boss.shake, death.shake) and is_equal_approx(boss.hold, death.hold) and boss.hold_shot == death.hold_shot, "the same weight")
 	check_equal(boss.sound, death.sound, "the same sound")
 	check_equal(death.stop_game, 0.0, "an enemy's death stops nobody else")
@@ -49,3 +68,12 @@ func test_problems_names_what_is_wrong() -> void:
 	cue.kick_way = &"left"
 	var found: PackedStringArray = cue.problems()
 	check_equal(found.size(), 8, "an id, the kick way and one a part: %s" % [found])
+
+
+func test_a_motes_part_names_what_is_wrong() -> void:
+	var cue := CueBase.new()
+	cue.id = &"test"
+	cue.parts = [{"part": &"motes"}, {"part": &"motes", "kind": &"surface", "count": 40, "reach": 1.0, "spread": 360.0, "up": 1.5, "ring": true, "way": &"back"}]
+	check_equal(cue.problems(), PackedStringArray(), "a motes part needs no effect, and takes its own keys")
+	cue.parts = [{"part": &"motes", "zoom": 2}, {"part": &"motes", "way": &"sideways"}, {"part": &"motes", "count": 0}, {"part": &"motes", "spread": 400.0}, {"part": &"motes", "kind": &""}]
+	check_equal(cue.problems().size(), 5, "one a part: %s" % [cue.problems()])

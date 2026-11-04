@@ -8,7 +8,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // shot shaders"; the owner, 2026-10-28: "the tail of projectiles turn with the projectile"): a
 // shot leaves its tail and its card particles in the world, where it was, as the mockup does.
 // The projectile manager keeps each shot's path in `trail_data`, one row per trail of
-// TRAIL_SAMPLES texels (x, y, odometer, time), a ring written 30 times a second and at every
+// TRAIL_SAMPLES texels (x, y, odometer, time; TRAIL_ROWS_PER_LINE rows to a line of the
+// texture, `trail_texel`), a ring written 30 times a second and at every
 // bounce and end. Each pixel of travel (a very fast shot's every 2-4, `gap`) leaves one tail pixel there, which drifts a little and
 // cools through the ramp in its own time (0.1-0.3 s), so the tail bends with any path and frays
 // at its end by itself; each 60th of a second may give off a particle of one of the shot's kinds
@@ -72,6 +73,7 @@ uniform float trail_now = 0.0;
 // shorter tail), a wizard's dash (speed streaks in the player's colours and the dash's cards, no
 // tail, no core).
 const int TRAIL_SAMPLES = 32;
+const int TRAIL_ROWS_PER_LINE = 64;
 const int SEARCH_STEPS = 5;
 const float BIRTHS = 60.0;
 const float TF_HEAD = 1.0;
@@ -171,10 +173,14 @@ varying flat vec4 c2;
 
 // ---- Vertices ----
 
-// Sample `k` back from the newest (0) of trail `row`: x, y, odometer, time.
+// Sample `k` back from the newest (0) of trail `row`: x, y, odometer, time. The rows lie
+// TRAIL_ROWS_PER_LINE to a line of the texture (a texture one row a line was too tall for the GPU
+// at the high caps).
 vec4 trail_texel(float row, float newest, float k) {
 	float n = newest - k;
-	return texelFetch(trail_data, ivec2(int(mod(n, float(TRAIL_SAMPLES))), int(row)), 0);
+	int r = int(row);
+	ivec2 at = ivec2((r % TRAIL_ROWS_PER_LINE) * TRAIL_SAMPLES + int(mod(n, float(TRAIL_SAMPLES))), r / TRAIL_ROWS_PER_LINE);
+	return texelFetch(trail_data, at, 0);
 }
 
 // For each of `v`'s two numbers, the newest sample from `first` back to `last` whose time

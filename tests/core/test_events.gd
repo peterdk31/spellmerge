@@ -23,6 +23,8 @@ const EVENTS: Dictionary = {
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
 	&"projectile_cap_changed": [["cap", TYPE_INT]],
 	&"mote_cap_changed": [["cap", TYPE_INT]],
+	&"mote_density_changed": [["density", TYPE_FLOAT]],
+	&"floor_marks_changed": [["on", TYPE_BOOL]],
 	&"spell_light_changed": [["on", TYPE_BOOL]],
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	&"sandbox_spawn_requested": [["player", TYPE_INT], ["enemy_id", TYPE_STRING_NAME], ["count", TYPE_INT]],
@@ -117,7 +119,7 @@ const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"horde_started", &"horde_ended", &"horde_status", &"horde_break_changed", &"horde_over",
-	&"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"spell_light_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

@@ -3,7 +3,7 @@ extends SceneTree
 ## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
 ## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Max shots, Screen shake and Show FPS; `back` (B)
+## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
 ## open builder; in the horde's build break (the game paused until every player is ready) the
 ## menu opens and closes and leaves the game paused, also when the break ends while it is open
@@ -36,6 +36,9 @@ var _shakes: Array[bool] = []
 var _caps: Array[int] = []
 ## Every `mote_cap_changed` the bus sent, from before the Hud binds.
 var _mote_caps: Array[int] = []
+var _densities: Array[float] = []
+## Every `floor_marks_changed` the bus sent, from before the Hud binds.
+var _floor_marks: Array[bool] = []
 var _lights: Array[bool] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
@@ -53,6 +56,8 @@ func _initialize() -> void:
 	_test_the_screen_shake_switch()
 	_test_the_max_shots_slider()
 	_test_the_particles_slider()
+	_test_the_particle_amount_slider()
+	_test_the_floor_marks_switch()
 	_test_the_spell_light_switch()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
@@ -91,6 +96,8 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
+	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
+	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
 	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
 	for index in count:
 		_input.add_virtual_device(index)
@@ -114,6 +121,8 @@ func _teardown() -> void:
 	_shakes.clear()
 	_caps.clear()
 	_mote_caps.clear()
+	_densities.clear()
+	_floor_marks.clear()
 	_lights.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
@@ -315,7 +324,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "SpellLight", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -345,6 +354,28 @@ func _test_the_screen_shake_switch() -> void:
 	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Floor marks (spell spectacle P2a) starts at the platform's default and sends nothing; accept
+## flips it and tells feel, and the choice is saved: a menu bound to the same save later starts
+## with it and tells feel.
+func _test_the_floor_marks_switch() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	var start: bool = FloorMarks.default_on()
+	var word: Callable = func(on: bool) -> String: return "Floor marks: %s" % ("On" if on else "Off")
+	_check(_floor_marks.is_empty(), "nothing is sent at the platform's default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("FloorMarks").text.ends_with(word.call(start)), "the platform's default at the start")
+	_press(0, "FloorMarks")
+	_check(_menu().button("FloorMarks").text.ends_with(word.call(not start)), "it flips")
+	_check(_floor_marks == [not start], "and feel is told, got %s" % [_floor_marks])
+	_check(SaveFile.new(SAVE_PATH).get_setting(&"floor_marks", start) == (not start), "the save remembers it")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().floor_marks == (not start), "a later menu starts with it")
+	_check(_floor_marks == [not start], "and tells feel when the Hud binds, got %s" % [_floor_marks])
 
 
 ## Spell light (spell spectacle P3a) starts at the platform's default and sends nothing; accept
@@ -405,6 +436,42 @@ func _test_the_particles_slider() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(_menu().mote_cap == 0, "a later menu starts with the saved cap")
 	_check(_mote_caps == [0], "and tells feel when the Hud binds, got %s" % [_mote_caps])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Particle amount (spell spectacle P1b) starts at Full and sends nothing; left and right step
+## through None, Half, Full and Double and tell feel, accept steps up and wraps, and the choice is
+## saved: a menu bound to the same save later starts with it and tells feel.
+func _test_the_particle_amount_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_densities.is_empty(), "nothing is sent at the default")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("MoteDensity")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	var at: int = MoteDensity.index_of(MoteDensity.DEFAULT)
+	_check(row.text.ends_with("Particle amount: Full") and is_equal_approx(bar.value, float(at)), "Full at the start, in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_right")
+	_frame()
+	_check(is_equal_approx(_menu().mote_density, 2.0) and _densities == [2.0], "right asks for Double, got %s" % [_densities])
+	_check(row.text.ends_with("Particle amount: Double") and is_equal_approx(bar.value, float(at + 1)), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	for i in MoteDensity.STOPS.size():
+		_tap(0, &"move_left")
+		_frame()
+	_check(_menu().mote_density == 0.0 and _densities.back() == 0.0, "left goes down to None")
+	_check(is_equal_approx(float(SaveFile.new(SAVE_PATH).get_setting(&"mote_density", -1.0)), 0.0), "the save remembers it")
+	_press(0, "MoteDensity")
+	_check(is_equal_approx(_menu().mote_density, 0.5), "accept steps up")
+	_menu().mote_density = MoteDensity.STOPS[-1]
+	_press(0, "MoteDensity")
+	_check(_menu().mote_density == 0.0, "accept at the top wraps to None")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().mote_density == 0.0 and _densities == [0.0], "a later menu starts with the saved amount and tells feel, got %s" % [_densities])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

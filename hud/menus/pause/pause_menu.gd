@@ -19,7 +19,7 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Spell light: On", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Max shots: 6000", "Screen shake: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
@@ -31,7 +31,15 @@ extends PanelContainer
 ##   `MoteCap.STOPS` (core/settings: Off, Low, Medium, High), from the platform's cap
 ##   (`MoteCap.default_cap()`); each move sends `mote_cap_changed`, which feel applies (its motes
 ##   in the air end), and is saved (`mote_cap`); a saved cap other than the default is sent again
-##   when the menu is bound. "Spell light: On" (or Off; P3a) flips on `accept`, from the
+##   when the menu is bound. "Particle amount" (P1b) is a slider the same way through
+##   `MoteDensity.STOPS` (None, Half, Full, Double: the share of its count every burst of motes
+##   throws), from `MoteDensity.DEFAULT`; each move sends `mote_density_changed`, which feel
+##   applies, and is saved (`mote_density`), sent again when bound if it is not the default.
+##   "Floor marks: On" (or Off; spell spectacle P2a) flips on `accept`
+##   from the platform's default (`FloorMarks.default_on()` in core/settings), is saved
+##   (`floor_marks`) and sends `floor_marks_changed`, which feel applies (off frees the room's
+##   marks); a saved choice other than the default is sent again when the menu is bound.
+##   "Spell light: On" (or Off; P3a) flips on `accept`, from the
 ##   platform's default (`SpellLightSetting.default_on()`), sends `spell_light_changed`, which feel
 ##   applies, and is saved (`spell_light`); a saved choice other than the default is sent again
 ##   when the menu is bound. "Screen shake: On" (or Off), the
@@ -106,6 +114,10 @@ const SHOT_CAP_TEXT: String = "Max shots: %d"
 const SHOT_CAP_SETTING: StringName = &"projectile_cap"
 const MOTE_CAP_TEXT: String = "Particles: %s"
 const MOTE_CAP_SETTING: StringName = &"mote_cap"
+const MOTE_DENSITY_TEXT: String = "Particle amount: %s"
+const MOTE_DENSITY_SETTING: StringName = &"mote_density"
+const MARKS_TEXT: String = "Floor marks: %s"
+const MARKS_SETTING: StringName = &"floor_marks"
 const LIGHT_TEXT: String = "Spell light: %s"
 const LIGHT_SETTING: StringName = &"spell_light"
 const FPS_TEXT: String = "Show FPS: %s"
@@ -141,6 +153,10 @@ var screen_shake: bool = true
 var shot_cap: int = ShotCap.default_cap()
 ## The "Particles" setting (see the top): the platform's cap by default.
 var mote_cap: int = MoteCap.default_cap()
+## The "Particle amount" setting (see the top): `MoteDensity.DEFAULT` by default.
+var mote_density: float = MoteDensity.DEFAULT
+## The "Floor marks" setting (see the top): the platform's default.
+var floor_marks: bool = FloorMarks.default_on()
 ## The "Show FPS" setting (see the top): off by default.
 var show_fps: bool = false
 ## The "Spell light" setting (see the top): the platform's default.
@@ -181,6 +197,9 @@ var ai_view: bool = false
 @onready var _effects_bar: HSlider = _add_slider(_effects, EffectSlots.MIN, EffectSlots.MAX, EffectSlots.STEP, effect_slots, EFFECT_SLOTS_TEXT % EffectSlots.MAX)
 @onready var _motes: Button = _add(Page.SETTINGS, "MoteCap", MOTE_CAP_TEXT % MoteCap.word_of(mote_cap))
 @onready var _motes_bar: HSlider = _add_slider(_motes, 0, MoteCap.STOPS.size() - 1, 1, MoteCap.index_of(mote_cap), MOTE_CAP_TEXT % "Medium")
+@onready var _density: Button = _add(Page.SETTINGS, "MoteDensity", MOTE_DENSITY_TEXT % MoteDensity.word_of(mote_density))
+@onready var _density_bar: HSlider = _add_slider(_density, 0, MoteDensity.STOPS.size() - 1, 1, MoteDensity.index_of(mote_density), MOTE_DENSITY_TEXT % "Double")
+@onready var _marks: Button = _add(Page.SETTINGS, "FloorMarks", MARKS_TEXT % ("On" if floor_marks else "Off"))
 @onready var _light: Button = _add(Page.SETTINGS, "SpellLight", LIGHT_TEXT % ("On" if spell_light else "Off"))
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
@@ -207,6 +226,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_shake()
 	_load_shot_cap()
 	_load_mote_cap()
+	_load_mote_density()
+	_load_floor_marks()
 	_load_light()
 	_load_fps()
 	if _events != null:
@@ -316,6 +337,10 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var stop: int = clampi(MoteCap.index_of(mote_cap) + direction.x, 0, MoteCap.STOPS.size() - 1)
 		_set_mote_cap(MoteCap.STOPS[stop])
 		return _motes
+	if control == _density and direction.x != 0:
+		var step: int = clampi(MoteDensity.index_of(mote_density) + direction.x, 0, MoteDensity.STOPS.size() - 1)
+		_set_mote_density(MoteDensity.STOPS[step])
+		return _density
 	if control == _shots and direction.x != 0:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
@@ -497,8 +522,12 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
 	elif control == _motes:
 		_set_mote_cap(MoteCap.STOPS[(MoteCap.index_of(mote_cap) + 1) % MoteCap.STOPS.size()])
+	elif control == _density:
+		_set_mote_density(MoteDensity.STOPS[(MoteDensity.index_of(mote_density) + 1) % MoteDensity.STOPS.size()])
 	elif control == _shots:
 		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
+	elif control == _marks:
+		_set_floor_marks(not floor_marks)
 	elif control == _light:
 		_set_light(not spell_light)
 	elif control == _shake:
@@ -608,6 +637,51 @@ func _show_mote_cap(cap: int) -> void:
 	_motes.set_meta(BASE_TEXT_META, MOTE_CAP_TEXT % MoteCap.word_of(cap))
 	_motes_bar.value = MoteCap.index_of(cap)
 	_mark_focus()
+
+
+## Read the saved particle amount and show it; feel is told only when it is not the default.
+func _load_mote_density() -> void:
+	var saved: float = MoteDensity.snap(float(save.get_setting(MOTE_DENSITY_SETTING, MoteDensity.DEFAULT)))
+	_show_mote_density(saved)
+	if saved != MoteDensity.DEFAULT and _events != null:
+		_events.mote_density_changed.emit(saved)
+
+
+## Move the "Particle amount" slider to `density` (a stop): show it, save it and tell feel.
+func _set_mote_density(density: float) -> void:
+	if density == mote_density:
+		return
+	_show_mote_density(density)
+	save.set_setting(MOTE_DENSITY_SETTING, density)
+	if _events != null:
+		_events.mote_density_changed.emit(density)
+
+
+func _show_mote_density(density: float) -> void:
+	mote_density = density
+	_density.set_meta(BASE_TEXT_META, MOTE_DENSITY_TEXT % MoteDensity.word_of(density))
+	_density_bar.value = MoteDensity.index_of(density)
+	_mark_focus()
+
+
+## Read the saved "Floor marks" choice and show it; feel is told only when it is not the platform's
+## (feel's own default).
+func _load_floor_marks() -> void:
+	floor_marks = bool(save.get_setting(MARKS_SETTING, FloorMarks.default_on()))
+	_marks.set_meta(BASE_TEXT_META, MARKS_TEXT % ("On" if floor_marks else "Off"))
+	_mark_focus()
+	if floor_marks != FloorMarks.default_on() and _events != null:
+		_events.floor_marks_changed.emit(floor_marks)
+
+
+## Flip the "Floor marks" switch: show it, save it and tell feel.
+func _set_floor_marks(on: bool) -> void:
+	floor_marks = on
+	_marks.set_meta(BASE_TEXT_META, MARKS_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(MARKS_SETTING, on)
+	if _events != null:
+		_events.floor_marks_changed.emit(on)
 
 
 ## Read the saved "Show FPS" choice and show it (panels reads `show_fps` after binding).

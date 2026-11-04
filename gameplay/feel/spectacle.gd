@@ -1,0 +1,382 @@
+extends Node
+## The spectacle: everything Feel draws that is drawn only (docs/milestones/spell-spectacle.md and
+## spell-spectacle-2.md, S1): the motes (`mote.gd`), the floor marks (`marks.gd`), spell light
+## (`spell_light.gd`) and the ramp table the motes and marks share (`ramp_table.gd`). A child of
+## Feel, made once; it owns their settings ("Particles", "Particle amount", "Floor marks", "Spell
+## light", each through its event) and the room they are in (`room_entered`: the walls' colours and
+## the mark layer's fit), and plays a cue's `motes` and `mark` parts (`cue_parts`, which Feel adds
+## to its table of part players).
+##
+## Feel says when: its hit, end, wall and reaction handlers call `shed_hit`, `shed_end`,
+## `shed_on_wall` and `reaction_motes` with what it already worked out (the caster's ramp, the
+## preset's shares), in the order it draws them, and `step` once a frame. The spectacle says
+## what: which kinds, in which colours, where they settle. Nothing here changes a fight.
+##
+## A new drawn-only system goes here the same way: made in `_ready`, its setting through its own
+## event, its cue parts in `cue_parts`.
+
+const EventsScript := preload("res://core/events/events.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MarksScript := preload("res://gameplay/feel/marks.gd")
+const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
+const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
+const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
+
+## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
+## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
+const MOTE_Z: int = 16
+## The floor marks lie on the room's floor (RoomBase.FLOOR_Z) and under every body (0).
+const MARK_Z: int = RoomBase.FLOOR_Z + 1
+## Spell light is applied just under the motes: above the room and every body (a body layer is
+## at most a few), under every spell, flash and telegraph (`spell_light.gd`; P3a).
+const LIGHT_Z: int = MOTE_Z - 1
+## The folders of the mote kinds, the mark kinds and the rooms in the registry, and a mark part's
+## radius with no size to go by.
+const MOTE_FOLDER: StringName = &"motes"
+const MARK_FOLDER: StringName = &"marks"
+const ROOM_FOLDER: StringName = &"rooms"
+const MARK_RADIUS: float = 8.0
+
+## The services: Feel hands down its own (and again whenever it is given new ones).
+var events: EventsScript = null
+var registry: RegistryScript = null
+## The projectile manager: the trails' births, the walls the marks keep off, the batches the light
+## mirrors (null in some tests: then no light and no trail motes).
+var projectiles: ProjectileManagerScript = null
+## Feel's switch for the stress benchmark (`Feel.particles_enabled`): off, no motes are thrown.
+var particles_enabled: bool = true
+
+## The motes (null with the "Particles" setting off), and how many they hold
+## (`MoteCap.default_cap()` until the setting changes it). Read only.
+var pool: MotesScript = null
+var mote_cap: int = MoteCap.default_cap()
+## The "Particle amount" setting (`MoteDensity`): every burst's count is times this.
+var mote_density: float = MoteDensity.DEFAULT
+## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
+var marks: MarksScript = null
+var floor_marks: bool = FloorMarks.default_on()
+## Spell light (null with the setting off, or with no projectile manager), and the setting.
+var light: SpellLightScript = null
+var spell_light: bool = SpellLightSetting.default_on()
+
+## The ramp table the motes and the floor marks share: a surface's colours and a body's art, one
+## row each, so a mote and the mark it leaves read the same colours.
+var _ramp_table: RampTableScript = RampTableScript.new()
+## The room's surface colours (`RoomBase.surface_colors`, from `room_entered`; empty for none),
+## and their source in the ramp table (-1 for none).
+var _surface_colors: PackedColorArray = PackedColorArray()
+var _surface_source: int = -1
+## The colours of each body art read so far (texture -> colours).
+var _art_colors: Dictionary = {}
+## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
+var _mark_room: StringName = &""
+## Feel's clock at the last step.
+var _clock: float = 0.0
+
+
+func _ready() -> void:
+	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(SpellLightScript.LIGHT_SHADER, ShaderWarmupScript.BATCH)
+	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
+	_make_motes(mote_cap)
+	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
+	set_floor_marks(floor_marks)
+	if events == null:
+		return
+	events.mote_cap_changed.connect(set_mote_cap)
+	events.mote_density_changed.connect(set_mote_density)
+	events.spell_light_changed.connect(set_spell_light)
+	events.room_entered.connect(_on_room_entered)
+	events.room_entered.connect(_fit_marks)
+	events.floor_marks_changed.connect(set_floor_marks)
+
+
+## The projectile manager is known (Feel finds it after its children are made): spell light can
+## be made now.
+func attach(manager: ProjectileManagerScript) -> void:
+	projectiles = manager
+	_make_light(spell_light)
+
+
+## Once a frame, at Feel's clock `now`: the trails' particles thrown, then the motes and the marks
+## stepped.
+func step(now: float) -> void:
+	_clock = now
+	_trail_motes()
+	if pool != null:
+		pool.step(now)
+	if marks != null:
+		marks.step(now)
+
+
+## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
+## Callable taking the part and the cue's `CueContext`.
+func cue_parts() -> Dictionary:
+	return {&"motes": play_motes_part, &"mark": play_mark_part}
+
+
+# --- Where motes come from (Feel calls these, in the order it draws) ------------------------
+
+## Whether motes are thrown now: there is a pool and particles are on.
+func motes_on() -> bool:
+	return pool != null and particles_enabled
+
+
+## A shot hit a body at `at`: its cards' motes (`look`, its `core` colour, in `ramp`) back along
+## `away`, `share` of their count.
+func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float) -> void:
+	if pool != null and particles_enabled:
+		pool.shed(at, away, core, ramp, look, share)
+
+
+## A shot's life ran out at `at`: a puff of its cards' motes on along `heading`, `share` of
+## their count.
+func shed_end(at: Vector2, heading: Vector2, core: Color, ramp: int, look: int, share: float) -> void:
+	if pool != null and particles_enabled:
+		pool.shed(at, heading, core, ramp, look, share)
+
+
+## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
+## projectile manager's `impact_look` and `impact_core` while the impact is sent) and the wall's
+## surface motes in the room's colours, thrown along `away` (back off the wall).
+func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
+	if pool == null or not particles_enabled:
+		return
+	var look: int = projectiles.impact_look if projectiles != null else 0
+	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
+	pool.shed(at, away, core, ramp, look)
+	if _surface_source >= 0:
+		for k in pool.surface_kinds():
+			pool.throw(k, at, away, _surface_source, Color.WHITE)
+
+
+## A reaction's motes: a ring of the reacting shot's kinds (`look`, read while the event is sent;
+## layer 0's for none) in the reaction's colour `tint`, from a caster of `ramp`: `count` in all
+## and `reach` pixels out.
+func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float, reach: float) -> void:
+	if pool == null or not particles_enabled:
+		return
+	var kinds: PackedInt32Array = pool.kinds_of_look(look)
+	var source: int = MotesScript.spell_source(ramp, MotesScript.LOOK_EXACT)
+	var each: int = maxi(roundi(count / float(kinds.size())), 1)
+	for k in kinds:
+		pool.throw_part(k, at, Vector2.RIGHT, source, tint, each, reach, 360.0, 1.0, true)
+
+
+## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per
+## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
+## neither motes nor floor marks to show it.
+func body_source(sprite: Sprite2D) -> int:
+	if pool == null and marks == null:
+		return -1
+	if sprite == null or sprite.texture == null:
+		return -1
+	var colours: Variant = _art_colors.get(sprite.texture)
+	if colours == null:
+		colours = RoomBase.colours_of_art(sprite.texture, _frame_rect(sprite))
+		_art_colors[sprite.texture] = colours
+	return _ramp_table.source(colours as PackedColorArray)
+
+
+## The part of its texture `sprite` shows: its region, or its frame of a sheet.
+static func _frame_rect(sprite: Sprite2D) -> Rect2i:
+	if sprite.region_enabled:
+		return Rect2i(sprite.region_rect)
+	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
+	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
+
+
+## The shots' trail particles as motes (spell spectacle P1d): the projectile manager hands them out
+## while there are motes (`spark_motes`), and they are thrown before the motes step. With
+## `particles_enabled` off (the stress benchmark's "no particles") the trails stay without their
+## particle slots and none are thrown: no trail particles at all, not the shader's instead.
+func _trail_motes() -> void:
+	if projectiles == null:
+		return
+	var on: bool = pool != null
+	if projectiles.spark_motes != on:
+		projectiles.spark_motes = on
+	if on and particles_enabled and projectiles.spark_birth_count > 0:
+		pool.give_off(projectiles.spark_births, projectiles.spark_birth_count)
+
+
+# --- Cue parts -------------------------------------------------------------------------------
+
+## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
+## cue's size times its `reach` out, in the cue's ramp with its tint and the cards of its look.
+func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
+	if pool == null or not particles_enabled:
+		return
+	var way: Vector2 = cue.way_of(part)
+	var reach: float = cue.size * float(part["reach"]) if part.has("reach") and cue.size > 0.0 else 0.0
+	var spread: float = float(part.get("spread", -1.0))
+	var up: float = float(part.get("up", 1.0))
+	var ring: bool = bool(part.get("ring", false))
+	var named: StringName = StringName(part.get("kind", "spell"))
+	var kinds: PackedInt32Array
+	match named:
+		&"spell":
+			kinds = pool.kinds_of_look(cue.look)
+		&"surface":
+			kinds = pool.surface_kinds()
+		_:
+			var k: int = pool.kind_index(named)
+			if k < 0:
+				return
+			kinds = PackedInt32Array([k])
+	var spell: int = MotesScript.spell_source(cue.ramp, cue.look)
+	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
+	var count: int = int(part.get("count", -1))
+	for k in kinds:
+		var source: int = surface if pool.kinds()[k].surface else spell
+		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
+		pool.throw_part(k, cue.at, way, source, Color.WHITE if pool.kinds()[k].surface else cue.tint, each, reach, spread, up, ring)
+
+
+## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
+## `cards` the marks of the cards of the cue's look when they have any; the cue's size x its
+## `reach` pixels round (or its `radius`), turned at random or along the cue's way, in the colours
+## of a spell of its ramp with its tint and of what broke (a dying body's art, else the walls).
+func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
+	if marks == null:
+		return
+	var radius: float = float(part.get("radius", MARK_RADIUS))
+	if part.has("reach") and cue.size > 0.0:
+		radius = cue.size * float(part["reach"])
+	var source: int = MotesScript.spell_source(cue.ramp, cue.look)
+	var turn: float = cue.aim.angle() if StringName(part.get("rot", "random")) == &"aim" else marks.random_turn()
+	var found: PackedInt32Array = marks.kinds_of_look(cue.look) if bool(part.get("cards", false)) else PackedInt32Array()
+	if found.is_empty():
+		found.append(marks.kind_index(StringName(part.get("mark", ""))))
+	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
+	for k in found:
+		marks.stamp(k, cue.at, radius, turn, source, cue.tint, surface)
+
+
+# --- Settings ----------------------------------------------------------------------------------
+
+## The "Particles" setting: how many motes the ring holds (0 none, and no nodes; at most
+## `MoteCap`'s top stop). A new size remakes the ring, ending the motes in the air. Returns the
+## number taken.
+func set_mote_cap(cap: int) -> int:
+	var taken: int = clampi(cap, 0, MoteCap.STOPS[-1])
+	if taken != mote_cap or (pool == null) != (taken == 0):
+		_make_motes(taken)
+	return mote_cap
+
+
+## Use `motes` as the pool from now on, in place of the one made for the setting (its cap is the
+## setting's now; null turns them off). For the benchmarks, which hand one that times its own
+## calls (tests/benchmark/timed_motes.gd).
+func use_motes(motes: MotesScript) -> void:
+	if pool != null:
+		pool.queue_free()
+		remove_child(pool)
+		pool = null
+	pool = motes
+	mote_cap = motes.cap() if motes != null else 0
+	if motes != null:
+		pool.name = "Motes"
+		pool.density = mote_density
+		add_child(pool)
+		pool.step(_clock)
+		pool.settle_into(marks)
+	_surface_source = _ramp_table.source(_surface_colors)
+
+
+## The colour table the motes and the floor marks share (a pool handed to `use_motes` is made
+## with it, so its table sources are the marks').
+func ramp_table() -> RampTableScript:
+	return _ramp_table
+
+
+func _make_motes(cap: int) -> void:
+	use_motes(MotesScript.new(cap, MOTE_Z, _mote_kinds(), _ramp_table) if cap > 0 else null)
+
+
+## The mote kinds of the registry (content/motes), in id order.
+func _mote_kinds() -> Array[MoteKind]:
+	var kinds: Array[MoteKind] = []
+	if registry != null:
+		for found: Resource in registry.get_all(MOTE_FOLDER):
+			if found is MoteKind:
+				kinds.append(found as MoteKind)
+	return kinds
+
+
+## The "Particle amount" setting: the share of its count every burst of motes throws (snapped by
+## `MoteDensity.snap`). Returns the share taken.
+func set_mote_density(density: float) -> float:
+	mote_density = MoteDensity.snap(density)
+	if pool != null:
+		pool.density = mote_density
+	return mote_density
+
+
+## The "Floor marks" setting: on makes the mark layer (fitted to the room it was last told of),
+## off frees it and every mark with it.
+func set_floor_marks(on: bool) -> void:
+	floor_marks = on
+	if on and marks == null:
+		var kinds: Array[MarkKind] = []
+		if registry != null:
+			for found: Resource in registry.get_all(MARK_FOLDER):
+				if found is MarkKind:
+					kinds.append(found as MarkKind)
+		marks = MarksScript.new(MARK_Z, kinds)
+		marks.name = "Marks"
+		marks.set_ramp_table(_ramp_table.texture())
+		add_child(marks)
+		if _mark_room != &"":
+			_fit_marks(_mark_room)
+	elif not on and marks != null:
+		marks.queue_free()
+		remove_child(marks)
+		marks = null
+	if pool != null:
+		pool.settle_into(marks)
+
+
+## The "Spell light" setting: on makes the light buffer and its rect, off frees them (no nodes).
+## Returns the setting.
+func set_spell_light(on: bool) -> bool:
+	if on != spell_light or (light == null) == on:
+		_make_light(on)
+	return spell_light
+
+
+func _make_light(on: bool) -> void:
+	spell_light = on
+	if light != null:
+		light.release()
+		remove_child(light)
+		light.queue_free()
+		light = null
+	if on and projectiles != null:
+		light = SpellLightScript.new(projectiles, LIGHT_Z)
+		light.name = "SpellLight"
+		add_child(light)
+
+
+# --- The room ------------------------------------------------------------------------------------
+
+## A new room: its colours for its walls' motes (`RoomBase.surface_colors`).
+func _on_room_entered(room_id: StringName) -> void:
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	_surface_colors = room.surface_colors() if room != null else PackedColorArray()
+	_surface_source = _ramp_table.source(_surface_colors)
+
+
+## A new room: the mark layer wiped and fitted to its bounds and walls (the projectile manager's,
+## set before `room_entered`) in its floor's colours.
+func _fit_marks(room_id: StringName) -> void:
+	_mark_room = room_id
+	if marks == null:
+		return
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
+	marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
+	marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())

@@ -85,7 +85,7 @@ func test_the_setting_is_on_by_default_and_makes_the_light() -> void:
 	var feel: FeelScript = made[1]
 	check(SpellLightSetting.default_on(), "spell light is on by default on the desktop")
 	var light: SpellLightScript = feel.light()
-	check(light != null and light.get_parent() == feel, "Feel makes the light")
+	check(light != null and feel.is_ancestor_of(light), "Feel makes the light (its spectacle)")
 	check(light.viewport != null and light.apply != null, "a light buffer and the rect that applies it")
 	check_equal(light.batches.size(), ProjectilesScript.BATCHES, "one light batch per projectile batch")
 

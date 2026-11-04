@@ -18,11 +18,7 @@ const DEFAULT: float = 1.0
 
 ## The index in STOPS of the stop nearest `density` (the lower one on a tie).
 static func index_of(density: float) -> int:
-	var best: int = 0
-	for i in STOPS.size():
-		if absf(STOPS[i] - density) < absf(STOPS[best] - density):
-			best = i
-	return best
+	return SettingStops.nearest(STOPS, density)
 
 
 ## `density` snapped to the nearest stop.

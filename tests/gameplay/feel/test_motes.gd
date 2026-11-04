@@ -480,7 +480,7 @@ func test_with_particles_off_there_are_no_motes_and_the_chips_effect_shows() -> 
 	bus.room_entered.emit(ARENA)
 	bus.mote_cap_changed.emit(0)
 	check(feel.motes() == null, "no motes")
-	check(feel.get_node_or_null("Motes") == null, "and no nodes")
+	check(feel.find_child("Motes", true, false) == null, "and no nodes")
 	check_equal(feel.mote_cap, 0, "the setting taken")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "the chips effect instead")
@@ -500,13 +500,13 @@ func test_feel_takes_a_pool_handed_to_it() -> void:
 	bus.room_entered.emit(ARENA)
 	var timed: MotesScript = TimedMotesScript.new(MoteCap.STOPS[1], FeelScript.MOTE_Z, feel.motes().kinds())
 	feel.use_motes(timed)
-	check(feel.motes() == timed and feel.get_node_or_null("Motes") == timed, "the pool handed is Feel's motes")
+	check(feel.motes() == timed and feel.find_child("Motes", true, false) == timed, "the pool handed is Feel's motes")
 	check_equal(feel.mote_cap, MoteCap.STOPS[1], "its cap is the setting's")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(timed, 0, timed.next_row()).has(&"chip"), "a wall hit sheds into it, in the room's colours")
 	check(int(timed.get(&"usec")) >= 0 and timed.written > 0, "and it counts what it wrote")
 	feel.use_motes(null)
-	check(feel.motes() == null and feel.get_node_or_null("Motes") == null and feel.mote_cap == 0, "null turns the motes off")
+	check(feel.motes() == null and feel.find_child("Motes", true, false) == null and feel.mote_cap == 0, "null turns the motes off")
 
 
 # --- P1b: the sources ---------------------------------------------------------------------------

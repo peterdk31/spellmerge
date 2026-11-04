@@ -278,3 +278,63 @@ func test_a_heal_plays_its_cue() -> void:
 	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [cue.parts[0]["color"], FeelScript.EXACT], "a ring in exactly its colour")
 	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT).get("zoom"), cue.parts[0]["zoom"], "as big as the cue says")
 	check_equal(feel.trauma(), 0.0, "no shake")
+
+
+## Cue parts are played by type from a table (docs/milestones/spell-spectacle-2.md, S1): a part
+## type added at run time plays with the cue's context, and a part of a type nothing plays is
+## skipped and counted.
+func test_a_part_type_added_at_run_time_plays() -> void:
+	var played: Array = []
+	feel.add_cue_part(&"test_part", func(part: Dictionary, cue: RefCounted) -> void:
+		played.append([part.get("size_x", 0), cue.get(&"at"), cue.get(&"size"), cue.get(&"ramp"), cue.get(&"surface")]))
+	_made([{"part": &"test_part", "size_x": 3}, {"effect": &"burst"}])
+	feel.play_cue(&"test_cue", 1, Vector2(10.0, 20.0), Vector2.UP, 30.0, Color.WHITE, 0, -1, -1, 7)
+	check_equal(played.size(), 1, "played once")
+	check_equal(played[0], [3, Vector2(10.0, 20.0), 30.0, feel._ramp_of(1), 7], "with the part and the cue's context, what broke too")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "and the cue's other parts as before")
+	check(feel.has_cue_part(&"effect") and feel.has_cue_part(&"motes") and feel.has_cue_part(&"mark"), "Feel's flashes and the spectacle's motes and marks are in the table")
+
+
+func test_a_part_nothing_plays_is_skipped_and_counted() -> void:
+	_made([{"part": &"nobody_plays_this"}, {"effect": &"burst"}])
+	_cue(&"test_cue")
+	check_equal(feel.unknown_cue_parts, 1, "counted")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "the rest still plays")
+
+
+## One context per depth is kept and filled for every cue: playing cues allocates none.
+func test_a_cue_reuses_its_context() -> void:
+	_made([{"effect": &"burst"}])
+	_cue(&"test_cue")
+	var made: int = feel._cue_contexts.size()
+	for i in 20:
+		_cue(&"test_cue", Vector2(float(i), 0.0))
+	check_equal(feel._cue_contexts.size(), made, "no new context")
+	check_equal(feel._cue_depth, 0, "and none left in use")
+
+
+## A cue played from inside a part gets a context of its own; the outer one is left as it was.
+func test_a_cue_inside_a_part_has_its_own_context() -> void:
+	var seen: Array = []
+	feel.add_cue_part(&"inner", func(_part: Dictionary, cue: RefCounted) -> void:
+		seen.append(cue.get(&"at")))
+	feel.add_cue_part(&"outer", func(_part: Dictionary, cue: RefCounted) -> void:
+		feel.play_cue(&"test_cue_inner", 0, Vector2(5.0, 5.0))
+		seen.append(cue.get(&"at")))
+	var inner := CueBase.new()
+	inner.id = &"test_cue_inner"
+	inner.parts = [{"part": &"inner"}]
+	feel._cue_cache[&"test_cue_inner"] = inner
+	_made([{"part": &"outer"}])
+	_cue(&"test_cue", Vector2(100.0, 50.0))
+	check_equal(seen, [Vector2(5.0, 5.0), Vector2(100.0, 50.0)], "the inner cue's point, then the outer's still")
+
+
+## A part's way: along the cue, against it, right or up.
+func test_a_parts_way_comes_from_the_cue() -> void:
+	var cue := FeelScript.CueContextScript.new()
+	cue.aim = Vector2.DOWN
+	check_equal(cue.way_of({}), Vector2.DOWN, "along the cue by default")
+	check_equal(cue.way_of({"way": &"back"}), Vector2.UP, "back")
+	check_equal(cue.way_of({"way": &"right"}), Vector2.RIGHT, "right")
+	check_equal(cue.way_of({"way": &"up"}), Vector2.UP, "up")

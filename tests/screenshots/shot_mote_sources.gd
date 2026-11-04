@@ -28,7 +28,7 @@ func take() -> void:
 		return
 	var feel: Node = root.get_node("Feel")
 	feel.set("drive_engine", false)
-	feel.call("_on_room_entered", &"arena_01")
+	(feel.call(&"spectacle") as Node).call(&"_on_room_entered", &"arena_01")
 	await _sheet(SOURCES, "mote_sources")
 	await _sheet(CUES, "mote_cues")
 

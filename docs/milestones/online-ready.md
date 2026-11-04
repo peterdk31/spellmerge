@@ -78,15 +78,15 @@ The owner asked: will it cost performance, and will the code be worse off or har
 | N3 one clock | **Likely a gain:** one tick calling steps replaces several engine callbacks (`_process`, `_physics_process` per area), and GDScript calls are what actors already pay most for | **Better:** one written order instead of an order implied by the scene tree. One-time churn: every seeded outcome changes once when chance moves to hashes (combo test numbers, the clips' `hashes.json`), redone in the same PR |
 | N4 hit-stop in ticks | None | **Simpler:** no `Engine.time_scale` games, and no real-time clock in Feel's stop |
 | N5 actor ids | None (int keys either way) | Neutral |
-| N6 own body movement (C++) | **Likely a gain:** one native call moves every actor against the wall grid, and Godot's physics bodies and broadphase for actors go away. Measured on the stress run | **A real cost, kept small:** a collision rule we own (corners, sliding along walls), in one C++ file with no GDScript twin. Circles against the wall grid only, as the swarm already does |
-| N7 DMath (C++) | **None:** one native call per use costs about what the engine's own `sin` does, and inside the kernels it is a plain inline function | `DMath.rotated(v, a)` reads a little worse than `v.rotated(a)`, but the rule is simple: simulation code calls no engine trig at all |
+| N6 own body movement (C++) | **Likely a gain:** one native call moves every actor against the wall grid, and Godot's physics bodies and broadphase for actors go away. Measured on the stress run | **A real cost, kept small:** a collision rule we own (corners, sliding along walls), in C++ with a GDScript twin (about 150 lines) for the editor without the module. Circles against the wall grid only, as the swarm already does |
+| N7 DMath (C++) | **None:** one native call per use costs about what the engine's own `sin` does, and inside the kernels it is a plain inline function | `DMath.rotated(v, a)` reads a little worse than `v.rotated(a)`, but the rule is simple: simulation code calls no engine trig at all. The GDScript twin is about 60 lines of polynomials |
 | N8 CI across platforms | None | CI time on the daily build only |
 | N9 sim/view test | None | **Better:** the rules are a test with a fix-it message, not a README line |
 | N10 snapshots | None at rest (taken only on a join, a test or a seek) | One `restore_nodes()` hook per area that makes nodes; the rest is the walker |
 | N11 session settings | None | Neutral: the shot cap moves from a per-machine setting to a run's rules |
 | N12 content coverage | None | Test time grows with content: a PR runs only the content it touches, the daily build runs all |
 
-**In short:** in normal play the game should be no slower and maybe a little faster (N3); N6 and N7 are C++ from the start (the owner, 2026-11-04), so they should cost nothing and N6 likely saves time. The code gets simpler in four places (input, one clock, hit-stop, rules as tests), stays the same in most, and gets two lasting costs (a `DERIVED` list on caches; `DMath` and our own slide, both C++ the game now needs). The one-time churn (seeded outcomes, the ~800 members reviewed once) lands early, in N1 and N3.
+**In short:** in normal play the game should be no slower and maybe a little faster (N3); N6 and N7 are C++ from the start (the owner, 2026-11-04), so they should cost nothing and N6 likely saves time. The code gets simpler in four places (input, one clock, hit-stop, rules as tests), stays the same in most, and gets two lasting costs (a `DERIVED` list on caches; `DMath` and our own slide, in C++ with small GDScript twins). The one-time churn (seeded outcomes, the ~800 members reviewed once) lands early, in N1 and N3.
 
 ## Done when
 
@@ -157,7 +157,7 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - `BodyKernel` (`native/src/body_kernel.cpp`): one call per tick moves every actor against the wall grid the projectile manager already keeps (room walls and solid shots): circles sliding along the grid's walls, the way the swarm moves onto its floor. It takes the actors' packed arrays (position, wanted move, radius) and the grid, and writes the positions back, as the other kernels do (native/README.md: arrays in place, nothing kept). Its maths is N7's.
 - `move_and_slide` and the bodies' physics shapes leave the simulation; the actor sets its position from the kernel's result.
 - Body-against-body pushing stays Combat's push.
-- **No GDScript twin.** The kernel is the one implementation; its tests check the behaviour directly (sliding along a wall, into a corner, between two solid shots, at every speed a dash reaches) instead of comparing with a GDScript copy.
+- **A GDScript twin, as every kernel has** (`gameplay/actor/body_move.gd`): the fallback when the module is not loaded (the project opened in the Godot editor without building it), and the reference its side-by-side test compares with, to the bit. Its tests also check the behaviour directly: sliding along a wall, into a corner, between two solid shots, at every speed a dash reaches.
 - Fixes A4. The highest-risk part for feel: walking along and into walls is compared with today's in the sandbox and by the bots before it merges.
 
 ### N7: deterministic maths, in C++
@@ -167,10 +167,10 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - `native/src/dmath.h`: `sin`, `cos`, `tan`, `atan2`, `exp`, `log`, `pow` from `+ - * / sqrt` only (polynomials with a range reduction, never the C library). The kernels (`ShotKernel`, `SwarmKernel`, `BodyKernel`) call it inline, in place of their `std::` trig.
 - `DMath` (the module's class, made by `core/native/native.gd` like the others): the same functions for GDScript, plus `from_angle`, `rotated`, `angle`, `angle_to` and `lerp_angle` on `Vector2`. Simulation code calls `DMath` and never the engine's trig (N9's test); view code keeps the engine's.
 - `native/SConstruct` builds with `-ffp-contract=off` and without fast-math on every platform (a protected file: the owner's change, listed in the PR).
-- **No GDScript twin.** Tests check `DMath` against known values (within a few units in the last place of the engine's results) and that it gives the same bits on every platform (N8).
+- **A GDScript twin** (`core/sim/dmath.gd`, the same polynomials): the fallback without the module, and the reference the side-by-side test compares with, to the bit. Tests also check it against known values (within a few units in the last place of the engine's results) and that it gives the same bits on every platform (N8).
 - Fixes A6 and A7.
 
-**What C++-only changes in the native contract.** native/README.md says every kernel has a GDScript twin, as reference and fallback, and that the game runs without the module. For N6 and N7 that no longer holds: the simulation needs the module. Every build already has it (the owner, 2026-11-02) and `build.sh` builds it before the tests, so only a checkout that never ran `build.sh` loses anything; the game then refuses to start a run and says why, rather than running a different game. native/README.md says so in N6's PR. The older kernels keep their twins.
+**The native contract holds.** N6 and N7 follow native/README.md like every kernel: C++ is what every build runs, and a GDScript twin, compared to the bit, keeps the project opening and playing in a plain Godot editor without a compiler (the owner, 2026-11-04: "So then I can't open it in Godot anymore?"). Because the twins match the C++ bit for bit, a game without the module is the same game, only slower; only the netcode, later, may require the module, for speed.
 
 ### N8: the same game on every platform
 

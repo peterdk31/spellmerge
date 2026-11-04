@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"fireball"
-parts = Array[Dictionary]([{"effect": &"fireball", "reach": 1.0}, {"effect": &"debris", "reach": 1.0, "particles": true}, {"effect": &"scorch", "reach": 1.0}, {"part": &"motes", "kind": &"spell", "count": 80, "reach": 1.0, "spread": 360.0}, {"part": &"motes", "kind": &"surface", "count": 30, "reach": 0.7, "spread": 360.0, "up": 1.5}])
+parts = Array[Dictionary]([{"effect": &"fireball", "reach": 1.0}, {"effect": &"debris", "reach": 1.0, "particles": true}, {"effect": &"scorch", "reach": 1.0}, {"part": &"motes", "kind": &"spell", "count": 80, "reach": 1.0, "spread": 360.0}, {"part": &"motes", "kind": &"surface", "count": 30, "reach": 0.7, "spread": 360.0, "up": 1.5}, {"part": &"mark", "mark": &"scorch", "reach": 0.9, "cards": true}])
 shake = 0.75
 kick = 3.0
 kick_way = &"away"

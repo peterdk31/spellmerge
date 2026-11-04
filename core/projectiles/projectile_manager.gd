@@ -1326,6 +1326,22 @@ func room_size() -> float:
 	return maxf(_bounds.size.x, _bounds.size.y)
 
 
+## The room's bounds (`set_bounds`), in world pixels.
+func bounds() -> Rect2:
+	return _bounds
+
+
+## The room's walls as an image (FORMAT_L8), one pixel a WALL_CELL square from the corner of
+## `bounds()`: white for a room wall, black for open (solid shots are left out). Made each call,
+## for what is built once a room (Feel's floor marks).
+func wall_image() -> Image:
+	var bytes := PackedByteArray()
+	bytes.resize(_wall_w * _wall_h)
+	for i in mini(bytes.size(), _wall_cells.size()):
+		bytes[i] = 255 if (_wall_cells[i] & ROOM_CELL) != 0 else 0
+	return Image.create_from_data(_wall_w, _wall_h, false, Image.FORMAT_L8, bytes)
+
+
 ## Make these world rectangles solid, replacing any walls set before. Parts outside
 ## the bounds are ignored. Call it after `set_bounds()`, which removes the walls.
 func set_walls(rects: Array[Rect2]) -> void:

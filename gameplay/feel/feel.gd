@@ -65,6 +65,13 @@ extends Node
 ## what broke, a body that died sampled from its own art). Every count is times the "Particle
 ## amount" setting (`MoteDensity`, `mote_density_changed`).
 ##
+## Floor marks (docs/milestones/spell-spectacle.md, P2a): a cue's `mark` parts stamp scorches,
+## cracks and frost into the room's mark layer (`marks.gd`, `mark.gdshader`), a texture over the
+## floor and under every body that stays until the next room (`room_entered` wipes it and fits it
+## to the room's bounds and walls). Their kinds are data (`MarkKind`, content/marks) and their
+## colours the floor's own (`RoomBase.floor_colors`) or the spell's. The "Floor marks" setting
+## (`FloorMarks`, `floor_marks_changed`) turns the layer off: no nodes at all.
+##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
 ## Flow frees the world on every Play and restart.
@@ -88,6 +95,7 @@ const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshad
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MarksScript := preload("res://gameplay/feel/marks.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -103,6 +111,11 @@ const FLOOR_Z: int = FORM_Z - 1
 ## Motes draw under the floor marks, the beams and every flash and telegraph
 ## (docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
 const MOTE_Z: int = FORM_Z - 2
+## The floor marks lie on the room's floor (RoomBase.FLOOR_Z) and under every body (0).
+const MARK_Z: int = RoomBase.FLOOR_Z + 1
+## The folder of the mark kinds in the registry, and a mark part's radius with no size to go by.
+const MARK_FOLDER: StringName = &"marks"
+const MARK_RADIUS: float = 8.0
 ## The folders of the mote kinds and the rooms in the registry.
 const MOTE_FOLDER: StringName = &"motes"
 const ROOM_FOLDER: StringName = &"rooms"
@@ -420,6 +433,12 @@ var _art_colors: Dictionary = {}
 ## and their source in the motes' ramp table (-1 for none).
 var _surface_colors: PackedColorArray = PackedColorArray()
 var _surface_source: int = -1
+## The floor marks (`marks.gd`; null with the "Floor marks" setting off), and the setting
+## (`FloorMarks.default_on()` until it changes; see `set_floor_marks`). Read only.
+var _marks: MarksScript = null
+var floor_marks: bool = FloorMarks.default_on()
+## The room the marks were last fitted to (`room_entered`), to fit a layer made later.
+var _mark_room: StringName = &""
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
@@ -567,6 +586,8 @@ func _ready() -> void:
 	add_child(_swing_trails)
 	ShaderWarmupScript.want(MotesScript.SHADER, ShaderWarmupScript.BATCH)
 	_make_motes(mote_cap)
+	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
+	set_floor_marks(floor_marks)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -629,6 +650,8 @@ func _ready() -> void:
 	events.mote_cap_changed.connect(_on_mote_cap_changed)
 	events.mote_density_changed.connect(_on_mote_density_changed)
 	events.room_entered.connect(_on_room_entered)
+	events.room_entered.connect(_fit_marks)
+	events.floor_marks_changed.connect(set_floor_marks)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
@@ -689,6 +712,8 @@ func step(real_delta: float) -> void:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha)
 	if _motes != null:
 		_motes.step(_clock)
+	if _marks != null:
+		_marks.step()
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1335,6 +1360,9 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			if _motes != null and particles_enabled:
 				_cue_motes(part, at, aim, size, tint, ramp, look)
 			continue
+		if StringName(part.get("part", "")) == &"mark":
+			_stamp_part(part, at, aim, size, tint, ramp, look)
+			continue
 		var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 		if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
 			continue
@@ -1740,6 +1768,62 @@ static func _frame_rect(sprite: Sprite2D) -> Rect2i:
 		return Rect2i(sprite.region_rect)
 	var size: Vector2i = Vector2i(sprite.texture.get_size()) / Vector2i(maxi(sprite.hframes, 1), maxi(sprite.vframes, 1))
 	return Rect2i(Vector2i(sprite.frame % maxi(sprite.hframes, 1), sprite.frame / maxi(sprite.hframes, 1)) * size, size)
+
+
+## The "Floor marks" setting: on makes the mark layer (fitted to the room it was last told of),
+## off frees it and every mark with it.
+func set_floor_marks(on: bool) -> void:
+	floor_marks = on
+	if on and _marks == null:
+		var kinds: Array[MarkKind] = []
+		if registry != null:
+			for found: Resource in registry.get_all(MARK_FOLDER):
+				if found is MarkKind:
+					kinds.append(found as MarkKind)
+		_marks = MarksScript.new(MARK_Z, kinds)
+		_marks.name = "Marks"
+		add_child(_marks)
+		if _mark_room != &"":
+			_fit_marks(_mark_room)
+	elif not on and _marks != null:
+		_marks.queue_free()
+		remove_child(_marks)
+		_marks = null
+
+
+## The floor marks (null with the setting off; for tests and the benchmarks).
+func marks() -> MarksScript:
+	return _marks
+
+
+## A new room: the mark layer is wiped and fitted to its bounds and walls (the projectile
+## manager's, set before `room_entered`) and takes its floor's colours.
+func _fit_marks(room_id: StringName) -> void:
+	_mark_room = room_id
+	if _marks == null:
+		return
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null
+	var bounds: Rect2 = projectiles.bounds() if projectiles != null else Rect2()
+	_marks.enter(bounds, projectiles.wall_image() if projectiles != null else null, ProjectileManagerScript.WALL_CELL)
+	_marks.set_floor_colors(room.floor_colors() if room != null else PackedColorArray())
+
+
+## Stamp a cue's mark part (`CueBase`, "part": "mark") at `at`: its mark, or with `cards` the
+## marks of the cards of `look` when they have any; `size` x its `reach` pixels round (or its
+## `radius`), turned at random or along `aim`, in the colours of a spell of `ramp` with `tint`.
+func _stamp_part(part: Dictionary, at: Vector2, aim: Vector2, size: float, tint: Color, ramp: int, look: int) -> void:
+	if _marks == null:
+		return
+	var radius: float = float(part.get("radius", MARK_RADIUS))
+	if part.has("reach") and size > 0.0:
+		radius = size * float(part["reach"])
+	var source: int = MotesScript.spell_source(ramp, look)
+	var turn: float = aim.angle() if StringName(part.get("rot", "random")) == &"aim" else _marks.random_turn()
+	var found: PackedInt32Array = _marks.kinds_of_look(look) if bool(part.get("cards", false)) else PackedInt32Array()
+	if found.is_empty():
+		found.append(_marks.kind_index(StringName(part.get("mark", ""))))
+	for k in found:
+		_marks.stamp(k, at, radius, turn, source, tint)
 
 
 func _on_screen_shake_changed(enabled: bool) -> void:

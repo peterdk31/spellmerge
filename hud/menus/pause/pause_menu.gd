@@ -19,7 +19,7 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Max shots: 6000", "Screen shake: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
@@ -35,6 +35,10 @@ extends PanelContainer
 ##   `MoteDensity.STOPS` (None, Half, Full, Double: the share of its count every burst of motes
 ##   throws), from `MoteDensity.DEFAULT`; each move sends `mote_density_changed`, which feel
 ##   applies, and is saved (`mote_density`), sent again when bound if it is not the default.
+##   when the menu is bound. "Floor marks: On" (or Off; spell spectacle P2a) flips on `accept`
+##   from the platform's default (`FloorMarks.default_on()` in core/settings), is saved
+##   (`floor_marks`) and sends `floor_marks_changed`, which feel applies (off frees the room's
+##   marks); a saved choice other than the default is sent again when the menu is bound.
 ##   "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
@@ -109,6 +113,8 @@ const MOTE_CAP_TEXT: String = "Particles: %s"
 const MOTE_CAP_SETTING: StringName = &"mote_cap"
 const MOTE_DENSITY_TEXT: String = "Particle amount: %s"
 const MOTE_DENSITY_SETTING: StringName = &"mote_density"
+const MARKS_TEXT: String = "Floor marks: %s"
+const MARKS_SETTING: StringName = &"floor_marks"
 const FPS_TEXT: String = "Show FPS: %s"
 const FPS_SETTING: StringName = &"show_fps"
 ## The slider bar beside the words: this wide, at the right of the row.
@@ -144,6 +150,8 @@ var shot_cap: int = ShotCap.default_cap()
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (see the top): `MoteDensity.DEFAULT` by default.
 var mote_density: float = MoteDensity.DEFAULT
+## The "Floor marks" setting (see the top): the platform's default.
+var floor_marks: bool = FloorMarks.default_on()
 ## The "Show FPS" setting (see the top): off by default.
 var show_fps: bool = false
 ## The save that keeps settings; made when the menu is bound, unless a test set its own first.
@@ -184,6 +192,7 @@ var ai_view: bool = false
 @onready var _motes_bar: HSlider = _add_slider(_motes, 0, MoteCap.STOPS.size() - 1, 1, MoteCap.index_of(mote_cap), MOTE_CAP_TEXT % "Medium")
 @onready var _density: Button = _add(Page.SETTINGS, "MoteDensity", MOTE_DENSITY_TEXT % MoteDensity.word_of(mote_density))
 @onready var _density_bar: HSlider = _add_slider(_density, 0, MoteDensity.STOPS.size() - 1, 1, MoteDensity.index_of(mote_density), MOTE_DENSITY_TEXT % "Double")
+@onready var _marks: Button = _add(Page.SETTINGS, "FloorMarks", MARKS_TEXT % ("On" if floor_marks else "Off"))
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
@@ -210,6 +219,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_shot_cap()
 	_load_mote_cap()
 	_load_mote_density()
+	_load_floor_marks()
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
@@ -507,6 +517,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_mote_density(MoteDensity.STOPS[(MoteDensity.index_of(mote_density) + 1) % MoteDensity.STOPS.size()])
 	elif control == _shots:
 		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
+	elif control == _marks:
+		_set_floor_marks(not floor_marks)
 	elif control == _shake:
 		_set_shake(not screen_shake)
 	elif control == _fps:
@@ -620,6 +632,26 @@ func _show_mote_density(density: float) -> void:
 	_density.set_meta(BASE_TEXT_META, MOTE_DENSITY_TEXT % MoteDensity.word_of(density))
 	_density_bar.value = MoteDensity.index_of(density)
 	_mark_focus()
+
+
+## Read the saved "Floor marks" choice and show it; feel is told only when it is not the platform's
+## (feel's own default).
+func _load_floor_marks() -> void:
+	floor_marks = bool(save.get_setting(MARKS_SETTING, FloorMarks.default_on()))
+	_marks.set_meta(BASE_TEXT_META, MARKS_TEXT % ("On" if floor_marks else "Off"))
+	_mark_focus()
+	if floor_marks != FloorMarks.default_on() and _events != null:
+		_events.floor_marks_changed.emit(floor_marks)
+
+
+## Flip the "Floor marks" switch: show it, save it and tell feel.
+func _set_floor_marks(on: bool) -> void:
+	floor_marks = on
+	_marks.set_meta(BASE_TEXT_META, MARKS_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(MARKS_SETTING, on)
+	if _events != null:
+		_events.floor_marks_changed.emit(on)
 
 
 ## Read the saved "Show FPS" choice and show it (panels reads `show_fps` after binding).

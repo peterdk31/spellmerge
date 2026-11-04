@@ -17,6 +17,8 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const TimedMotesScript := preload("res://tests/benchmark/timed_motes.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+## The settles left after a quiet room's blast of 100 chips (test_settles_are_budgeted_and_take_rows).
+const SETTLE_LEFT_AFTER_100: int = MotesScript.SETTLE_MOST - 100
 const ARENA: StringName = &"arena_01"
 
 ## Look bits of the elements' layers (layer n is bit n - 1).
@@ -865,12 +867,13 @@ func test_a_shed_never_writes_into_the_moments_rows() -> void:
 	check_equal(motes.written - written, 1 + MotesScript.MOMENT_ROWS, "and a moment has all of its rows")
 
 
-## The settled marks a frame: SETTLE_ROWS more each frame, kept up to SETTLE_MOST, the rest
-## counted as skipped (a flood of chips costs a bounded time; a quiet blast settles them all).
-func test_settles_are_budgeted_and_kept() -> void:
+## The settled marks a frame: SETTLE_ROWS more each frame, kept up to SETTLE_MOST, each taking a
+## row of the frame's as well (a settle costs about a row), the rest counted as skipped: a flood of
+## chips costs a bounded time, a quiet blast settles them all.
+func test_settles_are_budgeted_and_take_rows() -> void:
 	var chip := _kind(&"chip", -1)
 	chip.settles = &"speck"
-	var motes: MotesScript = _pool(4096, [chip])
+	var motes: MotesScript = _pool(4096, [chip, _kind(&"spark", 0)])
 	var speck := MarkKind.new()
 	speck.id = &"speck"
 	speck.form = "speck"
@@ -880,18 +883,26 @@ func test_settles_are_budgeted_and_kept() -> void:
 	marks.step(0.0)
 	motes.settle_into(marks)
 	motes.step(0.0)
-	motes.burst(0, Vector2(100.0, 100.0), Vector2.RIGHT, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2(10.0, 40.0), Vector2(3.0, 3.0), 0, Color.WHITE, 4.0)
-	check_equal(motes.settles, MotesScript.SETTLE_MOST, "a quiet room's first burst settles up to SETTLE_MOST")
-	check_equal(motes.settles_skipped, MotesScript.FRAME_ROWS - MotesScript.SETTLE_MOST, "the rest are skipped")
+	var chips: Callable = func() -> void:
+		motes.burst(0, Vector2(100.0, 100.0), Vector2.RIGHT, 100, Vector2(10.0, 50.0), 360.0, Vector2(10.0, 40.0), Vector2(3.0, 3.0), 0, Color.WHITE, 4.0)
+	chips.call()
+	check_equal(motes.settles, 100, "a quiet room's blast of 100 chips settles them all")
+	var written: int = motes.written
+	motes.burst(1, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(1.0, 1.0), 0, Color.WHITE)
+	check_equal(motes.written - written, MotesScript.FRAME_ROWS - 200, "each settle took a row of the frame's")
+	var counts: Array[int] = []
 	for frame in 3:
 		motes.step(0.1 * (frame + 1))
-		motes.burst(0, Vector2(100.0, 100.0), Vector2.RIGHT, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2(10.0, 40.0), Vector2(3.0, 3.0), 0, Color.WHITE, 4.0)
-	check_equal(motes.settles, MotesScript.SETTLE_MOST + 3 * MotesScript.SETTLE_ROWS, "then SETTLE_ROWS a frame in a flood")
+		var before: int = motes.settles
+		chips.call()
+		counts.append(motes.settles - before)
+	check_equal(counts, [SETTLE_LEFT_AFTER_100 + MotesScript.SETTLE_ROWS, MotesScript.SETTLE_ROWS, MotesScript.SETTLE_ROWS] as Array[int], "then SETTLE_ROWS a frame in a flood (what was left kept)")
+	check(motes.settles_skipped > 0, "the rest skipped: %d" % motes.settles_skipped)
 	for frame in 20:
 		motes.step(1.0 + 0.1 * frame)
-	var before: int = motes.settles
-	motes.burst(0, Vector2(100.0, 100.0), Vector2.RIGHT, MotesScript.FRAME_ROWS, Vector2(10.0, 50.0), 360.0, Vector2(10.0, 40.0), Vector2(3.0, 3.0), 0, Color.WHITE, 4.0)
-	check_equal(motes.settles - before, MotesScript.SETTLE_MOST, "quiet frames fill it up again, to SETTLE_MOST")
+	var again: int = motes.settles
+	chips.call()
+	check_equal(motes.settles - again, 100, "quiet frames fill it up again, up to SETTLE_MOST")
 
 
 ## The shader's flight and `Motes.flight` (and `rest_time`, which `mote_land` and the settled marks
@@ -915,6 +926,10 @@ func test_the_flight_is_the_shaders_line_for_line() -> void:
 		check(shader.contains(pair[0]), "the shader's mote_flight has: %s" % pair[0])
 		check(script.contains(pair[1]), "and Motes.flight its twin: %s" % pair[1])
 	check(script.contains("return land + 2.0 * rebound / g"), "rest_time ends where the flight comes to rest")
+	# `_land` (mote_land and the settled marks) writes the flight out at its rest: the same sums.
+	var land: String = script.substr(script.find("func _land("), script.find("func rest_time(") - script.find("func _land("))
+	for line: String in ["var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g", "var rebound: float = (g * land - vz) * kind.bounce", "var rest: float = land + 2.0 * rebound / g", "var along: float = (1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest", "var phase: float = buffer[i + ROW_SEED] * 6.2832", "kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase))"]:
+		check(land.contains(line), "_land has the flight's line: %s" % line)
 
 
 ## Numbers kept in two places agree: the trails' moments a second (the manager's rolls, the trail

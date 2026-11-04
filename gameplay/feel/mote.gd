@@ -72,16 +72,17 @@ const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## (`throw_part`, `burst`: a cue's or a reaction's, tens or a hundred in one burst, so a blast in a
 ## storm still throws its motes). Set from the sandbox storm (P1c, docs/DECISIONS.md): the sheds'
 ## rows cost about 2.5 us each, a moment's about 0.5.
-const FRAME_ROWS: int = 288
+const FRAME_ROWS: int = 256
 const MOMENT_ROWS: int = 128
 ## The motes that leave a settled mark (`MoteKind.settles`): SETTLE_ROWS more may each frame, and
 ## what a frame leaves unused is kept, up to SETTLE_MOST. Working out where a mote rests and
-## handing it to the mark layer costs about 2 us, about as much again as its row (the integration
-## of P1c, P1d and P2b; docs/DECISIONS.md), so a storm's flood settles SETTLE_ROWS a frame (1,440
-## specks a second) and the rest only fade (`settles_skipped`), while a blast in a quiet room
-## settles all of its chips.
+## handing it to the mark layer costs about as much as writing a row (the integration of P1c, P1d
+## and P2b; docs/DECISIONS.md), so each settle also takes one of the frame's rows (FRAME_ROWS
+## bounds the motes' whole time), a storm's flood settles at most SETTLE_ROWS a frame (1,440 specks
+## a second) and the rest only fade (`settles_skipped`), and a blast in a quiet room settles all of
+## its chips.
 const SETTLE_ROWS: int = 24
-const SETTLE_MOST: int = 192
+const SETTLE_MOST: int = 128
 ## The most kinds the shader holds (its `kind_motion` and `kind_sway` arrays).
 const MAX_KINDS: int = 16
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
@@ -352,7 +353,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 ## a time in `life` (s, at most LIFE_MAX), cooling through the ramp of `source` with the core
 ## colour `core`. Fewer when the frame's FRAME_ROWS run out. Every mote is written here: this is
 ## the one place a row is made. A kind that settles leaves its mark where each mote comes to rest
-## (`_settle`, as many as SETTLE_ROWS allows).
+## (as many as SETTLE_ROWS allows).
 func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0) -> void:
 	if density != 1.0:
 		count = floori(float(count) * density + _rng.randf())
@@ -364,7 +365,16 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		count = room
 		if count <= 0:
 			return
-	_rows_left -= count
+	# A settle costs about as much as a row, so it takes one of the frame's: the first `settling`
+	# motes of a settling kind leave their marks while rows and SETTLE_ROWS last.
+	var mark: int = _settle_marks[k] if _marks != null and k < _settle_marks.size() else -1
+	var settling: int = 0
+	if mark >= 0:
+		settling = mini(mini(count, _settles_left), room - count)
+		_settles_left -= settling
+		settles += settling
+		settles_skipped += count - settling
+	_rows_left -= count + settling
 	written += count
 	var aim: float = dir.angle() if dir != Vector2.ZERO else 0.0
 	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
@@ -378,7 +388,6 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 	var longest: float = clampf(life.y, 0.02, LIFE_MAX)
 	var chunk: int = -1
 	var buffer: PackedFloat32Array
-	var mark: int = _settle_marks[k] if _marks != null and k < _settle_marks.size() else -1
 	for n in count:
 		var row: int = _next
 		_next = (_next + 1) % _cap
@@ -408,24 +417,13 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		buffer[i + ROW_CORE + 1] = core.g
 		buffer[i + ROW_CORE + 2] = core.b
 		buffer[i + ROW_SEED] = _rng.randf()
-		if mark >= 0:
-			if _settles_left > 0:
-				_settles_left -= 1
-				settles += 1
-				_settle(buffer, i, k, mark, source, core, _serial + n)
-			else:
-				settles_skipped += 1
+		if n < settling:
+			# Where and when it rests (`mote_land`'s sum), for the mark it leaves there; its serial
+			# lets the layer forget it if the ring writes over it first (`step`).
+			var land: Vector3 = _land(buffer, i, k)
+			if is_finite(land.z):
+				_marks.settle(mark, Vector2(land.x, land.y).floor(), land.z, source, core, _serial + n)
 	_serial += count
-
-
-## Hand the mark layer where and when the mote in `buffer` at `i` (of kind `k`, the `serial`th row
-## written) comes to rest, to leave mark `mark` there in its own colours; nothing for one that
-## never rests in its life. The serial lets the layer forget it if the ring overwrites the mote
-## before it rests (`step`: `Marks.forget_settles_before`).
-func _settle(buffer: PackedFloat32Array, i: int, k: int, mark: int, source: int, core: Color, serial: int) -> void:
-	var land: Vector3 = _land(buffer, i, k)
-	if is_finite(land.z):
-		_marks.settle(mark, Vector2(land.x, land.y).floor(), land.z, source, core, serial)
 
 
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those
@@ -494,14 +492,25 @@ func mote_land(row: int) -> Vector3:
 
 
 ## `mote_land` of the row at `i` of `buffer`, of kind `k` (the settled marks' too, so the two are
-## one sum).
+## one sum): `flight` at the time it comes to rest, its sums written out here (the settles call it
+## in a fight; a test holds its lines to the shader's).
 func _land(buffer: PackedFloat32Array, i: int, k: int) -> Vector3:
+	var kind: MoteKind = _kinds[k]
+	var g: float = kind.gravity
+	if g <= 0.0:
+		return Vector3(INF, INF, INF)
 	var h0: float = buffer[i + ROW_HEIGHT] * HEIGHT_MAX
-	var rest: float = rest_time(k, h0, buffer[i + ROW_VZ])
+	var vz: float = buffer[i + ROW_VZ]
+	var land: float = (vz + sqrt(vz * vz + 2.0 * g * maxf(h0, 0.0))) / g
+	var rebound: float = (g * land - vz) * kind.bounce
+	var rest: float = land + 2.0 * rebound / g
 	if rest >= buffer[i + ROW_LIFE] * LIFE_MAX:
 		return Vector3(INF, INF, INF)
-	var at: Vector3 = flight(Vector2(buffer[i + ROW_X], buffer[i + ROW_Y]), Vector2(buffer[i + ROW_VX], buffer[i + ROW_VY]), h0, buffer[i + ROW_VZ], rest, k, buffer[i + ROW_SEED])
-	return Vector3(at.x, at.y, buffer[i + ROW_BORN] + rest)
+	var drag: float = kind.drag
+	var along: float = (1.0 - exp(-drag * rest)) / drag if drag > 0.0 else rest
+	var phase: float = buffer[i + ROW_SEED] * 6.2832
+	return Vector3(buffer[i + ROW_X] + buffer[i + ROW_VX] * along + kind.wobble * (sin(rest * kind.wobble_rate + phase) - sin(phase)),
+		buffer[i + ROW_Y] + buffer[i + ROW_VY] * along, buffer[i + ROW_BORN] + rest)
 
 
 ## The row of mote `row` as the shader reads it (a copy, for tests).

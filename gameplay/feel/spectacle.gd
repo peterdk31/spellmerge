@@ -7,8 +7,8 @@ extends Node
 ## the mark layer's fit), and plays a cue's `motes` and `mark` parts (`cue_parts`, which Feel adds
 ## to its table of part players).
 ##
-## Feel says when: its hit, end, wall and reaction handlers call `shed_hit`, `shed_end`,
-## `shed_on_wall` and `reaction_motes` with what it already worked out (the caster's ramp, the
+## Feel says when: its hit, end and wall handlers call `shed_hit`, `shed_end` and
+## `shed_on_wall` with what it already worked out (the caster's ramp, the
 ## preset's shares, the shot's tag), in the order it draws them, and `step` once a frame. The
 ## spectacle says what: which kinds (a spell's, from its cards: `card_kinds.gd`; S2), in which
 ## colours, where they settle. Nothing here changes a fight.
@@ -196,19 +196,6 @@ func surface_kinds() -> PackedInt32Array:
 	return _surface_kinds
 
 
-## A reaction's motes: a ring of the reacting shot's kinds (its `look` and `tag`, read while the
-## event is sent; layer 0's for none) in the reaction's colour `tint`, from a caster of `ramp`:
-## `count` in all and `reach` pixels out.
-func reaction_motes(ramp: int, at: Vector2, look: int, tint: Color, count: float, reach: float, tag: int = 0) -> void:
-	if pool == null or not particles_enabled:
-		return
-	var kinds: PackedInt32Array = cards.motes_of(tag, look)
-	var source: int = MotesScript.spell_source(ramp, MotesScript.LOOK_EXACT)
-	var each: int = maxi(roundi(count / float(kinds.size())), 1)
-	for k in kinds:
-		pool.throw_part(k, at, Vector2.RIGHT, source, tint, each, reach, 360.0, 1.0, true)
-
-
 ## A body breaking into motes (S3: a death, in place of the white-hot copy that fell apart pixel by
 ## pixel): about `share` of the pixels of the art `sprite` shows (times the area of `to_world`'s
 ## scale, at most `most`), each a mote of the surface kind `kind` (a body is a surface that broke)
@@ -302,13 +289,17 @@ func _trail_motes() -> void:
 # --- Cue parts -------------------------------------------------------------------------------
 
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
-## cue's size times its `reach` out (or its `radius` in pixels), in the cue's ramp with its tint and
-## the cards of its look; one `often` (a hit's spray, S6 2) leaves the moments' rows alone.
+## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
+## the cue's ramp with its tint and the cards of its look; its count and reach times the cue's power.
+## One `often` (a hit's sparks, S6 2) leaves the moments' rows alone.
 func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
 	var way: Vector2 = cue.way_of(part)
-	var reach: float = cue.size * float(part["reach"]) if part.has("reach") and cue.size > 0.0 else float(part.get("radius", 0.0))
+	var reach: float = float(part.get("radius", 0.0))
+	if part.has("reach") and cue.size > 0.0:
+		reach = cue.size * float(part["reach"])
+	reach *= cue.power
 	var often: bool = bool(part.get("often", false))
 	var spread: float = float(part.get("spread", -1.0))
 	var up: float = float(part.get("up", 1.0))
@@ -325,7 +316,11 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 			if k < 0:
 				return
 			kinds = PackedInt32Array([k])
-	var spell: int = MotesScript.spell_source(cue.ramp, cue.look)
+	# In an exact colour (the part's, else the cue's own), or in the cue's ramp, tint and cards.
+	var colour: Color = part["color"] as Color if part.has("color") else cue.color
+	var exact: bool = colour.a > 0.0
+	var spell: int = MotesScript.spell_source(cue.ramp, MotesScript.LOOK_EXACT if exact else cue.look)
+	var core: Color = colour if exact else cue.tint
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	var count: int = int(part.get("count", -1))
 	# What a surface sheds (the walls', or a room's own kinds) cools through the surface's colours,
@@ -334,10 +329,13 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	var of_surface: bool = named == &"surface" or colours == &"surface"
 	var at: Vector2 = cue.at + Vector2(0.0, float(part.get("below", 0.0)))
 	for k in kinds:
-		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell")
+		# A card's own surface kind (grit) cools through the walls' colours, unless in an exact one.
+		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
-		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring, often)
+		# How many of this kind: its share of the part's count (else its own count), times the power.
+		var share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
+		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(share * cue.power), 1)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, spread, up, ring, often)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
@@ -350,6 +348,7 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 	var radius: float = float(part.get("radius", MARK_RADIUS))
 	if part.has("reach") and cue.size > 0.0:
 		radius = cue.size * float(part["reach"])
+	radius *= cue.power
 	var source: int = MotesScript.spell_source(cue.ramp, cue.look)
 	var turn: float = cue.aim.angle() if StringName(part.get("rot", "random")) == &"aim" else marks.random_turn()
 	var found: PackedInt32Array = cards.marks_of(cue.tag, cue.look) if bool(part.get("cards", false)) else PackedInt32Array()

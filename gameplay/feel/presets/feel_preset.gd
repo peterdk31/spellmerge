@@ -3,7 +3,8 @@ extends Resource
 ## One set of juice numbers for `gameplay/feel`: how long the hit-stop lasts, how
 ## hard the screen shakes and how the hit particles look. A preset only tunes
 ## reactions; it can never change damage or outcomes. The point moments (a parry, a
-## deflect, a death, a downed wizard, a self-hit, a heal) are cues in `content/cues/`.
+## deflect, a death, a downed wizard, a self-hit, a heal, an element reaction) are cues in
+## `content/cues/`.
 
 ## Unique name of the preset, also its file name.
 @export var id: StringName = &""
@@ -44,58 +45,16 @@ extends Resource
 ## spectacle's surface kinds); its flare is its carrier card's `impact_cue` (`impact` for none).
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
-## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A reaction throws
-## a ring of `reaction_mote_count` of the reacting shot's kinds in its colour, out to
-## `reaction_mote_reach` pixels, both times its `reaction_power`. A cue's motes are its own data.
+## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A cue's motes (a
+## reaction's ring of them among them) are its own data.
 @export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
 @export_range(0.0, 4.0, 0.05) var expire_mote_share: float = 1.0
-@export_range(0, 64) var reaction_mote_count: int = 16
-@export_range(0.0, 64.0, 1.0) var reaction_mote_reach: float = 22.0
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
 ## Camera kick (a cue's `kick`, a cast's among them): pixels given back per second.
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
-## An element reaction (`reaction_triggered`): the seconds of its puff, ring and name, the
-## shake it adds, and the colour of each reaction by its id (a reaction not listed is white).
-## The sound is `reaction_sound_prefix` + the reaction id, for example `reaction_shatter`.
-@export_range(0.0, 0.5, 0.01) var reaction_seconds: float = 0.25
-@export_range(0.0, 1.0, 0.01) var reaction_shake: float = 0.2
-@export var reaction_colors: Dictionary = {
-	&"shatter": Color("e8fbff"),
-	&"thaw": Color("7be05a"),
-	&"flare": Color("ffd23a"),
-	&"kindle": Color("ff3b30"),
-	&"stillness": Color("4a78ff"),
-	&"rift": Color("c05cff"),
-	&"discharge": Color("00f0ff"),
-	&"overload": Color("ff6ba0"),
-	&"superconduct": Color("14a38b"),
-}
-@export var reaction_sound_prefix: String = "reaction_"
-## The burst a reaction adds to its flash, bigger than any plain hit: how long it holds its
-## caster (and the target of its hit) in seconds
-## (longer than a death's), the size of its particle burst, and the size of the ring that
-## opens (1.0 is the nova ring art's size; it grows as it fades). `reaction_power` scales
-## these and the flash and shake by reaction id (a reaction not listed is 1.0).
-@export_range(0.0, 0.3, 0.005) var reaction_stop_seconds: float = 0.09
-@export_range(1.0, 4.0, 0.1) var reaction_burst_size: float = 2.2
-@export_range(0.1, 4.0, 0.1) var reaction_ring_size: float = 0.9
-@export var reaction_power: Dictionary = {
-	&"shatter": 1.3,
-	&"rift": 1.2,
-	&"flare": 1.1,
-	&"kindle": 1.0,
-	&"thaw": 1.0,
-	&"stillness": 0.9,
-	&"discharge": 0.7,
-	&"overload": 1.1,
-	&"superconduct": 1.0,
-}
-## The jagged arc of lightning a discharge draws from the enemy struck to each enemy zapped
-## (`discharge_arc`), in the colour of the reaction `discharge`: seconds it shows.
-@export_range(0.0, 0.5, 0.01) var arc_seconds: float = 0.25
 ## What a character with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
 ## `hex`, `static`; the glow look, 2026-10-27): an effect that follows it, giving off the
 ## particles of a look kind (`look`: a `LOOK_*` of core/projectiles, the element's own: burn

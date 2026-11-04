@@ -155,6 +155,10 @@ const REACTION_RISE: float = 10.0
 ## The same reaction makes its sound and shake at most this often, and its name is not shown
 ## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
 const REACTION_REPEAT: float = 0.3
+## How long a reaction's name rises, in seconds.
+const REACTION_NAME_SECONDS: float = 0.75
+## The cue of a reaction with no cue of its own (`reaction_<id>`).
+const REACTION_CUE: StringName = &"reaction"
 const REACTION_LABEL_NEAR: float = 40.0
 ## The damage a hit spray is sized for (the fire bolt's); more is a bigger spray, less a smaller one.
 const SPRAY_REF_DAMAGE: int = 5
@@ -264,9 +268,8 @@ const DASH_ACROSS: float = 32.0
 ## ARC_ACROSS across (the shader's).
 const ARC_MARGIN: float = 12.0
 const ARC_ACROSS: float = 56.0
-## A zap no longer than this is a zap shot's spark into the air (SpellLimits.ZAP_SPARK_LONGEST): it
-## burns out sooner.
-const SPARK_LONGEST: float = 22.0
+## The cue of a discharge's arc (`discharge_arc`; content/cues).
+const DISCHARGE_ARC: StringName = &"discharge_arc"
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
 const STATUS_RISE: float = 8.0
@@ -310,11 +313,10 @@ const EFFECT_QUADS: Array[Vector3i] = [
 ## How long a muzzle flash is compared with its width.
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
-## A possession's ring on the possessed actor (`possess_started`, `possess_ended`): its zoom and
-## seconds, and the sound when it starts.
-const POSSESS_ZOOM: int = 2
-const POSSESS_SECONDS: float = 0.35
-const POSSESS_SOUND: StringName = &"possess"
+## The cues of a possession starting and ending, on the possessed body (`possess_started`,
+## `possess_ended`; content/cues).
+const POSSESS_START: StringName = &"possess_start"
+const POSSESS_END: StringName = &"possess_end"
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -464,7 +466,7 @@ var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
-## The seconds a label was given (0: a reaction name's own three times `reaction_seconds`).
+## The seconds a label was given (0: a reaction name's own REACTION_NAME_SECONDS).
 var _label_total: PackedFloat32Array = PackedFloat32Array()
 var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
@@ -476,8 +478,9 @@ var _status_effect: PackedInt32Array = PackedInt32Array()
 var _status_age: PackedFloat32Array = PackedFloat32Array()
 var _status_shown: Array[StringName] = []
 var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
-## Sound ids by reaction id, built the first time a reaction is heard (so it allocates once).
-var _reaction_sounds: Dictionary = {}
+## The cue of each reaction id (`reaction_<id>`, else REACTION_CUE), found the first time it is
+## seen (so it allocates once).
+var _reaction_cues: Dictionary = {}
 ## Display names by reaction id, built the same way.
 var _reaction_names: Dictionary = {}
 ## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
@@ -931,12 +934,6 @@ func _on_heal_dealt(_player: int, _target: Node, _amount: float, position: Vecto
 	play_cue(&"heal", ActorsScript.NONE, position)
 
 
-## A ring that flashes out from `position` in exactly `tint`, `size` as wide as the old ring
-## art (32 px), for `seconds`.
-func _show_ring(position: Vector2, tint: Color, seconds: float, size: float) -> void:
-	show_effect(KIND_RING_OUT, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(size * 1.6), 1, 15), seconds)
-
-
 ## A line of text rising from `position` for `seconds`, in a label slot of the reactions.
 func _show_note(text: String, position: Vector2, tint: Color, seconds: float) -> void:
 	var slot: int = _next_reaction
@@ -952,54 +949,47 @@ func _show_note(text: String, position: Vector2, tint: Color, seconds: float) ->
 	_label_id[slot] = &"note"
 
 
-## An element reaction fired at `position`: a puff and a ring in the reaction's colour, its
-## name rising from the spot, a little shake and the sound `reaction_<id>`. The same for every
-## player; it changes nothing in the fight.
+## An element reaction fired at `position`: its cue (`reaction_<id>`, else `reaction`;
+## content/cues: a puff, a ring and a ring of the reacting shot's motes in the reaction's own
+## colour, a hold, shake and its sound, as strong as its `power`), and its name rising from the spot
+## in that colour. The cue's weight (hold, shake, sound) comes at most every REACTION_REPEAT seconds
+## per reaction, its looks every time. The same for every player; it changes nothing in the fight.
 func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vector2, shot: int) -> void:
-	var tint: Color = preset.reaction_colors.get(reaction_id, Color.WHITE) as Color
-	var power: float = preset.reaction_power.get(reaction_id, 1.0) as float
-	var slot: int = _next_reaction
-	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
-	# A puff and a ring in the reaction's own colour, bigger for a stronger reaction.
-	show_effect(KIND_PUFF, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(preset.reaction_burst_size * power), 1, 15), preset.reaction_seconds * 2.0)
-	_show_ring(position, tint, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power * 2.0)
-	if _spectacle.motes_on():
-		_spectacle.reaction_motes(_ramp_of(caster), position, projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0, tint, float(preset.reaction_mote_count) * power, preset.reaction_mote_reach * power, projectiles.get_tag_of(shot) if projectiles != null and shot >= 0 else 0)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
-		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
-	if not _label_showing(reaction_id, position):
-		var label: Label = _labels[slot]
-		var shown: String = _reaction_names[reaction_id] as String
-		if label.text != shown:
-			label.text = shown
-		label.modulate = tint
-		_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -18.0)
-		label.global_position = _label_start[slot]
-		label.visible = true
-		_label_left[slot] = preset.reaction_seconds * 3.0
-		_label_total[slot] = 0.0
-		_label_id[slot] = reaction_id
-	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
-		return
-	_reaction_heard[reaction_id] = _clock
-	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop. The
-	# reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
+	if not _reaction_cues.has(reaction_id) and registry != null:
+		var own: StringName = StringName("reaction_" + String(reaction_id))
+		_reaction_cues[reaction_id] = own if cue_of(own) != null else REACTION_CUE
+	var id: StringName = _reaction_cues.get(reaction_id, REACTION_CUE) as StringName
+	var heard: bool = _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT
+	if not heard:
+		_reaction_heard[reaction_id] = _clock
+	# The reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
 	# lengthens, so whichever of the two comes first, the caster is held for the longer one.
-	_hold_bodies(caster, ActorsScript.NONE, preset.reaction_stop_seconds * power, true, shot)
-	if shake_enabled:
-		_refresh_camera()
-		_trauma = minf(_trauma + preset.reaction_shake * power, 1.0)
-	_play(_reaction_sounds[reaction_id] as StringName)
-
-
-## A discharge jumped from `from` to `to`: a jagged line of lightning between them, re-rolled
-## as it flickers, that burns out (an effect, KIND_ARC), in the discharge's colour.
-func _on_discharge_arc(_player: int, from: Vector2, to: Vector2) -> void:
-	if preset.arc_seconds <= 0.0 or from.is_equal_approx(to):
+	play_cue(id, caster, position, Vector2.ZERO, 0.0, Color.WHITE, projectiles.get_look_of(shot) if projectiles != null and shot >= 0 else 0, ActorsScript.NONE, shot, -1, 0, not heard)
+	if _label_showing(reaction_id, position):
 		return
-	var tint: Color = preset.reaction_colors.get(&"discharge", Color.WHITE) as Color
-	show_effect(KIND_ARC, from, from.direction_to(to), tint, 0, EXACT, 1, preset.arc_seconds, from.distance_to(to))
+	var cue: CueBase = cue_of(id)
+	var slot: int = _next_reaction
+	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
+	var label: Label = _labels[slot]
+	var shown: String = _reaction_names[reaction_id] as String
+	if label.text != shown:
+		label.text = shown
+	label.modulate = cue.color if cue != null and cue.color.a > 0.0 else Color.WHITE
+	_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -18.0)
+	label.global_position = _label_start[slot]
+	label.visible = true
+	_label_left[slot] = REACTION_NAME_SECONDS
+	_label_total[slot] = 0.0
+	_label_id[slot] = reaction_id
+
+
+## A discharge jumped from `from` to `to`: the cue `discharge_arc` from the one to the other, as
+## long as the gap (a jagged line of lightning in the discharge's colour that burns out; its `arc`
+## part, KIND_ARC).
+func _on_discharge_arc(caster: int, from: Vector2, to: Vector2) -> void:
+	play_cue(DISCHARGE_ARC, caster, from, to - from, from.distance_to(to))
 
 
 ## Discharge arcs showing right now (for tests).
@@ -1134,7 +1124,7 @@ func _step_labels(real_delta: float) -> void:
 		if _label_left[i] <= 0.0:
 			label.visible = false
 			continue
-		var total: float = _label_total[i] if _label_total[i] > 0.0 else preset.reaction_seconds * 3.0
+		var total: float = _label_total[i] if _label_total[i] > 0.0 else REACTION_NAME_SECONDS
 		var t: float = _label_left[i] / total
 		label.global_position = _label_start[i] + Vector2(0.0, -REACTION_RISE * (1.0 - t))
 		label.modulate.a = minf(t * 2.0, 1.0)
@@ -1240,8 +1230,11 @@ func _show_impact(caster: int, position: Vector2, direction: Vector2) -> void:
 ## for a moment of a seat or of a hit body rather than of the caster's spell, a seat's cast; CASTER_RAMP:
 ## the caster's, `Actors.ramp_of`). Plays its parts, each by
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
-## punch (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, ramp: int = CASTER_RAMP) -> void:
+## punch (both off with the screen shake setting) and its sound; with `weight` false, its parts
+## only (a reaction repeated within REACTION_REPEAT). Its `power` is applied here and in the parts'
+## players, by one rule (`CueBase`): times its sizes and counts, its holds, shake and punch. An
+## unknown cue plays nothing.
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1, surface: int = -1, tag: int = 0, weight: bool = true, ramp: int = CASTER_RAMP) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
@@ -1262,6 +1255,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	context.shot = shot
 	context.surface = surface
 	context.tag = tag if tag != 0 or shot < 0 or projectiles == null else projectiles.get_tag_of(shot)
+	context.color = cue.color
+	context.power = cue.power
 	_cue_depth += 1
 	for part: Dictionary in cue.parts:
 		var type: StringName = StringName(part.get("part", "effect"))
@@ -1271,17 +1266,20 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			continue
 		(player as Callable).call(part, context)
 	_cue_depth -= 1
+	if not weight:
+		return
+	var power: float = cue.power
 	var table: ActorsScript = _actor_table()
 	if table != null:
-		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold, true)
-		held = (cue.hold_target > 0.0 and _hold_actor(table, target, cue.hold_target, true)) or held
+		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold * power, true)
+		held = (cue.hold_target > 0.0 and _hold_actor(table, target, cue.hold_target * power, true)) or held
 		if cue.hold_shot and held and projectiles != null and shot >= 0:
-			projectiles.freeze_shot(shot, maxf(cue.hold, cue.hold_target))
+			projectiles.freeze_shot(shot, maxf(cue.hold, cue.hold_target) * power)
 	if cue.stop_game > 0.0:
 		_stop_game(cue.stop_game)
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0):
 		_refresh_camera()
-		_trauma = minf(_trauma + cue.shake, 1.0)
+		_trauma = minf(_trauma + cue.shake * power, 1.0)
 		var way: Vector2 = Vector2.DOWN
 		match cue.kick_way:
 			# Back or along its way only when it has one (a cast with no aim kicks nowhere).
@@ -1293,7 +1291,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 				var body: Node2D = table.node_of(caster) as Node2D if table != null and table.is_open(caster) else null
 				if body != null and body.global_position.distance_to(at) > 1.0:
 					way = body.global_position.direction_to(at)
-		_kick = (_kick + way * cue.kick).limit_length(MAX_KICK_PIXELS)
+		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
 
 
@@ -1320,7 +1318,8 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 
 ## A cue's flash (`CueBase`: a part with no `part`, or `"part": "effect"`) played with `cue`: its
 ## effect at the cue's point along its way, sized by its `zoom` or the cue's size times its
-## `reach`, for its seconds (or the cue's size with `lasts_size`), in its exact `color`, plain, or
+## `reach` (either times the cue's power), for its seconds (or the cue's size with `lasts_size`), in
+## its exact `color`, plain, in the caster's ramp alone (`bare`), in the cue's own colour, or in
 ## the cue's ramp, tint and cards.
 func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
@@ -1332,12 +1331,15 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 		return
 	if part.has("if_layer") and (layers >> (int(part["if_layer"]) - 1)) & 1 == 0:
 		return
+	# Only at some sizes (a zap's short spark into the air against a zap at a body).
+	if (part.has("if_size_over") and cue.size <= float(part["if_size_over"])) or (part.has("if_size_upto") and cue.size > float(part["if_size_upto"])):
+		return
 	var seconds: float = float(part.get("seconds", row[2]))
 	if bool(part.get("lasts_size", false)):
 		if cue.size <= 0.0:
 			return
 		seconds = cue.size
-	var zoom: int = int(part.get("zoom", 1))
+	var zoom: int = roundi(float(part.get("zoom", 1.0)) * cue.power)
 	var length: float = 0.0
 	if row.size() > 3:
 		# Drawn along its length (an arc): the cue's size times its reach, from the cue's point.
@@ -1345,7 +1347,7 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 		if length <= 0.0:
 			return
 	elif part.has("reach"):
-		zoom = roundi(cue.size * float(part["reach"]) / float(row[1]))
+		zoom = roundi(cue.size * float(part["reach"]) * cue.power / float(row[1]))
 	var way: Vector2 = cue.way_of(part)
 	if part.has("color"):
 		_cue_effect = show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds, length)
@@ -1353,6 +1355,8 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
 	elif bool(part.get("bare", false)):
 		_cue_effect = show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
+	elif cue.color.a > 0.0:
+		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.color, 0, EXACT, zoom, seconds, length)
 	elif bool(part.get("no_cards", false)):
 		_cue_effect = show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, 0, zoom, seconds, length)
 	else:
@@ -1865,13 +1869,14 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	# What broke is the body: its surface kinds and marks in the colours of its own art.
 	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(_body_sprite(enemy)))
 	if not upgraded:
-		play_cue(&"hit_puff", ActorsScript.NONE, position, Vector2.ZERO, zoom * HIT_STEP, preset.enemy_hit_color, 0, ActorsScript.NONE, -1, -1, 0, 0)
+		play_cue(&"hit_puff", ActorsScript.NONE, position, Vector2.ZERO, zoom * HIT_STEP, preset.enemy_hit_color, 0, ActorsScript.NONE, -1, -1, 0, true, 0)
 
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
-## 0) for an id that is no carrier card. Read once per card id, then kept: a cast or a hit allocates
-## nothing. With no registry yet, or no form id, the defaults are answered but not kept.
+## 0) for an id that is no carrier card; a modifier that shows itself (`form_shown` `zap`) brings its
+## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
+## With no registry yet, or no form id, the defaults are answered but not kept.
 func _form_cues_of(form: StringName) -> Array:
 	var cached: Variant = _form_cues.get(form)
 	if cached != null:
@@ -1882,6 +1887,9 @@ func _form_cues_of(form: StringName) -> Array:
 	var cues: Array = NO_FORM_CUES
 	if card is FormBase:
 		cues = (card as FormBase).look_cues()
+	elif card is ModifierBase and (card as ModifierBase).cue != &"":
+		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
+		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0]
 	_form_cues[form] = cues
 	return cues
 
@@ -1894,7 +1902,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		return
 	var table: ActorsScript = _actor_table()
 	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
-	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, player)
+	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, player)
 
 
 ## A carrier showed itself: its card's `shown_cue` (a nova's ring, a rain's telegraph
@@ -1911,11 +1919,6 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	if cue != &"":
 		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)
-	if form == &"zap":
-		# A zap or a zap shot's spark: lightning in the shot's colours (its infusion's, else its caster's).
-		if length > 0.0 and direction != Vector2.ZERO and preset.arc_seconds > 0.0:
-			show_effect(KIND_ARC, origin, direction, tint, ramp, look, 1, preset.arc_seconds * (1.0 if length > SPARK_LONGEST else 0.6), length)
-		return
 	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
 	var seconds: float = preset.beam_seconds
@@ -2134,28 +2137,26 @@ func _on_staff_shown(caster: int, actor: Node, _staff: int) -> void:
 		_effect_offset[slot] = offset
 
 
-## A possession started: a ring closes on the possessed actor in the driver's ramp, with the sound
-## `possess`.
+## A possession started: the cue `possess_start` on the possessed actor's body (a ring closing in
+## the driver's ramp, the sound `possess`).
 func _on_possess_started(caster: int, actor: int) -> void:
-	if _show_possession(caster, actor, KIND_RING_IN):
-		_play(POSSESS_SOUND)
+	_cue_on_body(POSSESS_START, caster, actor)
 
 
-## A possession ended: a ring in the driver's ramp goes out from the actor let go (if it is there).
+## A possession ended: the cue `possess_end` on the body let go, if it is still there (a ring going
+## out in the driver's ramp).
 func _on_possess_ended(caster: int, actor: int) -> void:
-	_show_possession(caster, actor, KIND_RING_OUT)
+	_cue_on_body(POSSESS_END, caster, actor)
 
 
-## A ring of `kind` on the body of `actor` (at its drawn body), in the ramp of `caster`. False
-## when the body is gone.
-func _show_possession(caster: int, actor: int, kind: int) -> bool:
+## Play the cue `id` of `caster` at the drawn body of `actor` (its `body_offset`); nothing when the
+## body is gone.
+func _cue_on_body(id: StringName, caster: int, actor: int) -> void:
 	var table: ActorsScript = _actor_table()
 	var body: Node2D = table.node_of(actor) as Node2D if table != null and actor != ActorsScript.NONE else null
 	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
-		return false
-	var at: Vector2 = body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO)
-	show_effect(kind, at, Vector2.RIGHT, Color.WHITE, _ramp_of(caster), 0, POSSESS_ZOOM, POSSESS_SECONDS)
-	return true
+		return
+	play_cue(id, caster, body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO), Vector2.ZERO, 0.0, Color.WHITE, 0, actor)
 
 
 func _on_player_downed(player: int) -> void:
@@ -2190,7 +2191,7 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 		var from: Vector2 = position if at == Vector2.INF else at
 		var zoom: int = clampi(roundi(size), 1, 3)
 		_cue_effect = -1
-		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, player)
+		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, true, player)
 		_hit_effect = _cue_effect
 		_hit_position = position
 	_hit_voice = _play(sound)
@@ -2205,7 +2206,7 @@ func _upgrade_hit(position: Vector2, zoom: int) -> bool:
 		return false
 	_effect_seconds[slot] = 0.0
 	_hit_effect = -1
-	play_cue(&"hit_puff", ActorsScript.NONE, _effect_at[slot], Vector2.ZERO, zoom * HIT_STEP, _effect_core[slot], _effect_look[slot], ActorsScript.NONE, -1, -1, 0, _effect_ramp[slot])
+	play_cue(&"hit_puff", ActorsScript.NONE, _effect_at[slot], Vector2.ZERO, zoom * HIT_STEP, _effect_core[slot], _effect_look[slot], ActorsScript.NONE, -1, -1, 0, true, _effect_ramp[slot])
 	return true
 
 

@@ -15,7 +15,8 @@ extends Resource
 ##
 ## A part with no `part` (or `"part": "effect"`) is a flash Feel draws:
 ##   `effect`     one of EFFECTS (required)
-##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given)
+##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given; a fraction is
+##                rounded after the cue's `power`)
 ##   `reach`      its size from the cue's: `size` x reach pixels (Feel turns pixels into its zoom)
 ##   `seconds`    how long it shows (the effect's own when not given)
 ##   `lasts_size` true: it lasts the cue's `size` in seconds instead (a telegraph: the wait until
@@ -29,6 +30,8 @@ extends Resource
 ##   `if_cards`   true: played only when the cue has cards (a look layer; an element's flare)
 ##   `if_layer`   a look layer (1 to MoteKind.LOOK_LAYERS; the LOOK_* kinds of core/projectiles):
 ##                played only when the cue's cards have it (lightning's arc: 5)
+##   `if_size_over`, `if_size_upto`  played only when the cue's size is over this, or this or less
+##                (a zap's spark into the air, 22 px at the most, burns out sooner than a zap)
 ## The `arc` effect is drawn along its length: the cue's `size` x its `reach` (1 when not given)
 ## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
 ## A part with `"part": "motes"` throws motes instead (docs/milestones/spell-spectacle.md, P1; Feel's
@@ -43,15 +46,17 @@ extends Resource
 ##   `count`      how many in all, split between the kinds (each kind's own count when not given)
 ##   `reach`      they fly out to the cue's `size` x reach pixels at the most (the kinds' own speed
 ##                when not given, or when the cue has no size)
-##   `radius`     they fly out to this many pixels at the most, with no `reach` or when the cue has
-##                no size (a spray's sparks: 15)
 ##   `spread`     degrees round the way (the kind's own when not given; 360 all round)
 ##   `up`         times the kind's own speed up (1 when not given)
+##   `radius`     they fly out this many pixels at the most when the cue has no size (or the part
+##                no `reach`)
 ##   `ring`       true: all go out as fast, a ring
 ##   `way`        as an effect's
 ##   `below`      thrown from this many pixels below the cue's point (a body's feet: 8)
 ##   `often`      true: a moment of many a frame (a hit's spray), which stops once only the frame's
 ##                rows the rarer moments keep are left (`Motes.MOMENT_ROWS`), as a shot's shed does
+##   `color`      this exact colour, instead of the caster's ramp and the cue's tint (not for
+##                what cools through a surface's colours)
 ## A part with `"part": "mark"` is not a flash but a floor mark (docs/milestones/spell-spectacle.md,
 ## P2a): stamped once into the room's mark layer, it stays until the room ends. Its keys (MARK_KEYS):
 ##   `mark`       the mark kind's id (`MarkKind`, content/marks; required, unless `cards`)
@@ -68,6 +73,13 @@ extends Resource
 ## `hold_target` on the target (each held alone; nobody else waits), `hold_shot` to hold the shot
 ## being sent too, `stop_game` seconds of the game-wide stop (only a downed player and a boss's
 ## death: melee I7), and the `sound` id asked from the registry (silent until an `.ogg` exists).
+##
+## Its own colour and strength (S6): `color`, when it has one, is the exact colour of every flash and
+## motes part that names no colour (nor `plain`, nor `bare`) of its own, and of what Feel draws of the
+## moment in code (a reaction's name). `power` scales how strong it plays, by one rule (`Feel.play_cue`):
+## times every flash's size (its zoom, or its size from `reach`), every motes part's count and how
+## far they fly, every mark's radius, its holds, shake and punch; never a part's seconds, nor an
+## arc's length (where it runs). A reaction's cues differ in their colour and power only.
 
 ## The flashes a part can name (Feel maps each to its effect kind, and says how many pixels a
 ## step of its zoom is).
@@ -80,8 +92,8 @@ const LENGTH_EFFECTS: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`effect`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "way", "particles", "if_cards", "if_layer"]
-const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "often"]
+const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto"]
+const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "often"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
 const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS}
@@ -100,6 +112,9 @@ const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
 @export var hold_shot: bool = false
 @export_range(0.0, 0.5, 0.01) var stop_game: float = 0.0
 @export var sound: StringName = &""
+## Its own colour (none while its alpha is 0), and how strong it plays (see above).
+@export var color: Color = Color(0.0, 0.0, 0.0, 0.0)
+@export_range(0.1, 4.0, 0.05) var power: float = 1.0
 
 
 func kind() -> StringName:
@@ -112,6 +127,8 @@ func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if id == &"":
 		found.append("a cue needs an id")
+	if power <= 0.0:
+		found.append("%s: power %s is 0 or less" % [id, power])
 	if not KICK_WAYS.has(kick_way):
 		found.append("%s: kick_way '%s' is not one of %s" % [id, kick_way, KICK_WAYS])
 	for i in parts.size():
@@ -154,7 +171,7 @@ func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: part %d has both zoom and reach" % [id, i])
 	if part.has("lasts_size") and (part.has("seconds") or part.has("reach")):
 		found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
-	if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or int(part.get("zoom", 1)) < 1:
+	if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or float(part.get("zoom", 1.0)) < 1.0:
 		found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
 	if LENGTH_EFFECTS.has(effect) and (part.has("zoom") or part.has("lasts_size")):
 		found.append("%s: part %d's %s is drawn along the cue's size: it takes no zoom or lasts_size" % [id, i, effect])
@@ -162,6 +179,8 @@ func _effect_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: part %d takes one of color, plain, bare and no_cards" % [id, i])
 	if part.has("if_layer") and (int(part["if_layer"]) < 1 or int(part["if_layer"]) > MoteKind.LOOK_LAYERS):
 		found.append("%s: part %d's if_layer is not a look layer (1-%d)" % [id, i, MoteKind.LOOK_LAYERS])
+	if part.has("if_size_over") and part.has("if_size_upto") and float(part["if_size_upto"]) <= float(part["if_size_over"]):
+		found.append("%s: part %d's if_size_over and if_size_upto leave no size it plays at" % [id, i])
 	return found
 
 

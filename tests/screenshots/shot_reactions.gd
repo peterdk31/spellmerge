@@ -44,12 +44,12 @@ func take() -> void:
 	for index in 4:
 		var wizard: Node = flow.call("get_wizard", index) as Node
 		casters.append(int(wizard.get("id")) if wizard != null else -1)
-	events.call("emit_signal", "reaction_triggered", casters[0], NAMES[0], centre)
+	events.call("emit_signal", "reaction_triggered", casters[0], NAMES[0], centre, -1)
 	await _snap(centre, "reaction_one")
 	await settle()
 	for player in 4:
 		var at: Vector2 = centre + Vector2(float(player - 2) * 40.0 + 20.0, float(player % 2) * 14.0)
-		events.call("emit_signal", "reaction_triggered", casters[player], NAMES[player], at)
+		events.call("emit_signal", "reaction_triggered", casters[player], NAMES[player], at, -1)
 	await _snap(centre, "reaction_four_players")
 	await create_timer(1.2).timeout
 	await _six(events, root.get_canvas_transform().affine_inverse() * (root.get_visible_rect().size * 0.5), casters[0])
@@ -78,7 +78,7 @@ func _six(events: Node, centre: Vector2, caster: int) -> void:
 	for group in 2:
 		for i in 3:
 			var at: Vector2 = centre + Vector2((float(i) - 1.0) * SIX_GAP, 0.0)
-			events.call("emit_signal", "reaction_triggered", caster, seen[group * 3 + i], at)
+			events.call("emit_signal", "reaction_triggered", caster, seen[group * 3 + i], at, -1)
 		await _snap(centre, "reactions_%s_4x" % GROUPS[group], 4)
 		await _snap(centre, "reactions_%s_1x" % GROUPS[group], 1)
 		# Let the names of this group fade (three times a reaction's seconds) before the next.

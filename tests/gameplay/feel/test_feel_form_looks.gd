@@ -92,7 +92,11 @@ func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 		check(_card_cue(form, true) != null, "%s has a cast cue" % form)
 		check(_card_cue(form, false) != null, "%s has an impact cue" % form)
 	check_equal(_card_cue(&"nova", true).id, &"cast_nova", "a nova has a cast flash of its own")
-	check_equal(_card_cue(&"bolt", true).parts.size(), 1, "a bolt's is the plain spark, with no ring")
+	var flashes: int = 0
+	for part: Dictionary in _card_cue(&"bolt", true).parts:
+		if StringName(part.get("part", "effect")) == &"effect":
+			flashes += 1
+	check_equal(flashes, 1, "a bolt's is the plain spark, with no ring (its sparks are motes, S6 item 3)")
 	check_equal(FormBase.new().cast_cue, &"cast", "a card naming none casts `cast`")
 	check_equal(FormBase.new().impact_cue, &"impact", "and lands in `impact`")
 

@@ -489,16 +489,19 @@ const DASH_STREAK_SLOTS: int = 32
 ## Feel's motes), the shots' trails are drawn with no particle slots, and the particles they would
 ## have given off are handed out as births (`spark_births`) for the motes to throw. The dashes keep
 ## theirs. A birth is SPARK_BIRTH_STRIDE floats: where (x, y), the way back along the shot (x, y),
-## the look kind it is of (LOOK_*; 0 a plain shot's twinkle), the caster's ramp, the shot's look and
-## its core colour (r, g, b). The pool's share still thins them, as it thins the shader's, so the
+## the look kind it is of (LOOK_*; 0 a plain shot's twinkle), the caster's ramp, the shot's look,
+## its core colour (r, g, b) and its tag (so the motes can take its spell's cards' kinds;
+## spell-spectacle-2.md, S2). The pool's share still thins them, as it thins the shader's, so the
 ## births a frame stay about as many as the pool's particles live (PARTICLE_CAP over their life),
 ## whatever the shot count. Measured (DECISIONS, 2026-11-04, "Trail particles as motes"): cheaper at
 ## 60, 400 and 3,000 shots, so the threshold is past every cap; it stays a knob for a platform
 ## whose CPU measures dearer than its GPU saves.
 const SPARK_MOTES_BELOW: int = 1 << 20
-const SPARK_BIRTH_STRIDE: int = 10
+const SPARK_BIRTH_STRIDE: int = 12
 ## Where a birth's numbers are: where (x, y), the way back (x, y), the look kind, the caster's
-## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE).
+## ramp, the shot's look, the core colour (r, g, b from SPARK_CORE), and the shot's tag in two
+## floats (SPARK_TAG its low SPARK_TAG_BITS bits, SPARK_TAG + 1 the rest: a float holds every
+## integer only up to 2^24, and a spell's tag is above it; `spark_tag` reads it back).
 const SPARK_X: int = 0
 const SPARK_Y: int = 1
 const SPARK_BACK_X: int = 2
@@ -507,6 +510,8 @@ const SPARK_KIND: int = 4
 const SPARK_RAMP: int = 5
 const SPARK_LOOK: int = 6
 const SPARK_CORE: int = 7
+const SPARK_TAG: int = 10
+const SPARK_TAG_BITS: int = 12
 ## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (the trail shader's TIP[row].w, by
@@ -595,6 +600,9 @@ var impact_body: int = 0
 ## beam and outside an impact). For looks only.
 var impact_core: Color = Color.WHITE
 var impact_look: int = 0
+## The tag of that shot (0 for a beam, a strike and outside an impact), so its motes and marks can
+## be its spell's cards' (spell-spectacle-2.md, S2). For looks only.
+var impact_tag: int = 0
 ## The way the shot was flying, while a `projectile_expired` is sent (with `impact_form`,
 ## `impact_core` and `impact_look`, so Feel can show where its life ran out).
 var impact_heading: Vector2 = Vector2.ZERO
@@ -3879,6 +3887,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	impact_form = form
 	impact_core = Color.WHITE
 	impact_look = 0
+	impact_tag = 0
 	events.projectile_impact.emit(caster, target, point, heading)
 	impact_form = &""
 	events.projectile_hit.emit(caster, target, point, tag, -1)
@@ -4044,6 +4053,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
+			impact_tag = 0
 			events.projectile_impact.emit(caster, node, points[i], heads[i])
 			impact_form = &""
 			impact_core = Color.WHITE
@@ -4061,6 +4071,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
+			impact_tag = 0
 			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
 			impact_form = &""
 			impact_core = Color.WHITE
@@ -4069,6 +4080,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &"beam"
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		events.projectile_impact.emit(caster, null, end, end_heading)
 		impact_form = &""
 		impact_core = Color.WHITE
@@ -4478,9 +4490,16 @@ func _give_off_sparks(fraction: float) -> void:
 		spark_births[i + SPARK_CORE] = _core[slot].r
 		spark_births[i + SPARK_CORE + 1] = _core[slot].g
 		spark_births[i + SPARK_CORE + 2] = _core[slot].b
+		spark_births[i + SPARK_TAG] = float(_tag[slot] & ((1 << SPARK_TAG_BITS) - 1))
+		spark_births[i + SPARK_TAG + 1] = float(_tag[slot] >> SPARK_TAG_BITS)
 		spark_birth_count += 1
 		if spark_birth_count >= SPARK_BIRTHS_MAX:
 			return
+
+
+## The tag of the birth that starts at `i` in `births` (SPARK_TAG's two floats).
+static func spark_tag(births: PackedFloat32Array, i: int) -> int:
+	return int(births[i + SPARK_TAG]) | (int(births[i + SPARK_TAG + 1]) << SPARK_TAG_BITS)
 
 
 static func _bit_count(bits: int) -> int:
@@ -4920,12 +4939,14 @@ func _expire(slot: int) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = tag
 		impact_heading = _vel[slot].normalized()
 		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		impact_heading = Vector2.ZERO
 		_event_slot = -1
 	if tag != 0:
@@ -5482,11 +5503,13 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = _tag[slot]
 		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 
 
 ## The form of the shot in `slot`: its card's (`set_form`), else by its body.
@@ -5533,11 +5556,13 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		impact_body = _kind_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
+		impact_tag = tag
 		events.projectile_impact.emit(caster, node, at, heading)
 		impact_form = &""
 		impact_body = 0
 		impact_core = Color.WHITE
 		impact_look = 0
+		impact_tag = 0
 		_event_slot = slot
 		events.projectile_hit.emit(caster, node, at, tag, slot)
 		_event_slot = -1

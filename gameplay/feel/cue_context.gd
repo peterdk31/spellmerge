@@ -1,9 +1,9 @@
 extends RefCounted
 ## What a cue is played with (`Feel.play_cue`), handed to each of its parts' players (the table
 ## of `Feel.add_cue_part`): who set it off and their ramp, where, which way, how big, in which
-## colour and cards, on whom, and the colours of what broke. Feel keeps one per depth of cues
-## played inside a cue's part and fills it for every cue, so playing a cue allocates nothing
-## (docs/milestones/spell-spectacle-2.md, S1).
+## colour and cards, on whom, the colours of what broke, and the spell it is of. Feel keeps one
+## per depth of cues played inside a cue's part and fills it for every cue, so playing a cue
+## allocates nothing (docs/milestones/spell-spectacle-2.md, S1).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
@@ -24,6 +24,8 @@ var shot: int = -1
 ## The ramp-table source of what broke, for the surface kinds and marks (a dying body's art;
 ## -1: the room's walls).
 var surface: int = -1
+## The tag of the spell it is of (its cards' motes and marks, `card_kinds.gd`; 0 for none).
+var tag: int = 0
 
 
 ## The way a part (a Dictionary with an optional `way`, `CueBase.WAYS`) points: along the cue's

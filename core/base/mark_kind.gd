@@ -6,9 +6,10 @@ extends Resource
 ## mark is a new file and no list is edited. A cue names it in a part
 ## (`{"part": "mark", "mark": "scorch", ...}`, core/base/cue_base.gd).
 ##
-## A kind may belong to the cards' looks (`look_layers`, like a `MoteKind`): a cue's mark part
-## with `"cards": true` stamps the marks of the cards it was played with instead of its own when
-## they have one, so a frost blast leaves frost where a plain blast leaves a scorch.
+## A kind may belong to cards (`cards` by id, `look_layers` by look, like a `MoteKind`; a card a kind
+## names by id takes no kind by its layer; spell-spectacle-2.md, S2): a cue's mark part with
+## `"cards": true` stamps the marks of the cards it was played with instead of its own when they
+## have one, so a frost blast leaves frost where a plain blast leaves a scorch.
 ##
 ## **No colours here** (STYLE.md: a mark is at most the shadow and base shades of its material):
 ## each of its two parts, the body and the edge, names where its colour comes from, the room's
@@ -34,9 +35,12 @@ extends Resource
 
 ## Unique name, also its file name.
 @export var id: StringName = &""
+## The cards (their ids) this kind is the mark of, for a part with `"cards": true`, whatever their
+## look layer.
+@export var cards: Array[StringName] = []
 ## The cards' look layers (`look_layer` of an element or modifier; the LOOK_* kinds of
-## core/projectiles) this kind is the mark of, for a part with `"cards": true`; empty for a mark
-## that belongs to no card (a scorch, a crack).
+## core/projectiles) this kind is the mark of, for a part with `"cards": true` and the cards no
+## kind names by id; empty for a mark that belongs to no card (a scorch, a crack).
 @export var look_layers: PackedInt32Array = PackedInt32Array()
 ## How the shader draws it (see above).
 @export_enum("blot", "crack", "rime", "ring", "rune", "speck") var form: String = "blot"
@@ -81,6 +85,9 @@ func problems() -> PackedStringArray:
 	for layer in look_layers:
 		if layer < 0 or layer > MoteKind.LOOK_LAYERS:
 			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, MoteKind.LOOK_LAYERS])
+	for card in cards:
+		if card == &"":
+			found.append("%s: a card it names has no id" % id)
 	if lines < 1 or lines > 8:
 		found.append("%s: a crack or a rune has 1 to 8 lines" % id)
 	return found

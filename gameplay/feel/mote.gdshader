@@ -13,11 +13,12 @@ render_mode blend_premul_alpha, world_vertex_coords;
 //
 // Nothing here is a kind or a colour of its own:
 // - the kinds' numbers are data (`MoteKind`, content/motes), handed over by mote.gd as
-//   `kind_motion` (gravity, drag, bounce, glow), `kind_sway` (sway, its rate, first shade, how
-//   far its shape reaches from its pixel in any frame and any way it turns: `Motes.reach_of`) and
-//   `kind_shape` (frames, how they play: 0 life, 1 loop, 2 pick; frames a second; 1 when it turns
-//   with its flight), and their shapes as `shape_atlas`: SHAPE_SIZE squares, a kind's frames
-//   along its row, each pixel 0 none, 0.5 its shade, 1 the shade hotter;
+//   `kind_table`, a row a kind (up to MAX_KINDS), three texels across: its motion (gravity, drag,
+//   bounce, glow), its sway (sway, its rate, first shade, how far its shape reaches from its pixel
+//   in any frame and any way it turns: `Motes.reach_of`) and its shape (frames, how they play: 0
+//   life, 1 loop, 2 pick; frames a second; 1 when it turns with its flight), and their shapes as
+//   `shape_atlas`: SHAPE_SIZE squares, a kind's frames along its row, each pixel 0 none, 0.5 its
+//   shade, 1 the shade hotter;
 // - a spell's ramp is the shot's own, picked by the shot shaders' `look_of` from its core colour
 //   and its caster's ramp; any other ramp (a room's walls) is a row of `ramp_table` (white-hot,
 //   light, base, shadow across).
@@ -40,9 +41,7 @@ render_mode blend_premul_alpha, world_vertex_coords;
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-uniform vec4 kind_motion[16];
-uniform vec4 kind_sway[16];
-uniform vec4 kind_shape[16];
+uniform sampler2D kind_table : filter_nearest;
 uniform sampler2D ramp_table : filter_nearest;
 uniform sampler2D shape_atlas : filter_nearest;
 
@@ -50,9 +49,9 @@ uniform sampler2D shape_atlas : filter_nearest;
 // MoteKind.SHAPE_SIZE.
 const float LIFE_MAX = 4.0;
 const float SOURCE_CODE = 128.0;
-const float KIND_CODE = 16.0;
+const float KIND_CODE = 255.0;
 const float HEIGHT_MAX = 63.75;
-const int MAX_KINDS = 16;
+const int MAX_KINDS = 256;
 const int SHAPE_SIZE = 5;
 const float EXACT_SOURCE = 8.0;
 const float TABLE_SOURCE = 16.0;
@@ -72,17 +71,18 @@ varying flat vec2 m_cell;
 varying flat vec2 m_turn;
 varying vec2 m_px;
 
-// Where a mote of kind `k` is `t` seconds after its birth at the ground point `from` with the
-// velocity `vel`, the height `h0` and the height's velocity `vz`: its ground point (xy) and its
-// height (z). A falling kind lands, bounces once and then lies still.
-vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float s) {
-	float g = kind_motion[k].x;
+// Where a mote of a kind of the motion `motion` and the sway `sway` (its `kind_table` row) is `t`
+// seconds after its birth at the ground point `from` with the velocity `vel`, the height `h0` and
+// the height's velocity `vz`: its ground point (xy) and its height (z). A falling kind lands,
+// bounces once and then lies still.
+vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, vec4 motion, vec4 sway, float s) {
+	float g = motion.x;
 	float land = 1.0e9;
 	float rest = 1.0e9;
 	float rebound = 0.0;
 	if (g > 0.0) {
 		land = (vz + sqrt(vz * vz + 2.0 * g * max(h0, 0.0))) / g;
-		rebound = (g * land - vz) * kind_motion[k].z;
+		rebound = (g * land - vz) * motion.z;
 		rest = land + 2.0 * rebound / g;
 	}
 	float tm = min(max(t, 0.0), rest);
@@ -93,11 +93,11 @@ vec3 mote_flight(vec2 from, vec2 vel, float h0, float vz, float t, int k, float 
 		float q = tm - land;
 		h = rebound * q - 0.5 * g * q * q;
 	}
-	float drag = kind_motion[k].y;
+	float drag = motion.y;
 	float along = drag > 0.0 ? (1.0 - exp(-drag * tm)) / drag : tm;
 	vec2 ground = from + vel * along;
 	float phase = s * 6.2832;
-	ground.x += kind_sway[k].x * (sin(tm * kind_sway[k].y + phase) - sin(phase));
+	ground.x += sway.x * (sin(tm * sway.y + phase) - sin(phase));
 	return vec3(ground, max(h, 0.0));
 }
 
@@ -134,14 +134,16 @@ void vertex() {
 	m_turn = vec2(1.0, 0.0);
 	// An unused row has no life: folded away, with none of the work below.
 	if (alive) {
-		vec3 at = mote_flight(from, vel, h0, vz, t, k, s);
+		vec4 motion = texelFetch(kind_table, ivec2(0, k), 0);
+		vec4 sway = texelFetch(kind_table, ivec2(1, k), 0);
+		vec4 shape = texelFetch(kind_table, ivec2(2, k), 0);
+		vec3 at = mote_flight(from, vel, h0, vz, t, motion, sway, s);
 		vec2 seen = at.xy - vec2(0.0, at.z);
 		vec2 pixel = floor(seen);
 		// Cooling: evenly from its first shade down to shadow over its life.
-		float shade_from = kind_sway[k].z;
+		float shade_from = sway.z;
 		int shade = int(min(shade_from + floor(t / life * (4.0 - shade_from)), 3.0));
 		// Its frame: through them over its life, round them, or its own.
-		vec4 shape = kind_shape[k];
 		float frames = max(shape.x, 1.0);
 		float frame = shape.y < 0.5 ? floor(t / life * frames) : (shape.y < 1.5 ? floor(t * shape.z + s * frames) : floor(s * frames));
 		frame = mod(clamp(frame, 0.0, 1.0e6), frames);
@@ -149,7 +151,7 @@ void vertex() {
 		vec2 turn = vec2(1.0, 0.0);
 		float reach = float(SHAPE_SIZE / 2);
 		if (shape.w > 0.5) {
-			vec3 before = mote_flight(from, vel, h0, vz, t - TURN_LOOK, k, s);
+			vec3 before = mote_flight(from, vel, h0, vz, t - TURN_LOOK, motion, sway, s);
 			vec2 way = seen - (before.xy - vec2(0.0, before.z));
 			if (dot(way, way) < 0.0025) {
 				way = vel;
@@ -158,11 +160,11 @@ void vertex() {
 			turn = vec2(cos(angle), sin(angle));
 			reach += 1.0;
 		}
-		float lit = shade <= 1 ? kind_motion[k].w * glow_strength : 0.0;
+		float lit = shade <= 1 ? motion.w * glow_strength : 0.0;
 		// A glowing mote's quad holds its glow (as far from its pixel for every shape); one
 		// with none only its shape's pixels (P1c: most motes are a pixel or two, and their
 		// fragments were most of their cost).
-		reach = lit > 0.0 ? reach + GLOW_REACH : kind_sway[k].w;
+		reach = lit > 0.0 ? reach + GLOW_REACH : sway.w;
 		vec2 corner = vec2(UV.x > 0.5 ? 1.0 : 0.0, UV.y > 0.5 ? 1.0 : 0.0);
 		vec2 p = mix(pixel - reach, pixel + 1.0 + reach, corner);
 		VERTEX = p;

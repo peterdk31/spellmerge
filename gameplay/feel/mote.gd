@@ -7,11 +7,14 @@ extends Node2D
 ## and never touches it again: there is no per-frame simulation.
 ##
 ## **Kinds are data** (`MoteKind`, `content/motes/`): how one flies and how many a burst throws.
-## The pool takes them when it is made and hands their numbers to the shader (`kind_motion`,
-## `kind_sway`, `kind_shape`) and their shapes' frames (`shape_atlas`, a texture of
+## The pool takes them when it is made and hands their numbers to the shader as a texture
+## (`kind_table`: a row a kind, KIND_COLUMNS texels across; up to MAX_KINDS kinds, so content can
+## grow with no shader edit) and their shapes' frames (`shape_atlas`, a texture of
 ## MoteKind.SHAPE_SIZE squares, a kind's frames along a row), so a new kind, or a new shape, is a
-## new file. A spell's kinds come from its cards' looks
-## (`kinds_of_look`): a shot sheds the kinds that name its look layers (`shed`).
+## new file. A spell's kinds come from its cards: those that name a card (`kinds_of_card`) and,
+## for its other cards, those that name their look layers (`kinds_of_look`). The spectacle works
+## a spell's out (`card_kinds.gd`, by the shot's tag) and hands them to `shed_kinds`; a shot with
+## no spell sheds by its look (`shed`).
 ##
 ## **Colours are never here.** A mote cools through a ramp of four shades (white-hot, light, base,
 ## shadow) named by its source (`spell_source`, `table_source`): a spell's motes take the shot's
@@ -83,8 +86,11 @@ const MOMENT_ROWS: int = 128
 ## its chips.
 const SETTLE_ROWS: int = 24
 const SETTLE_MOST: int = 128
-## The most kinds the shader holds (its `kind_motion` and `kind_sway` arrays).
-const MAX_KINDS: int = 16
+## The most kinds the shader holds (rows of its `kind_table`), and the table's texels a row: the
+## motion (gravity, drag, bounce, glow), the sway (sway, its rate, first shade, reach) and the
+## shape (frames, play, rate, turns).
+const MAX_KINDS: int = 256
+const KIND_COLUMNS: int = 3
 ## Rows of the ramp table (colours other than a spell's), and its shades a row.
 const RAMPS: int = RampTableScript.ROWS
 const SHADES: int = RampTableScript.SHADES
@@ -103,7 +109,7 @@ const LOOK_LAYERS: int = MoteKind.LOOK_LAYERS
 ## written in steps of 1/255 of their most (the height in quarter pixels), so a renderer that
 ## keeps the colour as bytes reads the same numbers `flight` does.
 const SOURCE_CODE: float = 128.0
-const KIND_CODE: float = 16.0
+const KIND_CODE: float = 255.0
 const HEIGHT_MAX: float = 63.75
 ## A trail particle's speed (and its speed up), as a share of its kind's burst (`give_off`): given
 ## off, not thrown. A birth's floats and where its numbers are: core/projectiles' SPARK_*.
@@ -129,6 +135,11 @@ var _cap: int = 0
 var _kinds: Array[MoteKind] = []
 var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
+## The kinds that name each card by id (`MoteKind.cards`).
+var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
+## The trails' births' kinds by their shot's spell (`card_kinds.gd`, the spectacle's: anything
+## with `layer_motes(tag, layer)`), or null: by their look layer only.
+var _cards: Object = null
 ## `kinds_of_look`'s answers, by a look's layer bits (a shot's hit or end asks it, hundreds of
 ## times a frame in a storm; there are few looks).
 var _look_kinds: Dictionary[int, PackedInt32Array] = {}
@@ -158,6 +169,7 @@ var _marks: MarksScript = null
 var _settle_marks: PackedInt32Array = PackedInt32Array()
 ## The shapes' frames: SHAPE_SIZE squares, a kind's along its row (`shape_value`).
 var _shape_image: Image = null
+var _kind_image: Image = null
 var _material: ShaderMaterial = null
 var _mesh: ArrayMesh = null
 var _z: int = 0
@@ -201,6 +213,31 @@ func kind_index(id: StringName) -> int:
 		if _kinds[i].id == id:
 			return i
 	return -1
+
+
+## The kinds that name the card `card` by id (`MoteKind.cards`); empty for none. Kept: read it,
+## never change it.
+func kinds_of_card(card: StringName) -> PackedInt32Array:
+	var found: Variant = _card_kinds.get(card)
+	return found if found != null else PackedInt32Array()
+
+
+## Whether any kind names a card by id (when none does, every spell's kinds are its look's).
+func has_card_kinds() -> bool:
+	return not _card_kinds.is_empty()
+
+
+## The kinds that name look layer `layer` (1 to LOOK_LAYERS; 0 a shot with none), with no
+## fallback (`kinds_of_layer` falls back to layer 0's). Kept: read it, never change it.
+func kinds_named_by_layer(layer: int) -> PackedInt32Array:
+	return _layer_kinds[layer] if layer >= 0 and layer <= LOOK_LAYERS else PackedInt32Array()
+
+
+## The trails' births take their shot's spell's kinds from `cards` (anything with
+## `layer_motes(tag, layer) -> PackedInt32Array`; the spectacle's `card_kinds.gd`), null for their
+## look layer's only.
+func use_cards(cards: Object) -> void:
+	_cards = cards
 
 
 ## The kinds a shot of the look `look` sheds (its cards' layers; LOOK_* bits, layer n is bit
@@ -271,7 +308,16 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 	if _rows_left <= MOMENT_ROWS:
 		cut += 1
 		return
-	var found: PackedInt32Array = kinds_of_look(look)
+	shed_kinds(kinds_of_look(look), at, dir, core, ramp, look, scale)
+
+
+## `shed` with the kinds `found` (a spell's, `card_kinds.gd`; never empty) in place of its look's.
+func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
+	if _rows_left <= MOMENT_ROWS:
+		cut += 1
+		return
+	if found.is_empty():
+		return
 	var source: int = spell_source(ramp, look)
 	var share: float = scale / float(found.size())
 	_keep = MOMENT_ROWS
@@ -285,6 +331,7 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 ## (core/projectiles' `spark_births`, BIRTH_STRIDE floats each), one mote each (times `density`,
 ## as any burst): a kind of its look kind's layer (`kinds_of_layer`), given off back along the shot
 ## within its kind's spread at TRAIL_SPEED of its burst speed and speed up, in the shot's own ramp.
+## A shot of a spell gives off its spell's kinds for that layer (`use_cards`).
 ## Each is a one-mote `burst`, so a trail's mote is written, counted and settled as every other.
 func give_off(given: PackedFloat32Array, count: int) -> void:
 	count = mini(count, given.size() / BIRTH_STRIDE)
@@ -293,7 +340,12 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 			cut += count - n
 			return
 		var b: int = n * BIRTH_STRIDE
-		var found: PackedInt32Array = kinds_of_layer(int(given[b + ProjectilesScript.SPARK_KIND]))
+		var layer: int = int(given[b + ProjectilesScript.SPARK_KIND])
+		var found: PackedInt32Array
+		if _cards != null:
+			found = _cards.layer_motes(ProjectilesScript.spark_tag(given, b), layer)
+		else:
+			found = kinds_of_layer(layer)
 		if found.is_empty():
 			continue
 		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
@@ -593,20 +645,16 @@ static func reach_of(kind: MoteKind) -> int:
 	return reach
 
 
-## Keep the kinds with no problems (MAX_KINDS at most), index them by look layer and hand their
-## numbers to the shader.
+## Keep the kinds with no problems (MAX_KINDS at most), index them by look layer and by card and
+## hand their numbers to the shader (`kind_table`, a row a kind).
 func _take_kinds(kinds: Array[MoteKind]) -> void:
 	_layer_kinds.resize(LOOK_LAYERS + 1)
 	for layer in LOOK_LAYERS + 1:
 		_layer_kinds[layer] = PackedInt32Array()
-	var motion := PackedVector4Array()
-	var sway := PackedVector4Array()
-	var shapes := PackedVector4Array()
-	motion.resize(MAX_KINDS)
-	sway.resize(MAX_KINDS)
-	shapes.resize(MAX_KINDS)
 	var size: int = MoteKind.SHAPE_SIZE
-	_shape_image = Image.create_empty(size * MoteKind.SHAPE_FRAMES, size * MAX_KINDS, false, Image.FORMAT_RGBA8)
+	var rows: int = mini(maxi(kinds.size(), 1), MAX_KINDS)
+	_kind_image = Image.create_empty(KIND_COLUMNS, rows, false, Image.FORMAT_RGBAF)
+	_shape_image = Image.create_empty(size * MoteKind.SHAPE_FRAMES, size * rows, false, Image.FORMAT_RGBA8)
 	for kind in kinds:
 		if kind == null or not kind.problems().is_empty():
 			continue
@@ -615,10 +663,10 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			continue
 		var k: int = _kinds.size()
 		_kinds.append(kind)
-		motion[k] = Vector4(kind.gravity, kind.drag, kind.bounce, kind.glow)
-		sway[k] = Vector4(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind)))
 		var frames: int = kind.shape_frames().size()
-		shapes[k] = Vector4(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0)
+		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
+		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))
+		_kind_image.set_pixel(2, k, Color(float(frames), float(MoteKind.SHAPE_PLAYS.find(kind.shape_play)), kind.shape_rate, 1.0 if kind.shape_turns else 0.0))
 		for frame in frames:
 			var pixels: PackedByteArray = kind.shape_pixels(frame)
 			for y in size:
@@ -629,10 +677,22 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			_surface_kinds.append(k)
 		for layer in kind.look_layers:
 			_layer_kinds[layer].append(k)
-	_material.set_shader_parameter(&"kind_motion", motion)
-	_material.set_shader_parameter(&"kind_sway", sway)
-	_material.set_shader_parameter(&"kind_shape", shapes)
+		for card in kind.cards:
+			if not _card_kinds.has(card):
+				_card_kinds[card] = PackedInt32Array()
+			_card_kinds[card].append(k)
+	_material.set_shader_parameter(&"kind_table", ImageTexture.create_from_image(_kind_image))
 	_material.set_shader_parameter(&"shape_atlas", ImageTexture.create_from_image(_shape_image))
+
+
+## Kind `k`'s numbers as the shader reads them (`kind_table`): its motion, its sway and its shape
+## (for tests).
+func kind_numbers(k: int) -> Array[Vector4]:
+	var numbers: Array[Vector4] = []
+	for column in KIND_COLUMNS:
+		var c: Color = _kind_image.get_pixel(column, k)
+		numbers.append(Vector4(c.r, c.g, c.b, c.a))
+	return numbers
 
 
 ## Chunk `c`'s rows, making its batch the first time.

@@ -689,6 +689,29 @@ func test_the_particle_amount_scales_every_burst() -> void:
 	check_equal(feel.set_mote_density(0.7), 0.5, "snapped to a stop")
 
 
+## The "Tailless motes" dev slider (S5 step 4): a bigger tailless pool gives the motes more rows a
+## frame, so its births are written, not cut; a new ring keeps them.
+func test_the_tailless_motes_slider_raises_the_frame_rows() -> void:
+	check_equal(TaillessMotes.frame_rows_of(TaillessMotes.DEFAULT), MotesScript.FRAME_ROWS, "the default pool keeps today's rows")
+	check_equal(TaillessMotes.DEFAULT, ProjectilesScript.TAILLESS_PARTICLE_CAP, "and is the manager's tailless pool")
+	check(TaillessMotes.frame_rows_of(8192) > TaillessMotes.frame_rows_of(4096), "a bigger pool, more rows")
+	check_equal(TaillessMotes.snap(5000), 4096, "snapped to a stop")
+	var made: Array = _feel()
+	var bus: EventsScript = made[0]
+	var feel: FeelScript = made[1]
+	var motes: MotesScript = feel.motes()
+	var k: int = motes.kind_index(&"chip")
+	check_equal(motes.frame_rows, MotesScript.FRAME_ROWS, "today's rows at the start")
+	bus.tailless_motes_changed.emit(8192)
+	var rows: int = TaillessMotes.frame_rows_of(8192)
+	check_equal(motes.frame_rows, rows, "the slider's event raises them")
+	motes.step(0.0)
+	motes.burst(k, Vector2.ZERO, Vector2.UP, rows + 100, Vector2(10.0, 50.0), 360.0, Vector2(0.0, 20.0), Vector2(1.0, 2.0), 0, Color.WHITE)
+	check_equal(motes.next_row(), rows, "a frame now writes that many")
+	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
+	check_equal(feel.motes().frame_rows, rows, "a new ring keeps them")
+
+
 func test_every_kind_a_cue_names_is_there() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]

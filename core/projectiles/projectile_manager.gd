@@ -1097,6 +1097,8 @@ func _ready() -> void:
 		events.projectile_cap_changed.connect(_on_projectile_cap_changed)
 	if events != null and not events.shot_tails_changed.is_connected(set_tails_enabled):
 		events.shot_tails_changed.connect(set_tails_enabled)
+	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):
+		events.tailless_motes_changed.connect(set_tailless_pool)
 	_nodes.resize(BATCHES)
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
@@ -1372,6 +1374,12 @@ func get_cap() -> int:
 func _on_projectile_cap_changed(cap: int) -> void:
 	if cap != _cap:
 		set_cap(cap)
+
+
+## The spark pool while the tails are off (`tailless_particle_cap`; the "Tailless motes" dev
+## slider, `tailless_motes_changed`, `TaillessMotes` in core/settings). Read each frame.
+func set_tailless_pool(pool: int) -> void:
+	tailless_particle_cap = maxi(pool, 0)
 
 
 ## Turn the shots' tails on or off (`tails_enabled`; the "Tails" switch, `shot_tails_changed`).

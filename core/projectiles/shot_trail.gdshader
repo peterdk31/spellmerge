@@ -14,8 +14,12 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // cools through the ramp in its own time (0.1-0.3 s), so the tail bends with any path and frays
 // at its end by itself. The card particles a shot gives off are not drawn here: they are motes
 // (S3, docs/milestones/spell-spectacle-2.md; the projectile manager hands them out as births,
-// `spark_births`, and Feel's motes throw them). A pixel's number is its place on the path (the
-// odometer), a dash's streak's its moment, so it stays the same pixel from frame to frame. A trail outlives its shot by its longest life, so a tail cools where it ended.
+// `spark_births`, and Feel's motes throw them), and neither are a dash's speed streaks (motes too
+// since S5; a dash's trail is not drawn). A pixel's number is its place on the path (the
+// odometer), so it stays the same pixel from frame to frame. A trail outlives its shot by its
+// longest life, so a tail cools where it ended. With the tails off (S5, the projectile manager's
+// `tails_enabled`) a shot has no row: only its core and the core's light are drawn, turned the
+// way its instance says it flies.
 // Everything is drawn on the world's pixel grid, axis-aligned: the core is a `+` whatever way
 // the shot flies, and a line is one pixel per step, as the mockup draws it.
 //
@@ -28,9 +32,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // told in its UV which QUAD KIND (Q_*) and which slot it is. The vertex shader works out, from
 // `trail_data`, what that slot is now and puts its quad round it alone, or folds it away:
 //   Q_HEAD_LIGHT  the core's light (and void's dark heart);
-//   Q_PIECE_LIGHT a piece of the path between two samples, the tail's light round it (a dash:
-//                 the light of a speed streak instead);
-//   Q_TAIL        tail pixel `slot` back from the head along the path (a dash: a speed streak);
+//   Q_PIECE_LIGHT a piece of the path between two samples, the tail's light round it;
+//   Q_TAIL        tail pixel `slot` back from the head along the path;
 //   Q_JAG         a 4-pixel step of the jagged line lightning draws behind its shot;
 //   Q_CORE        the core: a white-hot `+`, pierce's run, void's dark heart.
 // The mesh draws the lights first (added; the head's first, as its dark heart dims what is
@@ -41,7 +44,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // pixel in it when its centre is, as a square's two triangles take it.
 // The instance carries its data in its transform (the batch must sit untransformed at the
 // origin): origin the head (where the shot is drawn this frame), x axis (row, newest sample's
-// number), y axis (samples kept, TF_* flags). The colour and the custom data are the look
+// number), y axis (samples kept, TF_* flags); a shot with no row (-1) has the way it flies (x, y)
+// where the samples kept and the newest sample's number are. The colour and the custom data are the look
 // (`shot_look.gdshaderinc`; worked out per vertex here, `look_from_color`).
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
@@ -56,17 +60,13 @@ uniform sampler2D trail_data : filter_nearest;
 uniform float trail_now = 0.0;
 
 // Samples a row holds (TRAIL_SAMPLES in projectile_manager.gd), the steps of a search through
-// them (2^5 = 32), the moments a particle may be born a second, and the flags (TRAIL_* there):
-// the shot is alive (its core is drawn and its path runs on to the head), an orbit shot (a
-// shorter tail), a wizard's dash (speed streaks in the player's colours and the dash's cards, no
-// tail, no core).
+// them (2^5 = 32), and the flags (TRAIL_* there): the shot is alive (its core is drawn and its
+// path runs on to the head), an orbit shot (a shorter tail).
 const int TRAIL_SAMPLES = 32;
 const int TRAIL_ROWS_PER_LINE = 64;
 const int SEARCH_STEPS = 5;
-const float BIRTHS = 60.0;
 const float TF_HEAD = 1.0;
 const float TF_ORBIT = 2.0;
-const float TF_DASH = 4.0;
 // The longest anything of a trail lives (TRAIL_KEEP; no particle row lives longer).
 const float TRAIL_LONGEST = 1.0;
 // The tail pixels a trail has (TRAIL_TAIL_PIXELS), and the most pixels of path one of them
@@ -88,27 +88,6 @@ const float M_PIXELS = 2.0;
 const float M_LINE = 3.0;
 // A neighbour or a line that is not there.
 const vec2 FAR = vec2(1.0e7);
-
-// ---- A dash's speed streaks ----
-// The only particles a trail still draws (S3, docs/milestones/spell-spectacle-2.md: every other
-// particle a trail gave off is a mote now, thrown from the births the projectile manager hands out,
-// `spark_births`): two a moment along a wizard's dash, each a one-pixel line thrown back along the
-// way it went from beside its body, in its player's light then base colour, with a small light.
-// A streak `j` born at moment `id` (its numbers h(n) from STREAK_SALT on), `ago` seconds old:
-//   life   STREAK_LIFE.x + STREAK_LIFE.y h
-//   start  where the dash was + dir (STREAK_LIFE.z + STREAK_LIFE.w h) + side (h - 0.5) STREAK_SIDE
-//   flies  back along the dash at STREAK_SPEED.x + STREAK_SPEED.y h px/s; its line runs back to
-//          STREAK_TIP of its flight
-//   light  STREAK_GLOW (1 - 0.75 u) x (STREAK_SHINE.x falloff(r, STREAK_SHINE.y))
-const vec4 STREAK_LIFE = vec4(0.1, 0.08, -4.0, 8.0);
-const float STREAK_SIDE = 13.0;
-const vec2 STREAK_SPEED = vec2(60.0, 50.0);
-const float STREAK_TIP = 0.025;
-const float STREAK_GLOW = 0.4;
-const vec2 STREAK_SHINE = vec2(0.16, 3.0);
-const float STREAK_SALT = 460.0;
-// A dash's streaks are drawn this long back at most (their longest life, rounded up).
-const float STREAK_WINDOW = 0.18;
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
 // mode, three numbers and three colours.
@@ -134,25 +113,25 @@ vec4 trail_texel(float row, float newest, float k) {
 	return texelFetch(trail_data, at, 0);
 }
 
-// For each of `v`'s two numbers, the newest sample from `first` back to `last` whose time
-// (`by_time`) or odometer is at most it, the older end of the piece it is on: its k, or -1 when
+// For each of `v`'s two numbers, the newest sample from `first` back to `last` whose odometer is
+// at most it, the older end of the piece it is on: its k, or -1 when
 // even the oldest is later. Both are searched at once, and the vertex stage searches the path in
 // one place only (`vertex`): the compiler builds a loop once for every place it is called from,
 // and the Direct3D one takes its time over each.
-vec2 samples_before(float row, float newest, float first, float last, vec2 v, bool by_time) {
+vec2 samples_before(float row, float newest, float first, float last, vec2 v) {
 	vec2 lo_k = vec2(first);
 	vec2 hi_k = vec2(last);
 	for (int i = 0; i < SEARCH_STEPS; i++) {
 		vec2 half_k = floor((lo_k + hi_k) * 0.5);
 		vec4 s0 = trail_texel(row, newest, half_k.x);
 		vec4 s1 = trail_texel(row, newest, half_k.y);
-		vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+		vec2 earlier = vec2(lessThanEqual(vec2(s0.z, s1.z), v));
 		hi_k = mix(hi_k, half_k, earlier);
 		lo_k = mix(half_k + 1.0, lo_k, earlier);
 	}
 	vec4 s0 = trail_texel(row, newest, lo_k.x);
 	vec4 s1 = trail_texel(row, newest, lo_k.y);
-	vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+	vec2 earlier = vec2(lessThanEqual(vec2(s0.z, s1.z), v));
 	vec2 inside = vec2(lessThanEqual(lo_k, vec2(last))) * (first <= last ? 1.0 : 0.0);
 	return mix(vec2(-1.0), lo_k, earlier * inside);
 }
@@ -180,56 +159,6 @@ float dragged(float ago, float drag) {
 	return drag * (1.0 - pow(drag, f)) / (1.0 - drag) / 60.0;
 }
 
-// A dash's speed streak `j` born at moment `id`, as it is now: alive, where (`pos`, and `tip` for
-// its line), its colour and its light. `k` is the sample before its moment (`samples_before`, by
-// time), `head_end` the path's newest end.
-struct Streak {
-	bool alive;
-	vec2 pos;
-	vec2 tip;
-	vec4 rgb;
-	float glow;
-};
-
-Streak streak(float row, float newest, float skip, vec4 head_end, float id, float j, float k, Look L) {
-	Streak S;
-	S.alive = false;
-	S.pos = vec2(0.0);
-	S.tip = vec2(0.0);
-	S.rgb = vec4(0.0);
-	S.glow = 0.0;
-	float t = id / BIRTHS;
-	float ago = trail_now - t;
-	if (k < 0.0) {
-		return S;
-	}
-	// The piece it was born on, and where on it.
-	vec4 A = trail_texel(row, newest, k);
-	vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
-	vec2 ab = B.xy - A.xy;
-	float len = length(ab);
-	vec2 dir = len > 0.001 ? ab / len : vec2(1.0, 0.0);
-	vec2 side = vec2(-dir.y, dir.x);
-	vec2 at = mix(A.xy, B.xy, clamp((t - A.w) / max(B.w - A.w, 0.0001), 0.0, 1.0));
-	float hs = STREAK_SALT;
-	float life = STREAK_LIFE.x + STREAK_LIFE.y * th(id, j, hs, row);
-	if (ago >= life) {
-		return S;
-	}
-	float u = ago / life;
-	vec2 v = -dir * (STREAK_SPEED.x + STREAK_SPEED.y * th(id, j, hs + 7.0, row));
-	vec2 pos = at + dir * (STREAK_LIFE.z + STREAK_LIFE.w * th(id, j, hs + 1.0, row));
-	pos += side * (th(id, j, hs + 6.0, row) - 0.5) * STREAK_SIDE;
-	pos += v * ago;
-	int pi = int(L.player);
-	S.alive = true;
-	S.pos = pos;
-	S.tip = pos - v * STREAK_TIP;
-	S.rgb = vec4(u < 0.5 ? P_LIGHT[pi] : P_BASE[pi], 1.0);
-	S.glow = STREAK_GLOW * (1.0 - 0.75 * u);
-	return S;
-}
-
 void vertex() {
 	float row = MODEL_MATRIX[0].x;
 	float newest = MODEL_MATRIX[0].y;
@@ -248,17 +177,16 @@ void vertex() {
 	vec3 b = L.bits;
 	int pi = int(L.player);
 	bool live = flag_set(flags, TF_HEAD);
-	bool dash = flag_set(flags, TF_DASH);
 	bool lightning = bit_set(b, L_SPARKS);
 	bool pull = bit_set(b, L_PULL);
 	float mul = bit_set(b, L_FLECKS) ? 1.5 : (bit_set(b, L_SPARKS) ? 0.7 : (pull ? 1.1 : 1.0));
 	if (flag_set(flags, TF_ORBIT)) {
 		mul *= 0.8;
 	}
-	float tail = dash ? 0.0 : 0.3 * mul * trail_share;
-	// Every light of the trail: lightning flickers, void's is dimmer; a dash's in its player's colour.
+	float tail = 0.3 * mul * trail_share;
+	// Every light of the trail: lightning flickers, void's is dimmer.
 	float flicker = (lightning ? 0.55 + 0.9 * hash_seeded(floor(sim_time * 20.0), 0.0, 21.0, L.seed) : 1.0) * (pull ? 0.6 : 1.0);
-	vec3 hue = dash ? P_BASE[pi] : L.glow;
+	vec3 hue = L.glow;
 	// The newest samples can be later than the moment drawn (taken in the step being drawn
 	// towards): they are not drawn yet.
 	float skip = 0.0;
@@ -288,15 +216,11 @@ void vertex() {
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
 	bool shown = false;
-	// A dash's streak slot (its piece and tail slots, two a moment): its moment back from now, and
-	// which of the moment's.
-	bool is_streak = dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL);
-	float id = floor(trail_now * BIRTHS) - floor(slot * 0.5);
 	// A tail pixel's number (its place on the path: one every `gap` pixels, from the shot's pace
 	// over its whole kept path, so it holds still while the shot flies), and the ends of a step of
 	// lightning's line.
 	float gap = 1.0;
-	if (!dash && count - skip >= 2.0) {
+	if (count - skip >= 2.0) {
 		vec4 oldest = trail_texel(row, newest, count - 1.0);
 		float pace = (o_top - oldest.z) / max(t_top - oldest.w, 0.001);
 		gap = clamp(ceil(pace * tail / TAIL_PIXELS), 1.0, TAIL_GAP_MAX);
@@ -304,53 +228,24 @@ void vertex() {
 	float n = (ceil(o_top / gap) - 1.0 - slot) * gap;
 	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
 	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
-	// Whether a streak slot has a streak: born, on the path, and not past its window.
-	float j = mod(slot, 2.0);
-	bool born = false;
-	if (is_streak) {
-		float t = id / BIRTHS;
-		float ago = trail_now - t;
-		born = ago >= 0.0 && ago <= STREAK_WINDOW && t < t_top;
-	}
 	// The one search of the path: the pieces the quad's moment, pixel or step ends are on. Only a
 	// slot that may still draw searches (performance, 2026-11-02: the search is most of a vertex's
-	// work): a streak that was born, a tail pixel while the trail has a tail, a step of lightning's
-	// line. The head, the core and the pieces' lights never read it.
-	bool search = is_streak ? born : (quad == Q_TAIL ? !dash && tail > 0.0 : quad == Q_JAG && lightning && !dash);
+	// work): a tail pixel while the trail has a tail, a step of lightning's line. The head, the core
+	// and the pieces' lights never read it.
+	bool search = quad == Q_TAIL ? tail > 0.0 : quad == Q_JAG && lightning;
 	vec2 before = vec2(-1.0);
 	if (search) {
-		vec2 key = is_streak ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
-		before = samples_before(row, newest, skip, count - 1.0, key, is_streak);
+		vec2 key = quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo);
+		before = samples_before(row, newest, skip, count - 1.0, key);
 	}
-	if (is_streak) {
-		Streak S = streak(row, newest, skip, head_end, id, j, born ? before.x : -1.0, L);
-		if (S.alive) {
-			vec2 px = floor(S.pos);
-			if (quad == Q_PIECE_LIGHT) {
-				m = M_GLOW;
-				shown = true;
-				float reach = STREAK_SHINE.y;
-				q_lo = px + 0.5 - reach;
-				q_hi = px + 0.5 + reach;
-				a0 = vec4(px + 0.5, 0.0, 1.0);
-				a1 = vec4(S.glow * flicker * STREAK_SHINE.x, STREAK_SHINE.y, 0.0, 1.0);
-				k0 = vec4(hue, 1.0);
-			} else {
-				m = M_LINE;
-				shown = true;
-				q_lo = min(S.pos, S.tip) - 1.0;
-				q_hi = max(S.pos, S.tip) + 1.0;
-				a0 = vec4(S.pos, S.tip);
-				a2 = vec4(1.0e9, 0.0, 0.0, 0.0);
-				k0 = S.rgb;
-			}
-		}
-	} else if (quad == Q_HEAD_LIGHT || quad == Q_CORE) {
+	if (quad == Q_HEAD_LIGHT || quad == Q_CORE) {
 		// The head, while the shot lives: the core and its light.
-		if (live && !dash) {
+		if (live) {
 			shown = true;
-			// The way it flies: from its newest sample to the head.
-			vec2 last_at = count > 0.0 ? trail_texel(row, newest, 0.0).xy : head - vec2(1.0, 0.0);
+			// The way it flies: from its newest sample to the head; with no row (tails off, S5) the
+			// instance's way (`_write_trail`), in the row's numbers' place.
+			vec2 way = vec2(MODEL_MATRIX[1].x, MODEL_MATRIX[0].y);
+			vec2 last_at = row < 0.0 ? head - way : (count > 0.0 ? trail_texel(row, newest, 0.0).xy : head - vec2(1.0, 0.0));
 			vec2 fly = head - last_at;
 			fly = length(fly) > 0.01 ? normalize(fly) : vec2(1.0, 0.0);
 			vec2 at = head;
@@ -384,7 +279,7 @@ void vertex() {
 				k2 = pull ? vec4(VOID_BASE, 1.0) : vec4(0.0);
 			}
 		}
-	} else if (quad == Q_PIECE_LIGHT && !dash) {
+	} else if (quad == Q_PIECE_LIGHT) {
 		// A piece of the path: from sample `slot` + skip to the next newer (or the head), and the
 		// tail's light round it while it is young.
 		float ia = slot + skip;
@@ -415,7 +310,7 @@ void vertex() {
 				k0 = vec4(hue, (pull ? 0.45 : 0.75) * flicker);
 			}
 		}
-	} else if (quad == Q_TAIL && !dash) {
+	} else if (quad == Q_TAIL) {
 		// Tail pixel `slot` back from the head: one pixel per pixel of travel, thrown back a
 		// little, cooling as it ages (and lightning's only now and then).
 		float k = before.x;
@@ -452,7 +347,7 @@ void vertex() {
 				k0 = vec4(rgb, 1.0);
 			}
 		}
-	} else if (quad == Q_JAG && lightning && !dash) {
+	} else if (quad == Q_JAG && lightning) {
 		// Step `slot` back from the head of the jagged line lightning draws behind its shot along
 		// the last tenth of a second of its path: it bends every 4 pixels, re-rolled every other
 		// frame, newer than 0.05 s in its light.

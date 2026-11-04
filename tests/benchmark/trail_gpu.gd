@@ -22,6 +22,12 @@ extends SceneTree
 ##                                    trails' particles (P1d; since S3 the trails draw none of their
 ##                                    own): the births' and the throws' CPU time is printed too, and
 ##                                    the motes are in the GPU time.
+##   ... -- --no-tails                the shots without their tails (S5, "do shots need tails?":
+##                                    the manager's `tails_enabled` off): no trail rows sampled or
+##                                    sent, the shots drawn as their cores; with --trail-motes the
+##                                    births take the tails' budget (`tailless_particle_cap`). The
+##                                    `BENCH` lines then also give the CPU of the step's sampling.
+##   ... -- --tailless-cap=N          the births' pool with the tails off (TAILLESS_PARTICLE_CAP)
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -86,6 +92,8 @@ var _spell_light: SpellLightScript = null
 var _motes_only: bool = false
 var _marks_only: bool = false
 var _use_motes: bool = false
+var _tails: bool = true
+var _tailless_cap: int = -1
 var _motes: MotesScript = null
 var _mote_kinds: Array[MoteKind] = []
 
@@ -109,6 +117,10 @@ func _initialize() -> void:
 			_marks_only = true
 		elif arg == "--trail-motes":
 			_use_motes = true
+		elif arg == "--no-tails":
+			_tails = false
+		elif arg.begins_with("--tailless-cap="):
+			_tailless_cap = maxi(arg.substr(15).to_int(), 0)
 		elif arg.begins_with("--timed="):
 			_timed = maxi(arg.substr(8).to_int(), 4)
 	_run.call_deferred()
@@ -165,6 +177,9 @@ func _scenario(scenario: Dictionary) -> void:
 	_mgr.set_bounds(ROOM.grow(32.0))
 	var shots: int = scenario["shots"]
 	_mgr.set_cap(maxi(shots + 64, 256))
+	_mgr.set_tails_enabled(_tails)
+	if _tailless_cap >= 0:
+		_mgr.tailless_particle_cap = _tailless_cap
 	root.add_child(_mgr)
 	if _light:
 		_spell_light = SpellLightScript.new(_mgr, LIGHT_Z)
@@ -199,10 +214,13 @@ func _scenario(scenario: Dictionary) -> void:
 	var draw_times: PackedFloat64Array = PackedFloat64Array()
 	var wall_times: PackedFloat64Array = PackedFloat64Array()
 	var mote_times: PackedFloat64Array = PackedFloat64Array()
+	var step_times: PackedFloat64Array = PackedFloat64Array()
 	var births: int = 0
 	var last: int = Time.get_ticks_usec()
 	for f in _timed if _time else 0:
+		var stepped: int = Time.get_ticks_usec()
 		_step(WARM_STEPS + SAVED_FRAMES + f, shots)
+		step_times.append(float(Time.get_ticks_usec() - stepped) / 1000.0)
 		var before: int = Time.get_ticks_usec()
 		_mgr.update_draw(1.0)
 		draw_times.append(float(Time.get_ticks_usec() - before) / 1000.0)
@@ -231,8 +249,10 @@ func _scenario(scenario: Dictionary) -> void:
 	draw_times.sort()
 	wall_times = wall_times.slice(_timed / 4)
 	wall_times.sort()
-	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; a whole frame median %.1f ms (wall clock)" % [
-		label, draw_times[draw_times.size() / 2], wall_times[wall_times.size() / 2]])
+	step_times = step_times.slice(_timed / 4)
+	step_times.sort()
+	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; the step (with its trail sampling and new shots) median %.2f ms; a whole frame median %.1f ms (wall clock); tails %s, native %s" % [
+		label, draw_times[draw_times.size() / 2], step_times[step_times.size() / 2], wall_times[wall_times.size() / 2], "on" if _tails else "off", "on" if _mgr.is_native() else "off"])
 	if _motes != null:
 		mote_times = mote_times.slice(_timed / 4)
 		mote_times.sort()

@@ -1505,18 +1505,19 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		out_buffer[b] = _buffers[b].ptrw();
 		room[b] = rooms[b];
 	}
-	// `_write_trail` into batch `b`, or nothing past its room (the GDScript would fail there).
-	auto write_trail = [&](int64_t b, int64_t row, const Vector2 &at, int64_t flags, const Color &color, const Color &cr) {
+	// `_write_trail` into batch `b`, or nothing past its room (the GDScript would fail there): a shot
+	// with no row (tails off) is told the way it flies, `way`, in place of its row's numbers.
+	auto write_trail = [&](int64_t b, int64_t row, const Vector2 &at, int64_t flags, const Color &color, const Color &cr, const Vector2 &way) {
 		if (used[b] >= room[b]) {
 			return;
 		}
 		float *buf = out_buffer[b] + used[b] * DRAW_STRIDE;
 		used[b] += 1;
 		buf[0] = (float)row;
-		buf[1] = row >= 0 ? (float)trail_kept[row] : 0.0f;
+		buf[1] = row >= 0 ? (float)trail_kept[row] : (float)way.x;
 		buf[2] = 0.0f;
 		buf[3] = at.x;
-		buf[4] = row >= 0 ? (float)trail_newest[row] : 0.0f;
+		buf[4] = row >= 0 ? (float)trail_newest[row] : (float)way.y;
 		buf[5] = (float)flags;
 		buf[6] = 0.0f;
 		buf[7] = at.y;
@@ -1562,7 +1563,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				used[batch] += 1;
 			}
 		} else {
-			write_trail(batch, trail[slot], at, flags, look_data, core[slot]);
+			write_trail(batch, trail[slot], at, flags, look_data, core[slot], pos[slot] - prev[slot]);
 		}
 	}
 	int64_t shots = 0;
@@ -1575,13 +1576,17 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		const int64_t caster = trail_caster[row];
 		Vector2 head = trail_last[row];
 		int64_t flags = trail_flags[row];
+		// A dash's trail is never drawn: its streaks are motes (S5).
+		if ((flags & TRAIL_DASH) != 0) {
+			continue;
+		}
 		if (trail_holder[row] == ROW_CASTER) {
 			flags |= TRAIL_HEAD;
 			if (anchors[caster].is_finite()) {
 				head = anchors[caster];
 			}
 		}
-		write_trail(loose_batch(trail_ramp[row], trail_flags[row], trail_look[row]), row, head, flags, trail_color[row], trail_core[row]);
+		write_trail(loose_batch(trail_ramp[row], trail_flags[row], trail_look[row]), row, head, flags, trail_color[row], trail_core[row], Vector2());
 	}
 	for (int64_t b = 0; b < BATCHES; b++) {
 		draw_out[b] = (int32_t)used[b];

@@ -231,6 +231,7 @@ const CUE_EFFECTS: Dictionary = {
 	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
 	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
+	&"arc": [KIND_ARC, 4.0, RING_SECONDS, true],
 }
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
@@ -238,9 +239,6 @@ const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
-## A dash's dust where it left (its way is the caster's trail, drawn by the projectile manager
-## where the wizard really went; its landing is a ring, `_on_caster_move_finished`).
-const DASH_SECONDS: float = 0.6
 ## A shot whose life runs out goes off in a small pop (the mockup's): a flare this big.
 const POP_ZOOM: int = 1
 const POP_SECONDS: float = 0.2
@@ -447,11 +445,6 @@ var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
-## Each player's last dash (the enemies share the fifth): where it started, its element's colour
-## and its look, for the landing.
-var _dash_from: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
-var _dash_core: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
-var _dash_look: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
@@ -622,7 +615,6 @@ func _ready() -> void:
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
-	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
@@ -1162,24 +1154,6 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 	_show_impact(caster, ramp, position, direction, false)
 
 
-## A dash landed: a ring in its caster's ramp where the body stopped; lightning arcs from where it
-## left, and an infused dash lands in a small flare of its element (the mockup's). One dash is
-## kept per budget (a seat's, and one for every actor no seat drives).
-func _on_caster_move_finished(caster: int, mode: StringName, position: Vector2, _tag: int) -> void:
-	if mode != &"dash" or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not position.is_finite():
-		return
-	var ramp: int = _ramp_of(caster)
-	var who: int = _budget_of(caster)
-	var look: int = _dash_look[who]
-	show_effect(KIND_RING_OUT, position, Vector2.RIGHT, Color.WHITE, ramp, 0, 1, RING_SECONDS)
-	var from: Vector2 = _dash_from[who]
-	if from.is_finite() and (look & (1 << (ProjectileManagerScript.LOOK_SPARKS - 1))) != 0 and from.distance_to(position) > 4.0:
-		show_effect(KIND_ARC, from, from.direction_to(position), _dash_core[who], ramp, look, 1, RING_SECONDS, from.distance_to(position))
-	if look != 0:
-		show_effect(KIND_BURST, position, from.direction_to(position) if from.is_finite() else Vector2.RIGHT, _dash_core[who], ramp, look, POP_ZOOM, POP_SECONDS)
-	_dash_from[who] = Vector2.INF
-
-
 ## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
 ## was (the mockup's); one that ended on a wall already showed its impact, and a rune's going off
 ## is its own burst.
@@ -1344,21 +1318,35 @@ func _play_effect_part(part: Dictionary, cue: CueContextScript) -> void:
 	var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 	if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
 		return
+	# Only for the cards it names: any card's layer, or one look layer (lightning's arc).
+	var layers: int = cue.look & ((1 << MotesScript.LOOK_LAYERS) - 1)
+	if bool(part.get("if_cards", false)) and layers == 0:
+		return
+	if part.has("if_layer") and (layers >> (int(part["if_layer"]) - 1)) & 1 == 0:
+		return
 	var seconds: float = float(part.get("seconds", row[2]))
 	if bool(part.get("lasts_size", false)):
 		if cue.size <= 0.0:
 			return
 		seconds = cue.size
 	var zoom: int = int(part.get("zoom", 1))
-	if part.has("reach"):
+	var length: float = 0.0
+	if row.size() > 3:
+		# Drawn along its length (an arc): the cue's size times its reach, from the cue's point.
+		length = cue.size * float(part.get("reach", 1.0))
+		if length <= 0.0:
+			return
+	elif part.has("reach"):
 		zoom = roundi(cue.size * float(part["reach"]) / float(row[1]))
 	var way: Vector2 = cue.way_of(part)
 	if part.has("color"):
-		show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds)
+		show_effect(int(row[0]), cue.at, way, part["color"] as Color, 0, EXACT, zoom, seconds, length)
 	elif bool(part.get("plain", false)):
-		show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds)
+		show_effect(int(row[0]), cue.at, way, Color.WHITE, 0, 0, zoom, seconds, length)
+	elif bool(part.get("bare", false)):
+		show_effect(int(row[0]), cue.at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length)
 	else:
-		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds)
+		show_effect(int(row[0]), cue.at, way, cue.tint, cue.ramp, cue.look, zoom, seconds, length)
 
 
 ## The cue `id` (`content/cues/<id>.tres`), or null when there is none or no registry yet. Read
@@ -1376,9 +1364,14 @@ func cue_of(id: StringName) -> CueBase:
 
 
 func _on_cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
-	# The spell runtime's tag of the spell it shows the cue of (its cards' motes and marks).
+	play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
+
+
+## The spell runtime's tag of the spell whose cue, form or carrier's end is being sent (its cards'
+## motes and marks; `SpellRuntime.cue_tag`), 0 for none.
+func _cue_tag() -> int:
 	var tag: Variant = spells.get(&"cue_tag") if spells != null else null
-	play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag if tag is int else 0)
+	return tag if tag is int else 0
 
 
 ## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a
@@ -1386,7 +1379,7 @@ func _on_cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2
 func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
 	var cue: StringName = StringName(str(_form_look(form, false).get("cue", "")))
 	if cue != &"":
-		play_cue(cue, caster, at, direction, size, tint, look)
+		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 
 
 ## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.
@@ -1920,32 +1913,22 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 
 ## A carrier showed itself: the cue its card's cast look names (a nova's ring, a rain's telegraph
 ## with `length` its seconds, where a teleport leaves, each end of a swap, a decoy or familiar
-## appearing), then a beam (drawn by `shot_beam.gdshader` in the element's ramp) or a dash, each
-## with the cast's cards, in the caster's ramp: an enemy's look the same, in the enemy ramp (staffs
-## F7). The beam and the dash keep state of their own (a beam's slot while it fades, where a dash
-## left until it lands), so they stay in code. A slam's strike is its end (`carrier_ended`); its
+## appearing, a dash's dust and lightning arc, S5), then a beam (drawn by `shot_beam.gdshader` in
+## the element's ramp) with the cast's cards, in the caster's ramp: an enemy's look the same, in the
+## enemy ramp (staffs F7). The beam keeps state of its own (its slot while it fades), so it stays
+## in code. A slam's strike is its end (`carrier_ended`); its
 ## wind-up shows only on the staff (the rising, glowing staff: a ring there distracted from it).
 func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
 	var cue: StringName = StringName(str(_form_look(form, true).get("cue", "")))
 	if cue != &"":
-		play_cue(cue, caster, origin, direction, length, tint, look)
+		play_cue(cue, caster, origin, direction, length, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
 	var ramp: int = _ramp_of(caster)
 	if form == &"zap":
 		# A zap or a zap shot's spark: lightning in the shot's colours (its infusion's, else its caster's).
 		if length > 0.0 and direction != Vector2.ZERO and preset.arc_seconds > 0.0:
 			show_effect(KIND_ARC, origin, direction, tint, ramp, look, 1, preset.arc_seconds * (1.0 if length > SPARK_LONGEST else 0.6), length)
-		return
-	if form == &"dash":
-		# Only its dust here: the wizard picks its way (where it walks), so its streaks and cards
-		# are its trail, and the ring comes where it lands.
-		var who: int = _budget_of(caster)
-		_dash_from[who] = origin
-		_dash_core[who] = tint
-		_dash_look[who] = look
-		if length > 0.0 and direction != Vector2.ZERO:
-			show_effect(KIND_DASH, origin, Vector2.RIGHT, tint, ramp, look, 1, DASH_SECONDS, 4.0)
 		return
 	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return

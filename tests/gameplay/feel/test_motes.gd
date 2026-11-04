@@ -947,8 +947,7 @@ func test_the_flight_is_the_shaders_line_for_line() -> void:
 ## shader's BIRTHS), the look layers (the manager's look kinds), the longest life (MoteKind's), and
 ## the sources (a table row is past every spell's).
 func test_the_numbers_shared_with_core_agree() -> void:
-	var trail: String = FileAccess.get_file_as_string("res://core/projectiles/shot_trail.gdshader")
-	check(trail.contains("const float BIRTHS = %.1f;" % ProjectilesScript.SPARK_MOMENTS), "SPARK_MOMENTS is the trail shader's BIRTHS")
+	check(ProjectilesScript.SPARK_STREAK < 0, "a dash's streak is no look layer (S5)")
 	check_equal(MotesScript.LOOK_LAYERS, ProjectilesScript.LOOK_COUNT - 1, "a layer for every look kind past the plain shot")
 	check_equal(MotesScript.LIFE_MAX, MoteKind.LIFE_MAX, "the longest life")
 	check(MotesScript.TABLE_SOURCE >= MotesScript.ENEMY_SOURCE + 1 + MotesScript.EXACT_SOURCE, "a table row is past every spell's source (the enemies' exact one included)")

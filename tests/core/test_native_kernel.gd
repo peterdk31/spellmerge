@@ -187,7 +187,11 @@ func _test_both_step_alike() -> void:
 			return
 	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
 	for batch in ManagerScript.BATCHES:
-		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
+		# A dash's trail is never drawn (its streaks are motes, S5): its batches stay empty.
+		if ManagerScript.BATCH_MESH[batch] == ManagerScript.TRAIL_MESH_DASH:
+			_check(_batch_seen[batch] == 0, "dash batch %d draws nothing" % batch)
+		else:
+			_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 
 
@@ -216,6 +220,11 @@ func _drive(side: int, step: int) -> void:
 			node.global_position += Vector2.from_angle(float(step) * 0.05 + float(i)) * 0.6
 	if step == 40:
 		m.follow_caster(1, Color(0.9, 0.3, 0.2), 1 | 4, 0.4)
+	# The tails go off for a while (S5): the shots with no row are drawn told their way.
+	if step == 70:
+		m.set_tails_enabled(false)
+	if step == 90:
+		m.set_tails_enabled(true)
 	if step == 45:
 		# An enemy's dash, with lightning's look: a dash's batch all the same.
 		m.set_anchor(_imp, Vector2(480.0, 140.0))

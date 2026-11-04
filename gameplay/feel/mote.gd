@@ -135,6 +135,8 @@ var _cap: int = 0
 var _kinds: Array[MoteKind] = []
 var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
+## The kinds a dash gives off along its path (`MoteKind.dash_path`; its births of SPARK_STREAK).
+var _dash_kinds: PackedInt32Array = PackedInt32Array()
 ## The kinds that name each card by id (`MoteKind.cards`).
 var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
 ## The trails' births' kinds by their shot's spell (`card_kinds.gd`, the spectacle's: anything
@@ -340,7 +342,8 @@ func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color,
 ## (core/projectiles' `spark_births`, BIRTH_STRIDE floats each), one mote each (times `density`,
 ## as any burst): a kind of its look kind's layer (`kinds_of_layer`), given off back along the shot
 ## within its kind's spread at TRAIL_SPEED of its burst speed and speed up, in the shot's own ramp.
-## A shot of a spell gives off its spell's kinds for that layer (`use_cards`).
+## A shot of a spell gives off its spell's kinds for that layer (`use_cards`); a dash's streak
+## (SPARK_STREAK) is one of the dash path kinds (`MoteKind.dash_path`).
 ## Each is a one-mote `burst`, so a trail's mote is written, counted and settled as every other.
 func give_off(given: PackedFloat32Array, count: int) -> void:
 	count = mini(count, given.size() / BIRTH_STRIDE)
@@ -351,7 +354,9 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		var b: int = n * BIRTH_STRIDE
 		var layer: int = int(given[b + ProjectilesScript.SPARK_KIND])
 		var found: PackedInt32Array
-		if _cards != null:
+		if layer == ProjectilesScript.SPARK_STREAK:
+			found = _dash_kinds
+		elif _cards != null:
 			found = _cards.layer_motes(ProjectilesScript.spark_tag(given, b), layer)
 		else:
 			found = kinds_of_layer(layer)
@@ -366,6 +371,11 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), int(given[b + ProjectilesScript.SPARK_LOOK])),
 			Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2]),
 			kind.height)
+
+
+## The kinds a dash gives off along its path (`MoteKind.dash_path`). Kept: read it, never change it.
+func dash_kinds() -> PackedInt32Array:
+	return _dash_kinds
 
 
 ## The kinds of look layer `layer` (a look kind, LOOK_*), else those of layer 0.
@@ -691,6 +701,8 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 					_shape_image.set_pixel(frame * size + x, k * size + y, Color(value, value, value, 1.0))
 		if kind.surface:
 			_surface_kinds.append(k)
+		if kind.dash_path:
+			_dash_kinds.append(k)
 		for layer in kind.look_layers:
 			_layer_kinds[layer].append(k)
 		for card in kind.cards:

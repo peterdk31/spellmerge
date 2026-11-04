@@ -337,11 +337,12 @@ func play_motes_part(part: Dictionary, cue: CueContextScript) -> void:
 	# as does a part whose `colours` say so; one whose `colours` are the spell's, through its ramp.
 	var colours: StringName = StringName(part.get("colours", ""))
 	var of_surface: bool = named == &"surface" or colours == &"surface"
+	var at: Vector2 = cue.at + Vector2(0.0, float(part.get("below", 0.0)))
 	for k in kinds:
 		var walls: bool = of_surface or (pool.kinds()[k].surface and colours != &"spell")
 		var source: int = surface if walls else spell
 		var each: int = -1 if count < 0 else maxi(roundi(float(count) / float(kinds.size())), 1)
-		pool.throw_part(k, cue.at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else cue.tint, each, reach, spread, up, ring)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with
@@ -358,7 +359,11 @@ func play_mark_part(part: Dictionary, cue: CueContextScript) -> void:
 	var turn: float = cue.aim.angle() if StringName(part.get("rot", "random")) == &"aim" else marks.random_turn()
 	var found: PackedInt32Array = cards.marks_of(cue.tag, cue.look) if bool(part.get("cards", false)) else PackedInt32Array()
 	if found.is_empty():
-		found = PackedInt32Array([marks.kind_index(StringName(part.get("mark", "")))])
+		var named: StringName = StringName(part.get("mark", ""))
+		if named == &"":
+			# Only its cards' marks, and they have none.
+			return
+		found = PackedInt32Array([marks.kind_index(named)])
 	var surface: int = cue.surface if cue.surface >= 0 else _surface_source
 	for k in found:
 		marks.stamp(k, cue.at, radius, turn, source, cue.tint, surface)

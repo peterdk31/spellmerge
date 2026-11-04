@@ -131,7 +131,9 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	if spell == null or not at.is_finite():
 		return
 	if kit.events != null:
+		kit.set_cue_tag(tag)
 		kit.events.carrier_ended.emit(actor, spell.form_id, at, heading, spell.radius, spell.tint, spell.look)
+		kit.set_cue_tag(0)
 	kit.carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	kit.blast(spell, tag, actor, at)
 	for trigger in spell.triggers:

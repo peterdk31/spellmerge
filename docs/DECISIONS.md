@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-04: The trail texture holds 64 rows a line (owner session)
+
+- **The bug:** with Max shots at 10,000 or more on the owner's web build, after the sandbox's LB storm every fire bolt's tail was short and at a wrong angle; below 10,000 never. The storm holds every trail row (`TRAIL_ROWS_PER_SLOT` x the cap = 20,000), and `trail_data` had one texture line per row (32 texels wide), so it grew to 32 x 32,768, past the 16,384 most GPUs and WebGL take, and the shader read the wrong samples from then on (the texture stays at its largest size). Not seen at the default caps (1,000 web, 6,000 desktop: 2,048 and 16,384 lines).
+- **The fix:** `TRAIL_ROWS_PER_LINE` (64) rows side by side on a line: 2,048 texels wide (the smallest maximum WebGL guarantees) and rows / 64 lines high, 2,048 x 2,048 at the top cap (50,000). `trail_texel` finds row r's sample s at (r % 64 x 32 + s, r / 64). The texels are in the same order, so `_trail_data`, its writers and the native kernel are unchanged; only the image's size and the shader's address are new.
+- **Not done:** the texture still never shrinks after a storm, and freed rows are reused last freed first; neither is wrong, only memory (a 2,048 x 2,048 RGBAF texture is 64 MB at the top cap).
+
 ## 2026-11-03: Motes: the pool, kinds as data, colours from spells and rooms (spell spectacle P1a, owner session)
 
 - **Asked:** the owner-lane task "Spell spectacle: the mote pool (P1a)" (docs/milestones/spell-spectacle.md, approved 2026-11-03). After a first version with the kinds as tables in mote.gd mirrored in the shader and Stone chips, the owner: "It needs to be easy to change/add motes and different kinds should emerge from the spells", and colours "should also not be hardcoded, since the current tiles are just placeholders".

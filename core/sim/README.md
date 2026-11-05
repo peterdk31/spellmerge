@@ -44,7 +44,23 @@ Claude only, like all of `core/`. Typed GDScript, no banned APIs.
 
 ## Steps
 
-A new member of a simulation script needs nothing: it is state. A reference to a service, a cache or an instance id goes in DERIVED, a reference to another body that matters to the game in REFS, and something only the drawing uses in VIEW; `tests/core/test_state_declared.gd` names any that cannot be state (statically, and live as every card is cast), and `tests/core/test_determinism.gd` any that parts between two runs of the same scene.
+A new member of a simulation script, by what it holds:
+
+| It holds | List | Examples |
+|---|---|---|
+| the game: a value, a packed array, an object of a simulation script, an actor it owns | none (state by default) | `Combat._health`, `Actor.intent` |
+| a service, or a node the area sets up again | `DERIVED` | `events`, `projectiles`, `Flow.world` |
+| a cache, scratch refilled within a step, an instance id | `DERIVED` | `Spells._zap_near`, `Combat._row_by_node` |
+| another body the game would miss if it were lost | `REFS` | `AIBrain.target`, `ProjectileManager._stuck_to` |
+| what only the drawing reads and writes | `VIEW` | `ProjectileManager._drawn_seq`, `Actor._looks` |
+
+And around it:
+- A `static var`: `DERIVED` (a cache, a test switch); it never holds state.
+- A look or another script that only draws: `const VIEW_ONLY: bool = true`.
+- Chance: a `RandomNumberGenerator` of the area's own, seeded by the game; a seed nobody chose: `SimSeed.fresh()`. Time: `delta` and `sim_time`, never a clock.
+- A list sits above the script's first member, with its one-line comment (`## Not state: ...`, `## State as who they point at: ...`); a subclass of a script with a list names its own (`DERIVED_BEAM`).
+
+The tests say what is missed: `tests/core/test_state_declared.gd` from the types and the source (every script and inner class), `tests/core/test_state_walked.gd` in running games (three scenes and every card), and `tests/core/test_determinism.gd` any member that parts between two runs of the same scene. Each names the file, the member and the list it belongs in.
 
 ## Example to copy
 
@@ -54,7 +70,7 @@ A new member of a simulation script needs nothing: it is state. A reference to a
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_determinism
+ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_state_walked, test_determinism
 ```
 
 ## Review questions

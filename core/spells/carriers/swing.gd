@@ -9,8 +9,7 @@ extends Carrier
 ## the `swing_*` getters (`CarrierSwing.of(spells)`).
 
 
-## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
-## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_sw_source"]
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,

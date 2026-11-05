@@ -99,8 +99,7 @@ const HORDE_NODE_NAME: String = "Horde"
 ## A camera limit this wide or more counts as none (Godot's default is 10,000,000).
 const NO_LIMIT: int = 1000000
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"world", &"_horde", &"_camera", &"_gems"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.

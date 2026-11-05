@@ -40,8 +40,7 @@ const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its s
 ## alone decides what it does and the test can see whether a W cell really changes nothing.
 static var keep_wasted: bool = false
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_lookup", &"keep_wasted"]
 
 ## id -> SpellComponent (or null for an unknown id).

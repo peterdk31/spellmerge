@@ -15,17 +15,19 @@ extends RefCounted
 ## normal build's tick.
 ##
 ##     var walk := StateWalk.new()
+##     walk.with_paths = false
 ##     var hashes: Dictionary[String, int] = SimHash.areas({"combat": combat, "projectiles": shots}, walk)
 ##     var whole: int = SimHash.whole(hashes)
 ##     assert(walk.problems.is_empty())
 
 
-## Each area's hash, by name, in the order given. Problems go to `walk.problems` (a walk of the
-## caller's, or a throwaway one).
+## Each area's hash, by name, in the order given. Problems go to `walk.problems`: a walk of the
+## caller's (with its own settings; paths off is several times faster), or one of its own without
+## paths.
 static func areas(named: Dictionary, walk: StateWalk = null) -> Dictionary[String, int]:
 	if walk == null:
 		walk = StateWalk.new()
-	walk.with_paths = false
+		walk.with_paths = false
 	var out: Dictionary[String, int] = {}
 	for name: Variant in named:
 		out[String(name)] = area(walk, String(name), named[name] as Object)

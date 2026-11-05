@@ -11,8 +11,7 @@ extends RefCounted
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"projectiles", &"events"]
 
 var _rt: SpellRuntime = null

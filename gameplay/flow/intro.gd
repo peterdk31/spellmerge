@@ -86,8 +86,7 @@ const BONE: Array[Color] = [Color("a39fb8"), Color("d4d0e0"), Color("f4f1ea")]
 const FIRE_LIGHT: Color = Color("ffa23c")
 const SPARK_LIGHT: Color = Color("fff3a6")
 
-## View as a whole (online-ready N1, core/sim/README.md): nothing here is state, so the state walk
-## never enters it, and a member that holds one is listed in VIEW or DERIVED.
+## View as a whole: the state walk never enters it (core/sim/README.md).
 const VIEW_ONLY: bool = true
 
 var input: Node = null

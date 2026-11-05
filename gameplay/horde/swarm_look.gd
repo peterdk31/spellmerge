@@ -73,8 +73,7 @@ const REACH: float = 64.0
 const FLAG_FLASH: float = 8.0
 const FLAG_HURT: float = 16.0
 
-## View as a whole (online-ready N1, core/sim/README.md): nothing here is state, so the state walk
-## never enters it, and a member that holds one is listed in VIEW or DERIVED.
+## View as a whole: the state walk never enters it (core/sim/README.md).
 const VIEW_ONLY: bool = true
 
 ## The swarm whose rows it draws (see the class doc); set before it is added, or with `setup`.

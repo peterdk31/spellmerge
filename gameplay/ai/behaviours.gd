@@ -16,7 +16,7 @@ const LIST: Array[Script] = [
 	preload("res://gameplay/ai/behaviours/heal_ally.gd"),
 ]
 
-## Not state (online-ready N1, core/sim/README.md): the behaviours made once.
+## Not state: the behaviours made once (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"_all"]
 
 static var _all: Array[AIBehaviour] = []

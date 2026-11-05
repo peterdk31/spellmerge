@@ -116,13 +116,11 @@ const TARGET_SLOTS: int = 64
 ## The wall layer of the world's static bodies.
 const WALL_LAYER: int = 1
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"_parent", &"_cand_nodes"]
-## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
-## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"nodes", &"_slot_nodes"]
-## What only the drawing reads and writes (online-ready N1, N9).
+## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"look"]
 
 ## The services. The director hands over its own; whatever is null is taken from the autoloads

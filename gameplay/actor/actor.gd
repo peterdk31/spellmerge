@@ -76,10 +76,9 @@ signal died(killer: int)
 ## called for every hit on anyone (performance pass, 2026-10-28).
 signal damaged(by: int, amount: float)
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors"]
-## What only the drawing reads and writes (online-ready N1, N9).
+## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_looks"]
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.

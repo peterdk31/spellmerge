@@ -52,8 +52,7 @@ static var warmed: bool = false
 static var _wanted: Array[Shader] = []
 static var _wanted_how: PackedInt32Array = PackedInt32Array()
 
-## View as a whole (online-ready N1, core/sim/README.md): nothing here is state, so the state walk
-## never enters it, and a member that holds one is listed in VIEW or DERIVED.
+## View as a whole: the state walk never enters it (core/sim/README.md).
 const VIEW_ONLY: bool = true
 
 ## Every draw, shown one a unit in this order (made by `begin`), what holds them, and the one

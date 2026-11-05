@@ -37,7 +37,8 @@ extends RefCounted
 ## Anything else is a **problem**, named by its path and what it holds: a node that is not the
 ## holder's own (a service: DERIVED; another area's body: REFS), a node of a script outside the
 ## simulation, a Callable, a Signal, an RID or another engine object (a mesh, a material).
-## `tests/core/test_state_declared.gd` fails on any.
+## `tests/core/test_state_walked.gd` fails on any in running games; `tests/core/test_state_declared.gd`
+## on any a member's type already shows.
 ##
 ## It runs only in tests, tools, replays and later the netcode, never in a normal build's tick.
 ##
@@ -67,6 +68,9 @@ var problems: PackedStringArray = PackedStringArray()
 ## Whether the sink is handed each leaf's path. Off for the hash, which needs only the values (and
 ## is several times faster without building a string per leaf); a problem then names its area only.
 var with_paths: bool = true
+## Scripts this walk counts as simulation besides FOLDERS' (a test's stand-in for a game script: the
+## card test's scripted controller drives a wizard as a player's would).
+var also_simulation: Array[Script] = []
 
 var _sink: Callable
 ## Instance id to the order an object was first walked in (this walk).
@@ -111,7 +115,8 @@ static func is_view_only(script: Script) -> bool:
 
 
 ## The names `script` and the scripts it extends list in the lists of kind `list` (DERIVED, VIEW or
-## REFS): every constant `Array[StringName]` named `list` or `list` + "_" + a name.
+## REFS): every constant `Array[StringName]` named `list` or `list` + "_" + a name (`VIEW_ONLY`, a
+## bool, is no list).
 static func listed(script: Script, list: String) -> PackedStringArray:
 	var out := PackedStringArray()
 	var at: Script = script
@@ -279,15 +284,14 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 	if object is Node:
 		var node: Node = object
 		var what: String = _describe(node)
-		if not root and (script == null or not is_simulation(script) or is_view_only(script)):
+		if not root and not _walks_into(script):
 			_problem(path, "holds a Node (%s)" % what, "add it to DERIVED (a service), REFS (another body) or VIEW (if only the drawing reads it)")
 			return
 		if not root and not (holder is Node and (holder as Node).is_ancestor_of(node)):
 			# A reference to a body that has an id (an actor): its id is its identity (N5), the same
 			# on every machine, so the hash keeps who it points at without walking another's body.
-			var body_id: Variant = node.get(&"id")
-			if typeof(body_id) == TYPE_INT:
-				_sink.call(path, "%s#%d" % [script.resource_path.get_file(), body_id])
+			if typeof(node.get(&"id")) == TYPE_INT:
+				_sink.call(path, identity(node))
 				return
 			_problem(path, "holds a reference to a node it does not own (%s)" % what, "add it to REFS (a body that is state) or DERIVED (one set up again)")
 			return
@@ -309,8 +313,15 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 			_value(at, object.get(names[i]), object)
 
 
+## Whether a node of `script` is walked when the holder owns it: a simulation script (or one this
+## walk counts as one) that is not view as a whole.
+func _walks_into(script: Script) -> bool:
+	return script != null and (is_simulation(script) or also_simulation.has(script)) and not is_view_only(script)
+
+
+## A problem: where, what it holds, and the fix, with where the lists are explained.
 func _problem(path: String, what: String, fix: String) -> void:
-	problems.append("%s %s; %s" % [path, what, fix])
+	problems.append("%s %s; %s (core/sim/README.md, \"Steps\")" % [path, what, fix])
 
 
 static func _describe(node: Node) -> String:

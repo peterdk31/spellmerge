@@ -1,41 +1,24 @@
 extends "res://tests/support/suite.gd"
-## The state is declared (online-ready N1, docs/milestones/online-ready.md, "State by default"):
-## every member of a simulation script (StateWalk.FOLDERS) is state unless the script lists it in
-## DERIVED or VIEW (REFS are state, walked as who they point at), and state must be something the
-## walker can hash and save.
+## The state is declared (online-ready N1, core/sim/README.md, "State by default"): every member of
+## a simulation script (StateWalk.FOLDERS) is state unless the script lists it in DERIVED or VIEW
+## (REFS are state, walked as who they point at), and state must be something the walker can hash
+## and save. These checks read the scripts, not a game; tests/core/test_state_walked.gd walks the
+## state of running games.
 ##
-## - Statically, for every simulation script and every inner class of one: every listed name is a
-##   member (a rename leaves none behind), and no state member is typed as something that cannot be
-##   state: a node of the engine or of a script outside the simulation (a service, a sprite), a
-##   view-only node, a Callable, a Signal or an RID.
-## - Statically, what the walker cannot see: a static member belongs to no object, so it is listed
-##   in DERIVED or VIEW (a cache, a test switch) and never holds state; and simulation code reads no
-##   clock (`Time`, `OS.get_ticks_*`) and rolls no global dice (`randomize()`, `randf()`, `randi()`,
-##   `seed()`): a seed nobody chose comes from `SimSeed.fresh()` (core/sim). View-only scripts
-##   (`VIEW_ONLY`) may do both.
-## - Live: the determinism tests' scenes (tests/core/sim_scenes.gd: a staffed fight, a spell storm,
-##   a horde wave) are walked after two seconds, and every card of content/spells is cast in the card
-##   rules' world (tests/support/card_rules_world.gd) and walked as it casts, flies and lands; the
-##   walks must meet no problem (a reference to a node it does not own, an engine object). New cards
-##   and carriers are walked the day they land, with no edit here.
+## - For every simulation script and every inner class of one: every listed name is a member (a
+##   rename leaves none behind), and no state member is typed as something that cannot be state: a
+##   node of the engine or of a script outside the simulation (a service, a sprite), a view-only
+##   node, a Callable, a Signal or an RID.
+## - What the walker cannot see, from the source: a static member belongs to no object, so it is
+##   listed in DERIVED or VIEW (a cache, a test switch) and never holds state; and simulation code
+##   reads no clock (`Time`, `OS.get_ticks_*`) and rolls no global dice (`randomize()`, `randf()`,
+##   `randi()`, `seed()`): a seed nobody chose comes from `SimSeed.fresh()` (core/sim). View-only
+##   scripts (`VIEW_ONLY`) may do both.
+## - The simulation folders in core/sim/README.md's table are StateWalk.FOLDERS.
 ##
 ## Each failure names the file, the member and the fix ("add it to DERIVED, it is set up again, not
 ## saved").
 
-const SimScenes := preload("res://tests/core/sim_scenes.gd")
-const CardWorld := preload("res://tests/support/card_rules_world.gd")
-const RegistryScript := preload("res://core/registry/registry.gd")
-
-const STEPS: int = 120
-## The steps each card's world is walked at: as it casts, in flight, as it lands and after.
-const CARD_WALKS: Array[int] = [1, 12, 40, 75]
-## The card world's wizard is driven by the fixture's scripted controller (test code, an inner class
-## of tests/gameplay/actor/actor_fixture.gd), standing in for a player's: not the game's, so its
-## problems are not the game's either.
-const FIXTURE_CONTROLLERS: Array[String] = ["wizard.controller holds a Node (Node)", "wizard.home_controller holds a Node (Node)"]
-## How long each card's world runs (seconds); the wizard keeps casting, so channels, repeats and
-## held carriers are live at every walk.
-const CARD_SECONDS: float = 1.4
 ## Code a simulation script may not hold outside a comment (see the class doc), and why.
 const FORBIDDEN: Dictionary = {
 	"(^|[^\\w])randomize\\(": "seeds a generator by the clock; take `SimSeed.fresh()` (core/sim)",
@@ -69,7 +52,7 @@ func test_no_state_member_is_typed_as_something_it_cannot_save() -> void:
 			if int(info["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0 or skip.has(name) or inherited.has(name):
 				continue
 			var why: String = _cannot_hold(info, classes)
-			check(why.is_empty(), "%s: %s holds %s; add it to DERIVED (a service, set up again), REFS (another body, state) or VIEW (only the drawing reads it)" % [entry["name"], name, why])
+			check(why.is_empty(), "%s: %s holds %s; add it to DERIVED (a service, set up again), REFS (another body, state) or VIEW (only the drawing reads it) (core/sim/README.md, \"Steps\")" % [entry["name"], name, why])
 
 
 func test_no_static_member_holds_state() -> void:
@@ -79,7 +62,7 @@ func test_no_static_member_holds_state() -> void:
 			continue
 		var listed: PackedStringArray = StateWalk.listed(script, "DERIVED") + StateWalk.listed(script, "VIEW")
 		for name in _statics_of(script):
-			check(listed.has(name), "%s: the static member %s belongs to no object, so no walk sees it; a cache or a switch goes in DERIVED, state goes in an object's member" % [entry["name"], name])
+			check(listed.has(name), "%s: the static member %s belongs to no object, so no walk sees it; a cache or a switch goes in DERIVED, state goes in an object's member (core/sim/README.md, \"Steps\")" % [entry["name"], name])
 
 
 func test_simulation_code_reads_no_clock_and_rolls_no_global_dice() -> void:
@@ -99,108 +82,14 @@ func test_simulation_code_reads_no_clock_and_rolls_no_global_dice() -> void:
 					check(false, "%s:%d %s: %s" % [entry["name"], i + 1, FORBIDDEN.values()[p], lines[i].strip_edges()])
 
 
-func test_a_staffed_fight_walks_without_problems() -> void:
-	_check_scene(&"fight")
-
-
-func test_a_spell_storm_walks_without_problems() -> void:
-	_check_scene(&"storm")
-
-
-func test_a_horde_wave_walks_without_problems() -> void:
-	_check_scene(&"horde")
-
-
-## Every card of content/spells, cast alone (a carrier, with a payload when it carries one) or on
-## the payload carrier (any other card; a trigger with a payload to fire), in the card rules' world
-## with a teammate and two enemies, walked at CARD_WALKS.
-func test_every_card_walks_without_problems() -> void:
-	var registry := own(RegistryScript.new()) as Node
-	registry.call("scan")
-	var shelf := own(CardWorld.Shelf.new()) as CardWorld.Shelf
-	shelf.base = registry
-	var staff := StaffBase.new()
-	staff.id = &"state_walk"
-	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
-	var forms: Array[FormBase] = []
-	var others: Array[SpellComponent] = []
-	var payload: FormBase = null
-	for card: Resource in registry.call("get_all", &"spells"):
-		if card is FormBase:
-			var form: FormBase = card
-			forms.append(form)
-			if form.carrier == &"atom" and (payload == null or form.shots > payload.shots):
-				payload = form
-		elif card is SpellComponent:
-			others.append(card as SpellComponent)
-	if payload == null:
-		check(false, "a straight carrier to fire as a payload")
-		return
-	var casts: Array[Array] = []
-	for form in forms:
-		var cards: Array[StringName] = [form.id]
-		if form.carries_payload():
-			cards.append(payload.id)
-		casts.append(cards)
-	for card in others:
-		var cards: Array[StringName] = [card.id, payload.id]
-		if card is TriggerBase:
-			cards.append(payload.id)
-		casts.append(cards)
-	check(casts.size() == forms.size() + others.size() and forms.size() > 5, "every card is cast (%d carriers, %d others)" % [forms.size(), others.size()])
-	for cast: Array in casts:
-		var cards: Array[StringName] = []
-		cards.assign(cast)
-		var world := CardWorld.new(root, shelf, staff)
-		world.add_wizard(cards)
-		world.add_ally(Vector2(-40.0, 40.0))
-		var enemies: Array[Node2D] = [world.add_enemy(&"A", Vector2(90.0, 0.0)), world.add_enemy(&"B", Vector2(60.0, 30.0))]
-		# An Array, not a PackedStringArray: a lambda holds a copy of a packed array.
-		var problems: Array[String] = []
-		for step in CARD_WALKS:
-			world.at_step[step] = [func() -> void:
-				for problem in _walk(_card_areas(world, enemies)):
-					if not problems.has(problem) and not FIXTURE_CONTROLLERS.any(func(fixture: String) -> bool: return problem.begins_with(fixture)):
-						problems.append(problem)]
-		world.press(true)
-		world.run(CARD_SECONDS, CARD_SECONDS)
-		world.free_all()
-		for problem in problems:
-			check(false, "%s: %s" % [",".join(cards), problem])
-
-
-## The scene (tests/core/sim_scenes.gd) played a few seconds, then walked.
-func _check_scene(name: StringName) -> void:
-	var scene := SimScenes.new(root, name)
-	for i in STEPS:
-		scene.step()
-	for problem in _walk(scene.areas()):
-		check(false, "%s: %s" % [name, problem])
-	scene.free_all()
-
-
-## The problems one walk of `areas` meets (it must reach some state).
-func _walk(areas: Dictionary) -> PackedStringArray:
-	var walk := StateWalk.new()
-	var leaves: Array[int] = [0]
-	for name: Variant in areas:
-		walk.walk(String(name), areas[name] as Object, func(_path: String, _value: Variant) -> void: leaves[0] += 1)
-	if leaves[0] == 0:
-		walk.problems.append("the walk reached no state")
-	return walk.problems
-
-
-## A card world's areas: its services and every body still standing.
-static func _card_areas(world: CardWorld, enemies: Array[Node2D]) -> Dictionary:
-	var out: Dictionary = {"actors": world.table, "projectiles": world.projectiles, "spells": world.spells, "combat": world.combat, "entities": world.entities}
-	if is_instance_valid(world.wizard):
-		out["wizard"] = world.wizard
-	for enemy in enemies:
-		if is_instance_valid(enemy):
-			out[String(enemy.name)] = enemy
-	return out
+func test_the_readme_lists_the_simulation_folders() -> void:
+	var listed := PackedStringArray()
+	var row := RegEx.create_from_string("^\\| `([a-z_/]+/)` \\|")
+	for line in FileAccess.get_file_as_string("res://core/sim/README.md").split("\n"):
+		var found: RegExMatch = row.search(line)
+		if found != null:
+			listed.append("res://" + found.get_string(1))
+	check_equal(listed, PackedStringArray(StateWalk.FOLDERS), "core/sim/README.md's table of simulation folders is StateWalk.FOLDERS, in order")
 
 
 ## What a member typed by `info` holds that cannot be state, or "".

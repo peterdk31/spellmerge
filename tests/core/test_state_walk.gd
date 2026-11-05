@@ -174,3 +174,19 @@ func test_the_report_keeps_paths_only_for_its_tick() -> void:
 		a.capture({"area": Plain.new()})
 	check(a.leaves.has("area") and (a.leaves["area"] as Dictionary).has("area.health"), "the kept tick's leaves are named by path")
 	check_equal(a.hashes[0], a.hashes[1], "a kept tick hashes as any other")
+
+
+func test_a_script_counted_as_simulation_is_walked_as_one() -> void:
+	var holder := own(Holder.new()) as Holder
+	var child := Body.new()
+	holder.add_child(child)
+	holder.other = child
+	var walk := StateWalk.new()
+	walk.walk("holder", holder, func(_path: String, _value: Variant) -> void: pass)
+	check(", ".join(walk.problems).contains("holder.other"), "a node of a script outside the simulation is a problem")
+	var counted := StateWalk.new()
+	counted.also_simulation = [Body]
+	var paths: PackedStringArray = PackedStringArray()
+	counted.walk("holder", holder, func(path: String, _value: Variant) -> void: paths.append(path))
+	check(not ", ".join(counted.problems).contains("holder.other"), "counted as simulation, the child it owns is walked: %s" % ", ".join(counted.problems))
+	check(paths.has("holder.other.id"), "its members are state")

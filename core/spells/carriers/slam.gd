@@ -9,8 +9,7 @@ extends Carrier
 ## `slam_*` getters (`CarrierSlam.of(spells)`).
 
 
-## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
-## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_sl_source"]
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every

@@ -98,11 +98,9 @@ const REACTION_JITTER: float = 0.2
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"entities", &"_face", &"_target_id"]
-## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
-## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"target", &"grudge", &"plan_target"]
 
 ## The actor it drives, the profile it plays by and Entities (its team board; null: none).

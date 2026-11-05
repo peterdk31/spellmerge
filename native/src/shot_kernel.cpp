@@ -106,13 +106,7 @@ constexpr int BATCH_RUNE = 1;
 constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
 constexpr int BATCH_ENEMY_RUNE = 4;
-constexpr int BATCH_BOLT_JAG = 5;
-constexpr int BATCH_ORBIT_JAG = 6;
-constexpr int BATCH_ENEMY_JAG = 7;
-constexpr int BATCH_DASH = 8;
-constexpr int BATCH_ENEMY_DASH = 9;
-constexpr int BATCHES = 10;
-constexpr int64_t LOOK_LIGHTNING_BIT = 1 << 4;
+constexpr int BATCHES = 5;
 constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
@@ -846,13 +840,7 @@ const Constant CONSTANTS[] = {
 	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
 	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
-	{ "BATCH_BOLT_JAG", (double)BATCH_BOLT_JAG },
-	{ "BATCH_ORBIT_JAG", (double)BATCH_ORBIT_JAG },
-	{ "BATCH_ENEMY_JAG", (double)BATCH_ENEMY_JAG },
-	{ "BATCH_DASH", (double)BATCH_DASH },
-	{ "BATCH_ENEMY_DASH", (double)BATCH_ENEMY_DASH },
 	{ "BATCHES", (double)BATCHES },
-	{ "LOOK_LIGHTNING_BIT", (double)LOOK_LIGHTNING_BIT },
 	{ "LOOK_GRID", (double)LOOK_GRID },
 	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
@@ -1370,14 +1358,13 @@ void ShotKernel::count_draw(Object *m) {
 			drawn_radius[slot] = radius[slot];
 			drawn_look[slot] = look[slot];
 			// `_batch_of`.
-			const bool jag = (look[slot] & LOOK_LIGHTNING_BIT) != 0;
-			int64_t batch = jag ? BATCH_BOLT_JAG : BATCH_BOLT;
+			int64_t batch = BATCH_BOLT;
 			if (!is_hat_ramp(rmp)) {
-				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : (jag ? BATCH_ENEMY_JAG : BATCH_ENEMY);
+				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
 			} else if (mot == MOTION_STILL) {
 				batch = BATCH_RUNE;
 			} else if (mot == MOTION_ORBIT) {
-				batch = jag ? BATCH_ORBIT_JAG : BATCH_ORBIT;
+				batch = BATCH_ORBIT;
 			}
 			drawn_batch[slot] = (uint8_t)batch;
 			drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
@@ -1579,7 +1566,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	for (int64_t b = 0; b < BATCHES; b++) {
 		shots += used[b];
 	}
-	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_JAG] + used[BATCH_ENEMY_RUNE];
+	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
 	for (int64_t b = 0; b < BATCHES; b++) {
 		draw_out[b] = (int32_t)used[b];
 	}

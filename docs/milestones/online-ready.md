@@ -238,7 +238,7 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 **One order for both** (they share `core/projectiles/projectile_manager.gd` and `native/src/shot_kernel.cpp`, so one PR at a time there):
 
 1. N1, with H0 beside it (benchmarks only).
-2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7a (the kernel side of N7), H5 (T2), H5w if the web supports threads, H6 if measured, H7 last (after N11; H4 is dropped).
+2. The projectiles lane, one at a time: ~~H1~~ (dropped 2026-11-05, measured: H3b folds it in), H2 (fixed budget, T1; done 2026-11-05), N5, N7a (the kernel side of N7), H5 (T2), H5w if the web supports threads, H6 if measured, H7 last (after N11; H4 is dropped).
 3. Beside it, the rest: N2, N2b, N3, then N4, N7b (the GDScript side of N7), N6 (after N7a), N11; then H3 (one listener at a time) and H3b after N3; then N8, N9, N10, N12.
 
 The tasks are in NEXT.md's owner lane in this order.

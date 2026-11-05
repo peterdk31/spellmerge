@@ -72,8 +72,8 @@ const int C_SPIRAL = 19;
 const int C_SPIRAL_TURN = 20;
 const int SEGMENTS = 4;
 // The head texels of a row (its draw, metric, salt and spiral gap; its star's points, rays, dots
-// and spiral arms), before its curves.
-const int HEADS = 2;
+// and spiral arms; the mask of the curves it gives, bit C_*), before its curves.
+const int HEADS = 3;
 // A quake's reach per zoom in pixels, its cracks, and how flat the floor is seen (y over x).
 const float QUAKE_REACH = 8.0;
 const float QUAKE_CRACKS = 7.0;
@@ -103,19 +103,25 @@ varying flat vec4 c2;
 
 // ---- Vertices ----
 
-// Curve `c` of the kind in table row `row` at the age `a` and zoom `z` (FlashTable.value_at): the
-// last of its segments started, `t` its way from its start to its end, eased by its way (0 linear,
-// 1 out, 2 in, 3 hold), its pixels plus its steps of the zoom.
-float curve(int row, int c, float a, float z) {
+// Curve `c` of the kind in table row `row` at the age `a` and zoom `z` (FlashTable.value_at), or
+// `fallback` (FlashTable.DEFAULTS) when the kind gives none (bit c of `given` clear): the last of its
+// segments started (they start in order, so the first not started ends the search), `t` its way
+// from its start to its end, eased by its way (0 linear, 1 out, 2 in, 3 hold), its pixels plus its
+// steps of the zoom. Most curves are one or two segments: two to four texels.
+float curve(int row, int c, float a, float z, int given, float fallback) {
+	if (((given >> c) & 1) == 0) {
+		return fallback;
+	}
 	int x = HEADS + c * SEGMENTS * 2;
 	vec4 head = texelFetch(flash_table, ivec2(x, row), 0);
 	vec4 values = texelFetch(flash_table, ivec2(x + 1, row), 0);
 	for (int n = 1; n < SEGMENTS; n++) {
 		vec4 next = texelFetch(flash_table, ivec2(x + n * 2, row), 0);
-		if (next.x <= a) {
-			head = next;
-			values = texelFetch(flash_table, ivec2(x + n * 2 + 1, row), 0);
+		if (next.x > a) {
+			break;
 		}
+		head = next;
+		values = texelFetch(flash_table, ivec2(x + n * 2 + 1, row), 0);
 	}
 	float t = clamp((a - head.x) / max(head.y - head.x, 0.000001), 0.0, 1.0);
 	float e = head.z > 2.5 ? 0.0 : (head.z > 1.5 ? t * t : (head.z > 0.5 ? 1.0 - (1.0 - t) * (1.0 - t) : t));
@@ -159,51 +165,44 @@ void vertex() {
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
 	if (quad == Q_LIGHT || quad == Q_SHAPE) {
-		// The flash and its light, from the kind's curves: a1 the light's two falloffs (how bright,
-		// how far: x of the distance from a0.y, y of the distance), a0.x its metric (1 a diamond, 2
-		// flat on the floor); a0.yzw the cross's arms, the dotted disc's and the ring's reach (below
-		// 0 for none); a2 a column: its half width (below 0 for none), top, foot, and 1 when it is
-		// dotted.
+		// The flash and its light, from the kind's curves, each quad reading only the curves it
+		// draws: a1 the light's two falloffs (how bright, how far: x of the distance from a0.y, y of
+		// the distance), a0.x its metric (1 a diamond, 2 flat on the floor); a0.yzw the cross's arms,
+		// the dotted disc's and the ring's reach (below 0 for none); a2 a column: its half width
+		// (below 0 for none), top, foot, and 1 when it is dotted. Each quad is drawn only as big as
+		// what it colours (with a margin), inside the square.
+		int given = int(texelFetch(flash_table, ivec2(2, row), 0).x + 0.5);
 		float metric = kind_head.y;
-		float salt = kind_head.z;
-		float arm = round(curve(row, C_ARM, a, z));
-		float disc = curve(row, C_DISC, a, z);
-		float ring = curve(row, C_RING, a, z);
-		float wide = curve(row, C_COLUMN_WIDTH, a, z);
+		float ring = curve(row, C_RING, a, z, given, -1.0);
+		float wide = curve(row, C_COLUMN_WIDTH, a, z, given, -1.0);
 		vec4 column = vec4(-1.0, 0.0, 0.0, 0.0);
 		if (wide >= 0.0) {
 			// The most it is long, from its foot (a falling streak), below 0 for none.
-			float top = curve(row, C_COLUMN_TOP, a, z);
-			float foot = curve(row, C_COLUMN_FOOT, a, z);
-			float longest = curve(row, C_COLUMN_LENGTH, a, z);
-			column = vec4(floor(wide + 0.5), longest >= 0.0 ? max(foot - longest, top) : top, foot, curve(row, C_COLUMN_DOTTED, a, z));
+			float top = curve(row, C_COLUMN_TOP, a, z, given, 0.0);
+			float foot = curve(row, C_COLUMN_FOOT, a, z, given, 0.0);
+			float longest = curve(row, C_COLUMN_LENGTH, a, z, given, -1.0);
+			column = vec4(floor(wide + 0.5), longest >= 0.0 ? max(foot - longest, top) : top, foot, quad == Q_SHAPE ? curve(row, C_COLUMN_DOTTED, a, z, given, 0.0) : 0.0);
 		}
-		float k = curve(row, C_GLOW, a, z);
-		vec4 lit = vec4(curve(row, C_GLOW_RING, a, z), curve(row, C_GLOW_RING_REACH, a, z), curve(row, C_GLOW_MIDDLE, a, z), curve(row, C_GLOW_MIDDLE_REACH, a, z));
-		vec3 first = shade_of(L, curve(row, C_FIRST, a, z));
-		vec3 second = shade_of(L, curve(row, C_SECOND, a, z));
-		// The F4 parts: a star's reach, the rays' outer and inner ends, the dots' radius (a3); the
-		// spiral's reach, its turn, its gap (times the zoom), and the counts packed (points + 16 rays + 512 arms; the
-		// dots' count in a1.w). At most 15 points (FlashKind.MAX_POINTS 12) and 31 rays (MAX_RAYS).
-		vec4 counts = texelFetch(flash_table, ivec2(1, row), 0);
-		float rays = curve(row, C_RAYS, a, z);
-		a3 = vec4(curve(row, C_STAR, a, z), rays, rays >= 0.0 ? curve(row, C_RAYS_INNER, a, z) : 0.0, curve(row, C_DOTS, a, z));
-		float spiral = curve(row, C_SPIRAL, a, z);
-		a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z) : 0.0, kind_head.w * z, counts.x + counts.y * 16.0 + counts.w * 512.0);
-		bool more = a3.x >= 0.0 || a3.y > a3.z || a3.w >= 0.0 || a4.x >= 0.0;
-		shown = (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake || more);
-		q_lo = -o;
-		q_hi = size - o;
+		// The box round the middle it draws in (half its size), and a column's box beside it.
+		float reach = -1.0;
 		if (quad == Q_LIGHT) {
-			// A column's light is round its line (metric 3), not round the middle.
+			// A column's light is round its line (metric 3), not round the middle. It reaches no
+			// further than its two falloffs (falloff is 0 past its reach): none when they are 0.
 			bool lined = column.x >= 0.0;
+			float k = curve(row, C_GLOW, a, z, given, 1.0) * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0);
+			vec4 lit = vec4(curve(row, C_GLOW_RING, a, z, given, 0.0), curve(row, C_GLOW_RING_REACH, a, z, given, 1.0), curve(row, C_GLOW_MIDDLE, a, z, given, 0.0), curve(row, C_GLOW_MIDDLE_REACH, a, z, given, 1.0));
+			float centre = ring < 0.0 || lined ? 0.0 : ring;
+			reach = k > 0.0 ? max(lit.x > 0.0 ? centre + lit.y : -1.0, lit.z > 0.0 ? lit.w : -1.0) : -1.0;
+			shown = reach >= 0.0;
 			m = M_LIGHT;
-			a0 = vec4(lined ? 3.0 : metric, ring < 0.0 || lined ? 0.0 : ring, k * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0), 0.0);
+			a0 = vec4(lined ? 3.0 : metric, centre, k, 0.0);
 			a1 = lit;
 			a2 = column;
 			k0 = vec4(L.glow, 1.0);
 		} else if (quake) {
 			// The cracks: their reach, the age and seed, and the ramp they cool down.
+			reach = QUAKE_REACH * z;
+			shown = true;
 			m = M_CRACK;
 			a0 = vec4(QUAKE_REACH * z, a, s, 0.0);
 			a2 = vec4(L.lo, 0.0);
@@ -211,14 +210,35 @@ void vertex() {
 			k1 = vec4(L.hi, 1.0);
 			k2 = vec4(L.mid, 1.0);
 		} else {
+			float arm = round(curve(row, C_ARM, a, z, given, -1.0));
+			float disc = curve(row, C_DISC, a, z, given, -1.0);
+			// The F4 parts: a star's reach, the rays' outer and inner ends, the dots' radius (a3); the
+			// spiral's reach, its turn, its gap (times the zoom), and the counts packed (points + 16
+			// rays + 512 arms; the dots' count in a1.w). At most 15 points (FlashKind.MAX_POINTS 12)
+			// and 31 rays (MAX_RAYS).
+			vec4 counts = texelFetch(flash_table, ivec2(1, row), 0);
+			float rays = curve(row, C_RAYS, a, z, given, -1.0);
+			a3 = vec4(curve(row, C_STAR, a, z, given, -1.0), rays, rays >= 0.0 ? curve(row, C_RAYS_INNER, a, z, given, 0.0) : 0.0, curve(row, C_DOTS, a, z, given, -1.0));
+			float spiral = curve(row, C_SPIRAL, a, z, given, -1.0);
+			a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z, given, 0.0) : 0.0, kind_head.w * z, counts.x + counts.y * 16.0 + counts.w * 512.0);
+			reach = max(max(max(arm, disc), ring >= 0.0 ? ring + 1.0 : -1.0), max(max(a3.x, a3.y > a3.z ? a3.y + 1.0 : -1.0), max(a3.w >= 0.0 ? a3.w + 2.0 : -1.0, a4.x)));
+			shown = reach >= 0.0 || column.x >= 0.0;
 			m = M_SHAPE;
 			a0 = vec4(metric, arm, disc, ring);
 			// The dots' count, plus 128 when they are pluses (from zoom 2).
-			a1 = vec4(salt, a, s, counts.z + (z >= 2.0 ? 128.0 : 0.0));
+			a1 = vec4(kind_head.z, a, s, counts.z + (z >= 2.0 ? 128.0 : 0.0));
 			a2 = column;
-			k0 = vec4(first, 1.0);
-			k1 = vec4(second, 1.0);
+			k0 = vec4(shade_of(L, curve(row, C_FIRST, a, z, given, -1.0)), 1.0);
+			k1 = vec4(shade_of(L, curve(row, C_SECOND, a, z, given, -1.0)), 1.0);
 			k2 = vec4(L.mid, 1.0);
+		}
+		q_lo = vec2(-max(reach, 0.0)) - 2.0;
+		q_hi = vec2(max(reach, 0.0)) + 3.0;
+		if (column.x >= 0.0) {
+			// Its column's box: its width across, its top to its foot (and the light's reach past).
+			float past = quad == Q_LIGHT ? max(a1.y, a1.w) : 0.0;
+			q_lo = min(q_lo, vec2(-column.x - past, column.y - past) - 2.0);
+			q_hi = max(q_hi, vec2(column.x + past, column.z + past) + 3.0);
 		}
 	} else if (quad == Q_CLOUD && poof) {
 		// A staff's poof: four bone clouds along the staff, biggest at 35%, dotted as they go.
@@ -283,14 +303,17 @@ void fragment() {
 		if (v0.z >= 0.0 && r <= v0.z && mod(d.x + d.y, 2.0) == 0.0) {
 			colour = c0;
 		}
-		float bucket = floor(atan(d.y, d.x) * v0.w / 2.0);
-		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 0.85 : 0.5) && hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
-			colour = c1;
+		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 0.85 : 0.5)) {
+			float bucket = floor(atan(d.y, d.x) * v0.w / 2.0);
+			if (hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
+				colour = c1;
+			}
 		}
 		// The F4 parts (flash kinds), round (whatever the metric): their way round from +x, and the
-		// whole pixel's distance.
-		float turn = atan(d.y, d.x);
-		float round_r = length(d);
+		// whole pixel's distance (worked out only when the flash has one).
+		bool turned = v3.x >= 0.0 || v3.y > v3.z || v3.w >= 0.0 || v4.x >= 0.0;
+		float turn = turned ? atan(d.y, d.x) : 0.0;
+		float round_r = turned ? length(d) : 0.0;
 		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot's pixel, a plus from zoom 2
 		// (v1.w 128 or more).
 		if (v3.w >= 0.0) {
@@ -334,8 +357,7 @@ void fragment() {
 		float span = max(v2.z - v2.y, 1.0);
 		float up = clamp((d.y - v2.y) / (span * 0.35), 0.0, 1.0);
 		float half_w = floor(v2.x * (0.35 + 0.65 * up) + 0.5);
-		bool frayed = up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25;
-		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && !frayed && (v2.w < 0.5 || mod(d.y, 2.0) == 0.0)) {
+		if (v2.x >= 0.0 && abs(d.x) <= half_w && d.y >= v2.y && d.y <= v2.z && (v2.w < 0.5 || mod(d.y, 2.0) == 0.0) && !(up < 1.0 && hash_seeded(d.y, floor(v1.y * 12.0), 34.0, v1.z) > up + 0.25)) {
 			float e = abs(d.x);
 			colour = e <= max(floor(half_w * 0.4), 0.0) ? c0 : (e < half_w || half_w < 1.0 ? c1 : c2);
 		}

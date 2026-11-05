@@ -197,11 +197,7 @@ func _test_both_step_alike() -> void:
 			return
 	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
 	for batch in ManagerScript.BATCHES:
-		# A dash is never drawn (its streaks are motes, S5): its batches stay empty.
-		if ManagerScript.BATCH_MESH[batch] == ManagerScript.TRAIL_MESH_DASH:
-			_check(_batch_seen[batch] == 0, "dash batch %d draws nothing" % batch)
-		else:
-			_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
+		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 
@@ -235,9 +231,9 @@ func _drive(side: int, step: int) -> void:
 		# Fewer tail births than the shots ask for: the most is kept and the spacing widens.
 		m.tail_births_cap = 60
 	if step == 45:
-		# An enemy's dash, with lightning's look: a dash's batch all the same.
+		# An enemy's dash, with lightning's look.
 		m.set_anchor(_imp, Vector2(480.0, 140.0))
-		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), ManagerScript.LOOK_LIGHTNING_BIT | 2, 0.4)
+		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), (1 << (ManagerScript.LOOK_SPARKS - 1)) | 2, 0.4)
 	for i in 40 if step < 100 else 8:
 		var caster: int = _imp if i % 5 == 4 else i % 4
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)

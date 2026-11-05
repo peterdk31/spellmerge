@@ -234,12 +234,9 @@ func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
-	var dash: ArrayMesh = ManagerScript.trail_mesh(ManagerScript.TRAIL_MESH_DASH)
-	check_equal((dash.surface_get_arrays(0)[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), per, "a dash's batch draws nothing: one folded core")
 	for batch in ManagerScript.BATCHES:
-		var shape: int = ManagerScript.BATCH_MESH[batch]
-		if shape >= 0:
-			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(shape), "shot batch %d draws its shape's mesh" % batch)
+		if ManagerScript.BATCH_MESH[batch] >= 0:
+			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
 	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
 	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
@@ -397,23 +394,9 @@ func test_at_the_cap_every_shot_thins_alike() -> void:
 	check(is_equal_approx(_shader_share(mgr._rune_node, &"particle_share"), mgr.particle_share), "for every batch")
 
 
-## A dash's batch draws nothing (its streaks are motes, S5), so its shape's mesh is one folded core;
-## a shot's and lightning's are its light and its core.
-func test_each_mesh_shape_holds_what_it_draws() -> void:
-	for shape: int in [ManagerScript.TRAIL_MESH_PLAIN, ManagerScript.TRAIL_MESH_JAG, ManagerScript.TRAIL_MESH_DASH]:
-		var uvs: PackedVector2Array = ManagerScript.trail_mesh(shape).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-		var kinds: Array[int] = []
-		for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
-			kinds.append(floori(uvs[i].y))
-		var want: Array[int] = [ManagerScript.TRAIL_Q_CORE]
-		if shape != ManagerScript.TRAIL_MESH_DASH:
-			want.push_front(ManagerScript.TRAIL_Q_HEAD_LIGHT)
-		check_equal(kinds, want, "shape %d" % shape)
-
-
-## Lightning's shots and trails and the dashes are drawn by batches of their own, with their
-## shape's mesh; any other trail never meets a jagged line's slots.
-func test_lightning_and_dashes_have_batches_of_their_own() -> void:
+## Lightning's shots are drawn with the others of their ramp and body (they had batches of their
+## own while their trails drew a jagged line; since tails are motes every shot draws one mesh).
+func test_lightning_shots_are_drawn_with_the_others() -> void:
 	var plain: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(200.0, 0.0), 2.0)
 	var lightning: int = mgr.spawn(1, Vector2(100.0, 150.0), Vector2(200.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 77)
 	mgr.set_look(lightning, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_SPARKS, ManagerScript.LOOK_EMBERS])))
@@ -429,25 +412,11 @@ func test_lightning_and_dashes_have_batches_of_their_own() -> void:
 	var counts: Array[int] = []
 	for batch in ManagerScript.BATCHES:
 		counts.append(mgr._nodes[batch].multimesh.visible_instance_count)
-	check_equal(counts[ManagerScript.BATCH_BOLT], 1, "the plain bolt in the bolts' batch")
-	check_equal(counts[ManagerScript.BATCH_BOLT_JAG], 1, "lightning's bolt in its own")
-	check_equal(counts[ManagerScript.BATCH_ENEMY_JAG], 1, "an enemy's lightning in the enemy layer's own")
-	check_equal(counts[ManagerScript.BATCH_ORBIT_JAG], 1, "a lightning orbit in the orbits' own")
+	check_equal(counts[ManagerScript.BATCH_BOLT], 2, "the plain and lightning's bolts in the bolts' batch")
+	check_equal(counts[ManagerScript.BATCH_ENEMY], 1, "an enemy's lightning in the enemy batch")
+	check_equal(counts[ManagerScript.BATCH_ORBIT], 1, "a lightning orbit in the orbits'")
 	check_equal(mgr.drawn, 4, "four shots drawn")
 	check_equal(mgr.drawn_enemy, 1, "one of them an enemy's")
-	check_equal(mgr._nodes[ManagerScript.BATCH_ENEMY_JAG].z_index, mgr._enemy_node.z_index, "on the enemy layer")
-	# Ended, nothing of it is drawn (its tail is motes).
-	check_equal(mgr.remove_by_tag(77), 1, "lightning's bolt ends")
-	mgr.update_draw(1.0)
-	check_equal(mgr._nodes[ManagerScript.BATCH_BOLT_JAG].multimesh.visible_instance_count, 0, "and leaves nothing in lightning's batch")
-
-
-func _slots_of(mesh: ArrayMesh, kind: int) -> int:
-	var uvs: PackedVector2Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-	var count: int = 0
-	for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
-		count += 1 if floori(uvs[i].y) == kind else 0
-	return count
 
 
 func test_four_players_share_one_pool() -> void:
@@ -638,7 +607,7 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 		for n in mgr.spark_birth_count:
 			births += 1 if mgr.spark_births[n * ManagerScript.SPARK_BIRTH_STRIDE + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS else 0
 	check(births > 0, "its embers are given off as births: %d" % births)
-	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.TRAIL_MESH_PLAIN), "the core and its light")
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(), "the core and its light")
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	var found: bool = false
 	for i in mgr._draw_node.multimesh.visible_instance_count:
@@ -679,9 +648,7 @@ func test_a_dash_lasts_its_time_and_streaks_back_along_its_way() -> void:
 				backs.append(Vector2(mgr.spark_births[b + ManagerScript.SPARK_BACK_X], mgr.spark_births[b + ManagerScript.SPARK_BACK_Y]))
 	check(not backs.is_empty(), "it gives off streaks")
 	check(backs.all(func(v: Vector2) -> bool: return v.x < -0.9), "back along its way (it goes right)")
-	for batch in ManagerScript.BATCHES:
-		if ManagerScript.BATCH_MESH[batch] == ManagerScript.TRAIL_MESH_DASH:
-			check_equal(mgr._nodes[batch].multimesh.visible_instance_count, 0, "a dash draws nothing in its batch %d" % batch)
+	check_equal(mgr.drawn, 0, "a dash draws nothing")
 	mgr.follow_caster(1, Color.WHITE, 0, 0.5)
 	check(mgr.is_dashing(1), "a new dash takes over")
 	for i in 40:

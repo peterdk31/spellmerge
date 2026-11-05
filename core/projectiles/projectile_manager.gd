@@ -294,34 +294,24 @@ const DRAW_STRIDE: int = 16
 const MIN_BATCH: int = 64
 ## The draw batches by ramp: bolts, runes (still) and orbit shots in the four hat ramps, and the
 ## shots in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor), flying ones and runes
-## apart (each batch has one shader), drawn above the others. The trails are split once more by
-## what their mesh must hold (performance, 2026-11-02: every quad of a trail's mesh costs its
-## vertex stage, drawn or not; `trail_mesh_slots`): lightning's shots and trails (`_JAG`, the only
-## ones that draw its jagged line) and the dashes (`follow_caster`, the only ones that draw speed
-## streaks) apart from the rest. Their nodes are made in BATCH_ORDER, so at one z the bolts still
-## draw before the runes and the orbits; between two trails of different batches, which is on top
-## can differ from when they shared one.
+## apart (each batch has one shader), drawn above the others. (Lightning's shots and the dashes had
+## batches of their own while trails drew a jagged line and streaks; since tails are motes,
+## 2026-11-05, every shot draws the same mesh, and a dash draws nothing.) Their nodes are made in
+## BATCH_ORDER, so at one z the bolts draw before the runes and the orbits.
 const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_ENEMY: int = 3
 const BATCH_ENEMY_RUNE: int = 4
-const BATCH_BOLT_JAG: int = 5
-const BATCH_ORBIT_JAG: int = 6
-const BATCH_ENEMY_JAG: int = 7
-const BATCH_DASH: int = 8
-const BATCH_ENEMY_DASH: int = 9
-const BATCHES: int = 10
+const BATCHES: int = 5
 ## The order the batches' nodes are made in (their draw order at one z).
-const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_BOLT_JAG, BATCH_DASH, BATCH_RUNE, BATCH_ORBIT, BATCH_ORBIT_JAG, BATCH_ENEMY, BATCH_ENEMY_JAG, BATCH_ENEMY_DASH, BATCH_ENEMY_RUNE]
-## Each batch's trail mesh (TRAIL_MESH_*), or -1 for a batch of runes (one quad each).
-const BATCH_MESH: Array[int] = [TRAIL_MESH_PLAIN, -1, TRAIL_MESH_PLAIN, TRAIL_MESH_PLAIN, -1, TRAIL_MESH_JAG, TRAIL_MESH_JAG, TRAIL_MESH_JAG, TRAIL_MESH_DASH, TRAIL_MESH_DASH]
+const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_RUNE, BATCH_ORBIT, BATCH_ENEMY, BATCH_ENEMY_RUNE]
+## Each batch's mesh: 0 the shots' (`trail_mesh`), -1 a batch of runes (one quad each).
+const BATCH_MESH: Array[int] = [0, -1, 0, 0, -1]
 ## The batches on the enemy ramp's layer, one above the others.
-const BATCH_ENEMY_LAYER: Array[bool] = [false, false, false, true, true, false, false, true, false, true]
+const BATCH_ENEMY_LAYER: Array[bool] = [false, false, false, true, true]
 ## The batches given the shot art (`texture`).
-const BATCH_TEXTURED: Array[bool] = [true, true, true, false, false, true, true, false, true, false]
-## Lightning's look bit (LOOK_SPARKS in a packed look): its shots and trails are drawn by a `_JAG` batch.
-const LOOK_LIGHTNING_BIT: int = 1 << (LOOK_SPARKS - 1)
+const BATCH_TEXTURED: Array[bool] = [true, true, true, false, false]
 ## The bodies a shot is drawn as (the shot shaders build them on a pixel grid; staffs B6a): a
 ## bolt with its tail (`shot_trail.gdshader`), a rune (a diamond that pulses, `shot_rune.gdshader`),
 ## an orbit shot drawn whole with its tail bent round its circle (`shot_orbit.gdshader`, Entities'
@@ -499,10 +489,6 @@ const TAIL_BIRTHS: int = 256
 const TAIL_PLAYER_SHARE: float = 0.25
 ## Particle moments a second (the trail shader's BIRTHS were at these).
 const SPARK_MOMENTS: float = 60.0
-## The trail meshes' shapes (`trail_mesh_slots`): a shot's, lightning's (with its jagged line) and a dash's.
-const TRAIL_MESH_PLAIN: int = 0
-const TRAIL_MESH_JAG: int = 1
-const TRAIL_MESH_DASH: int = 2
 ## An orbit shot spirals out from its caster to its circle over this many seconds.
 const ORBIT_GROW: float = 0.25
 ## Particles a shot keeps in the air at most (the same number as the shader's).
@@ -839,13 +825,13 @@ var _orbit_node: MultiMeshInstance2D = null
 var _enemy_node: MultiMeshInstance2D = null
 var _enemy_rune_node: MultiMeshInstance2D = null
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, the trail cost, the shots drawn, the enemy shots drawn,
 ## the tail births laid (`spark_births`' first) and the tail asked for (`tail_demand`).
-var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-## The shots' meshes (`trail_mesh`), made once each, by shape.
-static var _trail_meshes: Dictionary = {}
+var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+## The shots' mesh (`trail_mesh`), made once.
+static var _trail_mesh: ArrayMesh = null
 ## Dashes (`follow_caster`), by caster: until when it gives off its streaks (-1: none), its ramp,
 ## the look and tag of its cast, its core, and where its caster was at the last DASH_EVERY moment
 ## (the way it goes is from there to where it is). `_dashing` lists the casters dashing now.
@@ -1050,7 +1036,7 @@ func _ready() -> void:
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
 		var z: int = DRAW_Z + (1 if BATCH_ENEMY_LAYER[batch] else 0)
-		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else TRAIL_SHADER, null if shape < 0 else trail_mesh(shape))
+		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else TRAIL_SHADER, null if shape < 0 else trail_mesh())
 	_draw_node = _nodes[BATCH_BOLT]
 	_rune_node = _nodes[BATCH_RUNE]
 	_orbit_node = _nodes[BATCH_ORBIT]
@@ -1109,20 +1095,17 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## vertex says which quad and corner it is in its UV: x 0.25 or 0.75, y the kind + 0.25 or 0.75. A
 ## quad is one triangle of TRAIL_QUAD_VERTICES vertices, twice its box each way, which the fragment
 ## stage cuts to the box: each vertex runs the whole vertex stage, so three cost a quarter less than
-## a square's four (performance, 2026-11-02; the pixels are the same). Each is made once and shared
-## by the batches of its `shape` (TRAIL_MESH_*): a dash's batch draws nothing (its streaks are
-## motes, S5), so its mesh is one folded core.
-static func trail_mesh(shape: int = TRAIL_MESH_PLAIN) -> ArrayMesh:
-	if _trail_meshes.has(shape):
-		return _trail_meshes[shape]
+## a square's four (performance, 2026-11-02; the pixels are the same). It is made once and shared
+## by the shot batches.
+static func trail_mesh() -> ArrayMesh:
+	if _trail_mesh != null:
+		return _trail_mesh
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, 1.0)]
 	for kind: int in TRAIL_QUAD_KINDS:
-		if kind == TRAIL_Q_HEAD_LIGHT and shape == TRAIL_MESH_DASH:
-			continue
 		var base: int = verts.size()
 		for corner: Vector2 in corners:
 			verts.append(corner)
@@ -1137,7 +1120,7 @@ static func trail_mesh(shape: int = TRAIL_MESH_PLAIN) -> ArrayMesh:
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_trail_meshes[shape] = mesh
+	_trail_mesh = mesh
 	return mesh
 
 
@@ -4324,7 +4307,7 @@ func _draw_shots(fraction: float) -> void:
 	for batch in BATCHES:
 		shots += _draw_out[batch]
 	_draw_out[BATCHES + 2] = shots
-	_draw_out[BATCHES + 3] = _draw_out[BATCH_ENEMY] + _draw_out[BATCH_ENEMY_JAG] + _draw_out[BATCH_ENEMY_RUNE]
+	_draw_out[BATCHES + 3] = _draw_out[BATCH_ENEMY] + _draw_out[BATCH_ENEMY_RUNE]
 	_draw_out[BATCHES] = asked
 	_draw_out[BATCHES + 1] = 0
 	_draw_out[BATCHES + 4] = spark_birth_count
@@ -4456,20 +4439,16 @@ static func particles_of(look: int) -> int:
 	return mini(4 + 2 * kinds, PARTICLES_PER_SHOT_MAX)
 
 
-## Which draw batch a live slot belongs to (BATCH_*), by its ramp, body and look (lightning's
-## trail draws its jagged line). The one rule both the counting and the writing use, so a batch
+## Which draw batch a live slot belongs to (BATCH_*), by its ramp and body. The one rule both the counting and the writing use, so a batch
 ## always has the room its writes need.
 func _batch_of(slot: int) -> int:
-	var jag: bool = _look[slot] & LOOK_LIGHTNING_BIT != 0
 	if not is_hat_ramp(_ramp[slot]):
-		if _motion[slot] == MOTION_STILL:
-			return BATCH_ENEMY_RUNE
-		return BATCH_ENEMY_JAG if jag else BATCH_ENEMY
+		return BATCH_ENEMY_RUNE if _motion[slot] == MOTION_STILL else BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
 		return BATCH_RUNE
 	if _motion[slot] == MOTION_ORBIT:
-		return BATCH_ORBIT_JAG if jag else BATCH_ORBIT
-	return BATCH_BOLT_JAG if jag else BATCH_BOLT
+		return BATCH_ORBIT
+	return BATCH_BOLT
 
 
 ## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE, KIND_ORBIT or KIND_STONE): its motion's,

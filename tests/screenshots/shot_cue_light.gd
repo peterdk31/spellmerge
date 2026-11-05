@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ## made dark (ambient 0.6, so the light reads), with spell light on, a row of cues played as player
 ## 1's at once: `heal`, `level_up`, `revive`, `shield_block`, `rune_burst` and `blast`, a few
 ## frames in (`cue_light`, and `cue_light_2x` round the row). Before the `light` part their
-## flashes lit by their kinds (`SpellLight.EFFECT_LIGHT`); a cue with a `light` part lights by it
+## flashes lit by their kinds (`SpellLight.FLASH_LIGHT`); a cue with a `light` part lights by it
 ## instead.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

@@ -5,7 +5,7 @@
 // left in the world where the shot was.
 //
 // `place_particle` works out where a particle is and what it looks like, once: a vertex stage
-// puts a small quad round it (PARTICLES ARE GEOMETRY, `shot_effect.gdshader`) and the fragment
+// puts a small quad round it (PARTICLES ARE GEOMETRY, `shot_flash.gdshader`) and the fragment
 // colours its pixels with `particle_pixel`. `particle` does both for one pixel, for the shaders
 // that still loop over their particles per pixel.
 

@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"possess_start"
-parts = Array[Dictionary]([{"effect": &"ring_in", "zoom": 2, "seconds": 0.35, "bare": true, "way": &"right"}])
+parts = Array[Dictionary]([{"flash": &"ring_in", "zoom": 2, "seconds": 0.35, "bare": true, "way": &"right"}])
 sound = &"possess"

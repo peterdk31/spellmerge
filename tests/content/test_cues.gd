@@ -64,7 +64,7 @@ func test_a_boss_death_is_a_death_that_stops_the_game() -> void:
 
 func test_problems_names_what_is_wrong() -> void:
 	var cue := CueBase.new()
-	cue.parts = [{"effect": &"sparkles"}, {"effect": &"burst", "colour": Color.RED}, {"effect": &"burst", "way": &"sideways"}, {"effect": &"burst", "zoom": 2, "reach": 1.0}, {"effect": &"burst", "seconds": 0.0}, {"effect": &"ring_in", "lasts_size": true, "seconds": 0.5}]
+	cue.parts = [{"flash": &"sparkles"}, {"flash": &"burst", "colour": Color.RED}, {"flash": &"burst", "way": &"sideways"}, {"flash": &"burst", "zoom": 2, "reach": 1.0}, {"flash": &"burst", "seconds": 0.0}, {"flash": &"ring_in", "lasts_size": true, "seconds": 0.5}]
 	cue.kick_way = &"left"
 	var found: PackedStringArray = cue.problems()
 	check_equal(found.size(), 8, "an id, the kick way and one a part: %s" % [found])
@@ -74,7 +74,7 @@ func test_a_motes_part_names_what_is_wrong() -> void:
 	var cue := CueBase.new()
 	cue.id = &"test"
 	cue.parts = [{"part": &"motes"}, {"part": &"motes", "kind": &"surface", "count": 40, "reach": 1.0, "spread": 360.0, "up": 1.5, "ring": true, "way": &"back"}]
-	check_equal(cue.problems(), PackedStringArray(), "a motes part needs no effect, and takes its own keys")
+	check_equal(cue.problems(), PackedStringArray(), "a motes part needs no flash, and takes its own keys")
 	cue.parts = [{"part": &"motes", "zoom": 2}, {"part": &"motes", "way": &"sideways"}, {"part": &"motes", "count": 0}, {"part": &"motes", "spread": 400.0}, {"part": &"motes", "kind": &""}]
 	check_equal(cue.problems().size(), 5, "one a part: %s" % [cue.problems()])
 
@@ -84,9 +84,9 @@ func test_a_motes_part_names_what_is_wrong() -> void:
 func test_a_flash_takes_one_colour() -> void:
 	var cue := CueBase.new()
 	cue.id = &"test"
-	cue.parts = [{"effect": &"puff", "body": true}]
+	cue.parts = [{"flash": &"puff", "body": true}]
 	check_equal(cue.problems(), PackedStringArray(), "a flash in the body's colour")
-	cue.parts = [{"effect": &"puff", "body": true, "plain": true}, {"effect": &"puff", "body": true, "color": Color.RED}]
+	cue.parts = [{"flash": &"puff", "body": true, "plain": true}, {"flash": &"puff", "body": true, "color": Color.RED}]
 	check_equal(cue.problems().size(), 2, "body beside another colour: %s" % [cue.problems()])
 
 
@@ -102,13 +102,13 @@ func test_a_shed_share_takes_no_burst_keys() -> void:
 
 
 ## A part's type is a row of CueBase.PART_TYPES (docs/milestones/spell-spectacle-2.md, S1): a type
-## no row names is a problem, and a flash may say its type (`effect`) or leave it out.
+## no row names is a problem, and a flash may say its type (`flash`) or leave it out.
 func test_a_parts_type_is_one_of_the_part_types() -> void:
 	var cue := CueBase.new()
 	cue.id = &"test"
-	cue.parts = [{"part": &"effect", "effect": &"burst"}, {"effect": &"burst"}]
+	cue.parts = [{"part": &"flash", "flash": &"burst"}, {"flash": &"burst"}]
 	check_equal(cue.problems(), PackedStringArray(), "a flash, its type said or not")
-	cue.parts = [{"part": &"sparkles", "effect": &"burst"}]
+	cue.parts = [{"part": &"sparkles", "flash": &"burst"}]
 	check_equal(cue.problems().size(), 1, "an unknown type: %s" % [cue.problems()])
 	for type: StringName in CueBase.PART_TYPES:
 		check((CueBase.PART_TYPES[type] as Array).has("part"), "a %s part may say its type" % type)

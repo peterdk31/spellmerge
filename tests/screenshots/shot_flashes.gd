@@ -1,15 +1,15 @@
 extends "res://tests/support/screenshot.gd"
-## The effects Feel draws with the shots' shader (the glow look, 2026-10-27): a row per infusion
+## The flashes Feel draws with the shots' shader (the glow look, 2026-10-27): a row per infusion
 ## (plain, fire, frost, storm, void, lightning; the colours and looks of the real cards), a
-## column per effect at an age, so one still shows how each one plays out (the flashes alone: their
+## column per flash at an age, so one still shows how each one plays out (the flashes alone: their
 ## sparks and card particles are their cues' motes since S6 item 3, `shot_flash_motes.gd`):
 ##   1-3  where a shot lands (KIND_BURST), 2, 6 and 12 frames old
 ##   4-6  a rune going off (KIND_RUNE_BURST), 3, 10 and 20 frames old
 ##   7    a nova's cast ring (KIND_RING_OUT), 6 frames old
 ##   8    a rune's or orbit's cast ring (KIND_RING_IN), 6 frames old
 ##   9    the cast flash at a staff tip (KIND_CAST), 2 frames old
-## `effects_sheet` at 1x and `effects_sheet_4x` (the plain, fire and frost rows, columns 1-6).
-## `effects_enemy_sheet`: the same grid cast by an enemy (staffs F7), in the enemy ramp
+## `flashes_sheet` at 1x and `flashes_sheet_4x` (the plain, fire and frost rows, columns 1-6).
+## `flashes_enemy_sheet`: the same grid cast by an enemy (staffs F7), in the enemy ramp
 ## where a player's colour would show.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -42,26 +42,26 @@ func take() -> void:
 	await settle()
 	if not await _sheet(feel, false):
 		return
-	save(_image, "effects_sheet")
-	save_crop(_image, Vector2(40.0 + 2.5 * COLUMN, 35.0 + ROW), "effects_sheet_4x", Vector2i(int(3.0 * COLUMN), int(1.5 * ROW)))
-	# Let every effect end before the enemy's grid.
+	save(_image, "flashes_sheet")
+	save_crop(_image, Vector2(40.0 + 2.5 * COLUMN, 35.0 + ROW), "flashes_sheet_4x", Vector2i(int(3.0 * COLUMN), int(1.5 * ROW)))
+	# Let every flash end before the enemy's grid.
 	for i in 90:
 		feel.call("step", 1.0 / 60.0)
 	if not await _sheet(feel, true):
 		return
-	save(_image, "effects_enemy_sheet")
+	save(_image, "flashes_enemy_sheet")
 
 
 var _image: Image = null
 
 
 ## Show the grid (by players, or by an enemy) and grab it into `_image`; false when it failed.
-## An effect takes a ramp (actors G3b): a player's hat ramp 0-3, or the enemy ramp.
+## A flash takes a ramp (actors G3b): a player's hat ramp 0-3, or the enemy ramp.
 func _sheet(feel: Node, enemy: bool) -> bool:
 	var oldest: int = 0
 	for column: Array in COLUMNS:
 		oldest = maxi(oldest, column[2] as int)
-	# Start the oldest first, so every effect is its age in the same frame.
+	# Start the oldest first, so every flash is its age in the same frame.
 	for left in range(oldest, 0, -1):
 		for c in COLUMNS.size():
 			var column: Array = COLUMNS[c]
@@ -72,11 +72,11 @@ func _sheet(feel: Node, enemy: bool) -> bool:
 				var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
 				var at := Vector2(40.0 + c * COLUMN, 35.0 + e * ROW)
 				var seconds: float = _seconds_of(column[0] as int)
-				feel.call("show_effect", column[0] as int, at, Vector2.RIGHT, tint, ActorsScript.RAMP_ENEMY if enemy else e % 4, look, column[1] as int, seconds)
+				feel.call("show_flash", column[0] as int, at, Vector2.RIGHT, tint, ActorsScript.RAMP_ENEMY if enemy else e % 4, look, column[1] as int, seconds)
 		await process_frame
 	_image = await grab()
-	if int(feel.call("live_effects")) < 50:
-		fail("only %d effects are showing" % int(feel.call("live_effects")))
+	if int(feel.call("live_flashes")) < 50:
+		fail("only %d flashes are showing" % int(feel.call("live_flashes")))
 		return false
 	return true
 

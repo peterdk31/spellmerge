@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// Lightning from the effect's place along its aim for zoom x 4 pixels (Feel's K_ARC: an arc's zap
+// Lightning from the flash's place along its aim for zoom x 4 pixels (Feel's K_ARC: an arc's zap
 // or spark, a discharge; its own batch in gameplay/feel/feel.gd; core/README.md, "The shot
 // shaders"; owner, 2026-10-30: "arcs should look waaaay cooler"). A jagged bolt that wanders
 // widest in its middle, with a white-hot core and coloured edges, up to three forks off it, a star

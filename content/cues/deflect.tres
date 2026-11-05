@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"deflect"
-parts = Array[Dictionary]([{"effect": &"burst", "zoom": 4, "seconds": 0.3}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 40.0, "spread": 160.0, "way": &"back"}])
+parts = Array[Dictionary]([{"flash": &"burst", "zoom": 4, "seconds": 0.3}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 40.0, "spread": 160.0, "way": &"back"}])
 sound = &"deflect"

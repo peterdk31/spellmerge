@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Effects are flashes (flash kinds F1, owner session)
+
+- **The owner's question:** "Would it make sense to consolidate effects and motes?" No: a mote is a particle that flies by itself after one row write; a flash is one shaped glow whose shader draws it whole, follows a body, or lasts a telegraph's wait. What were particles in the flash shader are already motes (S3, S6). The gap is that a new flash look is code, where a mote kind, a mark kind and a cue are files: the plan is [flash-kinds.md](milestones/flash-kinds.md) (F2 to F4). The owner: rename "Yes", "Effect slots" "Then keep it", port exactly then tune "yes", new drawings "Add them".
+- **The rename:** Feel's effects are flashes, the word the newer code and docs already used (`CuePlan.Flash`, the cues README, the shader's header): the cue part key and type `effect` are `flash` (the 60 cue files), `show_flash`, `flashes_of`, `flash_info`, `live_flashes`, `flash_dress`, `flash_mesh`, `_flash_*`, `FLASH_*`, `CUE_FLASHES`, `CueBase.FLASHES`, `SpellLight.FLASH_LIGHT`, `light_flashes`, `shot_flash.gdshader`, the sheet `shot_flashes.gd`. "Effect" is left to status effects and what a card does.
+- **The hit flash** (a sprite turning white when hit) owned "flash" before: it is `HIT_FLASH_SHADER`, `_hit_flash_material` and `FeelPreset.hit_flash_seconds` now, and the slot of a hit's spray is `_hit_slot`. The horde's `SwarmLook` keeps its own row arrays (`_flash_left`, `FLAG_FLASH`): they are its hit flash, inside its own file.
+- **Kept:** the "Effect slots" setting, its saved key, `EffectSlots` and `effect_slots` (the owner's pick: the slots hold flashes, arcs and statuses). No look changed; the suite passes unchanged but for the names.
+
 ## 2026-11-05: A dash's streaks are a cue's stream, not the projectile manager's (owner session)
 
 - **The owner's question:** "Do we actually need 'special code' for dashes?" After the trail removal, the manager kept a per-caster table (`follow_caster`, `_dash_*`, sampled every step) only to give off a dash's speed streaks and card particles: looks in the simulation, and state N1's hash had to cover.

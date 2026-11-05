@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"reaction_flare"
-parts = Array[Dictionary]([{"effect": &"puff", "zoom": 2.2, "seconds": 0.5, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 26.4, "spread": 360.0, "ring": true}, {"effect": &"ring_out", "zoom": 2.9, "seconds": 0.4, "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 16, "radius": 22.0, "spread": 360.0, "ring": true, "way": &"right"}])
+parts = Array[Dictionary]([{"flash": &"puff", "zoom": 2.2, "seconds": 0.5, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 26.4, "spread": 360.0, "ring": true}, {"flash": &"ring_out", "zoom": 2.9, "seconds": 0.4, "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 16, "radius": 22.0, "spread": 360.0, "ring": true, "way": &"right"}])
 shake = 0.2
 hold = 0.09
 hold_shot = true

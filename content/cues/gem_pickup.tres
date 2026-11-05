@@ -5,6 +5,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"gem_pickup"
-parts = Array[Dictionary]([{"effect": &"burst", "zoom": 1, "seconds": 0.15, "color": Color(0.45, 1, 0.75, 1), "way": &"right"}, {"effect": &"ring_in", "zoom": 1, "seconds": 0.2, "color": Color(0.45, 1, 0.75, 1), "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 3, "radius": 8.0, "spread": 360.0, "color": Color(0.45, 1, 0.75, 1), "life": 0.6, "often": true}])
+parts = Array[Dictionary]([{"flash": &"burst", "zoom": 1, "seconds": 0.15, "color": Color(0.45, 1, 0.75, 1), "way": &"right"}, {"flash": &"ring_in", "zoom": 1, "seconds": 0.2, "color": Color(0.45, 1, 0.75, 1), "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 3, "radius": 8.0, "spread": 360.0, "color": Color(0.45, 1, 0.75, 1), "life": 0.6, "often": true}])
 sound = &"gem"
 every = 0.08

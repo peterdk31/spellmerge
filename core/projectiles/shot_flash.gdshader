@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// Feel's flashes (gameplay/feel/feel.gd, its effect batch; core/README.md, "The shot shaders"), in
+// Feel's flashes (gameplay/feel/feel.gd, its flash batch; core/README.md, "The shot shaders"), in
 // a square GRID x zoom pixels across, +x along their aim, all in the ramp and look of the shot
 // they come from; the age is the code beside the kind (`coded_age`). Blending is premultiplied: a
 // pixel is opaque, the glow round it light added to what is below.
@@ -15,28 +15,28 @@ render_mode blend_premul_alpha;
 //   K_SPRAY       a hit on a character: a small white-hot cross where it struck
 //   K_PUFF        a dotted white-hot puff (a kill, a reaction, a hit with no way); with the POOF
 //                 bit (kind 22) a staff's personality swap instead (living staffs H4): bone clouds
-//                 along the staff (+x) that swell to their biggest at 35% of the effect (where the
+//                 along the staff (+x) that swell to their biggest at 35% of the flash (where the
 //                 body changes) and shrink away
 //   K_QUAKE       a slam's mark on the floor (Feel's floor batch, under the bodies): cracks out from
 //                 the impact, white-hot and cooling to dark stone, and a glow on the floor; its
 //                 reach is QUAKE_REACH x zoom pixels
 //   K_RISE        light pulled up off a spot (where a teleport leaves): a white-hot column that
 //                 thins to a line and lifts off the top, a flat ring gathering in; the spot is the
-//                 effect's middle, the column above it
+//                 flash's middle, the column above it
 //   K_FALL        light struck down onto a spot (where a teleport lands, a rain falls): a streak
 //                 falling the column to the floor in its first FALL_STRIKE, then the whole column
 //                 flashing and thinning away, a cross, a flat ring thrown out
 // Lightning (K_ARC) and statuses (K_STATUS) have shaders and batches of their own.
 //
-// No particles: an effect's sparks, rubble, dust and card particles are motes, thrown by the
+// No particles: a flash's sparks, rubble, dust and card particles are motes, thrown by the
 // motes parts of the cue that shows it (content/cues; docs/milestones/spell-spectacle-2.md, S6
 // item 3). This shader draws the flash's shape and its light only.
 //
-// An effect is one instance of a mesh of a few quads (`Feel.effect_mesh`), each told in its UV
+// A flash is one instance of a mesh of a few quads (`Feel.flash_mesh`), each told in its UV
 // which QUAD KIND (Q_*) and slot it is. The vertex stage puts each quad round what it draws (in
-// the effect's own pixels, so they turn with its aim), or folds it away; the fragment stage only
+// the flash's own pixels, so they turn with its aim), or folds it away; the fragment stage only
 // colours a pixel of its own quad, in a few small modes with no loops:
-//   Q_LIGHT     the effect's glow, over its whole square (added; drawn first)
+//   Q_LIGHT     the flash's glow, over its whole square (added; drawn first)
 //   Q_CLOUD     one of a poof's bone clouds; the first is on top
 //   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top); a quake's
 //               cracks
@@ -61,7 +61,7 @@ const float FALL_STRIKE = 0.18;
 const float QUAKE_REACH = 8.0;
 const float QUAKE_CRACKS = 7.0;
 const float QUAKE_FLAT = 0.6;
-// The quad kinds (EFFECT_Q_* in gameplay/feel/feel.gd), in UV.y, and the slots of each.
+// The quad kinds (FLASH_Q_* in gameplay/feel/feel.gd), in UV.y, and the slots of each.
 const float Q_LIGHT = 0.0;
 const float Q_CLOUD = 3.0;
 const float Q_SHAPE = 4.0;
@@ -71,7 +71,7 @@ const float M_CLOUD = 2.0;
 const float M_SHAPE = 3.0;
 const float M_CRACK = 4.0;
 
-// What the vertex stage hands a pixel (by mode; see `fragment`): where it is in the effect's
+// What the vertex stage hands a pixel (by mode; see `fragment`): where it is in the flash's
 // pixels, the mode, three numbers and three colours.
 varying vec2 px;
 varying flat float mode;

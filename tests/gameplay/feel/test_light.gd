@@ -1,9 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## Spell light (gameplay/feel/spell_light.gd; docs/milestones/spell-spectacle.md, P3a, P3b): a
-## light buffer the projectile batches, Feel's effects, the live beams and the room's light spots
+## light buffer the projectile batches, Feel's flashes, the live beams and the room's light spots
 ## draw into, and a rect that applies it to the world. Its batches mirror the manager's (each is
 ## handed the rows the batch uploads; nothing is written twice), every shot lights (the enemies'
-## too), Feel hands its effect rows and beam paths over, a torch is a light spot coloured by its
+## too), Feel hands its flash rows and beam paths over, a torch is a light spot coloured by its
 ## art, a room sets the ambient, the steps are a switch, the rect sits above every body and under
 ## every spell, flash and telegraph, the buffer follows the view at a quarter of its size, the
 ## shaders are warmed, and with the "Spell light" setting off no node of it exists. How it looks is
@@ -167,7 +167,7 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if item != manager:
 			check(_drawn_z(item) > at, "the shots' %s (z %d) are over the light" % [manager.get_path_to(item), _drawn_z(item)])
 	check(EntitiesScript.DRAW_Z > at, "the entities are over the light")
-	check(FeelScript.MOTE_Z > at and FeelScript.FLOOR_Z > at and FeelScript.FORM_Z > at and FeelScript.EFFECT_Z > at, "motes, floor flashes, beams and effects are over the light")
+	check(FeelScript.MOTE_Z > at and FeelScript.FLOOR_Z > at and FeelScript.FORM_Z > at and FeelScript.FLASH_Z > at, "motes, floor flashes, beams and flashes are over the light")
 
 
 func test_the_buffer_follows_the_view_at_a_quarter_size() -> void:
@@ -211,49 +211,49 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 ## The shader's ROWS_* and its row-reading constants are the script's and Feel's.
 func test_the_light_shader_reads_rows_as_the_script_says() -> void:
 	var code: String = SpellLightScript.LIGHT_SHADER.code
-	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_EFFECT", SpellLightScript.ROWS_EFFECT], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
+	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_FLASH", SpellLightScript.ROWS_FLASH], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
 		check(code.contains("const int %s = %d;" % [pair[0], pair[1]]), "the shader's %s is %d" % pair)
-	check(code.contains("const float EFFECT_FROM = %s;" % str(FeelScript.EFFECT_FROM)), "the shader's EFFECT_FROM is Feel's")
-	check(code.contains("const float EFFECT_SPAN = %s;" % str(FeelScript.EFFECT_SPAN)), "the shader's EFFECT_SPAN is Feel's")
+	check(code.contains("const float FLASH_FROM = %s;" % str(FeelScript.FLASH_FROM)), "the shader's FLASH_FROM is Feel's")
+	check(code.contains("const float FLASH_SPAN = %s;" % str(FeelScript.FLASH_SPAN)), "the shader's FLASH_SPAN is Feel's")
 	check(SpellLightScript.BEAM_SHADER.code.contains("const int BEAM_POINTS = %d;" % SpellLightScript.BEAM_POINTS), "the beam light's BEAM_POINTS")
 	check_equal(SpellLightScript.BEAM_POINTS, FeelScript.LIVE_BEAM_POINTS, "a beam's light holds every point of a live beam")
-	check_equal(SpellLightScript.STRIDE, FeelScript.EFFECT_STRIDE, "an effect row is a light row")
+	check_equal(SpellLightScript.STRIDE, FeelScript.FLASH_STRIDE, "a flash row is a light row")
 
 
-## Which effects light is data by Feel's KIND_* codes: every code named is the kind it says.
-func test_each_lit_effect_kind_is_feels() -> void:
+## Which flashes light is data by Feel's KIND_* codes: every code named is the kind it says.
+func test_each_lit_flash_kind_is_feels() -> void:
 	var flares: Dictionary = {FeelScript.KIND_BURST: 1, FeelScript.KIND_RING_OUT: 1, FeelScript.KIND_RING_IN: 1, FeelScript.KIND_RUNE_BURST: 1, FeelScript.KIND_CAST: 1, FeelScript.KIND_SPRAY: 1, FeelScript.KIND_PUFF: 1, FeelScript.KIND_ARC: 1}
-	for code: int in SpellLightScript.EFFECT_LIGHT:
-		check(flares.has(code), "effect code %d is a lit Feel kind" % code)
+	for code: int in SpellLightScript.FLASH_LIGHT:
+		check(flares.has(code), "flash code %d is a lit Feel kind" % code)
 	for code: int in flares:
-		check(SpellLightScript.EFFECT_LIGHT.has(code), "Feel kind %d lights" % code)
+		check(SpellLightScript.FLASH_LIGHT.has(code), "Feel kind %d lights" % code)
 	check(SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SHELL - FeelScript.KIND_SHELL) and SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_FIREBALL - FeelScript.KIND_SHELL), "a blast and a fireball light")
-	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.EFFECT_LIGHT)
+	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.FLASH_LIGHT)
 	check_equal(lights.size(), 16, "16 kinds to the shader")
 	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_STATUS] == 0.0, "by code")
 
 
-## Feel's effects light: the light's effect batches draw the rows Feel just uploaded.
-func test_feels_effects_are_handed_to_the_light() -> void:
+## Feel's flashes light: the light's flash batches draw the rows Feel just uploaded.
+func test_feels_flashes_are_handed_to_the_light() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var light: SpellLightScript = feel.light()
-	feel.show_effect(FeelScript.KIND_BURST, Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
-	feel.show_effect(FeelScript.KIND_SHELL, Vector2(200.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 6, 0.5)
-	feel.show_effect(FeelScript.KIND_ARC, Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
+	feel.show_flash(FeelScript.KIND_BURST, Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
+	feel.show_flash(FeelScript.KIND_SHELL, Vector2(200.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 6, 0.5)
+	feel.show_flash(FeelScript.KIND_ARC, Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
 	feel._process(1.0 / 60.0)
-	for kind: int in [SpellLightScript.EFFECTS_FLARE, SpellLightScript.EFFECTS_BLAST, SpellLightScript.EFFECTS_ARC]:
-		var multimesh: MultiMesh = light.effects[kind].multimesh
-		check_equal(multimesh.visible_instance_count, 1, "effect batch %d lights its one effect" % kind)
+	for kind: int in [SpellLightScript.FLASHES_FLARE, SpellLightScript.FLASHES_BLAST, SpellLightScript.FLASHES_ARC]:
+		var multimesh: MultiMesh = light.flashes[kind].multimesh
+		check_equal(multimesh.visible_instance_count, 1, "flash batch %d lights its one flash" % kind)
 		check_equal(multimesh.instance_count, feel.effect_slots, "as many rows as Feel's slots")
-		check_equal(int((light.effects[kind].material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_EFFECT, "read as effect rows")
-	var row: PackedFloat32Array = light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer
+		check_equal(int((light.flashes[kind].material as ShaderMaterial).get_shader_parameter(&"rows")), SpellLightScript.ROWS_FLASH, "read as flash rows")
+	var row: PackedFloat32Array = light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer
 	check(is_equal_approx(row[3], 100.0) and is_equal_approx(row[7], 100.0), "the burst's row is Feel's: where it is")
 	feel._process(1.0)
-	check_equal(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.visible_instance_count, 0, "an effect that ended no longer lights")
+	check_equal(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.visible_instance_count, 0, "a flash that ended no longer lights")
 
 
-## The kind and the age code beside it in an effect row's last float (Feel's coding): [kind, code].
+## The kind and the age code beside it in a flash row's last float (Feel's coding): [kind, code].
 func _coded(a: float) -> Array:
 	var coded: float = (1.0 - a) * 16.0
 	var kind: float = floorf(coded + 0.5)
@@ -277,7 +277,7 @@ func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
 	check(is_equal_approx(rows[0], 44.0) and is_equal_approx(rows[5], 44.0), "out to its radius")
 	check(rows[15] > 0.9 and rows[15] <= 1.0, "as bright as it says, fading: %f" % rows[15])
 	check(is_equal_approx(rows[12], 0.4196078), "in its exact colour")
-	var flare: Array = _coded(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer[15])
+	var flare: Array = _coded(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[15])
 	check_equal(flare[0], FeelScript.KIND_RING_OUT, "its ring is a flare row")
 	check(flare[1] < 0.0, "coded unlit: its age below its kind")
 	feel._process(1.0)
@@ -285,7 +285,7 @@ func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
 	feel.play_cue(&"possess_start", 0, Vector2(100.0, 50.0))
 	feel._process(1.0 / 60.0)
 	check_equal(light.cue_light_count(), 0, "a cue with no light part makes no cue light")
-	flare = _coded(light.effects[SpellLightScript.EFFECTS_FLARE].multimesh.buffer[15])
+	flare = _coded(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[15])
 	check_equal(flare[0], FeelScript.KIND_RING_IN, "its ring")
 	check(flare[1] > 0.0, "lights by its kind, as before")
 

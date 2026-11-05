@@ -13,7 +13,7 @@ extends Node
 ##   not feel like lag); kills hold at once. Only a downed player and a boss kill drop
 ##   Engine.time_scale (real time); overlapping stops do not add up: the longest one wins.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
-## - an effect (see "Effects" below): a spray along the hit (a white-hot cross, and its sparks
+## - a flash (see "Flashes" below): a spray along the hit (a white-hot cross, and its sparks
 ##   as motes), or a puff all round for a hit with no way. A kill turns its killing blow's
 ##   spray into a bigger puff, so it costs one slot, not two.
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node, on every hit
@@ -26,8 +26,8 @@ extends Node
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
 ## flew. On a character the hit becomes a spray along that way, in ember for an enemy and
 ## in the wizard's own colours for a wizard, a little bigger with more damage. On a wall or
-## pillar it knocks stone chips back. Where a shot lands it shows an effect in the shot's own
-## ramp and cards (see "Effects" below).
+## pillar it knocks stone chips back. Where a shot lands it shows a flash in the shot's own
+## ramp and cards (see "Flashes" below).
 ##
 ## On `spell_cast` it plays the carrier card's `cast_cue` at the staff tip in the player's colours
 ## (`cast` unless the card names another: a flash, a ring for a ring carrier, and a little kick of
@@ -42,15 +42,15 @@ extends Node
 ## (a hat ramp in its light shade, `ProjectileManager.ramp_light`; the enemy ramp in ember), and a
 ## hit whose caster is the hit actor itself is a self-hit.
 ##
-## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
+## Flashes (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
 ## every flare, spray, puff, ring, arc and status is drawn by the shots' own shaders (the sparks of
 ## a spray and a puff, and every chip, are motes since S3)
-## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
+## (core/projectiles: `shot_flash.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
 ## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
-## all glowing. A new effect takes the oldest slot when they are all busy. How a caster's body
+## all glowing. A new flash takes the oldest slot when they are all busy. How a caster's body
 ## moves when it casts is its carrier card's `staff_pose`, drawn by its look (ActorLook), not here.
 ## None of this touches the cast itself.
 ##
@@ -61,11 +61,11 @@ extends Node
 ## `set_*` of their settings are forwards to it.
 ##
 ## A cue (`play_cue`, `CueBase`) is played part by part through a table of part players by part
-## type (`add_cue_part`): Feel's own flashes (`effect`) and the spectacle's `motes` and `mark`
+## type (`add_cue_part`): Feel's own flashes (`flash`) and the spectacle's `motes` and `mark`
 ## parts, each handed the part and the cue's `CueContext` (one kept per depth, so a cue allocates
 ## nothing). A new kind of part is a player added to the table and a row in `CueBase.PART_TYPES`.
 ##
-## Nothing is allocated while playing: the effect batch and sound players are made once.
+## Nothing is allocated while playing: the flash batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
 ## Flow frees the world on every Play and restart.
 
@@ -74,13 +74,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## The look of a hit kind with no entry at all: nothing changes. Shared, never written.
 const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
-const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
+const HIT_FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
-## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
+## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the flashes'
 ## batches (flares, arcs, statuses, explosions).
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
-const EFFECT_SHADER: Shader = preload("res://core/projectiles/shot_effect.gdshader")
+const FLASH_SHADER: Shader = preload("res://core/projectiles/shot_flash.gdshader")
 const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
 const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
@@ -150,7 +150,7 @@ const SOUND_VOICES: int = 8
 const REACT_START: int = 64
 ## Reaction names (labels) rising at once.
 const REACTION_SLOTS: int = 4
-## Characters that show a status at once (an effect that follows each), and how often the
+## Characters that show a status at once (a flash that follows each), and how often the
 ## statuses are read in seconds.
 const STATUS_SLOTS: int = 16
 const STATUS_POLL: float = 0.1
@@ -172,7 +172,7 @@ const SPRAY_MAX_SIZE: float = 1.6
 ## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
 ## showing the body as it is drawn now (or null), which a death breaks into motes instead.
 const SPRITE_GIVER: StringName = &"sprite_giver"
-## The effects drawn with the shot shaders (see "Effects" above): the kinds they know (K_* in
+## The flashes drawn with the shot shaders (see "Flashes" above): the kinds they know (K_* in
 ## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
 ## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
 const KIND_BURST: int = 4
@@ -190,16 +190,16 @@ const KIND_STATUS: int = 15
 const KIND_QUAKE: int = 3
 ## Columns of light on a spot (parts of cues: where a teleport leaves and lands, where a rain falls),
 ## below KIND_BURST too: light pulled up off it, and light struck down onto it. A column is as high
-## as half the effect's square (12 px a zoom step); their seconds.
+## as half the flash's square (12 px a zoom step); their seconds.
 const KIND_RISE: int = 1
 const KIND_FALL: int = 2
 const RISE_SECONDS: float = 0.45
 const FALL_SECONDS: float = 0.5
-## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
+## The look bit that makes a flash take its colour exactly (a reaction's own colour) instead
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
 ## The look bit that turns a puff into a staff's poof (kind 22 in the shader; living staffs H4):
-## bone clouds swelling and shrinking along the staff (the cue part effect `poof`; a cue that names
+## bone clouds swelling and shrinking along the staff (the cue part flash `poof`; a cue that names
 ## it throws its own sparks, as a motes part).
 const POOF: int = 1 << 21
 ## The poof's own seconds (a `poof` part's when it gives none): StaffLook's POOF_TIME, the swap at
@@ -225,10 +225,10 @@ const KIND_FIREBALL: int = 17
 const SHELL_SECONDS: float = 0.5
 const FIREBALL_SECONDS: float = 1.2
 const BLAST_SPAN: float = 2.2
-## What a cue's part can name (`CueBase.EFFECTS`): its effect kind, the pixels a step of its zoom
+## What a cue's part can name (`CueBase.FLASHES`): its flash kind, the pixels a step of its zoom
 ## is (for a part's `reach`: a ring's radius, a flare's half width, a quake's reach, an
 ## explosion's radius) and its seconds when the part gives none.
-const CUE_EFFECTS: Dictionary = {
+const CUE_FLASHES: Dictionary = {
 	&"burst": [KIND_BURST, 12.0, BURST_SECONDS],
 	&"ring_out": [KIND_RING_OUT, 10.0, RING_SECONDS],
 	&"ring_in": [KIND_RING_IN, 10.0, RING_SECONDS],
@@ -242,7 +242,7 @@ const CUE_EFFECTS: Dictionary = {
 	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
 	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
 	&"arc": [KIND_ARC, 4.0, RING_SECONDS, true],
-	# A puff with the POOF look bit (a fifth column: look bits the effect always has; living staffs H4).
+	# A puff with the POOF look bit (a fifth column: look bits the flash always has; living staffs H4).
 	&"poof": [KIND_PUFF, 12.0, POOF_SECONDS, false, POOF],
 }
 ## What `_form_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
@@ -253,7 +253,7 @@ const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
-## effects' own step, CUE_EFFECTS).
+## flashes' own step, CUE_FLASHES).
 const HIT_STEP: float = 12.0
 ## `play_cue`'s body colour when there is none (alpha 0), and its ramp when not given: the caster's.
 const NO_BODY := Color(0.0, 0.0, 0.0, 0.0)
@@ -280,20 +280,20 @@ const STATUS_RISE: float = 8.0
 const BEAM_WIDTH: float = 16.0
 ## How far a beam's quad reaches past each end, so its flares are whole (the shader's beam_lead).
 const BEAM_LEAD: float = 8.0
-const EFFECT_Z: int = 50
-## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
-const EFFECT_GRID: float = 24.0
-const EFFECT_STRIDE: int = 16
-## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is, above
-## the kind, or below it for an effect that does not light the room (`_effect_unlit`).
-const EFFECT_FROM: float = 0.02
-const EFFECT_SPAN: float = 0.42
-## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`): its light, a
-## poof's clouds and its flash. An effect's sparks and card particles are motes, thrown by its
+const FLASH_Z: int = 50
+## The flash quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
+const FLASH_GRID: float = 24.0
+const FLASH_STRIDE: int = 16
+## The age code beside a flash's kind: TRACE_FROM + TRACE_SPAN x how far through it is, above
+## the kind, or below it for a flash that does not light the room (`_flash_unlit`).
+const FLASH_FROM: float = 0.02
+const FLASH_SPAN: float = 0.42
+## The quad kinds of a flash's mesh (`flash_mesh`; Q_* in `shot_flash.gdshader`): its light, a
+## poof's clouds and its flash. A flash's sparks and card particles are motes, thrown by its
 ## cue's motes parts (S6, item 3), not quads of its mesh.
-const EFFECT_Q_LIGHT: int = 0
-const EFFECT_Q_CLOUD: int = 3
-const EFFECT_Q_SHAPE: int = 4
+const FLASH_Q_LIGHT: int = 0
+const FLASH_Q_CLOUD: int = 3
+const FLASH_Q_SHAPE: int = 4
 ## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the light
 ## first, then the clouds (the first on top), the flash last: 4 clouds.
 ## The blast mesh's quads (`blast_mesh`; Q_* in `shot_blast.gdshader`): its light, then
@@ -305,10 +305,10 @@ const BLAST_QUADS: Array[Vector3i] = [
 	Vector3i(BLAST_Q_LIGHT, 1, 0),
 	Vector3i(BLAST_Q_PIECE, BLAST_PIECES, 0),
 ]
-const EFFECT_QUADS: Array[Vector3i] = [
-	Vector3i(EFFECT_Q_LIGHT, 1, 0),
-	Vector3i(EFFECT_Q_CLOUD, 4, 1),
-	Vector3i(EFFECT_Q_SHAPE, 1, 0),
+const FLASH_QUADS: Array[Vector3i] = [
+	Vector3i(FLASH_Q_LIGHT, 1, 0),
+	Vector3i(FLASH_Q_CLOUD, 4, 1),
+	Vector3i(FLASH_Q_SHAPE, 1, 0),
 ]
 ## How long a muzzle flash is compared with its width.
 ## The biggest camera kick in pixels, however fast the casting.
@@ -394,7 +394,7 @@ var _camera: Camera2D = null
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The effect slot, spot and sound voice of the latest plain hit since the last step, so a
 ## kill at the same spot upgrades them instead of using a second slot and sound.
-var _hit_effect: int = -1
+var _hit_slot: int = -1
 var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
 var _voices: Array[AudioStreamPlayer] = []
@@ -416,7 +416,7 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 ## cast thin and tall, which is negative).
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
-var _flash_material: ShaderMaterial = null
+var _hit_flash_material: ShaderMaterial = null
 ## The live beams (`Spells.carrier(&"beam")`), one beam mesh each (`beam_mesh`), made once, and each one's
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
@@ -438,7 +438,7 @@ var spell_light: bool:
 	get:
 		return _spectacle.spell_light if _spectacle != null else SpellLightSetting.default_on()
 ## The players of a cue's parts by part type, each [player, prepare] (`add_cue_part`; a part with no
-## `part` is an `effect`), the cues read for playing by id (`CuePlan`, `_plan_of`), the cue contexts
+## `part` is a `flash`), the cues read for playing by id (`CuePlan`, `_plan_of`), the cue contexts
 ## kept for them (one per depth of a cue played inside a cue's part), and the parts of a type no
 ## player plays, skipped (`unknown_cue_parts`, warned once per type).
 var _cue_parts: Dictionary = {}
@@ -447,8 +447,8 @@ var _cue_contexts: Array[CueContextScript] = []
 var _cue_depth: int = 0
 var unknown_cue_parts: int = 0
 ## The slot of the last flash a cue's part showed (-1 for none): a hit's spray, whose sound a kill
-## at its spot silences (`_hit_effect`).
-var _cue_effect: int = -1
+## at its spot silences (`_hit_slot`).
+var _cue_flash: int = -1
 var _unknown_part_warned: Dictionary = {}
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
@@ -496,11 +496,11 @@ var _reaction_cues: Dictionary = {}
 var _reaction_names: Dictionary = {}
 ## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
 var _clock: float = 0.0
-## The effects' batches, one per shader (see "Effects" above): the flares, the arcs, the
+## The flashes' batches, one per shader (see "Flashes" above): the flares, the arcs, the
 ## statuses, and the marks on the floor (the flares' shader, lower); each has room for every slot.
-var _effect_node: MultiMeshInstance2D = null
-var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
-static var _effect_mesh: ArrayMesh = null
+var _flash_node: MultiMeshInstance2D = null
+var _flash_buffer: PackedFloat32Array = PackedFloat32Array()
+static var _flash_mesh: ArrayMesh = null
 static var _beam_mesh: ArrayMesh = null
 static var _swing_mesh: ArrayMesh = null
 var _arc_node: MultiMeshInstance2D = null
@@ -513,29 +513,29 @@ var _floor_buffer: PackedFloat32Array = PackedFloat32Array()
 var _blast_node: MultiMeshInstance2D = null
 var _blast_buffer: PackedFloat32Array = PackedFloat32Array()
 static var _blast_mesh: ArrayMesh = null
-var _effect_kind: PackedInt32Array = PackedInt32Array()
-var _effect_at: PackedVector2Array = PackedVector2Array()
-var _effect_dir: PackedVector2Array = PackedVector2Array()
-var _effect_core: PackedColorArray = PackedColorArray()
-## Each effect's ramp (`Actors.ramp_of` of its caster; 0-3 a hat ramp, anything else the enemy ramp).
-var _effect_ramp: PackedInt32Array = PackedInt32Array()
-var _effect_zoom: PackedInt32Array = PackedInt32Array()
-var _effect_look: PackedInt32Array = PackedInt32Array()
-var _effect_age: PackedFloat32Array = PackedFloat32Array()
-var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
-var _effect_length: PackedFloat32Array = PackedFloat32Array()
-## The character an effect follows (a status), or null, and how far above it the effect sits.
-var _effect_follow: Array[Node2D] = []
-## 1 for an effect that does not light the room by its kind (S6, item 4: shown by a cue with a
+var _flash_kind: PackedInt32Array = PackedInt32Array()
+var _flash_at: PackedVector2Array = PackedVector2Array()
+var _flash_dir: PackedVector2Array = PackedVector2Array()
+var _flash_core: PackedColorArray = PackedColorArray()
+## Each flash's ramp (`Actors.ramp_of` of its caster; 0-3 a hat ramp, anything else the enemy ramp).
+var _flash_ramp: PackedInt32Array = PackedInt32Array()
+var _flash_zoom: PackedInt32Array = PackedInt32Array()
+var _flash_look: PackedInt32Array = PackedInt32Array()
+var _flash_age: PackedFloat32Array = PackedFloat32Array()
+var _flash_seconds: PackedFloat32Array = PackedFloat32Array()
+var _flash_length: PackedFloat32Array = PackedFloat32Array()
+## The character a flash follows (a status), or null, and how far above it the flash sits.
+var _flash_follow: Array[Node2D] = []
+## 1 for a flash that does not light the room by its kind (S6, item 4: shown by a cue with a
 ## `light` part, which lights instead); its row says so by the sign of its age code.
-var _effect_unlit: PackedByteArray = PackedByteArray()
+var _flash_unlit: PackedByteArray = PackedByteArray()
 ## Whether the cue whose parts are playing now lights by its own `light` part (`play_cue`), so the
-## effects it shows are unlit.
+## flashes it shows are unlit.
 var _cue_unlit: bool = false
-## Where a followed effect sits from its node (a status rises above it, a poof sits on the staff).
-var _effect_offset: PackedVector2Array = PackedVector2Array()
-var _next_effect: int = 0
-## How many effects can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
+## Where a followed flash sits from its node (a status rises above it, a poof sits on the staff).
+var _flash_offset: PackedVector2Array = PackedVector2Array()
+var _next_flash: int = 0
+## How many flashes can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
 ## `set_effect_slots`). Read only.
 var effect_slots: int = EffectSlots.DEFAULT
 var _reaction_heard: Dictionary = {}
@@ -589,13 +589,13 @@ func _ready() -> void:
 	if preset == null:
 		preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	_last_usec = Time.get_ticks_usec()
-	_flash_material = ShaderMaterial.new()
-	_flash_material.shader = FLASH_SHADER
-	ShaderWarmupScript.want(FLASH_SHADER, ShaderWarmupScript.RECT)
+	_hit_flash_material = ShaderMaterial.new()
+	_hit_flash_material.shader = HIT_FLASH_SHADER
+	ShaderWarmupScript.want(HIT_FLASH_SHADER, ShaderWarmupScript.RECT)
 	for i in FORM_SLOTS:
 		_forms.append(_make_beam())
 		_form_paths.append(_make_beam_path())
-	_make_effects()
+	_make_flashes()
 	for i in LIVE_BEAMS:
 		_live_beams.append(_make_beam())
 		_live_paths.append(_make_beam_path())
@@ -607,7 +607,7 @@ func _ready() -> void:
 	_spectacle.registry = registry
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
-	add_cue_part(&"effect", _play_flash, _prepare_flash)
+	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	var parts: Dictionary = _spectacle.cue_parts()
 	for type: StringName in parts:
 		var row: Array = parts[type] as Array
@@ -693,7 +693,7 @@ func _process(delta: float) -> void:
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
 	_steps += 1
-	_hit_effect = -1
+	_hit_slot = -1
 	_hit_voice = -1
 	_clock += real_delta
 	rest_left = maxf(rest_left - real_delta, 0.0)
@@ -713,7 +713,7 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	_step_reactions(real_delta)
 	_step_forms(real_delta)
-	_step_effects(real_delta)
+	_step_flashes(real_delta)
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
@@ -769,9 +769,9 @@ func _body_sprite(body: Node) -> Sprite2D:
 
 
 ## Start the white flash and the squash (wide and low) of the hit node's `Sprite` child, if it
-## has one, for `flash_seconds`; a hit on a sprite still reacting starts it again.
+## has one, for `hit_flash_seconds`; a hit on a sprite still reacting starts it again.
 func _react(target: Node) -> void:
-	var seconds: float = preset.flash_seconds
+	var seconds: float = preset.hit_flash_seconds
 	var amount: float = preset.hit_squash
 	if seconds <= 0.0 or target == null or not is_instance_valid(target):
 		return
@@ -796,7 +796,7 @@ func _react(target: Node) -> void:
 	_react_total[at] = seconds
 	_react_amount[at] = amount
 	# One material shared by every flashing sprite (its flash is the shader's): nothing per flash.
-	sprite.material = _flash_material
+	sprite.material = _hit_flash_material
 
 
 ## The reaction of the sprite with instance id `sprite` (of the actor `actor`, -1 for none), or -1.
@@ -844,7 +844,7 @@ func _grow_reactions(size: int) -> void:
 
 
 ## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's
-## promotion): a status shown on `old` and every effect following it follow `new`.
+## promotion): a status shown on `old` and every flash following it follow `new`.
 func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 	if old == null or new == null or not new is Node2D:
 		return
@@ -852,10 +852,10 @@ func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 	var at: int = _status_enemies.find(from)
 	if at >= 0 and _status_enemies.find(new.get_instance_id()) < 0:
 		_status_enemies[at] = new.get_instance_id()
-	for slot in _effect_follow.size():
-		var follow: Variant = _effect_follow[slot]
+	for slot in _flash_follow.size():
+		var follow: Variant = _flash_follow[slot]
 		if is_instance_valid(follow) and follow == old:
-			_effect_follow[slot] = new as Node2D
+			_flash_follow[slot] = new as Node2D
 
 
 ## Sprites flashing right now (for tests).
@@ -1023,7 +1023,7 @@ func _on_discharge_arc(caster: int, from: Vector2, to: Vector2) -> void:
 
 ## Discharge arcs showing right now (for tests).
 func live_arcs() -> int:
-	return effects_of(KIND_ARC)
+	return flashes_of(KIND_ARC)
 
 
 ## A character got a status: show it until combat says it has ended.
@@ -1047,7 +1047,7 @@ func _on_status_applied(_player: int, target: Node, _status_id: StringName) -> v
 	_pose_status(_status_enemies.size() - 1)
 
 
-## Read the statuses now and then; end the effect of a status that ended.
+## Read the statuses now and then; end the flash of a status that ended.
 func _step_statuses(real_delta: float) -> void:
 	var at: int = _status_enemies.size() - 1
 	while at >= 0:
@@ -1090,8 +1090,8 @@ func _status_of(enemy: Node) -> StringName:
 	return &""
 
 
-## Keep status `at` shown: an effect that follows its character, a glow in its card's colour
-## (`status_color`), started again if a crowd of other effects took its slot. Hidden while the
+## Keep status `at` shown: a flash that follows its character, a glow in its card's colour
+## (`status_color`), started again if a crowd of other flashes took its slot. Hidden while the
 ## character's sprite is. Its motes are `_status_motes`'.
 func _pose_status(at: int) -> void:
 	var enemy := instance_from_id(_status_enemies[at]) as Node2D
@@ -1103,11 +1103,11 @@ func _pose_status(at: int) -> void:
 		_end_status_effect(at)
 		return
 	var slot: int = _status_effect[at]
-	if slot >= 0 and slot < effect_slots and _effect_seconds[slot] > 0.0 and _effect_follow[slot] == enemy:
+	if slot >= 0 and slot < effect_slots and _flash_seconds[slot] > 0.0 and _flash_follow[slot] == enemy:
 		return
 	var layer: int = card[ElementBase.STATUS_LOOK_LAYER] as int
 	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([layer])) if layer > 0 else 0
-	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+	_status_effect[at] = show_flash(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
 
 
 ## How status `id` is shown (spell spectacle 2, S6 item 11): the `status_look()` of the element
@@ -1168,13 +1168,13 @@ func _status_motes(real_delta: float) -> void:
 			_spectacle.status_motes(card[ElementBase.STATUS_LOOK_CARD] as StringName, card[ElementBase.STATUS_LOOK_LAYER] as int, enemy.global_position, 4.0 * STATUS_ZOOM, status_color(id), count)
 
 
-## End the effect that shows status `at`, if it still shows it.
+## End the flash that shows status `at`, if it still shows it.
 func _end_status_effect(at: int) -> void:
 	var slot: int = _status_effect[at]
 	var enemy := instance_from_id(_status_enemies[at]) as Node2D
-	if slot >= 0 and slot < effect_slots and _effect_kind[slot] == KIND_STATUS and _effect_follow[slot] == enemy:
-		_effect_seconds[slot] = 0.0
-		_effect_follow[slot] = null
+	if slot >= 0 and slot < effect_slots and _flash_kind[slot] == KIND_STATUS and _flash_follow[slot] == enemy:
+		_flash_seconds[slot] = 0.0
+		_flash_follow[slot] = null
 	_status_effect[at] = -1
 
 
@@ -1188,7 +1188,7 @@ func status_shown(enemy: Node) -> StringName:
 
 ## Statuses showing right now (for tests).
 func live_statuses() -> int:
-	return effects_of(KIND_STATUS)
+	return flashes_of(KIND_STATUS)
 
 
 ## Is the name of `reaction_id` already rising near `position`?
@@ -1304,7 +1304,7 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 ## Play the cue `id` (a `CueBase`, `content/cues/<id>.tres`; `cue_shown` calls this) at `at`, set
 ## off by `caster` (NONE for none: the enemy ramp; its body is where `away` punches from) along
 ## `dir`, `size` pixels big (what a part's `reach` is times; the seconds a `lasts_size` part
-## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
+## lasts), in its ramp with `tint` (as `show_flash`'s `core`) and the cards of the packed `look`,
 ## on `target` (an actor, for `hold_target`), sent by `shot`, for what broke in the colours of the
 ## ramp-table source `surface` (a dying body's art; -1: the room's walls), of the spell of `tag` (its
 ## cards' motes and marks; 0: the tag of `shot`, if any), in `ramp` (a hat ramp, or the enemy ramp:
@@ -1416,7 +1416,7 @@ func _cue_due(cue: CueBase, caster: int) -> bool:
 ## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. With
 ## `prepare` (a Callable taking the part), each part is prepared once when its cue is first played
 ## and `player` takes what it made instead, so a part played often reads no key while it plays
-## (a flash's keys as typed fields: `CuePlan.Flash`). Feel's own flashes are `effect`, the
+## (a flash's keys as typed fields: `CuePlan.Flash`). Feel's own flashes are `flash`, the
 ## spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
 func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable()) -> void:
 	_cue_parts[type] = [player, prepare]
@@ -1437,13 +1437,13 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 		push_warning("Feel: cue '%s' has a part of the type '%s', which nothing plays" % [id, type])
 
 
-## A cue's flash part (`CueBase`: a part with no `part`, or `"part": "effect"`) read into its typed
-## fields once (`CuePlan.flash_of`; null for an effect Feel has not: the plan leaves it out).
+## A cue's flash part (`CueBase`: a part with no `part`, or `"part": "flash"`) read into its typed
+## fields once (`CuePlan.flash_of`; null for a flash Feel has not: the plan leaves it out).
 func _prepare_flash(part: Dictionary) -> Variant:
-	return CuePlanScript.flash_of(part, CUE_EFFECTS)
+	return CuePlanScript.flash_of(part, CUE_FLASHES)
 
 
-## A cue's flash (`CuePlan.Flash`, from its part) played with `cue`: its effect at the cue's point
+## A cue's flash (`CuePlan.Flash`, from its part) played with `cue`: its flash at the cue's point
 ## along its way, sized by its `zoom` or the cue's size times its `reach` (either times the cue's
 ## power), for its seconds (or the cue's size with `lasts_size`), in its exact `color`, plain, bare,
 ## the cue's own colour, or the cue's ramp and tint with its cards (without them for `no_cards`).
@@ -1469,7 +1469,7 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 	var length: float = 0.0
 	var steps: float = flash.reach_steps
 	if steps >= 0.0:
-		# Sized from the cue's: its size times the part's reach, in steps of the effect's zoom.
+		# Sized from the cue's: its size times the part's reach, in steps of the flash's zoom.
 		zoom = roundi(cue.size * steps * cue.power)
 	else:
 		zoom = roundi(flash.zoom * cue.power)
@@ -1495,20 +1495,20 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 	var bits: int = flash.bits
 	var paint: int = flash.paint
 	if paint == CuePlanScript.PAINT_COLOR:
-		_cue_effect = show_effect(flash.kind, at, way, flash.color, 0, EXACT | bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, flash.color, 0, EXACT | bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_PLAIN:
-		_cue_effect = show_effect(flash.kind, at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BARE:
-		_cue_effect = show_effect(flash.kind, at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BODY:
-		_cue_effect = show_effect(flash.kind, at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
 	elif cue.color.a > 0.0:
-		_cue_effect = show_effect(flash.kind, at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
 	else:
-		_cue_effect = show_effect(flash.kind, at, way, cue.tint, cue.ramp, (0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look) | bits, zoom, seconds, length, follow)
+		_cue_flash = show_flash(flash.kind, at, way, cue.tint, cue.ramp, (0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look) | bits, zoom, seconds, length, follow)
 	# A followed cue's flash sits where it was played from its body (S6, item 9).
-	if follow != null and _cue_effect >= 0:
-		_effect_offset[_cue_effect] = at - follow.global_position
+	if follow != null and _cue_flash >= 0:
+		_flash_offset[_cue_flash] = at - follow.global_position
 
 
 ## The cue `id` read for playing (`CuePlan`: its parts' players and prepared parts), made the first
@@ -1591,7 +1591,7 @@ func _make_beam_path() -> PackedVector3Array:
 
 ## The mesh a beam is drawn as (`shot_beam.gdshader`, PARTICLES ARE GEOMETRY there): small quads
 ## told in their UV which quad kind (BEAM_Q_*) and slot they are, in BEAM_QUADS' order, as
-## `effect_mesh`. The shader places them along the beam's path in the world, so the mesh says
+## `flash_mesh`. The shader places them along the beam's path in the world, so the mesh says
 ## nothing of where: it is never culled (its box is the whole world). Made once.
 static func beam_mesh() -> ArrayMesh:
 	if _beam_mesh == null:
@@ -1619,34 +1619,34 @@ func _swing_ramp(actor: int) -> int:
 	return _beam_ramp(_ramp_of(actor))
 
 
-## Make the effect batches (see "Effects" above): a MultiMesh of `effect_slots` quads in world
+## Make the flash batches (see "Flashes" above): a MultiMesh of `effect_slots` quads in world
 ## space for each of the flares, the arcs and the statuses, each drawn by its own shot shader,
 ## and the arrays behind them.
-func _make_effects() -> void:
+func _make_flashes() -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
-	_status_node = _make_effect_batch(STATUS_SHADER, quad)
-	_effect_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
-	_arc_node = _make_effect_batch(ARC_SHADER, quad)
-	_floor_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
+	_status_node = _make_flash_batch(STATUS_SHADER, quad)
+	_flash_node = _make_flash_batch(FLASH_SHADER, flash_mesh())
+	_arc_node = _make_flash_batch(ARC_SHADER, quad)
+	_floor_node = _make_flash_batch(FLASH_SHADER, flash_mesh())
 	_floor_node.z_index = FLOOR_Z
-	_blast_node = _make_effect_batch(BLAST_SHADER, blast_mesh())
-	_size_effects(effect_slots)
+	_blast_node = _make_flash_batch(BLAST_SHADER, blast_mesh())
+	_size_flashes(effect_slots)
 
 
-## The mesh an effect is drawn as (`shot_effect.gdshader`, PARTICLES ARE GEOMETRY there): small
-## quads, each told in its UV which quad kind (EFFECT_Q_*) and slot it is, in EFFECT_QUADS'
-## order. The shader places every quad in the effect's square, or folds it away; a vertex says
+## The mesh a flash is drawn as (`shot_flash.gdshader`, PARTICLES ARE GEOMETRY there): small
+## quads, each told in its UV which quad kind (FLASH_Q_*) and slot it is, in FLASH_QUADS'
+## order. The shader places every quad in the flash's square, or folds it away; a vertex says
 ## which quad and corner it is in its UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75.
 ## Made once.
-static func effect_mesh() -> ArrayMesh:
-	if _effect_mesh == null:
-		_effect_mesh = _quads_mesh(EFFECT_QUADS)
-	return _effect_mesh
+static func flash_mesh() -> ArrayMesh:
+	if _flash_mesh == null:
+		_flash_mesh = _quads_mesh(FLASH_QUADS)
+	return _flash_mesh
 
 
 ## The mesh an explosion's part is drawn as (`shot_blast.gdshader`): its light and BLAST_PIECES
-## small quads, told their kind and slot in their UV as `effect_mesh`'s. Made once.
+## small quads, told their kind and slot in their UV as `flash_mesh`'s. Made once.
 static func blast_mesh() -> ArrayMesh:
 	if _blast_mesh == null:
 		_blast_mesh = _quads_mesh(BLAST_QUADS)
@@ -1682,9 +1682,9 @@ static func _quads_mesh(quads: Array[Vector3i]) -> ArrayMesh:
 	return mesh
 
 
-func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
+func _make_flash_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
-	# Effects show anywhere in the world; there is no room to fit a box to.
+	# Flashes show anywhere in the world; there is no room to fit a box to.
 	var multimesh: MultiMesh = BatchesScript.multimesh()
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
@@ -1695,52 +1695,52 @@ func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	material.shader = shader
 	node.material = material
 	node.top_level = true
-	node.z_index = EFFECT_Z
+	node.z_index = FLASH_Z
 	add_child(node)
 	return node
 
 
-## Make room for `slots` effects: the MultiMesh, its buffer and the arrays behind it. The
-## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
-func _size_effects(slots: int) -> void:
+## Make room for `slots` flashes: the MultiMesh, its buffer and the arrays behind it. The
+## flashes showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
+func _size_flashes(slots: int) -> void:
 	effect_slots = slots
-	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node, _blast_node]:
+	for node: MultiMeshInstance2D in [_flash_node, _arc_node, _status_node, _floor_node, _blast_node]:
 		node.multimesh.visible_instance_count = 0
 		node.multimesh.instance_count = slots
-	_effect_buffer.resize(slots * EFFECT_STRIDE)
-	_arc_buffer.resize(slots * EFFECT_STRIDE)
-	_floor_buffer.resize(slots * EFFECT_STRIDE)
-	_blast_buffer.resize(slots * EFFECT_STRIDE)
-	_status_buffer.resize(slots * EFFECT_STRIDE)
-	_effect_kind.resize(slots)
-	_effect_at.resize(slots)
-	_effect_dir.resize(slots)
-	_effect_core.resize(slots)
-	_effect_ramp.resize(slots)
-	_effect_zoom.resize(slots)
-	_effect_look.resize(slots)
-	_effect_age.resize(slots)
-	_effect_seconds.resize(slots)
-	_effect_seconds.fill(0.0)
-	_effect_length.resize(slots)
-	_effect_follow.resize(slots)
-	_effect_follow.fill(null)
-	_effect_unlit.resize(slots)
-	_effect_unlit.fill(0)
-	_effect_offset.resize(slots)
-	_next_effect = 0
-	# The statuses shown lost their effects; the next step shows them again.
+	_flash_buffer.resize(slots * FLASH_STRIDE)
+	_arc_buffer.resize(slots * FLASH_STRIDE)
+	_floor_buffer.resize(slots * FLASH_STRIDE)
+	_blast_buffer.resize(slots * FLASH_STRIDE)
+	_status_buffer.resize(slots * FLASH_STRIDE)
+	_flash_kind.resize(slots)
+	_flash_at.resize(slots)
+	_flash_dir.resize(slots)
+	_flash_core.resize(slots)
+	_flash_ramp.resize(slots)
+	_flash_zoom.resize(slots)
+	_flash_look.resize(slots)
+	_flash_age.resize(slots)
+	_flash_seconds.resize(slots)
+	_flash_seconds.fill(0.0)
+	_flash_length.resize(slots)
+	_flash_follow.resize(slots)
+	_flash_follow.fill(null)
+	_flash_unlit.resize(slots)
+	_flash_unlit.fill(0)
+	_flash_offset.resize(slots)
+	_next_flash = 0
+	# The statuses shown lost their flashes; the next step shows them again.
 	_status_effect.fill(-1)
 
 
-## The setting: how many effects can show at once, snapped by `EffectSlots.snap`. Returns the
+## The setting: how many flashes can show at once, snapped by `EffectSlots.snap`. Returns the
 ## number taken.
 func set_effect_slots(slots: int) -> int:
 	var snapped: int = EffectSlots.snap(slots)
-	if _effect_node == null:
+	if _flash_node == null:
 		effect_slots = snapped
 	elif snapped != effect_slots:
-		_size_effects(snapped)
+		_size_flashes(snapped)
 	return effect_slots
 
 
@@ -1804,44 +1804,44 @@ func _on_screen_shake_changed(enabled: bool) -> void:
 	shake_enabled = enabled
 
 
-## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
+## Show a flash of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
 ## `core` (white: the colours of `ramp`, a caster's `Actors.ramp_of`: 0-3 a hat ramp, anything else
 ## from NONE up the enemy ramp) with the particles of the packed `look`, at `zoom`, for
 ## `seconds`. A dash or an arc runs `length` pixels from `at` along `dir` (its zoom is then the
-## length). An effect given a `follow` node moves with it (a status), and ends when it is gone.
-## It takes the next slot, the oldest effect when they are all busy, and returns it (-1 for
+## length). A flash given a `follow` node moves with it (a status), and ends when it is gone.
+## It takes the next slot, the oldest flash when they are all busy, and returns it (-1 for
 ## none).
-func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
-	if _effect_node == null or not at.is_finite() or ramp < ActorsScript.NONE or ramp > ActorsScript.RAMP_ENEMY:
+func show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
+	if _flash_node == null or not at.is_finite() or ramp < ActorsScript.NONE or ramp > ActorsScript.RAMP_ENEMY:
 		return -1
-	var slot: int = _next_effect
-	_next_effect = (_next_effect + 1) % effect_slots
-	_effect_kind[slot] = kind
-	_effect_at[slot] = at.round()
-	_effect_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
-	_effect_core[slot] = core
-	_effect_ramp[slot] = ramp
+	var slot: int = _next_flash
+	_next_flash = (_next_flash + 1) % effect_slots
+	_flash_kind[slot] = kind
+	_flash_at[slot] = at.round()
+	_flash_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
+	_flash_core[slot] = core
+	_flash_ramp[slot] = ramp
 	# An explosion's part takes its radius / 2 as its zoom, up to the most the look holds.
-	_effect_zoom[slot] = clampi(zoom, 1, 63 if kind >= KIND_SHELL else 15)
-	_effect_look[slot] = look
-	_effect_age[slot] = 0.0
-	_effect_seconds[slot] = maxf(seconds, 0.01)
-	_effect_length[slot] = 0.0
-	_effect_follow[slot] = follow
-	_effect_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
-	_effect_unlit[slot] = 1 if _cue_unlit else 0
+	_flash_zoom[slot] = clampi(zoom, 1, 63 if kind >= KIND_SHELL else 15)
+	_flash_look[slot] = look
+	_flash_age[slot] = 0.0
+	_flash_seconds[slot] = maxf(seconds, 0.01)
+	_flash_length[slot] = 0.0
+	_flash_follow[slot] = follow
+	_flash_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
+	_flash_unlit[slot] = 1 if _cue_unlit else 0
 	if kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
-		_effect_zoom[slot] = steps
-		_effect_length[slot] = steps * 4.0
+		_flash_zoom[slot] = steps
+		_flash_length[slot] = steps * 4.0
 	return slot
 
 
-## Age the effects by `real_delta` and write the live ones into their batches, oldest first.
-func _step_effects(real_delta: float) -> void:
-	if _effect_node == null:
+## Age the flashes by `real_delta` and write the live ones into their batches, oldest first.
+func _step_flashes(real_delta: float) -> void:
+	if _flash_node == null:
 		return
-	(_effect_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	(_flash_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_arc_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
@@ -1852,14 +1852,14 @@ func _step_effects(real_delta: float) -> void:
 	var blasts: int = 0
 	var statuses: int = 0
 	for n in effect_slots:
-		var slot: int = (_next_effect + n) % effect_slots
-		if _effect_seconds[slot] <= 0.0:
+		var slot: int = (_next_flash + n) % effect_slots
+		if _flash_seconds[slot] <= 0.0:
 			continue
-		_effect_age[slot] += real_delta
-		var through: float = _effect_age[slot] / _effect_seconds[slot]
-		# Read untyped: a freed body put in a typed variable reads as null, and its effect would
+		_flash_age[slot] += real_delta
+		var through: float = _flash_age[slot] / _flash_seconds[slot]
+		# Read untyped: a freed body put in a typed variable reads as null, and its flash would
 		# stay on where it was instead of ending (S6, item 9's regression test).
-		var followed: Variant = _effect_follow[slot]
+		var followed: Variant = _flash_follow[slot]
 		var follow: Node2D = null
 		if typeof(followed) == TYPE_OBJECT:
 			if is_instance_valid(followed):
@@ -1867,45 +1867,45 @@ func _step_effects(real_delta: float) -> void:
 			else:
 				through = 1.0
 		if through >= 1.0:
-			_effect_seconds[slot] = 0.0
-			_effect_follow[slot] = null
+			_flash_seconds[slot] = 0.0
+			_flash_follow[slot] = null
 			continue
 		if follow != null:
-			_effect_at[slot] = (follow.global_position + _effect_offset[slot]).round()
-		var kind: int = _effect_kind[slot]
-		var buffer: PackedFloat32Array = _effect_buffer
-		var i: int = out * EFFECT_STRIDE
+			_flash_at[slot] = (follow.global_position + _flash_offset[slot]).round()
+		var kind: int = _flash_kind[slot]
+		var buffer: PackedFloat32Array = _flash_buffer
+		var i: int = out * FLASH_STRIDE
 		if kind == KIND_ARC:
 			buffer = _arc_buffer
-			i = arcs * EFFECT_STRIDE
+			i = arcs * FLASH_STRIDE
 			arcs += 1
 		elif kind == KIND_STATUS:
 			buffer = _status_buffer
-			i = statuses * EFFECT_STRIDE
+			i = statuses * FLASH_STRIDE
 			statuses += 1
 		elif kind == KIND_QUAKE:
 			buffer = _floor_buffer
-			i = floors * EFFECT_STRIDE
+			i = floors * FLASH_STRIDE
 			floors += 1
 		elif kind >= KIND_SHELL:
 			buffer = _blast_buffer
-			i = blasts * EFFECT_STRIDE
+			i = blasts * FLASH_STRIDE
 			blasts += 1
 		else:
 			out += 1
-		var d: float = EFFECT_GRID * _effect_zoom[slot]
+		var d: float = FLASH_GRID * _flash_zoom[slot]
 		var along: float = d
-		var dir: Vector2 = _effect_dir[slot]
-		var at: Vector2 = _effect_at[slot]
+		var dir: Vector2 = _flash_dir[slot]
+		var at: Vector2 = _flash_at[slot]
 		if kind >= KIND_SHELL:
 			# An explosion's part: BLAST_SPAN radii each way, its radius the zoom x 2.
-			d = _effect_zoom[slot] * 4.0 * BLAST_SPAN
+			d = _flash_zoom[slot] * 4.0 * BLAST_SPAN
 			along = d
-		if _effect_length[slot] > 0.0:
+		if _flash_length[slot] > 0.0:
 			# An arc: from where it starts along its way, a margin past each end.
 			d = ARC_ACROSS
-			along = _effect_length[slot] + 2.0 * ARC_MARGIN
-			at += dir * _effect_length[slot] * 0.5
+			along = _flash_length[slot] + 2.0 * ARC_MARGIN
+			at += dir * _flash_length[slot] * 0.5
 		buffer[i] = dir.x * along
 		buffer[i + 1] = dir.y * d
 		buffer[i + 2] = 0.0
@@ -1914,23 +1914,23 @@ func _step_effects(real_delta: float) -> void:
 		buffer[i + 5] = -dir.x * d
 		buffer[i + 6] = 0.0
 		buffer[i + 7] = at.y
-		var data: Color = ProjectileManagerScript.look_color(_effect_ramp[slot], _effect_zoom[slot], _effect_look[slot])
+		var data: Color = ProjectileManagerScript.look_color(_flash_ramp[slot], _flash_zoom[slot], _flash_look[slot])
 		buffer[i + 8] = data.r
 		buffer[i + 9] = data.g
 		buffer[i + 10] = data.b
 		buffer[i + 11] = data.a
-		var core: Color = _effect_core[slot]
+		var core: Color = _flash_core[slot]
 		buffer[i + 12] = core.r
 		buffer[i + 13] = core.g
 		buffer[i + 14] = core.b
 		var code: int = kind - KIND_SHELL if kind >= KIND_SHELL else kind
-		# Its age beside its kind; below the kind for an effect that does not light (spell light
-		# reads the sign, the effect shaders the size: `coded_age`).
-		var age: float = EFFECT_FROM + EFFECT_SPAN * through
-		buffer[i + 15] = 1.0 - (float(code) + (-age if _effect_unlit[slot] != 0 else age)) / 16.0
+		# Its age beside its kind; below the kind for a flash that does not light (spell light
+		# reads the sign, the flash shaders the size: `coded_age`).
+		var age: float = FLASH_FROM + FLASH_SPAN * through
+		buffer[i + 15] = 1.0 - (float(code) + (-age if _flash_unlit[slot] != 0 else age)) / 16.0
 	if out > 0:
-		_effect_node.multimesh.buffer = _effect_buffer
-	_effect_node.multimesh.visible_instance_count = out
+		_flash_node.multimesh.buffer = _flash_buffer
+	_flash_node.multimesh.visible_instance_count = out
 	if arcs > 0:
 		_arc_node.multimesh.buffer = _arc_buffer
 	_arc_node.multimesh.visible_instance_count = arcs
@@ -1943,46 +1943,46 @@ func _step_effects(real_delta: float) -> void:
 	if blasts > 0:
 		_blast_node.multimesh.buffer = _blast_buffer
 	_blast_node.multimesh.visible_instance_count = blasts
-	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_effects`).
+	# Spell light draws the same rows (P3b; through the spectacle, `SpellLight.light_flashes`).
 	if _spectacle != null:
-		_spectacle.light_effects(_effect_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
+		_spectacle.light_flashes(_flash_buffer, out, _blast_buffer, blasts, _arc_buffer, arcs, effect_slots)
 
 
-## How many effects are showing (for tests and the sheets).
-func live_effects() -> int:
+## How many flashes are showing (for tests and the sheets).
+func live_flashes() -> int:
 	var live: int = 0
 	for slot in effect_slots:
-		if _effect_seconds[slot] > 0.0:
+		if _flash_seconds[slot] > 0.0:
 			live += 1
 	return live
 
 
-## How many live effects are of `kind`, and (with a `ramp` 0-4) in that ramp.
-func effects_of(kind: int, ramp: int = -1) -> int:
+## How many live flashes are of `kind`, and (with a `ramp` 0-4) in that ramp.
+func flashes_of(kind: int, ramp: int = -1) -> int:
 	var found: int = 0
 	for slot in effect_slots:
-		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind and (ramp < 0 or _effect_ramp[slot] == ramp):
+		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind and (ramp < 0 or _flash_ramp[slot] == ramp):
 			found += 1
 	return found
 
 
-## The core colour and look of the newest live effect of `kind` (for tests): [core, look].
-func effect_dress(kind: int) -> Array:
+## The core colour and look of the newest live flash of `kind` (for tests): [core, look].
+func flash_dress(kind: int) -> Array:
 	for n in effect_slots:
-		var slot: int = (_next_effect - 1 - n + effect_slots) % effect_slots
-		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
-			return [_effect_core[slot], _effect_look[slot]]
+		var slot: int = (_next_flash - 1 - n + effect_slots) % effect_slots
+		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind:
+			return [_flash_core[slot], _flash_look[slot]]
 	return []
 
 
-## The newest live effect of `kind` (for tests): its place, way, core colour, ramp, zoom and
+## The newest live flash of `kind` (for tests): its place, way, core colour, ramp, zoom and
 ## look, or an empty dictionary when none shows.
-func effect_info(kind: int) -> Dictionary:
+func flash_info(kind: int) -> Dictionary:
 	for n in effect_slots:
-		var slot: int = (_next_effect - 1 - n + effect_slots) % effect_slots
-		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
-			return {"at": _effect_at[slot], "dir": _effect_dir[slot], "core": _effect_core[slot], "ramp": _effect_ramp[slot],
-					"zoom": _effect_zoom[slot], "look": _effect_look[slot], "seconds": _effect_seconds[slot]}
+		var slot: int = (_next_flash - 1 - n + effect_slots) % effect_slots
+		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind:
+			return {"at": _flash_at[slot], "dir": _flash_dir[slot], "core": _flash_core[slot], "ramp": _flash_ramp[slot],
+					"zoom": _flash_zoom[slot], "look": _flash_look[slot], "seconds": _flash_seconds[slot]}
 	return {}
 
 
@@ -2039,7 +2039,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 	if body != null:
 		_spectacle.break_body(body, _rest_transform(body, enemy), preset.death_mote_kind, preset.death_mote_share, preset.death_mote_most, preset.death_mote_speed, preset.death_mote_up)
 	# The hit that killed it (its flash still showing here) is silenced for the death's sound.
-	if _hit_voice >= 0 and _hit_effect >= 0 and _hit_position == position and _effect_seconds[_hit_effect] > 0.0:
+	if _hit_voice >= 0 and _hit_slot >= 0 and _hit_position == position and _flash_seconds[_hit_slot] > 0.0:
 		_voices[_hit_voice].stop()
 	# Its motes: the killing shot's cards' kinds (read while the event is sent), and the surface
 	# kinds in the colours of the body's own art.
@@ -2421,9 +2421,9 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 		# `hit_puff`, `size` steps of HIT_STEP pixels big, in the hit body's colours.
 		var from: Vector2 = position if at == Vector2.INF else at
 		var zoom: int = clampi(roundi(size), 1, 3)
-		_cue_effect = -1
+		_cue_flash = -1
 		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
-		_hit_effect = _cue_effect
+		_hit_slot = _cue_flash
 		_hit_position = position
 	_hit_voice = _play(sound)
 

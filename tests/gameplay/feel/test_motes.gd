@@ -6,7 +6,7 @@ extends "res://tests/support/suite.gd"
 ## a shot sheds the kinds of its cards' look layers in its own ramp, and other colours (a room's
 ## walls, sampled from its art) go through the ramp table. `mote_land` is where the flight comes
 ## to rest. In Feel, a wall hit sheds the shot's motes and the wall's; with the "Particles"
-## setting off there are no motes and no nodes, and the old chips effect shows instead.
+## setting off there are no motes and no nodes, and the old chips flash shows instead.
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -501,7 +501,7 @@ func test_particles_has_no_off_its_least_is_a_minimal_ring() -> void:
 	check_equal(feel.mote_cap, MoteCap.STOPS[0], "the setting taken")
 	bus.projectile_impact.emit(0, null, Vector2(96.0, 100.0), Vector2.RIGHT)
 	check(_kinds_of_rows(feel.motes(), 0, feel.motes().next_row()).has(&"chip"), "a wall still sheds its chips as motes")
-	check_equal(feel.live_effects(), 1, "and only the shot's burst is an effect")
+	check_equal(feel.live_flashes(), 1, "and only the shot's burst is a flash")
 	feel.step(0.016)
 	bus.mote_cap_changed.emit(MoteCap.STOPS[1])
 	check(feel.motes() != null and feel.motes().cap() == MoteCap.STOPS[1], "on again at the new cap")
@@ -616,7 +616,7 @@ func test_a_shot_s_end_sheds_as_before_and_leaves_the_moments_rows() -> void:
 	var before: int = motes.next_row()
 	bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)
 	check_equal(motes.next_row() - before, want, "each kind its own count times the share, as shed_end threw, and the sparks")
-	check_equal(feel.effects_of(FeelScript.KIND_BURST, 0), 1, "and its small pop")
+	check_equal(feel.flashes_of(FeelScript.KIND_BURST, 0), 1, "and its small pop")
 	motes.step(0.0)
 	# Use the frame's rows up to the moments' own: the end throws nothing more, and counts a cut.
 	var filler: int = motes.kind_index(&"ember")
@@ -846,7 +846,7 @@ func test_a_cues_chips_are_its_motes() -> void:
 	var feel: FeelScript = made[1]
 	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
 	check(feel.motes().next_row() > 0, "its motes")
-	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
+	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
 
 
 ## Trail particles as motes (spell spectacle P1d): each birth the projectile manager hands out is
@@ -1117,8 +1117,8 @@ func test_the_numbers_shared_with_core_agree() -> void:
 
 
 ## S6 2: a hit's spray and a puff are the cues `hit` and `hit_puff`, whose motes part throws the
-## sparks (the effect draws only the flash): its count of its kind along the hit's way, or all round
-## as a ring; a flash alone (`show_effect`, a staff's poof) throws none, and a hit's sparks leave
+## sparks (the flash draws only the flash): its count of its kind along the hit's way, or all round
+## as a ring; a flash alone (`show_flash`, a staff's poof) throws none, and a hit's sparks leave
 ## the moments' rows alone (`often`), as a shed does.
 func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 	var made: Array = _feel()
@@ -1141,8 +1141,8 @@ func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
 	check(left > 0 and left < int(puff["count"]), "all round")
 	before = motes.next_row()
-	feel.show_effect(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
-	feel.show_effect(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	feel.show_flash(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
+	feel.show_flash(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
 	check_equal(motes.next_row(), before, "a flash alone throws none")
 	motes.step(0.0)
 	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)

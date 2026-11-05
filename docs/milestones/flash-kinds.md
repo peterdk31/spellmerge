@@ -44,7 +44,7 @@ Recommended, as its own commit before the rest, with no change to the look. It m
 
 - The cue part: `"effect": &"burst"` becomes `"flash": &"burst"` in the 60 cue files that have one, `CueBase` and `cue_plan.gd`, and the part type `effect` becomes `flash` (the default when a part names none). Cue files are content, not saves, so nothing old has to load.
 - In Feel: `show_effect` to `show_flash`, `_effect_*` to `_flash_*`, `effect_mesh` to `flash_mesh`, `live_effects`, `effects_of`, `effect_dress`, `effect_info` likewise, and the tests that call them (about 20 files). `shot_effect.gdshader` becomes `shot_flash.gdshader` (its `.uid` moves with it, and `ShaderWarmup` names it).
-- **"Flash" already means the hit flash** (a sprite turning white when hit: `FLASH_SHADER`, `FeelPreset.flash_seconds`, `flashing()`, the horde's `SwarmLook`). Those become `HIT_FLASH_SHADER`, `hit_flash_seconds` and `hit_flashing()`, so "flash" alone always means a flash kind. No `.tres` sets `flash_seconds` today.
+- **"Flash" already means the hit flash** (a sprite turning white when hit: `FLASH_SHADER`, `FeelPreset.flash_seconds`, `flashing()`, the horde's `SwarmLook`). Feel's become `HIT_FLASH_SHADER`, `_hit_flash_material` and `hit_flash_seconds`, so "flash" alone in Feel always means a flash kind. No `.tres` sets `flash_seconds` today. **Built:** `SwarmLook` keeps its own row arrays and `flashing()` (its hit flash, inside its own file).
 - **The "Effect slots" setting:** its slots hold flashes, arcs and statuses, so the player-facing name and the saved key can stay as they are, or become "Flash slots" (the saved key read under both names for one release). The owner picks.
 
 ## Steps

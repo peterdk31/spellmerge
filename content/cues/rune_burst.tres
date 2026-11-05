@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"rune_burst"
-parts = Array[Dictionary]([{"effect": &"rune_burst", "zoom": 3, "way": &"right"}, {"part": &"mark", "mark": &"rune_scar", "reach": 1.0}, {"part": &"motes", "kind": &"spark", "count": 16, "radius": 28.0, "spread": 360.0, "ring": true, "life": 1.2}, {"part": &"motes", "kind": &"spell", "count": 8, "radius": 14.0, "spread": 360.0}])
+parts = Array[Dictionary]([{"flash": &"rune_burst", "zoom": 3, "way": &"right"}, {"part": &"mark", "mark": &"rune_scar", "reach": 1.0}, {"part": &"motes", "kind": &"spark", "count": 16, "radius": 28.0, "spread": 360.0, "ring": true, "life": 1.2}, {"part": &"motes", "kind": &"spell", "count": 8, "radius": 14.0, "spread": 360.0}])

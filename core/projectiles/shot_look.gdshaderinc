@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The look of a shot, effect or beam, shared by the shot shaders (core/README.md, "The shot
+// The look of a shot, flash or beam, shared by the shot shaders (core/README.md, "The shot
 // shaders"): who it is (player ramp, zoom), its cards (the look bits and the kinds that give off
 // particles), its ramp (white-hot, light, base, shadow and the glow) and the clock. Include
 // `shot_palette.gdshaderinc` first.

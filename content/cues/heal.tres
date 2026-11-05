@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"heal"
-parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 2, "seconds": 0.4, "color": Color(0.4196078, 0.8901961, 0.4196078, 1), "way": &"right"}, {"part": &"light", "radius": 44.0, "strength": 1.0, "seconds": 0.45, "color": Color(0.4196078, 0.8901961, 0.4196078, 1)}])
+parts = Array[Dictionary]([{"flash": &"ring_out", "zoom": 2, "seconds": 0.4, "color": Color(0.4196078, 0.8901961, 0.4196078, 1), "way": &"right"}, {"part": &"light", "radius": 44.0, "strength": 1.0, "seconds": 0.45, "color": Color(0.4196078, 0.8901961, 0.4196078, 1)}])
 sound = &"heal"

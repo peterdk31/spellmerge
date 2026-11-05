@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"dash_start"
-parts = Array[Dictionary]([{"part": &"motes", "kind": &"dust", "colours": &"surface", "count": 6, "spread": 360.0, "below": 8.0}, {"effect": &"arc", "if_layer": 5, "reach": 1.0, "seconds": 0.3}, {"part": &"stream", "kind": &"dash_path", "rate": 120.0, "side": 13.0, "ahead": 4.0}, {"part": &"stream", "kind": &"spell", "rate": 60.0, "side": 10.0, "feet_layers": [1, 2], "below": 8.0}])
+parts = Array[Dictionary]([{"part": &"motes", "kind": &"dust", "colours": &"surface", "count": 6, "spread": 360.0, "below": 8.0}, {"flash": &"arc", "if_layer": 5, "reach": 1.0, "seconds": 0.3}, {"part": &"stream", "kind": &"dash_path", "rate": 120.0, "side": 13.0, "ahead": 4.0}, {"part": &"stream", "kind": &"spell", "rate": 60.0, "side": 10.0, "feet_layers": [1, 2], "below": 8.0}])

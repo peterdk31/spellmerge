@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"trade"
-parts = Array[Dictionary]([{"effect": &"fall", "zoom": 2, "way": &"right"}, {"effect": &"rise", "zoom": 1, "way": &"right"}, {"part": &"motes", "kind": &"glimmer", "count": 6, "radius": 12.0, "spread": 40.0, "way": &"up", "life": 0.5}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 20.0, "spread": 360.0, "up": 0.3}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])
+parts = Array[Dictionary]([{"flash": &"fall", "zoom": 2, "way": &"right"}, {"flash": &"rise", "zoom": 1, "way": &"right"}, {"part": &"motes", "kind": &"glimmer", "count": 6, "radius": 12.0, "spread": 40.0, "way": &"up", "life": 0.5}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 20.0, "spread": 360.0, "up": 0.3}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])
 shake = 0.08

@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"wave_start"
-parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 3, "seconds": 0.5, "bare": true, "way": &"right"}])
+parts = Array[Dictionary]([{"flash": &"ring_out", "zoom": 3, "seconds": 0.5, "bare": true, "way": &"right"}])
 sound = &"wave"

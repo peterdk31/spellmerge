@@ -735,10 +735,16 @@ func test_mirror_cancels_the_recoil_of_a_payload_too() -> void:
 	_build(0, [&"timer", &"bolt", &"mirror", &"recoil", &"spark"])
 	_cast(0)
 	var bolt: int = _others(-1)[0]
+	# The same bolt with no pushes, cast at once by player 1 from 100 px down: its own way.
+	_mgr.set_anchor(1, Vector2(0.0, 100.0))
+	_build(1, [&"timer", &"bolt", &"spark"])
+	_spells.cast_staff(1, 0, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0)
+	var plain: int = _others(bolt)[0]
 	_tick(50)
 	check_equal(_moves.size(), 0, "the wizard is not pushed")
-	check(_mgr.is_alive(bolt), "the bolt still flies")
-	check(absf(_mgr.get_position_of(bolt).x - 250.0) < 1.0, "the pushes cancel: the bolt flew its own way only: %s" % _mgr.get_position_of(bolt))
+	check(_mgr.is_alive(bolt) and _mgr.is_alive(plain), "the bolts still fly")
+	var own: float = _mgr.get_position_of(plain).x
+	check(own > 200.0 and absf(_mgr.get_position_of(bolt).x - own) < 1.0, "the pushes cancel: the bolt flew its own way only: %s, not %f" % [_mgr.get_position_of(bolt), own])
 
 
 func test_a_pull_after_a_recoil_on_a_shot_gets_both_moves() -> void:

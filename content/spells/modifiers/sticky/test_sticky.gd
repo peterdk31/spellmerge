@@ -110,3 +110,19 @@ func test_four_players_at_once() -> void:
 	for player in 4:
 		check(arena.lost(mine[player][0]) >= 15, "player %d's sticky nova rings out of the target" % player)
 	arena.free_all()
+
+
+## A planted nova rings out from inside its imp, whatever distance the bolt flew to it: the imp
+## takes the bolt and the whole ring (regression: the bolt stuck anywhere from the imp's centre to
+## its rim, by which moment of a step it met the imp, and half the ring missed at some distances).
+func test_a_planted_nova_hits_its_imp_with_the_whole_ring_at_any_distance() -> void:
+	var lost: Array[int] = []
+	for x: float in [80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0, 130.0]:
+		var arena := ArenaScript.new(root)
+		var imp: Node2D = arena.add_imp(Vector2(x, 0.0))
+		arena.install_cards(0, 0, ["sticky", "on_expire", "bolt", "nova"])
+		arena.cast(0, 0)
+		arena.run(2.0)
+		lost.append(arena.lost(imp))
+		arena.free_all()
+	check(lost.min() == lost.max() and lost.min() >= 15, "the same, bolt and whole ring, at every distance: %s" % [lost])

@@ -57,17 +57,24 @@ func _cast(cards: Array) -> CompiledStaff:
 
 
 func test_a_deflecting_swing_bats_an_enemy_shot_back_as_its_casters() -> void:
-	# The sweep runs from 0.12 s to 0.18 s; the enemy bolt (220 px/s) is 34 to 20 px away then.
-	var shot: int = _enemy_bolt(Vector2(60.0, 0.0))
+	# The sweep runs from 0.12 s to 0.18 s; the enemy bolt (220 px/s, bursting out at
+	# SpellLimits.SHOT_SPEED_START times it and slowing) is about 39 to 15 px away then.
+	var shot: int = _enemy_bolt(Vector2(100.0, 0.0))
 	var speed: float = arena.projectiles.get_velocity_of(shot).length()
 	var imp: Node2D = arena.add_imp(Vector2(150.0, 0.0))
 	_cast(["deflect", "swing"])
-	arena.run(0.25)
+	# A deflect starts the shot's life, and so its speed curve, again: one step after it, it flies
+	# 1.7 times as fast as it did one step after it was shot (`speed`).
+	var steps: int = 0
+	while deflected.is_empty() and steps < 15:
+		arena.run(1.0 / 60.0)
+		steps += 1
+	arena.run(1.0 / 60.0)
 	check_equal(deflected.size(), 1, "one deflect")
 	check_equal(arena.projectiles.get_actor_of(shot), 0, "the shot is the swinging wizard's now")
 	var way: Vector2 = arena.projectiles.get_velocity_of(shot)
 	check(way.x > 0.0, "it flies out, away from the hand: %s" % way)
-	check(is_equal_approx(way.length(), speed * SpellLimits.DEFLECT_SPEEDUP), "1.7 times faster: %f" % way.length())
+	check(absf(way.length() - speed * SpellLimits.DEFLECT_SPEEDUP) < 0.01, "1.7 times faster: %f, not %f" % [way.length(), speed * SpellLimits.DEFLECT_SPEEDUP])
 	arena.run(1.0)
 	check(arena.lost(imp) > 0, "it hits the enemies' side now")
 
@@ -91,9 +98,10 @@ func test_a_shot_already_going_away_keeps_its_way() -> void:
 
 func test_a_deflected_homing_shot_hunts_its_new_casters_enemies() -> void:
 	# An enemy homing shot comes for the wizard; batted back, it bends onto an imp off its line.
-	var shot: int = _enemy_bolt(Vector2(60.0, 0.0))
+	var shot: int = _enemy_bolt(Vector2(100.0, 0.0))
 	arena.projectiles.set_homing(shot, 6.0, 200.0)
-	var imp: Node2D = arena.add_imp(Vector2(90.0, 50.0))
+	# Off its line, far enough out that the shot, bursting out again, has slowed enough to turn.
+	var imp: Node2D = arena.add_imp(Vector2(180.0, 70.0))
 	_cast(["deflect", "swing"])
 	arena.run(2.0)
 	check_equal(deflected.size(), 1, "deflected")

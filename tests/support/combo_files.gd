@@ -1,7 +1,7 @@
 extends RefCounted
 ## The combo catalogue: one JSON file per combo, named like the combo's `id`, in a `combos/`
-## folder inside the card it was written for (`content/spells/modifiers/drag/combos/
-## drag_quick_strike.json`; staffs A2, docs/milestones/M2-staffs.md, "Working in parallel"). A
+## folder inside the card it was written for (`content/spells/modifiers/slow/combos/
+## slow_fire_fan.json`; staffs A2, docs/milestones/M2-staffs.md, "Working in parallel"). A
 ## card's combos live and go with its folder, and two card PRs never edit the same list.
 ##
 ##     const ComboFiles := preload("res://tests/support/combo_files.gd")

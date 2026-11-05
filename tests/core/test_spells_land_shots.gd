@@ -31,7 +31,7 @@ const SETS: Array = [
 		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"void", &"chain", &"split", &"atom"],
 		[&"timer", &"split", &"split", &"orbit", &"fire", &"bolt"],
 		[&"growth", &"homing", &"split", &"rune"],
-		[&"on_expire", &"split", &"bolt", &"split", &"orbit"],
+		[&"on_expire", &"drag", &"split", &"bolt", &"split", &"orbit"],
 		[&"on_expire", &"triple", &"bolt", &"homing", &"split", &"rune"],
 		[&"split", &"beam"],
 		[&"split", &"swing"],

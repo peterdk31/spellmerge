@@ -105,6 +105,13 @@ const STRIDE: int = 16
 ## autoload is drawn before the current scene, as the shots are.
 const DRAW_Z: int = 40
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"spells"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_caster", &"_enemies"]
+## Not state: what only the drawing reads and writes (core/sim/README.md).
+const VIEW: Array[StringName] = [&"_familiar_node"]
+
 ## The event bus and the projectile manager. Only tests set these, before adding the node;
 ## otherwise the "Events" and "Projectiles" autoloads.
 var events: EventsScript = null

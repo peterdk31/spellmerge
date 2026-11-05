@@ -11,6 +11,9 @@ extends RefCounted
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"projectiles", &"events"]
+
 var _rt: SpellRuntime = null
 ## The body made for the last `request_entity` (`entity_body`).
 var _entity_body: int = -1

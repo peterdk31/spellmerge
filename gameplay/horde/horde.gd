@@ -99,6 +99,9 @@ const HORDE_NODE_NAME: String = "Horde"
 ## A camera limit this wide or more counts as none (Godot's default is 10,000,000).
 const NO_LIMIT: int = 1000000
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"world", &"_horde", &"_camera", &"_gems"]
+
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
@@ -166,7 +169,7 @@ func _init() -> void:
 	_wizard_at.resize(SEATS)
 	_standing.resize(SEATS)
 	_present.resize(SEATS)
-	rng.randomize()
+	rng.seed = SimSeed.fresh()
 
 
 func _ready() -> void:

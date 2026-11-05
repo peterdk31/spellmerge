@@ -152,6 +152,8 @@ const ZAP_DUE: int = 8
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
 class PendingLaunch:
 	extends RefCounted
+	## State as who they point at: other bodies, never entered (core/sim/README.md).
+	const REFS: Array[StringName] = [&"source"]
 	var due: float = 0.0
 	var actor: int = 0
 	var staff: int = 0
@@ -183,6 +185,11 @@ class PendingLaunch:
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
 const REFUSED: float = -1.0
+
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 
 ## The shots one budget's trigger fires may make in one step (`SpellLimits.FIRE_SHOTS_PER_STEP`
 ## unless a benchmark sets another); a fire past it waits for the next step.
@@ -408,6 +415,9 @@ var _moves: CasterMoves = null
 
 
 func _init() -> void:
+	# Every cast seeds it before it rolls; a fixed start keeps two runs the same before the first
+	# cast too (online-ready N1: a new generator starts on a random seed).
+	_scatter.seed = 0
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)

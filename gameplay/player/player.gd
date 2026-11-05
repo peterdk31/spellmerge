@@ -71,6 +71,11 @@ const CAST_SOUND_ID: StringName = &"cast"
 ## `card_move_requested`'s staff for the bag.
 const BAG: int = -1
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"input", &"registry"]
+## Not state: what only the drawing reads and writes (core/sim/README.md).
+const VIEW: Array[StringName] = [&"_sound_player"]
+
 ## The input manager and the registry (the bag, the cast sound). Only tests set these, before
 ## adding the node; otherwise the "PlayerInput" and "Registry" autoloads are used.
 var input: InputManagerScript = null

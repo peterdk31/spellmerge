@@ -116,6 +116,13 @@ const TARGET_SLOTS: int = 64
 ## The wall layer of the world's static bodies.
 const WALL_LAYER: int = 1
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"_parent", &"_cand_nodes"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"nodes", &"_slot_nodes"]
+## Not state: what only the drawing reads and writes (core/sim/README.md).
+const VIEW: Array[StringName] = [&"look"]
+
 ## The services. The director hands over its own; whatever is null is taken from the autoloads
 ## (`start`).
 var events: EventsScript = null
@@ -219,7 +226,7 @@ var _asked: int = 0
 
 
 func _init() -> void:
-	rng.randomize()
+	rng.seed = SimSeed.fresh()
 	set_native(native)
 	_grow(START_ROOM)
 	_slot_nodes.resize(TARGET_SLOTS)

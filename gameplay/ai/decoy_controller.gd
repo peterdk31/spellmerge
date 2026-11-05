@@ -17,6 +17,11 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## (`AIBrain.LOOKS`) when the nearest is behind a wall.
 const SIGHT_CHECKS: int = 8
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"_found"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"target"]
+
 ## How far a target may be for it to creep toward it (its card's homing reach); 0: it stands.
 var reach: float = 0.0
 ## What it aims at, or null.

@@ -14,6 +14,11 @@ extends Carrier
 ## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
 const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_bm_source", &"_bm_due_body"]
+
 ## The live beams (see `start`), rows that double when every one is on (`_grow_beams`);
 ## `_bm_on` says which are in use. Each keeps what a shot's record keeps (fires, chain) plus where it is: its origin,
 ## way, the curve's pull and end, how far it got and where (its tip), and its caster.

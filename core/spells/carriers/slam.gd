@@ -9,6 +9,9 @@ extends Carrier
 ## `slam_*` getters (`CarrierSlam.of(spells)`).
 
 
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_sl_source"]
+
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
 ## one is on. Each keeps what a swing keeps for its hits, the hand it is held by and the aim locked
 ## at the cast, how long it has run and its wind-up, where it struck (INF before the impact), its

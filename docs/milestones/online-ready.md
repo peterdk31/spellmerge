@@ -111,13 +111,23 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 ### N1: the state hash and the determinism harness
 
-- **State by default.** In every simulation script (the simulation folders, listed in `core/sim/README.md` from N1 on; N9 enforces the line) every member is state, except those it lists in `const DERIVED: Array[StringName]`: caches, references to nodes and services, anything rebuilt from state. A state member is a value, a packed array, an array or dictionary of values, or an object of another simulation script, walked in turn (an actor's components, a brain, a caster's staffs).
+- **State by default.** In every simulation script (the simulation folders, listed in `core/sim/README.md` from N1 on; N9 enforces the line) every member is state, except those it lists in `const DERIVED: Array[StringName]`: caches, references to nodes and services, anything rebuilt from state. References to other bodies that are state all the same go in `const REFS` and are hashed as who they point at (added in N1's review; the table in `core/sim/README.md`, "Steps", says which list a member takes). A state member is a value, a packed array, an array or dictionary of values, or an object of another simulation script, walked in turn (an actor's components, a brain, a caster's staffs).
 - **`core/sim/state_walk.gd` (`StateWalk`):** the one generic walker (the script's own members by name: `get_script_property_list` and `get`), used by the hash here and by save and load in N10. It skips `DERIVED` and `VIEW` members (N9). Packed arrays in one engine call each; dictionaries in key order. It runs only in tests, tools, replays and later the netcode, never in a normal build's tick.
 - **`core/sim/sim_hash.gd` (`SimHash`):** one 64-bit hash per area and one for the whole game, from `StateWalk`. Areas do not reach into each other: the tick (N3) hands `SimHash` its areas.
 - **`tests/core/test_state_declared.gd`:** walks every simulation script's state and fails on a member it cannot save (a node or service not in `DERIVED`: "`gameplay/combat/combat.gd`: `_foo` holds a Node; add it to DERIVED, it is set up again, not saved") and on a `DERIVED` name that is no member (after a rename). The first PR lists today's caches and references; the ~800 members are reviewed once, area by area.
 - **The desync report (`core/sim/desync.gd`):** given two runs, the first tick whose hashes part, which areas part, and each differing member by name with both values. Used by every determinism test, N2b and N8, and later the netcode.
 - `tests/core/test_determinism.gd`: two runs of a scripted fight (bots, a horde wave, the sandbox storm) agree at every tick. A member that parts between two runs on one machine (a cache filled in a different order, a timing stat) is named by the desync report and goes into `DERIVED` or is fixed.
 - The hash's cost is measured once on the stress run, for the netcode's once-a-second check later.
+
+**Done (2026-11-05).** `core/sim/` (`StateWalk`, `SimHash`, `Desync`, `SimSeed`, README with the folders); `tests/core/test_state_walk.gd`, `test_state_declared.gd` (static over every simulation script and its inner classes, the source read for static members, clocks and global dice), `test_state_walked.gd` (live walks of the three scenes and of every card cast in the card rules' world), `test_determinism.gd` (a staffed fight, a spell storm and a horde wave on `tests/core/sim_scenes.gd`, each played twice and compared at every tick). What the first runs and the review found and how it was settled:
+
+- **Instance ids parted at tick 0** in five members (`Actors._node`, `ProjectileManager._target_id`, `Combat._node_id` and `_row_by_node`, `AIBrain._target_id`), as the audit said (A5): DERIVED until N5.
+- **`Spells._scatter` started on a random seed** (a new generator does), though every cast seeds it before it rolls: it now starts at 0, which changes no cast.
+- **Three lists, not two.** DERIVED holds only what is set up again (services, caches, scratch, instance ids); references to other bodies that are state (the AI's `target`, `grudge` and `plan_target`, a decoy's target, `ProjectileManager._stuck_to`, Spells' due zaps and jumps, the beams', swings' and slams' sources, Combat's body per row, Entities' casters and enemies, Flow's and Coop's bodies, the swarm's rows and target slots, a pending launch's source, a dash's struck bodies) are **REFS**: hashed as who they point at (an actor's id, else what it is), never entered, so a different target parts the runs at the tick it was picked. They are the worklist of N5: each becomes an identity there. Looks and the manager's drawing members (written only from `update_draw`) are VIEW; the looks, the intro and the shader warm-up `VIEW_ONLY`. The rest of the ~1,100 members is state by default; the review area by area goes on as N2 to N10 touch them.
+- **What the walker cannot see.** Static members (all caches or test switches today) are listed in DERIVED, and a test fails on one that is not. No simulation script reads a clock or rolls global dice; the horde director and the swarm seeded themselves with `randomize()` (the fixtures overrode it), and now take `SimSeed.fresh()`, the one seed nobody chose, which N11 makes the session's.
+- **Every card walked.** The three scenes cast six cards; walking every card found `Entities.spells` (a service) missing from DERIVED, and the static pass over inner classes found `Solid.body` (DERIVED), `PendingLaunch.source` and `MovePass.struck` (REFS).
+- **The hash's cost grows with the shot cap, not the live shots:** the projectile manager and the actor table hash in about 2 ms at the desktop cap (6,000) and 15 ms at 100,000 (the owner's machine, headless; 150 ms before a REFS array walked only its filled entries). Fine for the netcode's once a second. The desync report builds paths for its kept tick only (the determinism test took 101 s with a path per leaf every tick, 37 s now).
+- **Left for later parts, as planned:** the hash's cost on the stress run itself (its real autoloads are handed to `SimHash` only once N3's tick names them: measured in N3), and determinism runs of the real game's flow, coop and player areas with bots and the sandbox storm (the scenes are the test worlds, stepped by hand: N2's replays bring the real game in).
 
 ### N2: input frames and replays
 
@@ -126,6 +136,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - HUD commands apply at the start of the next tick, never in the middle of one: the bus holds the `*_requested` events the simulation listens to and sends them when the tick starts, so the HUD's code does not change.
 - `core/sim/replay.gd`: records a run's seed, content version and frames to `user://replays/`, and plays it back. A bug report can attach one (a later intake task).
 - Fixes A8.
+- From N1: the determinism runs move onto the real game (Flow, Coop, Player, bots, the sandbox storm) through replays; N1's scenes are test worlds stepped by hand.
 
 ### N2b: a first look across platforms
 
@@ -142,6 +153,7 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Flow's timers, Coop's revive and Horde's breaks move from `_process` to the tick. Coop's camera stays in `_process` (view).
 - A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes `DT`, as today; online, the netcode decides how many ticks to run.
 - Fixes A2 and A3, and the flaky `test_wave_balance.gd` (docs/BACKLOG.md).
+- From N1: the state hash's cost measured on the stress run, now that the tick names the real areas (N1 measured the test worlds only).
 
 ### N4: stops in ticks
 

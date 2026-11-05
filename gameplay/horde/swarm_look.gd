@@ -73,6 +73,9 @@ const REACH: float = 64.0
 const FLAG_FLASH: float = 8.0
 const FLAG_HURT: float = 16.0
 
+## View as a whole: the state walk never enters it (core/sim/README.md).
+const VIEW_ONLY: bool = true
+
 ## The swarm whose rows it draws (see the class doc); set before it is added, or with `setup`.
 var swarm: Object = null
 ## The Feel autoload (its `preset`); empty: "/root/Feel", else the default preset.

@@ -76,6 +76,11 @@ signal died(killer: int)
 ## called for every hit on anyone (performance pass, 2026-10-28).
 signal damaged(by: int, amount: float)
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors"]
+## Not state: what only the drawing reads and writes (core/sim/README.md).
+const VIEW: Array[StringName] = [&"_looks"]
+
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
 ## The team it keeps while no controller drives it and it has no home controller.

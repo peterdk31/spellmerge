@@ -44,6 +44,9 @@ const TEAM_ENEMIES: int = 1
 ## The enemy ramp (Blight); 0-3 are the four hat colours.
 const RAMP_ENEMY: int = 4
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"_node"]
+
 var _open: PackedByteArray = PackedByteArray()
 var _team: PackedInt32Array = PackedInt32Array()
 var _ramp: PackedInt32Array = PackedInt32Array()

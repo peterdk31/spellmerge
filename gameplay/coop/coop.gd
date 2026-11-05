@@ -65,6 +65,11 @@ const REVIVE_DRAIN_FACTOR: float = 2.0
 ## Seconds a revived wizard cannot be hurt, enough to step away from what downed it.
 const REVIVE_PROTECTION: float = 1.5
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"camera"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_wizards"]
+
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null

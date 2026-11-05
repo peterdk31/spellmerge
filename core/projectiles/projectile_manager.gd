@@ -535,6 +535,13 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
 ]
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_mesh"]
+## State as who they point at: other bodies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_stuck_to"]
+## Not state: what only the drawing reads and writes (core/sim/README.md).
+const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_spark_moment", &"_spark_rng"]
+
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
 var texture: Texture2D = null:
@@ -794,6 +801,8 @@ var _spare_bodies: Array[StaticBody2D] = []
 ## A solid shot's wall (`set_solid`): `stones` stones `gap` radii apart across `across`, laid at
 ## `at` with `radius` (where it lay last: it is laid again when the shot moves or grows).
 class Solid:
+	## Not state: the static body, laid again by `_lay_solid` (core/sim/README.md).
+	const DERIVED: Array[StringName] = [&"body"]
 	var across: Vector2 = Vector2.RIGHT
 	var stones: int = 1
 	var gap: float = 0.0

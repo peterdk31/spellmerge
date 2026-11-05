@@ -34,6 +34,9 @@ func before_each() -> void:
 	mgr.events = own(EventsScript.new()) as EventsScript
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	mgr.set_cap(600)
+	# These tests are the tail shader's tails (trail rows), which the game no longer turns on since
+	# tails are motes (2026-11-05); they go with the tail shader's tail in its own PR.
+	mgr.set_tails_enabled(true)
 	root.add_child(mgr)
 
 
@@ -878,8 +881,8 @@ func test_tails_off_draws_the_cores_alone() -> void:
 	check(mgr.get_trail_of(before) >= 0 and mgr.get_trail_of(ended) >= 0, "with tails, every flying shot has a row")
 	mgr.remove_by_tag(55)
 	check_equal(mgr.get_trail_count(), 3, "a shot's, a cooling one's and the dash's")
-	mgr.events.shot_tails_changed.emit(false)
-	check(not mgr.tails_enabled, "the switch's event turns them off")
+	mgr.set_tails_enabled(false)
+	check(not mgr.tails_enabled, "turned off")
 	check_equal(mgr.get_trail_of(before), -1, "the shot in the air gives its row back")
 	check_equal(mgr.get_trail_count(), 1, "and the cooling trail its row: only the dash keeps one")
 	check(dash_row >= 0 and mgr.get_trail_kept(dash_row) > 0, "which still follows its caster")

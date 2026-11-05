@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Tails are motes, each shot's in one of three kinds (spell spectacle 2, S5 step 4, owner session)
+
+- **The owner's pick:** "I'll pick motes. They look awesome as tails!" and "keep all three and make the shots randomly pick one". A shot's tail births are `SPARK_TAIL` + 0 to 2 (`SPARK_TAIL` is 60 now, `TAIL_KINDS` 3, so the codes fit the motes' pair key below `PAIR_LAYERS`), the code picked once from the shot's sequence (`tail_code`, `tail_hash(seq, -1)`; the native kernel's twin, compared to the bit by `test_native_kernel.gd`); the motes lay code n in the nth tail kind by id (A `tail`, B `tail_streak`, C `tail_long`).
+- **Gone:** the "Tails" and "Tail motes" dev switches (`ShotTails`, `TailMotes`, `shot_tails_changed`, `tail_motes_changed`, their pause rows); `tails_enabled` is off. The tail shader's tail is dead code in the game now and goes in its own PR (its tests turn it on until then).
+- **Cost:** the same CPU for A, B and C (the sandbox storm with the tails off, each twice in turn: 0.54-0.67 ms of the motes' a 60th of a second, 1.8-2.1 us a mote, the spread between two runs of one pick as wide as between picks); a mix lives longer on average than B alone (C's motes up to 0.55 s), so about a third more tail motes drawn, GPU only.
+- **A fix it needed:** `light.gdshader` lit a shot only while it held a trail row (`row >= 0.0`), so with tails as motes no shot lit the room. Every live shot's head lights now; `test_light.gd` has the regression.
+
 ## 2026-11-05: Tails as motes (spell spectacle 2, S5 step 4, owner session)
 
 - **The owner's answer to "do shots need tails?":** "I don't really like the look without tails. BUT I'm seeing a pretty substantial performance increase without them ... for the atom, when holding down the cast button, the motes seem to spawn at fixed equal distances along its path ... If only the motes could look more like a tail, then I would love them and the fact that we only have one system." So the tail is laid as motes; the tail shader's tail stays the "Tails: On" look until the owner picks.

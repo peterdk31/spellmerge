@@ -38,10 +38,10 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 ## Given off along every dash's path (its speed streaks; docs/milestones/spell-spectacle-2.md,
 ## S5), in the dashing actor's colours, whatever its cards (theirs are given off beside it).
 @export var dash_path: bool = false
-## A shot's tail while the tails are off (docs/milestones/spell-spectacle-2.md, S5 step 4: tails
-## as motes): laid along every flying shot's path by distance, in the shot's own colours, whatever
-## its cards (theirs are given off beside it). When several kinds are, the motes lay one of them
-## (`Motes.use_tail_kind`: the first by id unless one is picked).
+## A shot's tail (docs/milestones/spell-spectacle-2.md, S5 step 4: tails as motes): laid along
+## every flying shot's path by distance, in the shot's own colours, whatever its cards (theirs are
+## given off beside it). Each shot is laid in one of the tail kinds, picked by its sequence
+## (`ProjectileManager.tail_code`; `Motes.tail_kind_of`: the kinds in id order, A, B, C).
 @export var tail: bool = false
 ## The floor mark (a `MarkKind` id, content/marks) each of its motes leaves where it comes to
 ## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled

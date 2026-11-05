@@ -102,9 +102,10 @@ void vertex() {
 		half_size = vec2(reach);
 		colour = COLOR.rgb * COLOR.a * (1.0 - dip);
 	} else {
-		float row = MODEL_MATRIX[0].x;
+		// Every live shot lights, with a trail row or without (tails as motes: none has one; the
+		// owner, 2026-11-05). A cooling tail's row is no head, a dash's is TF_DASH.
 		float flags = MODEL_MATRIX[1].y;
-		if (row >= 0.0 && flag_set(flags, TF_HEAD) && !flag_set(flags, TF_DASH)) {
+		if (flag_set(flags, TF_HEAD) && !flag_set(flags, TF_DASH)) {
 			float red = floor(COLOR.r * 255.0 + 0.5);
 			float reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
 			half_size = vec2(reach);

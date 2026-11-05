@@ -181,6 +181,9 @@ func _run_scene() -> void:
 	_mgr.actors = _table
 	_mgr.events = _bus
 	_mgr.set_cap(700)
+	# The recording has each shot's newest trail point: the tail shader's tails, which the game no
+	# longer turns on since tails are motes (2026-11-05). Recorded again when trail rows go.
+	_mgr.set_tails_enabled(true)
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
 	var walls: Array[Rect2] = [
 		Rect2(0, 0, 640, 32), Rect2(0, 328, 640, 32), Rect2(0, 0, 32, 360), Rect2(608, 0, 16, 120),

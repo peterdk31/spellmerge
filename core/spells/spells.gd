@@ -663,6 +663,8 @@ func component_stats(id: StringName) -> PackedStringArray:
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
 				out.append("%s x%s" % [pair[0], _short(float(pair[1]))])
+		if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
+			out.append("Speed x%s to x%s" % [_short(modifier.speed_start), _short(modifier.speed_end)])
 	elif component is ElementBase:
 		var element: ElementBase = component
 		if element.status_id != &"":
@@ -1135,15 +1137,15 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) -> void:
 	var homing: bool = spell.homing_range > 0.0
 	var returns: bool = spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0
+	var curve: bool = spell.has_speed_curve()
 	var plain: bool = spell.behaviours.is_empty()
-	if plain and not homing and not returns:
+	if plain and not homing and not returns and not curve:
 		return
 	var bounce: float = spell.behaviour(ModifierBase.Behaviour.BOUNCE)
 	var ghost: bool = spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0
 	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
 	var linger: float = spell.behaviour(ModifierBase.Behaviour.LINGER)
 	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
-	var drag: float = spell.behaviour(ModifierBase.Behaviour.DRAG)
 	var sticky: float = spell.behaviour(ModifierBase.Behaviour.STICKY)
 	# A shot with `shield` blocks that many enemy shots; with deflect it turns them back.
 	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
@@ -1156,6 +1158,8 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 			projectiles.set_homing_curve(slot, spell.homing_curve, spell.homing_range)
 		if returns:
 			projectiles.set_return(slot)
+		if curve:
+			projectiles.set_speed_curve(slot, spell.speed_start, spell.speed_end, spell.speed_ease)
 		if plain:
 			continue
 		if bounce > 0.0:
@@ -1168,8 +1172,6 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 			projectiles.set_linger(slot, linger)
 		if growth > 1.0:
 			projectiles.set_growth(slot, growth)
-		if drag > 1.0:
-			projectiles.set_drag(slot, drag)
 		if sticky > 0.0:
 			projectiles.set_sticky(slot, sticky)
 		if shield > 0.0:

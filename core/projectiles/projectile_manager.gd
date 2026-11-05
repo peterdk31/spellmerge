@@ -289,9 +289,8 @@ const HIT_WORK: int = 400
 const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
-## The most a drag shot leaves faster than its own speed (`set_drag`; two Drag cards would make 4,
-## and its ease the steeper for it).
-const DRAG_MOST: float = 4.0
+## The most a speed curve multiplies a shot's speed by (`set_speed_curve`), however many cards.
+const SPEED_START_MOST: float = 4.0
 ## The threat grid (see `threat`): built from this many live shots (below, one pass is cheaper),
 ## its cells at least THREAT_CELL pixels and at most THREAT_GRID_MAX a side, and a shot whose path
 ## covers more than THREAT_SPAN_MAX cells is tried by every query instead of filed.
@@ -692,8 +691,12 @@ var _deflect: PackedByteArray = PackedByteArray()
 var _span: PackedFloat32Array = PackedFloat32Array()
 var _radius0: PackedFloat32Array = PackedFloat32Array()
 var _growth: PackedFloat32Array = PackedFloat32Array()
-## Drag (`set_drag`): the power its speed eases out by, as a share of its life left (0 for none).
-var _drag: PackedFloat32Array = PackedFloat32Array()
+## Speed over life (`set_speed_curve`): the factors on its speed when it leaves and as its life runs
+## out, the power of the ease between them, and the speed they are factors of.
+var _curve_from: PackedFloat32Array = PackedFloat32Array()
+var _curve_to: PackedFloat32Array = PackedFloat32Array()
+var _curve_ease: PackedFloat32Array = PackedFloat32Array()
+var _curve_speed: PackedFloat32Array = PackedFloat32Array()
 var _wave: PackedFloat32Array = PackedFloat32Array()
 var _wave_age: PackedFloat32Array = PackedFloat32Array()
 var _base: PackedVector2Array = PackedVector2Array()
@@ -1263,7 +1266,10 @@ func set_cap(value: int) -> void:
 	_span.resize(_cap)
 	_radius0.resize(_cap)
 	_growth.resize(_cap)
-	_drag.resize(_cap)
+	_curve_from.resize(_cap)
+	_curve_to.resize(_cap)
+	_curve_ease.resize(_cap)
+	_curve_speed.resize(_cap)
 	_wave.resize(_cap)
 	_wave_age.resize(_cap)
 	_base.resize(_cap)
@@ -2273,18 +2279,24 @@ func set_growth(slot: int, factor: float) -> bool:
 	return true
 
 
-## The shot leaves `factor` times faster and slows down over its life, to a stop as its life runs
-## out (where it ends with an expiry): its speed is `factor` times its own times (life left / its
-## life) to the power `factor - 1`, so it goes as far as it would have without it. `factor` above
-## DRAG_MOST counts as DRAG_MOST. Only a shot that flies; false otherwise, or for a factor of 1
-## or less.
-func set_drag(slot: int, factor: float) -> bool:
-	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
+## The shot's speed changes over its life (speed over life, a card's `speed_start`, `speed_end` and
+## `speed_ease`): it leaves at `start` times its speed now and goes to `end` times it as its life runs
+## out, `start + (end - start) x (1 - (life left / its life) ^ ease)`: with an ease above 1 most of
+## the change comes early (a shot that bursts out and slows to a stop: start 2.5, end 0, ease 1.5),
+## below 1 late. Homing and spiral turn and weave the speed it has; a deflect speeds the whole curve
+## up and starts it again with its life. Only a shot that flies; false otherwise, or for bad numbers.
+## `start` above SPEED_START_MOST counts as SPEED_START_MOST.
+func set_speed_curve(slot: int, start: float, end: float, ease_power: float) -> bool:
+	if not _is_flyer(slot) or not (start > 0.0) or not (end >= 0.0) or not (ease_power > 0.0):
 		return false
-	var most: float = minf(factor, DRAG_MOST)
-	_drag[slot] = most - 1.0
-	_vel[slot] = _vel[slot] * most
-	_join(slot, B_DRAG)
+	if not is_finite(start) or not is_finite(end) or not is_finite(ease_power):
+		return false
+	_curve_from[slot] = minf(start, SPEED_START_MOST)
+	_curve_to[slot] = minf(end, SPEED_START_MOST)
+	_curve_ease[slot] = ease_power
+	_curve_speed[slot] = _vel[slot].length()
+	_vel[slot] = _vel[slot] * _curve_from[slot]
+	_join(slot, B_CURVE)
 	return true
 
 
@@ -2365,6 +2377,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 		velocity -= 2.0 * velocity.dot(out) * out
 	_vel[slot] = velocity * SpellLimits.DEFLECT_SPEEDUP
 	_speed[slot] *= SpellLimits.DEFLECT_SPEEDUP
+	_curve_speed[slot] *= SpellLimits.DEFLECT_SPEEDUP
 	_base[slot] = _pos[slot]
 	_life[slot] = _span[slot]
 	_actor[slot] = by
@@ -2835,7 +2848,10 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_span[slot] = lifetime
 	_radius0[slot] = maxf(radius, 0.0)
 	_growth[slot] = 1.0
-	_drag[slot] = 0.0
+	_curve_from[slot] = 1.0
+	_curve_to[slot] = 1.0
+	_curve_ease[slot] = 1.0
+	_curve_speed[slot] = 0.0
 	_wave[slot] = 0.0
 	_wave_age[slot] = 0.0
 	_linger[slot] = 0.0
@@ -2904,7 +2920,7 @@ func step(delta: float) -> void:
 	at = _profiled(PROF_COMMON, at)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
-			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit, drag,
+			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit, curve,
 			# return, homing, spiral); it says false for the others.
 			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
 				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
@@ -3161,9 +3177,9 @@ func _hit_found(slot: int) -> void:
 # - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
 # - return before homing: a shot on its way back heads for its caster, bent toward the target its
 #   homing found (`_pass_return`); the homing pass only searches for it.
-# - drag after return and before homing and spiral: it eases only a shot flying out (one on its
-#   way home keeps the speed it turned with), and homing and spiral then turn and weave the
-#   eased velocity.
+# - speed curve after return and before homing and spiral: it sets the speed only of a shot flying
+#   out (one on its way home keeps the speed it turned with), and homing and spiral then turn and
+#   weave that velocity.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
 # - shield after the hits: it checks every shot's whole path of this step.
@@ -3175,7 +3191,7 @@ const B_GROWTH: int = 1
 const B_LINGER: int = 2
 const B_ORBIT: int = 3
 const B_RETURN: int = 4
-const B_DRAG: int = 5
+const B_CURVE: int = 5
 const B_HOMING: int = 6
 const B_SPIRAL: int = 7
 const B_MOVE: int = 8
@@ -3189,7 +3205,7 @@ const AFTER_HOMING_MASK: int = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1))
 ## The pass of each behaviour, by B_* (`_init` makes `_passes` from it).
 const BEHAVIOUR_PASSES: Array[StringName] = [
 	&"_pass_stuck", &"_pass_growth", &"_pass_linger", &"_pass_orbit", &"_pass_return",
-	&"_pass_drag", &"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
+	&"_pass_curve", &"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
 ]
 
 ## What a shot is doing in this step (`_state`), set by the common pass and the behaviour passes and
@@ -3393,18 +3409,16 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 		_state[slot] = S_RETURNING
 
 
-## Drag (`set_drag`): a shot flying out slows by the share of its life this step took, to the
-## power of its drag, and flies on along its slower velocity; at the end of its life it stands
-## still. Read from its life now, so a linger or a deflect (which give it life again) is eased on
-## from where it is.
-func _pass_drag(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
+## Speed over life (`set_speed_curve`): a shot flying out takes the speed of its curve at the share
+## of its life left, along the way it flies now, and flies on along it.
+func _pass_curve(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] != S_MOVING:
 			continue
-		var left: float = _life[slot]
-		var slower: float = pow(left / (left + delta), _drag[slot])
-		_vel[slot] = _vel[slot] * slower
+		var left: float = clampf(_life[slot] / _span[slot], 0.0, 1.0)
+		var factor: float = _curve_from[slot] + (_curve_to[slot] - _curve_from[slot]) * (1.0 - pow(left, _curve_ease[slot]))
+		_vel[slot] = _vel[slot].normalized() * (_curve_speed[slot] * factor)
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
 

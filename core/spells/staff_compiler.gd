@@ -13,7 +13,7 @@ extends RefCounted
 ## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
 
 ## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
-const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.DRAG]
+const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -29,7 +29,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ZAP,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
-	ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.DRAG,
+	ModifierBase.Behaviour.PULL,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -324,6 +324,10 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) ->
 		any = true
 		if on.has(Carrier.SHOTS):
 			return true
+	if not is_equal_approx(modifier.speed_start, 1.0) or not is_equal_approx(modifier.speed_end, 1.0):
+		any = true
+		if on.flies():
+			return true
 	if not is_equal_approx(modifier.reach_mult, 1.0):
 		any = true
 		if on.reaches():
@@ -406,6 +410,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		shots *= modifier.shot_mult
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
+		spell.speed_start *= modifier.speed_start
+		spell.speed_end *= modifier.speed_end
+		spell.speed_ease *= modifier.speed_ease
 		spell.lifetime *= modifier.lifetime_mult
 		if carrier.flies():
 			spell.lifetime *= modifier.reach_mult

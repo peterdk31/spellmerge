@@ -75,11 +75,6 @@ enum Behaviour {
 	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
 	## cast it. Several hits make several pulls, and they add. Strength unused (1).
 	PULL,
-	## Leaves `behaviour_strength` times faster and slows down over its life, easing out to a stop
-	## where it ends (more cards multiply, up to `ProjectileManager.DRAG_MOST`): its speed is that
-	## times its own times (life left / its life) to the power `behaviour_strength - 1`, so it goes
-	## as far as without it (`set_drag`). Only on a carrier that flies (`ModifierBase.NEEDS`).
-	DRAG,
 }
 
 ## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
@@ -104,7 +99,6 @@ const NEEDS: Dictionary = {
 	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.RETURN: {"any": CarrierTraits.FLIES},
-	Behaviour.DRAG: {"any": CarrierTraits.FLIES},
 	Behaviour.LINGER: {"any": CarrierTraits.MOVES},
 	Behaviour.STICKY: {"any": CarrierTraits.MOVES},
 	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
@@ -164,6 +158,17 @@ const NEEDS: Dictionary = {
 ## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 
+# --- Speed over life (drag) -------------------------------------------------------------
+
+## Factors on a flying shot's speed when it leaves (`speed_start`) and as its life runs out
+## (`speed_end`), and how it goes from one to the other (`speed_ease`: 1 evenly, above 1 most of
+## the change early, below 1 late; `ProjectileManager.set_speed_curve`). Drag bursts out and slows
+## to a stop: 2.5, 0, 1.5. Several cards multiply each. All 1 changes nothing; wasted where the
+## carrier does not fly.
+@export var speed_start: float = 1.0
+@export var speed_end: float = 1.0
+@export var speed_ease: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -186,5 +191,8 @@ func ranges() -> Dictionary:
 		"spread_mult": Vector2(0.0, 4.0),
 		"lifetime_mult": Vector2(0.1, 4.0),
 		"reach_mult": Vector2(0.1, 4.0),
+		"speed_start": Vector2(0.1, 4.0),
+		"speed_end": Vector2(0.0, 4.0),
+		"speed_ease": Vector2(0.1, 8.0),
 	})
 	return limits

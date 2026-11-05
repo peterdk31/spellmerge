@@ -1,6 +1,6 @@
 extends SceneTree
 ## Tests for core/projectiles, the projectile kit (staffs B1): bounce, ghost, spiral, return,
-## linger, growth, drag, sticky, shield, shots that hit their caster, every shot hitting both sides
+## linger, growth, speed over life, sticky, shield, shots that hit their caster, every shot hitting both sides
 ## (actors G3c) and the wall flag of an expiry. The manager is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_kit.gd
@@ -42,7 +42,7 @@ func _initialize() -> void:
 	_test_a_returning_shot_always_comes_home()
 	_test_linger_stops_then_goes_on()
 	_test_growth_grows_to_the_room()
-	_test_drag_eases_out_to_a_stop()
+	_test_speed_curve_eases_over_life()
 	_test_sticky_follows_its_target()
 	_test_shield_blocks_enemy_shots()
 	_test_shield_only_for_actors_shots()
@@ -281,13 +281,14 @@ func _test_linger_stops_then_goes_on() -> void:
 	_check(absf(_expired[0][1].x - 100.0 - 50.0) < 6.0, "having flown the whole flight (%s)" % _expired[0][1])
 
 
-## Drag (`set_drag`): the shot leaves `factor` times faster and eases out to a stop as its life
-## runs out, so it goes as far as a plain shot, only sooner; then it ends with an expiry.
-func _test_drag_eases_out_to_a_stop() -> void:
+## Speed over life (`set_speed_curve`): a drag curve (2.5 to 0, ease 1.5... here 3 to 0, ease 2)
+## leaves faster and eases out to a stop as its life runs out, about as far as a plain shot, only
+## sooner; an even curve the other way speeds up.
+func _test_speed_curve_eases_over_life() -> void:
 	_setup()
 	var plain: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 100.0), 1.0, 1)
 	var slot: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 200.0), 1.0, 2)
-	_check(_mgr.set_drag(slot, 3.0), "drag is accepted on a flying shot")
+	_check(_mgr.set_speed_curve(slot, 3.0, 0.0, 2.0), "a speed curve is accepted on a flying shot")
 	_check(_mgr.get_velocity_of(slot).is_equal_approx(Vector2(300.0, 0.0)), "it leaves three times faster (%s)" % _mgr.get_velocity_of(slot))
 	_run(12)
 	var ahead: float = _mgr.get_position_of(slot).x - _mgr.get_position_of(plain).x
@@ -295,8 +296,8 @@ func _test_drag_eases_out_to_a_stop() -> void:
 	var before: float = _mgr.get_velocity_of(slot).x
 	_run(18)
 	var half: float = _mgr.get_velocity_of(slot).x
-	# (Speed at half its life: 3 x 100 x 0.5^2 = 75.)
-	_check(half < before and absf(half - 75.0) < 5.0, "it slows down: %f px/s at half its life" % half)
+	# (Speed at half its life: 100 x 3 x 0.5^2 = 75.)
+	_check(half < before and absf(half - 75.0) < 1.0, "it slows down: %f px/s at half its life" % half)
 	_check(absf(_mgr.get_velocity_of(slot).y) < 0.001, "keeping its heading")
 	_run(29)
 	_check(_mgr.is_alive(slot) and _mgr.get_velocity_of(slot).x < 1.0, "it is all but still at the end of its life (%f)" % _mgr.get_velocity_of(slot).x)
@@ -305,29 +306,36 @@ func _test_drag_eases_out_to_a_stop() -> void:
 	var ends: Dictionary = {}
 	for row: Array in _expired:
 		ends[row[2]] = row[1]
-	_check(ends.has(2) and absf((ends[2] as Vector2).x - (ends[1] as Vector2).x) < 5.0, "as far as the plain shot went (%s)" % [ends])
-	# Refused where it means nothing, and for no drag.
+	_check(ends.has(2) and absf((ends[2] as Vector2).x - (ends[1] as Vector2).x) < 5.0, "about as far as the plain shot went (%s)" % [ends])
+	# The other way: an even curve from half speed up to twice.
+	_setup()
+	var speeding: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 100.0), 1.0)
+	_mgr.set_speed_curve(speeding, 0.5, 2.0, 1.0)
+	_run(30)
+	_check(absf(_mgr.get_velocity_of(speeding).x - 125.0) < 1.0, "an even curve is half way at half its life (%f)" % _mgr.get_velocity_of(speeding).x)
+	# Refused where it means nothing, and for bad numbers.
 	var still: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
 	var orbit: int = _mgr.spawn_orbit(0, 30.0, 0.0, 1.0, 1.0)
 	var flyer: int = _fire(Vector2(10.0, 0.0))
-	_check(not (_mgr.set_drag(still, 2.0) or _mgr.set_drag(orbit, 2.0)), "a still or orbiting shot takes no drag")
-	_check(not (_mgr.set_drag(flyer, 1.0) or _mgr.set_drag(flyer, INF) or _mgr.set_drag(-1, 2.0)), "nor a drag of 1, a bad number or no shot")
-	_check(_mgr.set_drag(flyer, 100.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(10.0 * ManagerScript.DRAG_MOST, 0.0)), "a huge drag leaves DRAG_MOST times faster")
+	_check(not (_mgr.set_speed_curve(still, 2.0, 0.0, 1.0) or _mgr.set_speed_curve(orbit, 2.0, 0.0, 1.0)), "a still or orbiting shot takes no curve")
+	_check(not (_mgr.set_speed_curve(flyer, 0.0, 1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, -1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, 1.0, 0.0) or _mgr.set_speed_curve(flyer, INF, 0.0, 1.0) or _mgr.set_speed_curve(-1, 2.0, 0.0, 1.0)), "nor bad numbers or no shot")
+	_check(_mgr.set_speed_curve(flyer, 100.0, 0.0, 1.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(10.0 * ManagerScript.SPEED_START_MOST, 0.0)), "a huge start counts as SPEED_START_MOST")
 	# A reused slot starts clean.
 	_mgr.clear()
 	var again: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 1.0)
 	_run(30)
 	_check(_mgr.get_velocity_of(again).is_equal_approx(Vector2(10.0, 0.0)), "a fresh shot in its slot keeps its speed")
-	# The card's number reaches the shot (`Spells._apply_travel`).
+	# The cards' numbers reach the shot (`Spells._apply_travel`).
 	var spells: Node = SpellsScript.new()
 	spells.bind(_mgr, _bus)
 	var spell := CompiledSpell.new()
-	spell.behaviours.resize(ModifierBase.Behaviour.size())
-	spell.behaviours[ModifierBase.Behaviour.DRAG] = 2.5
+	spell.speed_start = 2.5
+	spell.speed_end = 0.0
+	spell.speed_ease = 1.5
 	var carded: int = _fire(Vector2(100.0, 0.0))
 	spells._apply_travel(carded, spell)
-	_check(_mgr.get_velocity_of(carded).is_equal_approx(Vector2(250.0, 0.0)), "a Drag card of 2.5 sends the shot off 2.5 times faster")
+	_check(_mgr.get_velocity_of(carded).is_equal_approx(Vector2(250.0, 0.0)), "a Drag card sends the shot off 2.5 times faster")
 	spells.free()
 
 

@@ -19,8 +19,8 @@ func test_the_card_is_a_valid_modifier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"drag", "its id is its folder")
-	check_equal(card.behaviour, ModifierBase.Behaviour.DRAG, "the drag behaviour")
-	check(card.behaviour_strength > 1.0, "it leaves faster than its carrier's speed")
+	check_equal(card.behaviour, ModifierBase.Behaviour.NONE, "numbers only: no behaviour of its own")
+	check(card.speed_start > 1.0 and card.speed_end == 0.0 and card.speed_ease > 1.0, "it bursts out and eases to a stop")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 
 
@@ -50,11 +50,12 @@ func test_it_goes_as_far_as_a_plain_bolt() -> void:
 
 func test_drag_cards_multiply() -> void:
 	var arena := ArenaScript.new(root)
-	var strength: float = _card().behaviour_strength
+	var card: ModifierBase = _card()
 	var staff: CompiledStaff = arena.install_cards(0, 0, ["drag", "drag", "bolt"])
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	arena.free_all()
-	check_equal(spell.behaviour(ModifierBase.Behaviour.DRAG), strength * strength, "two cards multiply")
+	check_equal(spell.speed_start, card.speed_start * card.speed_start, "two cards multiply the start")
+	check_equal(spell.speed_ease, card.speed_ease * card.speed_ease, "and the ease")
 
 
 func test_it_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: The tail shader's tail removed (spell spectacle 2, S5 step 4, the cleanup; owner session)
+
+- **What went, since tails are motes:** every shot's trail row and its sampling (30 a second), the trail texture and its upload, the cooling trails left where shots ended, the tail meshes and their switching by the pool's share (`TAILS_*`), `tails_enabled`, the tails-on spark pool (`PARTICLE_CAP`, `particle_cap`, `trail_share`, `trail_demand`, `TRAIL_COST`, `drawn_trails`), and in `shot_trail.gdshader` the path search, the tail pixels, the pieces' lights and lightning's jagged line (478 lines to 185). The same in `ShotKernel` (`sample_shots`, the loose rows in the drawing); `test_native_kernel.gd` still compares the two to the bit.
+- **What stays:** a shot is drawn as its core and the core's light, told the way it flies in its instance (`_write_head`: no path, -1, then the way where a path's numbers were, as tail-less shots were already); the births' pool is `tailless_particle_cap`. A dash (`follow_caster`) keeps its contract (its streaks and cards along the way its caster goes) on a small per-caster table in place of a trail row, sampled every `DASH_EVERY` (1/30 s) as the rows were. A blink and a new orbit now start the shot's tail where it lands (`_tail_from`), as they started its trail.
+- **Left for later:** lightning's and the dashes' batches (`BATCH_*_JAG`, `BATCH_DASH`, `BATCH_ENEMY_DASH`) only differed by their mesh and now draw like the others (the dashes' stay empty); folding them into the plain batches is its own change (the native kernel's batch rule and the spell light read them).
+- **Recorded again:** `test_projectiles_step_exact.gd`'s recording, whose state lines held each shot's trail: every step's events, hits and live shots are the same as before (checked line by line), only the digests changed.
+
 ## 2026-11-05: Tails are motes, each shot's in one of three kinds (spell spectacle 2, S5 step 4, owner session)
 
 - **The owner's pick:** "I'll pick motes. They look awesome as tails!" and "keep all three and make the shots randomly pick one". A shot's tail births are `SPARK_TAIL` + 0 to 2 (`SPARK_TAIL` is 60 now, `TAIL_KINDS` 3, so the codes fit the motes' pair key below `PAIR_LAYERS`), the code picked once from the shot's sequence (`tail_code`, `tail_hash(seq, -1)`; the native kernel's twin, compared to the bit by `test_native_kernel.gd`); the motes lay code n in the nth tail kind by id (A `tail`, B `tail_streak`, C `tail_long`).

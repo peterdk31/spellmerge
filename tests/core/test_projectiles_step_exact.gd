@@ -11,7 +11,9 @@ extends SceneTree
 ## is higher; and again in rules R4 F4, when the way home stopped taking a returning shot's life:
 ## the shots do the same, only a returning shot's life stays where it turned; and again for the
 ## atom, when homing became a curve, radians a pixel flown: the same events, the turns differ by
-## float rounding only, at most 0.00004 px).
+## float rounding only, at most 0.00004 px; and again 2026-11-05 when the trails went, tails being
+## motes: the same events, hits and live shots at every step, only the state line lost each shot's
+## trail and the trail count).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -25,8 +27,8 @@ extends SceneTree
 ## What is compared, step by step: every event in the order it was sent (`projectile_hit`,
 ## `projectile_impact`, `projectile_expired` with its wall flag, `shot_blocked`, `shot_ended`, with
 ## positions written in full float precision) and every live shot's state after the step
-## (position, previous position, velocity, life, radius, pierce, flags, the newest point of its
-## trail and more) with the manager's counters. The recording keeps one line a step: the number of
+## (position, previous position, velocity, life, radius, pierce, flags, its moves and more) with
+## the manager's counters. The recording keeps one line a step: the number of
 ## events and hits, the live shots, and a digest of all of it. A changed number anywhere fails the
 ## test at the first step that differs.
 ##
@@ -181,9 +183,6 @@ func _run_scene() -> void:
 	_mgr.actors = _table
 	_mgr.events = _bus
 	_mgr.set_cap(700)
-	# The recording has each shot's newest trail point: the tail shader's tails, which the game no
-	# longer turns on since tails are motes (2026-11-05). Recorded again when trail rows go.
-	_mgr.set_tails_enabled(true)
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
 	var walls: Array[Rect2] = [
 		Rect2(0, 0, 640, 32), Rect2(0, 328, 640, 32), Rect2(0, 0, 32, 360), Rect2(608, 0, 16, 120),
@@ -398,17 +397,15 @@ func _moves_velocity(slot: int) -> Vector2:
 func _log_step(step: int) -> void:
 	var m: ManagerScript = _mgr
 	var parts: PackedStringArray = PackedStringArray()
-	parts.append("count %d dropped %d walls %d work %d resume %d high %d trails %d" % [m.get_count(), m.dropped, m.wall_hits, m._work_left, m._resume, m._high, m.get_trail_count()])
+	parts.append("count %d dropped %d walls %d work %d resume %d high %d" % [m.get_count(), m.dropped, m.wall_hits, m._work_left, m._resume, m._high])
 	for slot in m._high:
 		if not m.is_alive(slot):
 			continue
-		var row: int = m.get_trail_of(slot)
-		var newest: Vector4 = m.get_trail_point(row, 0) if row >= 0 else Vector4.ZERO
-		parts.append("%d seq%d p%s q%s v%s l%s r%s pi%d f%d b%d sh%d h%s ha%s ht%d c%s ml%s mv%s tr%d k%d n%s" % [
+		parts.append("%d seq%d p%s q%s v%s l%s r%s pi%d f%d b%d sh%d h%s ha%s ht%d c%s ml%s mv%s" % [
 			slot, m.get_seq_of(slot), _v(m._pos[slot]), _v(m._prev[slot]), _v(m._vel[slot]), _f(m._life[slot]),
 			_f(m._radius[slot]), m._pierce[slot], m._flags[slot], m._bounce[slot], m._shield[slot],
 			_f(m._hold[slot]), _v(m._home_at[slot]), int(m._home_target[slot] != 0), _v(m._caster_at[slot]),
-			_f(_moves_left(slot)), _v(_moves_velocity(slot)), int(row >= 0), m.get_trail_kept(row), var_to_str(newest)])
+			_f(_moves_left(slot)), _v(_moves_velocity(slot))])
 	var events: String = "\n".join(_events)
 	var state: String = "\n".join(parts)
 	if _full:

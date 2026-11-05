@@ -36,14 +36,14 @@ func test_its_card_names_its_impact_cue_and_its_wind_up_draws_no_ring() -> void:
 
 func test_its_strike_shown_is_no_cue_its_end_is() -> void:
 	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 0, "showing the slam plays no cue (its card's cast look names none)")
+	check_equal(feel.flashes_of(&"quake"), 0, "showing the slam plays no cue (its card's cast look names none)")
 	check_equal(feel.trauma(), 0.0, "and no shake")
 
 
 func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "a white-hot star")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT), 0, "no expanding ring (too uniform)")
+	check_equal(feel.flashes_of(&"burst"), 1, "a white-hot star")
+	check_equal(feel.flashes_of(&"ring_out"), 0, "no expanding ring (too uniform)")
 	check(feel.motes().next_row() > 0, "stone chips off the floor, as motes")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"slam").shake), "a shake")
 	check(feel.kick().y > 0.0 and is_zero_approx(feel.kick().x), "a punch down the screen")
@@ -51,17 +51,17 @@ func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
 
 func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> void:
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 1, "a quake where it struck")
-	check_equal(feel.flash_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "sized by its radius")
+	check_equal(feel.flashes_of(&"quake"), 1, "a quake where it struck")
+	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(16.0 * 1.5 / feel.flash_kind(&"quake").step), "sized by its radius")
 	feel.step(0.05)
 	check_equal(feel._floor_node.multimesh.visible_instance_count, 1, "drawn in the floor batch")
 	check_equal(feel._flash_node.multimesh.visible_instance_count, 1, "not with the flashes (the star; its chips are motes)")
 	check(feel._floor_node.z_index < 40, "under the enemies (entities.gd DRAW_Z)")
 	feel.step(0.5)
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 0, "the star is gone")
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 1, "the cracks are still there, cooling")
-	feel.step(FeelScript.QUAKE_SECONDS)
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 0, "and crumble away")
+	check_equal(feel.flashes_of(&"burst"), 0, "the star is gone")
+	check_equal(feel.flashes_of(&"quake"), 1, "the cracks are still there, cooling")
+	feel.step(feel.flash_kind(&"quake").seconds)
+	check_equal(feel.flashes_of(&"quake"), 0, "and crumble away")
 	check_equal(feel._floor_node.multimesh.visible_instance_count, 0, "nothing left on the floor")
 
 
@@ -76,4 +76,4 @@ func test_the_shake_setting_turns_its_shake_off() -> void:
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
 	check_equal(feel.trauma(), 0.0, "no shake")
 	check_equal(feel.kick(), Vector2.ZERO, "no punch")
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 1, "the floor mark still shows")
+	check_equal(feel.flashes_of(&"quake"), 1, "the floor mark still shows")

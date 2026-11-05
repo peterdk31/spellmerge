@@ -15,7 +15,7 @@ extends Resource
 ## its checks in `_type_problems`, if it has any) and a player in Feel or its spectacle.
 ##
 ## A part with no `part` (or `"part": "flash"`) is a flash Feel draws:
-##   `flash`      one of FLASHES (required)
+##   `flash`      a flash kind's id (required; content/flashes, `FlashKind`)
 ##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given; a fraction is
 ##                rounded after the cue's `power`)
 ##   `reach`      its size from the cue's: `size` x reach pixels (Feel turns pixels into its zoom)
@@ -36,10 +36,9 @@ extends Resource
 ##                played only when the cue's cards have it (lightning's arc: 5)
 ##   `if_size_over`, `if_size_upto`  played only when the cue's size is over this, or this or less
 ##                (a zap's spark into the air, 22 px at the most, burns out sooner than a zap)
-## The `poof` flash is a staff's cloud (living staffs H4: bone clouds that swell to their biggest
-## at 35% of its seconds and dot away, a few sparks in the ramp; a puff with Feel's `POOF` look).
-## The `arc` flash is drawn along its length: the cue's `size` x its `reach` (1 when not given)
-## pixels from the cue's point along its way (left out when that is 0), and takes no `zoom`.
+## A flash kind drawn along a length (`FlashKind.along`: the `arc`) runs the cue's `size` x its
+## `reach` (1 when not given) pixels from the cue's point along its way (left out when that is 0),
+## and takes no `zoom`.
 ## A cue's line (S6, item 9): its way for its `size` pixels from its point (a staff swap is played
 ## at the staff's grip, along it, its size the staff's length). A flash, a motes part or a light
 ## may say where on it it plays: `along`, 0 (the cue's point, the default) to 1 (the line's end; 0.5
@@ -116,7 +115,7 @@ extends Resource
 ##   `below`      how far under it its feet are (8 when not given)
 ##   `seconds`    the most it lasts (2 when not given), should its carrier's end never come
 ## A cue with a light part lights by its light parts alone: its flashes do not light the room by
-## their kinds as they otherwise do (`SpellLight.FLASH_LIGHT`), so content says how a rune or a
+## their kinds as they otherwise do (`FlashKind.room_light`), so content says how a rune or a
 ## heal lights.
 ## Its weight: `shake` (screen trauma, 0 to 1, on top of anything else's), `kick` pixels of camera
 ## punch `kick_way` (`down` the screen, `away` from the caster's body towards the cue, `back`
@@ -138,14 +137,6 @@ extends Resource
 ## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
 ## weight. 0 (the default) plays every time.
 
-## The flashes a part can name (Feel maps each to its flash kind, and says how many pixels a
-## step of its zoom is).
-const FLASHES: Array[StringName] = [
-	&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff",
-	&"quake", &"shell", &"fireball", &"rise", &"fall", &"arc", &"poof",
-]
-## The flashes drawn along a length (the cue's size x reach) rather than at a zoom.
-const LENGTH_FLASHES: Array[StringName] = [&"arc"]
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`flash`), motes and a floor mark.
@@ -199,8 +190,8 @@ func lights() -> bool:
 	return _lights == 2
 
 
-## What is wrong with this cue, one line each (empty when nothing is): an unknown flash, way or
-## key, or a number out of its range.
+## What is wrong with this cue, one line each (empty when nothing is): an unknown part type, way or
+## key, or a number out of its range. Whether its flash kinds exist is `kind_problems`.
 func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if id == &"":
@@ -246,27 +237,41 @@ func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringA
 	return PackedStringArray()
 
 
-## What is wrong with the flash part `i` (`part`): an unknown flash, or sizes that clash or are 0
-## or less.
+## What is wrong with the flash part `i` (`part`): no kind, or sizes that clash or are 0 or less.
 func _flash_problems(i: int, part: Dictionary) -> PackedStringArray:
 	var found := PackedStringArray()
-	var flash: StringName = StringName(part.get("flash", ""))
-	if not FLASHES.has(flash):
-		found.append("%s: part %d's flash '%s' is not one of %s" % [id, i, flash, FLASHES])
+	if StringName(part.get("flash", "")) == &"":
+		found.append("%s: part %d names no flash kind" % [id, i])
 	if part.has("zoom") and part.has("reach"):
 		found.append("%s: part %d has both zoom and reach" % [id, i])
 	if part.has("lasts_size") and (part.has("seconds") or part.has("reach")):
 		found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
 	if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or float(part.get("zoom", 1.0)) < 1.0:
 		found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
-	if LENGTH_FLASHES.has(flash) and (part.has("zoom") or part.has("lasts_size")):
-		found.append("%s: part %d's %s is drawn along the cue's size: it takes no zoom or lasts_size" % [id, i, flash])
 	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) + int(bool(part.get("no_cards", false))) + int(bool(part.get("body", false))) > 1:
 		found.append("%s: part %d takes one of color, plain, bare, no_cards and body" % [id, i])
 	if part.has("if_layer") and (int(part["if_layer"]) < 1 or int(part["if_layer"]) > MoteKind.LOOK_LAYERS):
 		found.append("%s: part %d's if_layer is not a look layer (1-%d)" % [id, i, MoteKind.LOOK_LAYERS])
 	if part.has("if_size_over") and part.has("if_size_upto") and float(part["if_size_upto"]) <= float(part["if_size_over"]):
 		found.append("%s: part %d's if_size_over and if_size_upto leave no size it plays at" % [id, i])
+	return found
+
+
+## What is wrong with this cue's flash parts with the flash kinds `kinds` (id -> FlashKind; the
+## registry's content/flashes): a kind there is not, or a zoom or lasts_size on a kind drawn along a
+## length (`tests/content/test_cues.gd` checks every cue).
+func kind_problems(kinds: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	for i in parts.size():
+		var part: Dictionary = parts[i]
+		if StringName(part.get("part", "flash")) != &"flash":
+			continue
+		var flash: StringName = StringName(part.get("flash", ""))
+		var kind: FlashKind = kinds.get(flash) as FlashKind
+		if kind == null:
+			found.append("%s: part %d's flash '%s' is no flash kind (content/flashes)" % [id, i, flash])
+		elif kind.along() and (part.has("zoom") or part.has("lasts_size")):
+			found.append("%s: part %d's %s is drawn along the cue's size: it takes no zoom or lasts_size" % [id, i, flash])
 	return found
 
 

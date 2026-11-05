@@ -45,12 +45,16 @@ extends Node
 ## Flashes (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
 ## every flare, spray, puff, ring, arc and status is drawn by the shots' own shaders (the sparks of
 ## a spray and a puff, and every chip, are motes since S3)
-## (core/projectiles: `shot_flash.gdshader` for the flares, kinds KIND_BURST to KIND_PUFF;
-## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
+## (core/projectiles: `shot_flash.gdshader` for the flash kinds it draws from their curves (and
+## the cracks on the floor), `shot_blast.gdshader` for an explosion's parts, `shot_arc.gdshader` for
+## lightning, `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
-## all glowing. A new flash takes the oldest slot when they are all busy. How a caster's body
+## all glowing. A new flash takes the oldest slot when they are all busy. **Each flash is a kind
+## of data** (docs/milestones/flash-kinds.md): a `FlashKind` file in content/flashes, read from the
+## registry (`_read_flash_kinds`) into the flash shader's table (`flash_table.gd`), so a new look
+## is a new file; a cue's `flash` part names it by id. How a caster's body
 ## moves when it casts is its carrier card's `staff_pose`, drawn by its look (ActorLook), not here.
 ## None of this touches the cast itself.
 ##
@@ -94,6 +98,7 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
+const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -172,79 +177,33 @@ const SPRAY_MAX_SIZE: float = 1.6
 ## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
 ## showing the body as it is drawn now (or null), which a death breaks into motes instead.
 const SPRITE_GIVER: StringName = &"sprite_giver"
-## The flashes drawn with the shot shaders (see "Flashes" above): the kinds they know (K_* in
-## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
-## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
-const KIND_BURST: int = 4
-const KIND_RING_OUT: int = 5
-const KIND_RING_IN: int = 6
-const KIND_RUNE_BURST: int = 7
-const KIND_CAST: int = 8
-const KIND_SPRAY: int = 11
-const KIND_PUFF: int = 12
+## The flash kinds' folder in the registry (content/flashes; `FlashKind`).
+const FLASH_FOLDER: StringName = &"flashes"
+## Feel's codes for its flashes (`_flash_kind` of a slot): a kind the flash shader draws from the
+## table is FLASH_TABLE + its row; the rest are drawn by shaders of their own, each its code there
+## (K_* in core/projectiles/shot_palette.gdshaderinc; an explosion's part less KIND_SHELL in
+## `shot_blast.gdshader`). A status's glow (`shot_status.gdshader`) is no kind of content.
 const KIND_ARC: int = 14
 const KIND_STATUS: int = 15
-## The ground struck (a part of the cues `quake` and `slam`): cracks cooling from white-hot,
-## rubble and dust, drawn by the flares' shader in a batch of its own under the bodies (`FLOOR_Z`). Below KIND_BURST, where
-## the shots' kinds are, which never come to that shader.
-const KIND_QUAKE: int = 3
-## Columns of light on a spot (parts of cues: where a teleport leaves and lands, where a rain falls),
-## below KIND_BURST too: light pulled up off it, and light struck down onto it. A column is as high
-## as half the flash's square (12 px a zoom step); their seconds.
-const KIND_RISE: int = 1
-const KIND_FALL: int = 2
-const RISE_SECONDS: float = 0.45
-const FALL_SECONDS: float = 0.5
+const KIND_SHELL: int = 16
+const KIND_FIREBALL: int = 17
+const FLASH_TABLE: int = 256
+## The code a table flash's row carries beside its age (any of 0-15 does: the shader reads its kind
+## from the row's transform; 15 keeps the age finest where the custom data is kept as half floats).
+const FLASH_TABLE_CODE: int = 15
+## The codes of the kinds drawn by shaders of their own, by their `draw`.
+const DRAW_KINDS: Dictionary = {&"shell": KIND_SHELL, &"fireball": KIND_FIREBALL, &"arc": KIND_ARC}
 ## The look bit that makes a flash take its colour exactly (a reaction's own colour) instead
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
-## The look bit that turns a puff into a staff's poof (kind 22 in the shader; living staffs H4):
-## bone clouds swelling and shrinking along the staff (the cue part flash `poof`; a cue that names
-## it throws its own sparks, as a motes part).
-const POOF: int = 1 << 21
-## The poof's own seconds (a `poof` part's when it gives none): StaffLook's POOF_TIME, the swap at
-## 35% of them.
-const POOF_SECONDS: float = 0.18
 ## Another staff on show plays the cue `staff_swap` (S6, item 9) along the new staff, following the
 ## body.
 const STAFF_SWAP: StringName = &"staff_swap"
-const SPRAY_SECONDS: float = 0.3
-const PUFF_SECONDS: float = 0.4
-## A quake's seconds (its cracks cool and crumble away at the end), and its reach per zoom in
-## pixels (QUAKE_REACH in the shader): its zoom is the reach struck times QUAKE_PAST over that.
-const QUAKE_SECONDS: float = 1.4
-const QUAKE_REACH: float = 8.0
-const QUAKE_PAST: float = 1.5
-## An explosion's parts (the cues `blast` and `fireball`), drawn by `shot_blast.gdshader` (its B_*: these less
-## KIND_SHELL) in a batch of their own: the ragged shell (blast's) and the rising fireball (an
-## exploding barrel's); their fragments and rubble are motes and their scorch a floor mark (S3,
-## the cues' `motes` and `mark` parts). Their seconds (the shader's; keep them equal), and the
-## square each is drawn in: BLAST_SPAN radii each way.
-const KIND_SHELL: int = 16
-const KIND_FIREBALL: int = 17
-const SHELL_SECONDS: float = 0.5
-const FIREBALL_SECONDS: float = 1.2
+## An explosion's parts (the flash kinds `shell` and `fireball`), drawn by `shot_blast.gdshader` in
+## a batch of their own; their fragments and rubble are motes and their scorch a floor mark (S3, the
+## cues' `motes` and `mark` parts). The square each is drawn in: BLAST_SPAN radii each way (the
+## shader's; its seconds are the kinds' own, keep them equal).
 const BLAST_SPAN: float = 2.2
-## What a cue's part can name (`CueBase.FLASHES`): its flash kind, the pixels a step of its zoom
-## is (for a part's `reach`: a ring's radius, a flare's half width, a quake's reach, an
-## explosion's radius) and its seconds when the part gives none.
-const CUE_FLASHES: Dictionary = {
-	&"burst": [KIND_BURST, 12.0, BURST_SECONDS],
-	&"ring_out": [KIND_RING_OUT, 10.0, RING_SECONDS],
-	&"ring_in": [KIND_RING_IN, 10.0, RING_SECONDS],
-	&"rune_burst": [KIND_RUNE_BURST, 12.0, RUNE_BURST_SECONDS],
-	&"cast": [KIND_CAST, 12.0, CAST_SECONDS],
-	&"spray": [KIND_SPRAY, 12.0, SPRAY_SECONDS],
-	&"puff": [KIND_PUFF, 12.0, PUFF_SECONDS],
-	&"quake": [KIND_QUAKE, QUAKE_REACH, QUAKE_SECONDS],
-	&"shell": [KIND_SHELL, 2.0, SHELL_SECONDS],
-	&"fireball": [KIND_FIREBALL, 2.0, FIREBALL_SECONDS],
-	&"rise": [KIND_RISE, 12.0, RISE_SECONDS],
-	&"fall": [KIND_FALL, 12.0, FALL_SECONDS],
-	&"arc": [KIND_ARC, 4.0, RING_SECONDS, true],
-	# A puff with the POOF look bit (a fifth column: look bits the flash always has; living staffs H4).
-	&"poof": [KIND_PUFF, 12.0, POOF_SECONDS, false, POOF],
-}
 ## What `_form_cues_of` answers: the places of a carrier card's cues and radius, and the defaults.
 const CUE_CAST: int = 0
 const CUE_SHOWN: int = 1
@@ -253,17 +212,13 @@ const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
-## flashes' own step, CUE_FLASHES).
+## `spray` and `puff` kinds' own step).
 const HIT_STEP: float = 12.0
 ## `play_cue`'s body colour when there is none (alpha 0), and its ramp when not given: the caster's.
 const NO_BODY := Color(0.0, 0.0, 0.0, 0.0)
 const CASTER_RAMP: int = -100
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
-const BURST_SECONDS: float = 0.3
-const RING_SECONDS: float = 0.22
-const RUNE_BURST_SECONDS: float = 0.45
-const CAST_SECONDS: float = 0.14
 ## A discharge arc is drawn along its length (at most ARC_LONGEST: the length travels in the
 ## zoom's place, 4 px a step), ARC_MARGIN past each end, ARC_ACROSS across (the shader's).
 const ARC_LONGEST: float = 252.0
@@ -284,8 +239,10 @@ const FLASH_Z: int = 50
 ## The flash quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const FLASH_GRID: float = 24.0
 const FLASH_STRIDE: int = 16
-## The age code beside a flash's kind: TRACE_FROM + TRACE_SPAN x how far through it is, above
-## the kind, or below it for a flash that does not light the room (`_flash_unlit`).
+## The age code beside a flash's kind: TRACE_FROM + TRACE_SPAN x how far through it is. A row's
+## transform carries two more numbers in its unused floats (full precision, where the custom data
+## may be kept as half floats): its table row (a table kind's, else 0) and how much it lights the
+## room at its start (0 for a flash that does not: `_flash_light`; spell light reads it).
 const FLASH_FROM: float = 0.02
 const FLASH_SPAN: float = 0.42
 ## The quad kinds of a flash's mesh (`flash_mesh`; Q_* in `shot_flash.gdshader`): its light, a
@@ -326,6 +283,8 @@ var registry: RegistryScript = null:
 	set(value):
 		registry = value
 		_status_cards.clear()
+		if _flash_node != null:
+			_read_flash_kinds()
 		if _spectacle != null:
 			_spectacle.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
@@ -526,15 +485,24 @@ var _flash_seconds: PackedFloat32Array = PackedFloat32Array()
 var _flash_length: PackedFloat32Array = PackedFloat32Array()
 ## The character a flash follows (a status), or null, and how far above it the flash sits.
 var _flash_follow: Array[Node2D] = []
-## 1 for a flash that does not light the room by its kind (S6, item 4: shown by a cue with a
-## `light` part, which lights instead); its row says so by the sign of its age code.
-var _flash_unlit: PackedByteArray = PackedByteArray()
+## How much each flash lights the room at its start: its kind's `room_light`, 0 for one shown by a
+## cue with a `light` part (S6, item 4: that lights instead) or a status.
+var _flash_light: PackedFloat32Array = PackedFloat32Array()
 ## Whether the cue whose parts are playing now lights by its own `light` part (`play_cue`), so the
 ## flashes it shows are unlit.
 var _cue_unlit: bool = false
 ## Where a followed flash sits from its node (a status rises above it, a poof sits on the staff).
 var _flash_offset: PackedVector2Array = PackedVector2Array()
 var _next_flash: int = 0
+## The flash kinds (content/flashes, `_read_flash_kinds`), in id order: a table kind's row is its
+## place here. Each id's code (`_flash_kind` of a slot), its row for a cue's flash part
+## (`CuePlan.flash_of`: code, step, seconds, drawn along a length), and each code's room light; the
+## table kinds drawn on the floor (by row).
+var _flash_kinds: Array[FlashKind] = []
+var _flash_codes: Dictionary = {}
+var _flash_rows: Dictionary = {}
+var _code_light: Dictionary = {}
+var _table_floor: PackedByteArray = PackedByteArray()
 ## How many flashes can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
 ## `set_effect_slots`). Read only.
 var effect_slots: int = EffectSlots.DEFAULT
@@ -1023,7 +991,7 @@ func _on_discharge_arc(caster: int, from: Vector2, to: Vector2) -> void:
 
 ## Discharge arcs showing right now (for tests).
 func live_arcs() -> int:
-	return flashes_of(KIND_ARC)
+	return _count_flashes(KIND_ARC)
 
 
 ## A character got a status: show it until combat says it has ended.
@@ -1107,7 +1075,7 @@ func _pose_status(at: int) -> void:
 		return
 	var layer: int = card[ElementBase.STATUS_LOOK_LAYER] as int
 	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([layer])) if layer > 0 else 0
-	_status_effect[at] = show_flash(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+	_status_effect[at] = _show_flash(KIND_STATUS, enemy.global_position, Vector2.RIGHT, status_color(_status_shown[at]), 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
 
 
 ## How status `id` is shown (spell spectacle 2, S6 item 11): the `status_look()` of the element
@@ -1188,7 +1156,7 @@ func status_shown(enemy: Node) -> StringName:
 
 ## Statuses showing right now (for tests).
 func live_statuses() -> int:
-	return flashes_of(KIND_STATUS)
+	return _count_flashes(KIND_STATUS)
 
 
 ## Is the name of `reaction_id` already rising near `position`?
@@ -1440,7 +1408,7 @@ func _unknown_cue_part(id: StringName, type: StringName) -> void:
 ## A cue's flash part (`CueBase`: a part with no `part`, or `"part": "flash"`) read into its typed
 ## fields once (`CuePlan.flash_of`; null for a flash Feel has not: the plan leaves it out).
 func _prepare_flash(part: Dictionary) -> Variant:
-	return CuePlanScript.flash_of(part, CUE_FLASHES)
+	return CuePlanScript.flash_of(part, _flash_rows)
 
 
 ## A cue's flash (`CuePlan.Flash`, from its part) played with `cue`: its flash at the cue's point
@@ -1492,20 +1460,19 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 	if flash.place >= 0.0:
 		at += cue.aim * cue.size * flash.place
 	var follow: Node2D = cue.follow if cue.follow != null and is_instance_valid(cue.follow) else null
-	var bits: int = flash.bits
 	var paint: int = flash.paint
 	if paint == CuePlanScript.PAINT_COLOR:
-		_cue_flash = show_flash(flash.kind, at, way, flash.color, 0, EXACT | bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, flash.color, 0, EXACT, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_PLAIN:
-		_cue_flash = show_flash(flash.kind, at, way, Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, Color.WHITE, 0, 0, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BARE:
-		_cue_flash = show_flash(flash.kind, at, way, Color.WHITE, cue.ramp, bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, Color.WHITE, cue.ramp, 0, zoom, seconds, length, follow)
 	elif paint == CuePlanScript.PAINT_BODY:
-		_cue_flash = show_flash(flash.kind, at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, cue.body if cue.body.a > 0.0 else Color.WHITE, 0, 0, zoom, seconds, length, follow)
 	elif cue.color.a > 0.0:
-		_cue_flash = show_flash(flash.kind, at, way, cue.color, 0, EXACT | bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, cue.color, 0, EXACT, zoom, seconds, length, follow)
 	else:
-		_cue_flash = show_flash(flash.kind, at, way, cue.tint, cue.ramp, (0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look) | bits, zoom, seconds, length, follow)
+		_cue_flash = _show_flash(flash.kind, at, way, cue.tint, cue.ramp, 0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look, zoom, seconds, length, follow)
 	# A followed cue's flash sits where it was played from its body (S6, item 9).
 	if follow != null and _cue_flash >= 0:
 		_flash_offset[_cue_flash] = at - follow.global_position
@@ -1632,6 +1599,43 @@ func _make_flashes() -> void:
 	_floor_node.z_index = FLOOR_Z
 	_blast_node = _make_flash_batch(BLAST_SHADER, blast_mesh())
 	_size_flashes(effect_slots)
+	_read_flash_kinds()
+
+
+## Read the flash kinds (content/flashes) from the registry: each id's code and its row for a
+## cue's flash part, and the table the flash shader draws the table kinds from (`FlashTable`). A
+## kind with problems (`FlashKind.problems`; the content test names them) is left out. The cues
+## are read again, so their flash parts take the new codes.
+func _read_flash_kinds() -> void:
+	_flash_kinds.clear()
+	_flash_codes.clear()
+	_flash_rows.clear()
+	_code_light.clear()
+	if registry != null:
+		for found: Resource in registry.get_all(FLASH_FOLDER):
+			var kind: FlashKind = found as FlashKind
+			if kind != null and kind.problems().is_empty():
+				_flash_kinds.append(kind)
+	_table_floor.resize(_flash_kinds.size())
+	for row in _flash_kinds.size():
+		var kind: FlashKind = _flash_kinds[row]
+		var code: int = FLASH_TABLE + row if kind.in_table() else int(DRAW_KINDS[kind.draw])
+		_table_floor[row] = 1 if kind.on_floor else 0
+		_flash_codes[kind.id] = code
+		_flash_rows[kind.id] = [code, kind.step, kind.seconds, kind.along()]
+		_code_light[code] = kind.room_light
+	var table := ImageTexture.create_from_image(FlashTableScript.image_of(_flash_kinds))
+	for node: MultiMeshInstance2D in [_flash_node, _floor_node]:
+		(node.material as ShaderMaterial).set_shader_parameter(&"flash_table", table)
+	_cue_plans.clear()
+
+
+## The flash kind `id` (content/flashes), or null.
+func flash_kind(id: StringName) -> FlashKind:
+	for kind: FlashKind in _flash_kinds:
+		if kind.id == id:
+			return kind
+	return null
 
 
 ## The mesh a flash is drawn as (`shot_flash.gdshader`, PARTICLES ARE GEOMETRY there): small
@@ -1725,8 +1729,8 @@ func _size_flashes(slots: int) -> void:
 	_flash_length.resize(slots)
 	_flash_follow.resize(slots)
 	_flash_follow.fill(null)
-	_flash_unlit.resize(slots)
-	_flash_unlit.fill(0)
+	_flash_light.resize(slots)
+	_flash_light.fill(0.0)
 	_flash_offset.resize(slots)
 	_next_flash = 0
 	# The statuses shown lost their flashes; the next step shows them again.
@@ -1804,14 +1808,19 @@ func _on_screen_shake_changed(enabled: bool) -> void:
 	shake_enabled = enabled
 
 
-## Show a flash of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
+## Show a flash of the kind `id` (content/flashes) at `at`, aimed along `dir`, in the ramp of
 ## `core` (white: the colours of `ramp`, a caster's `Actors.ramp_of`: 0-3 a hat ramp, anything else
 ## from NONE up the enemy ramp) with the particles of the packed `look`, at `zoom`, for
-## `seconds`. A dash or an arc runs `length` pixels from `at` along `dir` (its zoom is then the
-## length). A flash given a `follow` node moves with it (a status), and ends when it is gone.
-## It takes the next slot, the oldest flash when they are all busy, and returns it (-1 for
-## none).
-func show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
+## `seconds`. An arc runs `length` pixels from `at` along `dir` (its zoom is then the length). A
+## flash given a `follow` node moves with it, and ends when it is gone. It takes the next slot, the
+## oldest flash when they are all busy, and returns it (-1 for none, or a kind there is not).
+func show_flash(id: StringName, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
+	var code: int = int(_flash_codes.get(id, -1))
+	return _show_flash(code, at, dir, core, ramp, look, zoom, seconds, length, follow) if code >= 0 else -1
+
+
+## `show_flash` by Feel's code for the kind (`_flash_codes`; KIND_STATUS for a status's glow).
+func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
 	if _flash_node == null or not at.is_finite() or ramp < ActorsScript.NONE or ramp > ActorsScript.RAMP_ENEMY:
 		return -1
 	var slot: int = _next_flash
@@ -1822,14 +1831,14 @@ func show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, lo
 	_flash_core[slot] = core
 	_flash_ramp[slot] = ramp
 	# An explosion's part takes its radius / 2 as its zoom, up to the most the look holds.
-	_flash_zoom[slot] = clampi(zoom, 1, 63 if kind >= KIND_SHELL else 15)
+	_flash_zoom[slot] = clampi(zoom, 1, 63 if kind == KIND_SHELL or kind == KIND_FIREBALL else 15)
 	_flash_look[slot] = look
 	_flash_age[slot] = 0.0
 	_flash_seconds[slot] = maxf(seconds, 0.01)
 	_flash_length[slot] = 0.0
 	_flash_follow[slot] = follow
 	_flash_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
-	_flash_unlit[slot] = 1 if _cue_unlit else 0
+	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
 	if kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
 		_flash_zoom[slot] = steps
@@ -1875,6 +1884,10 @@ func _step_flashes(real_delta: float) -> void:
 		var kind: int = _flash_kind[slot]
 		var buffer: PackedFloat32Array = _flash_buffer
 		var i: int = out * FLASH_STRIDE
+		var blast: bool = kind == KIND_SHELL or kind == KIND_FIREBALL
+		# A table kind's row, and the code beside its age (its code in the shader that draws it).
+		var row: int = kind - FLASH_TABLE if kind >= FLASH_TABLE else 0
+		var code: int = FLASH_TABLE_CODE if kind >= FLASH_TABLE else (kind - KIND_SHELL if blast else kind)
 		if kind == KIND_ARC:
 			buffer = _arc_buffer
 			i = arcs * FLASH_STRIDE
@@ -1883,21 +1896,21 @@ func _step_flashes(real_delta: float) -> void:
 			buffer = _status_buffer
 			i = statuses * FLASH_STRIDE
 			statuses += 1
-		elif kind == KIND_QUAKE:
-			buffer = _floor_buffer
-			i = floors * FLASH_STRIDE
-			floors += 1
-		elif kind >= KIND_SHELL:
+		elif blast:
 			buffer = _blast_buffer
 			i = blasts * FLASH_STRIDE
 			blasts += 1
+		elif _table_floor[row] != 0:
+			buffer = _floor_buffer
+			i = floors * FLASH_STRIDE
+			floors += 1
 		else:
 			out += 1
 		var d: float = FLASH_GRID * _flash_zoom[slot]
 		var along: float = d
 		var dir: Vector2 = _flash_dir[slot]
 		var at: Vector2 = _flash_at[slot]
-		if kind >= KIND_SHELL:
+		if blast:
 			# An explosion's part: BLAST_SPAN radii each way, its radius the zoom x 2.
 			d = _flash_zoom[slot] * 4.0 * BLAST_SPAN
 			along = d
@@ -1906,13 +1919,14 @@ func _step_flashes(real_delta: float) -> void:
 			d = ARC_ACROSS
 			along = _flash_length[slot] + 2.0 * ARC_MARGIN
 			at += dir * _flash_length[slot] * 0.5
+		# The transform, its two unused floats its table row and its room light (full precision).
 		buffer[i] = dir.x * along
 		buffer[i + 1] = dir.y * d
-		buffer[i + 2] = 0.0
+		buffer[i + 2] = float(row)
 		buffer[i + 3] = at.x
 		buffer[i + 4] = dir.y * along
 		buffer[i + 5] = -dir.x * d
-		buffer[i + 6] = 0.0
+		buffer[i + 6] = _flash_light[slot]
 		buffer[i + 7] = at.y
 		var data: Color = ProjectileManagerScript.look_color(_flash_ramp[slot], _flash_zoom[slot], _flash_look[slot])
 		buffer[i + 8] = data.r
@@ -1923,11 +1937,8 @@ func _step_flashes(real_delta: float) -> void:
 		buffer[i + 12] = core.r
 		buffer[i + 13] = core.g
 		buffer[i + 14] = core.b
-		var code: int = kind - KIND_SHELL if kind >= KIND_SHELL else kind
-		# Its age beside its kind; below the kind for a flash that does not light (spell light
-		# reads the sign, the flash shaders the size: `coded_age`).
-		var age: float = FLASH_FROM + FLASH_SPAN * through
-		buffer[i + 15] = 1.0 - (float(code) + (-age if _flash_unlit[slot] != 0 else age)) / 16.0
+		# Its age beside its code (the flash shaders read it: `coded_age`).
+		buffer[i + 15] = 1.0 - (float(code) + FLASH_FROM + FLASH_SPAN * through) / 16.0
 	if out > 0:
 		_flash_node.multimesh.buffer = _flash_buffer
 	_flash_node.multimesh.visible_instance_count = out
@@ -1957,8 +1968,12 @@ func live_flashes() -> int:
 	return live
 
 
-## How many live flashes are of `kind`, and (with a `ramp` 0-4) in that ramp.
-func flashes_of(kind: int, ramp: int = -1) -> int:
+## How many live flashes are of the kind `id`, and (with a `ramp` 0-4) in that ramp.
+func flashes_of(id: StringName, ramp: int = -1) -> int:
+	return _count_flashes(int(_flash_codes.get(id, -1)), ramp)
+
+
+func _count_flashes(kind: int, ramp: int = -1) -> int:
 	var found: int = 0
 	for slot in effect_slots:
 		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind and (ramp < 0 or _flash_ramp[slot] == ramp):
@@ -1966,24 +1981,37 @@ func flashes_of(kind: int, ramp: int = -1) -> int:
 	return found
 
 
-## The core colour and look of the newest live flash of `kind` (for tests): [core, look].
-func flash_dress(kind: int) -> Array:
+## The newest live flash of Feel's code `kind`'s slot, or -1.
+func _newest_flash(kind: int) -> int:
 	for n in effect_slots:
 		var slot: int = (_next_flash - 1 - n + effect_slots) % effect_slots
-		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind:
-			return [_flash_core[slot], _flash_look[slot]]
-	return []
+		if kind >= 0 and _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind:
+			return slot
+	return -1
 
 
-## The newest live flash of `kind` (for tests): its place, way, core colour, ramp, zoom and
-## look, or an empty dictionary when none shows.
-func flash_info(kind: int) -> Dictionary:
-	for n in effect_slots:
-		var slot: int = (_next_flash - 1 - n + effect_slots) % effect_slots
-		if _flash_seconds[slot] > 0.0 and _flash_kind[slot] == kind:
-			return {"at": _flash_at[slot], "dir": _flash_dir[slot], "core": _flash_core[slot], "ramp": _flash_ramp[slot],
-					"zoom": _flash_zoom[slot], "look": _flash_look[slot], "seconds": _flash_seconds[slot]}
-	return {}
+## The core colour and look of the newest live flash of the kind `id` (for tests): [core, look].
+func flash_dress(id: StringName) -> Array:
+	var slot: int = _newest_flash(int(_flash_codes.get(id, -1)))
+	return [_flash_core[slot], _flash_look[slot]] if slot >= 0 else []
+
+
+## The newest live flash of the kind `id` (for tests): its place, way, core colour, ramp, zoom,
+## look, seconds and room light, or an empty dictionary when none shows.
+func flash_info(id: StringName) -> Dictionary:
+	return _flash_info_of(_newest_flash(int(_flash_codes.get(id, -1))))
+
+
+## The newest status glow shown (for tests), as `flash_info`.
+func status_info() -> Dictionary:
+	return _flash_info_of(_newest_flash(KIND_STATUS))
+
+
+func _flash_info_of(slot: int) -> Dictionary:
+	if slot < 0:
+		return {}
+	return {"at": _flash_at[slot], "dir": _flash_dir[slot], "core": _flash_core[slot], "ramp": _flash_ramp[slot],
+			"zoom": _flash_zoom[slot], "look": _flash_look[slot], "seconds": _flash_seconds[slot], "light": _flash_light[slot]}
 
 
 ## The actor id of a hit body (a kit Actor's `id`), or Actors.NONE for anything else.

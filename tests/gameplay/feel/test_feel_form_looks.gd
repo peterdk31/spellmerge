@@ -80,8 +80,8 @@ func _impact(player: int, form: StringName = &"", core: Color = Color.WHITE, loo
 
 ## Live flashes of each kind, as [cast, burst, ring out, ring in, rune burst].
 func _kinds() -> Array[int]:
-	return [feel.flashes_of(FeelScript.KIND_CAST), feel.flashes_of(FeelScript.KIND_BURST), feel.flashes_of(FeelScript.KIND_RING_OUT),
-			feel.flashes_of(FeelScript.KIND_RING_IN), feel.flashes_of(FeelScript.KIND_RUNE_BURST)] as Array[int]
+	return [feel.flashes_of(&"cast"), feel.flashes_of(&"burst"), feel.flashes_of(&"ring_out"),
+			feel.flashes_of(&"ring_in"), feel.flashes_of(&"rune_burst")] as Array[int]
 
 
 func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
@@ -104,8 +104,8 @@ func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:
 	for player in 4:
 		_cast(player, &"bolt")
-		check_equal(feel.flashes_of(FeelScript.KIND_CAST, player), 1, "player %d's cast flash" % (player + 1))
-	check_equal(feel.flash_dress(FeelScript.KIND_CAST), [Color.WHITE, 0], "white: the shader draws it in the player's ramp")
+		check_equal(feel.flashes_of(&"cast", player), 1, "player %d's cast flash" % (player + 1))
+	check_equal(feel.flash_dress(&"cast"), [Color.WHITE, 0], "white: the shader draws it in the player's ramp")
 
 
 func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
@@ -126,10 +126,10 @@ func test_a_new_carrier_card_brings_its_own_look() -> void:
 	card.impact_cue = &"impact_ring"
 	registry.extra = card
 	_cast(0, &"test_wave")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_IN), 1, "its cast gathers a ring in, as the card says")
+	check_equal(feel.flashes_of(&"ring_in"), 1, "its cast gathers a ring in, as the card says")
 	_impact(0, &"test_wave")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "it lands in a burst")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT), 1, "and a ring, as the card says")
+	check_equal(feel.flashes_of(&"burst"), 1, "it lands in a burst")
+	check_equal(feel.flashes_of(&"ring_out"), 1, "and a ring, as the card says")
 
 
 func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strikes() -> void:
@@ -139,25 +139,25 @@ func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strike
 	card.impact_cue = &"quake"
 	registry.extra = card
 	_impact(0, &"test_meteor")
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 1, "the floor cracks where it ends on a wall")
-	check_equal(feel.flash_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(12.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "as big as its radius")
+	check_equal(feel.flashes_of(&"quake"), 1, "the floor cracks where it ends on a wall")
+	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(12.0 * 1.5 / feel.flash_kind(&"quake").step), "as big as its radius")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"quake").shake), "with the ground's shake")
 	check(is_equal_approx(actors.held_left(0), feel.cue_of(&"quake").hold), "and its caster held")
 	_impact(0, &"test_meteor", Color.WHITE, 0, own(Node2D.new()) as Node2D)
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 2, "and where it strikes a body: one rule for every impact")
+	check_equal(feel.flashes_of(&"quake"), 2, "and where it strikes a body: one rule for every impact")
 	_impact(0, &"bolt")
-	check_equal(feel.flashes_of(FeelScript.KIND_QUAKE), 2, "a carrier without it leaves no mark")
+	check_equal(feel.flashes_of(&"quake"), 2, "a carrier without it leaves no mark")
 
 
 func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
 	_cast(0, &"nova")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT), 0, "no registry: no cue to play")
+	check_equal(feel.flashes_of(&"ring_out"), 0, "no registry: no cue to play")
 	check_equal(feel._form_cues_of(&"nova"), FeelScript.NO_FORM_CUES, "the defaults")
 	check_equal(feel._form_cues_of(&""), FeelScript.NO_FORM_CUES, "no form id, the defaults")
 	feel.registry = registry
 	_cast(0, &"nova")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT), 1, "once the registry is there the nova has its ring")
+	check_equal(feel.flashes_of(&"ring_out"), 1, "once the registry is there the nova has its ring")
 	check_equal(feel._form_cues_of(&"nova")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
 	check_equal(feel._form_cues_of(&"fire_bolt"), FeelScript.NO_FORM_CUES, "an id that is no carrier card: the defaults")
 
@@ -177,10 +177,10 @@ func test_the_flare_takes_the_shots_colours_and_cards() -> void:
 	var frost := Color("4fd6dc")
 	var look: int = ProjectilesScript.pack_look(PackedInt32Array([ProjectilesScript.LOOK_FLECKS, ProjectilesScript.LOOK_GLINTS]))
 	_impact(1, &"bolt", frost, look)
-	check_equal(feel.flash_dress(FeelScript.KIND_BURST), [frost, look], "the frost bolt's colour and both its looks")
+	check_equal(feel.flash_dress(&"burst"), [frost, look], "the frost bolt's colour and both its looks")
 	_impact(2, &"rune", Color.WHITE, 0)
-	check_equal(feel.flash_dress(FeelScript.KIND_RUNE_BURST), [Color.WHITE, 0], "a plain rune: white, its player's ramp")
-	check_equal(feel.flashes_of(FeelScript.KIND_RUNE_BURST, 2), 1, "of its player")
+	check_equal(feel.flash_dress(&"rune_burst"), [Color.WHITE, 0], "a plain rune: white, its player's ramp")
+	check_equal(feel.flashes_of(&"rune_burst", 2), 1, "of its player")
 
 
 func test_the_flare_follows_the_shot_not_the_last_cast() -> void:
@@ -188,17 +188,17 @@ func test_the_flare_follows_the_shot_not_the_last_cast() -> void:
 	_cast(0, &"rune")
 	_cast(0, &"bolt")
 	_impact(0, &"rune")
-	check_equal(feel.flashes_of(FeelScript.KIND_RUNE_BURST), 1, "the rune goes off")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 0, "not as a bolt")
+	check_equal(feel.flashes_of(&"rune_burst"), 1, "the rune goes off")
+	check_equal(feel.flashes_of(&"burst"), 0, "not as a bolt")
 
 
 func test_a_flash_ends_after_its_seconds() -> void:
 	_impact(0, &"bolt")
 	_cast(0, &"bolt")
-	feel.step(FeelScript.CAST_SECONDS + 0.01)
-	check_equal(feel.flashes_of(FeelScript.KIND_CAST), 0, "the cast flash is gone")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "the burst lasts longer")
-	feel.step(FeelScript.BURST_SECONDS)
+	feel.step(feel.flash_kind(&"cast").seconds + 0.01)
+	check_equal(feel.flashes_of(&"cast"), 0, "the cast flash is gone")
+	check_equal(feel.flashes_of(&"burst"), 1, "the burst lasts longer")
+	feel.step(feel.flash_kind(&"burst").seconds)
 	check_equal(feel.live_flashes(), 0, "and then it is gone too")
 	check_equal(feel._flash_node.multimesh.visible_instance_count, 0, "nothing is drawn")
 
@@ -212,8 +212,9 @@ func test_the_batch_draws_the_live_flashes() -> void:
 	# The first drawn is the oldest: the first wall's burst.
 	var buffer: PackedFloat32Array = multimesh.buffer
 	var coded: float = (1.0 - buffer[15]) * 16.0
-	check_equal(floori(coded + 0.5), FeelScript.KIND_BURST, "the kind travels as the shader reads it")
-	check(coded - FeelScript.KIND_BURST > FeelScript.FLASH_FROM and coded - FeelScript.KIND_BURST < 0.5, "with its age beside it")
+	check_equal(roundi(buffer[2]), (feel.get("_flash_kinds") as Array).find(feel.flash_kind(&"burst")), "the kind travels as the shader reads it: its table row")
+	check_equal(floori(coded + 0.5), FeelScript.FLASH_TABLE_CODE, "beside the table's code")
+	check(coded - FeelScript.FLASH_TABLE_CODE > FeelScript.FLASH_FROM and coded - FeelScript.FLASH_TABLE_CODE < 0.5, "with its age beside it")
 	check(is_equal_approx(buffer[3], 50.0) and is_equal_approx(buffer[7], 50.0), "where it landed")
 	check(is_equal_approx(buffer[0], FeelScript.FLASH_GRID), "a quad of the shader's grid")
 
@@ -228,7 +229,7 @@ func test_a_hit_on_a_character_shows_the_flare_too() -> void:
 	var enemy: Node2D = own(Node2D.new()) as Node2D
 	root.add_child(enemy)
 	_impact(2, &"rune", Color.WHITE, 0, enemy)
-	check_equal(feel.flashes_of(FeelScript.KIND_RUNE_BURST, 2), 1, "a flare at the hit")
+	check_equal(feel.flashes_of(&"rune_burst", 2), 1, "a flare at the hit")
 
 
 func test_flashes_past_the_slots_take_the_oldest() -> void:
@@ -243,7 +244,7 @@ func test_an_enemy_shot_lands_like_a_spell_in_the_enemy_ramp() -> void:
 	for form in FORMS:
 		_cast(0, form)
 		bus.projectile_impact.emit(enemy, null, Vector2(50, 50), Vector2.RIGHT)
-		var shown: Dictionary = feel.flash_info(FeelScript.KIND_BURST)
+		var shown: Dictionary = feel.flash_info(&"burst")
 		check(not shown.is_empty() and shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % form)
 		check(shown["core"] != EnemyBase.DEFAULT_HIT_COLOR, "%s: not in ember" % form)
 		feel.step(1.0)
@@ -362,15 +363,15 @@ func test_a_casts_kick_is_its_cues() -> void:
 	feel.step(1.0)
 	bus.spell_cast.emit(0, &"bolt", Vector2(10, 10), Vector2.ZERO)
 	check_equal(feel.kick(), Vector2.ZERO, "a cast with no aim kicks nowhere")
-	check_equal(feel.flashes_of(FeelScript.KIND_CAST), 1, "but still flashes")
+	check_equal(feel.flashes_of(&"cast"), 1, "but still flashes")
 
 
 func test_a_rings_impact_has_the_shots_colour_but_not_its_cards() -> void:
 	var frost := Color("4fd6dc")
 	var look: int = ProjectilesScript.pack_look(PackedInt32Array([ProjectilesScript.LOOK_FLECKS]))
 	_impact(1, &"nova", frost, look)
-	check_equal(feel.flash_dress(FeelScript.KIND_BURST), [frost, look], "its burst: the colour and the cards")
-	check_equal(feel.flash_dress(FeelScript.KIND_RING_OUT), [frost, 0], "its ring: the colour only (`no_cards`)")
+	check_equal(feel.flash_dress(&"burst"), [frost, look], "its burst: the colour and the cards")
+	check_equal(feel.flash_dress(&"ring_out"), [frost, 0], "its ring: the colour only (`no_cards`)")
 
 
 func test_an_impact_cue_is_of_the_shots_spell() -> void:

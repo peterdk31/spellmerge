@@ -1,6 +1,7 @@
 extends "res://tests/support/suite.gd"
-## The cues in `content/cues/` (CueBase): each is valid (no `problems()`), named for its file, and
-## found by the registry; and `problems()` names what a broken one gets wrong.
+## The cues in `content/cues/` (CueBase): each is valid (no `problems()`), names flash kinds there
+## are (`kind_problems`, content/flashes), is named for its file, and found by the registry; and
+## `problems()` names what a broken one gets wrong.
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -21,6 +22,7 @@ func test_every_cue_is_valid_and_named_for_its_file() -> void:
 		if cue == null:
 			continue
 		check_equal(cue.problems(), PackedStringArray(), "%s has no problems" % id)
+		check_equal(cue.kind_problems(_kinds()), PackedStringArray(), "%s names flash kinds there are" % id)
 		check_equal(cue.resource_path.get_file(), "%s.tres" % id, "%s is in its own file" % id)
 
 
@@ -67,7 +69,17 @@ func test_problems_names_what_is_wrong() -> void:
 	cue.parts = [{"flash": &"sparkles"}, {"flash": &"burst", "colour": Color.RED}, {"flash": &"burst", "way": &"sideways"}, {"flash": &"burst", "zoom": 2, "reach": 1.0}, {"flash": &"burst", "seconds": 0.0}, {"flash": &"ring_in", "lasts_size": true, "seconds": 0.5}]
 	cue.kick_way = &"left"
 	var found: PackedStringArray = cue.problems()
-	check_equal(found.size(), 8, "an id, the kick way and one a part: %s" % [found])
+	check_equal(found.size(), 7, "an id, the kick way and one a part but the first: %s" % [found])
+	cue.parts.append({"flash": &"arc", "zoom": 2})
+	check_equal(cue.kind_problems(_kinds()).size(), 2, "a kind there is not, and a zoom on one drawn along a length: %s" % [cue.kind_problems(_kinds())])
+
+
+## The flash kinds of the content by id.
+func _kinds() -> Dictionary:
+	var kinds: Dictionary = {}
+	for found: Resource in registry.get_all(&"flashes"):
+		kinds[(found as FlashKind).id] = found
+	return kinds
 
 
 func test_a_motes_part_names_what_is_wrong() -> void:

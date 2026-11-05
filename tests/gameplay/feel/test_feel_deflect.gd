@@ -50,7 +50,7 @@ func test_a_deflected_shot_flashes_big_and_white_in_its_new_casters_colours() ->
 	var shooter: Actor = _body(Vector2(200.0, 0.0))
 	var slot: int = _shot(shooter.id, Vector2(20.0, 0.0))
 	check(_world.projectiles.deflect_shot(slot, batter.id, Vector2.RIGHT, 7), "the shot is deflected")
-	var flash: Dictionary = _feel.flash_info(FeelScript.KIND_BURST)
+	var flash: Dictionary = _feel.flash_info(&"burst")
 	check(not flash.is_empty(), "a white-hot burst shows")
 	if flash.is_empty():
 		return
@@ -70,7 +70,7 @@ func test_a_swing_block_is_a_parry_a_gold_star_and_a_local_stop() -> void:
 	var other: Actor = _body(Vector2(0.0, 200.0))
 	var slot: int = _shot(shooter.id, Vector2(20.0, 0.0))
 	check(_world.projectiles.block_shot(slot, parrier.id, 7, &"swing"), "the swing's shield stops the shot")
-	var star: Dictionary = _feel.flash_info(FeelScript.KIND_BURST)
+	var star: Dictionary = _feel.flash_info(&"burst")
 	check(not star.is_empty(), "a four-point star shows")
 	if not star.is_empty():
 		check_equal(star["core"], Color("f2c230"), "in Spark gold")
@@ -90,7 +90,7 @@ func test_other_blocks_show_no_parry() -> void:
 	var shooter: Actor = _body(Vector2(200.0, 0.0))
 	check(_world.projectiles.block_shot(_shot(shooter.id, Vector2(20.0, 0.0)), guard.id, 7, &"beam"), "a beam's shield stops a shot")
 	check(_world.projectiles.block_shot(_shot(shooter.id, Vector2(20.0, 10.0)), guard.id, 7), "so does a block with no form")
-	check_equal(_feel.flashes_of(FeelScript.KIND_BURST), 0, "no star")
+	check_equal(_feel.flashes_of(&"burst"), 0, "no star")
 	check_equal(_world.table.held_left(guard.id), 0.0, "and no stop")
 
 
@@ -110,6 +110,6 @@ func test_a_real_shielded_swing_parries() -> void:
 	arena.cast(0, 0)
 	arena.run(0.3)
 	check_equal(arena.blocks, [0], "the swing's shield stopped the shot")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "the parry's star shows")
+	check_equal(feel.flashes_of(&"burst"), 1, "the parry's star shows")
 	check(arena.projectiles.actors.held_left(0) > 0.0, "the parrier is held")
 	arena.free_all()

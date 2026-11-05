@@ -616,7 +616,7 @@ func test_a_shot_s_end_sheds_as_before_and_leaves_the_moments_rows() -> void:
 	var before: int = motes.next_row()
 	bus.projectile_expired.emit(0, Vector2(20.0, 20.0), 0, -1)
 	check_equal(motes.next_row() - before, want, "each kind its own count times the share, as shed_end threw, and the sparks")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST, 0), 1, "and its small pop")
+	check_equal(feel.flashes_of(&"burst", 0), 1, "and its small pop")
 	motes.step(0.0)
 	# Use the frame's rows up to the moments' own: the end throws nothing more, and counts a cut.
 	var filler: int = motes.kind_index(&"ember")
@@ -846,7 +846,7 @@ func test_a_cues_chips_are_its_motes() -> void:
 	var feel: FeelScript = made[1]
 	feel.play_cue(&"slam", 0, Vector2(100.0, 100.0), Vector2.RIGHT, 40.0)
 	check(feel.motes().next_row() > 0, "its motes")
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST), 1, "its other flashes stay")
+	check_equal(feel.flashes_of(&"burst"), 1, "its other flashes stay")
 
 
 ## Trail particles as motes (spell spectacle P1d): each birth the projectile manager hands out is
@@ -1141,8 +1141,8 @@ func test_a_sprays_and_a_puffs_sparks_are_motes() -> void:
 		left += 1 if motes.row_data(row)[MotesScript.ROW_VX] < 0.0 else 0
 	check(left > 0 and left < int(puff["count"]), "all round")
 	before = motes.next_row()
-	feel.show_flash(FeelScript.KIND_PUFF, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, FeelScript.POOF, 2, FeelScript.POOF_SECONDS)
-	feel.show_flash(FeelScript.KIND_SPRAY, Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, FeelScript.SPRAY_SECONDS)
+	feel.show_flash(&"poof", Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.18)
+	feel.show_flash(&"spray", Vector2(50.0, 50.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.3)
 	check_equal(motes.next_row(), before, "a flash alone throws none")
 	motes.step(0.0)
 	motes.burst(2, Vector2.ZERO, Vector2.RIGHT, MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, Vector2(10.0, 50.0), 360.0, Vector2.ZERO, Vector2(0.2, 1.0), 0, Color.WHITE)

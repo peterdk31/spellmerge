@@ -55,7 +55,7 @@ Each is one PR with tests, `tools/check.sh` and the suite passing.
 |---|---|---|
 | F1 | **The rename.** Mechanical, no look change: the cue trace (S1's: every mote, mark and flash slot hashed over a fixed list of events) the same before and after | about 90 files, most of them one-word edits (60 cues, about 20 tests); low risk |
 | F2 | **The shaped flashes as data.** `FlashKind`, its table, the vertex stage reading it; the nine shaped kinds as files; `EFFECT_LIGHT` into the kinds; `content/flashes/README.md` with an example to copy | the real work: the vertex stage's 120 lines of branches become about 60 of table reading; `flash_kind.gd` about 200 lines; nine `.tres` |
-| F3 | **The coded flashes as kinds.** Quake, poof, shell, fireball and arc as files naming their drawing; `CUE_EFFECTS`, `CueBase.EFFECTS`, the `POOF` bit and the KIND_* codes the cues use go; `BLAST_LIGHT` into the kinds | small to medium |
+| F3 | **Built with F2** (DECISIONS, 2026-11-05). **The coded flashes as kinds.** Quake, poof, shell, fireball and arc as files naming their drawing; `CUE_EFFECTS`, `CueBase.EFFECTS`, the `POOF` bit and the KIND_* codes the cues use go; `BLAST_LIGHT` into the kinds | small to medium |
 | F4 | **Optional, the owner's call:** new drawings (a star, rays, a dotted ring) and a pick sheet of new flash looks made from them as data | per drawing, small |
 
 **F2 must look the same, pixel for pixel.** The screenshot sheets are not the same from run to run (real-time clocks), so the check is a test that draws every shaped kind both ways at fixed ages (eight points of its life, zoom 1, 2 and 4, two aims, one hat ramp and the enemy ramp), the old vertex stage kept beside the new one while the PR is built, and compares the pixels exactly; the DECISIONS entry records it, and the old stage is deleted before merging. A rounding left out (the burst's arm is `round()`ed, a column's width `floor(x + 0.5)`) shows up there.
@@ -68,6 +68,8 @@ Each is one PR with tests, `tools/check.sh` and the suite passing.
 2. **"Effect slots" stays, or becomes "Flash slots"?** Recommended: it stays (it also holds the statuses and arcs, and players already know the word).
 3. **Port exactly, then tune?** Recommended: F2 looks exactly as today, and new looks or tuning come after as data, on a pick sheet.
 4. **New drawings (F4)?** Which, if any: a star with n points (the parry's star is a big burst today), rays, a dotted ring, a spiral.
+
+**Built:** F1 (the rename) and F2 with F3 folded in (the kinds as data; DECISIONS, 2026-11-05, "Flash kinds are data").
 
 ## Order
 

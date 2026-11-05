@@ -11,7 +11,7 @@
 //                    line stays one pixel, so a bigger shot is bigger, never chunkier
 //   colour g, b, a   the look: one bit per layer kind (kind 1 is bit 0 of green, kind 9 bit 0
 //                    of blue, kind 17 bit 0 of alpha), every kind the shot's cards bring, and
-//                    the flags (POOF, ENEMY_RAMP, EXACT)
+//                    the flags (ENEMY_RAMP, EXACT)
 // A shader's vertex() works the look out once (`look_of`, `look_from_color`) and hands it to the
 // fragments with SET_LOOK, so a pixel never does.
 

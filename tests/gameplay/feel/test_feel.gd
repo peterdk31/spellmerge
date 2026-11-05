@@ -17,16 +17,22 @@ const STEP: float = 0.0625
 const FIXTURE: String = "res://tests/core/fixtures/registry"
 
 
-## The fixture's content and sounds, with the game's own cues (`content/cues`, from the Registry
-## autoload): a death and a downed wizard are cues.
+## The fixture's content and sounds, with the game's own cues and the flash kinds they name
+## (`content/cues`, `content/flashes`, from the Registry autoload): a death and a downed wizard are
+## cues.
 class FixtureRegistry:
 	extends RegistryScript
 	var cues: RegistryScript = null
 
 	func get_resource(folder: StringName, id: StringName) -> Resource:
-		if folder == &"cues" and cues != null:
+		if (folder == &"cues" or folder == &"flashes") and cues != null:
 			return cues.get_resource(folder, id)
 		return super(folder, id)
+
+	func get_all(folder: StringName) -> Array[Resource]:
+		if folder == &"flashes" and cues != null:
+			return cues.get_all(folder)
+		return super(folder)
 
 
 var _failures: Array[String] = []
@@ -231,7 +237,7 @@ func _test_particles_come_back() -> void:
 	_setup()
 	for i in 20:
 		_hit(i % 4)
-	_check(_feel.flashes_of(FeelScript.KIND_PUFF) == 20, "twenty hits with no way, twenty puffs")
+	_check(_feel.flashes_of(&"puff") == 20, "twenty hits with no way, twenty puffs")
 	for i in 30:
 		_feel.step(STEP)
 	_check(_feel.live_flashes() == 0, "finished flashes end")
@@ -246,10 +252,10 @@ func _test_particles_can_be_turned_off() -> void:
 		_hit(i % 4)
 	_bus.enemy_died.emit(0, null, Vector2(5.0, 0.0), -1)
 	_feel.step(STEP)
-	_check(_feel.flashes_of(FeelScript.KIND_PUFF) == 0 and _feel.flashes_of(FeelScript.KIND_SPRAY) == 0, "no hit flashes start with particles off")
+	_check(_feel.flashes_of(&"puff") == 0 and _feel.flashes_of(&"spray") == 0, "no hit flashes start with particles off")
 	_feel.particles_enabled = true
 	_hit(0)
-	_check(_feel.flashes_of(FeelScript.KIND_PUFF) == 1, "they start again when turned back on")
+	_check(_feel.flashes_of(&"puff") == 1, "they start again when turned back on")
 
 
 func _test_missing_sound_is_silent() -> void:
@@ -358,15 +364,15 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_setup()
 	_hit(0, Vector2(7.0, 7.0))
 	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0), -1)
-	_check(_feel.flashes_of(FeelScript.KIND_PUFF) == 2, "the hit's puff and the death cue's own (S6)")
-	_check(_feel.flashes_of(FeelScript.KIND_RING_OUT) == 1, "and a white-hot ring")
+	_check(_feel.flashes_of(&"puff") == 2, "the hit's puff and the death cue's own (S6)")
+	_check(_feel.flashes_of(&"ring_out") == 1, "and a white-hot ring")
 	_feel.step(STEP)
 	_feel.set_effect_slots(EffectSlots.MIN)
 	for i in _feel.effect_slots:
 		_hit(i % 4, Vector2(100.0 + i, 0.0))
 	_check(_feel.live_flashes() == _feel.effect_slots, "the slots are full of hit flashes")
 	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0), -1)
-	_check(_feel.flashes_of(FeelScript.KIND_PUFF) >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
+	_check(_feel.flashes_of(&"puff") >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
 	_check(_feel.live_flashes() == _feel.effect_slots, "taking one over keeps the limit")
 
 
@@ -480,7 +486,7 @@ func _test_hit_flash_and_squash() -> void:
 func _test_cast_flash_and_kick() -> void:
 	_setup()
 	_bus.spell_cast.emit(2, &"fire_bolt", Vector2(10, 5), Vector2.RIGHT)
-	_check(_feel.flashes_of(FeelScript.KIND_CAST, 2) == 1, "a cast shows a cast flash")
+	_check(_feel.flashes_of(&"cast", 2) == 1, "a cast shows a cast flash")
 	_check(_feel.kick().x < 0.0 and _feel.kick().y == 0.0, "the camera kicks against the aim")
 	_feel.step(0.015625)
 	_check(_camera.offset.x < 0.0, "the camera moves with the kick")
@@ -489,7 +495,7 @@ func _test_cast_flash_and_kick() -> void:
 	_check(_feel.kick().length() <= FeelScript.MAX_KICK_PIXELS + 0.001, "the kick is capped")
 	for i in 10:
 		_feel.step(STEP)
-	_check(_feel.flashes_of(FeelScript.KIND_CAST) == 0, "the cast flashes end")
+	_check(_feel.flashes_of(&"cast") == 0, "the cast flashes end")
 	_check(_camera.offset == Vector2.ZERO and _feel.kick() == Vector2.ZERO, "the camera settles after a cast")
 	_feel.shake_enabled = false
 	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
@@ -511,7 +517,7 @@ func _test_muzzle_flash_follows_aim_and_colour() -> void:
 	_setup()
 	_bus.spell_cast.emit(1, &"fire_bolt", Vector2(10, 5), Vector2.DOWN)
 	_feel.step(0.01)
-	_check(_feel.flashes_of(FeelScript.KIND_CAST, 1) == 1, "player 2's cast flash shows")
+	_check(_feel.flashes_of(&"cast", 1) == 1, "player 2's cast flash shows")
 	var buffer: PackedFloat32Array = _feel._flash_node.multimesh.buffer
 	_check(Vector2(buffer[0], buffer[4]).normalized().is_equal_approx(Vector2.DOWN), "the cast flash turns along the aim")
 	_check(roundi(buffer[8] * 255.0) % 4 == 1, "it is drawn in the colours of player 2")

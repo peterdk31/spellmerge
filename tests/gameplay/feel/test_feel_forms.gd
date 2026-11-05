@@ -88,15 +88,15 @@ func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
 	bus.form_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST, 7)
 	check_equal(_shown().size(), 0, "no sprite: the ring is a flash")
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT, 0), 1, "a ring flashes out")
-	check_equal(feel.flash_dress(FeelScript.KIND_RING_OUT), [FROST, 7], "in the element's colours, with the cast's cards")
+	check_equal(feel.flashes_of(&"ring_out", 0), 1, "a ring flashes out")
+	check_equal(feel.flash_dress(&"ring_out"), [FROST, 7], "in the element's colours, with the cast's cards")
 	feel.step(0.01)
 	var buffer: PackedFloat32Array = feel._flash_node.multimesh.buffer
 	check(is_equal_approx(buffer[3], 50.0) and is_equal_approx(buffer[7], 60.0), "at the caster")
 	var across: float = buffer[0]
 	check(across >= 120.0 * 0.9, "as wide as the cue's ring, 120 px (%f)" % across)
 	feel.step(0.25)
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_OUT), 0, "and gone after its seconds")
+	check_equal(feel.flashes_of(&"ring_out"), 0, "and gone after its seconds")
 
 
 func test_a_shot_whose_life_runs_out_pops() -> void:
@@ -104,11 +104,11 @@ func test_a_shot_whose_life_runs_out_pops() -> void:
 	projectiles.spawn(1, Vector2(50, 50), Vector2(100, 0), 0.05)
 	for i in 5:
 		projectiles.step(1.0 / 60.0)
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST, 1), 1, "a small pop where it ended (the mockup's)")
+	check_equal(feel.flashes_of(&"burst", 1), 1, "a small pop where it ended (the mockup's)")
 	projectiles.spawn(1, Vector2(50, 50), Vector2.ZERO, 0.05, 14.0, ProjectilesScript.LAYER_ENEMY, 0, 0, ProjectilesScript.MOTION_STILL)
 	for i in 5:
 		projectiles.step(1.0 / 60.0)
-	check_equal(feel.flashes_of(FeelScript.KIND_BURST, 1), 1, "a rune's end is its own burst, not a pop")
+	check_equal(feel.flashes_of(&"burst", 1), 1, "a rune's end is its own burst, not a pop")
 
 
 func test_forms_end() -> void:
@@ -168,12 +168,12 @@ func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 func test_a_rain_shows_its_marker_until_it_falls() -> void:
 	bus.form_shown.emit(1, &"rain", Vector2(40, 40), Vector2.RIGHT, 0.6, FROST, 3)
 	bus.form_shown.emit(ActorSeats.enemy(actors), &"rain", Vector2(80, 40), Vector2.RIGHT, 0.6, FROST, 3)
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_IN), 2, "a ring closes on each rain's point, a wizard's and an enemy's")
-	check(is_equal_approx(feel.flash_info(FeelScript.KIND_RING_IN)["seconds"], 0.6), "for as long as it takes to fall")
+	check_equal(feel.flashes_of(&"ring_in"), 2, "a ring closes on each rain's point, a wizard's and an enemy's")
+	check(is_equal_approx(feel.flash_info(&"ring_in")["seconds"], 0.6), "for as long as it takes to fall")
 	feel.step(0.5)
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_IN), 2, "still there just before")
+	check_equal(feel.flashes_of(&"ring_in"), 2, "still there just before")
 	feel.step(0.2)
-	check_equal(feel.flashes_of(FeelScript.KIND_RING_IN), 0, "gone when it lands")
+	check_equal(feel.flashes_of(&"ring_in"), 0, "gone when it lands")
 
 
 func test_the_shipped_preset_has_the_form_art() -> void:

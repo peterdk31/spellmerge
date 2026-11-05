@@ -15,11 +15,11 @@ render_mode blend_add, world_vertex_coords;
 //               left behind or a dash. Every shot, the enemies' too (one rule).
 //   ROWS_RUNE   its rune rows (shot_rune.gdshader): a real transform, a square quad of the
 //               rune's size round its centre.
-//   ROWS_FLASH Feel's flash rows (shot_flash, shot_blast, shot_arc): a real transform (its
-//               square, or an arc's length and width) round its centre, INSTANCE_CUSTOM.a its
-//               kind and how far through its life it is (Feel's FLASH_FROM, FLASH_SPAN; coded
-//               below the kind for a flash that does not light). Each kind's light is
-//               `kind_light` (0: none), fading out over its life.
+//   ROWS_FLASH  Feel's flash rows (shot_flash, shot_blast, shot_arc): a real transform (its
+//               square, or an arc's length and width) round its centre, its second unused float
+//               (MODEL_MATRIX[2].y) how much it lights at its start (its kind's `room_light`, 0
+//               for a flash that does not light), fading out over its life: INSTANCE_CUSTOM.a its
+//               code and how far through its life it is (Feel's FLASH_FROM, FLASH_SPAN).
 //   ROWS_CUE    the cues' `light` parts (S6 item 4), written by spell_light.gd while they last: a
 //               transform scaled by the reach round the cue's point, COLOR and INSTANCE_CUSTOM.rgb
 //               a flash row's colour (its ramp, cards and core, or an exact colour), and
@@ -43,8 +43,6 @@ uniform int rows = 0;
 // How bright a light is at its middle (the buffer adds them, up to 1 a channel).
 uniform float shot_strength = 0.9;
 uniform float rune_strength = 0.55;
-// Each flash kind's light (by its code: Feel's KIND_*, less KIND_SHELL for a blast).
-uniform float kind_light[16];
 // A flash's light reaches this many times its half size, and this much past it (px).
 uniform float flash_reach = 1.0;
 uniform float flash_pad = 10.0;
@@ -80,11 +78,8 @@ void vertex() {
 		half_size = vec2(reach);
 		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * rune_strength;
 	} else if (rows == ROWS_FLASH) {
-		// Its age below its kind: a flash of a cue that lights by its own `light` part, unlit.
-		float kind = coded_kind(INSTANCE_CUSTOM.a);
-		float code = coded_code(INSTANCE_CUSTOM.a);
-		float through = clamp((code - FLASH_FROM) / FLASH_SPAN, 0.0, 1.0);
-		float strength = code > 0.0 ? kind_light[int(clamp(kind, 0.0, 15.0))] * (1.0 - through) : 0.0;
+		float through = clamp((coded_code(INSTANCE_CUSTOM.a) - FLASH_FROM) / FLASH_SPAN, 0.0, 1.0);
+		float strength = MODEL_MATRIX[2].y * (1.0 - through);
 		if (strength > 0.0) {
 			vec2 along = MODEL_MATRIX[0].xy;
 			way = length(along) > 0.0 ? normalize(along) : vec2(1.0, 0.0);

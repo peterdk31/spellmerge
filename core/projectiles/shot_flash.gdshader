@@ -2,31 +2,24 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// Feel's flashes (gameplay/feel/feel.gd, its flash batch; core/README.md, "The shot shaders"), in
-// a square GRID x zoom pixels across, +x along their aim, all in the ramp and look of the shot
-// they come from; the age is the code beside the kind (`coded_age`). Blending is premultiplied: a
+// Feel's flashes (gameplay/feel/feel.gd, its flash batch and its floor batch; core/README.md, "The
+// shot shaders"; docs/milestones/flash-kinds.md), in a square GRID x zoom pixels across, +x along
+// their aim, all in the ramp and look of the shot they come from. Blending is premultiplied: a
 // pixel is opaque, the glow round it light added to what is below.
-//   K_BURST       where a shot lands: a white-hot cross that shrinks
-//   K_RING_OUT    a ring that flashes out (a nova's cast)
-//   K_RING_IN     a ring that gathers in (a rune's or orbit's cast)
-//   K_RUNE_BURST  a rune going off: a dotted flash over the diamond, a diamond ring widening
-//                 to twice its size
-//   K_CAST        the staff tip on a cast: a small cross
-//   K_SPRAY       a hit on a character: a small white-hot cross where it struck
-//   K_PUFF        a dotted white-hot puff (a kill, a reaction, a hit with no way); with the POOF
-//                 bit (kind 22) a staff's personality swap instead (living staffs H4): bone clouds
-//                 along the staff (+x) that swell to their biggest at 35% of the flash (where the
-//                 body changes) and shrink away
-//   K_QUAKE       a slam's mark on the floor (Feel's floor batch, under the bodies): cracks out from
-//                 the impact, white-hot and cooling to dark stone, and a glow on the floor; its
-//                 reach is QUAKE_REACH x zoom pixels
-//   K_RISE        light pulled up off a spot (where a teleport leaves): a white-hot column that
-//                 thins to a line and lifts off the top, a flat ring gathering in; the spot is the
-//                 flash's middle, the column above it
-//   K_FALL        light struck down onto a spot (where a teleport lands, a rain falls): a streak
-//                 falling the column to the floor in its first FALL_STRIKE, then the whole column
-//                 flashing and thinning away, a cross, a flat ring thrown out
-// Lightning (K_ARC) and statuses (K_STATUS) have shaders and batches of their own.
+//
+// **Kinds are data:** each flash kind is a `FlashKind` file (content/flashes), a row of
+// `flash_table` (`gameplay/feel/flash_table.gd` writes it; its layout is there): how it is drawn
+// (D_*), its metric and salt, and its curves over its life. A row's kind is its table row, in the
+// transform's first unused float (MODEL_MATRIX[2].x: full precision, where the custom data may be
+// kept as half floats); its age the code beside its kind in the custom data (`coded_age`). So a new
+// look is a new file and no edit here.
+//   D_SHAPE    the parts its curves draw: a cross, a dotted disc, a fraying ring, a column of light
+//   D_CLOUDS   a staff's poof (living staffs H4): bone clouds along the staff (+x) that swell to
+//              their biggest at 35% of the flash (where the body changes) and shrink away
+//   D_CRACKS   the ground struck (Feel's floor batch, under the bodies): cracks out from the
+//              impact, white-hot and cooling to dark stone; their reach is QUAKE_REACH x zoom pixels
+// Every kind's glow comes from its curves. Lightning, statuses and explosions have shaders and
+// batches of their own.
 //
 // No particles: a flash's sparks, rubble, dust and card particles are motes, thrown by the
 // motes parts of the cue that shows it (content/cues; docs/milestones/spell-spectacle-2.md, S6
@@ -38,25 +31,39 @@ render_mode blend_premul_alpha;
 // colours a pixel of its own quad, in a few small modes with no loops:
 //   Q_LIGHT     the flash's glow, over its whole square (added; drawn first)
 //   Q_CLOUD     one of a poof's bone clouds; the first is on top
-//   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top); a quake's
-//               cracks
+//   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring, a column (drawn last, on top);
+//               the cracks
 // The instance's square is drawn from the mesh's own corners: a pixel `d` (whole pixels from the
 // middle; from where a dash left) is at UV (d + o) / size of the square, as a QuadMesh has it.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
+// The kinds (FlashTable): a row a kind, TEXELS texels, RGBAF.
+uniform sampler2D flash_table : filter_nearest;
+
 const float GRID = 24.0;
-// A rune's reach at its rest (the 14 px of rune.tres, as `shot_rune.gdshader` draws it at zoom 4).
-const float RUNE_REACH = 14.4;
-// The floor batch's kind (KIND_QUAKE in gameplay/feel/feel.gd): below K_BURST, where the shots'
-// kinds are, which never come to this shader.
-const float K_QUAKE = 3.0;
-// The columns (KIND_RISE and KIND_FALL in gameplay/feel/feel.gd): below K_BURST too. A fall's
-// streak takes this share of its life to reach the floor.
-const float K_RISE = 1.0;
-const float K_FALL = 2.0;
-const float FALL_STRIKE = 0.18;
+// How a kind is drawn (FlashTable.DRAW_CODES).
+const float D_SHAPE = 0.0;
+const float D_CLOUDS = 1.0;
+const float D_CRACKS = 2.0;
+// The curves, in the table's order (FlashTable.CURVES), and the segments of each.
+const int C_ARM = 0;
+const int C_DISC = 1;
+const int C_RING = 2;
+const int C_COLUMN_WIDTH = 3;
+const int C_COLUMN_TOP = 4;
+const int C_COLUMN_FOOT = 5;
+const int C_COLUMN_LENGTH = 6;
+const int C_COLUMN_DOTTED = 7;
+const int C_GLOW = 8;
+const int C_GLOW_RING = 9;
+const int C_GLOW_RING_REACH = 10;
+const int C_GLOW_MIDDLE = 11;
+const int C_GLOW_MIDDLE_REACH = 12;
+const int C_FIRST = 13;
+const int C_SECOND = 14;
+const int SEGMENTS = 4;
 // A quake's reach per zoom in pixels, its cracks, and how flat the floor is seen (y over x).
 const float QUAKE_REACH = 8.0;
 const float QUAKE_CRACKS = 7.0;
@@ -84,19 +91,41 @@ varying flat vec4 c2;
 
 // ---- Vertices ----
 
-// The ramp of look `L` at `u` (0 white-hot, 1 shadow), as `ramp` has it.
-vec3 ramp_of(Look L, float u) {
-	return u < 0.15 ? L.hot : (u < 0.4 ? L.hi : (u < 0.7 ? L.mid : L.lo));
+// Curve `c` of the kind in table row `row` at the age `a` and zoom `z` (FlashTable.value_at): the
+// last of its segments started, `t` its way from its start to its end, eased by its way (0 linear,
+// 1 out, 2 in, 3 hold), its pixels plus its steps of the zoom.
+float curve(int row, int c, float a, float z) {
+	int x = 1 + c * SEGMENTS * 2;
+	vec4 head = texelFetch(flash_table, ivec2(x, row), 0);
+	vec4 values = texelFetch(flash_table, ivec2(x + 1, row), 0);
+	for (int n = 1; n < SEGMENTS; n++) {
+		vec4 next = texelFetch(flash_table, ivec2(x + n * 2, row), 0);
+		if (next.x <= a) {
+			head = next;
+			values = texelFetch(flash_table, ivec2(x + n * 2 + 1, row), 0);
+		}
+	}
+	float t = clamp((a - head.x) / max(head.y - head.x, 0.000001), 0.0, 1.0);
+	float e = head.z > 2.5 ? 0.0 : (head.z > 1.5 ? t * t : (head.z > 0.5 ? 1.0 - (1.0 - t) * (1.0 - t) : t));
+	return mix(values.x, values.z, e) + mix(values.y, values.w, e) * z;
+}
+
+// The shade `n` of look `L` (FlashTable.SHADE_CODES: 0 white-hot, 1 light, 2 base, 3 shadow; below
+// 0 none, black).
+vec3 shade_of(Look L, float n) {
+	return n < -0.5 ? vec3(0.0) : (n < 0.5 ? L.hot : (n < 1.5 ? L.hi : (n < 2.5 ? L.mid : L.lo)));
 }
 
 void vertex() {
-	float kind = coded_kind(INSTANCE_CUSTOM.a);
+	int row = int(MODEL_MATRIX[2].x + 0.5);
+	vec4 kind_head = texelFetch(flash_table, ivec2(0, row), 0);
+	float draw = kind_head.x;
 	float a = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, true);
 	float z = L.zoom;
 	float s = L.seed;
-	float ease = 1.0 - (1.0 - a) * (1.0 - a);
-	bool poof = kind == K_PUFF && bit_set(L.bits, POOF);
+	bool poof = draw == D_CLOUDS;
+	bool quake = draw == D_CRACKS;
 	// The square in pixels, and where its pixel 0 is.
 	vec2 size = vec2(GRID) * z;
 	vec2 o = size * 0.5;
@@ -116,101 +145,29 @@ void vertex() {
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
 	if (quad == Q_LIGHT || quad == Q_SHAPE) {
-		// The flash and its light: a1 the light's two falloffs (how bright, how far: x of the
-		// distance from a0.y, y of the distance), a0.x 1 for a diamond (the rune's) or 2 for a flat
-		// ring on the floor instead of a circle; a0.yzw the cross's arms, the dotted disc's and the
-		// ring's reach (-1 for none); a2 a column: its half width (-1 for none), top, foot, and 1
-		// when it is dotted.
-		float k = 1.0;
-		float metric = 0.0;
-		float arm = -1.0;
-		float disc = -1.0;
-		float ring = -1.0;
+		// The flash and its light, from the kind's curves: a1 the light's two falloffs (how bright,
+		// how far: x of the distance from a0.y, y of the distance), a0.x its metric (1 a diamond, 2
+		// flat on the floor); a0.yzw the cross's arms, the dotted disc's and the ring's reach (below
+		// 0 for none); a2 a column: its half width (below 0 for none), top, foot, and 1 when it is
+		// dotted.
+		float metric = kind_head.y;
+		float salt = kind_head.z;
+		float arm = round(curve(row, C_ARM, a, z));
+		float disc = curve(row, C_DISC, a, z);
+		float ring = curve(row, C_RING, a, z);
+		float wide = curve(row, C_COLUMN_WIDTH, a, z);
 		vec4 column = vec4(-1.0, 0.0, 0.0, 0.0);
-		float salt = 32.0;
-		vec4 lit = vec4(0.0, 1.0, 0.0, 1.0);
-		vec3 first = vec3(0.0);
-		vec3 second = vec3(0.0);
-		if (kind == K_BURST || kind == K_CAST) {
-			// A white-hot cross that shrinks.
-			arm = round((kind == K_CAST ? 1.5 : 2.0) * z * (1.0 - a * 2.5));
-			first = L.hot;
-			second = L.hi;
-			k = (1.0 - a) * (1.0 - a);
-			lit = vec4(0.9, 4.0 * z, 0.4, 10.0 * z);
-		} else if (kind == K_RING_OUT || kind == K_RING_IN) {
-			// A ring that flashes out or gathers in, fraying as it goes.
-			float big = 10.0 * z;
-			float small = 2.0 * z;
-			ring = kind == K_RING_OUT ? mix(small, big, ease) : mix(big, small, ease);
-			second = ramp_of(L, a);
-			k = 1.0 - a;
-			lit = vec4(0.5, 3.0 * z, 0.0, 1.0);
-		} else if (kind == K_RUNE_BURST) {
-			// A dotted white-hot flash over the diamond, then a diamond ring that widens and frays.
-			metric = 1.0;
-			disc = a < 0.2 ? RUNE_REACH : -1.0;
-			ring = mix(RUNE_REACH, RUNE_REACH * 2.2, ease);
-			salt = 33.0;
-			first = a < 0.1 ? L.hot : L.hi;
-			second = ramp_of(L, a);
-			k = 1.0 - a;
-			lit = vec4(0.5, 6.0, a < 0.25 ? 0.8 : 0.0, RUNE_REACH);
-		} else if (poof) {
-			// Only a soft light: its clouds are quads of their own.
-			k = 1.0 - a;
-			lit = vec4(0.3, 6.0 * z, 0.0, 1.0);
-		} else if (kind == K_SPRAY || kind == K_PUFF) {
-			// A small white-hot cross where it struck, or a dotted puff.
-			if (kind == K_PUFF) {
-				disc = a < 0.18 ? 2.0 * z : -1.0;
-				first = a < 0.09 ? L.hot : L.hi;
-			} else {
-				arm = a < 0.2 ? 1.0 : -1.0;
-				first = L.hot;
-				second = L.hot;
-			}
-			k = (1.0 - a) * (1.0 - a);
-			lit = vec4(0.7, 3.0 * z, 0.3, 9.0 * z);
-		} else if (kind == K_QUAKE) {
-			// A glow on the floor round the impact, gone well before the cracks cool.
-			k = max(1.0 - a * 2.5, 0.0);
-			k *= k;
-			lit = vec4(0.8, QUAKE_REACH * z * 0.6, 0.0, 1.0);
-		} else if (kind == K_RISE) {
-			// The column swells, thins to a line and its foot lifts off, pulled up out of the top;
-			// a flat ring gathers in under it.
-			float top = 1.0 - o.y;
-			float wide = a < 0.15 ? a / 0.15 : max(1.0 - (a - 0.15) / 0.6, 0.0);
-			float foot = a < 0.5 ? 2.0 * z : mix(2.0 * z, top, (a - 0.5) / 0.35);
-			column = a < 0.85 ? vec4(floor(1.5 * z * wide + 0.5), top, foot, a > 0.5 ? 1.0 : 0.0) : column;
-			metric = 2.0;
-			ring = a < 0.7 ? mix(9.0 * z, z, ease) : -1.0;
-			first = L.hot;
-			second = a < 0.4 ? L.hi : L.mid;
-			k = 1.0 - a;
-			lit = vec4(0.7, 2.0 * z, 0.45, 7.0 * z);
-		} else if (kind == K_FALL) {
-			// A streak falls the column to the floor; then the whole column flashes and thins away,
-			// with a cross where it struck and a flat ring thrown out from it.
-			float top = 1.0 - o.y;
-			float strike = min(a / FALL_STRIKE, 1.0);
-			float t = max(a - FALL_STRIKE, 0.0) / (1.0 - FALL_STRIKE);
-			float foot = mix(top, 2.0 * z, strike * strike);
-			if (a < FALL_STRIKE) {
-				column = vec4(0.0, max(foot - 8.0 * z, top), foot, 0.0);
-			} else if (t < 0.5) {
-				column = vec4(floor(2.0 * z * (1.0 - t / 0.5) + 0.5), top, foot, t > 0.25 ? 1.0 : 0.0);
-			}
-			arm = a >= FALL_STRIKE && t < 0.25 ? round(2.0 * z * (1.0 - t / 0.25)) : -1.0;
-			metric = 2.0;
-			ring = a >= FALL_STRIKE ? mix(2.0 * z, 11.0 * z, 1.0 - (1.0 - t) * (1.0 - t)) : -1.0;
-			first = L.hot;
-			second = ramp_of(L, t);
-			k = a < FALL_STRIKE ? 0.5 * strike : (1.0 - t) * (1.0 - t);
-			lit = vec4(0.9, 2.0 * z, 0.5, 8.0 * z);
+		if (wide >= 0.0) {
+			// The most it is long, from its foot (a falling streak), below 0 for none.
+			float top = curve(row, C_COLUMN_TOP, a, z);
+			float foot = curve(row, C_COLUMN_FOOT, a, z);
+			float longest = curve(row, C_COLUMN_LENGTH, a, z);
+			column = vec4(floor(wide + 0.5), longest >= 0.0 ? max(foot - longest, top) : top, foot, curve(row, C_COLUMN_DOTTED, a, z));
 		}
-		bool quake = kind == K_QUAKE;
+		float k = curve(row, C_GLOW, a, z);
+		vec4 lit = vec4(curve(row, C_GLOW_RING, a, z), curve(row, C_GLOW_RING_REACH, a, z), curve(row, C_GLOW_MIDDLE, a, z), curve(row, C_GLOW_MIDDLE_REACH, a, z));
+		vec3 first = shade_of(L, curve(row, C_FIRST, a, z));
+		vec3 second = shade_of(L, curve(row, C_SECOND, a, z));
 		shown = (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake);
 		q_lo = -o;
 		q_hi = size - o;

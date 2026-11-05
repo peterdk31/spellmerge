@@ -3,11 +3,11 @@ extends "res://tests/support/screenshot.gd"
 ## (plain, fire, frost, storm, void, lightning; the colours and looks of the real cards), a
 ## column per flash at an age, so one still shows how each one plays out (the flashes alone: their
 ## sparks and card particles are their cues' motes since S6 item 3, `shot_flash_motes.gd`):
-##   1-3  where a shot lands (KIND_BURST), 2, 6 and 12 frames old
-##   4-6  a rune going off (KIND_RUNE_BURST), 3, 10 and 20 frames old
-##   7    a nova's cast ring (KIND_RING_OUT), 6 frames old
-##   8    a rune's or orbit's cast ring (KIND_RING_IN), 6 frames old
-##   9    the cast flash at a staff tip (KIND_CAST), 2 frames old
+##   1-3  where a shot lands (`burst`), 2, 6 and 12 frames old
+##   4-6  a rune going off (`rune_burst`), 3, 10 and 20 frames old
+##   7    a nova's cast ring (`ring_out`), 6 frames old
+##   8    a rune's or orbit's cast ring (`ring_in`), 6 frames old
+##   9    the cast flash at a staff tip (`cast`), 2 frames old
 ## `flashes_sheet` at 1x and `flashes_sheet_4x` (the plain, fire and frost rows, columns 1-6).
 ## `flashes_enemy_sheet`: the same grid cast by an enemy (staffs F7), in the enemy ramp
 ## where a player's colour would show.
@@ -26,9 +26,9 @@ const COLUMN: float = 68.0
 const ROW: float = 58.0
 ## Each column: [kind, zoom, frames old].
 const COLUMNS: Array = [
-	[FeelScript.KIND_BURST, 1, 2], [FeelScript.KIND_BURST, 1, 6], [FeelScript.KIND_BURST, 1, 12],
-	[FeelScript.KIND_RUNE_BURST, 3, 3], [FeelScript.KIND_RUNE_BURST, 3, 10], [FeelScript.KIND_RUNE_BURST, 3, 20],
-	[FeelScript.KIND_RING_OUT, 1, 6], [FeelScript.KIND_RING_IN, 1, 6], [FeelScript.KIND_CAST, 1, 2],
+	[&"burst", 1, 2], [&"burst", 1, 6], [&"burst", 1, 12],
+	[&"rune_burst", 3, 3], [&"rune_burst", 3, 10], [&"rune_burst", 3, 20],
+	[&"ring_out", 1, 6], [&"ring_in", 1, 6], [&"cast", 1, 2],
 ]
 
 
@@ -71,8 +71,8 @@ func _sheet(feel: Node, enemy: bool) -> bool:
 				var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 				var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
 				var at := Vector2(40.0 + c * COLUMN, 35.0 + e * ROW)
-				var seconds: float = _seconds_of(column[0] as int)
-				feel.call("show_flash", column[0] as int, at, Vector2.RIGHT, tint, ActorsScript.RAMP_ENEMY if enemy else e % 4, look, column[1] as int, seconds)
+				var seconds: float = (feel.call("flash_kind", column[0] as StringName) as FlashKind).seconds
+				feel.call("show_flash", column[0] as StringName, at, Vector2.RIGHT, tint, ActorsScript.RAMP_ENEMY if enemy else e % 4, look, column[1] as int, seconds)
 		await process_frame
 	_image = await grab()
 	if int(feel.call("live_flashes")) < 50:
@@ -80,13 +80,3 @@ func _sheet(feel: Node, enemy: bool) -> bool:
 		return false
 	return true
 
-
-func _seconds_of(kind: int) -> float:
-	match kind:
-		FeelScript.KIND_BURST:
-			return FeelScript.BURST_SECONDS
-		FeelScript.KIND_RUNE_BURST:
-			return FeelScript.RUNE_BURST_SECONDS
-		FeelScript.KIND_CAST:
-			return FeelScript.CAST_SECONDS
-	return FeelScript.RING_SECONDS

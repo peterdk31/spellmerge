@@ -82,8 +82,8 @@ func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() ->
 	var body := _staff()
 	var tip: Vector2 = body.muzzle_position()
 	_bus.staff_shown.emit(body.id, body, STAFF)
-	check_equal(_feel.flash_info(FeelScript.KIND_RING_OUT).get("at"), body.butt_position().round(), "the cue's point is the staff's lower end")
-	var shown: Dictionary = _feel.flash_info(FeelScript.KIND_BURST)
+	check_equal(_feel.flash_info(&"ring_out").get("at"), body.butt_position().round(), "the cue's point is the staff's lower end")
+	var shown: Dictionary = _feel.flash_info(&"burst")
 	check(not shown.is_empty(), "its flash shows")
 	if shown.is_empty():
 		return
@@ -91,11 +91,11 @@ func test_a_staff_shown_plays_staff_swap_along_the_staff_following_the_body() ->
 	check_equal(shown["dir"], Vector2.UP, "along the aim")
 	# Frame by frame, the body walking: the flash stays on the tip it was played at.
 	var frames: int = 0
-	while not _feel.flash_info(FeelScript.KIND_BURST).is_empty():
+	while not _feel.flash_info(&"burst").is_empty():
 		body.position += Vector2(1.5, -0.5)
 		_feel.step(STEP)
 		frames += 1
-		var info: Dictionary = _feel.flash_info(FeelScript.KIND_BURST)
+		var info: Dictionary = _feel.flash_info(&"burst")
 		if not info.is_empty():
 			check_equal(info["at"], (tip + Vector2(1.5, -0.5) * frames).round(), "on the tip at frame %d" % frames)
 		if frames > 60:
@@ -109,14 +109,14 @@ func test_a_followed_flash_moves_as_the_old_poof_did() -> void:
 	var body := _staff()
 	var ramp: int = int(_feel.call("_ramp_of", -1))
 	var offset: Vector2 = body.hand_offset + body.aim * 4.0
-	var old: int = _feel.show_flash(FeelScript.KIND_PUFF, body.global_position + offset, body.aim, Color.WHITE, ramp, FeelScript.POOF, 2, FeelScript.POOF_SECONDS, 0.0, body)
+	var old: int = _feel.show_flash(&"poof", body.global_position + offset, body.aim, Color.WHITE, ramp, 0, 2, _feel.flash_kind(&"poof").seconds, 0.0, body)
 	var offsets: PackedVector2Array = _feel.get("_flash_offset") as PackedVector2Array
 	offsets[old] = offset
 	_feel.set("_flash_offset", offsets)
 	_swap_cue([{"flash": &"poof", "zoom": 2, "bare": true}])
 	_feel.play_cue(FeelScript.STAFF_SWAP, -1, body.global_position + offset, body.aim, 0.0, Color.WHITE, 0, -1, -1, -1, 0, true, FeelScript.NO_BODY, FeelScript.CASTER_RAMP, body)
 	var new: int = (old + 1) % _feel.effect_slots
-	for frame in roundi(FeelScript.POOF_SECONDS / STEP) + 2:
+	for frame in roundi(_feel.flash_kind(&"poof").seconds / STEP) + 2:
 		for field: String in ["_flash_at", "_flash_dir", "_flash_core", "_flash_ramp", "_flash_zoom", "_flash_look", "_flash_seconds", "_flash_age", "_flash_offset", "_flash_kind"]:
 			var values: Variant = _feel.get(field)
 			check_equal(values[new], values[old], "%s at frame %d" % [field, frame])
@@ -130,10 +130,10 @@ func test_a_followed_flash_ends_when_its_body_goes() -> void:
 	_swap_cue([{"flash": &"burst", "zoom": 1, "seconds": 1.0}])
 	var body := _staff()
 	_bus.staff_shown.emit(body.id, body, STAFF)
-	check(not _feel.flash_info(FeelScript.KIND_BURST).is_empty(), "it shows")
+	check(not _feel.flash_info(&"burst").is_empty(), "it shows")
 	body.free()
 	_feel.step(STEP)
-	check(_feel.flash_info(FeelScript.KIND_BURST).is_empty(), "and goes with the body")
+	check(_feel.flash_info(&"burst").is_empty(), "and goes with the body")
 
 
 func test_it_is_in_the_new_staffs_colour_and_cards() -> void:
@@ -145,7 +145,7 @@ func test_it_is_in_the_new_staffs_colour_and_cards() -> void:
 	var body := _staff()
 	_bus.staff_shown.emit(body.id, body, STAFF)
 	check_equal(spells.asked, [[body.id, STAFF]], "asked for the build of the staff put on show")
-	var shown: Dictionary = _feel.flash_info(FeelScript.KIND_BURST)
+	var shown: Dictionary = _feel.flash_info(&"burst")
 	check(not shown.is_empty() and shown["core"] == Color(0.2, 0.6, 1.0), "in its spell's colour")
 	check(not shown.is_empty() and shown["look"] == 0b10010, "with its cards")
 

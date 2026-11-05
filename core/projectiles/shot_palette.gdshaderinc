@@ -58,10 +58,9 @@ const float L_DOUBLE = 19.0;
 const float L_CONVERGE = 20.0;
 const float L_DRIFT = 21.0;
 const float KIND_COUNT = 21.0;
-// Flags in the look, not particles: Feel's poof (living staffs H4), the enemy ramp (Blight ochre
-// takes the player's place; staffs F2), and an exact colour (a reaction's own, its ramp made from
-// it instead of the palette material it is nearest).
-const float POOF = 22.0;
+// Flags in the look, not particles: the enemy ramp (Blight ochre takes the player's place; staffs
+// F2), and an exact colour (a reaction's own, its ramp made from it instead of the palette material
+// it is nearest). Kind 22 is free (Feel's poof flag until flash kinds F2).
 const float ENEMY_RAMP = 23.0;
 const float EXACT = 24.0;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:

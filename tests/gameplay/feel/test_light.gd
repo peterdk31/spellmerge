@@ -220,17 +220,21 @@ func test_the_light_shader_reads_rows_as_the_script_says() -> void:
 	check_equal(SpellLightScript.STRIDE, FeelScript.FLASH_STRIDE, "a flash row is a light row")
 
 
-## Which flashes light is data by Feel's KIND_* codes: every code named is the kind it says.
-func test_each_lit_flash_kind_is_feels() -> void:
-	var flares: Dictionary = {FeelScript.KIND_BURST: 1, FeelScript.KIND_RING_OUT: 1, FeelScript.KIND_RING_IN: 1, FeelScript.KIND_RUNE_BURST: 1, FeelScript.KIND_CAST: 1, FeelScript.KIND_SPRAY: 1, FeelScript.KIND_PUFF: 1, FeelScript.KIND_ARC: 1}
-	for code: int in SpellLightScript.FLASH_LIGHT:
-		check(flares.has(code), "flash code %d is a lit Feel kind" % code)
-	for code: int in flares:
-		check(SpellLightScript.FLASH_LIGHT.has(code), "Feel kind %d lights" % code)
-	check(SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_SHELL - FeelScript.KIND_SHELL) and SpellLightScript.BLAST_LIGHT.has(FeelScript.KIND_FIREBALL - FeelScript.KIND_SHELL), "a blast and a fireball light")
-	var lights: PackedFloat32Array = SpellLightScript.kind_lights(SpellLightScript.FLASH_LIGHT)
-	check_equal(lights.size(), 16, "16 kinds to the shader")
-	check(is_equal_approx(lights[FeelScript.KIND_BURST], 1.0) and lights[FeelScript.KIND_STATUS] == 0.0, "by code")
+## Which flashes light is data (`FlashKind.room_light`): the flares, rings, casts, hits, puffs, the
+## poof, lightning and the explosions light; the columns and the cracks do not. Feel writes each
+## flash's light into its row (the transform's second unused float), which the light reads.
+func test_each_flash_kinds_light_is_its_files() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	for id: StringName in [&"burst", &"ring_out", &"ring_in", &"rune_burst", &"cast", &"spray", &"puff", &"poof", &"arc", &"shell", &"fireball"]:
+		check(feel.flash_kind(id) != null and feel.flash_kind(id).room_light > 0.0, "%s lights" % id)
+	for id: StringName in [&"rise", &"fall", &"quake"]:
+		check(feel.flash_kind(id) != null and feel.flash_kind(id).room_light == 0.0, "%s does not" % id)
+	feel.show_flash(&"burst", Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
+	feel._process(1.0 / 60.0)
+	check_equal(feel.flash_info(&"burst")["light"], 1.0, "a burst lights 1.0 (its file)")
+	check(is_equal_approx(feel.light().flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], 1.0), "and its row says so")
+	check(SpellLightScript.LIGHT_SHADER.code.contains("MODEL_MATRIX[2].y"), "where the light reads it")
 
 
 ## Feel's flashes light: the light's flash batches draw the rows Feel just uploaded.
@@ -238,9 +242,9 @@ func test_feels_flashes_are_handed_to_the_light() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
 	var light: SpellLightScript = feel.light()
-	feel.show_flash(FeelScript.KIND_BURST, Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
-	feel.show_flash(FeelScript.KIND_SHELL, Vector2(200.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 6, 0.5)
-	feel.show_flash(FeelScript.KIND_ARC, Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
+	feel.show_flash(&"burst", Vector2(100.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 2, 0.5)
+	feel.show_flash(&"shell", Vector2(200.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 6, 0.5)
+	feel.show_flash(&"arc", Vector2(300.0, 100.0), Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 40.0)
 	feel._process(1.0 / 60.0)
 	for kind: int in [SpellLightScript.FLASHES_FLARE, SpellLightScript.FLASHES_BLAST, SpellLightScript.FLASHES_ARC]:
 		var multimesh: MultiMesh = light.flashes[kind].multimesh
@@ -253,16 +257,9 @@ func test_feels_flashes_are_handed_to_the_light() -> void:
 	check_equal(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.visible_instance_count, 0, "a flash that ended no longer lights")
 
 
-## The kind and the age code beside it in a flash row's last float (Feel's coding): [kind, code].
-func _coded(a: float) -> Array:
-	var coded: float = (1.0 - a) * 16.0
-	var kind: float = floorf(coded + 0.5)
-	return [int(kind), coded - kind]
-
-
 ## A cue's `light` part (S6, item 4) lights round its point in its colour for its seconds, fading;
-## and a cue with one lights by it alone: its flashes' rows are coded unlit (their age below their
-## kind), while another cue's flashes light by their kinds as before.
+## and a cue with one lights by it alone: its flashes' rows light 0, while another cue's flashes
+## light by their kinds as before.
 func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
 	var made: Array = _feel()
 	var feel: FeelScript = made[1]
@@ -277,17 +274,15 @@ func test_a_cues_light_part_lights_and_its_flashes_do_not() -> void:
 	check(is_equal_approx(rows[0], 44.0) and is_equal_approx(rows[5], 44.0), "out to its radius")
 	check(rows[15] > 0.9 and rows[15] <= 1.0, "as bright as it says, fading: %f" % rows[15])
 	check(is_equal_approx(rows[12], 0.4196078), "in its exact colour")
-	var flare: Array = _coded(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[15])
-	check_equal(flare[0], FeelScript.KIND_RING_OUT, "its ring is a flare row")
-	check(flare[1] < 0.0, "coded unlit: its age below its kind")
+	check(not feel.flash_info(&"ring_out").is_empty(), "its ring is a flare row")
+	check_equal(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], 0.0, "unlit: its row lights 0")
 	feel._process(1.0)
 	check_equal(light.cue_light_count(), 0, "gone after its seconds")
 	feel.play_cue(&"possess_start", 0, Vector2(100.0, 50.0))
 	feel._process(1.0 / 60.0)
 	check_equal(light.cue_light_count(), 0, "a cue with no light part makes no cue light")
-	flare = _coded(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[15])
-	check_equal(flare[0], FeelScript.KIND_RING_IN, "its ring")
-	check(flare[1] > 0.0, "lights by its kind, as before")
+	check(not feel.flash_info(&"ring_in").is_empty(), "its ring")
+	check(is_equal_approx(light.flashes[SpellLightScript.FLASHES_FLARE].multimesh.buffer[6], feel.flash_kind(&"ring_in").room_light), "lights by its kind, as before")
 
 
 ## The cue lights' rows are the spell light's own: a new one past CUE_LIGHTS takes the oldest's

@@ -88,8 +88,6 @@ var spread_mult: float = 1.0
 ## zapped (rolled again `SpellLimits.ZAP_AGAIN` after it was zapped or lost), and what a zap hits with.
 var zap_chance: float = 0.0
 var zap_reach: float = 0.0
-## `penta`: how far ahead it looks for the foe its ring surrounds (its cards' widest reach).
-var penta_reach: float = 0.0
 var zap_hit: HitProfile = null
 ## An echoed shot's zap: `zap_hit` at ECHO_DAMAGE. Null without both `zap` and `echo`.
 var echo_zap_hit: HitProfile = null

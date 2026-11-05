@@ -13,5 +13,4 @@ damage_mult = 0.4
 mana_mult = 2.5
 behaviour = 24
 behaviour_strength = 5.0
-behaviour_reach = 200.0
 look_layer = 20

@@ -76,10 +76,10 @@ enum Behaviour {
 	## cast it. Several hits make several pulls, and they add. Strength unused (1).
 	PULL,
 	## The carrier is cast `behaviour_strength` times (5 the card; more cards add) instead of once,
-	## each copy from a point on a ring round the nearest foe in front within `behaviour_reach`,
-	## all aimed in at it; with no foe in reach, round the point the carrier would reach along the
-	## aim: a nova turned inside out (owner, 2026-11-05). Each copy is cast by its point
-	## (`SpellRuntime._penta`). Not on a carrier that moves its caster or strikes from the hand.
+	## each copy from a point on a ring round its caster, all aimed in at it; with homing, round
+	## the target its homing picks (owner, 2026-11-05: the caster is the point, homing moves it).
+	## Each copy is cast by its point (`SpellRuntime._penta`). Not on a carrier that moves its
+	## caster or strikes from the hand.
 	PENTA,
 }
 

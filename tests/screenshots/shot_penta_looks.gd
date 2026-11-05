@@ -1,16 +1,17 @@
 extends "res://tests/support/screenshot.gd"
-## Penta (docs/milestones/portal.md, "Penta") on four carriers, each round a dummy: five fire beams
-## burning in at it, five walls caging it, five runes ringing it, and five frost bolts closing on
-## it. `penta_looks` is the whole screen.
+## Penta (docs/milestones/portal.md, "Penta") on four carriers: with homing, round a dummy, five
+## fire beams burning in at it, five runes ringing it and five frost bolts closing on it; without
+## homing, round its caster, five walls caging the caster. `penta_looks` is the whole screen.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
-## Each: the cards, where they are cast from (aiming right) and the dummy.
+## Each: the cards, where they are cast from (aiming right) and the dummy (INF for none). The
+## caster has no body here, so the wall row shows the ring round the point it is cast from.
 const CASTS: Array = [
-	[[&"hold", &"penta", &"fire", &"beam"], Vector2(30.0, 90.0), Vector2(170.0, 90.0)],
-	[[&"penta", &"wall"], Vector2(330.0, 90.0), Vector2(470.0, 90.0)],
-	[[&"penta", &"rune"], Vector2(30.0, 270.0), Vector2(170.0, 270.0)],
-	[[&"penta", &"frost", &"bolt"], Vector2(330.0, 270.0), Vector2(470.0, 270.0)],
+	[[&"hold", &"homing", &"penta", &"fire", &"beam"], Vector2(30.0, 90.0), Vector2(170.0, 90.0)],
+	[[&"penta", &"wall"], Vector2(400.0, 90.0), Vector2.INF],
+	[[&"homing", &"penta", &"rune"], Vector2(30.0, 270.0), Vector2(170.0, 270.0)],
+	[[&"homing", &"penta", &"frost", &"bolt"], Vector2(330.0, 270.0), Vector2(470.0, 270.0)],
 ]
 
 
@@ -34,6 +35,8 @@ func take() -> void:
 	staff_base.spread = 0.0
 	lay_floor()
 	for row: Array in CASTS:
+		if not (row[2] as Vector2).is_finite():
+			continue
 		var dummy := Node2D.new()
 		dummy.position = row[2]
 		root.add_child(dummy)

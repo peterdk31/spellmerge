@@ -414,8 +414,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.ray_length *= modifier.reach_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ZAP:
 			spell.zap_reach = maxf(spell.zap_reach, modifier.behaviour_reach)
-		if modifier.behaviour == ModifierBase.Behaviour.PENTA:
-			spell.penta_reach = maxf(spell.penta_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
 			spell.behaviour_cues[modifier.behaviour] = modifier.cue

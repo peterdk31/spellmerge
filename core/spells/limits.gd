@@ -173,14 +173,11 @@ const PORTAL_EXITS_MOST: int = 24
 ## Portal rows made at once; more are made when needed.
 const PORTAL_ROWS_START: int = 8
 
-## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of the foe it
-## surrounds, or from the point it surrounds when there is none.
+## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of what it
+## surrounds (its homing target, or its caster).
 const PENTA_RING: float = 64.0
 ## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
 ## so a carrier that goes a short way (a nova's ring) still meets in the middle.
 const PENTA_WITHIN: float = 0.8
-## How far ahead the point is that a penta with no foe in reach surrounds, for a carrier that is
-## not aimed (a rune, a decoy, an orbit: `Carrier.reach_of` 0).
-const PENTA_REACH: float = 96.0
 ## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
 const PENTA_MOST: int = 24

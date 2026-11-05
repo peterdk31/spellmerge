@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Penta (ModifierBase.Behaviour.PENTA; docs/milestones/portal.md, "Penta"): the carrier cast five
-## times from a ring round the nearest foe, aimed in at it, or round the point it would reach with
-## no foe; more cards add copies; wasted where nothing leaves from a point (a dash, a swing).
+## times from a ring round its caster, all aimed in at it, or with homing round the target its
+## homing picks; more cards add copies; wasted where nothing leaves from a point (a dash, a swing).
 ##
 ## godot --headless --path . --script res://tests/core/test_penta.gd
 
@@ -24,10 +24,10 @@ func _shots() -> Array[int]:
 	return out
 
 
-func test_five_bolts_from_a_ring_round_the_foe_all_aimed_at_it() -> void:
+func test_with_homing_five_bolts_from_a_ring_round_its_target_all_aimed_at_it() -> void:
 	_arena = ArenaScript.new(root)
 	var imp: Node2D = _arena.add_imp(Vector2(150, 30))
-	_arena.install_cards(0, 0, ["penta", "bolt"])
+	_arena.install_cards(0, 0, ["homing", "penta", "bolt"])
 	check(_arena.cast(0, 0), "cast")
 	var shots: Array[int] = _shots()
 	check_equal(shots.size(), 5, "five bolts")
@@ -40,31 +40,52 @@ func test_five_bolts_from_a_ring_round_the_foe_all_aimed_at_it() -> void:
 		nearest = minf(nearest, at.length())
 	check(nearest < Vector2(150, 30).length(), "the first on the caster's side")
 	_arena.run(1.0)
-	check(_arena.lost(_arena.imps[0]) > 0, "and they hit it")
+	check(_arena.lost(imp) > 0, "and they hit it")
 
 
-func test_with_no_foe_it_rings_the_point_the_carrier_reaches() -> void:
+## Without homing the point is the caster (owner, 2026-11-05): the copies stand round it and aim in
+## at it, even though that hurts it.
+func test_without_homing_it_rings_its_caster_aimed_in() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.add_imp(Vector2(150, 0))
+	_arena.install_cards(0, 0, ["penta", "bolt"])
+	check(_arena.cast(0, 0), "cast")
+	var shots: Array[int] = _shots()
+	check_equal(shots.size(), 5, "five bolts")
+	var ahead: bool = false
+	for slot in shots:
+		var at: Vector2 = _arena.projectiles.get_position_of(slot)
+		check(is_equal_approx(at.length(), SpellLimits.PENTA_RING), "each starts on the ring round the caster (%s)" % at)
+		check(_arena.projectiles.get_velocity_of(slot).normalized().dot(-at.normalized()) > 0.99, "and flies in at it")
+		ahead = ahead or at.is_equal_approx(Vector2(SpellLimits.PENTA_RING, 0))
+	check(ahead, "the first ahead along the aim")
+
+
+func test_beams_stay_where_their_points_are() -> void:
 	_arena = ArenaScript.new(root)
 	_arena.install_cards(0, 0, ["penta", "beam"])
 	check(_arena.cast(0, 0), "cast")
 	var beams: CarrierBeam = CarrierBeam.of(_arena.spells)
 	check_equal(beams.beam_count(), 5, "five beams")
-	# The beam reaches 240, the card looks 200: the point is 200 ahead.
-	var middle: Vector2 = Vector2(200, 0)
-	for at in beams.beam_slots():
-		if beams.beam_on(at):
-			var origin: Vector2 = beams.beam_origin(at)
-			check(is_equal_approx(origin.distance_to(middle), SpellLimits.PENTA_RING), "each beam starts on the ring (%s)" % origin)
 	_arena.run(0.1)
 	for at in beams.beam_slots():
 		if beams.beam_on(at):
-			check(is_equal_approx(beams.beam_origin(at).distance_to(middle), SpellLimits.PENTA_RING), "and stays there, cast by its point")
+			check(is_equal_approx(beams.beam_origin(at).length(), SpellLimits.PENTA_RING), "each stays on the ring, cast by its point")
+
+
+func test_homing_with_no_target_rings_the_caster() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["homing", "penta", "bolt"])
+	check(_arena.cast(0, 0), "cast")
+	check_equal(_shots().size(), 5, "five bolts")
+	for slot in _shots():
+		check(is_equal_approx(_arena.projectiles.get_position_of(slot).length(), SpellLimits.PENTA_RING), "round the caster")
 
 
 func test_two_cards_cast_ten() -> void:
 	_arena = ArenaScript.new(root)
 	_arena.add_imp(Vector2(150, 0))
-	_arena.install_cards(0, 0, ["penta", "penta", "bolt"])
+	_arena.install_cards(0, 0, ["homing", "penta", "penta", "bolt"])
 	check(_arena.cast(0, 0), "cast")
 	check_equal(_shots().size(), 10, "ten bolts")
 
@@ -72,7 +93,7 @@ func test_two_cards_cast_ten() -> void:
 func test_a_short_carrier_rings_within_its_reach() -> void:
 	_arena = ArenaScript.new(root)
 	var imp: Node2D = _arena.add_imp(Vector2(150, 0))
-	_arena.install_cards(0, 0, ["penta", "frost", "nova"])
+	_arena.install_cards(0, 0, ["homing", "penta", "frost", "nova"])
 	check(_arena.cast(0, 0), "cast")
 	_arena.run(1.0)
 	check(_arena.was_given(imp, &"chill"), "five novas close over the imp in the middle")

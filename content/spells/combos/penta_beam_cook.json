@@ -1,8 +1,8 @@
 {
 	"id": "penta_beam_cook",
 	"name": "Penta beam cook",
-	"does": "Five beams open on a ring round the imp ahead and all burn in at it at once, a fire beam from every side.",
-	"casts": [{"staff": 0, "cards": ["penta", "fire", "beam"]}],
+	"does": "Homing picks the imp ahead and five beams open on a ring round it, all burning in at it at once, fire from every side.",
+	"casts": [{"staff": 0, "cards": ["homing", "penta", "fire", "beam"]}],
 	"imps": [[150, 0]],
 	"seconds": 1.0,
 	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "burn"}]

@@ -1252,32 +1252,35 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 
 ## `penta` (owner, 2026-11-05): `spell` is cast `behaviour_strength` times (5 a card), each copy from
-## a point on a ring round the nearest foe in front of `origin` along `heading` within the card's
-## reach, SpellLimits.PENTA_RING beyond its edge (or PENTA_WITHIN of the carrier's own reach, when
-## that is less), aimed in at it, the first on the caster's side;
-## with no foe there, round the point the carrier would reach along the aim (a nova turned inside
-## out). Each point stops short of a wall, and each copy is cast by its point (a beam stays there,
-## an orbit circles it). Returns the shots made.
+## a point on a ring round a centre, all aimed in at it (owner: "they should just aim towards the
+## point, even if it is the player"). The centre is the caster (its body, or the point or shot
+## that casts a payload), unless the spell homes: then the target its homing picks from `origin`
+## along `heading` (a flying shot's homing looks all round, an instant carrier's within its bend),
+## the caster again when there is none. The ring stands SpellLimits.PENTA_RING beyond the centre's
+## edge, or within PENTA_WITHIN of the carrier's own reach when that is less; the first copy stands
+## on the caster's side of a target, or ahead along the aim round the caster. Each point stops
+## short of a wall, and each copy is cast by its point (a beam stays there, an orbit circles it).
+## Returns the shots made.
 func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
 	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
+	# The caster: a wizard's body (its anchor), else the point or shot casting this payload.
+	var caster_at: Vector2 = origin
+	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
+		caster_at = projectiles.get_anchor(actor)
 	var centre: Vector2 = Vector2.INF
 	var edge: float = 0.0
-	var reach: float = spell.penta_reach
-	if projectiles != null and reach > 0.0:
-		centre = projectiles.homing_point(actor, origin, way, PI * 0.5, ProjectilesScript.ACTOR_LAYERS, reach, 0, tag)
+	if spell.homing_range > 0.0 and projectiles != null:
+		var bend: float = PI if spell.has_trait(CarrierTraits.FLIES) else deg_to_rad(spell.homing_angle)
+		centre = projectiles.homing_point(actor, origin, way, bend, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, tag)
 		if centre.is_finite():
 			edge = projectiles.homing_target_radius
-	if not centre.is_finite():
-		var ahead: float = _carrier_of(spell).reach_of(spell)
-		if ahead <= 0.0:
-			ahead = SpellLimits.PENTA_REACH
-		if reach > 0.0:
-			ahead = minf(ahead, reach)
-		centre = origin + way * ahead
-		if projectiles != null:
-			centre = projectiles.clip_to_walls(origin, centre)
-	var first: Vector2 = centre.direction_to(origin) if not centre.is_equal_approx(origin) else -way
+	var first: Vector2 = way
+	if centre.is_finite():
+		if not centre.is_equal_approx(caster_at):
+			first = centre.direction_to(caster_at)
+	else:
+		centre = caster_at
 	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
 	var carried: float = _carrier_of(spell).reach_of(spell)
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):

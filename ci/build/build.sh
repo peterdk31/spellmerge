@@ -22,7 +22,7 @@
 # Every mode first builds the native module (ci/build/native.sh: Linux for --quick, Linux and the
 # web for --web, all three for a full build) and fails without it; the exports are checked for it.
 # NATIVE=0 leaves it out, for local builds only.
-#   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
+#   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test and every card's own test (content/**/test_*.gd)
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
 #                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
 #                                     8 at once; PNGs in build/screenshots/, and shots.txt there
@@ -230,9 +230,9 @@ unit_tests() {
   rm -rf build/test-runs && mkdir -p build/test-runs
   export -f unit_test godot_checked
   export GODOT
-  find tests -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -vE "/($TIMED_TESTS)\.gd$" || true; } | sort \
+  find tests content -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -vE "/($TIMED_TESTS)\.gd$" || true; } | sort \
     | xargs -P "$jobs" -I{} bash -c 'unit_test "$1"' _ {} >"$results"
-  find tests -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -E "/($TIMED_TESTS)\.gd$" || true; } | sort \
+  find tests content -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -E "/($TIMED_TESTS)\.gd$" || true; } | sort \
     | xargs -P 1 -I{} bash -c 'unit_test "$1"' _ {} >>"$results"
   echo "$(grep -c '^PASS' "$results") unit tests passed ($jobs at once)"
   while read -r status test; do

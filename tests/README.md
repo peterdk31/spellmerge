@@ -59,7 +59,7 @@ New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.g
 
 ```sh
 ci/build/build.sh --quick        # downloads the pinned Godot once, imports, runs the editor smoke test
-ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd (about a second each)
+ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd and each card's own content/spells/**/test_<id>.gd (about a second each)
 ci/build/build.sh --quick --screenshots  # the same, then every tests/screenshots/shot_*.gd on a virtual display
 ```
 

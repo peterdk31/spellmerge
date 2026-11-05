@@ -84,14 +84,16 @@ var chain_jumps: int = 0
 ## Factor on the staff's `spread` for this carrier's shots (its modifiers' `spread_mult`,
 ## multiplied); 1 means the staff's own spread.
 var spread_mult: float = 1.0
-## Speed over life (its modifiers' `speed_start`, `speed_end` and `speed_ease`, each multiplied):
-## all 1 for a shot that keeps its speed (`ProjectileManager.set_speed_curve`).
-var speed_start: float = 1.0
-var speed_end: float = 1.0
-var speed_ease: float = 1.0
+## Speed over life (`ProjectileManager.set_speed_curve`): every shot's default motion, the
+## SpellLimits.SHOT_SPEED_* curve, times its modifiers' `speed_start`, `speed_end` and
+## `speed_ease`, each multiplied. All 1 would be a shot that keeps its speed.
+var speed_start: float = SpellLimits.SHOT_SPEED_START
+var speed_end: float = SpellLimits.SHOT_SPEED_END
+var speed_ease: float = SpellLimits.SHOT_SPEED_EASE
 
 
-## True when the spell's shots change speed over their life.
+## True when the spell's shots change speed over their life (every spell's, unless its cards
+## cancel the default curve out).
 func has_speed_curve() -> bool:
 	return speed_start != 1.0 or speed_end != 1.0
 ## `zap`: the chance (0 to 1; 0 for none) that each body coming within `zap_reach` of a shot is

@@ -281,7 +281,7 @@ func _test_linger_stops_then_goes_on() -> void:
 	_check(absf(_expired[0][1].x - 100.0 - 50.0) < 6.0, "having flown the whole flight (%s)" % _expired[0][1])
 
 
-## Speed over life (`set_speed_curve`): a drag curve (2.5 to 0, ease 1.5... here 3 to 0, ease 2)
+## Speed over life (`set_speed_curve`): a bursting curve (every shot's is 2.2 to 0.2, ease 1.5; here 3 to 0, ease 2)
 ## leaves faster and eases out to a stop as its life runs out, about as far as a plain shot, only
 ## sooner; an even curve the other way speeds up.
 func _test_speed_curve_eases_over_life() -> void:
@@ -296,8 +296,8 @@ func _test_speed_curve_eases_over_life() -> void:
 	var before: float = _mgr.get_velocity_of(slot).x
 	_run(18)
 	var half: float = _mgr.get_velocity_of(slot).x
-	# (Speed at half its life: 100 x 3 x 0.5^2 = 75.)
-	_check(half < before and absf(half - 75.0) < 1.0, "it slows down: %f px/s at half its life" % half)
+	# (Speed at half its life, read at the middle of the step: 100 x 3 x (0.5 + 1/120)^2 = 77.5.)
+	_check(half < before and absf(half - 77.5) < 1.0, "it slows down: %f px/s at half its life" % half)
 	_check(absf(_mgr.get_velocity_of(slot).y) < 0.001, "keeping its heading")
 	_run(29)
 	_check(_mgr.is_alive(slot) and _mgr.get_velocity_of(slot).x < 1.0, "it is all but still at the end of its life (%f)" % _mgr.get_velocity_of(slot).x)
@@ -306,13 +306,16 @@ func _test_speed_curve_eases_over_life() -> void:
 	var ends: Dictionary = {}
 	for row: Array in _expired:
 		ends[row[2]] = row[1]
-	_check(ends.has(2) and absf((ends[2] as Vector2).x - (ends[1] as Vector2).x) < 5.0, "about as far as the plain shot went (%s)" % [ends])
+	# Its curve's mean is 1 (3 + (0 - 3) x 2 / 3), so it goes as far: read at the middle of each
+	# step, within a pixel (read at the step's end, a front-loaded curve fell a step's change short).
+	_check(ends.has(2) and absf((ends[2] as Vector2).x - (ends[1] as Vector2).x) < 1.0, "as far as the plain shot went (%s)" % [ends])
 	# The other way: an even curve from half speed up to twice.
 	_setup()
 	var speeding: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 100.0), 1.0)
 	_mgr.set_speed_curve(speeding, 0.5, 2.0, 1.0)
 	_run(30)
-	_check(absf(_mgr.get_velocity_of(speeding).x - 125.0) < 1.0, "an even curve is half way at half its life (%f)" % _mgr.get_velocity_of(speeding).x)
+	# (100 x (0.5 + 1.5 x (1 - (0.5 + 1/120))) = 123.75: read at the middle of the step.)
+	_check(absf(_mgr.get_velocity_of(speeding).x - 123.75) < 0.5, "an even curve is half way at half its life (%f)" % _mgr.get_velocity_of(speeding).x)
 	# Refused where it means nothing, and for bad numbers.
 	var still: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
@@ -326,16 +329,18 @@ func _test_speed_curve_eases_over_life() -> void:
 	var again: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 1.0)
 	_run(30)
 	_check(_mgr.get_velocity_of(again).is_equal_approx(Vector2(10.0, 0.0)), "a fresh shot in its slot keeps its speed")
-	# The cards' numbers reach the shot (`Spells._apply_travel`).
+	# Every spell's shots take the default curve (`Spells._apply_travel`), cards or none...
 	var spells: Node = SpellsScript.new()
 	spells.bind(_mgr, _bus)
 	var spell := CompiledSpell.new()
-	spell.speed_start = 2.5
-	spell.speed_end = 0.0
-	spell.speed_ease = 1.5
+	var plain_spell: int = _fire(Vector2(100.0, 0.0))
+	spells._apply_travel(plain_spell, spell)
+	_check(_mgr.get_velocity_of(plain_spell).is_equal_approx(Vector2(100.0 * SpellLimits.SHOT_SPEED_START, 0.0)), "every spell's shot bursts out (%s)" % _mgr.get_velocity_of(plain_spell))
+	# ...and a card's numbers on it reach the shot.
+	spell.speed_start = 1.5
 	var carded: int = _fire(Vector2(100.0, 0.0))
 	spells._apply_travel(carded, spell)
-	_check(_mgr.get_velocity_of(carded).is_equal_approx(Vector2(250.0, 0.0)), "a Drag card sends the shot off 2.5 times faster")
+	_check(_mgr.get_velocity_of(carded).is_equal_approx(Vector2(150.0, 0.0)), "a card's start reaches the shot")
 	spells.free()
 
 

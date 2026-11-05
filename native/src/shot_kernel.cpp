@@ -1272,7 +1272,8 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			if (state[slot] != S_MOVING) {
 				continue;
 			}
-			const double left = clampf((double)life[slot] / (double)span[slot], 0.0, 1.0);
+			// At the middle of the step, as `_pass_curve`.
+			const double left = clampf(((double)life[slot] + delta * 0.5) / (double)span[slot], 0.0, 1.0);
 			const double from = (double)curve_from[slot];
 			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - std::pow(left, (double)curve_ease[slot]));
 			vel[slot] = vmul(vel[slot].normalized(), (double)curve_speed[slot] * factor);

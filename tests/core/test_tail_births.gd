@@ -188,3 +188,97 @@ func test_the_tail_dice() -> void:
 	check(inside, "between 0 and 1")
 	check(absf(total / 2000.0 - 0.5) < 0.03, "about 0.5 on average (%.3f)" % (total / 2000.0))
 	check(ManagerScript.tail_hash(-1, -1) >= 0.0, "negative numbers too")
+
+
+## The owner's Storm and Fireball (2026-11-05: "If i fire the fireball wand while the storm is still
+## going, im not getting a tail on the fireball"): the births are shared by staff, not by shot
+## (GROUPS), so a Fireball cast through a Storm of another staff keeps its whole tail, and the
+## Storm's tails thin. On the Storm's own staff the same shot thins with it.
+func test_a_lone_shot_keeps_its_tail_beside_a_crowd_of_another_staff() -> void:
+	var own_staff: int = _lone_tail(SpellTag.make(0, 0, 0, 0))
+	var path: float = 600.0 * DT * 6.0
+	check(float(own_staff) >= 0.8 * path / ManagerScript.TAIL_SPACING, "its own staff: the whole tail (%d births over %.0f px)" % [own_staff, path])
+	var storm_group: int = ManagerScript.group_of(0, SpellTag.make(0, 1, 0, 0))
+	check(mgr._group_spacing[storm_group] > ManagerScript.TAIL_SPACING * 2.0, "the Storm's tails thin (spacing %.1f)" % mgr._group_spacing[storm_group])
+	check(mgr.tail_births <= mgr.tail_births_cap, "and the frame keeps to the most (%d)" % mgr.tail_births)
+	before_each()
+	var storm_staff: int = _lone_tail(SpellTag.make(0, 1, 0, 0))
+	check(storm_staff * 2 < own_staff, "on the Storm's staff it thins with it (%d, against %d)" % [storm_staff, own_staff])
+
+
+## A Storm of 30 shots of staff 1 flies for five frames, then one shot tagged `tag` (the Fireball);
+## the Fireball's tail births over the next six frames.
+func _lone_tail(tag: int) -> int:
+	mgr.tail_births_cap = 20
+	var storm: int = SpellTag.make(0, 1, 0, 0)
+	for n in 30:
+		var slot: int = mgr.spawn(0, ORIGIN + Vector2(0.0, float(n) * 6.0), Vector2(300.0, 0.0), 3.0, 1.5, ManagerScript.LAYER_ENEMY, 0, storm)
+		mgr.set_look(slot, 0)
+	for n in 5:
+		mgr.step(DT)
+		mgr.update_draw(1.0)
+	var lone: int = mgr.spawn(0, ORIGIN + Vector2(0.0, 300.0), Vector2(600.0, 0.0), 3.0, 1.5, ManagerScript.LAYER_ENEMY, 0, tag)
+	mgr.set_look(lone, 0)
+	var laid: int = 0
+	for n in 7:
+		mgr.step(DT)
+		mgr.update_draw(1.0)
+		if n == 0:
+			continue
+		for b in _births_of(ManagerScript.SPARK_TAIL):
+			if b[1] > ORIGIN.y + 250.0:
+				laid += 1
+	return laid
+
+
+## The cards' particles too: a lone ember shot of one staff keeps its embers whole beside a crowd of
+## another staff's that is over the pool, which thins.
+func test_a_lone_shot_keeps_its_particles_beside_a_crowd_of_another_staff() -> void:
+	mgr.tail_births_cap = 0
+	mgr.tailless_particle_cap = 60
+	var drift: int = ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_DRIFT]))
+	var embers: int = ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS]))
+	for n in 60:
+		var slot: int = mgr.spawn(0, ORIGIN + Vector2(float(n % 10) * 8.0, float(n / 10) * 8.0), Vector2(1.0, 0.0), 5.0, 1.5, ManagerScript.LAYER_ENEMY, 0, SpellTag.make(0, 1, 0, 0))
+		mgr.set_look(slot, drift)
+	var fireball: int = SpellTag.make(0, 0, 0, 0)
+	var lone: int = mgr.spawn(0, ORIGIN + Vector2(0.0, 300.0), Vector2(1.0, 0.0), 5.0, 1.5, ManagerScript.LAYER_ENEMY, 0, fireball)
+	mgr.set_look(lone, embers)
+	var laid: int = 0
+	var crowd: int = 0
+	for n in 120:
+		mgr.step(DT)
+		mgr.update_draw(1.0)
+		laid += _births_of(ManagerScript.LOOK_EMBERS).size()
+		crowd += _births_of(ManagerScript.LOOK_DRIFT).size()
+	check(mgr.particle_share < 0.2, "the pool is over its count (%.2f)" % mgr.particle_share)
+	check_equal(mgr._group_share[ManagerScript.group_of(0, fireball)], 1.0, "the lone shot's staff is given all it asks for")
+	var whole: float = 120.0 * ManagerScript.SPARK_RATES[ManagerScript.LOOK_EMBERS]
+	check(float(laid) > 0.7 * whole and float(laid) < 1.3 * whole, "its embers at their whole rate (%d of about %.0f)" % [laid, whole])
+	var crowd_whole: float = 60.0 * 120.0 * ManagerScript.SPARK_RATES[ManagerScript.LOOK_DRIFT]
+	check(float(crowd) < 0.2 * crowd_whole, "the crowd's thin (%d of %.0f)" % [crowd, crowd_whole])
+
+
+## The fair level: asks under it are given whole, the rest share what is left alike; INF when all fit.
+func test_the_fair_level() -> void:
+	check_equal(ManagerScript.fair_level(PackedFloat32Array([1.0, 2.0, 3.0]), 10.0), INF, "all fit")
+	check_equal(ManagerScript.fair_level(PackedFloat32Array([5.0, 300.0]), 40.0), 35.0, "a small ask whole, the big one the rest")
+	check_equal(ManagerScript.fair_level(PackedFloat32Array([100.0, 100.0, 100.0, 100.0]), 40.0), 10.0, "even asks share alike")
+	check_equal(ManagerScript.fair_level(PackedFloat32Array([2.0, 12.0, 50.0]), 30.0), 16.0, "levels past the small asks")
+	check_equal(ManagerScript.fair_level(PackedFloat32Array(), 30.0), INF, "no asks")
+
+
+## A shot's group is its caster's staff (a spell's tag), the caster's first for any other shot.
+func test_a_shots_group_is_its_casters_staff() -> void:
+	check_equal(ManagerScript.group_of(3, SpellTag.make(3, 2, 17, 5)), 3 * ManagerScript.GROUP_STAFFS + 2, "the caster's staff")
+	check_equal(ManagerScript.group_of(3, SpellTag.make(3, 2, 40, 1)), ManagerScript.group_of(3, SpellTag.make(3, 2, 17, 5)), "every spell of one staff, payloads too")
+	check(ManagerScript.group_of(3, SpellTag.make(3, 1, 0, 0)) != ManagerScript.group_of(3, SpellTag.make(3, 2, 0, 0)), "two staffs, two groups")
+	check(ManagerScript.group_of(2, SpellTag.make(2, 1, 0, 0)) != ManagerScript.group_of(3, SpellTag.make(3, 1, 0, 0)), "two casters, two groups")
+	check_equal(ManagerScript.group_of(5, 1000), 5 * ManagerScript.GROUP_STAFFS, "a shot of no spell: its caster's first")
+	var slot: int = mgr.spawn(1, ORIGIN, Vector2(10.0, 0.0), 1.0, 1.5, ManagerScript.LAYER_ENEMY, 0, SpellTag.make(1, 3, 0, 0))
+	var group: int = ManagerScript.group_of(1, SpellTag.make(1, 3, 0, 0))
+	check_equal(mgr._group_count[group], 1, "a spawn joins its group")
+	check(slot >= 0, "spawned")
+	check_equal(mgr.remove_by_tag(SpellTag.make(1, 3, 0, 0)), 1, "ended")
+	check_equal(mgr._group_count[group], 0, "and leaves it when it ends")
+	check_equal(mgr._group_live, 0, "no group is left live")

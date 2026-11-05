@@ -207,7 +207,13 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
 	X(tail_births_on, "tail_births_on", BOOL) \
 	X(tail_births_cap, "tail_births_cap", INT) \
-	X(tail_spacing, "tail_spacing", FLOAT) \
+	X(tail_thin_most, "tail_thin_most", INT) \
+	X(group, "_group", PACKED_INT32_ARRAY) \
+	X(group_end, "_group_end", PACKED_INT32_ARRAY) \
+	X(by_group, "_by_group", PACKED_INT32_ARRAY) \
+	X(group_tail, "_group_tail", PACKED_FLOAT32_ARRAY) \
+	X(group_ask, "_group_ask", PACKED_FLOAT32_ARRAY) \
+	X(group_spacing, "_group_spacing", PACKED_FLOAT32_ARRAY) \
 	X(team, "_team", PACKED_INT32_ARRAY) \
 	X(threat_slot, "threat_slot", INT) \
 	X(threat_away, "threat_away", VECTOR2) \
@@ -1423,10 +1429,21 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
 	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
+	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
+	// in `_by_group`, and its particles and tail asked for are added to its group's.
+	Arr<PackedInt32Array> group, group_end, by_group;
+	Arr<PackedFloat32Array> group_tail, group_ask, group_spacing;
+	group.load(m, k.group);
+	group_end.load(m, k.group_end);
+	by_group.load(m, k.by_group);
+	group_tail.load(m, k.group_tail);
+	group_ask.load(m, k.group_ask);
+	group_spacing.load(m, k.group_spacing);
+	ERR_FAIL_COND(high > group.n || high > by_group.n || group_end.n != group_ask.n || group_end.n != group_tail.n || group_end.n != group_spacing.n);
 	// Tails as motes (`_lay_tail`).
 	const bool tails_on = m->get(k.tail_births_on);
 	const int64_t tail_cap = m->get(k.tail_births_cap);
-	const double tail_spacing = m->get(k.tail_spacing);
+	const int64_t thin_most = m->get(k.tail_thin_most);
 	Arr<PackedVector2Array> tail_from;
 	Arr<PackedFloat32Array> tail_carry, births;
 	Arr<PackedInt32Array> tail_n, ramp, look;
@@ -1443,6 +1460,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		ERR_FAIL_COND(high > tail_from.n || high > tail_carry.n || high > tail_n.n || high > tag.n || high > seq.n || births.n < tail_cap * SPARK_BIRTH_STRIDE);
 	}
 	int64_t tail_count = 0;
+	int64_t thin_count = 0;
 	double tail_wanted = 0.0;
 	auto lay_tail = [&](int64_t slot, const Vector2 &at) {
 		const Vector2 from = tail_from[slot];
@@ -1453,6 +1471,10 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			return;
 		}
 		tail_wanted += d / TAIL_SPACING;
+		const int64_t g = group[slot];
+		group_tail[g] = (float)((double)group_tail[g] + d / TAIL_SPACING);
+		const double spacing = (double)group_spacing[g];
+		const bool thinned = spacing > TAIL_SPACING;
 		double carry = tail_carry[slot];
 		int64_t n = tail_n[slot];
 		const int64_t sq = seq[slot];
@@ -1462,7 +1484,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		const int64_t tg = tag[slot];
 		const double code = (double)tail_code(sq);
 		while (carry < d) {
-			if (tail_count >= tail_cap) {
+			if (tail_count >= tail_cap || (thinned && thin_count >= thin_most)) {
 				carry = d;
 				break;
 			}
@@ -1486,7 +1508,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			b[SPARK_TAG] = (float)(double)(tg & ((1ll << SPARK_TAG_BITS) - 1));
 			b[SPARK_TAG + 1] = (float)(double)(tg >> SPARK_TAG_BITS);
 			tail_count += 1;
-			carry += tail_spacing * (0.5 + tail_hash(sq, n * 2 + 1));
+			thin_count += thinned ? 1 : 0;
+			carry += spacing * (0.5 + tail_hash(sq, n * 2 + 1));
 			n += 1;
 		}
 		tail_carry[slot] = (float)(carry - d);
@@ -1542,6 +1565,11 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		const double size = drawn_size[slot];
 		const Color look_data = drawn_color[slot];
 		asked += drawn_particles[slot];
+		const int64_t g = group[slot];
+		const int64_t particles = drawn_particles[slot];
+		group_ask[g] = (float)((double)group_ask[g] + (double)(particles > 1 ? particles : 1));
+		by_group[group_end[g]] = (int32_t)slot;
+		group_end[g] += 1;
 		const bool rune = mot == MOTION_STILL;
 		Vector2 dir = Vector2(1, 0);
 		if (rune && vel[slot].length_squared() > 0.0f) {

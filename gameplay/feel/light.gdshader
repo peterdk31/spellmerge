@@ -9,10 +9,9 @@ render_mode blend_add, world_vertex_coords;
 // black every frame, with a quad of size 1 at the origin. The rows are someone else's, handed
 // over as they are uploaded (nothing is written twice), read as `rows` says (ROWS_* in
 // spell_light.gd):
-//   ROWS_TRAIL  the projectile manager's trail rows (shot_trail.gdshader): MODEL_MATRIX[0].x the
-//               trail's row (below 0: none), MODEL_MATRIX[1].y its flags (TF_*),
-//               MODEL_MATRIX[3].xy the head. Only a live shot's head gives light, not a trail
-//               left behind or a dash. Every shot, the enemies' too (one rule).
+//   ROWS_SHOT   the projectile manager's shot rows (shot_head.gdshader): MODEL_MATRIX[1].y the
+//               flags (HF_*), MODEL_MATRIX[3].xy the head. Only a live shot's head gives light, not
+//               a dash. Every shot, the enemies' too (one rule).
 //   ROWS_RUNE   its rune rows (shot_rune.gdshader): a real transform, a square quad of the
 //               rune's size round its centre.
 //   ROWS_FLASH  Feel's flash rows (shot_flash, shot_blast, shot_arc): a real transform (its
@@ -34,7 +33,7 @@ render_mode blend_add, world_vertex_coords;
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-const int ROWS_TRAIL = 0;
+const int ROWS_SHOT = 0;
 const int ROWS_RUNE = 1;
 const int ROWS_FLASH = 2;
 const int ROWS_SPOT = 3;
@@ -47,8 +46,8 @@ uniform float rune_strength = 0.55;
 uniform float flash_reach = 1.0;
 uniform float flash_pad = 10.0;
 
-// TRAIL_HEAD (in projectile_manager.gd): the shot lives.
-const float TF_HEAD = 1.0;
+// HEAD_LIVE (in projectile_manager.gd): the shot lives.
+const float HF_LIVE = 1.0;
 // A shot's light reaches this far (px), and this much more a zoom; a speck's (zoom 0) is smaller.
 const float SHOT_REACH = 26.0;
 const float SHOT_REACH_ZOOM = 6.0;
@@ -97,9 +96,9 @@ void vertex() {
 		colour = COLOR.rgb * COLOR.a * (1.0 - dip);
 	} else {
 		// Every live shot lights (tails are motes since the owner's pick of 2026-11-05: the shot
-		// batches hold only live shots, each with TF_HEAD).
+		// batches hold only live shots, each with HF_LIVE).
 		float flags = MODEL_MATRIX[1].y;
-		if (flag_set(flags, TF_HEAD)) {
+		if (flag_set(flags, HF_LIVE)) {
 			float red = floor(COLOR.r * 255.0 + 0.5);
 			float reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
 			half_size = vec2(reach);

@@ -291,12 +291,12 @@ func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
 	check_equal(mgr._enemy_rune_node.multimesh.visible_instance_count, 1, "the rune in the enemy rune batch")
 	kinds.append(roundi((1.0 - rune_buffer[15]) * ManagerScript.KIND_STEPS))
 	var buffer: PackedFloat32Array = node.multimesh.buffer
-	check_equal(node.multimesh.visible_instance_count, 2, "the bolt and the orbit shot in the enemy trail batch")
+	check_equal(node.multimesh.visible_instance_count, 2, "the bolt and the orbit shot in the enemy shot batch")
 	for i in 2:
 		var at: int = i * ManagerScript.DRAW_STRIDE
 		var kind: int = roundi((1.0 - buffer[at + 15]) * ManagerScript.KIND_STEPS)
-		# A shot in flight is drawn as its trail; an orbit shot's is flagged so.
-		if kind == ManagerScript.KIND_BOLT and (roundi(buffer[at + 5]) & ManagerScript.TRAIL_ORBIT) != 0:
+		# A shot in flight is drawn as its head; an orbit shot's is flagged so.
+		if kind == ManagerScript.KIND_BOLT and (roundi(buffer[at + 5]) & ManagerScript.HEAD_ORBIT) != 0:
 			kind = ManagerScript.KIND_ORBIT
 		kinds.append(kind)
 		var bits: int = roundi(buffer[at + 9] * 255.0) | (roundi(buffer[at + 10] * 255.0) << 8) | (roundi(buffer[at + 11] * 255.0) << 16)

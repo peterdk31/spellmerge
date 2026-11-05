@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt, rune, orbit)
 ## with its ramp (actors G3a: its caster's `Actors.ramp_of`), its look layers and its core colour in the instance data that
-## shot shaders read (`shot_trail.gdshader`, `shot_rune.gdshader`), at a size that follows its hit radius in whole pixels; cards
+## shot shaders read (`shot_head.gdshader`, `shot_rune.gdshader`), at a size that follows its hit radius in whole pixels; cards
 ## give the layers (`look_layer`), the compiler combines every infusion's and modifier's look
 ## into one set, and the runtime hands it to the manager. Stepped and drawn by hand.
 
@@ -137,8 +137,8 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
 	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its ramp, its zoom (radius 14) and its layers")
-	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight, its trail round its circle")
-	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.TRAIL_HEAD | ManagerScript.TRAIL_ORBIT, "flagged an orbit shot")
+	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight")
+	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.HEAD_LIVE | ManagerScript.HEAD_ORBIT, "flagged an orbit shot")
 	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "in its caster's ramp")
 
 
@@ -198,7 +198,7 @@ func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	check(slot >= 0 and is_equal_approx(buffer[3], 100.0) and is_equal_approx(buffer[7], 100.0), "a flying shot's instance holds its head where it is drawn")
 	check_equal(roundi(buffer[0]), -1, "and no path in the transform's x axis (its tail is motes)")
-	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_HEAD, "flagged alive: the core is drawn")
+	check_equal(roundi(buffer[5]), ManagerScript.HEAD_LIVE, "flagged alive: the core is drawn")
 
 
 func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
@@ -211,7 +211,7 @@ func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
 	var buffer: PackedFloat32Array = mgr._orbit_node.multimesh.buffer
 	var drawn_out: float = Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0))
 	check(drawn_out > 1.0 and drawn_out < 6.0, "but is drawn near its caster at first (%.1f px out)" % drawn_out)
-	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_HEAD | ManagerScript.TRAIL_ORBIT, "as an orbit shot's trail")
+	check_equal(roundi(buffer[5]), ManagerScript.HEAD_LIVE | ManagerScript.HEAD_ORBIT, "as an orbit shot")
 	for i in 20:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
@@ -223,23 +223,23 @@ func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
 ## shader whose every pixel walked its path. A shot is two small quads now (its light, then its
 ## core), each placed by the vertex shader, and the fragment stage is small: no loops, no look kinds,
 ## nothing read from a path (since 2026-11-05 there is none: a tail is motes).
-func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void:
-	var mesh: ArrayMesh = ManagerScript.trail_mesh()
-	check(mesh == ManagerScript.trail_mesh(), "one mesh, made once")
-	var quads: int = ManagerScript.TRAIL_QUAD_KINDS.size()
+func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
+	var mesh: ArrayMesh = ManagerScript.head_mesh()
+	check(mesh == ManagerScript.head_mesh(), "one mesh, made once")
+	var quads: int = ManagerScript.HEAD_QUAD_KINDS.size()
 	var arrays: Array = mesh.surface_get_arrays(0)
-	var per: int = ManagerScript.TRAIL_QUAD_VERTICES
+	var per: int = ManagerScript.HEAD_QUAD_VERTICES
 	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * per, "a quad for every kind")
 	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 3, "one triangle each")
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
-	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
+	check_equal(floori(uvs[0].y), ManagerScript.HEAD_Q_LIGHT, "the head's light first (void's dark heart)")
+	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.HEAD_Q_CORE, "the core last, on top")
 	for batch in ManagerScript.BATCHES:
 		if ManagerScript.BATCH_MESH[batch] >= 0:
 			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
-	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
+	var shader: Shader = load("res://core/projectiles/shot_head.gdshader")
 	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
-	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
+	for kind: Array in [["Q_LIGHT", ManagerScript.HEAD_Q_LIGHT], ["Q_CORE", ManagerScript.HEAD_Q_CORE]]:
 		check(shader.code.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
 	check(not shader.code.contains("trail_data") and not shader.code.contains("texelFetch"), "nothing reads a path")
 	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
@@ -470,10 +470,10 @@ func test_a_kept_look_follows_set_look_growth_and_a_new_shot_in_the_slot() -> vo
 	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "it is drawn in the enemy ramp, not the old shot's")
 
 
-## Trail particles are motes (spell spectacle P1d; since S3 the only way they are drawn): no trail
+## A shot's particles are motes (spell spectacle P1d; since S3 the only way they are drawn): no head
 ## mesh has particle slots, and while something takes them (`spark_motes`) the particles come out
 ## as births; while nothing does, none are rolled.
-func test_trail_particles_are_births() -> void:
+func test_shot_particles_are_births() -> void:
 	_lasting(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
@@ -484,7 +484,6 @@ func test_trail_particles_are_births() -> void:
 		mgr.step(1.0 / 60.0)
 		mgr.update_draw(1.0)
 		births += mgr.spark_birth_count
-	check(not ManagerScript.TRAIL_QUAD_KINDS.any(func(kind: int) -> bool: return kind == 2 or kind == 3), "no mesh has particle slots (S3)")
 	# 20 shots x 30 moments at embers' rate (0.45): 270 expected.
 	check(births > 180 and births < 360, "about one in rate x moments x shots: %d" % births)
 	var b: PackedFloat32Array = mgr.spark_births
@@ -532,10 +531,10 @@ func test_births_follow_the_kinds_rates_and_the_share() -> void:
 	check(births < 340, "thinned by the share: %d" % births)
 
 
-## The rates are the manager's alone since S3 (the trail shader's TIP table is gone): one a look
+## The rates are the manager's alone since S3 (the old trail shader's TIP table is gone): one a look
 ## kind, the weave none.
 func test_spark_rates_are_the_managers() -> void:
-	var code: String = (load("res://core/projectiles/shot_trail.gdshader") as Shader).code
+	var code: String = (load("res://core/projectiles/shot_head.gdshader") as Shader).code
 	check(not code.contains("TIP[ROWS]"), "the shader has no rates of its own")
 	check_equal(ManagerScript.SPARK_RATES.size(), ManagerScript.LOOK_COUNT, "a rate a look kind")
 	check_equal(ManagerScript.SPARK_RATES[ManagerScript.LOOK_WEAVE], 0.0, "the weave gives off nothing")
@@ -564,7 +563,7 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 		for n in mgr.spark_birth_count:
 			births += 1 if mgr.spark_births[n * ManagerScript.SPARK_BIRTH_STRIDE + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS else 0
 	check(births > 0, "its embers are given off as births: %d" % births)
-	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(), "the core and its light")
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.head_mesh(), "the core and its light")
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	var found: bool = false
 	for i in mgr._draw_node.multimesh.visible_instance_count:

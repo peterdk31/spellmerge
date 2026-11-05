@@ -138,6 +138,17 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Fixes A8.
 - From N1: the determinism runs move onto the real game (Flow, Coop, Player, bots, the sandbox storm) through replays; N1's scenes are test worlds stepped by hand.
 
+**Done (2026-11-05).** `core/sim/input_frame.gd` (`InputFrame`, strict bytes), `core/sim/frames.gd` (the `Frames` autoload: each seat's frame at the tick's start, before every other physics step; commands applied; `record`, `play`), `core/sim/frame_source.gd` (`FrameSource`; bots fill frames), `core/input/local_input.gd` (`LocalInput`, the device layer in front of the frame), `core/sim/replay.gd` (`Replay`, `user://replays/`), `SimSeed.begin` (a replay's seeds); `PlayerController` reads only its frame; commands through `Events.listen` and `command_sink`. Tests: `test_input_frame.gd`, `test_frames.gd`, `test_replay.gd`, `test_replay_game.gd` (a scripted sandbox run with the storm and a mid-run rebuild, a wave of two bots, a horde run of a bot: recorded and replayed on the real game to the same hash at all 240 ticks). Decisions in docs/DECISIONS.md (2026-11-05). What the first runs found:
+
+- **The press buffer stays in the simulation** (it ends when a cast leaves); the frame carries the fresh press.
+- **Session residue:** the services' clocks run from the game's start and their counters carry from run to run, so a replay plays the same only from a fresh game, the same number of ticks after its start (the test makes the autoloads again before each run). **For N3:** start the one clock, and reset the run's counters, at the run's start.
+- **A bot changes what it reads:** its threat and target queries fill the projectile manager's caches, which count as state and change the next step, so a bot's run replays with the bot watching again (a source set while a replay plays is asked and its frame dropped). A scripted player's run replays as it is. **For N3 or the projectile lane:** caches built at a fixed point of the tick, or listed in DERIVED.
+- **Instance ids** parted the AI board's attack targets and the swarm's rows (DERIVED now) and the shots' homing targets (`_home_target`, `_skip_id`: the projectile lane's file, so the scripted run uses no homing card). **For N5.**
+- **Real time:** Feel's stops (A1) are frozen and Flow's, Coop's and the horde's `_process` timers (A2) stepped once a tick by the test. **For N3 and N4.**
+- **Pauses:** each recorded tick says whether the game stood paused, so a pause-menu pause in the recording is skipped through and the horde's break plays paused. **For N4:** a stop that is part of the state.
+- **Joins and leaves** are in the frames but happen as the device joins (Flow and Coop read the seats at a run's start); a replay joins its seats then. **For N10:** joining online.
+- **N1's tools** missed four things the real game showed: a kept tick held packed arrays by reference, a float in a report was an error line, a REFS array of arrays stopped the walker, and Flow, Coop, the swarm, the AI board and the swing and slam carriers had members in no list. Fixed, with tests.
+
 ### N2b: a first look across platforms
 
 - A cheap measurement, before the costly parts: one recorded sandbox fight and one horde wave (N2), replayed headless on Linux, under Windows (Wine, or a Windows machine by hand) and in the web build (headless Chromium through Playwright), with N1's hash per area at every tick.

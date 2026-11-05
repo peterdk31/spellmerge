@@ -21,7 +21,11 @@ extends Node
 ##   joined, or with a command) into a `Replay`, `stop_recording` hands it over; `play(replay)`
 ##   joins its seats, starts its run the same way and feeds its frames, one a tick, until they run
 ##   out (live input and commands are dropped meanwhile). Both deal the seeds nobody chose from the
-##   replay's seed (`SimSeed.begin`).
+##   replay's seed (`SimSeed.begin`). A source set while a replay plays is still asked each tick
+##   and its frame dropped: a bot reads the game through queries that fill the services' caches
+##   (the projectile manager's threat grid and target table), which count as state and change the
+##   next step, so a bot's run replays exactly only with the bot watching again (docs/DECISIONS.md,
+##   2026-11-05). A person's input reads nothing of the game but where the hand is.
 ##
 ## Nothing here allocates per tick, but a command (an array) and a recorded tick (its bytes).
 
@@ -59,6 +63,8 @@ var _play_at: int = 0
 ## Where the seat's actor holds its staff and where the mouse is, for the local layer.
 var _hand: Vector2 = Vector2.INF
 var _mouse: Vector2 = Vector2.INF
+## The frame a source watching a replay fills, dropped.
+var _watched: InputFrame = InputFrame.new()
 
 
 func _init() -> void:
@@ -117,15 +123,15 @@ func source_of(seat: int) -> FrameSource:
 ## commands applied. `delta` is the tick's length in seconds.
 func tick(delta: float) -> void:
 	ticks += 1
-	if _playing != null and _play_at >= _playing.tick_count():
-		stop_playing()
 	if _playing != null:
-		_read_replay()
+		_read_replay(delta)
 	else:
 		_build(delta)
 		if _recording != null:
 			_recording.add_tick(_frames, _recorded_seats())
 	_apply()
+	if _playing != null and _play_at >= _playing.tick_count():
+		stop_playing()
 
 
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
@@ -254,7 +260,12 @@ func _find_hand(seat: int) -> void:
 	_mouse = body.get_global_mouse_position()
 
 
-func _read_replay() -> void:
+func _read_replay(delta: float) -> void:
+	for seat in SEATS:
+		if _sources[seat] != null:
+			_watched.seat = seat
+			_watched.clear()
+			_sources[seat].fill_frame(_watched, delta)
 	_playing.read_tick(_play_at, _frames)
 	_play_at += 1
 	for seat in SEATS:

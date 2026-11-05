@@ -110,7 +110,8 @@ var actors: ActorsScript = null
 var curve: HordeCurve = DefaultCurve
 ## The size of the view in pixels. Only tests set this; otherwise the viewport's.
 var view_size: Vector2 = Vector2.ZERO
-## The randomness of spawns and offers. Tests seed it.
+## The randomness of spawns and offers. Tests seed it. While a replay records or plays, each run
+## starts it from the replay's seeds (`SimSeed.is_dealing`, online-ready N2), so the run is the same.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
 var web: bool = OS.has_feature("web")
@@ -288,6 +289,8 @@ func start(new_world: Node2D) -> void:
 	if new_world == null or not is_instance_valid(new_world):
 		return
 	world = new_world
+	if SimSeed.is_dealing():
+		rng.seed = SimSeed.fresh()
 	seconds = 0.0
 	kills = 0
 	level = 1

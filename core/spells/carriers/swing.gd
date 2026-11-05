@@ -10,7 +10,7 @@ extends Carrier
 
 
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"_sw_source"]
+const REFS: Array[StringName] = [&"_sw_source", &"_sw_struck"]
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
 ## more when every one is on (no swing ends another); `_sw_on` says which are in use. Each keeps what a beam keeps for its hits (fires, chain, echo, its

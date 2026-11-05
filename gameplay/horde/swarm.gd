@@ -116,8 +116,9 @@ const TARGET_SLOTS: int = 64
 ## The wall layer of the world's static bodies.
 const WALL_LAYER: int = 1
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"_parent", &"_cand_nodes"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); the rows' nodes by
+## instance id, which differ between runs (until N5; found by N2's replays).
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"_parent", &"_cand_nodes", &"_kernel", &"_node_ids", &"_row_by_node"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"nodes", &"_slot_nodes"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -167,7 +168,8 @@ var native: bool = true:
 	set = set_native
 var _kernel: Object = null
 
-## The randomness of the seeds. Tests seed it.
+## The randomness of the seeds. Tests seed it. While a replay records or plays, each run starts it
+## from the replay's seeds (`SimSeed.is_dealing`, online-ready N2).
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 
 ## The node the swarmers stand under, and the floor they stand on (its space).
@@ -267,6 +269,8 @@ static func kind_for(data: EnemyBase) -> SwarmKind:
 ## parent's parent's static bodies on the wall layer) become the wall grid.
 func start(parent: Node2D, arena: Rect2) -> void:
 	stop()
+	if SimSeed.is_dealing():
+		rng.seed = SimSeed.fresh()
 	_find_services()
 	_parent = parent
 	_arena = arena

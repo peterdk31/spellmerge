@@ -190,3 +190,47 @@ func test_a_script_counted_as_simulation_is_walked_as_one() -> void:
 	counted.walk("holder", holder, func(path: String, _value: Variant) -> void: paths.append(path))
 	check(not ", ".join(counted.problems).contains("holder.other"), "counted as simulation, the child it owns is walked: %s" % ", ".join(counted.problems))
 	check(paths.has("holder.other.id"), "its members are state")
+
+
+## A report shows a float with every digit it needs (it used `%.17g`, which GDScript's `%` does not
+## know: the report was an error line per float).
+func test_the_report_shows_floats_whole() -> void:
+	var lines: PackedStringArray = Desync.members_parting({"a.x": 0.1, "a.y": 1e-20}, {"a.x": 0.30000000000000004, "a.y": 2e-20})
+	check_equal(lines, PackedStringArray(["a.x: 0.1 vs 0.30000000000000004", "a.y: 1e-20 vs 2e-20"]), "the floats as they are")
+
+
+## An area that is a node of no script is a problem, not a crash.
+func test_an_area_of_no_script_is_a_problem() -> void:
+	var plain: Node = own(Node.new()) as Node
+	var walk := StateWalk.new()
+	SimHash.areas({"plain": plain}, walk)
+	check_equal(walk.problems.size(), 1, "named: %s" % walk.problems)
+
+
+## A kept tick's leaves are the values at that tick: an array changed later does not change them
+## (packed arrays are held by reference; the report showed later values).
+func test_kept_leaves_are_copies() -> void:
+	var plain := Plain.new()
+	var desync := Desync.new(0)
+	desync.capture({"plain": plain})
+	plain.marks[0] = 99
+	check_equal(desync.leaves["plain"]["plain.marks"], PackedInt32Array([1, 2, 3]), "the leaf as captured")
+
+
+class Striker:
+	extends RefCounted
+	const REFS: Array[StringName] = [&"struck"]
+	var struck: Array[Array] = [[], []]
+
+
+## A REFS member that is a typed array of arrays (a carrier's struck lists) is walked, entry by
+## entry, without an engine error.
+func test_refs_of_arrays_of_arrays() -> void:
+	var striker := Striker.new()
+	var body := own(Body.new()) as Body
+	striker.struck[1].append(body)
+	var walk := StateWalk.new()
+	var leaves: Dictionary = {}
+	walk.walk("s", striker, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(walk.problems.is_empty(), "no problem: %s" % walk.problems)
+	check(leaves.values().has("Body#3") or str(leaves).contains("#3"), "the struck body by who it is: %s" % leaves)

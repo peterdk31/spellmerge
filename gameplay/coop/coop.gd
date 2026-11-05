@@ -66,9 +66,12 @@ const REVIVE_DRAIN_FACTOR: float = 2.0
 const REVIVE_PROTECTION: float = 1.5
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"camera"]
+const DERIVED: Array[StringName] = [&"events", &"camera", &"view_size"]
+## Not state: what only the drawing reads and writes (core/sim/README.md): the shared camera's
+## target, eased every drawn frame.
+const VIEW: Array[StringName] = [&"target_position", &"target_zoom"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"_wizards"]
+const REFS: Array[StringName] = [&"_wizards", &"_downs"]
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.

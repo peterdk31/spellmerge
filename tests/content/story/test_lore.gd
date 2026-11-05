@@ -53,11 +53,11 @@ func test_the_components_that_ship_have_a_description() -> void:
 
 
 func test_a_good_description_passes() -> void:
-	check_equal(StoryValidator.check_descriptions([_card("A shot.")] as Array[SpellComponent]).size(), 0, "no problem")
+	check_equal(SpellValidator.check_descriptions([_card("A shot.")] as Array[SpellComponent]).size(), 0, "no problem")
 
 
 func test_a_missing_description_is_named() -> void:
-	var problems: Array[Dictionary] = StoryValidator.check_descriptions([_card("")] as Array[SpellComponent])
+	var problems: Array[Dictionary] = SpellValidator.check_descriptions([_card("")] as Array[SpellComponent])
 	check_equal(_rules(problems), ["missing-lore"] as Array[String], "none")
 	check_equal(str(problems[0]["field"]), "description", "on its field")
 

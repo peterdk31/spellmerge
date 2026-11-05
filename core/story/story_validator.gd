@@ -7,9 +7,9 @@ extends RefCounted
 ## A problem is a Dictionary with `rule`, `file`, `field` and `fix`, like `SpellValidator`.
 ## `format()` turns one into a line.
 ##
-## A card's description (`SpellComponent.description`, in the card's own `.tres`) is one line of
-## at most `MAX_LORE_CHARS` characters. A card with none is reported as `missing-lore`, which only
-## warns (docs/DECISIONS.md: a card PR is not blocked by its words).
+## A line players read (`check_line`) is one line of at most `MAX_LORE_CHARS` characters. The
+## cards' descriptions are checked with it by `SpellValidator.check_descriptions` (only
+## `core/spells` reads a card's fields).
 
 const MAX_LORE_CHARS: int = 60
 ## The speech limit of docs/STORY.md. No dialogue file exists yet; its validator comes with them.
@@ -25,18 +25,6 @@ static func check_line(file: String, field: String, line: String) -> Array[Dicti
 		problems.append(_problem("text-too-long", file, field, "Cut it from %d to at most %d characters." % [line.length(), MAX_LORE_CHARS]))
 	elif line != line.strip_edges() or line.contains("\n"):
 		problems.append(_problem("text-not-a-line", file, field, "Keep it one line, with no spaces or breaks at either end."))
-	return problems
-
-
-## Problems in the descriptions of these cards: one with none (`missing-lore`, a warning), and a
-## description that is not one short line.
-static func check_descriptions(cards: Array[SpellComponent]) -> Array[Dictionary]:
-	var problems: Array[Dictionary] = []
-	for card: SpellComponent in cards:
-		if card.description.is_empty():
-			problems.append(_problem("missing-lore", card.resource_path, "description", "Add a description for the component `%s`: one line, at most %d characters." % [card.id, MAX_LORE_CHARS]))
-		else:
-			problems.append_array(check_line(card.resource_path, "description", card.description))
 	return problems
 
 

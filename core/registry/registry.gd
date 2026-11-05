@@ -125,15 +125,14 @@ func validate_spells() -> Array[Dictionary]:
 	return problems
 
 
-## The story validator's problems with the words of the spell cards: each card's description
-## (`SpellComponent.description`, a missing one only warns). Problems come back as `StoryValidator`
-## describes them.
+## The problems with the words of the spell cards: each card's description
+## (`SpellComponent.description`, `SpellValidator.check_descriptions`; a missing one only warns).
 func validate_story() -> Array[Dictionary]:
 	var cards: Array[SpellComponent] = []
 	for res: Resource in get_all(&"spells"):
 		if res is SpellComponent:
 			cards.append(res as SpellComponent)
-	return StoryValidator.check_descriptions(cards)
+	return SpellValidator.check_descriptions(cards)
 
 
 ## The resource with this id in this folder, or `null` when there is none.

@@ -312,3 +312,17 @@ static func _join(names: Array[StringName]) -> String:
 	for name in names:
 		parts.append(String(name))
 	return ", ".join(parts)
+
+
+## Problems in the descriptions of these cards (`SpellComponent.description`, the builder's line,
+## in the card's own `.tres`): one with none (`missing-lore`, which only warns: docs/DECISIONS.md,
+## a card PR is not blocked by its words), and one that is not a short line
+## (`StoryValidator.check_line`).
+static func check_descriptions(cards: Array[SpellComponent]) -> Array[Dictionary]:
+	var problems: Array[Dictionary] = []
+	for card: SpellComponent in cards:
+		if card.description.is_empty():
+			problems.append(_problem("missing-lore", card.resource_path, "description", "Add a description for the component `%s`: one line, at most %d characters." % [card.id, StoryValidator.MAX_LORE_CHARS]))
+		else:
+			problems.append_array(StoryValidator.check_line(card.resource_path, "description", card.description))
+	return problems

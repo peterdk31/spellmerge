@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: Hits' motes shared by staff (owner session)
+
+A Fireball's impact in a Storm threw nothing: the Storm's hits took the frame's hit rows first. Every hit is now one spray shared by its caster's staff (`gameplay/feel/hit_shares.gd`, planned from the frame before as the tails are): a lone cast's hits spray whole, a crowded staff's are a fair random subset that spray whole (the owner's variant b), and a staff beside a crowd may take 32 of the moments' rows for its first hit. The frame's rows by class are one table at `Motes.FRAME_ROWS`. About +0.2 ms for 300 impacts a frame on desktop; GPU web build not measured. Tests in `test_hit_shares.gd`; DECISIONS has the rules.
+
 ## 2026-11-05: The tails keep their motes' rows (owner session)
 
 The owner still saw Fireballs without a tail in a Storm: the projectile manager gave the tail, but the mote pool's rows a frame were one counter, and the Storm's hits (all before the trails' births) took the tails' rows too, so the births laid last were cut. The pool keeps `tail_rows` (the manager's `tail_births_cap`) from every other write until the spectacle hands them to the births (`open_tail_rows`), natively too; a storm's sheds are back to the rows they had before tails were motes. Regression test in `test_tail_motes.gd`.

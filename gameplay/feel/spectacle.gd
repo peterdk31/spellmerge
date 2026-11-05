@@ -29,6 +29,8 @@ const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CardKindsScript := preload("res://gameplay/feel/card_kinds.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const StreamsScript := preload("res://gameplay/feel/streams.gd")
+const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -129,6 +131,10 @@ var _mark_room: StringName = &""
 ## Feel's clock at the last step.
 var _clock: float = 0.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## A hit framed by Feel (`begin_hit` to `end_hit`; false: none), and whether it sprays: every
+## write of the hits' class inside it follows that one roll, so a hit sprays whole or not at all.
+var _hit_held: bool = false
+var _hit_on: bool = false
 
 
 func _ready() -> void:
@@ -187,11 +193,65 @@ func motes_on() -> bool:
 	return pool != null and particles_enabled
 
 
+## The group a hit of the actor `caster` with the tag `tag` is shared in (`hit_shares.gd`): the
+## spell's caster's staff (the projectile manager's `group_of`), the caster's first staff for a hit
+## of no spell, OTHER for a hit of no one's.
+static func hit_group(caster: int, tag: int) -> int:
+	if tag >= SpellTag.FLAG and tag < SpellTag.LIMIT:
+		# `group_of(SpellTag.caster_of(tag), tag)` written out: hundreds of hits a frame ask it.
+		return ((tag >> SpellTag.CASTER_SHIFT) & SpellTag.CASTER_MASK) * ProjectileManagerScript.GROUP_STAFFS + ((tag >> SpellTag.STAFF_SHIFT) & 3)
+	if caster >= 0 and caster < ActorsScript.ACTORS:
+		return ProjectileManagerScript.group_of(caster, tag)
+	return HitSharesScript.OTHER
+
+
+## A hit of `caster`'s shot tagged `tag` begins (Feel frames a shot's impact with this and
+## `end_hit`): it rolls its staff's share once (`Motes.open_hit`), and every hit write until
+## `end_hit` follows it. Returns whether it sprays (Feel keeps it for the hit's damage, `hold_hit`).
+func begin_hit(caster: int, tag: int) -> bool:
+	if _hit_held:
+		end_hit()
+	_hit_held = true
+	_hit_on = pool != null and particles_enabled and pool.open_hit(hit_group(caster, tag))
+	return _hit_on
+
+
+## More of a hit already rolled (`begin_hit` returned `shown`): its body's spray, played by the
+## damage that follows its impact, until `end_hit`. Its rows are the hit's.
+func hold_hit(caster: int, tag: int, shown: bool) -> void:
+	if _hit_held:
+		end_hit()
+	_hit_held = true
+	_hit_on = shown and pool != null and particles_enabled
+	if _hit_on:
+		pool.hold_hit(hit_group(caster, tag))
+
+
+## The hit framed by `begin_hit` or `hold_hit` is done.
+func end_hit() -> void:
+	if not _hit_held:
+		return
+	_hit_held = false
+	if _hit_on:
+		_hit_on = false
+		pool.close_hit()
+
+
+## A write of the hits' class (a shed, an `often` part, a status's motes) writes by the framing
+## hit's roll (`_hit_on` while `_hit_held`), else by a roll of its own, of `caster`'s spell tagged
+## `tag`, closed by `pool.close_hit` after its writes (written out at each: hundreds a frame).
+func _open_hit(caster: int, tag: int) -> bool:
+	return pool.open_hit(hit_group(caster, tag))
+
+
 ## A shot (of the tag `tag`) hit a body at `at`: its cards' motes (`look`, its `core` colour, in
-## `ramp`) back along `away`, `share` of their count.
+## `ramp`) back along `away`, `share` of their count, if its hit sprays (`begin_hit`).
 func shed_hit(at: Vector2, away: Vector2, core: Color, ramp: int, look: int, share: float, tag: int = 0) -> void:
-	if pool != null and particles_enabled and not pool.shed_closed():
-		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
+	if pool == null or not particles_enabled or not (_hit_on if _hit_held else _open_hit(ActorsScript.NONE, tag)):
+		return
+	pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look, share)
+	if not _hit_held:
+		pool.close_hit()
 
 
 ## A shot of an actor of `ramp` ended on a wall at `at`: its cards' motes in its own ramp (the
@@ -204,11 +264,14 @@ func shed_on_wall(ramp: int, at: Vector2, away: Vector2) -> void:
 	var look: int = projectiles.impact_look if projectiles != null else 0
 	var core: Color = projectiles.impact_core if projectiles != null else Color.WHITE
 	var tag: int = projectiles.impact_tag if projectiles != null else 0
-	if not pool.shed_closed():
-		pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)
+	if not (_hit_on if _hit_held else _open_hit(ActorsScript.NONE, tag)):
+		return
+	pool.shed_kinds(cards.motes_of(tag, look), at, away, core, ramp, look)
 	if _surface_source >= 0:
 		for k in _surface_kinds:
 			pool.throw(k, at, away, _surface_source, Color.WHITE)
+	if not _hit_held:
+		pool.close_hit()
 
 
 ## The mote kinds the room's walls shed: its `surface_kinds`, or every surface kind (read it,
@@ -328,15 +391,16 @@ func _drawn_motes() -> void:
 ## A status's motes (spell spectacle 2, S6 item 11): `count` motes of the element card `card`'s
 ## kinds (those that name it, else those of its look layer `layer`), each from a random point of
 ## an oval `reach` pixels round `at` (a character), drifting out STATUS_DRIFT pixels and a little
-## up (STATUS_UP of its kind's own), cooling from the exact colour `core`. One of many a frame: it
-## leaves the moments' rows alone, as a shed does.
+## up (STATUS_UP of its kind's own), cooling from the exact colour `core`. One of many a frame: a
+## hit of the statuses' own group (`hit_shares.gd`), so it leaves the moments' rows alone and
+## never takes a staff's share.
 func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core: Color, count: int) -> void:
 	if count <= 0 or not motes_on() or not at.is_finite():
 		return
 	var found: PackedInt32Array = pool.kinds_of_card(card)
 	if found.is_empty():
 		found = pool.kinds_of_layer(layer)
-	if found.is_empty():
+	if found.is_empty() or not (_hit_on if _hit_held else pool.open_hit(HitSharesScript.STATUSES)):
 		return
 	var source: int = MotesScript.spell_source(0, MotesScript.LOOK_EXACT)
 	for n in count:
@@ -345,6 +409,8 @@ func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core:
 		var out: Vector2 = Vector2(cos(angle), sin(angle))
 		var from: Vector2 = at + Vector2(out.x, out.y * STATUS_FLAT) * reach * (0.5 + 0.5 * _rng.randf())
 		pool.throw_part(k, from, out, source, core, 1, STATUS_DRIFT, -1.0, STATUS_UP, false, true)
+	if not _hit_held:
+		pool.close_hit()
 
 
 # --- Cue parts -------------------------------------------------------------------------------
@@ -352,15 +418,25 @@ func status_motes(card: StringName, layer: int, at: Vector2, reach: float, core:
 ## A cue's `motes` part (`CueBase`) played with `cue`: the kinds it names thrown as it says, the
 ## cue's size times its `reach` out (or its `radius`), in its exact `color` or the cue's own, else in
 ## the cue's ramp with its tint and the cards of its look (in the caster's ramp alone when `bare`);
-## its count and reach times the cue's power. One of many a frame (`often`, a hit's sparks, S6 2; and any with a `share`, a shot's end) is
-## skipped, before its kinds are looked up, once the frame has only the moments' rows left; one with
-## a `share` throws each kind its own count times the share (and the power), split between the
-## kinds, as they shed.
+## its count and reach times the cue's power. One of many a frame (`often`, a hit's sparks, S6 2; and
+## any with a `share`, a shot's end) is a hit (`hit_shares.gd`: its cue's caster's staff's share, or
+## the hit Feel framed with `begin_hit`), skipped before its kinds are looked up when it does not
+## spray; one with a `share` throws each kind its own count times the share (and the power), split
+## between the kinds, as they shed.
 func play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	if pool == null or not particles_enabled:
 		return
-	if part.often and pool.shed_closed():
+	if not part.often:
+		_play_motes_part(part, cue)
 		return
+	if not (_hit_on if _hit_held else _open_hit(cue.caster, cue.tag)):
+		return
+	_play_motes_part(part, cue)
+	if not _hit_held:
+		pool.close_hit()
+
+
+func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	var way: Vector2 = cue.aim
 	var turn: StringName = part.way
 	if turn != &"aim":

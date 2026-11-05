@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Hits' motes shared by staff, whole sprays or none (owner session)
+
+- **The owner's ask:** after the tails (#567, #568), a lone cast's impacts should stay readable beside a crowd's too: a Fireball hitting a wall in a Storm threw nothing, because the Storm's hits came first in the frame and took every hit row (`Motes.MOMENT_ROWS` kept, first come for the rest).
+- **Shared by staff, as the tails:** every hit is one spray (a shot's shed on a body or a wall, the wall's chips, its cue's `often` sparks, its damage's `hit` sparks; Feel frames them with `Spectacle.begin_hit` and `end_hit`, and the damage follows the impact's roll with `hold_hit`), in its caster's staff's group (`Spectacle.hit_group`, the projectile manager's `group_of`; statuses' motes a group of their own, hits of no one's another). `gameplay/feel/hit_shares.gd` shares the frame's hit rows (`Motes.hit_rows()`: the frame's past the tails' and the moments') with `fair_level`.
+- **Variant (b), the owner's pick:** a thinned staff's hits are a fair random subset that spray whole (each hit rolls its staff's chance once), not every hit a little: a storm keeps the look of sprays, only fewer.
+- **Planned, not queued:** each staff's chance is planned at the step from the frame before (its hits times the rows a spray of it took), as the tails are, so a hit is written when it happens (no queue, no delay, nothing allocated) and a skipped hit costs no card lookup. A staff new since the plan sprays whole; beside a thinned staff, a staff not thinned may also take `Motes.FRESH_ROWS` (32) of the moments' rows, so a lone cast's first hit is never cut by a crowd's (with no crowd, hits leave the moments all of theirs, as before). Holding a quarter of the hit rows back for new staffs instead left a lone Storm a third fewer motes; this way it keeps about as many (116 a frame against 128 before, the rolls' spread).
+- **The budget table:** the frame's rows by class (tails, moments, hits, settles, births) are one table at `Motes.FRAME_ROWS`, saying what each class keeps and which ones are first come.
+- **Cost:** about 0.7 us a hit of bookkeeping (300 wall impacts a frame: about +0.2 ms on desktop headless, noisy runs; `test_hit_shares.gd`'s setup timed). Not measured on the GPU web build yet.
+- **Tests:** `test_hit_shares.gd`: a lone staff beside a crowd, a thinned staff never past its share, staffs with room never thinned, the groups, a Fireball's wall impact whole every frame in a Storm of 300 hits (0 motes without the sharing), the Storm's impacts whole or none, and a body hit's damage spray following its impact's roll.
+
 ## 2026-11-05: Tails and particles shared by staff, not by shot (owner session)
 
 - **The owner's case:** "when casting eg. the Storm wand, it keeps creating (splitting) new shots. So If i fire the fireball wand while the storm is still going, im not getting a tail on the fireball. But the storm is already densely packed, so I cant even see individual tails there, so they are kinda wasted." The tails' births (`tail_births_cap` a frame) and the cards' particles (`tailless_particle_cap`) thinned every shot alike, so a Storm of thousands of shots took all but a thousandth of each, and a Fireball's share was a thousandth.

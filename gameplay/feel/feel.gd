@@ -548,6 +548,10 @@ var _impact_target: int = 0
 var _impact_caster: int = 0
 ## The physics frame it was sent in: the damage follows at once, or the record is stale.
 var _impact_frame: int = -1
+## The shot's tag, and whether its hit sprays its motes (its staff's share, rolled once at the
+## impact, `Spectacle.begin_hit`): the damage's spray follows the same roll.
+var _impact_tag: int = 0
+var _impact_shown: bool = false
 ## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
 ## wizard hit themselves. `damage_dealt` follows at once, or the record is stale.
 var _kind_target: int = 0
@@ -883,6 +887,8 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	var tint: Color = Color.WHITE
 	var size: float = 1.0
 	var colours: int = 0
+	# The spray's motes are a hit's: the shot's impact's roll when it did this hit, else one of its own.
+	var held: bool = false
 	if target != null and is_instance_valid(target):
 		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in their own
 		# colour (`EnemyBase.hit_color`).
@@ -895,6 +901,8 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
 			at = _impact_at
+			held = true
+			_spectacle.hold_hit(caster, _impact_tag, _impact_shown)
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
 	_impact_target = 0
 	# The kind of the hit came just before (`hit_landed`): its default stop, shake and sound.
@@ -917,7 +925,10 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	if not repeat:
 		_hold_bodies(caster, hit_id, stop, false, shot)
 	var voice: int = _hit_voice
+	if not held:
+		_spectacle.begin_hit(caster, 0)
 	_juice(position, shake, &"" if repeat else sound, aim, tint, size, at, colours)
+	_spectacle.end_hit()
 	if repeat:
 		# The sound of the hit it repeats is still this hit's (a kill stops it, `_on_enemy_died`).
 		_hit_voice = voice
@@ -1229,20 +1240,27 @@ func live_labels() -> int:
 ## on a wall or pillar (`target` is null), show the impact.
 func _on_projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
 	var ramp: int = _ramp_of(caster)
+	# One hit: its motes all spray or none do, by its staff's share of the frame's (`hit_shares.gd`).
+	var tag: int = projectiles.impact_tag if projectiles != null else 0
+	var shown: bool = _spectacle.begin_hit(caster, tag)
 	if target != null:
 		_impact_target = target.get_instance_id()
 		_impact_caster = caster
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
+		_impact_tag = tag
+		_impact_shown = shown
 		# Its cards' motes back along the way it came, in its own ramp.
 		if projectiles != null:
-			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, projectiles.impact_tag)
+			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, tag)
 		_show_impact(caster, ramp, position, direction)
+		_spectacle.end_hit()
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's.
 	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction)
+	_spectacle.end_hit()
 
 
 ## A bolt or orbit shot whose life ran out goes off: the cue `expire` (a small pop of its own

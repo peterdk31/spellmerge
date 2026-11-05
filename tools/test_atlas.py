@@ -20,7 +20,6 @@ class AtlasTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.tmp, True)
         shutil.copytree(REPO / "content/spells", self.tmp / "content/spells")
-        shutil.copytree(REPO / "content/story/lore/components", self.tmp / "content/story/lore/components")
 
     def entries(self) -> list[dict]:
         return atlas.build(self.tmp)["entries"]
@@ -42,22 +41,21 @@ class AtlasTest(unittest.TestCase):
             if e["kind"] == "reaction":
                 self.assertEqual(len(e["clips"]), 2, e)
             elif e["kind"] != "combo":
-                self.assertTrue(e["description"], f"no builder description: add content/story/lore/components/{e['id']}.json: {e}")
+                self.assertTrue(e["description"], f"no builder description: add a description to {e['source']}: {e}")
 
     def test_a_fake_combo_file_appears(self) -> None:
-        path = self.tmp / atlas.COMBOS / "fake_combo.json"
+        path = self.tmp / atlas.SPELLS / "forms/bolt/combos/fake_combo.json"
+        path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps({"id": "fake_combo", "name": "Fake combo", "does": "Does a fake thing."}))
         row = next(e for e in self.entries() if e["id"] == "fake_combo")
         self.assertEqual((row["kind"], row["name"], row["does"]), ("combo", "Fake combo", "Does a fake thing."))
         self.assertEqual(row["clips"], ["combo_fake_combo"])
-        self.assertEqual(row["source"], f"{atlas.COMBOS}/fake_combo.json")
+        self.assertEqual(row["source"], f"{atlas.SPELLS}/forms/bolt/combos/fake_combo.json")
 
     def test_a_new_component_folder_appears_with_its_description(self) -> None:
         folder = self.tmp / "content/spells/elements/acid"
         folder.mkdir()
-        (folder / "acid.tres").write_text('[resource]\nid = &"acid"\ndisplay_name = "Acid"\n')
-        (self.tmp / "content/story/lore/components/acid.json").write_text(
-            json.dumps({"id": "acid", "about": "component", "text": "Eats armour."}))
+        (folder / "acid.tres").write_text('[resource]\nid = &"acid"\ndisplay_name = "Acid"\ndescription = "Eats armour."\n')
         row = next(e for e in self.entries() if e["id"] == "acid")
         self.assertEqual((row["kind"], row["name"], row["description"]), ("element", "Acid", "Eats armour."))
         self.assertEqual(row["clips"], ["element_acid"])
@@ -144,7 +142,7 @@ class AtlasTest(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         # The recorder's rule (tests/clips/scenarios.gd): one clip per combo and per component,
         # two per reaction that has at least two rows.
-        combos = list((REPO / atlas.COMBOS).glob("*.json"))
+        combos = list((REPO / atlas.SPELLS).glob(atlas.COMBO_GLOB))
         count = {k: sum(1 for e in entries if e["kind"] == k) for k in atlas.KIND_ORDER}
         paired = sum(1 for e in entries if e["kind"] == "reaction" and e["clips"])
         components = sum(count[k] for k in atlas.KIND_FOLDERS)

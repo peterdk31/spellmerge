@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"mirror"
 display_name = "Mirror"
+description = "Fires the next straight or beam shot backwards as well."
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 16
+behaviour_id = &"mirror"
 behaviour_strength = 1.0
 look_layer = 19

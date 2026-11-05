@@ -16,12 +16,37 @@ func _staff(cards: Array) -> CompiledStaff:
 	return staff
 
 
+func test_every_behaviour_has_one_row_of_known_rules() -> void:
+	# A behaviour is described in one place: a row of ModifierBase.RULES each, no other keys.
+	for behaviour: int in ModifierBase.Behaviour.values():
+		check(ModifierBase.RULES.has(behaviour), "%s has a row" % ModifierBase.Behaviour.keys()[behaviour])
+	check_equal(ModifierBase.RULES.size(), ModifierBase.Behaviour.size(), "and only they do")
+	for behaviour: int in ModifierBase.RULES:
+		for rule: String in ModifierBase.RULES[behaviour]:
+			check(["needs", "stacks", "travel_only"].has(rule), "%s is a rule a behaviour has" % rule)
+
+
+func test_cards_name_their_behaviour() -> void:
+	for behaviour: int in ModifierBase.Behaviour.values():
+		check_equal(ModifierBase.behaviour_of(ModifierBase.name_of(behaviour)), behaviour, "%s goes by its name" % ModifierBase.Behaviour.keys()[behaviour])
+	check_equal(ModifierBase.behaviour_of(&"no_such_thing"), ModifierBase.Behaviour.NONE, "an unknown name is none")
+	var card := ModifierBase.new()
+	card.behaviour = ModifierBase.Behaviour.RETURN
+	check_equal(card.behaviour_id, &"return", "setting the behaviour sets the name")
+	check(card.range_problems().is_empty(), "a known name is fine")
+	card.behaviour_id = &"boomerang"
+	check_equal(card.range_problems().size(), 1, "an unknown name is a problem")
+
+
 func test_every_need_names_known_behaviours_traits_and_fields() -> void:
-	# A typo in a NEEDS row would quietly make a card work or waste everywhere.
+	# A typo in a needs row would quietly make a card work or waste everywhere.
 	var fields: Array[String] = ["any", "not", "or_cards", "cards", "or_infused", "not_cards"]
 	var all_traits: int = (CarrierTraits.GATES << 1) - 1
-	for table: Dictionary in [ModifierBase.NEEDS, TriggerBase.NEEDS]:
-		var size: int = ModifierBase.Behaviour.size() if table == ModifierBase.NEEDS else TriggerBase.Event.size()
+	var modifier_needs: Dictionary = {}
+	for behaviour: int in ModifierBase.RULES:
+		modifier_needs[behaviour] = ModifierBase.needs(behaviour)
+	for table: Dictionary in [modifier_needs, TriggerBase.NEEDS]:
+		var size: int = ModifierBase.Behaviour.size() if table == modifier_needs else TriggerBase.Event.size()
 		for key: int in table:
 			check(key >= 0 and key < size, "%d is a row the table can have" % key)
 			var need: Dictionary = table[key]

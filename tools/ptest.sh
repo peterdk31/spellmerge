@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Runs the unit tests in parallel: tools/ptest.sh [jobs] [path-regex]
 #
-# Every tests/**/test_*.gd is its own Godot process (as in ci/build/build.sh --quick --tests),
+# Every tests/**/test_*.gd and card test (content/**/test_*.gd) is its own Godot process (as in ci/build/build.sh --quick --tests),
 # so they can run side by side: one import, then up to `jobs` (default 12) tests at once, each
 # with its own user:// folder. The whole suite takes about a minute instead of 20-40. Needs the
 # pinned Godot in build/godot (run ci/build/build.sh --quick once). Logs: build/logs/ptest/.
@@ -26,7 +26,7 @@ rm -rf "$LOG"
 mkdir -p "$LOG/data/_import"
 XDG_DATA_HOME="$LOG/data/_import" "$GODOT" --headless --path . --import >"$LOG/_import.txt" 2>&1
 export GODOT LOG
-find tests -name 'test_*.gd' -not -path '*/fixtures/*' | grep -E "$FILTER" | sort \
+find tests content -name 'test_*.gd' -not -path '*/fixtures/*' | grep -E "$FILTER" | sort \
   | xargs -P "$JOBS" -I{} bash -c 'name=$(echo {} | tr / _); mkdir -p "$LOG/data/$name"
       if XDG_DATA_HOME="$LOG/data/$name" timeout 900 "$GODOT" --headless --path . --script "res://{}" \
         >"$LOG/$name.log" 2>&1 && ! grep -qE "^(SCRIPT )?ERROR:" "$LOG/$name.log"; then echo "PASS {}"

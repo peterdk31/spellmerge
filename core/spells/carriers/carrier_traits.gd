@@ -1,7 +1,7 @@
 class_name CarrierTraits
 extends RefCounted
 ## The yes/no questions a carrier answers about itself (`Carrier.traits`, a set of these flags), and
-## that a card's needs are written in (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`). On their own here,
+## that a card's needs are written in (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`). On their own here,
 ## so a card and a carrier can both name them. `Carrier` has the same names, for its subclasses.
 
 ## A shot flying out on its own: `reach` stretches its life, `return` brings it back.

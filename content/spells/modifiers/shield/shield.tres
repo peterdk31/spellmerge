@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"shield"
 display_name = "Shield"
+description = "The next shot is a ward: it blocks one enemy shot."
 complexity = 2
 icon = ExtResource("2_icon")
-behaviour = 3
+behaviour_id = &"shield"
 behaviour_strength = 1.0
 look_layer = 10

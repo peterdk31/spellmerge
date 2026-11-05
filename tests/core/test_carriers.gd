@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The carriers (docs/CARRIERS.md, core/spells/carriers/): every one is found by its name and fired
 ## by a form card, and which cards work on it follows from its yes/no answers (`CarrierTraits`) and
-## what each card needs (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`). Whether that is right in play is
+## what each card needs (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`). Whether that is right in play is
 ## tested by tests/core/test_card_rules.gd.
 ##
 ## godot --headless --path . --script res://tests/core/test_carriers.gd

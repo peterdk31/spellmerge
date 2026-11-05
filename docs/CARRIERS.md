@@ -34,7 +34,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 `carrier.gd`.)
 
 Each kind of card says, next to its own definition and once for every carrier, what it needs from a
-carrier (`ModifierBase.NEEDS` for modifier behaviours, `TriggerBase.NEEDS` for triggers; the flags
+carrier (`ModifierBase.RULES` "needs" for modifier behaviours, `TriggerBase.NEEDS` for triggers; the flags
 are `CarrierTraits`):
 
 ```gdscript
@@ -55,10 +55,10 @@ on a carrier: yes or no (Return needs `FLIES`; a decoy does not fly, so Return d
 decoy). A card that does nothing is marked in the builder; no text explains it (owner, 2026-10-30:
 the visuals are enough). A card not in `NEEDS` works on every carrier
 (numbers, blast, echo, recoil). On a carrier that hits nothing, a blast carries an infusion and
-heavy (`takes_infusion`, and heavy's `"or_cards"` in `ModifierBase.NEEDS`). A carrier that hits
-nothing but passes an infusion on (a portal: what comes out of it takes its element and status)
-says so in `takes_infusion`, and which infusions count in `takes_element` (mend, which has no
-status, does nothing on a portal).
+heavy (`takes_infusion`, and heavy's `"or_cards"` in `ModifierBase.RULES` "needs"). A carrier that
+hits nothing but passes an infusion on (a portal: what comes out of it takes its element and
+status) says so in `takes_infusion`, and which infusions count in `takes_element` (mend, which has
+no status, does nothing on a portal).
 
 `tests/core/test_card_rules.gd` plays every card on every carrier in a small world and fails where
 the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
@@ -192,5 +192,5 @@ it is refused by the validator.
 ## Adding a modifier behaviour or a trigger
 
 Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`), implement it, and,
-if it does not work on every carrier, say what it needs in `ModifierBase.NEEDS` (or `TriggerBase.NEEDS`), traits and cards alike. If it
+if it does not work on every carrier, say what it needs in `ModifierBase.RULES` "needs" (or `TriggerBase.NEEDS`), traits and cards alike. If it
 needs something no flag asks yet, add the flag and answer it on each carrier.

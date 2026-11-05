@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"portal"
 display_name = "Portal"
+description = "Open a way through: what goes in comes out of its exits."
 complexity = 3
 icon = ExtResource("2_icon")
 base_damage = 0.1

@@ -274,7 +274,7 @@ static func _check_element(element: ElementBase) -> Array[Dictionary]:
 
 static func _check_modifier(modifier: ModifierBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
-	if modifier.behaviour != ModifierBase.Behaviour.NONE and modifier.behaviour_strength <= 0.0:
+	if modifier.behaviour_id != &"" and modifier.behaviour_strength <= 0.0:
 		problems.append(_problem("required-field", modifier.resource_path, "behaviour_strength", "A behaviour needs a `behaviour_strength` above 0 (what it means is next to the behaviour in core/base/modifier_base.gd; 1 where it means nothing)."))
 	if modifier.behaviour == ModifierBase.Behaviour.HOMING and modifier.behaviour_reach <= 0.0:
 		problems.append(_problem("required-field", modifier.resource_path, "behaviour_reach", "A HOMING modifier needs a `behaviour_reach` above 0: how many pixels round a shot it looks for a target."))
@@ -312,3 +312,17 @@ static func _join(names: Array[StringName]) -> String:
 	for name in names:
 		parts.append(String(name))
 	return ", ".join(parts)
+
+
+## Problems in the descriptions of these cards (`SpellComponent.description`, the builder's line,
+## in the card's own `.tres`): one with none (`missing-lore`, which only warns: docs/DECISIONS.md,
+## a card PR is not blocked by its words), and one that is not a short line
+## (`StoryValidator.check_line`).
+static func check_descriptions(cards: Array[SpellComponent]) -> Array[Dictionary]:
+	var problems: Array[Dictionary] = []
+	for card: SpellComponent in cards:
+		if card.description.is_empty():
+			problems.append(_problem("missing-lore", card.resource_path, "description", "Add a description for the component `%s`: one line, at most %d characters." % [card.id, StoryValidator.MAX_LORE_CHARS]))
+		else:
+			problems.append_array(StoryValidator.check_line(card.resource_path, "description", card.description))
+	return problems

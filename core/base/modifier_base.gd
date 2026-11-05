@@ -50,7 +50,7 @@ enum Behaviour {
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
 	RELAY,
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
-	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.NEEDS`).
+	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.RULES`).
 	RETURN,
 	## Each enemy that comes within `behaviour_reach` pixels of the shot has a `behaviour_strength`
 	## chance (0 to 1; 0.5 the card) to be zapped, rolled again `SpellLimits.ZAP_AGAIN` (1 s) after it
@@ -83,38 +83,95 @@ enum Behaviour {
 	PENTA,
 }
 
-## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
-## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these; "or_cards":
-## a card with one of these behaviours on the carrier does instead (what a blast strikes is the
-## carrier's hit, rules R4 F2). A behaviour not here works on every carrier (numbers, blast, echo,
-## recoil, mirror: a move and its mirror add up to none, rules R4 F1). A new behaviour adds its line here, never per carrier; the compiler checks it every
-## time a staff is built (`Carrier.works`).
-const NEEDS: Dictionary = {
-	Behaviour.HOMING: {"any": CarrierTraits.STEERS},
-	# What a blast strikes is the carrier's hit (rules R4 F2), so these work with one too.
-	Behaviour.CHAIN: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
-	Behaviour.SIPHON: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
-	Behaviour.POSSESS: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
-	Behaviour.HEAVY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
-	Behaviour.RELAY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
+## (bounces, shields, seconds, pixels), factors multiply (two heavy cards are 4 x 4, rule 3,
+## docs/milestones/M2-rules.md R1c), chances combine as chances (two 50% zaps are 75%).
+enum Stack { ADD, MULTIPLY, CHANCE }
+
+## Everything the spell rules know about each behaviour, one row each, so a behaviour is described
+## in one place (the engine code that runs it aside: the projectile manager or the spell runtime):
+## - "needs": what it needs from the carrier it rides on to do anything (`Carrier.works`), in the
+##   carrier's yes/no answers (`CarrierTraits`): "any": at least one of these flags; "not": none of
+##   these; "or_cards": a card with one of these behaviours on the carrier does instead (what a
+##   blast strikes is the carrier's hit, rules R4 F2). None: it works on every carrier (numbers,
+##   blast, echo, recoil, mirror: a move and its mirror add up to none, rules R4 F1).
+## - "stacks": a `Stack` (ADD when missing).
+## - "travel_only": true when it only means something on a shot in flight, so it is wasted on the
+##   cards that land on a caster or a point.
+## A card names its behaviour by its name (`behaviour_id`), so a behaviour added or taken out never
+## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
+const RULES: Dictionary = {
+	Behaviour.NONE: {},
+	Behaviour.HOMING: {"needs": {"any": CarrierTraits.STEERS}, "travel_only": true},
+	# What a blast strikes is the carrier's hit (rules R4 F2), so the hit cards work with one too.
+	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
+	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
+	Behaviour.BLAST: {},
+	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
+	Behaviour.RECOIL: {},
+	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}, "travel_only": true},
+	Behaviour.ECHO: {},
+	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES}, "travel_only": true},
+	Behaviour.HEAVY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "stacks": Stack.MULTIPLY},
+	Behaviour.SIPHON: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
+	Behaviour.STICKY: {"needs": {"any": CarrierTraits.MOVES}, "travel_only": true},
+	Behaviour.MAGNET: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "travel_only": true},
+	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}, "travel_only": true},
+	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE}, "travel_only": true},
+	Behaviour.MIRROR: {"travel_only": true},
+	Behaviour.GROWTH: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.MULTIPLY, "travel_only": true},
+	Behaviour.RELAY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
+	Behaviour.RETURN: {"needs": {"any": CarrierTraits.FLIES}, "travel_only": true},
+	Behaviour.ZAP: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.CHANCE, "travel_only": true},
+	Behaviour.POSSESS: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
+	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS}, "travel_only": true},
 	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
-	Behaviour.PULL: {"any": CarrierTraits.HITS},
-	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS},
-	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS},
-	Behaviour.HOLD: {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER},
-	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
-	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
-	Behaviour.RETURN: {"any": CarrierTraits.FLIES},
-	Behaviour.LINGER: {"any": CarrierTraits.MOVES},
-	Behaviour.STICKY: {"any": CarrierTraits.MOVES},
-	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
-	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
-	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
-	Behaviour.ZAP: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	Behaviour.PULL: {"needs": {"any": CarrierTraits.HITS}, "travel_only": true},
 	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
-	# leaves from a point of a ring.
-	Behaviour.PENTA: {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE},
+	# leaves from a point of a ring. More cards add copies.
+	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}, "travel_only": true},
 }
+
+## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.
+## An unknown name counts as none, and the validator names it (`range_problems`).
+@export var behaviour_id: StringName = &""
+
+## `behaviour_id` as a `Behaviour`, for the compiler and the runtime.
+var behaviour: Behaviour:
+	get:
+		return behaviour_of(behaviour_id)
+	set(value):
+		behaviour_id = name_of(value)
+
+
+## The `Behaviour` named `id` (NONE for empty or unknown).
+static func behaviour_of(id: StringName) -> Behaviour:
+	if id == &"" or String(id) != String(id).to_lower():
+		return Behaviour.NONE
+	return Behaviour.get(String(id).to_upper(), Behaviour.NONE)
+
+
+## The name a card gives `behaviour` (empty for NONE).
+static func name_of(behaviour: int) -> StringName:
+	if behaviour <= Behaviour.NONE or behaviour >= Behaviour.size():
+		return &""
+	return StringName(String(Behaviour.keys()[behaviour]).to_lower())
+
+
+## What `behaviour` needs from its carrier (`RULES` "needs"; empty: nothing).
+static func needs(behaviour: int) -> Dictionary:
+	return (RULES.get(behaviour, {}) as Dictionary).get("needs", {})
+
+
+## How cards of `behaviour` combine (`RULES` "stacks").
+static func stacks(behaviour: int) -> Stack:
+	return (RULES.get(behaviour, {}) as Dictionary).get("stacks", Stack.ADD)
+
+
+## True when `behaviour` only means something on a shot in flight (`RULES` "travel_only").
+static func travel_only(behaviour: int) -> bool:
+	return bool((RULES.get(behaviour, {}) as Dictionary).get("travel_only", false))
+
 
 @export var damage_mult: float = 1.0
 @export var speed_mult: float = 1.0
@@ -126,7 +183,6 @@ const NEEDS: Dictionary = {
 @export var shot_mult: int = 1
 ## Targets added to each shot's pierce.
 @export var extra_pierce: int = 0
-@export var behaviour: Behaviour = Behaviour.NONE
 ## For HOMING the radius in pixels of the tightest curve it turns on (at any speed: a fast shot
 ## turns faster, on the same curve); number of jumps for CHAIN; unused for NONE.
 @export var behaviour_strength: float = 0.0
@@ -167,6 +223,17 @@ const NEEDS: Dictionary = {
 ## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 
+# --- Speed over life (drag) -------------------------------------------------------------
+
+## Factors on a flying shot's speed when it leaves (`speed_start`) and as its life runs out
+## (`speed_end`), and how it goes from one to the other (`speed_ease`: 1 evenly, above 1 most of
+## the change early, below 1 late; `ProjectileManager.set_speed_curve`). Drag bursts out and slows
+## to a stop: 2.5, 0, 1.5. Several cards multiply each. All 1 changes nothing; wasted where the
+## carrier does not fly.
+@export var speed_start: float = 1.0
+@export var speed_end: float = 1.0
+@export var speed_ease: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -183,11 +250,21 @@ func ranges() -> Dictionary:
 		"shot_mult": Vector2(1, 8),
 		"look_layer": Vector2(0.0, 21.0),
 		"extra_pierce": Vector2(0, 8),
-		"behaviour": Vector2(0, Behaviour.size() - 1),
 		"behaviour_strength": Vector2(0.0, 256.0),
 		"behaviour_reach": Vector2(0.0, 360.0),
 		"spread_mult": Vector2(0.0, 4.0),
 		"lifetime_mult": Vector2(0.1, 4.0),
 		"reach_mult": Vector2(0.1, 4.0),
+		"speed_start": Vector2(0.1, 4.0),
+		"speed_end": Vector2(0.0, 4.0),
+		"speed_ease": Vector2(0.1, 8.0),
 	})
 	return limits
+
+
+## The range problems, and a behaviour name that is not a `Behaviour`.
+func range_problems() -> PackedStringArray:
+	var problems: PackedStringArray = super()
+	if behaviour_id != &"" and behaviour_of(behaviour_id) == Behaviour.NONE:
+		problems.append("behaviour_id: %s is not a behaviour (%s)" % [behaviour_id, ", ".join(Behaviour.keys().slice(1)).to_lower()])
+	return problems

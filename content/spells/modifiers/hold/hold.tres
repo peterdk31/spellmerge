@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"hold"
 display_name = "Hold"
+description = "The shot stays until you cast again; mana stays set aside."
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 5
+behaviour_id = &"hold"
 behaviour_strength = 1.0
 look_layer = 21

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"pierce"
 display_name = "Pierce"
+description = "Goes through a couple of foes. Weaker, politely."
 complexity = 1
 icon = ExtResource("2_icon")
 damage_mult = 0.9

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"beam"
 display_name = "Beam"
+description = "Hold fire and it stays on, burning everything on its line."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 2

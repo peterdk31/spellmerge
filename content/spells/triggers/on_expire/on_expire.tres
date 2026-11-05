@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_expire"
 display_name = "On Expire"
+description = "Casts its spell where the shot ends. Patience pays."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 1

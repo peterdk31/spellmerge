@@ -222,6 +222,43 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	check(not _frames.is_playing(), "it stops when its frames run out")
 
 
+func test_a_pause_in_the_recording_is_skipped_through() -> void:
+	_input.add_virtual_device(0)
+	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	_input.send_virtual(0, &"move_right", 1.0)
+	_frames.tick(DT)
+	paused = true
+	_bus.staff_change_requested.emit(0, 1, 0, &"fire")
+	_frames.tick(DT)
+	_frames.tick(DT)
+	paused = false
+	_input.send_virtual(0, &"move_right", 0.0)
+	_input.send_virtual(0, &"move_left", 1.0)
+	_frames.tick(DT)
+	_frames.stop_recording()
+	check(not replay.is_paused_at(0) and replay.is_paused_at(1) and replay.is_paused_at(2) and not replay.is_paused_at(3), "the paused ticks are marked")
+	check_equal(_heard.size(), 1, "the command applied while paused, as the horde's picks do")
+	_heard.clear()
+	_input.leave(0)
+	check(_frames.play(replay), "it plays")
+	_frames.tick(DT)
+	check_equal(_frames.frame_of(0).move_vector(), Vector2.RIGHT, "the first tick")
+	check(_heard.is_empty(), "no command yet")
+	_frames.tick(DT)
+	check_equal(_heard.size(), 1, "a running game goes through the paused ticks at once, their commands applied")
+	check_equal(_frames.frame_of(0).move_vector(), Vector2.LEFT, "and plays the next running tick")
+	check(not _frames.is_playing(), "done")
+	# Paused while playing: a tick that ran waits.
+	check(_frames.play(replay), "again")
+	paused = true
+	_frames.tick(DT)
+	check_equal(_frames.play_tick(), 0, "a running tick waits while the game stands paused")
+	paused = false
+	_frames.tick(DT)
+	check_equal(_frames.play_tick(), 1, "and plays once it runs")
+	_frames.stop_playing()
+
+
 func test_a_wizard_takes_its_intent_from_its_seats_frame() -> void:
 	var world := WizardFixture.new(root, true)
 	var body: Actor = world.wizard(1, Vector2.ZERO, [[&"bolt"], [], [], []], null, false)

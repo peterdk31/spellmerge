@@ -12,8 +12,9 @@ extends Node
 ## as long as the keyboard has not been used since (a key press or a mouse click). So one player
 ## with a controller on the web, who clicks Play with the mouse because the browser shows no
 ## gamepad before its first press, plays as P1 (owner, 2026-10-27). The handover keeps P1's
-## wizard: no `device_left` or `device_joined`, only `glyph_kind_changed(0)`. Bots use virtual devices, one per player index, that feed the
-## same handle_event() path real devices use.
+## wizard: no `device_left` or `device_joined`, only `glyph_kind_changed(0)`. Bots join with virtual devices, one per player index,
+## and fill their seat's input frames (core/sim/frames.gd); a virtual device's buttons (a menu's) feed the same handle_event() path
+## real devices use. The simulation never asks this manager: a seat's local input layer (`LocalInput`) turns it into input frames.
 ##
 ## Device ids: KEYBOARD (keys and mouse), a gamepad's own id (0 and up), and
 ## VIRTUAL_BASE + player index for a virtual device. Gameplay never reads

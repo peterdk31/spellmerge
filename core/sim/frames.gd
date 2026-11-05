@@ -20,7 +20,8 @@ extends Node
 ## - **Replays:** `record(start, starter)` starts a run and records every tick's frames (the seats
 ##   joined, or with a command) into a `Replay`, `stop_recording` hands it over; `play(replay)`
 ##   joins its seats, starts its run the same way and feeds its frames, one a tick, until they run
-##   out (live input and commands are dropped meanwhile). Both deal the seeds nobody chose from the
+##   out (live input and commands are dropped meanwhile; each tick says whether the game stood
+##   paused, `_read_replay`). Both deal the seeds nobody chose from the
 ##   replay's seed (`SimSeed.begin`). A source set while a replay plays is still asked each tick
 ##   and its frame dropped: a bot reads the game through queries that fill the services' caches
 ##   (the projectile manager's threat grid and target table), which count as state and change the
@@ -128,8 +129,8 @@ func tick(delta: float) -> void:
 	else:
 		_build(delta)
 		if _recording != null:
-			_recording.add_tick(_frames, _recorded_seats())
-	_apply()
+			_recording.add_tick(_frames, _recorded_seats(), _paused())
+		_apply()
 	if _playing != null and _play_at >= _playing.tick_count():
 		stop_playing()
 
@@ -260,12 +261,35 @@ func _find_hand(seat: int) -> void:
 	_mouse = body.get_global_mouse_position()
 
 
+## The replay's next tick, read and applied. A tick that stood paused is played while the game
+## stands paused (the horde's break), and one that ran while it runs: a pause of the recording's
+## own (the pause menu) is skipped through at once, its commands applied in order, and a pause of
+## the player's waits (N4 makes a stop part of the game's state).
 func _read_replay(delta: float) -> void:
 	for seat in SEATS:
 		if _sources[seat] != null:
 			_watched.seat = seat
 			_watched.clear()
 			_sources[seat].fill_frame(_watched, delta)
+	var paused: bool = _paused()
+	while _play_at < _playing.tick_count():
+		var stood: bool = _playing.is_paused_at(_play_at)
+		if stood == paused:
+			_read_tick()
+			_apply()
+			return
+		if not stood:
+			# Paused here, running in the recording: wait.
+			for seat in SEATS:
+				_frames[seat].clear()
+			return
+		_read_tick()
+		_apply()
+	for seat in SEATS:
+		_frames[seat].clear()
+
+
+func _read_tick() -> void:
 	_playing.read_tick(_play_at, _frames)
 	_play_at += 1
 	for seat in SEATS:
@@ -297,6 +321,11 @@ func _apply() -> void:
 			var args: Array = [seat]
 			args.append_array(command.slice(1))
 			events.apply_command(command_name, args)
+
+
+## True while the tree stands paused (the pause menu, the horde's level-up break).
+func _paused() -> bool:
+	return is_inside_tree() and get_tree().paused
 
 
 ## A bit per seat joined now.

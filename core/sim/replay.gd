@@ -10,8 +10,9 @@ extends RefCounted
 ##   every content id, `content_of`), the run's seed (`run_seed`, which `SimSeed` deals the seeds
 ##   nobody chose from), how it started (`start`, one of STARTS, and `starter`, the seat that
 ##   asked) and the seats joined at the start (`seats`, a bit per seat).
-## - **The ticks:** per tick a byte of the seats with a frame, then each one's frame (its length,
-##   then `InputFrame` bytes). Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
+## - **The ticks:** per tick a byte of the seats with a frame (a bit each) and whether the game stood
+##   paused (PAUSED: the pause menu, the horde's level-up break), then each seat's frame (its
+##   length, then `InputFrame` bytes). Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
 ##   a few megabytes and recording allocates no object per tick.
 ##
 ## Files live in `user://replays/` only (`save`, `open`), named by an id (letters, digits, `_`).
@@ -29,6 +30,8 @@ const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): Play, the sandbox, the horde.
 const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"horde_requested"]
 const SEATS: int = 4
+## A tick's byte: the bit for "the game stood paused" beside the seats' bits.
+const PAUSED: int = 0x10
 ## Limits: four hours at 60 ticks a second, and the file's bytes.
 const MAX_TICKS: int = 60 * 60 * 60 * 4
 const MAX_BYTES: int = 64 * 1024 * 1024
@@ -51,10 +54,11 @@ func tick_count() -> int:
 	return _offsets.size()
 
 
-## Append a tick: the frame of every seat whose bit is set in `mask` (`frames` by seat).
-func add_tick(frames: Array[InputFrame], mask: int) -> void:
+## Append a tick: the frame of every seat whose bit is set in `mask` (`frames` by seat), and
+## whether the game stood `paused`.
+func add_tick(frames: Array[InputFrame], mask: int, paused: bool = false) -> void:
 	_offsets.append(_data.size())
-	_data.append(mask & 0x0f)
+	_data.append((mask & 0x0f) | (PAUSED if paused else 0))
 	for seat in SEATS:
 		if mask & (1 << seat) == 0:
 			continue
@@ -70,7 +74,7 @@ func read_tick(tick: int, frames: Array[InputFrame]) -> int:
 	if tick < 0 or tick >= _offsets.size():
 		return -1
 	var at: int = _offsets[tick]
-	var mask: int = _data[at]
+	var mask: int = _data[at] & 0x0f
 	at += 1
 	for seat in SEATS:
 		frames[seat].seat = seat
@@ -82,6 +86,11 @@ func read_tick(tick: int, frames: Array[InputFrame]) -> int:
 		frames[seat].decode(_data.slice(at + 2, at + 2 + size))
 		at += 2 + size
 	return mask
+
+
+## True when the game stood paused at tick `tick` (false for a tick it does not hold).
+func is_paused_at(tick: int) -> bool:
+	return tick >= 0 and tick < _offsets.size() and (_data[_offsets[tick]] & PAUSED) != 0
 
 
 ## The whole replay as bytes: the header, the tick count, the ticks.
@@ -169,7 +178,7 @@ func _decode(bytes: PackedByteArray) -> String:
 			return "tick %d is missing" % tick
 		_offsets[tick] = read
 		var mask: int = _data[read]
-		if mask > 0x0f:
+		if mask > (0x0f | PAUSED):
 			return "tick %d: seats %d" % [tick, mask]
 		read += 1
 		for seat in SEATS:

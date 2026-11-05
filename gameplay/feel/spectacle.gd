@@ -305,10 +305,15 @@ func _trail_motes() -> void:
 		projectiles.spark_motes = on
 	if not on:
 		return
-	# The tails laid as motes (S5 step 4) take rows of their own: the most the manager lays a frame.
-	var rows: int = TaillessMotes.frame_rows_of(tailless_motes) + (projectiles.tail_births_cap if projectiles.tail_births_on else 0)
+	# The tails laid as motes (S5 step 4) take rows of their own: the most the manager lays a frame,
+	# kept from the frame's hits and moments (`tail_rows`) and handed to the births here, so a lone
+	# Fireball's tail is never cut by a Storm's hits.
+	var tails: int = projectiles.tail_births_cap if projectiles.tail_births_on else 0
+	var rows: int = TaillessMotes.frame_rows_of(tailless_motes) + tails
 	if pool.frame_rows != rows:
 		pool.frame_rows = rows
+	pool.tail_rows = tails
+	pool.open_tail_rows()
 	if particles_enabled and projectiles.spark_birth_count > 0:
 		pool.give_off(projectiles.spark_births, projectiles.spark_birth_count)
 

@@ -408,7 +408,8 @@ const SPECK_RADIUS: float = 2.0
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
 ## from one pool with a global count, `tailless_particle_cap` (a visual budget; never a build
 ## rule). A shot with `n` emitting kinds asks for `particles_of(look)` of them (4 + 2n, at most 12).
-## Under the count everything is given off; over it every shot's births thin alike.
+## Under the count everything is given off; over it the births thin by group (GROUPS): every
+## caster's staff gets a fair share, and the shots of one staff thin alike within it.
 ## The pool's count (S5: the tails' budget went to the motes when the tails went): the births a
 ## frame thin only past this many particles asked, so a fight of thousands of shots keeps more of
 ## the look of a fight of tens. Set from the trail benchmark (DECISIONS, 2026-11-04, "Do shots need
@@ -471,9 +472,10 @@ const SPARK_STREAK: int = -1
 ## frame on average, each gap a random 0.5 to 1.5 of the spacing, from a phase of its own
 ## (`_lay_tail`), so a fast shot's tail is as whole as a slow one's and a held stream of shots
 ## never lines its motes up. TAIL_BIRTHS a frame at most with the default births' pool (the
-## "Tailless motes" slider scales it, `tail_births_cap`): past that the spacing of every tail
-## grows by the frame's ask over it (`tail_spacing`, from the last frame's), so a fight of
-## thousands of shots keeps a thinner tail on every shot, never a whole tail on some.
+## "Tailless motes" slider scales it, `tail_births_cap`): past that the tails are shared out by
+## group (GROUPS: a caster's staff), and the spacing of each group's tails grows by its ask over its
+## share (`_group_spacing`, planned from the last frame's ask), so a fight of thousands of shots
+## keeps a thinner tail on every shot of a crowded staff, never a whole tail on some of them.
 ## TAIL_PLAYER_SHARE of an infused shot's tail is its caster's colours, as the tail shader's
 ## quarter was. Its numbers: a birth's (SPARK_BIRTH_STRIDE), the way back along the shot.
 ##
@@ -487,6 +489,24 @@ const TAIL_KINDS: int = 3
 const TAIL_SPACING: float = 2.0
 const TAIL_BIRTHS: int = 256
 const TAIL_PLAYER_SHARE: float = 0.25
+## **The births are shared by staff** (the owner, 2026-11-05: a Storm that keeps splitting took
+## every tail, so a Fireball cast through it had none, while the Storm's own tails were too dense
+## to tell apart): every shot is in a group, its caster's staff (`group_of`: the spell tag's staff,
+## the caster's first for a shot of no spell; a payload's shots are its staff's too), and the
+## frame's tail births (`tail_births_cap`) and particles (`tailless_particle_cap`) are shared out
+## fairly among the groups that ask (`fair_level`): a group that asks for less than an even share
+## gets all it asks for, and the rest share what is left alike. So a lone Fireball keeps its whole
+## tail and its embers beside a Storm of thousands of shots, which thins as before, and two Storms
+## thin alike. A group is a staff, not a cast: a held Storm's many casts are one group.
+## The tails are shared out of TAIL_FRESH less than `tail_births_cap`, so a cast new since the last
+## frame (whose ask is not known yet) always finds room for its first frame's tail; the thinned
+## groups stop at what they were given together (`tail_thin_most`; past it their tails are cut, in
+## slot order), and the groups given their whole tails stop only at `tail_births_cap`. So a frame
+## never lays more than the most, and a Fireball drawn after a Storm that laid past its share is
+## not cut for it.
+const TAIL_FRESH: float = 0.125
+const GROUP_STAFFS: int = 4
+const GROUPS: int = ACTORS * GROUP_STAFFS
 ## Particle moments a second (the trail shader's BIRTHS were at these).
 const SPARK_MOMENTS: float = 60.0
 ## An orbit shot spirals out from its caster to its circle over this many seconds.
@@ -540,7 +560,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_spark_moment", &"_spark_rng"]
+const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame"]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -914,11 +934,13 @@ var spark_births: PackedFloat32Array = PackedFloat32Array()
 var spark_birth_count: int = 0
 ## Tails as motes (see SPARK_TAIL): whether the shots lay them this frame (the tails off and
 ## something takes the births), the most a frame (`set_tailless_pool` scales TAIL_BIRTHS), the
-## spacing they are laid at (TAIL_SPACING, wider when the last frame asked for more than the
-## most), and what the last frame laid and asked for (births at TAIL_SPACING; for the spacing,
-## the tests and the benchmarks).
+## most the thinned groups lay together this frame (see TAIL_FRESH), the widest spacing a group's
+## are laid at this frame (TAIL_SPACING, wider when a group asks for more than its share;
+## `_group_spacing`), and what the last frame laid and asked for (births at
+## TAIL_SPACING; for the tests and the benchmarks).
 var tail_births_on: bool = false
 var tail_births_cap: int = TAIL_BIRTHS
+var tail_thin_most: int = TAIL_BIRTHS
 var tail_spacing: float = TAIL_SPACING
 var tail_births: int = 0
 var tail_demand: int = 0
@@ -927,8 +949,36 @@ var tail_demand: int = 0
 var _tail_from: PackedVector2Array = PackedVector2Array()
 var _tail_carry: PackedFloat32Array = PackedFloat32Array()
 var _tail_n: PackedInt32Array = PackedInt32Array()
-## The tail asked for while drawing (births at TAIL_SPACING).
+## The tail asked for while drawing (births at TAIL_SPACING), and the births of thinned groups laid.
 var _tail_wanted: float = 0.0
+var _tail_thin: int = 0
+## The groups (see GROUPS). Per slot: its group (`group_of`, set at its spawn). Per group: its live
+## shots; and the groups with any, the first `_group_live` of `_groups` (`_group_at`: a group's
+## place there).
+var _group: PackedInt32Array = PackedInt32Array()
+var _group_count: PackedInt32Array = PackedInt32Array()
+var _groups: PackedInt32Array = PackedInt32Array()
+var _group_at: PackedInt32Array = PackedInt32Array()
+var _group_live: int = 0
+## The drawing's, per group (`_plan_groups`): its first place in `_by_group` and the place after
+## its last (the drawn slots of each group together, in slot order, for its particles), the tail
+## and the particles it asked for this frame (births at TAIL_SPACING; `particles_of`, and one for a
+## plain shot, whose twinkle asks the pool for none), the spacing
+## its tail is laid at and the share of its particles given off, the tail it is expected to ask
+## for, and the frame it was last planned in (`_draw_frame`) with its shots then. `_group_sort` is
+## the scratch `fair_level` reads, sorted.
+var _by_group: PackedInt32Array = PackedInt32Array()
+var _group_start: PackedInt32Array = PackedInt32Array()
+var _group_end: PackedInt32Array = PackedInt32Array()
+var _group_tail: PackedFloat32Array = PackedFloat32Array()
+var _group_ask: PackedFloat32Array = PackedFloat32Array()
+var _group_spacing: PackedFloat32Array = PackedFloat32Array()
+var _group_share: PackedFloat32Array = PackedFloat32Array()
+var _group_want: PackedFloat32Array = PackedFloat32Array()
+var _group_frame: PackedInt32Array = PackedInt32Array()
+var _group_seen: PackedInt32Array = PackedInt32Array()
+var _group_sort: PackedFloat32Array = PackedFloat32Array()
+var _draw_frame: int = 0
 ## The last particle moment handed out, and the dice the births are rolled with.
 var _spark_moment: int = -1
 var _spark_rng := RandomNumberGenerator.new()
@@ -982,6 +1032,20 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
+	_group_count.resize(GROUPS)
+	_groups.resize(GROUPS)
+	_group_at.resize(GROUPS)
+	_group_start.resize(GROUPS)
+	_group_end.resize(GROUPS)
+	_group_frame.resize(GROUPS)
+	_group_seen.resize(GROUPS)
+	_group_tail.resize(GROUPS)
+	_group_ask.resize(GROUPS)
+	_group_spacing.resize(GROUPS)
+	_group_share.resize(GROUPS)
+	_group_want.resize(GROUPS)
+	_group_spacing.fill(TAIL_SPACING)
+	_group_share.fill(1.0)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
 	set_native(native)
@@ -1227,6 +1291,8 @@ func set_cap(value: int) -> void:
 	_tail_from.resize(_cap)
 	_tail_carry.resize(_cap)
 	_tail_n.resize(_cap)
+	_group.resize(_cap)
+	_by_group.resize(_cap)
 	_born.resize(_cap)
 	while _buffers.size() < BATCHES:
 		_buffers.append(PackedFloat32Array())
@@ -1618,6 +1684,8 @@ func clear() -> void:
 	_owned.fill(0)
 	_own_head.fill(-1)
 	_own_tail.fill(-1)
+	_group_count.fill(0)
+	_group_live = 0
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -2718,6 +2786,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_tail_from[slot] = origin
 	_tail_carry[slot] = TAIL_SPACING * tail_hash(_seq[slot], -1)
 	_tail_n[slot] = 0
+	_join_group(slot, group_of(caster, tag))
 	_skip_left[slot] = 0.0
 	_flags[slot] = 0
 	_bounce[slot] = 0
@@ -4104,6 +4173,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	tail_births_on = spark_motes
 	if tail_births_on and spark_births.size() < SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE:
 		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
+	_plan_groups()
 	if kernel_draw:
 		_kernel.call(&"draw_shots", self, fraction)
 	else:
@@ -4111,8 +4181,6 @@ func update_draw(fraction: float = -1.0) -> void:
 	tail_births = _draw_out[BATCHES + 4]
 	tail_demand = _draw_out[BATCHES + 5]
 	spark_birth_count = tail_births
-	# The next frame's spacing: wider by as much as this frame asked past the most.
-	tail_spacing = TAIL_SPACING * maxf(1.0, float(tail_demand) / float(maxi(tail_births_cap, 1)))
 	for batch in BATCHES:
 		var out: int = _draw_out[batch]
 		var multimesh: MultiMesh = _nodes[batch].multimesh
@@ -4131,15 +4199,17 @@ func update_draw(fraction: float = -1.0) -> void:
 	drawn_enemy = _draw_out[BATCHES + 3]
 	drawn = shots_out
 	_share_pool(_draw_out[BATCHES])
+	_share_groups()
 	_give_off_sparks(fraction)
 
 
 ## Hand out the particles the drawn shots' trails give off since the last frame, as
 ## births (`spark_births`; see SPARK_BIRTH_STRIDE), while something takes them. The shader's rule, rolled on the
 ## CPU: at each moment (SPARK_MOMENTS a second) a flying shot gives off one of its kinds, picked at
-## random, at that kind's rate (SPARK_RATES) times the pool's share. Rolled per birth, not per shot:
-## a random slot at each of `_high` x the share tries a moment, kept at the kind's rate, so the work
-## follows the births (the pool's share bounds them), not the shots.
+## random, at that kind's rate (SPARK_RATES) times its group's share of the pool (GROUPS). Rolled
+## per birth, not per shot: for each group, a random one of its drawn shots at each of its shots x
+## its share tries a moment, kept at the kind's rate, so the work follows the births (the shares
+## bound them), not the shots.
 func _give_off_sparks(fraction: float) -> void:
 	var moment: int = floori((sim_time - (1.0 - fraction) * _last_delta) * SPARK_MOMENTS)
 	var moments: int = clampi(moment - _spark_moment, 0, 4) if _spark_moment >= 0 else 1
@@ -4150,30 +4220,43 @@ func _give_off_sparks(fraction: float) -> void:
 		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
 	if _high == 0:
 		return
-	var tries: int = mini(floori(float(_high * moments) * particle_share + _spark_rng.randf()), SPARK_BIRTHS_MAX * 4)
+	var tries_left: int = SPARK_BIRTHS_MAX * 4
 	# The steps the frame's moments cover.
 	var span: float = float(moments) / SPARK_MOMENTS / maxf(_last_delta, 0.0001)
-	for n in tries:
-		var slot: int = _spark_rng.randi_range(0, _high - 1)
-		if _alive[slot] == 0 or _motion[slot] == MOTION_STILL:
+	for i in _group_live:
+		var group: int = _groups[i]
+		var first: int = _group_start[group]
+		var shots: int = _group_end[group] - first
+		if shots == 0:
 			continue
-		var bits: int = _look[slot] & EMITTING_MASK
-		var kind: int = 0
-		if bits != 0:
-			kind = _nth_bit(bits, _spark_rng.randi_range(0, _bit_count(bits) - 1)) + 1
-		if _spark_rng.randf() >= SPARK_RATES[kind]:
-			continue
-		# Anywhere on the path it was drawn along since the last frame (the moments since then, back
-		# from where it is drawn now): a frame's births never gather in one part of each step, so a
-		# held stream of shots does not line them up (the owner, 2026-11-05).
-		var step: Vector2 = _pos[slot] - _prev[slot]
-		var at: Vector2 = _prev[slot] + step * (fraction - _spark_rng.randf() * span)
-		var back: Vector2 = -step
-		if _motion[slot] == MOTION_ORBIT:
-			at = _drawn_at(slot, at)
-			back = -_orbit_tangent(slot)
-		if not _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot], _tag[slot]):
-			return
+		var tries: int = mini(floori(float(shots * moments) * _group_share[group] + _spark_rng.randf()), tries_left)
+		tries_left -= tries
+		for n in tries:
+			if not _give_off_spark(_by_group[first + _spark_rng.randi_range(0, shots - 1)], fraction, span):
+				return
+
+
+## One try of `_give_off_sparks` on the drawn shot in `slot`: a birth of one of its kinds, kept at
+## that kind's rate. Returns false once the frame's SPARK_BIRTHS_MAX are taken.
+func _give_off_spark(slot: int, fraction: float, span: float) -> bool:
+	if _alive[slot] == 0 or _motion[slot] == MOTION_STILL:
+		return true
+	var bits: int = _look[slot] & EMITTING_MASK
+	var kind: int = 0
+	if bits != 0:
+		kind = _nth_bit(bits, _spark_rng.randi_range(0, _bit_count(bits) - 1)) + 1
+	if _spark_rng.randf() >= SPARK_RATES[kind]:
+		return true
+	# Anywhere on the path it was drawn along since the last frame (the moments since then, back
+	# from where it is drawn now): a frame's births never gather in one part of each step, so a
+	# held stream of shots does not line them up (the owner, 2026-11-05).
+	var step: Vector2 = _pos[slot] - _prev[slot]
+	var at: Vector2 = _prev[slot] + step * (fraction - _spark_rng.randf() * span)
+	var back: Vector2 = -step
+	if _motion[slot] == MOTION_ORBIT:
+		at = _drawn_at(slot, at)
+		back = -_orbit_tangent(slot)
+	return _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot], _tag[slot])
 
 
 ## One birth (SPARK_BIRTH_STRIDE floats; see there): a particle of look kind `kind` at `at`, given
@@ -4231,6 +4314,7 @@ func _draw_shots(fraction: float) -> void:
 	for batch in BATCHES:
 		_draw_out[batch] = 0
 	_tail_wanted = 0.0
+	_tail_thin = 0
 	var asked: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
@@ -4242,6 +4326,10 @@ func _draw_shots(fraction: float) -> void:
 		var batch: int = _drawn_batch[slot]
 		var look_data: Color = _drawn_color[slot]
 		asked += _drawn_particles[slot]
+		var group: int = _group[slot]
+		_group_ask[group] += float(maxi(_drawn_particles[slot], 1))
+		_by_group[_group_end[group]] = slot
+		_group_end[group] += 1
 		if motion == MOTION_STILL:
 			# Only a rune's quad turns with the shot (a trail is drawn along its path).
 			var dir: Vector2 = Vector2.RIGHT
@@ -4267,8 +4355,9 @@ func _draw_shots(fraction: float) -> void:
 
 ## Lay the tail of the shot in `slot`, drawn at `at` this frame, as births (SPARK_TAIL; what
 ## `ShotKernel.draw_shots` does natively, to the bit): along the path from where it was drawn last
-## frame, one at its next tail point and every `tail_spacing` x 0.5 to 1.5 pixels on from there
-## (`tail_hash` of its sequence and its count), while the frame's `tail_births_cap` lasts. A jump
+## frame, one at its next tail point and every spacing of its group (`_group_spacing`) x 0.5 to 1.5 pixels on from there
+## (`tail_hash` of its sequence and its count), while the frame's most lasts (`tail_births_cap`,
+## and `tail_thin_most` for a thinned group's; see TAIL_FRESH). A jump
 ## longer than TRAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
 ## tail its caster's colours (a white core, so the motes take its hat ramp).
 func _lay_tail(slot: int, at: Vector2) -> void:
@@ -4279,6 +4368,10 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 	if not (d > 0.0) or d > TRAIL_JUMP:
 		return
 	_tail_wanted += d / TAIL_SPACING
+	var group: int = _group[slot]
+	_group_tail[group] += d / TAIL_SPACING
+	var spacing: float = _group_spacing[group]
+	var thinned: bool = spacing > TAIL_SPACING
 	var carry: float = _tail_carry[slot]
 	var n: int = _tail_n[slot]
 	var seq: int = _seq[slot]
@@ -4287,14 +4380,15 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 	var back: Vector2 = way / -d
 	var code: int = tail_code(seq)
 	while carry < d:
-		if spark_birth_count >= tail_births_cap:
+		if spark_birth_count >= tail_births_cap or (thinned and _tail_thin >= tail_thin_most):
 			carry = d
 			break
 		var colour: Color = core
 		if mixed and tail_hash(seq, n * 2) < TAIL_PLAYER_SHARE:
 			colour = Color.WHITE
 		_add_birth(from.lerp(at, carry / d), back, code, _ramp[slot], _look[slot], colour, _tag[slot])
-		carry += tail_spacing * (0.5 + tail_hash(seq, n * 2 + 1))
+		_tail_thin += 1 if thinned else 0
+		carry += spacing * (0.5 + tail_hash(seq, n * 2 + 1))
 		n += 1
 	_tail_carry[slot] = carry - d
 	_tail_n[slot] = n
@@ -4320,6 +4414,102 @@ static func tail_hash(a: int, b: int) -> float:
 	h = ((h ^ (h >> 16)) * 0x45D9F3B) & 0xFFFFFFFF
 	h = h ^ (h >> 16)
 	return float(h & 0xFFFFFF) / 16777216.0
+
+
+## The group of a shot of the actor `caster` with `tag` (see GROUPS): the caster's staff for a
+## spell's shot (`SpellTag.staff_of`), the caster's first for a shot of no spell.
+static func group_of(caster: int, tag: int) -> int:
+	var staff: int = SpellTag.staff_of(tag) if SpellTag.is_spell_tag(tag) else 0
+	return clampi(caster, 0, ACTORS - 1) * GROUP_STAFFS + staff
+
+
+## The level that shares `cap` out fairly among the asks in `sorted` (smallest first): every ask
+## up to it is given whole, every larger one this much, and all of them together `cap`. INF when
+## all of them fit.
+static func fair_level(sorted: PackedFloat32Array, cap: float) -> float:
+	var left: float = cap
+	var count: int = sorted.size()
+	for i in count:
+		var level: float = left / float(count - i)
+		if sorted[i] > level:
+			return level
+		left -= sorted[i]
+	return INF
+
+
+## The shot in `slot` joins `group` (see GROUPS).
+func _join_group(slot: int, group: int) -> void:
+	_group[slot] = group
+	if _group_count[group] == 0:
+		_group_at[group] = _group_live
+		_groups[_group_live] = group
+		_group_live += 1
+	_group_count[group] += 1
+
+
+## The shot in `slot` leaves its group; a group with no shots left leaves the live ones.
+func _leave_group(slot: int) -> void:
+	var group: int = _group[slot]
+	_group_count[group] -= 1
+	if _group_count[group] == 0:
+		var at: int = _group_at[group]
+		_group_live -= 1
+		var last: int = _groups[_group_live]
+		_groups[at] = last
+		_group_at[last] = at
+
+
+## Before the drawing: place each live group's shots in `_by_group` (the drawing fills them in) and
+## share the frame's tail births out among the groups (see GROUPS). A group's ask is the tail it
+## asked for last frame, scaled by its shots now against then (a Storm that split since asks for
+## that much more); a group new since the last frame asks for nothing yet, so a new cast's tail is
+## whole from its first frame. The fair level shares TAIL_FRESH less than the most; a group's
+## spacing is TAIL_SPACING, wider by its ask over the level, and the thinned groups lay at most
+## the level each (`tail_thin_most`).
+func _plan_groups() -> void:
+	_draw_frame += 1
+	if _group_sort.size() != _group_live:
+		_group_sort.resize(_group_live)
+	var at: int = 0
+	for i in _group_live:
+		var group: int = _groups[i]
+		var count: int = _group_count[group]
+		_group_start[group] = at
+		_group_end[group] = at
+		at += count
+		var want: float = 0.0
+		if _group_frame[group] == _draw_frame - 1 and _group_seen[group] > 0:
+			want = _group_tail[group] * float(count) / float(_group_seen[group])
+		_group_want[group] = want
+		_group_sort[i] = want
+		_group_frame[group] = _draw_frame
+		_group_seen[group] = count
+		_group_tail[group] = 0.0
+		_group_ask[group] = 0.0
+	_group_sort.sort()
+	var level: float = maxf(fair_level(_group_sort, float(tail_births_cap) * (1.0 - TAIL_FRESH)), 0.0001)
+	var thin: float = 0.0
+	tail_spacing = TAIL_SPACING
+	for i in _group_live:
+		var group: int = _groups[i]
+		_group_spacing[group] = TAIL_SPACING * maxf(1.0, _group_want[group] / level)
+		tail_spacing = maxf(tail_spacing, _group_spacing[group])
+		if _group_spacing[group] > TAIL_SPACING:
+			thin += level
+	tail_thin_most = ceili(thin)
+
+
+## After the drawing: each group's share of the particles it asked for (`_group_share`, for
+## `_give_off_sparks`): the pool's count shared out fairly among the groups (see GROUPS).
+func _share_groups() -> void:
+	for i in _group_live:
+		_group_sort[i] = _group_ask[_groups[i]]
+	_group_sort.sort()
+	var level: float = fair_level(_group_sort, float(maxi(tailless_particle_cap, 0)))
+	for i in _group_live:
+		var group: int = _groups[i]
+		var ask: float = _group_ask[group]
+		_group_share[group] = 1.0 if ask <= level else level / ask
 
 
 ## Write the rune quad of the still shot in `slot` drawn at `at` into `buffer` from instance
@@ -4616,6 +4806,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 		_leave_all(slot)
 	_alive[slot] = 0
 	_state[slot] = S_IDLE
+	_leave_group(slot)
 	_free_slots[_free_count] = slot
 	_free_count += 1
 	_count -= 1

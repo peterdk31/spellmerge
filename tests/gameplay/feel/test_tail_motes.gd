@@ -6,6 +6,7 @@ extends "res://tests/support/suite.gd"
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const NativeScript := preload("res://core/native/native.gd")
 
 
 func _kind(id: StringName, tail: bool) -> MoteKind:
@@ -83,3 +84,50 @@ func test_the_content_has_three_tail_kinds() -> void:
 		if kind != null:
 			found.append(kind.id)
 	check(found.size() == ProjectilesScript.TAIL_KINDS, "one for each tail code: A, B and C")
+
+
+## `count` tail births in a row from x = `x0` on (as the projectile manager lays a frame's: every
+## shot's tail in slot order, then its other births).
+func _tail_births(count: int, x0: float, core: Color) -> PackedFloat32Array:
+	var given := PackedFloat32Array()
+	for n in count:
+		given.append_array(_tail_birth(Vector2(x0 + float(n), 30.0), core))
+	return given
+
+
+## The regression (the owner, 2026-11-05): a splitting Storm's hits shed their sparks all frame,
+## before the trails' births are given off, so they took the frame's rows and the tail laid last
+## in the births, a Fireball's cast through the Storm, was cut though the projectile manager had
+## given it its whole share. The tail rows (`tail_rows`) are kept from every other write until the
+## spectacle hands them to the births (`open_tail_rows`), in GDScript and in the native kernel.
+func test_the_hits_never_take_the_tails_rows() -> void:
+	for native in [false, true]:
+		if native and not NativeScript.loaded():
+			continue
+		var motes := MotesScript.new(4096, 0, [_kind(&"spark", false), _kind(&"tail", true)] as Array[MoteKind])
+		motes.native = native
+		own(motes)
+		root.add_child(motes)
+		var tails: int = 200
+		motes.frame_rows = MotesScript.FRAME_ROWS + tails
+		motes.tail_rows = tails
+		motes.step(1.0)
+		var label: String = "native" if native else "GDScript"
+		# The Storm's hits: sheds until only the moments' rows are left, then a moment that takes all.
+		for n in 100:
+			motes.throw(0, Vector2(float(n), 0.0), Vector2.LEFT, 0, Color.WHITE, 4.0)
+		motes.throw_part(0, Vector2.ZERO, Vector2.RIGHT, 0, Color.WHITE, MotesScript.FRAME_ROWS * 2, 0.0, 360.0, 1.0, false)
+		check_equal(motes.written, MotesScript.FRAME_ROWS, "%s: the hits and moments take the frame's rows past the tails'" % label)
+		# The Storm's thinned tails, then the Fireball's whole one, last in the births.
+		var given: PackedFloat32Array = _tail_births(tails - 12, 0.0, Color(0.9, 0.8, 0.2))
+		given.append_array(_tail_births(12, 500.0, Color(0.9, 0.3, 0.1)))
+		var births: int = motes.births
+		motes.open_tail_rows()
+		motes.give_off(given, tails)
+		check_equal(motes.births - births, tails, "%s: every tail birth is a mote, the Fireball's last ones too" % label)
+		var last: PackedFloat32Array = motes.row_data(motes.next_row() - 1)
+		check(is_equal_approx(last[MotesScript.ROW_X], 511.0), "%s: the Fireball's tail is written to its end" % label)
+		motes.step(1.1)
+		for n in 100:
+			motes.throw(0, Vector2(float(n), 0.0), Vector2.LEFT, 0, Color.WHITE, 4.0)
+		check(motes.written - MotesScript.FRAME_ROWS - tails <= MotesScript.FRAME_ROWS - MotesScript.MOMENT_ROWS, "%s: the next frame keeps them again" % label)

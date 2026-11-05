@@ -177,6 +177,14 @@ var _rows_left: int = FRAME_ROWS
 ## pool's births are written: `TaillessMotes.frame_rows_of`, set by the spectacle). The moments
 ## keep their MOMENT_ROWS of it.
 var frame_rows: int = FRAME_ROWS
+## The rows of a frame's that only the shots' tails take (the projectile manager's most a frame,
+## `tail_births_cap`, set by the spectacle while the tails are laid as motes): every other write
+## leaves them (`_open`) until `open_tail_rows`, so the hits and moments of the frame, which all come
+## before the trails' births, never cut a tail. Without it a splitting Storm's hit sparks took the
+## frame's rows and the births after them, a Fireball's tail laid after the Storm's, were cut (the
+## owner, 2026-11-05). `_tail_kept` is what is still kept this frame.
+var tail_rows: int = 0
+var _tail_kept: int = 0
 var _keep: int = 0
 var _settles_left: int = SETTLE_MOST
 ## Rows written since the pool was made: a mote's serial (the mark layer forgets a settle whose
@@ -384,7 +392,7 @@ func settle_mark(k: int) -> int:
 ## count, split between them) along `dir`, in the shot's own ramp. It leaves the frame's last
 ## MOMENT_ROWS to the moments, and writes nothing once only they are left.
 func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _open() <= MOMENT_ROWS:
 		cut += 1
 		return
 	shed_kinds(kinds_of_look(look), at, dir, core, ramp, look, scale)
@@ -393,7 +401,7 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 ## Whether a shed now writes nothing (only the frame's MOMENT_ROWS are left), counted as cut: ask it
 ## before working out a shed's kinds (`card_kinds.gd`), which costs more than a shed that is cut.
 func shed_closed() -> bool:
-	if _rows_left <= MOMENT_ROWS:
+	if _open() <= MOMENT_ROWS:
 		cut += 1
 		return true
 	return false
@@ -401,7 +409,7 @@ func shed_closed() -> bool:
 
 ## `shed` with the kinds `found` (a spell's, `card_kinds.gd`; never empty) in place of its look's.
 func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _open() <= MOMENT_ROWS:
 		cut += 1
 		return
 	if found.is_empty():
@@ -429,7 +437,7 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		_give_off_native(given, count)
 		return
 	for n in count:
-		if _rows_left <= 0:
+		if _open() <= 0:
 			cut += count - n
 			return
 		var b: int = n * BIRTH_STRIDE
@@ -483,7 +491,10 @@ func _give_off_native(given: PackedFloat32Array, count: int) -> void:
 		for i in size:
 			_pair_kinds[at + i] = found[i]
 		at += size
+	# The kernel writes while `_rows_left` lasts: the kept tail rows are not its to take (`_open`).
+	_rows_left -= _tail_kept
 	var handed: int = _kernel.call(&"give_off", self, given, count, _marks != null)
+	_rows_left += _tail_kept
 	for s in handed:
 		var o: int = s * SETTLE_STRIDE
 		_marks.settle(int(_settle_out[o]), Vector2(_settle_out[o + 1], _settle_out[o + 2]), _settle_out[o + 3],
@@ -543,7 +554,7 @@ func kinds_of_layer(layer: int) -> PackedInt32Array:
 ## and height) from `at` along `dir`, from `source` (`spell_source`, `table_source`) with the core
 ## colour `core` (a spell's; white for none). Like `shed`, it leaves the frame's last MOMENT_ROWS.
 func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: float = 1.0) -> void:
-	if _rows_left <= MOMENT_ROWS:
+	if _open() <= MOMENT_ROWS:
 		cut += 1
 		return
 	if k < 0 or k >= _kinds.size() or source < 0:
@@ -565,7 +576,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
-	if often and _rows_left <= MOMENT_ROWS:
+	if often and _open() <= MOMENT_ROWS:
 		cut += 1
 		return
 	var kind: MoteKind = _kinds[k]
@@ -595,7 +606,7 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		count = floori(float(count) * density + _rng.randf())
 	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
 		return
-	var room: int = _rows_left - _keep
+	var room: int = _open() - _keep
 	if count > room:
 		cut += 1
 		count = room
@@ -663,11 +674,23 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 	_serial += count
 
 
+## The rows a write other than the tails' may take now: the frame's left, past the kept tail rows.
+func _open() -> int:
+	return _rows_left - _tail_kept
+
+
+## The shots' tails are given off now (the spectacle, just before the trails' births): the rows
+## kept for them (`tail_rows`) are the frame's births' from here to the next step.
+func open_tail_rows() -> void:
+	_tail_kept = 0
+
+
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those
 ## with nothing alive, and move the shader's clock on.
 func step(now: float) -> void:
 	_now = now
 	_rows_left = frame_rows
+	_tail_kept = clampi(tail_rows, 0, frame_rows)
 	_settles_left = mini(_settles_left + SETTLE_ROWS, SETTLE_MOST)
 	if _marks != null:
 		_marks.forget_settles_before(_serial - _cap)
@@ -944,7 +967,7 @@ func crumble(k: int, points: PackedVector2Array, feet: float, centre: Vector2, s
 		return
 	var kind: MoteKind = _kinds[k]
 	for p in points:
-		if _rows_left <= 0:
+		if _open() <= 0:
 			cut += 1
 			break
 		var out: Vector2 = p - centre

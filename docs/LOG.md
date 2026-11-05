@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: The tails keep their motes' rows (owner session)
+
+The owner still saw Fireballs without a tail in a Storm: the projectile manager gave the tail, but the mote pool's rows a frame were one counter, and the Storm's hits (all before the trails' births) took the tails' rows too, so the births laid last were cut. The pool keeps `tail_rows` (the manager's `tail_births_cap`) from every other write until the spectacle hands them to the births (`open_tail_rows`), natively too; a storm's sheds are back to the rows they had before tails were motes. Regression test in `test_tail_motes.gd`.
+
 ## 2026-11-05: Tails and particles shared by staff (owner session)
 
 The owner's Fireball cast through a splitting Storm had no tail: the tails' and particles' budgets thinned every shot alike. They are shared by staff now (`group_of`: the caster's staff from the spell tag; `fair_level` gives a small ask all of it, the crowded staffs share the rest), tails planned before the drawing (native too) and particles rolled per group. Tests in `test_tail_births.gd`; DECISIONS has the rules.

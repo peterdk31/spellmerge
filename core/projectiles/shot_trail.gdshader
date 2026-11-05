@@ -100,21 +100,23 @@ void vertex() {
 		vec2 px = floor(at);
 		if (quad == Q_HEAD_LIGHT) {
 			m = M_GLOW;
-			// A speck's light is a smaller one.
-			float reach = speck ? 6.0 : 8.0 + 2.0 * z;
+			// A speck's light is a smaller one; a bigger shot's reaches 4 px further a zoom (10 px
+			// at zoom 1, as before), its bright middle 2 px.
+			float reach = speck ? 6.0 : 6.0 + 4.0 * z;
 			q_lo = px + 0.5 - reach;
 			q_hi = px + 0.5 + reach;
 			a0 = vec4(px + 0.5, pull ? 0.45 : 0.0, 6.0);
-			a1 = vec4((speck ? 0.6 : 0.8) * flicker, speck ? 2.0 : 3.0 + z, 0.35 * flicker, reach);
+			a1 = vec4((speck ? 0.6 : 0.8) * flicker, speck ? 2.0 : 2.0 + 2.0 * z, 0.35 * flicker, reach);
 			k0 = vec4(hue, 1.0);
 		} else {
-			// A white-hot pixel with four round it, a pixel more each side a zoom (a speck's is
-			// the pixel alone); pierce lengthens it along the flight; void's is a dark heart
-			// ringed in pink.
+			// A white-hot diamond of z - 1 pixels round its pixel (the pixel alone at zoom 1),
+			// ringed out to z, with arms of 2z - 1 along the axes: at zoom 1 the `+` of five
+			// pixels, at zoom 2 a filled diamond 7 px across (a speck's is the pixel alone);
+			// pierce lengthens it along the flight; void's is a dark heart ringed in pink.
 			float half_size = 3.0 + 2.0 * z;
 			q_lo = px - half_size;
 			q_hi = px + half_size + 1.0;
-			a0 = vec4(px, 1.0, speck ? 0.0 : z);
+			a0 = vec4(px, speck ? 1.0 : z, speck ? 0.0 : 2.0 * z - 1.0);
 			if (bit_set(b, L_STREAKS)) {
 				a1 = vec4(at, at - fly * (2.0 + z));
 			}
@@ -166,14 +168,16 @@ void fragment() {
 		float lit = v1.x * falloff(r, v1.y) + v1.z * falloff(r, v1.w);
 		colour = vec4(c0.rgb * lit * glow_strength, v0.z * falloff(r, v0.w));
 	} else {
-		// Pixels: a square of v0.z from v0.xy in c0, a cross of arms v0.w round its pixel and a
-		// line v1.xy-v1.zw in c1, the pixels between the arms in c2.
+		// Pixels round v0.xy: a diamond closer than v0.z in c0, ringed out to v0.z (at most
+		// v0.w) with a cross of arms v0.w and a line v1.xy-v1.zw in c1, the pixels between the
+		// arms in c2.
 		vec2 d = floor(P) - v0.xy;
 		vec2 a = abs(d);
+		float m = a.x + a.y;
 		float along;
-		if (d.x >= 0.0 && d.y >= 0.0 && d.x < v0.z && d.y < v0.z) {
+		if (m < v0.z) {
 			colour = c0;
-		} else if (((a.x == 0.0 || a.y == 0.0) && a.x + a.y <= v0.w) || (v1.x < 1.0e6 && on_line(P, v1.xy, v1.zw, along))) {
+		} else if (m <= min(v0.z, v0.w) || ((a.x == 0.0 || a.y == 0.0) && m <= v0.w) || (v1.x < 1.0e6 && on_line(P, v1.xy, v1.zw, along))) {
 			colour = c1;
 		} else if (a.x == 1.0 && a.y == 1.0) {
 			colour = c2;

@@ -127,8 +127,7 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	_watch_builder()
-	for bot in _bots:
-		bot.step(delta)
+	# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
 	if _settle >= 0:
 		_settle -= 1
 		if _settle == 0:

@@ -189,8 +189,9 @@ func _ready() -> void:
 	events.horde_started.connect(_on_horde_started)
 	events.horde_ended.connect(stop)
 	events.enemy_died.connect(_on_enemy_died)
-	events.horde_pick_requested.connect(_on_pick_requested)
-	events.horde_ready_requested.connect(_on_ready_requested)
+	# Commands, heard at the tick's start (core/events, online-ready N2).
+	events.listen(&"horde_pick_requested", _on_pick_requested)
+	events.listen(&"horde_ready_requested", _on_ready_requested)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
 	events.player_joined.connect(_on_player_joined)

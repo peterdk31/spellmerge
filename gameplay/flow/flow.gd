@@ -267,8 +267,9 @@ func _ready() -> void:
 		return
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
-	events.sandbox_action_requested.connect(_on_sandbox_action_requested)
-	events.sandbox_spawn_requested.connect(_on_sandbox_spawn_requested)
+	# Commands, heard at the tick's start (core/events, online-ready N2).
+	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
+	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.horde_requested.connect(_on_horde_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)

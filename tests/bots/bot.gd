@@ -1,15 +1,16 @@
-extends RefCounted
-## A bot: plays one player slot through a virtual device and the real input path
-## (`PlayerInput.send_virtual`, `send_virtual_aim`), the same path a gamepad uses. It never
-## touches a spell field or the projectile manager's shots, so it plays the way a person does: the
-## wizard casts what its buttons say.
+extends FrameSource
+## A bot: plays one player slot. It joins with a virtual device, as a gamepad joins, and fills its
+## seat's input frames (online-ready N2: `Frames.set_source`, core/sim/frames.gd), as a device's
+## local input layer does: the one input path, so a recorded bot run replays like a person's. It
+## never touches a spell field or the projectile manager's shots, so it plays the way a person
+## does: the wizard casts what its frame's buttons say.
 ##
 ## Fighter (enemy AI L5, docs/milestones/M2-enemy-ai.md): its decisions come from the same brain
 ## every enemy plays by (`AIBrain`, gameplay/ai/brain.gd), with the bot's profile
 ## (`bot_profile.tres`: no rest, pressing on, quick to react, dodging). The brain drives the
-## wizard but writes a spare `ActorIntent`, never the wizard's own, and the bot turns that into
-## buttons: the walk into the four move actions, the aim into the virtual right stick, a tap of
-## a staff's button for each press and the button held while a staff is held. The wizard is on
+## wizard but writes a spare `ActorIntent`, never the wizard's own, and the bot turns that into its
+## frame (`send`): the walk (each axis full on or off, as the four move keys), the aim, a press for
+## each press and the button held while a staff is held. The wizard is on
 ## the players' team, so the brain winds up nothing (enemies telegraph, allies don't: owner,
 ## 2026-11-01) and casts the step a staff is ready. It reads what each staff casts next
 ## (`CastSense`), never a card: it fires the staff that hurts and reaches, walks round walls
@@ -24,8 +25,8 @@ extends RefCounted
 ## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
 ## and it stays there (the full builder, waves included).
 ##
-## Everything is driven by step(delta), so a run with the same frames repeats. A bot sends an
-## input only when it changes. Nothing is allocated per step.
+## The brain thinks at each tick's start, when the frames service asks for the frame
+## (`fill_frame`), so a run repeats. Nothing is allocated per step.
 
 enum Mode { FIGHTER, IDLER }
 
@@ -50,10 +51,9 @@ var intent: ActorIntent = ActorIntent.new()
 
 var _input: Node = null
 var _flow: Node = null
-var _held_move: Vector2i = Vector2i.ZERO
-var _held_aim: Vector2 = Vector2.ZERO
-## The staffs it holds now, by index (0 to 3).
-var _held_staffs: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+var _frames: Node = null
+## The frame it wants for the next tick (`send`), handed over in `fill_frame`.
+var _wanted: InputFrame = InputFrame.new()
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
@@ -62,13 +62,21 @@ var requests_sent: int = 0
 
 
 ## `input` is the `PlayerInput` autoload and `flow` the `Flow` autoload. Takes the
-## virtual device of `index`; returns false if that slot is not free.
+## virtual device of `index` and fills that seat's frames (the `Frames` autoload); returns false
+## if that slot is not free.
 func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	player = index
 	mode = bot_mode
 	_input = input
 	_flow = flow
-	return int(_input.call("add_virtual_device", player)) != int(_input.get("NO_DEVICE"))
+	_wanted.seat = index
+	_wanted.clear()
+	if int(_input.call("add_virtual_device", player)) == int(_input.get("NO_DEVICE")):
+		return false
+	_frames = _input.get_tree().root.get_node_or_null("Frames")
+	if _frames != null:
+		_frames.call("set_source", player, self)
+	return true
 
 
 ## Press and release `back` (B) once: in play it opens the builder.
@@ -109,14 +117,27 @@ func open_builder() -> void:
 	tap_back()
 
 
-## Let go of everything the bot holds and free the slot.
+## Let go of everything the bot holds, stop filling its seat's frames and free the slot.
 func leave() -> void:
 	_release()
+	if _frames != null and _frames.call("source_of", player) == self:
+		_frames.call("set_source", player, null)
 	_input.call("leave", player)
 
 
-## One step: the brain thinks for the wizard and the bot presses what it wants. An idler does
-## nothing.
+## The frames service asks for this tick's frame: the brain thinks for the wizard and the frame
+## says what it wants. An idler wants nothing.
+func fill_frame(frame: InputFrame, delta: float) -> void:
+	step(delta)
+	frame.move = _wanted.move
+	frame.aim = _wanted.aim
+	frame.held_bits = _wanted.held_bits
+	frame.pressed_bits = _wanted.pressed_bits
+	_wanted.pressed_bits = 0
+
+
+## One step: the brain thinks for the wizard and the bot wants what it wants (`send`). An idler
+## does nothing. The frames service calls it each tick (`fill_frame`).
 func step(delta: float) -> void:
 	if mode == Mode.IDLER:
 		return
@@ -133,57 +154,23 @@ func step(delta: float) -> void:
 	send(intent)
 
 
-## Turn `wanted` into buttons: the walk, the aim, a tap per pressed staff and the button held per
-## held staff.
+## Want `wanted` in the next frame: the walk (each axis full on or off, as the move keys), the aim
+## (ZERO keeps it, and the wizard aims where it walks), a press per pressed staff and the button
+## held per held staff. A press waits for the frame, so none is lost.
 func send(wanted: ActorIntent) -> void:
-	_hold_move(wanted.move)
-	_aim(wanted.aim)
-	for at in STAFF_ACTIONS.size():
-		var held: bool = wanted.is_held(at)
-		if wanted.is_pressed(at):
-			if _held_staffs[at] != 0:
-				_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
-			_input.call("send_virtual", player, STAFF_ACTIONS[at], 1.0)
-			if not held:
-				_input.call("send_virtual", player, STAFF_ACTIONS[at], 0.0)
-			_held_staffs[at] = 1 if held else 0
-		else:
-			_hold_staff(at, held)
+	_wanted.set_move(Vector2(signi(roundi(wanted.move.x * 1.5)), signi(roundi(wanted.move.y * 1.5))).limit_length(1.0))
+	_wanted.set_aim(wanted.aim)
+	_wanted.held_bits = wanted.held_bits
+	_wanted.pressed_bits |= wanted.pressed_bits
 
 
-## Hold the four move actions for `direction` (each axis on or off).
-func _hold_move(direction: Vector2) -> void:
-	var wanted := Vector2i(signi(roundi(direction.x * 1.5)), signi(roundi(direction.y * 1.5)))
-	if wanted == _held_move:
-		return
-	_input.call("send_virtual", player, &"move_left", 1.0 if wanted.x < 0 else 0.0)
-	_input.call("send_virtual", player, &"move_right", 1.0 if wanted.x > 0 else 0.0)
-	_input.call("send_virtual", player, &"move_up", 1.0 if wanted.y < 0 else 0.0)
-	_input.call("send_virtual", player, &"move_down", 1.0 if wanted.y > 0 else 0.0)
-	_held_move = wanted
-
-
-## Push the right stick toward `direction` (ZERO lets it go, and the wizard aims where it walks).
-func _aim(direction: Vector2) -> void:
-	var wanted: Vector2 = direction.normalized() if direction != Vector2.ZERO else Vector2.ZERO
-	if wanted == _held_aim:
-		return
-	_input.call("send_virtual_aim", player, wanted)
-	_held_aim = wanted
-
-
-func _hold_staff(at: int, on: bool) -> void:
-	if (_held_staffs[at] != 0) == on:
-		return
-	_input.call("send_virtual", player, STAFF_ACTIONS[at], 1.0 if on else 0.0)
-	_held_staffs[at] = 1 if on else 0
+## The frame it wants next (read only; tests).
+func wanted_frame() -> InputFrame:
+	return _wanted
 
 
 func _release() -> void:
-	_hold_move(Vector2.ZERO)
-	_aim(Vector2.ZERO)
-	for at in _held_staffs.size():
-		_hold_staff(at, false)
+	_wanted.clear()
 	if brain.actor != null:
 		brain.reset()
 		brain.actor = null

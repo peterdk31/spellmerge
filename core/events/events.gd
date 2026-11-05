@@ -12,6 +12,18 @@ extends Node
 ## - `player`: a seat (0-3), a human: HUD intent, devices, the builder, stats, downed and
 ##   revived, joined and left, and the casts the wizard announces for the HUD and Feel.
 
+## Commands (online-ready N2, docs/milestones/online-ready.md): the HUD's `*_requested` events the
+## simulation hears (`InputFrame.COMMAND_NAMES`: the builder's, the horde's picks, the sandbox
+## page's, rewards and doors) apply at the start of the next tick, never in the middle of one. The
+## HUD sends them as before; the bus hands each to `command_sink` (the frames service,
+## core/sim/frames.gd, the autoload "Frames"), which puts it into its seat's next input frame and
+## applies it with `apply_command` when that tick starts, so a replay (and later the network) gives
+## the same command at the same tick. With no sink (a test's own bus) a command applies as it is
+## sent. The simulation hears a command through `listen`, never by connecting to its signal (that
+## would hear it as it is sent); the HUD and tests may still connect to see it sent. The requests
+## that start a run (`play_requested`, `sandbox_requested`, `horde_requested`) are not commands: a
+## replay's header says how its run started.
+##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
 const NO_PLAYER: int = -1
 
@@ -239,3 +251,46 @@ signal reward_taken(player: int, reward_id: StringName)
 signal unlock_gained(unlock_id: StringName)
 ## Sender: progression. The balance of `currency_id` is now `amount`.
 signal currency_changed(currency_id: StringName, amount: int)
+
+
+## Where a command goes when it is sent, as `(name, args)` with the seat first in `args`: the frames
+## service sets it. Unset, a command applies at once (`apply_command`).
+var command_sink: Callable = Callable()
+## The simulation's listeners per command, by name (`listen`).
+var _listeners: Dictionary = {}
+
+
+func _init() -> void:
+	for command: StringName in InputFrame.COMMAND_NAMES:
+		if has_signal(command):
+			_listeners[command] = []
+			connect(command, _on_command.bind(command))
+
+
+## `callable` hears the command `command` (one of `InputFrame.COMMAND_NAMES` with a signal here) when
+## it applies, with the signal's arguments: at the next tick's start, or at once with no sink.
+func listen(command: StringName, callable: Callable) -> void:
+	if not _listeners.has(command):
+		push_error("Events: %s is not a command (InputFrame.COMMAND_NAMES)." % command)
+		return
+	var listeners: Array = _listeners[command]
+	for at in range(listeners.size() - 1, -1, -1):
+		if not (listeners[at] as Callable).is_valid():
+			listeners.remove_at(at)
+	listeners.append(callable)
+
+
+## Apply the command `command` now: every listener hears `args` (the seat first), in the order
+## they listened. A listener whose object is gone is skipped.
+func apply_command(command: StringName, args: Array) -> void:
+	for callable: Callable in _listeners.get(command, []):
+		if callable.is_valid():
+			callable.callv(args)
+
+
+func _on_command(...args: Array) -> void:
+	var command: StringName = args.pop_back()
+	if command_sink.is_valid():
+		command_sink.call(command, args)
+	else:
+		apply_command(command, args)

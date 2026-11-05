@@ -11,6 +11,12 @@
 #                                 tests (preview.yml; the daily run checks everything). With
 #                                 --screenshots it takes them too, for the gallery; a failed
 #                                 script only warns, so it never keeps the build back.
+#   ci/build/build.sh --only linux,windows [--tests] [--version V] [--channel manual] [--commit SHA]
+#                                 only those platforms (web, windows, linux), zipped into dist/:
+#                                 no tests unless --tests (the unit tests and the editor smoke
+#                                 test before the export), and a Linux export gets its boot smoke
+#                                 test. For a build to download by hand (manual-build.yml).
+#                                 --web is --only web.
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #
 # Every mode first builds the native module (ci/build/native.sh: Linux for --quick, Linux and the
@@ -52,14 +58,15 @@ VERSION="dev"
 CHANNEL="dev"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 QUICK=0
-WEB=0
+ONLY=""
 TESTS=0
 SHOTS=0
 CLIPS=0
 while (($#)); do
   case "$1" in
     --quick)   QUICK=1; shift ;;
-    --web)     WEB=1; shift ;;
+    --web)     ONLY=web; shift ;;
+    --only)    ONLY=$2; shift 2 ;;
     --tests)   TESTS=1; shift ;;
     --screenshots) SHOTS=1; shift ;;
     --clips)   CLIPS=1; shift ;;
@@ -69,6 +76,14 @@ while (($#)); do
     *) echo "unknown option $1" >&2; exit 2 ;;
   esac
 done
+
+ONLY_PLATFORMS=()
+if [[ -n "$ONLY" ]]; then
+  IFS=, read -ra ONLY_PLATFORMS <<<"$ONLY"
+  for platform in "${ONLY_PLATFORMS[@]}"; do
+    [[ "$platform" =~ ^(web|windows|linux)$ ]] || { echo "--only takes web, windows and linux, not '$platform'" >&2; exit 2; }
+  done
+fi
 
 CACHE="${GODOT_CACHE:-$HOME/.cache/pinned-godot}"
 TOOLS="$PWD/build/godot"
@@ -439,9 +454,12 @@ package() { # package [platform...]: zips build/<platform> into dist/ (default: 
   # Budgets warn, with likely fixes; they never fail the build (docs/PLAN.md, "Gates are sparse").
   step "Size budgets"
   local size
-  size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
-  echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
-  ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
+  for platform in "${platforms[@]}"; do
+    [[ "$platform" == web ]] || continue
+    size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
+    echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
+    ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
+  done
   for platform in "${platforms[@]}"; do
     [[ "$platform" == web ]] && continue
     size=$(stat -c %s "dist/$SLUG-$platform-$VERSION.zip")
@@ -465,18 +483,30 @@ if ((QUICK)); then
 fi
 stamp
 trap reset_build_info EXIT
-if ((WEB)); then
+if ((${#ONLY_PLATFORMS[@]})); then
   # Linux too: the editor that imports and exports here runs on Linux, and it fails on an extension
   # with no library for its own platform.
-  setup_native linux web
-  step "Importing"
-  godot_checked import "$GODOT" --headless --path . --import
-  export_preset Web
-  package web
-  if ((SHOTS)) && ! screenshots; then
-    echo "::warning::some screenshots failed; the web build goes out without them (the daily run fails on them)"
+  setup_native $(printf '%s\n' linux "${ONLY_PLATFORMS[@]}" | sort -u)
+  if ((TESTS)); then
+    import_and_smoke
+    unit_tests
+  else
+    step "Importing"
+    godot_checked import "$GODOT" --headless --path . --import
   fi
-  step "Done: dist/ (web only, unchecked)"
+  declare -A PRESETS=([web]=Web [windows]=Windows [linux]=Linux)
+  for platform in "${ONLY_PLATFORMS[@]}"; do
+    export_preset "${PRESETS[$platform]}"
+  done
+  if [[ " ${ONLY_PLATFORMS[*]} " == *" linux "* ]]; then
+    step "Boot smoke test (exported Linux build)"
+    godot_checked smoke-linux build/linux/"$GAME_NAME".x86_64 --headless --quit-after 300
+  fi
+  package "${ONLY_PLATFORMS[@]}"
+  if ((SHOTS)) && ! screenshots; then
+    echo "::warning::some screenshots failed; the build goes out without them (the daily run fails on them)"
+  fi
+  step "Done: dist/ (${ONLY_PLATFORMS[*]}$( ((TESTS)) || echo ", unchecked"))"
   exit 0
 fi
 setup_native linux web windows

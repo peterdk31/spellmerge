@@ -1,0 +1,108 @@
+# A build to download by hand: Actions > manual build > Run workflow, on any branch.
+#
+# Builds the platforms chosen (build.sh --only) and keeps each zip as an artifact of the run,
+# downloadable from the run's page for 7 days. Nothing is released, deployed or pushed. Without
+# "tests" it is only imported and exported (a Linux export also gets its boot smoke test); with
+# it, the unit tests and the editor smoke test run first. The version is
+# v0.YYYYMMDD.HHMM-<commit> (UTC), channel "manual", as the game's version line shows.
+# No secrets; the build's token can only read.
+name: manual build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform
+        type: choice
+        options: [linux, windows, web, all]
+        default: linux
+      tests:
+        description: Run the unit tests first (slower)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ci
+
+jobs:
+  build:
+    name: build ${{ inputs.platform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Name the build and pick the platforms
+        id: plan
+        env:
+          PLATFORM: ${{ inputs.platform }}
+        run: |
+          echo "version=v0.$(date -u +%Y%m%d.%H%M)-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          if [[ "$PLATFORM" == all ]]; then echo "only=web,windows,linux"; else echo "only=$PLATFORM"; fi >> "$GITHUB_OUTPUT"
+      - name: Cache Godot (hash-checked again after restore)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pinned-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: The native module's tools, restored only (the daily build saves them; ci/build/native.sh checks their pins)
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-native
+          key: native-${{ hashFiles('ci/build/godot.env') }}
+      - name: MinGW-w64 for the native module's Windows build
+        if: inputs.platform == 'windows' || inputs.platform == 'all'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq g++-mingw-w64-x86-64-posix
+      - name: Build
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          ONLY: ${{ steps.plan.outputs.only }}
+          TESTS: ${{ inputs.tests }}
+        run: >-
+          ci/build/build.sh --only "$ONLY" $([ "$TESTS" = true ] && echo --tests)
+          --version "$VERSION" --channel manual --commit "$(git rev-parse HEAD)"
+      - name: Keep the build logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-logs
+          path: build/logs
+          retention-days: 7
+      # One artifact per platform; each is the game's folder, ready to run once unzipped.
+      - name: Keep the Linux build
+        if: inputs.platform == 'linux' || inputs.platform == 'all'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux-${{ steps.plan.outputs.version }}
+          path: build/linux
+          retention-days: 7
+          if-no-files-found: error
+      - name: Keep the Windows build
+        if: inputs.platform == 'windows' || inputs.platform == 'all'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-${{ steps.plan.outputs.version }}
+          path: build/windows
+          retention-days: 7
+          if-no-files-found: error
+      - name: Keep the web build
+        if: inputs.platform == 'web' || inputs.platform == 'all'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-${{ steps.plan.outputs.version }}
+          path: build/web
+          retention-days: 7
+          if-no-files-found: error
+      - name: Where to download
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+          ONLY: ${{ steps.plan.outputs.only }}
+        run: |
+          {
+            echo "### $VERSION"
+            echo "Built: ${ONLY//,/, }. Download from **Artifacts** at the bottom of this page (kept 7 days)."
+            echo "The Linux build loses its executable bit in the zip: \`chmod +x\` the \`.x86_64\` file once unzipped."
+          } >> "$GITHUB_STEP_SUMMARY"

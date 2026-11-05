@@ -8,6 +8,8 @@ extends "res://tests/support/screenshot.gd"
 
 ## Frames after a press for the builder to redraw; the full settle is kept for the shots.
 const STEP_FRAMES := 3
+## The cards each staff starts with in these shots: A a dash, X a fire bolt, Y and B empty.
+const SHOT_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
 
 var _input: Node = null
 var _focus: Node = null
@@ -15,7 +17,7 @@ var _hud: Node = null
 
 
 func take() -> void:
-	if not need(["PlayerInput", "UIFocus", "Hud", "Flow"]):
+	if not need(["PlayerInput", "UIFocus", "Hud", "Flow", "Registry"]):
 		return
 	_input = root.get_node("PlayerInput")
 	_focus = root.get_node("UIFocus")
@@ -24,6 +26,10 @@ func take() -> void:
 	_input.call("add_virtual_device", 0)
 	# These shots are the list builder's (the radial one is the default).
 	_hud.call("_on_builder_options_changed", false, 0, true)
+	# Play's bag is only dash and bolt (owner, 2026-11-05); these shots build with split, nova,
+	# homing and orbit, from a fire bolt on X, so this run's bag is every card.
+	flow.set("start_cards", SHOT_CARDS.duplicate(true))
+	flow.set("play_bag", _every_card())
 	flow.call("start_run", 0)
 	await settle(STEP_FRAMES)
 	await _open_builders([0])
@@ -93,6 +99,16 @@ func take() -> void:
 	await settle()
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
+
+
+## Every spell card of the registry, as the sandbox's bag.
+func _every_card() -> Array[StringName]:
+	var registry: Node = root.get_node("Registry")
+	var out: Array[StringName] = []
+	for id: StringName in registry.call("get_ids", &"spells"):
+		if registry.call("get_resource", &"spells", id) is SpellComponent:
+			out.append(id)
+	return out
 
 
 ## The bag row of the card named `display_name` in `builder`, or null.

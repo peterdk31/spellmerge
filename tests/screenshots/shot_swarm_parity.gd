@@ -126,8 +126,7 @@ func _play(data: EnemyBase, feel: Node) -> String:
 		var swarm_crop: Image = image.get_region(Rect2i(at + Vector2i(OFFSET) + CROP.position, CROP.size))
 		if _apart(full_crop, _background) < MOST_PIXELS + 40:
 			fail("%s: frame %d shows no enemy in its crop" % [data.id, i])
-			_world.free_all()
-			look.queue_free()
+			_clear(look, script)
 			return ""
 		var apart: int = _apart(full_crop, swarm_crop)
 		most_apart = maxi(most_apart, apart)
@@ -150,17 +149,23 @@ func _play(data: EnemyBase, feel: Node) -> String:
 		if apart > MOST_PIXELS:
 			_save_pair(full_crop, swarm_crop, "swarm_parity_%s_apart" % data.id)
 			fail("%s: frame %d (%.3f s) has %d pixels apart (more than %d); see swarm_parity_%s_apart" % [data.id, i, second, apart, MOST_PIXELS, data.id])
-			_world.free_all()
-			look.queue_free()
+			_clear(look, script)
 			return ""
 		if blinked and hits == 2 and second > 2.0:
 			break
-	_world.free_all()
-	look.queue_free()
+	_clear(look, script)
 	if not blinked:
 		fail("%s: no blink within %d frames" % [data.id, frames])
 		return ""
 	return "%s: %d frames, at most %d pixels apart" % [data.id, frames, most_apart]
+
+
+## Frees one kind's play: the world, the swarm's look, and the scripted controller (driving the
+## body but in no tree, so freeing the body leaves it).
+func _clear(look: SwarmLook, script: ActorFixture.Scripted) -> void:
+	_world.free_all()
+	look.queue_free()
+	script.free()
 
 
 ## Pixels of `a` and `b` (the same size) apart by more than CHANNEL in some channel.

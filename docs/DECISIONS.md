@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Shot scale H1 dropped, H2: the hit budget priced by measurement and no lost damage (owner session)
+
+- **H1 dropped (the owner's pick, after measuring it):** a hand-back from the native hit pass costs about 3-4 us (1.8 us the call itself, the rest reading the target arrays): about 12-15 ms of the 211 ms step of crowd_all at 100,000 shots, under 1 ms in a budgeted step. A run of hits handed back in the same order needs the kernel to scan ahead and undo whenever a hit handler changes a target or a later shot (and the hit memory's free list). H3b's hit pass hands back only walls and ends, which takes the crossings away anyway.
+- **The budget lost damage:** a hit was priced at 40 units, a target examined at 1, so a budget of 6,000 went on about 150 hits, and in a crowd most shots went untested that step; an untested shot skipped what it passed, and one that met a wall past the budget ended untested. In the benchmark's window the crowd at the desktop cap dealt 47% of its damage, the storm at 30,000 shots half.
+- **Priced by measurement:** a unit is one target examined by the native hit pass (about 0.13 us), a hit 400 units (about 50 us of listeners; H0, owner's laptop). `WORK_PER_STEP` = 150,000, the smallest round budget at which no shot waits more than one step in a full crowd at the desktop cap (`test_hit_budget.gd`; at 120,000 thousands wait twice). A fixed number in the code, never measured at run time (online-ready T1). The GDScript fallback's scan costs more a unit; it is only slower.
+- **No lost damage:** a deferred shot is marked `F_DEFERRED` and keeps where its untested path starts (`_untested`); its next test sweeps all of it, and a deferred shot that ends is tested first whatever the budget. Not covered: a shot ended or blinked by a hit handler, or removed by a cap drop or a revoked tag, while it waits (its untested path goes untested; a blink would otherwise sweep across the gap).
+- **With moving targets** a deferred shot sweeps its old path against where the targets are now, so which body it hits may differ (totals over whole flights within 0.01%). With still targets a budget changes no hit at all.
+- **The cost moves to the caps:** the hits the budget dropped now happen, so a full crowd at the desktop cap costs about 13 ms a manager step on the owner's laptop (6 ms before). Since no damage is lost the budget only spreads a burst of hits over a step or two; the caps (H7) and cheaper hits (H3, H3b) bound the cost.
+- **Recorded again:** `test_projectiles_step_exact.gd` (a budget of its own, 50,000, about the 125 hits a step its flood had) and `test_projectiles_targets.gd` (80,000, spent in 49 of its 90 steps; a new check that it is spent in some steps).
+
 ## 2026-11-05: Hits' motes shared by staff, whole sprays or none (owner session)
 
 - **The owner's ask:** after the tails (#567, #568), a lone cast's impacts should stay readable beside a crowd's too: a Fireball hitting a wall in a Storm threw nothing, because the Storm's hits came first in the frame and took every hit row (`Motes.MOMENT_ROWS` kept, first come for the rest).

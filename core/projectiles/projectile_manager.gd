@@ -31,14 +31,17 @@ extends Node2D
 ## an orbit ring hits a target each time it comes round): it remembers the targets
 ## it is touching, as many as they are, and forgets one its path no longer touches.
 ##
-## The hit work of one step is bounded (WORK_PER_STEP), so a crowd of packed
-## targets with thousands of piercing shots inside it cannot stall a frame.
-## When the budget runs out, the projectiles not yet tested still move, but
-## are not hit-tested this step; the next step starts with them, so nobody is
-## starved. A deferred shot that is still inside a target hits it a step late;
-## a very fast one may skip a target. Only crowds at the caps ever get there.
-## The budget is per `step` call, not per frame: if the engine runs several
-## physics steps in one frame to catch up, each has its own budget.
+## The hit work of one step is bounded (WORK_PER_STEP), so a burst of hits in a
+## crowd is spread over a few steps instead of stalling one frame. When the
+## budget runs out, the projectiles not yet tested still move, but are not
+## hit-tested this step; the next step starts with them, so nobody is starved.
+## No damage is lost to it (shot scale H2): a deferred shot keeps the start of
+## the path it was not tested on (`_untested`), and its next test sweeps the
+## whole path since then, so a fast shot skips no target, and a shot that ends
+## (its life out, a wall, out of bounds) is tested first whatever the budget.
+## The budget is fixed work, never measured time, so every machine defers the
+## same shots (online-ready, rule T1). It is per `step` call, not per frame: if
+## the engine runs several physics steps in one frame to catch up, each has its own.
 ##
 ## Drawing: a shot is built by the shot shaders on a pixel grid (staffs B6a; the glow look,
 ## 2026-10-27): a small white-hot core in the ramp of its first infusion's colour (`set_core`;
@@ -229,6 +232,8 @@ const F_STUCK: int = 16
 const F_RETURN: int = 32
 const F_TURNED: int = 64
 const F_WAVE: int = 128
+## Passed over by the hit-work budget (WORK_PER_STEP): its path from `_untested` on is still to test.
+const F_DEFERRED: int = 256
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
@@ -250,9 +255,16 @@ const HIT_MEMORY_START: int = 1024
 ## Moves under way (see `move_shot`) made room for at first; more are made when needed.
 const MOVES_START: int = 64
 ## The most hit-test work one step does, in units: each target examined costs 1,
-## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
-## tested this step (see the class doc). Normal play uses a tiny part of it.
-const WORK_PER_STEP: int = 6000
+## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are tested
+## in a later step, losing no damage (see the class doc). A fixed number, never
+## measured at run time (rule T1). Sized once (shot scale H2, 2026-11-05) for a
+## full crowd at the desktop cap: it asks about 93,500 a step (some 200 hits) in
+## the median step and more in a busy one, and at 150,000 no shot there waits more
+## than one step (tests/core/test_hit_budget.gd; at 120,000 thousands do). Normal
+## play uses a tiny part of it. No lost damage means the hits a step average what
+## the shots make whatever the budget, so the budget only spreads a burst of them:
+## the caps bound the cost.
+const WORK_PER_STEP: int = 150000
 ## The parts of `step_profile` (shot scale H0): microseconds of `step()`'s passes in its order, the
 ## native kernel's own share of the hit pass, the hand-backs to GDScript (native `hits` calls) and
 ## the shots the hit-work budget left for a later step.
@@ -268,8 +280,10 @@ const PROF_PARTS: int = 8
 
 ## The most wall cells one shot walks in one step (see `_wall_hit`).
 const MAX_WALL_VISITS: int = 64
-## The work one hit counts for: the event, its handlers and the bookkeeping.
-const HIT_WORK: int = 40
+## The work one hit counts for: the event, its handlers and the bookkeeping. A unit is one target
+## examined by the native hit pass (about 0.13 us); a hit's listeners cost about 400 of them (about
+## 50 us; shot scale H2, measured with H0's crowd, docs/DECISIONS.md 2026-11-05).
+const HIT_WORK: int = 400
 ## The most a returning homing shot's way home bends off the line to its caster (radians): under
 ## a right angle, so it always closes in (`_pass_return`).
 const RETURN_BEND: float = PI / 3.0
@@ -620,6 +634,8 @@ var _bounds: Rect2 = Rect2(-1024.0, -1024.0, 2048.0, 2048.0)
 # One row per slot.
 var _pos: PackedVector2Array = PackedVector2Array()
 var _prev: PackedVector2Array = PackedVector2Array()
+## Where the path of a shot the hit-work budget passed over starts (read only with F_DEFERRED).
+var _untested: PackedVector2Array = PackedVector2Array()
 var _vel: PackedVector2Array = PackedVector2Array()
 var _life: PackedFloat32Array = PackedFloat32Array()
 var _radius: PackedFloat32Array = PackedFloat32Array()
@@ -1212,6 +1228,7 @@ func set_cap(value: int) -> void:
 	_cap = maxi(value, 1)
 	_pos.resize(_cap)
 	_prev.resize(_cap)
+	_untested.resize(_cap)
 	_vel.resize(_cap)
 	_life.resize(_cap)
 	_radius.resize(_cap)
@@ -2002,7 +2019,9 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		_base[slot] += to - _pos[slot]
 		_pos[slot] = to
 		_prev[slot] = to
-		# A blink leaves no tail across the gap.
+		# A blink leaves no tail across the gap, and sweeps no hits across it: a deferred shot's
+		# path before it goes untested (only a hit handler blinks a shot).
+		_flags[slot] &= ~F_DEFERRED
 		_tail_from[slot] = to
 		return true
 	if _move_free < 0:
@@ -3020,15 +3039,18 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 			state = _state[slot]
 			_state[slot] = S_DONE
 		if state == S_EXPIRE:
-			_expire(slot)
+			if _test_deferred(slot):
+				_expire(slot)
 			return
 		if state == S_GONE:
-			_kill(slot)
+			if _test_deferred(slot):
+				_kill(slot)
 			return
 		if state == S_STUCK or state == S_FROZEN:
 			return
 	if not limit.has_point(_pos[slot]):
-		_kill(slot)
+		if _test_deferred(slot):
+			_kill(slot)
 		return
 	# A shot that meets a wall is cut short there: it can still hit what is
 	# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
@@ -3044,10 +3066,11 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 			walled = true
 			_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
 	if _layers[slot] != 0 and not _targets.is_empty():
-		if _work_left <= 0:
-			if walled:
-				_wall_end(slot)
-			elif _starved_at < 0:
+		# Past the budget a shot flies on untested and keeps where its untested path starts; one
+		# that ends at a wall is tested all the same (H2: no lost damage).
+		if _work_left <= 0 and not walled:
+			_defer(slot)
+			if _starved_at < 0:
 				_starved_at = slot
 			return
 		# A piercing shot passes through every target on its path this step, each hit once
@@ -3061,6 +3084,29 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 	# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
 	if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
 		_wall_end(slot)
+
+
+## Mark the shot in `slot` passed over by the hit-work budget: its path from `_prev` on (or from
+## where an earlier deferral began) waits for its next test.
+func _defer(slot: int) -> void:
+	var flags: int = _flags[slot]
+	if (flags & F_DEFERRED) == 0:
+		_flags[slot] = flags | F_DEFERRED
+		_untested[slot] = _prev[slot]
+
+
+## Before a deferred shot ends (its life out, out of bounds, vanishing): test the path it was not
+## tested on, whatever the budget, so its damage is not lost. Returns whether it is still the same
+## live shot to end (a hit may have ended it, or a handler taken its slot).
+func _test_deferred(slot: int) -> bool:
+	if (_flags[slot] & F_DEFERRED) == 0:
+		return true
+	if _layers[slot] == 0 or _targets.is_empty():
+		_flags[slot] &= ~F_DEFERRED
+		return true
+	var seq: int = _seq[slot]
+	_hit_test(slot)
+	return _alive[slot] != 0 and _seq[slot] == seq
 
 
 ## The rest of a shot's turn once the native hit pass found `_cand_found` targets on its path (it
@@ -5144,6 +5190,10 @@ func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int)
 func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
 	var to: Vector2 = _pos[slot]
+	# A shot the budget passed over sweeps its whole path since its last test (`_defer`).
+	if (_flags[slot] & F_DEFERRED) != 0:
+		_flags[slot] &= ~F_DEFERRED
+		from = _untested[slot]
 	if _any_solid and _solids.has(slot):
 		# A solid shot hits along its row.
 		var half: Vector2 = _solid_half(slot, _solids[slot])

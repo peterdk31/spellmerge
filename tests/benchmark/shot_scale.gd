@@ -6,7 +6,8 @@ extends SceneTree
 ##   eight training bodies in their way: what flying costs (the kernel's passes, drawing).
 ## - **crowd:** the same shots among CROWD bodies on a lattice over the arena, each on a small circle
 ##   about its home (as the swarm moves): what hitting costs as the game does it, with the hit-work
-##   budget (`WORK_PER_STEP`) spent every step, so most shots go untested that step.
+##   budget (`WORK_PER_STEP`): past the desktop cap it is spent every step and shots wait, each
+##   sweeping its whole untested path when its turn comes (H2), so no damage is lost.
 ## - **crowd_all:** the crowd with the budget lifted (`work_per_step` = UNBUDGETED), every shot
 ##   tested every step: what hitting would cost if nothing waited (H2's question), and the kernel's
 ##   real share of it (H5's).

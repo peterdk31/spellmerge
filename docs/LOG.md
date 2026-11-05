@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: Shot scale H1 dropped, H2 built (owner session)
+
+H1 (fewer hand-backs) was measured first: a hand-back costs about 3-4 us, 12-15 ms of a 211 ms step at 100,000 shots all tested, under 1 ms in a budgeted step, and an exact run needs the kernel to undo its scan-ahead; the owner dropped it (H3b folds it in). H2: the hit-work budget lost damage (the crowd at the desktop cap dealt 47% of it, the storm at 30,000 shots half). A hit now costs 400 units (measured: one target examined is about 0.13 us, a hit about 50 us), `WORK_PER_STEP` is 150,000 so no shot waits more than one step in a full crowd at the desktop cap, and a deferred shot sweeps its whole untested path when tested, or before it ends. GDScript and native alike; `tests/core/test_hit_budget.gd`; two recorded scenes recorded again. A full crowd at the cap now costs what its hits cost (about 13 ms a manager step on the owner's laptop, 6 before): the caps (H7) and cheaper hits (H3) bound it.
+
 ## 2026-11-05: Hits' motes shared by staff (owner session)
 
 A Fireball's impact in a Storm threw nothing: the Storm's hits took the frame's hit rows first. Every hit is now one spray shared by its caster's staff (`gameplay/feel/hit_shares.gd`, planned from the frame before as the tails are): a lone cast's hits spray whole, a crowded staff's are a fair random subset that spray whole (the owner's variant b), and a staff beside a crowd may take 32 of the moments' rows for its first hit. The frame's rows by class are one table at `Motes.FRAME_ROWS`. About +0.2 ms for 300 impacts a frame on desktop; GPU web build not measured. Tests in `test_hit_shares.gd`; DECISIONS has the rules.

@@ -1,11 +1,10 @@
 extends "res://tests/support/screenshot.gd"
 ## Tails as motes (docs/milestones/spell-spectacle-2.md, S5 step 4; the owner, 2026-11-05: "if
-## only the motes could look more like a tail"): the same shots drawn five ways, a row each, by the
-## real projectile manager and Feel's motes:
-##   tails on       the trail shader's tails (`ShotTails` on)
-##   tails off      no tail, only the cards' motes (the tailless look before; "Tail motes: Off")
-##   A, B, C        the tails laid as motes of the first, second and third tail kind
-##                  (`MoteKind.tail`, content/motes; the "Tail motes" dev switch)
+## only the motes could look more like a tail"; the pick, 2026-11-05: all three, each shot its own):
+## the shots' tails as motes, drawn by the real projectile manager and Feel's motes, every shot's
+## tail in one of the tail kinds (A `tail`, B `tail_streak`, C `tail_long`, content/motes) picked
+## by its sequence (`ProjectileManager.tail_code`). Two rows of the same streams, the second a
+## stream later, so other shots pick other kinds.
 ## Each row is a held stream of atoms (the atom's speed and life, one shot every ATOM_EVERY
 ## frames, player 1's plain shot) above a slower stream of fire bolts, seen at FRAMES (a
 ## filmstrip: the stream held, then let go and cooling). `tail_motes` is the strip at 1x;
@@ -16,8 +15,8 @@ const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
 const FIRE := preload("res://content/spells/elements/fire/fire.tres")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
-## The rows: their names, whether the tails are on, and the "Tail motes" pick.
-const ROWS: Array[Array] = [["tails on", true, 0], ["tails off", false, 0], ["A tail", false, 1], ["B tail_streak", false, 2], ["C tail_long", false, 3]]
+## The rows' names.
+const ROWS: Array[Array] = [["each shot A, B or C"], ["the next streams"]]
 ## Frames the streams are held for, an atom every ATOM_EVERY of them and a bolt every BOLT_EVERY.
 const HELD: int = 30
 const ATOM_EVERY: int = 1
@@ -55,8 +54,6 @@ func take() -> void:
 		var row: Array = ROWS[r]
 		var top: float = BAND_TOP + r * BAND
 		label(row[0] as String, Vector2(4.0, top + 4.0), 8)
-		_events.emit_signal(&"shot_tails_changed", row[1] as bool)
-		_events.emit_signal(&"tail_motes_changed", row[2] as int)
 		var seen: int = 0
 		for f in FRAMES[-1] + 1:
 			if f < HELD and f % ATOM_EVERY == 0:
@@ -74,7 +71,7 @@ func take() -> void:
 				zooms.blit_rect(zoom, Rect2i(Vector2i.ZERO, ZOOM * 4), Vector2i(seen * ZOOM.x * 4, r * ZOOM.y * 4))
 				seen += 1
 			await physics_frame
-		# Let this row's shots end and its motes cool before the next row's switch.
+		# Let this row's shots end and its motes cool before the next row.
 		for f in 45:
 			await physics_frame
 	if int(_shots.get("tail_births")) < 0:

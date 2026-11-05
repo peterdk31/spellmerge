@@ -40,9 +40,7 @@ var _densities: Array[float] = []
 ## Every `floor_marks_changed` the bus sent, from before the Hud binds.
 var _floor_marks: Array[bool] = []
 var _lights: Array[bool] = []
-var _tails: Array[bool] = []
 var _tailless: Array[int] = []
-var _tail_picks: Array[int] = []
 
 const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
@@ -62,9 +60,7 @@ func _initialize() -> void:
 	_test_the_particle_amount_slider()
 	_test_the_floor_marks_switch()
 	_test_the_spell_light_switch()
-	_test_the_tails_switch()
 	_test_the_tailless_motes_slider()
-	_test_the_tail_motes_switch()
 	_test_the_show_fps_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
@@ -105,9 +101,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
 	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
-	_bus.shot_tails_changed.connect(func(on: bool) -> void: _tails.append(on))
 	_bus.tailless_motes_changed.connect(func(pool: int) -> void: _tailless.append(pool))
-	_bus.tail_motes_changed.connect(func(pick: int) -> void: _tail_picks.append(pick))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -133,9 +127,7 @@ func _teardown() -> void:
 	_densities.clear()
 	_floor_marks.clear()
 	_lights.clear()
-	_tails.clear()
 	_tailless.clear()
-	_tail_picks.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -336,7 +328,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotTails", "TaillessMotes", "TailMotes", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -413,28 +405,6 @@ func _test_the_spell_light_switch() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
 
 
-## Tails (spell spectacle 2, S5: a dev switch) starts on and sends nothing; accept flips it and
-## tells the projectile manager, and the choice is saved: a menu bound to the same save later
-## starts with it and tells the manager.
-func _test_the_tails_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_tails.is_empty(), "nothing is sent at the default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	_check(ShotTails.DEFAULT and _menu().button("ShotTails").text.ends_with("Tails: On"), "on at the start (today's look)")
-	_press(0, "ShotTails")
-	_check(not _menu().shot_tails and _tails == [false], "accept turns them off and tells the manager, got %s" % [_tails])
-	_check(_menu().button("ShotTails").text.ends_with("Tails: Off"), "and shows it")
-	_check(not bool(SaveFile.new(SAVE_PATH).get_setting(&"shot_tails", true)), "the save remembers it")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(not _menu().shot_tails, "a later menu starts with the saved choice")
-	_check(_tails == [false], "and tells the manager when the Hud binds, got %s" % [_tails])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
-
-
 ## Tailless motes (S5 step 4: a dev slider) starts at the default pool and sends nothing; left
 ## and right step through the stops and tell the manager and feel, accept steps up and wraps, and
 ## the choice is saved: a menu bound to the same save later starts with it and tells them.
@@ -466,44 +436,6 @@ func _test_the_tailless_motes_slider() -> void:
 	_check(_menu().tailless_motes == 4096, "accept steps up")
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(_menu().tailless_motes == 4096 and _tailless == [4096], "a later menu starts with the saved pool and tells them, got %s" % [_tailless])
-	_teardown()
-	DirAccess.remove_absolute(SAVE_PATH)
-
-
-## Tail motes (S5 step 4: tails as motes, a dev switch) starts at B and sends nothing; left and
-## right step through Off, A, B and C and tell the manager and feel, accept steps on and wraps,
-## and the choice is saved: a menu bound to the same save later starts with it and tells them.
-func _test_the_tail_motes_switch() -> void:
-	DirAccess.remove_absolute(SAVE_PATH)
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_tail_picks.is_empty(), "nothing is sent at the default")
-	_tap(0, &"pause")
-	_frame()
-	_press(0, "Settings")
-	var row: Button = _menu().button("TailMotes")
-	var bar: HSlider = row.get_node("Bar") as HSlider
-	_check(row.text.ends_with("Tail motes: B") and is_equal_approx(bar.value, 2.0), "B at the start, in words and on the bar")
-	_focus.focus(0, row)
-	_tap(0, &"move_left")
-	_frame()
-	_tap(0, &"move_left")
-	_frame()
-	_check(_menu().tail_motes == 0 and _tail_picks == [1, 0], "left asks for A, then Off, got %s" % [_tail_picks])
-	_check(row.text.ends_with("Tail motes: Off"), "and shows it")
-	_tap(0, &"move_left")
-	_frame()
-	_check(_tail_picks == [1, 0], "left stops at Off, got %s" % [_tail_picks])
-	for n in 4:
-		_tap(0, &"move_right")
-		_frame()
-	_check(_menu().tail_motes == 3 and _tail_picks == [1, 0, 1, 2, 3], "right steps to C and stops, got %s" % [_tail_picks])
-	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"tail_motes", -1)) == 3, "the save remembers it")
-	_press(0, "TailMotes")
-	_check(_menu().tail_motes == 0, "accept at C wraps to Off")
-	_press(0, "TailMotes")
-	_check(_menu().tail_motes == 1, "accept steps on")
-	_setup(1, false, SaveFile.new(SAVE_PATH))
-	_check(_menu().tail_motes == 1 and _tail_picks == [1], "a later menu starts with the saved pick and tells them, got %s" % [_tail_picks])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

@@ -64,7 +64,7 @@ func _kinds() -> Array[MoteKind]:
 	streak.dash_path = true
 	var chip := _kind(&"chip", PackedInt32Array(), 320.0, &"speck")
 	chip.surface = true
-	# Two tail kinds (S5 step 4): the tails' births take the one in use.
+	# Two tail kinds (S5 step 4): each tail code takes one, round again past the second.
 	var tail := _kind(&"tail", PackedInt32Array(), 0.0)
 	tail.tail = true
 	var tail_b := _kind(&"tail_b", PackedInt32Array(), -10.0)
@@ -84,7 +84,6 @@ func _side(native: bool, cards: bool) -> Array:
 	marks.enter(Rect2(-200.0, -200.0, 1000.0, 800.0), null, 8.0)
 	marks.step(0.0)
 	motes.settle_into(marks)
-	motes.use_tail_kind(&"tail_b")
 	if cards:
 		var lookup := Cards.new()
 		lookup.motes = motes
@@ -93,13 +92,13 @@ func _side(native: bool, cards: bool) -> Array:
 	return [motes, marks]
 
 
-## A frame's births, seeded: every look kind (and one with no kinds), the streak, a tail, tags odd and
+## A frame's births, seeded: every look kind (and one with no kinds), the streak, every tail code, tags odd and
 ## even, ramps in and out of the hats', the flags, now and then no point or no way back.
 func _births(rng: RandomNumberGenerator) -> PackedFloat32Array:
 	var stride: int = ProjectilesScript.SPARK_BIRTH_STRIDE
 	var given := PackedFloat32Array()
 	given.resize(BIRTHS * stride)
-	var kinds: PackedInt32Array = PackedInt32Array([ProjectilesScript.SPARK_STREAK, ProjectilesScript.SPARK_TAIL, 0, 1, 2, 3, 9])
+	var kinds: PackedInt32Array = PackedInt32Array([ProjectilesScript.SPARK_STREAK, ProjectilesScript.SPARK_TAIL, ProjectilesScript.SPARK_TAIL + 1, ProjectilesScript.SPARK_TAIL + 2, 0, 1, 2, 3, 9])
 	var flags: PackedInt32Array = PackedInt32Array([0, MotesScript.LOOK_ENEMY_RAMP, MotesScript.LOOK_EXACT, MotesScript.LOOK_ENEMY_RAMP | MotesScript.LOOK_EXACT])
 	for n in BIRTHS:
 		var b: int = n * stride

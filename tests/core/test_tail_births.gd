@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Tails as motes (docs/milestones/spell-spectacle-2.md, S5 step 4; the owner, 2026-11-05: "the
 ## motes seem to spawn at fixed equal distances along its path ... if only the motes could look
 ## more like a tail"): with the tails off, the projectile manager's drawing lays every flying
-## shot's tail as births of SPARK_TAIL, by distance (`_lay_tail`), and the cards' births are rolled
+## shot's tail as births of its tail code (SPARK_TAIL + 0 to 2), by distance (`_lay_tail`), and the cards' births are rolled
 ## anywhere on the path drawn since the last frame. Stepped and drawn by hand, as a held stream
 ## of atoms: one shot a step from the same point at the same speed.
 
@@ -30,15 +30,17 @@ func before_each() -> void:
 	mgr.set_tails_enabled(false)
 
 
-## The births of the last draw of kind `kind`, as [x, y, core r, tag] each.
+## The births of the last draw of kind `kind` (SPARK_TAIL: of any tail code), as [x, y, core r,
+## tag, kind] each.
 func _births_of(kind: int) -> Array[PackedFloat32Array]:
 	var found: Array[PackedFloat32Array] = []
 	var stride: int = ManagerScript.SPARK_BIRTH_STRIDE
 	for n in mgr.spark_birth_count:
 		var b: int = n * stride
-		if int(mgr.spark_births[b + ManagerScript.SPARK_KIND]) == kind:
+		var laid: int = int(mgr.spark_births[b + ManagerScript.SPARK_KIND])
+		if laid == kind or (kind == ManagerScript.SPARK_TAIL and ManagerScript.is_tail_code(laid)):
 			found.append(PackedFloat32Array([mgr.spark_births[b + ManagerScript.SPARK_X], mgr.spark_births[b + ManagerScript.SPARK_Y],
-					mgr.spark_births[b + ManagerScript.SPARK_CORE], float(ManagerScript.spark_tag(mgr.spark_births, b))]))
+					mgr.spark_births[b + ManagerScript.SPARK_CORE], float(ManagerScript.spark_tag(mgr.spark_births, b)), float(laid)]))
 	return found
 
 
@@ -122,14 +124,47 @@ func test_a_busy_frame_thins_every_tail() -> void:
 	check(shots.size() == 12, "a thinned frame lays some of every tail (%d of 12 shots)" % shots.size())
 
 
-## No tail births with the tails on, or with the "Tail motes" switch at Off; on again, they come.
-func test_tails_on_or_switched_off_lay_none() -> void:
-	mgr.set_tail_motes(0)
-	check(_stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "Tail motes: Off lays none")
-	mgr.set_tail_motes(2)
-	check(not _stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "B lays them")
+## Tails are motes by default (the owner's pick, 2026-11-05); the tail shader's tails, which only
+## the tests still turn on, lay none.
+func test_tails_are_motes_by_default_and_the_shader_tails_lay_none() -> void:
+	var fresh := own(ManagerScript.new()) as ManagerScript
+	check(not fresh.tails_enabled, "a new manager lays its tails as motes")
+	check(not _stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "they come")
 	mgr.set_tails_enabled(true)
-	check(_stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "the tails on lay none")
+	check(_stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "the shader tails lay none")
+
+
+## Each shot lays its whole tail in one tail code, picked by its sequence (the owner, 2026-11-05:
+## "make the shots randomly pick one"), and a stream's shots use every code.
+func test_each_shot_keeps_one_tail_kind_and_a_stream_uses_all() -> void:
+	var laid: Array[PackedFloat32Array] = _stream(40, 0.5, ManagerScript.SPARK_TAIL)
+	var code_of: Dictionary[int, int] = {}
+	var codes: Dictionary[int, bool] = {}
+	var one_each: bool = true
+	for b in laid:
+		var shot: int = int(b[3])
+		var code: int = int(b[4])
+		codes[code] = true
+		if code_of.has(shot) and code_of[shot] != code:
+			one_each = false
+		code_of[shot] = code
+	check(one_each, "every shot's births are of one code")
+	check_equal(codes.size(), ManagerScript.TAIL_KINDS, "the stream's shots use all %d codes" % ManagerScript.TAIL_KINDS)
+	for code: int in codes:
+		check(ManagerScript.is_tail_code(code), "%d is a tail code" % code)
+
+
+## A shot's code is its sequence's alone, and the codes come about evenly.
+func test_the_tail_code_dice() -> void:
+	check_equal(ManagerScript.tail_code(77), ManagerScript.tail_code(77), "the same shot, the same code")
+	var counts: PackedInt32Array = PackedInt32Array()
+	counts.resize(ManagerScript.TAIL_KINDS)
+	for seq in 3000:
+		var code: int = ManagerScript.tail_code(seq)
+		check(ManagerScript.is_tail_code(code), "in range")
+		counts[code - ManagerScript.SPARK_TAIL] += 1
+	for n in counts:
+		check(n > 850 and n < 1150, "about a third each (%s)" % counts)
 
 
 ## An infused shot's tail is TAIL_PLAYER_SHARE its caster's colours (a white core), as the tail

@@ -26,9 +26,7 @@ const EVENTS: Dictionary = {
 	&"mote_density_changed": [["density", TYPE_FLOAT]],
 	&"floor_marks_changed": [["on", TYPE_BOOL]],
 	&"spell_light_changed": [["on", TYPE_BOOL]],
-	&"shot_tails_changed": [["on", TYPE_BOOL]],
 	&"tailless_motes_changed": [["pool", TYPE_INT]],
-	&"tail_motes_changed": [["pick", TYPE_INT]],
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	&"sandbox_spawn_requested": [["player", TYPE_INT], ["enemy_id", TYPE_STRING_NAME], ["count", TYPE_INT]],
 	&"ai_view_changed": [["on", TYPE_BOOL]],
@@ -122,7 +120,7 @@ const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"horde_started", &"horde_ended", &"horde_status", &"horde_break_changed", &"horde_over",
-	&"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"shot_tails_changed", &"tailless_motes_changed", &"tail_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

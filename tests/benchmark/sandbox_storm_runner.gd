@@ -20,8 +20,8 @@ extends Node
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
 ## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids: a beam build, say, whose
 ## hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
-## `--no-tails` (the shots without their tails: the manager's
-## `tails_enabled` off, docs/milestones/spell-spectacle-2.md, S5), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## `--tails` (the tail shader's tails, for comparing until they go: the manager's
+## `tails_enabled` on; the game's tails are motes since 2026-11-05, docs/milestones/spell-spectacle-2.md, S5), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
@@ -155,8 +155,8 @@ func _ready() -> void:
 			all[STORM_STAFF] = cards
 			_flow.set("sandbox_cards", all)
 			_own_cards = true
-	if args.has("--no-tails"):
-		_projectiles.call(&"set_tails_enabled", false)
+	if args.has("--tails"):
+		_projectiles.call(&"set_tails_enabled", true)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
 		return

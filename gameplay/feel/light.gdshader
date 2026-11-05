@@ -49,9 +49,8 @@ uniform float kind_light[16];
 uniform float effect_reach = 1.0;
 uniform float effect_pad = 10.0;
 
-// TRAIL_HEAD and TRAIL_DASH (TRAIL_* in projectile_manager.gd): the shot lives, a wizard's dash.
+// TRAIL_HEAD (in projectile_manager.gd): the shot lives.
 const float TF_HEAD = 1.0;
-const float TF_DASH = 4.0;
 // A shot's light reaches this far (px), and this much more a zoom; a speck's (zoom 0) is smaller.
 const float SHOT_REACH = 26.0;
 const float SHOT_REACH_ZOOM = 6.0;
@@ -102,10 +101,10 @@ void vertex() {
 		half_size = vec2(reach);
 		colour = COLOR.rgb * COLOR.a * (1.0 - dip);
 	} else {
-		// Every live shot lights, with a trail row or without (tails as motes: none has one; the
-		// owner, 2026-11-05). A cooling tail's row is no head, a dash's is TF_DASH.
+		// Every live shot lights (tails are motes since the owner's pick of 2026-11-05: the shot
+		// batches hold only live shots, each with TF_HEAD).
 		float flags = MODEL_MATRIX[1].y;
-		if (flag_set(flags, TF_HEAD) && !flag_set(flags, TF_DASH)) {
+		if (flag_set(flags, TF_HEAD)) {
 			float red = floor(COLOR.r * 255.0 + 0.5);
 			float reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
 			half_size = vec2(reach);

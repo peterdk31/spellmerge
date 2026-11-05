@@ -827,7 +827,7 @@ var _enemy_rune_node: MultiMeshInstance2D = null
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
 var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
-## (BATCH_*), then the particles asked for, the trail cost, the shots drawn, the enemy shots drawn,
+## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
 ## the tail births laid (`spark_births`' first) and the tail asked for (`tail_demand`).
 var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ## The shots' mesh (`trail_mesh`), made once.
@@ -4102,7 +4102,7 @@ func update_draw(fraction: float = -1.0) -> void:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
 	for node in _nodes:
-		_set_sim_time(node, fraction)
+		_set_sim_time(node)
 	# The native kernel counts and writes every shot when no shot is solid (`_write_stones`); either
 	# way `_draw_out` says what was written, into the kernel's buffers or the manager's.
 	var kernel_draw: bool = _kernel != null and not _any_solid
@@ -4402,7 +4402,7 @@ func _remember_drawn(slot: int) -> void:
 
 
 ## Hand the shader the simulation clock (the shot shaders animate from it).
-func _set_sim_time(node: MultiMeshInstance2D, _fraction: float) -> void:
+func _set_sim_time(node: MultiMeshInstance2D) -> void:
 	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"sim_time", sim_time)
 

@@ -4,7 +4,7 @@ Oct 16, 2026 · peterdk31
 
 ## Overview
 
-Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Claude writes the code and the assets, turns players' bug reports and ideas into work, and ships a new playable web build every day, all on GitHub's servers with no PC running.
+Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players, with online co-op later (the owner, 2026-11-04; [milestones/online-ready.md](milestones/online-ready.md)). Claude writes the code and the assets, turns players' bug reports and ideas into work, and ships a new playable web build every day, all on GitHub's servers with no PC running.
 
 **Tagline:** *Merge spells. Cause chaos. Together.* On GitHub and in developer communities, a second line: *Every spell is a merge request.*
 

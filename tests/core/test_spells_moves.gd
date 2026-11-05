@@ -528,18 +528,19 @@ func test_a_dash_moves_its_card_distance_and_faster_only_makes_it_sooner() -> vo
 
 func test_a_dash_is_drawn_where_its_caster_goes() -> void:
 	# The owner (2026-10-28): the dash look went another way than the wizard. Its streaks and cards
-	# are a trail that follows the caster's anchor for the dash's time.
+	# follow the caster's anchor for the dash's time (`follow_caster`).
 	_distance_cards()
 	_build(0, [&"short"])
 	_cast(0)
-	check_equal(_mgr.get_trail_count(), 1, "the dash opens a trail on its caster")
+	check(_mgr.is_dashing(0), "the dash follows its caster")
 	_mgr.set_anchor(0, Vector2(0.0, 30.0))
 	for i in 4:
 		_mgr.step(1.0 / 60.0)
-	check(_mgr.get_trail_point(0, 0).y > 20.0, "which follows the wizard, wherever it goes")
+	check(_mgr._dash_last[0].y > 20.0, "wherever it goes")
+	var until: float = _mgr._dash_until[0]
 	_build(0, [&"blink"])
 	_cast(0)
-	check_equal(_mgr.get_trail_count(), 1, "a teleport opens none")
+	check_equal(_mgr._dash_until[0], until, "a teleport starts no dash")
 
 
 func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:

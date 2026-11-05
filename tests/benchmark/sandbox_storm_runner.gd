@@ -20,8 +20,7 @@ extends Node
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
 ## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids: a beam build, say, whose
 ## hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
-## `--tails` (the tail shader's tails, for comparing until they go: the manager's
-## `tails_enabled` on; the game's tails are motes since 2026-11-05, docs/milestones/spell-spectacle-2.md, S5), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
+## `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
@@ -155,8 +154,6 @@ func _ready() -> void:
 			all[STORM_STAFF] = cards
 			_flow.set("sandbox_cards", all)
 			_own_cards = true
-	if args.has("--tails"):
-		_projectiles.call(&"set_tails_enabled", true)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
 		_finish(["player %d's virtual device is taken" % (PLAYER + 1)])
 		return
@@ -349,9 +346,9 @@ func _report() -> void:
 	print("BENCH: storm: %d hits on dummies in all (%.0f a second, %.2f%% of the shots made), %.0f damage" % [
 		_hits, float(_hits) / seconds, 100.0 * float(_hits) / maxf(1.0, float(made)), damage])
 	var frames: float = maxf(1.0, float(_draw_frames))
-	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots and %d trails drawn at the end" % [
+	print("BENCH: storm draw: the manager's update_draw avg %.3f ms max %.3f ms a frame (%d frames), %d shots drawn at the end" % [
 		float(_draw_usec) / frames / 1000.0, float(_draw_max_usec) / 1000.0, _draw_frames,
-		int(_projectiles.get("drawn")), int(_projectiles.get("drawn_trails"))])
+		int(_projectiles.get("drawn"))])
 	var motes: Node = _motes()
 	if motes == null:
 		print("BENCH: storm motes: off")

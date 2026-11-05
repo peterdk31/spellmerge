@@ -27,7 +27,6 @@ func before_each() -> void:
 	mgr.set_cap(600)
 	root.add_child(mgr)
 	mgr.spark_motes = true
-	mgr.set_tails_enabled(false)
 
 
 ## The births of the last draw of kind `kind` (SPARK_TAIL: of any tail code), as [x, y, core r,
@@ -124,14 +123,12 @@ func test_a_busy_frame_thins_every_tail() -> void:
 	check(shots.size() == 12, "a thinned frame lays some of every tail (%d of 12 shots)" % shots.size())
 
 
-## Tails are motes by default (the owner's pick, 2026-11-05); the tail shader's tails, which only
-## the tests still turn on, lay none.
-func test_tails_are_motes_by_default_and_the_shader_tails_lay_none() -> void:
-	var fresh := own(ManagerScript.new()) as ManagerScript
-	check(not fresh.tails_enabled, "a new manager lays its tails as motes")
+## Every flying shot lays its tail as motes while something takes the births (the owner's pick,
+## 2026-11-05: tails are motes); while nothing does, none.
+func test_tails_are_laid_while_something_takes_the_births() -> void:
 	check(not _stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "they come")
-	mgr.set_tails_enabled(true)
-	check(_stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "the shader tails lay none")
+	mgr.spark_motes = false
+	check(_stream(5, 0.5, ManagerScript.SPARK_TAIL).is_empty(), "nothing takes them: none")
 
 
 ## Each shot lays its whole tail in one tail code, picked by its sequence (the owner, 2026-11-05:

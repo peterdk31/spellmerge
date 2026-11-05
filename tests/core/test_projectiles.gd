@@ -714,10 +714,10 @@ func _test_batch_room_grows_and_shrinks_with_hysteresis() -> void:
 	root.add_child(_mgr)
 	_mgr.set_cap(300)
 	var min_batch: int = ManagerScript.MIN_BATCH
-	# [shots drawn, expected room]: room 64 at 64, 128 at 65, 256 at 129, 512 at 257 (the bolt
-	# batch also draws the trails that outlive their shots, so it may grow past the cap).
-	var steps: Array = [[1, min_batch], [64, min_batch], [65, 128], [129, 256], [257, 512], [300, 512],
-		[129, 512], [128, 128], [33, 128], [32, 64], [1, 64]]
+	# [shots drawn, expected room]: room 64 at 64, 128 at 65, 256 at 129, and never past the cap
+	# (300) at 257; it shrinks once use is a quarter of the room or less.
+	var steps: Array = [[1, min_batch], [64, min_batch], [65, 128], [129, 256], [257, 300], [300, 300],
+		[129, 300], [76, 300], [75, 128], [33, 128], [32, 64], [1, 64]]
 	for step: Array in steps:
 		_mgr.clear()
 		for i in int(step[0]):

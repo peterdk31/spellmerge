@@ -45,8 +45,6 @@ public:
 	// The behaviour passes that need nothing of GDScript (homing among them: the hit pass catches up
 	// a homing shot that waited for its search); false for one it doesn't run.
 	bool run_pass(Object *manager, int64_t kind, int64_t first, int64_t count, double delta);
-	// The trail points of every flying shot at a sample tick (`_sample_trails`, its first loop).
-	bool sample_shots(Object *manager, double now);
 	// The drawing (`_count_batches`, then `update_draw`'s writing into the buffers the kernel holds).
 	void count_draw(Object *manager);
 	void draw_shots(Object *manager, double fraction);

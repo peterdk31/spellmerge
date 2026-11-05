@@ -2,7 +2,7 @@ extends SceneTree
 ## The native kernel against its GDScript (native/README.md): two projectile managers, one with
 ## the native `ShotKernel` and one without (`Projectiles.native`), are given the same seeded scene
 ## and stepped side by side. After every step every packed array of the two must be equal byte
-## for byte (the shots, their trails, the target grid, the hit memory, the threat grid), as must
+## for byte (the shots, the target grid, the hit memory, the threat grid, the dashes), as must
 ## what `update_draw` wrote into the draw batches and what `threat` answers to random asks.
 ## `test_projectiles_step_exact.gd` holds both to its recording too; this test also covers the
 ## drawing, the threat grid and many more shots (the grid and the hit-work budget both come in).
@@ -13,7 +13,7 @@ extends SceneTree
 ## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
 ## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
-## handlers that spawn shots and remove a target now and then; cooling trails and a dash.
+## handlers that spawn shots and remove a target now and then; dashes.
 ##
 ## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it, as in
 ## ci/build/build.sh).
@@ -197,11 +197,7 @@ func _test_both_step_alike() -> void:
 			return
 	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
 	for batch in ManagerScript.BATCHES:
-		# A dash's trail is never drawn (its streaks are motes, S5): its batches stay empty.
-		if ManagerScript.BATCH_MESH[batch] == ManagerScript.TRAIL_MESH_DASH:
-			_check(_batch_seen[batch] == 0, "dash batch %d draws nothing" % batch)
-		else:
-			_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
+		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 
@@ -231,18 +227,13 @@ func _drive(side: int, step: int) -> void:
 			node.global_position += Vector2.from_angle(float(step) * 0.05 + float(i)) * 0.6
 	if step == 40:
 		m.follow_caster(1, Color(0.9, 0.3, 0.2), 1 | 4, 0.4)
-	# The tails go off for a while (S5): the shots with no row are drawn told their way.
-	if step == 70:
-		m.set_tails_enabled(false)
 	if step == 80:
 		# Fewer tail births than the shots ask for: the most is kept and the spacing widens.
 		m.tail_births_cap = 60
-	if step == 90:
-		m.set_tails_enabled(true)
 	if step == 45:
-		# An enemy's dash, with lightning's look: a dash's batch all the same.
+		# An enemy's dash, with lightning's look.
 		m.set_anchor(_imp, Vector2(480.0, 140.0))
-		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), ManagerScript.LOOK_LIGHTNING_BIT | 2, 0.4)
+		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), (1 << (ManagerScript.LOOK_SPARKS - 1)) | 2, 0.4)
 	for i in 40 if step < 100 else 8:
 		var caster: int = _imp if i % 5 == 4 else i % 4
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)
@@ -340,9 +331,9 @@ func _first_difference(a: Variant, b: Variant) -> String:
 func _compare_draw(step: int) -> void:
 	var a: ManagerScript = _mgrs[0]
 	var b: ManagerScript = _mgrs[1]
-	_check(a.drawn == b.drawn and a.drawn_trails == b.drawn_trails and a.drawn_enemy == b.drawn_enemy,
-			"step %d: the same drawn counts (%d %d %d / %d %d %d)" % [step, a.drawn, a.drawn_trails, a.drawn_enemy, b.drawn, b.drawn_trails, b.drawn_enemy])
-	_check(a.particle_demand == b.particle_demand and a.trail_demand == b.trail_demand, "step %d: the same demand" % step)
+	_check(a.drawn == b.drawn and a.drawn_enemy == b.drawn_enemy,
+			"step %d: the same drawn counts (%d %d / %d %d)" % [step, a.drawn, a.drawn_enemy, b.drawn, b.drawn_enemy])
+	_check(a.particle_demand == b.particle_demand, "step %d: the same demand" % step)
 	for batch in ManagerScript.BATCHES:
 		var count_a: int = a._nodes[batch].multimesh.visible_instance_count
 		var count_b: int = b._nodes[batch].multimesh.visible_instance_count

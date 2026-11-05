@@ -34,9 +34,6 @@ func before_each() -> void:
 	mgr.events = own(EventsScript.new()) as EventsScript
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	mgr.set_cap(600)
-	# These tests are the tail shader's tails (trail rows), which the game no longer turns on since
-	# tails are motes (2026-11-05); they go with the tail shader's tail in its own PR.
-	mgr.set_tails_enabled(true)
 	root.add_child(mgr)
 
 
@@ -200,83 +197,14 @@ func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	mgr.update_draw(1.0)
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	check(slot >= 0 and is_equal_approx(buffer[3], 100.0) and is_equal_approx(buffer[7], 100.0), "a flying shot's instance holds its head where it is drawn")
-	check_equal(roundi(buffer[0]), mgr.get_trail_of(slot), "and its trail's row in the transform's x axis (TRAILS in the shader)")
+	check_equal(roundi(buffer[0]), -1, "and no path in the transform's x axis (its tail is motes)")
 	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_HEAD, "flagged alive: the core is drawn")
-
-
-func test_a_flying_shot_leaves_its_path_behind() -> void:
-	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 2.0)
-	var row: int = mgr.get_trail_of(slot)
-	check(row >= 0, "a bolt takes a trail row")
-	check_equal(mgr.get_trail_kept(row), 1, "starting where it was cast")
-	for i in 30:
-		mgr.step(1.0 / 60.0)
-	var kept: int = mgr.get_trail_kept(row)
-	check(kept >= 15 and kept <= 17, "half a second keeps about 15 points, one every TRAIL_EVERY (%d)" % kept)
-	var newest: Vector4 = mgr.get_trail_point(row, 0)
-	var older: Vector4 = mgr.get_trail_point(row, 1)
-	check(newest.x > older.x and is_equal_approx(newest.y, 100.0), "the points are where it flew")
-	check(is_equal_approx(newest.z - older.z, newest.x - older.x), "with how far it had gone")
-	check(newest.w > older.w and newest.w <= mgr.sim_time, "and when")
-	check(mgr.get_trail_point(row, kept).x == INF, "nothing past what it keeps")
-
-
-func test_a_homing_turn_stays_in_the_path() -> void:
-	# The owner (2026-10-28): the tail turned with the shot. The path keeps where it went.
-	var slot: int = mgr.spawn(0, Vector2(100.0, 200.0), Vector2(0.0, -150.0), 2.0)
-	var row: int = mgr.get_trail_of(slot)
-	for i in 12:
-		mgr.step(1.0 / 60.0)
-	mgr._vel[slot] = Vector2(150.0, 0.0)
-	for i in 12:
-		mgr.step(1.0 / 60.0)
-	var oldest: Vector4 = mgr.get_trail_point(row, mgr.get_trail_kept(row) - 1)
-	var newest: Vector4 = mgr.get_trail_point(row, 0)
-	check(is_equal_approx(oldest.x, 100.0) and is_equal_approx(oldest.y, 200.0), "the tail still starts where it went up")
-	check(newest.x > 110.0 and newest.y < 180.0, "and ends where it turned to")
-
-
-func test_a_bounce_leaves_its_corner_in_the_path() -> void:
-	mgr.set_walls([Rect2(0.0, 0.0, 640.0, 40.0)] as Array[Rect2])
-	var slot: int = mgr.spawn(0, Vector2(100.0, 60.0), Vector2(0.0, -120.0), 2.0)
-	mgr.set_bounce(slot, 1)
-	var row: int = mgr.get_trail_of(slot)
-	var corner: bool = false
-	for i in 20:
-		mgr.step(1.0 / 60.0)
-		if mgr._vel[slot].y > 0.0 and not corner:
-			corner = mgr.get_trail_point(row, 0).y <= 40.5
-	check(corner, "the point where it bounced is kept, so the tail turns there")
-
-
-func test_a_trail_cools_where_its_shot_ended_then_goes() -> void:
-	var slot: int = mgr.spawn(1, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 0.2)
-	mgr.set_core(slot, Color(0.878, 0.349, 0.184))
-	var row: int = mgr.get_trail_of(slot)
-	for i in 13:
-		mgr.step(1.0 / 60.0)
-	check(not mgr.is_alive(slot), "the shot's life ran out")
-	check_equal(mgr.get_trail_count(), 1, "its trail is still there")
-	check(mgr.get_trail_point(row, 0).x > 120.0, "with its last point where it ended")
-	mgr.update_draw(1.0)
-	check_equal(mgr.drawn, 0, "no shot is drawn")
-	check_equal(mgr.drawn_trails, 1, "but its trail is, without a core")
-	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
-	check_equal(roundi(buffer[5]) & ManagerScript.TRAIL_HEAD, 0, "flagged without a head")
-	check(Color(buffer[12], buffer[13], buffer[14]).is_equal_approx(Color(0.878, 0.349, 0.184)), "in its shot's colours")
-	check_equal(look_at(mgr._draw_node, 0)[0], 1, "and its player")
-	for i in roundi(ManagerScript.TRAIL_KEEP * 60.0) + 3:
-		mgr.step(1.0 / 60.0)
-	check_equal(mgr.get_trail_count(), 0, "once all of it has cooled, the row is given back")
-	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_trails, 0, "and nothing is drawn")
 
 
 func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
 	mgr.set_anchor(0, Vector2(200.0, 200.0))
 	var slot: int = mgr.spawn_orbit(0, 36.0, 0.0, 4.0, 5.0, 6.0)
-	var row: int = mgr.get_trail_of(slot)
-	check(mgr.get_trail_point(row, 0).is_equal_approx(Vector4(200.0, 200.0, 0.0, mgr.sim_time)), "its trail starts on its caster")
+	check(mgr._tail_from[slot].is_equal_approx(Vector2(200.0, 200.0)), "its tail starts on its caster")
 	mgr.step(1.0 / 60.0)
 	check(is_equal_approx(mgr.get_position_of(slot).distance_to(Vector2(200.0, 200.0)), 36.0), "it hits at its circle from the start")
 	mgr.update_draw(1.0)
@@ -291,147 +219,35 @@ func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
 	check(is_equal_approx(Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0)), 36.0), "and on its circle after ORBIT_GROW")
 
 
-func test_a_blink_starts_the_trail_afresh() -> void:
-	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 2.0)
-	for i in 10:
-		mgr.step(1.0 / 60.0)
-	mgr.move_shot(slot, Vector2(0.0, 60.0), 0.0)
-	var row: int = mgr.get_trail_of(slot)
-	check_equal(mgr.get_trail_kept(row), 1, "no tail across the gap")
-
-
-func test_a_caster_trail_follows_where_the_caster_goes() -> void:
-	mgr.set_anchor(2, Vector2(100.0, 100.0))
-	var row: int = mgr.follow_caster(2, Color.WHITE, 0, 0.2)
-	check(row >= 0, "a dash takes a row")
-	for i in 12:
-		mgr.set_anchor(2, Vector2(100.0, 100.0) + Vector2(cos(i * 0.2), sin(i * 0.2)) * 40.0)
-		mgr.step(1.0 / 60.0)
-	var newest: Vector4 = mgr.get_trail_point(row, 0)
-	check(Vector2(newest.x, newest.y).distance_to(Vector2(100.0, 100.0)) > 30.0, "its points are where the caster went, round a curve")
-	mgr.update_draw(1.0)
-	# Its streaks are motes (S5): the row is its path, for its births, and is never drawn.
-	check_equal(mgr._nodes[ManagerScript.BATCH_DASH].multimesh.visible_instance_count, 0, "not drawn: its streaks are motes")
-	check_equal(mgr._draw_node.multimesh.visible_instance_count, 0, "nor in the bolts' batch")
-	check_equal(mgr.drawn_trails, 0, "no trail drawn")
-	for i in roundi((0.2 + ManagerScript.TRAIL_KEEP) * 60.0) + 4:
-		mgr.step(1.0 / 60.0)
-	check_equal(mgr.get_trail_count(), 0, "after its time and its cooling, the row is given back")
-	check_equal(mgr.follow_caster(3, Color.WHITE, 0, 0.2), -1, "a caster with no anchor has nothing to follow")
-	var enemy: int = ActorSeats.enemy(mgr.actors)
-	mgr.set_anchor(enemy, Vector2(50.0, 50.0))
-	check(mgr.follow_caster(enemy, Color.WHITE, 0, 0.2) >= 0, "an enemy actor's dash takes a row too")
-	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_trails, 0, "and is not drawn either")
-	check_equal(mgr._nodes[ManagerScript.BATCH_ENEMY_DASH].multimesh.visible_instance_count, 0, "its batch stays empty")
-
-
-func test_when_the_rows_run_out_a_shot_has_its_core_alone() -> void:
-	mgr.set_cap(2)
-	for i in 4:
-		mgr.spawn(0, Vector2(100.0, 50.0 + i * 20.0), Vector2(120.0, 0.0), 0.05)
-		mgr.step(1.0 / 60.0)
-		mgr.step(1.0 / 60.0)
-		mgr.step(1.0 / 60.0)
-		mgr.step(1.0 / 60.0)
-	var slot: int = mgr.spawn(0, Vector2(100.0, 300.0), Vector2(120.0, 0.0), 1.0)
-	check_equal(mgr.get_trail_count(), ManagerScript.TRAIL_ROWS_PER_SLOT * 2, "every row is held, by shots or cooling trails")
-	check_equal(mgr.get_trail_of(slot), -1, "a new shot finds none")
-	mgr.update_draw(1.0)
-	check_equal(mgr.drawn, 1, "and is still drawn")
-
-
-## Regression (a web build, 2026-11-04: Max shots at 10,000, then the sandbox's LB storm): with a
-## row of the trail texture per trail, 20,000 rows made it 32 x 32,768, past the 16,384 a GPU
-## takes, and every trail after read the wrong samples (a short tail at a wrong angle). Folded,
-## it stays in bounds and a high row's samples are where the shader reads them.
-func test_the_trail_texture_fits_a_gpu_at_a_high_cap() -> void:
-	mgr.set_cap(10000)
-	# Every row held: one cap of shots ended and cooling, one cap flying.
-	for i in 10000:
-		mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 0.02)
-	mgr.step(1.0 / 60.0)
-	mgr.step(1.0 / 60.0)
-	var slot: int = -1
-	for i in 10000:
-		slot = mgr.spawn(0, Vector2(200.0, 150.0), Vector2(0.0, 90.0), 1.0)
-	for i in 4:
-		mgr.step(1.0 / 60.0)
-	check_equal(mgr.get_trail_count(), 20000, "every row is held")
-	mgr.update_draw(1.0)
-	var texture: Texture2D = (mgr._draw_node.material as ShaderMaterial).get_shader_parameter(&"trail_data")
-	check(texture != null, "the trails are sent")
-	if texture == null:
-		return
-	check(texture.get_width() <= 2048 and texture.get_height() <= 2048, "in a texture any GPU takes (%s)" % texture.get_size())
-	var row: int = mgr.get_trail_of(slot)
-	check(row >= 16384, "the last shot holds a row past the old texture's height (%d)" % row)
-	var newest: Vector4 = mgr.get_trail_point(row, 0)
-	var sample: int = mgr._trail_newest[row] % ManagerScript.TRAIL_SAMPLES
-	# Where `trail_texel` in shot_trail.gdshader reads it.
-	var at := Vector2i((row % 64) * ManagerScript.TRAIL_SAMPLES + sample, row / 64)
-	var texel: Color = (mgr._trail_image as Image).get_pixelv(at)
-	check(is_equal_approx(texel.r, newest.x) and is_equal_approx(texel.g, newest.y) and is_equal_approx(texel.a, newest.w), "its newest sample is where the shader reads it (%s, %s)" % [texel, newest])
-	check(absf(newest.x - 200.0) < 0.01 and newest.y > 150.0, "and it is that shot's path (%s)" % newest)
-
-
-func test_the_shader_holds_the_same_trail_numbers() -> void:
-	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
-	check(shader.code.contains("const int TRAIL_SAMPLES = %d;" % ManagerScript.TRAIL_SAMPLES), "the same samples a row")
-	check(shader.code.contains("const int TRAIL_ROWS_PER_LINE = %d;" % ManagerScript.TRAIL_ROWS_PER_LINE), "the same rows a line of the texture")
-	check(shader.code.contains("const float TF_HEAD = %d.0;" % ManagerScript.TRAIL_HEAD), "the same alive flag")
-	check(shader.code.contains("const float TF_ORBIT = %d.0;" % ManagerScript.TRAIL_ORBIT), "the same orbit flag")
-	check(not shader.code.contains("TF_DASH"), "no dash flag: a dash's trail is not drawn (S5)")
-	check(shader.code.contains("const float TRAIL_LONGEST = %s;" % str(ManagerScript.TRAIL_KEEP)), "and a trail is drawn as long as it is kept")
-	check(shader.code.contains("const float TAIL_PIXELS = %d.0;" % ManagerScript.TRAIL_TAIL_PIXELS), "the same tail pixels")
-	check(ManagerScript.TRAIL_KEEP <= (ManagerScript.TRAIL_SAMPLES - 1) * ManagerScript.TRAIL_EVERY, "which the samples cover")
-	var orbit: Shader = load("res://core/projectiles/shot_orbit.gdshader")
-	check(orbit.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "a familiar's bend code is the same")
-	check(orbit.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "and its span")
-
-
-## Regression (the owner, 2026-10-29: the web build lost its WebGL context on a real GPU, then
-## the GPU process died ~90 s after the menu while Direct3D compiled the trail's fragment stage):
-## every pixel of a trail's quad walked its path, then its piece's tail pixels and births, a
-## branch per look kind. A trail is small quads now, each placed by the vertex shader, and the
-## fragment stage is small: it reads nothing of the path, has no loops and no look kinds.
+## PARTICLES ARE GEOMETRY (the owner, 2026-10-29): a Windows browser's compiler hung on the
+## shader whose every pixel walked its path. A shot is two small quads now (its light, then its
+## core), each placed by the vertex shader, and the fragment stage is small: no loops, no look kinds,
+## nothing read from a path (since 2026-11-05 there is none: a tail is motes).
 func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void:
 	var mesh: ArrayMesh = ManagerScript.trail_mesh()
 	check(mesh == ManagerScript.trail_mesh(), "one mesh, made once")
-	var quads: int = 0
-	for entry: Vector3i in ManagerScript.TRAIL_QUADS:
-		quads += entry.y
+	var quads: int = ManagerScript.TRAIL_QUAD_KINDS.size()
 	var arrays: Array = mesh.surface_get_arrays(0)
 	var per: int = ManagerScript.TRAIL_QUAD_VERTICES
-	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * per, "a quad for every slot of every kind")
+	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * per, "a quad for every kind")
 	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 3, "one triangle each")
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
-	var first_pixel: int = 1 + ManagerScript.TRAIL_SAMPLES
-	check_equal(floori(uvs[first_pixel * per].y), ManagerScript.TRAIL_Q_TAIL, "the tail's pixels after every light (no card particle slots: they are motes, S3)")
-	check_equal(floori(uvs[first_pixel * per].x), ManagerScript.TRAIL_TAIL_PIXELS - 1, "the oldest first")
-	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
-	check(trail.code.contains("box = vec4(q_lo, q_hi)") and trail.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
-	check_equal(trail.code.count("samples_before(row"), 1, "the path is searched from one place")
-	check(trail.code.contains("if (search) {"), "and only by a slot that may still draw")
 	for batch in ManagerScript.BATCHES:
-		var shape: int = ManagerScript.BATCH_MESH[batch]
-		if shape >= 0:
-			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.TAILS_FULL, shape), "trail batch %d draws its shape's full mesh" % batch)
-	check(mesh == ManagerScript.trail_mesh(ManagerScript.TAILS_FULL, ManagerScript.TRAIL_MESH_JAG), "the full mesh is lightning's, which has every kind")
+		if ManagerScript.BATCH_MESH[batch] >= 0:
+			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
-	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_PIECE_LIGHT", ManagerScript.TRAIL_Q_PIECE_LIGHT], ["Q_TAIL", ManagerScript.TRAIL_Q_TAIL], ["Q_JAG", ManagerScript.TRAIL_Q_JAG], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
+	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
+	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
 		check(shader.code.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
+	check(not shader.code.contains("trail_data") and not shader.code.contains("texelFetch"), "nothing reads a path")
 	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
 	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
-	check(not fragments.contains("trail_texel") and not fragments.contains("texelFetch") and not fragments.contains("TRAIL_SAMPLES"), "no pixel reads the path")
 	check(not fragments.contains("for (") and not fragments.contains("while ("), "no pixel loops")
 	var kinds := RegEx.create_from_string("\\bL_[A-Z]+\\b|has_layer|bit_set|emitter")
 	check(kinds.search(fragments) == null, "no pixel asks for a look kind")
 	check(fragments.split("\n").size() < 100, "the fragment stage is small (%d lines)" % fragments.split("\n").size())
-	check(mgr._draw_node.material is ShaderMaterial and (mgr._draw_node.material as ShaderMaterial).shader == shader, "the bolts' batch is drawn by the trail shader")
-	check((mgr._rune_node.material as ShaderMaterial).shader == load("res://core/projectiles/shot_rune.gdshader"), "the runes' by the rune shader")
 
 
 ## The code beside a rune's kind, as the shader reads it.
@@ -562,94 +378,25 @@ func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
 
 
 func test_under_the_cap_nothing_thins() -> void:
-	mgr.particle_cap = 1000
+	mgr.tailless_particle_cap = 1000
 	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_demand, 20 * 6, "twenty shots ask for 120")
-	check_equal(mgr.trail_demand, 20 * ManagerScript.TRAIL_COST, "and twenty trails")
 	check_equal(mgr.particle_share, 1.0, "all particles")
-	check_equal(mgr.trail_share, 1.0, "all trails")
-	check_equal(_shader_share(mgr._draw_node, &"trail_share"), 1.0, "the shader is told")
+	check_equal(_shader_share(mgr._draw_node, &"particle_share"), 1.0, "the shader is told")
 
 
-func test_at_the_cap_the_trails_thin_first() -> void:
-	mgr.particle_cap = 150
+func test_at_the_cap_every_shot_thins_alike() -> void:
+	mgr.tailless_particle_cap = 100
 	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.update_draw(1.0)
-	check_equal(mgr.particle_share, 1.0, "the particles (120) fit, so they all show")
-	check(is_equal_approx(mgr.trail_share, 30.0 / 80.0), "the trails get what is left: 30 of 80")
-	check(is_equal_approx(_shader_share(mgr._draw_node, &"trail_share"), mgr.trail_share), "the shader draws that much trail")
-	mgr.particle_cap = 100
-	mgr.update_draw(1.0)
-	check_equal(mgr.trail_share, 0.0, "when the particles fill the pool there is no trail")
-	check(is_equal_approx(mgr.particle_share, 100.0 / 120.0), "and then the particles thin, every shot alike")
+	check(is_equal_approx(mgr.particle_share, 100.0 / 120.0), "the particles thin, every shot alike")
 	check(is_equal_approx(_shader_share(mgr._rune_node, &"particle_share"), mgr.particle_share), "for every batch")
 
 
-## The trail mesh has only the slots the pool can fill (performance, 2026-11-02): every quad of
-## it runs the vertex stage, drawn or not. With no share for the tails a shot's mesh has no tail
-## slots and only the newest pieces' lights. Under the cap it is each shape's full mesh. No mesh has
-## card particle slots (S3: they are motes), and a dash's has no streak slots (S5: motes too).
-func test_the_trail_mesh_has_the_slots_the_pool_fills() -> void:
-	mgr.particle_cap = 1000
-	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
-	mgr.update_draw(1.0)
-	var full: ArrayMesh = ManagerScript.trail_mesh(ManagerScript.TAILS_FULL, ManagerScript.TRAIL_MESH_PLAIN)
-	check(mgr._draw_node.multimesh.mesh == full, "under the cap: the full mesh")
-	mgr.particle_cap = 100
-	mgr.update_draw(1.0)
-	check_equal(mgr.trail_share, 0.0, "the particles (120) fill the pool: no tail")
-	check_equal(_tail_slots(mgr._draw_node.multimesh.mesh), 0, "no tail slots for a shot")
-	check_equal(_slots_of(mgr._draw_node.multimesh.mesh, ManagerScript.TRAIL_Q_PIECE_LIGHT), ManagerScript.TRAIL_PIECES_NO_TAIL, "only the newest pieces' lights")
-	check_equal(_tail_slots(mgr._nodes[ManagerScript.BATCH_DASH].multimesh.mesh), 0, "a dash has no streak slots (S5)")
-	for batch in ManagerScript.BATCHES:
-		var shape: int = ManagerScript.BATCH_MESH[batch]
-		if shape >= 0:
-			check(mgr._nodes[batch].multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, shape), "trail batch %d draws its shape's thin mesh" % batch)
-	mgr.particle_cap = 1000
-	mgr.update_draw(1.0)
-	check(mgr._draw_node.multimesh.mesh == full, "back under the cap: the full mesh again")
-
-
-## Each shape's mesh holds what its trails can draw, in the full mesh's order (`trail_mesh_slots`):
-## a dash's one folded core (its trail is not drawn: S5); a shot's no jagged line (lightning's alone
-## has it); with the tails off (TAILS_NONE) only the core and its light.
-func test_each_trail_mesh_shape_keeps_its_order_and_its_slots() -> void:
-	var thin: ArrayMesh = ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, ManagerScript.TRAIL_MESH_PLAIN)
-	check(thin == ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, ManagerScript.TRAIL_MESH_PLAIN), "each mesh made once")
-	check(thin != ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, ManagerScript.TRAIL_MESH_JAG), "and apart from another shape's")
-	check_equal(_slots_of(thin, ManagerScript.TRAIL_Q_JAG), 0, "a shot's has no jagged line")
-	check_equal(_slots_of(ManagerScript.trail_mesh(ManagerScript.TAILS_FULL, ManagerScript.TRAIL_MESH_PLAIN), ManagerScript.TRAIL_Q_TAIL), ManagerScript.TRAIL_TAIL_PIXELS, "a full tail")
-	check_equal(_slots_of(ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, ManagerScript.TRAIL_MESH_JAG), ManagerScript.TRAIL_Q_JAG), ManagerScript.TRAIL_JAGS, "lightning's has its jagged line")
-	for tails: int in [ManagerScript.TAILS_NONE, ManagerScript.TAILS_THIN, ManagerScript.TAILS_FULL]:
-		var dash: ArrayMesh = ManagerScript.trail_mesh(tails, ManagerScript.TRAIL_MESH_DASH)
-		check_equal(dash.surface_get_array_len(0), ManagerScript.TRAIL_QUAD_VERTICES, "a dash's mesh is one folded quad")
-		for shape: int in [ManagerScript.TRAIL_MESH_PLAIN, ManagerScript.TRAIL_MESH_JAG]:
-			var none: ArrayMesh = ManagerScript.trail_mesh(ManagerScript.TAILS_NONE, shape)
-			check_equal(none.surface_get_array_len(0), 2 * ManagerScript.TRAIL_QUAD_VERTICES, "tails off: the core and its light alone (shape %d)" % shape)
-	var trail: Shader = load("res://core/projectiles/shot_trail.gdshader")
-	check(not trail.code.contains("streak(") and not trail.code.contains("STREAK_"), "the shader draws no dash streaks (S5: motes)")
-	check(not trail.code.contains("spark_stride") and not trail.code.contains("LOOK TABLE"), "and no card particles of its own (S3)")
-	check(trail.code.contains("quad == Q_JAG && lightning"), "only lightning's shot draws the jagged line")
-	var order := PackedInt32Array()
-	for entry: Vector3i in ManagerScript.TRAIL_QUADS:
-		order.append(entry.x)
-	for shape: int in [ManagerScript.TRAIL_MESH_PLAIN, ManagerScript.TRAIL_MESH_JAG, ManagerScript.TRAIL_MESH_DASH]:
-		var kinds: PackedInt32Array = PackedInt32Array()
-		var uvs: PackedVector2Array = ManagerScript.trail_mesh(ManagerScript.TAILS_THIN, shape).surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-		for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
-			var kind: int = floori(uvs[i].y)
-			if kinds.is_empty() or kinds[kinds.size() - 1] != kind:
-				kinds.append(kind)
-		var last: int = -1
-		for kind in kinds:
-			check(order.find(kind) > last, "shape %d: kind %d in the full mesh's order" % [shape, kind])
-			last = order.find(kind)
-
-
-## Lightning's shots and trails and the dashes are drawn by batches of their own, with their
-## shape's mesh; any other trail never meets a jagged line's slots.
-func test_lightning_and_dashes_have_batches_of_their_own() -> void:
+## Lightning's shots are drawn with the others of their ramp and body (they had batches of their
+## own while their trails drew a jagged line; since tails are motes every shot draws one mesh).
+func test_lightning_shots_are_drawn_with_the_others() -> void:
 	var plain: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(200.0, 0.0), 2.0)
 	var lightning: int = mgr.spawn(1, Vector2(100.0, 150.0), Vector2(200.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 77)
 	mgr.set_look(lightning, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_SPARKS, ManagerScript.LOOK_EMBERS])))
@@ -665,34 +412,15 @@ func test_lightning_and_dashes_have_batches_of_their_own() -> void:
 	var counts: Array[int] = []
 	for batch in ManagerScript.BATCHES:
 		counts.append(mgr._nodes[batch].multimesh.visible_instance_count)
-	check_equal(counts[ManagerScript.BATCH_BOLT], 1, "the plain bolt in the bolts' batch")
-	check_equal(counts[ManagerScript.BATCH_BOLT_JAG], 1, "lightning's bolt in its own")
-	check_equal(counts[ManagerScript.BATCH_ENEMY_JAG], 1, "an enemy's lightning in the enemy layer's own")
-	check_equal(counts[ManagerScript.BATCH_ORBIT_JAG], 1, "a lightning orbit in the orbits' own")
+	check_equal(counts[ManagerScript.BATCH_BOLT], 2, "the plain and lightning's bolts in the bolts' batch")
+	check_equal(counts[ManagerScript.BATCH_ENEMY], 1, "an enemy's lightning in the enemy batch")
+	check_equal(counts[ManagerScript.BATCH_ORBIT], 1, "a lightning orbit in the orbits'")
 	check_equal(mgr.drawn, 4, "four shots drawn")
 	check_equal(mgr.drawn_enemy, 1, "one of them an enemy's")
-	check_equal(mgr._nodes[ManagerScript.BATCH_ENEMY_JAG].z_index, mgr._enemy_node.z_index, "on the enemy layer")
-	# Ended, lightning's trail cools in lightning's batch.
-	check_equal(mgr.remove_by_tag(77), 1, "lightning's bolt ends")
-	mgr.update_draw(1.0)
-	check_equal(mgr._nodes[ManagerScript.BATCH_BOLT_JAG].multimesh.visible_instance_count, 1, "its cooling trail stays in lightning's batch")
-	check_equal(roundi(mgr._nodes[ManagerScript.BATCH_BOLT_JAG].multimesh.buffer[5]) & ManagerScript.TRAIL_HEAD, 0, "without its head")
-
-
-func _slots_of(mesh: ArrayMesh, kind: int) -> int:
-	var uvs: PackedVector2Array = mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV]
-	var count: int = 0
-	for i in range(0, uvs.size(), ManagerScript.TRAIL_QUAD_VERTICES):
-		count += 1 if floori(uvs[i].y) == kind else 0
-	return count
-
-
-func _tail_slots(mesh: ArrayMesh) -> int:
-	return _slots_of(mesh, ManagerScript.TRAIL_Q_TAIL)
 
 
 func test_four_players_share_one_pool() -> void:
-	mgr.particle_cap = 240
+	mgr.tailless_particle_cap = 240
 	for player in 4:
 		_volley(10, player, PackedInt32Array([ManagerScript.LOOK_EMBERS, ManagerScript.LOOK_SPARKS]))
 	mgr.update_draw(1.0)
@@ -701,13 +429,12 @@ func test_four_players_share_one_pool() -> void:
 
 
 func test_the_pool_asks_no_particles_for_plain_shots() -> void:
-	mgr.particle_cap = 10
+	mgr.tailless_particle_cap = 10
 	mgr.spawn(-1, Vector2(50.0, 50.0), Vector2(1.0, 0.0), 1.0)
 	mgr.spawn(0, Vector2(80.0, 50.0), Vector2(1.0, 0.0), 1.0)
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_demand, 0, "no particles asked")
-	check_equal(mgr.trail_demand, 2 * ManagerScript.TRAIL_COST, "both bolts have a trail (an enemy's shot is a shader bolt since staffs F9b)")
-	check_equal(mgr.trail_share, 1.0, "which fits")
+	check_equal(mgr.particle_share, 1.0, "so nothing thins")
 
 
 func test_a_crowd_of_looked_shots_stays_inside_the_cap() -> void:
@@ -716,9 +443,8 @@ func test_a_crowd_of_looked_shots_stays_inside_the_cap() -> void:
 	mgr.update_draw(1.0)
 	check_equal(mgr.drawn, 500, "every shot is still drawn")
 	check_equal(mgr.particle_demand, 500 * 12, "they ask for 6,000")
-	var shown: float = float(mgr.particle_demand) * mgr.particle_share + float(mgr.trail_demand) * mgr.trail_share
-	check(shown <= float(mgr.particle_cap) + 0.5, "what is drawn is no more than the cap")
-	check_equal(mgr.trail_share, 0.0, "and the trails went first")
+	var shown: float = float(mgr.particle_demand) * mgr.particle_share
+	check(shown <= float(mgr.tailless_particle_cap) + 0.5, "what is given off is no more than the pool")
 
 
 ## Regression (performance pass, 2026-10-28): what a shot is drawn as is worked out once and kept
@@ -740,7 +466,7 @@ func test_a_kept_look_follows_set_look_growth_and_a_new_shot_in_the_slot() -> vo
 	var again: int = mgr.spawn(ActorsScript.SEATS + 6, Vector2(50.0, 40.0), Vector2(100.0, 0.0), 2.0)
 	check_equal(again, slot, "a new shot of another ramp takes the slot")
 	mgr.update_draw(1.0)
-	check_equal(mgr._draw_node.multimesh.visible_instance_count - mgr.drawn_trails, 0, "no live hat-ramp shot is left")
+	check_equal(mgr._draw_node.multimesh.visible_instance_count, 0, "no live hat-ramp shot is left")
 	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "it is drawn in the enemy ramp, not the old shot's")
 
 
@@ -758,7 +484,7 @@ func test_trail_particles_are_births() -> void:
 		mgr.step(1.0 / 60.0)
 		mgr.update_draw(1.0)
 		births += mgr.spark_birth_count
-	check(not ManagerScript.TRAIL_QUADS.any(func(entry: Vector3i) -> bool: return entry.x == 2 or entry.x == 3), "no mesh has particle slots (S3)")
+	check(not ManagerScript.TRAIL_QUAD_KINDS.any(func(kind: int) -> bool: return kind == 2 or kind == 3), "no mesh has particle slots (S3)")
 	# 20 shots x 30 moments at embers' rate (0.45): 270 expected.
 	check(births > 180 and births < 360, "about one in rate x moments x shots: %d" % births)
 	var b: PackedFloat32Array = mgr.spark_births
@@ -822,6 +548,8 @@ func test_a_dash_gives_off_its_cards_as_births() -> void:
 ## particles.
 func test_births_follow_the_kinds_rates_and_the_share() -> void:
 	mgr.spark_motes = true
+	# The cards' births alone: no tails laid (they are counted in test_tail_births.gd).
+	mgr.tail_births_cap = 0
 	_lasting(20, 0, PackedInt32Array())
 	_lasting(20, 1, PackedInt32Array([ManagerScript.LOOK_WEAVE]))
 	var kinds: Dictionary = {}
@@ -835,7 +563,7 @@ func test_births_follow_the_kinds_rates_and_the_share() -> void:
 	check_equal(kinds.keys(), [0], "only twinkles")
 	# 40 x 60 x 0.18 = 432.
 	check(births > 340 and births < 520, "at the twinkle's rate: %d" % births)
-	mgr.particle_cap = 30
+	mgr.tailless_particle_cap = 30
 	_lasting(20, 2, PackedInt32Array([ManagerScript.LOOK_DRIFT]))
 	births = 0
 	for n in 60:
@@ -864,66 +592,66 @@ func _lasting(count: int, player: int, kinds: PackedInt32Array) -> void:
 		mgr.set_look(slot, look)
 
 
-## Tails off (spell-spectacle-2.md, S5: "do shots need tails?"; the "Tails" switch): a flying shot
-## takes no trail row, so nothing is sampled or sent; the rows of the shots in the air and of the
-## cooling trails are given back at once (a dash's keeps its row, for its births); the shots are
-## drawn as their cores with the head-only mesh, told the way they fly in place of their row's
-## numbers; their births are still rolled, from the bigger tailless pool. On again, new shots take
-## rows as before.
-func test_tails_off_draws_the_cores_alone() -> void:
+## A shot is drawn as its core and the core's light, told the way it flies in its instance (no
+## path: its tail is motes since 2026-11-05), and its births thin by the pool (the "Tailless motes"
+## slider's).
+func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 	mgr.spark_motes = true
-	var before: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 5.0)
-	var ended: int = mgr.spawn(0, Vector2(100.0, 200.0), Vector2(120.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 55)
-	mgr.set_anchor(1, Vector2(300.0, 300.0))
-	var dash_row: int = mgr.follow_caster(1, Color.WHITE, 0, 2.0)
-	for i in 6:
-		mgr.step(1.0 / 60.0)
-	check(mgr.get_trail_of(before) >= 0 and mgr.get_trail_of(ended) >= 0, "with tails, every flying shot has a row")
-	mgr.remove_by_tag(55)
-	check_equal(mgr.get_trail_count(), 3, "a shot's, a cooling one's and the dash's")
-	mgr.set_tails_enabled(false)
-	check(not mgr.tails_enabled, "turned off")
-	check_equal(mgr.get_trail_of(before), -1, "the shot in the air gives its row back")
-	check_equal(mgr.get_trail_count(), 1, "and the cooling trail its row: only the dash keeps one")
-	check(dash_row >= 0 and mgr.get_trail_kept(dash_row) > 0, "which still follows its caster")
-	var after: int = mgr.spawn(2, Vector2(100.0, 150.0), Vector2(0.0, -90.0), 5.0)
-	mgr.set_look(after, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])))
-	check_equal(mgr.get_trail_of(after), -1, "a new shot takes none")
+	mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 5.0)
+	var embers: int = mgr.spawn(2, Vector2(100.0, 150.0), Vector2(0.0, -90.0), 5.0)
+	mgr.set_look(embers, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])))
 	var births: int = 0
 	for i in 30:
 		mgr.step(1.0 / 60.0)
 		mgr.update_draw(1.0)
 		for n in mgr.spark_birth_count:
 			births += 1 if mgr.spark_births[n * ManagerScript.SPARK_BIRTH_STRIDE + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS else 0
-	check(births > 0, "its embers are still given off as births: %d" % births)
-	check_equal(mgr.tail_mesh, ManagerScript.TAILS_NONE, "the trail batches draw the head-only mesh")
-	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(ManagerScript.TAILS_NONE, ManagerScript.TRAIL_MESH_PLAIN), "the core and its light alone")
-	check_equal(mgr.trail_share, 0.0, "no share for tails")
-	check_equal(mgr.drawn_trails, 0, "no trail drawn")
-	# The bolts' batch: shot 0's core, its way in the row's place.
+	check(births > 0, "its embers are given off as births: %d" % births)
+	check(mgr._draw_node.multimesh.mesh == ManagerScript.trail_mesh(), "the core and its light")
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	var found: bool = false
 	for i in mgr._draw_node.multimesh.visible_instance_count:
 		var at: int = i * ManagerScript.DRAW_STRIDE
-		check_equal(buffer[at], -1.0, "no row")
+		check_equal(buffer[at], -1.0, "no path")
 		if is_equal_approx(buffer[at + 7], 100.0):
 			found = true
 			check(buffer[at + 1] > 1.0 and is_zero_approx(buffer[at + 4]), "it flies right: its way, %s" % [Vector2(buffer[at + 1], buffer[at + 4])])
 	check(found, "the first shot is drawn")
-	mgr.particle_cap = 2
 	mgr.tailless_particle_cap = 10000
 	mgr.update_draw(1.0)
-	check_equal(mgr.particle_share, 1.0, "the births thin only past the tailless cap (6 asked, the tails' cap 2)")
+	check_equal(mgr.particle_share, 1.0, "the births thin only past the pool")
 	mgr.tailless_particle_cap = 3
 	mgr.update_draw(1.0)
 	check(is_equal_approx(mgr.particle_share, 0.5), "and then by it: %.2f" % mgr.particle_share)
 	mgr.events.tailless_motes_changed.emit(6)
-	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the tailless pool")
+	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the pool")
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_share, 1.0, "and the births thin by it")
-	mgr.set_tails_enabled(true)
-	var again: int = mgr.spawn(0, Vector2(100.0, 250.0), Vector2(120.0, 0.0), 5.0)
-	check(mgr.get_trail_of(again) >= 0, "on again: a new shot takes its row")
-	check_equal(mgr.get_trail_of(before), -1, "one from before stays without")
-	mgr.update_draw(1.0)
-	check(mgr.tail_mesh != ManagerScript.TAILS_NONE, "and the tails' meshes come back")
+
+
+## A dash (`follow_caster`) lasts its seconds and needs its caster's anchor; while it lasts it gives
+## off speed streaks back along the way its caster goes; a new one takes over; none is drawn.
+func test_a_dash_lasts_its_time_and_streaks_back_along_its_way() -> void:
+	mgr.spark_motes = true
+	check_equal(mgr.follow_caster(1, Color.WHITE, 0, 0.5), -1, "no anchor: no dash")
+	mgr.set_anchor(1, Vector2(100.0, 100.0))
+	check_equal(mgr.follow_caster(1, Color.WHITE, 0, 0.5), 1, "with one, the caster dashes")
+	check(mgr.is_dashing(1), "it is dashing")
+	var backs: Array[Vector2] = []
+	for i in 12:
+		mgr.set_anchor(1, Vector2(100.0 + 6.0 * float(i + 1), 100.0))
+		mgr.step(1.0 / 60.0)
+		mgr.update_draw(1.0)
+		for n in mgr.spark_birth_count:
+			var b: int = n * ManagerScript.SPARK_BIRTH_STRIDE
+			if int(mgr.spark_births[b + ManagerScript.SPARK_KIND]) == ManagerScript.SPARK_STREAK:
+				backs.append(Vector2(mgr.spark_births[b + ManagerScript.SPARK_BACK_X], mgr.spark_births[b + ManagerScript.SPARK_BACK_Y]))
+	check(not backs.is_empty(), "it gives off streaks")
+	check(backs.all(func(v: Vector2) -> bool: return v.x < -0.9), "back along its way (it goes right)")
+	check_equal(mgr.drawn, 0, "a dash draws nothing")
+	mgr.follow_caster(1, Color.WHITE, 0, 0.5)
+	check(mgr.is_dashing(1), "a new dash takes over")
+	for i in 40:
+		mgr.step(1.0 / 60.0)
+	check(not mgr.is_dashing(1), "once its time is up, it ends")
+

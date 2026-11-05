@@ -22,12 +22,9 @@ extends SceneTree
 ##                                    trails' particles (P1d; since S3 the trails draw none of their
 ##                                    own): the births' and the throws' CPU time is printed too, and
 ##                                    the motes are in the GPU time.
-##   ... -- --no-tails                the shots without their tails (S5, "do shots need tails?":
-##                                    the manager's `tails_enabled` off): no trail rows sampled or
-##                                    sent, the shots drawn as their cores; with --trail-motes the
-##                                    births take the tails' budget (`tailless_particle_cap`). The
-##                                    `BENCH` lines then also give the CPU of the step's sampling.
-##   ... -- --tailless-cap=N          the births' pool with the tails off (TAILLESS_PARTICLE_CAP)
+##   ... -- --tailless-cap=N          the births' pool (TAILLESS_PARTICLE_CAP)
+## (Since 2026-11-05 a shot's tail is motes, laid with --trail-motes: the shots are their cores
+## and lights alone, and the trail rows and their `--no-tails` switch are gone.)
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
@@ -92,7 +89,6 @@ var _spell_light: SpellLightScript = null
 var _motes_only: bool = false
 var _marks_only: bool = false
 var _use_motes: bool = false
-var _tails: bool = true
 var _tailless_cap: int = -1
 var _motes: MotesScript = null
 var _mote_kinds: Array[MoteKind] = []
@@ -117,8 +113,6 @@ func _initialize() -> void:
 			_marks_only = true
 		elif arg == "--trail-motes":
 			_use_motes = true
-		elif arg == "--no-tails":
-			_tails = false
 		elif arg.begins_with("--tailless-cap="):
 			_tailless_cap = maxi(arg.substr(15).to_int(), 0)
 		elif arg.begins_with("--timed="):
@@ -177,7 +171,6 @@ func _scenario(scenario: Dictionary) -> void:
 	_mgr.set_bounds(ROOM.grow(32.0))
 	var shots: int = scenario["shots"]
 	_mgr.set_cap(maxi(shots + 64, 256))
-	_mgr.set_tails_enabled(_tails)
 	if _tailless_cap >= 0:
 		_mgr.tailless_particle_cap = _tailless_cap
 	root.add_child(_mgr)
@@ -242,17 +235,17 @@ func _scenario(scenario: Dictionary) -> void:
 	times = times.slice(_timed / 4)
 	var sorted: PackedFloat64Array = times.duplicate()
 	sorted.sort()
-	print("BENCH: trail gpu %s: %d shots (%d drawn, %d trail instances, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; shares particles %.2f, tails %.2f" % [
-		label, shots, _mgr.drawn, _mgr.drawn + _mgr.drawn_trails, _vertices(), sorted[sorted.size() / 2],
-		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share, _mgr.trail_share])
+	print("BENCH: trail gpu %s: %d shots (%d drawn, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; particles' share %.2f" % [
+		label, shots, _mgr.drawn, _vertices(), sorted[sorted.size() / 2],
+		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share])
 	draw_times = draw_times.slice(_timed / 4)
 	draw_times.sort()
 	wall_times = wall_times.slice(_timed / 4)
 	wall_times.sort()
 	step_times = step_times.slice(_timed / 4)
 	step_times.sort()
-	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; the step (with its trail sampling and new shots) median %.2f ms; a whole frame median %.1f ms (wall clock); tails %s, native %s" % [
-		label, draw_times[draw_times.size() / 2], step_times[step_times.size() / 2], wall_times[wall_times.size() / 2], "on" if _tails else "off", "on" if _mgr.is_native() else "off"])
+	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; the step (with its new shots) median %.2f ms; a whole frame median %.1f ms (wall clock); native %s" % [
+		label, draw_times[draw_times.size() / 2], step_times[step_times.size() / 2], wall_times[wall_times.size() / 2], "on" if _mgr.is_native() else "off"])
 	if _motes != null:
 		mote_times = mote_times.slice(_timed / 4)
 		mote_times.sort()

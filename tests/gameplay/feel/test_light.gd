@@ -362,11 +362,10 @@ func test_an_enemy_shot_lights_like_any() -> void:
 func test_a_shot_without_a_trail_row_lights() -> void:
 	var made: Array = _feel()
 	var manager: ProjectilesScript = made[2]
-	manager.set_tails_enabled(false)
 	var slot: int = manager.spawn(0, Vector2(200.0, 120.0), Vector2(60.0, 0.0), 2.0, 4.0)
 	manager.step(1.0 / 60.0)
 	manager.update_draw(1.0)
-	check_equal(manager.get_trail_of(slot), -1, "the shot holds no trail row")
+	check(slot >= 0, "a shot (with no trail row: its tail is motes)")
 	var shader: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
 	check(not shader.contains("row >= 0.0 && flag_set(flags, TF_HEAD)"), "the light shader lights a head without a row")
 	var at: Vector2 = manager.get_position_of(slot)

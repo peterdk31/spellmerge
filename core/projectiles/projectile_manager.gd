@@ -3019,18 +3019,14 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 ## wait for their turn in the hit pass (see `_wait`), so they see the same as before. Then the
 ## trails take their points.
 func step(delta: float) -> void:
-	# Timed only for a benchmark (`step_profile`); the game reads no clock here.
-	var timing: bool = not step_profile.is_empty()
-	var at: int = 0
-	if timing:
-		step_profile.fill(0)
-		at = profile_clock.call()
+	# A benchmark times the parts (`step_profile`); in the game the marks below do nothing. A new
+	# pass goes between two marks, and gets a PROF_ part of its own when it is worth timing alone.
+	var at: int = _profile_start()
 	sim_time += delta
 	_mem_step += 1
 	_last_delta = delta
 	_refresh_targets()
-	if timing:
-		at = _profiled(PROF_REFRESH, at)
+	at = _profiled(PROF_REFRESH, at)
 	var top: int = _high
 	_stepping = true
 	_work_left = work_per_step
@@ -3038,33 +3034,40 @@ func step(delta: float) -> void:
 		_kernel.call(&"pass_common", self, top, delta)
 	else:
 		_pass_common(top, delta)
-	if timing:
-		at = _profiled(PROF_COMMON, at)
+	at = _profiled(PROF_COMMON, at)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
 			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit,
 			# return, homing, spiral); it says false for the others.
 			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
 				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
-	if timing:
-		at = _profiled(PROF_BEFORE, at)
+	at = _profiled(PROF_BEFORE, at)
 	_pass_hits(top, delta)
-	if timing:
-		at = _profiled(PROF_HITS, at)
+	at = _profiled(PROF_HITS, at)
 	for kind in range(AFTER_HITS, BEHAVIOURS):
 		if _member_count[kind] > 0:
 			_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
 	_step_index += 1
 	_stepping = false
-	if timing:
-		at = _profiled(PROF_AFTER, at)
+	at = _profiled(PROF_AFTER, at)
 	_sample_trails()
-	if timing:
-		_profiled(PROF_TRAILS, at)
+	_profiled(PROF_TRAILS, at)
 
 
-## Sets part `part` of `step_profile` to the microseconds since `since`; returns now.
+## A timed step's start (`step_profile`): its parts cleared and the clock's now. 0, and nothing
+## else, in the game.
+func _profile_start() -> int:
+	if step_profile.is_empty():
+		return 0
+	step_profile.fill(0)
+	return profile_clock.call()
+
+
+## Sets part `part` of `step_profile` to the microseconds since `since` and returns now. Nothing in
+## the game (no profile): the step reads no clock.
 func _profiled(part: int, since: int) -> int:
+	if step_profile.is_empty():
+		return 0
 	var now: int = profile_clock.call()
 	step_profile[part] = now - since
 	return now

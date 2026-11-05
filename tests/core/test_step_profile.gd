@@ -60,6 +60,26 @@ func test_a_profiled_step_times_every_part() -> void:
 		_free(scene)
 
 
+func test_the_parts_cover_the_whole_step() -> void:
+	for native: bool in [false, true]:
+		var scene := _scene(native)
+		var reads: Array[int] = []
+		scene.mgr.profile_clock = func() -> int:
+			reads.append(reads.size())
+			return reads.size()
+		scene.mgr.step_profile.resize(ManagerScript.PROF_PARTS)
+		for i in 12:
+			reads.clear()
+			scene.mgr.step(DT)
+		var profile: PackedInt64Array = scene.mgr.step_profile
+		var parts: int = 0
+		for part: int in [ManagerScript.PROF_REFRESH, ManagerScript.PROF_COMMON, ManagerScript.PROF_BEFORE, ManagerScript.PROF_HITS, ManagerScript.PROF_AFTER, ManagerScript.PROF_TRAILS]:
+			parts += profile[part]
+		# The clock reads 1, 2, 3, ...: the step's whole span is the last read less the first.
+		check_equal(parts, reads.size() - 1, "%s: the parts follow each other with no gap from the step's first clock read to its last" % ("native" if scene.mgr.is_native() else "GDScript"))
+		_free(scene)
+
+
 func test_profiling_changes_nothing_in_the_game() -> void:
 	for native: bool in [false, true]:
 		var plain := _scene(native)

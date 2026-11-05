@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"enemy_death"
-parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 3, "seconds": 0.14, "color": Color(0.9568627, 0.945098, 0.9176471, 1), "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 8, "spread": 360.0}, {"part": &"motes", "kind": &"surface", "count": 14, "spread": 360.0, "up": 1.5}, {"part": &"mark", "mark": &"ichor", "radius": 6.0}])
+parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 3, "seconds": 0.14, "color": Color(0.9568627, 0.945098, 0.9176471, 1), "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 8, "spread": 360.0}, {"part": &"motes", "kind": &"surface", "count": 14, "spread": 360.0, "up": 1.5}, {"part": &"mark", "mark": &"ichor", "radius": 6.0}, {"effect": &"puff", "zoom": 2, "body": true, "particles": true, "way": &"right"}, {"part": &"motes", "kind": &"spark", "count": 14, "radius": 24.0, "spread": 360.0, "ring": true, "body": true}])
 shake = 0.38
 hold = 0.09
 hold_shot = true

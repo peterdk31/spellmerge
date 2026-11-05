@@ -18,9 +18,17 @@ extends Node
 ##     here, by Feel's KIND_* codes; a test names each one), fading out over its life.
 ##   - Live beams: `light_beam` hands over the path Feel just gave the beam's own shader; each is
 ##     a band of light along it.
+## - **The cues' lights** (docs/milestones/spell-spectacle-2.md, S6 item 4): a cue's `light` part
+##   (`flash`, through the spectacle's part table) lights round the cue's point for its seconds,
+##   fading; up to CUE_LIGHTS at once (a new one takes the oldest's place). Their rows are this
+##   node's own, written each frame while one lasts (`step_cues`). A cue with a light part lights by
+##   it alone: Feel codes its flashes' rows as unlit.
 ## - **The room's lights:** every node in the group `LightSpot.GROUP` (a torch's flame;
 ##   core/base/light_spot.gd: its reach, strength, flicker and the art its colour is read from, as
-##   metadata) is a row of one batch, written only when a spot comes or goes.
+##   metadata) is a row of one batch, written only when a spot comes or goes. The light painted
+##   into the art (the group `LightSpot.PAINTED`: a torch's glow sprites) is hidden while this node
+##   is in the tree, and shown again when it leaves (the setting turned off), so a torch lights
+##   once (S6, item 12).
 ## - **Applying it:** one rect over the whole world at `z` (Feel's LIGHT_Z: above the room and the
 ##   bodies, under the motes, beams, flashes, telegraphs and shots), drawn by
 ##   `light_apply.gdshader`: what is under it, times the room's `ambient` (`RoomBase.ambient`,
@@ -43,6 +51,9 @@ const ROWS_TRAIL: int = 0
 const ROWS_RUNE: int = 1
 const ROWS_EFFECT: int = 2
 const ROWS_SPOT: int = 3
+const ROWS_CUE: int = 4
+## The most cue lights at once (`flash`).
+const CUE_LIGHTS: int = 64
 ## The steps the light comes in by default (`light_apply.gdshader`'s `bands`): 3 (dim, lit,
 ## bright); 0 is smooth. The owner's choice between them is open (2026-11-04).
 const DEFAULT_BANDS: int = 3
@@ -89,6 +100,8 @@ var batches: Array[MultiMeshInstance2D] = []
 var effects: Array[MultiMeshInstance2D] = []
 var beams: Array[MeshInstance2D] = []
 var spots: MultiMeshInstance2D = null
+## The cues' lights' batch (ROWS_CUE). Read only.
+var cue_lights: MultiMeshInstance2D = null
 var apply: ColorRect = null
 ## The room's light (`set_ambient`) and the steps (`set_bands`). Read only.
 var ambient: float = 1.0
@@ -101,6 +114,19 @@ var _spots_dirty: bool = true
 var _spot_buffer: PackedFloat32Array = PackedFloat32Array()
 ## A spot's colour by the texture it is read from (read once per texture).
 var _art_colours: Dictionary = {}
+## The cue lights, by slot (CUE_LIGHTS of them, the next one `_next_cue`): where, how far they reach,
+## how bright, when they began and how long they last (0: none), and their row colour and core; and
+## their rows, written while one lasts.
+var _cue_at: PackedVector2Array = PackedVector2Array()
+var _cue_reach: PackedFloat32Array = PackedFloat32Array()
+var _cue_strength: PackedFloat32Array = PackedFloat32Array()
+var _cue_from: PackedFloat32Array = PackedFloat32Array()
+var _cue_seconds: PackedFloat32Array = PackedFloat32Array()
+var _cue_data: PackedColorArray = PackedColorArray()
+var _cue_core: PackedColorArray = PackedColorArray()
+var _next_cue: int = 0
+var _cue_live: int = 0
+var _cue_buffer: PackedFloat32Array = PackedFloat32Array()
 
 
 ## Light for `projectiles`' shots (null: the buffer and the rect only), applied at `z`.
@@ -132,6 +158,17 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 		effects.append(node)
 	spots = _light_batch(ROWS_SPOT)
 	spots.name = "Spots"
+	cue_lights = _light_batch(ROWS_CUE)
+	cue_lights.name = "CueLights"
+	cue_lights.multimesh.instance_count = CUE_LIGHTS
+	_cue_at.resize(CUE_LIGHTS)
+	_cue_reach.resize(CUE_LIGHTS)
+	_cue_strength.resize(CUE_LIGHTS)
+	_cue_from.resize(CUE_LIGHTS)
+	_cue_seconds.resize(CUE_LIGHTS)
+	_cue_data.resize(CUE_LIGHTS)
+	_cue_core.resize(CUE_LIGHTS)
+	_cue_buffer.resize(CUE_LIGHTS * STRIDE)
 	apply = ColorRect.new()
 	apply.name = "LightApply"
 	apply.top_level = true
@@ -182,6 +219,7 @@ func _enter_tree() -> void:
 		tree.node_added.connect(_on_node_changed)
 		tree.node_removed.connect(_on_node_changed)
 	_spots_dirty = true
+	_show_painted(tree, false)
 
 
 func _exit_tree() -> void:
@@ -191,11 +229,27 @@ func _exit_tree() -> void:
 	if tree.node_added.is_connected(_on_node_changed):
 		tree.node_added.disconnect(_on_node_changed)
 		tree.node_removed.disconnect(_on_node_changed)
+	_show_painted(tree, true)
 
 
 func _on_node_changed(node: Node) -> void:
 	if node.is_in_group(LightSpot.GROUP):
 		_spots_dirty = true
+	elif node.is_in_group(LightSpot.PAINTED) and node.is_inside_tree():
+		# A torch come into the room while the light is on: its painted glow is the spot's now.
+		_show_painted_node(node, false)
+
+
+## Show or hide the light painted into the room's art (every node in `LightSpot.PAINTED`).
+func _show_painted(tree: SceneTree, shown: bool) -> void:
+	for node: Node in tree.get_nodes_in_group(LightSpot.PAINTED):
+		_show_painted_node(node, shown)
+
+
+func _show_painted_node(node: Node, shown: bool) -> void:
+	var item := node as CanvasItem
+	if item != null:
+		item.visible = shown
 
 
 ## Stop mirroring the batches (before this node is freed: the setting turned off).
@@ -253,6 +307,72 @@ func _hand(multimesh: MultiMesh, buffer: PackedFloat32Array, count: int, slots: 
 		multimesh.visible_instance_count = count
 	elif multimesh.visible_instance_count != 0:
 		multimesh.visible_instance_count = 0
+
+
+## A cue's light (its `light` part): round `at`, reaching `reach` pixels, `strength` bright at
+## first and fading to nothing over `seconds`, from the clock time `now` (the spectacle's), in the
+## colour of an effect row in the ramp `ramp` with the cards `look` and the core `core` (`look`
+## with Feel's EXACT: `core` exactly). Takes the oldest light's place when all are lit.
+func flash(at: Vector2, reach: float, strength: float, seconds: float, core: Color, ramp: int, look: int, now: float) -> void:
+	if reach <= 0.0 or strength <= 0.0 or seconds <= 0.0 or not at.is_finite():
+		return
+	var slot: int = _next_cue
+	_next_cue = (_next_cue + 1) % CUE_LIGHTS
+	_cue_at[slot] = at
+	_cue_reach[slot] = reach
+	_cue_strength[slot] = strength
+	_cue_from[slot] = now
+	_cue_seconds[slot] = seconds
+	_cue_data[slot] = ProjectileManagerScript.look_color(ramp, 1, look)
+	_cue_core[slot] = core
+	_cue_live = CUE_LIGHTS
+
+
+## Write the lasting cue lights' rows at the clock time `now`, each as bright as it still is; those
+## over go. Nothing is written once none lasts.
+func step_cues(now: float) -> void:
+	if _cue_live == 0:
+		return
+	var out: int = 0
+	for slot in CUE_LIGHTS:
+		if _cue_seconds[slot] <= 0.0:
+			continue
+		var through: float = (now - _cue_from[slot]) / _cue_seconds[slot]
+		if through >= 1.0:
+			_cue_seconds[slot] = 0.0
+			continue
+		var i: int = out * STRIDE
+		var reach: float = _cue_reach[slot]
+		var at: Vector2 = _cue_at[slot]
+		_cue_buffer[i] = reach
+		_cue_buffer[i + 1] = 0.0
+		_cue_buffer[i + 2] = 0.0
+		_cue_buffer[i + 3] = at.x
+		_cue_buffer[i + 4] = 0.0
+		_cue_buffer[i + 5] = reach
+		_cue_buffer[i + 6] = 0.0
+		_cue_buffer[i + 7] = at.y
+		var data: Color = _cue_data[slot]
+		_cue_buffer[i + 8] = data.r
+		_cue_buffer[i + 9] = data.g
+		_cue_buffer[i + 10] = data.b
+		_cue_buffer[i + 11] = data.a
+		var core: Color = _cue_core[slot]
+		_cue_buffer[i + 12] = core.r
+		_cue_buffer[i + 13] = core.g
+		_cue_buffer[i + 14] = core.b
+		_cue_buffer[i + 15] = _cue_strength[slot] * (1.0 - maxf(through, 0.0))
+		out += 1
+	_cue_live = out
+	var multimesh: MultiMesh = cue_lights.multimesh
+	if out > 0:
+		multimesh.buffer = _cue_buffer
+	multimesh.visible_instance_count = out
+
+
+## How many cue lights are lit (for tests).
+func cue_light_count() -> int:
+	return cue_lights.multimesh.visible_instance_count
 
 
 ## Before Feel draws its live beams: none lit until `light_beam` lights one this frame.

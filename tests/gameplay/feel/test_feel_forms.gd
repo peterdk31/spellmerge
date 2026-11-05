@@ -8,6 +8,7 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FROST := Color(0.5, 0.75, 0.94)
@@ -242,6 +243,9 @@ class FakeBeams:
 	func beam_fade(_at: int) -> float:
 		return 1.0
 
+	func beam_tag(_at: int) -> int:
+		return 55
+
 
 func _live_lines() -> Array[MeshInstance2D]:
 	var found: Array[MeshInstance2D] = []
@@ -356,8 +360,9 @@ func test_an_effect_is_one_mesh_of_small_quads() -> void:
 	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for every slot of every kind")
 	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
 	check_equal(_quad(mesh, 0), Vector2i(FeelScript.EFFECT_Q_LIGHT, 0), "the light first, under everything")
-	check_equal(_quad(mesh, 1), Vector2i(FeelScript.EFFECT_Q_PARTICLE, 0), "then the particles, the newest on top")
-	check_equal(_quad(mesh, 13), Vector2i(FeelScript.EFFECT_Q_SPARK, 15), "then the sparks, the first on top")
+	check_equal(_quad(mesh, 1), Vector2i(FeelScript.EFFECT_Q_CLOUD, 3), "then a poof's clouds, the first on top")
+	# No sparks or card particles: they are the cues' motes (S6, item 3).
+	check_equal(quads, 6, "the light, four clouds and the flash")
 	check_equal(_quad(mesh, quads - 1), Vector2i(FeelScript.EFFECT_Q_SHAPE, 0), "the flash last, on top")
 	check(feel._effect_node.multimesh.mesh == mesh, "the effect batch draws it")
 	check(feel._arc_node.multimesh.mesh != mesh and feel._status_node.multimesh.mesh != mesh, "the arcs and statuses keep their one quad")
@@ -368,10 +373,8 @@ func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
 	check(mesh == FeelScript.beam_mesh(), "one mesh, made once")
 	var pieces: int = FeelScript.LIVE_BEAM_POINTS - 1
 	check_equal(_quad(mesh, 0), Vector2i(FeelScript.BEAM_Q_PIECE_LIGHT, 0), "the pieces' light first")
-	check_equal(_quad(mesh, pieces), Vector2i(FeelScript.BEAM_Q_SPLASH_LIGHT, 0), "then the splash's light")
-	check_equal(_quad(mesh, pieces + 6), Vector2i(FeelScript.BEAM_Q_PARTICLE, 0), "then the particles")
-	check_equal(_quad(mesh, pieces + 18), Vector2i(FeelScript.BEAM_Q_SPLASH, 5), "then the splash, the first on top")
-	check_equal(_quad(mesh, pieces + 24), Vector2i(FeelScript.BEAM_Q_PIECE, 0), "the beam's own pixels last, on top")
+	check_equal(_quad(mesh, pieces), Vector2i(FeelScript.BEAM_Q_PIECE, 0), "the beam's own pixels last, on top")
+	check_equal(mesh.surface_get_array_len(0), pieces * 2 * 4, "nothing else: its splash and card particles are motes (S6 item 10)")
 	check(mesh.custom_aabb.size.x >= 100000.0 and mesh.custom_aabb.size.y >= 100000.0, "its box is the world: the shader places it, so it is never culled")
 	var shader: Shader = FeelScript.BEAM_SHADER
 	check(shader.code.contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
@@ -380,3 +383,61 @@ func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
 		if node.mesh == mesh:
 			drawn += 1
 	check_equal(drawn, FeelScript.FORM_SLOTS + FeelScript.LIVE_BEAMS, "every beam draws it")
+
+
+## The births in the spectacle's collector now (Feel's own motes this frame, before they are given off).
+func _births() -> Array[PackedFloat32Array]:
+	var births: BirthsScript = feel.spectacle().births
+	var found: Array[PackedFloat32Array] = []
+	for n in births.count:
+		found.append(births.rows.slice(n * BirthsScript.STRIDE, (n + 1) * BirthsScript.STRIDE))
+	return found
+
+
+func test_a_beam_gives_off_its_splash_and_card_particles_as_motes() -> void:
+	# A straight beam 100 px down from (0, 0), of a mend card (its look kind 6), for one second.
+	var path := PackedVector3Array([Vector3(0, 0, 0), Vector3(0, 100, 100)])
+	feel.spectacle().births.clear()
+	var look: int = 1 << (ProjectilesScript.LOOK_MOTES - 1)
+	feel._beam_motes(path, 2, 100.0, Vector2(0, 100), Vector2.DOWN, 1.0, 1, look, FROST, 55, 1.0)
+	var splash: int = 0
+	var along: int = 0
+	for b: PackedFloat32Array in _births():
+		var at := Vector2(b[ProjectilesScript.SPARK_X], b[ProjectilesScript.SPARK_Y])
+		var way := Vector2(b[ProjectilesScript.SPARK_BACK_X], b[ProjectilesScript.SPARK_BACK_Y])
+		check_equal(ProjectilesScript.spark_tag(b, 0), 55, "of its spell")
+		check_equal(int(b[ProjectilesScript.SPARK_RAMP]), 1, "in its caster's ramp")
+		if int(b[ProjectilesScript.SPARK_KIND]) == 0:
+			splash += 1
+			check(at.is_equal_approx(Vector2(0, 100)) and way.is_equal_approx(Vector2.UP), "a splash spark thrown back off where it lands")
+		else:
+			along += 1
+			check_equal(int(b[ProjectilesScript.SPARK_KIND]), ProjectilesScript.LOOK_MOTES, "a card particle of its look's kind")
+			check(at.x == 0.0 and at.y >= 0.0 and at.y <= 100.0 and absf(way.x) > 0.99, "from a point along it, out to a side: %s %s" % [at, way])
+	check(absf(float(splash) - FeelScript.BEAM_SPLASH_RATE) <= 1.0, "BEAM_SPLASH_RATE splash sparks a second: %d" % splash)
+	check(absf(float(along) - 6.0 * FeelScript.BEAM_PARTICLE_RATE) <= 1.0, "each of its 6 card particles BEAM_PARTICLE_RATE times a second: %d" % along)
+	feel.spectacle().births.clear()
+	feel._beam_motes(path, 2, 100.0, Vector2(0, 100), Vector2.DOWN, FeelScript.BEAM_SPLASH_FADE, 1, 0, FROST, 55, 1.0)
+	check_equal(feel.spectacle().births.count, 0, "a dissolving beam of no cards gives off nothing")
+
+
+func test_live_and_shown_beams_give_their_motes_to_the_pool() -> void:
+	var beams := own(FakeBeams.new()) as FakeBeams
+	feel.spells = beams
+	feel.step(0.016)
+	var before: int = feel.motes().births
+	for i in 30:
+		feel.step(0.016)
+	check(feel.motes().births - before > 10, "a live beam's births are thrown as motes: %d" % (feel.motes().births - before))
+	feel.spells = null
+	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
+	before = feel.motes().births
+	for i in 10:
+		feel.step(0.016)
+	check(feel.motes().births > before, "a beam shown whole splashes too")
+	check_equal(feel.spectacle().births.count, 0, "and the collector is emptied every frame")
+
+
+func test_the_beam_shader_draws_no_particles() -> void:
+	var code: String = FeelScript.BEAM_SHADER.code
+	check(not code.contains("shot_particle") and not code.contains("Q_SPLASH") and not code.contains("Q_PARTICLE"), "its splash and card particles are motes (S6 item 10)")

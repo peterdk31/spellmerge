@@ -37,6 +37,8 @@ var actors: ActorSeats.ActorsScript
 func before_each() -> void:
 	bus = own(EventsScript.new()) as EventsScript
 	registry = own(AskingRegistry.new()) as AskingRegistry
+	# The cues (a hit's spray is the cue `hit`, S6 2).
+	registry.scan()
 	feel = own(FeelScript.new()) as FeelScript
 	var preset := FeelPresetScript.new()
 	preset.hit_sound = SOUND

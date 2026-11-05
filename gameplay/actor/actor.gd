@@ -306,6 +306,12 @@ func reach() -> float:
 	return tip if tip > 0.0 else staff_reach
 
 
+## Where the drawn staff ends behind the hand: `Caster.butt` against the aim from the hand (the
+## hand itself without a caster). The whole staff runs from here to `muzzle_position`.
+func butt_position() -> Vector2:
+	return aim_pivot() - aim * (caster.butt() if caster != null else 0.0)
+
+
 ## The number it casts under in Spells and the projectile manager, -1 for none.
 func caster_number() -> int:
 	return _caster_number

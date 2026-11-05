@@ -84,6 +84,25 @@ func test_the_shot_leaves_from_the_tip_of_the_head_on_show_in_every_direction() 
 			check(body.muzzle_position().distance_to(expected) < 0.01, "and the muzzle is there")
 
 
+## A staff's `butt` (S6 item 9: the swap's look covers the staff from there to its tip) is where its
+## head sheet's art ends behind the grip, pointing right (column 0), to a pixel; and the actor's
+## `butt_position` is that far behind the hand, against the aim, for the staff on show.
+func test_the_butt_is_where_the_staffs_art_ends_behind_the_grip() -> void:
+	for staff: StaffBase in _heads:
+		var image: Image = staff.head.get_image()
+		var left: int = 48
+		for x in 48:
+			for y in 48:
+				if image.get_pixel(x, y).a > 0.1:
+					left = mini(left, x)
+		check(absf(StaffLook.GRIP.x - float(left) - staff.butt) <= 1.0, "%s: its art ends %d px behind the grip, its butt says %.0f" % [staff.id, int(StaffLook.GRIP.x) - left, staff.butt])
+	var body := _wizard()
+	for at in _heads.size():
+		_press(at)
+		var butt: float = body.caster.staff_of(body.caster.current).butt
+		check(body.butt_position().is_equal_approx(body.aim_pivot() - body.aim * butt), "staff %d: the butt is %.0f px behind the hand" % [at, butt])
+
+
 func test_it_hovers_on_the_hand_and_the_face_goes_with_it() -> void:
 	var body := _wizard()
 	var sprite := body.get_node(^"Sprite") as Sprite2D

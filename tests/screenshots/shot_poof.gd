@@ -1,7 +1,8 @@
 extends "res://tests/support/screenshot.gd"
-## The poof (living staffs H4): four players in the arena each press another staff button; a shot
-## of the arena before, then a 4x crop of player 2 every frame for 12 frames (0.2 s): the cloud
-## swelling, the body and face changing at its biggest, the cloud dotting away.
+## The staff swap (living staffs H4; the cue `staff_swap` since S6 item 9): four players in the
+## arena each press another staff button; a shot of the arena before, then a 4x crop of player 2
+## every frame for 12 frames (0.2 s): the swap's look, the body and face changing at 35%. The looks
+## to pick from side by side: shot_staff_swap.gd.
 
 
 func take() -> void:

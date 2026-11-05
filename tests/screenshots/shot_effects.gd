@@ -1,7 +1,8 @@
 extends "res://tests/support/screenshot.gd"
 ## The effects Feel draws with the shots' shader (the glow look, 2026-10-27): a row per infusion
 ## (plain, fire, frost, storm, void, lightning; the colours and looks of the real cards), a
-## column per effect at an age, so one still shows how each one plays out:
+## column per effect at an age, so one still shows how each one plays out (the flashes alone: their
+## sparks and card particles are their cues' motes since S6 item 3, `shot_flash_motes.gd`):
 ##   1-3  where a shot lands (KIND_BURST), 2, 6 and 12 frames old
 ##   4-6  a rune going off (KIND_RUNE_BURST), 3, 10 and 20 frames old
 ##   7    a nova's cast ring (KIND_RING_OUT), 6 frames old

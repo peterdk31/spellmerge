@@ -3,7 +3,8 @@ extends Resource
 ## One set of juice numbers for `gameplay/feel`: how long the hit-stop lasts, how
 ## hard the screen shakes and how the hit particles look. A preset only tunes
 ## reactions; it can never change damage or outcomes. The point moments (a parry, a
-## deflect, a death, a downed wizard, a self-hit, a heal) are cues in `content/cues/`.
+## deflect, a death, a downed wizard, a self-hit, a heal, an element reaction) are cues in
+## `content/cues/`.
 
 ## Unique name of the preset, also its file name.
 @export var id: StringName = &""
@@ -22,18 +23,13 @@ extends Resource
 @export_range(0.0, 32.0, 0.5) var max_shake_pixels: float = 6.0
 ## Trauma lost per second.
 @export_range(0.1, 10.0, 0.1) var shake_decay: float = 2.5
-## How much bigger (rounded to a whole zoom) a death's puff is than a hit's.
-@export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
 ## The spray of a hit on a character (an effect along the way the shot flew), bigger or smaller
 ## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
-## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
+## whole zoom. An enemy is hit in the ramp nearest its own colour (`EnemyBase.hit_color`); a wizard
+## in its own ramp.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
-## The sparks of a hit's spray and of a puff (a hit with no way, a kill, a reaction) are motes
-## (S3, docs/milestones/spell-spectacle-2.md; the effect drew them before, and draws the flash
-## still): `spray_mote_count` of the kind `spray_mote_kind` along the hit's way within
-## `spray_mote_spread` degrees, out to `spray_mote_reach` pixels a zoom step; a puff
-## `puff_mote_count` of them all round, out to `puff_mote_reach` pixels a step.
-@export var spray_mote_kind: StringName = &"spark"
+## The spray itself and its sparks are the cue `hit` (a hit with no way, `hit_puff`; content/cues,
+## S6 2), `size` zoom steps big.
 ## A dead body breaks into motes (S3; `Spectacle.break_body`): `death_mote_share` of its art's
 ## pixels (times its scale's area, at most `death_mote_most`), each a mote of the surface kind
 ## `death_mote_kind` in its art's colours, flung out from its middle at `death_mote_speed` px/s
@@ -43,86 +39,32 @@ extends Resource
 @export_range(0, 512) var death_mote_most: int = 160
 @export var death_mote_speed: Vector2 = Vector2(8.0, 46.0)
 @export var death_mote_up: Vector2 = Vector2(0.0, 40.0)
-@export_range(0, 64) var spray_mote_count: int = 10
-@export_range(0.0, 64.0, 1.0) var spray_mote_reach: float = 15.0
-@export_range(0.0, 360.0, 1.0) var spray_mote_spread: float = 92.0
-@export_range(0, 64) var puff_mote_count: int = 14
-@export_range(0.0, 64.0, 1.0) var puff_mote_reach: float = 12.0
-@export var enemy_hit_color: Color = Color("e0592f")
 ## A shot that ends on a wall or pillar knocks the wall's motes back off the surface (the
-## spectacle's surface kinds); `wall_spark_size` is the size of a shot's flare when its carrier
-## card names none.
-@export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
+## spectacle's surface kinds); its flare is its carrier card's `impact_cue` (`impact` for none).
 ## Motes (docs/milestones/spell-spectacle.md, P1; Feel's `mote.gd`) a shot's end throws, as a
 ## share of its cards' kinds' own count: a hit on a body (back along the way it came, on top of
-## its spray) and a bolt or orbit whose life ran out (a puff of its own kinds). A reaction throws
-## a ring of `reaction_mote_count` of the reacting shot's kinds in its colour, out to
-## `reaction_mote_reach` pixels, both times its `reaction_power`. A cue's motes are its own data.
+## its spray). A shot's end (the cue `expire`, its `share`) and a cue's motes (a reaction's ring of
+## them among them) are their own data.
 @export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
-@export_range(0.0, 4.0, 0.05) var expire_mote_share: float = 1.0
-@export_range(0, 64) var reaction_mote_count: int = 16
-@export_range(0.0, 64.0, 1.0) var reaction_mote_reach: float = 22.0
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
-## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
-@export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
+## Camera kick (a cue's `kick`, a cast's among them): pixels given back per second.
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
-## An element reaction (`reaction_triggered`): the seconds of its puff, ring and name, the
-## shake it adds, and the colour of each reaction by its id (a reaction not listed is white).
-## The sound is `reaction_sound_prefix` + the reaction id, for example `reaction_shatter`.
-@export_range(0.0, 0.5, 0.01) var reaction_seconds: float = 0.25
-@export_range(0.0, 1.0, 0.01) var reaction_shake: float = 0.2
-@export var reaction_colors: Dictionary = {
-	&"shatter": Color("e8fbff"),
-	&"thaw": Color("7be05a"),
-	&"flare": Color("ffd23a"),
-	&"kindle": Color("ff3b30"),
-	&"stillness": Color("4a78ff"),
-	&"rift": Color("c05cff"),
-	&"discharge": Color("00f0ff"),
-	&"overload": Color("ff6ba0"),
-	&"superconduct": Color("14a38b"),
-}
-@export var reaction_sound_prefix: String = "reaction_"
-## The burst a reaction adds to its flash, bigger than any plain hit: how long it holds its
-## caster (and the target of its hit) in seconds
-## (longer than a death's), the size of its particle burst, and the size of the ring that
-## opens (1.0 is the nova ring art's size; it grows as it fades). `reaction_power` scales
-## these and the flash and shake by reaction id (a reaction not listed is 1.0).
-@export_range(0.0, 0.3, 0.005) var reaction_stop_seconds: float = 0.09
-@export_range(1.0, 4.0, 0.1) var reaction_burst_size: float = 2.2
-@export_range(0.1, 4.0, 0.1) var reaction_ring_size: float = 0.9
-@export var reaction_power: Dictionary = {
-	&"shatter": 1.3,
-	&"rift": 1.2,
-	&"flare": 1.1,
-	&"kindle": 1.0,
-	&"thaw": 1.0,
-	&"stillness": 0.9,
-	&"discharge": 0.7,
-	&"overload": 1.1,
-	&"superconduct": 1.0,
-}
-## The jagged arc of lightning a discharge draws from the enemy struck to each enemy zapped
-## (`discharge_arc`), in the colour of the reaction `discharge`: seconds it shows.
-@export_range(0.0, 0.5, 0.01) var arc_seconds: float = 0.25
-## What a character with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
-## `hex`, `static`; the glow look, 2026-10-27): an effect that follows it, giving off the
-## particles of a look kind (`look`: a `LOOK_*` of core/projectiles, the element's own: burn
-## fire's embers, chill and freeze frost's flecks, shock storm's gusts, hex void's pull, static
-## lightning's sparks) round it, with a glow in `color` that pulses.
+## What a character with a status looks like (spell spectacle 2, S6 item 11): its element card's
+## (the element whose `status_id` it is, `ElementBase`): a glow in the card's `tint` that follows
+## it and pulses, and the card's motes (the kinds that name it, else those of its `look_layer`)
+## given off round it, `status_mote_rate` a second. A status no element puts on is shown as the
+## status it deepens from (`deep_statuses`: freeze, which three chills make, as frost's chill) at
+## full depth: its glow `status_deep_white` of the way to white and `status_deep_motes` times the
+## motes, so a frozen character reads apart from a chilled one.
 ## When a character has several, the first in `status_order` is the one shown.
 @export var status_order: Array[StringName] = [&"freeze", &"static", &"shock", &"burn", &"hex", &"chill"]
-@export var status_looks: Dictionary = {
-	&"burn": {"color": Color("ff6a1a"), "look": 1},
-	&"chill": {"color": Color("8fd8ff"), "look": 2},
-	&"freeze": {"color": Color("e8fbff"), "look": 2},
-	&"shock": {"color": Color("fff04a"), "look": 3},
-	&"hex": {"color": Color("a63cff"), "look": 4},
-	&"static": {"color": Color("b4e82a"), "look": 5},
-}
+@export var deep_statuses: Dictionary = {&"freeze": &"chill"}
+@export_range(0.0, 60.0, 0.5) var status_mote_rate: float = 8.0
+@export_range(1.0, 8.0, 0.5) var status_deep_motes: float = 2.0
+@export_range(0.0, 1.0, 0.05) var status_deep_white: float = 0.75
 ## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `swing`, `burst`, `reaction`,
 ## `status`), so a new card feels like something before it has its own sound: `stop` and `shake`
 ## scale `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the
@@ -166,6 +108,5 @@ extends Resource
 ## How strongly a beam glows (1.0 full; the glow look, 2026-10-27). Its one-pixel core leaves
 ## room round it, so beams that cross (a split, a multicast) all still show.
 @export_range(0.2, 1.0, 0.05) var beam_alpha: float = 0.7
-## The cast flash on the wizard and the flare where a shot ends are data on the carrier cards
-## (`FormBase.cast_look` and `impact_look`, staffs B6b), not in this preset. A card without a
-## look gets the plain cast flash and a burst `wall_spark_size` big.
+## The cast flash on the wizard and the flare where a shot ends are cues the carrier cards name
+## (`FormBase.cast_cue` and `impact_cue`, S6 2; `cast` and `impact` by default), not in this preset.

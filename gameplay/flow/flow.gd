@@ -135,6 +135,8 @@ const HORDE_ROOM_ID: StringName = &"horde"
 const MODE_WAVES: StringName = &"waves"
 const MODE_SANDBOX: StringName = &"sandbox"
 const MODE_HORDE: StringName = &"horde"
+## The cue played on every standing wizard as a wave starts (`_show_wave_start`).
+const WAVE_START_CUE: StringName = &"wave_start"
 ## The actions of `sandbox_action_requested`.
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 ## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
@@ -339,6 +341,15 @@ func get_wizard(index: int) -> Node2D:
 	return null
 
 
+## A wave starting: its cue (WAVE_START_CUE, content/cues; S6, item 13) on every wizard standing in
+## the world, so content gives the moment its look.
+func _show_wave_start() -> void:
+	for wizard: Node2D in _wizards:
+		var actor := wizard as Actor
+		if actor != null and is_instance_valid(actor) and actor.is_inside_tree() and not actor.is_down():
+			events.cue_shown.emit(actor.id, WAVE_START_CUE, actor.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
+
+
 ## The home seat of a wizard actor (its PlayerController's), or -1.
 func _seat_of(wizard: Node) -> int:
 	var controller: PlayerScript = PlayerScript.of(wizard)
@@ -415,6 +426,7 @@ func start_run(requester: int) -> bool:
 				events.horde_started.emit(new_world)
 			MODE_WAVES:
 				events.wave_started.emit(wave)
+				_show_wave_start()
 	return true
 
 
@@ -675,6 +687,7 @@ func _start_next_wave() -> void:
 	state = State.RUNNING
 	if events != null:
 		events.wave_started.emit(wave)
+		_show_wave_start()
 
 
 ## The sandbox's answer to everyone down: they all stand up where they are, protected for a

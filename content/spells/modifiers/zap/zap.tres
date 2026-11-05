@@ -14,3 +14,4 @@ behaviour = 20
 behaviour_strength = 0.5
 behaviour_reach = 60.0
 look_layer = 18
+cue = &"zap"

@@ -303,7 +303,7 @@ func test_the_other_marks_come_from_their_cues() -> void:
 	feel.play_cue(&"nova", 0, Vector2(300.0, 150.0))
 	check_equal(roundi(marks.pending_row(0)[8] * MarksScript.KIND_CODE), marks.kind_index(&"burn_ring"), "a nova burns a ring round its caster")
 	var rune: FormBase = registry.get_resource(&"spells", &"rune") as FormBase
-	check_equal(StringName(rune.impact_look.get("cue", "")), &"rune_burst", "a rune's impact plays rune_burst")
+	check_equal(rune.impact_cue, &"rune_burst", "a rune's impact plays rune_burst")
 	feel.play_cue(&"rune_burst", 0, Vector2(300.0, 150.0), Vector2.RIGHT, rune.radius)
 	check_equal(roundi(marks.pending_row(1)[8] * MarksScript.KIND_CODE), marks.kind_index(&"rune_scar"), "which leaves a rune's scar")
 	check_equal(marks.pending_row(1)[0], roundf(rune.radius), "as big as the rune")

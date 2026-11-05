@@ -10,14 +10,14 @@ blend_mode = 1
 
 [node name="Torch" type="Node2D"]
 
-[node name="Glow" type="Sprite2D" parent="."]
+[node name="Glow" type="Sprite2D" parent="." groups=["painted_light"]]
 modulate = Color(1, 1, 1, 0.14)
 material = SubResource("CanvasItemMaterial_add")
 texture_filter = 1
 position = Vector2(16, 10)
 texture = ExtResource("2_glow")
 
-[node name="Core" type="AnimatedSprite2D" parent="."]
+[node name="Core" type="AnimatedSprite2D" parent="." groups=["painted_light"]]
 modulate = Color(1, 1, 1, 0.22)
 material = SubResource("CanvasItemMaterial_add")
 texture_filter = 1

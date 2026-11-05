@@ -18,12 +18,19 @@ extends Node
 ##
 ## Run in a window it is the showcase: a line at the top shows the live numbers, and with `--stay`
 ## it keeps casting after the report. User arguments: `--seconds=N` (SECONDS), `--cap=N` (the projectile cap; the platform's by default), `--no-native` (the
-## projectile manager's GDScript), `--no-tails` (the shots without their tails: the manager's
+## projectile manager's GDScript), `--cards=a,b,c` (another build on the storm's staff, card ids: a beam build, say, whose
+## hits are not shots, so it passes with none; spell spectacle 2, S6 items 10 and 11),
+## `--no-tails` (the shots without their tails: the manager's
 ## `tails_enabled` off, docs/milestones/spell-spectacle-2.md, S5), `--stay`, `--profile` (the tree profile, tree_profile.gd: each
 ## script's time a physics step and a frame) and `--profile-signals` (with it, the time of each
 ## listener of the hot events, PROFILED_SIGNALS). It is the benchmark for drawing many shots that
 ## hit: the frame's parts and the manager's drawing (`BENCH: storm draw`) are printed beside the
 ## counts; in a window (or under xvfb-run) the renderer runs too.
+##
+## On a real GPU in a browser: the Web Test export started with `--storm` (the main menu adds this
+## runner, as it does the stress run's), e.g. the owner's harness `wingpu.sh build/web-test 120
+## "--storm --seconds=10"`; the page's `args` are read like the user arguments. Its frame time is the
+## real one (no `--fixed-fps` there), uncapped when Chrome runs without vsync.
 ##
 ## The wizard is placed among the dummies at the start and kept up (mana full, revived and
 ## protected), since the shooting dummy in the other lane shoots back.
@@ -102,6 +109,8 @@ var _peak_shots: int = 0
 var _shot_sum: int = 0
 var _shot_samples: int = 0
 var _show_left: float = 0.0
+## Whether the storm's staff holds another build (`--cards`).
+var _own_cards: bool = false
 
 
 func _ready() -> void:
@@ -118,7 +127,7 @@ func _ready() -> void:
 	if _events == null or _flow == null or _input == null or _projectiles == null or _combat == null:
 		_finish(["the Events, Flow, PlayerInput, Projectiles and Combat autoloads must exist"])
 		return
-	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var args: PackedStringArray = _arguments()
 	stay = args.has("--stay")
 	for arg in args:
 		if arg.begins_with("--seconds="):
@@ -140,6 +149,17 @@ func _ready() -> void:
 			_feel.call(&"use_motes", timed)
 	if args.has("--no-native"):
 		_projectiles.set(&"native", false)
+	for arg in args:
+		if arg.begins_with("--cards="):
+			# Another build on the storm's staff (a beam or swing build: what Feel draws itself and
+			# its motes; spell spectacle 2, S6 items 10 and 11), comma separated card ids.
+			var cards: Array = []
+			for id in arg.trim_prefix("--cards=").split(",", false):
+				cards.append(StringName(id))
+			var all: Array = (_flow.get("sandbox_cards") as Array).duplicate(true)
+			all[STORM_STAFF] = cards
+			_flow.set("sandbox_cards", all)
+			_own_cards = true
 	if args.has("--no-tails"):
 		_projectiles.call(&"set_tails_enabled", false)
 	if int(_input.call("add_virtual_device", PLAYER)) == int(_input.get("NO_DEVICE")):
@@ -193,7 +213,7 @@ func _start() -> void:
 	if _dummies.is_empty():
 		_finish(["the sandbox has no dummies"])
 		return
-	var cards: Array = (FlowScript.SANDBOX_START_CARDS[STORM_STAFF] as Array)
+	var cards: Array = (_flow.get("sandbox_cards") as Array)[STORM_STAFF] as Array
 	print("BENCH: storm: the sandbox's %s staff on %s, held for %.0f s at %s, %d dummies, cap %d, native %s" % [
 		String(_wizard.caster.staffs[STORM_STAFF].id) if _wizard.caster.staffs.size() > STORM_STAFF and _wizard.caster.staffs[STORM_STAFF] != null else "?",
 		" ".join(PackedStringArray(cards)), seconds, STORM_AT, _dummies.size(),
@@ -213,7 +233,7 @@ func _start() -> void:
 		_skipped_at = int(motes.get(&"settles_skipped"))
 	_probe = ProbeScript.new()
 	add_child(_probe)
-	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var args: PackedStringArray = _arguments()
 	if args.has("--profile") or args.has("--profile-signals"):
 		_tree_profile = TreeProfileScript.new()
 		add_child(_tree_profile)
@@ -364,6 +384,12 @@ func _report() -> void:
 		_tree_profile.call(&"report")
 
 
+## The run's arguments: the user ones (after "--") and the plain ones, which is how a web page's
+## start config (`args`) hands them over in the Web Test export (`--storm`, the main menu).
+static func _arguments() -> PackedStringArray:
+	return OS.get_cmdline_user_args() + OS.get_cmdline_args()
+
+
 ## Feel's motes (null with them off).
 func _motes() -> Node:
 	return _feel.call(&"motes") as Node if _feel != null else null
@@ -373,7 +399,8 @@ func _failures() -> Array[String]:
 	var found: Array[String] = []
 	if _casts == 0:
 		found.append("the wizard never cast")
-	if _hits == 0:
+	# Another build (`--cards`) may make no shots at all (a beam's hits are not shots).
+	if _hits == 0 and not _own_cards:
 		found.append("no shot hit a dummy")
 	var lines: Array[String] = _log.call("get_lines")
 	for line in lines:

@@ -134,7 +134,8 @@ const NEEDS: Dictionary = {
 ## and modifiers, mixed at random from its tail; two cards with the same kind add nothing more.
 @export var look_layer: int = 0
 ## The cue (`content/cues`) Feel plays when this card's behaviour goes off: `blast`'s explosion,
-## as big as its radius. When several cards of one behaviour name a cue, the first in slot order
+## as big as its radius, or `zap`'s arc wherever a zap shows itself (`form_shown` names the card;
+## as long as the zap). When several cards of one behaviour name a cue, the first in slot order
 ## is played (`CompiledSpell.cue_of`); none plays nothing.
 @export var cue: StringName = &""
 

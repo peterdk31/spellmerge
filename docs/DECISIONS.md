@@ -12,6 +12,14 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Cost:** about 0.7 us a hit of bookkeeping (300 wall impacts a frame: about +0.2 ms on desktop headless, noisy runs; `test_hit_shares.gd`'s setup timed). Not measured on the GPU web build yet.
 - **Tests:** `test_hit_shares.gd`: a lone staff beside a crowd, a thinned staff never past its share, staffs with room never thinned, the groups, a Fireball's wall impact whole every frame in a Storm of 300 hits (0 motes without the sharing), the Storm's impacts whole or none, and a body hit's damage spray following its impact's roll.
 
+## 2026-11-05: The flash shader made as fast as before flash kinds (owner session)
+
+- **Measured first** (the web storm on the owner's GPU, `webstorm.sh --seconds=10`, main before #569 against #569, three pairs, one left out for a loaded machine): frame time avg 6.0 against 6.5-7.0 ms, p95 15.3-15.8 against 17.3-19.4 ms. The game was the same (5,947 hits each run), and the shader compiled and ran on Chrome's ANGLE/Direct3D. The owner: "build the fix and optimize it more if you can".
+- **Fewer texels:** a curve's search stops at the first segment not started (they start in order), and a curve the kind does not give is read as its default without a texel: a third head texel holds the mask of the curves it gives (`FlashTable.given_of`, `HEADS` 3; the shader's defaults at each `curve()` call are `FlashTable.DEFAULTS`, a test holds them). Each quad reads only the curves it draws: the glow its glow and the ring and column it lights round, the shape its parts and shades.
+- **Smaller quads:** the shape and the glow were each drawn over the flash's whole square (24 x zoom across); now each covers only what it can colour, with a margin: the shape its parts' reach (a ring + 1, the dots + 2, the rays + 1) and its column, the glow its two falloffs' reach (`falloff` is 0 past it) round its ring or column, and no glow quad at all when its glow is 0. The fragment works out an angle or a hash only for a part the flash has.
+- **The same pixels, but for ties:** the comparison render (old shader against new, 4,752 cases of the ported kinds and 2,592 of F4's, as #569's) gave every pixel the same for flashes along an axis, and 139 pixels in all differ for flashes turned 0.6 rad: one edge pixel at a time, whose centre lies on a grid line to within a float's last bit, which a quad of other corners interpolates the other way. Not a change of shape. The probe was not committed this time (#569's first F2 commit has it).
+- **Measured after** (the same storm, three alternated pairs): before 6.17/15.6, 6.03/15.0 ms (and 7.39/20.4 on a loaded run), after 6.10/15.1, 6.01/14.5, 6.32/15.9 ms: the same within the noise, so flash kinds cost nothing measurable in the storm.
+
 ## 2026-11-05: Four new drawings for flashes (flash kinds F4, owner session)
 
 - **Asked:** the owner's "Add them" to the plan's question 4 (a star, rays, a dotted ring, a spiral).

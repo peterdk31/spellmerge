@@ -56,12 +56,21 @@ func test_problems_names_what_is_wrong() -> void:
 func test_the_table_is_laid_out_as_the_shader_reads_it() -> void:
 	var kinds: Array[FlashKind] = [_kind(&"burst"), _kind(&"rune_burst"), _kind(&"quake")]
 	var image: Image = FlashTableScript.image_of(kinds)
+	var code: String = (load("res://core/projectiles/shot_flash.gdshader") as Shader).code
 	check_equal(image.get_width(), FlashTableScript.TEXELS, "TEXELS a row")
 	check_equal(image.get_height(), 3, "a row a kind")
 	check_equal(image.get_pixel(0, 1), Color(0.0, 1.0, 33.0, 6.0), "the rune's head: a shape, a diamond, salt 33, the spiral's gap")
 	check_equal(image.get_pixel(1, 1), Color(4.0, 8.0, 12.0, 1.0), "and its counts: star points, rays, dots, spiral arms")
+	var given: int = roundi(image.get_pixel(2, 1).r)
+	check_equal(given, FlashTableScript.given_of(_kind(&"rune_burst")), "and the curves it gives")
+	check(given & (1 << FlashTableScript.CURVES.find(&"ring")) != 0 and given & (1 << FlashTableScript.CURVES.find(&"arm")) == 0, "a ring, no cross")
+	# The shader takes each curve a kind does not give as its default: the same number at every call.
+	for c in FlashTableScript.CURVES.size():
+		var name: String = String(FlashTableScript.CURVES[c]).to_upper()
+		var default: String = str(FlashTableScript.DEFAULTS[FlashTableScript.CURVES[c]]).pad_decimals(1)
+		var calls: int = code.count("curve(row, C_%s, a, z, given, " % name)
+		check(calls > 0 and calls == code.count("curve(row, C_%s, a, z, given, %s)" % [name, default]), "the shader's default for %s is %s" % [name, default])
 	check_equal(image.get_pixel(0, 2).r, 2.0, "the quake's cracks")
-	var code: String = (load("res://core/projectiles/shot_flash.gdshader") as Shader).code
 	check(code.contains("const int SEGMENTS = %d;" % FlashTableScript.MAX_SEGMENTS), "the shader's SEGMENTS")
 	check(code.contains("const int HEADS = %d;" % FlashTableScript.HEADS), "the shader's HEADS")
 	check(15 + 16 * FlashKind.MAX_RAYS < 512 and FlashKind.MAX_POINTS < 16 and FlashKind.MAX_DOTS < 128, "the counts pack into the shader's floats")

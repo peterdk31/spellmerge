@@ -3,7 +3,9 @@ extends RefCounted
 ## docs/milestones/flash-kinds.md): a texture of a row a kind, in the kinds' order, so a new kind
 ## (content/flashes) needs no shader edit. A row is TEXELS texels (RGBAF):
 ##   texel 0             its draw (DRAW_*), metric (0 round, 1 diamond, 2 flat), salt and spiral gap
-##   texel 1             its star's points, rays, dots and spiral arms (HEADS texels in all)
+##   texel 1             its star's points, rays, dots and spiral arms
+##   texel 2             the curves it gives, a bit each (bit n: CURVES[n]); the shader reads
+##                       only those and takes the others' DEFAULTS without a texel (HEADS in all)
 ##   then each curve     (FlashKind.NUMBER_CURVES, then SHADE_CURVES) as MAX_SEGMENTS segments of two
 ##                       texels: (start, end of its way, WAY_*, 0) and (from, from_z, to, to_z); a
 ##                       segment past the last starts at 2 (never). The shader takes the last
@@ -18,7 +20,7 @@ const CURVES: Array[StringName] = [
 	&"first", &"second", &"star", &"rays", &"rays_inner", &"dots", &"spiral", &"spiral_turn",
 ]
 ## Texels a row: the head, then two a segment of each curve (the shader's HEADS and SEGMENTS).
-const HEADS: int = 2
+const HEADS: int = 3
 const TEXELS: int = HEADS + 21 * MAX_SEGMENTS * 2
 ## The draws the shader knows (its D_*); a kind drawn by another shader has no row worth reading.
 const DRAW_CODES: Dictionary = {&"shape": 0.0, &"clouds": 1.0, &"cracks": 2.0}
@@ -56,6 +58,7 @@ static func row_of(kind: FlashKind) -> Array[Color]:
 	var texels: Array[Color] = [
 		Color(float(DRAW_CODES.get(kind.draw, -1.0)), float(METRIC_CODES.get(kind.metric, 0.0)), float(kind.salt), kind.spiral_gap),
 		Color(float(kind.star_points), float(kind.ray_count), float(kind.dot_count), float(kind.spiral_arms)),
+		Color(float(given_of(kind)), 0.0, 0.0, 0.0),
 	]
 	for curve: StringName in CURVES:
 		texels.append_array(_curve_texels(kind.curve_of(curve), float(DEFAULTS[curve]), FlashKind.SHADE_CURVES.has(curve)))
@@ -89,6 +92,15 @@ static func _curve_texels(curve: Array[Dictionary], default: float, shade: bool)
 		texels.append(Color(at, end, float(WAY_CODES.get(StringName(segment.get("way", "linear")), 0.0)), 0.0))
 		texels.append(Color(from, from_z, float(segment.get("to", from)), float(segment.get("to_z", from_z))))
 	return texels
+
+
+## The curves `kind` gives, a bit each in CURVES' order (21 bits: whole in a float).
+static func given_of(kind: FlashKind) -> int:
+	var given: int = 0
+	for c in CURVES.size():
+		if not kind.curve_of(CURVES[c]).is_empty():
+			given |= 1 << c
+	return given
 
 
 ## `kind`'s curve `curve` at `age` (0 to 1) and `zoom`, as the shader works it out (for tests).

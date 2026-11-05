@@ -100,7 +100,10 @@ const SPREAD_BONUS: float = 0.1
 
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"entities", &"target", &"grudge", &"plan_target", &"_face", &"_target_id"]
+const DERIVED: Array[StringName] = [&"entities", &"_face", &"_target_id"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"target", &"grudge", &"plan_target"]
 
 ## The actor it drives, the profile it plays by and Entities (its team board; null: none).
 var actor: Actor = null

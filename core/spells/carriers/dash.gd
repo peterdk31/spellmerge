@@ -7,6 +7,8 @@ extends CarrierMove
 ## A dash under way (rules R4c, `_start_pass`): it strikes every body its mover passes, once each.
 class MovePass:
 	extends RefCounted
+	## Who it points at is state (online-ready N1, core/sim/README.md): the bodies it struck.
+	const REFS: Array[StringName] = [&"struck"]
 	var tag: int = 0
 	var spell: CompiledSpell = null
 	var actor: int = 0

@@ -11,6 +11,9 @@ extends RefCounted
 ## is a carrier (the bases, `Carrier`, `CarrierMove` and `CarrierEntity`, have none).
 const FOLDER: String = "res://core/spells/carriers/"
 
+## Not state (online-ready N1, core/sim/README.md): the carriers made once per script, shared by every runtime.
+const DERIVED: Array[StringName] = [&"_shared", &"_none"]
+
 static var _shared: Dictionary = {}
 static var _none: Carrier = Carrier.new()
 

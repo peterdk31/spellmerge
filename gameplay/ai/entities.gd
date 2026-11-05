@@ -107,7 +107,10 @@ const DRAW_Z: int = 40
 
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"_caster", &"_enemies"]
+const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"spells"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_caster", &"_enemies"]
 ## What only the drawing reads and writes (online-ready N1, N9).
 const VIEW: Array[StringName] = [&"_familiar_node"]
 

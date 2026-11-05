@@ -17,6 +17,8 @@ extends Resource
 var ids: Array[StringName] = []
 ## Weight of id `i` at point `p` is `_weights[p * ids.size() + i]`; filled by `prepare()`.
 var _weights: PackedFloat32Array = PackedFloat32Array()
+## Not state (online-ready N1, core/sim/README.md): a stand-in made once.
+const DERIVED: Array[StringName] = [&"_empty"]
 ## Stands in for a null point.
 static var _empty: HordeCurvePoint = HordeCurvePoint.new()
 

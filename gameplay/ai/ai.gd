@@ -30,8 +30,8 @@ const GRUDGE_TIME: float = AIBrain.GRUDGE_TIME
 const SIGHT: float = AIBrain.SIGHT
 const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
+## Not state (online-ready N1, core/sim/README.md): the Entities service, and `target` and `grudge`,
+## which read the brain's (walked there, as REFS).
 const DERIVED: Array[StringName] = [&"entities", &"target", &"grudge"]
 
 ## How it plays (null: its home actor's data's profile, else the shared default).

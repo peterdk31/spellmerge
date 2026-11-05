@@ -9,9 +9,9 @@ extends Carrier
 ## `slam_*` getters (`CarrierSlam.of(spells)`).
 
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"_sl_source"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_sl_source"]
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
 ## one is on. Each keeps what a swing keeps for its hits, the hand it is held by and the aim locked

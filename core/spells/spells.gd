@@ -152,6 +152,8 @@ const ZAP_DUE: int = 8
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
 class PendingLaunch:
 	extends RefCounted
+	## Who it points at is state (online-ready N1, core/sim/README.md): the body it is cast from.
+	const REFS: Array[StringName] = [&"source"]
 	var due: float = 0.0
 	var actor: int = 0
 	var staff: int = 0
@@ -186,7 +188,10 @@ const REFUSED: float = -1.0
 
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_rec_due_body", &"_zap_near", &"_strike_bodies", &"_jq_target"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 
 ## The shots one budget's trigger fires may make in one step (`SpellLimits.FIRE_SHOTS_PER_STEP`
 ## unless a benchmark sets another); a fire past it waits for the next step.

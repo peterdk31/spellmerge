@@ -42,7 +42,7 @@ static var keep_wasted: bool = false
 
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"_lookup"]
+const DERIVED: Array[StringName] = [&"_lookup", &"keep_wasted"]
 
 ## id -> SpellComponent (or null for an unknown id).
 var _lookup: Callable

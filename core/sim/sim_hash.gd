@@ -2,32 +2,48 @@ class_name SimHash
 extends RefCounted
 ## The state hash (online-ready N1, docs/milestones/online-ready.md): one 64-bit hash per area and
 ## one for the whole game, from `StateWalk`. The caller hands it the areas by name (the tick does from
-## N3; a test does now): areas never reach into each other. Two runs that agree hash the same, to
-## the bit; every leaf is hashed by its bytes (`var_to_bytes`; a packed array by the engine's
-## `hash()`, in one call), in the walker's fixed order.
+## N3; a test does now): areas never reach into each other. Two runs that agree hash the same; every
+## leaf is hashed by its bytes (`var_to_bytes`), a packed array or a typed array of plain values by
+## the engine's `hash()` in one call, in the walker's fixed order.
+##
+## One thing the bytes tell apart and `hash()` does not: inside a packed or typed array the engine
+## hashes -0.0 as 0.0 and every NaN alike. Two runs that part only by the sign of a zero in an array
+## hash the same; the desync report (`Desync`), which compares leaves byte for byte, still tells
+## them apart.
 ##
 ## It runs only in tests, tools, replays and later the netcode (then once a second), never in a
 ## normal build's tick.
 ##
-##     var hashes: Dictionary[String, int] = SimHash.areas({"combat": combat, "projectiles": shots})
+##     var walk := StateWalk.new()
+##     var hashes: Dictionary[String, int] = SimHash.areas({"combat": combat, "projectiles": shots}, walk)
 ##     var whole: int = SimHash.whole(hashes)
-
-## The problems the last `areas` call met (StateWalk.problems).
-static var problems: PackedStringArray = PackedStringArray()
+##     assert(walk.problems.is_empty())
 
 
-## Each area's hash, by name, in the order given.
-static func areas(named: Dictionary) -> Dictionary[String, int]:
-	var out: Dictionary[String, int] = {}
-	var walk := StateWalk.new()
+## Each area's hash, by name, in the order given. Problems go to `walk.problems` (a walk of the
+## caller's, or a throwaway one).
+static func areas(named: Dictionary, walk: StateWalk = null) -> Dictionary[String, int]:
+	if walk == null:
+		walk = StateWalk.new()
 	walk.with_paths = false
+	var out: Dictionary[String, int] = {}
 	for name: Variant in named:
-		var context := HashingContext.new()
-		context.start(HashingContext.HASH_MD5)
-		walk.walk(String(name), named[name] as Object, func(_path: String, value: Variant) -> void: feed(context, value))
-		out[String(name)] = context.finish().decode_s64(0)
-	problems = walk.problems
+		out[String(name)] = area(walk, String(name), named[name] as Object)
 	return out
+
+
+## One area's hash by `walk`. With `also`, every leaf is handed to `also(path, value)` too (the
+## desync report keeps a tick's leaves so); the walk's `with_paths` says whether paths are built.
+static func area(walk: StateWalk, name: String, object: Object, also: Callable = Callable()) -> int:
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_MD5)
+	if also.is_valid():
+		walk.walk(name, object, func(path: String, value: Variant) -> void:
+			feed(context, value)
+			also.call(path, value))
+	else:
+		walk.walk(name, object, func(_path: String, value: Variant) -> void: feed(context, value))
+	return context.finish().decode_s64(0)
 
 
 ## The whole game's hash from the areas' (`areas`), in their order.

@@ -16,7 +16,10 @@ extends Carrier
 const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"_bm_source", &"_steer_call", &"_bm_due_body", &"_zap_near"]
+const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_bm_source", &"_bm_due_body"]
 
 ## The live beams (see `start`), rows that double when every one is on (`_grow_beams`);
 ## `_bm_on` says which are in use. Each keeps what a shot's record keeps (fires, chain) plus where it is: its origin,

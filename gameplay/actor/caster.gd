@@ -62,6 +62,9 @@ var current: int = 0
 ## -1 while it has none (out of the tree, or no actor id): the actor's `id` (actors G3b).
 var number: int = -1
 
+## Not state (online-ready N1, core/sim/README.md): the compiled staffs' cache.
+const DERIVED: Array[StringName] = [&"_cache"]
+
 ## Every compiled staff, by "spells id|staff id|cards".
 static var _cache: Dictionary = {}
 

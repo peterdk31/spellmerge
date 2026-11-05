@@ -36,28 +36,24 @@ func _init(keep: int = -1) -> void:
 
 ## Records one tick of `areas` ({name: object}).
 func capture(areas: Dictionary) -> void:
-	var tick_hashes: Dictionary[String, int] = {}
-	var tick_leaves: Dictionary = {}
+	var keep: bool = hashes.size() == keep_tick
 	var walk := StateWalk.new()
-	for name: Variant in areas:
-		var area: String = String(name)
-		var context := HashingContext.new()
-		context.start(HashingContext.HASH_MD5)
-		var kept: Dictionary = {}
-		var keep: bool = hashes.size() == keep_tick
-		walk.walk(area, areas[name] as Object, func(path: String, value: Variant) -> void:
-			SimHash.feed(context, value)
-			if keep:
-				kept[path] = value)
-		tick_hashes[area] = context.finish().decode_s64(0)
-		if keep:
-			tick_leaves[area] = kept
+	# Paths only for the kept tick: building a string per leaf is most of a walk's time (a
+	# determinism test took 101 s with them every tick, 28 s without).
+	walk.with_paths = keep
+	if not keep:
+		hashes.append(SimHash.areas(areas, walk))
+	else:
+		var tick_hashes: Dictionary[String, int] = {}
+		leaves = {}
+		for name: Variant in areas:
+			var kept: Dictionary = {}
+			tick_hashes[String(name)] = SimHash.area(walk, String(name), areas[name] as Object, func(path: String, value: Variant) -> void: kept[path] = value)
+			leaves[String(name)] = kept
+		hashes.append(tick_hashes)
 	for problem in walk.problems:
 		if not problems.has(problem):
 			problems.append(problem)
-	if hashes.size() == keep_tick:
-		leaves = tick_leaves
-	hashes.append(tick_hashes)
 
 
 ## The first tick at which `a` and `b` part (hashes differ, or one run is shorter), or -1.
@@ -117,8 +113,8 @@ static func members_parting(a: Dictionary, b: Dictionary) -> PackedStringArray:
 	return out
 
 
-## Bit for bit: the same type and the same bytes (so -0.0 and 0.0, or two NaNs, are told apart
-## as the hash tells them).
+## Bit for bit: the same type and the same bytes, so -0.0 and 0.0, or two NaNs, are told apart
+## (the hash tells them apart in a single value, not inside a packed array: see `SimHash`).
 static func _same(x: Variant, y: Variant) -> bool:
 	return typeof(x) == typeof(y) and var_to_bytes(x) == var_to_bytes(y)
 

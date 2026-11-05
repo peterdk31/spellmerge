@@ -67,7 +67,10 @@ const REVIVE_PROTECTION: float = 1.5
 
 ## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
 ## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"events", &"camera", &"_wizards"]
+const DERIVED: Array[StringName] = [&"events", &"camera"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_wizards"]
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.

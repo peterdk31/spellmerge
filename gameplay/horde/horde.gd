@@ -170,7 +170,7 @@ func _init() -> void:
 	_wizard_at.resize(SEATS)
 	_standing.resize(SEATS)
 	_present.resize(SEATS)
-	rng.randomize()
+	rng.seed = SimSeed.fresh()
 
 
 func _ready() -> void:

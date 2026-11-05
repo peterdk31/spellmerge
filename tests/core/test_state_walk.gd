@@ -21,6 +21,33 @@ class Holder:
 	var call_me: Callable = Callable()
 
 
+## A body with an id (as an actor has), for references.
+class Body:
+	extends Node
+	var id: int = 3
+
+
+class Pointer:
+	extends RefCounted
+	const REFS: Array[StringName] = [&"target", &"due"]
+	var target: Node = null
+	var due: Array[Node] = []
+
+
+class Based:
+	extends RefCounted
+	const DERIVED: Array[StringName] = [&"cache"]
+	var cache: int = 0
+	var kept: int = 0
+
+
+## A script that extends one with a list cannot declare it again; it names a list of its own.
+class Extended:
+	extends Based
+	const DERIVED_EXTENDED: Array[StringName] = [&"scratch"]
+	var scratch: int = 0
+
+
 func test_derived_and_view_members_are_not_hashed() -> void:
 	var a := Plain.new()
 	var hashed: int = SimHash.of(a)
@@ -97,3 +124,53 @@ func test_runs_that_agree_have_no_report() -> void:
 		a.capture({"area": Plain.new()})
 		b.capture({"area": Plain.new()})
 	check_equal(Desync.compare(a, b), "", "no report")
+
+
+func test_a_reference_is_hashed_as_who_it_points_at() -> void:
+	var body := own(Body.new()) as Body
+	var other := own(Node.new()) as Node
+	var a := Pointer.new()
+	a.target = body
+	a.due = [other, null]
+	var walk := StateWalk.new()
+	var leaves: Dictionary = {}
+	walk.walk("a", a, func(path: String, value: Variant) -> void: leaves[path] = value)
+	check(walk.problems.is_empty(), "a reference listed in REFS is no problem: %s" % ", ".join(walk.problems))
+	check(String(leaves.get("a.target", "")).ends_with("#3"), "the body is named by its id: %s" % [leaves.get("a.target")])
+	check_equal(leaves.get("a.due[0]"), "Node", "a body without an id is named by what it is")
+	check_equal(leaves.get("a.due[1]"), null, "an empty one is null")
+	var before: int = SimHash.of(a)
+	body.set(&"name", "Moved")
+	check_equal(SimHash.of(a), before, "a reference is never entered: the body's own members leave it alone")
+	body.id = 4
+	check(SimHash.of(a) != before, "pointing at another actor changes the hash")
+	# Only filled entries are walked (a slot-sized array is nearly all empty); their index counts.
+	a.due = [null, other, null]
+	var at_one: int = SimHash.of(a)
+	a.due = [null, null, other]
+	check(SimHash.of(a) != at_one, "the same body in another slot changes the hash")
+	a.due = [null, null, null]
+	var empty: int = SimHash.of(a)
+	a.due = [null, null]
+	check(SimHash.of(a) != empty, "an empty array's size counts")
+
+
+func test_a_list_may_carry_a_name_of_its_own() -> void:
+	check_equal(StateWalk.members(Extended), PackedStringArray(["kept"]), "DERIVED and DERIVED_EXTENDED are both skipped")
+	check_equal(StateWalk.listed(Extended, "DERIVED"), PackedStringArray(["scratch", "cache"]), "the lists of the script and its base")
+
+
+func test_a_dictionary_keyed_by_an_object_is_a_problem() -> void:
+	var a := Plain.new()
+	a.table = {Plain.new(): 1}
+	var walk := StateWalk.new()
+	walk.walk("a", a, func(_path: String, _value: Variant) -> void: pass)
+	check(", ".join(walk.problems).contains("keyed by an object"), "an object key is named: %s" % ", ".join(walk.problems))
+
+
+func test_the_report_keeps_paths_only_for_its_tick() -> void:
+	var a := Desync.new(1)
+	for tick in 3:
+		a.capture({"area": Plain.new()})
+	check(a.leaves.has("area") and (a.leaves["area"] as Dictionary).has("area.health"), "the kept tick's leaves are named by path")
+	check_equal(a.hashes[0], a.hashes[1], "a kept tick hashes as any other")

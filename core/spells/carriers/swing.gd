@@ -9,9 +9,9 @@ extends Carrier
 ## the `swing_*` getters (`CarrierSwing.of(spells)`).
 
 
-## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
-## what is set up again or rebuilt from state.
-const DERIVED: Array[StringName] = [&"_sw_source"]
+## Who it points at is state (online-ready N1, core/sim/README.md): references to other bodies,
+## hashed as who they are (an actor by its id), never entered, until N5 gives every body an identity.
+const REFS: Array[StringName] = [&"_sw_source"]
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
 ## more when every one is on (no swing ends another); `_sw_on` says which are in use. Each keeps what a beam keeps for its hits (fires, chain, echo, its

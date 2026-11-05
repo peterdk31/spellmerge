@@ -6,7 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"on_expire"
-demo = true
 display_name = "On Expire"
 complexity = 1
 icon = ExtResource("2_icon")

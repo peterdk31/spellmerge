@@ -73,6 +73,25 @@ func test_without_a_set_bag_it_fills_with_every_card() -> void:
 	check_equal(Fixture.controller(body).bag.size(), 5, "the bag has every card of the registry")
 
 
+## Each run mode's bag (owner, 2026-11-05): flow hands it over with `seat_wizard`, before the
+## wizard is in the tree; the first fill keeps it, and binding announces it.
+func test_seat_wizard_gives_the_bag() -> void:
+	var body: Actor = _world.wizard(0, Vector2.ZERO, Fixture.NO_CARDS, null, false)
+	PlayerController.seat_wizard(body, 0, null, Fixture.NO_CARDS.duplicate(true), [], _ids("dash bolt"))
+	Fixture.controller(body).registry = _registry
+	_world.add(body)
+	check_equal(Fixture.controller(body).bag, _ids("dash bolt"), "the bag is the mode's, not every card")
+	check_equal(_bags.back(), [0, _ids("dash bolt")], "and it is announced")
+
+
+func test_seat_wizard_with_no_bag_fills_every_card() -> void:
+	var body: Actor = _world.wizard(0, Vector2.ZERO, Fixture.NO_CARDS, null, false)
+	PlayerController.seat_wizard(body, 0, null, Fixture.NO_CARDS.duplicate(true), [], [] as Array[StringName])
+	Fixture.controller(body).registry = _registry
+	_world.add(body)
+	check_equal(Fixture.controller(body).bag.size(), 5, "an empty bag means every card of the registry")
+
+
 func test_a_set_bag_replaces_the_filled_one_and_is_announced() -> void:
 	var body := _wizard(0)
 	_bags.clear()

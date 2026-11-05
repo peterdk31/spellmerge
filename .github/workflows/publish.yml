@@ -1,0 +1,221 @@
+# Publishes a build: the GitHub release, GitHub Pages and itch.io (docs/PLAN.md, "Daily run",
+# step 3). Two ways in:
+#
+#  - Run by hand (Actions > publish > Run workflow, on main, owner only): builds main with
+#    build.yml (every test, as the daily run does), then publishes to the places ticked.
+#    The channel is the quality gate's unless one is chosen. Pages without a release deploys
+#    the build as /preview/ only (/nightly/ and /play/ stay the releases, as preview.yml does);
+#    itch.io without a release pushes the zips under the planned version anyway.
+#  - Called by daily.yml once per place, after its own build (version given): nothing is built.
+#
+# The build's zips come from the calling run's "dist" artifact. Each place has its own
+# concurrency group, shared with the other workflows that publish there, so two runs never
+# publish to one place at the same time. No AI anywhere; only itch.io needs a secret.
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "GitHub release (tag, zips, checksums, attestation)"
+        type: boolean
+        default: true
+      pages:
+        description: "GitHub Pages (the web build)"
+        type: boolean
+        default: true
+      itch:
+        description: "itch.io (web, Windows and Linux, needs the ITCH_TARGET variable)"
+        type: boolean
+        default: true
+      channel:
+        description: "Channel: auto follows the quality gate (no open crash or blocker issue = stable)"
+        type: choice
+        options: [auto, nightly, stable]
+        default: auto
+  workflow_call:
+    inputs:
+      version:
+        description: the version the caller built (its "dist" artifact)
+        type: string
+        required: true
+      channel:
+        description: stable or nightly
+        type: string
+        required: true
+      commit:
+        description: the commit the caller built
+        type: string
+        required: true
+      release:
+        type: boolean
+        default: false
+      pages:
+        type: boolean
+        default: false
+      itch:
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ci
+
+jobs:
+  check:
+    name: check the manual run
+    if: ${{ !inputs.version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          REF: ${{ github.ref }}
+          ACTOR_ID: ${{ github.actor_id }}
+          OWNER_ID: ${{ vars.OWNER_ID }}
+          ANY: ${{ inputs.release || inputs.pages || inputs.itch }}
+        run: |
+          [[ "$REF" == refs/heads/main ]] || { echo "::error::Publish runs from main only (this run: $REF)."; exit 1; }
+          [[ -n "$OWNER_ID" && "$ACTOR_ID" == "$OWNER_ID" ]] || { echo "::error::Only the owner publishes by hand."; exit 1; }
+          [[ "$ANY" == true ]] || { echo "::error::Tick at least one place to publish to."; exit 1; }
+
+  build:
+    name: build
+    needs: check
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+      issues: read # quality gate
+    with:
+      channel: ${{ inputs.channel }}
+
+  release:
+    name: GitHub release
+    needs: build
+    if: ${{ !cancelled() && inputs.release && (inputs.version || needs.build.result == 'success') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    permissions:
+      contents: write # create the tag and release
+      id-token: write # build attestations
+      attestations: write
+    env:
+      VERSION: ${{ inputs.version || needs.build.outputs.version }}
+      CHANNEL: ${{ inputs.version && inputs.channel || needs.build.outputs.channel }}
+      COMMIT: ${{ inputs.version && inputs.commit || needs.build.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Verify checksums
+        run: cd dist && sha256sum --check SHA256SUMS
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.zip
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m smbot.release publish --version "$VERSION" --channel "$CHANNEL" --commit "$COMMIT"
+
+  pages:
+    name: GitHub Pages
+    needs: [build, release]
+    if: >-
+      ${{ !cancelled() && inputs.pages && (inputs.version || needs.build.result == 'success')
+      && needs.release.result != 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Shared with preview.yml's Pages job, so two deploys never overlap.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: read # the releases for /nightly/ and /play/
+      issues: read # Contribute page: the community queue
+      pull-requests: read # Contribute page: recently merged
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    env:
+      VERSION: ${{ inputs.version || needs.build.outputs.version }}
+      CHANNEL: ${{ inputs.version && inputs.channel || needs.build.outputs.channel }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no gallery without screenshots
+        with:
+          name: screenshots
+          path: screenshots
+      - name: The Spell atlas (smbot.clips; published on the screenshots branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true # no atlas yet: the site goes out without it
+        with:
+          ref: screenshots
+          path: published
+          sparse-checkout: atlas
+          persist-credentials: false
+      - name: Assemble the site (the day's release, or /preview/ when this version is not released)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            mode=(--channel "$CHANNEL")
+          else
+            echo "::notice::$VERSION is not released: deployed as /preview/ only."
+            mode=(--preview)
+          fi
+          python3 -m smbot.site --version "$VERSION" "${mode[@]}" --out site --screenshots screenshots \
+            --atlas published/atlas
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+          retention-days: 1
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
+
+  itch:
+    name: itch.io
+    needs: [build, release]
+    if: >-
+      ${{ !cancelled() && inputs.itch && (inputs.version || needs.build.result == 'success')
+      && needs.release.result != 'failure' && github.ref == 'refs/heads/main' && vars.ITCH_TARGET != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: itch
+      cancel-in-progress: false
+    environment: automation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - name: Push with butler
+        env:
+          BUTLER_API_KEY: ${{ secrets.BUTLER_API_KEY }}
+          TARGET: ${{ vars.ITCH_TARGET }}
+          VERSION: ${{ inputs.version || needs.build.outputs.version }}
+          CHANNEL: ${{ inputs.version && inputs.channel || needs.build.outputs.channel }}
+        run: ci/build/itch.sh "$TARGET" "$VERSION" "$CHANNEL" dist

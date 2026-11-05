@@ -27,7 +27,6 @@ cards = Array[StringName]([&"void", &"rain", &"nova"])
 script = ExtResource("1_base")
 id = &"bone_scepter"
 display_name = "Bone Scepter"
-demo = true
 max_health = 18.0
 move_speed = 30.0
 contact_damage = 0

@@ -27,7 +27,6 @@ cards = Array[StringName]([&"slow", &"bolt"])
 script = ExtResource("1_base")
 id = &"shooting_dummy"
 display_name = "Shooting dummy"
-demo = true
 max_health = 300.0
 move_speed = 0.0
 scene = ExtResource("2_scene")

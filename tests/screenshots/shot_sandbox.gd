@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of the sandbox (staffs B7a), the two-lane room of dev and preview builds.
+## Screenshots of the sandbox (staffs B7a), the two-lane room (Sandbox on the main menu, every build).
 ##
 ## Shots: one player firing fire bolts up the left lane at the training dummy and the group round
 ## it (damage numbers, DPS, burn); the pause menu's sandbox page open; four players, two per lane, with an imp

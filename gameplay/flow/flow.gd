@@ -38,8 +38,13 @@ extends Node
 ## Play and the horde the four basic staffs STARTER_HEADS (`content/wizard/staffs/`, one per
 ## button, each its own head), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
 ## no delay, practically infinite mana). The build channel plays no part. With them the mode's
-## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `fire bolt`, Y and B empty),
+## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `bolt`, Y and B empty),
 ## which the wizard builds itself; flow never touches a spell.
+##
+## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
+## bag (the cards it may build with, `bag_for_mode`, handed over with `seat_wizard`): Play `dash`
+## and `bolt` (PLAY_BAG, `play_bag`); the horde `dash` and `swing` (HORDE_BAG, which the horde
+## director's START_BAG matches, and its level-up picks add to); the sandbox every card.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -57,7 +62,7 @@ extends Node
 ## four-bot and stress runs) load like a player, and wait for `room_entered`.
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
-## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
+## main menu's Sandbox button, in every build) starts a run in the sandbox room
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
 ## `dummy_spawns` (more spawns stand more training dummies, a group to try homing, pierce and
 ## spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
@@ -105,10 +110,15 @@ const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
 const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
-## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
-const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
+## The cards each staff starts with in Play: A, X, Y, B (owner, 2026-11-05: dash and a bolt).
+const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
+## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05).
+const PLAY_BAG: Array[StringName] = [&"dash", &"bolt"]
 ## The cards a horde run starts with instead (owner, 2026-10-31): RB a dash staff, RT a swing staff.
 const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
+## The horde's bag at the start (owner, 2026-11-05: dash and swing; the horde director's
+## START_BAG is the same list, and its level-up picks add to it).
+const HORDE_BAG: Array[StringName] = [&"dash", &"swing"]
 ## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
 ## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
 ## Y, the most shots: a fire nova split three times (216 shots) whose every shot, when it ends,
@@ -196,6 +206,8 @@ var world_parent: Node = null
 var room_id_to_play: StringName = DEFAULT_ROOM_ID
 var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
 var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
+## Play's bag (PLAY_BAG unless a test sets another).
+var play_bag: Array[StringName] = PLAY_BAG.duplicate()
 ## What the sandbox's wizards start with instead (SANDBOX_START_CARDS unless a test or a
 ## screenshot sets other cards).
 var sandbox_cards: Array = SANDBOX_START_CARDS.duplicate(true)
@@ -877,10 +889,27 @@ func start_cards_for_mode() -> Array:
 	return start_cards
 
 
+## The bag a new wizard gets in this run's `mode`: HORDE_BAG in the horde, every spell card of
+## the registry in the sandbox, `play_bag` in Play.
+func bag_for_mode() -> Array[StringName]:
+	var out: Array[StringName] = []
+	match mode:
+		MODE_HORDE:
+			out.assign(HORDE_BAG)
+		MODE_SANDBOX:
+			if registry != null:
+				for id: StringName in registry.get_ids(&"spells"):
+					if registry.get_resource(&"spells", id) is SpellComponent:
+						out.append(id)
+		_:
+			out.assign(play_bag)
+	return out
+
+
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
 	var cards: Array = start_cards_for_mode()
-	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode())
+	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode(), bag_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

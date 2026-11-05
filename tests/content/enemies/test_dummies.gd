@@ -50,7 +50,6 @@ func _look(dummy: Actor) -> DummyLook:
 func test_the_data_names_its_scene() -> void:
 	check_equal(TrainingData.id, &"training_dummy", "training dummy id")
 	check_equal(ShootingData.id, &"shooting_dummy", "shooting dummy id")
-	check(TrainingData.demo and ShootingData.demo, "both are demo content, so the web preview has them")
 	check(ShootingData.move_speed == 0.0, "the shooting dummy does not walk")
 
 

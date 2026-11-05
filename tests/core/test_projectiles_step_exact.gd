@@ -13,7 +13,11 @@ extends SceneTree
 ## atom, when homing became a curve, radians a pixel flown: the same events, the turns differ by
 ## float rounding only, at most 0.00004 px; and again 2026-11-05 when the trails went, tails being
 ## motes: the same events, hits and live shots at every step, only the state line lost each shot's
-## trail and the trail count).
+## trail and the trail count; and again for shot scale H2, 2026-11-05: a hit costs 400 units of the
+## budget where it cost 40, the scene has a budget of its own (BUDGET, about the hits it had), and a
+## shot the budget passed over sweeps its whole untested path when it is next tested, or before it
+## ends: the events differ in the steps the flood spends the budget, from step 0 on in the state
+## line's work left).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -57,6 +61,9 @@ const DT: float = 1.0 / 60.0
 const STEPS: int = 90
 const ROOM: Vector2 = Vector2(640.0, 360.0)
 const CROWD: Vector2 = Vector2(330.0, 170.0)
+## The hit-work budget of the scene (`work_per_step`): about 125 hits a step, as before H2 repriced a
+## hit, so the flood spends it in about one step in five.
+const BUDGET: int = 50000
 ## Tags: what a handler does when a shot with it hits or expires.
 const TAG_PLAIN: int = 1
 const TAG_SPLITS: int = 2
@@ -183,6 +190,9 @@ func _run_scene() -> void:
 	_mgr.actors = _table
 	_mgr.events = _bus
 	_mgr.set_cap(700)
+	# A budget the flood spends, so the step defers shots and resumes (since H2, the game's own
+	# budget is sized for a crowd at the desktop cap and this scene would no longer reach it).
+	_mgr.work_per_step = BUDGET
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
 	var walls: Array[Rect2] = [
 		Rect2(0, 0, 640, 32), Rect2(0, 328, 640, 32), Rect2(0, 0, 32, 360), Rect2(608, 0, 16, 120),

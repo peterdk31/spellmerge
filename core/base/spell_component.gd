@@ -16,8 +16,6 @@ extends Resource
 ## Unique name of the component across all four kinds, also its folder name; the
 ## registry finds it by this under `spells`.
 @export var id: StringName = &""
-## True for content shown in the free web demo.
-@export var demo: bool = false
 ## Name shown in the builder, for example "Frost". Original names only.
 @export var display_name: String = ""
 ## A rough measure of the card's power (1-4). There is no complexity budget since the staffs

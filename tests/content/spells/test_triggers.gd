@@ -108,7 +108,6 @@ func test_every_trigger_loads_and_matches_its_folder() -> void:
 		check_equal(trigger.id, id, "%s: the id is the folder name" % id)
 		check(trigger.display_name != "", "%s has a name" % id)
 		check(trigger.icon != null, "%s has an icon" % id)
-		check(trigger.demo, "%s is in the web demo" % id)
 		check_equal(trigger.event, EVENTS[id], "%s: the event" % id)
 		check_equal(trigger.complexity, COMPLEXITY[id], "%s: complexity from the design table" % id)
 		check_equal(trigger.range_problems().size(), 0, "%s: %s" % [id, ", ".join(trigger.range_problems())])

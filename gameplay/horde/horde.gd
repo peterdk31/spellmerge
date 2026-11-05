@@ -53,7 +53,8 @@ const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres"
 
 const SEATS: int = 4
 ## The cards every wizard's bag holds at the start of a horde run (and a joiner's).
-## The cards of Flow's HORDE_START_CARDS (owner, 2026-10-31: a dash staff and a swing staff).
+## Flow's HORDE_BAG, the cards of its HORDE_START_CARDS (owner, 2026-10-31: a dash staff and a
+## swing staff).
 const START_BAG: Array[StringName] = [&"dash", &"swing"]
 ## The cues of a level-up (on every standing wizard) and of gems picked up (on the wizard that
 ## picked them; each played at most its `every` apart, CueBase), content's looks (S6, item 13).

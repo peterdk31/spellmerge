@@ -5,8 +5,6 @@ extends Resource
 
 ## Unique name of the enemy, also its folder name; the registry finds it by this.
 @export var id: StringName = &""
-## True for content shown in the free web demo.
-@export var demo: bool = false
 ## Its name for people (the enemy arena's picker); empty: its id.
 @export var display_name: String = ""
 @export var max_health: float = 1.0

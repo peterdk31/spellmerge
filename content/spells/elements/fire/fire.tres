@@ -6,7 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"fire"
-demo = true
 display_name = "Fire"
 complexity = 1
 icon = ExtResource("2_icon")

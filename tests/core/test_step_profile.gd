@@ -49,7 +49,7 @@ func test_a_profiled_step_times_every_part() -> void:
 		scene.mgr.step(DT)
 		var profile: PackedInt64Array = scene.mgr.step_profile
 		var label: String = "native" if scene.mgr.is_native() else "GDScript"
-		for part: int in [ManagerScript.PROF_REFRESH, ManagerScript.PROF_COMMON, ManagerScript.PROF_BEFORE, ManagerScript.PROF_HITS, ManagerScript.PROF_AFTER, ManagerScript.PROF_TRAILS]:
+		for part: int in [ManagerScript.PROF_REFRESH, ManagerScript.PROF_COMMON, ManagerScript.PROF_BEFORE, ManagerScript.PROF_HITS, ManagerScript.PROF_AFTER, ManagerScript.PROF_DASHES]:
 			check(profile[part] >= 1, "%s: part %d is timed (%d)" % [label, part, profile[part]])
 		if scene.mgr.is_native():
 			check(profile[ManagerScript.PROF_HANDBACKS] >= 1, "native: the kernel's calls are counted")
@@ -73,7 +73,7 @@ func test_the_parts_cover_the_whole_step() -> void:
 			scene.mgr.step(DT)
 		var profile: PackedInt64Array = scene.mgr.step_profile
 		var parts: int = 0
-		for part: int in [ManagerScript.PROF_REFRESH, ManagerScript.PROF_COMMON, ManagerScript.PROF_BEFORE, ManagerScript.PROF_HITS, ManagerScript.PROF_AFTER, ManagerScript.PROF_TRAILS]:
+		for part: int in [ManagerScript.PROF_REFRESH, ManagerScript.PROF_COMMON, ManagerScript.PROF_BEFORE, ManagerScript.PROF_HITS, ManagerScript.PROF_AFTER, ManagerScript.PROF_DASHES]:
 			parts += profile[part]
 		# The clock reads 1, 2, 3, ...: the step's whole span is the last read less the first.
 		check_equal(parts, reads.size() - 1, "%s: the parts follow each other with no gap from the step's first clock read to its last" % ("native" if scene.mgr.is_native() else "GDScript"))

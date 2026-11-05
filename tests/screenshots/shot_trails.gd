@@ -1,17 +1,16 @@
 extends "res://tests/support/screenshot.gd"
-## Trails (the owner, 2026-10-28: "the tail of projectiles turn with the projectile"): a shot's
-## tail and card particles stay in the world where it was, so they bend with any path. Drawn by
-## the real projectile manager, a column per infusion (plain, fire, frost, storm, void, lightning;
+## Tails (the owner, 2026-10-28: "the tail of projectiles turn with the projectile"; since
+## 2026-11-05 a tail is motes, each shot's in one of three tail kinds): a shot's tail and card
+## particles stay in the world where it was, so they bend with any path. Drawn by the real
+## projectile manager and Feel's motes, a column per infusion (plain, fire, frost, storm, void, lightning;
 ## the real cards' colours and looks):
 ##   top     homing bolts fired upward that turn hard toward a target to their right: the tail
 ##           follows the curve, it does not swing round with the head
 ##   middle  bolts that bounced off the wall above them and fly down again: the tail turns the
 ##           corner
-##   bottom  a dash (the caster's trail, `follow_caster`) along a curve, as a wizard that walks
-##           round while it dashes: the streaks and cards are where it went
-## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows). The shots'
-## card particles are Feel's motes (spell spectacle P1d; since S3 the trail shader draws none, a
-## dash's included: only its speed streaks).
+##   bottom  a dash (`follow_caster`) along a curve, as a wizard that walks round while it
+##           dashes: the streaks and cards are where it went
+## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -78,9 +77,10 @@ func take() -> void:
 		for e in 6:
 			_shots.call("set_anchor", dashers[e], _dash_point(e, float(n + 1) / 18.0))
 	var image: Image = await grab()
-	var drawn: int = int(_shots.get("drawn")) + int(_shots.get("drawn_trails"))
-	if drawn < 12:
-		fail("only %d trails were drawn" % drawn)
+	# Twelve shots fly (six homing, six bounced); a homing one may have ended on its target.
+	var drawn: int = int(_shots.get("drawn"))
+	if drawn < 10:
+		fail("only %d shots were drawn" % drawn)
 		return
 	save(image, sheet)
 	save_crop(image, Vector2(160.0, 110.0), sheet + "_4x", Vector2i(160, 100))

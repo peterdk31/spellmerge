@@ -2,9 +2,9 @@ extends "res://tests/support/screenshot.gd"
 ## A wizard's dash (the owner, 2026-10-28: the dash look went the aim's way, not the wizard's): a
 ## row per infusion (plain, fire, frost, storm, void, lightning; the real cards' colours and
 ## looks), each caster dashing 80 px (Dash) to the right and bending down on the way, as
-## a wizard does that walks while it dashes. The way is the caster's trail (`follow_caster`, the
-## projectile manager), which gives off its speed streaks (in the player's colours) and its cards'
-## particles as motes where it went (spell-spectacle-2.md, S5: the trail itself is not drawn); the
+## a wizard does that walks while it dashes. The dash follows its caster (`follow_caster`, the
+## projectile manager), giving off its speed streaks (in the player's colours) and its cards'
+## particles as motes where it went (spell-spectacle-2.md, S5: nothing of it is drawn as a shot); the
 ## dash card's cues draw the dust where it left (`dash_start`, at `form_shown`) and the ring where
 ## it landed (`dash_land`, at `carrier_ended`).
 ## `dash_looks` half way through, `dash_looks_landed` just after the landing, and

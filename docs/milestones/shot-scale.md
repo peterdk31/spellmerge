@@ -35,7 +35,7 @@ Facts from the code and [DECISIONS.md](../DECISIONS.md) (2026-11-02):
 
 The target refresh, the common pass and the trail samples stay under 0.3 ms each at every count; Spells', Combat's and Feel's own steps under 0.7 ms together. The hits and damage are the same as on the base before the tails changed (the damage check holds), and the hits a step are the same as the first H0 run's on the cloud machine.
 
-**With the tail shader's trails** (`--tails`, as before #562), the storm's `update_draw` is 2.3, 7.7, 13.5 and 25.5 ms at 10k, 30k, 50k and 100k, and the trail samples 0.2 to 1.1 ms: the motes take that away (1.1 to 4.1 ms). The first run of this benchmark, on a slower cloud machine with the trails, measured 85 ms at 100k.
+**With the tail shader's trails** (`--tails`, as before #562; the option went with them in #563), the storm's `update_draw` is 2.3, 7.7, 13.5 and 25.5 ms at 10k, 30k, 50k and 100k, and the trail samples 0.2 to 1.1 ms: the motes take that away (1.1 to 4.1 ms). The first run of this benchmark, on a slower cloud machine with the trails, measured 85 ms at 100k.
 
 The listeners, per step at 100k (a listener's time includes the events it sends in turn):
 

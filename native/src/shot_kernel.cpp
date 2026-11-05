@@ -74,8 +74,6 @@ constexpr double HOMING_DRIFT = 24.0; // SpellLimits.HOMING_DRIFT
 // none of the passes after homing that run before the hits.
 constexpr int64_t AFTER_HOMING_MASK = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1)) - 1);
 // Trails and drawing.
-constexpr int TRAIL_SAMPLES = 32;
-constexpr int TRAIL_STRIDE = TRAIL_SAMPLES * 4;
 constexpr double TRAIL_JUMP = 96.0;
 // Tails as motes (the manager's SPARK_TAIL, `_lay_tail`) and a birth's numbers (SPARK_*).
 constexpr int SPARK_BIRTH_STRIDE = 12;
@@ -96,9 +94,6 @@ constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
 constexpr int TRAIL_HEAD = 1;
 constexpr int TRAIL_ORBIT = 2;
-constexpr int TRAIL_DASH = 4;
-constexpr int TRAIL_COST = 4;
-constexpr int ROW_CASTER = -3;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
@@ -111,13 +106,7 @@ constexpr int BATCH_RUNE = 1;
 constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
 constexpr int BATCH_ENEMY_RUNE = 4;
-constexpr int BATCH_BOLT_JAG = 5;
-constexpr int BATCH_ORBIT_JAG = 6;
-constexpr int BATCH_ENEMY_JAG = 7;
-constexpr int BATCH_DASH = 8;
-constexpr int BATCH_ENEMY_DASH = 9;
-constexpr int BATCHES = 10;
-constexpr int64_t LOOK_LIGHTNING_BIT = 1 << 4;
+constexpr int BATCHES = 5;
 constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
@@ -194,14 +183,8 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(cand_found, "_cand_found", INT) \
 	X(high, "_high", INT) \
 	X(sim_time, "sim_time", FLOAT) \
-	X(trail, "_trail", PACKED_INT32_ARRAY) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
 	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
-	X(trail_kept, "_trail_kept", PACKED_INT32_ARRAY) \
-	X(trail_last, "_trail_last", PACKED_VECTOR2_ARRAY) \
-	X(trail_odo, "_trail_odo", PACKED_FLOAT32_ARRAY) \
-	X(trail_newest, "_trail_newest", PACKED_INT32_ARRAY) \
-	X(trail_data, "_trail_data", PACKED_FLOAT32_ARRAY) \
 	X(seq, "_seq", PACKED_INT64_ARRAY) \
 	X(drawn_seq, "_drawn_seq", PACKED_INT64_ARRAY) \
 	X(drawn_radius, "_drawn_radius", PACKED_FLOAT32_ARRAY) \
@@ -214,18 +197,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(ramp, "_ramp", PACKED_INT32_ARRAY) \
 	X(core, "_core", PACKED_COLOR_ARRAY) \
 	X(batch_counts, "_batch_counts", PACKED_INT32_ARRAY) \
-	X(loose, "_loose", PACKED_INT32_ARRAY) \
-	X(loose_count, "_loose_count", INT) \
-	X(trail_ramp, "_trail_ramp", PACKED_INT32_ARRAY) \
-	X(trail_caster, "_trail_caster", PACKED_INT32_ARRAY) \
-	X(trail_flags, "_trail_flags", PACKED_INT32_ARRAY) \
-	X(trail_holder, "_trail_holder", PACKED_INT32_ARRAY) \
-	X(trail_color, "_trail_color", PACKED_COLOR_ARRAY) \
-	X(trail_core, "_trail_core", PACKED_COLOR_ARRAY) \
 	X(anchors, "_anchors", PACKED_VECTOR2_ARRAY) \
 	X(draw_out, "_draw_out", PACKED_INT32_ARRAY) \
 	X(rooms, "_rooms", PACKED_INT32_ARRAY) \
-	X(trail_look, "_trail_look", PACKED_INT32_ARRAY) \
 	X(tail_from, "_tail_from", PACKED_VECTOR2_ARRAY) \
 	X(tail_carry, "_tail_carry", PACKED_FLOAT32_ARRAY) \
 	X(tail_n, "_tail_n", PACKED_INT32_ARRAY) \
@@ -835,8 +809,6 @@ const Constant CONSTANTS[] = {
 	{ "HOMING_PERIOD", (double)HOMING_PERIOD },
 	{ "HOMING_DRIFT", (double)HOMING_DRIFT },
 	{ "AFTER_HOMING_MASK", (double)AFTER_HOMING_MASK },
-	{ "TRAIL_SAMPLES", (double)TRAIL_SAMPLES },
-	{ "TRAIL_STRIDE", (double)TRAIL_STRIDE },
 	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
 	{ "SPARK_BIRTH_STRIDE", (double)SPARK_BIRTH_STRIDE },
 	{ "SPARK_X", (double)SPARK_X },
@@ -855,10 +827,7 @@ const Constant CONSTANTS[] = {
 	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
 	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
-	{ "TRAIL_DASH", (double)TRAIL_DASH },
 	{ "TRAIL_ORBIT", (double)TRAIL_ORBIT },
-	{ "TRAIL_COST", (double)TRAIL_COST },
-	{ "ROW_CASTER", (double)ROW_CASTER },
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
@@ -871,13 +840,7 @@ const Constant CONSTANTS[] = {
 	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
 	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
-	{ "BATCH_BOLT_JAG", (double)BATCH_BOLT_JAG },
-	{ "BATCH_ORBIT_JAG", (double)BATCH_ORBIT_JAG },
-	{ "BATCH_ENEMY_JAG", (double)BATCH_ENEMY_JAG },
-	{ "BATCH_DASH", (double)BATCH_DASH },
-	{ "BATCH_ENEMY_DASH", (double)BATCH_ENEMY_DASH },
 	{ "BATCHES", (double)BATCHES },
-	{ "LOOK_LIGHTNING_BIT", (double)LOOK_LIGHTNING_BIT },
 	{ "LOOK_GRID", (double)LOOK_GRID },
 	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
@@ -1049,19 +1012,6 @@ inline Vector2 drawn_at(int64_t motion, double sim_time, float born, const Vecto
 }
 
 inline bool is_hat_ramp(int64_t ramp) { return ramp >= 0 && ramp < RAMP_ENEMY; }
-
-// `_loose_batch`: the batch a loose trail is written to, a dash's, lightning's or any other, in
-// its ramp's layer.
-inline int64_t loose_batch(int64_t ramp, int64_t flags, int64_t look) {
-	const bool hat = is_hat_ramp(ramp);
-	if ((flags & TRAIL_DASH) != 0) {
-		return hat ? BATCH_DASH : BATCH_ENEMY_DASH;
-	}
-	if ((look & LOOK_LIGHTNING_BIT) != 0) {
-		return hat ? BATCH_BOLT_JAG : BATCH_ENEMY_JAG;
-	}
-	return hat ? BATCH_BOLT : BATCH_ENEMY;
-}
 
 // `look_zoom`, `look_core_zoom`, `look_size`, `particles_of`, `look_color` (static in the manager).
 inline int64_t look_zoom(double radius) {
@@ -1368,69 +1318,13 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 	return true;
 }
 
-// `_sample_trails`, its loop over the flying shots (the caller does the tick and the loose rows):
-// returns true when a row took a point (the trails need sending).
-bool ShotKernel::sample_shots(Object *m, double now) {
-	const Names &k = *names;
-	Arr<PackedInt32Array> trail, trail_kept, trail_newest;
-	Arr<PackedByteArray> alive, motion;
-	Arr<PackedVector2Array> pos, orbit_centre, trail_last;
-	Arr<PackedFloat32Array> born, trail_odo, trail_data;
-	trail.load(m, k.trail);
-	trail_kept.load(m, k.trail_kept);
-	trail_newest.load(m, k.trail_newest);
-	alive.load(m, k.alive);
-	motion.load(m, k.motion);
-	pos.load(m, k.pos);
-	orbit_centre.load(m, k.orbit_centre);
-	trail_last.load(m, k.trail_last);
-	born.load(m, k.born);
-	trail_odo.load(m, k.trail_odo);
-	trail_data.load(m, k.trail_data);
-	const int64_t high = m->get(k.high);
-	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND_V(high > trail.n || high > pos.n, false);
-	bool dirty = false;
-	for (int64_t slot = 0; slot < high; slot++) {
-		const int64_t row = trail[slot];
-		if (row < 0 || alive[slot] == 0) {
-			continue;
-		}
-		Vector2 at = pos[slot];
-		if (motion[slot] == MOTION_ORBIT) {
-			at = drawn_at(MOTION_ORBIT, sim_time, born[slot], orbit_centre[slot], at);
-		}
-		int64_t kept = trail_kept[row];
-		if (kept > 0) {
-			const double moved = at.distance_to(trail_last[row]);
-			if (moved > TRAIL_JUMP) {
-				kept = 0;
-			} else {
-				trail_odo[row] = (float)((double)trail_odo[row] + moved);
-			}
-		}
-		const int64_t newest = trail_newest[row] + 1;
-		const int64_t i = row * TRAIL_STRIDE + (newest % TRAIL_SAMPLES) * 4;
-		ERR_FAIL_COND_V(i + 3 >= trail_data.n, dirty);
-		trail_data[i] = at.x;
-		trail_data[i + 1] = at.y;
-		trail_data[i + 2] = trail_odo[row];
-		trail_data[i + 3] = (float)now;
-		trail_newest[row] = (int32_t)newest;
-		trail_kept[row] = (int32_t)MIN(kept + 1, (int64_t)TRAIL_SAMPLES);
-		trail_last[row] = at;
-		dirty = true;
-	}
-	return dirty;
-}
-
 // `_count_batches` (no solid shots): `_batch_counts` and every live shot's drawn data.
 void ShotKernel::count_draw(Object *m) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch;
 	Arr<PackedInt64Array> seq, drawn_seq;
 	Arr<PackedFloat32Array> radius, drawn_radius, drawn_size;
-	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, loose, trail_ramp, trail_flags, trail_look;
+	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts;
 	Arr<PackedColorArray> drawn_color;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
@@ -1445,14 +1339,9 @@ void ShotKernel::count_draw(Object *m) {
 	drawn_particles.load(m, k.drawn_particles);
 	ramp.load(m, k.ramp);
 	batch_counts.load(m, k.batch_counts);
-	loose.load(m, k.loose);
-	trail_ramp.load(m, k.trail_ramp);
-	trail_flags.load(m, k.trail_flags);
-	trail_look.load(m, k.trail_look);
 	drawn_color.load(m, k.drawn_color);
 	const int64_t high = m->get(k.high);
-	const int64_t loose_count = m->get(k.loose_count);
-	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || batch_counts.n < BATCHES || loose_count > loose.n);
+	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || batch_counts.n < BATCHES);
 	for (int64_t b = 0; b < BATCHES; b++) {
 		batch_counts[b] = 0;
 	}
@@ -1469,14 +1358,13 @@ void ShotKernel::count_draw(Object *m) {
 			drawn_radius[slot] = radius[slot];
 			drawn_look[slot] = look[slot];
 			// `_batch_of`.
-			const bool jag = (look[slot] & LOOK_LIGHTNING_BIT) != 0;
-			int64_t batch = jag ? BATCH_BOLT_JAG : BATCH_BOLT;
+			int64_t batch = BATCH_BOLT;
 			if (!is_hat_ramp(rmp)) {
-				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : (jag ? BATCH_ENEMY_JAG : BATCH_ENEMY);
+				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
 			} else if (mot == MOTION_STILL) {
 				batch = BATCH_RUNE;
 			} else if (mot == MOTION_ORBIT) {
-				batch = jag ? BATCH_ORBIT_JAG : BATCH_ORBIT;
+				batch = BATCH_ORBIT;
 			}
 			drawn_batch[slot] = (uint8_t)batch;
 			drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
@@ -1485,15 +1373,11 @@ void ShotKernel::count_draw(Object *m) {
 		}
 		batch_counts[drawn_batch[slot]] += 1;
 	}
-	for (int64_t n = 0; n < loose_count; n++) {
-		const int64_t row = loose[n];
-		batch_counts[loose_batch(trail_ramp[row], trail_flags[row], trail_look[row])] += 1;
-	}
 }
 
-// `update_draw`'s writing (no solid shots): every live shot and every loose trail into the batches'
-// buffers, which the kernel holds (`buffer`), sized to the manager's rooms; `_draw_out` gets the
-// instances written per batch (BATCH_*), the particles asked for and the trail cost.
+// `update_draw`'s writing (no solid shots): every live shot into the batches' buffers, which the
+// kernel holds (`buffer`), sized to the manager's rooms; `_draw_out` gets the instances written per
+// batch (BATCH_*), the particles asked for, the shots, the tail births laid and the tail asked.
 namespace {
 
 // The manager's `tail_hash`: a number from 0 up to 1 for the pair (a, b), every product below 2^63
@@ -1518,11 +1402,10 @@ inline int64_t tail_code(int64_t seq) {
 void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch;
-	Arr<PackedVector2Array> prev, pos, vel, orbit_centre, trail_last, anchors;
+	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
 	Arr<PackedFloat32Array> drawn_size, born;
-	Arr<PackedInt32Array> drawn_particles, trail, trail_kept, trail_newest, loose, trail_caster, trail_flags;
-	Arr<PackedInt32Array> trail_holder, trail_ramp, trail_look, draw_out, rooms;
-	Arr<PackedColorArray> drawn_color, core, trail_color, trail_core;
+	Arr<PackedInt32Array> drawn_particles, draw_out, rooms;
+	Arr<PackedColorArray> drawn_color, core;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
 	drawn_batch.load(m, k.drawn_batch);
@@ -1530,30 +1413,16 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	pos.load(m, k.pos);
 	vel.load(m, k.vel);
 	orbit_centre.load(m, k.orbit_centre);
-	trail_last.load(m, k.trail_last);
-	anchors.load(m, k.anchors);
 	drawn_size.load(m, k.drawn_size);
 	born.load(m, k.born);
 	drawn_particles.load(m, k.drawn_particles);
-	trail.load(m, k.trail);
-	trail_kept.load(m, k.trail_kept);
-	trail_newest.load(m, k.trail_newest);
-	loose.load(m, k.loose);
-	trail_caster.load(m, k.trail_caster);
-	trail_flags.load(m, k.trail_flags);
-	trail_holder.load(m, k.trail_holder);
-	trail_ramp.load(m, k.trail_ramp);
-	trail_look.load(m, k.trail_look);
 	draw_out.load(m, k.draw_out);
 	rooms.load(m, k.rooms);
 	drawn_color.load(m, k.drawn_color);
 	core.load(m, k.core);
-	trail_color.load(m, k.trail_color);
-	trail_core.load(m, k.trail_core);
 	const int64_t high = m->get(k.high);
-	const int64_t loose_count = m->get(k.loose_count);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 6 || loose_count > loose.n || rooms.n < BATCHES);
+	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
 	// Tails as motes (`_lay_tail`).
 	const bool tails_on = m->get(k.tail_births_on);
 	const int64_t tail_cap = m->get(k.tail_births_cap);
@@ -1634,19 +1503,19 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		out_buffer[b] = _buffers[b].ptrw();
 		room[b] = rooms[b];
 	}
-	// `_write_trail` into batch `b`, or nothing past its room (the GDScript would fail there): a shot
-	// with no row (tails off) is told the way it flies, `way`, in place of its row's numbers.
-	auto write_trail = [&](int64_t b, int64_t row, const Vector2 &at, int64_t flags, const Color &color, const Color &cr, const Vector2 &way) {
+	// `_write_head` into batch `b`, or nothing past its room (the GDScript would fail there): no path
+	// (-1), and the way it flies, `way`.
+	auto write_head = [&](int64_t b, const Vector2 &at, int64_t flags, const Color &color, const Color &cr, const Vector2 &way) {
 		if (used[b] >= room[b]) {
 			return;
 		}
 		float *buf = out_buffer[b] + used[b] * DRAW_STRIDE;
 		used[b] += 1;
-		buf[0] = (float)row;
-		buf[1] = row >= 0 ? (float)trail_kept[row] : (float)way.x;
+		buf[0] = -1.0f;
+		buf[1] = (float)way.x;
 		buf[2] = 0.0f;
 		buf[3] = at.x;
-		buf[4] = row >= 0 ? (float)trail_newest[row] : (float)way.y;
+		buf[4] = (float)way.y;
 		buf[5] = (float)flags;
 		buf[6] = 0.0f;
 		buf[7] = at.y;
@@ -1660,7 +1529,6 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		buf[15] = (float)(1.0 - (double)KIND_BOLT / KIND_STEPS);
 	};
 	int64_t asked = 0;
-	int64_t trails = 0;
 	for (int64_t slot = 0; slot < high; slot++) {
 		if (alive[slot] == 0) {
 			continue;
@@ -1676,12 +1544,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		asked += drawn_particles[slot];
 		const bool rune = mot == MOTION_STILL;
 		Vector2 dir = Vector2(1, 0);
-		if (rune) {
-			if (vel[slot].length_squared() > 0.0f) {
-				dir = vel[slot].normalized();
-			}
-		} else {
-			trails += TRAIL_COST;
+		if (rune && vel[slot].length_squared() > 0.0f) {
+			dir = vel[slot].normalized();
 		}
 		const int64_t flags = TRAIL_HEAD | (mot == MOTION_ORBIT ? TRAIL_ORBIT : 0);
 		if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
@@ -1692,7 +1556,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				used[batch] += 1;
 			}
 		} else {
-			write_trail(batch, trail[slot], at, flags, look_data, core[slot], pos[slot] - prev[slot]);
+			write_head(batch, at, flags, look_data, core[slot], pos[slot] - prev[slot]);
 			if (tails_on && !rune) {
 				lay_tail(slot, at);
 			}
@@ -1702,29 +1566,12 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	for (int64_t b = 0; b < BATCHES; b++) {
 		shots += used[b];
 	}
-	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_JAG] + used[BATCH_ENEMY_RUNE];
-	for (int64_t n = 0; n < loose_count; n++) {
-		const int64_t row = loose[n];
-		const int64_t caster = trail_caster[row];
-		Vector2 head = trail_last[row];
-		int64_t flags = trail_flags[row];
-		// A dash's trail is never drawn: its streaks are motes (S5).
-		if ((flags & TRAIL_DASH) != 0) {
-			continue;
-		}
-		if (trail_holder[row] == ROW_CASTER) {
-			flags |= TRAIL_HEAD;
-			if (anchors[caster].is_finite()) {
-				head = anchors[caster];
-			}
-		}
-		write_trail(loose_batch(trail_ramp[row], trail_flags[row], trail_look[row]), row, head, flags, trail_color[row], trail_core[row], Vector2());
-	}
+	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
 	for (int64_t b = 0; b < BATCHES; b++) {
 		draw_out[b] = (int32_t)used[b];
 	}
 	draw_out[BATCHES] = (int32_t)asked;
-	draw_out[BATCHES + 1] = (int32_t)trails;
+	draw_out[BATCHES + 1] = 0;
 	draw_out[BATCHES + 2] = (int32_t)shots;
 	draw_out[BATCHES + 3] = (int32_t)enemy_shots;
 	draw_out[BATCHES + 4] = (int32_t)tail_count;
@@ -1960,7 +1807,6 @@ void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("pass_common", "manager", "top", "delta"), &ShotKernel::pass_common);
 	ClassDB::bind_method(D_METHOD("hits", "manager", "n", "top", "resume", "limit", "delta"), &ShotKernel::hits);
 	ClassDB::bind_method(D_METHOD("run_pass", "manager", "kind", "first", "count", "delta"), &ShotKernel::run_pass);
-	ClassDB::bind_method(D_METHOD("sample_shots", "manager", "now"), &ShotKernel::sample_shots);
 	ClassDB::bind_method(D_METHOD("count_draw", "manager"), &ShotKernel::count_draw);
 	ClassDB::bind_method(D_METHOD("draw_shots", "manager", "fraction"), &ShotKernel::draw_shots);
 	ClassDB::bind_method(D_METHOD("buffer", "batch"), &ShotKernel::buffer);

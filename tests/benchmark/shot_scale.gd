@@ -15,14 +15,14 @@ extends SceneTree
 ## Spells), so its hit goes through the real listeners: Spells, Combat (damage, statuses) and Feel
 ## (impacts, sparks, sounds, motes), on a bus of their own, as the clip stage wires them
 ## (tests/clips/stage.gd). Nothing steps by itself; the script steps one tick (1/60 s) at a time.
-## The shots' tails are the game's: motes (`tails_enabled` off, as since 2026-11-05); `--tails` puts
-## the tail shader's trails back, for comparing with the numbers before.
+## The shots' tails are the game's: motes (since 2026-11-05; the tail shader's trails, `--tails`
+## before, went in #563).
 ##
 ## Timed, per step (medians and p95, milliseconds): the projectile manager's own `step()`, in the
 ## parts it times itself when a benchmark asks (`step_profile`, `PROF_*`: the target refresh, the
 ## common pass, the behaviour passes before the hits, the hit pass, of which the native kernel's own
 ## time and the rest, the hand-backs to GDScript with every listener of the hits and ends they send,
-## the passes after the hits, the trail samples), the hand-backs a step (native `hits` calls), the
+## the passes after the hits, the dash samples), the hand-backs a step (native `hits` calls), the
 ## hits and the shots past the hit-work budget; then Spells', Combat's and Feel's own `step`, the
 ## shots' spawn (not part of the game's cost: the script tops the shots up), `update_draw`, and, in
 ## a window, the GPU's time for a frame. A second pass of the same scene puts a timer between each
@@ -45,7 +45,7 @@ extends SceneTree
 ## User arguments: `--counts=a,b,c` (the shot counts), `--only=storm|crowd|crowd_all` (or several,
 ## comma separated), `--steps=N` (the steps measured, STEPS), `--crowd=N` (the crowd's bodies,
 ## CROWD), `--cards=a,b,c` (card ids, in staff order), `--no-native` (the manager's GDScript),
-## `--tails` (the tail shader's trails), `--work=N` (the hit-work budget of the storm and the crowd),
+## `--work=N` (the hit-work budget of the storm and the crowd),
 ## `--no-listeners` (skip the listener pass). Not run in the build: a few minutes headless with the
 ## native module, longer without.
 
@@ -80,7 +80,7 @@ const BODY_RADIUS: float = 7.0
 ## The events a shot's hit or end sends (the sandbox storm's PROFILED_SIGNALS).
 const TIMED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
 ## The lines printed: the manager's parts (its PROF_* times, in step order), then the rest of the tick.
-const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "trail samples", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
+const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "dash samples", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
 const P_REFRESH: int = 0
 const P_COMMON: int = 1
 const P_BEFORE: int = 2
@@ -88,7 +88,7 @@ const P_HITS: int = 3
 const P_KERNEL: int = 4
 const P_HANDBACK: int = 5
 const P_AFTER: int = 6
-const P_TRAILS: int = 7
+const P_DASHES: int = 7
 const P_STEP: int = 8
 const P_SPELLS: int = 9
 const P_COMBAT: int = 10
@@ -138,7 +138,6 @@ class Timed:
 var _registry: Node
 var _cards: Array[StringName] = [&"bolt"]
 var _native: bool = true
-var _tails: bool = false
 var _work: int = ManagerScript.WORK_PER_STEP
 var _headless: bool = true
 
@@ -203,15 +202,13 @@ func _initialize() -> void:
 			_work = maxi(arg.trim_prefix("--work=").to_int(), 1)
 		elif arg == "--no-native":
 			_native = false
-		elif arg == "--tails":
-			_tails = true
 		elif arg == "--no-listeners":
 			listeners = false
 	if not _build(16, 1, false, _work):
 		return
 	var native_on: bool = _mgr.is_native()
 	_free_all()
-	print("BENCH: shot scale, cards %s, native %s, tails %s, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", "the tail shader's" if _tails else "motes", crowd, _work, steps, "headless" if _headless else "in a window"])
+	print("BENCH: shot scale, cards %s, native %s, tails motes, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", crowd, _work, steps, "headless" if _headless else "in a window"])
 	for scene: String in SCENES:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -242,7 +239,6 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	_mgr.set_native(_native)
 	_mgr.set_cap(count)
 	_mgr.set_bounds(ARENA)
-	_mgr.set_tails_enabled(_tails)
 	_mgr.work_per_step = work
 	_mgr.profile_clock = Time.get_ticks_usec
 	_spells = _own(SpellsScript.new()) as SpellsScript
@@ -341,7 +337,7 @@ func _tick(timed: bool) -> void:
 		_part_usec[P_KERNEL] = profile[ManagerScript.PROF_KERNEL]
 		_part_usec[P_HANDBACK] = _part_usec[P_HITS] - _part_usec[P_KERNEL]
 		_part_usec[P_AFTER] = profile[ManagerScript.PROF_AFTER]
-		_part_usec[P_TRAILS] = profile[ManagerScript.PROF_TRAILS]
+		_part_usec[P_DASHES] = profile[ManagerScript.PROF_DASHES]
 	_spells.step(DT)
 	var t2: int = Time.get_ticks_usec()
 	_combat.step(DT)

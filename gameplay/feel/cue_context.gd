@@ -15,7 +15,7 @@ var at: Vector2 = Vector2.ZERO
 var aim: Vector2 = Vector2.RIGHT
 ## How big: the pixels a part's `reach` is times (the seconds a `lasts_size` part lasts).
 var size: float = 0.0
-## The colour of its element (as `Feel.show_effect`'s `core`) and its cards (a packed look).
+## The colour of its element (as `Feel.show_flash`'s `core`) and its cards (a packed look).
 var tint: Color = Color.WHITE
 var look: int = 0
 ## The actor it plays on (`hold_target`), and the shot it was sent by (-1 for none).

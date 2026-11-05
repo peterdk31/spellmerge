@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="FlashKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/flash_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"arc"
+draw = &"arc"
+seconds = 0.22
+step = 4.0
+room_light = 0.9

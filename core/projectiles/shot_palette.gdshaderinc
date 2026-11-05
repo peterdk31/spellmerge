@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The shot shaders' shared constants and small helpers (core/README.md, "The shot shaders"):
-// the palette ramps (docs/STYLE.md), the look kinds, the effect kinds and flags, and the pure
+// the palette ramps (docs/STYLE.md), the look kinds, the flash kinds and flags, and the pure
 // functions every one of them uses. No uniforms, no varyings: `shot_look.gdshaderinc` has those.
 
 // docs/STYLE.md: the players' ramps (shadow, base, light), then the enemy ramp (Blight ochre,
@@ -58,10 +58,9 @@ const float L_DOUBLE = 19.0;
 const float L_CONVERGE = 20.0;
 const float L_DRIFT = 21.0;
 const float KIND_COUNT = 21.0;
-// Flags in the look, not particles: Feel's poof (living staffs H4), the enemy ramp (Blight ochre
-// takes the player's place; staffs F2), and an exact colour (a reaction's own, its ramp made from
-// it instead of the palette material it is nearest).
-const float POOF = 22.0;
+// Flags in the look, not particles: the enemy ramp (Blight ochre takes the player's place; staffs
+// F2), and an exact colour (a reaction's own, its ramp made from it instead of the palette material
+// it is nearest). Kind 22 is free (Feel's poof flag until flash kinds F2).
 const float ENEMY_RAMP = 23.0;
 const float EXACT = 24.0;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:
@@ -70,7 +69,7 @@ const float EXACT = 24.0;
 const int MAX_PARTICLES = 12;
 
 // The kind travels in the alpha of the custom data as 1 - (kind + code) / 16 (KIND_STEPS in
-// projectile_manager.gd): the effects Feel draws (KIND_* in gameplay/feel/feel.gd), each by the
+// projectile_manager.gd): the flashes Feel draws (KIND_* in gameplay/feel/feel.gd), each by the
 // shader of its own batch.
 const float K_BURST = 4.0;
 const float K_RING_OUT = 5.0;
@@ -83,7 +82,7 @@ const float K_SPRAY = 11.0;
 const float K_PUFF = 12.0;
 const float K_ARC = 14.0;
 const float K_STATUS = 15.0;
-// An effect's age (or a rune's trace) travels as TRACE_FROM + TRACE_SPAN x the fraction
+// A flash's age (or a rune's trace) travels as TRACE_FROM + TRACE_SPAN x the fraction
 // (RUNE_TRACE in projectile_manager.gd); code 0 is a whole rune.
 const float TRACE_FROM = 0.02;
 const float TRACE_SPAN = 0.42;
@@ -127,8 +126,8 @@ vec3 shade4(vec3 a, vec3 b, vec3 c, vec3 d, float u) {
 	return u < 0.25 ? a : (u < 0.5 ? b : (u < 0.75 ? c : d));
 }
 
-// The kind (0-15) and the code beside it (0-0.45 above the kind; below it, -0.45-0, for an effect
-// that does not light the room: Feel's unlit effects, S6 item 4) in an instance's custom data alpha.
+// The kind (0-15) and the code beside it (0-0.45 above the kind; below it, -0.45-0, for a flash
+// that does not light the room: Feel's unlit flashes, S6 item 4) in an instance's custom data alpha.
 float coded_kind(float custom_a) {
 	return floor((1.0 - custom_a) * 16.0 + 0.5);
 }
@@ -138,7 +137,7 @@ float coded_code(float custom_a) {
 	return coded - floor(coded + 0.5);
 }
 
-// How far through its life an effect (or a rune's trace) is, from its code (either side of its kind).
+// How far through its life a flash (or a rune's trace) is, from its code (either side of its kind).
 float coded_age(float code) {
 	float a = abs(code);
 	return a > 0.01 ? clamp((a - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) : 1.0;

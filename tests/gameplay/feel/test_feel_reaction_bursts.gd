@@ -93,9 +93,9 @@ func test_a_stronger_reaction_plays_its_cue_bigger() -> void:
 	var weak: CueBase = _feel.cue_of(&"reaction_stillness")
 	check(strong.power > weak.power, "shatter is the stronger")
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO, -1)
-	var big: int = _feel.effect_info(FeelScript.KIND_RING_OUT)["zoom"] as int
+	var big: int = _feel.flash_info(&"ring_out")["zoom"] as int
 	_bus.reaction_triggered.emit(1, &"stillness", Vector2(80.0, 0.0), -1)
-	var small: int = _feel.effect_info(FeelScript.KIND_RING_OUT)["zoom"] as int
+	var small: int = _feel.flash_info(&"ring_out")["zoom"] as int
 	check(big > small, "its ring is the bigger (%d, %d)" % [big, small])
 	check_equal(big, 4, "shatter's ring as before the cues (2.9 x 1.3, rounded)")
 	check_equal(small, 3, "stillness's ring as before the cues (2.9 x 0.9, rounded)")
@@ -104,9 +104,9 @@ func test_a_stronger_reaction_plays_its_cue_bigger() -> void:
 func test_a_repeated_reaction_shows_again_without_its_weight() -> void:
 	_bus.reaction_triggered.emit(0, &"thaw", Vector2.ZERO, -1)
 	var shake: float = _feel.trauma()
-	var rings: int = _feel.effects_of(FeelScript.KIND_RING_OUT)
+	var rings: int = _feel.flashes_of(&"ring_out")
 	_bus.reaction_triggered.emit(0, &"thaw", Vector2(60.0, 0.0), -1)
-	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), rings + 1, "its looks every time")
+	check_equal(_feel.flashes_of(&"ring_out"), rings + 1, "its looks every time")
 	check(is_equal_approx(_feel.trauma(), shake), "its shake at most every REACTION_REPEAT seconds")
 
 
@@ -114,25 +114,25 @@ func test_a_reaction_with_no_cue_of_its_own_plays_the_plain_one() -> void:
 	_bus.reaction_triggered.emit(0, &"steam", Vector2.ZERO, -1)
 	var plain: CueBase = _feel.cue_of(FeelScript.REACTION_CUE)
 	check(plain != null, "there is a plain reaction cue")
-	check_equal(_feel.effect_info(FeelScript.KIND_RING_OUT)["core"], plain.color, "its ring in the plain cue's colour")
+	check_equal(_feel.flash_info(&"ring_out")["core"], plain.color, "its ring in the plain cue's colour")
 
 
 func test_the_puff_is_bigger_than_a_hit_and_the_ring_ends() -> void:
 	_bus.damage_dealt.emit(0, null, 5, Vector2(50.0, 0.0))
-	var hit: int = _feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int
+	var hit: int = _feel.flash_info(&"puff")["zoom"] as int
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO, -1)
-	check((_feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int) > hit, "a reaction's puff is bigger than a hit's")
-	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), 1, "with a ring")
+	check((_feel.flash_info(&"puff")["zoom"] as int) > hit, "a reaction's puff is bigger than a hit's")
+	check_equal(_feel.flashes_of(&"ring_out"), 1, "with a ring")
 	for i in 40:
 		_feel.step(STEP)
-	check_equal(_feel.live_effects(), 0, "ring and puff end")
+	check_equal(_feel.live_flashes(), 0, "ring and puff end")
 
 
 func test_four_players_reacting_at_once_stay_inside_the_effect_slots() -> void:
 	for player in 4:
 		_bus.reaction_triggered.emit(player, &"shatter", Vector2(float(player) * 20.0, 0.0), -1)
-	check_equal(_feel.effects_of(FeelScript.KIND_PUFF), 4, "four puffs")
-	check(_feel.live_effects() <= _feel.effect_slots, "inside the effect slots")
+	check_equal(_feel.flashes_of(&"puff"), 4, "four puffs")
+	check(_feel.live_flashes() <= _feel.effect_slots, "inside the effect slots")
 
 
 func test_each_status_shows_a_different_colour() -> void:
@@ -154,12 +154,12 @@ func test_the_status_follows_the_enemy_and_ends_with_the_status() -> void:
 	_status_on(enemy, &"burn")
 	_feel.step(STEP)
 	check_equal(_feel.live_statuses(), 1, "one status effect")
-	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_STATUS)
+	var shown: Dictionary = _feel.status_info()
 	check((shown["core"] as Color).is_equal_approx(Color(FIRE.tint.r, FIRE.tint.g, FIRE.tint.b, 1.0)), "in its element card's colour (fire's): %s" % shown["core"])
 	check(ProjectileManagerScript.look_has(shown["look"] as int, FIRE.look_layer), "with the card's look (fire's embers)")
 	enemy.global_position = Vector2(80.0, 30.0)
 	_feel.step(STEP)
-	check_equal((_feel.effect_info(FeelScript.KIND_STATUS)["at"] as Vector2).x, 80.0, "it moved with the enemy")
+	check_equal((_feel.status_info()["at"] as Vector2).x, 80.0, "it moved with the enemy")
 	_combat.left.clear()
 	for i in 4:
 		_feel.step(STEP)
@@ -182,7 +182,7 @@ func test_a_status_shows_through_a_hit() -> void:
 	check_equal(_feel.live_statuses(), 1, "its particles go on while the sprite flashes")
 
 
-func test_a_status_comes_back_when_a_crowd_of_effects_took_its_slot() -> void:
+func test_a_status_comes_back_when_a_crowd_of_flashes_took_its_slot() -> void:
 	_feel.set_effect_slots(EffectSlots.MIN)
 	var enemy: Enemy = _enemy()
 	_status_on(enemy, &"static")

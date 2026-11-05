@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"impact_ring"
-parts = Array[Dictionary]([{"effect": &"burst", "zoom": 1}, {"effect": &"ring_out", "no_cards": true}, {"part": &"motes", "kind": &"spark", "count": 6, "radius": 11.0, "spread": 160.0, "way": &"back", "life": 0.8, "often": true}])
+parts = Array[Dictionary]([{"flash": &"burst", "zoom": 1}, {"flash": &"ring_out", "no_cards": true}, {"part": &"motes", "kind": &"spark", "count": 6, "radius": 11.0, "spread": 160.0, "way": &"back", "life": 0.8, "often": true}])

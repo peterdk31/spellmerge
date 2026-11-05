@@ -27,6 +27,10 @@ class AskingRegistry:
 	func get_resource(folder: StringName, id: StringName) -> Resource:
 		return real.get_resource(folder, id) if real != null else null
 
+	## The flash kinds the cues name (content/flashes).
+	func get_all(folder: StringName) -> Array[Resource]:
+		return real.get_all(folder) if real != null else [] as Array[Resource]
+
 
 var _bus: EventsScript
 var _feel: FeelScript
@@ -47,8 +51,8 @@ func before_each() -> void:
 
 func test_a_reaction_shows_a_flash_and_a_name() -> void:
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2(10.0, 20.0), -1)
-	check_equal(_feel.effects_of(FeelScript.KIND_PUFF), 1, "a puff")
-	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), 1, "and a ring")
+	check_equal(_feel.flashes_of(&"puff"), 1, "a puff")
+	check_equal(_feel.flashes_of(&"ring_out"), 1, "and a ring")
 	check_equal(_feel.live_labels(), 1, "one name")
 	check_equal(_feel.get_child_count() > 0, true, "feel owns them")
 
@@ -57,7 +61,7 @@ func test_the_name_and_flash_end_by_themselves() -> void:
 	_bus.reaction_triggered.emit(1, &"rift", Vector2.ZERO, -1)
 	for i in 40:
 		_feel.step(STEP)
-	check_equal(_feel.live_effects(), 0, "the puff and ring are gone")
+	check_equal(_feel.live_flashes(), 0, "the puff and ring are gone")
 	check_equal(_feel.live_labels(), 0, "the name is gone")
 
 
@@ -78,12 +82,12 @@ func test_a_crowd_of_reactions_stays_inside_the_pools() -> void:
 	for i in 60:
 		_bus.reaction_triggered.emit(i % 4, &"kindle", Vector2(float(i), 0.0), -1)
 	check(_feel.live_labels() <= FeelScript.REACTION_SLOTS, "labels are capped")
-	check(_feel.live_effects() <= _feel.effect_slots, "effects stay inside the slots")
+	check(_feel.live_flashes() <= _feel.effect_slots, "flashes stay inside the slots")
 
 
 func test_an_unknown_reaction_still_shows_and_a_missing_sound_is_silent() -> void:
 	_bus.reaction_triggered.emit(0, &"brand_new", Vector2.ZERO, -1)
-	check_equal(_feel.effects_of(FeelScript.KIND_PUFF) + _feel.effects_of(FeelScript.KIND_RING_OUT), 2, "a puff and a ring in the default colour")
+	check_equal(_feel.flashes_of(&"puff") + _feel.flashes_of(&"ring_out"), 2, "a puff and a ring in the default colour")
 	check_equal(_feel.live_labels(), 1, "and its name")
 
 
@@ -142,7 +146,7 @@ func test_a_discharge_arc_shows_a_jagged_line_between_both_ends_and_fades() -> v
 	var to := Vector2(90.0, 10.0)
 	_bus.discharge_arc.emit(0, from, to)
 	check_equal(_feel.live_arcs(), 1, "one arc")
-	var arc: Dictionary = _feel.effect_info(FeelScript.KIND_ARC)
+	var arc: Dictionary = _feel.flash_info(&"arc")
 	check_equal(arc["at"], from, "it starts at the struck enemy")
 	check((arc["dir"] as Vector2).is_equal_approx(Vector2.RIGHT), "toward the zapped one")
 	check_equal(arc["zoom"], 20, "as long as the gap: 80 px is 20 steps of 4 (the shader jags it)")
@@ -168,9 +172,9 @@ func test_a_crowd_of_arcs_stays_inside_the_slots() -> void:
 func test_a_reaction_keeps_its_own_colour_exactly() -> void:
 	_bus.reaction_triggered.emit(0, &"rift", Vector2(5.0, 5.0), -1)
 	var want: Color = _colour_of(&"rift")
-	for kind: int in [FeelScript.KIND_PUFF, FeelScript.KIND_RING_OUT]:
-		var shown: Dictionary = _feel.effect_info(kind)
-		check_equal(shown["core"], want, "kind %d is in the reaction's colour" % kind)
-		check((shown["look"] as int) & FeelScript.EXACT != 0, "kind %d takes it exactly, not the nearest palette ramp" % kind)
+	for kind: StringName in [&"puff", &"ring_out"]:
+		var shown: Dictionary = _feel.flash_info(kind)
+		check_equal(shown["core"], want, "%s is in the reaction's colour" % kind)
+		check((shown["look"] as int) & FeelScript.EXACT != 0, "%s takes it exactly, not the nearest palette ramp" % kind)
 
 

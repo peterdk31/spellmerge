@@ -131,7 +131,7 @@ func test_problems_name_what_is_wrong() -> void:
 	cue.parts = [{"part": &"mark"}, {"part": &"mark", "mark": &"scorch", "zoom": 2, "rot": &"spin", "radius": 0.0}]
 	check_equal(cue.problems().size(), 4, "no mark; an unknown key, an unknown rot and a radius of 0: %s" % [cue.problems()])
 	cue.parts = [{"part": &"mark", "mark": &"scorch", "reach": 0.9, "cards": true, "rot": &"aim"}, {"part": &"mark", "cards": true, "radius": 6.0}]
-	check_equal(cue.problems(), PackedStringArray(), "fine mark parts (they take no effect; with cards the mark may be left out)")
+	check_equal(cue.problems(), PackedStringArray(), "fine mark parts (they take no flash; with cards the mark may be left out)")
 
 
 func test_the_shader_is_handed_each_kinds_numbers() -> void:

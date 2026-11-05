@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: Flash kinds (F1 to F4, owner session)
+
+The owner asked whether effects and motes should be one system; no (a flash is one shaped glow, a mote a particle), but flash looks were the one look still code. Built [flash-kinds.md](milestones/flash-kinds.md): F1 renamed Feel's effects to flashes (the cue part key `flash`; the "Effect slots" setting kept, the owner's pick); F2 made every flash a `FlashKind` file in `content/flashes/` (14 kinds), the flash shader reading the shaped kinds' curves from a table and each row carrying its kind and room light in the transform's unused floats (the custom data is half precision in the compatibility renderer), with F3 folded in (shell, fireball and arc are files too; `CUE_FLASHES`, `CueBase.FLASHES`, the light tables and the poof look bit gone, freeing look bit 22); ported exactly (a curve test against the old branches, and a one-off render of 4,752 cases with both shaders: every pixel the same). F4 added a star, rays, a ring of dots and a spiral, with six example kinds on `shot_flash_drawings.gd` for the owner to pick from. Not measured on the web storm yet.
+
 ## 2026-11-05: The tails keep their motes' rows (owner session)
 
 The owner still saw Fireballs without a tail in a Storm: the projectile manager gave the tail, but the mote pool's rows a frame were one counter, and the Storm's hits (all before the trails' births) took the tails' rows too, so the births laid last were cut. The pool keeps `tail_rows` (the manager's `tail_births_cap`) from every other write until the spectacle hands them to the births (`open_tail_rows`), natively too; a storm's sheds are back to the rows they had before tails were motes. Regression test in `test_tail_motes.gd`.

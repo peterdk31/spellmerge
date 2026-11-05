@@ -5,4 +5,4 @@
 [resource]
 script = ExtResource("1_base")
 id = &"nova"
-parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 6, "seconds": 0.25, "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 32, "spread": 360.0, "ring": true, "way": &"right"}, {"part": &"mark", "mark": &"burn_ring", "radius": 18.0}])
+parts = Array[Dictionary]([{"flash": &"ring_out", "zoom": 6, "seconds": 0.25, "way": &"right"}, {"part": &"motes", "kind": &"spell", "count": 32, "spread": 360.0, "ring": true, "way": &"right"}, {"part": &"mark", "mark": &"burn_ring", "radius": 18.0}])

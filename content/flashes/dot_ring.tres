@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="FlashKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/flash_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"dot_ring"
+seconds = 0.35
+step = 10.0
+room_light = 0.6
+dot_count = 16
+dots = Array[Dictionary]([{"from_z": 2.0, "to_z": 10.0, "way": &"out"}, {"at": 0.9, "off": true}])
+second = Array[Dictionary]([{"shade": &"hot"}, {"at": 0.15, "shade": &"hi"}, {"at": 0.4, "shade": &"mid"}, {"at": 0.7, "shade": &"lo"}])
+glow = Array[Dictionary]([{"from": 1.0, "to": 0.0, "way": &"out"}])
+glow_ring = Array[Dictionary]([{"from": 0.5}])
+glow_ring_reach = Array[Dictionary]([{"from_z": 3.0}])
+glow_middle = Array[Dictionary]([{"from": 0.4}])
+glow_middle_reach = Array[Dictionary]([{"from_z": 8.0}])

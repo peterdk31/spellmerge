@@ -659,11 +659,11 @@ func _make_light(on: bool) -> void:
 		add_child(light)
 
 
-## Feel's effect rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows
-## each), lit by the spell light while it is on (P3b; `SpellLight.light_effects`).
-func light_effects(flare_rows: PackedFloat32Array, flares: int, blast_rows: PackedFloat32Array, blasts: int, arc_rows: PackedFloat32Array, arcs: int, slots: int) -> void:
+## Feel's flash rows, just uploaded (the flares', the explosions' and the arcs'; `slots` rows
+## each), lit by the spell light while it is on (P3b; `SpellLight.light_flashes`).
+func light_flashes(flare_rows: PackedFloat32Array, flares: int, blast_rows: PackedFloat32Array, blasts: int, arc_rows: PackedFloat32Array, arcs: int, slots: int) -> void:
 	if light != null:
-		light.light_effects(flare_rows, flares, blast_rows, blasts, arc_rows, arcs, slots)
+		light.light_flashes(flare_rows, flares, blast_rows, blasts, arc_rows, arcs, slots)
 
 
 ## Before Feel draws its live beams: none lit until `light_beam` lights one (P3b).

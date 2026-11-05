@@ -48,7 +48,7 @@ extends Resource
 @export_range(0.0, 4.0, 0.05) var hit_mote_share: float = 0.5
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
-@export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
+@export_range(0.0, 0.3, 0.01) var hit_flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
 ## Camera kick (a cue's `kick`, a cast's among them): pixels given back per second.
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0

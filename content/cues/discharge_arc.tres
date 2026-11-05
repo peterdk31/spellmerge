@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"discharge_arc"
-parts = Array[Dictionary]([{"effect": &"arc", "seconds": 0.25}])
+parts = Array[Dictionary]([{"flash": &"arc", "seconds": 0.25}])
 color = Color(0, 0.9411765, 1, 1)

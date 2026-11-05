@@ -231,14 +231,14 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - **T2: threads never change a result.** Chunks of a fixed size (not one per core), each reading only the target grid and writing only its own shots; partial results (hits, the threat grid's sums) combined in chunk order; the hit budget spent at the merge, in shot order. A test runs the kernel with one thread and with several and compares the bits, so the web's single chunk and a 12-core desktop play the same game.
 - **T3: the kernels' maths is `dmath.h`** (N7), threaded or not.
 - **T4: the caps are session rules** (N11). The weakest machine in a session sets the shot cap online, and at 100,000 shots that matters more: every machine simulates every shot. A snapshot of a full room grows to roughly 10 MB (a join only, N10); the hash runs once a second.
-- **T5: what shot scale changes only in the look stays view.** H4's thinner drawing past a count, sparks to hits first, and H3b's one look per target are drawn only; they may use real time and their own generators, in `VIEW` (N9).
+- **T5: what shot scale changes only in the look stays view.** H3b's one look per target is drawn only; it may use real time and its own generators, in `VIEW` (N9).
 
 **Both help each other.** N1's hash and desync report prove H5's "threaded equals one thread" and the damage check; H3b's re-recorded hit traces and N3's (chance by hash) are recorded again together, once.
 
 **One order for both** (they share `core/projectiles/projectile_manager.gd` and `native/src/shot_kernel.cpp`, so one PR at a time there):
 
 1. N1, with H0 beside it (benchmarks only).
-2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7a (the kernel side of N7), H5 (T2), H5w if the web supports threads, H6 if measured, H4, H7 last (after N11).
+2. The projectiles lane, one at a time: H1, H2 (fixed budget, T1), N5, N7a (the kernel side of N7), H5 (T2), H5w if the web supports threads, H6 if measured, H7 last (after N11; H4 is dropped).
 3. Beside it, the rest: N2, N2b, N3, then N4, N7b (the GDScript side of N7), N6 (after N7a), N11; then H3 (one listener at a time) and H3b after N3; then N8, N9, N10, N12.
 
 The tasks are in NEXT.md's owner lane in this order.

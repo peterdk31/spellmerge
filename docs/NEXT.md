@@ -101,14 +101,14 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Shot scale: threads in the kernel (H5).** Projectiles lane. (`native/`, the owner's `ci/smbot/rules.py` and `native/build_profile.json`) H5, with T2's one-against-several test. After N7a and N1; the owner merges it.
 - [ ] **Shot scale: threads on the web (H5w).** Projectiles lane. (`export_presets.cfg`, the owner's `ci/build/native.sh`) H5w, only if the web supports threads. After H5.
 - [ ] **Shot scale: shots-first queries (H6).** Projectiles lane. (`core/projectiles/`, `native/`) H6, only if H0 or H5 measures the need. After H5.
-- [ ] **Shot scale: draw cost by count (H4).** Projectiles lane. (`core/projectiles/`, `core/settings/`) H4, view only (T5). After H6, or H5 when H6 is not needed.
+- [x] ~~**Shot scale: draw cost by count (H4).**~~ Dropped 2026-11-05: the tails became motes (#562), and H0 measures `update_draw` at 4.7 ms at 100,000 (shot-scale.md).
 - [ ] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3.
 - [ ] **Online-ready: deterministic maths, the GDScript side (N7b).** (`core/native/`, `core/sim/dmath.gd`, simulation trig calls) N7: the `DMath` class, its GDScript twin and every simulation trig call. After N7a.
 - [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
 - [ ] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3.
 - [ ] **Shot scale: cheaper hits (H3).** (`gameplay/combat/`, `gameplay/feel/`, `core/spells/`) H3, one PR per listener, biggest first by H0. After N3.
 - [ ] **Shot scale: bundled hit events (H3b).** (`core/events/`, `core/projectiles/`, `gameplay/combat/`, `core/spells/`, `gameplay/feel/`, tests) H3b, only if H3 leaves the hits as the largest part of a step. After H3; touches the projectile manager, so it waits for the projectiles lane's PR of the moment.
-- [ ] **Shot scale: caps (H7).** Projectiles lane. (`core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS) H7: defaults as session rules (T4). After H4 and N11.
+- [ ] **Shot scale: caps (H7).** Projectiles lane. (`core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS) H7: defaults as session rules (T4). After N11.
 - [ ] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4, N5, N6 and N7b.
 - [ ] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N8 and N11.
 - [ ] **Online-ready: snapshots (N10).** (`core/sim/`, `restore_nodes()` hooks) N10; may split into N10a and N10b. After N9.

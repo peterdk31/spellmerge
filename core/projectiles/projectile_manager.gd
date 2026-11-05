@@ -253,6 +253,19 @@ const MOVES_START: int = 64
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
 const WORK_PER_STEP: int = 6000
+## The parts of `step_profile` (shot scale H0): microseconds of `step()`'s passes in its order, the
+## native kernel's own share of the hit pass, the hand-backs to GDScript (native `hits` calls) and
+## the shots the hit-work budget left for a later step.
+const PROF_REFRESH: int = 0
+const PROF_COMMON: int = 1
+const PROF_BEFORE: int = 2
+const PROF_HITS: int = 3
+const PROF_KERNEL: int = 4
+const PROF_HANDBACKS: int = 5
+const PROF_PAST_BUDGET: int = 6
+const PROF_AFTER: int = 7
+const PROF_TRAILS: int = 8
+const PROF_PARTS: int = 9
 
 ## The most wall cells one shot walks in one step (see `_wall_hit`).
 const MAX_WALL_VISITS: int = 64
@@ -606,7 +619,7 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ]
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_meshes"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_meshes", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -966,6 +979,16 @@ var _stepping: bool = false
 ## (the first one that went untested when the budget ran out).
 var _work_left: int = 0
 var _resume: int = 0
+## The hit-test work one step may do (WORK_PER_STEP unless a benchmark sets another: shot scale
+## measures the crowd with every shot tested).
+var work_per_step: int = WORK_PER_STEP
+## Each step's parts, timed (PROF_*; shot scale H0, tests/benchmark/shot_scale.gd). Empty in the
+## game, where `step()` reads no clock and pays one check a pass. A benchmark sizes it to
+## PROF_PARTS and hands the clock (`profile_clock`, microseconds): the manager never reads real
+## time itself (core/sim/README.md), so the same step is timed in the headless benchmark and in a
+## runner on the real GPU.
+var step_profile: PackedInt64Array = PackedInt64Array()
+var profile_clock: Callable = Callable()
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
 ## Per slot: the target a shot must not hit, and the seconds left of that.
@@ -2996,30 +3019,55 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 ## wait for their turn in the hit pass (see `_wait`), so they see the same as before. Then the
 ## trails take their points.
 func step(delta: float) -> void:
+	# Timed only for a benchmark (`step_profile`); the game reads no clock here.
+	var timing: bool = not step_profile.is_empty()
+	var at: int = 0
+	if timing:
+		step_profile.fill(0)
+		at = profile_clock.call()
 	sim_time += delta
 	_mem_step += 1
 	_last_delta = delta
 	_refresh_targets()
+	if timing:
+		at = _profiled(PROF_REFRESH, at)
 	var top: int = _high
 	_stepping = true
-	_work_left = WORK_PER_STEP
+	_work_left = work_per_step
 	if _kernel != null:
 		_kernel.call(&"pass_common", self, top, delta)
 	else:
 		_pass_common(top, delta)
+	if timing:
+		at = _profiled(PROF_COMMON, at)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
 			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit,
 			# return, homing, spiral); it says false for the others.
 			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
 				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
+	if timing:
+		at = _profiled(PROF_BEFORE, at)
 	_pass_hits(top, delta)
+	if timing:
+		at = _profiled(PROF_HITS, at)
 	for kind in range(AFTER_HITS, BEHAVIOURS):
 		if _member_count[kind] > 0:
 			_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
 	_step_index += 1
 	_stepping = false
+	if timing:
+		at = _profiled(PROF_AFTER, at)
 	_sample_trails()
+	if timing:
+		_profiled(PROF_TRAILS, at)
+
+
+## Sets part `part` of `step_profile` to the microseconds since `since`; returns now.
+func _profiled(part: int, since: int) -> int:
+	var now: int = profile_clock.call()
+	step_profile[part] = now - since
+	return now
 
 
 ## Pass 1: every live shot's life runs down; a straight shot flies on along its velocity (the
@@ -3065,6 +3113,9 @@ func _pass_hits(top: int, delta: float) -> void:
 	while n < top:
 		_hit_slot(_wrapped(n + resume, top), delta, limit)
 		n += 1
+	if not step_profile.is_empty() and _starved_at >= 0:
+		# The shots from the first starved one round to where the pass began.
+		step_profile[PROF_PAST_BUDGET] = top - ((_starved_at - resume + top) % top)
 	_resume = maxi(_starved_at, 0)
 
 
@@ -3074,10 +3125,15 @@ func _pass_hits(top: int, delta: float) -> void:
 ## logged why; `_pass_hits` does the rest).
 func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int:
 	var n: int = 0
+	var timing: bool = not step_profile.is_empty()
 	while n < top:
 		# The kernel's scratch holds every target (a hit handler may have added some).
 		_fit_hit_scratch()
+		var at: int = profile_clock.call() if timing else 0
 		var handed: int = _kernel.call(&"hits", self, n, top, resume, limit, delta)
+		if timing:
+			step_profile[PROF_KERNEL] += profile_clock.call() - at
+			step_profile[PROF_HANDBACKS] += 1
 		if handed == -1:
 			return top
 		if handed < -1:

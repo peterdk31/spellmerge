@@ -1,44 +1,53 @@
 extends SceneTree
-## Shot scale H0 (docs/milestones/shot-scale.md): the baseline for every later part. Two scenes, each
-## at 10,000, 30,000, 50,000 and 100,000 live shots, timed part by part:
+## Shot scale H0 (docs/milestones/shot-scale.md): the baseline for every later part. Three scenes,
+## each at 10,000, 30,000, 50,000 and 100,000 live shots, timed part by part:
 ##
 ## - **storm:** the shots fly over the horde arena (1280x720) from four wizards in the middle, with
 ##   eight training bodies in their way: what flying costs (the kernel's passes, drawing).
 ## - **crowd:** the same shots among CROWD bodies on a lattice over the arena, each on a small circle
-##   about its home (as the swarm moves): what hitting costs, with the hit budget spent every step.
+##   about its home (as the swarm moves): what hitting costs as the game does it, with the hit-work
+##   budget (`WORK_PER_STEP`) spent every step, so most shots go untested that step.
+## - **crowd_all:** the crowd with the budget lifted (`work_per_step` = UNBUDGETED), every shot
+##   tested every step: what hitting would cost if nothing waited (H2's question), and the kernel's
+##   real share of it (H5's).
 ##
 ## Every shot is a real spell's (the cards `--cards=`, a plain bolt by default, compiled by the real
 ## Spells), so its hit goes through the real listeners: Spells, Combat (damage, statuses) and Feel
-## (impacts, sparks, sounds), on a bus of their own, as the clip stage wires them
+## (impacts, sparks, sounds, motes), on a bus of their own, as the clip stage wires them
 ## (tests/clips/stage.gd). Nothing steps by itself; the script steps one tick (1/60 s) at a time.
+## The shots' tails are the game's: motes (`tails_enabled` off, as since 2026-11-05); `--tails` puts
+## the tail shader's trails back, for comparing with the numbers before.
 ##
-## Timed, per step (medians and p95, milliseconds): the projectile manager's step in its parts, the
-## same parts `step()` runs, in its order (the target refresh, the common pass, the behaviour passes
-## before the hits, the hit pass split into the kernel's own time and the hand-backs' GDScript, the
-## passes after the hits, the trail samples), the hand-backs a step (native `hits` calls), the hits
-## and the shots past the hit budget; then Spells', Combat's and Feel's own `step`, the shots' spawn
-## (not part of the game's cost: the script tops the shots up), `update_draw`, and, in a window, the
-## GPU's time for a frame. A second pass of the same scene puts a timer between each hit event and
-## each of its listeners (`BENCH: shot scale listener` lines; a listener's time includes the events
-## it sends in turn, and the timer adds its own cost, so this pass's step is not compared).
-##
-## Since the parts are the manager's own passes called one by one, a check runs first: a short scene
-## stepped by `step()` and by the parts must give the same hits, or the script fails (`SHOT SCALE
-## FAILED`): `step()` changed, and `_step_in_parts` here has to follow it.
+## Timed, per step (medians and p95, milliseconds): the projectile manager's own `step()`, in the
+## parts it times itself when a benchmark asks (`step_profile`, `PROF_*`: the target refresh, the
+## common pass, the behaviour passes before the hits, the hit pass, of which the native kernel's own
+## time and the rest, the hand-backs to GDScript with every listener of the hits and ends they send,
+## the passes after the hits, the trail samples), the hand-backs a step (native `hits` calls), the
+## hits and the shots past the hit-work budget; then Spells', Combat's and Feel's own `step`, the
+## shots' spawn (not part of the game's cost: the script tops the shots up), `update_draw`, and, in
+## a window, the GPU's time for a frame. A second pass of the same scene puts a timer between each
+## hit event and each of its listeners (`BENCH: shot scale listener` lines; a listener's time
+## includes the events it sends in turn, and the timer adds its own cost, so this pass's step is not
+## compared).
 ##
 ## It also prints each scene's fingerprint for the damage check (shot-scale.md, "Parts"): the hits,
 ## a hash of every hit in order (step, caster, body, tag, point) and each body's damage taken
 ## (`DAMAGE:`, the total and a hash of the per-body totals). Nothing is random, so two versions of
 ## the code on the same scene must give the same totals.
 ##
+## The numbers are one run on one machine: compare parts and versions with each other, and take a
+## frame's real cost from the storm on the real GPU (`--storm` in the Web Test export).
+##
 ## godot --headless --path . --script res://tests/benchmark/shot_scale.gd
 ## godot --headless --path . --script res://tests/benchmark/shot_scale.gd -- --counts=10000,30000 --only=crowd
 ## godot --path . --script res://tests/benchmark/shot_scale.gd   (a window: the GPU's frame time too)
 ##
-## User arguments: `--counts=a,b,c` (the shot counts), `--only=storm|crowd`, `--steps=N` (the steps
-## measured, STEPS), `--crowd=N` (the crowd's bodies, CROWD), `--cards=a,b,c` (card ids, in staff
-## order), `--no-native` (the manager's GDScript), `--no-listeners` (skip the listener pass). Not run
-## in the build: about a minute headless with the native module, longer without.
+## User arguments: `--counts=a,b,c` (the shot counts), `--only=storm|crowd|crowd_all` (or several,
+## comma separated), `--steps=N` (the steps measured, STEPS), `--crowd=N` (the crowd's bodies,
+## CROWD), `--cards=a,b,c` (card ids, in staff order), `--no-native` (the manager's GDScript),
+## `--tails` (the tail shader's trails), `--work=N` (the hit-work budget of the storm and the crowd),
+## `--no-listeners` (skip the listener pass). Not run in the build: a few minutes headless with the
+## native module, longer without.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -51,15 +60,15 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DT: float = 1.0 / 60.0
 const ARENA: Rect2 = Rect2(0.0, 0.0, 1280.0, 720.0)
 const COUNTS: Array[int] = [10000, 30000, 50000, 100000]
+const SCENES: Array[String] = ["storm", "crowd", "crowd_all"]
 const CROWD: int = 500
 ## The storm's bodies in the shots' way, round the wizards.
 const STORM_BODIES: int = 8
+## The hit-work budget of crowd_all: more than any step spends.
+const UNBUDGETED: int = 1 << 40
 ## Steps before measuring: past one shot lifetime, so the shot count is steady.
 const WARMUP: int = 150
 const STEPS: int = 120
-## The parts check: a short scene stepped both ways.
-const CHECK_SHOTS: int = 4000
-const CHECK_STEPS: int = 90
 const SHOT_SPEED: float = 300.0
 const SHOT_LIFE: float = 2.0
 const SHOT_RADIUS: float = 3.0
@@ -70,8 +79,8 @@ const BODY_HEALTH: float = 1.0e12
 const BODY_RADIUS: float = 7.0
 ## The events a shot's hit or end sends (the sandbox storm's PROFILED_SIGNALS).
 const TIMED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
-## Part names, in step order, then the rest of the tick.
-const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs (GDScript)", "passes after hits", "trail samples", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
+## The lines printed: the manager's parts (its PROF_* times, in step order), then the rest of the tick.
+const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "trail samples", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
 const P_REFRESH: int = 0
 const P_COMMON: int = 1
 const P_BEFORE: int = 2
@@ -129,6 +138,8 @@ class Timed:
 var _registry: Node
 var _cards: Array[StringName] = [&"bolt"]
 var _native: bool = true
+var _tails: bool = false
+var _work: int = ManagerScript.WORK_PER_STEP
 var _headless: bool = true
 
 var _bus: EventsScript
@@ -154,10 +165,8 @@ var _slots: PackedInt32Array = PackedInt32Array()
 ## The fingerprint: hits, their hash.
 var _hits: int = 0
 var _hash: int = 0
-## This step's measures, filled by `_step_in_parts`.
+## This step's measures, filled by `_tick`.
 var _part_usec: PackedInt64Array = PackedInt64Array()
-var _handbacks: int = 0
-var _past_budget: int = 0
 ## Microseconds in this script's own hit handler this step (taken off the hit pass).
 var _handler_usec: int = 0
 var _timed: Array[Timed] = []
@@ -171,7 +180,7 @@ func _initialize() -> void:
 		_fail("the Registry autoload must exist")
 		return
 	var counts: Array[int] = COUNTS.duplicate()
-	var only: String = ""
+	var only: PackedStringArray = PackedStringArray()
 	var steps: int = STEPS
 	var crowd: int = CROWD
 	var listeners: bool = true
@@ -181,7 +190,7 @@ func _initialize() -> void:
 			for part: String in arg.trim_prefix("--counts=").split(",", false):
 				counts.append(maxi(part.to_int(), 1))
 		elif arg.begins_with("--only="):
-			only = arg.trim_prefix("--only=")
+			only = arg.trim_prefix("--only=").split(",", false)
 		elif arg.begins_with("--steps="):
 			steps = maxi(arg.trim_prefix("--steps=").to_int(), 1)
 		elif arg.begins_with("--crowd="):
@@ -190,18 +199,25 @@ func _initialize() -> void:
 			_cards.clear()
 			for id: String in arg.trim_prefix("--cards=").split(",", false):
 				_cards.append(StringName(id))
+		elif arg.begins_with("--work="):
+			_work = maxi(arg.trim_prefix("--work=").to_int(), 1)
 		elif arg == "--no-native":
 			_native = false
+		elif arg == "--tails":
+			_tails = true
 		elif arg == "--no-listeners":
 			listeners = false
-	if not _parts_match_step(crowd):
+	if not _build(16, 1, false, _work):
 		return
-	print("BENCH: shot scale, cards %s, native %s, crowd %d, %d steps measured, %s" % [",".join(_cards), "on" if _mgr_native_ok() else "off", crowd, steps, "headless" if _headless else "in a window"])
-	for scene: String in ["storm", "crowd"]:
-		if only != "" and only != scene:
+	var native_on: bool = _mgr.is_native()
+	_free_all()
+	print("BENCH: shot scale, cards %s, native %s, tails %s, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", "the tail shader's" if _tails else "motes", crowd, _work, steps, "headless" if _headless else "in a window"])
+	for scene: String in SCENES:
+		if not only.is_empty() and not only.has(scene):
 			continue
 		for count in counts:
-			if not _build(count, crowd if scene == "crowd" else STORM_BODIES, scene == "crowd"):
+			var is_crowd: bool = scene != "storm"
+			if not _build(count, crowd if is_crowd else STORM_BODIES, is_crowd, UNBUDGETED if scene == "crowd_all" else _work):
 				return
 			await _measure(scene, count, steps)
 			if listeners:
@@ -211,33 +227,10 @@ func _initialize() -> void:
 	quit(0)
 
 
-## The manager's parts, called one by one, must step the same game as `step()`: a short scene each
-## way gives the same hits in the same order.
-func _parts_match_step(crowd: int) -> bool:
-	var fingerprints: Array[String] = []
-	for parts: bool in [false, true]:
-		if not _build(CHECK_SHOTS, crowd, true):
-			return false
-		for i in CHECK_STEPS:
-			_tick(parts)
-		fingerprints.append("%d hits, hash %d, %s" % [_hits, _hash, _damage_line()])
-		_free_all()
-	if fingerprints[0] != fingerprints[1]:
-		_fail("the parts do not step as step() does (step(): %s; the parts: %s): step() changed, make _step_in_parts follow it" % [fingerprints[0], fingerprints[1]])
-		return false
-	return true
-
-
-func _mgr_native_ok() -> bool:
-	_build(16, 1, false)
-	var on: bool = _mgr._kernel != null
-	_free_all()
-	return on
-
-
-## The scene: the bus, the real Spells, Combat and Feel, the manager at `count` shots, the wizards
-## and `bodies` bodies (a lattice over the arena when `crowd`, else round the wizards).
-func _build(count: int, bodies: int, crowd: bool) -> bool:
+## The scene: the bus, the real Spells, Combat and Feel, the manager at `count` shots with the hit-work
+## budget `work`, the wizards and `bodies` bodies (a lattice over the arena when `crowd`, else round
+## the wizards).
+func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	_bus = _own(EventsScript.new()) as EventsScript
 	_actors = _own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_casters = PackedInt32Array()
@@ -249,6 +242,9 @@ func _build(count: int, bodies: int, crowd: bool) -> bool:
 	_mgr.set_native(_native)
 	_mgr.set_cap(count)
 	_mgr.set_bounds(ARENA)
+	_mgr.set_tails_enabled(_tails)
+	_mgr.work_per_step = work
+	_mgr.profile_clock = Time.get_ticks_usec
 	_spells = _own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
 	_spells.bind(_mgr, _bus)
@@ -317,8 +313,9 @@ func _build(count: int, bodies: int, crowd: bool) -> bool:
 	return true
 
 
-## One tick: bodies, the top-up, the manager (by `step()` or in parts), Spells, Combat, Feel.
-func _tick(parts: bool) -> void:
+## One tick: bodies, the top-up, the manager's `step()` (timing its own parts when `timed`), Spells,
+## Combat, Feel.
+func _tick(timed: bool) -> void:
 	_part_usec.fill(0)
 	_handler_usec = 0
 	_move()
@@ -327,13 +324,24 @@ func _tick(parts: bool) -> void:
 	_part_usec[P_SPAWN] = Time.get_ticks_usec() - t
 	for seat in 4:
 		_mgr.set_anchor(_casters[seat], _origin(seat))
+	if timed and _mgr.step_profile.is_empty():
+		_mgr.step_profile.resize(ManagerScript.PROF_PARTS)
+	elif not timed:
+		_mgr.step_profile.clear()
 	t = Time.get_ticks_usec()
-	if parts:
-		_step_in_parts(DT)
-	else:
-		_mgr.step(DT)
+	_mgr.step(DT)
 	var t1: int = Time.get_ticks_usec()
-	_part_usec[P_STEP] = t1 - t
+	_part_usec[P_STEP] = t1 - t - _handler_usec
+	if timed:
+		var profile: PackedInt64Array = _mgr.step_profile
+		_part_usec[P_REFRESH] = profile[ManagerScript.PROF_REFRESH]
+		_part_usec[P_COMMON] = profile[ManagerScript.PROF_COMMON]
+		_part_usec[P_BEFORE] = profile[ManagerScript.PROF_BEFORE]
+		_part_usec[P_HITS] = profile[ManagerScript.PROF_HITS] - _handler_usec
+		_part_usec[P_KERNEL] = profile[ManagerScript.PROF_KERNEL]
+		_part_usec[P_HANDBACK] = _part_usec[P_HITS] - _part_usec[P_KERNEL]
+		_part_usec[P_AFTER] = profile[ManagerScript.PROF_AFTER]
+		_part_usec[P_TRAILS] = profile[ManagerScript.PROF_TRAILS]
 	_spells.step(DT)
 	var t2: int = Time.get_ticks_usec()
 	_combat.step(DT)
@@ -346,95 +354,8 @@ func _tick(parts: bool) -> void:
 	_step_no += 1
 
 
-## `ProjectileManager.step()`, its parts timed one by one (keep it in step with `step()`; the parts
-## check fails when it is not).
-func _step_in_parts(delta: float) -> void:
-	_mgr.sim_time += delta
-	_mgr._mem_step += 1
-	_mgr._last_delta = delta
-	var t0: int = Time.get_ticks_usec()
-	_mgr._refresh_targets()
-	var t1: int = Time.get_ticks_usec()
-	var top: int = _mgr._high
-	_mgr._stepping = true
-	_mgr._work_left = ManagerScript.WORK_PER_STEP
-	if _mgr._kernel != null:
-		_mgr._kernel.call(&"pass_common", _mgr, top, delta)
-	else:
-		_mgr._pass_common(top, delta)
-	var t2: int = Time.get_ticks_usec()
-	for kind in ManagerScript.AFTER_HITS:
-		if _mgr._member_count[kind] > 0:
-			if _mgr._kernel == null or not _mgr._kernel.call(&"run_pass", _mgr, kind, kind * _mgr._cap, _mgr._member_count[kind], delta):
-				_mgr._passes[kind].call(_mgr._members, kind * _mgr._cap, _mgr._member_count[kind], delta)
-	var t3: int = Time.get_ticks_usec()
-	_pass_hits(top, delta)
-	var t4: int = Time.get_ticks_usec()
-	for kind in range(ManagerScript.AFTER_HITS, ManagerScript.BEHAVIOURS):
-		if _mgr._member_count[kind] > 0:
-			_mgr._passes[kind].call(_mgr._members, kind * _mgr._cap, _mgr._member_count[kind], delta)
-	_mgr._step_index += 1
-	_mgr._stepping = false
-	var t5: int = Time.get_ticks_usec()
-	_mgr._sample_trails()
-	var t6: int = Time.get_ticks_usec()
-	_part_usec[P_REFRESH] = t1 - t0
-	_part_usec[P_COMMON] = t2 - t1
-	_part_usec[P_BEFORE] = t3 - t2
-	_part_usec[P_HITS] = t4 - t3 - _handler_usec
-	_part_usec[P_HANDBACK] = _part_usec[P_HITS] - _part_usec[P_KERNEL]
-	_part_usec[P_AFTER] = t5 - t4
-	_part_usec[P_TRAILS] = t6 - t5
-
-
-## `ProjectileManager._pass_hits` and `_pass_hits_native`, counting the kernel's calls and its time.
-func _pass_hits(top: int, delta: float) -> void:
-	var limit: Rect2 = _mgr._bounds.grow(ManagerScript.BOUNDS_MARGIN)
-	var resume: int = _mgr._resume if _mgr._resume < top else 0
-	_mgr._starved_at = -1
-	_handbacks = 0
-	var n: int = 0
-	if _mgr._kernel != null and not _mgr._any_solid:
-		n = _pass_hits_native(top, delta, limit, resume)
-	while n < top:
-		_mgr._hit_slot(ManagerScript._wrapped(n + resume, top), delta, limit)
-		n += 1
-	# The slots the budget left for a later step: from the first starved one round to the start.
-	var starved: int = _mgr._starved_at
-	_past_budget = 0 if starved < 0 else top - ((starved - resume + top) % top)
-	_mgr._resume = maxi(starved, 0)
-
-
-func _pass_hits_native(top: int, delta: float, limit: Rect2, resume: int) -> int:
-	var n: int = 0
-	var kernel_usec: int = 0
-	while n < top:
-		_mgr._fit_hit_scratch()
-		var t: int = Time.get_ticks_usec()
-		var handed: int = _mgr._kernel.call(&"hits", _mgr, n, top, resume, limit, delta)
-		kernel_usec += Time.get_ticks_usec() - t
-		_handbacks += 1
-		if handed == -1:
-			_part_usec[P_KERNEL] = kernel_usec
-			return top
-		if handed < -1:
-			_part_usec[P_KERNEL] = kernel_usec
-			return -2 - handed
-		n = handed >> 1
-		var slot: int = ManagerScript._wrapped(n + resume, top)
-		if handed & 1 == 0:
-			_mgr._hit_slot(slot, delta, limit)
-		else:
-			_mgr._hit_found(slot)
-		n += 1
-		while n < top and _mgr._kernel_hands_back(ManagerScript._wrapped(n + resume, top)):
-			_mgr._hit_slot(ManagerScript._wrapped(n + resume, top), delta, limit)
-			n += 1
-	_part_usec[P_KERNEL] = kernel_usec
-	return top
-
-
-## Warm up, then STEPS steps in parts with `update_draw` and, in a window, a drawn frame each.
+## Warm up, then STEPS steps with the manager's parts timed, `update_draw` and, in a window, a drawn
+## frame each.
 func _measure(scene: String, count: int, steps: int) -> void:
 	for i in WARMUP:
 		_tick(false)
@@ -457,13 +378,14 @@ func _measure(scene: String, count: int, steps: int) -> void:
 		_part_usec[P_DRAW] = Time.get_ticks_usec() - t
 		for p in PARTS.size():
 			samples[p].append(float(_part_usec[p]))
-		handbacks.append(float(_handbacks))
+		handbacks.append(float(_mgr.step_profile[ManagerScript.PROF_HANDBACKS]))
 		hits.append(float(_hits - hits_before))
-		past.append(float(_past_budget))
+		past.append(float(_mgr.step_profile[ManagerScript.PROF_PAST_BUDGET]))
 		alive.append(float(_mgr.get_count()))
 		if not _headless:
 			await process_frame
 			gpu.append(RenderingServer.viewport_get_measured_render_time_gpu(viewport) * 1000.0)
+	_mgr.step_profile.clear()
 	if not _headless:
 		RenderingServer.viewport_set_measure_render_time(viewport, false)
 	var label: String = "%s %d" % [scene, count]

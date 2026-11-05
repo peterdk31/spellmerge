@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: Tails and particles shared by staff (owner session)
+
+The owner's Fireball cast through a splitting Storm had no tail: the tails' and particles' budgets thinned every shot alike. They are shared by staff now (`group_of`: the caster's staff from the spell tag; `fair_level` gives a small ask all of it, the crowded staffs share the rest), tails planned before the drawing (native too) and particles rolled per group. Tests in `test_tail_births.gd`; DECISIONS has the rules.
+
 ## 2026-11-05: Tails as motes (spell spectacle 2, S5 step 4, owner session)
 
 The owner played "Tails: Off": faster, but not the look, and a held atom stream's motes sat at fixed distances. Fixed the cause (the cards' births were rolled in the first part of each step only) and built tails as motes: with the tails off every flying shot lays its tail by distance (`_lay_tail`, `SPARK_TAIL`, about one every 2 px, random gaps from a phase of its own; native in `ShotKernel.draw_shots` to the bit), `tail_births_cap` a frame with every tail thinned past it, in a tail mote kind (`MoteKind.tail`; `tail`, `tail_streak` the default, `tail_long`) picked by the new "Tail motes" dev switch (`TailMotes`, `tail_motes_changed`). Tests: `test_tail_births.gd`, `test_tail_motes.gd`, the native kernel and motes comparisons with tails; sheet `shot_tail_motes.gd`. Web storm: about +0.3 ms motes CPU, +1.5-2 ms frame against tails off (DECISIONS). The owner plays each pick next.

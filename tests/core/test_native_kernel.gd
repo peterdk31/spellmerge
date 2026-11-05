@@ -33,10 +33,11 @@ const ROOM: Vector2 = Vector2(960.0, 540.0)
 const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## Not compared: node instance ids (each side has its own nodes), the hit test's scratch (the native
 ## pass sizes it for every target at once), what only the native drawing writes, the GDScript
-## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for (the native keeps
-## it in a local; both hand it out as `tail_demand`, which is compared).
+## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
+## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
+## `tail_demand`, which is compared, and the births themselves are compared).
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"_mem_id", &"_skip_id", &"_home_target", &"homing_target",
-		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted"]
+		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 var _failures: Array[String] = []
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.

@@ -119,6 +119,10 @@ Runs the hard rules check and the automation's unit tests. There is no build per
 1. **Community intake** (see Community intake): new issues, discussions and outside PRs are gathered, Claude decides each one with read-only tools, attached files are checked with no secrets, and a script labels, replies, closes and queues.
 2. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, nothing is released and the Daily log says why; nothing is reverted automatically (owner, 2026-11-02).
 3. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
+
+   The build is `build.yml` and the release `publish.yml`, both called by the daily run. The owner can also run `publish.yml` by hand (Actions > publish, on `main`): it builds `main` with every test, then publishes to the places ticked (GitHub release, Pages, itch.io), on the quality gate's channel unless one is chosen. Pages without a release goes to `/preview/` only.
+
+   For a build to download without publishing it, `manual-build.yml` (Actions > manual build, any branch) builds the chosen platform (`build.sh --only`, tests optional) and keeps it as an artifact of the run for 7 days.
 4. **Log**: post a summary to the day's Daily log issue.
 
 **Develop** runs hourly in `develop.yml`: take the top task (scheduled issues first, then `docs/NEXT.md`), implement it with tests, update the plan files and open a PR, which merges after all checks plus an independent fresh-context review (see Self-driven progress).

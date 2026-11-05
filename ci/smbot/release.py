@@ -1,11 +1,13 @@
 """Plans and publishes the daily release (docs/PLAN.md, "Daily run", step 7).
 
-  python3 -m smbot.release plan                      -> version and channel
+  python3 -m smbot.release plan [--channel C]        -> version and channel
   python3 -m smbot.release publish --version V --channel C --commit SHA
 
 Every passing daily build is released. It is labelled stable only when it also
 passes the quality gate (docs/PLAN.md, "Bugs"): no open issue labelled crash or
 blocker. Failing tests stop the build before this, so nothing broken ships.
+A manual run (publish.yml) may name the channel with --channel; the gate's open
+issues are still listed.
 """
 
 from __future__ import annotations
@@ -53,11 +55,15 @@ def open_gate_issues(repo: str) -> list[str]:
     return found
 
 
-def plan(repo: str, today: dt.date) -> dict[str, str]:
+def plan(repo: str, today: dt.date, channel: str | None = None) -> dict[str, str]:
+    """The next tag and the channel: the quality gate's, unless the owner named one (publish.yml)."""
     blockers = open_gate_issues(repo)
     for line in blockers:
         print(f"quality gate: {line}", file=sys.stderr)
-    return {"version": next_tag(remote_tags(repo), today), "channel": channel_for(len(blockers))}
+    if channel and channel != channel_for(len(blockers)):
+        print(f"channel {channel} chosen by hand (the quality gate says {channel_for(len(blockers))})",
+              file=sys.stderr)
+    return {"version": next_tag(remote_tags(repo), today), "channel": channel or channel_for(len(blockers))}
 
 
 def release_notes(repo: str, version: str, channel: str) -> str:
@@ -100,7 +106,8 @@ def _write_outputs(values: dict[str, str]) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("plan")
+    pln = sub.add_parser("plan")
+    pln.add_argument("--channel", choices=("stable", "nightly"), help="override the quality gate")
     pub = sub.add_parser("publish")
     pub.add_argument("--version", required=True)
     pub.add_argument("--channel", choices=("stable", "nightly"), required=True)
@@ -110,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     repo = config.load().repo
     if args.cmd == "plan":
-        _write_outputs(plan(repo, dt.datetime.now(dt.timezone.utc).date()))
+        _write_outputs(plan(repo, dt.datetime.now(dt.timezone.utc).date(), args.channel))
     else:
         publish(repo, args.version, args.channel, args.commit, args.dist)
     return 0

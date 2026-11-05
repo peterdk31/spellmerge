@@ -27,7 +27,9 @@ extends Node
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
 ## ray) and cannot hit the target that fired it
-## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). A payload is cast by the
+## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it), as long as it starts touching
+## it (`_launch`; owner, 2026-11-05): one that starts outside it, a Penta copy on its ring, hits it
+## as it hits anything. A payload is cast by the
 ## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, pull,
 ## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
@@ -981,6 +983,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# A held carrier lives until switched off; one that repeats (`_repeats`) lives its own life each time.
 	var held: bool = _holds(spell, tag)
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if held and not _repeats(spell) else spell.lifetime
+	# A payload is kept off the body that fired it only while it starts touching that body (owner,
+	# 2026-11-05: "a payload that starts outside the body that fired it can hit it"), as a Penta
+	# copy on its ring does not.
+	if source != null and projectiles != null and not projectiles.touches_target(source, origin, spell.radius + SpellLimits.SOURCE_TOUCH):
+		source = null
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):

@@ -5242,6 +5242,21 @@ func freeze_left_of(slot: int) -> float:
 
 ## Keep the shot in `slot` from hitting `node` for `seconds` (a payload must not hit the
 ## target that fired it). One target per shot; a later call replaces it.
+## True when the circle (`point`, `radius`) overlaps the hit circle of the registered target
+## `node` where it stands now (its node's place and offset, as each step reads it). False for a
+## node that is not registered, freed or out of the tree.
+func touches_target(node: Node, point: Vector2, radius: float) -> bool:
+	if node == null or not is_instance_valid(node):
+		return false
+	var at: int = _target_id.find(node.get_instance_id())
+	if at < 0:
+		return false
+	var body: Node2D = _targets[at] as Node2D
+	if body == null or not body.is_inside_tree():
+		return false
+	return point.distance_to(body.global_position + _target_offset[at]) <= _target_radius[at] + radius
+
+
 func exclude(slot: int, node: Node, seconds: float) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
 		_skip_id[slot] = node.get_instance_id()

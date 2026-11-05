@@ -155,8 +155,13 @@ const SWING_LEAN: float = 22.5
 ## at once; more is made when needed.
 const SHOT_MOVES_START: int = 64
 
-## Seconds a payload's shots cannot hit the target that fired the trigger.
+## Seconds a payload's shots cannot hit the target that fired the trigger (one that starts
+## touching it; `SpellRuntime._launch`).
 const SOURCE_EXCLUSION: float = 0.1
+## Pixels of slack on "a payload starts touching the body that fired it": a payload starts where
+## the shot that hit was, whose centre may stand its own radius off the body, more than the
+## payload's when that shot was bigger (a `bigger` bolt's 8 px against a nova shot's 5).
+const SOURCE_TOUCH: float = 8.0
 ## Knockback of one hit in pixels per second (M1's fire bolt had 120).
 const KNOCKBACK: float = 120.0
 ## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).

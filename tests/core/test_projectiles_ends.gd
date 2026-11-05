@@ -202,6 +202,20 @@ func test_a_slow_excluded_shot_still_hits_its_source_after_the_time() -> void:
 	check_equal(_hits, 1, "hit its source once the time is over, though it has not left the circle")
 
 
+## `touches_target` (a payload is kept off its source only while it starts touching it,
+## SpellRuntime._launch): the circle overlaps the body's hit circle where the body stands now.
+func test_touches_target_is_an_overlap_with_the_body_where_it_stands() -> void:
+	var node: Node2D = _target(Vector2(0, 0))
+	var reach: float = 10.0 + 4.0
+	check(_mgr.touches_target(node, Vector2(reach - 0.5, 0), 4.0), "a circle just overlapping touches")
+	check(not _mgr.touches_target(node, Vector2(reach + 0.5, 0), 4.0), "one just clear does not")
+	node.position = Vector2(100, 0)
+	check(_mgr.touches_target(node, Vector2(100, 0), 0.0), "it reads where the body is now")
+	var stray := Node2D.new()
+	own(stray)
+	check(not _mgr.touches_target(stray, Vector2.ZERO, 50.0), "a body not registered touches nothing")
+
+
 func test_exclude_is_cleared_when_the_slot_is_reused() -> void:
 	var node: Node2D = _target(Vector2(0, 0))
 	var slot: int = _mgr.spawn(0, Vector2(-5, 0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG, ManagerScript.MOTION_STILL)

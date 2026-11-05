@@ -1257,8 +1257,8 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 ## that casts a payload), unless the spell homes: then the target its homing picks from `origin`
 ## along `heading` (a flying shot's homing looks all round, an instant carrier's within its bend),
 ## the caster again when there is none. The ring stands SpellLimits.PENTA_RING beyond the centre's
-## edge, or within PENTA_WITHIN of the carrier's own reach when that is less; the first copy stands
-## on the caster's side of a target, or ahead along the aim round the caster. Each point stops
+## edge, or within PENTA_WITHIN of the carrier's own reach when that is less, turned at random each
+## cast (owner, 2026-11-05) by the cast's seeded generator, as scatter is. Each point stops
 ## short of a wall, and each copy is cast by its point (a beam stays there, an orbit circles it).
 ## Returns the shots made.
 func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
@@ -1275,12 +1275,10 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 		centre = projectiles.homing_point(actor, origin, way, bend, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, tag)
 		if centre.is_finite():
 			edge = projectiles.homing_target_radius
-	var first: Vector2 = way
-	if centre.is_finite():
-		if not centre.is_equal_approx(caster_at):
-			first = centre.direction_to(caster_at)
-	else:
+	if not centre.is_finite():
 		centre = caster_at
+	# Turned at random each cast, by the cast's own generator (the same on every machine).
+	var first: Vector2 = Vector2.from_angle(_scatter.randf() * TAU)
 	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
 	var carried: float = _carrier_of(spell).reach_of(spell)
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):

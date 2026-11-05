@@ -31,14 +31,11 @@ func test_with_homing_five_bolts_from_a_ring_round_its_target_all_aimed_at_it() 
 	check(_arena.cast(0, 0), "cast")
 	var shots: Array[int] = _shots()
 	check_equal(shots.size(), 5, "five bolts")
-	var nearest: float = INF
 	for slot in shots:
 		var at: Vector2 = _arena.projectiles.get_position_of(slot)
 		var to_imp: Vector2 = at.direction_to(imp.global_position)
 		check(_arena.projectiles.get_velocity_of(slot).normalized().dot(to_imp) > 0.99, "each flies at the imp")
 		check(at.distance_to(imp.global_position) > SpellLimits.PENTA_RING - 1.0, "from its ring, past its edge")
-		nearest = minf(nearest, at.length())
-	check(nearest < Vector2(150, 30).length(), "the first on the caster's side")
 	_arena.run(1.0)
 	check(_arena.lost(imp) > 0, "and they hit it")
 
@@ -52,13 +49,40 @@ func test_without_homing_it_rings_its_caster_aimed_in() -> void:
 	check(_arena.cast(0, 0), "cast")
 	var shots: Array[int] = _shots()
 	check_equal(shots.size(), 5, "five bolts")
-	var ahead: bool = false
+	var angles: Array[float] = []
 	for slot in shots:
 		var at: Vector2 = _arena.projectiles.get_position_of(slot)
 		check(is_equal_approx(at.length(), SpellLimits.PENTA_RING), "each starts on the ring round the caster (%s)" % at)
 		check(_arena.projectiles.get_velocity_of(slot).normalized().dot(-at.normalized()) > 0.99, "and flies in at it")
-		ahead = ahead or at.is_equal_approx(Vector2(SpellLimits.PENTA_RING, 0))
-	check(ahead, "the first ahead along the aim")
+		angles.append(fposmod(at.angle(), TAU))
+	angles.sort()
+	for n in angles.size():
+		var gap: float = fposmod((angles[(n + 1) % angles.size()] - angles[n]), TAU)
+		check(is_equal_approx(gap, TAU / 5.0), "evenly round it (%s)" % gap)
+
+
+## The ring is turned at random each cast (owner, 2026-11-05), by the cast's seeded generator: two
+## casts in a row stand differently, and the same casts again stand the same.
+func test_the_ring_turns_at_random_each_cast_the_same_every_run() -> void:
+	var first: Array[Vector2] = _two_rings()
+	var again: Array[Vector2] = _two_rings()
+	check(not first[0].is_equal_approx(first[1]), "two casts in a row turn differently (%s, %s)" % [first[0], first[1]])
+	check_equal(again, first, "and the same casts turn the same")
+
+
+## Where the first bolt of each of two casts stood.
+func _two_rings() -> Array[Vector2]:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["penta", "bolt"])
+	var out: Array[Vector2] = []
+	for n in 2:
+		_arena.cast(0, 0)
+		var shots: Array[int] = _shots()
+		out.append(_arena.projectiles.get_position_of(shots[shots.size() - 1]).round())
+		_arena.run(1.5)
+	_arena.free_all()
+	_arena = null
+	return out
 
 
 func test_beams_stay_where_their_points_are() -> void:

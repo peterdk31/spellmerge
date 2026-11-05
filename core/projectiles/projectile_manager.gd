@@ -536,11 +536,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ]
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_meshes"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_mesh"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"drawn_trails", &"particle_demand", &"trail_demand", &"particle_share", &"trail_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"_trail_image", &"_trail_texture", &"_trail_dirty", &"tail_mesh", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_spark_moment", &"_spark_rng"]
+const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_spark_moment", &"_spark_rng"]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.

@@ -31,6 +31,9 @@ extends RefCounted
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
+## What only the drawing reads and writes (online-ready N1, N9).
+const VIEW: Array[StringName] = [&"_look"]
+
 ## The controller that possesses the target, and the actor it possesses.
 var driver: ActorController = null
 var target: Actor = null

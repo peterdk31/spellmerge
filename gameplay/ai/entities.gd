@@ -105,6 +105,12 @@ const STRIDE: int = 16
 ## autoload is drawn before the current scene, as the shots are.
 const DRAW_Z: int = 40
 
+## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
+## what is set up again or rebuilt from state.
+const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"_caster", &"_enemies"]
+## What only the drawing reads and writes (online-ready N1, N9).
+const VIEW: Array[StringName] = [&"_familiar_node"]
+
 ## The event bus and the projectile manager. Only tests set these, before adding the node;
 ## otherwise the "Events" and "Projectiles" autoloads.
 var events: EventsScript = null

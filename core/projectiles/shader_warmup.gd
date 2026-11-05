@@ -52,6 +52,10 @@ static var warmed: bool = false
 static var _wanted: Array[Shader] = []
 static var _wanted_how: PackedInt32Array = PackedInt32Array()
 
+## View as a whole (online-ready N1, core/sim/README.md): nothing here is state, so the state walk
+## never enters it, and a member that holds one is listed in VIEW or DERIVED.
+const VIEW_ONLY: bool = true
+
 ## Every draw, shown one a unit in this order (made by `begin`), what holds them, and the one
 ## on show (-1 before the first).
 var _draws: Array[CanvasItem] = []

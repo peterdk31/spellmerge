@@ -28,7 +28,7 @@ func take() -> void:
 	if not need(["PlayerInput", "Flow", "Feel"]):
 		return
 	settle_frames = 30
-	# Feel ages its effects by the wall clock; a software-rendered frame is far longer than 1/60 s,
+	# Feel ages its flashes by the wall clock; a software-rendered frame is far longer than 1/60 s,
 	# so frame time instead (--fixed-fps 60), as shot_poof.gd does.
 	var feel: Node = root.get_node("Feel")
 	feel.set("drive_engine", false)
@@ -110,14 +110,14 @@ func _crop(image: Image, at: Vector2) -> Image:
 	return crop
 
 
-## The poof as it was before S6 item 9 (living staffs H4, Feel's `_on_staff_shown`): a puff with the
-## POOF look along the staff, its middle 4 px from the hand along the aim, 0.18 s, zoom 2, in the
+## The poof as it was before S6 item 9 (living staffs H4, Feel's `_on_staff_shown`): the `poof`
+## flash kind (a puff with Feel's poof look bit until flash kinds F2) along the staff, its middle 4 px from the hand along the aim, 0.18 s, zoom 2, in the
 ## actor's ramp, following the body.
 func _old_poof(feel: Node, body: Actor) -> void:
 	var offset: Vector2 = body.hand_offset + body.aim * 4.0
 	var ramp: int = int(feel.call("_ramp_of", body.id))
-	var slot: int = int(feel.call("show_effect", feel.get("KIND_PUFF"), body.global_position + offset, body.aim, Color.WHITE, ramp, feel.get("POOF"), 2, 0.18, 0.0, body))
+	var slot: int = int(feel.call("show_flash", &"poof", body.global_position + offset, body.aim, Color.WHITE, ramp, 0, 2, 0.18, 0.0, body))
 	if slot >= 0:
-		var offsets: PackedVector2Array = feel.get("_effect_offset") as PackedVector2Array
+		var offsets: PackedVector2Array = feel.get("_flash_offset") as PackedVector2Array
 		offsets[slot] = offset
-		feel.set("_effect_offset", offsets)
+		feel.set("_flash_offset", offsets)

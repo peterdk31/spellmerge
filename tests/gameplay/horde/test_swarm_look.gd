@@ -67,7 +67,7 @@ func _differences(body: Actor, rest_offset: Vector2, look: SwarmLook, row: int) 
 	var eyes := face.get_child(0) as Sprite2D
 	var brows := face.get_child(1) as Sprite2D
 	var shown: Dictionary = look.row_look(row)
-	var flashing: bool = sprite.material != null and sprite.material == _feel.get(&"_flash_material")
+	var flashing: bool = sprite.material != null and sprite.material == _feel.get(&"_hit_flash_material")
 	var found: PackedStringArray = PackedStringArray()
 	if sprite.offset - rest_offset != shown["lift"]:
 		found.append("hop %s / %s" % [sprite.offset - rest_offset, shown["lift"]])
@@ -258,7 +258,7 @@ func test_no_batch_is_ever_culled() -> void:
 ## Feel's numbers are read from its live preset: a longer flash there is a longer flash here.
 func test_the_flash_follows_feels_preset() -> void:
 	var preset: Resource = (_feel.get(&"preset") as Resource).duplicate()
-	preset.set(&"flash_seconds", 0.5)
+	preset.set(&"hit_flash_seconds", 0.5)
 	var swarm := FakeSwarm.new()
 	swarm.add(swarm.kind_of(MiteData.scene), Vector2.ZERO, 1)
 	var look: SwarmLook = _look_of(swarm)

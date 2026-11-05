@@ -2,15 +2,16 @@ extends RefCounted
 ## A cue read once for playing (`Feel.play_cue`; docs/milestones/spell-spectacle-2.md, S6 2): each
 ## part's player looked up by its type once, and each part prepared once by its type's `prepare`
 ## (`Feel.add_cue_part`), so a cue played hundreds of times a second (a shot's impact, a hit) reads
-## no Dictionary key while it plays. A flash part (`effect`) is prepared into a `Flash`, its keys as
+## no Dictionary key while it plays. A flash part (`flash`) is prepared into a `Flash`, its keys as
 ## typed fields. Feel keeps one plan a cue, made again when the cue or the part players change.
 
-## A flash part (`CueBase`, an `effect`) as typed fields: the effect kind and its step in pixels,
+## A flash part (`CueBase`, a `flash`) as typed fields: the flash kind and its step in pixels,
 ## and every key the part may have.
 class Flash:
 	extends RefCounted
+	## Feel's code for its kind (`Feel._flash_codes`).
 	var kind: int = 0
-	## Pixels a step of its zoom is (CUE_EFFECTS' second column), and its own seconds.
+	## Pixels a step of its zoom is (its kind's `step`), and its own seconds.
 	var step: float = 12.0
 	var seconds: float = 0.0
 	var lasts_size: bool = false
@@ -20,10 +21,8 @@ class Flash:
 	var reach: float = -1.0
 	var reach_steps: float = -1.0
 	var along: bool = false
-	## Where on the cue's line it plays (its `along` key, 0 to 1; -1: the cue's point; S6 item 9),
-	## and the look bits its effect always has (CUE_EFFECTS' fifth column: the poof's).
+	## Where on the cue's line it plays (its `along` key, 0 to 1; -1: the cue's point; S6 item 9).
 	var place: float = -1.0
-	var bits: int = 0
 	## How it is coloured: PAINT_*, and its own `color` for PAINT_COLOR.
 	var paint: int = PAINT_CUE
 	var color: Color = Color.WHITE
@@ -80,14 +79,14 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 	var plan: RefCounted = new()
 	plan.cue = of
 	for part: Dictionary in of.parts:
-		var type: StringName = StringName(part.get("part", "effect"))
+		var type: StringName = StringName(part.get("part", "flash"))
 		var row: Variant = types.get(type)
 		if row == null:
 			plan.unknown.append(type)
 			continue
 		var prepare: Callable = (row as Array)[1]
 		var made: Variant = prepare.call(part) if prepare.is_valid() else part
-		# A part its type could not prepare (a flash of an effect Feel has not) plays nothing.
+		# A part its type could not prepare (a flash Feel has not) plays nothing.
 		if made == null:
 			continue
 		plan.players.append((row as Array)[0] as Callable)
@@ -101,20 +100,18 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 	return plan
 
 
-## The flash part `part` as a `Flash`, with `effects` Feel's table of effect names (CUE_EFFECTS:
-## kind, pixels a step, seconds, a fourth column true for one drawn along a length, and a fifth of
-## look bits it always has). Null for an
-## effect not in it (`CueBase.problems` names it in content).
-static func flash_of(part: Dictionary, effects: Dictionary) -> Flash:
-	var row: Array = effects.get(StringName(part.get("effect", "")), []) as Array
+## The flash part `part` as a `Flash`, with `flashes` Feel's rows of the flash kinds by id
+## (`Feel._flash_rows`: its code, pixels a step, seconds, and true for one drawn along a length).
+## Null for a kind not in it (the content test names it).
+static func flash_of(part: Dictionary, flashes: Dictionary) -> Flash:
+	var row: Array = flashes.get(StringName(part.get("flash", "")), []) as Array
 	if row.is_empty():
 		return null
 	var flash := Flash.new()
 	flash.kind = int(row[0])
 	flash.step = float(row[1])
 	flash.seconds = float(part.get("seconds", row[2]))
-	flash.along = row.size() > 3 and bool(row[3])
-	flash.bits = int(row[4]) if row.size() > 4 else 0
+	flash.along = bool(row[3])
 	flash.place = clampf(float(part["along"]), 0.0, 1.0) if part.has("along") else -1.0
 	flash.lasts_size = bool(part.get("lasts_size", false))
 	flash.zoom = float(part.get("zoom", 1.0))

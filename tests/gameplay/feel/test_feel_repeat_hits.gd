@@ -70,12 +70,12 @@ func test_a_repeat_hit_is_not_heard_again_but_still_sprays() -> void:
 	var by: int = FIRST_WIZARD_ID
 	_hit(by, target)
 	check_equal(registry.asked.size(), 1, "the first hit is heard")
-	var sprays: int = feel.effects_of(FeelScript.KIND_PUFF) + feel.effects_of(FeelScript.KIND_SPRAY)
+	var sprays: int = feel.flashes_of(&"puff") + feel.flashes_of(&"spray")
 	var shake: float = feel.trauma()
 	for i in 5:
 		_hit(by, target)
 	check_equal(registry.asked.size(), 1, "five more by the same attacker in the same frame are not")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF) + feel.effects_of(FeelScript.KIND_SPRAY), sprays + 5, "each still sprays")
+	check_equal(feel.flashes_of(&"puff") + feel.flashes_of(&"spray"), sprays + 5, "each still sprays")
 	check(feel.trauma() >= shake, "and still shakes")
 
 

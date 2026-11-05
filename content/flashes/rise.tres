@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="FlashKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/flash_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"rise"
+seconds = 0.45
+step = 12.0
+metric = &"flat"
+ring = Array[Dictionary]([{"from_z": 9.0, "to_z": 1.0, "way": &"out", "over": 1.0}, {"at": 0.7, "off": true}])
+column_width = Array[Dictionary]([{"from_z": 0.0, "to_z": 1.5}, {"at": 0.15, "from_z": 1.5, "to_z": 0.0}, {"at": 0.75, "from_z": 0.0}, {"at": 0.85, "off": true}])
+column_top = Array[Dictionary]([{"from": 1.0, "from_z": -12.0}])
+column_foot = Array[Dictionary]([{"from_z": 2.0}, {"at": 0.5, "from_z": 2.0, "to": 1.0, "to_z": -12.0, "over": 0.85}])
+column_dotted = Array[Dictionary]([{"from": 0.0}, {"at": 0.5, "from": 1.0}])
+glow = Array[Dictionary]([{"from": 1.0, "to": 0.0}])
+glow_ring = Array[Dictionary]([{"from": 0.7}])
+glow_ring_reach = Array[Dictionary]([{"from_z": 2.0}])
+glow_middle = Array[Dictionary]([{"from": 0.45}])
+glow_middle_reach = Array[Dictionary]([{"from_z": 7.0}])
+first = Array[Dictionary]([{"shade": &"hot"}])
+second = Array[Dictionary]([{"shade": &"hi"}, {"at": 0.4, "shade": &"mid"}])

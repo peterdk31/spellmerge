@@ -140,7 +140,7 @@ func _process(_delta: float) -> void:
 	if _projectiles != null:
 		_peak_projectiles = maxi(_peak_projectiles, int(_projectiles.call("get_count")))
 	if _feel != null:
-		_peak_particles = maxi(_peak_particles, int(_feel.call("live_effects")))
+		_peak_particles = maxi(_peak_particles, int(_feel.call("live_flashes")))
 
 
 ## Read the engine's monitors for the frame that just ended (nothing before the second frame).
@@ -245,4 +245,4 @@ func report() -> void:
 		var process: float = process_scripts_average_ms()
 		print("BENCH: frame parts: physics steps per frame avg %.2f max %d; a physics step's scripts avg %.2f ms max %.2f ms; process scripts avg %.2f ms a frame; the rest of the frame (physics server, message queue and frees, renderer) avg %.2f ms; renderer CPU avg %.2f ms max %.2f ms; peak draw calls %d" % [steps, _steps_max, physics, physics_scripts_max_ms(), process, maxf(average_ms() - steps * physics - process, 0.0), _render_sum_ms / n, _render_max_ms, _peak_draw_calls])
 		print("BENCH: engine monitors (each the longest of its second, not an average step): physics step avg of maxima %.2f ms max %.2f ms; process avg of maxima %.2f ms max %.2f ms" % [_physics_sum_ms / n, _physics_max_ms, _process_sum_ms / n, _process_max_ms])
-	print("BENCH: peak live effects %d (slots %d, Feel.effect_slots)" % [_peak_particles, EffectSlots.DEFAULT if _feel == null else int(_feel.get("effect_slots"))])
+	print("BENCH: peak live flashes %d (slots %d, Feel.effect_slots)" % [_peak_particles, EffectSlots.DEFAULT if _feel == null else int(_feel.get("effect_slots"))])

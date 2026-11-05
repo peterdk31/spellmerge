@@ -12,7 +12,7 @@ extends Node2D
 ##   and bob while standing (HOP_IDLE), and its hurt pose for HURT_TIME after a hit when the scene
 ##   has a `hurt_texture`; a swarmer has no staff, so no telegraph, windup or staff animation;
 ## - Feel's hit flash (the body in plain white) and squash (wide and low, settling back) for the
-##   preset's `flash_seconds` and `hit_squash`, stepped in real time as Feel steps them;
+##   preset's `hit_flash_seconds` and `hit_squash`, stepped in real time as Feel steps them;
 ## - the whole `Face` (the scene's style, resting mood, anchor and glow): eyes in the nine look
 ##   directions from the aim and the blink, brows by mood (worried for Face.HURT_TIME after a hit,
 ##   down: shut and worried), the style's idle habits from a generator seeded per row (the swarm's
@@ -360,7 +360,7 @@ func on_hit(row: int) -> void:
 	_hurt_left[row] = CreatureLook.HURT_TIME
 	_mood_left[row] = Face.HURT_TIME
 	var preset: Resource = _preset()
-	var seconds: float = preset.get(&"flash_seconds") as float
+	var seconds: float = preset.get(&"hit_flash_seconds") as float
 	if seconds <= 0.0:
 		return
 	# Feel._react: the flash shows at once; the squash is written by the next step of Feel's part.

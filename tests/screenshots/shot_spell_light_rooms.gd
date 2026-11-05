@@ -17,7 +17,7 @@ const LIGHTNING := preload("res://content/spells/elements/lightning/lightning.tr
 const BOLT_RADIUS: float = 5.0
 const MIDDLE := Vector2(320.0, 150.0)
 ## How long the burst and the blast last: long, so they hardly change between the takes.
-const EFFECT_SECONDS: float = 600.0
+const FLASH_SECONDS: float = 600.0
 
 var _shots: Node = null
 
@@ -43,8 +43,8 @@ func take() -> void:
 	_bolt(1, Vector2(260.0, 160.0), BOLT_RADIUS, FROST.get("tint") as Color, PackedInt32Array([int(FROST.get("look_layer"))]))
 	_bolt(3, Vector2(520.0, 120.0), BOLT_RADIUS, LIGHTNING.get("tint") as Color, PackedInt32Array([int(LIGHTNING.get("look_layer"))]))
 	_bolt(enemy, Vector2(420.0, 70.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
-	feel.call("show_effect", FeelScript.KIND_BURST, Vector2(360.0, 190.0), Vector2.RIGHT, Color.WHITE, 2, 0, 2, EFFECT_SECONDS)
-	feel.call("show_effect", FeelScript.KIND_SHELL, Vector2(200.0, 300.0), Vector2.RIGHT, FIRE.get("tint") as Color, 0, ManagerScript.pack_look(PackedInt32Array([int(FIRE.get("look_layer"))])), 6, EFFECT_SECONDS)
+	feel.call("show_flash", &"burst", Vector2(360.0, 190.0), Vector2.RIGHT, Color.WHITE, 2, 0, 2, FLASH_SECONDS)
+	feel.call("show_flash", &"shell", Vector2(200.0, 300.0), Vector2.RIGHT, FIRE.get("tint") as Color, 0, ManagerScript.pack_look(PackedInt32Array([int(FIRE.get("look_layer"))])), 6, FLASH_SECONDS)
 	feel.call("set_spell_light", true)
 	var light: Node = feel.call("light")
 	if light == null:

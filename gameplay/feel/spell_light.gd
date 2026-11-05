@@ -1,5 +1,5 @@
 extends Node
-## Spell light (docs/milestones/spell-spectacle.md, P3a, P3b): shots, effects, beams and the
+## Spell light (docs/milestones/spell-spectacle.md, P3a, P3b): shots, flashes, beams and the
 ## room's own lights light the floor, the walls and the bodies round them. A child of the
 ## spectacle (gameplay/feel/spectacle.gd, under Feel), made only while the "Spell light" setting is on (`SpellLightSetting`, `spell_light_changed`); with
 ## it off none of these nodes exist.
@@ -13,9 +13,10 @@ extends Node
 ##     mirroring the batch (`ProjectileManager.mirror_batch`): each frame it is handed the buffer
 ##     the batch uploads, with a quad of its own (the batch's MultiMesh is not shared: it holds
 ##     the trails' mesh, hundreds of quads a shot, drawn or folded; DECISIONS, 2026-11-02).
-##   - Feel's effects (flares, rings, casts, arcs, blasts): `light_effects` hands over the buffers
-##     Feel just uploaded (Feel calls the spectacle's, which calls this). How much each effect kind lights is EFFECT_LIGHT and BLAST_LIGHT (data
-##     here, by Feel's KIND_* codes; a test names each one), fading out over its life.
+##   - Feel's flashes (flares, rings, casts, arcs, blasts): `light_flashes` hands over the buffers
+##     Feel just uploaded (Feel calls the spectacle's, which calls this). How much each lights is its kind's `room_light`
+##     (`FlashKind`; Feel writes it into the row's transform, 0 for an unlit flash), fading out
+##     over its life.
 ##   - Live beams: `light_beam` hands over the path Feel just gave the beam's own shader; each is
 ##     a band of light along it.
 ## - **The cues' lights** (docs/milestones/spell-spectacle-2.md, S6 item 4): a cue's `light` part
@@ -49,7 +50,7 @@ const REACH: float = 65536.0
 ## How `light.gdshader` reads a batch's rows (its ROWS_*).
 const ROWS_TRAIL: int = 0
 const ROWS_RUNE: int = 1
-const ROWS_EFFECT: int = 2
+const ROWS_FLASH: int = 2
 const ROWS_SPOT: int = 3
 const ROWS_CUE: int = 4
 ## The most cue lights at once (`flash`).
@@ -57,34 +58,16 @@ const CUE_LIGHTS: int = 64
 ## The steps the light comes in by default (`light_apply.gdshader`'s `bands`): 3 (dim, lit,
 ## bright); 0 is smooth. The owner's choice between them is open (2026-11-04).
 const DEFAULT_BANDS: int = 3
-## How much each effect kind lights at its start (0: none), by Feel's KIND_* (its code in the
-## effect rows); `test_light.gd` names each. Flashes and bursts light; a dash, chips and a
-## status mark do not.
-const EFFECT_LIGHT: Dictionary = {
-	4: 1.0,   # KIND_BURST: a shot's end
-	5: 0.8,   # KIND_RING_OUT
-	6: 0.6,   # KIND_RING_IN
-	7: 0.9,   # KIND_RUNE_BURST
-	8: 0.6,   # KIND_CAST: the flash at the staff
-	11: 0.35, # KIND_SPRAY: a hit
-	12: 0.45, # KIND_PUFF: a hit with no way, a kill, a reaction
-	14: 0.9,  # KIND_ARC: lightning between two bodies
-}
-## The same for the explosions' parts, by their code (Feel's KIND_* less KIND_SHELL).
-const BLAST_LIGHT: Dictionary = {
-	0: 1.0, # KIND_SHELL: a blast's flash
-	1: 1.0, # KIND_FIREBALL
-}
-## An effect's light reaches this many times its square's half size, plus EFFECT_PAD (px); an
+## A flash's light reaches this many times its square's half size, plus FLASH_PAD (px); an
 ## explosion's square is already BLAST_SPAN radii, so it reaches about that far.
-const EFFECT_REACH: float = 1.6
+const FLASH_REACH: float = 1.6
 const BLAST_REACH: float = 1.0
 const ARC_REACH: float = 1.0
-const EFFECT_PAD: float = 10.0
-## The effect light batches (`effects`, `light_effects`).
-const EFFECTS_FLARE: int = 0
-const EFFECTS_BLAST: int = 1
-const EFFECTS_ARC: int = 2
+const FLASH_PAD: float = 10.0
+## The flash light batches (`flashes`, `light_flashes`).
+const FLASHES_FLARE: int = 0
+const FLASHES_BLAST: int = 1
+const FLASHES_ARC: int = 2
 ## The most points a beam's path has (Feel's LIVE_BEAM_POINTS, `light_beam.gdshader`'s BEAM_POINTS).
 const BEAM_POINTS: int = 80
 ## How far a beam's light reaches each side of it (px), and how bright it is.
@@ -93,11 +76,11 @@ const BEAM_STRENGTH: float = 0.8
 ## Floats a 2D MultiMesh row holds with colours and custom data.
 const STRIDE: int = 16
 
-## The light buffer, its shot batches (by BATCH_*), effect batches (EFFECTS_*), beams, the spots'
+## The light buffer, its shot batches (by BATCH_*), flash batches (FLASHES_*), beams, the spots'
 ## batch and the rect that applies it. Read only.
 var viewport: SubViewport = null
 var batches: Array[MultiMeshInstance2D] = []
-var effects: Array[MultiMeshInstance2D] = []
+var flashes: Array[MultiMeshInstance2D] = []
 var beams: Array[MeshInstance2D] = []
 var spots: MultiMeshInstance2D = null
 ## The cues' lights' batch (ROWS_CUE). Read only.
@@ -149,13 +132,12 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 		batches.append(node)
 		if _projectiles != null:
 			_projectiles.mirror_batch(batch, node.multimesh)
-	for kind in [EFFECTS_FLARE, EFFECTS_BLAST, EFFECTS_ARC]:
-		var node: MultiMeshInstance2D = _light_batch(ROWS_EFFECT)
+	for kind in [FLASHES_FLARE, FLASHES_BLAST, FLASHES_ARC]:
+		var node: MultiMeshInstance2D = _light_batch(ROWS_FLASH)
 		var material: ShaderMaterial = node.material as ShaderMaterial
-		material.set_shader_parameter(&"kind_light", kind_lights(BLAST_LIGHT if kind == EFFECTS_BLAST else EFFECT_LIGHT))
-		material.set_shader_parameter(&"effect_reach", [EFFECT_REACH, BLAST_REACH, ARC_REACH][kind])
-		material.set_shader_parameter(&"effect_pad", EFFECT_PAD)
-		effects.append(node)
+		material.set_shader_parameter(&"flash_reach", [FLASH_REACH, BLAST_REACH, ARC_REACH][kind])
+		material.set_shader_parameter(&"flash_pad", FLASH_PAD)
+		flashes.append(node)
 	spots = _light_batch(ROWS_SPOT)
 	spots.name = "Spots"
 	cue_lights = _light_batch(ROWS_CUE)
@@ -201,14 +183,6 @@ func _light_batch(rows: int) -> MultiMeshInstance2D:
 	viewport.add_child(node)
 	return node
 
-
-## `lights` (code -> light) as the shader's 16 kinds.
-static func kind_lights(lights: Dictionary) -> PackedFloat32Array:
-	var out := PackedFloat32Array()
-	out.resize(16)
-	for code: int in lights:
-		out[code] = float(lights[code])
-	return out
 
 
 func _enter_tree() -> void:
@@ -291,12 +265,12 @@ func set_bands(to: int) -> void:
 	(apply.material as ShaderMaterial).set_shader_parameter(&"bands", bands)
 
 
-## Feel's effect rows, just uploaded: the flares' (`flares` rows of `flare_rows`), the explosions'
+## Feel's flash rows, just uploaded: the flares' (`flares` rows of `flare_rows`), the explosions'
 ## and the arcs', each buffer `slots` rows long. Their lights draw those rows.
-func light_effects(flare_rows: PackedFloat32Array, flares: int, blast_rows: PackedFloat32Array, blasts: int, arc_rows: PackedFloat32Array, arcs: int, slots: int) -> void:
-	_hand(effects[EFFECTS_FLARE].multimesh, flare_rows, flares, slots)
-	_hand(effects[EFFECTS_BLAST].multimesh, blast_rows, blasts, slots)
-	_hand(effects[EFFECTS_ARC].multimesh, arc_rows, arcs, slots)
+func light_flashes(flare_rows: PackedFloat32Array, flares: int, blast_rows: PackedFloat32Array, blasts: int, arc_rows: PackedFloat32Array, arcs: int, slots: int) -> void:
+	_hand(flashes[FLASHES_FLARE].multimesh, flare_rows, flares, slots)
+	_hand(flashes[FLASHES_BLAST].multimesh, blast_rows, blasts, slots)
+	_hand(flashes[FLASHES_ARC].multimesh, arc_rows, arcs, slots)
 
 
 func _hand(multimesh: MultiMesh, buffer: PackedFloat32Array, count: int, slots: int) -> void:
@@ -311,7 +285,7 @@ func _hand(multimesh: MultiMesh, buffer: PackedFloat32Array, count: int, slots: 
 
 ## A cue's light (its `light` part): round `at`, reaching `reach` pixels, `strength` bright at
 ## first and fading to nothing over `seconds`, from the clock time `now` (the spectacle's), in the
-## colour of an effect row in the ramp `ramp` with the cards `look` and the core `core` (`look`
+## colour of a flash row in the ramp `ramp` with the cards `look` and the core `core` (`look`
 ## with Feel's EXACT: `core` exactly). Takes the oldest light's place when all are lit.
 func flash(at: Vector2, reach: float, strength: float, seconds: float, core: Color, ramp: int, look: int, now: float) -> void:
 	if reach <= 0.0 or strength <= 0.0 or seconds <= 0.0 or not at.is_finite():

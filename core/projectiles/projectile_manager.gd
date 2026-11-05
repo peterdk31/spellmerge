@@ -380,7 +380,8 @@ const LOOK_ZIG: int = 18
 const LOOK_DOUBLE: int = 19
 const LOOK_CONVERGE: int = 20
 const LOOK_DRIFT: int = 21
-## Kind 22 is the poof flag (`Feel.POOF`), 23 the enemy ramp and 24 the exact colour: not kinds.
+## Kind 22 is free (Feel's poof flag until the poof became a flash kind of its own: flash kinds
+## F2), 23 the enemy ramp and 24 the exact colour: not kinds.
 const LOOK_COUNT: int = 22
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24

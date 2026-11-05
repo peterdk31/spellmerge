@@ -28,7 +28,7 @@ const RECT: int = 2
 ## custom data each), one mesh each (`Feel`'s beams and swing trails), sprites (deaths, ghosts, staffs).
 const BATCH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_trail.gdshader"),
-	preload("res://core/projectiles/shot_effect.gdshader"),
+	preload("res://core/projectiles/shot_flash.gdshader"),
 	preload("res://core/projectiles/shot_rune.gdshader"),
 	preload("res://core/projectiles/shot_orbit.gdshader"),
 	preload("res://core/projectiles/shot_status.gdshader"),
@@ -169,7 +169,7 @@ func _batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	multimesh.use_custom_data = true
 	multimesh.mesh = mesh
 	multimesh.instance_count = 1
-	# Data that draws nothing: a trail of row -1 (no samples, not alive), an effect of no kind.
+	# Data that draws nothing: a trail of row -1 (no samples, not alive), a flash of no kind.
 	multimesh.set_instance_transform_2d(0, Transform2D(Vector2(-1.0, 0.0), Vector2.ZERO, Vector2.ZERO))
 	multimesh.set_instance_custom_data(0, Color(0.0, 0.0, 0.0, 0.0))
 	node.multimesh = multimesh

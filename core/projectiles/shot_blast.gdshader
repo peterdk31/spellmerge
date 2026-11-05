@@ -17,7 +17,7 @@ render_mode blend_premul_alpha;
 // Up is up the screen (the floor is seen from above at a slant, so the floor's own lines are
 // squashed to FLOOR_FLAT top to bottom).
 //
-// PARTICLES ARE GEOMETRY (as `shot_effect.gdshader`): the mesh is a light and BLAST_PIECES small
+// PARTICLES ARE GEOMETRY (as `shot_flash.gdshader`): the mesh is a light and BLAST_PIECES small
 // quads, each told in its UV its quad kind and slot; `vertex()` works out where each piece is now
 // and what colours it has, and puts its quad round it alone or folds it away. The fragment stage
 // only colours a pixel of its own quad, in a few small modes with no loops:

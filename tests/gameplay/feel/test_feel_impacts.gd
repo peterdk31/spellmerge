@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Hit and wall impacts in gameplay/feel (the glow look: all effects): a shot that hits a
+## Hit and wall impacts in gameplay/feel (the glow look: all flashes): a shot that hits a
 ## character sprays along the way it flew, in the colours of what was hit and a little bigger
 ## for more damage; a shot that ends on a wall knocks stone chips back and lands in a burst in
 ## its colours. Everything stays inside the effect slots, with four players.
@@ -56,23 +56,23 @@ func test_a_hit_sprays_along_the_shot_from_where_it_struck() -> void:
 	var enemy: Node2D = _enemy()
 	enemy.global_position = Vector2(100.0, 50.0)
 	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "one spray")
-	var spray: Dictionary = feel.effect_info(FeelScript.KIND_SPRAY)
+	check_equal(feel.flashes_of(&"spray"), 1, "one spray")
+	var spray: Dictionary = feel.flash_info(&"spray")
 	check((spray["dir"] as Vector2).is_equal_approx(Vector2.RIGHT), "along the shot")
 	check((spray["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "from the point it struck")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 0, "a spray, not a puff all round")
+	check_equal(feel.flashes_of(&"puff"), 0, "a spray, not a puff all round")
 
 
 func test_a_spray_is_aimed_the_way_the_shot_flew_for_every_player() -> void:
 	for player in 4:
 		var aim: Vector2 = Vector2.from_angle(float(player) * 1.3)
 		_strike(player, _enemy(), Vector2.ZERO, aim, 5)
-		check((feel.effect_info(FeelScript.KIND_SPRAY)["dir"] as Vector2).is_equal_approx(aim), "player %d's spray follows the shot" % player)
+		check((feel.flash_info(&"spray")["dir"] as Vector2).is_equal_approx(aim), "player %d's spray follows the shot" % player)
 
 
 func test_an_enemy_is_hit_in_ember() -> void:
 	_strike(1, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], EnemyBase.DEFAULT_HIT_COLOR, "ember")
+	check_equal(feel.flash_info(&"spray")["core"], EnemyBase.DEFAULT_HIT_COLOR, "ember")
 
 
 ## An enemy's colour is its data's (S6 item 14): a hit's spray and its death cue's puff are in its
@@ -84,34 +84,34 @@ func test_an_enemy_is_hit_and_dies_in_its_own_data_s_colour() -> void:
 	enemy.id = ActorSeats.enemy(actors)  # an actor of the enemy ramp, not a wizard's
 	root.add_child(enemy)
 	_strike(1, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["core"], Color("3b9bd9"), "the spray in its own colour")
+	check_equal(feel.flash_info(&"spray")["core"], Color("3b9bd9"), "the spray in its own colour")
 	bus.enemy_died.emit(1, enemy, enemy.global_position, -1)
-	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], Color("3b9bd9"), "and its death's puff")
+	check_equal(feel.flash_info(&"puff")["core"], Color("3b9bd9"), "and its death's puff")
 
 
 func test_a_wizard_is_hit_in_its_own_colours() -> void:
 	for index in 4:
 		_strike(EventsScript.NO_PLAYER, _wizard(index), Vector2.ZERO, Vector2.LEFT, 5)
-		var spray: Dictionary = feel.effect_info(FeelScript.KIND_SPRAY)
+		var spray: Dictionary = feel.flash_info(&"spray")
 		check(spray["core"] == Color.WHITE and spray["ramp"] == index, "wizard %d is hit in its own ramp" % index)
 
 
 func test_more_damage_is_a_bigger_spray() -> void:
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 2)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["zoom"], 1, "a small hit is the small spray")
+	check_equal(feel.flash_info(&"spray")["zoom"], 1, "a small hit is the small spray")
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 30)
-	check_equal(feel.effect_info(FeelScript.KIND_SPRAY)["zoom"], 2, "a big hit a bigger one")
+	check_equal(feel.flash_info(&"spray")["zoom"], 2, "a big hit a bigger one")
 
 
 func test_the_spray_size_is_bounded() -> void:
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 100000)
-	check((feel.effect_info(FeelScript.KIND_SPRAY)["zoom"] as int) <= roundi(FeelScript.SPRAY_MAX_SIZE), "a huge hit is not a huge spray")
+	check((feel.flash_info(&"spray")["zoom"] as int) <= roundi(FeelScript.SPRAY_MAX_SIZE), "a huge hit is not a huge spray")
 
 
 func test_damage_without_an_impact_is_a_puff() -> void:
 	bus.damage_dealt.emit(0, null, 5, Vector2(5.0, 5.0))
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "no shot, no way: a puff all round")
-	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(5.0, 5.0)), "where it was hit")
+	check_equal(feel.flashes_of(&"puff"), 1, "no shot, no way: a puff all round")
+	check((feel.flash_info(&"puff")["at"] as Vector2).is_equal_approx(Vector2(5.0, 5.0)), "where it was hit")
 
 
 func test_an_impact_is_used_once_and_only_for_its_target() -> void:
@@ -119,8 +119,8 @@ func test_an_impact_is_used_once_and_only_for_its_target() -> void:
 	var second: Node2D = _enemy()
 	bus.projectile_impact.emit(0, first, Vector2.ZERO, Vector2.RIGHT)
 	bus.damage_dealt.emit(0, second, 5, Vector2.ZERO)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "another target's damage does not take the shot's way")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "it is a puff")
+	check_equal(feel.flashes_of(&"spray"), 0, "another target's damage does not take the shot's way")
+	check_equal(feel.flashes_of(&"puff"), 1, "it is a puff")
 
 
 ## A kill's puff is a part of its death cue (S6): in the body's own colour, beside the killing
@@ -129,15 +129,15 @@ func test_a_killing_blow_s_puff_is_the_death_cue_s_in_the_body_s_colour() -> voi
 	var enemy: Node2D = _enemy()
 	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "the hit's spray plays on")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "the death cue's puff")
-	check_equal(feel.effect_dress(FeelScript.KIND_PUFF), [EnemyBase.DEFAULT_HIT_COLOR, 0], "in ember, no one's ramp, no cards")
+	check_equal(feel.flashes_of(&"spray"), 1, "the hit's spray plays on")
+	check_equal(feel.flashes_of(&"puff"), 1, "the death cue's puff")
+	check_equal(feel.flash_dress(&"puff"), [EnemyBase.DEFAULT_HIT_COLOR, 0], "in ember, no one's ramp, no cards")
 	var cue: CueBase = feel.cue_of(&"enemy_death")
 	var puffs: int = 0
 	for part: Dictionary in cue.parts:
-		if StringName(part.get("effect", "")) == &"puff" and bool(part.get("body", false)):
+		if StringName(part.get("flash", "")) == &"puff" and bool(part.get("body", false)):
 			puffs += 1
-			check_equal(feel.effect_info(FeelScript.KIND_PUFF)["zoom"], int(part["zoom"]), "as big as the cue says")
+			check_equal(feel.flash_info(&"puff")["zoom"], int(part["zoom"]), "as big as the cue says")
 	check_equal(puffs, 1, "the cue has one puff in the body's colour")
 
 
@@ -148,34 +148,34 @@ func test_sprays_stay_inside_the_effect_slots_with_four_players() -> void:
 			for shot in 4:
 				_strike(player, _enemy(), Vector2(float(shot) * 9.0, float(player) * 9.0), Vector2.RIGHT, 5)
 		feel.step(STEP / 4.0)
-		check(feel.live_effects() <= feel.effect_slots, "within the effect slots (frame %d)" % frame)
+		check(feel.live_flashes() <= feel.effect_slots, "within the effect slots (frame %d)" % frame)
 
 
-func test_a_wall_hit_shows_an_effect_in_its_casters_ramp() -> void:
+func test_a_wall_hit_shows_a_flash_in_its_casters_ramp() -> void:
 	for player in 4:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)
 	for player in 4:
-		check_equal(feel.effects_of(FeelScript.KIND_BURST, player), 1, "player %d's burst, in its hat ramp" % player)
+		check_equal(feel.flashes_of(&"burst", player), 1, "player %d's burst, in its hat ramp" % player)
 	check(feel.motes().next_row() >= 4, "and four sprays of motes off the wall")
 
 
 func test_an_enemy_shot_on_a_wall_lands_in_the_enemy_ramp() -> void:
 	bus.projectile_impact.emit(ActorSeats.enemy(actors), null, Vector2.ZERO, Vector2.UP)
-	var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
+	var shown: Dictionary = feel.flash_info(&"burst")
 	check(shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "an enemy shot's burst is a spell's, in the enemy ramp (staffs F7)")
 	bus.projectile_impact.emit(EventsScript.NO_PLAYER, null, Vector2.ZERO, Vector2.UP)
-	check(not ProjectilesScript.is_hat_ramp(feel.effect_info(FeelScript.KIND_BURST)["ramp"] as int), "a shot of no actor too")
+	check(not ProjectilesScript.is_hat_ramp(feel.flash_info(&"burst")["ramp"] as int), "a shot of no actor too")
 
 
-func test_wall_effects_are_limited_and_end() -> void:
+func test_wall_flashes_are_limited_and_end() -> void:
 	feel.set_effect_slots(EffectSlots.MIN)
 	for i in 60:
 		bus.projectile_impact.emit(i % 4, null, Vector2(float(i), 0.0), Vector2.UP)
 		bus.projectile_impact.emit(-1, null, Vector2(float(i), 0.0), Vector2.UP)
-	check(feel.live_effects() <= feel.effect_slots, "no more effects than slots")
+	check(feel.live_flashes() <= feel.effect_slots, "no more flashes than slots")
 	for i in 12:
 		feel.step(STEP)
-	check_equal(feel.live_effects(), 0, "they end")
+	check_equal(feel.live_flashes(), 0, "they end")
 
 
 func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
@@ -183,16 +183,16 @@ func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
 	bus.projectile_impact.emit(0, target, Vector2.ZERO, Vector2.RIGHT)
 	feel._impact_frame -= 1  # the damage never came; a contact hit on a later frame
 	bus.damage_dealt.emit(0, target, 5, Vector2.ZERO)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "a stale impact gives no spray")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "but a puff")
+	check_equal(feel.flashes_of(&"spray"), 0, "a stale impact gives no spray")
+	check_equal(feel.flashes_of(&"puff"), 1, "but a puff")
 
 
 func test_a_contact_hit_does_not_take_a_refused_shots_direction() -> void:
 	var target: Node2D = _wizard(0)
 	bus.projectile_impact.emit(1, target, Vector2.ZERO, Vector2.RIGHT)  # combat refused it: no damage
 	bus.damage_dealt.emit(EventsScript.NO_PLAYER, target, 5, Vector2.ZERO)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "a contact hit gets no spray")
-	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "but a puff")
+	check_equal(feel.flashes_of(&"spray"), 0, "a contact hit gets no spray")
+	check_equal(feel.flashes_of(&"puff"), 1, "but a puff")
 
 
 func test_a_kill_keeps_the_spray_where_the_shot_struck_and_puffs_at_the_body() -> void:
@@ -200,12 +200,12 @@ func test_a_kill_keeps_the_spray_where_the_shot_struck_and_puffs_at_the_body() -
 	enemy.global_position = Vector2(100.0, 50.0)
 	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
 	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
-	check((feel.effect_info(FeelScript.KIND_SPRAY)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the spray stays where the shot struck")
-	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(100.0, 50.0)), "the death cue's puff is at the body")
+	check((feel.flash_info(&"spray")["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the spray stays where the shot struck")
+	check((feel.flash_info(&"puff")["at"] as Vector2).is_equal_approx(Vector2(100.0, 50.0)), "the death cue's puff is at the body")
 
 
-func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
-	check(feel._effect_node.z_index > 5, "above the pillar tops (z 5)")
+func test_flashes_draw_above_the_room_and_the_pillar_tops() -> void:
+	check(feel._flash_node.z_index > 5, "above the pillar tops (z 5)")
 	var children: int = feel.get_child_count()
 	bus.damage_dealt.emit(0, null, 5, Vector2.ZERO)
 	bus.projectile_impact.emit(0, null, Vector2.ZERO, Vector2.UP)
@@ -218,17 +218,17 @@ func test_effects_draw_above_the_room_and_the_pillar_tops() -> void:
 ## with other parts changes every hit, and Feel draws no spray of its own.
 func test_a_hits_look_is_its_cue() -> void:
 	var plain: CueBase = feel.cue_of(&"hit")
-	check(plain != null and plain.parts[0]["effect"] == &"spray", "a spray, from content/cues/hit.tres")
+	check(plain != null and plain.parts[0]["flash"] == &"spray", "a spray, from content/cues/hit.tres")
 	var enemy: Node2D = _enemy()
 	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
-	var colour: Color = feel.effect_info(FeelScript.KIND_SPRAY)["core"]
+	var colour: Color = feel.flash_info(&"spray")["core"]
 	var other := CueBase.new()
 	other.id = &"hit"
-	other.parts = [{"effect": &"ring_out", "reach": 1.0}] as Array[Dictionary]
+	other.parts = [{"flash": &"ring_out", "reach": 1.0}] as Array[Dictionary]
 	feel.forget_cues()
 	feel._cue_cache[&"hit"] = other
 	_strike(0, _enemy(), Vector2.ZERO, Vector2.RIGHT, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 1, "no spray of Feel's own")
-	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "the cue's ring instead")
-	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT)["core"], colour, "in the hit's colours")
+	check_equal(feel.flashes_of(&"spray"), 1, "no spray of Feel's own")
+	check_equal(feel.flashes_of(&"ring_out"), 1, "the cue's ring instead")
+	check_equal(feel.flash_info(&"ring_out")["core"], colour, "in the hit's colours")
 	feel.forget_cues()

@@ -5,5 +5,5 @@
 [resource]
 script = ExtResource("1_base")
 id = &"pull"
-parts = Array[Dictionary]([{"effect": &"ring_in", "zoom": 1, "seconds": 0.25, "bare": true, "way": &"right"}])
+parts = Array[Dictionary]([{"flash": &"ring_in", "zoom": 1, "seconds": 0.25, "bare": true, "way": &"right"}])
 every = 0.1

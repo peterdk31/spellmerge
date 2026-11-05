@@ -34,6 +34,7 @@ var _slots: Array[int] = []
 var _shakes: Array[bool] = []
 ## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
 var _caps: Array[int] = []
+var _trail_caps: Array[int] = []
 ## Every `mote_cap_changed` the bus sent, from before the Hud binds.
 var _mote_caps: Array[int] = []
 var _densities: Array[float] = []
@@ -58,6 +59,7 @@ func _initialize() -> void:
 	_test_the_effect_slots_slider()
 	_test_the_screen_shake_switch()
 	_test_the_max_shots_slider()
+	_test_the_trailed_shots_slider()
 	_test_the_particles_slider()
 	_test_the_particle_amount_slider()
 	_test_the_floor_marks_switch()
@@ -101,6 +103,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
+	_bus.shot_trails_changed.connect(func(count: int) -> void: _trail_caps.append(count))
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
 	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
@@ -129,6 +132,7 @@ func _teardown() -> void:
 	_slots.clear()
 	_shakes.clear()
 	_caps.clear()
+	_trail_caps.clear()
 	_mote_caps.clear()
 	_densities.clear()
 	_floor_marks.clear()
@@ -336,7 +340,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotTails", "TaillessMotes", "TailMotes", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "ShotTails", "TaillessMotes", "TailMotes", "ShotCap", "TrailCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -585,6 +589,40 @@ func _test_the_particle_amount_slider() -> void:
 	_check(_menu().mote_density == 0.0, "accept at the top wraps to None")
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(_menu().mote_density == 0.0 and _densities == [0.0], "a later menu starts with the saved amount and tells feel, got %s" % [_densities])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Trailed shots (shot scale H4) starts at the platform's count and sends nothing; left steps down
+## and tells the projectile manager, accept at the top wraps, and a later menu starts with the saved
+## count and tells the manager.
+func _test_the_trailed_shots_slider() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_trail_caps.is_empty(), "nothing is sent at the platform's count")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("TrailCap")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	var start: int = TrailCap.default_cap()
+	var at: int = TrailCap.index_of(start)
+	_check(TrailCap.STOPS[at] == start, "the platform's count is a stop")
+	_check(row.text.ends_with("Trailed shots: %d" % start) and is_equal_approx(bar.value, float(at)), "the platform's count at the start, in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_left")
+	_frame()
+	_check(_trail_caps == [TrailCap.STOPS[at - 1]], "left asks for the stop below, got %s" % [_trail_caps])
+	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"trail_cap", 0)) == TrailCap.STOPS[at - 1], "the save remembers it")
+	for i in TrailCap.STOPS.size():
+		_tap(0, &"move_right")
+		_frame()
+	_check(_menu().trail_cap == TrailCap.STOPS[-1], "it stops at the top")
+	_press(0, "TrailCap")
+	_check(_menu().trail_cap == TrailCap.STOPS[0], "accept at the top wraps to the bottom")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_menu().trail_cap == TrailCap.STOPS[0], "a later menu starts with the saved count")
+	_check(_trail_caps == [TrailCap.STOPS[0]], "and tells the manager when the Hud binds, got %s" % [_trail_caps])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

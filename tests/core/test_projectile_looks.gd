@@ -344,6 +344,8 @@ func test_when_the_rows_run_out_a_shot_has_its_core_alone() -> void:
 ## it stays in bounds and a high row's samples are where the shader reads them.
 func test_the_trail_texture_fits_a_gpu_at_a_high_cap() -> void:
 	mgr.set_cap(10000)
+	# Every shot may hold a trail (past the default "Trailed shots", shot scale H4).
+	mgr.set_trail_cap(10000)
 	# Every row held: one cap of shots ended and cooling, one cap flying.
 	for i in 10000:
 		mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 0.02)

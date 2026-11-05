@@ -425,12 +425,20 @@ const TRAIL_COST: int = 4
 ## TRAIL_SAMPLES texels x, y, odometer, time per trail, TRAIL_ROWS_PER_LINE rows to a line of the
 ## texture). A trail outlives its shot by TRAIL_KEEP
 ## seconds (the longest any of it lives), so the tail cools where the shot ended. There are
-## TRAIL_ROWS_PER_SLOT x the cap rows; a shot that finds none is drawn without a tail. A step
+## TRAIL_ROWS_PER_SLOT x the smaller of the cap and `trail_cap` rows; a shot that finds none is drawn
+## without a tail. A step
 ## longer than TRAIL_JUMP pixels (a teleport) starts the path afresh.
 const TRAIL_SAMPLES: int = 32
 const TRAIL_EVERY: float = 1.0 / 30.0
 const TRAIL_KEEP: float = 1.0
 const TRAIL_ROWS_PER_SLOT: int = 2
+## How many shots draw a trail at once by default (`trail_cap`, shot scale H4): the default shot
+## caps, so a game at its platform's cap looks as before. Past it the newest shots draw without a
+## trail (their core and light alone, as with the tails off, and no sparks), which keeps the trail
+## texture, sent whole each time the trails take their points, at the size of these rows: at
+## 100,000 shots with a row each it was 134 MB a send, 71 ms a frame (tests/benchmark/shot_scale.gd).
+const DEFAULT_TRAILS_WEB: int = 1000
+const DEFAULT_TRAILS_DESKTOP: int = 6000
 const TRAIL_JUMP: float = 96.0
 ## Floats per trail row in `trail_data`.
 const TRAIL_STRIDE: int = TRAIL_SAMPLES * 4
@@ -1003,6 +1011,11 @@ var tail_mesh: int = TAILS_FULL
 ## share for the births grows to `tailless_particle_cap` (the motes take the tails' budget). The
 ## pause menu's "Tails" switch (`shot_tails_changed`, `ShotTails` in core/settings) sets it.
 var tails_enabled: bool = true
+## At most this many shots draw a trail at once (`set_trail_cap`, DEFAULT_TRAILS_*): the trail rows
+## are TRAIL_ROWS_PER_SLOT x the smaller of it and the cap.
+var trail_cap: int = DEFAULT_TRAILS_WEB if OS.has_feature("web") else DEFAULT_TRAILS_DESKTOP
+## How many live shots hold a trail row now (at most `trail_cap`).
+var _trailed: int = 0
 ## The spark pool's count while the tails are off (see `tails_enabled`; PARTICLE_CAP with them on).
 var tailless_particle_cap: int = TAILLESS_PARTICLE_CAP
 ## Trail particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
@@ -1134,6 +1147,8 @@ func _ready() -> void:
 		events.projectile_cap_changed.connect(_on_projectile_cap_changed)
 	if events != null and not events.shot_tails_changed.is_connected(set_tails_enabled):
 		events.shot_tails_changed.connect(set_tails_enabled)
+	if events != null and not events.shot_trails_changed.is_connected(set_trail_cap):
+		events.shot_trails_changed.connect(set_trail_cap)
 	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):
 		events.tailless_motes_changed.connect(set_tailless_pool)
 	if events != null and not events.tail_motes_changed.is_connected(set_tail_motes):
@@ -1373,7 +1388,60 @@ func set_cap(value: int) -> void:
 	_born.resize(_cap)
 	_trail.resize(_cap)
 	_trail.fill(-1)
-	var rows: int = _cap * TRAIL_ROWS_PER_SLOT
+	_size_trail_rows(trail_rows(_cap, trail_cap))
+	while _buffers.size() < BATCHES:
+		_buffers.append(PackedFloat32Array())
+	for buffer in _buffers:
+		buffer.resize(0)
+	_rooms.fill(0)
+	_alive.resize(_cap)
+	_free_slots.resize(_cap)
+	clear()
+	for node in _nodes:
+		node.multimesh.instance_count = 0
+	for mirror in _mirrors:
+		if mirror != null:
+			mirror.instance_count = 0
+
+
+func get_cap() -> int:
+	return _cap
+
+
+## The trail rows for `cap` shots of which at most `trailed` draw a trail: TRAIL_ROWS_PER_SLOT a
+## trailed shot, so the trails cooling where their shots ended have rows too.
+static func trail_rows(cap: int, trailed: int) -> int:
+	return mini(cap, maxi(trailed, 1)) * TRAIL_ROWS_PER_SLOT
+
+
+## The "Trailed shots" setting (shot scale H4, `shot_trails_changed`, `TrailCap` in core/settings):
+## at most this many shots draw a trail at once (`trail_cap`). A change gives back every row (the
+## tails in the air are gone; the shots fly on drawn without, and the shots spawned from then on
+## take the new rows), so it is safe mid-fight. View only: no hit, no damage reads a trail.
+func set_trail_cap(value: int) -> void:
+	value = maxi(value, 1)
+	if value == trail_cap:
+		return
+	trail_cap = value
+	if _cap <= 0 or _alive.size() != _cap:
+		return
+	var rows: int = trail_rows(_cap, trail_cap)
+	if rows == _trail_free.size():
+		return
+	_trail.fill(-1)
+	_trailed = 0
+	_size_trail_rows(rows)
+	_trail_holder.fill(ROW_FREE)
+	for i in rows:
+		_trail_free[i] = rows - 1 - i
+	_trail_free_count = rows
+	_trail_high = 0
+	_loose_count = 0
+	_trail_dirty = true
+
+
+## Every trail row array at `rows` rows, and the trail texture to be made again at its size.
+func _size_trail_rows(rows: int) -> void:
 	_trail_newest.resize(rows)
 	_trail_kept.resize(rows)
 	_trail_odo.resize(rows)
@@ -1392,23 +1460,7 @@ func set_cap(value: int) -> void:
 	_loose.resize(rows)
 	_trail_data.resize(0)
 	_trail_rows = 0
-	while _buffers.size() < BATCHES:
-		_buffers.append(PackedFloat32Array())
-	for buffer in _buffers:
-		buffer.resize(0)
-	_rooms.fill(0)
-	_alive.resize(_cap)
-	_free_slots.resize(_cap)
-	clear()
-	for node in _nodes:
-		node.multimesh.instance_count = 0
-	for mirror in _mirrors:
-		if mirror != null:
-			mirror.instance_count = 0
-
-
-func get_cap() -> int:
-	return _cap
+	_trail_texture = null
 
 
 ## The "Max shots" setting (`projectile_cap_changed`): a new cap applies at once, which ends the
@@ -1449,6 +1501,7 @@ func set_tails_enabled(on: bool) -> void:
 		if row >= 0:
 			_trail[slot] = -1
 			_give_row_back(row)
+	_trailed = 0
 	var n: int = 0
 	while n < _loose_count:
 		var row: int = _loose[n]
@@ -1820,6 +1873,7 @@ func clear() -> void:
 	_own_head.fill(-1)
 	_own_tail.fill(-1)
 	_trail.fill(-1)
+	_trailed = 0
 	_trail_holder.fill(ROW_FREE)
 	var rows: int = _trail_free.size()
 	for i in rows:
@@ -2954,7 +3008,10 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_forget_all(slot)
 	_orbit_centre[slot] = Vector2.INF
 	_threat_step = -1
-	_trail[slot] = -1 if motion == MOTION_STILL or not tails_enabled else _open_row(slot, origin)
+	# Past `trail_cap` trailed shots the newest draw without (shot scale H4).
+	_trail[slot] = -1 if motion == MOTION_STILL or not tails_enabled or _trailed >= trail_cap else _open_row(slot, origin)
+	if _trail[slot] >= 0:
+		_trailed += 1
 	_state[slot] = S_IDLE
 	_alive[slot] = 1
 	_count += 1
@@ -5111,6 +5168,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	if _trail[slot] >= 0:
 		_fade_row(_trail[slot], slot)
 		_trail[slot] = -1
+		_trailed -= 1
 	if _kinds[slot] != 0:
 		_leave_all(slot)
 	_alive[slot] = 0

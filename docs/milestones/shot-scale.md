@@ -38,6 +38,25 @@ What it says for the parts after it:
 - **The ends, not only the hits:** about 500 shots end a step at 100,000 (lifetime 2 s), and Feel's `projectile_expired` costs more than Combat's hit in total. It is the largest listener in both scenes, so H3 ("biggest first") starts with it.
 - **The kernel's own time is small** (1.6–4.1 ms at 100,000); the hand-backs' GDScript is mostly the listeners above. H1 (fewer hand-backs) saves the crossings, about 200 a step here, and H5's threads have little to win in the kernel until the hits and the drawing are cheaper.
 
+## H4: draw cost by count (2026-11-05)
+
+Taken out of the projectiles lane's order by the owner on 2026-11-05, after H0 showed drawing was the largest cost. H0's `update_draw` was nearly all one call: `_upload_trails`, 71 of the 83 ms at 100,000 shots. Every flying shot held a trail row, and the trail texture is sent whole each time the trails take their points (30 times a second): 262,144 rows, 134 MB a send.
+
+Built: **"Trailed shots"** (`TrailCap` in core/settings, a pause-menu slider, `shot_trails_changed`): at most that many shots hold a trail at once (`trail_cap`; 6,000 on desktop and 1,000 on the web, the default shot caps, so a game at its default cap looks as before). The newest shots past it draw without one, as with the tails off (their core and light, no sparks), and the trail rows are sized by the smaller of the cap and the count, so the texture stays at 16,384 rows on desktop whatever the shot count. A new count drops the tails in the air, not the shots. View only (T5): the trails feed no hit, which the damage check shows.
+
+Measured on the same machine as H0 (`shot_scale.gd`), medians in milliseconds:
+
+| Scene, shots | `update_draw` before | after | trail samples before | after |
+|---|---|---|---|---|
+| storm 10k | 3.7 | 3.4 | 0.2 | 0.2 |
+| storm 100k | 84.9 | 6.4 | 2.9 | 0.2 |
+| crowd 10k | 3.9 | 3.1 | 0.4 | 0.4 |
+| crowd 100k | 82.8 | 5.6 | 3.5 | 0.2 |
+
+At 100,000 shots, `update_draw`'s parts are now: the native `draw_shots` 1.6 ms, the batch buffers 0.7 ms, the trail send 0.6 ms. **The damage check passes:** every scene's hits (count and hash) and each body's damage are the same as H0's, to the bit.
+
+Not done here: "sparks go to hits first" (the sparks' births cost 0.05 ms at 100,000 shots, and the shots without trails give off none); a simpler look per batch kind beyond "no trail" (`draw_shots` is 1.6 ms); and the GPU's side, which needs the target PC (`godot --path . --script res://tests/benchmark/shot_scale.gd` in a window prints the GPU frame). For phase N (N1): the trails now differ between machines by a setting, so the manager's `_trail*` members belong in VIEW.
+
 ## What 100,000 means
 
 Shot count and hit count are separate costs:

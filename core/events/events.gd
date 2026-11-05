@@ -48,6 +48,8 @@ signal floor_marks_changed(on: bool)
 signal spell_light_changed(on: bool)
 ## Sender: hud. The "Tails" switch in the pause menu (Settings) flipped, or a saved choice was loaded when the menu was bound: whether flying shots draw their tails (`ShotTails` in core/settings; docs/milestones/spell-spectacle-2.md, S5). Heard by core/projectiles (`set_tails_enabled`: off ends the tails in the air at once).
 signal shot_tails_changed(on: bool)
+## Sender: hud. The "Trailed shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: at most how many shots draw a trail at once (`TrailCap` in core/settings; shot scale H4). Heard by core/projectiles (`set_trail_cap`: the tails in the air end, the shots fly on).
+signal shot_trails_changed(count: int)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)
 ## Sender: hud. The "Tail motes" dev switch in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: with the tails off, whether the shots lay their tails as motes and in which tail kind (`TailMotes` in core/settings: 0 off, else the nth tail kind; S5 step 4). Heard by core/projectiles (`set_tail_motes`) and feel (`Motes.use_tail_kind`).

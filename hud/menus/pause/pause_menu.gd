@@ -63,7 +63,10 @@ extends PanelContainer
 ##   slider like "Effect slots" through `ShotCap.STOPS` (core/settings), from the platform's cap
 ##   (`ShotCap.default_cap()`); each move sends `projectile_cap_changed`, which the projectile
 ##   manager applies at once (the shots in the air end), and is saved (`projectile_cap`); a saved
-##   cap other than the default is sent again when the menu is bound. "Show FPS: Off" (or On;
+##   cap other than the default is sent again when the menu is bound. "Trailed shots" (shot scale
+##   H4) is the same kind of slider through `TrailCap.STOPS`: how many shots draw a trail at once,
+##   sent as `shot_trails_changed` (the manager drops the tails in the air, not the shots) and saved
+##   (`trail_cap`). "Show FPS: Off" (or On;
 ##   owner, 2026-11-02) flips on `accept`, is saved (`show_fps`) and sends `show_fps_changed`,
 ##   which `hud/panels` applies to its frame rate readout (`hud/widgets/fps_counter.gd`); panels
 ##   reads `show_fps` once after binding the menu. (The Gameplay page, with
@@ -126,6 +129,8 @@ const SHAKE_TEXT: String = "Screen shake: %s"
 const SHAKE_SETTING: StringName = &"screen_shake"
 const SHOT_CAP_TEXT: String = "Max shots: %d"
 const SHOT_CAP_SETTING: StringName = &"projectile_cap"
+const TRAIL_CAP_TEXT: String = "Trailed shots: %d"
+const TRAIL_CAP_SETTING: StringName = &"trail_cap"
 const MOTE_CAP_TEXT: String = "Particles: %s"
 const MOTE_CAP_SETTING: StringName = &"mote_cap"
 const MOTE_DENSITY_TEXT: String = "Particle amount: %s"
@@ -171,6 +176,7 @@ var effect_slots: int = EffectSlots.DEFAULT
 var screen_shake: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
 var shot_cap: int = ShotCap.default_cap()
+var trail_cap: int = TrailCap.default_cap()
 ## The "Particles" setting (see the top): the platform's cap by default.
 var mote_cap: int = MoteCap.default_cap()
 ## The "Particle amount" setting (see the top): `MoteDensity.DEFAULT` by default.
@@ -234,6 +240,8 @@ var ai_view: bool = false
 @onready var _tail_motes_bar: HSlider = _add_slider(_tail_motes, 0, TailMotes.WORDS.size() - 1, 1, tail_motes, TAIL_MOTES_TEXT % "Off")
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
+@onready var _trails: Button = _add(Page.SETTINGS, "TrailCap", TRAIL_CAP_TEXT % trail_cap)
+@onready var _trails_bar: HSlider = _add_slider(_trails, 0, TrailCap.STOPS.size() - 1, 1, TrailCap.index_of(trail_cap), TRAIL_CAP_TEXT % TrailCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
 @onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
@@ -256,6 +264,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 		save = SaveFile.new()
 	_load_shake()
 	_load_shot_cap()
+	_load_trail_cap()
 	_load_mote_cap()
 	_load_mote_density()
 	_load_floor_marks()
@@ -386,6 +395,9 @@ func _navigate(control: Control, direction: Vector2i) -> Control:
 		var at: int = clampi(ShotCap.index_of(shot_cap) + direction.x, 0, ShotCap.STOPS.size() - 1)
 		_set_shot_cap(ShotCap.STOPS[at])
 		return _shots
+	if control == _trails and direction.x != 0:
+		_set_trail_cap(TrailCap.STOPS[clampi(TrailCap.index_of(trail_cap) + direction.x, 0, TrailCap.STOPS.size() - 1)])
+		return _trails
 	if control == _arena_enemy and direction.x != 0:
 		_pick_enemy(arena_pick + direction.x)
 		return _arena_enemy
@@ -567,6 +579,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_mote_density(MoteDensity.STOPS[(MoteDensity.index_of(mote_density) + 1) % MoteDensity.STOPS.size()])
 	elif control == _shots:
 		_set_shot_cap(ShotCap.STOPS[(ShotCap.index_of(shot_cap) + 1) % ShotCap.STOPS.size()])
+	elif control == _trails:
+		_set_trail_cap(TrailCap.STOPS[(TrailCap.index_of(trail_cap) + 1) % TrailCap.STOPS.size()])
 	elif control == _marks:
 		_set_floor_marks(not floor_marks)
 	elif control == _light:
@@ -677,6 +691,32 @@ func _show_shot_cap(cap: int) -> void:
 	shot_cap = cap
 	_shots.set_meta(BASE_TEXT_META, SHOT_CAP_TEXT % cap)
 	_shots_bar.value = ShotCap.index_of(cap)
+	_mark_focus()
+
+
+## Read the saved "Trailed shots" and show it; the manager is told only when it is not the
+## platform's (the manager's own default).
+func _load_trail_cap() -> void:
+	var saved: int = TrailCap.snap(int(save.get_setting(TRAIL_CAP_SETTING, TrailCap.default_cap())))
+	_show_trail_cap(saved)
+	if saved != TrailCap.default_cap() and _events != null:
+		_events.shot_trails_changed.emit(saved)
+
+
+## Move the "Trailed shots" slider to `count` (a stop): show it, save it and tell the manager.
+func _set_trail_cap(count: int) -> void:
+	if count == trail_cap:
+		return
+	_show_trail_cap(count)
+	save.set_setting(TRAIL_CAP_SETTING, count)
+	if _events != null:
+		_events.shot_trails_changed.emit(count)
+
+
+func _show_trail_cap(count: int) -> void:
+	trail_cap = count
+	_trails.set_meta(BASE_TEXT_META, TRAIL_CAP_TEXT % count)
+	_trails_bar.value = TrailCap.index_of(count)
 	_mark_focus()
 
 

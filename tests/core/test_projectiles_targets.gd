@@ -7,8 +7,8 @@ extends "res://tests/support/suite.gd"
 ## (its targets, highest index first) and the count and box a hit test reads of a cell. And a
 ## scripted crowd (moving, freed, removed, added, re-owned and possessed targets; straight,
 ## piercing and homing shots; `nearest_target` and `targets_in` every step; dense enough that the
-## hit-work budget runs out) must send the very hits it sent before the change: the fingerprint
-## below was recorded on the manager before S5.
+## hit-work budget runs out in some steps) must send the very hits it sent before the change: the
+## fingerprint below was recorded on the manager before S5 (and again for H2, below).
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_targets.gd
 
@@ -22,14 +22,20 @@ const ROOM: Vector2 = Vector2(640.0, 360.0)
 const BODIES: int = 400
 const SHOTS: int = 300
 const STEPS: int = 90
+## The crowd's hit-work budget (`work_per_step`): one the crowd spends in some steps (since shot
+## scale H2 the game's own is sized for a crowd at the desktop cap, which this one never reaches).
+const BUDGET: int = 80000
 ## The crowd's hits on the manager before S5 (count and hash of every hit and query, in order),
 ## recorded again on main's manager and Combat as they were before S5 when main's homing and atom
 ## changes came in (2026-10-31): a change to how shots fly changes this hash, so record it again
 ## on the code before the change, never from the code under test. Recorded again on main's manager
 ## (60826bb9) when the test stopped the engine stepping its manager in the frame it waits for
 ## (2026-11-02: that frame's catch-up steps had been counted in, 8 of them at the old engine limit).
-const RECORDED_HITS: int = 6938
-const RECORDED_HASH: int = 3361975059
+## Recorded again on this code for shot scale H2 (2026-11-05), which changes the hits on purpose: a
+## hit costs 400 units of the budget where it cost 40, the crowd has a budget of its own (BUDGET),
+## and a shot the budget passed over sweeps its whole untested path when it is next tested.
+const RECORDED_HITS: int = 14375
+const RECORDED_HASH: int = 3710008787
 
 var _bus: EventsScript
 var _mgr: ManagerScript
@@ -58,6 +64,7 @@ func before_each() -> void:
 	# many times as it catches up (`max_physics_steps_per_frame`), and the hits with it.
 	_mgr.set_physics_process(false)
 	_mgr.set_cap(SHOTS)
+	_mgr.work_per_step = BUDGET
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
 	_holder = own(Node2D.new()) as Node2D
 	_holder.position = Vector2(3.0, -2.0)
@@ -176,6 +183,7 @@ func _query() -> void:
 
 func test_the_crowd_sends_the_hits_it_sent_before() -> void:
 	_bus.projectile_hit.connect(_on_hit)
+	var spent: int = 0
 	for i in STEPS:
 		if i == 62:
 			# The bodies queued for freeing go.
@@ -184,10 +192,13 @@ func test_the_crowd_sends_the_hits_it_sent_before() -> void:
 		_events()
 		_top_up()
 		_mgr.step(DT)
+		if _mgr._work_left <= 0:
+			spent += 1
 		_query()
 		_step_no += 1
-	print("crowd: %d hits, hash %d" % [_hits, _hash])
+	print("crowd: %d hits, hash %d, budget spent in %d steps" % [_hits, _hash, spent])
 	check(_hits > 1000, "the crowd is hit a lot (%d hits)" % _hits)
+	check(spent > 0 and spent < STEPS, "the crowd spends the hit-work budget in some steps (%d of %d)" % [spent, STEPS])
 	check_equal(_hits, RECORDED_HITS, "as many hits as before")
 	check_equal(_hash, RECORDED_HASH, "the same hits, queries and order as before")
 

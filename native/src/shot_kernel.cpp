@@ -55,6 +55,7 @@ constexpr int S_WAITING = 8;
 constexpr int S_GONE = 7;
 constexpr int F_TURNED = 64;
 constexpr int F_WAVE = 128;
+constexpr int F_DEFERRED = 256;
 constexpr int CASTER_WIZARD = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
@@ -136,6 +137,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(skip_left, "_skip_left", PACKED_FLOAT32_ARRAY) \
 	X(pos, "_pos", PACKED_VECTOR2_ARRAY) \
 	X(prev, "_prev", PACKED_VECTOR2_ARRAY) \
+	X(untested, "_untested", PACKED_VECTOR2_ARRAY) \
 	X(state, "_state", PACKED_BYTE_ARRAY) \
 	X(motion, "_motion", PACKED_BYTE_ARRAY) \
 	X(vel, "_vel", PACKED_VECTOR2_ARRAY) \
@@ -306,7 +308,7 @@ struct Steer {
 // Everything `_pass_hits` and `_hit_test` read, for one call.
 struct HitPass {
 	Arr<PackedByteArray> state, motion, wall_cells;
-	Arr<PackedVector2Array> pos, prev, target_pos, cand_point;
+	Arr<PackedVector2Array> pos, prev, target_pos, cand_point, untested;
 	Arr<PackedInt32Array> flags, layers, actor, mem_head;
 	Arr<PackedFloat32Array> radius, skip_left, target_radius, cand_along;
 	Arr<PackedInt64Array> skip_id, target_id, mem_id;
@@ -321,6 +323,8 @@ struct HitPass {
 	double grid_x = 0.0, grid_y = 0.0, max_target_radius = 0.0;
 
 	bool targets_loaded = false;
+	// `_untested`, read only for a deferred shot (`defer`, `scan`).
+	bool untested_loaded = false;
 	// For catching up a waiting homing shot (`load_homing`).
 	bool homing_loaded = false;
 	Steer steer;
@@ -433,10 +437,28 @@ struct HitPass {
 		bounds = m->get(k.bounds);
 	}
 
+	void load_untested(Object *m) {
+		if (!untested_loaded) {
+			untested_loaded = true;
+			untested.load(m, names->untested);
+		}
+	}
+
+	// `_defer`.
+	void defer(Object *m, int64_t slot) {
+		const int64_t flg = flags[slot];
+		if ((flg & F_DEFERRED) == 0) {
+			load_untested(m);
+			flags[slot] = (int32_t)(flg | F_DEFERRED);
+			untested[slot] = prev[slot];
+		}
+	}
+
 	// What a hit test reads, the first time one runs in a call.
 	void load_targets(Object *m) {
 		const Names &k = *names;
 		targets_loaded = true;
+		load_untested(m);
 		target_pos.load(m, k.target_pos);
 		cand_point.load(m, k.cand_point);
 		actor.load(m, k.actor);
@@ -649,8 +671,13 @@ struct HitPass {
 
 	// `_hit_test` up to its hits (not for a solid shot): the candidates, nearest first; returns how many.
 	int64_t scan(int64_t slot) {
-		const Vector2 from = prev[slot];
+		Vector2 from = prev[slot];
 		const Vector2 to = pos[slot];
+		// A shot the budget passed over sweeps its whole path since its last test (`_defer`).
+		if ((flags[slot] & F_DEFERRED) != 0) {
+			flags[slot] &= ~F_DEFERRED;
+			from = untested[slot];
+		}
 		const double rad = radius[slot];
 		const Vector2 lowest = vmin(from, to);
 		const Vector2 highest = vmax(from, to);
@@ -800,6 +827,7 @@ const Constant CONSTANTS[] = {
 	{ "S_GONE", (double)S_GONE },
 	{ "F_TURNED", (double)F_TURNED },
 	{ "F_WAVE", (double)F_WAVE },
+	{ "F_DEFERRED", (double)F_DEFERRED },
 	{ "CASTER_WIZARD", (double)CASTER_WIZARD },
 	{ "CASTER_POINT", (double)CASTER_POINT },
 	{ "SPIRAL_PERIOD", (double)SPIRAL_PERIOD },
@@ -980,6 +1008,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 		h.state[slot] = S_DONE;
 		if (h.layers[slot] != 0 && any_targets) {
 			if (h.work_left <= 0) {
+				h.defer(m, slot);
 				if (h.starved_at < 0) {
 					h.starved_at = slot;
 				}

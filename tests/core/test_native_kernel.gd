@@ -32,10 +32,11 @@ const ROOM: Vector2 = Vector2(960.0, 540.0)
 ## were: compared batch by batch in `_compare_draw`, not by name.
 const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## Not compared: node instance ids (each side has its own nodes), the hit test's scratch (the native
-## pass sizes it for every target at once), what only the native drawing writes and the GDScript
-## catch-up's one-shot list.
+## pass sizes it for every target at once), what only the native drawing writes, the GDScript
+## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for (the native keeps
+## it in a local; both hand it out as `tail_demand`, which is compared).
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"_mem_id", &"_skip_id", &"_home_target", &"homing_target",
-		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one"]
+		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted"]
 
 var _failures: Array[String] = []
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.
@@ -50,6 +51,9 @@ var _events: Array[Array] = [[], []]
 var _imp: int = -1
 ## Each side's bodies hang under a node of their own, so both keep the same names.
 var _holders: Array[Node] = []
+## Tail births laid while the tails were off (S5 step 4), and whether a frame hit the most.
+var _tails_laid: int = 0
+var _tails_capped: bool = false
 
 
 func _initialize() -> void:
@@ -135,6 +139,10 @@ func _test_both_step_alike() -> void:
 		root.add_child(mgr)
 		mgr.set_cap(1500)
 		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
+		# The births are handed out (as Feel's motes take them), from the same dice on both sides:
+		# with the tails off the drawing lays the tails as births (S5 step 4), compared to the bit.
+		mgr.spark_motes = true
+		mgr._spark_rng.seed = 11
 		mgr.set_walls([Rect2(0, 0, 960, 24), Rect2(0, 516, 960, 24), Rect2(0, 0, 24, 540), Rect2(936, 0, 24, 540),
 				Rect2(300, 200, 40, 40), Rect2(620, 300, 40, 40)] as Array[Rect2])
 		_mgrs.append(mgr)
@@ -169,6 +177,8 @@ func _test_both_step_alike() -> void:
 		for side in 2:
 			_mgrs[side].update_draw(fraction)
 		_compare_draw(step)
+		_tails_laid += _mgrs[1].tail_births
+		_tails_capped = _tails_capped or (_mgrs[1].tail_births == _mgrs[1].tail_births_cap and _mgrs[1].tail_spacing > ManagerScript.TAIL_SPACING)
 		# Threat asks: enough in a step for the grid (from the third), and some in a step without it.
 		var asks: int = 6 if step % 3 != 2 else 1
 		for n in asks:
@@ -193,6 +203,7 @@ func _test_both_step_alike() -> void:
 		else:
 			_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
+	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 
 
 func _add_body(side: int, name: String, at: Vector2, radius: float, layer: int, owner: int) -> Node2D:
@@ -223,6 +234,9 @@ func _drive(side: int, step: int) -> void:
 	# The tails go off for a while (S5): the shots with no row are drawn told their way.
 	if step == 70:
 		m.set_tails_enabled(false)
+	if step == 80:
+		# Fewer tail births than the shots ask for: the most is kept and the spacing widens.
+		m.tail_births_cap = 60
 	if step == 90:
 		m.set_tails_enabled(true)
 	if step == 45:

@@ -145,6 +145,10 @@ var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
 ## The kinds a dash gives off along its path (`MoteKind.dash_path`; its births of SPARK_STREAK).
 var _dash_kinds: PackedInt32Array = PackedInt32Array()
+## The tail kinds (`MoteKind.tail`), and the one a shot's tail is laid in (its births of
+## SPARK_TAIL; `use_tail_kind`): one kind, so a tail is all of a piece.
+var _tail_kinds: PackedInt32Array = PackedInt32Array()
+var _tail_kind: PackedInt32Array = PackedInt32Array()
 ## The kinds that name each card by id (`MoteKind.cards`).
 var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
 ## The trails' births' kinds by their shot's spell (`card_kinds.gd`, the spectacle's: anything
@@ -431,6 +435,8 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		var found: PackedInt32Array
 		if layer == ProjectilesScript.SPARK_STREAK:
 			found = _dash_kinds
+		elif layer == ProjectilesScript.SPARK_TAIL:
+			found = _tail_kind
 		elif _cards != null:
 			found = _cards.layer_motes(ProjectilesScript.spark_tag(given, b), layer)
 		else:
@@ -461,6 +467,8 @@ func _give_off_native(given: PackedFloat32Array, count: int) -> void:
 		var found: PackedInt32Array
 		if layer == ProjectilesScript.SPARK_STREAK:
 			found = _dash_kinds
+		elif layer == ProjectilesScript.SPARK_TAIL:
+			found = _tail_kind
 		elif _cards != null:
 			found = _cards.layer_motes(key / PAIR_LAYERS, layer)
 		else:
@@ -497,6 +505,31 @@ func _ready_chunks() -> void:
 ## The kinds a dash gives off along its path (`MoteKind.dash_path`). Kept: read it, never change it.
 func dash_kinds() -> PackedInt32Array:
 	return _dash_kinds
+
+
+## The tail kinds (`MoteKind.tail`), and the one the shots' tails are laid in (empty for none).
+## Kept: read them, never change them.
+func tail_kinds() -> PackedInt32Array:
+	return _tail_kinds
+
+
+func tail_kind() -> PackedInt32Array:
+	return _tail_kind
+
+
+## Lay the shots' tails in the tail kind `id` (one of `tail_kinds`; the "Tail motes" dev switch,
+## `TailMotes` in core/settings); an id that is not one picks the first. Returns the id taken
+## (empty with no tail kinds).
+func use_tail_kind(id: StringName) -> StringName:
+	_tail_kind = PackedInt32Array()
+	if _tail_kinds.is_empty():
+		return &""
+	var k: int = _tail_kinds[0]
+	for t in _tail_kinds:
+		if _kinds[t].id == id:
+			k = t
+	_tail_kind.append(k)
+	return _kinds[k].id
 
 
 ## The kinds of look layer `layer` (a look kind, LOOK_*), else those of layer 0.
@@ -841,6 +874,8 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			_surface_kinds.append(k)
 		if kind.dash_path:
 			_dash_kinds.append(k)
+		if kind.tail:
+			_tail_kinds.append(k)
 		for layer in kind.look_layers:
 			_layer_kinds[layer].append(k)
 		for card in kind.cards:
@@ -849,6 +884,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			_card_kinds[card].append(k)
 	_material.set_shader_parameter(&"kind_table", ImageTexture.create_from_image(_kind_image))
 	_material.set_shader_parameter(&"shape_atlas", ImageTexture.create_from_image(_shape_image))
+	use_tail_kind(&"")
 
 
 ## Kind `k`'s numbers as the shader reads them (`kind_table`): its motion, its sway and its shape

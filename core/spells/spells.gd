@@ -699,14 +699,12 @@ static func _short(value: float) -> String:
 	return text.rstrip("0").rstrip(".")
 
 
-## The one-line description of the component `id` for the builder, from its lore file in
-## `content/story/lore/components/`. Empty for an unknown id or a missing file; the builder
+## The one-line description of the component `id` for the builder, from the card itself
+## (`SpellComponent.description`). Empty for an unknown id or a card without one; the builder
 ## shows nothing for an empty one.
 func component_description(id: StringName) -> String:
-	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
-	if source == null:
-		return ""
-	return source.call("get_lore", &"component", id)
+	var component: SpellComponent = _component(id)
+	return component.description if component != null else ""
 
 
 func component_kind(id: StringName) -> StringName:

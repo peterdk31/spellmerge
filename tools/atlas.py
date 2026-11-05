@@ -23,9 +23,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPELLS = "content/spells"
-COMBOS = f"{SPELLS}/combos"  # one JSON file per combo, named like its id
+# One JSON file per combo, named like its id, in a `combos/` folder of the card it was written for.
+COMBO_GLOB = "**/combos/*.json"
 REACTIONS = f"{SPELLS}/reactions.tres"
-LORE = "content/story/lore/components"
 # The folder of each component kind under content/spells/.
 KIND_FOLDERS = {"form": "forms", "element": "elements", "modifier": "modifiers", "trigger": "triggers",
                 "multicast": "multicasts"}
@@ -55,24 +55,10 @@ def _number(text: str, key: str) -> float:
         return 0.0
 
 
-def _lore(root: Path) -> dict[str, str]:
-    """Builder descriptions by component id."""
-    out: dict[str, str] = {}
-    for path in sorted((root / LORE).glob("*.json")):
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            continue
-        if isinstance(data, dict) and isinstance(data.get("id"), str) and isinstance(data.get("text"), str):
-            out[data["id"]] = data["text"]
-    return out
-
-
 def components(root: Path) -> list[dict]:
     """Every component file with an id, like the registry's scan. The name must agree with
     `Spells.component_name` (display_name, else the id as it is), because the recorder titles
     its clips with it."""
-    lore = _lore(root)
     rows: list[dict] = []
     for kind, folder in KIND_FOLDERS.items():
         for path in sorted((root / SPELLS / folder).rglob("*.tres")):
@@ -84,14 +70,14 @@ def components(root: Path) -> list[dict]:
             if not comp_id:
                 continue
             rows.append({"id": comp_id, "kind": kind, "name": _value(text, "display_name", comp_id),
-                         "description": lore.get(comp_id, ""), "does": "", "clips": [f"{kind}_{comp_id}"],
+                         "description": _value(text, "description").replace('\\"', '"'), "does": "", "clips": [f"{kind}_{comp_id}"],
                          "source": path.relative_to(root).as_posix()})
     return rows
 
 
 def combos(root: Path) -> list[dict]:
     rows = []
-    for path in sorted((root / COMBOS).glob("*.json")):
+    for path in sorted((root / SPELLS).glob(COMBO_GLOB), key=lambda p: p.name):
         try:
             combo = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):

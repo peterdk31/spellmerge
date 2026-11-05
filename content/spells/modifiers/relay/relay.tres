@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"relay"
 display_name = "Relay"
+description = "The next shot takes on what the one it hits last cast."
 complexity = 2
 icon = ExtResource("2_icon")
 behaviour_id = &"relay"

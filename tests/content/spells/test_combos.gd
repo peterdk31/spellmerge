@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The combo catalogue in content/spells/combos/ (M2 part 14; one file per combo since staffs
+## The combo catalogue, in each card's combos/ folder (M2 part 14; one file per combo since staffs
 ## A2): every named combo is built from the real components, cast in the test arena
 ## (`combo_arena.gd`: real registry, spell runtime, projectile manager and combat, with imps)
 ## and must do what it promises. One data-driven test per check kind runs over every combo, so
@@ -25,7 +25,7 @@ var _unreadable: PackedStringArray = PackedStringArray()
 
 func before_each() -> void:
 	_unreadable = PackedStringArray()
-	_combos = ComboFiles.read_all(ComboFiles.FOLDER, _unreadable)
+	_combos = ComboFiles.read_all(ComboFiles.ROOT, _unreadable)
 
 
 ## Builds the arena for `combo`, casts it as the row says and runs it. The caller frees it.
@@ -162,7 +162,7 @@ func test_every_component_is_in_two_combos() -> void:
 	check(known.size() > 0, "the registry finds the spell components")
 	for component: StringName in known:
 		var count: int = int(uses.get(component, 0))
-		check(count >= 2, "%s is in at least two combos (got %d): add combo files for it in content/spells/combos/" % [component, count])
+		check(count >= 2, "%s is in at least two combos (got %d): add combo files for it in its own folder, combos/<id>.json" % [component, count])
 
 
 func test_every_combo_file_is_an_object_named_like_its_id() -> void:
@@ -171,7 +171,7 @@ func test_every_combo_file_is_an_object_named_like_its_id() -> void:
 	check_equal(ids.size(), _combos.size() + _unreadable.size(), "one combo per file")
 	for combo: Dictionary in _combos:
 		var id: String = str(combo.get("id", ""))
-		check(ids.has(id), "the combo %s is in content/spells/combos/%s.json" % [id, id])
+		check(ids.has(id), "the combo %s is in a file combos/%s.json" % [id, id])
 
 
 func test_every_row_has_its_fields_and_an_unseen_id() -> void:

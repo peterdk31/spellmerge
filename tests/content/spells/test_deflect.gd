@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## "Phase I: melee", "Deflect"): shots of another team that touch the carrier turn and become its
 ## caster's, 1.7 times faster, as many as touch it. The engine side is tested in
 ## `tests/core/test_spells_deflect.gd`; here the card's data and how it plays with other cards,
-## from every seat. The combos with the card are in content/spells/combos/ (test_combos.gd plays
+## from every seat. The combos with the card are in its folder's combos/ (test_combos.gd plays
 ## them).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_deflect.gd

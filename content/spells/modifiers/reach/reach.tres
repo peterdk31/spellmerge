@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"reach"
 display_name = "Reach"
+description = "The next carrier goes farther, whatever it is."
 complexity = 1
 icon = ExtResource("2_icon")
 mana_mult = 1.25

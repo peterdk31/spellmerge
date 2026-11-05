@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"zap"
 display_name = "Zap"
+description = "Each enemy the shot passes has a 50% chance to get zapped."
 complexity = 3
 icon = ExtResource("2_icon")
 mana_mult = 1.5

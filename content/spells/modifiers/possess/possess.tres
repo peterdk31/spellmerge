@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"possess"
 display_name = "Possess"
+description = "Every body the next shot hits obeys you for 3 s."
 complexity = 4
 icon = ExtResource("2_icon")
 mana_mult = 2.5

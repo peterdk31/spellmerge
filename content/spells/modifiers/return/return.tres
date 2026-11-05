@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"return"
 display_name = "Return"
+description = "The next shot flies out, then comes back to you."
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.25

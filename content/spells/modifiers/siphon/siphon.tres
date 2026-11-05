@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"siphon"
 display_name = "Siphon"
+description = "Each hit of the next shot gives some mana back."
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour_id = &"siphon"

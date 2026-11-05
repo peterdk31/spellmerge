@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"linger"
 display_name = "Linger"
+description = "The next shot stops mid-air for a second, then goes on."
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour_id = &"linger"

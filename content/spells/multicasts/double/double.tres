@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"double"
 display_name = "Double"
+description = "The next two carriers leave together, as one cast."
 complexity = 2
 icon = ExtResource("2_icon")
 extra_draws = 1

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_cast"
 display_name = "On Cast"
+description = "Casts its spell the moment you cast, from where you stand."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 5

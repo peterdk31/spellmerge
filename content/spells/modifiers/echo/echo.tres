@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"echo"
 display_name = "Echo"
+description = "Fires the next shot again a moment later, at half damage."
 complexity = 1
 icon = ExtResource("2_icon")
 behaviour_id = &"echo"

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"faster"
 display_name = "Faster"
+description = "Faster, a little softer. Arrives before the excuses."
 complexity = 1
 icon = ExtResource("2_icon")
 speed_mult = 1.5

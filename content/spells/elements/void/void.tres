@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"void"
 display_name = "Void"
+description = "Hexes: more damage taken, and pulled in. A bit rude."
 complexity = 1
 icon = ExtResource("2_icon")
 status_id = &"hex"

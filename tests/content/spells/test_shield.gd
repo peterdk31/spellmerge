@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Shield card (content/spells/modifiers/shield/, staffs C): the next shot is a ward that blocks
 ## one enemy shot per shield (the shields add up); on a dash, a teleport or the caster itself it is
-## a barrier on the caster. The combos with the card are in content/spells/combos/ (test_combos.gd
+## a barrier on the caster. The combos with the card are in its folder's combos/ (test_combos.gd
 ## plays them); here an enemy shot is sent through each shielded thing, from every seat.
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_shield.gd

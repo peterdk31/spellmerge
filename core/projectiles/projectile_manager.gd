@@ -2312,7 +2312,7 @@ func set_growth(slot: int, factor: float) -> bool:
 ## The shot's speed changes over its life (speed over life, a card's `speed_start`, `speed_end` and
 ## `speed_ease`): it leaves at `start` times its speed now and goes to `end` times it as its life runs
 ## out, `start + (end - start) x (1 - (life left / its life) ^ ease)`: with an ease above 1 most of
-## the change comes early (a shot that bursts out and slows to a stop: start 2.5, end 0, ease 1.5),
+## the change comes early (every spell shot's default, SpellLimits.SHOT_SPEED_*: start 2.2, end 0.2, ease 1.5),
 ## below 1 late. Homing and spiral turn and weave the speed it has; a deflect speeds the whole curve
 ## up and starts it again with its life. Only a shot that flies; false otherwise, or for bad numbers.
 ## `start` above SPEED_START_MOST counts as SPEED_START_MOST.
@@ -3440,13 +3440,16 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 
 
 ## Speed over life (`set_speed_curve`): a shot flying out takes the speed of its curve at the share
-## of its life left, along the way it flies now, and flies on along it.
+## of its life left, along the way it flies now, and flies on along it. The share is read at the
+## middle of the step (its life was already counted down for the whole step), so a curve that
+## changes most early still goes as far as its mean says, to within a pixel, and not a step's
+## worth of change short (every shot has a curve, SpellLimits.SHOT_SPEED_*).
 func _pass_curve(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] != S_MOVING:
 			continue
-		var left: float = clampf(_life[slot] / _span[slot], 0.0, 1.0)
+		var left: float = clampf((_life[slot] + delta * 0.5) / _span[slot], 0.0, 1.0)
 		var factor: float = _curve_from[slot] + (_curve_to[slot] - _curve_from[slot]) * (1.0 - pow(left, _curve_ease[slot]))
 		_vel[slot] = _vel[slot].normalized() * (_curve_speed[slot] * factor)
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
@@ -5801,7 +5804,16 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		# Stick to the target: it carries the shot until the stick time is up.
 		_flags[slot] |= F_STUCK
 		_stuck_to[slot] = node
-		_stuck_off[slot] = at - (node as Node2D).global_position
+		# Where its line of flight comes closest to the target's centre (a head-on shot: the
+		# centre), not `at`, the point of this step's path nearest it: that one lies anywhere from
+		# the centre to the rim by when in its step the shot met the target, so what a stuck shot
+		# fires from inside (a nova) hit all or half of its ring by chance. Only a straight shot
+		# has such a line: an orbit (on its circle) and a still shot stick where they are.
+		var centre: Vector2 = (node as Node2D).global_position
+		var stick_at: Vector2 = at
+		if _motion[slot] == MOTION_STRAIGHT and not _vel[slot].is_zero_approx():
+			stick_at = at + heading * heading.dot(centre - at)
+		_stuck_off[slot] = stick_at - centre
 		_life[slot] = _stick[slot]
 		_stick[slot] = 0.0
 		_join(slot, B_STUCK)

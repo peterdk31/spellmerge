@@ -3,7 +3,7 @@
 	"name": "Linger nova mine",
 	"does": "A timed bolt that stops in mid-air rings out novas from one spot: the second hits an imp the moving bolt never came near.",
 	"casts": [{"staff": 0, "cards": ["timer", "linger", "bolt", "nova"]}],
-	"imps": [[132, 52]],
+	"imps": [[198, 60]],
 	"seconds": 2.5,
 	"checks": [{"kind": "damaged", "imps": [0]}]
 }

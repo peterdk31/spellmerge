@@ -174,6 +174,7 @@ func test_the_shooting_dummy_fires_slow_telegraphed_shots_at_the_nearest_wizard(
 	check(ai.windup_time >= 1.0, "the telegraph is long (%s s)" % ai.windup_time)
 	dummy.step(ai.windup_time)
 	check_equal(projectiles.call("get_count") as int, 1, "the shot flies")
-	var speed: float = (projectiles.call("get_velocity_of", 0) as Vector2).length()
+	# Every shot leaves SpellLimits.SHOT_SPEED_START times its speed and slows (the default motion).
+	var speed: float = (projectiles.call("get_velocity_of", 0) as Vector2).length() / SpellLimits.SHOT_SPEED_START
 	check(speed > 0.0 and speed <= 80.0, "its staff's shot (slow · bolt) is slow (%.1f px/s)" % speed)
 	check_equal(dummy.velocity, Vector2.ZERO, "it never walks")

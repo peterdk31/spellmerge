@@ -101,8 +101,8 @@ func test_one_card_turns_every_shot_that_touches_it() -> void:
 
 
 func test_a_deflecting_swing_bats_a_bolt_into_the_imp_behind_its_shooter() -> void:
-	check(_lost_behind(["deflect", "swing"], Vector2(60.0, 0.0), Vector2(150.0, 0.0)) > 0, "the batted bolt hits the imp behind where it came from")
-	check_equal(_lost_behind(["swing"], Vector2(60.0, 0.0), Vector2(150.0, 0.0)), 0, "a plain swing sends nothing back")
+	check(_lost_behind(["deflect", "swing"], Vector2(100.0, 0.0), Vector2(150.0, 0.0)) > 0, "the batted bolt hits the imp behind where it came from")
+	check_equal(_lost_behind(["swing"], Vector2(100.0, 0.0), Vector2(150.0, 0.0)), 0, "a plain swing sends nothing back")
 
 
 ## Every step of its sweep a swing's whole arc parries, a step of each shot's way ahead too (the

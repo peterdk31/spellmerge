@@ -223,13 +223,13 @@ static func travel_only(behaviour: int) -> bool:
 ## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 
-# --- Speed over life (drag) -------------------------------------------------------------
+# --- Speed over life -------------------------------------------------------------------
 
 ## Factors on a flying shot's speed when it leaves (`speed_start`) and as its life runs out
 ## (`speed_end`), and how it goes from one to the other (`speed_ease`: 1 evenly, above 1 most of
-## the change early, below 1 late; `ProjectileManager.set_speed_curve`). Drag bursts out and slows
-## to a stop: 2.5, 0, 1.5. Several cards multiply each. All 1 changes nothing; wasted where the
-## carrier does not fly.
+## the change early, below 1 late; `ProjectileManager.set_speed_curve`). Every shot already bursts
+## out and slows (SpellLimits.SHOT_SPEED_*: 2.2, 0.2, 1.5); a card's numbers multiply that, and
+## several cards multiply each other. All 1 changes nothing; wasted where the carrier does not fly.
 @export var speed_start: float = 1.0
 @export var speed_end: float = 1.0
 @export var speed_ease: float = 1.0

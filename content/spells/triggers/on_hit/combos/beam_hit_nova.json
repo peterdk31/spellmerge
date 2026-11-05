@@ -6,5 +6,5 @@
 	"casts": [{"staff": 0, "cards": ["on_hit", "beam", "frost", "nova"]}],
 	"imps": [[100, 0], [100, 24]],
 	"seconds": 1.5,
-	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [1], "status": "chill"}]
 }

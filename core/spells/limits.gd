@@ -101,6 +101,16 @@ const BEAM_WAVE_STEPS: int = 8
 ## (melee I3; the owner's playground, 2026-10-29). Its pool and the hit pass's sweep of its whole
 ## path each step are the engine's limits; nothing caps the speed.
 const DEFLECT_SPEEDUP: float = 1.7
+## Every flying shot's speed over life, the default motion (owner, 2026-11-05: what the Drag card
+## did, now every shot's, "they look like fireworks"): it bursts out at SHOT_SPEED_START times its
+## speed and eases (SHOT_SPEED_EASE, above 1 most of the change early) down to SHOT_SPEED_END times
+## it as its life runs out (`ProjectileManager.set_speed_curve`). The three are picked so the shot
+## still goes as far as its speed x life says: start + (end - start) x ease / (ease + 1) = 1. It
+## never stops dead, so its last moments still drift. A card's `speed_start`, `speed_end` and
+## `speed_ease` multiply these (`CompiledSpell`); only a carrier that flies has a speed to curve.
+const SHOT_SPEED_START: float = 2.2
+const SHOT_SPEED_END: float = 0.2
+const SHOT_SPEED_EASE: float = 1.5
 ## Slam rows made at once (more when every one is on), and the share of a slam's `lifetime` its
 ## ring takes to grow to its radius; it holds for the rest (the playground's 0.08 s of 0.12 s).
 const SLAM_ROWS_START: int = 16

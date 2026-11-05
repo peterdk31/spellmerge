@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Penta always rings its caster; homing no longer moves the ring (owner's decision)
+
+- **Before:** with homing on the same carrier, Penta's ring stood round the target the homing picked, and homing also steered each copy. That gave homing a second job only Penta had: a rule between two cards, the kind the portal dropped the same day ("to not have custom rules").
+- **Now (owner: "Drop it, Penta always rings the caster"):** `SpellRuntime._penta` reads no other card. The ring stands round its caster: the wizard's body, or the point or shot that casts a payload. Homing steers each copy after it leaves the ring, as on any carrier.
+- **Surrounding a target:** cast Penta as a payload: `on hit · bolt · penta · fire · beam` rings where the bolt hit, and `on hit · bolt · hold · penta · beam` keeps that ring of beams on while the staff is held (a held payload holds, M2-rules R1f). The combos `penta_beam_cook` and `penta_frost_novas` now do it that way; `test_penta.gd` checks both, the held ring, and that homing leaves the ring round the caster.
+
 ## 2026-11-05: Every shot bursts out and slows; the Drag card is gone (owner's request)
 
 - **Why:** the owner liked the motion Drag gave a carrier ("it kinda makes them look like fireworks") and wanted it as every shot's default, in one place, so every carrier now and later moves that way.

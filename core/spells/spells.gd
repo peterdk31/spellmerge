@@ -1255,31 +1255,21 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 
 ## `penta` (owner, 2026-11-05): `spell` is cast `behaviour_strength` times (5 a card), each copy from
-## a point on a ring round a centre, all aimed in at it (owner: "they should just aim towards the
-## point, even if it is the player"). The centre is the caster (its body, or the point or shot
-## that casts a payload), unless the spell homes: then the target its homing picks from `origin`
-## along `heading` (a flying shot's homing looks all round, an instant carrier's within its bend),
-## the caster again when there is none. The ring stands SpellLimits.PENTA_RING beyond the centre's
-## edge, or within PENTA_WITHIN of the carrier's own reach when that is less, turned at random each
-## cast (owner, 2026-11-05) by the cast's seeded generator, as scatter is. Each point stops
-## short of a wall, and each copy is cast by its point (a beam stays there, an orbit circles it).
-## Returns the shots made.
+## a point on a ring round its caster, all aimed in at it (owner: "they should just aim towards the
+## point, even if it is the player"). The caster is a wizard's body, or the point or shot that casts
+## a payload, so `on hit · bolt · penta · beam` rings where the bolt hit. Penta reads no other card
+## (owner, 2026-11-05: homing no longer moves the ring; it steers each copy, as on any carrier).
+## The ring stands SpellLimits.PENTA_RING out, or within PENTA_WITHIN of the carrier's own reach
+## when that is less, turned at random each cast (owner, 2026-11-05) by the cast's seeded
+## generator, as scatter is. Each point stops short of a wall, and each copy is cast by its point
+## (a beam stays there, an orbit circles it). Returns the shots made.
 func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
 	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
-	# The caster: a wizard's body (its anchor), else the point or shot casting this payload.
-	var caster_at: Vector2 = origin
+	# The centre: a wizard's body (its anchor), else the point or shot casting this payload.
+	var centre: Vector2 = origin
 	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
-		caster_at = projectiles.get_anchor(actor)
-	var centre: Vector2 = Vector2.INF
-	var edge: float = 0.0
-	if spell.homing_range > 0.0 and projectiles != null:
-		var bend: float = PI if spell.has_trait(CarrierTraits.FLIES) else deg_to_rad(spell.homing_angle)
-		centre = projectiles.homing_point(actor, origin, way, bend, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, tag)
-		if centre.is_finite():
-			edge = projectiles.homing_target_radius
-	if not centre.is_finite():
-		centre = caster_at
+		centre = projectiles.get_anchor(actor)
 	# Turned at random each cast, by the cast's own generator (the same on every machine).
 	var first: Vector2 = Vector2.from_angle(_scatter.randf() * TAU)
 	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
@@ -1287,7 +1277,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
 		# A ring of shots (a nova) is not aimed, but its shots fly this far.
 		carried = spell.speed * spell.lifetime
-	var radius: float = edge + (minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING)
+	var radius: float = minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING
 	var outer_caster: int = _caster
 	var outer_seq: int = _caster_seq
 	_caster = CASTER_POINT

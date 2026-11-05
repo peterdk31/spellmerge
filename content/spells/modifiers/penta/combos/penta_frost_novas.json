@@ -1,9 +1,9 @@
 {
 	"id": "penta_frost_novas",
 	"name": "Penta frost novas",
-	"does": "Homing picks an imp off the aim and five frost novas burst on a ring round it, and their rings close over it from every side.",
-	"casts": [{"staff": 0, "cards": ["homing", "penta", "frost", "nova"]}],
-	"imps": [[140, 50]],
+	"does": "A bolt hits the imp ahead and five frost novas burst on a ring round where it hit, and their rings close over it from every side.",
+	"casts": [{"staff": 0, "cards": ["on_hit", "bolt", "penta", "frost", "nova"]}],
+	"imps": [[140, 0]],
 	"seconds": 1.5,
 	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
 }

@@ -183,8 +183,7 @@ const PORTAL_EXITS_MOST: int = 24
 ## Portal rows made at once; more are made when needed.
 const PORTAL_ROWS_START: int = 8
 
-## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of what it
-## surrounds (its homing target, or its caster).
+## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands from its caster's centre.
 const PENTA_RING: float = 64.0
 ## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
 ## so a carrier that goes a short way (a nova's ring) still meets in the middle.

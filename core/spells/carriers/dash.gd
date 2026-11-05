@@ -86,8 +86,10 @@ func _move_seconds(spell: CompiledSpell) -> float:
 	return CasterMoves.move_seconds(spell.ray_length, spell.speed, spell.lifetime)
 
 
-## The body dashes: it may home with `move_homing`, and other moves add to it; its way is drawn
-## where it really goes, and it strikes every body it passes (`_start_pass`).
+## The body dashes: it may home with `move_homing`, and other moves add to it, and it strikes
+## every body it passes (`_start_pass`). Its look is its card's cues: `dash_start` (at
+## `form_shown`) gives off its streaks and cards where it really goes until it lands (a `stream`
+## part, gameplay/feel), `dash_land` where it lands (`carrier_ended`).
 func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[actor].start(spell, hash(Vector2i(actor, tag)))
 	kit.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
@@ -95,7 +97,6 @@ func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way
 	kit.set_cue_tag(tag)
 	kit.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	kit.set_cue_tag(0)
-	kit.projectiles.follow_caster(actor, spell.tint, spell.look, seconds, tag)
 	_start_pass(spell, tag, actor, -1, seconds, chain, prev)
 	kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
 

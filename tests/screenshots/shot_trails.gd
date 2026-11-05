@@ -8,8 +8,8 @@ extends "res://tests/support/screenshot.gd"
 ##           follows the curve, it does not swing round with the head
 ##   middle  bolts that bounced off the wall above them and fly down again: the tail turns the
 ##           corner
-##   bottom  a dash (`follow_caster`) along a curve, as a wizard that walks round while it
-##           dashes: the streaks and cards are where it went
+##   bottom  a dash along a curve, as a wizard that walks round while it dashes: its cue's
+##           streams (`dash_start`, gameplay/feel/streams.gd) leave the streaks and cards where it went
 ## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -37,6 +37,7 @@ func take() -> void:
 	if not need(["Projectiles"]):
 		return
 	_shots = root.get_node("Projectiles")
+	var events: Node = root.get_node("Events")
 	lay_floor()
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 300)
@@ -70,7 +71,8 @@ func take() -> void:
 		# The dashers: players 0-3, then two enemy casters (their streaks are the enemy ramp).
 		var caster: int = e if e < 4 else enemies[e - 4]
 		_shots.call("set_anchor", caster, _dash_point(e, 0.0))
-		_shots.call("follow_caster", caster, tint, look, 0.3)
+		# The dash card's start (its cue's streams follow the caster until it lands).
+		events.emit_signal("form_shown", caster, &"dash", _dash_point(e, 0.0), Vector2.UP, 80.0, tint, look)
 		dashers.append(caster)
 	for n in STEPS:
 		await physics_frame

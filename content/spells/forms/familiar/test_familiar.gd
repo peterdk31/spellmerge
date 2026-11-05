@@ -78,3 +78,11 @@ func test_four_players_send_their_own() -> void:
 		check_equal(spawns.size(), 1, "player %d sends one familiar" % seat)
 		if not spawns.is_empty():
 			check_equal(spawns[0][0], seat, "player %d: the familiar is theirs" % seat)
+
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/familiar/familiar.tres") as FormBase
+	check_equal(card.shown_cue, &"conjure", "its shown plays conjure")
+	check_equal(card.end_cue, &"dismiss", "its end plays dismiss")

@@ -222,3 +222,10 @@ func test_closing_its_caster_ends_a_slam_in_its_wind_up() -> void:
 	arena.run(1.0)
 	check_equal(arena.lost(near), 0, "and it never strikes")
 	arena.free_all()
+
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/slam/slam.tres") as FormBase
+	check_equal(card.end_cue, &"slam", "its end plays slam")

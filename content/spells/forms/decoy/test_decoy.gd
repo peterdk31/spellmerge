@@ -326,3 +326,11 @@ func test_a_decoy_aims_at_a_foe_it_can_see_and_turns_to_it() -> void:
 	check_equal(look.sprite.frame_coords, Vector2i(StaffLook.direction_of(decoy.aim), 2), "its copy turns to its aim")
 	world.free_all()
 
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/decoy/decoy.tres") as FormBase
+	check_equal(card.shown_cue, &"conjure", "its shown plays conjure")
+	check_equal(card.end_cue, &"dismiss", "its end plays dismiss")
+	check_equal(card.cast_cue, &"cast", "its cast plays cast")

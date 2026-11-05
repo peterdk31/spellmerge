@@ -108,3 +108,10 @@ func test_four_players_trade_each() -> void:
 			check_equal(moves[0][0], seat, "player %d: the trade is theirs" % seat)
 			check_equal(moves[0][1], &"swap", "player %d: a swap" % seat)
 		check_equal(target_moves.size(), 1, "player %d: the imp is moved once" % seat)
+
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/swap/swap.tres") as FormBase
+	check_equal(card.shown_cue, &"trade", "its shown plays trade")

@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## bolt's flight, a beam's length), and on a form it cannot steer the Homing card must be listed
 ## as wasted and change nothing.
 ##
-## godot --headless --path . --script res://tests/content/spells/test_homing_forms.gd
+## godot --headless --path . --script res://content/spells/modifiers/homing/test_homing_forms.gd
 
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")

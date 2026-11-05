@@ -59,6 +59,24 @@ func test_the_real_spell_content_has_no_problem() -> void:
 		check(false, SpellValidator.format(problem))
 
 
+## Every card the registry finds is in its own folder, named like its id, with an icon of its own
+## (the rules the first cards' tests checked kind by kind, now for every card).
+func test_every_real_card_is_in_its_own_folder_with_its_own_icon() -> void:
+	var registry := _registry()
+	registry.scan()
+	var icons: Dictionary = {}
+	for card: Resource in registry.get_all(&"spells"):
+		var component := card as SpellComponent
+		if component == null:
+			continue
+		check_equal(component.resource_path.get_base_dir().get_file(), String(component.id), "%s is in a folder named like it" % component.id)
+		if component.icon == null:
+			continue
+		var path: String = component.icon.resource_path
+		check(not icons.has(path), "%s's icon %s is its own (also %s's)" % [component.id, path, icons.get(path, "")])
+		icons[path] = component.id
+
+
 func test_the_real_reaction_table_names_only_real_elements_and_known_statuses() -> void:
 	var registry := _registry()
 	registry.scan()

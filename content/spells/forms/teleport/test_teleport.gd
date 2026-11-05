@@ -77,3 +77,11 @@ func test_four_players_blink_each() -> void:
 		check_equal(moves.size(), 1, "player %d blinks once" % seat)
 		if not moves.is_empty():
 			check_equal(moves[0][1], &"teleport", "player %d: a teleport" % seat)
+
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/teleport/teleport.tres") as FormBase
+	check_equal(card.shown_cue, &"vanish", "its shown plays vanish")
+	check_equal(card.end_cue, &"appear", "its end plays appear")

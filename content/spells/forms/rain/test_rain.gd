@@ -75,3 +75,11 @@ func test_four_players_rain_at_once() -> void:
 	for imp in imps:
 		check_equal(arena.lost(imp), plain, "every imp on its player's aim point took the nova")
 	arena.free_all()
+
+
+## Its looks (S6 2): the cue each moment plays (every cue a card names is a cue file:
+## tests/content/spells/test_carrier_looks.gd).
+func test_its_moments_have_their_cues() -> void:
+	var card: FormBase = load("res://content/spells/forms/rain/rain.tres") as FormBase
+	check_equal(card.shown_cue, &"telegraph", "its shown plays telegraph")
+	check_equal(card.end_cue, &"rainfall", "its end plays rainfall")

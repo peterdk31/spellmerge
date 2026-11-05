@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_test_growth_grows_to_the_room()
 	_test_speed_curve_eases_over_life()
 	_test_sticky_follows_its_target()
+	_test_sticky_sticks_on_its_line_whatever_the_step()
 	_test_shield_blocks_enemy_shots()
 	_test_shield_only_for_actors_shots()
 	_test_self_hit_waits_until_the_shot_leaves_the_caster()
@@ -492,6 +493,22 @@ func _test_every_shot_hits_both_sides() -> void:
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 1, 0)
 	_run(40)
 	_check(_hits.size() == 2 and _hits[0][1] == wizard and _hits[1][1] == enemy, "a shot of no actor hits the wizard, then the enemy (%d hits)" % _hits.size())
+
+
+## A sticky shot sticks where its line of flight comes closest to the target's centre, the same
+## spot whichever moment of a step it met the target in (regression: it stuck at the point of
+## that step's path nearest the centre, anywhere from the centre to the rim, so a nova it fired
+## from inside hit all or half of its ring by chance).
+func _test_sticky_sticks_on_its_line_whatever_the_step() -> void:
+	for n in 6:
+		_setup()
+		var enemy: Node2D = _target(Vector2(100.0, 103.0), 8.0)
+		# Start a little further back each time: it meets the target at another moment of a step.
+		var slot: int = _fire(Vector2(400.0, 0.0), Vector2(30.0 - 1.1 * n, 100.0), 3.0, 9)
+		_mgr.set_sticky(slot, 1.0)
+		_run(15)
+		var off: Vector2 = _mgr.get_position_of(slot) - enemy.global_position
+		_check(_hits.size() == 1 and off.distance_to(Vector2(0.0, -3.0)) < 0.01, "start %d: it sticks where its line passes the centre: %s" % [n, off])
 
 
 func _test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall() -> void:

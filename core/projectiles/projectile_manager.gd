@@ -5804,7 +5804,16 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		# Stick to the target: it carries the shot until the stick time is up.
 		_flags[slot] |= F_STUCK
 		_stuck_to[slot] = node
-		_stuck_off[slot] = at - (node as Node2D).global_position
+		# Where its line of flight comes closest to the target's centre (a head-on shot: the
+		# centre), not `at`, the point of this step's path nearest it: that one lies anywhere from
+		# the centre to the rim by when in its step the shot met the target, so what a stuck shot
+		# fires from inside (a nova) hit all or half of its ring by chance. Only a straight shot
+		# has such a line: an orbit (on its circle) and a still shot stick where they are.
+		var centre: Vector2 = (node as Node2D).global_position
+		var stick_at: Vector2 = at
+		if _motion[slot] == MOTION_STRAIGHT and not _vel[slot].is_zero_approx():
+			stick_at = at + heading * heading.dot(centre - at)
+		_stuck_off[slot] = stick_at - centre
 		_life[slot] = _stick[slot]
 		_stick[slot] = 0.0
 		_join(slot, B_STUCK)

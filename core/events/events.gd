@@ -48,7 +48,7 @@ signal floor_marks_changed(on: bool)
 signal spell_light_changed(on: bool)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)
-## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
+## The Sandbox button was pressed (in every build). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)

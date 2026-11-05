@@ -57,7 +57,7 @@ extends Node
 ## four-bot and stress runs) load like a player, and wait for `room_entered`.
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
-## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
+## main menu's Sandbox button, in every build) starts a run in the sandbox room
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
 ## `dummy_spawns` (more spawns stand more training dummies, a group to try homing, pierce and
 ## spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends

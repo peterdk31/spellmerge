@@ -2,6 +2,7 @@
 	"id": "pull_and_fire",
 	"name": "Pull and fire",
 	"does": "Pull in close with one staff, then a fire bolt from another: the imp burns.",
+	"needs": "pull",
 	"casts": [
 		{"staff": 0, "cards": ["pull", "bolt"]},
 		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.3}

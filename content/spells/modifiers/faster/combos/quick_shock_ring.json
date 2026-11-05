@@ -2,6 +2,7 @@
 	"id": "quick_shock_ring",
 	"name": "Quick shock ring",
 	"does": "A quick ring of shock that flies farther and is ready again before a plain ring is (the second cast, at 0.8 s, is refused without Faster).",
+	"needs": "faster",
 	"casts": [
 		{"staff": 0, "cards": ["storm", "faster", "nova"]},
 		{"staff": 0, "cards": ["storm", "faster", "nova"], "at": 0.8}

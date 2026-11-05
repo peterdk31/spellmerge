@@ -2,6 +2,7 @@
 	"id": "blast_rocket",
 	"name": "Rocket",
 	"does": "A blast bolt bursts where it hits the first imp and hurts the imp standing beside it, which the bolt itself missed.",
+	"needs": "blast",
 	"casts": [{"staff": 0, "cards": ["blast", "bolt"]}],
 	"imps": [[100, 0], [100, 30]],
 	"seconds": 1.5,

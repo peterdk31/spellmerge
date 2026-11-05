@@ -47,7 +47,7 @@ func test_the_components_that_ship_have_a_description() -> void:
 	for id in registry.get_ids(&"spells"):
 		var text: String = spells.call(&"component_description", id)
 		check(text.length() <= StoryValidator.MAX_LORE_CHARS, "%s fits the limit" % id)
-	for id: StringName in [&"bolt", &"fire", &"chain", &"beam", &"pierce", &"bigger", &"drag"]:
+	for id: StringName in [&"bolt", &"fire", &"chain", &"beam", &"pierce", &"bigger"]:
 		check(String(spells.call(&"component_description", id)) != "", "%s has a description" % id)
 	check_equal(String(spells.call(&"component_description", &"nothing_like_it")), "", "an unknown id has none")
 

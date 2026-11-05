@@ -2,6 +2,7 @@
 	"id": "relay_teammate_frost",
 	"name": "Relay teammate frost",
 	"does": "A plain bolt pierces a teammate who just cast frost, takes on the frost and chills the imp behind.",
+	"needs": "relay",
 	"casts": [
 		{"player": 1, "staff": 0, "cards": ["frost", "bolt"], "dir": [0, 1]},
 		{"player": 0, "staff": 0, "cards": ["relay", "pierce", "bolt"], "at": 0.1}

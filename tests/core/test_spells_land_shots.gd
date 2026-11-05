@@ -20,9 +20,10 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DT: float = 1.0 / 60.0
 const STEPS: int = 90
 ## Sets of staffs of real cards, at most 16 each (four seats of four staffs); staff `i` of a set
-## is seat `i % 4`'s staff `i / 4`. Together they cast every card (`test_every_card_is_cast`), the
-## carriers from the staff and as a payload (`on_expire`, `on_hit`, `timer`). A new card fails that
-## test until a staff here casts it.
+## is seat `i % 4`'s staff `i / 4`. They cast the carriers from the staff and as a payload
+## (`on_expire`, `on_hit`, `timer`) and the cards that mix in interesting ways. Every card not cast
+## here is cast by a staff of its own, made from its kind (`_sets`, `_plain_staff`), so a new card
+## folder is covered with no edit here.
 const SETS: Array = [
 	[
 		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova"],
@@ -31,7 +32,7 @@ const SETS: Array = [
 		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"void", &"chain", &"split", &"atom"],
 		[&"timer", &"split", &"split", &"orbit", &"fire", &"bolt"],
 		[&"growth", &"homing", &"split", &"rune"],
-		[&"on_expire", &"drag", &"split", &"bolt", &"split", &"orbit"],
+		[&"on_expire", &"split", &"bolt", &"split", &"orbit"],
 		[&"on_expire", &"triple", &"bolt", &"homing", &"split", &"rune"],
 		[&"split", &"beam"],
 		[&"split", &"swing"],
@@ -112,7 +113,7 @@ func before_each() -> void:
 
 func test_every_card_is_cast() -> void:
 	var cast: Dictionary = {}
-	for staffs: Array in SETS:
+	for staffs: Array in _sets():
 		check(staffs.size() <= 4 * SpellLimits.STAFFS, "a set fits four seats")
 		for cards: Array in staffs:
 			for card: StringName in cards:
@@ -120,11 +121,52 @@ func test_every_card_is_cast() -> void:
 	var ids: Array = _registry.call("get_ids", &"spells")
 	check(ids.size() > 40, "the registry has the cards (%d)" % ids.size())
 	for id: StringName in ids:
-		check(cast.has(id), "the card '%s' is cast by a staff in SETS" % id)
+		check(cast.has(id), "the card '%s' is cast by a staff" % id)
+
+
+## SETS, then the staffs for the cards SETS does not cast, 16 a set (the last filled up).
+func _sets() -> Array:
+	var sets: Array = SETS.duplicate()
+	var cast: Dictionary = {}
+	for staffs: Array in SETS:
+		for cards: Array in staffs:
+			for card: StringName in cards:
+				cast[card] = true
+	var extra: Array = []
+	for id: StringName in _registry.call("get_ids", &"spells"):
+		if cast.has(id):
+			continue
+		if extra.size() == 4 * SpellLimits.STAFFS:
+			sets.append(extra)
+			extra = []
+		extra.append(_plain_staff(id))
+	if not extra.is_empty():
+		# The crowd the comparison needs (and that fills a small cap): the first set's staffs.
+		var at: int = 0
+		while extra.size() < 4 * SpellLimits.STAFFS:
+			extra.append(SETS[0][at % SETS[0].size()])
+			at += 1
+		sets.append(extra)
+	return sets
+
+
+## A staff that casts the card `id` on shots that make a crowd, by its kind: a carrier split; a
+## modifier or an infusion on a split bolt; a trigger that fires a nova from a split bolt; a
+## multicast that pulls a nova and a bolt.
+func _plain_staff(id: StringName) -> Array:
+	var card: SpellComponent = _registry.call("get_resource", &"spells", id) as SpellComponent
+	match card.kind() if card != null else &"":
+		&"form":
+			return [&"split", id]
+		&"trigger":
+			return [id, &"split", &"bolt", &"split", &"nova"]
+		&"multicast":
+			return [id, &"split", &"nova", &"bolt"]
+	return [id, &"split", &"bolt"]
 
 
 func test_a_launch_together_leaves_what_one_at_a_time_leaves() -> void:
-	for set_index in SETS.size():
+	for set_index in _sets().size():
 		var one: Dictionary = _run(false, 6000, set_index)
 		var together: Dictionary = _run(true, 6000, set_index)
 		check(int(one["made"]) > 300, "set %d made a crowd (%d shots)" % [set_index + 1, int(one["made"])])
@@ -132,7 +174,7 @@ func test_a_launch_together_leaves_what_one_at_a_time_leaves() -> void:
 
 
 func test_at_a_small_cap_too() -> void:
-	for set_index in SETS.size():
+	for set_index in _sets().size():
 		var one: Dictionary = _run(false, 120, set_index)
 		var together: Dictionary = _run(true, 120, set_index)
 		check(int(one["dropped"]) > 0, "set %d: the cap dropped shots (%d)" % [set_index + 1, int(one["dropped"])])
@@ -167,7 +209,7 @@ func _run(together: bool, cap: int, set_index: int) -> Dictionary:
 	staff.cast_delay = 0.0
 	staff.recharge = 0.0
 	staff.spread = SPREAD
-	var staffs: Array = SETS[set_index]
+	var staffs: Array = _sets()[set_index]
 	for seat in 4:
 		var origin: Vector2 = _origin(seat)
 		manager.set_anchor(seat, origin)

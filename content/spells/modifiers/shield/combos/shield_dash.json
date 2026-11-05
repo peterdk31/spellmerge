@@ -2,6 +2,7 @@
 	"id": "shield_dash",
 	"name": "Shielded dash",
 	"does": "The dash card moves its caster and puts a shield on them, which stops the enemy shot flying at the caster.",
+	"needs": "shield",
 	"casts": [{"staff": 0, "cards": ["shield", "dash"]}],
 	"imps": [],
 	"guard": true,

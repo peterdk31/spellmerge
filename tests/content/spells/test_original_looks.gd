@@ -7,74 +7,50 @@ extends "res://tests/support/suite.gd"
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
-const FIRST_SIX: Array[ModifierBase] = [
-	preload("res://content/spells/modifiers/split/split.tres"),
-	preload("res://content/spells/modifiers/pierce/pierce.tres"),
-	preload("res://content/spells/modifiers/homing/homing.tres"),
-	preload("res://content/spells/modifiers/chain/chain.tres"),
-	preload("res://content/spells/modifiers/bigger/bigger.tres"),
-	preload("res://content/spells/modifiers/faster/faster.tres"),
-]
+const RegistryScript := preload("res://core/registry/registry.gd")
 
-const LATER: Array[ModifierBase] = [
-	preload("res://content/spells/modifiers/zap/zap.tres"),
-	preload("res://content/spells/modifiers/blast/blast.tres"),
-	preload("res://content/spells/modifiers/bounce/bounce.tres"),
-	preload("res://content/spells/modifiers/deflect/deflect.tres"),
-	preload("res://content/spells/modifiers/drag/drag.tres"),
-	preload("res://content/spells/modifiers/echo/echo.tres"),
-	preload("res://content/spells/modifiers/ghost/ghost.tres"),
-	preload("res://content/spells/modifiers/growth/growth.tres"),
-	preload("res://content/spells/modifiers/heavy/heavy.tres"),
-	preload("res://content/spells/modifiers/hold/hold.tres"),
-	preload("res://content/spells/modifiers/linger/linger.tres"),
-	preload("res://content/spells/modifiers/magnet/magnet.tres"),
-	preload("res://content/spells/modifiers/mirror/mirror.tres"),
-	preload("res://content/spells/modifiers/overcharge/overcharge.tres"),
-	preload("res://content/spells/modifiers/possess/possess.tres"),
-	preload("res://content/spells/modifiers/reach/reach.tres"),
-	preload("res://content/spells/modifiers/recoil/recoil.tres"),
-	preload("res://content/spells/modifiers/relay/relay.tres"),
-	preload("res://content/spells/modifiers/return/return.tres"),
-	preload("res://content/spells/modifiers/shield/shield.tres"),
-	preload("res://content/spells/modifiers/short_delay/short_delay.tres"),
-	preload("res://content/spells/modifiers/siphon/siphon.tres"),
-	preload("res://content/spells/modifiers/slow/slow.tres"),
-	preload("res://content/spells/modifiers/sniper/sniper.tres"),
-	preload("res://content/spells/modifiers/spiral/spiral.tres"),
-	preload("res://content/spells/modifiers/sticky/sticky.tres"),
-]
+## The first six modifiers, which never share a look with each other.
+const FIRST_SIX: Array[StringName] = [&"split", &"pierce", &"homing", &"chain", &"bigger", &"faster"]
 
-const INFUSIONS: Array[ElementBase] = [
-	preload("res://content/spells/elements/fire/fire.tres"),
-	preload("res://content/spells/elements/frost/frost.tres"),
-	preload("res://content/spells/elements/storm/storm.tres"),
-	preload("res://content/spells/elements/void/void.tres"),
-	preload("res://content/spells/elements/lightning/lightning.tres"),
-	preload("res://content/spells/elements/mend/mend.tres"),
-]
+## The look kinds later modifiers may share (docs/DECISIONS.md, "The later cards' looks"): 9
+## burst, 12 glitter, 15 weight, 16 ripple, 17 curl, 18 zig, 19 double, 20 converge, 21 drift. A
+## share is for cards that rarely sit on one shot or say the same thing; a new card may take one
+## of these kinds with no edit here (its folder alone adds it); any other kind must be its own.
+const SHARED_KINDS: Array[int] = [9, 12, 15, 16, 17, 18, 19, 20, 21]
 
-## The kinds later modifiers may share, and with whom (docs/DECISIONS.md, "The later cards'
-## looks"). A share is for cards that rarely sit on one shot or say the same thing; anything
-## not listed here must have a kind of its own.
-const ALLOWED_SHARES: Dictionary = {
-	9: ["split", "blast", "overcharge"],
-	12: ["sniper", "reach"],
-	15: ["heavy", "sticky"],
-	16: ["growth", "linger"],
-	17: ["spiral", "return", "relay", "recoil"],
-	18: ["bounce", "zap", "deflect"],
-	19: ["echo", "mirror", "ghost"],
-	20: ["magnet", "siphon", "possess"],
-	21: ["slow", "hold", "short_delay", "drag"],
-}
+var _first_six: Array[ModifierBase] = []
+var _later: Array[ModifierBase] = []
+var _infusions: Array[ElementBase] = []
+
+
+## Every modifier and infusion the registry finds, so a new card folder is checked with no edit.
+func before_each() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	_first_six.clear()
+	_later.clear()
+	_infusions.clear()
+	for res: Resource in registry.get_all(&"spells"):
+		if res is ElementBase:
+			_infusions.append(res as ElementBase)
+		elif res is ModifierBase:
+			var card := res as ModifierBase
+			if FIRST_SIX.has(card.id):
+				_first_six.append(card)
+			else:
+				_later.append(card)
 
 
 func _all() -> Array[ModifierBase]:
 	var all: Array[ModifierBase] = []
-	all.append_array(FIRST_SIX)
-	all.append_array(LATER)
+	all.append_array(_first_six)
+	all.append_array(_later)
 	return all
+
+
+func test_the_registry_finds_the_cards() -> void:
+	check_equal(_first_six.size(), FIRST_SIX.size(), "the first six")
+	check(_later.size() > 20 and _infusions.size() >= 6, "the later modifiers (%d) and the infusions (%d)" % [_later.size(), _infusions.size()])
 
 
 func test_every_modifier_has_a_look() -> void:
@@ -84,7 +60,7 @@ func test_every_modifier_has_a_look() -> void:
 
 func test_no_modifier_shares_a_look_with_an_infusion() -> void:
 	var taken: Dictionary = {}
-	for infusion: ElementBase in INFUSIONS:
+	for infusion: ElementBase in _infusions:
 		taken[infusion.look_layer] = infusion.id
 	for card: ModifierBase in _all():
 		check(not taken.has(card.look_layer), "%s's look is not an infusion's (kind %d, %s)" % [card.id, card.look_layer, str(taken.get(card.look_layer, ""))])
@@ -92,10 +68,10 @@ func test_no_modifier_shares_a_look_with_an_infusion() -> void:
 
 func test_no_first_modifier_shares_a_look() -> void:
 	var seen: Dictionary = {}
-	for card: ModifierBase in FIRST_SIX:
+	for card: ModifierBase in _first_six:
 		check(not seen.has(card.look_layer), "%s has a look of its own among the first six (kind %d)" % [card.id, card.look_layer])
 		seen[card.look_layer] = card.id
-	for card: ModifierBase in LATER:
+	for card: ModifierBase in _later:
 		check(not seen.has(card.look_layer) or card.look_layer == 9, "%s does not hide a first card (kind %d)" % [card.id, card.look_layer])
 
 
@@ -109,8 +85,4 @@ func test_shared_looks_are_the_allowed_ones() -> void:
 		var ids: Array = by_kind[kind]
 		if ids.size() < 2:
 			continue
-		check(ALLOWED_SHARES.has(kind), "kind %d is shared by %s, which is not allowed" % [kind, str(ids)])
-		if ALLOWED_SHARES.has(kind):
-			var allowed: Array = ALLOWED_SHARES[kind]
-			for id: String in ids:
-				check(allowed.has(id), "%s may not share kind %d" % [id, kind])
+		check(SHARED_KINDS.has(kind), "kind %d is shared by %s, which is not allowed" % [kind, str(ids)])

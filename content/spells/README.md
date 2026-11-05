@@ -65,7 +65,7 @@ These steps are not new files only (the report of #243, the fifth element):
 
 ## Allowed files
 
-`.tres`, `.gd`, the icon (`.png` or `.svg`), SFX (`.ogg`), plus Godot's `.uid` and `.import` files and `.license` files. Limits: 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else. Typed GDScript only; no banned APIs (see AGENTS.md, hard rules).
+`.tres`, `.gd` (a script, and the card's own `test_<id>.gd`), the icon (`.png` or `.svg`), SFX (`.ogg`), `.json` (the combos in `combos/`, and `assets.json`), plus Godot's `.uid` and `.import` files and `.license` files. Limits: 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else. Typed GDScript only; no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps
 

@@ -20,16 +20,13 @@ const ICONS: Array[Texture2D] = [
 ]
 
 
-## A registry stand-in with the two questions `Spells` asks.
+## A registry stand-in with the question `Spells` asks.
 class FakeRegistry:
 	extends Node
 	var items: Dictionary = {}
 
 	func get_resource(_folder: StringName, id: StringName) -> Resource:
 		return items.get(id)
-
-	func get_lore(_about: StringName, _id: StringName) -> String:
-		return ""
 
 
 ## The id of made-up card number `at`.

@@ -12,7 +12,7 @@ The projectile manager's hot loops run in C++ where the module is built (`native
 
 ## Carrier traits and card needs (owner, 2026-10-30)
 
-Since 2026-10-30 a carrier answers yes/no questions about itself (`CarrierTraits`), each kind of card says what it needs from one (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), and `Spells.card_works(card_id, carrier)` answers yes or no to "does this card do anything on this carrier?" before it is placed (docs/CARRIERS.md). What that opens, by milestone:
+Since 2026-10-30 a carrier answers yes/no questions about itself (`CarrierTraits`), each kind of card says what it needs from one (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`), and `Spells.card_works(card_id, carrier)` answers yes or no to "does this card do anything on this carrier?" before it is placed (docs/CARRIERS.md). What that opens, by milestone:
 
 - **Builder: say it before the drop (M2 polish).** The builder greys a card out once it sits on a carrier where it does nothing; with `card_works` it can mark the cards in the bag that would do nothing on the carrier being built on, while choosing.
 - **Reward hints and offers (M3 rewards).** "Works with" hints on a reward from the player's own staffs ("Bounce: works on 2 of your carriers"; docs/PLAN.md's "Works with: Split, Chain"), and offers that lean away from cards that would do nothing on any carrier the player holds.

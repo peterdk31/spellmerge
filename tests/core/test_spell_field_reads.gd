@@ -20,8 +20,9 @@ const COMMON_FIELDS: String = "(id|damage|speed|complexity|shots|radius|pierce|t
 const SPELL_CLASSES: String = "(SpellComponent|FormBase|ElementBase|ModifierBase|TriggerBase|CompiledSpell)"
 ## Folders that are not game scripts, and the three that may read spell fields.
 const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "build", "ci", "docs", "content/spells", "core/base", "core/spells"]
-## Fixtures that build cards, so they set card fields as the test_*.gd files may.
-const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd"]
+## Fixtures that build or check cards, so they read and set card fields as the test_*.gd files may
+## (the card rig is what each card's own test extends).
+const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd", "tests/support/card_rig.gd"]
 
 
 func test_the_scanner_catches_field_reads() -> void:

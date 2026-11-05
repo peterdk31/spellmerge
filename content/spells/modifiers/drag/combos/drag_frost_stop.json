@@ -1,0 +1,9 @@
+{
+	"id": "drag_frost_stop",
+	"name": "Drag frost stop",
+	"does": "A bolt that slows to a stop and rings out a frost nova where it ends, chilling the imp beside its path.",
+	"casts": [{"staff": 0, "cards": ["on_expire", "drag", "bolt", "frost", "nova"]}],
+	"imps": [[250, 30]],
+	"seconds": 1.8,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

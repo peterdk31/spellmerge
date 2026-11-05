@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"frost"
 display_name = "Frost"
+description = "Slows; the third chill in a row freezes. Patient."
 complexity = 1
 icon = ExtResource("2_icon")
 status_id = &"chill"

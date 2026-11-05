@@ -1,6 +1,6 @@
 extends RefCounted
 ## The clip scenarios (#245), read from the content so a new row or component is a new clip
-## with no code change: one per combo file in `content/spells/combos/`, one per component (a form,
+## with no code change: one per combo file (each in its card's `combos/` folder), one per component (a form,
 ## an element, a modifier or a trigger alone), one per element reaction in `reactions.tres`,
 ## and a co-op version of each reaction with two players.
 ##

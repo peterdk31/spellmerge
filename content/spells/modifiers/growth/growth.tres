@@ -7,9 +7,10 @@
 script = ExtResource("1_base")
 id = &"growth"
 display_name = "Growth"
+description = "The next shot grows as it flies, so it hits wider."
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2
-behaviour = 17
+behaviour_id = &"growth"
 behaviour_strength = 2.0
 look_layer = 16

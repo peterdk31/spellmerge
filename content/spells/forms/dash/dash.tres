@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"dash"
 display_name = "Dash"
+description = "A dash the way you walk. It does not make you safe."
 complexity = 1
 icon = ExtResource("2_icon")
 base_damage = 1

@@ -267,6 +267,10 @@ func _drive(side: int, step: int) -> void:
 				m.set_return(slot)
 				if rng.randf() < 0.5:
 					m.set_homing(slot, 2.5, 140.0)
+		# A speed curve on any of them (only a flying shot takes it): it sets the speed of the kinds
+		# above before homing turns and spiral weaves it, and a returning one turns with its speed.
+		if rng.randf() < 0.2:
+			m.set_speed_curve(slot, rng.randf_range(0.3, 5.0), rng.randf_range(0.0, 2.0), rng.randf_range(0.3, 3.0))
 		# Rarer kinds, from the same draws on both sides.
 		var extra: float = rng.randf()
 		if extra < 0.05 and kind == 3:

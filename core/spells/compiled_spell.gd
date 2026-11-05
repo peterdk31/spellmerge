@@ -84,6 +84,16 @@ var chain_jumps: int = 0
 ## Factor on the staff's `spread` for this carrier's shots (its modifiers' `spread_mult`,
 ## multiplied); 1 means the staff's own spread.
 var spread_mult: float = 1.0
+## Speed over life (its modifiers' `speed_start`, `speed_end` and `speed_ease`, each multiplied):
+## all 1 for a shot that keeps its speed (`ProjectileManager.set_speed_curve`).
+var speed_start: float = 1.0
+var speed_end: float = 1.0
+var speed_ease: float = 1.0
+
+
+## True when the spell's shots change speed over their life.
+func has_speed_curve() -> bool:
+	return speed_start != 1.0 or speed_end != 1.0
 ## `zap`: the chance (0 to 1; 0 for none) that each body coming within `zap_reach` of a shot is
 ## zapped (rolled again `SpellLimits.ZAP_AGAIN` after it was zapped or lost), and what a zap hits with.
 var zap_chance: float = 0.0

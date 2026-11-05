@@ -18,6 +18,10 @@ extends Resource
 @export var id: StringName = &""
 ## Name shown in the builder, for example "Frost". Original names only.
 @export var display_name: String = ""
+## The one line the builder shows when a player points at the card: at most 60 characters
+## (`StoryValidator.MAX_LORE_CHARS`), saying truthfully what it does and, if there is room, how it
+## feels, in the tone of docs/STORY.md. A card without one only warns (the builder shows nothing).
+@export var description: String = ""
 ## A rough measure of the card's power (1-4). There is no complexity budget since the staffs
 ## rework; the validator still keeps it in range, and it may come back as a price.
 @export var complexity: int = 1

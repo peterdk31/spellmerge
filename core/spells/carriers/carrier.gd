@@ -7,7 +7,7 @@ extends RefCounted
 ## A subclass answers yes/no questions about itself in `traits()` (the flags below: does it fly?
 ## does it hit? does it last? ...), and from those alone the compiler works out which cards do
 ## something on it (`works`, `fires`): each card says what it needs from a carrier
-## (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
+## (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
 ## list of cards.
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
 ## wrong (a card that does nothing but is not said to, or the other way round).
@@ -102,12 +102,12 @@ func steers() -> bool:
 
 
 ## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or
-## the blast, meet what the behaviour needs (`ModifierBase.NEEDS`). The carrier that runs nothing
+## the blast, meet what the behaviour needs (`ModifierBase.needs`). The carrier that runs nothing
 ## (id &"") runs no card.
 func works(behaviour: int, blasts: bool = false) -> bool:
 	if id() == &"":
 		return false
-	var need: Dictionary = ModifierBase.NEEDS.get(behaviour, {})
+	var need: Dictionary = ModifierBase.needs(behaviour)
 	return _meets(need) or (blasts and (need.get("or_cards", []) as Array).has(ModifierBase.Behaviour.BLAST))
 
 
@@ -137,7 +137,7 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 	return true
 
 
-## True when its traits meet `need` (a `NEEDS` row; empty: always).
+## True when its traits meet `need` (a needs row; empty: always).
 func _meets(need: Dictionary) -> bool:
 	var any: int = int(need.get("any", 0))
 	return (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0

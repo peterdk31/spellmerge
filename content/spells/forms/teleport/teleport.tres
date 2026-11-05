@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"teleport"
 display_name = "Teleport"
+description = "Blink a fixed way along your aim, and stop short of a wall."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"wall"
 display_name = "Wall"
+description = "A wall rises across your aim; nothing gets through."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 3

@@ -3,24 +3,25 @@ extends ActorController
 ## The player's controller (actors G7, docs/milestones/M2-actors.md, "The components"): a human
 ## seat 0-3 and its input. It drives one actor at a time, its home actor (the wizard of
 ## content/wizard/base/wizard.tscn, where it is the `PlayerController` node) or another one it
-## was handed (`Actor.drive`, possess in G9). It reads only its own seat's input from `core/input`
-## and never looks at another seat, so nobody waits for anybody.
+## was handed (`Actor.drive`, possess in G9). It reads only its own seat's input frame (core/sim,
+## `Frames.frame_of`; online-ready N2) and never looks at another seat, so nobody waits for anybody.
 ##
 ## It IS the seat: the HUD, the builder and the rest of the game hear a seat only from here.
 ## The seat's panel and builder are always its own wizard, its **home body** (the actor whose
 ## home controller it is): its input drives whatever actor it drives now, but what the player
 ## sees and builds is the wizard, which may stand vulnerable meanwhile (owner, 2026-10-28).
 ##
-## - **Input to intent** (`think`): the walk; the aim (the right stick, which holds AIM_HOLD_TIME
-##   after it is let go, so a quick flick still shoots where it pointed; the keyboard player aims
-##   at the mouse once it has moved, the J key switches back; with no aim input the walk
-##   direction); the four staff buttons `staff_1` to `staff_4` (staffs 0-3: RB, RT, LB, LT). A
-##   button is held while it is down, and a press is counted (`get_press_count`, so a tap released
-##   before the step looked is not lost) and remembered for INPUT_BUFFER seconds, pressed again
-##   each step until a cast leaves, so a tap just before the staff is ready still fires. The
-##   Caster casts (a press, or a hold while no sustained card is on). While an overlay captures
-##   the seat (`is_captured`) the move in progress stops (`Mover.stop`), the intent is empty and
-##   presses made meanwhile are not held against the player later; while the actor is down, too.
+## - **Frame to intent** (`think`): the seat's `InputFrame` for this tick, never a device. What a
+##   device says becomes a frame in front of it (`LocalInput`, core/input: the walk, the aim with
+##   the right stick's hold and the keyboard player's mouse, the staff buttons), and so does what a
+##   bot or a replay says. The walk and the aim are the frame's (quantised: what is recorded is
+##   what is played); the four staff buttons `staff_1` to `staff_4` (staffs 0-3: RB, RT, LB, LT)
+##   are held while the frame holds them, and a press is remembered for INPUT_BUFFER seconds,
+##   pressed again each step until a cast leaves, so a tap just before the staff is ready still
+##   fires (the buffer is the simulation's: only it knows when a cast leaves). The Caster casts (a
+##   press, or a hold while no sustained card is on). While the frame says captured (an overlay of
+##   the seat is open) the move in progress stops (`Mover.stop`), the intent is empty and the
+##   buffer forgets; while the actor is down, too.
 ## - **The panel's events** (always from the home body, also while the seat drives another actor
 ##   or another controller drives the wizard): `player_stats_changed` (when it first drives the
 ##   wizard and each time it comes home, on a health change, when the mana of the staff on show
@@ -33,7 +34,7 @@ extends ActorController
 ##   (the carrier, `Caster.last_form`) and `staff_cast` on every cast (with the cast sound `cast`
 ##   from `core/registry`, nothing on null).
 ## - **The builder** (`staff_change_requested`, `card_move_requested`, `staff_cards_requested`,
-##   each for this seat only) builds the home body's staffs with `Caster.set_staff`, also during a
+##   each for this seat only; commands, heard at the tick's start: core/events `listen`) builds the home body's staffs with `Caster.set_staff`, also during a
 ##   possession. A change is refused only when the slot does not exist or the card is not in the
 ##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given); `card_move_requested`'s staff
 ##   BAG (-1) is the bag.
@@ -55,6 +56,7 @@ extends ActorController
 ## Flow puts a wizard together with `seat_wizard` before adding it to the tree.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -62,42 +64,47 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const INPUT_BUFFER: float = 0.15
 ## The four staff buttons (0 RB, 1 RT, 2 LB, 3 LT; owner, 2026-10-26).
 const STAFF_COUNT: int = 4
-const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
-## Seconds the aim holds after the right stick is let go.
-const AIM_HOLD_TIME: float = 0.6
+const CAST_ACTIONS: Array[StringName] = LocalInput.CAST_ACTIONS
+## Seconds the aim holds after the right stick is let go (the local input layer's).
+const AIM_HOLD_TIME: float = LocalInput.AIM_HOLD_TIME
 ## A point closer than this (pixels) to the hand gives no direction (`aim_at`).
-const MOUSE_MIN_DISTANCE: float = 4.0
+const MOUSE_MIN_DISTANCE: float = LocalInput.MOUSE_MIN_DISTANCE
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 ## `card_move_requested`'s staff for the bag.
 const BAG: int = -1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"input", &"registry"]
+const DERIVED: Array[StringName] = [&"input", &"registry", &"frames", &"mouse_world_override", &"_local", &"_own_frame"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_sound_player"]
 
-## The input manager and the registry (the bag, the cast sound). Only tests set these, before
-## adding the node; otherwise the "PlayerInput" and "Registry" autoloads are used.
-var input: InputManagerScript = null
+## The frames service (core/sim/frames.gd: this seat's input frame each tick) and the registry (the
+## bag, the cast sound). Only tests set these, before adding the node; otherwise the "Frames" and
+## "Registry" autoloads are used.
+var frames: FramesScript = null
 var registry: RegistryScript = null
+## Only tests set this, before adding the node: an input manager of their own, which this seat
+## reads through a local input layer of its own (the same `LocalInput` the frames service keeps)
+## into a frame of its own, instead of the frames service's. Set to null later: no input at all.
+var input: InputManagerScript = null
 
 ## The card ids this seat may build with. Filled from the registry when it first drives, unless
 ## it was set (`set_bag`) before.
 var bag: Array[StringName] = []
 
-## Only tests set this: the mouse position in the world, instead of the real one.
+## Only tests set this (with `input`): the mouse position in the world, instead of the real one.
 ## Vector2.INF means "ask the viewport".
 var mouse_world_override: Vector2 = Vector2.INF
+## With a test's `input`: its local input layer and the frame it fills each step.
+var _local: LocalInput = null
+var _own_frame: InputFrame = null
 
 ## The actor driven now (set by `started`, cleared by `stopped`), or null.
 var _actor: Actor = null
 ## Its home body (the actor whose home controller it is), bound the first time it drives it.
 var _home: Actor = null
-var _aim_hold_left: float = 0.0
-## Per staff: the button's press count last seen, and the seconds left in which a remembered
-## press still counts (0 = none remembered).
-var _seen_presses: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Per staff: the seconds left in which a remembered press still counts (0 = none remembered).
 var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _bag_filled: bool = false
 var _sound_player: AudioStreamPlayer = null
@@ -117,10 +124,10 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	if input == null:
-		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
-		if input == null:
-			push_warning("PlayerController %d: the PlayerInput autoload is missing, so this seat cannot move." % seat)
+	if input == null and frames == null:
+		frames = get_node_or_null("/root/Frames") as FramesScript
+		if frames == null:
+			push_warning("PlayerController %d: the Frames autoload is missing, so this seat cannot move." % seat)
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if _sound_player == null:
@@ -172,7 +179,6 @@ func home() -> Actor:
 
 func started(actor: Actor) -> void:
 	_actor = actor
-	_aim_hold_left = 0.0
 	_aside = false
 	forget_presses()
 	if actor.caster != null:
@@ -203,9 +209,10 @@ func _bind_home(actor: Actor) -> void:
 		actor.health.changed.connect(_on_health_changed)
 	var bus: EventsScript = actor.events
 	if bus != null:
-		bus.staff_change_requested.connect(_on_staff_change_requested)
-		bus.card_move_requested.connect(_on_card_move_requested)
-		bus.staff_cards_requested.connect(_on_staff_cards_requested)
+		# Commands, heard at the tick's start (core/events, online-ready N2).
+		bus.listen(&"staff_change_requested", _on_staff_change_requested)
+		bus.listen(&"card_move_requested", _on_card_move_requested)
+		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
 		bus.bag_set_requested.connect(_on_bag_set_requested)
 		if not _bag_filled:
 			_fill_bag()
@@ -235,67 +242,58 @@ func stopped(actor: Actor) -> void:
 		_actor = null
 
 
-## The seat's input becomes the actor's intent for this step (see the class doc).
+## The seat's input frame becomes the actor's intent for this step (see the class doc).
 func think(actor: Actor, delta: float) -> void:
 	var intent: ActorIntent = actor.intent
 	announce_stats()
 	for at in STAFF_COUNT:
 		_buffer_left[at] = maxf(_buffer_left[at] - delta, 0.0)
-	if input == null or actor.is_down():
+	var frame: InputFrame = _frame(actor, delta)
+	if frame == null or actor.is_down():
 		# No input (only in tests), or down: stand, cast nothing, and presses made meanwhile are
 		# not held against the player after a revive.
 		intent.clear()
 		forget_presses()
 		return
-	var captured: bool = input.is_captured(seat)
-	if captured and actor.mover != null and actor.mover.is_moving():
+	if frame.captured and actor.mover != null and actor.mover.is_moving():
 		# An overlay opened: freeze, and end a dash in progress.
 		actor.mover.stop()
-	var move: Vector2 = input.get_move(seat)
-	intent.move = move
-	intent.aim = _aim(actor, move, delta)
-	# Count presses rather than asking "just pressed": a tap released again before this step is
-	# not lost. The staff buttons are hidden while an overlay is open (captured), so a menu tap
-	# never casts, and a press made meanwhile is not held against the player later.
+	intent.move = frame.move_vector()
+	intent.aim = frame.aim_vector()
+	# A press is the frame's (counted in front of it, so a tap released again before this tick is
+	# not lost). While an overlay is open (captured) no button holds and the buffer forgets.
 	for at in STAFF_COUNT:
-		var presses: int = input.get_press_count(seat, CAST_ACTIONS[at])
-		var fresh: bool = presses != _seen_presses[at]
-		_seen_presses[at] = presses
-		if captured:
+		if frame.captured:
 			_buffer_left[at] = 0.0
 			intent.hold(at, false)
 			continue
-		if fresh:
+		if frame.is_pressed(at):
 			_buffer_left[at] = INPUT_BUFFER
-		intent.hold(at, input.is_action_pressed(seat, CAST_ACTIONS[at]))
+		intent.hold(at, frame.is_held(at))
 		if _buffer_left[at] > 0.0:
 			intent.press(at)
 
 
-## The aim for this step: the right stick, else the mouse (keyboard player), else the held stick
-## aim, else the move direction; ZERO keeps the aim the actor has.
-func _aim(actor: Actor, move: Vector2, delta: float) -> Vector2:
-	var stick: Vector2 = input.get_aim(seat)
-	if stick != Vector2.ZERO:
-		_aim_hold_left = AIM_HOLD_TIME
-		return stick
-	if input.is_mouse_aiming(seat):
-		_aim_hold_left = 0.0
-		return aim_at(actor, _mouse_world(actor))
-	_aim_hold_left = maxf(_aim_hold_left - delta, 0.0)
-	if _aim_hold_left <= 0.0 and move != Vector2.ZERO:
-		return move.normalized()
-	return Vector2.ZERO
+## This tick's frame of the seat: the frames service's, or with a test's own `input` one filled
+## here by the same local input layer; null for no input at all.
+func _frame(actor: Actor, delta: float) -> InputFrame:
+	if input != null:
+		_ensure_local()
+		_own_frame.seat = seat
+		_own_frame.clear()
+		var mouse: Vector2 = _mouse_world(actor) if input.is_mouse_aiming(seat) else Vector2.INF
+		_local.fill(_own_frame, input, seat, delta, actor.aim_pivot(), mouse)
+		return _own_frame
+	if frames != null:
+		return frames.frame_of(seat)
+	return null
 
 
 ## The aim (unit length) for a shot of `actor` that flies through `point` (world position):
 ## measured from the hand (`Actor.aim_pivot`), so the shot from the staff tip passes `point`.
-## Vector2.ZERO when `point` is within MOUSE_MIN_DISTANCE of the hand.
+## Vector2.ZERO when `point` is within MOUSE_MIN_DISTANCE of the hand (`LocalInput.aim_at`).
 func aim_at(actor: Actor, point: Vector2) -> Vector2:
-	var to_point: Vector2 = point - actor.aim_pivot()
-	if to_point.length() < MOUSE_MIN_DISTANCE:
-		return Vector2.ZERO
-	return to_point.normalized()
+	return LocalInput.aim_at(actor.aim_pivot(), point)
 
 
 func _mouse_world(actor: Actor) -> Vector2:
@@ -304,12 +302,20 @@ func _mouse_world(actor: Actor) -> Vector2:
 	return actor.get_global_mouse_position() if actor.is_inside_tree() else actor.global_position
 
 
-## Take the press counts as they are now, so no press made before counts later.
+## Forget remembered presses, so no press made before counts later (a test's own local layer
+## takes its press counts as they are now).
 func forget_presses() -> void:
 	for at in STAFF_COUNT:
 		_buffer_left[at] = 0.0
-		if input != null:
-			_seen_presses[at] = input.get_press_count(seat, CAST_ACTIONS[at])
+	if input != null:
+		_ensure_local()
+		_local.forget_presses(input, seat)
+
+
+func _ensure_local() -> void:
+	if _local == null:
+		_local = LocalInput.new()
+		_own_frame = InputFrame.new()
 
 
 ## Send `staff_mana_changed` for each staff of the home body whose whole mana or pool size

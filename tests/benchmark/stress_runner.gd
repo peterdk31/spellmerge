@@ -511,8 +511,7 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	_keep_wizards_up()
-	for bot in _bots:
-		bot.step(delta)
+	# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
 	_top_up_enemies()
 	_process_frames += 1
 	if _measuring and _process_frames % PARTS_EVERY == 0:

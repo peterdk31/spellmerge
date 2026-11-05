@@ -88,8 +88,7 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 		for index in count:
 			if is_instance_valid(wizards[index]):
 				lowest[index] = minf(lowest[index], wizards[index].health.health)
-		for bot in bots:
-			bot.step(delta)
+		# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
 	Engine.time_scale = 1.0
 	events.disconnect("room_cleared", on_cleared)
 	events.disconnect("player_downed", on_downed)

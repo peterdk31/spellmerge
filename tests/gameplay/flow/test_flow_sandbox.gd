@@ -134,11 +134,13 @@ func test_sandbox_is_ignored_while_a_run_is_on() -> void:
 func test_the_enemy_arena_spawns_any_enemy_and_clears_them() -> void:
 	_start(1)
 	events.emit_signal("sandbox_spawn_requested", 0, &"storm_fork", 3)
+	await commands_applied()
 	check_equal(flow.enemies_left(), 3, "three Storm Forks")
 	check_equal(flow.spawn_in_sandbox(&"splinter", 2), 2, "and two Splinters, from code too")
 	check_equal(flow.spawn_in_sandbox(&"no_such_enemy", 2), 0, "an unknown id spawns nothing")
 	check_equal(flow.spawn_in_sandbox(&"splinter", 100), FlowScript.WAVE_MAX - 5, "never past WAVE_MAX")
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_CLEAR_ENEMIES)
+	await commands_applied()
 	check_equal(flow.enemies_left(), 0, "clear takes them all")
 	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies stay")
 	check_equal(cleared, 0, "and clearing starts no break")
@@ -169,9 +171,10 @@ func test_reset_dummies_puts_fresh_ones_back() -> void:
 	events.emit_signal("enemy_died", 0, old[1], Vector2.ZERO, -1)
 	check_equal(flow.dummies().size(), _wanted_ids().size() - 1, "a killed dummy is gone")
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_RESET_DUMMIES)
+	await commands_applied()
 	var fresh: Array[Node] = flow.dummies()
 	check_equal(_dummy_ids(), _wanted_ids(), "every dummy stands again")
-	check(not fresh.has(old[0]), "the training dummy is a new one")
+	check(not is_instance_valid(old[0]) or not fresh.has(old[0]), "the training dummy is a new one")
 	check(not is_instance_valid(old[0]) or not old[0].is_inside_tree(), "the old training dummy left the room")
 
 
@@ -181,6 +184,7 @@ func test_actions_out_of_the_sandbox_do_nothing() -> void:
 	var imps: int = flow.enemies_left()
 	events.emit_signal("sandbox_spawn_requested", 0, &"ember_imp", 5)
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_RESET_DUMMIES)
+	await commands_applied()
 	check_equal(flow.enemies_left(), imps, "no imps added to the normal game")
 	check_equal(flow.dummies().size(), 0, "no dummies in the normal game")
 
@@ -191,6 +195,7 @@ func test_everyone_down_stands_up_with_their_staffs() -> void:
 		var world: Node = flow.world
 		var first := _wizards()[0]
 		events.emit_signal("staff_change_requested", PlayerController.of(first).seat, 2, 0, &"nova")
+		await commands_applied()
 		for wizard in _wizards():
 			wizard.health.take(wizard.health.max_health)
 		check(flow.is_restarting(), "%d players: all down starts the timer" % count)

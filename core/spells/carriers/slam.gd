@@ -10,7 +10,7 @@ extends Carrier
 
 
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"_sl_source"]
+const REFS: Array[StringName] = [&"_sl_source", &"_sl_struck"]
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
 ## one is on. Each keeps what a swing keeps for its hits, the hand it is held by and the aim locked

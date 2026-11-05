@@ -48,12 +48,21 @@ func capture(areas: Dictionary) -> void:
 		leaves = {}
 		for name: Variant in areas:
 			var kept: Dictionary = {}
-			tick_hashes[String(name)] = SimHash.area(walk, String(name), areas[name] as Object, func(path: String, value: Variant) -> void: kept[path] = value)
+			tick_hashes[String(name)] = SimHash.area(walk, String(name), areas[name] as Object, func(path: String, value: Variant) -> void: kept[path] = _copy(value))
 			leaves[String(name)] = kept
 		hashes.append(tick_hashes)
 	for problem in walk.problems:
 		if not problems.has(problem):
 			problems.append(problem)
+
+
+## `value` as it is now: a packed array, an array or a dictionary is held by reference, so a kept
+## leaf would show the member as it is when compared, not when captured.
+static func _copy(value: Variant) -> Variant:
+	var type: int = typeof(value)
+	if type >= TYPE_PACKED_BYTE_ARRAY or type == TYPE_ARRAY or type == TYPE_DICTIONARY:
+		return (value as Variant).duplicate()
+	return value
 
 
 ## The first tick at which `a` and `b` part (hashes differ, or one run is shorter), or -1.
@@ -133,6 +142,8 @@ static func _difference(x: Variant, y: Variant) -> String:
 
 static func _shown(value: Variant) -> String:
 	if typeof(value) == TYPE_FLOAT:
-		return "%.17g" % value
+		# The shortest text that reads back as the same double, its sign kept (GDScript's `%` has no
+		# `g`, and `var_to_str` drops the sign of -0.0).
+		return String.num_scientific(value)
 	var text: String = var_to_str(value)
 	return text if text.length() <= 120 else text.substr(0, 117) + "..."

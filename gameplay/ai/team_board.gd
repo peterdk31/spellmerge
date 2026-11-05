@@ -49,6 +49,10 @@ const CALL_REACH: float = 160.0
 const CALL_GAP: float = 3.0
 const CALL_BOOST: float = 0.5
 
+## Not state: services, caches and scratch, set up again (core/sim/README.md): the attacks' targets
+## are instance ids, which differ between runs (until N5 gives identities; found by N2's replays).
+const DERIVED: Array[StringName] = [&"_att_target"]
+
 ## Seconds it has run (moved on by `step`).
 var clock: float = 0.0
 var _last_start: PackedFloat32Array = PackedFloat32Array()

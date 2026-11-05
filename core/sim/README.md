@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; the tick, the `sim` service, input frames, replays and snapshots come in later parts (N2, N3, N10).
+The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; N2 the one input path (input frames, the frames service, replays); the tick and the `sim` service, and snapshots come in later parts (N3, N10).
 
 ## The simulation folders
 
@@ -21,7 +21,7 @@ Every script in these folders, and every inner class of one, is a **simulation s
 | `gameplay/horde/` | the horde director, the swarm, gems |
 | `gameplay/player/` | a seat's body and its staffs |
 
-`core/sim/` itself is not one: these tools read the simulation, they are not part of it. Everything else (Feel, the HUD, the camera, looks) is view: it may use real time and its own generators, as long as it only reads the game.
+`core/sim/` itself is not one: these tools read the simulation and feed it its input, they are not part of it. Everything else (Feel, the HUD, the camera, looks) is view: it may use real time and its own generators, as long as it only reads the game.
 
 ## Contract
 
@@ -37,6 +37,15 @@ Every script in these folders, and every inner class of one, is a **simulation s
 - **The desync report** (`desync.gd`, `Desync`): `capture(areas)` after each tick records the hashes, and every leaf of one chosen tick (`Desync.new(tick)`), with paths for that tick only (a path per leaf every tick made a determinism test 3.5 times slower); `Desync.first_parting(a, b)` is the first tick two runs part, and `Desync.compare(a, b)` names that tick, its areas and each member that differs, with both values (a packed array's first differing index).
 - **Never in a normal build's tick.** The walker, the hash and the report run in tests, tools, replays and later the netcode only.
 - **Instance ids are not identities.** They differ between runs: a member that keys by one (`Combat._row_by_node`, `Actors._node`) is DERIVED until N5 gives identities without them.
+
+## Input (N2)
+
+- **One input path.** The simulation takes input from `InputFrame`s only (`input_frame.gd`): one seat's input for one tick, its move (a signed byte per axis), its aim (a 16-bit angle, or keep), the staff buttons held and pressed, captured (an overlay of the seat is open), and the tick's commands. A seat's `PlayerController` builds its actor's intent from its frame; nothing in the simulation reads a device, the mouse or the camera. Devices (`LocalInput`, core/input), bots (`FrameSource`, `frame_source.gd`), replays and later the network all produce frames.
+- **The frames service** (`frames.gd`, the autoload `Frames`): its physics step runs before every other node's (`process_physics_priority` -1000), so it is the tick's start (N3's Tick takes it over). It builds each seat's frame (from the replay played, the seat's source, or its device; captured holds a source still), records it when a replay records, and applies the frame's commands. `frame_of(seat)` is the tick's frame, read only.
+- **Commands at the tick's start.** The HUD's requests the simulation hears (`InputFrame.COMMAND_NAMES`) are commands: the bus hands each to the frames service (`Events.command_sink`), which puts it into its seat's next frame and applies it when that tick starts (`Events.apply_command`); the simulation hears them through `Events.listen`, never by connecting to the signal. A frame speaks for its own seat only (the seat is not in the command). A device's join and leave are in the frame too (JOIN, LEAVE): they happen as the device joins (Flow and Coop read the joined seats at a run's start), and a replay played joins and leaves its seats at their tick. The requests that start a run (`play_requested`, `sandbox_requested`, `horde_requested`) are not commands: they are a replay's start.
+- **The bytes** (`InputFrame.to_bytes`, `Replay.to_bytes`) have strict decoders: every size and value is checked, an id is letters, digits and `_` only (never a path), nothing is left over, no `bytes_to_var`; a bad frame or file is rejected whole and says why (`decode`).
+- **Replays** (`replay.gd`): a run's build, content (a hash of every content id), seed, start (the request and the seat) and seats, then every tick's frames, inputs only. `Frames.record(start, starter)` starts a run and records it; `Frames.play(replay)` joins its seats, starts its run the same way and feeds its frames until they run out (live input and commands are dropped meanwhile). Each tick says whether the game stood paused: a paused tick plays while the game stands paused (the horde's level-up break), a pause of the recording's own (the pause menu) is skipped through at once with its commands, and a pause while playing holds the replay (N4 makes a stop part of the state). Files live in `user://replays/` only (`save(name)`, `open(name)`). While one records or plays, the seeds nobody chose are dealt from its seed (`SimSeed.begin`), and the horde director and the swarm take a new one at each run's start.
+- **What a replay does not hold yet.** The services' clocks run from the game's start and their counters carry over from run to run (`sim_time`, Spells' clock, Combat's steps, the AI board's clock, the shots' sequence), so a replay plays the same only from a fresh game, the same number of ticks after the start: N3 starts the one clock with the run. Flow's, Coop's and the horde's `_process` timers (A2, N3) and Feel's real-time stops (A1, N4) still run on drawn frames and real time; `tests/core/test_replay_game.gd` holds them to the tick. A bot reads the game through queries that fill the services' caches, and those count as state (the projectile manager's threat grid and target table), so a bot's run replays exactly with the bot watching again (a source set while a replay plays is asked each tick and its frame dropped); a person's input reads nothing of the game but where the hand is. Shots keep homing targets and skips by instance id (`_home_target`, `_skip_id`, A5): a run with homing parts until N5.
 
 ## Allowed files
 
@@ -64,16 +73,18 @@ The tests say what is missed: `tests/core/test_state_declared.gd` from the types
 
 ## Example to copy
 
-`gameplay/combat/combat.gd`'s DERIVED and REFS lists (services, instance-id keys; the body of each row).
+`gameplay/combat/combat.gd`'s DERIVED and REFS lists (services, instance-id keys; the body of each row). A new HUD request the simulation hears: its name and shape in `InputFrame.COMMAND_NAMES` and `COMMAND_SHAPES` (at the end), its listener through `Events.listen` (`gameplay/flow/flow.gd`'s sandbox page). A new input source: a `FrameSource` (`tests/bots/bot.gd`).
 
 ## Validate
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_state_walked, test_determinism
+ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_state_walked, test_determinism,
+                                    # test_input_frame, test_frames, test_replay, test_replay_game
 ```
 
 ## Review questions
 
 - Is every name in DERIVED really rebuilt or set up again, not state that would be lost? A body the game would miss goes in REFS.
 - Does a new scene in `tests/core/sim_scenes.gd` play the same twice?
+- Does any simulation code read a device, the mouse or the camera, or connect to a command's signal instead of `Events.listen`?

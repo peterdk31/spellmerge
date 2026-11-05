@@ -184,7 +184,7 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"input", &"combat", &"projectiles", &"world_parent", &"intro", &"loading", &"world"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"input", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 
@@ -279,8 +279,9 @@ func _ready() -> void:
 		return
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
-	events.sandbox_action_requested.connect(_on_sandbox_action_requested)
-	events.sandbox_spawn_requested.connect(_on_sandbox_spawn_requested)
+	# Commands, heard at the tick's start (core/events, online-ready N2).
+	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
+	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
 	events.horde_requested.connect(_on_horde_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)

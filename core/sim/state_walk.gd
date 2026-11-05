@@ -227,7 +227,9 @@ func _ref(path: String, value: Variant) -> void:
 			# 136 ms a hash at the 100,000 cap; an empty one costs one engine call.
 			var items: Array = value
 			_sink.call(_join(path, "#"), items.size())
-			if items.count(null) == items.size():
+			# (A typed array of arrays, as a carrier's struck lists, holds no null to count.)
+			var may_hold_null: bool = not items.is_typed() or items.get_typed_builtin() == TYPE_OBJECT
+			if may_hold_null and items.count(null) == items.size():
 				return
 			for i in items.size():
 				var item: Variant = items[i]
@@ -295,7 +297,8 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 				return
 			_problem(path, "holds a reference to a node it does not own (%s)" % what, "add it to REFS (a body that is state) or DERIVED (one set up again)")
 			return
-	elif script == null:
+	if script == null:
+		# An engine object, or a node of no script handed as an area: nothing of the game's to walk.
 		_problem(path, "holds a %s" % object.get_class(), "add it to DERIVED (or VIEW if only the drawing reads it)")
 		return
 	_seen[id] = _seen.size()

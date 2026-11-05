@@ -74,6 +74,15 @@ func check_equal(actual: Variant, expected: Variant, message: String) -> void:
 		_failures.append("%s: %s (got %s, expected %s)" % [_current, message, str(actual), str(expected)])
 
 
+## Waits until a command sent now through the game's bus (core/events: the builder's, the sandbox
+## page's, the horde's picks) has applied: commands apply at the next tick's start (online-ready
+## N2, the Frames autoload). A resume at `physics_frame` comes before that tick's nodes step, so
+## it is the second one.
+func commands_applied() -> void:
+	await physics_frame
+	await physics_frame
+
+
 ## Hands an object to the suite: it is freed after the test. Returns it for chaining.
 func own(object: Object) -> Object:
 	_owned.append(object)

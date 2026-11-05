@@ -1,11 +1,11 @@
 extends SceneTree
-## Tests for the bot (tests/bots/bot.gd): it takes a virtual device, an idler sends
-## nothing, a fighter's brain (the enemies' AI, with the bot's profile) drives its own wizard and
-## walks toward the enemies, casting with no windup (it is on the players' team), and lets go of
-## every input when the run is over; what the brain wants becomes buttons (the walk, the aim
-## stick, a tap per press, a held button per hold); the B tap goes through the input path to its
-## own player only, and leaving frees the slot. Bots for different indices never disturb each
-## other.
+## Tests for the bot (tests/bots/bot.gd): it takes a virtual device and fills its seat's input
+## frames (the Frames autoload), an idler wants nothing, a fighter's brain (the enemies' AI, with
+## the bot's profile) drives its own wizard and walks toward the enemies, casting with no windup
+## (it is on the players' team), and lets go of everything when the run is over; what the brain
+## wants becomes the frame (the walk, the aim, a press per press, a held button per hold); the B
+## tap goes through the input path to its own player only, and leaving frees the slot and the
+## seat's frames. Bots for different indices never disturb each other.
 ##
 ## godot --headless --path . --script res://tests/bots/test_bot.gd
 
@@ -27,6 +27,7 @@ func _initialize() -> void:
 		return
 	_test_names_exist(events)
 	_test_join_and_leave()
+	_test_fills_its_seats_frames()
 	_test_idler_sends_nothing()
 	_test_builder_walk()
 	_test_intent_becomes_buttons()
@@ -74,6 +75,20 @@ func _test_join_and_leave() -> void:
 	_check(not _input.call("is_joined", 0) and not _input.call("is_joined", 3), "leaving frees the slots")
 
 
+## A bot fills its seat's frames while it is in, and the seat's device does again once it left.
+func _test_fills_its_seats_frames() -> void:
+	var frames: Node = root.get_node_or_null("Frames")
+	_check(frames != null, "the Frames autoload exists")
+	if frames == null:
+		return
+	var bot := BotScript.new()
+	bot.join(2, BotScript.Mode.FIGHTER, _input, _flow)
+	_check(frames.call("source_of", 2) == bot, "a bot is its seat's frame source")
+	_check(frames.call("source_of", 1) == null, "and no other seat's")
+	bot.leave()
+	_check(frames.call("source_of", 2) == null, "leaving hands the seat back")
+
+
 ## The way into the builder is one press of B (`back`) and nothing else; without a wizard a bot
 ## cannot build and sends nothing.
 func _test_builder_walk() -> void:
@@ -90,7 +105,8 @@ func _test_builder_walk() -> void:
 
 
 ## With a wizard, `build_random` sends one `staff_change_requested` per slot of staff 3, all for
-## its own player, and the wizard's staff 3 then holds the cards the bot chose.
+## its own player, and the wizard's staff 3 holds the cards the bot chose from the next tick on
+## (a command applies at the tick's start).
 func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var builds: Array = []
 	var on_build := func(player: int, staff: int, slot: int, id: StringName) -> void: builds.append([player, staff, slot, id])
@@ -98,6 +114,8 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var before: int = bot.requests_sent
 	_check(bot.build_random(5), "a bot with a wizard builds")
 	events.disconnect("staff_change_requested", on_build)
+	await physics_frame
+	await physics_frame
 	var caster: Caster = (wizard as Actor).caster
 	var slots: int = caster.slot_count()
 	_check(bot.requests_sent - before == builds.size() and builds.size() == slots, "one counted request per slot")
@@ -109,9 +127,8 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
 
 
-## What the brain wants, as a person's buttons: the walk on the move actions, the aim on the
-## right stick, a press as one tap, a hold as the button kept down, a press and hold as a tap that
-## stays down.
+## What the brain wants, as the frame a person's buttons would make: the walk each axis full on
+## or off, the aim, a press, a hold, a press and hold; a press lasts one frame.
 func _test_intent_becomes_buttons() -> void:
 	var bot := BotScript.new()
 	bot.join(1, BotScript.Mode.FIGHTER, _input, _flow)
@@ -120,31 +137,47 @@ func _test_intent_becomes_buttons() -> void:
 	wanted.aim = Vector2(0.0, 3.0)
 	wanted.press(0)
 	wanted.hold(2, true)
-	var taps: int = int(_input.call("get_press_count", 1, &"staff_1"))
 	bot.send(wanted)
-	_check(_input.call("get_move", 1) == Vector2.RIGHT, "it walks the way wanted: %s" % _input.call("get_move", 1))
-	_check(_input.call("get_aim", 1) == Vector2.DOWN, "and aims with the stick: %s" % _input.call("get_aim", 1))
-	_check(int(_input.call("get_press_count", 1, &"staff_1")) == taps + 1 and not _input.call("is_action_pressed", 1, &"staff_1"), "a press is one tap")
-	_check(_input.call("is_action_pressed", 1, &"staff_3"), "a hold keeps the button down")
+	var frame := InputFrame.new()
+	frame.seat = 1
+	_fill(bot, frame)
+	_check(frame.move_vector() == Vector2.RIGHT, "it walks the way wanted: %s" % frame.move_vector())
+	_check(frame.aim_vector().is_equal_approx(Vector2.DOWN), "and aims: %s" % frame.aim_vector())
+	_check(frame.is_pressed(0) and not frame.is_held(0), "a press is one press")
+	_check(frame.is_held(2) and not frame.is_pressed(2), "a hold keeps the button down")
 	wanted.begin_step()
 	wanted.hold(2, false)
-	var holds: int = int(_input.call("get_press_count", 1, &"staff_2"))
 	wanted.press(1)
 	wanted.hold(1, true)
 	bot.send(wanted)
-	_check(not _input.call("is_action_pressed", 1, &"staff_3"), "let go, it is up")
-	_check(int(_input.call("get_press_count", 1, &"staff_2")) == holds + 1 and _input.call("is_action_pressed", 1, &"staff_2"), "a press and hold taps and stays down")
+	_fill(bot, frame)
+	_check(not frame.is_held(2), "let go, it is up")
+	_check(not frame.is_pressed(0), "a press lasts one frame")
+	_check(frame.is_pressed(1) and frame.is_held(1), "a press and hold presses and stays down")
 	bot.leave()
-	_check(_input.call("get_move", 1) == Vector2.ZERO and _input.call("get_aim", 1) == Vector2.ZERO, "leaving lets go of everything")
+	_check(bot.wanted_frame().move == Vector2i.ZERO and bot.wanted_frame().held_bits == 0, "leaving lets go of everything")
+
+
+## The frame as the frames service asks for it, without the brain thinking (no world: `step`
+## lets go, so the frame is taken from what `send` wanted, read before the step).
+func _fill(bot: BotScript, frame: InputFrame) -> void:
+	var wanted: InputFrame = bot.wanted_frame()
+	frame.move = wanted.move
+	frame.aim = wanted.aim
+	frame.held_bits = wanted.held_bits
+	frame.pressed_bits = wanted.pressed_bits
+	wanted.pressed_bits = 0
 
 
 func _test_idler_sends_nothing() -> void:
 	var idler := BotScript.new()
 	idler.join(2, BotScript.Mode.IDLER, _input, _flow)
+	var frame := InputFrame.new()
+	frame.seat = 2
 	for i in 10:
-		idler.step(0.016)
-	_check(_input.call("get_move", 2) == Vector2.ZERO, "an idler does not move")
-	_check(not _input.call("is_action_pressed", 2, &"staff_2"), "an idler does not cast")
+		idler.fill_frame(frame, 0.016)
+	_check(frame.move == Vector2i.ZERO, "an idler does not move")
+	_check(frame.held_bits == 0 and frame.pressed_bits == 0, "an idler does not cast")
 	idler.leave()
 
 
@@ -160,22 +193,19 @@ func _test_fighter(events: Node) -> void:
 	_check(wizard != null, "the run started with a wizard for bot 1")
 	if wizard != null:
 		var before: Vector2 = wizard.global_position
+		# The bots think at each tick's start (the Frames autoload asks them for their frames).
 		for i in 20:
-			for bot in bots:
-				bot.step(0.016)
 			await physics_frame
 		_check(wizard.global_position.distance_to(before) > 1.0, "a fighter walks toward the enemies")
 		_check(bots[0].brain.actor == wizard and bots[0].brain.profile == BotScript.PROFILE, "its brain drives its own wizard by the bot's profile")
 		_check(not bots[0].brain.warns() and bots[0].brain.windup_for(1) == 0.0, "on the players' team: no windup")
 		var other := _flow.call("get_wizard", 1) as Node2D
 		_check(other != null and other.global_position != wizard.global_position, "each bot steers its own wizard")
-		_test_build_random(events, bots[0], wizard)
+		await _test_build_random(events, bots[0], wizard)
 	_flow.call("stop_run")
-	for bot in bots:
-		bot.step(0.016)
-	var held: bool = false
-	for action: StringName in BotScript.STAFF_ACTIONS:
-		held = held or _input.call("is_action_pressed", 0, action)
-	_check(_input.call("get_move", 0) == Vector2.ZERO and _input.call("get_aim", 0) == Vector2.ZERO and not held, "with no world a fighter lets go of every input")
+	await physics_frame
+	var frames: Node = root.get_node_or_null("Frames")
+	var frame: InputFrame = frames.call("frame_of", 0) if frames != null else null
+	_check(frame != null and frame.move == Vector2i.ZERO and frame.aim == InputFrame.AIM_KEEP and frame.held_bits == 0 and frame.pressed_bits == 0, "with no world a fighter lets go of everything")
 	for bot in bots:
 		bot.leave()

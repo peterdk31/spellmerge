@@ -111,7 +111,8 @@ var actors: ActorsScript = null
 var curve: HordeCurve = DefaultCurve
 ## The size of the view in pixels. Only tests set this; otherwise the viewport's.
 var view_size: Vector2 = Vector2.ZERO
-## The randomness of spawns and offers. Tests seed it.
+## The randomness of spawns and offers. Tests seed it. While a replay records or plays, each run
+## starts it from the replay's seeds (`SimSeed.is_dealing`, online-ready N2), so the run is the same.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
 var web: bool = OS.has_feature("web")
@@ -190,8 +191,9 @@ func _ready() -> void:
 	events.horde_started.connect(_on_horde_started)
 	events.horde_ended.connect(stop)
 	events.enemy_died.connect(_on_enemy_died)
-	events.horde_pick_requested.connect(_on_pick_requested)
-	events.horde_ready_requested.connect(_on_ready_requested)
+	# Commands, heard at the tick's start (core/events, online-ready N2).
+	events.listen(&"horde_pick_requested", _on_pick_requested)
+	events.listen(&"horde_ready_requested", _on_ready_requested)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
 	events.player_joined.connect(_on_player_joined)
@@ -288,6 +290,8 @@ func start(new_world: Node2D) -> void:
 	if new_world == null or not is_instance_valid(new_world):
 		return
 	world = new_world
+	if SimSeed.is_dealing():
+		rng.seed = SimSeed.fresh()
 	seconds = 0.0
 	kills = 0
 	level = 1

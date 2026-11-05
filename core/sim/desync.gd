@@ -57,10 +57,15 @@ func capture(areas: Dictionary) -> void:
 
 
 ## `value` as it is now: a packed array, an array or a dictionary is held by reference, so a kept
-## leaf would show the member as it is when compared, not when captured.
+## leaf would show the member as it is when compared, not when captured. A packed array is copied
+## into a buffer of its own (`slice`): `duplicate` shares the buffer until one side writes through
+## the engine, and the native kernels write into the manager's arrays in place, past that (found
+## by N2b: a kept leaf showed the next step's shots).
 static func _copy(value: Variant) -> Variant:
 	var type: int = typeof(value)
-	if type >= TYPE_PACKED_BYTE_ARRAY or type == TYPE_ARRAY or type == TYPE_DICTIONARY:
+	if type >= TYPE_PACKED_BYTE_ARRAY:
+		return (value as Variant).slice(0)
+	if type == TYPE_ARRAY or type == TYPE_DICTIONARY:
 		return (value as Variant).duplicate()
 	return value
 

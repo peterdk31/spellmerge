@@ -155,6 +155,12 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - No CI job yet (that is N8): a script under `tests/` and a written result in docs/DECISIONS.md: the first tick and area that part on each platform, or that none does.
 - It shows what parts besides trig and the body move, which N6 and N7 take out of the engine anyway: if the platforms part somewhere else (inside the engine's own code), the owner hears it here, early.
 
+**Done (2026-11-06).** `tests/platforms/replay_hashes_runner.gd` (on `--replay-hashes` in the Linux Test, Windows Test and Web Test exports; the Windows Test preset is new) and `tools/platform_hashes.py` (exports, runs Linux headless, Windows through WSL and the web in headless Chromium, and names the first tick, area and members that part); the replay test's machinery is shared in `tests/support/replay_run.gd`. The result, in docs/DECISIONS.md (2026-11-06):
+
+- **Only trig parts, one float step apart:** Windows at the sandbox's tick 0 and the horde's tick 89 (`Vector2.angle_to`, atan2, in Spells' walk turn), the web at the sandbox's tick 1 (`Vector2.from_angle` in the atom's spread) and the horde's tick 117 (`Vector2.from_angle` of a frame's aim). Nothing inside the engine's own code parted first. What hides behind the first parting (the body move, A4) shows once N7 lands; N8 runs this again then.
+- **The inputs were the same bytes on every platform,** and each platform replayed its own recording exactly. Windows ran the GDScript twins (no MinGW here), the web the Emscripten kernels; Linux native and GDScript agree at all 600 ticks.
+- **Fixed in N1's and N2's tools:** StringName keys walked by text (the engine sorts them by address), kept leaves sliced (the native kernels write past copy-on-write; N10's snapshots must copy so too), and the native switch and the hit test's scratch listed in DERIVED.
+
 ### N3: one clock, one context
 
 - `core/sim/tick.gd` (`Tick`, autoload): the tick counter and the only driver of the simulation. Each physics frame it runs one tick, in a written order: input frames, commands, Flow, Coop's rules, actors (by id), Spells, projectiles, Combat, the swarm. Nothing in the simulation has its own `_process` or `_physics_process`; each area's step is called by the tick.

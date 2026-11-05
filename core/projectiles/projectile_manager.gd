@@ -572,8 +572,10 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
 ]
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
+## which gives the same game either way (native/README.md), and the hit test's scratch, which only
+## the native pass sizes ahead (both found by N2b's platform runs).
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).

@@ -36,6 +36,11 @@ const TIMING_NODE: String = "ProjectileTimingRunner"
 const STORM_ARGUMENT: String = "--storm"
 const STORM_RUNNER: String = "res://tests/benchmark/sandbox_storm_runner.gd"
 const STORM_NODE: String = "SandboxStormRunner"
+## The replay hashes (`--replay-hashes`, tests/platforms/replay_hashes_runner.gd): the same recorded
+## runs on Linux, Windows and the web, every tick's state hash printed (online-ready N2b).
+const REPLAY_HASHES_ARGUMENT: String = "--replay-hashes"
+const REPLAY_HASHES_RUNNER: String = "res://tests/platforms/replay_hashes_runner.gd"
+const REPLAY_HASHES_NODE: String = "ReplayHashesRunner"
 
 ## The event bus. Only tests set this, before adding the node; otherwise the
 ## "Events" autoload is used.
@@ -80,6 +85,7 @@ func _ready() -> void:
 	_start_stress_test(args)
 	_start_timing_test(args)
 	_start_storm(args)
+	_start_replay_hashes(args)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -109,6 +115,11 @@ func _start_timing_test(args: PackedStringArray) -> bool:
 ## The same for the sandbox storm (`--storm`).
 func _start_storm(args: PackedStringArray) -> bool:
 	return _start_runner(args, STORM_ARGUMENT, STORM_NODE)
+
+
+## The same for the replay hashes (`--replay-hashes`).
+func _start_replay_hashes(args: PackedStringArray) -> bool:
+	return _start_runner(args, REPLAY_HASHES_ARGUMENT, REPLAY_HASHES_NODE)
 
 
 func _start_runner(args: PackedStringArray, argument: String, node_name: String) -> bool:
@@ -150,6 +161,9 @@ func _runner_script(node_name: String) -> GDScript:
 		STORM_NODE:
 			if ResourceLoader.exists(STORM_RUNNER):
 				return load("res://tests/benchmark/sandbox_storm_runner.gd") as GDScript
+		REPLAY_HASHES_NODE:
+			if ResourceLoader.exists(REPLAY_HASHES_RUNNER):
+				return load("res://tests/platforms/replay_hashes_runner.gd") as GDScript
 	return null
 
 

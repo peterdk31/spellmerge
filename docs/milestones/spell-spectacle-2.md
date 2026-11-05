@@ -90,6 +90,10 @@ Today a mote is a row and every row is a GDScript write. Instead, one row could 
 
 Merged only if the storm's CPU drops and the GPU time on llvmpipe and the Intel UHD does not grow more than that; the result goes in DECISIONS either way. After S3, so fewer callers write rows.
 
+**Result (2026-11-04): not merged.** Built with three rings of 1, 4 and 16 quads a row: the storm's motes cost about 0.15-0.2 ms less CPU at the same count (or 2.4 times the motes at the same CPU), but the Intel UHD drew the storm's bursts in 3.01 ms against 2.36 (DECISIONS, 2026-11-04). The rows stay a mote each; the branch `owner/burst-a-row` keeps the build and its benchmarks. S6's particle items go ahead on today's rows.
+
+**Again after S6 (2026-11-05): still not merged.** Merged with main (the native births writing burst rows to the byte) and measured once on the web build: the frame is the same (about 30 ms on both, CPU-bound), the motes' CPU the same, and the branch writes about 1.6 times the motes for it (DECISIONS, 2026-11-05). #546 closed by the owner (2026-11-05); the branch `owner/burst-a-row` keeps the build.
+
 ## S5: Do shots need tails? (the owner, 2026-11-04)
 
 The owner asked whether the shots need tails at all now that they shed motes. After S3 the trail shader draws only the tail line and the dashes' streaks; the tails have been the shots' largest GPU cost (DECISIONS, 2026-11-02: their vertex count, drawn or folded), and the manager uploads every shot's recent positions for them each frame (`trail_data`). Without tails, that budget could go to motes instead: more births a shot in busy fights, so a fight of thousands of shots keeps the look of a fight of tens (the owner: "This might also allow us to increase motes in busier fights, so the visual look will stay the same for more projectiles").

@@ -1,7 +1,9 @@
 class_name CarrierPortal
 extends Carrier
 ## A portal (`&"portal"`; docs/milestones/portal.md): one cast opens a mouth a step ahead along the
-## aim and `shots` exits `ray_length` ahead (or, homing, in a ring round a target, each facing it).
+## aim and `shots` exits `ray_length` ahead, fanned as a split fans shots, each facing out along its
+## own way. Its cards act on what comes out of it (owner, 2026-11-05: no rules of its own): its
+## infusion, and its homing, which steers what leaves it onto a target.
 ## What goes into the mouth comes out of every exit, and what goes into an exit comes out of the
 ## mouth: it works both ways (owner, 2026-11-05), so a foe can fire back through it. It belongs to
 ## no team: anybody's shots, beams and bodies go through.
@@ -64,8 +66,9 @@ static func of(spells: SpellRuntime) -> CarrierPortal:
 	return spells.carrier(&"portal") as CarrierPortal
 
 
-## It stays a while where it was opened (its `lifetime`: slow keeps it open longer), homing places
-## its exits, `reach` moves them further, `shots` is how many exits and `spread` fans them. It hits
+## It stays a while where it was opened (its `lifetime`: slow keeps it open longer), homing steers
+## what comes out of it, `reach` moves its exits further, `shots` is how many exits and `spread`
+## fans them. It hits
 ## nothing itself and meets no shot (a shot that touches it goes through), so shield, deflect and
 ## the hit cards do nothing on it.
 func traits() -> int:
@@ -137,26 +140,11 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		_pt_gates[at * _pt_stride] = mouth
 		used = 1
 	var exits: int = clampi(spell.shots, 1, SpellLimits.PORTAL_EXITS_MOST)
-	var target: Vector2 = Vector2.INF
-	var target_radius: float = 0.0
-	if spell.homing_range > 0.0:
-		var homing: Homing = Homing.new()
-		homing.start(spell, hash(Vector2i(born, actor)))
-		target = homing.point(kit.projectiles, actor, mouth_at, way)
-		target_radius = homing.target_radius
 	for n in exits:
-		var exit_at: Vector2
-		var face: Vector2
-		if target.is_finite():
-			# Round the target, each facing it, the first on the side its caster stands (P2).
-			var round_way: Vector2 = target.direction_to(origin) if not target.is_equal_approx(origin) else -way
-			var ring: Vector2 = target + round_way.rotated(TAU * float(n) / float(exits)) * (target_radius + SpellLimits.PORTAL_RING)
-			exit_at = _clear_of_walls(target, ring, spell.radius)
-			face = exit_at.direction_to(target) if not exit_at.is_equal_approx(target) else way
-		else:
-			var angle: float = way.angle() + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
-			face = Vector2.from_angle(angle)
-			exit_at = _clear_of_walls(origin, origin + face * spell.ray_length, spell.radius)
+		# Fanned as a split fans shots, each facing out along its own way (P1).
+		var angle: float = way.angle() + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
+		var face: Vector2 = Vector2.from_angle(angle)
+		var exit_at: Vector2 = _clear_of_walls(origin, origin + face * spell.ray_length, spell.radius)
 		var exit: int = kit.projectiles.open_gate(born, tag, exit_at, face, spell.radius, false)
 		if exit >= 0:
 			_pt_gates[at * _pt_stride + used] = exit
@@ -293,6 +281,9 @@ func _pass_shots() -> void:
 			_set_jumps(moved, jumps + 1)
 			if portal != null:
 				kit.infuse_shot(moved, portal.hit, portal.tint)
+				# Its homing steers what comes out of it (the shot's own homing, if any, stays).
+				if portal.homing_range > 0.0 and (spell == null or spell.homing_range <= 0.0):
+					kit.projectiles.set_homing_curve(moved, portal.homing_curve, portal.homing_range)
 			_shown(to, out_at, way)
 
 

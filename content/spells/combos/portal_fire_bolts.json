@@ -1,10 +1,9 @@
 {
 	"id": "portal_fire_bolts",
 	"name": "Portal fire bolts",
-	"does": "A fire portal rings an imp behind a wall; plain bolts fired into its mouth come out of its exits as burning copies.",
+	"does": "Plain bolts fired into a fire homing portal come out of its exits as burning copies that home in on an imp off the line.",
 	"casts": [{"staff": 0, "cards": ["fire", "homing", "split", "portal"]}, {"staff": 1, "cards": ["bolt"], "at": 0.2}],
-	"imps": [[170, 0]],
-	"walls": [[80, -200, 16, 400]],
+	"imps": [[230, -40]],
 	"seconds": 2.0,
 	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
 }

@@ -75,20 +75,45 @@ func test_one_cast_opens_a_mouth_and_its_exits() -> void:
 	check_equal(_portals().portal_count(), 0, "and its row with it")
 
 
-func test_homing_rings_the_target_each_exit_facing_it() -> void:
+func test_split_fans_the_exits_each_facing_its_own_way() -> void:
 	_arena = ArenaScript.new(root)
-	var imp: Node2D = _arena.add_imp(Vector2(150, 0))
+	_arena.add_imp(Vector2(150, 0))
 	_arena.install_cards(0, 0, ["homing", "split", "portal"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	var pm: ManagerScript = _arena.projectiles
-	var exits: int = 0
+	var faces: Array[float] = []
 	for gate in pm.gate_rows():
 		if pm.gate_open(gate) and not pm.gate_is_mouth(gate):
-			exits += 1
-			var to_imp: Vector2 = pm.gate_position(gate).direction_to(imp.global_position)
-			check(pm.gate_face(gate).dot(to_imp) > 0.99, "an exit faces the target")
-			check(pm.gate_position(gate).distance_to(imp.global_position) > SpellLimits.PORTAL_RING, "round it, past its edge")
-	check_equal(exits, 3, "three exits")
+			var at: Vector2 = pm.gate_position(gate)
+			check(is_equal_approx(at.length(), 160.0), "an exit opens its reach ahead (%s), homing or not" % at)
+			check(pm.gate_face(gate).dot(at.normalized()) > 0.999, "facing out along its own way")
+			faces.append(pm.gate_face(gate).angle())
+	check_equal(faces.size(), 3, "three exits")
+	faces.sort()
+	if faces.size() == 3:
+		check(faces[0] < -0.1 and absf(faces[1]) < 0.01 and faces[2] > 0.1, "fanned either side of the aim, as a split fans shots: %s" % [faces])
+
+
+## Homing on a portal steers what comes out of it: a plain bolt through it bends onto an imp off
+## its line, which it misses through a portal without homing.
+func test_homing_steers_what_comes_out() -> void:
+	check(_bolt_through_hits(["homing", "portal"]), "a bolt out of a homing portal finds the imp off its line")
+	check(not _bolt_through_hits(["portal"]), "without homing it flies past")
+
+
+func _bolt_through_hits(portal: Array) -> bool:
+	_arena = ArenaScript.new(root)
+	var imp: Node2D = _arena.add_imp(Vector2(260, 60))
+	_arena.install_cards(0, 0, portal)
+	_arena.install_cards(0, 1, ["bolt"])
+	_arena.cast(0, 0)
+	_arena.run(0.1)
+	_arena.cast(0, 1)
+	_arena.run(1.4)
+	var hit: bool = _arena.lost(imp) > 0
+	_arena.free_all()
+	_arena = null
+	return hit
 
 
 func test_a_beam_into_the_mouth_goes_on_from_every_exit() -> void:
@@ -101,17 +126,16 @@ func test_a_beam_into_the_mouth_goes_on_from_every_exit() -> void:
 	check_equal(_beams().beam_count(), 4, "the beam and a leg from each of the three exits")
 
 
-func test_a_beam_leg_out_of_a_frost_portal_chills() -> void:
+func test_a_beam_leg_out_of_a_homing_frost_portal_bends_onto_a_target_and_chills() -> void:
 	_arena = ArenaScript.new(root)
-	# Within the homing card's reach (160) of the mouth.
-	var imp: Node2D = _arena.add_imp(Vector2(170, 0))
-	_arena.add_wall(Rect2(80, -200, 16, 400))
+	# Off the beam's line, within the homing card's reach (160) of the exit at (160, 0).
+	var imp: Node2D = _arena.add_imp(Vector2(240, 50))
 	_arena.install_cards(0, 0, ["frost", "homing", "portal"])
 	_arena.install_cards(0, 1, ["beam"])
 	check(_arena.cast(0, 0), "the portal is cast")
 	check(_arena.cast(0, 1), "the beam is cast")
 	_arena.run(0.4)
-	check(_arena.lost(imp) > 0, "a beam reaches the imp behind the wall through the portal")
+	check(_arena.lost(imp) > 0, "the leg out of the portal bends onto the imp off its line")
 	check(_arena.was_given(imp, &"chill"), "and takes the portal's frost on the way")
 
 

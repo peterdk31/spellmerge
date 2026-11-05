@@ -1,18 +1,18 @@
 extends "res://tests/support/screenshot.gd"
 ## Portals as the game draws them (docs/milestones/portal.md): a plain portal a held beam goes
-## through, out of its exit; a fire portal that rings a dummy with three exits (homing, split), a
-## held beam into its mouth coming out of all three as burning legs; and a frost portal of player 2
+## through, out of its exit; a fire homing split portal whose three exits fan ahead, a held
+## beam into its mouth coming out of all three as burning legs that bend onto a dummy off the line; and a frost portal of player 2
 ## with a held beam of its own. Each gate is a ring in its caster's colour (gameplay/feel/
 ## portal_rings.gd), the mouth swirling in, the exits out with a notch, a dotted line between.
-## `portal_looks` is the whole screen and `portal_looks_ring` a crop of the ring.
+## `portal_looks` is the whole screen and `portal_looks_ring` a crop of the homing row.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
-## (The dummy of the ring stands within the homing card's reach, 160 px, of the mouth.)
+## (The homing row's dummy stands within the homing card's reach, 160 px, of the exits.)
 ## Each row: the portal's cards, the beam's cards, where both are cast from, and a dummy (INF for none).
 const ROWS: Array = [
 	[[&"hold", &"portal"], [&"hold", &"beam"], Vector2(40.0, 60.0), Vector2.INF],
-	[[&"hold", &"fire", &"homing", &"split", &"portal"], [&"hold", &"beam"], Vector2(40.0, 200.0), Vector2(215.0, 200.0)],
+	[[&"hold", &"fire", &"homing", &"split", &"portal"], [&"hold", &"beam"], Vector2(40.0, 200.0), Vector2(270.0, 240.0)],
 	[[&"hold", &"frost", &"portal"], [&"hold", &"beam"], Vector2(40.0, 330.0), Vector2(320.0, 330.0)],
 ]
 
@@ -59,4 +59,4 @@ func take() -> void:
 		label(" ".join(PackedStringArray(portal)) + "  +  " + " ".join(PackedStringArray(beam)), row[2] + Vector2(0.0, -40.0))
 	await settle()
 	await shot("portal_looks")
-	await snap(Vector2(215.0, 200.0), "portal_looks_ring", Vector2i(170, 150), 3)
+	await snap(Vector2(220.0, 210.0), "portal_looks_ring", Vector2i(200, 150), 3)

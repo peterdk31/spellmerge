@@ -163,10 +163,7 @@ const EXPIRE_BACKOFF: float = 2.0
 ## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05
 
-## The portal (docs/milestones/portal.md). How far beyond a homing portal's target's edge its exits
-## open, round it (P2).
-const PORTAL_RING: float = 48.0
-## The most portals one thing goes through in a row (a shot, a beam's leg): an engine safeguard
+## The portal (docs/milestones/portal.md). The most portals one thing goes through in a row (a shot, a beam's leg): an engine safeguard
 ## against a loop or a runaway fork, not a build limit (P4, P5).
 const PORTAL_JUMPS: int = 4
 ## Seconds a body that came through a portal waits before another takes it (P6).

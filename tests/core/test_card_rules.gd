@@ -72,6 +72,14 @@ const SIDE: float = 30.0
 const SECOND: float = 45.0
 ## How far from the target on the line the rest of a crowd stands.
 const CROWD: float = 16.0
+## Where the teammate stands that sends a shot through a carrier that opens a way through (a
+## portal), the point on the aim line it aims at (a portal's mouth, a step ahead) and the step it
+## casts at. It stands ahead and to the side, so its shot comes down into the mouth clear of the
+## wizard's body, and out of the exit clear of the target off the line, unless the portal's cards
+## turn it.
+const COURIER_AT: Vector2 = Vector2(60.0, -60.0)
+const COURIER_AIM: float = 24.0
+const COURIER_STEP: int = 0
 ## How far behind the target on the line the enemy shooter stands.
 const SHOOTER_BEHIND: float = 70.0
 ## The wizard casts when an enemy shot is this much further than its carrier's reach.
@@ -588,6 +596,11 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("shooter", false):
 		var shot: Array[StringName] = [_shot.id]
 		world.add_enemy(&"E", Vector2(r + SHOOTER_BEHIND, 0.0), World.HEALTH, shot, Vector2.LEFT, true)
+	if Carriers.of(form.carrier).has(CarrierTraits.GATES):
+		# A carrier that opens a way through (a portal) acts on what goes through it: a teammate
+		# sends a plain shot into it a moment after the cast.
+		var shot: Array[StringName] = [_shot.id]
+		world.add_courier(COURIER_AT, shot, COURIER_AT.direction_to(Vector2(COURIER_AIM, 0.0)), COURIER_STEP)
 	if scene.get("hurt", false):
 		for step in HURT_STEPS:
 			world.hurt_wizard_at(step, 1)

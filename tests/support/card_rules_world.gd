@@ -177,6 +177,17 @@ func add_enemy(label: StringName, at: Vector2, health: float = HEALTH, cards: Ar
 	return _body(label, at, mind, cards, health)
 
 
+## A teammate (seat 2) at `at` that casts `cards` once along `aim` at step `step`: a plain shot
+## sent through a carrier that opens gates (a portal), so what its cards do to what comes out shows.
+func add_courier(at: Vector2, cards: Array[StringName], aim: Vector2, step: int) -> Node2D:
+	var mind := ActorFixture.Scripted.new()
+	mind.team = ActorsScript.TEAM_WIZARDS
+	mind.seat = 2
+	mind.aim = aim
+	mind.presses = [step]
+	return _body(&"courier", at, mind, cards, HEALTH)
+
+
 ## A wall over `rect`.
 func add_wall(rect: Rect2) -> void:
 	_walls.append(rect)

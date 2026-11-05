@@ -4,7 +4,7 @@
 
 ## Why it fits the pillars
 
-- **Deep spell building (pillar 1).** A portal does nothing alone. It changes where every other spell goes: yours, a teammate's and an enemy's. The ring round an enemy comes from cards that already exist (homing, split), so it adds a carrier and no special cases.
+- **Deep spell building (pillar 1).** A portal does nothing alone. It changes where every other spell goes: yours, a teammate's and an enemy's. Its cards do what they do anywhere, to what comes out of it (rework, owner 2026-11-05): split fans its exits, homing steers what leaves them, an infusion goes onto it. A carrier and no special cases.
 - **Surprising combos.** It works across systems: beams, flying shots, knockback, magnet, infusions and triggers all do something new with it (the table below).
 - **Everything hurts everything.** A portal belongs to no team. An enemy's bolt that flies into your mouth comes out of your exits, and a teammate's beam fired through it cooks your target.
 - **Nobody waits (pillar 2).** A portal is walked into, never forced on anybody's choices. Being knocked through one is a hit like any other.
@@ -22,15 +22,15 @@ A form card, `content/spells/forms/portal/`, `carrier = &"portal"`, a new `core/
 | `radius` | 12 px | the size of the mouth and of each exit |
 | `ray_length` | 160 px | how far ahead the exit opens (the reach of a beam is 240) |
 | `shots` | 1 | how many exits |
-| `spread` | 40° | how far apart several exits are fanned without homing |
+| `spread` | 40° | how far apart several exits are fanned |
 | `base_damage` | 0.05 (the minimum) | a portal hurts nothing itself |
 | `complexity` | 3 | |
 
 ## The rules
 
-**P1. One cast opens one mouth and `shots` exits.** The **mouth** opens a step ahead of the staff tip (`kit.placed_at`, as a rune does), facing along the aim. Without homing the **exits** open `ray_length` ahead along the aim, stopping before walls (`clip_to_walls`, as teleport and wall do), fanned `spread` apart when there are several, each facing the aim. A portal cast as a payload opens where its payload fires, like any carrier (`on hit · bolt · portal` opens one where the bolt hit).
+**P1. One cast opens one mouth and `shots` exits.** The **mouth** opens a step ahead of the staff tip (`kit.placed_at`, as a rune does), facing along the aim. The **exits** open `ray_length` ahead along the aim, stopping before walls (`clip_to_walls`, as teleport and wall do), fanned as a split fans shots (`spread` apart, plus the staff's spread), **each facing out along its own way**. A portal cast as a payload opens where its payload fires, like any carrier (`on hit · bolt · portal` opens one where the bolt hit).
 
-**P2. With homing, the exits ring the target.** The exits open evenly round the target homing picks (the same pick and reach as every other carrier), on a circle of `SpellLimits.PORTAL_RING` (48 px) beyond its edge, **each facing the target**. The first exit is placed on the far side from the caster, so one exit fires the beam straight on and the others come in from the flanks. No homing target in reach: the exits open as in P1. Exits do not follow the target after they open (see `sticky` in the table).
+**P2. Its cards act on what comes out of it (rework, owner 2026-11-05: "to not have custom rules").** A portal has no rules of its own for its cards: each does to what leaves an exit what it does to a shot. Its **homing** steers what comes out onto a target (a shot takes the portal's homing when it has none of its own; a beam's leg bends as a homing beam does), its **infusion** goes onto it. So `homing · split · portal` fans three exits ahead, and a beam into its mouth comes out of all three and each leg bends onto the target: a crossfire from three angles, read from the cards. (The first build placed homing exits in a ring round the target, each facing it: a rule split and homing have nowhere else, so it was dropped.)
 
 **P3. It works both ways (owner, 2026-11-05).** Anything that goes into the mouth's circle, from any side, leaves from every exit; anything that goes into an exit leaves from the mouth. Its heading turns by the angle between the facings of the gate it went in by and the one it leaves: something that flies straight into the mouth comes straight out of an exit along its facing, and a foe's shot fired straight at an exit comes out of the mouth flying back at the caster. It leaves just outside the gate, so it does not go straight back in. A portal's gates never move (growth only widens them).
 
@@ -50,7 +50,7 @@ The traits it answers (`traits()`): `STAYS | LASTS | STEERS | REACHES | SPEED | 
 
 | Card | On a portal |
 | --- | --- |
-| homing | the exits ring the nearest target, facing it (P2) |
+| homing | what comes out of it steers onto a target: beam legs bend, shots home (P2) |
 | split, multicast | more exits (`shots`); a multicast opens more portals |
 | reach | the exits open further away |
 | bigger | wider gates: easier to aim into, swallows bigger bodies |
@@ -66,7 +66,7 @@ The traits it answers (`traits()`): `STAYS | LASTS | STEERS | REACHES | SPEED | 
 | mend | nothing (it has no status), unless a blast carries it |
 | blast | a blast at the mouth and every exit when it closes |
 | on expire | its payload fires from every gate when it closes |
-| timer, on hurt | its payload fires out of every exit, along its facing: `timer · homing · split · portal · bolt` is a ring of turrets round a target |
+| timer, on hurt | its payload fires out of every exit, along its facing: `timer · split · portal · bolt` is three turrets ahead |
 | on cast, recoil | as on any carrier |
 | on hit, on kill, on reaction, chain, pierce, siphon, heavy, possess, relay, pull, overcharge | nothing: a portal hits nothing (marked in the builder, as everywhere) |
 | sticky, linger, return, bounce, ghost, spiral, on wall | nothing: it does not move |
@@ -83,13 +83,13 @@ The traits it answers (`traits()`): `STAYS | LASTS | STEERS | REACHES | SPEED | 
 
 ## The combos (`content/spells/combos/`)
 
-- `portal_crossfire`: staff 0 `homing · split · portal`, staff 1 `fire · beam` into the mouth: three legs burn an imp behind a wall.
-- `portal_fire_bolts`: staff 0 `fire · homing · split · portal`, staff 1 a plain `bolt`: its three copies come out burning and hit an imp behind a wall.
+- `portal_crossfire`: staff 0 `homing · split · portal`, staff 1 `fire · beam` into the mouth: three legs bend onto an imp off the line and burn it.
+- `portal_fire_bolts`: staff 0 `fire · homing · split · portal`, staff 1 a plain `bolt`: its three copies come out burning and home in on an imp off the line.
 - `portal_frost_vacuum`: `frost · magnet · portal` pulls an imp beside its exit in and drops it by the caster, chilled.
 
 ## How it was built
 
-All in one branch, in GDScript: no C++ changed. The gates are rows of the projectile manager, as the walls are (`open_gate`, `close_gate`, `gate_outs`, `gate_turn`, `gate_cut`); a ray stops where it goes into one when its caller asks (`ray_gates`, a beam only: a zap or a jump passes gates by) and says which (`ray_gate`, `ray_gate_left`); `shots_into_gates` lists the flying shots that went into one on their last step, and `pass_shot` moves one. The portal carrier (`core/spells/carriers/portal.gd`) runs every step after the manager's: it moves those shots (and makes their copies through `land_shot`, so a copy is a full shot of its spell), moves the bodies, pulls, zaps and closes. A beam that stops at a gate opens a leg at every gate it leads to: a beam row of its own (`CarrierBeam._start_leg`), which follows its beam and ends when its beam no longer reaches that gate. Since the shots are moved after the step, outside the kernel's loop, the native shot kernel needed no change and its check (`test_native_kernel`) is unchanged; the swarm's bodies are moved by `target_move_requested`, which the swarm already hears. `tests/core/test_portal.gd` checks the rules; `test_card_rules` plays every card on it.
+All in one branch, in GDScript: no C++ changed. The gates are rows of the projectile manager, as the walls are (`open_gate`, `close_gate`, `gate_outs`, `gate_turn`, `gate_cut`); a ray stops where it goes into one when its caller asks (`ray_gates`, a beam only: a zap or a jump passes gates by) and says which (`ray_gate`, `ray_gate_left`); `shots_into_gates` lists the flying shots that went into one on their last step, and `pass_shot` moves one. The portal carrier (`core/spells/carriers/portal.gd`) runs every step after the manager's: it moves those shots (and makes their copies through `land_shot`, so a copy is a full shot of its spell), moves the bodies, pulls, zaps and closes. A beam that stops at a gate opens a leg at every gate it leads to: a beam row of its own (`CarrierBeam._start_leg`), which follows its beam and ends when its beam no longer reaches that gate. Since the shots are moved after the step, outside the kernel's loop, the native shot kernel needed no change and its check (`test_native_kernel`) is unchanged; the swarm's bodies are moved by `target_move_requested`, which the swarm already hears. `tests/core/test_portal.gd` checks the rules; `test_card_rules` plays every card on it, with a teammate's plain shot sent through every carrier that opens a way through (`GATES`), so what its cards do to what comes out shows.
 
 Not built yet: the enemy AI does not aim through portals (step 4 below; an enemy that holds a portal opens it and fights on as it does), spell light, and sounds.
 

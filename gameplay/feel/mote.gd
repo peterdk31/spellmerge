@@ -115,7 +115,8 @@ const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## about 2.5 us whatever its size. Kept at 256: a dead body's crumble is a row a pixel (up to 160).
 const FRAME_ROWS: int = 256
 const MOMENT_ROWS: int = 128
-## `frame_rows` is FRAME_ROWS unless a benchmark sets it (the moments keep the same share).
+## `frame_rows` is FRAME_ROWS unless a benchmark or the "Tailless motes" dev slider sets it (the
+## moments keep the same share).
 ## The motes that leave a settled mark (`MoteKind.settles`): SETTLE_ROWS more may each frame, and
 ## what a frame leaves unused is kept, up to SETTLE_MOST. Working out where a mote rests and
 ## handing it to the mark layer costs about as much as writing a row (the integration of P1c, P1d

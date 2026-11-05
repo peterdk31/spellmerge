@@ -352,9 +352,33 @@ func test_an_enemy_shot_lights_like_any() -> void:
 		var buffer: PackedFloat32Array = mirror.buffer
 		for n in mirror.visible_instance_count:
 			var i: int = n * SpellLightScript.STRIDE
-			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and buffer[i] >= 0.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
+			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
 				found = true
 	check(found, "the enemy shot's live head is in a light batch, so it lights")
+
+
+## The regression (tails as motes, 2026-11-05): a shot drawn without a trail row (every shot, now
+## its tail is motes) still lights; the light shader once lit only shots that held a row.
+func test_a_shot_without_a_trail_row_lights() -> void:
+	var made: Array = _feel()
+	var manager: ProjectilesScript = made[2]
+	manager.set_tails_enabled(false)
+	var slot: int = manager.spawn(0, Vector2(200.0, 120.0), Vector2(60.0, 0.0), 2.0, 4.0)
+	manager.step(1.0 / 60.0)
+	manager.update_draw(1.0)
+	check_equal(manager.get_trail_of(slot), -1, "the shot holds no trail row")
+	var shader: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
+	check(not shader.contains("row >= 0.0 && flag_set(flags, TF_HEAD)"), "the light shader lights a head without a row")
+	var at: Vector2 = manager.get_position_of(slot)
+	var found: bool = false
+	for batch in ProjectilesScript.BATCHES:
+		var mirror: MultiMesh = manager.batch_mirror(batch)
+		var buffer: PackedFloat32Array = mirror.buffer
+		for n in mirror.visible_instance_count:
+			var i: int = n * SpellLightScript.STRIDE
+			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
+				found = true
+	check(found, "its head is in a light batch")
 
 
 ## A torch is a light spot (data on a plain node: rooms carry no scripts), lit in its flame's

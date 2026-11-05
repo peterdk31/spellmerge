@@ -91,8 +91,6 @@ var mote_cap: int = MoteCap.default_cap()
 var mote_density: float = MoteDensity.DEFAULT
 ## The "Tailless motes" dev setting (`TaillessMotes`): the motes' rows a frame follow its pool.
 var tailless_motes: int = TaillessMotes.DEFAULT
-## The "Tail motes" dev switch (`TailMotes`): which tail kind the shots' tails are laid in.
-var tail_motes: int = TailMotes.DEFAULT
 ## The floor marks (null with the "Floor marks" setting off), and the setting. Read only.
 var marks: MarksScript = null
 var floor_marks: bool = FloorMarks.default_on()
@@ -141,7 +139,6 @@ func _ready() -> void:
 	events.mote_cap_changed.connect(set_mote_cap)
 	events.mote_density_changed.connect(set_mote_density)
 	events.tailless_motes_changed.connect(set_tailless_motes)
-	events.tail_motes_changed.connect(set_tail_motes)
 	events.spell_light_changed.connect(set_spell_light)
 	events.room_entered.connect(_on_room_entered)
 	events.room_entered.connect(_fit_marks)
@@ -534,7 +531,6 @@ func use_motes(motes: MotesScript) -> void:
 		pool.name = "Motes"
 		pool.density = mote_density
 		pool.frame_rows = TaillessMotes.frame_rows_of(tailless_motes)
-		_use_tail_kind()
 		add_child(pool)
 		pool.step(_clock)
 		pool.settle_into(marks)
@@ -583,25 +579,6 @@ func set_tailless_motes(births: int) -> int:
 	if pool != null:
 		pool.frame_rows = rows
 	return rows
-
-
-## The "Tail motes" dev switch (`TailMotes`): the shots' tails are laid in the `pick`th tail kind
-## (`MoteKind.tail`, in id order; the first when there are fewer), or none with 0 (the projectile
-## manager lays none then). Returns the pick taken.
-func set_tail_motes(pick: int) -> int:
-	tail_motes = TailMotes.snap(pick)
-	_use_tail_kind()
-	return tail_motes
-
-
-func _use_tail_kind() -> void:
-	if pool == null or not TailMotes.lays(tail_motes):
-		return
-	var kinds: PackedInt32Array = pool.tail_kinds()
-	if kinds.is_empty():
-		return
-	var k: int = kinds[mini(tail_motes - 1, kinds.size() - 1)]
-	pool.use_tail_kind(pool.kinds()[k].id)
 
 
 ## The "Floor marks" setting: on makes the mark layer (fitted to the room it was last told of),

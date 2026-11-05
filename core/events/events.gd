@@ -46,12 +46,8 @@ signal mote_density_changed(density: float)
 signal floor_marks_changed(on: bool)
 ## Sender: hud. The "Spell light" switch in the pause menu (Settings) flipped, or a saved choice was loaded when the menu was bound: whether shots light the world round them (`SpellLightSetting` in core/settings). Heard by feel, which makes or frees its light buffer.
 signal spell_light_changed(on: bool)
-## Sender: hud. The "Tails" switch in the pause menu (Settings) flipped, or a saved choice was loaded when the menu was bound: whether flying shots draw their tails (`ShotTails` in core/settings; docs/milestones/spell-spectacle-2.md, S5). Heard by core/projectiles (`set_tails_enabled`: off ends the tails in the air at once).
-signal shot_tails_changed(on: bool)
 ## Sender: hud. The "Tailless motes" dev slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the spark pool the shots' births share while the tails are off (`TaillessMotes` in core/settings; S5 step 4). Heard by core/projectiles (`tailless_particle_cap`) and feel (`Motes.frame_rows`, `TaillessMotes.frame_rows_of`).
 signal tailless_motes_changed(pool: int)
-## Sender: hud. The "Tail motes" dev switch in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: with the tails off, whether the shots lay their tails as motes and in which tail kind (`TailMotes` in core/settings: 0 off, else the nth tail kind; S5 step 4). Heard by core/projectiles (`set_tail_motes`) and feel (`Motes.use_tail_kind`).
-signal tail_motes_changed(pick: int)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).

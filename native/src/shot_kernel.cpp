@@ -89,7 +89,8 @@ constexpr int SPARK_LOOK = 6;
 constexpr int SPARK_CORE = 7;
 constexpr int SPARK_TAG = 10;
 constexpr int SPARK_TAG_BITS = 12;
-constexpr int SPARK_TAIL = 62;
+constexpr int SPARK_TAIL = 60;
+constexpr int TAIL_KINDS = 3;
 constexpr double TAIL_SPACING = 2.0;
 constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
@@ -849,6 +850,7 @@ const Constant CONSTANTS[] = {
 	{ "SPARK_TAG", (double)SPARK_TAG },
 	{ "SPARK_TAG_BITS", (double)SPARK_TAG_BITS },
 	{ "SPARK_TAIL", (double)SPARK_TAIL },
+	{ "TAIL_KINDS", (double)TAIL_KINDS },
 	{ "TAIL_SPACING", (double)TAIL_SPACING },
 	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
@@ -1504,6 +1506,13 @@ inline double tail_hash(int64_t a, int64_t b) {
 	return (double)(h & 0xFFFFFFull) / 16777216.0;
 }
 
+// The manager's `tail_code`: the shot's tail kind, SPARK_TAIL + 0 to TAIL_KINDS - 1, from its
+// sequence alone.
+inline int64_t tail_code(int64_t seq) {
+	const int64_t v = (int64_t)std::floor(tail_hash(seq, -1) * (double)TAIL_KINDS);
+	return SPARK_TAIL + (v < TAIL_KINDS - 1 ? v : TAIL_KINDS - 1);
+}
+
 } // namespace
 
 void ShotKernel::draw_shots(Object *m, double fraction) {
@@ -1582,6 +1591,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		const bool mixed = !((double)cr.r > 0.99 && (double)cr.g > 0.99 && (double)cr.b > 0.99);
 		const Vector2 back = way / (real_t)(-d);
 		const int64_t tg = tag[slot];
+		const double code = (double)tail_code(sq);
 		while (carry < d) {
 			if (tail_count >= tail_cap) {
 				carry = d;
@@ -1598,7 +1608,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			b[SPARK_Y] = p.y;
 			b[SPARK_BACK_X] = back.x;
 			b[SPARK_BACK_Y] = back.y;
-			b[SPARK_KIND] = (float)(double)SPARK_TAIL;
+			b[SPARK_KIND] = (float)code;
 			b[SPARK_RAMP] = (float)(double)ramp[slot];
 			b[SPARK_LOOK] = (float)(double)look[slot];
 			b[SPARK_CORE] = colour.r;

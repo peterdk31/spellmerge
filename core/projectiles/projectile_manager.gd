@@ -526,7 +526,7 @@ const DASH_STREAK_AHEAD: float = 4.0
 const SPARK_STREAK: int = -1
 ## Tails as motes (spell-spectacle-2.md, S5 step 4; the owner, 2026-11-05: "if only the motes could
 ## look more like a tail"): with the tails off, every flying shot lays its tail as births of the
-## look kind SPARK_TAIL (the motes' kinds that are a shot's tail, `MoteKind.tail`), by distance,
+## look kinds SPARK_TAIL on (the motes' kinds that are a shot's tail, `MoteKind.tail`), by distance,
 ## not by moment: one every TAIL_SPACING pixels of the path it was drawn along since the last
 ## frame on average, each gap a random 0.5 to 1.5 of the spacing, from a phase of its own
 ## (`_lay_tail`), so a fast shot's tail is as whole as a slow one's and a held stream of shots
@@ -536,7 +536,14 @@ const SPARK_STREAK: int = -1
 ## thousands of shots keeps a thinner tail on every shot, never a whole tail on some.
 ## TAIL_PLAYER_SHARE of an infused shot's tail is its caster's colours, as the tail shader's
 ## quarter was. Its numbers: a birth's (SPARK_BIRTH_STRIDE), the way back along the shot.
-const SPARK_TAIL: int = 62
+##
+## **Each shot its own tail kind** (the owner, 2026-11-05: "keep all three and make the shots randomly
+## pick one"): a shot's births are SPARK_TAIL + one of TAIL_KINDS codes (60, 61, 62), picked once from
+## its sequence (`tail_code`: the same die every frame, and in the native kernel), and the mote pool
+## lays each code in its own tail kind (`MoteKind.tail`, in id order: A, B, C), so every tail is all
+## of a piece and the shots of a fight vary.
+const SPARK_TAIL: int = 60
+const TAIL_KINDS: int = 3
 const TAIL_SPACING: float = 2.0
 const TAIL_BIRTHS: int = 256
 const TAIL_PLAYER_SHARE: float = 0.25
@@ -1001,8 +1008,9 @@ var tail_mesh: int = TAILS_FULL
 ## and the core's light alone (TAILS_NONE: told the way it flies in its instance); a shot that
 ## ends leaves nothing to cool, and its births are rolled whether it has a row or not. The pool's
 ## share for the births grows to `tailless_particle_cap` (the motes take the tails' budget). The
-## pause menu's "Tails" switch (`shot_tails_changed`, `ShotTails` in core/settings) sets it.
-var tails_enabled: bool = true
+## Off since the owner picked tails as motes (2026-11-05): the switch is gone from the menu, and
+## the tail shader's tail (trail rows, their texture) goes in its own PR; tests still turn it on.
+var tails_enabled: bool = false
 ## The spark pool's count while the tails are off (see `tails_enabled`; PARTICLE_CAP with them on).
 var tailless_particle_cap: int = TAILLESS_PARTICLE_CAP
 ## Trail particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
@@ -1017,9 +1025,6 @@ var spark_birth_count: int = 0
 ## most), and what the last frame laid and asked for (births at TAIL_SPACING; for the spacing,
 ## the tests and the benchmarks).
 var tail_births_on: bool = false
-## The "Tail motes" dev switch (`TailMotes`; `set_tail_motes`): whether tails are laid as motes at
-## all with the tails off.
-var tail_motes: bool = TailMotes.lays(TailMotes.DEFAULT)
 var tail_births_cap: int = TAIL_BIRTHS
 var tail_spacing: float = TAIL_SPACING
 var tail_births: int = 0
@@ -1132,12 +1137,8 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if events != null and not events.projectile_cap_changed.is_connected(_on_projectile_cap_changed):
 		events.projectile_cap_changed.connect(_on_projectile_cap_changed)
-	if events != null and not events.shot_tails_changed.is_connected(set_tails_enabled):
-		events.shot_tails_changed.connect(set_tails_enabled)
 	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):
 		events.tailless_motes_changed.connect(set_tailless_pool)
-	if events != null and not events.tail_motes_changed.is_connected(set_tail_motes):
-		events.tail_motes_changed.connect(set_tail_motes)
 	_nodes.resize(BATCHES)
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
@@ -1425,13 +1426,8 @@ func set_tailless_pool(pool: int) -> void:
 	tail_births_cap = clampi(TAIL_BIRTHS * tailless_particle_cap / TAILLESS_PARTICLE_CAP, 0, SPARK_BIRTHS_MAX / 2)
 
 
-## The "Tail motes" dev switch (`TailMotes` in core/settings, `tail_motes_changed`): with the
-## tails off, a pick other than Off lays every flying shot's tail as motes (SPARK_TAIL).
-func set_tail_motes(pick: int) -> void:
-	tail_motes = TailMotes.lays(pick)
-
-
-## Turn the shots' tails on or off (`tails_enabled`; the "Tails" switch, `shot_tails_changed`).
+## Turn the tail shader's tails on or off (`tails_enabled`; off in the game since tails are motes,
+## 2026-11-05: only tests turn them on, until the tail shader's tail goes).
 ## Off gives back every shot's row and every cooling one at once (their tails are gone; a dash's,
 ## which is never drawn, keeps its row for its births), and the next frame draws the shots with
 ## TAILS_NONE. On gives the shots spawned from then on their rows.
@@ -4511,7 +4507,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	for batch in BATCHES:
 		_rooms[batch] = _fit_batch(_nodes[batch].multimesh, _buffers[batch], _rooms[batch], _batch_counts[batch], _cap * (1 + TRAIL_ROWS_PER_SLOT) if BATCH_LOOSE[batch] else -1)
 	# Tails as motes (SPARK_TAIL): the drawing lays them, first in the frame's births.
-	tail_births_on = spark_motes and not tails_enabled and tail_motes
+	tail_births_on = spark_motes and not tails_enabled
 	if tail_births_on and spark_births.size() < SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE:
 		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
 	if kernel_draw:
@@ -4759,6 +4755,7 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 	var core: Color = _core[slot]
 	var mixed: bool = not (core.r > 0.99 and core.g > 0.99 and core.b > 0.99)
 	var back: Vector2 = way / -d
+	var code: int = tail_code(seq)
 	while carry < d:
 		if spark_birth_count >= tail_births_cap:
 			carry = d
@@ -4766,11 +4763,22 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 		var colour: Color = core
 		if mixed and tail_hash(seq, n * 2) < TAIL_PLAYER_SHARE:
 			colour = Color.WHITE
-		_add_birth(from.lerp(at, carry / d), back, SPARK_TAIL, _ramp[slot], _look[slot], colour, _tag[slot])
+		_add_birth(from.lerp(at, carry / d), back, code, _ramp[slot], _look[slot], colour, _tag[slot])
 		carry += tail_spacing * (0.5 + tail_hash(seq, n * 2 + 1))
 		n += 1
 	_tail_carry[slot] = carry - d
 	_tail_n[slot] = n
+
+
+## The tail code of the shot of sequence `seq` (SPARK_TAIL + 0 to TAIL_KINDS - 1): its tail kind,
+## the same every frame (`tail_hash` of its sequence alone; the kernel's `tail_code`).
+static func tail_code(seq: int) -> int:
+	return SPARK_TAIL + mini(floori(tail_hash(seq, -1) * TAIL_KINDS), TAIL_KINDS - 1)
+
+
+## Whether `kind` (a birth's SPARK_KIND) is a tail's: SPARK_TAIL to SPARK_TAIL + TAIL_KINDS - 1.
+static func is_tail_code(kind: int) -> bool:
+	return kind >= SPARK_TAIL and kind < SPARK_TAIL + TAIL_KINDS
 
 
 ## A number from 0 up to 1 for the pair (`a`, `b`), the same every time (and in the native

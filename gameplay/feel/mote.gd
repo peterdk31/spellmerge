@@ -145,10 +145,12 @@ var _layer_kinds: Array[PackedInt32Array] = []
 var _surface_kinds: PackedInt32Array = PackedInt32Array()
 ## The kinds a dash gives off along its path (`MoteKind.dash_path`; its births of SPARK_STREAK).
 var _dash_kinds: PackedInt32Array = PackedInt32Array()
-## The tail kinds (`MoteKind.tail`), and the one a shot's tail is laid in (its births of
-## SPARK_TAIL; `use_tail_kind`): one kind, so a tail is all of a piece.
+## The tail kinds (`MoteKind.tail`, in id order), and for each of a shot's tail codes (its births
+## of SPARK_TAIL + 0 to TAIL_KINDS - 1, the projectile manager's `tail_code`) the one kind it is
+## laid in: the code's place among them, round again when there are fewer. One kind a shot, so a
+## tail is all of a piece and the shots of a fight vary (the owner, 2026-11-05).
 var _tail_kinds: PackedInt32Array = PackedInt32Array()
-var _tail_kind: PackedInt32Array = PackedInt32Array()
+var _tail_codes: Array[PackedInt32Array] = []
 ## The kinds that name each card by id (`MoteKind.cards`).
 var _card_kinds: Dictionary[StringName, PackedInt32Array] = {}
 ## The trails' births' kinds by their shot's spell (`card_kinds.gd`, the spectacle's: anything
@@ -435,8 +437,8 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		var found: PackedInt32Array
 		if layer == ProjectilesScript.SPARK_STREAK:
 			found = _dash_kinds
-		elif layer == ProjectilesScript.SPARK_TAIL:
-			found = _tail_kind
+		elif ProjectilesScript.is_tail_code(layer):
+			found = tail_kind_of(layer)
 		elif _cards != null:
 			found = _cards.layer_motes(ProjectilesScript.spark_tag(given, b), layer)
 		else:
@@ -467,8 +469,8 @@ func _give_off_native(given: PackedFloat32Array, count: int) -> void:
 		var found: PackedInt32Array
 		if layer == ProjectilesScript.SPARK_STREAK:
 			found = _dash_kinds
-		elif layer == ProjectilesScript.SPARK_TAIL:
-			found = _tail_kind
+		elif ProjectilesScript.is_tail_code(layer):
+			found = tail_kind_of(layer)
 		elif _cards != null:
 			found = _cards.layer_motes(key / PAIR_LAYERS, layer)
 		else:
@@ -507,29 +509,27 @@ func dash_kinds() -> PackedInt32Array:
 	return _dash_kinds
 
 
-## The tail kinds (`MoteKind.tail`), and the one the shots' tails are laid in (empty for none).
-## Kept: read them, never change them.
+## The tail kinds (`MoteKind.tail`, in id order). Kept: read them, never change them.
 func tail_kinds() -> PackedInt32Array:
 	return _tail_kinds
 
 
-func tail_kind() -> PackedInt32Array:
-	return _tail_kind
+## The kind a shot's tail of code `code` (SPARK_TAIL + 0 to TAIL_KINDS - 1) is laid in, as a list
+## of one (empty with no tail kinds or for a code that is no tail's). Kept: never change it.
+func tail_kind_of(code: int) -> PackedInt32Array:
+	var at: int = code - ProjectilesScript.SPARK_TAIL
+	if at < 0 or at >= _tail_codes.size():
+		return PackedInt32Array()
+	return _tail_codes[at]
 
 
-## Lay the shots' tails in the tail kind `id` (one of `tail_kinds`; the "Tail motes" dev switch,
-## `TailMotes` in core/settings); an id that is not one picks the first. Returns the id taken
-## (empty with no tail kinds).
-func use_tail_kind(id: StringName) -> StringName:
-	_tail_kind = PackedInt32Array()
-	if _tail_kinds.is_empty():
-		return &""
-	var k: int = _tail_kinds[0]
-	for t in _tail_kinds:
-		if _kinds[t].id == id:
-			k = t
-	_tail_kind.append(k)
-	return _kinds[k].id
+func _fit_tail_codes() -> void:
+	_tail_codes.clear()
+	for v in ProjectilesScript.TAIL_KINDS:
+		var one := PackedInt32Array()
+		if not _tail_kinds.is_empty():
+			one.append(_tail_kinds[v % _tail_kinds.size()])
+		_tail_codes.append(one)
 
 
 ## The kinds of look layer `layer` (a look kind, LOOK_*), else those of layer 0.
@@ -884,7 +884,7 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 			_card_kinds[card].append(k)
 	_material.set_shader_parameter(&"kind_table", ImageTexture.create_from_image(_kind_image))
 	_material.set_shader_parameter(&"shape_atlas", ImageTexture.create_from_image(_shape_image))
-	use_tail_kind(&"")
+	_fit_tail_codes()
 
 
 ## Kind `k`'s numbers as the shader reads them (`kind_table`): its motion, its sway and its shape

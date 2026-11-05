@@ -289,6 +289,9 @@ const HIT_WORK: int = 400
 const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
+## The most a drag shot leaves faster than its own speed (`set_drag`; two Drag cards would make 4,
+## and its ease the steeper for it).
+const DRAG_MOST: float = 4.0
 ## The threat grid (see `threat`): built from this many live shots (below, one pass is cheaper),
 ## its cells at least THREAT_CELL pixels and at most THREAT_GRID_MAX a side, and a shot whose path
 ## covers more than THREAT_SPAN_MAX cells is tried by every query instead of filed.
@@ -689,6 +692,8 @@ var _deflect: PackedByteArray = PackedByteArray()
 var _span: PackedFloat32Array = PackedFloat32Array()
 var _radius0: PackedFloat32Array = PackedFloat32Array()
 var _growth: PackedFloat32Array = PackedFloat32Array()
+## Drag (`set_drag`): the power its speed eases out by, as a share of its life left (0 for none).
+var _drag: PackedFloat32Array = PackedFloat32Array()
 var _wave: PackedFloat32Array = PackedFloat32Array()
 var _wave_age: PackedFloat32Array = PackedFloat32Array()
 var _base: PackedVector2Array = PackedVector2Array()
@@ -1258,6 +1263,7 @@ func set_cap(value: int) -> void:
 	_span.resize(_cap)
 	_radius0.resize(_cap)
 	_growth.resize(_cap)
+	_drag.resize(_cap)
 	_wave.resize(_cap)
 	_wave_age.resize(_cap)
 	_base.resize(_cap)
@@ -2267,6 +2273,21 @@ func set_growth(slot: int, factor: float) -> bool:
 	return true
 
 
+## The shot leaves `factor` times faster and slows down over its life, to a stop as its life runs
+## out (where it ends with an expiry): its speed is `factor` times its own times (life left / its
+## life) to the power `factor - 1`, so it goes as far as it would have without it. `factor` above
+## DRAG_MOST counts as DRAG_MOST. Only a shot that flies; false otherwise, or for a factor of 1
+## or less.
+func set_drag(slot: int, factor: float) -> bool:
+	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
+		return false
+	var most: float = minf(factor, DRAG_MOST)
+	_drag[slot] = most - 1.0
+	_vel[slot] = _vel[slot] * most
+	_join(slot, B_DRAG)
+	return true
+
+
 ## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot).
 func get_growth_of(slot: int) -> float:
 	# The shot whose hit is being sent counts even when that hit spent it (it is gone already).
@@ -2814,6 +2835,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_span[slot] = lifetime
 	_radius0[slot] = maxf(radius, 0.0)
 	_growth[slot] = 1.0
+	_drag[slot] = 0.0
 	_wave[slot] = 0.0
 	_wave_age[slot] = 0.0
 	_linger[slot] = 0.0
@@ -2882,7 +2904,7 @@ func step(delta: float) -> void:
 	at = _profiled(PROF_COMMON, at)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
-			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit,
+			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit, drag,
 			# return, homing, spiral); it says false for the others.
 			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
 				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
@@ -3139,6 +3161,9 @@ func _hit_found(slot: int) -> void:
 # - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
 # - return before homing: a shot on its way back heads for its caster, bent toward the target its
 #   homing found (`_pass_return`); the homing pass only searches for it.
+# - drag after return and before homing and spiral: it eases only a shot flying out (one on its
+#   way home keeps the speed it turned with), and homing and spiral then turn and weave the
+#   eased velocity.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
 # - shield after the hits: it checks every shot's whole path of this step.
@@ -3150,12 +3175,13 @@ const B_GROWTH: int = 1
 const B_LINGER: int = 2
 const B_ORBIT: int = 3
 const B_RETURN: int = 4
-const B_HOMING: int = 5
-const B_SPIRAL: int = 6
-const B_MOVE: int = 7
-const B_SHIELD: int = 8
+const B_DRAG: int = 5
+const B_HOMING: int = 6
+const B_SPIRAL: int = 7
+const B_MOVE: int = 8
+const B_SHIELD: int = 9
 ## How many behaviours there are; the passes of B_* below AFTER_HITS run before the hit pass.
-const BEHAVIOURS: int = 9
+const BEHAVIOURS: int = 10
 const AFTER_HITS: int = B_SHIELD
 ## The behaviours after homing that run before the hits: a waiting homing shot with none of them is
 ## caught up by the native hit pass itself (`_kernel_hands_back`).
@@ -3163,7 +3189,7 @@ const AFTER_HOMING_MASK: int = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1))
 ## The pass of each behaviour, by B_* (`_init` makes `_passes` from it).
 const BEHAVIOUR_PASSES: Array[StringName] = [
 	&"_pass_stuck", &"_pass_growth", &"_pass_linger", &"_pass_orbit", &"_pass_return",
-	&"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
+	&"_pass_drag", &"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
 ]
 
 ## What a shot is doing in this step (`_state`), set by the common pass and the behaviour passes and
@@ -3365,6 +3391,21 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
+
+
+## Drag (`set_drag`): a shot flying out slows by the share of its life this step took, to the
+## power of its drag, and flies on along its slower velocity; at the end of its life it stands
+## still. Read from its life now, so a linger or a deflect (which give it life again) is eased on
+## from where it is.
+func _pass_drag(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
+	for n in range(first, first + count):
+		var slot: int = list[n]
+		if _state[slot] != S_MOVING:
+			continue
+		var left: float = _life[slot]
+		var slower: float = pow(left / (left + delta), _drag[slot])
+		_vel[slot] = _vel[slot] * slower
+		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
 
 ## Homing (`set_homing`): the shot turns toward the point it last found, at most its turn rate, and

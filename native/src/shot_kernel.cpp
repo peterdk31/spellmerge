@@ -65,10 +65,11 @@ constexpr int B_GROWTH = 1;
 constexpr int B_LINGER = 2;
 constexpr int B_ORBIT = 3;
 constexpr int B_RETURN = 4;
-constexpr int B_HOMING = 5;
-constexpr int B_SPIRAL = 6;
-constexpr int B_MOVE = 7;
-constexpr int AFTER_HITS = 8;
+constexpr int B_DRAG = 5;
+constexpr int B_HOMING = 6;
+constexpr int B_SPIRAL = 7;
+constexpr int B_MOVE = 8;
+constexpr int AFTER_HITS = 9;
 constexpr int HOMING_PERIOD = 4;
 constexpr double HOMING_DRIFT = 24.0; // SpellLimits.HOMING_DRIFT
 // The behaviours a waiting homing shot may also have for the native hit pass to catch it up itself:
@@ -232,6 +233,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(threat_seen, "_threat_seen", PACKED_INT32_ARRAY) \
 	X(threat_stamp, "_threat_stamp", INT) \
 	X(growth, "_growth", PACKED_FLOAT32_ARRAY) \
+	X(drag, "_drag", PACKED_FLOAT32_ARRAY) \
 	X(radius0, "_radius0", PACKED_FLOAT32_ARRAY) \
 	X(hold, "_hold", PACKED_FLOAT32_ARRAY) \
 	X(linger, "_linger", PACKED_FLOAT32_ARRAY) \
@@ -836,6 +838,7 @@ const Constant CONSTANTS[] = {
 	{ "B_LINGER", (double)B_LINGER },
 	{ "B_ORBIT", (double)B_ORBIT },
 	{ "B_RETURN", (double)B_RETURN },
+	{ "B_DRAG", (double)B_DRAG },
 	{ "B_HOMING", (double)B_HOMING },
 	{ "B_SPIRAL", (double)B_SPIRAL },
 	{ "B_MOVE", (double)B_MOVE },
@@ -1145,7 +1148,7 @@ void ShotKernel::homing_pass(Object *m, int64_t first, int64_t count, double del
 }
 
 // The behaviour passes that need nothing of GDScript (`_pass_growth`, `_pass_linger`, `_pass_orbit`,
-// `_pass_return`, `_pass_homing`, `_pass_spiral`), over the shots `_members[first ..
+// `_pass_return`, `_pass_drag`, `_pass_homing`, `_pass_spiral`), over the shots `_members[first ..
 // first + count - 1]`, not catching up: a shot whose caster is another shot waits for its turn
 // (`_wait`), as in GDScript, and GDScript catches it up. Returns false for another kind.
 bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count, double delta) {
@@ -1153,7 +1156,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		homing_pass(m, first, count, delta);
 		return true;
 	}
-	if (kind != B_GROWTH && kind != B_LINGER && kind != B_ORBIT && kind != B_RETURN && kind != B_SPIRAL) {
+	if (kind != B_GROWTH && kind != B_LINGER && kind != B_ORBIT && kind != B_RETURN && kind != B_DRAG && kind != B_SPIRAL) {
 		return false;
 	}
 	const Names &k = *names;
@@ -1252,6 +1255,20 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			pos[slot] = centre + vmul(away, reach);
 			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * (double)orbit_speed[slot]);
 			orbit_centre[slot] = centre;
+		}
+	} else if (kind == B_DRAG) {
+		Arr<PackedFloat32Array> life, drag;
+		life.load(m, k.life);
+		drag.load(m, k.drag);
+		for (int64_t n = first; n < first + count; n++) {
+			const int64_t slot = members[n];
+			if (state[slot] != S_MOVING) {
+				continue;
+			}
+			const double left = (double)life[slot];
+			const double slower = std::pow(left / (left + delta), (double)drag[slot]);
+			vel[slot] = vmul(vel[slot], slower);
+			pos[slot] = prev[slot] + vmul(vel[slot], delta);
 		}
 	} else if (kind == B_SPIRAL) {
 		Arr<PackedVector2Array> base;

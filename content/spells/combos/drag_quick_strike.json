@@ -1,0 +1,9 @@
+{
+	"id": "drag_quick_strike",
+	"name": "Drag quick strike",
+	"does": "A bolt that bursts out fast and reaches an imp before a plain bolt would get there.",
+	"casts": [{"staff": 0, "cards": ["drag", "fire", "bolt"]}],
+	"imps": [[150, 0]],
+	"seconds": 0.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

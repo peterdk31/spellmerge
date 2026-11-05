@@ -270,6 +270,7 @@ const CONTROLS: Dictionary = {
 	"deflect_wall_mirror": "deflect",
 	"reach_far_bolt": "reach",
 	"reach_long_beam": "reach",
+	"drag_quick_strike": "drag",
 }
 
 

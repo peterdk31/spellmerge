@@ -13,7 +13,7 @@ extends RefCounted
 ## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
 
 ## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
-const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
+const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.DRAG]
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -29,7 +29,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ZAP,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
-	ModifierBase.Behaviour.PULL,
+	ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.DRAG,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.

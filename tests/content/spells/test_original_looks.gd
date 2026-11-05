@@ -21,6 +21,7 @@ const LATER: Array[ModifierBase] = [
 	preload("res://content/spells/modifiers/blast/blast.tres"),
 	preload("res://content/spells/modifiers/bounce/bounce.tres"),
 	preload("res://content/spells/modifiers/deflect/deflect.tres"),
+	preload("res://content/spells/modifiers/drag/drag.tres"),
 	preload("res://content/spells/modifiers/echo/echo.tres"),
 	preload("res://content/spells/modifiers/ghost/ghost.tres"),
 	preload("res://content/spells/modifiers/growth/growth.tres"),
@@ -65,7 +66,7 @@ const ALLOWED_SHARES: Dictionary = {
 	18: ["bounce", "zap", "deflect"],
 	19: ["echo", "mirror", "ghost"],
 	20: ["magnet", "siphon", "possess"],
-	21: ["slow", "hold", "short_delay"],
+	21: ["slow", "hold", "short_delay", "drag"],
 }
 
 

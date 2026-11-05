@@ -75,6 +75,11 @@ enum Behaviour {
 	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
 	## cast it. Several hits make several pulls, and they add. Strength unused (1).
 	PULL,
+	## Leaves `behaviour_strength` times faster and slows down over its life, easing out to a stop
+	## where it ends (more cards multiply, up to `ProjectileManager.DRAG_MOST`): its speed is that
+	## times its own times (life left / its life) to the power `behaviour_strength - 1`, so it goes
+	## as far as without it (`set_drag`). Only on a carrier that flies (`ModifierBase.NEEDS`).
+	DRAG,
 }
 
 ## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
@@ -99,6 +104,7 @@ const NEEDS: Dictionary = {
 	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 	Behaviour.RETURN: {"any": CarrierTraits.FLIES},
+	Behaviour.DRAG: {"any": CarrierTraits.FLIES},
 	Behaviour.LINGER: {"any": CarrierTraits.MOVES},
 	Behaviour.STICKY: {"any": CarrierTraits.MOVES},
 	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},

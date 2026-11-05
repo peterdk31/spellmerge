@@ -6,7 +6,7 @@ Spellmerge's own C++, loaded by Godot as a GDExtension: faster versions of hot l
 
 | Class | What it runs | GDScript it stands for |
 |---|---|---|
-| `ShotKernel` (`src/shot_kernel.cpp`) | the step's common pass, the hit pass's shots that need no event, the behaviour passes growth, linger, orbit, return, homing (with its search) and spiral, trail sampling, the draw batches' writing, the threat grid | `core/projectiles/projectile_manager.gd` |
+| `ShotKernel` (`src/shot_kernel.cpp`) | the step's common pass, the hit pass's shots that need no event, the behaviour passes growth, linger, orbit, return, drag, homing (with its search) and spiral, trail sampling, the draw batches' writing, the threat grid | `core/projectiles/projectile_manager.gd` |
 | `SwarmKernel` (`src/swarm_kernel.cpp`) | the horde swarm's spacing and its move onto the floor | `gameplay/horde/swarm.gd` |
 | `SwarmLookKernel` (same file) | the swarm look's step over the rows and its batch writing | `gameplay/horde/swarm_look.gd` |
 | `MoteKernel` (`src/mote_kernel.cpp`) | the motes' trail births: each birth's kind picked and its row written, the settling motes' marks worked out (handed back for the mark layer, a script) | `gameplay/feel/mote.gd` (`give_off` and the one-mote `burst` it calls) |

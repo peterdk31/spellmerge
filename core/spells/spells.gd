@@ -1143,6 +1143,7 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
 	var linger: float = spell.behaviour(ModifierBase.Behaviour.LINGER)
 	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
+	var drag: float = spell.behaviour(ModifierBase.Behaviour.DRAG)
 	var sticky: float = spell.behaviour(ModifierBase.Behaviour.STICKY)
 	# A shot with `shield` blocks that many enemy shots; with deflect it turns them back.
 	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
@@ -1167,6 +1168,8 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 			projectiles.set_linger(slot, linger)
 		if growth > 1.0:
 			projectiles.set_growth(slot, growth)
+		if drag > 1.0:
+			projectiles.set_drag(slot, drag)
 		if sticky > 0.0:
 			projectiles.set_sticky(slot, sticky)
 		if shield > 0.0:

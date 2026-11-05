@@ -267,6 +267,10 @@ func _drive(side: int, step: int) -> void:
 				m.set_return(slot)
 				if rng.randf() < 0.5:
 					m.set_homing(slot, 2.5, 140.0)
+		# Drag on any of them (only a flying shot takes it): it eases the speed of the kinds above
+		# before homing turns and spiral weaves it, and a returning one turns with its eased speed.
+		if rng.randf() < 0.2:
+			m.set_drag(slot, rng.randf_range(1.5, 5.0))
 		# Rarer kinds, from the same draws on both sides.
 		var extra: float = rng.randf()
 		if extra < 0.05 and kind == 3:

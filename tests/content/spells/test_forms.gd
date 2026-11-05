@@ -96,7 +96,6 @@ func test_every_form_loads_and_matches_its_folder() -> void:
 		check_equal(form.id, id, "%s: the id is the folder name" % id)
 		check(form.display_name != "", "%s has a name" % id)
 		check(form.icon != null, "%s has an icon" % id)
-		check(form.demo, "%s is in the web demo" % id)
 		check_equal(form.complexity, COMPLEXITY[id], "%s: complexity from the design table" % id)
 		check_equal(form.range_problems().size(), 0, "%s: %s" % [id, ", ".join(form.range_problems())])
 

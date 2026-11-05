@@ -69,9 +69,9 @@ def _lore(root: Path) -> dict[str, str]:
 
 
 def components(root: Path) -> list[dict]:
-    """Every component file with an id, like the registry's scan. Demo or not: the recorder runs
-    with demo_only off, so it records them all. The name must agree with `Spells.component_name`
-    (display_name, else the id as it is), because the recorder titles its clips with it."""
+    """Every component file with an id, like the registry's scan. The name must agree with
+    `Spells.component_name` (display_name, else the id as it is), because the recorder titles
+    its clips with it."""
     lore = _lore(root)
     rows: list[dict] = []
     for kind, folder in KIND_FOLDERS.items():

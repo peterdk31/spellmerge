@@ -3,6 +3,7 @@ extends "res://tests/support/suite.gd"
 ## room, enemy, start card, staff or wizard scene needs no edit in `flow.gd`. Uses the real autoloads.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
+const HordeScript := preload("res://gameplay/horde/horde.gd")
 
 var flow: FlowScript
 var input: Node
@@ -22,6 +23,8 @@ func after_each() -> void:
 	flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
 	flow.enemy_id_to_play = FlowScript.DEFAULT_ENEMY_ID
 	flow.start_cards = FlowScript.DEFAULT_START_CARDS.duplicate(true)
+	flow.play_bag = FlowScript.PLAY_BAG.duplicate()
+	flow.mode = FlowScript.MODE_WAVES
 	flow.wizard_scene = FlowScript.DefaultWizardScene
 	input.leave(0)
 
@@ -29,7 +32,8 @@ func after_each() -> void:
 func test_the_defaults_are_the_m1_content() -> void:
 	check_equal(flow.room_id_to_play, &"arena_01", "default room")
 	check_equal(flow.enemy_id_to_play, &"ember_imp", "default enemy")
-	check_equal(flow.start_cards, [[&"dash"], [&"fire", &"bolt"], [], []], "default start cards: dash on A, fire bolt on X")
+	check_equal(flow.start_cards, [[&"dash"], [&"bolt"], [], []], "default start cards: dash on A, bolt on X")
+	check_equal(flow.play_bag, [&"dash", &"bolt"] as Array[StringName], "Play's bag: dash and bolt")
 
 
 func test_an_unknown_room_starts_no_run() -> void:
@@ -64,6 +68,39 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 	for id in FlowScript.STARTER_HEADS:
 		heads[(registry.call("get_resource", &"wizard", id) as StaffBase).head] = true
 	check_equal(heads.size(), 4, "the four basic staffs have four different heads")
+
+
+## Each mode's setup (owner, 2026-11-05): a new wizard's bag is the mode's. Play: dash and bolt;
+## the horde: dash and swing (the horde director's START_BAG too); the sandbox: every card.
+func test_each_mode_gives_its_own_bag() -> void:
+	var registry: Node = root.get_node("Registry")
+	var every: Array[StringName] = []
+	for id: StringName in registry.call("get_ids", &"spells"):
+		if registry.call("get_resource", &"spells", id) is SpellComponent:
+			every.append(id)
+	var wanted: Dictionary = {
+		FlowScript.MODE_WAVES: [&"dash", &"bolt"] as Array[StringName],
+		FlowScript.MODE_HORDE: [&"dash", &"swing"] as Array[StringName],
+		FlowScript.MODE_SANDBOX: every,
+	}
+	for mode: StringName in wanted:
+		flow.mode = mode
+		check_equal(flow.bag_for_mode(), wanted[mode], "%s: bag_for_mode" % mode)
+		check(flow.start_run(0), "%s: a run starts" % mode)
+		var wizard := flow.get_wizard(0) as Actor
+		check(wizard != null, "%s: a wizard" % mode)
+		if wizard != null:
+			check_equal(PlayerController.of(wizard).bag, wanted[mode], "%s: the wizard's bag" % mode)
+		flow.stop_run()
+	check_equal(FlowScript.HORDE_BAG, HordeScript.START_BAG, "the horde director starts the same bag")
+
+
+## A mode's start cards are all in its bag, so taking one out can be undone.
+func test_play_and_horde_start_cards_are_in_their_bags() -> void:
+	for pair: Array in [[FlowScript.DEFAULT_START_CARDS, FlowScript.PLAY_BAG], [FlowScript.HORDE_START_CARDS, FlowScript.HORDE_BAG]]:
+		for staff: Array in pair[0]:
+			for id: Variant in staff:
+				check((pair[1] as Array).has(StringName(str(id))), "%s is in the bag %s" % [id, pair[1]])
 
 
 func test_other_start_cards_reach_the_wizards() -> void:

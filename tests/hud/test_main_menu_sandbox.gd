@@ -1,6 +1,7 @@
 extends "res://tests/support/suite.gd"
-## The main menu's Sandbox button (staffs B7): shown and focused in `dev` and `preview` builds,
-## hidden in the others, and it only sends `sandbox_requested(0)` (flow starts the sandbox).
+## The main menu's Sandbox button (staffs B7): shown in every build (owner, 2026-11-05), focused
+## in `dev` and `preview` builds (Play in the others), and it only sends `sandbox_requested(0)`
+## (flow starts the sandbox).
 
 const MenuScene: PackedScene = preload("res://hud/menus/main_menu/main_menu.tscn")
 const EventsScript := preload("res://core/events/events.gd")
@@ -34,11 +35,17 @@ func test_dev_and_preview_show_it_with_the_focus() -> void:
 		check((menu.get_node("%Play") as Button).visible, "%s: Play is still there" % channel)
 
 
-func test_nightly_and_stable_hide_it() -> void:
-	for channel: String in ["nightly", "stable"]:
+func test_the_other_builds_show_it_with_the_focus_on_play() -> void:
+	for channel: String in ["nightly", "stable", "manual"]:
 		var menu := _menu(channel)
-		check(not (menu.get_node("%Sandbox") as Button).visible, "%s: no Sandbox button" % channel)
+		check((menu.get_node("%Sandbox") as Button).visible, "%s: the Sandbox button shows" % channel)
 		check((menu.get_node("%Play") as Button).has_focus(), "%s: Play has the focus" % channel)
+
+
+func test_a_release_build_sends_it_too() -> void:
+	var menu := _menu("stable")
+	(menu.get_node("%Sandbox") as Button).pressed.emit()
+	check_equal(requests, [0] as Array[int], "stable: sandbox_requested(0)")
 
 
 func test_it_sends_only_sandbox_requested() -> void:

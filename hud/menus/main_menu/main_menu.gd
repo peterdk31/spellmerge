@@ -2,8 +2,9 @@ extends Control
 ## The main menu: the name, the tagline, the build version and the Play and Horde buttons.
 ## Play only sends the intent event `play_requested`; the flow area hears it and
 ## starts the arena. The menu never calls flow and never changes the scene itself.
-## In `dev` and `preview` builds a Sandbox button stands above Play and has the focus, so
-## those builds start in the sandbox with one press (staffs B7); it sends `sandbox_requested`.
+## In every build a Sandbox button stands above Play (owner, 2026-11-05); it sends
+## `sandbox_requested`. In `dev` and `preview` builds it has the focus, so those builds start in
+## the sandbox with one press (staffs B7); in the others Play has it.
 ## Below Play, in every build, the Horde button sends `horde_requested` (docs/milestones/horde.md):
 ## the horde run, a walled arena against a growing horde.
 ## Below Play, "Fullscreen: Off" (or On) asks `Display` (core) to fill the screen: on the web a
@@ -15,8 +16,8 @@ const EventsScript := preload("res://core/events/events.gd")
 ## The player index sent with `play_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
 const MENU_PLAYER: int = 0
-## The build channels that show the Sandbox button (`BuildInfo.channel()`).
-const SANDBOX_CHANNELS: Array[String] = ["dev", "preview"]
+## The build channels where the Sandbox button has the focus (`BuildInfo.channel()`); it shows in all.
+const SANDBOX_FOCUS_CHANNELS: Array[String] = ["dev", "preview"]
 
 ## The user argument (`-- --four-bot`) that starts the 4-bot test, and its script.
 const FOUR_BOT_ARGUMENT: String = "--four-bot"
@@ -68,8 +69,8 @@ func _ready() -> void:
 	if display != null:
 		display.connect(&"fullscreen_changed", func(_on: bool) -> void: _show_fullscreen())
 		_show_fullscreen()
-	_sandbox.visible = SANDBOX_CHANNELS.has(channel)
-	if _sandbox.visible:
+	_sandbox.visible = true
+	if SANDBOX_FOCUS_CHANNELS.has(channel):
 		_sandbox.grab_focus()
 	else:
 		_play.grab_focus()

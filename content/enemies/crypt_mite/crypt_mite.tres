@@ -8,7 +8,6 @@
 script = ExtResource("1_base")
 id = &"crypt_mite"
 display_name = "Crypt Mite"
-demo = true
 max_health = 8
 move_speed = 70.0
 contact_damage = 3

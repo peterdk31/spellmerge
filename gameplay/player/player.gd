@@ -35,10 +35,11 @@ extends ActorController
 ## - **The builder** (`staff_change_requested`, `card_move_requested`, `staff_cards_requested`,
 ##   each for this seat only) builds the home body's staffs with `Caster.set_staff`, also during a
 ##   possession. A change is refused only when the slot does not exist or the card is not in the
-##   `bag` (every card in the registry until M3's rewards fill it); `card_move_requested`'s staff
+##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given); `card_move_requested`'s staff
 ##   BAG (-1) is the bag.
-## - **A set bag** (horde, docs/milestones/horde.md): `bag_set_requested` for this seat (or
-##   `set_bag`) makes the bag exactly that list and sends `bag_changed`. A set bag is never
+## - **A set bag** (each run mode's, from flow through `seat_wizard`; the horde's picks,
+##   docs/milestones/horde.md): `bag_set_requested` for this seat (or `set_bag`) makes the bag
+##   exactly that list and sends `bag_changed`. A set bag is never
 ##   overwritten by the first fill, also when it was set before the wizard first drove.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
 ##   (`set_aside`, `is_set_aside`) and drives nothing until `started` hands it an actor again; the
@@ -128,14 +129,17 @@ func _ready() -> void:
 
 
 ## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index`: its controller's
-## seat, its ramp (the seat's colour) and its four staffs (`staff` for every button, or `staffs`,
+## seat, its ramp (the seat's colour), its four staffs (`staff` for every button, or `staffs`,
 ## one per button: the four heads; and `cards`: four lists of card ids, built when it enters the
-## tree). Returns its controller, or null when `body` has none.
-static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = []) -> PlayerController:
+## tree) and its `bag` (the run mode's, `set_bag`; empty: every card of the registry). Returns its
+## controller, or null when `body` has none.
+static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = [], bag: Array[StringName] = []) -> PlayerController:
 	var controller: PlayerController = of(body)
 	if controller == null:
 		return null
 	controller.seat = seat_index
+	if not bag.is_empty():
+		controller.set_bag(bag)
 	body.ramp = seat_index
 	for child in body.get_children():
 		if child is Caster:

@@ -17,7 +17,7 @@ The **cards** players put in their staffs, in any order, and that a staff reads 
 
 ### Fields every component has
 
-`id` (equals the folder name, unique across all four kinds), `display_name`, `demo` (true if it is in the free web demo; leave it false for new content), `icon` (16×16, listed in `art/manifest.json`) and `complexity`.
+`id` (equals the folder name, unique across all four kinds), `display_name`, `icon` (16×16, listed in `art/manifest.json`) and `complexity`.
 
 ### Name words
 

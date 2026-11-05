@@ -17,11 +17,7 @@ extends Node
 ## is skipped. The first file found wins a duplicate id (files are read in
 ## sorted path order) and a warning names both.
 ##
-## The `demo` flag: when `demo_only` is true (a web build, the feature tag `demo`, on a
-## release channel), resources whose `demo` is false are hidden from every question.
-## Resources with no `demo` property are always visible. Development and preview builds
-## (`EVERY_CARD_CHANNELS`) show everything even on the web (the owner, 2026-10-27: the new cards
-## were missing from the web preview), so only the public web demo is limited.
+## Every build sees all of it: there is no demo subset (owner, 2026-11-05).
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`) and
 ## pushes one warning per problem, so broken spell content shows up on the first run.
@@ -31,14 +27,6 @@ extends Node
 
 const DEFAULT_CONTENT_ROOT: String = "res://content"
 const DEFAULT_AUDIO_ROOT: String = "res://audio"
-const FEATURE_DEMO: String = "demo"
-## The build channels (`BuildInfo.channel()`) that show every resource even with the `demo`
-## feature: the ones that also start in the sandbox with the dev staff.
-const EVERY_CARD_CHANNELS: Array[String] = ["dev", "preview"]
-
-## Only demo content is visible when true. Starts true in a build with the
-## `demo` feature tag. Changing it takes effect at once, no rescan needed.
-var demo_only: bool = false
 
 ## The content root of the last scan, and the duplicate spell ids it found (one line each,
 ## naming both files), for the validator.
@@ -46,7 +34,7 @@ var _content_root: String = DEFAULT_CONTENT_ROOT
 var _duplicates: PackedStringArray = PackedStringArray()
 ## folder -> { id -> Resource }
 var _resources: Dictionary = {}
-## folder -> sorted Array[StringName] of every id (demo or not)
+## folder -> sorted Array[StringName] of every id
 var _ids: Dictionary = {}
 ## sound id -> path
 var _sound_paths: Dictionary = {}
@@ -59,7 +47,6 @@ var _lore: Dictionary = {}
 
 
 func _ready() -> void:
-	demo_only = demo_only_for(OS.has_feature(FEATURE_DEMO), BuildInfo.channel())
 	scan()
 	if OS.is_debug_build():
 		warn_spell_problems()
@@ -123,7 +110,7 @@ func warn_story_problems() -> int:
 	return problems.size()
 
 
-## Runs the spell validator on everything found under `spells` (demo or not), on the
+## Runs the spell validator on everything found under `spells`, on the
 ## reaction table `<content root>/spells/reactions.tres`, which is skipped when there is
 ## none, and on every staff found under `wizard` (`SpellValidator.check_staff`). Returns the problems as `SpellValidator` describes them; empty when all is well.
 func validate_spells() -> Array[Dictionary]:
@@ -169,7 +156,7 @@ func get_lore(about: StringName, id: StringName) -> String:
 
 
 ## Runs the story validator on the component lore files and checks that every spell component
-## has one (demo or not). Problems come back as `StoryValidator` describes them.
+## has one. Problems come back as `StoryValidator` describes them.
 func validate_story() -> Array[Dictionary]:
 	var entries: Dictionary = {}
 	for path: String in _lore_files:
@@ -182,28 +169,20 @@ func validate_story() -> Array[Dictionary]:
 	return StoryValidator.check_component_lore(entries, ids)
 
 
-## The resource with this id in this folder, or `null` when there is none (or
-## it is hidden by `demo_only`).
+## The resource with this id in this folder, or `null` when there is none.
 func get_resource(folder: StringName, id: StringName) -> Resource:
 	var found: Dictionary = _resources.get(folder, {})
-	var res: Resource = found.get(id)
-	if res == null or not _visible(res):
-		return null
-	return res
+	return found.get(id) as Resource
 
 
-## Every visible id in the folder, sorted. Empty for an unknown folder.
+## Every id in the folder, sorted. Empty for an unknown folder.
 func get_ids(folder: StringName) -> Array[StringName]:
 	var result: Array[StringName] = []
-	var all_ids: Array[StringName] = []
-	all_ids.assign(_ids.get(folder, []))
-	for id: StringName in all_ids:
-		if _visible((_resources[folder] as Dictionary)[id] as Resource):
-			result.append(id)
+	result.assign(_ids.get(folder, []))
 	return result
 
 
-## Every visible resource in the folder, in id order.
+## Every resource in the folder, in id order.
 func get_all(folder: StringName) -> Array[Resource]:
 	var result: Array[Resource] = []
 	for id: StringName in get_ids(folder):
@@ -211,7 +190,7 @@ func get_all(folder: StringName) -> Array[Resource]:
 	return result
 
 
-## Folders that hold at least one resource (visible or not), sorted.
+## Folders that hold at least one resource, sorted.
 func get_folders() -> Array[StringName]:
 	var result: Array[StringName] = []
 	for folder: StringName in _resources:
@@ -237,17 +216,6 @@ func get_sound(id: StringName) -> AudioStream:
 	_sounds[id] = stream  # a failed load is remembered too, so it is tried once
 	return stream
 
-
-## Whether a build hides non-demo resources: one with the `demo` feature, on a channel that is
-## not one of EVERY_CARD_CHANNELS.
-static func demo_only_for(demo_feature: bool, channel: String) -> bool:
-	return demo_feature and not EVERY_CARD_CHANNELS.has(channel)
-
-
-func _visible(res: Resource) -> bool:
-	if not demo_only or not ("demo" in res):
-		return true
-	return res.get("demo") == true
 
 
 ## Names in one directory, sorted. Exported games list imported files with a

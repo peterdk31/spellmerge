@@ -106,7 +106,6 @@ func test_every_modifier_loads_and_matches_its_folder() -> void:
 		check_equal(modifier.id, id, "%s: the id is the folder name" % id)
 		check(modifier.display_name != "", "%s has a name" % id)
 		check(modifier.icon != null, "%s has an icon" % id)
-		check(modifier.demo, "%s is in the web demo" % id)
 		check_equal(modifier.complexity, COMPLEXITY[id], "%s: complexity from the design table" % id)
 		check_equal(modifier.range_problems().size(), 0, "%s: %s" % [id, ", ".join(modifier.range_problems())])
 

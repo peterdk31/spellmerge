@@ -6,7 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"arena_01"
-demo = true
 scene = ExtResource("2_scene")
 player_spawns = PackedVector2Array(224, 320, 288, 320, 352, 320, 416, 320)
 enemy_spawns = PackedVector2Array(96, 96, 224, 64, 416, 64, 544, 96, 96, 224, 544, 224)

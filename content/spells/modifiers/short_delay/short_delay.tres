@@ -6,7 +6,6 @@
 [resource]
 script = ExtResource("1_base")
 id = &"short_delay"
-demo = true
 display_name = "Short Delay"
 complexity = 1
 icon = ExtResource("2_icon")

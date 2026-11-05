@@ -11,7 +11,7 @@ func _initialize() -> void:
 	_test_spell()
 	_test_enemy()
 	_test_room()
-	_test_demo_defaults_to_false()
+	_test_no_demo_flag()
 	_test_round_trip()
 	_test_room_round_trip()
 	_test_enemy_round_trip()
@@ -64,31 +64,30 @@ func _test_room() -> void:
 	_check(room.scene == null, "room scene is empty by default")
 
 
-func _test_demo_defaults_to_false() -> void:
-	_check(not FormBase.new().demo, "spell: demo is false by default")
-	_check(not EnemyBase.new().demo, "enemy: demo is false by default")
-	_check(not RoomBase.new().demo, "room: demo is false by default")
+func _test_no_demo_flag() -> void:
+	# There is no demo subset (owner, 2026-11-05): no base class carries a `demo` flag.
+	_check(not ("demo" in FormBase.new()), "spell: no demo flag")
+	_check(not ("demo" in EnemyBase.new()), "enemy: no demo flag")
+	_check(not ("demo" in RoomBase.new()), "room: no demo flag")
 	_check(FormBase.new().id == &"", "spell: id is empty by default")
 
 
 func _test_round_trip() -> void:
 	var spell := FormBase.new()
 	spell.id = &"fire_bolt"
-	spell.demo = true
 	spell.base_damage = 4
 	var path := "user://test_base_spell.tres"
 	_check(ResourceSaver.save(spell, path) == OK, "spell saves as text")
 	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as FormBase
 	_check(loaded != null, "spell loads back as FormBase")
 	if loaded != null:
-		_check(loaded.id == &"fire_bolt" and loaded.demo and loaded.base_damage == 4, "spell keeps its values")
+		_check(loaded.id == &"fire_bolt" and loaded.base_damage == 4, "spell keeps its values")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 
 func _test_room_round_trip() -> void:
 	var room := RoomBase.new()
 	room.id = &"start_room"
-	room.demo = true
 	room.player_spawns = PackedVector2Array([Vector2(1, 1), Vector2(2, 1), Vector2(1, 2), Vector2(2, 2)])
 	room.enemy_spawns = PackedVector2Array([Vector2(8, 8), Vector2(9, 8)])
 	room.doors = PackedVector2Array([Vector2(0, 5)])
@@ -97,7 +96,7 @@ func _test_room_round_trip() -> void:
 	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as RoomBase
 	_check(loaded != null, "room loads back as RoomBase")
 	if loaded != null:
-		_check(loaded.id == &"start_room" and loaded.demo, "room keeps its id and demo flag")
+		_check(loaded.id == &"start_room", "room keeps its id")
 		_check(loaded.player_spawns == room.player_spawns, "room keeps its player spawns")
 		_check(loaded.enemy_spawns == room.enemy_spawns, "room keeps its enemy spawns")
 		_check(loaded.doors == room.doors, "room keeps its doors")

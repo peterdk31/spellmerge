@@ -60,3 +60,6 @@ const BLOCKS: int = 1 << 23
 ## Does it make a body of its own that stays and acts for its caster (a decoy, a familiar)? Read
 ## by `CastSense.spawns`; no card needs it.
 const SPAWNS: int = 1 << 24
+## Does it open a way through the world that shots and bodies take (a portal)? Read only by
+## `CastSense.opens`; no card needs it.
+const GATES: int = 1 << 25

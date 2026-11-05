@@ -110,7 +110,8 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 		var fresh := ArenaScript.new(root)
 		_populate(fresh)
 		fresh.install_cards(0, 0, cards)
-		check(fresh.cast(0, 0) or staff.casts[0].group.is_empty(), "%s: the first cast was refused" % label)
+		# A cast that costs more mana than the arena gives (ArenaScript.MANA) is refused, rightly.
+		check(fresh.cast(0, 0) or staff.casts[0].group.is_empty() or staff.casts[0].mana > ArenaScript.MANA, "%s: the first cast was refused" % label)
 		var total: float = 0.0
 		var steps: int = int(ceilf(SECONDS / ArenaScript.STEP))
 		for i in steps:

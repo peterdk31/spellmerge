@@ -263,6 +263,9 @@ static func reach(form: FormBase) -> float:
 			return form.ray_length
 		&"decoy", &"familiar":
 			return 60.0
+		&"portal":
+			# Its exit: what stands there goes through to the mouth.
+			return form.ray_length
 	return -1.0
 
 

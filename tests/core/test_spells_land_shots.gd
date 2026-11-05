@@ -62,7 +62,7 @@ const SETS: Array = [
 	],
 	[
 		[&"blast", &"split", &"nova"],
-		[&"burst", &"split", &"bolt"],
+		[&"burst", &"split", &"bolt", &"split", &"portal"],
 		[&"echo", &"split", &"nova"],
 		[&"faster", &"heavy", &"split", &"nova"],
 		[&"hold", &"split", &"orbit"],

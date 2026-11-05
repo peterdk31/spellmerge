@@ -64,8 +64,9 @@ func _expected(event: int, carrier: StringName) -> bool:
 		E.TIMER, E.HURT:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
-			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
-			return carrier != &"rain" and carrier != &"familiar"
+			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards),
+			# nor a portal, which passes every shot on (owner, 2026-11-05).
+			return carrier != &"rain" and carrier != &"familiar" and carrier != &"portal"
 		E.WALL:
 			return [&"atom", &"swap", &"beam"].has(carrier)
 	return true

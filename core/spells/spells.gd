@@ -2516,6 +2516,41 @@ func _relay(spell: CompiledSpell, target: Node, tag: int, shot: int) -> void:
 		_ray.hit = _rec_zap[slot]
 
 
+## `base` with every element of `donor` it does not have yet (each with its status), as relay
+## merges them; null when `donor` adds nothing. What a portal's infusion gives what goes through
+## it (docs/milestones/portal.md).
+static func merge_hit(base: HitProfile, donor: HitProfile) -> HitProfile:
+	if base == null or donor == null:
+		return null
+	var merged: HitProfile = null
+	for n in donor.element_ids.size():
+		var id: StringName = donor.element_ids[n]
+		if base.element_ids.has(id) or (merged != null and merged.element_ids.has(id)):
+			continue
+		if merged == null:
+			merged = base.copy()
+		_add_element(merged, donor, n)
+	return merged
+
+
+## The shot in `slot` takes on the infusions of `donor` (a portal's hit) for its later hits, its
+## zaps and its jumps, as a relay shot does; its core takes `tint` when it had no infusion.
+func _infuse_shot(slot: int, donor: HitProfile, tint: Color) -> void:
+	if donor == null or donor.element_ids.is_empty() or not _knows(slot):
+		return
+	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
+	if spell == null:
+		return
+	var base: HitProfile = _rec_relay[slot] if _rec_relay[slot] != null else spell.hit
+	var merged: HitProfile = merge_hit(base, donor)
+	if merged == null:
+		return
+	if base.element_id == &"":
+		projectiles.set_core(slot, tint)
+	_rec_relay[slot] = merged
+	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
+
+
 ## Adds element `n` of `from` to `onto`, with its status (none if `from` has none for it), as
 ## its last element.
 static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:

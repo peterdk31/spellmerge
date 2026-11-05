@@ -1,0 +1,10 @@
+{
+	"id": "portal_crossfire",
+	"name": "Portal crossfire",
+	"does": "A homing split portal rings an imp behind a wall with three exits facing it; a beam fired into the mouth comes out of all three and burns it from every side.",
+	"casts": [{"staff": 0, "cards": ["homing", "split", "portal"]}, {"staff": 1, "cards": ["fire", "beam"], "at": 0.2}],
+	"imps": [[170, 0]],
+	"walls": [[80, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

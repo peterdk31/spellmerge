@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"portal_open"
+parts = Array[Dictionary]([{"flash": &"ring_in", "zoom": 2}, {"flash": &"spiral", "zoom": 1}, {"part": &"motes", "kind": &"glimmer", "count": 10, "radius": 18.0, "spread": 360.0, "life": 0.5}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])

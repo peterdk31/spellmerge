@@ -15,7 +15,7 @@ extends Carrier
 ## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
 const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near"]
+const DERIVED: Array[StringName] = [&"_steer_call", &"_zap_near", &"_gate_outs"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_bm_source", &"_bm_due_body"]
 
@@ -68,6 +68,23 @@ var _bm_reach: PackedFloat32Array = PackedFloat32Array()
 var _bm_tip: PackedVector2Array = PackedVector2Array()
 var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
 var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
+## How long live beam `at` is (its spell's `ray_length`; a leg out of a portal, what its beam had
+## left at the gate).
+var _bm_length: PackedFloat32Array = PackedFloat32Array()
+## Through portals (docs/milestones/portal.md, P4): the gate live beam `at`'s ray stopped at (-1
+## for none), its way in and the length it had left. A leg out of a portal is a beam row of its
+## own, a full copy of its beam: its parent row and that one's birth, the gate it came in by and
+## the one it leaves, and how many portals it is past.
+var _bm_gate: PackedInt32Array = PackedInt32Array()
+var _bm_gate_heading: PackedVector2Array = PackedVector2Array()
+var _bm_gate_left: PackedFloat32Array = PackedFloat32Array()
+var _bm_parent: PackedInt32Array = PackedInt32Array()
+var _bm_parent_born: PackedInt64Array = PackedInt64Array()
+var _bm_gate_in: PackedInt32Array = PackedInt32Array()
+var _bm_gate_out: PackedInt32Array = PackedInt32Array()
+var _bm_jumps: PackedInt32Array = PackedInt32Array()
+## The gates a portal leads to (scratch, refilled before every use).
+var _gate_outs: PackedInt32Array = PackedInt32Array()
 ## A live beam's `zap` (rules as a shot's, `Spells._step_zaps`): what its zaps hit with when not
 ## its spell's `zap_hit` (null: an echo's, or its relay's), how many random numbers it has drawn
 ## (`SpellRuntime.zap_hash` of its birth and that count), the bodies it has rolled for and when
@@ -127,7 +144,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_jumps]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -396,6 +413,10 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_dir[at] = heading.normalized()
 	_bm_reach[at] = 0.0
 	_bm_hit_at[at] = kit.clock()
+	_bm_length[at] = spell.ray_length
+	_bm_gate[at] = -1
+	_bm_parent[at] = -1
+	_bm_jumps[at] = 0
 	# How far off its caster's way the beam points (a fan, a multicast or a mirror keeps it).
 	_bm_caster[at] = caster
 	_bm_caster_seq[at] = caster_seq
@@ -440,6 +461,8 @@ func _beam_step(at: int, delta: float) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	_beam_cast(at, hit)
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+		_open_legs(at)
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at])
@@ -448,6 +471,9 @@ func _beam_step(at: int, delta: float) -> void:
 ## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
 ## (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
 func _beam_follow(at: int) -> void:
+	if _bm_parent[at] >= 0:
+		_leg_follow(at)
+		return
 	var caster: int = _bm_caster[at]
 	if caster == SpellRuntime.CASTER_WIZARD:
 		var actor: int = _bm_actor[at]
@@ -478,7 +504,7 @@ func _beam_path(at: int) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var origin: Vector2 = _bm_origin[at]
 	var way: Vector2 = _bm_dir[at]
-	var length: float = spell.ray_length
+	var length: float = _bm_length[at]
 	var legs: int = maxi(spell.pierce, 0) + 1 if spell.homing_range > 0.0 else 0
 	_fit_beam_points(legs * SpellRuntime.ProjectilesScript.RAY_SEGMENTS + 2)
 	var base: int = at * _bm_stride
@@ -626,15 +652,22 @@ func _beam_cast(at: int, hit: bool) -> void:
 	# What a shot casts leaves it: a wall's beam walks out of its wall (rules R4 F8).
 	if _bm_caster[at] >= 0:
 		kit.projectiles.ray_cast_by(_bm_caster[at])
+	var gates: bool = _bm_jumps[at] < SpellLimits.PORTAL_JUMPS
 	if not hit:
-		_bm_reach[at] = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, SpellRuntime.HITS, tag, width, source, false, bounces, steer, ghost)
+		kit.projectiles.ray_gates = gates
+		_bm_reach[at] = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], _bm_length[at], spell.pierce, SpellRuntime.HITS, tag, width, source, false, bounces, steer, ghost)
 		_bm_tip[at] = kit.projectiles.ray_end
 		_bm_tip_dir[at] = kit.projectiles.ray_end_heading
+		_keep_gate(at)
 		if bounces > 0:
 			_beam_keep_path(at)
 		return
 	var ray: RayHit = kit.ray_begin(tag, _bm_dir[at], _bm_chain[at], _bm_prev[at], _bm_hit[at], -1)
-	var got: float = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, SpellRuntime.HITS, tag, width, source, true, bounces, steer, ghost)
+	kit.projectiles.ray_gates = gates
+	var got: float = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], _bm_length[at], spell.pierce, SpellRuntime.HITS, tag, width, source, true, bounces, steer, ghost)
+	var gate: int = kit.projectiles.ray_gate
+	var gate_heading: Vector2 = kit.projectiles.ray_gate_heading
+	var gate_left: float = kit.projectiles.ray_gate_left
 	var tip: Vector2 = kit.projectiles.ray_end
 	var tip_dir: Vector2 = kit.projectiles.ray_end_heading
 	var turned: bool = bounces > 0 and kit.projectiles.ray_path_count > 0
@@ -651,9 +684,118 @@ func _beam_cast(at: int, hit: bool) -> void:
 		_bm_tip[at] = tip
 		_bm_tip_dir[at] = tip_dir
 		_bm_hit_at[at] = kit.clock()
+		_bm_gate[at] = gate
+		_bm_gate_heading[at] = gate_heading
+		_bm_gate_left[at] = gate_left
 		if turned:
 			_beam_keep_path(at)
 	kit.cast_jumps()
+
+
+## What the last ray of live beam `at` said of the gate it stopped at (`Projectiles.ray_gate`).
+func _keep_gate(at: int) -> void:
+	_bm_gate[at] = kit.projectiles.ray_gate
+	_bm_gate_heading[at] = kit.projectiles.ray_gate_heading
+	_bm_gate_left[at] = kit.projectiles.ray_gate_left
+
+
+## Live beam `at` stopped at a gate: a leg goes on from every gate it leads to (P4), each a full
+## copy of the beam (owner, 2026-11-05), opened once and kept while the beam reaches that gate.
+## A leg opened now waits for the next step to walk (`step`).
+func _open_legs(at: int) -> void:
+	var gate: int = _bm_gate[at]
+	if gate < 0 or _bm_gate_left[at] <= 0.5:
+		return
+	var outs: int = kit.projectiles.gate_outs(gate, _gate_outs)
+	for k in outs:
+		var out: int = _gate_outs[k]
+		var known: bool = false
+		for row in _bm_on.size():
+			if _bm_on[row] != 0 and _bm_parent[row] == at and _bm_parent_born[row] == _bm_born[at] and _bm_gate_in[row] == gate and _bm_gate_out[row] == out:
+				known = true
+				break
+		if not known:
+			_start_leg(at, gate, out)
+
+
+## A leg of live beam `parent` out of gate `out`, which it came to by `gate`.
+func _start_leg(parent: int, gate: int, out: int) -> void:
+	var spell: CompiledSpell = _bm_spell[parent]
+	var tag: int = _bm_tag[parent]
+	var at: int = _bm_on.find(0)
+	if at < 0:
+		at = _bm_on.size()
+		_grow_beams()
+	_bm_on[at] = 1
+	_bm_born[at] = _bm_next_born
+	_bm_next_born += 1
+	_bm_spell[at] = spell
+	_bm_source[at] = null
+	_bm_tag[at] = tag
+	_bm_actor[at] = _bm_actor[parent]
+	_bm_life[at] = _bm_life[parent]
+	_bm_span[at] = _bm_span[parent]
+	_bm_tick[at] = 0.0
+	_bm_chain[at] = _bm_chain[parent]
+	_bm_prev[at] = _bm_prev[parent]
+	# What comes out of a portal takes its infusion (owner, 2026-11-05).
+	var hit: HitProfile = _bm_hit[parent]
+	var zap_hit: HitProfile = _bm_zap_hit[parent]
+	var portal: CompiledSpell = kit.spell_of(kit.projectiles.gate_tag(gate))
+	if portal != null:
+		var merged: HitProfile = kit.merge_hit(hit if hit != null else spell.hit, portal.hit)
+		if merged != null:
+			hit = merged
+			if spell.zap_hit != null:
+				zap_hit = StaffCompiler.zap_hit(merged)
+	_bm_hit[at] = hit
+	_bm_zap_hit[at] = zap_hit
+	_bm_zap_rolls[at] = 0
+	_bm_zapped_count[at] = 0
+	_bm_due_count[at] = 0
+	_bm_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
+	_bm_caster[at] = SpellRuntime.CASTER_POINT
+	_bm_caster_seq[at] = 0
+	_bm_turn[at] = 0.0
+	_bm_reach[at] = 0.0
+	_bm_hit_at[at] = kit.clock()
+	_bm_gate[at] = -1
+	_bm_parent[at] = parent
+	_bm_parent_born[at] = _bm_born[parent]
+	_bm_gate_in[at] = gate
+	_bm_gate_out[at] = out
+	_bm_jumps[at] = _bm_jumps[parent] + 1
+	var legs: int = maxi(spell.pierce, 0) + 1
+	_fit_beam_legs(legs)
+	for leg in legs:
+		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
+	_bm_count[at] = 0
+	kit.shot_started(tag)
+	_leg_follow(at)
+	if _bm_on[at] != 0:
+		_beam_path(at)
+		_bm_tip[at] = _bm_origin[at]
+		_bm_tip_dir[at] = _bm_dir[at]
+
+
+## A leg out of a portal starts where its beam comes out of its gate, going the way the gates turn
+## it, as long as its beam had left; it ends quietly once its beam no longer reaches that gate (or
+## the beam or a gate is gone).
+func _leg_follow(at: int) -> void:
+	var parent: int = _bm_parent[at]
+	var gate: int = _bm_gate_in[at]
+	var out: int = _bm_gate_out[at]
+	if _bm_on[parent] == 0 or _bm_born[parent] != _bm_parent_born[at] or _bm_gate[parent] != gate or not kit.projectiles.gate_open(gate) or not kit.projectiles.gate_open(out) or _bm_gate_left[parent] <= 0.5:
+		_end_beam(at, false)
+		return
+	var way: Vector2 = kit.projectiles.gate_turn(gate, out, _bm_gate_heading[parent])
+	if way.is_zero_approx():
+		way = kit.projectiles.gate_face(out)
+	way = way.normalized()
+	var centre: Vector2 = kit.projectiles.gate_position(out)
+	_bm_origin[at] = kit.projectiles.clip_to_walls(centre, centre + way * (kit.projectiles.gate_radius(out) + 1.0))
+	_bm_dir[at] = way
+	_bm_length[at] = _bm_gate_left[parent]
 
 
 ## Live beam `at` follows the path its last ray walked (`Projectiles.ray_path`), so a beam that
@@ -738,6 +880,8 @@ func _end_beam(at: int, finished: bool) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	var actor: int = _bm_actor[at]
+	_bm_parent[at] = -1
+	_bm_gate[at] = -1
 	_bm_spell[at] = null
 	_bm_source[at] = null
 	_bm_hit[at] = null
@@ -780,6 +924,8 @@ func _grow_beams() -> void:
 	_bm_tip.resize(size)
 	_bm_tip_dir.resize(size)
 	_bm_hit_at.resize(size)
+	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_jumps]:
+		column.resize(size)
 	_bm_zap_hit.resize(size)
 	_bm_zap_rolls.resize(size)
 	_bm_zapped_count.resize(size)

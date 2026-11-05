@@ -14,6 +14,30 @@ Facts from the code and [DECISIONS.md](../DECISIONS.md) (2026-11-02):
 - **The GPU:** trails cost about 6 ms a frame at 3,000 shots with cards on an RTX A3000, and grow with the shot count.
 - **Bundling, decided against on 2026-11-02 and reversed on 2026-11-04.** The earlier finding was that bundling saves only the signal calls (about 0.3 ms a frame) as long as each listener still handles hits one by one in order. That still holds, so H3b only pays where a listener actually shares work across a step's hits. That's why H3b's design below changes the order of effects within a step.
 
+## H0: the baseline (2026-11-05)
+
+`tests/benchmark/shot_scale.gd`, headless, with the native module, on a 4-core cloud container (Xeon, 2.1 GHz; no GPU, so no GPU frame time: run it in a window on the target PC for that). A plain bolt, a third of the shots piercing two; medians of 120 steps, in milliseconds. "Past budget" is the shot slots the hit budget left for a later step.
+
+| Scene, shots | Hits a step | Hand-backs a step | Past budget | Manager step | Kernel | Hand-backs (GDScript) | Trail samples | `update_draw` |
+|---|---|---|---|---|---|---|---|---|
+| storm 10k | 10 | 50 | 0 | 3.3 | 0.7 | 1.9 | 0.2 | 3.7 |
+| storm 30k | 26 | 151 | 0 | 6.5 | 1.5 | 2.6 | 1.0 | 22.5 |
+| storm 50k | 27 | 179 | 0 | 8.7 | 2.3 | 3.2 | 1.4 | 42.6 |
+| storm 100k | 27 | 184 | 3,143 | 13.7 | 4.1 | 5.2 | 2.9 | 84.9 |
+| crowd 10k | 100 | 141 | 9,414 | 9.0 | 1.0 | 7.3 | 0.4 | 3.9 |
+| crowd 30k | 100 | 189 | 29,463 | 11.9 | 1.2 | 8.2 | 1.2 | 22.7 |
+| crowd 50k | 100 | 207 | 49,452 | 13.7 | 1.4 | 8.8 | 2.0 | 43.0 |
+| crowd 100k | 100 | 217 | 99,446 | 17.1 | 1.6 | 9.0 | 3.5 | 82.8 |
+
+The target refresh stays under 0.4 ms and the common pass under 0.4 ms at every count; Spells', Combat's and Feel's own steps under 0.7 ms together. The listeners at 100k shots (the crowd; the storm's are alike), per step: Feel's `projectile_expired` 4.4 ms (480 calls, 9 µs each), Combat's `projectile_hit` 4.0 ms (98 calls, 41 µs), Feel's `damage_dealt` 2.1 ms (21 µs), Feel's `projectile_impact` 1.4 ms (15 µs), Spells' `projectile_expired` 1.2 ms (2.4 µs), Spells' `projectile_hit` 0.5 ms (5.5 µs), Feel's `hit_landed` 0.1 ms.
+
+What it says for the parts after it:
+
+- **Drawing is the largest cost past 10,000 shots:** `update_draw` grows at about 0.85 µs a shot (83 ms at 100,000), far past a frame, before the GPU draws anything. H4 (draw cost by count) matters more than this plan assumed and should not wait long.
+- **The hit budget binds in every crowd step:** 100 hits a step, and nearly every slot waits for a later step, at every count. That is H2's problem: deferred shots move on untested.
+- **The ends, not only the hits:** about 500 shots end a step at 100,000 (lifetime 2 s), and Feel's `projectile_expired` costs more than Combat's hit in total. It is the largest listener in both scenes, so H3 ("biggest first") starts with it.
+- **The kernel's own time is small** (1.6–4.1 ms at 100,000); the hand-backs' GDScript is mostly the listeners above. H1 (fewer hand-backs) saves the crossings, about 200 a step here, and H5's threads have little to win in the kernel until the hits and the drawing are cheaper.
+
 ## What 100,000 means
 
 Shot count and hit count are separate costs:

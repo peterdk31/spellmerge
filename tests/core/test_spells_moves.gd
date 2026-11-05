@@ -526,21 +526,32 @@ func test_a_dash_moves_its_card_distance_and_faster_only_makes_it_sooner() -> vo
 	check(is_equal_approx(_moves[1][3], 0.2 / 1.5), "it gets there sooner: %s" % _moves[1][3])
 
 
-func test_a_dash_is_drawn_where_its_caster_goes() -> void:
+func test_a_dash_shows_from_its_start_to_its_landing_with_its_tag() -> void:
 	# The owner (2026-10-28): the dash look went another way than the wizard. Its streaks and cards
-	# follow the caster's anchor for the dash's time (`follow_caster`).
+	# are Feel's: the `dash_start` cue's streams follow the caster's anchor from its `form_shown`
+	# until its `carrier_ended` (gameplay/feel/streams.gd), which the runtime sends with the dash's
+	# tag (`cue_tag`), so the landing ends that dash's streams and no other's.
+	var shown: Array = []
+	var ended: Array = []
+	_bus.form_shown.connect(func(caster: int, form: StringName, _origin: Vector2, _direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if form == &"dash":
+			shown.append([caster, _spells.cue_tag]))
+	# Its end names its card's form (here the test's `short`, a dash carrier).
+	_bus.carrier_ended.connect(func(caster: int, _form: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+		ended.append([caster, _spells.cue_tag]))
 	_distance_cards()
-	_build(0, [&"short"])
+	var tag: int = _build(0, [&"short"])
 	_cast(0)
-	check(_mgr.is_dashing(0), "the dash follows its caster")
-	_mgr.set_anchor(0, Vector2(0.0, 30.0))
-	for i in 4:
-		_mgr.step(1.0 / 60.0)
-	check(_mgr._dash_last[0].y > 20.0, "wherever it goes")
-	var until: float = _mgr._dash_until[0]
+	check_equal(shown.size(), 1, "the dash shows itself where it leaves")
+	check(shown.size() == 1 and shown[0][0] == 0 and shown[0][1] == tag, "for its caster, with its tag")
+	check_equal(ended.size(), 0, "nothing lands before the body has moved")
+	# The body says where it landed (gameplay/actor, as for a teleport).
+	_bus.caster_move_finished.emit(0, &"dash", Vector2(80, 0), tag)
+	check_equal(ended.size(), 1, "and ends where it lands")
+	check(ended.size() == 1 and shown.size() == 1 and ended[0] == shown[0], "with the same caster and tag")
 	_build(0, [&"blink"])
 	_cast(0)
-	check_equal(_mgr._dash_until[0], until, "a teleport starts no dash")
+	check_equal(shown.size(), 1, "a teleport shows no dash")
 
 
 func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:

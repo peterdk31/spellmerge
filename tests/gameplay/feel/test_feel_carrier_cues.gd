@@ -72,8 +72,8 @@ func test_a_rain_falls_where_it_lands() -> void:
 
 ## A dash's moments are cues its card names (spell-spectacle-2.md, S5): `dash_start` where it
 ## leaves (dust kicked up at its feet, and lightning arcs along its way), `dash_land` where it lands
-## (a ring in its caster's ramp, a flare of its element, its cards' motes). Its path is the caster's
-## trail and its streaks are motes (the projectile manager's births), so Feel keeps no dash state.
+## (a ring in its caster's ramp, a flare of its element, its cards' motes). Its path is `dash_start`'s
+## streams (its streaks and cards, until it lands): tests/gameplay/feel/test_streams.gd.
 func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
 	const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 	var sparks: int = 1 << (ProjectilesScript.LOOK_SPARKS - 1)

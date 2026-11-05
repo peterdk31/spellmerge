@@ -1558,11 +1558,15 @@ func _cue_tag() -> int:
 
 
 ## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a
-## decoy or familiar going): its card's `end_cue`, `size` big.
+## decoy or familiar going): the streams its cues started end (a dash's streaks), and its card's
+## `end_cue` plays, `size` big.
 func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
+	var tag: int = _cue_tag()
+	if _spectacle != null:
+		_spectacle.end_streams(caster, tag)
 	var cue: StringName = _form_cues_of(form)[CUE_END] as StringName
 	if cue != &"":
-		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, _cue_tag())
+		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
 
 
 ## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.

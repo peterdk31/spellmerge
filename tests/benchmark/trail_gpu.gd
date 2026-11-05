@@ -6,7 +6,7 @@ extends SceneTree
 ##   godot --path . --script res://tests/benchmark/trail_gpu.gd               time each scenario
 ##   godot --path . --script res://tests/benchmark/trail_gpu.gd -- --frames=DIR
 ##                                    also save each scenario's frames as DIR/<scenario>_<n>.png
-##   ... -- --plain                   no lightning and no dashes (one batch per layer: a change of
+##   ... -- --plain                   no lightning (one batch per layer: a change of
 ##                                    batching cannot move one trail over another)
 ##   ... -- --no-time                 save the frames only
 ##   ... -- --only=some               run one scenario (few, some, many)
@@ -29,7 +29,8 @@ extends SceneTree
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
 ## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
 ## lightning's look, the rest with up to three of the other card kinds, a third bouncing off the
-## room's border, and two wizards dashing. A shot that ends is replaced, so the count holds. The
+## room's border, and two wizards walking round (their orbits' anchors; their dashes' streaks are
+## Feel's since 2026-11-05, a `stream` cue part). A shot that ends is replaced, so the count holds. The
 ## manager is stepped and drawn by hand at a fixed 60 steps a second, so a frame is the same on
 ## every run of the same code: a change that should look the same can be compared pixel by pixel
 ## (the saved frames of two checkouts). It prints `BENCH: trail gpu` lines: the GPU time of a frame
@@ -278,11 +279,8 @@ func _vertices() -> int:
 	return total
 
 
-## One step: the dashes, the step, and new shots for the ones that ended.
+## One step: the wizards walk, the step, and new shots for the ones that ended.
 func _step(n: int, shots: int) -> void:
-	if n % 30 == 0 and not _plain:
-		for seat in 2:
-			_mgr.follow_caster(seat, Color(1.0, 0.6, 0.2), ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS + seat])), 0.25)
 	for seat in 2:
 		var angle: float = float(n) * 0.09 + float(seat) * PI
 		_mgr.set_anchor(seat, Vector2(320.0, 180.0) + Vector2(cos(angle), sin(angle)) * 120.0)

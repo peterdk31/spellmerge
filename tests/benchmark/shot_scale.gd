@@ -22,7 +22,7 @@ extends SceneTree
 ## parts it times itself when a benchmark asks (`step_profile`, `PROF_*`: the target refresh, the
 ## common pass, the behaviour passes before the hits, the hit pass, of which the native kernel's own
 ## time and the rest, the hand-backs to GDScript with every listener of the hits and ends they send,
-## the passes after the hits, the dash samples), the hand-backs a step (native `hits` calls), the
+## the passes after the hits), the hand-backs a step (native `hits` calls), the
 ## hits and the shots past the hit-work budget; then Spells', Combat's and Feel's own `step`, the
 ## shots' spawn (not part of the game's cost: the script tops the shots up), `update_draw`, and, in
 ## a window, the GPU's time for a frame. A second pass of the same scene puts a timer between each
@@ -80,7 +80,7 @@ const BODY_RADIUS: float = 7.0
 ## The events a shot's hit or end sends (the sandbox storm's PROFILED_SIGNALS).
 const TIMED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
 ## The lines printed: the manager's parts (its PROF_* times, in step order), then the rest of the tick.
-const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "dash samples", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
+const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
 const P_REFRESH: int = 0
 const P_COMMON: int = 1
 const P_BEFORE: int = 2
@@ -88,13 +88,12 @@ const P_HITS: int = 3
 const P_KERNEL: int = 4
 const P_HANDBACK: int = 5
 const P_AFTER: int = 6
-const P_DASHES: int = 7
-const P_STEP: int = 8
-const P_SPELLS: int = 9
-const P_COMBAT: int = 10
-const P_FEEL: int = 11
-const P_SPAWN: int = 12
-const P_DRAW: int = 13
+const P_STEP: int = 7
+const P_SPELLS: int = 8
+const P_COMBAT: int = 9
+const P_FEEL: int = 10
+const P_SPAWN: int = 11
+const P_DRAW: int = 12
 
 
 ## A timer between one event and one listener (the listener pass).
@@ -337,7 +336,6 @@ func _tick(timed: bool) -> void:
 		_part_usec[P_KERNEL] = profile[ManagerScript.PROF_KERNEL]
 		_part_usec[P_HANDBACK] = _part_usec[P_HITS] - _part_usec[P_KERNEL]
 		_part_usec[P_AFTER] = profile[ManagerScript.PROF_AFTER]
-		_part_usec[P_DASHES] = profile[ManagerScript.PROF_DASHES]
 	_spells.step(DT)
 	var t2: int = Time.get_ticks_usec()
 	_combat.step(DT)

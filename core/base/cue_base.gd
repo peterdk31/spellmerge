@@ -6,7 +6,8 @@ extends Resource
 ## is edited. A cue is played at a point with what set it off: who (its ramp), which way, how big
 ## (its `size` in pixels, the radius of an explosion or the reach of a ground strike; seconds for
 ## a telegraph), its element's colour and its cards. Feel's moments with a life of their own
-## (beams, swing trails, statuses, ghosts) are not cues; a dash's start and landing are (S5).
+## (beams, swing trails, statuses, ghosts) are not cues; a dash's start, path and landing are (S5;
+## its path a `stream` part of its start).
 ##
 ## The cue's `parts` are each a Dictionary of a part type (its `part`; PART_TYPES, each with the
 ## keys it may have). Feel plays each part by the player of its type (`Feel.add_cue_part`;
@@ -97,6 +98,23 @@ extends Resource
 ##   `radius`     how far in pixels, when the cue has no size (or with no `reach`; 40 when neither)
 ##   `seconds`    how long it lasts (0.3 when not given)
 ##   `color`, `plain`, `bare`  its colour, as a flash's
+## A part with `"part": "stream"` gives off motes from its cue's caster while it moves (a dash's
+## speed streaks and its cards' particles; gameplay/feel/streams.gd): from the moment the cue plays
+## until the carrier it shows ends (`carrier_ended` of its caster and spell), its caster has no
+## anchor (core/projectiles' `get_anchor`), or its `seconds` run out, following that anchor and
+## thrown back against the way it goes (the cue's way until it has moved). Left out with the
+## "Particles" setting or particles off. Its keys (STREAM_KEYS):
+##   `kind`       `dash_path` (the default: the dash path kinds, `MoteKind.dash_path`, in the
+##                caster's ramp without its cards) or `spell` (the cue's cards: each try picks one of
+##                its look's layers that give off particles and keeps it at a shot's rate for that
+##                layer, `ProjectileManager.SPARK_RATES`, as a shot's trail does; none for no cards)
+##   `rate`       tries a second (60 when not given)
+##   `side`       pixels across the way it goes they leave from (spread evenly; 0 when not given)
+##   `ahead`      pixels along it, either side, they leave from (0 when not given)
+##   `feet_layers` the look layers that leave from its feet instead (fire's embers and frost's
+##                flecks: [1, 2]), `below` pixels under it
+##   `below`      how far under it its feet are (8 when not given)
+##   `seconds`    the most it lasts (2 when not given), should its carrier's end never come
 ## A cue with a light part lights by its light parts alone: its flashes do not light the room by
 ## their kinds as they otherwise do (`SpellLight.EFFECT_LIGHT`), so content says how a rune or a
 ## heal lights.
@@ -135,8 +153,11 @@ const PART_KEYS: Array[String] = ["part", "effect", "zoom", "reach", "seconds", 
 const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
+const STREAM_KEYS: Array[String] = ["part", "kind", "rate", "side", "ahead", "feet_layers", "below", "seconds"]
 ## The part types a cue may have (a part's `part`; none is `effect`), each with the keys it may have.
-const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS}
+const PART_TYPES: Dictionary = {&"effect": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS}
+## What a `stream` part gives off (its `kind`).
+const STREAM_KINDS: Array[StringName] = [&"dash_path", &"spell"]
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.
 const MOTE_GROUPS: Array[StringName] = [&"spell", &"surface"]
 const MARK_ROTS: Array[StringName] = [&"random", &"aim"]
@@ -220,6 +241,8 @@ func _type_problems(type: StringName, i: int, part: Dictionary) -> PackedStringA
 			return _mark_problems(i, part)
 		&"light":
 			return _light_problems(i, part)
+		&"stream":
+			return _stream_problems(i, part)
 	return PackedStringArray()
 
 
@@ -301,4 +324,20 @@ func _light_problems(i: int, part: Dictionary) -> PackedStringArray:
 		found.append("%s: light part %d has a reach, radius or seconds of 0 or less" % [id, i])
 	if int(part.has("color")) + int(bool(part.get("plain", false))) + int(bool(part.get("bare", false))) > 1:
 		found.append("%s: light part %d takes one of color, plain and bare" % [id, i])
+	return found
+
+
+## What is wrong with the stream part `part` (number `i`): a kind it does not know, a number out
+## of its range, or a feet layer that is not a look layer.
+func _stream_problems(i: int, part: Dictionary) -> PackedStringArray:
+	var found := PackedStringArray()
+	if not STREAM_KINDS.has(StringName(part.get("kind", "dash_path"))):
+		found.append("%s: stream part %d's kind '%s' is not one of %s" % [id, i, part.get("kind"), STREAM_KINDS])
+	if float(part.get("rate", 1.0)) <= 0.0 or float(part.get("seconds", 1.0)) <= 0.0:
+		found.append("%s: stream part %d has a rate or seconds of 0 or less" % [id, i])
+	if float(part.get("side", 0.0)) < 0.0 or float(part.get("ahead", 0.0)) < 0.0 or float(part.get("below", 0.0)) < 0.0 or float(part.get("below", 0.0)) > 32.0:
+		found.append("%s: stream part %d has a side or ahead below 0, or a below not 0 to 32 pixels" % [id, i])
+	for layer: Variant in part.get("feet_layers", []):
+		if int(layer) < 1 or int(layer) > MoteKind.LOOK_LAYERS:
+			found.append("%s: stream part %d's feet layer %s is not a look layer (1-%d)" % [id, i, layer, MoteKind.LOOK_LAYERS])
 	return found

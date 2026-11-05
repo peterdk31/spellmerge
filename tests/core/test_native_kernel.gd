@@ -2,7 +2,7 @@ extends SceneTree
 ## The native kernel against its GDScript (native/README.md): two projectile managers, one with
 ## the native `ShotKernel` and one without (`Projectiles.native`), are given the same seeded scene
 ## and stepped side by side. After every step every packed array of the two must be equal byte
-## for byte (the shots, the target grid, the hit memory, the threat grid, the dashes), as must
+## for byte (the shots, the target grid, the hit memory, the threat grid), as must
 ## what `update_draw` wrote into the draw batches and what `threat` answers to random asks.
 ## `test_projectiles_step_exact.gd` holds both to its recording too; this test also covers the
 ## drawing, the threat grid and many more shots (the grid and the hit-work budget both come in).
@@ -13,7 +13,7 @@ extends SceneTree
 ## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
 ## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
-## handlers that spawn shots and remove a target now and then; dashes.
+## handlers that spawn shots and remove a target now and then.
 ##
 ## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it, as in
 ## ci/build/build.sh).
@@ -225,15 +225,11 @@ func _drive(side: int, step: int) -> void:
 		var node: Node2D = targets[i]
 		if is_instance_valid(node):
 			node.global_position += Vector2.from_angle(float(step) * 0.05 + float(i)) * 0.6
-	if step == 40:
-		m.follow_caster(1, Color(0.9, 0.3, 0.2), 1 | 4, 0.4)
 	if step == 80:
 		# Fewer tail births than the shots ask for: the most is kept and the spacing widens.
 		m.tail_births_cap = 60
 	if step == 45:
-		# An enemy's dash, with lightning's look.
 		m.set_anchor(_imp, Vector2(480.0, 140.0))
-		m.follow_caster(_imp, Color(0.4, 0.8, 1.0), (1 << (ManagerScript.LOOK_SPARKS - 1)) | 2, 0.4)
 	for i in 40 if step < 100 else 8:
 		var caster: int = _imp if i % 5 == 4 else i % 4
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)

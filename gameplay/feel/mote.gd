@@ -47,6 +47,7 @@ const BatchesScript := preload("res://core/projectiles/batches.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
+const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const NativeScript := preload("res://core/native/native.gd")
 
 ## Rows in a chunk: one batch, uploaded whole when any of its rows is written.
@@ -76,8 +77,29 @@ const LIFE_MAX: float = MoteKind.LIFE_MAX
 ## (`throw_part`, `burst`: a cue's or a reaction's, tens or a hundred in one burst, so a blast in a
 ## storm still throws its motes). Set from the sandbox storm (P1c, docs/DECISIONS.md): the sheds'
 ## rows cost about 2.5 us each, a moment's about 0.5.
+##
+## **The frame's rows by class** (the owner, 2026-11-05: what a lone cast shows is never cut for a
+## crowd's), each written by its own calls:
+##
+##     class    rows a frame                         taken by                       first come?
+##     tails    `tail_rows` (the manager's cap)      the trails' tail births        no: kept until `open_tail_rows`
+##     moments  MOMENT_ROWS kept, and any open row   `burst`, `throw_part`, `crumble` yes (few a frame)
+##     hits     `hit_rows()`: the rest of the open   `shed`, `throw`, an `often` part no: shared by staff (`hit_shares.gd`);
+##              (beside a crowd, a staff not thinned:                                a lone cast's whole beside a crowd's
+##              FRESH_ROWS of the moments' too)
+##     settles  SETTLE_ROWS (kept to SETTLE_MOST),   a settling kind's motes         yes
+##              each a row of its burst's class
+##     births   what is left at their give-off       trail particles, Feel's drawings yes (tails first)
+##
+## A hit's writes are framed by `open_hit` and `close_hit` (the spectacle does it): its staff's share
+## says whether it sprays at all, and its rows are counted toward its staff's next ask.
 const FRAME_ROWS: int = 256
 const MOMENT_ROWS: int = 128
+## The moments' rows a hit of a staff not thinned beside one that is may take as well
+## (`hit_shares.gd`, `beside_crowd`: a lone cast hitting beside a crowd, its share not planned yet,
+## is never cut by the crowd's sprays, which are planned to the hit rows). With no crowd, a hit
+## leaves the moments all of MOMENT_ROWS.
+const FRESH_ROWS: int = 32
 ## The motes that leave a settled mark (`MoteKind.settles`): SETTLE_ROWS more may each frame, and
 ## what a frame leaves unused is kept, up to SETTLE_MOST. Working out where a mote rests and
 ## handing it to the mark layer costs about as much as writing a row (the integration of P1c, P1d
@@ -186,6 +208,16 @@ var frame_rows: int = FRAME_ROWS
 var tail_rows: int = 0
 var _tail_kept: int = 0
 var _keep: int = 0
+## The hits' shares by staff (see the class table at FRAME_ROWS; read only), the group of the hit
+## open now (-1: none) and the rows its writes took, and whether it was opened (a spray) or only
+## held (more of one already counted).
+var hits: HitSharesScript = HitSharesScript.new()
+var _hit_group: int = -1
+var _hit_rows: int = 0
+var _hit_spray: bool = false
+## What the open hit's writes leave the moments (MOMENT_ROWS, less FRESH_ROWS for a staff not
+## thinned beside a crowd).
+var _hit_keep: int = MOMENT_ROWS
 var _settles_left: int = SETTLE_MOST
 ## Rows written since the pool was made: a mote's serial (the mark layer forgets a settle whose
 ## mote the ring overwrote before it came to rest).
@@ -392,7 +424,7 @@ func settle_mark(k: int) -> int:
 ## count, split between them) along `dir`, in the shot's own ramp. It leaves the frame's last
 ## MOMENT_ROWS to the moments, and writes nothing once only they are left.
 func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _open() <= MOMENT_ROWS:
+	if _open() <= _hit_keep:
 		cut += 1
 		return
 	shed_kinds(kinds_of_look(look), at, dir, core, ramp, look, scale)
@@ -401,7 +433,7 @@ func shed(at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: f
 ## Whether a shed now writes nothing (only the frame's MOMENT_ROWS are left), counted as cut: ask it
 ## before working out a shed's kinds (`card_kinds.gd`), which costs more than a shed that is cut.
 func shed_closed() -> bool:
-	if _open() <= MOMENT_ROWS:
+	if _open() <= _hit_keep:
 		cut += 1
 		return true
 	return false
@@ -409,14 +441,14 @@ func shed_closed() -> bool:
 
 ## `shed` with the kinds `found` (a spell's, `card_kinds.gd`; never empty) in place of its look's.
 func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, scale: float = 1.0) -> void:
-	if _open() <= MOMENT_ROWS:
+	if _open() <= _hit_keep:
 		cut += 1
 		return
 	if found.is_empty():
 		return
 	var source: int = spell_source(ramp, look)
 	var share: float = scale / float(found.size())
-	_keep = MOMENT_ROWS
+	_keep = _hit_keep
 	for k in found:
 		var kind: MoteKind = _kinds[k]
 		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
@@ -554,13 +586,13 @@ func kinds_of_layer(layer: int) -> PackedInt32Array:
 ## and height) from `at` along `dir`, from `source` (`spell_source`, `table_source`) with the core
 ## colour `core` (a spell's; white for none). Like `shed`, it leaves the frame's last MOMENT_ROWS.
 func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: float = 1.0) -> void:
-	if _open() <= MOMENT_ROWS:
+	if _open() <= _hit_keep:
 		cut += 1
 		return
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	var kind: MoteKind = _kinds[k]
-	_keep = MOMENT_ROWS
+	_keep = _hit_keep
 	burst(k, at, dir, maxi(roundi(float(kind.count) * scale), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
 	_keep = 0
 
@@ -576,7 +608,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
-	if often and _open() <= MOMENT_ROWS:
+	if often and _open() <= _hit_keep:
 		cut += 1
 		return
 	var kind: MoteKind = _kinds[k]
@@ -587,7 +619,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 		speed = Vector2(top * (kind.speed.x / maxf(kind.speed.y, 0.001)), top)
 	if ring:
 		speed.x = speed.y * 0.9
-	_keep = MOMENT_ROWS if often else 0
+	_keep = _hit_keep if often else 0
 	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source, core, kind.height, line)
 	_keep = 0
 
@@ -622,6 +654,9 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		settles += settling
 		settles_skipped += count - settling
 	_rows_left -= count + settling
+	if _keep > 0:
+		# A write of the hits' class (it leaves the moments' rows): its hit's.
+		_hit_rows += count + settling
 	written += count
 	var aim: float = dir.angle() if dir != Vector2.ZERO else 0.0
 	var half: float = deg_to_rad(clampf(spread, 0.0, 360.0)) * 0.5
@@ -685,9 +720,60 @@ func open_tail_rows() -> void:
 	_tail_kept = 0
 
 
+## The hit rows a frame (the hits' class, see FRAME_ROWS): the frame's rows past the tails' and the
+## moments'.
+func hit_rows() -> int:
+	return maxi(frame_rows - clampi(tail_rows, 0, frame_rows) - MOMENT_ROWS, 0)
+
+
+## A hit of `group` (`HitShares`: a caster's staff, OTHER or STATUSES) is about to write its motes:
+## true when it sprays, by its staff's share (`hit_shares.gd`) and while the frame has more than
+## the moments' rows left (less FRESH_ROWS for a staff not thinned beside a crowd; else cut, as
+## `shed_closed`). Its writes until `close_hit` are
+## counted as its spray's rows. Every hit is counted toward its staff's next ask, sprayed or not.
+func open_hit(group: int) -> bool:
+	if _hit_group >= 0:
+		close_hit()
+	if not hits.opens(group):
+		return false
+	var keep: int = MOMENT_ROWS - FRESH_ROWS if hits.beside_crowd(group) else MOMENT_ROWS
+	if _open() <= keep:
+		cut += 1
+		return false
+	_hit_group = group
+	_hit_rows = 0
+	_hit_spray = true
+	_hit_keep = keep
+	return true
+
+
+## More writes of a hit of `group` already counted and let through by `open_hit` (a body hit's
+## spray, played by its damage just after its impact): their rows are its, until `close_hit`.
+func hold_hit(group: int) -> void:
+	if _hit_group >= 0:
+		close_hit()
+	_hit_group = group
+	_hit_rows = 0
+	_hit_spray = false
+	_hit_keep = MOMENT_ROWS - FRESH_ROWS if hits.beside_crowd(group) else MOMENT_ROWS
+
+
+## The open hit's writes are done: its rows go to its staff's next ask.
+func close_hit() -> void:
+	if _hit_group < 0:
+		return
+	hits.spent(_hit_group, _hit_rows, _hit_spray)
+	_hit_group = -1
+	_hit_rows = 0
+	_hit_keep = MOMENT_ROWS
+
+
 ## Once a frame, at Feel's clock `now`: upload the chunks written since the last step, hide those
-## with nothing alive, and move the shader's clock on.
+## with nothing alive, and move the shader's clock on. The hits' shares for the next frame are
+## planned from this one's (`hit_shares.gd`).
 func step(now: float) -> void:
+	close_hit()
+	hits.plan(hit_rows())
 	_now = now
 	_rows_left = frame_rows
 	_tail_kept = clampi(tail_rows, 0, frame_rows)

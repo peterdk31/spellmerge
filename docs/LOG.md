@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-05: Hits' motes shared by staff (owner session)
+
+A Fireball's impact in a Storm threw nothing: the Storm's hits took the frame's hit rows first. Every hit is now one spray shared by its caster's staff (`gameplay/feel/hit_shares.gd`, planned from the frame before as the tails are): a lone cast's hits spray whole, a crowded staff's are a fair random subset that spray whole (the owner's variant b), and a staff beside a crowd may take 32 of the moments' rows for its first hit. The frame's rows by class are one table at `Motes.FRAME_ROWS`. About +0.2 ms for 300 impacts a frame on desktop; GPU web build not measured. Tests in `test_hit_shares.gd`; DECISIONS has the rules.
+
 ## 2026-11-05: Flash kinds (F1 to F4, owner session)
 
 The owner asked whether effects and motes should be one system; no (a flash is one shaped glow, a mote a particle), but flash looks were the one look still code. Built [flash-kinds.md](milestones/flash-kinds.md): F1 renamed Feel's effects to flashes (the cue part key `flash`; the "Effect slots" setting kept, the owner's pick); F2 made every flash a `FlashKind` file in `content/flashes/` (14 kinds), the flash shader reading the shaped kinds' curves from a table and each row carrying its kind and room light in the transform's unused floats (the custom data is half precision in the compatibility renderer), with F3 folded in (shell, fireball and arc are files too; `CUE_FLASHES`, `CueBase.FLASHES`, the light tables and the poof look bit gone, freeing look bit 22); ported exactly (a curve test against the old branches, and a one-off render of 4,752 cases with both shaders: every pixel the same). F4 added a star, rays, a ring of dots and a spiral, with six example kinds on `shot_flash_drawings.gd` for the owner to pick from. Not measured on the web storm yet.

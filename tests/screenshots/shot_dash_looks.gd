@@ -2,11 +2,11 @@ extends "res://tests/support/screenshot.gd"
 ## A wizard's dash (the owner, 2026-10-28: the dash look went the aim's way, not the wizard's): a
 ## row per infusion (plain, fire, frost, storm, void, lightning; the real cards' colours and
 ## looks), each caster dashing 80 px (Dash) to the right and bending down on the way, as
-## a wizard does that walks while it dashes. The dash follows its caster (`follow_caster`, the
-## projectile manager), giving off its speed streaks (in the player's colours) and its cards'
-## particles as motes where it went (spell-spectacle-2.md, S5: nothing of it is drawn as a shot); the
-## dash card's cues draw the dust where it left (`dash_start`, at `form_shown`) and the ring where
-## it landed (`dash_land`, at `carrier_ended`).
+## a wizard does that walks while it dashes. The dash card's cues draw it: `dash_start` (at
+## `form_shown`) the dust where it left and its streams, which follow the caster's anchor and give
+## off its speed streaks (in the player's colours) and its cards' particles as motes where it went
+## until it lands (gameplay/feel/streams.gd; spell-spectacle-2.md, S5), and `dash_land` (at
+## `carrier_ended`) the ring where it landed.
 ## `dash_looks` half way through, `dash_looks_landed` just after the landing, and
 ## `dash_looks_4x` (the plain, fire and frost rows half way).
 
@@ -55,7 +55,6 @@ func take() -> void:
 		var caster: int = e if e < 4 else enemies[e - 4]
 		casters.append(caster)
 		shots.call("set_anchor", caster, _at(e, 0.0, length))
-		shots.call("follow_caster", caster, tint, look, float(STEPS) / 60.0)
 		# Its way, as the dash carrier sends it (the move's direction, not the aim).
 		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.RIGHT, length, tint, look)
 	for n in STEPS + 4:

@@ -45,8 +45,8 @@ extends Node2D
 ## its caster's ramp for a plain shot), a soft glow round it, and particles given off in the styles
 ## of all its cards (`set_look`), mixed at random. Its tail and particles are motes left in the
 ## world where the shot was (see SPARK_TAIL and SPARK_BIRTH_STRIDE; the owner, 2026-10-28, and
-## tails as motes, 2026-11-05), so they bend with any path and cool where it ended; a caster's dash
-## gives off its streaks the same way (`follow_caster`). It is drawn about its hit size (`look_size`). Shots in
+## tails as motes, 2026-11-05), so they bend with any path and cool where it ended (a dash's streaks
+## are Feel's, a `stream` cue part). It is drawn about its hit size (`look_size`). Shots in
 ## the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same shaders
 ## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
 ## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
@@ -264,8 +264,7 @@ const PROF_KERNEL: int = 4
 const PROF_HANDBACKS: int = 5
 const PROF_PAST_BUDGET: int = 6
 const PROF_AFTER: int = 7
-const PROF_DASHES: int = 8
-const PROF_PARTS: int = 9
+const PROF_PARTS: int = 8
 
 ## The most wall cells one shot walks in one step (see `_wall_hit`).
 const MAX_WALL_VISITS: int = 64
@@ -431,16 +430,13 @@ const TRAIL_QUAD_VERTICES: int = 3
 ## The quads of a shot's mesh in draw order: the light first (void's dark heart dims what is under
 ## it), then the core.
 const TRAIL_QUAD_KINDS: Array[int] = [TRAIL_Q_HEAD_LIGHT, TRAIL_Q_CORE]
-## A dash (`follow_caster`): it gives off its streaks while it lasts, and the way it goes is from
-## where its caster was at the last of these moments (DASH_EVERY seconds apart) to where it is.
-const DASH_EVERY: float = 1.0 / 30.0
 ## Trail particles are motes (spell spectacle P1d, and since S3 the only way they are drawn;
 ## docs/milestones/spell-spectacle-2.md): the trails are drawn with no particle slots, and the
-## particles a shot (or a dash) gives off are handed out as births (`spark_births`) for Feel's motes
+## particles a shot gives off are handed out as births (`spark_births`) for Feel's motes
 ## to throw, while something takes them (`spark_motes`). A birth is SPARK_BIRTH_STRIDE floats:
 ## where (x, y), the way back along the shot (x, y), the look kind it is of (LOOK_*; 0 a plain
 ## shot's twinkle), the caster's ramp, the shot's look, its core colour (r, g, b) and its tag (so
-## the motes can take its spell's cards' kinds; spell-spectacle-2.md, S2; a dash's is its cast's).
+## the motes can take its spell's cards' kinds; spell-spectacle-2.md, S2).
 ## The pool's share thins them, so the births a frame stay about as many as the pool's particles
 ## live (TAILLESS_PARTICLE_CAP over their life), whatever the shot count. Measured (DECISIONS, 2026-11-04,
 ## "Trail particles as motes"): cheaper than the shader's at 60, 400 and 3,000 shots.
@@ -464,19 +460,9 @@ const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
 ## twinkle, 11 the weave none): the trail shader's own rates before S3, now only here.
 const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4]
-## How often a dash gives off its cards' particles, against a shot's rate, and its feet's embers
-## and flecks (`_give_off_dash_sparks`). The trail shader gave them off at twice and always (S3);
-## as motes, which live and glow longer than the shader's dots, half that reads the same.
-const DASH_SPARK_RATE: float = 1.0
-const DASH_FEET_RATE: float = 0.5
-## A dash's speed streaks (spell-spectacle-2.md, S5: the trail shader drew them until then): every
-## dash gives off DASH_STREAKS a moment as births of the look kind SPARK_STREAK (the motes' kinds
-## that are a dash's path, `MoteKind.dash_path`), from beside its body (DASH_STREAK_SIDE across,
-## DASH_STREAK_AHEAD along its way either side of it) back along the way it goes, in its caster's
-## colours (look 0).
-const DASH_STREAKS: int = 2
-const DASH_STREAK_SIDE: float = 13.0
-const DASH_STREAK_AHEAD: float = 4.0
+## A dash's speed streak: a birth of this look kind is one of the motes' dash path kinds
+## (`MoteKind.dash_path`). The manager lays none: a dash's streaks are a `stream` part of its cue,
+## which Feel gives off in this format (gameplay/feel/streams.gd; spell-spectacle-2.md, S5).
 const SPARK_STREAK: int = -1
 ## Tails as motes (spell-spectacle-2.md, S5 step 4; the owner, 2026-11-05: "if only the motes could
 ## look more like a tail"): with the tails off, every flying shot lays its tail as births of the
@@ -874,18 +860,6 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ## The shots' mesh (`trail_mesh`), made once.
 static var _trail_mesh: ArrayMesh = null
-## Dashes (`follow_caster`), by caster: until when it gives off its streaks (-1: none), its ramp,
-## the look and tag of its cast, its core, and where its caster was at the last DASH_EVERY moment
-## (the way it goes is from there to where it is). `_dashing` lists the casters dashing now.
-var _dash_until: PackedFloat64Array = PackedFloat64Array()
-var _dash_ramp: PackedInt32Array = PackedInt32Array()
-var _dash_look: PackedInt32Array = PackedInt32Array()
-var _dash_tag: PackedInt64Array = PackedInt64Array()
-var _dash_core: PackedColorArray = PackedColorArray()
-var _dash_last: PackedVector2Array = PackedVector2Array()
-var _dashing: PackedInt32Array = PackedInt32Array()
-## The last DASH_EVERY moment taken (sim_time / DASH_EVERY, floored).
-var _dash_tick: int = -1
 ## The length of the last step, so the drawing knows when its heads are (see `update_draw`).
 var _last_delta: float = 0.0
 ## True inside step(): the grid is in use, so a target removed then is only
@@ -1057,13 +1031,6 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
-	_dash_until.resize(ACTORS)
-	_dash_until.fill(-1.0)
-	_dash_ramp.resize(ACTORS)
-	_dash_look.resize(ACTORS)
-	_dash_tag.resize(ACTORS)
-	_dash_core.resize(ACTORS)
-	_dash_last.resize(ACTORS)
 	_group_count.resize(GROUPS)
 	_groups.resize(GROUPS)
 	_group_at.resize(GROUPS)
@@ -1718,9 +1685,6 @@ func clear() -> void:
 	_own_tail.fill(-1)
 	_group_count.fill(0)
 	_group_live = 0
-	for caster in _dashing:
-		_dash_until[caster] = -1.0
-	_dashing.resize(0)
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -2910,9 +2874,7 @@ func step(delta: float) -> void:
 			_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
 	_step_index += 1
 	_stepping = false
-	at = _profiled(PROF_AFTER, at)
-	_sample_dashes()
-	_profiled(PROF_DASHES, at)
+	_profiled(PROF_AFTER, at)
 
 
 ## A timed step's start (`step_profile`): its parts cleared and the clock's now. 0, and nothing
@@ -4185,55 +4147,12 @@ func _ray_keep(nodes: Array, alongs: Array, points: Array, heads: Array, found: 
 	return mini(found + 1, wanted)
 
 
-## An actor's dash (a wizard's, an enemy's): for `seconds` it gives off the card particles of
-## `look` in the ramp of `core` as births (motes, S3) of the spell tagged `tag` (its cards' motes,
-## S2), and speed streaks, along the way its caster goes (see `set_anchor`), so a dash that slides
-## along a wall or homes gives them off where it went. A caster has one dash at a time: a new one
-## takes over. Returns `caster`, or -1 when it has no anchor.
-func follow_caster(caster: int, core: Color, look: int, seconds: float, tag: int = 0) -> int:
-	if not is_caster(caster) or caster < 0 or not _anchors[caster].is_finite() or not (seconds >= 0.0):
-		return -1
-	if _dash_until[caster] < 0.0:
-		_dashing.append(caster)
-	_dash_until[caster] = sim_time + seconds
-	_dash_ramp[caster] = _ramp_of(caster)
-	_dash_look[caster] = look
-	_dash_tag[caster] = tag
-	_dash_core[caster] = Color(core.r, core.g, core.b, 1.0)
-	_dash_last[caster] = _anchors[caster]
-	return caster
-
-
-## Whether `caster` is dashing (`follow_caster`) now.
-func is_dashing(caster: int) -> bool:
-	return caster >= 0 and caster < _dash_until.size() and _dash_until[caster] >= 0.0
-
-
-## Every DASH_EVERY seconds: each dash takes where its caster is (the way it goes is from there),
-## and a dash whose time is up, or whose caster has no anchor, ends.
-func _sample_dashes() -> void:
-	var tick: int = floori(sim_time / DASH_EVERY)
-	if tick == _dash_tick:
-		return
-	_dash_tick = tick
-	var n: int = 0
-	while n < _dashing.size():
-		var caster: int = _dashing[n]
-		var at: Vector2 = _anchors[caster]
-		if sim_time >= _dash_until[caster] or not at.is_finite():
-			_dash_until[caster] = -1.0
-			_dashing.remove_at(n)
-			continue
-		_dash_last[caster] = at
-		n += 1
-
-
 func update_draw(fraction: float = -1.0) -> void:
 	spark_birth_count = 0
 	if _draw_node == null:
 		drawn = 0
 		return
-	if _high == 0 and drawn == 0 and _dashing.is_empty():
+	if _high == 0 and drawn == 0:
 		return
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
@@ -4283,7 +4202,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	_give_off_sparks(fraction)
 
 
-## Hand out the particles the drawn shots' trails and the dashes give off since the last frame, as
+## Hand out the particles the drawn shots' trails give off since the last frame, as
 ## births (`spark_births`; see SPARK_BIRTH_STRIDE), while something takes them. The shader's rule, rolled on the
 ## CPU: at each moment (SPARK_MOMENTS a second) a flying shot gives off one of its kinds, picked at
 ## random, at that kind's rate (SPARK_RATES) times its group's share of the pool (GROUPS). Rolled
@@ -4298,7 +4217,6 @@ func _give_off_sparks(fraction: float) -> void:
 		return
 	if spark_births.size() < SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE:
 		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
-	_give_off_dash_sparks(moments)
 	if _high == 0:
 		return
 	var tries_left: int = SPARK_BIRTHS_MAX * 4
@@ -4340,45 +4258,9 @@ func _give_off_spark(slot: int, fraction: float, span: float) -> bool:
 	return _add_birth(at, back.normalized(), kind, _ramp[slot], _look[slot], _core[slot], _tag[slot])
 
 
-## The particles the dashes give off since the last frame (`moments` of them), as births: each dash
-## that is following its caster (`follow_caster`) gives off DASH_STREAKS speed streaks a moment
-## (SPARK_STREAK, in its caster's colours: look 0, S5), and at most one a moment of its cards' kinds,
-## picked at random, at DASH_SPARK_RATE x a shot's rate (SPARK_RATES; fire's embers and frost's
-## flecks at DASH_FEET_RATE, from its feet, the rest from beside its body) times the pool's share.
-func _give_off_dash_sparks(moments: int) -> void:
-	for caster in _dashing:
-		if not _anchors[caster].is_finite():
-			continue
-		var bits: int = _dash_look[caster] & EMITTING_MASK
-		var at: Vector2 = _anchors[caster]
-		var back: Vector2 = Vector2.LEFT
-		var way: Vector2 = at - _dash_last[caster]
-		if way.length_squared() > 0.0001:
-			back = -way.normalized()
-		var side: Vector2 = Vector2(-back.y, back.x)
-		for m in moments:
-			for j in DASH_STREAKS:
-				var from: Vector2 = at + side * (_spark_rng.randf() - 0.5) * DASH_STREAK_SIDE - back * (_spark_rng.randf() * 2.0 - 1.0) * DASH_STREAK_AHEAD
-				if not _add_birth(from, back, SPARK_STREAK, _dash_ramp[caster], 0, Color.WHITE, _dash_tag[caster]):
-					return
-			if bits == 0:
-				continue
-			var kind: int = _nth_bit(bits, _spark_rng.randi_range(0, _bit_count(bits) - 1)) + 1
-			var feet: bool = kind == LOOK_EMBERS or kind == LOOK_FLECKS
-			var rate: float = DASH_FEET_RATE if feet else minf(SPARK_RATES[kind] * DASH_SPARK_RATE, 1.0)
-			if _spark_rng.randf() >= rate * particle_share:
-				continue
-			var from: Vector2 = at + side * (_spark_rng.randf() - 0.5) * 10.0
-			if feet:
-				from = at + Vector2((_spark_rng.randf() - 0.5) * 8.0, (7.0 if kind == LOOK_FLECKS else 8.0) + (_spark_rng.randf() - 0.5) * 2.0)
-			if not _add_birth(from, back, kind, _dash_ramp[caster], _dash_look[caster], _dash_core[caster], _dash_tag[caster]):
-				return
-
-
 ## One birth (SPARK_BIRTH_STRIDE floats; see there): a particle of look kind `kind` at `at`, given
-## off back along `back`, from a shot (or a dash) of the caster's `ramp`, the look `look` and the
-## core colour `core`, of the spell tagged `tag` (S2). A shot's and a dash's are written the same
-## way, here. Returns false once the frame's SPARK_BIRTHS_MAX are taken.
+## off back along `back`, from a shot of the caster's `ramp`, the look `look` and the core colour
+## `core`, of the spell tagged `tag` (S2). Returns false once the frame's SPARK_BIRTHS_MAX are taken.
 func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> bool:
 	var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
 	spark_births[i + SPARK_X] = at.x

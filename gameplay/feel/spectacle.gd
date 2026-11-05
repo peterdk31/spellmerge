@@ -4,8 +4,8 @@ extends Node
 ## (`spell_light.gd`) and the ramp table the motes and marks share (`ramp_table.gd`). A child of
 ## Feel, made once; it owns their settings ("Particles", "Particle amount", "Floor marks", "Spell
 ## light", each through its event) and the room they are in (`room_entered`: the walls' colours and
-## the mark layer's fit), and plays a cue's `motes` and `mark` parts (`cue_parts`, which Feel adds
-## to its table of part players).
+## the mark layer's fit), and plays a cue's `motes`, `mark`, `light` and `stream` parts (`cue_parts`,
+## which Feel adds to its table of part players).
 ##
 ## Feel says when: its hit and wall handlers call `shed_hit` and `shed_on_wall` with what it
 ## already worked out (the caster's ramp, the preset's shares, the shot's tag), in the order it
@@ -28,6 +28,7 @@ const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CardKindsScript := preload("res://gameplay/feel/card_kinds.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
+const StreamsScript := preload("res://gameplay/feel/streams.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -81,6 +82,10 @@ var particles_enabled: bool = true
 ## cards' particles; S6 item 10): births in the trails' format, given off after the trails' in
 ## `step`. Feel adds to it only while `motes_on`.
 var births: BirthsScript = BirthsScript.new()
+## The cues' mote streams under way (`stream` parts: a dash's streaks and cards along its way;
+## `streams.gd`), given off into `births` each step. Feel ends one when its carrier ends
+## (`end_streams`).
+var streams: StreamsScript = StreamsScript.new()
 
 ## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
@@ -153,12 +158,13 @@ func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 	_make_light(spell_light)
 
 
-## Once a frame, at Feel's clock `now`: the trails' particles thrown, then the motes and the marks
-## stepped.
+## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams' and Feel's own
+## drawings' given off, then the motes and the marks stepped.
 func step(now: float) -> void:
 	_clock = now
 	cards.new_frame()
 	_trail_motes()
+	streams.step(now, projectiles, births, motes_on())
 	_drawn_motes()
 	if pool != null:
 		pool.step(now)
@@ -171,7 +177,7 @@ func step(now: float) -> void:
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
 ## Callable taking the part and the cue's `CueContext`.
 func cue_parts() -> Dictionary:
-	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part], &"light": [play_light_part]}
+	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part], &"light": [play_light_part], &"stream": [play_stream_part, prepare_stream_part]}
 
 
 # --- Where motes come from (Feel calls these, in the order it draws) ------------------------
@@ -451,6 +457,26 @@ func prepare_motes_part(part: Dictionary) -> MotesPart:
 	made.line = bool(part.get("line", false))
 	made.life = float(part.get("life", 1.0))
 	return made
+
+
+## A cue's `stream` part (`CueBase`) played with `cue`: a stream of motes from its caster starts
+## (`streams.gd`), going the cue's way until it moves, in the cue's ramp with its tint and cards, of
+## its spell (its tag). Nothing with no projectile manager (no anchors to follow).
+func play_stream_part(part: StreamsScript.Part, cue: CueContextScript) -> void:
+	if projectiles == null or cue.caster < 0:
+		return
+	streams.start(part, cue.caster, cue.tag, cue.ramp, cue.look, cue.tint, projectiles.get_anchor(cue.caster), cue.aim, _clock)
+
+
+## A cue's `stream` part read into its typed fields once (`Feel.add_cue_part`'s `prepare`).
+func prepare_stream_part(part: Dictionary) -> StreamsScript.Part:
+	return StreamsScript.prepare(part)
+
+
+## The carrier of the spell tagged `tag` that `caster` showed has ended (`carrier_ended`): its
+## streams end.
+func end_streams(caster: int, tag: int) -> void:
+	streams.end(caster, tag)
 
 
 ## Stamp a cue's mark part (`CueBase`, "part": "mark") played with `cue`: its mark, or with

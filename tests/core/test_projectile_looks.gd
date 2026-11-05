@@ -500,49 +500,6 @@ func test_trail_particles_are_births() -> void:
 	check(found, "the last frame had births")
 
 
-## A dash gives off its cards' particles as births too (S3: the trail shader drew them before):
-## fire's embers and frost's flecks from its feet at DASH_FEET_RATE of the moments, its other kinds
-## from beside its body; and every dash, with cards or none, its speed streaks (S5: the shader's
-## until then), DASH_STREAKS a moment of SPARK_STREAK in its caster's colours (look 0).
-func test_a_dash_gives_off_its_cards_as_births() -> void:
-	mgr.spark_motes = true
-	mgr.set_anchor(0, Vector2(100.0, 100.0))
-	mgr.follow_caster(0, Color.WHITE, 0, 1.0)
-	var births: int = 0
-	var streaks: bool = true
-	for n in 20:
-		mgr.set_anchor(0, Vector2(100.0 + 4.0 * n, 100.0))
-		mgr.step(1.0 / 60.0)
-		mgr.update_draw(1.0)
-		births += mgr.spark_birth_count
-		for i in mgr.spark_birth_count:
-			var at: int = i * ManagerScript.SPARK_BIRTH_STRIDE
-			streaks = streaks and mgr.spark_births[at + ManagerScript.SPARK_KIND] == ManagerScript.SPARK_STREAK and mgr.spark_births[at + ManagerScript.SPARK_LOOK] == 0.0
-			streaks = streaks and mgr.spark_births[at + ManagerScript.SPARK_BACK_X] < -0.9 and absf(mgr.spark_births[at + ManagerScript.SPARK_Y] - 100.0) <= ManagerScript.DASH_STREAK_SIDE * 0.5 + 0.01
-	check(births >= 19 * ManagerScript.DASH_STREAKS and births <= 21 * ManagerScript.DASH_STREAKS, "a plain dash: only its streaks, %d a moment (%d in 20)" % [ManagerScript.DASH_STREAKS, births])
-	check(streaks, "beside its body, flung back along the dash, in its caster's colours")
-	mgr.set_anchor(1, Vector2(100.0, 200.0))
-	var tag: int = SpellTag.make(1, 2, 3, 1)
-	mgr.follow_caster(1, Color.RED, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), 1.0, tag)
-	births = 0
-	var feet: bool = true
-	for n in 30:
-		mgr.set_anchor(1, Vector2(100.0 + 4.0 * n, 200.0))
-		mgr.step(1.0 / 60.0)
-		mgr.update_draw(1.0)
-		for i in mgr.spark_birth_count:
-			var at: int = i * ManagerScript.SPARK_BIRTH_STRIDE
-			if mgr.spark_births[at + ManagerScript.SPARK_KIND] == ManagerScript.SPARK_STREAK:
-				continue
-			births += 1
-			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_KIND] == ManagerScript.LOOK_EMBERS and mgr.spark_births[at + ManagerScript.SPARK_Y] > 205.0
-			feet = feet and mgr.spark_births[at + ManagerScript.SPARK_BACK_X] < -0.9
-			feet = feet and ManagerScript.spark_tag(mgr.spark_births, at) == tag
-	# 30 moments at DASH_FEET_RATE (0.5): 15 expected.
-	check(births >= 6 and births <= 25, "a fire dash's embers at its feet's rate: %d in 30" % births)
-	check(feet, "from its feet, given off back along the dash, with its cast's tag (its cards' motes, S2)")
-
-
 ## A plain shot gives off the shader's twinkle (kind 0), as does a shot whose only kind is the weave
 ## (it gives off nothing of its own), and the pool's share thins the births as it thins the shader's
 ## particles.
@@ -627,31 +584,3 @@ func test_a_shot_is_drawn_as_its_core_told_its_way() -> void:
 	check_equal(mgr.tailless_particle_cap, 6, "the Tailless motes slider's event sets the pool")
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_share, 1.0, "and the births thin by it")
-
-
-## A dash (`follow_caster`) lasts its seconds and needs its caster's anchor; while it lasts it gives
-## off speed streaks back along the way its caster goes; a new one takes over; none is drawn.
-func test_a_dash_lasts_its_time_and_streaks_back_along_its_way() -> void:
-	mgr.spark_motes = true
-	check_equal(mgr.follow_caster(1, Color.WHITE, 0, 0.5), -1, "no anchor: no dash")
-	mgr.set_anchor(1, Vector2(100.0, 100.0))
-	check_equal(mgr.follow_caster(1, Color.WHITE, 0, 0.5), 1, "with one, the caster dashes")
-	check(mgr.is_dashing(1), "it is dashing")
-	var backs: Array[Vector2] = []
-	for i in 12:
-		mgr.set_anchor(1, Vector2(100.0 + 6.0 * float(i + 1), 100.0))
-		mgr.step(1.0 / 60.0)
-		mgr.update_draw(1.0)
-		for n in mgr.spark_birth_count:
-			var b: int = n * ManagerScript.SPARK_BIRTH_STRIDE
-			if int(mgr.spark_births[b + ManagerScript.SPARK_KIND]) == ManagerScript.SPARK_STREAK:
-				backs.append(Vector2(mgr.spark_births[b + ManagerScript.SPARK_BACK_X], mgr.spark_births[b + ManagerScript.SPARK_BACK_Y]))
-	check(not backs.is_empty(), "it gives off streaks")
-	check(backs.all(func(v: Vector2) -> bool: return v.x < -0.9), "back along its way (it goes right)")
-	check_equal(mgr.drawn, 0, "a dash draws nothing")
-	mgr.follow_caster(1, Color.WHITE, 0, 0.5)
-	check(mgr.is_dashing(1), "a new dash takes over")
-	for i in 40:
-		mgr.step(1.0 / 60.0)
-	check(not mgr.is_dashing(1), "once its time is up, it ends")
-

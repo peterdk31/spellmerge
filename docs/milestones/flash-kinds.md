@@ -69,7 +69,7 @@ Each is one PR with tests, `tools/check.sh` and the suite passing.
 3. **Port exactly, then tune?** Recommended: F2 looks exactly as today, and new looks or tuning come after as data, on a pick sheet.
 4. **New drawings (F4)?** Which, if any: a star with n points (the parry's star is a big burst today), rays, a dotted ring, a spiral.
 
-**Built:** F1 (the rename) and F2 with F3 folded in (the kinds as data; DECISIONS, 2026-11-05, "Flash kinds are data").
+**Built:** F1 (the rename), F2 with F3 folded in (the kinds as data; DECISIONS, 2026-11-05, "Flash kinds are data") and F4 (a star, rays, a ring of dots and a spiral, six example kinds on `shot_flash_drawings.gd`; DECISIONS, "Four new drawings"). Left for the owner: which of F4's kinds a cue shows, and the web storm on the real GPU.
 
 ## Order
 

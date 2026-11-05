@@ -2,7 +2,8 @@ extends RefCounted
 ## The flash kinds as Feel's flash shader reads them (`shot_flash.gdshader`'s `flash_table`;
 ## docs/milestones/flash-kinds.md): a texture of a row a kind, in the kinds' order, so a new kind
 ## (content/flashes) needs no shader edit. A row is TEXELS texels (RGBAF):
-##   texel 0             its draw (DRAW_*), metric (0 round, 1 diamond, 2 flat) and salt
+##   texel 0             its draw (DRAW_*), metric (0 round, 1 diamond, 2 flat), salt and spiral gap
+##   texel 1             its star's points, rays, dots and spiral arms (HEADS texels in all)
 ##   then each curve     (FlashKind.NUMBER_CURVES, then SHADE_CURVES) as MAX_SEGMENTS segments of two
 ##                       texels: (start, end of its way, WAY_*, 0) and (from, from_z, to, to_z); a
 ##                       segment past the last starts at 2 (never). The shader takes the last
@@ -14,10 +15,11 @@ const MAX_SEGMENTS: int = FlashKind.MAX_SEGMENTS
 const CURVES: Array[StringName] = [
 	&"arm", &"disc", &"ring", &"column_width", &"column_top", &"column_foot", &"column_length",
 	&"column_dotted", &"glow", &"glow_ring", &"glow_ring_reach", &"glow_middle", &"glow_middle_reach",
-	&"first", &"second",
+	&"first", &"second", &"star", &"rays", &"rays_inner", &"dots", &"spiral", &"spiral_turn",
 ]
-## Texels a row: the head, then two a segment of each curve (the shader's TEXELS).
-const TEXELS: int = 1 + 15 * MAX_SEGMENTS * 2
+## Texels a row: the head, then two a segment of each curve (the shader's HEADS and SEGMENTS).
+const HEADS: int = 2
+const TEXELS: int = HEADS + 21 * MAX_SEGMENTS * 2
 ## The draws the shader knows (its D_*); a kind drawn by another shader has no row worth reading.
 const DRAW_CODES: Dictionary = {&"shape": 0.0, &"clouds": 1.0, &"cracks": 2.0}
 const METRIC_CODES: Dictionary = {&"round": 0.0, &"diamond": 1.0, &"flat": 2.0}
@@ -32,7 +34,8 @@ const DEFAULTS: Dictionary = {
 	&"arm": OFF, &"disc": OFF, &"ring": OFF, &"column_width": OFF, &"column_top": 0.0,
 	&"column_foot": 0.0, &"column_length": OFF, &"column_dotted": 0.0, &"glow": 1.0,
 	&"glow_ring": 0.0, &"glow_ring_reach": 1.0, &"glow_middle": 0.0, &"glow_middle_reach": 1.0,
-	&"first": -1.0, &"second": -1.0,
+	&"first": -1.0, &"second": -1.0, &"star": OFF, &"rays": OFF, &"rays_inner": 0.0, &"dots": OFF,
+	&"spiral": OFF, &"spiral_turn": 0.0,
 }
 ## Where a segment that never starts starts.
 const NEVER: float = 2.0
@@ -50,7 +53,10 @@ static func image_of(kinds: Array[FlashKind]) -> Image:
 
 ## The texels of `kind`'s row.
 static func row_of(kind: FlashKind) -> Array[Color]:
-	var texels: Array[Color] = [Color(float(DRAW_CODES.get(kind.draw, -1.0)), float(METRIC_CODES.get(kind.metric, 0.0)), float(kind.salt), 0.0)]
+	var texels: Array[Color] = [
+		Color(float(DRAW_CODES.get(kind.draw, -1.0)), float(METRIC_CODES.get(kind.metric, 0.0)), float(kind.salt), kind.spiral_gap),
+		Color(float(kind.star_points), float(kind.ray_count), float(kind.dot_count), float(kind.spiral_arms)),
+	]
 	for curve: StringName in CURVES:
 		texels.append_array(_curve_texels(kind.curve_of(curve), float(DEFAULTS[curve]), FlashKind.SHADE_CURVES.has(curve)))
 	return texels

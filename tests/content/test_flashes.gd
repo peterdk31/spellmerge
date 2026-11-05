@@ -58,10 +58,13 @@ func test_the_table_is_laid_out_as_the_shader_reads_it() -> void:
 	var image: Image = FlashTableScript.image_of(kinds)
 	check_equal(image.get_width(), FlashTableScript.TEXELS, "TEXELS a row")
 	check_equal(image.get_height(), 3, "a row a kind")
-	check_equal(image.get_pixel(0, 1), Color(0.0, 1.0, 33.0, 0.0), "the rune's head: a shape, a diamond, salt 33")
+	check_equal(image.get_pixel(0, 1), Color(0.0, 1.0, 33.0, 6.0), "the rune's head: a shape, a diamond, salt 33, the spiral's gap")
+	check_equal(image.get_pixel(1, 1), Color(4.0, 8.0, 12.0, 1.0), "and its counts: star points, rays, dots, spiral arms")
 	check_equal(image.get_pixel(0, 2).r, 2.0, "the quake's cracks")
 	var code: String = (load("res://core/projectiles/shot_flash.gdshader") as Shader).code
 	check(code.contains("const int SEGMENTS = %d;" % FlashTableScript.MAX_SEGMENTS), "the shader's SEGMENTS")
+	check(code.contains("const int HEADS = %d;" % FlashTableScript.HEADS), "the shader's HEADS")
+	check(15 + 16 * FlashKind.MAX_RAYS < 512 and FlashKind.MAX_POINTS < 16 and FlashKind.MAX_DOTS < 128, "the counts pack into the shader's floats")
 	for c in FlashTableScript.CURVES.size():
 		check(code.contains("const int C_%s = %d;" % [String(FlashTableScript.CURVES[c]).to_upper(), c]), "the shader's C_%s" % String(FlashTableScript.CURVES[c]).to_upper())
 	for draw: StringName in FlashTableScript.DRAW_CODES:
@@ -91,6 +94,24 @@ func test_the_ported_kinds_draw_as_the_shader_did() -> void:
 						if wrong <= 3:
 							check(false, "%s %s at age %.3f zoom %d: %f, was %f" % [id, curve, a, z, value, was])
 		check_equal(wrong, 0, "%s is drawn as before" % id)
+		for part: StringName in [&"star", &"rays", &"dots", &"spiral"]:
+			check(FlashTableScript.value_at(kind, part, 0.5, 2.0) < 0.0, "%s draws no %s (F4's parts are off unless given)" % [id, part])
+
+
+## F4's drawings: the example kinds draw them (a part on at a third of their life) with the counts
+## they say, and a count past what the shader packs is a problem.
+func test_the_drawings_kinds_draw_them() -> void:
+	var parts: Dictionary = {&"star": &"star", &"star_six": &"star", &"rays_out": &"rays", &"rays_in": &"rays", &"dot_ring": &"dots", &"spiral": &"spiral"}
+	for id: StringName in parts:
+		var kind: FlashKind = _kind(id)
+		check(kind != null and FlashTableScript.value_at(kind, parts[id], 0.33, 2.0) > 0.0, "%s draws its %s" % [id, parts[id]])
+	check_equal(_kind(&"star_six").star_points, 6, "six points")
+	check_equal(_kind(&"spiral").spiral_arms, 2, "two arms")
+	var many := FlashKind.new()
+	many.id = &"many"
+	many.rays = [{"from": 10.0}]
+	many.ray_count = 40
+	check_equal(many.problems().size(), 1, "40 rays are too many: %s" % [many.problems()])
 
 
 ## The flash shader's numbers before F2 (its vertex stage's branches, kind by kind) at age `a` and

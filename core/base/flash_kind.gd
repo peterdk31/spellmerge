@@ -30,6 +30,17 @@ extends Resource
 ##                    the top of its square is 1 - 12 x its zoom)
 ##   `column_length`  the most it is long, from its foot (a falling streak); none: top to foot
 ##   `column_dotted`  1: every other row (0 or none: whole)
+##   `star`           a star of `star_points` points (4: a cross turned sharp): its reach; white-hot
+##                    `first` in its middle, `second` out to its points (flash kinds F4)
+##   `rays`, `rays_inner`  `ray_count` thin rays all round, from `rays_inner` (0 when none) out to
+##                    `rays`, one pixel wide, in `second` (white-hot `first` within 2 px of their
+##                    inner end): rays thrown out, or drawn in
+##   `dots`           a ring of `dot_count` dots: its radius, in `second` (dots of a pixel, a plus
+##                    from zoom 2)
+##   `spiral`         a spiral of `spiral_arms` arms, coils `spiral_gap` pixels a zoom step apart (each
+##                    arm's: 2 arms 6 px apart at zoom 1 are 12 px at zoom 2), out to its
+##                    reach, in `second` (`first` in its middle third); `spiral_turn` how far it has
+##                    turned (in turns: 1 is all the way round; it grows to spin it)
 ## **Its glow** (added light round it, over its whole square; drawn first):
 ##   `glow`                             how bright it is
 ##   `glow_ring`, `glow_ring_reach`     a soft light round the ring's line (or the column's)
@@ -53,6 +64,11 @@ extends Resource
 ## The most segments a curve has (the shader's table holds this many).
 const MAX_SEGMENTS: int = 4
 const DRAWS: Array[StringName] = [&"shape", &"clouds", &"cracks", &"shell", &"fireball", &"arc"]
+## The most points, rays, dots and arms (the table holds them as whole numbers).
+const MAX_POINTS: int = 12
+const MAX_RAYS: int = 31
+const MAX_DOTS: int = 64
+const MAX_ARMS: int = 4
 ## The draws Feel's flash shader draws (from the table), and the one drawn along a length.
 const TABLE_DRAWS: Array[StringName] = [&"shape", &"clouds", &"cracks"]
 const LENGTH_DRAWS: Array[StringName] = [&"arc"]
@@ -63,7 +79,10 @@ const SHADES: Array[StringName] = [&"hot", &"hi", &"mid", &"lo"]
 const NUMBER_CURVES: Array[StringName] = [
 	&"arm", &"disc", &"ring", &"column_width", &"column_top", &"column_foot", &"column_length",
 	&"column_dotted", &"glow", &"glow_ring", &"glow_ring_reach", &"glow_middle", &"glow_middle_reach",
+	&"star", &"rays", &"rays_inner", &"dots", &"spiral", &"spiral_turn",
 ]
+## The parts a shape may draw (at least one).
+const PARTS: Array[StringName] = [&"arm", &"disc", &"ring", &"column_width", &"star", &"rays", &"dots", &"spiral"]
 const SHADE_CURVES: Array[StringName] = [&"first", &"second"]
 const SEGMENT_KEYS: Array[String] = ["at", "from", "to", "from_z", "to_z", "way", "over", "off"]
 const SHADE_KEYS: Array[String] = ["at", "shade"]
@@ -97,6 +116,18 @@ const SHADE_KEYS: Array[String] = ["at", "shade"]
 @export var column_foot: Array[Dictionary] = []
 @export var column_length: Array[Dictionary] = []
 @export var column_dotted: Array[Dictionary] = []
+@export var star: Array[Dictionary] = []
+@export_range(2, 12) var star_points: int = 4
+@export var rays: Array[Dictionary] = []
+@export var rays_inner: Array[Dictionary] = []
+@export_range(1, 31) var ray_count: int = 8
+@export var dots: Array[Dictionary] = []
+@export_range(1, 64) var dot_count: int = 12
+@export var spiral: Array[Dictionary] = []
+@export var spiral_turn: Array[Dictionary] = []
+@export_range(1, 4) var spiral_arms: int = 1
+## Pixels a zoom step between one arm's coils (the shader's gap is this times the zoom).
+@export_range(2.0, 32.0, 0.5) var spiral_gap: float = 6.0
 
 @export_group("Glow")
 @export var glow: Array[Dictionary] = []
@@ -144,10 +175,14 @@ func problems() -> PackedStringArray:
 		if not curve.is_empty() and not in_table():
 			found.append("%s: a %s flash is drawn by its own shader, so it has no curves (%s)" % [id, draw, name])
 		found.append_array(_curve_problems(name, curve))
-		if not curve.is_empty() and name in [&"arm", &"disc", &"ring", &"column_width"]:
+		if not curve.is_empty() and PARTS.has(name):
 			drawn = true
 	if draw == &"shape" and not drawn:
-		found.append("%s: a shape draws at least one of arm, disc, ring and column_width" % id)
+		found.append("%s: a shape draws at least one of %s" % [id, PARTS])
+	if star_points < 2 or star_points > MAX_POINTS or ray_count < 1 or ray_count > MAX_RAYS or dot_count < 1 or dot_count > MAX_DOTS or spiral_arms < 1 or spiral_arms > MAX_ARMS:
+		found.append("%s: star_points 2-%d, ray_count 1-%d, dot_count 1-%d, spiral_arms 1-%d" % [id, MAX_POINTS, MAX_RAYS, MAX_DOTS, MAX_ARMS])
+	if spiral_gap < 2.0:
+		found.append("%s: spiral_gap is 2 px or more" % id)
 	return found
 
 

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-05: Four new drawings for flashes (flash kinds F4, owner session)
+
+- **Asked:** the owner's "Add them" to the plan's question 4 (a star, rays, a dotted ring, a spiral).
+- **Four parts, each a few lines of the flash shader's fragment stage with no loop**, drawn in the shape quad with the old ones (disc, ring, dots, spiral, rays, star, then column and cross on top): a star of `star_points` points (its reach narrowing between the points as |cos(n theta / 2)|^6, white-hot `first` in its inner 30%), `ray_count` one-pixel rays from `rays_inner` out to `rays` (white-hot within 2 px of their inner end), a ring of `dot_count` dots at `dots` (a pixel, a plus from zoom 2), and a spiral of `spiral_arms` arms out to `spiral`, turned `spiral_turn` turns, coils `spiral_gap` px a zoom step apart (closed form: the pixel's coil is near a whole one). Each size is a curve like the others; the counts are whole numbers in a second head texel of the kind's row (`FlashTable.HEADS` 2, `TEXELS` 170) and travel packed in two varyings (points + 16 rays + 512 arms; dots + 128 for a plus), so at most 12 points, 31 rays, 64 dots, 4 arms (`FlashKind.problems`).
+- **The spiral's gap scales with the zoom:** in pixels it packed two arms into rings at zoom 2 (the first sheet); a zoom step's pixels keep its coils as many at every size, as every other size does.
+- **Six example kinds, not yet named by any cue:** `star`, `star_six`, `rays_out`, `rays_in`, `dot_ring`, `spiral`, drawn by `tests/screenshots/shot_flash_drawings.gd` (plain, fire, frost, lightning; a third and two thirds through their lives). The owner picks which, if any, a cue shows (a parry's star, a level-up's rays).
+- **The port stays exact:** the new parts are off unless a kind gives them (`test_flashes` checks every ported kind draws none), so F2's pixel comparison still holds.
+
 ## 2026-11-05: Flash kinds are data (flash kinds F2 and F3, owner session)
 
 - **Asked:** the owner's go for [flash-kinds.md](milestones/flash-kinds.md): flash looks as data, ported exactly first ("yes"), then tuned.

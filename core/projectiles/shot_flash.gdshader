@@ -13,7 +13,8 @@ render_mode blend_premul_alpha;
 // transform's first unused float (MODEL_MATRIX[2].x: full precision, where the custom data may be
 // kept as half floats); its age the code beside its kind in the custom data (`coded_age`). So a new
 // look is a new file and no edit here.
-//   D_SHAPE    the parts its curves draw: a cross, a dotted disc, a fraying ring, a column of light
+//   D_SHAPE    the parts its curves draw: a cross, a dotted disc, a fraying ring, a column of light,
+//              a star, rays, a ring of dots, a spiral (the last four flash kinds F4)
 //   D_CLOUDS   a staff's poof (living staffs H4): bone clouds along the staff (+x) that swell to
 //              their biggest at 35% of the flash (where the body changes) and shrink away
 //   D_CRACKS   the ground struck (Feel's floor batch, under the bodies): cracks out from the
@@ -63,7 +64,16 @@ const int C_GLOW_MIDDLE = 11;
 const int C_GLOW_MIDDLE_REACH = 12;
 const int C_FIRST = 13;
 const int C_SECOND = 14;
+const int C_STAR = 15;
+const int C_RAYS = 16;
+const int C_RAYS_INNER = 17;
+const int C_DOTS = 18;
+const int C_SPIRAL = 19;
+const int C_SPIRAL_TURN = 20;
 const int SEGMENTS = 4;
+// The head texels of a row (its draw, metric, salt and spiral gap; its star's points, rays, dots
+// and spiral arms), before its curves.
+const int HEADS = 2;
 // A quake's reach per zoom in pixels, its cracks, and how flat the floor is seen (y over x).
 const float QUAKE_REACH = 8.0;
 const float QUAKE_CRACKS = 7.0;
@@ -79,12 +89,14 @@ const float M_SHAPE = 3.0;
 const float M_CRACK = 4.0;
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): where it is in the flash's
-// pixels, the mode, three numbers and three colours.
+// pixels, the mode, five numbers and three colours.
 varying vec2 px;
 varying flat float mode;
 varying flat vec4 v0;
 varying flat vec4 v1;
 varying flat vec4 v2;
+varying flat vec4 v3;
+varying flat vec4 v4;
 varying flat vec4 c0;
 varying flat vec4 c1;
 varying flat vec4 c2;
@@ -95,7 +107,7 @@ varying flat vec4 c2;
 // last of its segments started, `t` its way from its start to its end, eased by its way (0 linear,
 // 1 out, 2 in, 3 hold), its pixels plus its steps of the zoom.
 float curve(int row, int c, float a, float z) {
-	int x = 1 + c * SEGMENTS * 2;
+	int x = HEADS + c * SEGMENTS * 2;
 	vec4 head = texelFetch(flash_table, ivec2(x, row), 0);
 	vec4 values = texelFetch(flash_table, ivec2(x + 1, row), 0);
 	for (int n = 1; n < SEGMENTS; n++) {
@@ -141,6 +153,8 @@ void vertex() {
 	vec4 a0 = vec4(0.0);
 	vec4 a1 = vec4(0.0);
 	vec4 a2 = vec4(0.0);
+	vec4 a3 = vec4(-1.0);
+	vec4 a4 = vec4(-1.0, 0.0, 0.0, 0.0);
 	vec4 k0 = vec4(0.0);
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
@@ -168,7 +182,16 @@ void vertex() {
 		vec4 lit = vec4(curve(row, C_GLOW_RING, a, z), curve(row, C_GLOW_RING_REACH, a, z), curve(row, C_GLOW_MIDDLE, a, z), curve(row, C_GLOW_MIDDLE_REACH, a, z));
 		vec3 first = shade_of(L, curve(row, C_FIRST, a, z));
 		vec3 second = shade_of(L, curve(row, C_SECOND, a, z));
-		shown = (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake);
+		// The F4 parts: a star's reach, the rays' outer and inner ends, the dots' radius (a3); the
+		// spiral's reach, its turn, its gap (times the zoom), and the counts packed (points + 16 rays + 512 arms; the
+		// dots' count in a1.w). At most 15 points (FlashKind.MAX_POINTS 12) and 31 rays (MAX_RAYS).
+		vec4 counts = texelFetch(flash_table, ivec2(1, row), 0);
+		float rays = curve(row, C_RAYS, a, z);
+		a3 = vec4(curve(row, C_STAR, a, z), rays, rays >= 0.0 ? curve(row, C_RAYS_INNER, a, z) : 0.0, curve(row, C_DOTS, a, z));
+		float spiral = curve(row, C_SPIRAL, a, z);
+		a4 = vec4(spiral, spiral >= 0.0 ? curve(row, C_SPIRAL_TURN, a, z) : 0.0, kind_head.w * z, counts.x + counts.y * 16.0 + counts.w * 512.0);
+		bool more = a3.x >= 0.0 || a3.y > a3.z || a3.w >= 0.0 || a4.x >= 0.0;
+		shown = (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || column.x >= 0.0 || quake || more);
 		q_lo = -o;
 		q_hi = size - o;
 		if (quad == Q_LIGHT) {
@@ -190,7 +213,8 @@ void vertex() {
 		} else {
 			m = M_SHAPE;
 			a0 = vec4(metric, arm, disc, ring);
-			a1 = vec4(salt, a, s, 0.0);
+			// The dots' count, plus 128 when they are pluses (from zoom 2).
+			a1 = vec4(salt, a, s, counts.z + (z >= 2.0 ? 128.0 : 0.0));
 			a2 = column;
 			k0 = vec4(first, 1.0);
 			k1 = vec4(second, 1.0);
@@ -220,6 +244,8 @@ void vertex() {
 	v0 = a0;
 	v1 = a1;
 	v2 = a2;
+	v3 = a3;
+	v4 = a4;
 	c0 = k0;
 	c1 = k1;
 	c2 = k2;
@@ -260,6 +286,48 @@ void fragment() {
 		float bucket = floor(atan(d.y, d.x) * v0.w / 2.0);
 		if (v0.w >= 0.0 && abs(r - v0.w) < (v0.x > 1.5 ? 0.85 : 0.5) && hash_seeded(bucket, floor(v1.y * 8.0), v1.x, v1.z) > v1.y * 0.7) {
 			colour = c1;
+		}
+		// The F4 parts (flash kinds), round (whatever the metric): their way round from +x, and the
+		// whole pixel's distance.
+		float turn = atan(d.y, d.x);
+		float round_r = length(d);
+		// A ring of mod(v1.w, 128) dots at radius v3.w: the nearest dot's pixel, a plus from zoom 2
+		// (v1.w 128 or more).
+		if (v3.w >= 0.0) {
+			float n = max(mod(v1.w, 128.0), 1.0);
+			float at = round(turn / 6.2832 * n) / n * 6.2832;
+			vec2 dot_at = round(vec2(cos(at), sin(at)) * v3.w);
+			vec2 off = abs(d - dot_at);
+			if (off.x + off.y <= (v1.w >= 128.0 ? 1.0 : 0.0)) {
+				colour = c1;
+			}
+		}
+		// A spiral out to v4.x, turned v4.y turns, coils v4.z px apart, of (v4.w / 512) arms: the
+		// pixel's coil (its distance in coils less its way round in turns) is near a whole one.
+		if (v4.x >= 0.0 && round_r <= v4.x && round_r >= 1.0) {
+			float arms = floor(v4.w / 512.0);
+			float u = (round_r / v4.z - (turn / 6.2832 - v4.y)) * arms;
+			if (abs(fract(u + 0.5) - 0.5) * v4.z / arms < 0.5) {
+				colour = round_r < v4.x * 0.34 ? c0 : c1;
+			}
+		}
+		// mod(v4.w, 16) rays from v3.z out to v3.y, a pixel wide, white-hot near their inner end.
+		if (v3.y > v3.z) {
+			float n = max(floor(mod(v4.w, 512.0) / 16.0), 1.0);
+			float at = round(turn / 6.2832 * n) / n * 6.2832;
+			float along = round_r * cos(turn - at);
+			if (abs(round_r * sin(turn - at)) < 0.5 && along >= v3.z && along <= v3.y) {
+				colour = along < v3.z + 2.0 ? c0 : c1;
+			}
+		}
+		// A star of mod(v4.w, 16) points out to v3.x: its reach narrows between the points.
+		if (v3.x >= 0.0) {
+			float n = max(mod(v4.w, 16.0), 2.0);
+			float sharp = pow(abs(cos(turn * n * 0.5)), 6.0);
+			float reach = v3.x * (0.22 + 0.78 * sharp);
+			if (round_r <= max(reach, 0.5)) {
+				colour = round_r <= max(v3.x * 0.3, 0.5) ? c0 : c1;
+			}
 		}
 		// A column narrows and frays into its top third; across, white-hot in its middle, then c1,
 		// its rim c2.

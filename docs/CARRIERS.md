@@ -28,6 +28,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |
 | `BLOCKS` | Does it stand in the world and stop other actors' shots (a wall)? Read only by the AI's summary (`CastSense`). |
 | `SPAWNS` | Does it make a body of its own that stays (a decoy, a familiar)? Read only by `CastSense`. |
+| `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)
@@ -54,7 +55,10 @@ on a carrier: yes or no (Return needs `FLIES`; a decoy does not fly, so Return d
 decoy). A card that does nothing is marked in the builder; no text explains it (owner, 2026-10-30:
 the visuals are enough). A card not in `NEEDS` works on every carrier
 (numbers, blast, echo, recoil). On a carrier that hits nothing, a blast carries an infusion and
-heavy (`takes_infusion`, and heavy's `"or_cards"` in `ModifierBase.RULES` "needs").
+heavy (`takes_infusion`, and heavy's `"or_cards"` in `ModifierBase.RULES` "needs"). A carrier that
+hits nothing but passes an infusion on (a portal: what comes out of it takes its element and
+status) says so in `takes_infusion`, and which infusions count in `takes_element` (mend, which has
+no status, does nothing on a portal).
 
 `tests/core/test_card_rules.gd` plays every card on every carrier in a small world and fails where
 the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
@@ -76,11 +80,11 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
-| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), atom (adds the nova's ring) |
+| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), atom (adds the nova's ring) |
 | `shoot` | a shot flying along its heading | rune (still, placed ahead), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
-| `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows) |
+| `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam, rain (for an enemy's telegraph) |
@@ -172,6 +176,15 @@ struck; the screenshot `shot_staff_alignment` (`ci/build/build.sh --quick --scre
 them, a white cross on each tip and a red ring on each point struck. A card asks for nothing: it is
 found because it lands. While a hit holds the caster (a local stop), the body shows the moment of
 the hit, not the step before (`Actor.step`).
+
+### Portals: gates in the world
+
+A portal (`portal.gd`, docs/milestones/portal.md) opens gates, rows of the projectile manager
+(`open_gate`) that the other carriers meet without knowing the portal: a beam's ray stops where it
+goes into one when the beam asks (`ray_gates`) and goes on from every gate it leads to as a leg of
+its own (`CarrierBeam._start_leg`); a flying shot that went in is moved by the portal after the
+step (`shots_into_gates`, `pass_shot`); a body by `target_move_requested`. A new carrier whose
+rays should go through portals sets `ray_gates` before its ray and reads `ray_gate` after it.
 
 Removing a carrier is deleting its script. A form card that still names
 it is refused by the validator.

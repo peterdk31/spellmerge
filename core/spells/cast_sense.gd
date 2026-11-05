@@ -40,6 +40,8 @@ var move_reach: float = 0.0
 var blocks: bool = false
 ## True when it makes a body of its own that stays (a decoy, a familiar).
 var spawns: bool = false
+## True when it opens a way through the world that shots and bodies take (a portal).
+var opens: bool = false
 ## True when its hits heal, and when a heal lands on its caster itself (a mend that fell back on
 ## the caster, with no carrier to fly on): a cast to heal itself with.
 var heals: bool = false
@@ -112,6 +114,8 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		blocks = true
 	if spell.has_trait(CarrierTraits.SPAWNS):
 		spawns = true
+	if spell.has_trait(CarrierTraits.GATES):
+		opens = true
 	if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):

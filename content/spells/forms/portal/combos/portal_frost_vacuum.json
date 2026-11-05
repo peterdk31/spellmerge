@@ -1,0 +1,10 @@
+{
+	"id": "portal_frost_vacuum",
+	"name": "Portal frost vacuum",
+	"does": "A frost magnet portal pulls an imp beside its exit in and drops it out of the mouth by the caster, chilled by the portal's frost on the way.",
+	"casts": [{"staff": 0, "cards": ["frost", "magnet", "portal"]}],
+	"imps": [[165, 30]],
+	"pushed": true,
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

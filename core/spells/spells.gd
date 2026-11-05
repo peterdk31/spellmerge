@@ -1220,7 +1220,11 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if spell.fallback != CompiledSpell.FALLBACK_NONE:
 		return _fallback_hit(spell, tag, actor, origin)
 	_echo_spell = spell if echoed else null
-	var launched: int = _launch(spell, tag, actor, origin, heading, source)
+	var launched: int = 0
+	if spell.behaviour(ModifierBase.Behaviour.PENTA) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
+		launched = _penta(spell, tag, actor, origin, heading, source)
+	else:
+		launched = _launch(spell, tag, actor, origin, heading, source)
 	if launched > 0:
 		_recoil(spell, tag, actor, heading)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
@@ -1248,6 +1252,55 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0 and not echoed and not again and echo > 0.0:
 		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster).echoed = true
 	return launched
+
+
+## `penta` (owner, 2026-11-05): `spell` is cast `behaviour_strength` times (5 a card), each copy from
+## a point on a ring round a centre, all aimed in at it (owner: "they should just aim towards the
+## point, even if it is the player"). The centre is the caster (its body, or the point or shot
+## that casts a payload), unless the spell homes: then the target its homing picks from `origin`
+## along `heading` (a flying shot's homing looks all round, an instant carrier's within its bend),
+## the caster again when there is none. The ring stands SpellLimits.PENTA_RING beyond the centre's
+## edge, or within PENTA_WITHIN of the carrier's own reach when that is less, turned at random each
+## cast (owner, 2026-11-05) by the cast's seeded generator, as scatter is. Each point stops
+## short of a wall, and each copy is cast by its point (a beam stays there, an orbit circles it).
+## Returns the shots made.
+func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
+	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
+	# The caster: a wizard's body (its anchor), else the point or shot casting this payload.
+	var caster_at: Vector2 = origin
+	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
+		caster_at = projectiles.get_anchor(actor)
+	var centre: Vector2 = Vector2.INF
+	var edge: float = 0.0
+	if spell.homing_range > 0.0 and projectiles != null:
+		var bend: float = PI if spell.has_trait(CarrierTraits.FLIES) else deg_to_rad(spell.homing_angle)
+		centre = projectiles.homing_point(actor, origin, way, bend, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, tag)
+		if centre.is_finite():
+			edge = projectiles.homing_target_radius
+	if not centre.is_finite():
+		centre = caster_at
+	# Turned at random each cast, by the cast's own generator (the same on every machine).
+	var first: Vector2 = Vector2.from_angle(_scatter.randf() * TAU)
+	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
+	var carried: float = _carrier_of(spell).reach_of(spell)
+	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
+		# A ring of shots (a nova) is not aimed, but its shots fly this far.
+		carried = spell.speed * spell.lifetime
+	var radius: float = edge + (minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING)
+	var outer_caster: int = _caster
+	var outer_seq: int = _caster_seq
+	_caster = CASTER_POINT
+	var made: int = 0
+	for n in copies:
+		var point: Vector2 = centre + first.rotated(TAU * float(n) / float(copies)) * radius
+		if projectiles != null:
+			point = projectiles.clip_to_walls(centre, point)
+		var aim: Vector2 = point.direction_to(centre) if not point.is_equal_approx(centre) else way
+		made += _launch(spell, tag, actor, point, aim, source)
+	_caster = outer_caster
+	_caster_seq = outer_seq
+	return made
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
@@ -2517,6 +2570,41 @@ func _relay(spell: CompiledSpell, target: Node, tag: int, shot: int) -> void:
 	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
 	if slot == _ray.zap_slot:
 		_ray.hit = _rec_zap[slot]
+
+
+## `base` with every element of `donor` it does not have yet (each with its status), as relay
+## merges them; null when `donor` adds nothing. What a portal's infusion gives what goes through
+## it (docs/milestones/portal.md).
+static func merge_hit(base: HitProfile, donor: HitProfile) -> HitProfile:
+	if base == null or donor == null:
+		return null
+	var merged: HitProfile = null
+	for n in donor.element_ids.size():
+		var id: StringName = donor.element_ids[n]
+		if base.element_ids.has(id) or (merged != null and merged.element_ids.has(id)):
+			continue
+		if merged == null:
+			merged = base.copy()
+		_add_element(merged, donor, n)
+	return merged
+
+
+## The shot in `slot` takes on the infusions of `donor` (a portal's hit) for its later hits, its
+## zaps and its jumps, as a relay shot does; its core takes `tint` when it had no infusion.
+func _infuse_shot(slot: int, donor: HitProfile, tint: Color) -> void:
+	if donor == null or donor.element_ids.is_empty() or not _knows(slot):
+		return
+	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
+	if spell == null:
+		return
+	var base: HitProfile = _rec_relay[slot] if _rec_relay[slot] != null else spell.hit
+	var merged: HitProfile = merge_hit(base, donor)
+	if merged == null:
+		return
+	if base.element_id == &"":
+		projectiles.set_core(slot, tint)
+	_rec_relay[slot] = merged
+	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.zap_hit != null else null
 
 
 ## Adds element `n` of `from` to `onto`, with its status (none if `from` has none for it), as

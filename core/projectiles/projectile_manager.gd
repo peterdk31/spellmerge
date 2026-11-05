@@ -937,6 +937,34 @@ var ray_path_count: int = 0
 ## did nothing). Read right after the call: a nested ray in a hit handler changes them.
 var ray_end: Vector2 = Vector2.INF
 var ray_end_heading: Vector2 = Vector2.ZERO
+## The gates (the `portal` carrier, docs/milestones/portal.md): circles in the world that what goes
+## in comes out of elsewhere. A row each: on or not, where, the way it faces, how big, its portal
+## (`_gate_group`, the portal's own number), its portal's spell tag and whether it is the portal's mouth (1) or an exit (0).
+## The portal carrier opens and closes them; rays (`ray_gates`), shots (`shots_into_gates`) and
+## bodies read them here, as they read the walls. `_gate_live` counts the rows on.
+var _gate_on: PackedByteArray = PackedByteArray()
+var _gate_pos: PackedVector2Array = PackedVector2Array()
+var _gate_face: PackedVector2Array = PackedVector2Array()
+var _gate_radius: PackedFloat32Array = PackedFloat32Array()
+var _gate_group: PackedInt64Array = PackedInt64Array()
+var _gate_tag: PackedInt64Array = PackedInt64Array()
+var _gate_mouth: PackedByteArray = PackedByteArray()
+var _gate_live: int = 0
+## With `ray_gates` set, the next rays stop where they enter a gate (a beam, which goes on from the
+## other side: `CarrierBeam`); every other ray (a zap, a jump, a sweep) passes gates by. After a ray
+## that stopped at one, `ray_gate` is that gate (-1 for none), `ray_gate_at` where it went in,
+## `ray_gate_heading` its way in and `ray_gate_left` the length it had left. Read right after the
+## call, like `ray_end`.
+var ray_gates: bool = false
+var ray_gate: int = -1
+var ray_gate_at: Vector2 = Vector2.INF
+var ray_gate_heading: Vector2 = Vector2.ZERO
+var ray_gate_left: float = 0.0
+## The gate the last `gate_cut` found (-1 for none).
+var gate_hit: int = -1
+## What the last `shots_into_gates` found: each shot's slot and the gate it went into (reused).
+var gate_shots: PackedInt32Array = PackedInt32Array()
+var gate_shot_gates: PackedInt32Array = PackedInt32Array()
 ## What the last `sweep` found (reused; grows when a sweep finds more): the bodies, where the
 ## wedge meets each, and the sweep's way there. Read right after the call: a hit handler's sweep changes them.
 var sweep_nodes: Array = []
@@ -1715,6 +1743,8 @@ func clear() -> void:
 	_own_tail.fill(-1)
 	_group_count.fill(0)
 	_group_live = 0
+	_gate_on.fill(0)
+	_gate_live = 0
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -3817,6 +3847,194 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## it ended and its heading there are left in `ray_end` and `ray_end_heading`, and the path it
 ## walked in `ray_path`. A `ghost` ray passes through walls (it never turns or ends at one). It
 ## allocates only when a ray is bigger than any before it.
+# --- Gates (the portal carrier; docs/milestones/portal.md) -----------------------------------
+
+## Opens a gate of the portal `group` (cast as the spell `tag`) at `at`, facing `face` (unit),
+## `radius` pixels round: its mouth when `mouth`, else one of its exits. Returns its row (rows are reused once closed, the
+## lowest free first, so the order is the same every run), or -1 for a bad one.
+func open_gate(group: int, tag: int, at: Vector2, face: Vector2, radius: float, mouth: bool) -> int:
+	if not at.is_finite() or not face.is_finite() or face.is_zero_approx() or not (radius > 0.0):
+		return -1
+	var row: int = _gate_on.find(0)
+	if row < 0:
+		row = _gate_on.size()
+		var size: int = maxi(8, row * 2)
+		for column: Variant in [_gate_on, _gate_pos, _gate_face, _gate_radius, _gate_group, _gate_tag, _gate_mouth]:
+			column.resize(size)
+		for n in range(row, size):
+			_gate_on[n] = 0
+	_gate_on[row] = 1
+	_gate_pos[row] = at
+	_gate_face[row] = face.normalized()
+	_gate_radius[row] = radius
+	_gate_group[row] = group
+	_gate_tag[row] = tag
+	_gate_mouth[row] = 1 if mouth else 0
+	_gate_live += 1
+	return row
+
+
+## Closes gate `gate` (nothing when it is not open).
+func close_gate(gate: int) -> void:
+	if gate_open(gate):
+		_gate_on[gate] = 0
+		_gate_live -= 1
+
+
+## How many gate rows there are (open or not), for `gate_open`.
+func gate_rows() -> int:
+	return _gate_on.size()
+
+
+## True when there is at least one open gate.
+func has_gates() -> bool:
+	return _gate_live > 0
+
+
+func gate_open(gate: int) -> bool:
+	return gate >= 0 and gate < _gate_on.size() and _gate_on[gate] != 0
+
+
+func gate_position(gate: int) -> Vector2:
+	return _gate_pos[gate] if gate_open(gate) else Vector2.INF
+
+
+func gate_face(gate: int) -> Vector2:
+	return _gate_face[gate] if gate_open(gate) else Vector2.ZERO
+
+
+func gate_radius(gate: int) -> float:
+	return _gate_radius[gate] if gate_open(gate) else 0.0
+
+
+func gate_group(gate: int) -> int:
+	return _gate_group[gate] if gate_open(gate) else -1
+
+
+## The spell tag of gate `gate`'s portal (0 when it is not open).
+func gate_tag(gate: int) -> int:
+	return _gate_tag[gate] if gate_open(gate) else 0
+
+
+## Gate `gate` is `radius` pixels round from now on (a portal that grows).
+func set_gate_radius(gate: int, radius: float) -> void:
+	if gate_open(gate) and radius > 0.0 and is_finite(radius):
+		_gate_radius[gate] = radius
+
+
+func gate_is_mouth(gate: int) -> bool:
+	return gate_open(gate) and _gate_mouth[gate] != 0
+
+
+## Where what goes into gate `gate` comes out: from a mouth, every exit of its portal; from an
+## exit, its portal's mouth (a portal works both ways; owner, 2026-11-05). Fills `out` (grown when
+## needed) in row order and returns how many.
+func gate_outs(gate: int, out: PackedInt32Array) -> int:
+	if not gate_open(gate):
+		return 0
+	var group: int = _gate_group[gate]
+	var want: int = 0 if _gate_mouth[gate] != 0 else 1
+	var found: int = 0
+	for row in _gate_on.size():
+		if _gate_on[row] != 0 and row != gate and _gate_group[row] == group and _gate_mouth[row] == want:
+			if out.size() <= found:
+				out.resize(maxi(4, found * 2))
+			out[found] = row
+			found += 1
+	return found
+
+
+## The way something going `way` into gate `from` leaves gate `to`: the same way. A gate is a
+## sphere with no front (owner, 2026-11-05): what hits it from one side leaves the other gate on the
+## far side, going on as it went; what is fired back at an exit leaves the mouth flying at the one
+## who opened it (P3). Every pass asks here, so a later rule for turning is one place.
+func gate_turn(from: int, to: int, way: Vector2) -> Vector2:
+	if not gate_open(from) or not gate_open(to):
+		return way
+	return way
+
+
+## The share (0 to 1) of the segment from `a` to `b` at which it first goes into an open gate's
+## circle widened by `pad`, starting outside it (a segment that starts inside a gate is leaving it);
+## -1.0 for none. `gate_hit` says which gate (the lower row of two met at the same point).
+func gate_cut(a: Vector2, b: Vector2, pad: float = 0.0) -> float:
+	gate_hit = -1
+	if _gate_live <= 0:
+		return -1.0
+	var d: Vector2 = b - a
+	var dd: float = d.length_squared()
+	var best: float = 2.0
+	for row in _gate_on.size():
+		if _gate_on[row] == 0:
+			continue
+		var r: float = _gate_radius[row] + pad
+		var f: Vector2 = a - _gate_pos[row]
+		var c: float = f.length_squared() - r * r
+		if c <= 0.0:
+			continue
+		if dd <= 0.0:
+			continue
+		var bq: float = f.dot(d)
+		if bq >= 0.0:
+			continue
+		var disc: float = bq * bq - dd * c
+		if disc < 0.0:
+			continue
+		var t: float = (-bq - sqrt(disc)) / dd
+		if t >= 0.0 and t <= 1.0 and t < best:
+			best = t
+			gate_hit = row
+	return best if gate_hit >= 0 else -1.0
+
+
+## The flying shots whose centre went into a gate on their last step (from where they were to
+## where they are), in slot order: `gate_shots` and `gate_shot_gates` (each one's gate), and how
+## many. Only shots that fly on their own (straight, not stuck, held or frozen); a still shot, an
+## orbit and one that did not move never go through. Nothing is allocated once the lists have grown.
+func shots_into_gates() -> int:
+	if _gate_live <= 0:
+		return 0
+	var found: int = 0
+	for slot in _high:
+		if _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
+			continue
+		var state: int = _state[slot]
+		if state == S_STUCK or state == S_FROZEN or state == S_HELD:
+			continue
+		var from: Vector2 = _prev[slot]
+		var to: Vector2 = _pos[slot]
+		if from == to:
+			continue
+		if gate_cut(from, to) < 0.0:
+			continue
+		if gate_shots.size() <= found:
+			gate_shots.resize(maxi(8, found * 2))
+			gate_shot_gates.resize(gate_shots.size())
+		gate_shots[found] = slot
+		gate_shot_gates[found] = gate_hit
+		found += 1
+	return found
+
+
+## Puts the shot in `slot` at `at` at once, flying `velocity` (a shot that came out of a gate): no
+## tail across the gap and no hits swept across it, as a blink (`move_shot` with no seconds). Its
+## speed (what homing and return keep) stays. False when there is no such shot.
+func pass_shot(slot: int, at: Vector2, velocity: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
+		return false
+	if not at.is_finite() or not velocity.is_finite():
+		return false
+	_threat_step = -1
+	_base[slot] += at - _pos[slot]
+	_pos[slot] = at
+	_prev[slot] = at
+	_vel[slot] = velocity
+	_flags[slot] &= ~F_DEFERRED
+	_tail_from[slot] = at
+	_home_at[slot] = Vector2.INF
+	return true
+
+
 func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0, ghost: bool = false) -> float:
 	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
@@ -3881,6 +4099,8 @@ func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce
 ## A ray that is not cast: its `ray_cast_by` is used up all the same.
 func _no_ray() -> float:
 	_ray_caster = -1
+	ray_gates = false
+	_set_ray_gate(-1, Vector2.INF, Vector2.ZERO, 0.0)
 	return 0.0
 
 
@@ -3981,6 +4201,17 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
+	ray_gate = -1
+	ray_gate_at = Vector2.INF
+	ray_gate_heading = Vector2.ZERO
+	ray_gate_left = 0.0
+	# The flag is for this ray alone: a ray its hit handlers send (a zap, a jump) passes gates by.
+	var gates: bool = ray_gates and _gate_live > 0
+	ray_gates = false
+	var g_gate: int = -1
+	var g_at: Vector2 = Vector2.INF
+	var g_heading: Vector2 = Vector2.ZERO
+	var g_left: float = 0.0
 	# A wall's own ray leaves it: its row is lifted while the ray walks (`ray_cast_by`).
 	var own: Solid = _solid_of(_ray_caster, _ray_caster_seq)
 	_ray_caster = -1
@@ -3995,7 +4226,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	# (a homing beam homes again), else straight.
 	var left_turns: int = maxi(bounces, 0)
 	var left: float = 0.0
-	if left_turns > 0:
+	if left_turns > 0 or gates:
 		for i in segments:
 			left += _path[i].distance_to(_path[i + 1])
 	var reach: float = 0.0
@@ -4010,6 +4241,20 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var b: Vector2 = _path[at_piece + 1]
 		var piece: float = a.distance_to(b)
 		used = at_piece + 1
+		# A gate before the wall (or with no wall): the ray stops where it goes in, and its beam
+		# goes on from the other side (`ray_gate`).
+		var gate_at: float = gate_cut(a, b) if gates else -1.0
+		if gate_at >= 0.0:
+			var wall_at: float = _wall_hit(a, b, 1 << 30) if _has_walls and not ghost else -1.0
+			if wall_at < 0.0 or gate_at <= wall_at:
+				var into: Vector2 = a.lerp(b, gate_at)
+				g_gate = gate_hit
+				g_at = into
+				g_heading = (b - a) / piece if piece > 0.0 else Vector2.ZERO
+				g_left = maxf(left - piece * gate_at, 0.0)
+				_path[at_piece + 1] = into
+				reach += piece * gate_at
+				break
 		if _has_walls and not ghost:
 			# A ray walks every cell it crosses, however long it is.
 			var cut: float = _wall_hit(a, b, 1 << 30)
@@ -4107,6 +4352,9 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		# The beam is spent on its last target.
 		got = alongs[found - 1]
 		walled = false
+		if got < reach - 0.001:
+			# Spent before the gate: it never got there.
+			g_gate = -1
 	var end: Vector2 = _path_point(used, got)
 	var end_heading: Vector2 = _path_heading
 	# What it walked, kept for `ray_path` (and its turns' events) past the hit handlers' rays.
@@ -4123,6 +4371,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		ray_end = end
 		ray_end_heading = end_heading
 		_keep_ray_path(walk, walked)
+		_set_ray_gate(g_gate, g_at, g_heading, g_left)
 		return got
 	_ray_depth += 1
 	var outer_slot: int = _event_slot
@@ -4178,7 +4427,16 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	ray_end = end
 	ray_end_heading = end_heading
 	_keep_ray_path(walk, walked)
+	_set_ray_gate(g_gate, g_at, g_heading, g_left)
 	return got
+
+
+## What the last ray says of the gate it stopped at (`ray_gate`).
+func _set_ray_gate(gate: int, at: Vector2, heading: Vector2, left: float) -> void:
+	ray_gate = gate
+	ray_gate_at = at
+	ray_gate_heading = heading
+	ray_gate_left = left
 
 
 ## Copy the first `count` points of `walk` into `ray_path`.

@@ -75,6 +75,12 @@ enum Behaviour {
 	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
 	## cast it. Several hits make several pulls, and they add. Strength unused (1).
 	PULL,
+	## The carrier is cast `behaviour_strength` times (5 the card; more cards add) instead of once,
+	## each copy from a point on a ring round its caster, all aimed in at it; with homing, round
+	## the target its homing picks (owner, 2026-11-05: the caster is the point, homing moves it).
+	## Each copy is cast by its point (`SpellRuntime._penta`). Not on a carrier that moves its
+	## caster or strikes from the hand.
+	PENTA,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -121,6 +127,9 @@ const RULES: Dictionary = {
 	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS}, "travel_only": true},
 	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
 	Behaviour.PULL: {"needs": {"any": CarrierTraits.HITS}, "travel_only": true},
+	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
+	# leaves from a point of a ring. More cards add copies.
+	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}, "travel_only": true},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

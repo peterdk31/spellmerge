@@ -140,6 +140,9 @@ signal discharge_arc(caster: int, from: Vector2, to: Vector2)
 signal damage_dealt(caster: int, target: Node, amount: float, position: Vector2)
 ## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
 signal status_applied(caster: int, target: Node, status_id: StringName)
+## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
+## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.
+signal status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 

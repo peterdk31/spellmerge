@@ -38,6 +38,7 @@ const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
 const BLOCKS: int = CarrierTraits.BLOCKS
 const SPAWNS: int = CarrierTraits.SPAWNS
+const GATES: int = CarrierTraits.GATES
 
 
 ## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
@@ -154,6 +155,12 @@ static func _has_one(has: Dictionary, behaviours: Array) -> bool:
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.
 func takes_infusion(blasts: bool) -> bool:
 	return hits() or blasts
+
+
+## True when the infusion `element` counts on it: by default when any infusion does
+## (`takes_infusion`); a carrier that passes only an infusion's status on (a portal) says which.
+func takes_element(_element: ElementBase, blasts: bool) -> bool:
+	return takes_infusion(blasts)
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`

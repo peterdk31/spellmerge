@@ -157,8 +157,9 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					kept_modifiers.append(modifier)
 			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
 			var kept_elements: Array[ElementBase] = []
-			if on.takes_infusion(blasts) or keep_wasted:
-				kept_elements = elements
+			for element in elements:
+				if on.takes_element(element, blasts) or keep_wasted:
+					kept_elements.append(element)
 			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
@@ -166,7 +167,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
 					_waste(at)
-				elif _cards[at] is ElementBase and kept_elements.is_empty():
+				elif _cards[at] is ElementBase and not kept_elements.has(_cards[at]):
 					_waste(at)
 				else:
 					_attach(at, slot)
@@ -284,7 +285,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 		var modifier := card as ModifierBase
 		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false)
 	if card is ElementBase:
-		return on.takes_infusion(false)
+		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
 		return on.fires_with((card as TriggerBase).event, {}, false)
 	return true

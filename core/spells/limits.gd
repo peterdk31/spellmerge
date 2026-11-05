@@ -162,3 +162,22 @@ const ORBIT_TURN: float = 3.0
 const EXPIRE_BACKOFF: float = 2.0
 ## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05
+
+## The portal (docs/milestones/portal.md). The most portals one thing goes through in a row (a shot, a beam's leg): an engine safeguard
+## against a loop or a runaway fork, not a build limit (P4, P5).
+const PORTAL_JUMPS: int = 4
+## Seconds a body that came through a portal waits before another takes it (P6).
+const PORTAL_REST: float = 0.4
+## The most exits one portal opens (an engine safeguard: the most shots a carrier has, 24).
+const PORTAL_EXITS_MOST: int = 24
+## Portal rows made at once; more are made when needed.
+const PORTAL_ROWS_START: int = 8
+
+## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of what it
+## surrounds (its homing target, or its caster).
+const PENTA_RING: float = 64.0
+## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
+## so a carrier that goes a short way (a nova's ring) still meets in the middle.
+const PENTA_WITHIN: float = 0.8
+## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
+const PENTA_MOST: int = 24

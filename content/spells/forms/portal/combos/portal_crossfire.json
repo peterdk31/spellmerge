@@ -1,0 +1,9 @@
+{
+	"id": "portal_crossfire",
+	"name": "Portal crossfire",
+	"does": "A homing split portal fans three exits ahead; a fire beam into its mouth comes out of all three and each leg bends onto an imp off the line, so it burns from three sides.",
+	"casts": [{"staff": 0, "cards": ["homing", "split", "portal"]}, {"staff": 1, "cards": ["fire", "beam"], "at": 0.2}],
+	"imps": [[230, 40]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

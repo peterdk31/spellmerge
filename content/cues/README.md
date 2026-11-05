@@ -58,6 +58,9 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 | `telegraph` | the rain card's `shown_cue`, at `form_shown` `rain` | a ring closing on where a rain falls, for the seconds until then (`size`) |
 | `rainfall` | the rain card's `end_cue`, at `carrier_ended` where it falls | a column of light struck down (`fall`) and a spray |
 | `vanish` | the teleport card's `shown_cue`, where it leaves | a column of light pulled up off the spot (`rise`) |
+| `portal_open` | the portal card's `shown_cue`, at each of its gates as it opens | a ring gathering in and a quick spiral, glimmers and its cards' motes |
+| `portal_through` | the portal carrier (`cue_shown`), where a shot, a body or nothing else goes into a gate and where it comes out | a small ring going out without its cards and a few sparks (`often`) |
+| `portal_close` | the portal card's `end_cue`, at each of its gates as it closes (`carrier_ended`) | a ring closing, a puff and its cards' motes |
 | `appear` | the teleport card's `end_cue`, at `carrier_ended` where it lands | a column struck down (`fall`), a spray, a small shake and punch |
 | `trade` | the swap card's `shown_cue`, at each end of its trade | a column struck down and a small one pulled up, their rings crossing |
 | `dash_start` | the dash card's `shown_cue`, at `form_shown` `dash` where it leaves (spell-spectacle-2.md, S5) | a few `dust` motes at its feet (`below` 8) in the room's colours, for lightning (`if_layer` 5) an `arc` along its way as far as it goes, and two `stream` parts until it lands: its speed streaks (`dash_path`, 120 a second, 13 px across and 4 along) and its cards' particles (`spell`, 60 tries a second, 10 px across; embers and frost flecks, layers 1 and 2, from its feet) |

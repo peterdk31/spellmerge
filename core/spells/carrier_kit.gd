@@ -166,6 +166,13 @@ func register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int) 
 	_rt._register(slot, tag, spell, chain, prev)
 
 
+## The shot in `slot` takes on the infusions of `donor` for its later hits (a portal's: it passed
+## through one), its core `tint` when it had none.
+func infuse_shot(slot: int, donor: HitProfile, tint: Color) -> void:
+	_rt._infuse_shot(slot, donor, tint)
+## `base` with the infusions of `donor` it lacks, or null when `donor` adds none.
+func merge_hit(base: HitProfile, donor: HitProfile) -> HitProfile:
+	return SpellRuntime.merge_hit(base, donor)
 # --- Hits with no shot slot (a beam's, a sweep's, a strike, a zap, a jump) --------------
 
 ## Sends a ray: until `ray_end`, every hit with no shot slot is this one, with `tag`'s cards, going

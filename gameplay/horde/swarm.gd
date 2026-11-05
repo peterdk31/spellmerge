@@ -116,6 +116,12 @@ const TARGET_SLOTS: int = 64
 ## The wall layer of the world's static bodies.
 const WALL_LAYER: int = 1
 
+## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
+## what is set up again or rebuilt from state.
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"nodes", &"_parent", &"_slot_nodes", &"_cand_nodes"]
+## What only the drawing reads and writes (online-ready N1, N9).
+const VIEW: Array[StringName] = [&"look"]
+
 ## The services. The director hands over its own; whatever is null is taken from the autoloads
 ## (`start`).
 var events: EventsScript = null

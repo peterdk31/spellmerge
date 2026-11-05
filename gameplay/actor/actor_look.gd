@@ -25,6 +25,10 @@ const SHAKE_RATE: Vector2 = Vector2(97.0, 83.0)
 const POSE_MOODS: Dictionary = {&"raised": Face.Mood.RAISED, &"angry": Face.Mood.ANGRY, &"furious": Face.Mood.FURIOUS, &"worried": Face.Mood.WORRIED}
 const POSE_MOOD_SECONDS: float = 0.08
 
+## View as a whole (online-ready N1, core/sim/README.md): nothing here is state, so the state walk
+## never enters it, and a member that holds one is listed in VIEW or DERIVED.
+const VIEW_ONLY: bool = true
+
 ## The actor this look draws (set by `setup`).
 var actor: Actor = null
 ## The body's material while its animation glows (made the first time), and whether the body is

@@ -65,6 +65,10 @@ const REVIVE_DRAIN_FACTOR: float = 2.0
 ## Seconds a revived wizard cannot be hurt, enough to step away from what downed it.
 const REVIVE_PROTECTION: float = 1.5
 
+## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
+## what is set up again or rebuilt from state.
+const DERIVED: Array[StringName] = [&"events", &"camera", &"_wizards"]
+
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null

@@ -184,6 +184,10 @@ class PendingLaunch:
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
 const REFUSED: float = -1.0
 
+## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
+## what is set up again or rebuilt from state.
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_rec_due_body", &"_zap_near", &"_strike_bodies", &"_jq_target"]
+
 ## The shots one budget's trigger fires may make in one step (`SpellLimits.FIRE_SHOTS_PER_STEP`
 ## unless a benchmark sets another); a fire past it waits for the next step.
 var fire_shots_per_step: int = SpellLimits.FIRE_SHOTS_PER_STEP
@@ -408,6 +412,9 @@ var _moves: CasterMoves = null
 
 
 func _init() -> void:
+	# Every cast seeds it before it rolls; a fixed start keeps two runs the same before the first
+	# cast too (online-ready N1: a new generator starts on a random seed).
+	_scatter.seed = 0
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)

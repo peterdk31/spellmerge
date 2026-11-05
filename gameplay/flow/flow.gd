@@ -173,6 +173,10 @@ const INTRO_SEEN: StringName = &"intro_seen"
 
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
+## Not state (online-ready N1, core/sim/README.md): references to services and nodes, and
+## what is set up again or rebuilt from state.
+const DERIVED: Array[StringName] = [&"events", &"registry", &"input", &"combat", &"projectiles", &"world_parent", &"intro", &"loading", &"world", &"_enemies", &"_dummies", &"_wizards"]
+
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null

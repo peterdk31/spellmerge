@@ -119,6 +119,15 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - `tests/core/test_determinism.gd`: two runs of a scripted fight (bots, a horde wave, the sandbox storm) agree at every tick. A member that parts between two runs on one machine (a cache filled in a different order, a timing stat) is named by the desync report and goes into `DERIVED` or is fixed.
 - The hash's cost is measured once on the stress run, for the netcode's once-a-second check later.
 
+**Done (2026-11-05).** `core/sim/` (`StateWalk`, `SimHash`, `Desync`, README with the folders); `tests/core/test_state_walk.gd`, `test_state_declared.gd` (static over every simulation script, and live walks of the three scenes), `test_determinism.gd` (a staffed fight, a spell storm and a horde wave on `tests/core/sim_scenes.gd`, each played twice and compared at every tick). What the first runs found and how it was settled:
+
+- **Instance ids parted at tick 0** in five members (`Actors._node`, `ProjectileManager._target_id`, `Combat._node_id` and `_row_by_node`, `AIBrain._target_id`), as the audit said (A5): DERIVED until N5.
+- **`Spells._scatter` started on a random seed** (a new generator does), though every cast seeds it before it rolls: it now starts at 0, which changes no cast.
+- **Lists:** services, node references and engine objects in DERIVED, the manager's drawing members (written only from `update_draw`) and looks in VIEW, and the looks, the intro and the shader warm-up `VIEW_ONLY`. The rest of the ~1,100 members is state by default; the review area by area goes on as N2 to N10 touch them.
+- **A reference to an actor** (an AI's target) is hashed as its actor id, not flagged, so who points at whom stays in the hash. Node references without an id (swarm bodies, decoys) are DERIVED for now.
+- **The hash's cost:** about 4.3 ms for 5,000 shots, 200 bodies, the actor table and Combat (cloud test machine; 52 ms before packed arrays went through `hash()` in one call and the walk stopped building paths for the hash). Fine for the netcode's once a second. Not measured on the stress run itself: its real autoloads are not handed to `SimHash` until N3's tick names them.
+- **Not covered yet:** the real game's flow, coop and player areas, and bots (the scenes are the test worlds, stepped by hand); N2's replays bring the real game in.
+
 ### N2: input frames and replays
 
 - `core/sim/input_frame.gd` (`InputFrame`): one seat's input for one tick: move and aim quantised (move to a signed byte per axis, aim to a 16-bit angle or the "keep" value), held and pressed bits for the four staffs, and that tick's commands (the HUD's `*_requested` events, joins and leaves). `to_bytes` / `from_bytes` with a strict decoder (no `bytes_to_var` with objects).

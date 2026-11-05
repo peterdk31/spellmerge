@@ -26,11 +26,6 @@ func test_resource_has_the_horde_id_a_scene_and_four_player_spawns() -> void:
 	check(room.dummy_spawns.is_empty(), "no dummies")
 
 
-func test_in_web_builds() -> void:
-	# The Horde button is in every build, the web ones too, and web builds only see demo content.
-	check((RoomData as RoomBase).demo, "the horde room is demo content")
-
-
 func test_the_floor_is_the_whole_arena() -> void:
 	var floor_sprite := room_root.get_node("Floor") as Sprite2D
 	check_equal(RoomScan.sprite_rect(floor_sprite), Rect2(Vector2.ZERO, SIZE), "the floor covers 1280×720")

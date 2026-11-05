@@ -20,7 +20,6 @@ func test_every_element_loads_and_matches_its_folder() -> void:
 			check_equal(element.id, id, "the id is the folder name")
 			check(element.display_name != "", "%s has a name" % id)
 			check(element.icon != null, "%s has an icon" % id)
-			check(element.demo, "%s is in the web demo" % id)
 
 
 func test_every_element_is_inside_its_ranges() -> void:

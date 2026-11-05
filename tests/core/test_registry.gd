@@ -1,5 +1,5 @@
 extends SceneTree
-## Tests for core/registry: lookup by folder and id, the demo flag, duplicate
+## Tests for core/registry: lookup by folder and id, every resource seen, duplicate
 ## ids, and sounds by id (`null` for an unknown one), on a fixture folder.
 ##
 ## godot --headless --path . --script res://tests/core/test_registry.gd
@@ -16,7 +16,7 @@ func _initialize() -> void:
 	_test_lookup()
 	_test_nested_folders_and_skipped_files()
 	_test_duplicate_id_keeps_the_first()
-	_test_demo_flag()
+	_test_every_resource_is_seen()
 	_test_unknown_folder_and_id()
 	_test_sounds()
 	_test_rescan_and_missing_roots()
@@ -62,7 +62,7 @@ func _test_lookup() -> void:
 func _test_nested_folders_and_skipped_files() -> void:
 	var registry: Node = _registry()
 	_check(registry.get_resource(&"spells", &"deep") != null,"a resource two folders down is found")
-	_check(registry.get_ids(&"spells") == _names([&"deep", &"hidden", &"spark"]),"ids are sorted; a .tres without an id is skipped: %s" % [registry.get_ids(&"spells")])
+	_check(registry.get_ids(&"spells") == _names([&"deep", &"ember", &"spark"]),"ids are sorted; a .tres without an id is skipped: %s" % [registry.get_ids(&"spells")])
 	registry.free()
 
 
@@ -73,23 +73,14 @@ func _test_duplicate_id_keeps_the_first() -> void:
 	registry.free()
 
 
-func _test_demo_flag() -> void:
+func _test_every_resource_is_seen() -> void:
+	# There is no demo subset (owner, 2026-11-05): every build sees every resource.
 	var registry: Node = _registry()
-	_check(registry.get_ids(&"spells").has(&"hidden"), "everything is visible when demo_only is off")
-	_check(registry.get_resource(&"enemies", &"blob") != null,"a non-demo enemy is visible when demo_only is off")
-	registry.demo_only = true
-	_check(registry.get_resource(&"spells", &"hidden") == null, "a non-demo resource is hidden by demo_only")
-	_check(registry.get_ids(&"spells") == _names([&"deep", &"spark"]),"get_ids leaves out non-demo ids")
-	_check(registry.get_all(&"spells").size() == 2, "get_all leaves out non-demo resources")
-	_check(registry.get_ids(&"enemies").is_empty(), "a folder with only non-demo content is empty")
-	_check(registry.get_resource(&"rooms", &"hall") != null,"demo content stays visible")
-	registry.demo_only = false
-	_check(registry.get_resource(&"spells", &"hidden") != null,"turning demo_only off shows everything again")
-	# Only a release of the web demo is limited; development and preview builds show every card.
-	_check(RegistryScript.demo_only_for(true, "stable") and RegistryScript.demo_only_for(true, "nightly"), "the web demo's releases show only demo content")
-	_check(not RegistryScript.demo_only_for(true, "preview"), "a web preview build shows everything")
-	_check(not RegistryScript.demo_only_for(true, "dev"), "a web development build shows everything")
-	_check(not RegistryScript.demo_only_for(false, "stable"), "a full build shows everything")
+	_check(not ("demo_only" in registry), "the registry has no demo filter")
+	_check(registry.get_ids(&"spells") == _names([&"deep", &"ember", &"spark"]), "every spell id is listed")
+	_check(registry.get_all(&"spells").size() == 3, "get_all gives every spell")
+	_check(registry.get_resource(&"enemies", &"blob") != null, "every enemy is found")
+	_check(registry.get_resource(&"rooms", &"hall") != null, "every room is found")
 	registry.free()
 
 

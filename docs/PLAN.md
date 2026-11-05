@@ -382,10 +382,10 @@ Every daily release ships two builds from the same code:
 
 | Build | Content | Where |
 | --- | --- | --- |
-| Web demo | A curated subset that fits the web budgets: first biome, a selection of spells and enemies | GitHub Pages and itch.io, playable in the browser |
+| Web demo | Everything, as the full build (owner, 2026-11-05) | GitHub Pages and itch.io, playable in the browser |
 | Full build | Everything | Windows and Linux downloads on GitHub Releases and itch.io; later Steam |
 
-Each content item carries a `demo` flag, and Godot export presets with feature tags include or exclude it. Both builds are produced from M1, so the switch is ready before it's needed. The demo stays complete content while web budgets hold; when the full game exceeds them, the weekly planning run curates the demo subset automatically. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
+There is no demo flag on content (owner, 2026-11-05: the sandbox shows every card, and so does every build). If the full game ever outgrows the web budgets, the Web preset's `exclude_filter` (export_presets.cfg) can leave content out, by the owner's decision. Windows builds are unsigned at first, so Windows shows a SmartScreen warning until signing is added for Steam.
 
 ## Planning system
 

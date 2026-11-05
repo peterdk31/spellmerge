@@ -147,7 +147,7 @@ LOAD_FIXES = (
     "look for big textures or sounds added since the last fast build (art/manifest.json, audio/manifest.json)",
     "check work at start: autoload _ready() and Registry.scan() load every content .tres; "
     "a build-time manifest or loading on first use (docs/milestones/M1-core-loop.md, Registry) avoids that",
-    "keep demo-only content small: the Web preset can exclude more (export_presets.cfg, the demo flag)",
+    "the Web preset can leave content out of the web build (export_presets.cfg, exclude_filter)",
     "a slow runner can add seconds: re-check the next daily build before changing anything",
 )
 

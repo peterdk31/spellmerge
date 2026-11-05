@@ -458,7 +458,7 @@ package() { # package [platform...]: zips build/<platform> into dist/ (default: 
     [[ "$platform" == web ]] || continue
     size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
     echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
-    ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
+    ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), content the Web preset could leave out (export_presets.cfg, exclude_filter), uncompressed imports"
   done
   for platform in "${platforms[@]}"; do
     [[ "$platform" == web ]] && continue

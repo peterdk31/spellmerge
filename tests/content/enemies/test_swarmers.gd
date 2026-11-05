@@ -29,11 +29,10 @@ func _swarmers() -> Array[EnemyBase]:
 	return [MiteData, HuskData]
 
 
-func test_each_is_demo_content_with_its_own_id() -> void:
+func test_each_has_its_own_id() -> void:
 	check_equal(MiteData.id, &"crypt_mite", "the mite's id is its folder")
 	check_equal(HuskData.id, &"bone_husk", "the husk's id is its folder")
 	for data in _swarmers():
-		check(data.demo, "%s: in every build, so the horde has it on the web too" % data.id)
 		check(data.staffs.is_empty() and not data.has_staffs(), "%s: no staff and no cards" % data.id)
 		check(data.contact_damage > 0, "%s: hurts by touch" % data.id)
 

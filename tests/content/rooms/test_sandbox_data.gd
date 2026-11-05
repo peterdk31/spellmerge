@@ -27,11 +27,6 @@ func test_resource_has_an_id_a_scene_and_six_dummy_spawns() -> void:
 	check_equal(room.dummy_spawns.size(), 6, "dummy spawns: the training dummy, the shooting dummy and a group of four")
 
 
-func test_in_web_builds() -> void:
-	# `/preview/` is a web build, and web builds only see demo content (core/registry).
-	check((RoomData as RoomBase).demo, "the sandbox is demo content, so the preview site has it")
-
-
 func test_spawns_match_the_markers() -> void:
 	var room: RoomBase = RoomData
 	check_equal(RoomScan.markers(room_root, "PlayerSpawns"), room.player_spawns, "player spawns")

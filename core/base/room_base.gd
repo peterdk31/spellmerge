@@ -5,8 +5,6 @@ extends Resource
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
-## True for content shown in the free web demo.
-@export var demo: bool = false
 ## The layout scene (tiles only, no scripts).
 @export var scene: PackedScene
 ## Where the players start, in room pixels. Index i is player i; four are expected (checked from M3).

@@ -136,13 +136,15 @@ func tick(delta: float) -> void:
 
 
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
-## tick. Returns the replay it records into (it grows each tick until `stop_recording`).
-func record(start: StringName, starter: int) -> Replay:
+## tick. Returns the replay it records into (it grows each tick until `stop_recording`). The run's
+## seed is `run_seed`, or a random one when it is 0 (the platform runs, N2b, pick theirs, so every
+## platform plays the same horde).
+func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	stop_playing()
 	var replay := Replay.new()
 	replay.build = Replay.build_of()
 	replay.content = Replay.content_of(registry)
-	replay.run_seed = SimSeed.pick()
+	replay.run_seed = run_seed if run_seed != 0 else SimSeed.pick()
 	replay.start = start
 	replay.starter = starter
 	replay.seats = _joined_seats()

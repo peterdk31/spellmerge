@@ -1,0 +1,96 @@
+# SPDX-FileCopyrightText: 2026 peterdk31 and Spellmerge contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+"""Tests for tools/platform_hashes.py: reading the runner's lines and naming where two runs part."""
+
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import platform_hashes as ph  # noqa: E402
+
+
+def log(*ticks: tuple[str, dict[str, str]], scene: str = "sandbox", inputs: str = "abc",
+        leaves: list[tuple[str, str, str, str]] | None = None, result: str = "REPLAY HASHES OK",
+        prefix: str = "") -> str:
+    lines = [f"{prefix}REPLAY START\t{scene}\tLinux\tticks={len(ticks)}\tnative=on\tcap=1000",
+             f"{prefix}REPLAY INPUT\t{scene}\t{inputs}"]
+    for tick, (whole, areas) in enumerate(ticks):
+        lines.append(f"{prefix}REPLAY TICK\t{scene}\t{tick}\t{whole}\t" + "\t".join(f"{a}={h}" for a, h in areas.items()))
+    for area, digest, path, shown in leaves or []:
+        lines.append(f"{prefix}REPLAY LEAF\t{scene}\t{area}\t{digest}\t{path}\t{shown}")
+    lines.append(f"{prefix}REPLAY SELF\t{scene}\tagree")
+    lines.append(prefix + result)
+    return "\n".join(lines)
+
+
+class ParseTest(unittest.TestCase):
+    def test_reads_ticks_leaves_and_result(self) -> None:
+        run = ph.parse("linux", log(("w0", {"Spells": "1", "actor 0": "2"}), ("w1", {"Spells": "3", "actor 0": "2"}),
+                                    leaves=[("Spells", "d1", "Spells._walk_turn", "PackedFloat32Array(0.5)")]))
+        scene = run.scenes["sandbox"]
+        self.assertEqual(run.result, "REPLAY HASHES OK")
+        self.assertEqual(scene.input, "abc")
+        self.assertEqual(scene.ticks[1], ("w1", {"Spells": "3", "actor 0": "2"}))
+        self.assertEqual(scene.leaves[("Spells", "Spells._walk_turn")], ("d1", "PackedFloat32Array(0.5)"))
+        self.assertEqual(scene.self_check, "agree")
+
+    def test_skips_the_browser_console_prefix(self) -> None:
+        run = ph.parse("web", log(("w0", {"A": "1"}), prefix="console.log: "))
+        self.assertEqual(len(run.scenes["sandbox"].ticks), 1)
+        self.assertEqual(run.result, "REPLAY HASHES OK")
+
+    def test_a_missing_tick_is_an_error(self) -> None:
+        text = log(("w0", {"A": "1"})).replace("REPLAY TICK\tsandbox\t0", "REPLAY TICK\tsandbox\t3")
+        with self.assertRaises(ValueError):
+            ph.parse("linux", text)
+
+
+class CompareTest(unittest.TestCase):
+    def test_runs_that_agree(self) -> None:
+        a = ph.parse("linux", log(("w0", {"A": "1"}), ("w1", {"A": "2"})))
+        b = ph.parse("web", log(("w0", {"A": "1"}), ("w1", {"A": "2"})))
+        text, agree = ph.report(a, b)
+        self.assertTrue(agree)
+        self.assertIn("sandbox: agrees at all 2 ticks", text)
+
+    def test_names_the_first_tick_and_its_areas(self) -> None:
+        a = ph.parse("linux", log(("w0", {"A": "1", "B": "1"}), ("w1", {"A": "2", "B": "2"}), ("w2", {"A": "3", "B": "3"})))
+        b = ph.parse("windows", log(("w0", {"A": "1", "B": "1"}), ("x1", {"A": "2", "B": "9"}), ("x2", {"A": "8", "B": "9"})))
+        parting = ph.compare(a, b)[0]
+        self.assertEqual((parting.tick, parting.areas), (1, ["B"]))
+        text, agree = ph.report(a, b)
+        self.assertFalse(agree)
+        self.assertIn("sandbox: parts at tick 1, in B", text)
+
+    def test_names_the_members_from_kept_leaves(self) -> None:
+        leaves_a = [("B", "d1", "B.x", "1.0"), ("B", "d2", "B.y", "2.0")]
+        leaves_b = [("B", "d1", "B.x", "1.0"), ("B", "d3", "B.y", "2.0000002"), ("B", "d4", "B.z", "3")]
+        a = ph.parse("linux", log(("w0", {"B": "1"}), leaves=leaves_a))
+        b = ph.parse("windows", log(("x0", {"B": "2"}), leaves=leaves_b))
+        text, _ = ph.report(a, b)
+        self.assertIn("B: B.y: 2.0 vs 2.0000002", text)
+        self.assertIn("B: B.z: (missing) vs 3", text)
+        self.assertNotIn("B.x", text)
+
+    def test_says_when_the_inputs_differ_or_a_run_is_short(self) -> None:
+        a = ph.parse("linux", log(("w0", {"A": "1"}), ("w1", {"A": "2"})))
+        b = ph.parse("web", log(("w0", {"A": "1"}), inputs="other"))
+        text, agree = ph.report(a, b)
+        self.assertFalse(agree)
+        self.assertIn("the inputs differ", text)
+        self.assertIn("parts at tick 1, in one run has 2 ticks, the other 1", text)
+
+    def test_a_scene_not_played_is_a_parting(self) -> None:
+        a = ph.parse("linux", log(("w0", {"A": "1"})) + "\n" + log(("w0", {"A": "1"}), scene="horde"))
+        b = ph.parse("web", log(("w0", {"A": "1"})))
+        text, agree = ph.report(a, b)
+        self.assertFalse(agree)
+        self.assertIn("not played: horde", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

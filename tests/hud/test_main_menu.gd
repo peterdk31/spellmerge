@@ -60,11 +60,11 @@ func _initialize() -> void:
 	_expect(root.get_node("StressRunner").get_class() == "Node", "the stub was not used for the stress run")
 	root.get_node("StressRunner").free()
 	root.get_node("ProjectileTimingRunner").free()
-	for constant in ["STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER"]:
+	for constant in ["STRESS_RUNNER", "TIMING_RUNNER", "STORM_RUNNER", "REPLAY_HASHES_RUNNER"]:
 		_expect(ResourceLoader.exists(String(menu.get(constant))), "%s does not exist" % constant)
 	_expect(menu.call("_make_runner", "Nothing") == null, "an unknown runner name made a node")
 	# Each literal path in the menu is its constant (the real runners are not made here).
-	for pair in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["SandboxStormRunner", "STORM_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
+	for pair in [["StressRunner", "STRESS_RUNNER"], ["ProjectileTimingRunner", "TIMING_RUNNER"], ["SandboxStormRunner", "STORM_RUNNER"], ["ReplayHashesRunner", "REPLAY_HASHES_RUNNER"], [RUNNER_NODE, "FOUR_BOT_RUNNER"]]:
 		var script: GDScript = menu.call("_runner_script", pair[0]) as GDScript
 		_expect(script != null and script.resource_path == String(menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
 

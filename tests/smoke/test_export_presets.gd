@@ -1,6 +1,7 @@
 extends SceneTree
-## `Linux Test` and `Web Test` (the exports that keep tests/ for the 4-bot run) must stay
-## copies of `Linux` and `Web`: each pair, and their options, differ only in name,
+## `Linux Test`, `Web Test` and `Windows Test` (the exports that keep tests/ for the 4-bot run,
+## and on Windows for the replay hashes, online-ready N2b) must stay copies of `Linux`, `Web` and
+## `Windows`: each pair, and their options, differ only in name,
 ## runnable, exclude_filter and export_path. A new option added to one must be added to both.
 ##
 ## godot --headless --path . --script res://tests/smoke/test_export_presets.gd
@@ -15,6 +16,7 @@ func _initialize() -> void:
 	await process_frame
 	_test_test_preset_matches("Linux", "Linux Test")
 	_test_test_preset_matches("Web", "Web Test")
+	_test_test_preset_matches("Windows", "Windows Test")
 	if _failures.is_empty():
 		print("TEST OK: tests/smoke/export_presets")
 		quit(0)

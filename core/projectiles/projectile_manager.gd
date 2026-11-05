@@ -524,6 +524,22 @@ const DASH_STREAKS: int = 2
 const DASH_STREAK_SIDE: float = 13.0
 const DASH_STREAK_AHEAD: float = 4.0
 const SPARK_STREAK: int = -1
+## Tails as motes (spell-spectacle-2.md, S5 step 4; the owner, 2026-11-05: "if only the motes could
+## look more like a tail"): with the tails off, every flying shot lays its tail as births of the
+## look kind SPARK_TAIL (the motes' kinds that are a shot's tail, `MoteKind.tail`), by distance,
+## not by moment: one every TAIL_SPACING pixels of the path it was drawn along since the last
+## frame on average, each gap a random 0.5 to 1.5 of the spacing, from a phase of its own
+## (`_lay_tail`), so a fast shot's tail is as whole as a slow one's and a held stream of shots
+## never lines its motes up. TAIL_BIRTHS a frame at most with the default births' pool (the
+## "Tailless motes" slider scales it, `tail_births_cap`): past that the spacing of every tail
+## grows by the frame's ask over it (`tail_spacing`, from the last frame's), so a fight of
+## thousands of shots keeps a thinner tail on every shot, never a whole tail on some.
+## TAIL_PLAYER_SHARE of an infused shot's tail is its caster's colours, as the tail shader's
+## quarter was. Its numbers: a birth's (SPARK_BIRTH_STRIDE), the way back along the shot.
+const SPARK_TAIL: int = 62
+const TAIL_SPACING: float = 2.0
+const TAIL_BIRTHS: int = 256
+const TAIL_PLAYER_SHARE: float = 0.25
 ## Particle moments a second (the trail shader's BIRTHS were at these).
 const SPARK_MOMENTS: float = 60.0
 ## The trail meshes' shapes (`trail_mesh_slots`): a shot's, lightning's (with its jagged line) and a dash's.
@@ -883,8 +899,9 @@ var _enemy_rune_node: MultiMeshInstance2D = null
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
 var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
-## (BATCH_*), then the particles asked for, the trail cost, the shots drawn and the enemy shots drawn.
-var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+## (BATCH_*), then the particles asked for, the trail cost, the shots drawn, the enemy shots drawn,
+## the tail births laid (`spark_births`' first) and the tail asked for (`tail_demand`).
+var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 ## The trail meshes (`trail_mesh`), made once each, by `_trail_mesh_key`.
 static var _trail_meshes: Dictionary = {}
 ## Trails (see TRAIL_SAMPLES): each shot's row (-1 for none), and per row its samples (`trail_data`
@@ -994,6 +1011,26 @@ var tailless_particle_cap: int = TAILLESS_PARTICLE_CAP
 var spark_motes: bool = false
 var spark_births: PackedFloat32Array = PackedFloat32Array()
 var spark_birth_count: int = 0
+## Tails as motes (see SPARK_TAIL): whether the shots lay them this frame (the tails off and
+## something takes the births), the most a frame (`set_tailless_pool` scales TAIL_BIRTHS), the
+## spacing they are laid at (TAIL_SPACING, wider when the last frame asked for more than the
+## most), and what the last frame laid and asked for (births at TAIL_SPACING; for the spacing,
+## the tests and the benchmarks).
+var tail_births_on: bool = false
+## The "Tail motes" dev switch (`TailMotes`; `set_tail_motes`): whether tails are laid as motes at
+## all with the tails off.
+var tail_motes: bool = TailMotes.lays(TailMotes.DEFAULT)
+var tail_births_cap: int = TAIL_BIRTHS
+var tail_spacing: float = TAIL_SPACING
+var tail_births: int = 0
+var tail_demand: int = 0
+## Per shot: where its tail was laid to (its drawn point last frame), the pixels of path before
+## its next tail mote, and the tail motes it has laid (the dice of each: `tail_hash`).
+var _tail_from: PackedVector2Array = PackedVector2Array()
+var _tail_carry: PackedFloat32Array = PackedFloat32Array()
+var _tail_n: PackedInt32Array = PackedInt32Array()
+## The tail asked for while drawing (births at TAIL_SPACING).
+var _tail_wanted: float = 0.0
 ## The last particle moment handed out, and the dice the births are rolled with.
 var _spark_moment: int = -1
 var _spark_rng := RandomNumberGenerator.new()
@@ -1099,6 +1136,8 @@ func _ready() -> void:
 		events.shot_tails_changed.connect(set_tails_enabled)
 	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):
 		events.tailless_motes_changed.connect(set_tailless_pool)
+	if events != null and not events.tail_motes_changed.is_connected(set_tail_motes):
+		events.tail_motes_changed.connect(set_tail_motes)
 	_nodes.resize(BATCHES)
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
@@ -1328,6 +1367,9 @@ func set_cap(value: int) -> void:
 	_own_next.resize(_cap)
 	_core.resize(_cap)
 	_look.resize(_cap)
+	_tail_from.resize(_cap)
+	_tail_carry.resize(_cap)
+	_tail_n.resize(_cap)
 	_born.resize(_cap)
 	_trail.resize(_cap)
 	_trail.fill(-1)
@@ -1380,6 +1422,13 @@ func _on_projectile_cap_changed(cap: int) -> void:
 ## slider, `tailless_motes_changed`, `TaillessMotes` in core/settings). Read each frame.
 func set_tailless_pool(pool: int) -> void:
 	tailless_particle_cap = maxi(pool, 0)
+	tail_births_cap = clampi(TAIL_BIRTHS * tailless_particle_cap / TAILLESS_PARTICLE_CAP, 0, SPARK_BIRTHS_MAX / 2)
+
+
+## The "Tail motes" dev switch (`TailMotes` in core/settings, `tail_motes_changed`): with the
+## tails off, a pick other than Off lays every flying shot's tail as motes (SPARK_TAIL).
+func set_tail_motes(pick: int) -> void:
+	tail_motes = TailMotes.lays(pick)
 
 
 ## Turn the shots' tails on or off (`tails_enabled`; the "Tails" switch, `shot_tails_changed`).
@@ -1392,6 +1441,9 @@ func set_tails_enabled(on: bool) -> void:
 	tails_enabled = on
 	if on:
 		return
+	# A tail laid from here on starts where each shot is now.
+	for slot in _high:
+		_tail_from[slot] = _pos[slot]
 	for slot in _high:
 		var row: int = _trail[slot]
 		if row >= 0:
@@ -2876,6 +2928,10 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_born[slot] = sim_time
 	_seq[slot] = _next_seq
 	_next_seq += 1
+	# Its tail (with the tails off) starts where it does, from a phase of its own.
+	_tail_from[slot] = origin
+	_tail_carry[slot] = TAIL_SPACING * tail_hash(_seq[slot], -1)
+	_tail_n[slot] = 0
 	_skip_left[slot] = 0.0
 	_flags[slot] = 0
 	_bounce[slot] = 0
@@ -4454,10 +4510,19 @@ func update_draw(fraction: float = -1.0) -> void:
 	# A batch that also draws loose trails has room for more than the cap.
 	for batch in BATCHES:
 		_rooms[batch] = _fit_batch(_nodes[batch].multimesh, _buffers[batch], _rooms[batch], _batch_counts[batch], _cap * (1 + TRAIL_ROWS_PER_SLOT) if BATCH_LOOSE[batch] else -1)
+	# Tails as motes (SPARK_TAIL): the drawing lays them, first in the frame's births.
+	tail_births_on = spark_motes and not tails_enabled and tail_motes
+	if tail_births_on and spark_births.size() < SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE:
+		spark_births.resize(SPARK_BIRTHS_MAX * SPARK_BIRTH_STRIDE)
 	if kernel_draw:
 		_kernel.call(&"draw_shots", self, fraction)
 	else:
 		_draw_shots(fraction)
+	tail_births = _draw_out[BATCHES + 4]
+	tail_demand = _draw_out[BATCHES + 5]
+	spark_birth_count = tail_births
+	# The next frame's spacing: wider by as much as this frame asked past the most.
+	tail_spacing = TAIL_SPACING * maxf(1.0, float(tail_demand) / float(maxi(tail_births_cap, 1)))
 	var instances: int = 0
 	for batch in BATCHES:
 		var out: int = _draw_out[batch]
@@ -4489,7 +4554,6 @@ func update_draw(fraction: float = -1.0) -> void:
 ## a random slot at each of `_high` x the share tries a moment, kept at the kind's rate, so the work
 ## follows the births (the pool's share bounds them), not the shots.
 func _give_off_sparks(fraction: float) -> void:
-	spark_birth_count = 0
 	var moment: int = floori((sim_time - (1.0 - fraction) * _last_delta) * SPARK_MOMENTS)
 	var moments: int = clampi(moment - _spark_moment, 0, 4) if _spark_moment >= 0 else 1
 	_spark_moment = moment
@@ -4501,6 +4565,8 @@ func _give_off_sparks(fraction: float) -> void:
 	if _high == 0:
 		return
 	var tries: int = mini(floori(float(_high * moments) * particle_share + _spark_rng.randf()), SPARK_BIRTHS_MAX * 4)
+	# The steps the frame's moments cover.
+	var span: float = float(moments) / SPARK_MOMENTS / maxf(_last_delta, 0.0001)
 	for n in tries:
 		var slot: int = _spark_rng.randi_range(0, _high - 1)
 		if _alive[slot] == 0 or _motion[slot] == MOTION_STILL or (_trail[slot] < 0 and tails_enabled):
@@ -4511,8 +4577,12 @@ func _give_off_sparks(fraction: float) -> void:
 			kind = _nth_bit(bits, _spark_rng.randi_range(0, _bit_count(bits) - 1)) + 1
 		if _spark_rng.randf() >= SPARK_RATES[kind]:
 			continue
-		var at: Vector2 = _prev[slot].lerp(_pos[slot], _spark_rng.randf() * fraction)
-		var back: Vector2 = _prev[slot] - _pos[slot]
+		# Anywhere on the path it was drawn along since the last frame (the moments since then, back
+		# from where it is drawn now): a frame's births never gather in one part of each step, so a
+		# held stream of shots does not line them up (the owner, 2026-11-05).
+		var step: Vector2 = _pos[slot] - _prev[slot]
+		var at: Vector2 = _prev[slot] + step * (fraction - _spark_rng.randf() * span)
+		var back: Vector2 = -step
 		if _motion[slot] == MOTION_ORBIT:
 			at = _drawn_at(slot, at)
 			back = -_orbit_tangent(slot)
@@ -4616,6 +4686,7 @@ static func _nth_bit(bits: int, n: int) -> int:
 func _draw_shots(fraction: float) -> void:
 	for batch in BATCHES:
 		_draw_out[batch] = 0
+	_tail_wanted = 0.0
 	var asked: int = 0
 	var trails: int = 0
 	for slot in _high:
@@ -4639,6 +4710,8 @@ func _draw_shots(fraction: float) -> void:
 		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if motion == MOTION_ORBIT else 0)
 		_write_trail(_buffers[batch], _draw_out[batch] * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
 		_draw_out[batch] += 1
+		if tail_births_on:
+			_lay_tail(slot, at)
 	var shots: int = 0
 	for batch in BATCHES:
 		shots += _draw_out[batch]
@@ -4662,6 +4735,53 @@ func _draw_shots(fraction: float) -> void:
 		_draw_out[batch] += 1
 	_draw_out[BATCHES] = asked
 	_draw_out[BATCHES + 1] = trails
+	_draw_out[BATCHES + 4] = spark_birth_count
+	_draw_out[BATCHES + 5] = int(_tail_wanted)
+
+
+## Lay the tail of the shot in `slot`, drawn at `at` this frame, as births (SPARK_TAIL; what
+## `ShotKernel.draw_shots` does natively, to the bit): along the path from where it was drawn last
+## frame, one at its next tail point and every `tail_spacing` x 0.5 to 1.5 pixels on from there
+## (`tail_hash` of its sequence and its count), while the frame's `tail_births_cap` lasts. A jump
+## longer than TRAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
+## tail its caster's colours (a white core, so the motes take its hat ramp).
+func _lay_tail(slot: int, at: Vector2) -> void:
+	var from: Vector2 = _tail_from[slot]
+	_tail_from[slot] = at
+	var way: Vector2 = at - from
+	var d: float = way.length()
+	if not (d > 0.0) or d > TRAIL_JUMP:
+		return
+	_tail_wanted += d / TAIL_SPACING
+	var carry: float = _tail_carry[slot]
+	var n: int = _tail_n[slot]
+	var seq: int = _seq[slot]
+	var core: Color = _core[slot]
+	var mixed: bool = not (core.r > 0.99 and core.g > 0.99 and core.b > 0.99)
+	var back: Vector2 = way / -d
+	while carry < d:
+		if spark_birth_count >= tail_births_cap:
+			carry = d
+			break
+		var colour: Color = core
+		if mixed and tail_hash(seq, n * 2) < TAIL_PLAYER_SHARE:
+			colour = Color.WHITE
+		_add_birth(from.lerp(at, carry / d), back, SPARK_TAIL, _ramp[slot], _look[slot], colour, _tag[slot])
+		carry += tail_spacing * (0.5 + tail_hash(seq, n * 2 + 1))
+		n += 1
+	_tail_carry[slot] = carry - d
+	_tail_n[slot] = n
+
+
+## A number from 0 up to 1 for the pair (`a`, `b`), the same every time (and in the native
+## kernel): the tails' dice (`_lay_tail`).
+static func tail_hash(a: int, b: int) -> float:
+	# Every product stays below 2^63, so GDScript's ints and the kernel's agree.
+	var h: int = ((a & 0xFFFFFFFF) * 374761393 + (b & 0xFFFFFFFF) * 668265263) & 0xFFFFFFFF
+	h = ((h ^ (h >> 16)) * 0x45D9F3B) & 0xFFFFFFFF
+	h = ((h ^ (h >> 16)) * 0x45D9F3B) & 0xFFFFFFFF
+	h = h ^ (h >> 16)
+	return float(h & 0xFFFFFF) / 16777216.0
 
 
 ## Write the rune quad of the still shot in `slot` drawn at `at` into `buffer` from instance

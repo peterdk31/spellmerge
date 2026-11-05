@@ -77,6 +77,21 @@ constexpr int64_t AFTER_HOMING_MASK = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMIN
 constexpr int TRAIL_SAMPLES = 32;
 constexpr int TRAIL_STRIDE = TRAIL_SAMPLES * 4;
 constexpr double TRAIL_JUMP = 96.0;
+// Tails as motes (the manager's SPARK_TAIL, `_lay_tail`) and a birth's numbers (SPARK_*).
+constexpr int SPARK_BIRTH_STRIDE = 12;
+constexpr int SPARK_X = 0;
+constexpr int SPARK_Y = 1;
+constexpr int SPARK_BACK_X = 2;
+constexpr int SPARK_BACK_Y = 3;
+constexpr int SPARK_KIND = 4;
+constexpr int SPARK_RAMP = 5;
+constexpr int SPARK_LOOK = 6;
+constexpr int SPARK_CORE = 7;
+constexpr int SPARK_TAG = 10;
+constexpr int SPARK_TAG_BITS = 12;
+constexpr int SPARK_TAIL = 62;
+constexpr double TAIL_SPACING = 2.0;
+constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
 constexpr int TRAIL_HEAD = 1;
 constexpr int TRAIL_ORBIT = 2;
@@ -210,6 +225,14 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(draw_out, "_draw_out", PACKED_INT32_ARRAY) \
 	X(rooms, "_rooms", PACKED_INT32_ARRAY) \
 	X(trail_look, "_trail_look", PACKED_INT32_ARRAY) \
+	X(tail_from, "_tail_from", PACKED_VECTOR2_ARRAY) \
+	X(tail_carry, "_tail_carry", PACKED_FLOAT32_ARRAY) \
+	X(tail_n, "_tail_n", PACKED_INT32_ARRAY) \
+	X(tag, "_tag", PACKED_INT64_ARRAY) \
+	X(spark_births, "spark_births", PACKED_FLOAT32_ARRAY) \
+	X(tail_births_on, "tail_births_on", BOOL) \
+	X(tail_births_cap, "tail_births_cap", INT) \
+	X(tail_spacing, "tail_spacing", FLOAT) \
 	X(team, "_team", PACKED_INT32_ARRAY) \
 	X(threat_slot, "threat_slot", INT) \
 	X(threat_away, "threat_away", VECTOR2) \
@@ -814,6 +837,20 @@ const Constant CONSTANTS[] = {
 	{ "TRAIL_SAMPLES", (double)TRAIL_SAMPLES },
 	{ "TRAIL_STRIDE", (double)TRAIL_STRIDE },
 	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
+	{ "SPARK_BIRTH_STRIDE", (double)SPARK_BIRTH_STRIDE },
+	{ "SPARK_X", (double)SPARK_X },
+	{ "SPARK_Y", (double)SPARK_Y },
+	{ "SPARK_BACK_X", (double)SPARK_BACK_X },
+	{ "SPARK_BACK_Y", (double)SPARK_BACK_Y },
+	{ "SPARK_KIND", (double)SPARK_KIND },
+	{ "SPARK_RAMP", (double)SPARK_RAMP },
+	{ "SPARK_LOOK", (double)SPARK_LOOK },
+	{ "SPARK_CORE", (double)SPARK_CORE },
+	{ "SPARK_TAG", (double)SPARK_TAG },
+	{ "SPARK_TAG_BITS", (double)SPARK_TAG_BITS },
+	{ "SPARK_TAIL", (double)SPARK_TAIL },
+	{ "TAIL_SPACING", (double)TAIL_SPACING },
+	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
 	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
 	{ "TRAIL_DASH", (double)TRAIL_DASH },
@@ -1455,6 +1492,20 @@ void ShotKernel::count_draw(Object *m) {
 // `update_draw`'s writing (no solid shots): every live shot and every loose trail into the batches'
 // buffers, which the kernel holds (`buffer`), sized to the manager's rooms; `_draw_out` gets the
 // instances written per batch (BATCH_*), the particles asked for and the trail cost.
+namespace {
+
+// The manager's `tail_hash`: a number from 0 up to 1 for the pair (a, b), every product below 2^63
+// there, so the two agree.
+inline double tail_hash(int64_t a, int64_t b) {
+	uint64_t h = (((uint64_t)a & 0xFFFFFFFFull) * 374761393ull + ((uint64_t)b & 0xFFFFFFFFull) * 668265263ull) & 0xFFFFFFFFull;
+	h = ((h ^ (h >> 16)) * 0x45D9F3Bull) & 0xFFFFFFFFull;
+	h = ((h ^ (h >> 16)) * 0x45D9F3Bull) & 0xFFFFFFFFull;
+	h = h ^ (h >> 16);
+	return (double)(h & 0xFFFFFFull) / 16777216.0;
+}
+
+} // namespace
+
 void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch;
@@ -1493,7 +1544,75 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const int64_t high = m->get(k.high);
 	const int64_t loose_count = m->get(k.loose_count);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 4 || loose_count > loose.n || rooms.n < BATCHES);
+	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 6 || loose_count > loose.n || rooms.n < BATCHES);
+	// Tails as motes (`_lay_tail`).
+	const bool tails_on = m->get(k.tail_births_on);
+	const int64_t tail_cap = m->get(k.tail_births_cap);
+	const double tail_spacing = m->get(k.tail_spacing);
+	Arr<PackedVector2Array> tail_from;
+	Arr<PackedFloat32Array> tail_carry, births;
+	Arr<PackedInt32Array> tail_n, ramp, look;
+	Arr<PackedInt64Array> seq, tag;
+	if (tails_on) {
+		tail_from.load(m, k.tail_from);
+		tail_carry.load(m, k.tail_carry);
+		births.load(m, k.spark_births);
+		tail_n.load(m, k.tail_n);
+		ramp.load(m, k.ramp);
+		look.load(m, k.look);
+		seq.load(m, k.seq);
+		tag.load(m, k.tag);
+		ERR_FAIL_COND(high > tail_from.n || high > tail_carry.n || high > tail_n.n || high > tag.n || high > seq.n || births.n < tail_cap * SPARK_BIRTH_STRIDE);
+	}
+	int64_t tail_count = 0;
+	double tail_wanted = 0.0;
+	auto lay_tail = [&](int64_t slot, const Vector2 &at) {
+		const Vector2 from = tail_from[slot];
+		tail_from[slot] = at;
+		const Vector2 way = at - from;
+		const double d = way.length();
+		if (!(d > 0.0) || d > TRAIL_JUMP) {
+			return;
+		}
+		tail_wanted += d / TAIL_SPACING;
+		double carry = tail_carry[slot];
+		int64_t n = tail_n[slot];
+		const int64_t sq = seq[slot];
+		const Color cr = core[slot];
+		const bool mixed = !((double)cr.r > 0.99 && (double)cr.g > 0.99 && (double)cr.b > 0.99);
+		const Vector2 back = way / (real_t)(-d);
+		const int64_t tg = tag[slot];
+		while (carry < d) {
+			if (tail_count >= tail_cap) {
+				carry = d;
+				break;
+			}
+			Color colour = cr;
+			if (mixed && tail_hash(sq, n * 2) < TAIL_PLAYER_SHARE) {
+				colour = Color(1, 1, 1, 1);
+			}
+			// `_add_birth`.
+			const Vector2 p = from.lerp(at, (real_t)(carry / d));
+			float *b = births.p + tail_count * SPARK_BIRTH_STRIDE;
+			b[SPARK_X] = p.x;
+			b[SPARK_Y] = p.y;
+			b[SPARK_BACK_X] = back.x;
+			b[SPARK_BACK_Y] = back.y;
+			b[SPARK_KIND] = (float)(double)SPARK_TAIL;
+			b[SPARK_RAMP] = (float)(double)ramp[slot];
+			b[SPARK_LOOK] = (float)(double)look[slot];
+			b[SPARK_CORE] = colour.r;
+			b[SPARK_CORE + 1] = colour.g;
+			b[SPARK_CORE + 2] = colour.b;
+			b[SPARK_TAG] = (float)(double)(tg & ((1ll << SPARK_TAG_BITS) - 1));
+			b[SPARK_TAG + 1] = (float)(double)(tg >> SPARK_TAG_BITS);
+			tail_count += 1;
+			carry += tail_spacing * (0.5 + tail_hash(sq, n * 2 + 1));
+			n += 1;
+		}
+		tail_carry[slot] = (float)(carry - d);
+		tail_n[slot] = (int32_t)n;
+	};
 	float *out_buffer[BATCHES];
 	int64_t room[BATCHES];
 	int64_t used[BATCHES] = {};
@@ -1564,6 +1683,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			}
 		} else {
 			write_trail(batch, trail[slot], at, flags, look_data, core[slot], pos[slot] - prev[slot]);
+			if (tails_on && !rune) {
+				lay_tail(slot, at);
+			}
 		}
 	}
 	int64_t shots = 0;
@@ -1595,6 +1717,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	draw_out[BATCHES + 1] = (int32_t)trails;
 	draw_out[BATCHES + 2] = (int32_t)shots;
 	draw_out[BATCHES + 3] = (int32_t)enemy_shots;
+	draw_out[BATCHES + 4] = (int32_t)tail_count;
+	draw_out[BATCHES + 5] = (int32_t)(int64_t)tail_wanted;
 }
 
 PackedFloat32Array ShotKernel::buffer(int64_t batch) const {

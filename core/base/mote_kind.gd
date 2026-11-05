@@ -38,6 +38,11 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 ## Given off along every dash's path (its speed streaks; docs/milestones/spell-spectacle-2.md,
 ## S5), in the dashing actor's colours, whatever its cards (theirs are given off beside it).
 @export var dash_path: bool = false
+## A shot's tail while the tails are off (docs/milestones/spell-spectacle-2.md, S5 step 4: tails
+## as motes): laid along every flying shot's path by distance, in the shot's own colours, whatever
+## its cards (theirs are given off beside it). When several kinds are, the motes lay one of them
+## (`Motes.use_tail_kind`: the first by id unless one is picked).
+@export var tail: bool = false
 ## The floor mark (a `MarkKind` id, content/marks) each of its motes leaves where it comes to
 ## rest, in its own colours, once it lies still (docs/milestones/spell-spectacle.md, P2b: settled
 ## motes); empty for none. Only a kind that falls (gravity above 0) comes to rest.
@@ -165,6 +170,8 @@ func problems() -> PackedStringArray:
 		found.append("%s: a surface kind belongs to no card, so it names no cards and no look layers" % id)
 	if dash_path and (surface or not look_layers.is_empty() or not cards.is_empty()):
 		found.append("%s: a dash's path kind belongs to no card and no surface" % id)
+	if tail and (surface or dash_path or not look_layers.is_empty() or not cards.is_empty()):
+		found.append("%s: a tail kind belongs to no card, no surface and no dash" % id)
 	for card in cards:
 		if card == &"":
 			found.append("%s: a card it names has no id" % id)

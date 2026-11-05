@@ -1,13 +1,13 @@
 extends SceneTree
-## The shot trails on the GPU (performance, 2026-11-02): a fixed scene of shots stepped by hand, in
+## The shots on the GPU (performance, 2026-11-02; their heads, `shot_head.gdshader`, and the motes): a fixed scene of shots stepped by hand, in
 ## a window, timed and optionally saved frame by frame. Not run in the build (it needs a GPU, or a
 ## virtual display: llvmpipe stands in for one, slower, but its time follows the vertex count).
 ##
-##   godot --path . --script res://tests/benchmark/trail_gpu.gd               time each scenario
-##   godot --path . --script res://tests/benchmark/trail_gpu.gd -- --frames=DIR
+##   godot --path . --script res://tests/benchmark/shot_gpu.gd               time each scenario
+##   godot --path . --script res://tests/benchmark/shot_gpu.gd -- --frames=DIR
 ##                                    also save each scenario's frames as DIR/<scenario>_<n>.png
 ##   ... -- --plain                   no lightning (one batch per layer: a change of
-##                                    batching cannot move one trail over another)
+##                                    batching cannot move one shot over another)
 ##   ... -- --no-time                 save the frames only
 ##   ... -- --only=some               run one scenario (few, some, many)
 ##   ... -- --timed=N                 time N frames (TIMED_FRAMES; the first quarter left out)
@@ -18,12 +18,11 @@ extends SceneTree
 ##                                    default, the desktop's)
 ##   ... -- --marks                   the floor mark scene instead (P1c for P2a; `_mark_scene`):
 ##                                    frames with 300 new stamps and frames with none, by turns
-##   ... -- --trail-motes             with a mote pool (Feel's, gameplay/feel/mote.gd) throwing the
-##                                    trails' particles (P1d; since S3 the trails draw none of their
-##                                    own): the births' and the throws' CPU time is printed too, and
+##   ... -- --tail-motes              with a mote pool (Feel's, gameplay/feel/mote.gd) throwing the
+##                                    shots' tails and particles (P1d, S5): the births' and the throws' CPU time is printed too, and
 ##                                    the motes are in the GPU time.
 ##   ... -- --tailless-cap=N          the births' pool (TAILLESS_PARTICLE_CAP)
-## (Since 2026-11-05 a shot's tail is motes, laid with --trail-motes: the shots are their cores
+## (Since 2026-11-05 a shot's tail is motes, laid with --tail-motes: the shots are their cores
 ## and lights alone, and the trail rows and their `--no-tails` switch are gone.)
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
@@ -33,9 +32,9 @@ extends SceneTree
 ## Feel's since 2026-11-05, a `stream` cue part). A shot that ends is replaced, so the count holds. The
 ## manager is stepped and drawn by hand at a fixed 60 steps a second, so a frame is the same on
 ## every run of the same code: a change that should look the same can be compared pixel by pixel
-## (the saved frames of two checkouts). It prints `BENCH: trail gpu` lines: the GPU time of a frame
-## (median and p95 over the measured frames, `RenderingServer` viewport timing), the trail
-## instances, the vertices the batches send a frame (each runs the trail's vertex stage) and the
+## (the saved frames of two checkouts). It prints `BENCH: shot gpu` lines: the GPU time of a frame
+## (median and p95 over the measured frames, `RenderingServer` viewport timing), the shot
+## instances, the vertices the batches send a frame (each runs the head's vertex stage) and the
 ## pool's shares.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -53,7 +52,7 @@ const LIGHT_Z: int = 15
 
 const ROOM := Rect2(0.0, 0.0, 640.0, 360.0)
 const DT: float = 1.0 / 60.0
-## Steps before the first frame is kept (the trails grow to their length), frames saved and frames timed.
+## Steps before the first frame is kept (the tails grow to their length), frames saved and frames timed.
 const WARM_STEPS: int = 90
 const SAVED_FRAMES: int = 4
 const TIMED_FRAMES: int = 120
@@ -112,7 +111,7 @@ func _initialize() -> void:
 			_motes_only = true
 		elif arg == "--marks":
 			_marks_only = true
-		elif arg == "--trail-motes":
+		elif arg == "--tail-motes":
 			_use_motes = true
 		elif arg.begins_with("--tailless-cap="):
 			_tailless_cap = maxi(arg.substr(15).to_int(), 0)
@@ -124,7 +123,7 @@ func _initialize() -> void:
 func _run() -> void:
 	await process_frame
 	RenderingServer.viewport_set_measure_render_time(root.get_viewport_rid(), true)
-	print("BENCH: trail gpu on %s" % RenderingServer.get_video_adapter_name())
+	print("BENCH: shot gpu on %s" % RenderingServer.get_video_adapter_name())
 	if _use_motes:
 		var registry := RegistryScript.new()
 		registry.scan()
@@ -230,13 +229,13 @@ func _scenario(scenario: Dictionary) -> void:
 		if _spell_light != null:
 			light_times.append(RenderingServer.viewport_get_measured_render_time_gpu(_spell_light.viewport.get_viewport_rid()))
 	if times.is_empty():
-		print("BENCH: trail gpu %s: frames saved" % label)
+		print("BENCH: shot gpu %s: frames saved" % label)
 		return
 	# The first frames after a change of mesh compile and upload: leave a quarter out.
 	times = times.slice(_timed / 4)
 	var sorted: PackedFloat64Array = times.duplicate()
 	sorted.sort()
-	print("BENCH: trail gpu %s: %d shots (%d drawn, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; particles' share %.2f" % [
+	print("BENCH: shot gpu %s: %d shots (%d drawn, %d vertices a frame), GPU median %.2f ms, p95 %.2f ms; particles' share %.2f" % [
 		label, shots, _mgr.drawn, _vertices(), sorted[sorted.size() / 2],
 		sorted[int(float(sorted.size()) * 0.95)], _mgr.particle_share])
 	draw_times = draw_times.slice(_timed / 4)
@@ -245,21 +244,21 @@ func _scenario(scenario: Dictionary) -> void:
 	wall_times.sort()
 	step_times = step_times.slice(_timed / 4)
 	step_times.sort()
-	print("BENCH: trail gpu %s: update_draw CPU median %.2f ms; the step (with its new shots) median %.2f ms; a whole frame median %.1f ms (wall clock); native %s" % [
+	print("BENCH: shot gpu %s: update_draw CPU median %.2f ms; the step (with its new shots) median %.2f ms; a whole frame median %.1f ms (wall clock); native %s" % [
 		label, draw_times[draw_times.size() / 2], step_times[step_times.size() / 2], wall_times[wall_times.size() / 2], "on" if _mgr.is_native() else "off"])
 	if _motes != null:
 		mote_times = mote_times.slice(_timed / 4)
 		mote_times.sort()
-		print("BENCH: trail gpu %s: %.1f births a frame, throwing them CPU median %.3f ms, %d mote chunks shown" % [
+		print("BENCH: shot gpu %s: %.1f births a frame, throwing them CPU median %.3f ms, %d mote chunks shown" % [
 			label, float(births) / float(_timed), mote_times[mote_times.size() / 2], _motes.chunks_shown()])
 	if not light_times.is_empty():
 		light_times = light_times.slice(_timed / 4)
 		light_times.sort()
-		print("BENCH: trail gpu %s: spell light buffer GPU median %.2f ms, p95 %.2f ms (the apply pass is in the frame's)" % [
+		print("BENCH: shot gpu %s: spell light buffer GPU median %.2f ms, p95 %.2f ms (the apply pass is in the frame's)" % [
 			label, light_times[light_times.size() / 2], light_times[int(float(light_times.size()) * 0.95)]])
 
 
-## The trails' particles of the last `update_draw` thrown as motes, and the pool stepped to frame `n`.
+## The shots' births (tails and particles) of the last `update_draw` thrown as motes, and the pool stepped to frame `n`.
 func _throw_motes(n: int) -> void:
 	if _motes == null:
 		return
@@ -359,7 +358,7 @@ func _mote_scene(scene: Dictionary) -> void:
 		motes.free()
 	times = times.slice(_timed / 4)
 	times.sort()
-	print("BENCH: trail gpu %s: %d motes in flight (%d vertices a frame), GPU median %.2f ms, p95 %.2f ms" % [
+	print("BENCH: shot gpu %s: %d motes in flight (%d vertices a frame), GPU median %.2f ms, p95 %.2f ms" % [
 		label, cap, vertices, times[times.size() / 2], times[int(float(times.size()) * 0.95)]])
 
 
@@ -412,7 +411,7 @@ func _mark_scene() -> void:
 	marks.free()
 	for list: PackedFloat64Array in [stamp_layer, stamp_frame, none_frame]:
 		list.sort()
-	print("BENCH: trail gpu marks: %d stamps a frame: layer GPU median %.2f ms (p95 %.2f), whole frame median %.2f ms; no stamps: %d layer renders in %d frames, whole frame median %.2f ms; layer %dx%d (%.1f MB)" % [
+	print("BENCH: shot gpu marks: %d stamps a frame: layer GPU median %.2f ms (p95 %.2f), whole frame median %.2f ms; no stamps: %d layer renders in %d frames, whole frame median %.2f ms; layer %dx%d (%.1f MB)" % [
 		MARK_STAMPS, stamp_layer[stamp_layer.size() / 2], stamp_layer[int(float(stamp_layer.size()) * 0.95)], stamp_frame[stamp_frame.size() / 2],
 		none_renders, none_frames, none_frame[none_frame.size() / 2],
 		int(MARK_ROOM.size.x), int(MARK_ROOM.size.y), MARK_ROOM.size.x * MARK_ROOM.size.y * 4.0 / 1048576.0])

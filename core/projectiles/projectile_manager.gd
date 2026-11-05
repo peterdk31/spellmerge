@@ -54,8 +54,8 @@ extends Node2D
 ## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
 ## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
 ## batch of its own (the owner, 2026-10-29; core/README.md, "The shot shaders"): a flying shot
-## and its trail by `shot_trail.gdshader`, as small quads its vertex stage places (`trail_mesh`:
-## a quad per tail pixel, particle and light, so the fragment stage stays small), a rune by
+## (its core and the core's light; the tail is motes) by `shot_head.gdshader`, as small quads its
+## vertex stage places (`head_mesh`, so the fragment stage stays small), a rune by
 ## `shot_rune.gdshader`.
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
@@ -334,16 +334,17 @@ const BATCH_ENEMY_RUNE: int = 4
 const BATCHES: int = 5
 ## The order the batches' nodes are made in (their draw order at one z).
 const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_RUNE, BATCH_ORBIT, BATCH_ENEMY, BATCH_ENEMY_RUNE]
-## Each batch's mesh: 0 the shots' (`trail_mesh`), -1 a batch of runes (one quad each).
+## Each batch's mesh: 0 the shots' (`head_mesh`), -1 a batch of runes (one quad each).
 const BATCH_MESH: Array[int] = [0, -1, 0, 0, -1]
 ## The batches on the enemy ramp's layer, one above the others.
 const BATCH_ENEMY_LAYER: Array[bool] = [false, false, false, true, true]
 ## The batches given the shot art (`texture`).
 const BATCH_TEXTURED: Array[bool] = [true, true, true, false, false]
 ## The bodies a shot is drawn as (the shot shaders build them on a pixel grid; staffs B6a): a
-## bolt with its tail (`shot_trail.gdshader`), a rune (a diamond that pulses, `shot_rune.gdshader`),
-## an orbit shot drawn whole with its tail bent round its circle (`shot_orbit.gdshader`, Entities'
-## familiars; the manager's orbit shots are trails). Kind 0 is no body.
+## bolt's head (`shot_head.gdshader`; its tail is motes), a rune (a diamond that pulses,
+## `shot_rune.gdshader`), an orbit shot drawn whole with its tail bent round its circle
+## (`shot_orbit.gdshader`, Entities' familiars; the manager's orbit shots are drawn as bolts are).
+## Kind 0 is no body.
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
@@ -369,11 +370,12 @@ const RUNE_TRACE: float = 0.25
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
-## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
-## its tail (`shot_trail.gdshader`), and a shot shows every kind its cards bring, mixed at
-## random: the look is a set, one bit per kind. WEAVE and STREAKS also change the body (a
-## weave, a longer core). A new kind of effect is a new number here (up to LOOK_MAX_KINDS) and
-## a branch in the shader's `particle`; a new card with an old kind needs neither.
+## `set_look`). The body stays plain; each kind is a style of particle the shot gives off along
+## its path (births for Feel's motes, `_give_off_sparks`), and a shot shows every kind its cards
+## bring, mixed at random: the look is a set, one bit per kind. WEAVE and STREAKS also change the
+## head (a weave, a longer core; `shot_head.gdshader`). A new kind of effect is a new number here
+## (up to LOOK_MAX_KINDS), its rate in SPARK_RATES and a branch in `particle`
+## (`shot_particle.gdshaderinc`, for runes and familiars); a new card with an old kind needs none.
 const LOOK_NONE: int = 0
 const LOOK_EMBERS: int = 1
 const LOOK_FLECKS: int = 2
@@ -419,7 +421,7 @@ const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
 ## A bolt-like shot of hit radius below this is a speck (an atom): its core is one pixel, no
 ## cross. It travels as zoom 0 in the look (`look_core_zoom`); every other shape of it, and every
-## shader but the trail's core, reads zoom 1 (`look_from_color` never goes below 1).
+## shader but the head's core, reads zoom 1 (`look_from_color` never goes below 1).
 const SPECK_RADIUS: float = 2.0
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
 ## from one pool with a global count, `tailless_particle_cap` (a visual budget; never a build
@@ -428,27 +430,26 @@ const SPECK_RADIUS: float = 2.0
 ## caster's staff gets a fair share, and the shots of one staff thin alike within it.
 ## The pool's count (S5: the tails' budget went to the motes when the tails went): the births a
 ## frame thin only past this many particles asked, so a fight of thousands of shots keeps more of
-## the look of a fight of tens. Set from the trail benchmark (DECISIONS, 2026-11-04, "Do shots need
+## the look of a fight of tens. Set from the shot benchmark (`tests/benchmark/shot_gpu.gd`; DECISIONS, 2026-11-04, "Do shots need
 ## tails?"); the "Tailless motes" dev slider sets it (`set_tailless_pool`).
 const TAILLESS_PARTICLE_CAP: int = 2048
 ## A teleport: a shot that moves more than this many pixels between two frames lays no tail across
 ## the gap (`_lay_tail`).
-const TRAIL_JUMP: float = 96.0
-## A shot's flags in its instance (the shader's TF_*): its shot is alive (the core is drawn), an
+const TAIL_JUMP: float = 96.0
+## A shot's flags in its instance (the shader's HF_*): its shot is alive (the core is drawn), an
 ## orbit shot.
-const TRAIL_HEAD: int = 1
-const TRAIL_ORBIT: int = 2
-## The quad kinds of a shot's mesh (`trail_mesh`; the shader's Q_*): the core's light, the core.
-## (The tail's kinds, 1, 4 and 5, went with the tail shader's tail, 2026-11-05.)
-const TRAIL_Q_HEAD_LIGHT: int = 0
-const TRAIL_Q_CORE: int = 6
-## Vertices a quad of a shot's mesh has (one triangle round its box; see `trail_mesh`).
-const TRAIL_QUAD_VERTICES: int = 3
+const HEAD_LIVE: int = 1
+const HEAD_ORBIT: int = 2
+## The quad kinds of a shot's mesh (`head_mesh`; the shader's Q_*): the core's light, the core.
+const HEAD_Q_LIGHT: int = 0
+const HEAD_Q_CORE: int = 1
+## Vertices a quad of a shot's mesh has (one triangle round its box; see `head_mesh`).
+const HEAD_QUAD_VERTICES: int = 3
 ## The quads of a shot's mesh in draw order: the light first (void's dark heart dims what is under
 ## it), then the core.
-const TRAIL_QUAD_KINDS: Array[int] = [TRAIL_Q_HEAD_LIGHT, TRAIL_Q_CORE]
-## Trail particles are motes (spell spectacle P1d, and since S3 the only way they are drawn;
-## docs/milestones/spell-spectacle-2.md): the trails are drawn with no particle slots, and the
+const HEAD_QUAD_KINDS: Array[int] = [HEAD_Q_LIGHT, HEAD_Q_CORE]
+## A shot's particles are motes (spell spectacle P1d, and since S3 the only way they are drawn;
+## docs/milestones/spell-spectacle-2.md): a shot's mesh has no particle slots, and the
 ## particles a shot gives off are handed out as births (`spark_births`) for Feel's motes
 ## to throw, while something takes them (`spark_motes`). A birth is SPARK_BIRTH_STRIDE floats:
 ## where (x, y), the way back along the shot (x, y), the look kind it is of (LOOK_*; 0 a plain
@@ -475,7 +476,7 @@ const SPARK_TAG_BITS: int = 12
 ## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
-## twinkle, 11 the weave none): the trail shader's own rates before S3, now only here.
+## twinkle, 11 the weave none).
 const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4]
 ## A dash's speed streak: a birth of this look kind is one of the motes' dash path kinds
 ## (`MoteKind.dash_path`). The manager lays none: a dash's streaks are a `stream` part of its cue,
@@ -523,16 +524,16 @@ const TAIL_PLAYER_SHARE: float = 0.25
 const TAIL_FRESH: float = 0.125
 const GROUP_STAFFS: int = 4
 const GROUPS: int = ACTORS * GROUP_STAFFS
-## Particle moments a second (the trail shader's BIRTHS were at these).
+## Particle moments a second.
 const SPARK_MOMENTS: float = 60.0
 ## An orbit shot spirals out from its caster to its circle over this many seconds.
 const ORBIT_GROW: float = 0.25
-## Particles a shot keeps in the air at most (the same number as the shader's).
+## Particles a shot keeps in the air at most (the same number as `shot_particle.gdshaderinc`'s).
 const PARTICLES_PER_SHOT_MAX: int = 12
 ## The look bits of the kinds that give off particles: all of them but the weave.
 const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
-## Build the shots from their looks (see "Drawing" above): flying shots and their trails, runes.
-const TRAIL_SHADER: Shader = preload("res://core/projectiles/shot_trail.gdshader")
+## Build the shots from their looks (see "Drawing" above): flying shots' heads, runes.
+const HEAD_SHADER: Shader = preload("res://core/projectiles/shot_head.gdshader")
 const RUNE_SHADER: Shader = preload("res://core/projectiles/shot_rune.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
@@ -572,7 +573,7 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ]
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_trail_mesh", &"step_profile", &"profile_clock"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -883,8 +884,8 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
 ## the tail births laid (`spark_births`' first) and the tail asked for (`tail_demand`).
 var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-## The shots' mesh (`trail_mesh`), made once.
-static var _trail_mesh: ArrayMesh = null
+## The shots' mesh (`head_mesh`), made once.
+static var _head_mesh: ArrayMesh = null
 ## The length of the last step, so the drawing knows when its heads are (see `update_draw`).
 var _last_delta: float = 0.0
 ## True inside step(): the grid is in use, so a target removed then is only
@@ -978,7 +979,7 @@ var threat_slot: int = -1
 var threat_away: Vector2 = Vector2.ZERO
 ## The spark pool's count (TAILLESS_PARTICLE_CAP; the "Tailless motes" dev slider).
 var tailless_particle_cap: int = TAILLESS_PARTICLE_CAP
-## Trail particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
+## A shot's particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
 ## births are rolled while nothing does). `spark_births` holds `spark_birth_count` births of the
 ## last `update_draw` (reused; read before the next one).
 var spark_motes: bool = false
@@ -1152,7 +1153,7 @@ func _ready() -> void:
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
 		var z: int = DRAW_Z + (1 if BATCH_ENEMY_LAYER[batch] else 0)
-		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else TRAIL_SHADER, null if shape < 0 else trail_mesh())
+		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else HEAD_SHADER, null if shape < 0 else head_mesh())
 	_draw_node = _nodes[BATCH_BOLT]
 	_rune_node = _nodes[BATCH_RUNE]
 	_orbit_node = _nodes[BATCH_ORBIT]
@@ -1182,7 +1183,7 @@ func batch_mirror(batch: int) -> MultiMesh:
 
 
 ## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)
-## by `shader`, added as a child: each a quad, or each a `mesh` (the trails' mesh).
+## by `shader`, added as a child: each a quad, or each a `mesh` (the shots' `head_mesh`).
 func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
 	if mesh == null:
@@ -1205,23 +1206,23 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	return node
 
 
-## The mesh a shot is drawn as (`shot_trail.gdshader`, PARTICLES ARE GEOMETRY there): small
-## quads, each told in its UV which quad kind (TRAIL_Q_*) it is, in TRAIL_QUAD_KINDS' order (the
+## The mesh a shot is drawn as (`shot_head.gdshader`, PARTICLES ARE GEOMETRY there): small
+## quads, each told in its UV which quad kind (HEAD_Q_*) it is, in HEAD_QUAD_KINDS' order (the
 ## light first, then the core). The shader places each quad round the head, or folds it away; a
 ## vertex says which quad and corner it is in its UV: x 0.25 or 0.75, y the kind + 0.25 or 0.75. A
-## quad is one triangle of TRAIL_QUAD_VERTICES vertices, twice its box each way, which the fragment
+## quad is one triangle of HEAD_QUAD_VERTICES vertices, twice its box each way, which the fragment
 ## stage cuts to the box: each vertex runs the whole vertex stage, so three cost a quarter less than
 ## a square's four (performance, 2026-11-02; the pixels are the same). It is made once and shared
 ## by the shot batches.
-static func trail_mesh() -> ArrayMesh:
-	if _trail_mesh != null:
-		return _trail_mesh
+static func head_mesh() -> ArrayMesh:
+	if _head_mesh != null:
+		return _head_mesh
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, 1.0)]
-	for kind: int in TRAIL_QUAD_KINDS:
+	for kind: int in HEAD_QUAD_KINDS:
 		var base: int = verts.size()
 		for corner: Vector2 in corners:
 			verts.append(corner)
@@ -1236,7 +1237,7 @@ static func trail_mesh() -> ArrayMesh:
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_trail_mesh = mesh
+	_head_mesh = mesh
 	return mesh
 
 
@@ -2183,8 +2184,8 @@ func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, for
 		_body[slot] = kind
 
 
-## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
-## `shot_trail.gdshader` draws along its path. Returns false for an empty slot or a look with a
+## Give the shot in `slot` its look, packed by `pack_look` (0 for none): the particles it gives
+## off and what its head shows (`shot_head.gdshader`). Returns false for an empty slot or a look with a
 ## bit for a kind that does not exist.
 func set_look(slot: int, look: int) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (LOOK_COUNT - 1):
@@ -2929,8 +2930,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 ##    each shot was moved and tested in turn.
 ## 4. The behaviours whose passes come after the hits (shields: every shot's path is this step's).
 ## The few shots whose motion reads something a hit handler may change, or the hit-work budget,
-## wait for their turn in the hit pass (see `_wait`), so they see the same as before. Then the
-## trails take their points.
+## wait for their turn in the hit pass (see `_wait`), so they see the same as before.
 func step(delta: float) -> void:
 	# A benchmark times the parts (`step_profile`); in the game the marks below do nothing. A new
 	# pass goes between two marks, and gets a PROF_ part of its own when it is worth timing alone.
@@ -4565,7 +4565,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	_give_off_sparks(fraction)
 
 
-## Hand out the particles the drawn shots' trails give off since the last frame, as
+## Hand out the particles the drawn shots give off since the last frame, as
 ## births (`spark_births`; see SPARK_BIRTH_STRIDE), while something takes them. The shader's rule, rolled on the
 ## CPU: at each moment (SPARK_MOMENTS a second) a flying shot gives off one of its kinds, picked at
 ## random, at that kind's rate (SPARK_RATES) times its group's share of the pool (GROUPS). Rolled
@@ -4693,13 +4693,13 @@ func _draw_shots(fraction: float) -> void:
 		_by_group[_group_end[group]] = slot
 		_group_end[group] += 1
 		if motion == MOTION_STILL:
-			# Only a rune's quad turns with the shot (a trail is drawn along its path).
+			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
 			if _vel[slot].length_squared() > 0.0:
 				dir = _vel[slot].normalized()
 			_draw_out[batch] = _write_stones(_buffers[batch], _draw_out[batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue
-		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if motion == MOTION_ORBIT else 0)
+		var flags: int = HEAD_LIVE | (HEAD_ORBIT if motion == MOTION_ORBIT else 0)
 		_write_head(_buffers[batch], _draw_out[batch] * DRAW_STRIDE, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
 		_draw_out[batch] += 1
 		if tail_births_on:
@@ -4720,14 +4720,14 @@ func _draw_shots(fraction: float) -> void:
 ## frame, one at its next tail point and every spacing of its group (`_group_spacing`) x 0.5 to 1.5 pixels on from there
 ## (`tail_hash` of its sequence and its count), while the frame's most lasts (`tail_births_cap`,
 ## and `tail_thin_most` for a thinned group's; see TAIL_FRESH). A jump
-## longer than TRAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
+## longer than TAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
 ## tail its caster's colours (a white core, so the motes take its hat ramp).
 func _lay_tail(slot: int, at: Vector2) -> void:
 	var from: Vector2 = _tail_from[slot]
 	_tail_from[slot] = at
 	var way: Vector2 = at - from
 	var d: float = way.length()
-	if not (d > 0.0) or d > TRAIL_JUMP:
+	if not (d > 0.0) or d > TAIL_JUMP:
 		return
 	_tail_wanted += d / TAIL_SPACING
 	var group: int = _group[slot]
@@ -5003,7 +5003,7 @@ static func look_zoom(radius: float) -> int:
 
 
 ## The zoom a shot of hit radius `radius` tells its shaders: its `look_zoom`, or 0 for a speck
-## (below SPECK_RADIUS), whose core the trail draws as one pixel.
+## (below SPECK_RADIUS), whose core the head shader draws as one pixel.
 static func look_core_zoom(radius: float) -> int:
 	return 0 if radius < SPECK_RADIUS else look_zoom(radius)
 
@@ -5103,7 +5103,7 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 
 
 ## Write a live shot's instance at float index `i` of `buffer`: its data in the transform, which
-## `shot_trail.gdshader` reads back (its quads are placed from it; the batch sits untransformed at
+## `shot_head.gdshader` reads back (its quads are placed from it; the batch sits untransformed at
 ## the origin): the head `at`, no path (-1: a tail is motes), the way it flies `way`, its flags, the
 ## colour and the core.
 func _write_head(buffer: PackedFloat32Array, i: int, at: Vector2, flags: int, color: Color, core: Color, way: Vector2) -> void:

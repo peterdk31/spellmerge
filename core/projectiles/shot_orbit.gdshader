@@ -4,7 +4,7 @@ render_mode blend_premul_alpha;
 
 // A shot drawn whole in its own quad, its tail bent round its path (core/README.md, "The shot
 // shaders"): Entities' familiars, orbit shots flying round their wizard (gameplay/ai/entities.gd).
-// A shot the projectile manager flies leaves its tail in the world instead (`shot_trail.gdshader`).
+// A shot the projectile manager flies leaves its tail in the world instead (`shot_head.gdshader`).
 // The quad is LENGTH x GRID pixels times the zoom, the shot FRONT pixels from its front edge and
 // its tail behind, +x along the flight. The code beside the kind is the bend (how its path
 // curves, so its tail follows it; BEND_* below). The look (the owner, 2026-10-27): a small
@@ -16,9 +16,8 @@ render_mode blend_premul_alpha;
 #include "res://core/projectiles/shot_look.gdshaderinc"
 #include "res://core/projectiles/shot_particle.gdshaderinc"
 
-// The spark pool's share (1.0 is everything): the fraction of the particles and of the tail drawn.
+// The spark pool's share (1.0 is everything): the fraction of the particles drawn.
 uniform float particle_share = 1.0;
-uniform float trail_share = 1.0;
 
 // The quad: GRID pixels across, LENGTH along, the shot FRONT pixels from the front
 // (LOOK_GRID, LOOK_LENGTH in projectile_manager.gd).
@@ -89,7 +88,7 @@ vec4 shot(vec2 uv) {
 	vec2 d = q - c;
 	// The tail: one pixel a column (zoom pixels for a bigger shot), cooling from white-hot to
 	// shadow and fraying towards its end, re-rolled 24 times a second.
-	float tail = TAIL * zoom * trail_share * (has_layer(L_FLECKS) ? 1.2 : 1.0) * (has_layer(L_SPARKS) ? 0.7 : 1.0);
+	float tail = TAIL * zoom * (has_layer(L_FLECKS) ? 1.2 : 1.0) * (has_layer(L_SPARKS) ? 0.7 : 1.0);
 	if (bend != 0.0) {
 		tail = min(tail, TAIL_TURN / abs(bend));
 	}

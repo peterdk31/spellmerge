@@ -75,8 +75,8 @@ constexpr double HOMING_DRIFT = 24.0; // SpellLimits.HOMING_DRIFT
 // The behaviours a waiting homing shot may also have for the native hit pass to catch it up itself:
 // none of the passes after homing that run before the hits.
 constexpr int64_t AFTER_HOMING_MASK = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1)) - 1);
-// Trails and drawing.
-constexpr double TRAIL_JUMP = 96.0;
+// Tails and drawing.
+constexpr double TAIL_JUMP = 96.0;
 // Tails as motes (the manager's SPARK_TAIL, `_lay_tail`) and a birth's numbers (SPARK_*).
 constexpr int SPARK_BIRTH_STRIDE = 12;
 constexpr int SPARK_X = 0;
@@ -94,8 +94,8 @@ constexpr int TAIL_KINDS = 3;
 constexpr double TAIL_SPACING = 2.0;
 constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
-constexpr int TRAIL_HEAD = 1;
-constexpr int TRAIL_ORBIT = 2;
+constexpr int HEAD_LIVE = 1;
+constexpr int HEAD_ORBIT = 2;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
@@ -849,7 +849,7 @@ const Constant CONSTANTS[] = {
 	{ "HOMING_PERIOD", (double)HOMING_PERIOD },
 	{ "HOMING_DRIFT", (double)HOMING_DRIFT },
 	{ "AFTER_HOMING_MASK", (double)AFTER_HOMING_MASK },
-	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
+	{ "TAIL_JUMP", (double)TAIL_JUMP },
 	{ "SPARK_BIRTH_STRIDE", (double)SPARK_BIRTH_STRIDE },
 	{ "SPARK_X", (double)SPARK_X },
 	{ "SPARK_Y", (double)SPARK_Y },
@@ -866,8 +866,8 @@ const Constant CONSTANTS[] = {
 	{ "TAIL_SPACING", (double)TAIL_SPACING },
 	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
-	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
-	{ "TRAIL_ORBIT", (double)TRAIL_ORBIT },
+	{ "HEAD_LIVE", (double)HEAD_LIVE },
+	{ "HEAD_ORBIT", (double)HEAD_ORBIT },
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
@@ -1036,7 +1036,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 	return -1;
 }
 
-// --- Trails and drawing ------------------------------------------------------------------------
+// --- Tails and drawing -------------------------------------------------------------------------
 
 namespace {
 
@@ -1522,7 +1522,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		tail_from[slot] = at;
 		const Vector2 way = at - from;
 		const double d = way.length();
-		if (!(d > 0.0) || d > TRAIL_JUMP) {
+		if (!(d > 0.0) || d > TAIL_JUMP) {
 			return;
 		}
 		tail_wanted += d / TAIL_SPACING;
@@ -1630,7 +1630,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		if (rune && vel[slot].length_squared() > 0.0f) {
 			dir = vel[slot].normalized();
 		}
-		const int64_t flags = TRAIL_HEAD | (mot == MOTION_ORBIT ? TRAIL_ORBIT : 0);
+		const int64_t flags = HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0);
 		if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
 			// `_write_stones` for a shot that is not solid: one stone.
 			if (used[batch] < room[batch]) {

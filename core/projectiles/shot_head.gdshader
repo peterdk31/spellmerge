@@ -16,10 +16,10 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // Direct3D, and a big, branchy fragment stage took the compiler about 90 s on a real GPU, until
 // the browser killed its GPU process. So the VERTEX stage does the work and the fragment stage only
 // colours a pixel of its own quad: a few small modes, no loops, no kinds.
-// A shot is one instance of a mesh (`trail_mesh` in projectile_manager.gd) of small quads, each
+// A shot is one instance of a mesh (`head_mesh` in projectile_manager.gd) of small quads, each
 // told in its UV which QUAD KIND (Q_*) it is. The vertex shader puts each quad round the head, or
 // folds it away:
-//   Q_HEAD_LIGHT  the core's light (and void's dark heart);
+//   Q_LIGHT  the core's light (and void's dark heart);
 //   Q_CORE        the core: a white-hot `+`, pierce's run, void's dark heart.
 // The light is drawn first (added; void's dark heart dims what is under it), the core last.
 // A quad is one triangle (performance, 2026-11-02: every vertex runs the whole vertex stage, and
@@ -28,19 +28,19 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // pixel in it when its centre is, as a square's two triangles take it.
 // The instance carries its data in its transform (the batch must sit untransformed at the
 // origin): origin the head (where the shot is drawn this frame), x axis (-1, the way it flies' y),
-// y axis (the way it flies' x, TF_* flags). The colour and the custom data are the look
+// y axis (the way it flies' x, HF_* flags). The colour and the custom data are the look
 // (`shot_look.gdshaderinc`; worked out per vertex here, `look_from_color`).
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-// The flags (TRAIL_* in projectile_manager.gd): the shot is alive (its core is drawn), an orbit
+// The flags (HEAD_LIVE, HEAD_ORBIT in projectile_manager.gd): the shot is alive (its core is drawn), an orbit
 // shot.
-const float TF_HEAD = 1.0;
-const float TF_ORBIT = 2.0;
-// The quad kinds (TRAIL_Q_* in projectile_manager.gd), in UV.y.
-const float Q_HEAD_LIGHT = 0.0;
-const float Q_CORE = 6.0;
+const float HF_LIVE = 1.0;
+const float HF_ORBIT = 2.0;
+// The quad kinds (HEAD_Q_* in projectile_manager.gd), in UV.y.
+const float Q_LIGHT = 0.0;
+const float Q_CORE = 1.0;
 // The fragment's modes: a round light, pixels (a square, a cross, a line beside it).
 const float M_GLOW = 0.0;
 const float M_PIXELS = 2.0;
@@ -74,7 +74,7 @@ void vertex() {
 	bool speck = floor(COLOR.r * 255.0 + 0.5) < 4.0;
 	float z = L.zoom;
 	vec3 b = L.bits;
-	bool live = flag_set(flags, TF_HEAD);
+	bool live = flag_set(flags, HF_LIVE);
 	bool lightning = bit_set(b, L_SPARKS);
 	bool pull = bit_set(b, L_PULL);
 	// The light: lightning flickers, void's is dimmer.
@@ -89,7 +89,7 @@ void vertex() {
 	vec4 k1 = vec4(0.0);
 	vec4 k2 = vec4(0.0);
 	bool shown = false;
-	if (live && (quad == Q_HEAD_LIGHT || quad == Q_CORE)) {
+	if (live && (quad == Q_LIGHT || quad == Q_CORE)) {
 		shown = true;
 		vec2 fly = length(way) > 0.01 ? normalize(way) : vec2(1.0, 0.0);
 		vec2 at = head;
@@ -98,7 +98,7 @@ void vertex() {
 			at += vec2(-fly.y, fly.x) * (triangle(sim_time * 3.0 + L.seed * 0.25) > 0.0 ? 1.0 : 0.0);
 		}
 		vec2 px = floor(at);
-		if (quad == Q_HEAD_LIGHT) {
+		if (quad == Q_LIGHT) {
 			m = M_GLOW;
 			// A speck's light is a smaller one.
 			float reach = speck ? 6.0 : 8.0 + 2.0 * z;

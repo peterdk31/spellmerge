@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // A card's particle drawn round a body (runes, familiars, beams, effects, statuses), in the
 // body's own pixels (core/README.md, "The shot shaders"). Include `shot_palette.gdshaderinc` and
-// `shot_look.gdshaderinc` first. A flying shot's particles are its trail's (`shot_trail.gdshader`),
-// left in the world where the shot was.
+// `shot_look.gdshaderinc` first. A flying shot's particles are Feel's motes, given off as births by
+// the projectile manager (`_give_off_sparks`) and left in the world where the shot was.
 //
 // `place_particle` works out where a particle is and what it looks like, once: a vertex stage
 // puts a small quad round it (PARTICLES ARE GEOMETRY, `shot_flash.gdshader`) and the fragment

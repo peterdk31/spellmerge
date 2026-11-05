@@ -1,7 +1,7 @@
 extends "res://tests/support/screenshot.gd"
 ## The atom beside the bolt in flight: a speck (hit radius below `SPECK_RADIUS`) drawn as a
-## one-pixel core, and a fast shot's tail, its pixels spaced out (`gap` in `shot_trail.gdshader`)
-## so it reaches as far as the shot goes in its tail's life. It fails when fewer than 12 shots
+## one-pixel core (`shot_head.gdshader`), and a fast shot's tail of motes, laid along all the
+## way it went. It fails when fewer than 12 shots
 ## are drawn.
 ##
 ## `atom_looks` (1x): a pair of lanes per infusion (plain, fire, frost, storm, void, lightning),

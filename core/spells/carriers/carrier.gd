@@ -7,7 +7,7 @@ extends RefCounted
 ## A subclass answers yes/no questions about itself in `traits()` (the flags below: does it fly?
 ## does it hit? does it last? ...), and from those alone the compiler works out which cards do
 ## something on it (`works`, `fires`): each card says what it needs from a carrier
-## (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
+## (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
 ## list of cards.
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
 ## wrong (a card that does nothing but is not said to, or the other way round).
@@ -38,6 +38,7 @@ const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 const STRIKES_POINT: int = CarrierTraits.STRIKES_POINT
 const BLOCKS: int = CarrierTraits.BLOCKS
 const SPAWNS: int = CarrierTraits.SPAWNS
+const GATES: int = CarrierTraits.GATES
 
 
 ## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which
@@ -102,12 +103,12 @@ func steers() -> bool:
 
 
 ## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits, or
-## the blast, meet what the behaviour needs (`ModifierBase.NEEDS`). The carrier that runs nothing
+## the blast, meet what the behaviour needs (`ModifierBase.needs`). The carrier that runs nothing
 ## (id &"") runs no card.
 func works(behaviour: int, blasts: bool = false) -> bool:
 	if id() == &"":
 		return false
-	var need: Dictionary = ModifierBase.NEEDS.get(behaviour, {})
+	var need: Dictionary = ModifierBase.needs(behaviour)
 	return _meets(need) or (blasts and (need.get("or_cards", []) as Array).has(ModifierBase.Behaviour.BLAST))
 
 
@@ -137,7 +138,7 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 	return true
 
 
-## True when its traits meet `need` (a `NEEDS` row; empty: always).
+## True when its traits meet `need` (a needs row; empty: always).
 func _meets(need: Dictionary) -> bool:
 	var any: int = int(need.get("any", 0))
 	return (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0
@@ -154,6 +155,12 @@ static func _has_one(has: Dictionary, behaviours: Array) -> bool:
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.
 func takes_infusion(blasts: bool) -> bool:
 	return hits() or blasts
+
+
+## True when the infusion `element` counts on it: by default when any infusion does
+## (`takes_infusion`); a carrier that passes only an infusion's status on (a portal) says which.
+func takes_element(_element: ElementBase, blasts: bool) -> bool:
+	return takes_infusion(blasts)
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`

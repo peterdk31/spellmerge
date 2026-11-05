@@ -177,6 +177,17 @@ func add_enemy(label: StringName, at: Vector2, health: float = HEALTH, cards: Ar
 	return _body(label, at, mind, cards, health)
 
 
+## A teammate (seat 2) at `at` that casts `cards` once along `aim` at step `step`: a plain shot
+## sent through a carrier that opens gates (a portal), so what its cards do to what comes out shows.
+func add_courier(at: Vector2, cards: Array[StringName], aim: Vector2, step: int) -> Node2D:
+	var mind := ActorFixture.Scripted.new()
+	mind.team = ActorsScript.TEAM_WIZARDS
+	mind.seat = 2
+	mind.aim = aim
+	mind.presses = [step]
+	return _body(&"courier", at, mind, cards, HEALTH)
+
+
 ## A wall over `rect`.
 func add_wall(rect: Rect2) -> void:
 	_walls.append(rect)
@@ -380,7 +391,7 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0:
+	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0 or CarrierPortal.of(spells).portal_count() > 0:
 		return false
 	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false
@@ -504,6 +515,14 @@ func _sample() -> void:
 				points.append(_at(CarrierBeam.of(spells).beam_point(at, n)))
 			# How wide it hits (growth) as well as where.
 			_put("beam %s w%d %s" % [_who(CarrierBeam.of(spells).beam_caster(at)), roundi(CarrierBeam.of(spells).beam_growth(at) * 100.0), " ".join(points)])
+	for at in CarrierPortal.of(spells).portal_slots():
+		if CarrierPortal.of(spells).portal_on(at):
+			# Where each gate is, which way it faces and how big it is (growth).
+			var gates: PackedStringArray = PackedStringArray()
+			for n in CarrierPortal.of(spells).portal_gate_count(at):
+				var gate: int = CarrierPortal.of(spells).portal_gate(at, n)
+				gates.append("%s>%s r%.1f" % [_at(projectiles.gate_position(gate)), _at(projectiles.gate_face(gate) * 100.0), projectiles.gate_radius(gate)])
+			_put("portal %s %s" % [_who(CarrierPortal.of(spells).portal_caster(at)), " ".join(gates)])
 	for at in CarrierSlam.of(spells).slam_slots():
 		if CarrierSlam.of(spells).slam_on(at):
 			# A slam's row is read directly: Spells has no getter for its caster and aim.

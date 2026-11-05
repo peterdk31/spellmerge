@@ -48,7 +48,7 @@ func _test_test_preset_matches(shipped_name: String, test_name: String) -> void:
 	if linux == "" or test == "":
 		return
 	_check(config.get_value(test, "exclude_filter", "x") == "", "%s excludes nothing" % test_name)
-	_check(config.get_value(linux, "exclude_filter", "") == "tests/*", "%s still excludes tests/*" % shipped_name)
+	_check(config.get_value(linux, "exclude_filter", "") == "tests/*, content/*/test_*.gd*", "%s still excludes tests/* and the cards' tests" % shipped_name)
 	_check(config.get_value(test, "runnable", true) == false, "%s is not runnable" % test_name)
 	_check(config.get_value(test, "export_path", "") != config.get_value(linux, "export_path", ""), "the two presets export to different paths")
 	_compare(config, linux, test)

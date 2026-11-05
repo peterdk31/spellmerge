@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"fire"
 display_name = "Fire"
+description = "Burns what it hits. Eager, and slightly proud of it."
 complexity = 1
 icon = ExtResource("2_icon")
 status_id = &"burn"

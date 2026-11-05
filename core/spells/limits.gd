@@ -101,6 +101,16 @@ const BEAM_WAVE_STEPS: int = 8
 ## (melee I3; the owner's playground, 2026-10-29). Its pool and the hit pass's sweep of its whole
 ## path each step are the engine's limits; nothing caps the speed.
 const DEFLECT_SPEEDUP: float = 1.7
+## Every flying shot's speed over life, the default motion (owner, 2026-11-05: what the Drag card
+## did, now every shot's, "they look like fireworks"): it bursts out at SHOT_SPEED_START times its
+## speed and eases (SHOT_SPEED_EASE, above 1 most of the change early) down to SHOT_SPEED_END times
+## it as its life runs out (`ProjectileManager.set_speed_curve`). The three are picked so the shot
+## still goes as far as its speed x life says: start + (end - start) x ease / (ease + 1) = 1. It
+## never stops dead, so its last moments still drift. A card's `speed_start`, `speed_end` and
+## `speed_ease` multiply these (`CompiledSpell`); only a carrier that flies has a speed to curve.
+const SHOT_SPEED_START: float = 2.2
+const SHOT_SPEED_END: float = 0.2
+const SHOT_SPEED_EASE: float = 1.5
 ## Slam rows made at once (more when every one is on), and the share of a slam's `lifetime` its
 ## ring takes to grow to its radius; it holds for the rest (the playground's 0.08 s of 0.12 s).
 const SLAM_ROWS_START: int = 16
@@ -162,3 +172,22 @@ const ORBIT_TURN: float = 3.0
 const EXPIRE_BACKOFF: float = 2.0
 ## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05
+
+## The portal (docs/milestones/portal.md). The most portals one thing goes through in a row (a shot, a beam's leg): an engine safeguard
+## against a loop or a runaway fork, not a build limit (P4, P5).
+const PORTAL_JUMPS: int = 4
+## Seconds a body that came through a portal waits before another takes it (P6).
+const PORTAL_REST: float = 0.4
+## The most exits one portal opens (an engine safeguard: the most shots a carrier has, 24).
+const PORTAL_EXITS_MOST: int = 24
+## Portal rows made at once; more are made when needed.
+const PORTAL_ROWS_START: int = 8
+
+## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of what it
+## surrounds (its homing target, or its caster).
+const PENTA_RING: float = 64.0
+## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
+## so a carrier that goes a short way (a nova's ring) still meets in the middle.
+const PENTA_WITHIN: float = 0.8
+## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
+const PENTA_MOST: int = 24

@@ -27,7 +27,7 @@ const RECT: int = 2
 ## The shot shaders by how they are drawn: batches of instances (TRANSFORM_2D, a colour and
 ## custom data each), one mesh each (`Feel`'s beams and swing trails), sprites (deaths, ghosts, staffs).
 const BATCH_SHADERS: Array[Shader] = [
-	preload("res://core/projectiles/shot_trail.gdshader"),
+	preload("res://core/projectiles/shot_head.gdshader"),
 	preload("res://core/projectiles/shot_flash.gdshader"),
 	preload("res://core/projectiles/shot_rune.gdshader"),
 	preload("res://core/projectiles/shot_orbit.gdshader"),
@@ -169,7 +169,7 @@ func _batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	multimesh.use_custom_data = true
 	multimesh.mesh = mesh
 	multimesh.instance_count = 1
-	# Data that draws nothing: a trail of row -1 (no samples, not alive), a flash of no kind.
+	# Data that draws nothing: a shot not alive (no HEAD_LIVE flag), a flash of no kind.
 	multimesh.set_instance_transform_2d(0, Transform2D(Vector2(-1.0, 0.0), Vector2.ZERO, Vector2.ZERO))
 	multimesh.set_instance_custom_data(0, Color(0.0, 0.0, 0.0, 0.0))
 	node.multimesh = multimesh

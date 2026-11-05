@@ -28,7 +28,7 @@ enum Event {
 }
 
 ## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
-## `ModifierBase.NEEDS`: from its carrier "any" (one of these traits) and "not" (none of them), or
+## `ModifierBase.RULES` "needs": from its carrier "any" (one of these traits) and "not" (none of them), or
 ## "or_cards" (a card with one of these behaviours on it does instead: what a blast strikes is the
 ## carrier's hit, rules R4 F2); from the cards on it "cards" (one of these behaviours, or an
 ## infusion where "or_infused") and "not_cards" (none of these where they work). A trigger not here

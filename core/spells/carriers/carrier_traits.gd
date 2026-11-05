@@ -1,7 +1,7 @@
 class_name CarrierTraits
 extends RefCounted
 ## The yes/no questions a carrier answers about itself (`Carrier.traits`, a set of these flags), and
-## that a card's needs are written in (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`). On their own here,
+## that a card's needs are written in (`ModifierBase.RULES` "needs", `TriggerBase.NEEDS`). On their own here,
 ## so a card and a carrier can both name them. `Carrier` has the same names, for its subclasses.
 
 ## A shot flying out on its own: `reach` stretches its life, `return` brings it back.
@@ -60,3 +60,6 @@ const BLOCKS: int = 1 << 23
 ## Does it make a body of its own that stays and acts for its caster (a decoy, a familiar)? Read
 ## by `CastSense.spawns`; no card needs it.
 const SPAWNS: int = 1 << 24
+## Does it open a way through the world that shots and bodies take (a portal)? Read only by
+## `CastSense.opens`; no card needs it.
+const GATES: int = 1 << 25

@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"recoil"
 display_name = "Recoil"
+description = "Casting kicks you back, away from where the shot goes."
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 6
+behaviour_id = &"recoil"
 behaviour_strength = 24.0
 look_layer = 17

@@ -91,6 +91,7 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
+const PortalRingsScript := preload("res://gameplay/feel/portal_rings.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
@@ -381,6 +382,8 @@ var _hit_flash_material: ShaderMaterial = null
 var _live_beams: Array[MeshInstance2D] = []
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
+## The open portals' gates (`PortalRingsScript`), drawn every frame.
+var _portal_rings: PortalRingsScript = null
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -573,6 +576,8 @@ func _ready() -> void:
 		_live_paths.append(_make_beam_path())
 	_swing_trails = SwingTrailsScript.new(swing_mesh())
 	add_child(_swing_trails)
+	_portal_rings = PortalRingsScript.new()
+	add_child(_portal_rings)
 	_spectacle = SpectacleScript.new()
 	_spectacle.name = "Spectacle"
 	_spectacle.events = events
@@ -689,6 +694,8 @@ func step(real_delta: float) -> void:
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
+	if _portal_rings != null:
+		_portal_rings.step(spells.call("carrier", &"portal") if spells != null and spells.has_method("carrier") else null, projectiles, _clock)
 	_status_motes(real_delta)
 	_spectacle.step(_clock)
 	_step_labels(real_delta)

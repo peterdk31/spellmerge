@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"familiar"
 display_name = "Familiar"
+description = "A small spirit circles you, casting its triggers outward."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

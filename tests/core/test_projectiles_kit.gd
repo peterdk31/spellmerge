@@ -1,6 +1,6 @@
 extends SceneTree
 ## Tests for core/projectiles, the projectile kit (staffs B1): bounce, ghost, spiral, return,
-## linger, growth, sticky, shield, shots that hit their caster, every shot hitting both sides
+## linger, growth, speed over life, sticky, shield, shots that hit their caster, every shot hitting both sides
 ## (actors G3c) and the wall flag of an expiry. The manager is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_kit.gd
@@ -42,7 +42,9 @@ func _initialize() -> void:
 	_test_a_returning_shot_always_comes_home()
 	_test_linger_stops_then_goes_on()
 	_test_growth_grows_to_the_room()
+	_test_speed_curve_eases_over_life()
 	_test_sticky_follows_its_target()
+	_test_sticky_sticks_on_its_line_whatever_the_step()
 	_test_shield_blocks_enemy_shots()
 	_test_shield_only_for_actors_shots()
 	_test_self_hit_waits_until_the_shot_leaves_the_caster()
@@ -280,6 +282,69 @@ func _test_linger_stops_then_goes_on() -> void:
 	_check(absf(_expired[0][1].x - 100.0 - 50.0) < 6.0, "having flown the whole flight (%s)" % _expired[0][1])
 
 
+## Speed over life (`set_speed_curve`): a bursting curve (every shot's is 2.2 to 0.2, ease 1.5; here 3 to 0, ease 2)
+## leaves faster and eases out to a stop as its life runs out, about as far as a plain shot, only
+## sooner; an even curve the other way speeds up.
+func _test_speed_curve_eases_over_life() -> void:
+	_setup()
+	var plain: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 100.0), 1.0, 1)
+	var slot: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 200.0), 1.0, 2)
+	_check(_mgr.set_speed_curve(slot, 3.0, 0.0, 2.0), "a speed curve is accepted on a flying shot")
+	_check(_mgr.get_velocity_of(slot).is_equal_approx(Vector2(300.0, 0.0)), "it leaves three times faster (%s)" % _mgr.get_velocity_of(slot))
+	_run(12)
+	var ahead: float = _mgr.get_position_of(slot).x - _mgr.get_position_of(plain).x
+	_check(ahead > 20.0, "after a fifth of its life it is well ahead of a plain shot (%f px)" % ahead)
+	var before: float = _mgr.get_velocity_of(slot).x
+	_run(18)
+	var half: float = _mgr.get_velocity_of(slot).x
+	# (Speed at half its life, read at the middle of the step: 100 x 3 x (0.5 + 1/120)^2 = 77.5.)
+	_check(half < before and absf(half - 77.5) < 1.0, "it slows down: %f px/s at half its life" % half)
+	_check(absf(_mgr.get_velocity_of(slot).y) < 0.001, "keeping its heading")
+	_run(29)
+	_check(_mgr.is_alive(slot) and _mgr.get_velocity_of(slot).x < 1.0, "it is all but still at the end of its life (%f)" % _mgr.get_velocity_of(slot).x)
+	_run(3)
+	_check(not _mgr.is_alive(slot) and not _mgr.is_alive(plain), "and ends with its life")
+	var ends: Dictionary = {}
+	for row: Array in _expired:
+		ends[row[2]] = row[1]
+	# Its curve's mean is 1 (3 + (0 - 3) x 2 / 3), so it goes as far: read at the middle of each
+	# step, within a pixel (read at the step's end, a front-loaded curve fell a step's change short).
+	_check(ends.has(2) and absf((ends[2] as Vector2).x - (ends[1] as Vector2).x) < 1.0, "as far as the plain shot went (%s)" % [ends])
+	# The other way: an even curve from half speed up to twice.
+	_setup()
+	var speeding: int = _fire(Vector2(100.0, 0.0), Vector2(50.0, 100.0), 1.0)
+	_mgr.set_speed_curve(speeding, 0.5, 2.0, 1.0)
+	_run(30)
+	# (100 x (0.5 + 1.5 x (1 - (0.5 + 1/120))) = 123.75: read at the middle of the step.)
+	_check(absf(_mgr.get_velocity_of(speeding).x - 123.75) < 0.5, "an even curve is half way at half its life (%f)" % _mgr.get_velocity_of(speeding).x)
+	# Refused where it means nothing, and for bad numbers.
+	var still: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
+	_mgr.set_anchor(0, Vector2(100.0, 100.0))
+	var orbit: int = _mgr.spawn_orbit(0, 30.0, 0.0, 1.0, 1.0)
+	var flyer: int = _fire(Vector2(10.0, 0.0))
+	_check(not (_mgr.set_speed_curve(still, 2.0, 0.0, 1.0) or _mgr.set_speed_curve(orbit, 2.0, 0.0, 1.0)), "a still or orbiting shot takes no curve")
+	_check(not (_mgr.set_speed_curve(flyer, 0.0, 1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, -1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, 1.0, 0.0) or _mgr.set_speed_curve(flyer, INF, 0.0, 1.0) or _mgr.set_speed_curve(-1, 2.0, 0.0, 1.0)), "nor bad numbers or no shot")
+	_check(_mgr.set_speed_curve(flyer, 100.0, 0.0, 1.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(10.0 * ManagerScript.SPEED_START_MOST, 0.0)), "a huge start counts as SPEED_START_MOST")
+	# A reused slot starts clean.
+	_mgr.clear()
+	var again: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 1.0)
+	_run(30)
+	_check(_mgr.get_velocity_of(again).is_equal_approx(Vector2(10.0, 0.0)), "a fresh shot in its slot keeps its speed")
+	# Every spell's shots take the default curve (`Spells._apply_travel`), cards or none...
+	var spells: Node = SpellsScript.new()
+	spells.bind(_mgr, _bus)
+	var spell := CompiledSpell.new()
+	var plain_spell: int = _fire(Vector2(100.0, 0.0))
+	spells._apply_travel(plain_spell, spell)
+	_check(_mgr.get_velocity_of(plain_spell).is_equal_approx(Vector2(100.0 * SpellLimits.SHOT_SPEED_START, 0.0)), "every spell's shot bursts out (%s)" % _mgr.get_velocity_of(plain_spell))
+	# ...and a card's numbers on it reach the shot.
+	spell.speed_start = 1.5
+	var carded: int = _fire(Vector2(100.0, 0.0))
+	spells._apply_travel(carded, spell)
+	_check(_mgr.get_velocity_of(carded).is_equal_approx(Vector2(150.0, 0.0)), "a card's start reaches the shot")
+	spells.free()
+
+
 func _test_growth_grows_to_the_room() -> void:
 	_setup()
 	var slot: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 10.0)
@@ -428,6 +493,22 @@ func _test_every_shot_hits_both_sides() -> void:
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 1, 0)
 	_run(40)
 	_check(_hits.size() == 2 and _hits[0][1] == wizard and _hits[1][1] == enemy, "a shot of no actor hits the wizard, then the enemy (%d hits)" % _hits.size())
+
+
+## A sticky shot sticks where its line of flight comes closest to the target's centre, the same
+## spot whichever moment of a step it met the target in (regression: it stuck at the point of
+## that step's path nearest the centre, anywhere from the centre to the rim, so a nova it fired
+## from inside hit all or half of its ring by chance).
+func _test_sticky_sticks_on_its_line_whatever_the_step() -> void:
+	for n in 6:
+		_setup()
+		var enemy: Node2D = _target(Vector2(100.0, 103.0), 8.0)
+		# Start a little further back each time: it meets the target at another moment of a step.
+		var slot: int = _fire(Vector2(400.0, 0.0), Vector2(30.0 - 1.1 * n, 100.0), 3.0, 9)
+		_mgr.set_sticky(slot, 1.0)
+		_run(15)
+		var off: Vector2 = _mgr.get_position_of(slot) - enemy.global_position
+		_check(_hits.size() == 1 and off.distance_to(Vector2(0.0, -3.0)) < 0.01, "start %d: it sticks where its line passes the centre: %s" % [n, off])
 
 
 func _test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall() -> void:

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"overcharge"
 display_name = "Overcharge"
+description = "The next carrier hits twice as hard, for twice the mana."
 complexity = 2
 icon = ExtResource("2_icon")
 damage_mult = 2.0

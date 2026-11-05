@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The combo catalogue in content/spells/combos/ (M2 part 14; one file per combo since staffs
+## The combo catalogue, in each card's combos/ folder (M2 part 14; one file per combo since staffs
 ## A2): every named combo is built from the real components, cast in the test arena
 ## (`combo_arena.gd`: real registry, spell runtime, projectile manager and combat, with imps)
 ## and must do what it promises. One data-driven test per check kind runs over every combo, so
@@ -25,7 +25,7 @@ var _unreadable: PackedStringArray = PackedStringArray()
 
 func before_each() -> void:
 	_unreadable = PackedStringArray()
-	_combos = ComboFiles.read_all(ComboFiles.FOLDER, _unreadable)
+	_combos = ComboFiles.read_all(ComboFiles.ROOT, _unreadable)
 
 
 ## Builds the arena for `combo`, casts it as the row says and runs it. The caller frees it.
@@ -162,7 +162,7 @@ func test_every_component_is_in_two_combos() -> void:
 	check(known.size() > 0, "the registry finds the spell components")
 	for component: StringName in known:
 		var count: int = int(uses.get(component, 0))
-		check(count >= 2, "%s is in at least two combos (got %d): add combo files for it in content/spells/combos/" % [component, count])
+		check(count >= 2, "%s is in at least two combos (got %d): add combo files for it in its own folder, combos/<id>.json" % [component, count])
 
 
 func test_every_combo_file_is_an_object_named_like_its_id() -> void:
@@ -171,7 +171,7 @@ func test_every_combo_file_is_an_object_named_like_its_id() -> void:
 	check_equal(ids.size(), _combos.size() + _unreadable.size(), "one combo per file")
 	for combo: Dictionary in _combos:
 		var id: String = str(combo.get("id", ""))
-		check(ids.has(id), "the combo %s is in content/spells/combos/%s.json" % [id, id])
+		check(ids.has(id), "the combo %s is in a file combos/%s.json" % [id, id])
 
 
 func test_every_row_has_its_fields_and_an_unseen_id() -> void:
@@ -232,47 +232,6 @@ func test_every_combo_does_what_it_promises() -> void:
 		arena.free_all()
 
 
-## Rows whose point is one card: with it dropped, some check of the row must fail.
-const CONTROLS: Dictionary = {
-	"storm_mine": "chain",
-	"frost_carousel": "pierce",
-	"quick_shock_ring": "faster",
-	"seeking_frost_burst": "on_expire",
-	"echo_double_tap": "echo",
-	"echo_timer_nova": "echo",
-	"burst_triple_bolt": "burst",
-	"burst_nova_pulse": "burst",
-	"scatter_nova_flurry": "scatter",
-	"scatter_kindle_flurry": "scatter",
-	"mirror_back_guard": "mirror",
-	"mirror_frost_pincer": "mirror",
-	"rain_nova_drop": "rain",
-	"rain_frost_field": "rain",
-	"beam_fire_line": "pierce",
-	"beam_hit_nova": "on_hit",
-	"wall_fire_barrier": "wall",
-	"wall_frost_row": "wall",
-	"relay_teammate_frost": "relay",
-	"relay_teammate_fire": "relay",
-	"shield_dash": "shield",
-	"shield_teleport": "shield",
-	"pull_bolt": "pull",
-	"pull_and_fire": "pull",
-	"swap_trade": "swap",
-	"swap_frost": "swap",
-	"shield_wall_fire": "shield",
-	"shield_orbit_ring": "shield",
-	"blast_rocket": "blast",
-	"blast_wall_burst": "blast",
-	"mend_blast_self": "mend",
-	"mend_pierce_party": "mend",
-	"deflect_swing_return": "deflect",
-	"deflect_wall_mirror": "deflect",
-	"reach_far_bolt": "reach",
-	"reach_long_beam": "reach",
-}
-
-
 ## The cards with every copy of `card` taken out (its slots dropped, so the rest reads as before).
 func _without(cards: Array, card: String) -> Array:
 	var out: Array = []
@@ -283,23 +242,28 @@ func _without(cards: Array, card: String) -> Array:
 
 
 func test_a_combo_row_fails_without_the_component_it_is_for() -> void:
+	# A combo whose point is one card names it (`"needs": "<card id>"`): with that card dropped,
+	# some check of the row must fail.
+	var controls: int = 0
 	for combo: Dictionary in _combos:
-		if not CONTROLS.has(combo["id"]):
+		if not combo.has("needs"):
 			continue
+		controls += 1
+		var needed: String = str(combo["needs"])
+		var used: bool = false
+		for entry: Dictionary in combo["casts"]:
+			used = used or (entry["cards"] as Array).has(needed)
+		check(used, "%s: the card it needs, %s, is in it" % [combo["id"], needed])
 		var plain: Dictionary = combo.duplicate(true)
 		for entry: Dictionary in plain["casts"]:
-			entry["cards"] = _without(entry["cards"] as Array, CONTROLS[combo["id"]])
+			entry["cards"] = _without(entry["cards"] as Array, needed)
 		var arena: ArenaScript = _play(plain, true)
 		var failed: bool = false
 		for row: Dictionary in combo["checks"]:
 			failed = failed or _problem_with(arena, row) != ""
-		check(failed, "%s: its checks fail without %s" % [combo["id"], CONTROLS[combo["id"]]])
+		check(failed, "%s: its checks fail without %s" % [combo["id"], needed])
 		arena.free_all()
-	for id: String in CONTROLS:
-		var found: bool = false
-		for combo: Dictionary in _combos:
-			found = found or combo["id"] == id
-		check(found, "the control row %s exists" % id)
+	check(controls >= 30, "the combos that need one card say so (%d)" % controls)
 
 
 func test_a_combo_check_that_fails_is_reported() -> void:

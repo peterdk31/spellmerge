@@ -134,7 +134,9 @@ func test_a_timer_on_a_short_shot_ticks_at_half_its_life() -> void:
 	_tick(2)
 	var runes: Array[Vector2] = _runes()
 	check_equal(runes.size(), 1, "a 0.4 s shot ticks once, at half its life (the interval is 0.5 s)")
-	check(runes.size() == 1 and absf(runes[0].x - 60.0) < 8.0, "from where the shot is then (%s)" % [runes])
+	# 120 px of reach; a shot that bursts out and slows (SpellLimits.SHOT_SPEED_*) has gone about
+	# 0.76 of it at half its life.
+	check(runes.size() == 1 and absf(runes[0].x - 91.0) < 8.0, "from where the shot is then (%s)" % [runes])
 	_tick(30)
 	check_equal(_runes().size(), 1, "and only once: it ends before the next")
 

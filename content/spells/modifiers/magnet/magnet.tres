@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"magnet"
 display_name = "Magnet"
+description = "The next shot drags every enemy near it toward its path."
 complexity = 2
 icon = ExtResource("2_icon")
-behaviour = 13
+behaviour_id = &"magnet"
 behaviour_strength = 70.0
 look_layer = 20

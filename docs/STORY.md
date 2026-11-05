@@ -33,7 +33,7 @@ The characters and the story were rewritten on 2026-10-28 at the owner's word (d
 - Humour is aimed at the in-world guild, its wizards and the magic. It never mocks the real player for playing badly or losing, and never targets real groups of people.
 - No swearing, no real-world politics or religion, no graphic violence; fights are about spells and imps.
 - Speech, if there is any, is in short lines of at most 60 characters.
-- The 60-character description limit and the 60-character speech limit are constants of the story validator (`core/story/story_validator.gd`). The description limit is enforced since M2 part 23; the speech limit applies once dialogue exists. The first lore is `content/story/lore/components/`; the Story README has the schema.
+- The 60-character description limit and the 60-character speech limit are constants of the story validator (`core/story/story_validator.gd`). The description limit is enforced since M2 part 23; the speech limit applies once dialogue exists. The first words are the cards' descriptions, a line in each card's `.tres` (`description`, since 2026-11-05 part of the card's folder); the Story README has the rules.
 
 ## Not fixed yet
 

@@ -367,6 +367,8 @@ func setup() -> void:
 		events.wizard_shield_requested.connect(_on_wizard_shield_requested)
 	if not events.pull_requested.is_connected(_on_pull_requested):
 		events.pull_requested.connect(_on_pull_requested)
+	if not events.status_requested.is_connected(_on_status_requested):
+		events.status_requested.connect(_on_status_requested)
 
 
 func _physics_process(delta: float) -> void:
@@ -1235,6 +1237,12 @@ func _remove_status(row: int, status_id: StringName) -> void:
 ## A barrier for the caster's own actor (`wizard_shield_requested`), whoever it is.
 func _on_wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int) -> void:
 	give_shield(caster, charges, seconds, tag)
+
+
+## A carrier that hits nothing gave `target` a status (a portal's infusion): applied with no hit.
+func _on_status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float) -> void:
+	if status_id != &"" and is_instance_valid(target):
+		apply_status(caster, target, status_id, duration, strength)
 
 
 func _on_pull_requested(caster: int, position: Vector2, radius: float, strength: float, _tag_of_card: int, to: Vector2) -> void:

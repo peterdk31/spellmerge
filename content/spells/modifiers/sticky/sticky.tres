@@ -7,8 +7,9 @@
 script = ExtResource("1_base")
 id = &"sticky"
 display_name = "Sticky"
+description = "The next shot sticks to what it hits, then ends there."
 complexity = 2
 icon = ExtResource("2_icon")
-behaviour = 12
+behaviour_id = &"sticky"
 behaviour_strength = 1.0
 look_layer = 15

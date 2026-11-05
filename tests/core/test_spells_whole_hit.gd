@@ -147,7 +147,7 @@ func test_an_echoed_shots_zaps_hit_at_the_echos_share() -> void:
 		return
 	check(is_equal_approx(spell.echo_zap_hit.damage, spell.echo_hit.damage * SpellLimits.ZAP_DAMAGE), "the echo's damage at the zap's share")
 	check_equal(spell.echo_zap_hit.kind, &"ray", "a zap is a ray hit")
-	# (How often a rune zaps is the card's chance, tests/content/spells/test_zap.gd: one roll a body.)
+	# (How often a rune zaps is the card's chance, content/spells/modifiers/zap/test_zap.gd: one roll a body.)
 
 
 func test_a_zap_keeps_slam_and_heal() -> void:

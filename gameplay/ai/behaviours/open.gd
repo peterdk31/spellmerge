@@ -1,7 +1,7 @@
 extends AIBehaviour
-## A staff whose next cast makes a body of its own (a decoy, a familiar) or stays on (`hold`) is
-## ready and its last one has run out: cast it once, before anything else, so the fight opens
-## with it.
+## A staff whose next cast makes a body of its own (a decoy, a familiar), opens a way through
+## (a portal) or stays on (`hold`) is ready and its last one has run out: cast it once, before
+## anything else, so the fight opens with it.
 
 
 func name() -> String:
@@ -16,7 +16,7 @@ func want(brain: AIBrain) -> float:
 		var sense: CastSense = brain.senses[at]
 		if sense == null or sense.empty or brain.ready[at] == 0 or brain.holding[at] != 0:
 			continue
-		if not (sense.spawns or sense.sustained):
+		if not (sense.spawns or sense.opens or sense.sustained):
 			continue
 		if brain.clock - brain.memo[index] < maxf(sense.lasts, 3.0):
 			continue

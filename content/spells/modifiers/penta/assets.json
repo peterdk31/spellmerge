@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/penta/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator, outline worked out from the shape)",
+			"prompt": "A 16x16 icon for the Penta card: five small light violet orbs on a ring, each with a dot pointing in at a dark centre, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

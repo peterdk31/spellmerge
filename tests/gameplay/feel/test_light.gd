@@ -132,7 +132,7 @@ func test_the_light_batches_get_the_rows_the_batches_upload() -> void:
 		var source: MultiMesh = manager._nodes[batch].multimesh
 		var mirror: MultiMesh = manager.batch_mirror(batch)
 		check(mirror == light.batches[batch].multimesh, "batch %d is mirrored by its light batch" % batch)
-		check(mirror != source and mirror.mesh is QuadMesh, "batch %d: the light draws a quad of its own, not the trails' mesh" % batch)
+		check(mirror != source and mirror.mesh is QuadMesh, "batch %d: the light draws a quad of its own, not the shots' mesh" % batch)
 		check_equal(mirror.instance_count, source.instance_count, "batch %d: as many rows" % batch)
 		check_equal(mirror.visible_instance_count, source.visible_instance_count, "batch %d: as many drawn" % batch)
 		check(mirror.buffer == source.buffer, "batch %d: the same rows" % batch)
@@ -203,15 +203,15 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 	for batch in ProjectilesScript.BATCHES:
 		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
 		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.BATCH_MESH[batch] < 0 else SpellLightScript.ROWS_TRAIL
-		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "trails"])
+		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.BATCH_MESH[batch] < 0 else SpellLightScript.ROWS_SHOT
+		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "shots"])
 	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
 
 
 ## The shader's ROWS_* and its row-reading constants are the script's and Feel's.
 func test_the_light_shader_reads_rows_as_the_script_says() -> void:
 	var code: String = SpellLightScript.LIGHT_SHADER.code
-	for pair: Array in [["ROWS_TRAIL", SpellLightScript.ROWS_TRAIL], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_FLASH", SpellLightScript.ROWS_FLASH], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
+	for pair: Array in [["ROWS_SHOT", SpellLightScript.ROWS_SHOT], ["ROWS_RUNE", SpellLightScript.ROWS_RUNE], ["ROWS_FLASH", SpellLightScript.ROWS_FLASH], ["ROWS_SPOT", SpellLightScript.ROWS_SPOT], ["ROWS_CUE", SpellLightScript.ROWS_CUE]]:
 		check(code.contains("const int %s = %d;" % [pair[0], pair[1]]), "the shader's %s is %d" % pair)
 	check(code.contains("const float FLASH_FROM = %s;" % str(FeelScript.FLASH_FROM)), "the shader's FLASH_FROM is Feel's")
 	check(code.contains("const float FLASH_SPAN = %s;" % str(FeelScript.FLASH_SPAN)), "the shader's FLASH_SPAN is Feel's")
@@ -347,7 +347,7 @@ func test_an_enemy_shot_lights_like_any() -> void:
 		var buffer: PackedFloat32Array = mirror.buffer
 		for n in mirror.visible_instance_count:
 			var i: int = n * SpellLightScript.STRIDE
-			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
+			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.HEAD_LIVE != 0:
 				found = true
 	check(found, "the enemy shot's live head is in a light batch, so it lights")
 
@@ -362,7 +362,7 @@ func test_a_shot_without_a_trail_row_lights() -> void:
 	manager.update_draw(1.0)
 	check(slot >= 0, "a shot (with no trail row: its tail is motes)")
 	var shader: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	check(not shader.contains("row >= 0.0 && flag_set(flags, TF_HEAD)"), "the light shader lights a head without a row")
+	check(not shader.contains("row >= 0.0 && flag_set(flags, HF_LIVE)"), "the light shader lights a head without a row")
 	var at: Vector2 = manager.get_position_of(slot)
 	var found: bool = false
 	for batch in ProjectilesScript.BATCHES:
@@ -370,7 +370,7 @@ func test_a_shot_without_a_trail_row_lights() -> void:
 		var buffer: PackedFloat32Array = mirror.buffer
 		for n in mirror.visible_instance_count:
 			var i: int = n * SpellLightScript.STRIDE
-			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.TRAIL_HEAD != 0:
+			if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 2.0 and int(buffer[i + 5]) & ProjectilesScript.HEAD_LIVE != 0:
 				found = true
 	check(found, "its head is in a light batch")
 

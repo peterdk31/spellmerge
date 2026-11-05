@@ -12,7 +12,7 @@ extends Node
 ##   - Shots, every one (the enemies' too): one batch per projectile batch, its MultiMesh
 ##     mirroring the batch (`ProjectileManager.mirror_batch`): each frame it is handed the buffer
 ##     the batch uploads, with a quad of its own (the batch's MultiMesh is not shared: it holds
-##     the trails' mesh, hundreds of quads a shot, drawn or folded; DECISIONS, 2026-11-02).
+##     the shots' `head_mesh`, a few quads a shot placed by its vertex stage).
 ##   - Feel's flashes (flares, rings, casts, arcs, blasts): `light_flashes` hands over the buffers
 ##     Feel just uploaded (Feel calls the spectacle's, which calls this). How much each lights is its kind's `room_light`
 ##     (`FlashKind`; Feel writes it into the row's transform, 0 for an unlit flash), fading out
@@ -48,7 +48,7 @@ const DOWNSCALE: int = 4
 ## the view (the GPU only shades what is on screen).
 const REACH: float = 65536.0
 ## How `light.gdshader` reads a batch's rows (its ROWS_*).
-const ROWS_TRAIL: int = 0
+const ROWS_SHOT: int = 0
 const ROWS_RUNE: int = 1
 const ROWS_FLASH: int = 2
 const ROWS_SPOT: int = 3
@@ -127,7 +127,7 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	_quad = QuadMesh.new()
 	_quad.size = Vector2.ONE
 	for batch in ProjectileManagerScript.BATCHES:
-		var rows: int = ROWS_RUNE if ProjectileManagerScript.BATCH_MESH[batch] < 0 else ROWS_TRAIL
+		var rows: int = ROWS_RUNE if ProjectileManagerScript.BATCH_MESH[batch] < 0 else ROWS_SHOT
 		var node: MultiMeshInstance2D = _light_batch(rows)
 		batches.append(node)
 		if _projectiles != null:

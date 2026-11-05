@@ -65,7 +65,7 @@ func before_each() -> void:
 	slow.lifetime_mult = 3.0
 	_modifier(&"return", ModifierBase.Behaviour.RETURN, 1.0)
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
-	# A sure zap (100%), so these tests read its rules, not its chance (tests/content/spells/test_zap.gd).
+	# A sure zap (100%), so these tests read its rules, not its chance (content/spells/modifiers/zap/test_zap.gd).
 	var arc: ModifierBase = _modifier(&"zap", ModifierBase.Behaviour.ZAP, 1.0)
 	arc.behaviour_reach = 60.0
 	var on_hit := TriggerBase.new()

@@ -65,17 +65,18 @@ constexpr int B_GROWTH = 1;
 constexpr int B_LINGER = 2;
 constexpr int B_ORBIT = 3;
 constexpr int B_RETURN = 4;
-constexpr int B_HOMING = 5;
-constexpr int B_SPIRAL = 6;
-constexpr int B_MOVE = 7;
-constexpr int AFTER_HITS = 8;
+constexpr int B_CURVE = 5;
+constexpr int B_HOMING = 6;
+constexpr int B_SPIRAL = 7;
+constexpr int B_MOVE = 8;
+constexpr int AFTER_HITS = 9;
 constexpr int HOMING_PERIOD = 4;
 constexpr double HOMING_DRIFT = 24.0; // SpellLimits.HOMING_DRIFT
 // The behaviours a waiting homing shot may also have for the native hit pass to catch it up itself:
 // none of the passes after homing that run before the hits.
 constexpr int64_t AFTER_HOMING_MASK = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1)) - 1);
-// Trails and drawing.
-constexpr double TRAIL_JUMP = 96.0;
+// Tails and drawing.
+constexpr double TAIL_JUMP = 96.0;
 // Tails as motes (the manager's SPARK_TAIL, `_lay_tail`) and a birth's numbers (SPARK_*).
 constexpr int SPARK_BIRTH_STRIDE = 12;
 constexpr int SPARK_X = 0;
@@ -93,8 +94,8 @@ constexpr int TAIL_KINDS = 3;
 constexpr double TAIL_SPACING = 2.0;
 constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
-constexpr int TRAIL_HEAD = 1;
-constexpr int TRAIL_ORBIT = 2;
+constexpr int HEAD_LIVE = 1;
+constexpr int HEAD_ORBIT = 2;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
@@ -232,6 +233,10 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(threat_seen, "_threat_seen", PACKED_INT32_ARRAY) \
 	X(threat_stamp, "_threat_stamp", INT) \
 	X(growth, "_growth", PACKED_FLOAT32_ARRAY) \
+	X(curve_from, "_curve_from", PACKED_FLOAT32_ARRAY) \
+	X(curve_to, "_curve_to", PACKED_FLOAT32_ARRAY) \
+	X(curve_ease, "_curve_ease", PACKED_FLOAT32_ARRAY) \
+	X(curve_speed, "_curve_speed", PACKED_FLOAT32_ARRAY) \
 	X(radius0, "_radius0", PACKED_FLOAT32_ARRAY) \
 	X(hold, "_hold", PACKED_FLOAT32_ARRAY) \
 	X(linger, "_linger", PACKED_FLOAT32_ARRAY) \
@@ -836,6 +841,7 @@ const Constant CONSTANTS[] = {
 	{ "B_LINGER", (double)B_LINGER },
 	{ "B_ORBIT", (double)B_ORBIT },
 	{ "B_RETURN", (double)B_RETURN },
+	{ "B_CURVE", (double)B_CURVE },
 	{ "B_HOMING", (double)B_HOMING },
 	{ "B_SPIRAL", (double)B_SPIRAL },
 	{ "B_MOVE", (double)B_MOVE },
@@ -843,7 +849,7 @@ const Constant CONSTANTS[] = {
 	{ "HOMING_PERIOD", (double)HOMING_PERIOD },
 	{ "HOMING_DRIFT", (double)HOMING_DRIFT },
 	{ "AFTER_HOMING_MASK", (double)AFTER_HOMING_MASK },
-	{ "TRAIL_JUMP", (double)TRAIL_JUMP },
+	{ "TAIL_JUMP", (double)TAIL_JUMP },
 	{ "SPARK_BIRTH_STRIDE", (double)SPARK_BIRTH_STRIDE },
 	{ "SPARK_X", (double)SPARK_X },
 	{ "SPARK_Y", (double)SPARK_Y },
@@ -860,8 +866,8 @@ const Constant CONSTANTS[] = {
 	{ "TAIL_SPACING", (double)TAIL_SPACING },
 	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
-	{ "TRAIL_HEAD", (double)TRAIL_HEAD },
-	{ "TRAIL_ORBIT", (double)TRAIL_ORBIT },
+	{ "HEAD_LIVE", (double)HEAD_LIVE },
+	{ "HEAD_ORBIT", (double)HEAD_ORBIT },
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
@@ -1030,7 +1036,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 	return -1;
 }
 
-// --- Trails and drawing ------------------------------------------------------------------------
+// --- Tails and drawing -------------------------------------------------------------------------
 
 namespace {
 
@@ -1145,7 +1151,7 @@ void ShotKernel::homing_pass(Object *m, int64_t first, int64_t count, double del
 }
 
 // The behaviour passes that need nothing of GDScript (`_pass_growth`, `_pass_linger`, `_pass_orbit`,
-// `_pass_return`, `_pass_homing`, `_pass_spiral`), over the shots `_members[first ..
+// `_pass_return`, `_pass_curve`, `_pass_homing`, `_pass_spiral`), over the shots `_members[first ..
 // first + count - 1]`, not catching up: a shot whose caster is another shot waits for its turn
 // (`_wait`), as in GDScript, and GDScript catches it up. Returns false for another kind.
 bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count, double delta) {
@@ -1153,7 +1159,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		homing_pass(m, first, count, delta);
 		return true;
 	}
-	if (kind != B_GROWTH && kind != B_LINGER && kind != B_ORBIT && kind != B_RETURN && kind != B_SPIRAL) {
+	if (kind != B_GROWTH && kind != B_LINGER && kind != B_ORBIT && kind != B_RETURN && kind != B_CURVE && kind != B_SPIRAL) {
 		return false;
 	}
 	const Names &k = *names;
@@ -1252,6 +1258,26 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			pos[slot] = centre + vmul(away, reach);
 			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * (double)orbit_speed[slot]);
 			orbit_centre[slot] = centre;
+		}
+	} else if (kind == B_CURVE) {
+		Arr<PackedFloat32Array> life, span, curve_from, curve_to, curve_ease, curve_speed;
+		life.load(m, k.life);
+		span.load(m, k.span);
+		curve_from.load(m, k.curve_from);
+		curve_to.load(m, k.curve_to);
+		curve_ease.load(m, k.curve_ease);
+		curve_speed.load(m, k.curve_speed);
+		for (int64_t n = first; n < first + count; n++) {
+			const int64_t slot = members[n];
+			if (state[slot] != S_MOVING) {
+				continue;
+			}
+			// At the middle of the step, as `_pass_curve`.
+			const double left = clampf(((double)life[slot] + delta * 0.5) / (double)span[slot], 0.0, 1.0);
+			const double from = (double)curve_from[slot];
+			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - std::pow(left, (double)curve_ease[slot]));
+			vel[slot] = vmul(vel[slot].normalized(), (double)curve_speed[slot] * factor);
+			pos[slot] = prev[slot] + vmul(vel[slot], delta);
 		}
 	} else if (kind == B_SPIRAL) {
 		Arr<PackedVector2Array> base;
@@ -1496,7 +1522,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		tail_from[slot] = at;
 		const Vector2 way = at - from;
 		const double d = way.length();
-		if (!(d > 0.0) || d > TRAIL_JUMP) {
+		if (!(d > 0.0) || d > TAIL_JUMP) {
 			return;
 		}
 		tail_wanted += d / TAIL_SPACING;
@@ -1604,7 +1630,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		if (rune && vel[slot].length_squared() > 0.0f) {
 			dir = vel[slot].normalized();
 		}
-		const int64_t flags = TRAIL_HEAD | (mot == MOTION_ORBIT ? TRAIL_ORBIT : 0);
+		const int64_t flags = HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0);
 		if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
 			// `_write_stones` for a shot that is not solid: one stone.
 			if (used[batch] < room[batch]) {

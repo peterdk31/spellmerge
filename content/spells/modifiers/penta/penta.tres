@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/penta/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"penta"
+display_name = "Penta"
+description = "Casts the next spell five times from a ring, aimed in."
+complexity = 3
+icon = ExtResource("2_icon")
+damage_mult = 0.4
+mana_mult = 2.5
+behaviour_id = &"penta"
+behaviour_strength = 5.0
+look_layer = 20

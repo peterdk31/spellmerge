@@ -54,8 +54,8 @@ extends Node2D
 ## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
 ## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
 ## batch of its own (the owner, 2026-10-29; core/README.md, "The shot shaders"): a flying shot
-## and its trail by `shot_trail.gdshader`, as small quads its vertex stage places (`trail_mesh`:
-## a quad per tail pixel, particle and light, so the fragment stage stays small), a rune by
+## (its core and the core's light; the tail is motes) by `shot_head.gdshader`, as small quads its
+## vertex stage places (`head_mesh`, so the fragment stage stays small), a rune by
 ## `shot_rune.gdshader`.
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
@@ -289,6 +289,8 @@ const HIT_WORK: int = 400
 const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
+## The most a speed curve multiplies a shot's speed by (`set_speed_curve`), however many cards.
+const SPEED_START_MOST: float = 4.0
 ## The threat grid (see `threat`): built from this many live shots (below, one pass is cheaper),
 ## its cells at least THREAT_CELL pixels and at most THREAT_GRID_MAX a side, and a shot whose path
 ## covers more than THREAT_SPAN_MAX cells is tried by every query instead of filed.
@@ -332,16 +334,17 @@ const BATCH_ENEMY_RUNE: int = 4
 const BATCHES: int = 5
 ## The order the batches' nodes are made in (their draw order at one z).
 const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_RUNE, BATCH_ORBIT, BATCH_ENEMY, BATCH_ENEMY_RUNE]
-## Each batch's mesh: 0 the shots' (`trail_mesh`), -1 a batch of runes (one quad each).
+## Each batch's mesh: 0 the shots' (`head_mesh`), -1 a batch of runes (one quad each).
 const BATCH_MESH: Array[int] = [0, -1, 0, 0, -1]
 ## The batches on the enemy ramp's layer, one above the others.
 const BATCH_ENEMY_LAYER: Array[bool] = [false, false, false, true, true]
 ## The batches given the shot art (`texture`).
 const BATCH_TEXTURED: Array[bool] = [true, true, true, false, false]
 ## The bodies a shot is drawn as (the shot shaders build them on a pixel grid; staffs B6a): a
-## bolt with its tail (`shot_trail.gdshader`), a rune (a diamond that pulses, `shot_rune.gdshader`),
-## an orbit shot drawn whole with its tail bent round its circle (`shot_orbit.gdshader`, Entities'
-## familiars; the manager's orbit shots are trails). Kind 0 is no body.
+## bolt's head (`shot_head.gdshader`; its tail is motes), a rune (a diamond that pulses,
+## `shot_rune.gdshader`), an orbit shot drawn whole with its tail bent round its circle
+## (`shot_orbit.gdshader`, Entities' familiars; the manager's orbit shots are drawn as bolts are).
+## Kind 0 is no body.
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
@@ -367,11 +370,12 @@ const RUNE_TRACE: float = 0.25
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
-## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
-## its tail (`shot_trail.gdshader`), and a shot shows every kind its cards bring, mixed at
-## random: the look is a set, one bit per kind. WEAVE and STREAKS also change the body (a
-## weave, a longer core). A new kind of effect is a new number here (up to LOOK_MAX_KINDS) and
-## a branch in the shader's `particle`; a new card with an old kind needs neither.
+## `set_look`). The body stays plain; each kind is a style of particle the shot gives off along
+## its path (births for Feel's motes, `_give_off_sparks`), and a shot shows every kind its cards
+## bring, mixed at random: the look is a set, one bit per kind. WEAVE and STREAKS also change the
+## head (a weave, a longer core; `shot_head.gdshader`). A new kind of effect is a new number here
+## (up to LOOK_MAX_KINDS), its rate in SPARK_RATES and a branch in `particle`
+## (`shot_particle.gdshaderinc`, for runes and familiars); a new card with an old kind needs none.
 const LOOK_NONE: int = 0
 const LOOK_EMBERS: int = 1
 const LOOK_FLECKS: int = 2
@@ -417,7 +421,7 @@ const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
 ## A bolt-like shot of hit radius below this is a speck (an atom): its core is one pixel, no
 ## cross. It travels as zoom 0 in the look (`look_core_zoom`); every other shape of it, and every
-## shader but the trail's core, reads zoom 1 (`look_from_color` never goes below 1).
+## shader but the head's core, reads zoom 1 (`look_from_color` never goes below 1).
 const SPECK_RADIUS: float = 2.0
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
 ## from one pool with a global count, `tailless_particle_cap` (a visual budget; never a build
@@ -426,27 +430,26 @@ const SPECK_RADIUS: float = 2.0
 ## caster's staff gets a fair share, and the shots of one staff thin alike within it.
 ## The pool's count (S5: the tails' budget went to the motes when the tails went): the births a
 ## frame thin only past this many particles asked, so a fight of thousands of shots keeps more of
-## the look of a fight of tens. Set from the trail benchmark (DECISIONS, 2026-11-04, "Do shots need
+## the look of a fight of tens. Set from the shot benchmark (`tests/benchmark/shot_gpu.gd`; DECISIONS, 2026-11-04, "Do shots need
 ## tails?"); the "Tailless motes" dev slider sets it (`set_tailless_pool`).
 const TAILLESS_PARTICLE_CAP: int = 2048
 ## A teleport: a shot that moves more than this many pixels between two frames lays no tail across
 ## the gap (`_lay_tail`).
-const TRAIL_JUMP: float = 96.0
-## A shot's flags in its instance (the shader's TF_*): its shot is alive (the core is drawn), an
+const TAIL_JUMP: float = 96.0
+## A shot's flags in its instance (the shader's HF_*): its shot is alive (the core is drawn), an
 ## orbit shot.
-const TRAIL_HEAD: int = 1
-const TRAIL_ORBIT: int = 2
-## The quad kinds of a shot's mesh (`trail_mesh`; the shader's Q_*): the core's light, the core.
-## (The tail's kinds, 1, 4 and 5, went with the tail shader's tail, 2026-11-05.)
-const TRAIL_Q_HEAD_LIGHT: int = 0
-const TRAIL_Q_CORE: int = 6
-## Vertices a quad of a shot's mesh has (one triangle round its box; see `trail_mesh`).
-const TRAIL_QUAD_VERTICES: int = 3
+const HEAD_LIVE: int = 1
+const HEAD_ORBIT: int = 2
+## The quad kinds of a shot's mesh (`head_mesh`; the shader's Q_*): the core's light, the core.
+const HEAD_Q_LIGHT: int = 0
+const HEAD_Q_CORE: int = 1
+## Vertices a quad of a shot's mesh has (one triangle round its box; see `head_mesh`).
+const HEAD_QUAD_VERTICES: int = 3
 ## The quads of a shot's mesh in draw order: the light first (void's dark heart dims what is under
 ## it), then the core.
-const TRAIL_QUAD_KINDS: Array[int] = [TRAIL_Q_HEAD_LIGHT, TRAIL_Q_CORE]
-## Trail particles are motes (spell spectacle P1d, and since S3 the only way they are drawn;
-## docs/milestones/spell-spectacle-2.md): the trails are drawn with no particle slots, and the
+const HEAD_QUAD_KINDS: Array[int] = [HEAD_Q_LIGHT, HEAD_Q_CORE]
+## A shot's particles are motes (spell spectacle P1d, and since S3 the only way they are drawn;
+## docs/milestones/spell-spectacle-2.md): a shot's mesh has no particle slots, and the
 ## particles a shot gives off are handed out as births (`spark_births`) for Feel's motes
 ## to throw, while something takes them (`spark_motes`). A birth is SPARK_BIRTH_STRIDE floats:
 ## where (x, y), the way back along the shot (x, y), the look kind it is of (LOOK_*; 0 a plain
@@ -473,7 +476,7 @@ const SPARK_TAG_BITS: int = 12
 ## The births a frame holds at most (more moments than this a frame are a stall: they are dropped).
 const SPARK_BIRTHS_MAX: int = 1024
 ## How often each look kind gives off a particle at a moment (by look kind; 0 the plain shot's
-## twinkle, 11 the weave none): the trail shader's own rates before S3, now only here.
+## twinkle, 11 the weave none).
 const SPARK_RATES: PackedFloat32Array = [0.18, 0.45, 0.32, 0.4, 0.55, 0.45, 0.25, 0.25, 0.25, 0.25, 0.25, 0.0, 0.25, 1.0, 0.7, 0.4, 1.0, 1.0, 0.5, 0.5, 1.0, 0.4]
 ## A dash's speed streak: a birth of this look kind is one of the motes' dash path kinds
 ## (`MoteKind.dash_path`). The manager lays none: a dash's streaks are a `stream` part of its cue,
@@ -521,16 +524,16 @@ const TAIL_PLAYER_SHARE: float = 0.25
 const TAIL_FRESH: float = 0.125
 const GROUP_STAFFS: int = 4
 const GROUPS: int = ACTORS * GROUP_STAFFS
-## Particle moments a second (the trail shader's BIRTHS were at these).
+## Particle moments a second.
 const SPARK_MOMENTS: float = 60.0
 ## An orbit shot spirals out from its caster to its circle over this many seconds.
 const ORBIT_GROW: float = 0.25
-## Particles a shot keeps in the air at most (the same number as the shader's).
+## Particles a shot keeps in the air at most (the same number as `shot_particle.gdshaderinc`'s).
 const PARTICLES_PER_SHOT_MAX: int = 12
 ## The look bits of the kinds that give off particles: all of them but the weave.
 const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
-## Build the shots from their looks (see "Drawing" above): flying shots and their trails, runes.
-const TRAIL_SHADER: Shader = preload("res://core/projectiles/shot_trail.gdshader")
+## Build the shots from their looks (see "Drawing" above): flying shots' heads, runes.
+const HEAD_SHADER: Shader = preload("res://core/projectiles/shot_head.gdshader")
 const RUNE_SHADER: Shader = preload("res://core/projectiles/shot_rune.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
@@ -572,7 +575,7 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
 ## which gives the same game either way (native/README.md), and the hit test's scratch, which only
 ## the native pass sizes ahead (both found by N2b's platform runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_trail_mesh", &"step_profile", &"profile_clock"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -691,6 +694,12 @@ var _deflect: PackedByteArray = PackedByteArray()
 var _span: PackedFloat32Array = PackedFloat32Array()
 var _radius0: PackedFloat32Array = PackedFloat32Array()
 var _growth: PackedFloat32Array = PackedFloat32Array()
+## Speed over life (`set_speed_curve`): the factors on its speed when it leaves and as its life runs
+## out, the power of the ease between them, and the speed they are factors of.
+var _curve_from: PackedFloat32Array = PackedFloat32Array()
+var _curve_to: PackedFloat32Array = PackedFloat32Array()
+var _curve_ease: PackedFloat32Array = PackedFloat32Array()
+var _curve_speed: PackedFloat32Array = PackedFloat32Array()
 var _wave: PackedFloat32Array = PackedFloat32Array()
 var _wave_age: PackedFloat32Array = PackedFloat32Array()
 var _base: PackedVector2Array = PackedVector2Array()
@@ -877,8 +886,8 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
 ## the tail births laid (`spark_births`' first) and the tail asked for (`tail_demand`).
 var _draw_out: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
-## The shots' mesh (`trail_mesh`), made once.
-static var _trail_mesh: ArrayMesh = null
+## The shots' mesh (`head_mesh`), made once.
+static var _head_mesh: ArrayMesh = null
 ## The length of the last step, so the drawing knows when its heads are (see `update_draw`).
 var _last_delta: float = 0.0
 ## True inside step(): the grid is in use, so a target removed then is only
@@ -931,6 +940,34 @@ var ray_path_count: int = 0
 ## did nothing). Read right after the call: a nested ray in a hit handler changes them.
 var ray_end: Vector2 = Vector2.INF
 var ray_end_heading: Vector2 = Vector2.ZERO
+## The gates (the `portal` carrier, docs/milestones/portal.md): circles in the world that what goes
+## in comes out of elsewhere. A row each: on or not, where, the way it faces, how big, its portal
+## (`_gate_group`, the portal's own number), its portal's spell tag and whether it is the portal's mouth (1) or an exit (0).
+## The portal carrier opens and closes them; rays (`ray_gates`), shots (`shots_into_gates`) and
+## bodies read them here, as they read the walls. `_gate_live` counts the rows on.
+var _gate_on: PackedByteArray = PackedByteArray()
+var _gate_pos: PackedVector2Array = PackedVector2Array()
+var _gate_face: PackedVector2Array = PackedVector2Array()
+var _gate_radius: PackedFloat32Array = PackedFloat32Array()
+var _gate_group: PackedInt64Array = PackedInt64Array()
+var _gate_tag: PackedInt64Array = PackedInt64Array()
+var _gate_mouth: PackedByteArray = PackedByteArray()
+var _gate_live: int = 0
+## With `ray_gates` set, the next rays stop where they enter a gate (a beam, which goes on from the
+## other side: `CarrierBeam`); every other ray (a zap, a jump, a sweep) passes gates by. After a ray
+## that stopped at one, `ray_gate` is that gate (-1 for none), `ray_gate_at` where it went in,
+## `ray_gate_heading` its way in and `ray_gate_left` the length it had left. Read right after the
+## call, like `ray_end`.
+var ray_gates: bool = false
+var ray_gate: int = -1
+var ray_gate_at: Vector2 = Vector2.INF
+var ray_gate_heading: Vector2 = Vector2.ZERO
+var ray_gate_left: float = 0.0
+## The gate the last `gate_cut` found (-1 for none).
+var gate_hit: int = -1
+## What the last `shots_into_gates` found: each shot's slot and the gate it went into (reused).
+var gate_shots: PackedInt32Array = PackedInt32Array()
+var gate_shot_gates: PackedInt32Array = PackedInt32Array()
 ## What the last `sweep` found (reused; grows when a sweep finds more): the bodies, where the
 ## wedge meets each, and the sweep's way there. Read right after the call: a hit handler's sweep changes them.
 var sweep_nodes: Array = []
@@ -944,7 +981,7 @@ var threat_slot: int = -1
 var threat_away: Vector2 = Vector2.ZERO
 ## The spark pool's count (TAILLESS_PARTICLE_CAP; the "Tailless motes" dev slider).
 var tailless_particle_cap: int = TAILLESS_PARTICLE_CAP
-## Trail particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
+## A shot's particles as motes (see SPARK_BIRTH_STRIDE): whether something takes the births (no
 ## births are rolled while nothing does). `spark_births` holds `spark_birth_count` births of the
 ## last `update_draw` (reused; read before the next one).
 var spark_motes: bool = false
@@ -1118,7 +1155,7 @@ func _ready() -> void:
 	for batch: int in BATCH_ORDER:
 		var shape: int = BATCH_MESH[batch]
 		var z: int = DRAW_Z + (1 if BATCH_ENEMY_LAYER[batch] else 0)
-		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else TRAIL_SHADER, null if shape < 0 else trail_mesh())
+		_nodes[batch] = _make_batch(z, RUNE_SHADER if shape < 0 else HEAD_SHADER, null if shape < 0 else head_mesh())
 	_draw_node = _nodes[BATCH_BOLT]
 	_rune_node = _nodes[BATCH_RUNE]
 	_orbit_node = _nodes[BATCH_ORBIT]
@@ -1148,7 +1185,7 @@ func batch_mirror(batch: int) -> MultiMesh:
 
 
 ## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)
-## by `shader`, added as a child: each a quad, or each a `mesh` (the trails' mesh).
+## by `shader`, added as a child: each a quad, or each a `mesh` (the shots' `head_mesh`).
 func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
 	if mesh == null:
@@ -1171,23 +1208,23 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	return node
 
 
-## The mesh a shot is drawn as (`shot_trail.gdshader`, PARTICLES ARE GEOMETRY there): small
-## quads, each told in its UV which quad kind (TRAIL_Q_*) it is, in TRAIL_QUAD_KINDS' order (the
+## The mesh a shot is drawn as (`shot_head.gdshader`, PARTICLES ARE GEOMETRY there): small
+## quads, each told in its UV which quad kind (HEAD_Q_*) it is, in HEAD_QUAD_KINDS' order (the
 ## light first, then the core). The shader places each quad round the head, or folds it away; a
 ## vertex says which quad and corner it is in its UV: x 0.25 or 0.75, y the kind + 0.25 or 0.75. A
-## quad is one triangle of TRAIL_QUAD_VERTICES vertices, twice its box each way, which the fragment
+## quad is one triangle of HEAD_QUAD_VERTICES vertices, twice its box each way, which the fragment
 ## stage cuts to the box: each vertex runs the whole vertex stage, so three cost a quarter less than
 ## a square's four (performance, 2026-11-02; the pixels are the same). It is made once and shared
 ## by the shot batches.
-static func trail_mesh() -> ArrayMesh:
-	if _trail_mesh != null:
-		return _trail_mesh
+static func head_mesh() -> ArrayMesh:
+	if _head_mesh != null:
+		return _head_mesh
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(0.0, 1.0)]
-	for kind: int in TRAIL_QUAD_KINDS:
+	for kind: int in HEAD_QUAD_KINDS:
 		var base: int = verts.size()
 		for corner: Vector2 in corners:
 			verts.append(corner)
@@ -1202,7 +1239,7 @@ static func trail_mesh() -> ArrayMesh:
 	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_trail_mesh = mesh
+	_head_mesh = mesh
 	return mesh
 
 
@@ -1260,6 +1297,10 @@ func set_cap(value: int) -> void:
 	_span.resize(_cap)
 	_radius0.resize(_cap)
 	_growth.resize(_cap)
+	_curve_from.resize(_cap)
+	_curve_to.resize(_cap)
+	_curve_ease.resize(_cap)
+	_curve_speed.resize(_cap)
 	_wave.resize(_cap)
 	_wave_age.resize(_cap)
 	_base.resize(_cap)
@@ -1705,6 +1746,8 @@ func clear() -> void:
 	_own_tail.fill(-1)
 	_group_count.fill(0)
 	_group_live = 0
+	_gate_on.fill(0)
+	_gate_live = 0
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -2143,8 +2186,8 @@ func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, for
 		_body[slot] = kind
 
 
-## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
-## `shot_trail.gdshader` draws along its path. Returns false for an empty slot or a look with a
+## Give the shot in `slot` its look, packed by `pack_look` (0 for none): the particles it gives
+## off and what its head shows (`shot_head.gdshader`). Returns false for an empty slot or a look with a
 ## bit for a kind that does not exist.
 func set_look(slot: int, look: int) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (LOOK_COUNT - 1):
@@ -2269,6 +2312,27 @@ func set_growth(slot: int, factor: float) -> bool:
 	return true
 
 
+## The shot's speed changes over its life (speed over life, a card's `speed_start`, `speed_end` and
+## `speed_ease`): it leaves at `start` times its speed now and goes to `end` times it as its life runs
+## out, `start + (end - start) x (1 - (life left / its life) ^ ease)`: with an ease above 1 most of
+## the change comes early (every spell shot's default, SpellLimits.SHOT_SPEED_*: start 2.2, end 0.2, ease 1.5),
+## below 1 late. Homing and spiral turn and weave the speed it has; a deflect speeds the whole curve
+## up and starts it again with its life. Only a shot that flies; false otherwise, or for bad numbers.
+## `start` above SPEED_START_MOST counts as SPEED_START_MOST.
+func set_speed_curve(slot: int, start: float, end: float, ease_power: float) -> bool:
+	if not _is_flyer(slot) or not (start > 0.0) or not (end >= 0.0) or not (ease_power > 0.0):
+		return false
+	if not is_finite(start) or not is_finite(end) or not is_finite(ease_power):
+		return false
+	_curve_from[slot] = minf(start, SPEED_START_MOST)
+	_curve_to[slot] = minf(end, SPEED_START_MOST)
+	_curve_ease[slot] = ease_power
+	_curve_speed[slot] = _vel[slot].length()
+	_vel[slot] = _vel[slot] * _curve_from[slot]
+	_join(slot, B_CURVE)
+	return true
+
+
 ## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot).
 func get_growth_of(slot: int) -> float:
 	# The shot whose hit is being sent counts even when that hit spent it (it is gone already).
@@ -2346,6 +2410,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 		velocity -= 2.0 * velocity.dot(out) * out
 	_vel[slot] = velocity * SpellLimits.DEFLECT_SPEEDUP
 	_speed[slot] *= SpellLimits.DEFLECT_SPEEDUP
+	_curve_speed[slot] *= SpellLimits.DEFLECT_SPEEDUP
 	_base[slot] = _pos[slot]
 	_life[slot] = _span[slot]
 	_actor[slot] = by
@@ -2816,6 +2881,10 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_span[slot] = lifetime
 	_radius0[slot] = maxf(radius, 0.0)
 	_growth[slot] = 1.0
+	_curve_from[slot] = 1.0
+	_curve_to[slot] = 1.0
+	_curve_ease[slot] = 1.0
+	_curve_speed[slot] = 0.0
 	_wave[slot] = 0.0
 	_wave_age[slot] = 0.0
 	_linger[slot] = 0.0
@@ -2863,8 +2932,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 ##    each shot was moved and tested in turn.
 ## 4. The behaviours whose passes come after the hits (shields: every shot's path is this step's).
 ## The few shots whose motion reads something a hit handler may change, or the hit-work budget,
-## wait for their turn in the hit pass (see `_wait`), so they see the same as before. Then the
-## trails take their points.
+## wait for their turn in the hit pass (see `_wait`), so they see the same as before.
 func step(delta: float) -> void:
 	# A benchmark times the parts (`step_profile`); in the game the marks below do nothing. A new
 	# pass goes between two marks, and gets a PROF_ part of its own when it is worth timing alone.
@@ -2884,7 +2952,7 @@ func step(delta: float) -> void:
 	at = _profiled(PROF_COMMON, at)
 	for kind in AFTER_HITS:
 		if _member_count[kind] > 0:
-			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit,
+			# The native kernel runs the passes that need nothing of GDScript (growth, linger, orbit, curve,
 			# return, homing, spiral); it says false for the others.
 			if _kernel == null or not _kernel.call(&"run_pass", self, kind, kind * _cap, _member_count[kind], delta):
 				_passes[kind].call(_members, kind * _cap, _member_count[kind], delta)
@@ -3141,6 +3209,9 @@ func _hit_found(slot: int) -> void:
 # - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
 # - return before homing: a shot on its way back heads for its caster, bent toward the target its
 #   homing found (`_pass_return`); the homing pass only searches for it.
+# - speed curve after return and before homing and spiral: it sets the speed only of a shot flying
+#   out (one on its way home keeps the speed it turned with), and homing and spiral then turn and
+#   weave that velocity.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
 # - shield after the hits: it checks every shot's whole path of this step.
@@ -3152,12 +3223,13 @@ const B_GROWTH: int = 1
 const B_LINGER: int = 2
 const B_ORBIT: int = 3
 const B_RETURN: int = 4
-const B_HOMING: int = 5
-const B_SPIRAL: int = 6
-const B_MOVE: int = 7
-const B_SHIELD: int = 8
+const B_CURVE: int = 5
+const B_HOMING: int = 6
+const B_SPIRAL: int = 7
+const B_MOVE: int = 8
+const B_SHIELD: int = 9
 ## How many behaviours there are; the passes of B_* below AFTER_HITS run before the hit pass.
-const BEHAVIOURS: int = 9
+const BEHAVIOURS: int = 10
 const AFTER_HITS: int = B_SHIELD
 ## The behaviours after homing that run before the hits: a waiting homing shot with none of them is
 ## caught up by the native hit pass itself (`_kernel_hands_back`).
@@ -3165,7 +3237,7 @@ const AFTER_HOMING_MASK: int = ((1 << AFTER_HITS) - 1) & ~((1 << (B_HOMING + 1))
 ## The pass of each behaviour, by B_* (`_init` makes `_passes` from it).
 const BEHAVIOUR_PASSES: Array[StringName] = [
 	&"_pass_stuck", &"_pass_growth", &"_pass_linger", &"_pass_orbit", &"_pass_return",
-	&"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
+	&"_pass_curve", &"_pass_homing", &"_pass_spiral", &"_pass_move", &"_pass_shield",
 ]
 
 ## What a shot is doing in this step (`_state`), set by the common pass and the behaviour passes and
@@ -3367,6 +3439,22 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
+
+
+## Speed over life (`set_speed_curve`): a shot flying out takes the speed of its curve at the share
+## of its life left, along the way it flies now, and flies on along it. The share is read at the
+## middle of the step (its life was already counted down for the whole step), so a curve that
+## changes most early still goes as far as its mean says, to within a pixel, and not a step's
+## worth of change short (every shot has a curve, SpellLimits.SHOT_SPEED_*).
+func _pass_curve(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
+	for n in range(first, first + count):
+		var slot: int = list[n]
+		if _state[slot] != S_MOVING:
+			continue
+		var left: float = clampf((_life[slot] + delta * 0.5) / _span[slot], 0.0, 1.0)
+		var factor: float = _curve_from[slot] + (_curve_to[slot] - _curve_from[slot]) * (1.0 - pow(left, _curve_ease[slot]))
+		_vel[slot] = _vel[slot].normalized() * (_curve_speed[slot] * factor)
+		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
 
 ## Homing (`set_homing`): the shot turns toward the point it last found, at most its turn rate, and
@@ -3764,6 +3852,194 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## it ended and its heading there are left in `ray_end` and `ray_end_heading`, and the path it
 ## walked in `ray_path`. A `ghost` ray passes through walls (it never turns or ends at one). It
 ## allocates only when a ray is bigger than any before it.
+# --- Gates (the portal carrier; docs/milestones/portal.md) -----------------------------------
+
+## Opens a gate of the portal `group` (cast as the spell `tag`) at `at`, facing `face` (unit),
+## `radius` pixels round: its mouth when `mouth`, else one of its exits. Returns its row (rows are reused once closed, the
+## lowest free first, so the order is the same every run), or -1 for a bad one.
+func open_gate(group: int, tag: int, at: Vector2, face: Vector2, radius: float, mouth: bool) -> int:
+	if not at.is_finite() or not face.is_finite() or face.is_zero_approx() or not (radius > 0.0):
+		return -1
+	var row: int = _gate_on.find(0)
+	if row < 0:
+		row = _gate_on.size()
+		var size: int = maxi(8, row * 2)
+		for column: Variant in [_gate_on, _gate_pos, _gate_face, _gate_radius, _gate_group, _gate_tag, _gate_mouth]:
+			column.resize(size)
+		for n in range(row, size):
+			_gate_on[n] = 0
+	_gate_on[row] = 1
+	_gate_pos[row] = at
+	_gate_face[row] = face.normalized()
+	_gate_radius[row] = radius
+	_gate_group[row] = group
+	_gate_tag[row] = tag
+	_gate_mouth[row] = 1 if mouth else 0
+	_gate_live += 1
+	return row
+
+
+## Closes gate `gate` (nothing when it is not open).
+func close_gate(gate: int) -> void:
+	if gate_open(gate):
+		_gate_on[gate] = 0
+		_gate_live -= 1
+
+
+## How many gate rows there are (open or not), for `gate_open`.
+func gate_rows() -> int:
+	return _gate_on.size()
+
+
+## True when there is at least one open gate.
+func has_gates() -> bool:
+	return _gate_live > 0
+
+
+func gate_open(gate: int) -> bool:
+	return gate >= 0 and gate < _gate_on.size() and _gate_on[gate] != 0
+
+
+func gate_position(gate: int) -> Vector2:
+	return _gate_pos[gate] if gate_open(gate) else Vector2.INF
+
+
+func gate_face(gate: int) -> Vector2:
+	return _gate_face[gate] if gate_open(gate) else Vector2.ZERO
+
+
+func gate_radius(gate: int) -> float:
+	return _gate_radius[gate] if gate_open(gate) else 0.0
+
+
+func gate_group(gate: int) -> int:
+	return _gate_group[gate] if gate_open(gate) else -1
+
+
+## The spell tag of gate `gate`'s portal (0 when it is not open).
+func gate_tag(gate: int) -> int:
+	return _gate_tag[gate] if gate_open(gate) else 0
+
+
+## Gate `gate` is `radius` pixels round from now on (a portal that grows).
+func set_gate_radius(gate: int, radius: float) -> void:
+	if gate_open(gate) and radius > 0.0 and is_finite(radius):
+		_gate_radius[gate] = radius
+
+
+func gate_is_mouth(gate: int) -> bool:
+	return gate_open(gate) and _gate_mouth[gate] != 0
+
+
+## Where what goes into gate `gate` comes out: from a mouth, every exit of its portal; from an
+## exit, its portal's mouth (a portal works both ways; owner, 2026-11-05). Fills `out` (grown when
+## needed) in row order and returns how many.
+func gate_outs(gate: int, out: PackedInt32Array) -> int:
+	if not gate_open(gate):
+		return 0
+	var group: int = _gate_group[gate]
+	var want: int = 0 if _gate_mouth[gate] != 0 else 1
+	var found: int = 0
+	for row in _gate_on.size():
+		if _gate_on[row] != 0 and row != gate and _gate_group[row] == group and _gate_mouth[row] == want:
+			if out.size() <= found:
+				out.resize(maxi(4, found * 2))
+			out[found] = row
+			found += 1
+	return found
+
+
+## The way something going `way` into gate `from` leaves gate `to`: the same way. A gate is a
+## sphere with no front (owner, 2026-11-05): what hits it from one side leaves the other gate on the
+## far side, going on as it went; what is fired back at an exit leaves the mouth flying at the one
+## who opened it (P3). Every pass asks here, so a later rule for turning is one place.
+func gate_turn(from: int, to: int, way: Vector2) -> Vector2:
+	if not gate_open(from) or not gate_open(to):
+		return way
+	return way
+
+
+## The share (0 to 1) of the segment from `a` to `b` at which it first goes into an open gate's
+## circle widened by `pad`, starting outside it (a segment that starts inside a gate is leaving it);
+## -1.0 for none. `gate_hit` says which gate (the lower row of two met at the same point).
+func gate_cut(a: Vector2, b: Vector2, pad: float = 0.0) -> float:
+	gate_hit = -1
+	if _gate_live <= 0:
+		return -1.0
+	var d: Vector2 = b - a
+	var dd: float = d.length_squared()
+	var best: float = 2.0
+	for row in _gate_on.size():
+		if _gate_on[row] == 0:
+			continue
+		var r: float = _gate_radius[row] + pad
+		var f: Vector2 = a - _gate_pos[row]
+		var c: float = f.length_squared() - r * r
+		if c <= 0.0:
+			continue
+		if dd <= 0.0:
+			continue
+		var bq: float = f.dot(d)
+		if bq >= 0.0:
+			continue
+		var disc: float = bq * bq - dd * c
+		if disc < 0.0:
+			continue
+		var t: float = (-bq - sqrt(disc)) / dd
+		if t >= 0.0 and t <= 1.0 and t < best:
+			best = t
+			gate_hit = row
+	return best if gate_hit >= 0 else -1.0
+
+
+## The flying shots whose centre went into a gate on their last step (from where they were to
+## where they are), in slot order: `gate_shots` and `gate_shot_gates` (each one's gate), and how
+## many. Only shots that fly on their own (straight, not stuck, held or frozen); a still shot, an
+## orbit and one that did not move never go through. Nothing is allocated once the lists have grown.
+func shots_into_gates() -> int:
+	if _gate_live <= 0:
+		return 0
+	var found: int = 0
+	for slot in _high:
+		if _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
+			continue
+		var state: int = _state[slot]
+		if state == S_STUCK or state == S_FROZEN or state == S_HELD:
+			continue
+		var from: Vector2 = _prev[slot]
+		var to: Vector2 = _pos[slot]
+		if from == to:
+			continue
+		if gate_cut(from, to) < 0.0:
+			continue
+		if gate_shots.size() <= found:
+			gate_shots.resize(maxi(8, found * 2))
+			gate_shot_gates.resize(gate_shots.size())
+		gate_shots[found] = slot
+		gate_shot_gates[found] = gate_hit
+		found += 1
+	return found
+
+
+## Puts the shot in `slot` at `at` at once, flying `velocity` (a shot that came out of a gate): no
+## tail across the gap and no hits swept across it, as a blink (`move_shot` with no seconds). Its
+## speed (what homing and return keep) stays. False when there is no such shot.
+func pass_shot(slot: int, at: Vector2, velocity: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
+		return false
+	if not at.is_finite() or not velocity.is_finite():
+		return false
+	_threat_step = -1
+	_base[slot] += at - _pos[slot]
+	_pos[slot] = at
+	_prev[slot] = at
+	_vel[slot] = velocity
+	_flags[slot] &= ~F_DEFERRED
+	_tail_from[slot] = at
+	_home_at[slot] = Vector2.INF
+	return true
+
+
 func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0, ghost: bool = false) -> float:
 	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
@@ -3828,6 +4104,8 @@ func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce
 ## A ray that is not cast: its `ray_cast_by` is used up all the same.
 func _no_ray() -> float:
 	_ray_caster = -1
+	ray_gates = false
+	_set_ray_gate(-1, Vector2.INF, Vector2.ZERO, 0.0)
 	return 0.0
 
 
@@ -3928,6 +4206,17 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
+	ray_gate = -1
+	ray_gate_at = Vector2.INF
+	ray_gate_heading = Vector2.ZERO
+	ray_gate_left = 0.0
+	# The flag is for this ray alone: a ray its hit handlers send (a zap, a jump) passes gates by.
+	var gates: bool = ray_gates and _gate_live > 0
+	ray_gates = false
+	var g_gate: int = -1
+	var g_at: Vector2 = Vector2.INF
+	var g_heading: Vector2 = Vector2.ZERO
+	var g_left: float = 0.0
 	# A wall's own ray leaves it: its row is lifted while the ray walks (`ray_cast_by`).
 	var own: Solid = _solid_of(_ray_caster, _ray_caster_seq)
 	_ray_caster = -1
@@ -3942,7 +4231,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	# (a homing beam homes again), else straight.
 	var left_turns: int = maxi(bounces, 0)
 	var left: float = 0.0
-	if left_turns > 0:
+	if left_turns > 0 or gates:
 		for i in segments:
 			left += _path[i].distance_to(_path[i + 1])
 	var reach: float = 0.0
@@ -3957,6 +4246,20 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var b: Vector2 = _path[at_piece + 1]
 		var piece: float = a.distance_to(b)
 		used = at_piece + 1
+		# A gate before the wall (or with no wall): the ray stops where it goes in, and its beam
+		# goes on from the other side (`ray_gate`).
+		var gate_at: float = gate_cut(a, b) if gates else -1.0
+		if gate_at >= 0.0:
+			var wall_at: float = _wall_hit(a, b, 1 << 30) if _has_walls and not ghost else -1.0
+			if wall_at < 0.0 or gate_at <= wall_at:
+				var into: Vector2 = a.lerp(b, gate_at)
+				g_gate = gate_hit
+				g_at = into
+				g_heading = (b - a) / piece if piece > 0.0 else Vector2.ZERO
+				g_left = maxf(left - piece * gate_at, 0.0)
+				_path[at_piece + 1] = into
+				reach += piece * gate_at
+				break
 		if _has_walls and not ghost:
 			# A ray walks every cell it crosses, however long it is.
 			var cut: float = _wall_hit(a, b, 1 << 30)
@@ -4054,6 +4357,9 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		# The beam is spent on its last target.
 		got = alongs[found - 1]
 		walled = false
+		if got < reach - 0.001:
+			# Spent before the gate: it never got there.
+			g_gate = -1
 	var end: Vector2 = _path_point(used, got)
 	var end_heading: Vector2 = _path_heading
 	# What it walked, kept for `ray_path` (and its turns' events) past the hit handlers' rays.
@@ -4070,6 +4376,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		ray_end = end
 		ray_end_heading = end_heading
 		_keep_ray_path(walk, walked)
+		_set_ray_gate(g_gate, g_at, g_heading, g_left)
 		return got
 	_ray_depth += 1
 	var outer_slot: int = _event_slot
@@ -4125,7 +4432,16 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	ray_end = end
 	ray_end_heading = end_heading
 	_keep_ray_path(walk, walked)
+	_set_ray_gate(g_gate, g_at, g_heading, g_left)
 	return got
+
+
+## What the last ray says of the gate it stopped at (`ray_gate`).
+func _set_ray_gate(gate: int, at: Vector2, heading: Vector2, left: float) -> void:
+	ray_gate = gate
+	ray_gate_at = at
+	ray_gate_heading = heading
+	ray_gate_left = left
 
 
 ## Copy the first `count` points of `walk` into `ray_path`.
@@ -4251,7 +4567,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	_give_off_sparks(fraction)
 
 
-## Hand out the particles the drawn shots' trails give off since the last frame, as
+## Hand out the particles the drawn shots give off since the last frame, as
 ## births (`spark_births`; see SPARK_BIRTH_STRIDE), while something takes them. The shader's rule, rolled on the
 ## CPU: at each moment (SPARK_MOMENTS a second) a flying shot gives off one of its kinds, picked at
 ## random, at that kind's rate (SPARK_RATES) times its group's share of the pool (GROUPS). Rolled
@@ -4379,13 +4695,13 @@ func _draw_shots(fraction: float) -> void:
 		_by_group[_group_end[group]] = slot
 		_group_end[group] += 1
 		if motion == MOTION_STILL:
-			# Only a rune's quad turns with the shot (a trail is drawn along its path).
+			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
 			if _vel[slot].length_squared() > 0.0:
 				dir = _vel[slot].normalized()
 			_draw_out[batch] = _write_stones(_buffers[batch], _draw_out[batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue
-		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if motion == MOTION_ORBIT else 0)
+		var flags: int = HEAD_LIVE | (HEAD_ORBIT if motion == MOTION_ORBIT else 0)
 		_write_head(_buffers[batch], _draw_out[batch] * DRAW_STRIDE, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
 		_draw_out[batch] += 1
 		if tail_births_on:
@@ -4406,14 +4722,14 @@ func _draw_shots(fraction: float) -> void:
 ## frame, one at its next tail point and every spacing of its group (`_group_spacing`) x 0.5 to 1.5 pixels on from there
 ## (`tail_hash` of its sequence and its count), while the frame's most lasts (`tail_births_cap`,
 ## and `tail_thin_most` for a thinned group's; see TAIL_FRESH). A jump
-## longer than TRAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
+## longer than TAIL_JUMP (a teleport) lays none. An infused shot gives TAIL_PLAYER_SHARE of its
 ## tail its caster's colours (a white core, so the motes take its hat ramp).
 func _lay_tail(slot: int, at: Vector2) -> void:
 	var from: Vector2 = _tail_from[slot]
 	_tail_from[slot] = at
 	var way: Vector2 = at - from
 	var d: float = way.length()
-	if not (d > 0.0) or d > TRAIL_JUMP:
+	if not (d > 0.0) or d > TAIL_JUMP:
 		return
 	_tail_wanted += d / TAIL_SPACING
 	var group: int = _group[slot]
@@ -4689,7 +5005,7 @@ static func look_zoom(radius: float) -> int:
 
 
 ## The zoom a shot of hit radius `radius` tells its shaders: its `look_zoom`, or 0 for a speck
-## (below SPECK_RADIUS), whose core the trail draws as one pixel.
+## (below SPECK_RADIUS), whose core the head shader draws as one pixel.
 static func look_core_zoom(radius: float) -> int:
 	return 0 if radius < SPECK_RADIUS else look_zoom(radius)
 
@@ -4789,7 +5105,7 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 
 
 ## Write a live shot's instance at float index `i` of `buffer`: its data in the transform, which
-## `shot_trail.gdshader` reads back (its quads are placed from it; the batch sits untransformed at
+## `shot_head.gdshader` reads back (its quads are placed from it; the batch sits untransformed at
 ## the origin): the head `at`, no path (-1: a tail is motes), the way it flies `way`, its flags, the
 ## colour and the core.
 func _write_head(buffer: PackedFloat32Array, i: int, at: Vector2, flags: int, color: Color, core: Color, way: Vector2) -> void:
@@ -5490,7 +5806,16 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		# Stick to the target: it carries the shot until the stick time is up.
 		_flags[slot] |= F_STUCK
 		_stuck_to[slot] = node
-		_stuck_off[slot] = at - (node as Node2D).global_position
+		# Where its line of flight comes closest to the target's centre (a head-on shot: the
+		# centre), not `at`, the point of this step's path nearest it: that one lies anywhere from
+		# the centre to the rim by when in its step the shot met the target, so what a stuck shot
+		# fires from inside (a nova) hit all or half of its ring by chance. Only a straight shot
+		# has such a line: an orbit (on its circle) and a still shot stick where they are.
+		var centre: Vector2 = (node as Node2D).global_position
+		var stick_at: Vector2 = at
+		if _motion[slot] == MOTION_STRAIGHT and not _vel[slot].is_zero_approx():
+			stick_at = at + heading * heading.dot(centre - at)
+		_stuck_off[slot] = stick_at - centre
 		_life[slot] = _stick[slot]
 		_stick[slot] = 0.0
 		_join(slot, B_STUCK)

@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Every combo in the catalogue (`content/spells/combos/`), played by an enemy (enemy AI AI5,
+## Every combo in the catalogue (each card's `combos/` folder), played by an enemy (enemy AI AI5,
 ## docs/milestones/M2-enemy-ai.md, "Done when" 3): it casts each combo's staffs on its own, by
 ## what they cast next, never shoots an aimed cast into a wall, and never kills itself. A wizard
 ## stands 100 px away and stings it once a second, so a guarding staff is called for too. A
@@ -32,7 +32,7 @@ func _data(casts: Array) -> EnemyBase:
 
 func test_every_combo_is_played() -> void:
 	var problems: PackedStringArray = PackedStringArray()
-	var combos: Array = ComboFiles.read_all(ComboFiles.FOLDER, problems)
+	var combos: Array = ComboFiles.read_all(ComboFiles.ROOT, problems)
 	check(combos.size() > 50, "the combos are read: %d" % combos.size())
 	var silent: PackedStringArray = PackedStringArray()
 	for combo: Variant in combos:

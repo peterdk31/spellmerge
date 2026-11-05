@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"swap"
 display_name = "Swap"
+description = "Throw a charm. What it touches and you trade places."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

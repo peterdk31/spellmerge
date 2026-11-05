@@ -7,9 +7,10 @@
 script = ExtResource("1_base")
 id = &"chain"
 display_name = "Chain"
+description = "After a hit, jumps to another foe, up to twice. Costs some."
 complexity = 2
 icon = ExtResource("2_icon")
 damage_mult = 0.8
-behaviour = 2
+behaviour_id = &"chain"
 behaviour_strength = 2.0
 look_layer = 13

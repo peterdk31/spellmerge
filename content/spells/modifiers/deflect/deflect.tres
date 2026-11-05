@@ -11,6 +11,6 @@ complexity = 2
 icon = ExtResource("2_icon")
 cooldown_mult = 1.2
 mana_mult = 1.25
-behaviour = 22
+behaviour_id = &"deflect"
 behaviour_strength = 1.0
 look_layer = 18

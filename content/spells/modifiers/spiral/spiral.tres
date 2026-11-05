@@ -9,6 +9,6 @@ id = &"spiral"
 display_name = "Spiral"
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 15
+behaviour_id = &"spiral"
 behaviour_strength = 24.0
 look_layer = 17

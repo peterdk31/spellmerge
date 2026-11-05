@@ -9,6 +9,6 @@ id = &"echo"
 display_name = "Echo"
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 8
+behaviour_id = &"echo"
 behaviour_strength = 0.3
 look_layer = 19

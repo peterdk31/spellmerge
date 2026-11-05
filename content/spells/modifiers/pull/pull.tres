@@ -11,6 +11,6 @@ complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2
 cooldown_mult = 3.0
-behaviour = 23
+behaviour_id = &"pull"
 behaviour_strength = 1.0
 look_layer = 20

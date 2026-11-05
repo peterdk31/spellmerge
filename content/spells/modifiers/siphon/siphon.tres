@@ -9,6 +9,6 @@ id = &"siphon"
 display_name = "Siphon"
 complexity = 1
 icon = ExtResource("2_icon")
-behaviour = 11
+behaviour_id = &"siphon"
 behaviour_strength = 1.0
 look_layer = 20

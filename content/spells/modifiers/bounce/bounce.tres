@@ -10,6 +10,6 @@ display_name = "Bounce"
 complexity = 2
 icon = ExtResource("2_icon")
 mana_mult = 1.2
-behaviour = 7
+behaviour_id = &"bounce"
 behaviour_strength = 3.0
 look_layer = 18

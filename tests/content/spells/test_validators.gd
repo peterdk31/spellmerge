@@ -113,7 +113,7 @@ func test_the_broken_element_fails() -> void:
 func test_the_broken_modifier_fails() -> void:
 	var problems := SpellValidator.check_component(_component(FIXTURES + "/modifier/broken_modifier.tres"), _manifest())
 	check(_fields(problems, "range").has("damage_mult"), "damage_mult out of range")
-	check(_fields(problems, "range").has("behaviour"), "an unknown behaviour")
+	check(_fields(problems, "range").has("behaviour_id"), "an unknown behaviour")
 	check_equal(_fields(problems, "required-field").filter(func(f: String) -> bool: return f != "display_name"), ["behaviour_strength"] as Array[String], "a behaviour without strength")
 
 

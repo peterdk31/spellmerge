@@ -9,6 +9,6 @@ id = &"relay"
 display_name = "Relay"
 complexity = 2
 icon = ExtResource("2_icon")
-behaviour = 18
+behaviour_id = &"relay"
 behaviour_strength = 1.0
 look_layer = 17

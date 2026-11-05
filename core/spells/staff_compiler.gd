@@ -12,8 +12,6 @@ extends RefCounted
 ## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
 ## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
 
-## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
-const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -22,15 +20,6 @@ const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE}
 const TARGET_CASTER: int = -1
 const TARGET_POINT: int = -2
 
-## Behaviours that only mean something on a shot in flight, so they are wasted on a fallback.
-const TRAVEL_ONLY: Array[int] = [
-	ModifierBase.Behaviour.HOMING, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.BOUNCE,
-	ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.GHOST,
-	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
-	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ZAP,
-	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
-	ModifierBase.Behaviour.PULL,
-]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
 const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction"]
@@ -267,7 +256,7 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 
 
 func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
-	if TRAVEL_ONLY.has(modifier.behaviour):
+	if ModifierBase.travel_only(modifier.behaviour):
 		return false
 	if modifier.behaviour == ModifierBase.Behaviour.SHIELD:
 		return not payload
@@ -509,15 +498,16 @@ static func blast_hit(hit: HitProfile) -> HitProfile:
 	return blast
 
 
-## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none):
-## counts add (bounces, shields, seconds, pixels) and multipliers multiply (heavy's knockback,
+## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none), by its
+## `ModifierBase.RULES` "stacks": counts add (bounces, shields, seconds, pixels) and multipliers multiply (heavy's knockback,
 ## growth's factor; rule 3, docs/milestones/M2-rules.md R1c), so two heavy cards are 4 x 4, not 4 + 4.
 ## Homing multiplies too, by its own rule (HOMING_STACK). Chances (zap's) combine as chances do:
 ## two 50% cards are 75%, never past 100%.
 static func stacked(behaviour: int, before: float, strength: float) -> float:
-	if before > 0.0 and MULTIPLIED.has(behaviour):
+	var stack: ModifierBase.Stack = ModifierBase.stacks(behaviour)
+	if before > 0.0 and stack == ModifierBase.Stack.MULTIPLY:
 		return before * strength
-	if behaviour == ModifierBase.Behaviour.ZAP:
+	if stack == ModifierBase.Stack.CHANCE:
 		return 1.0 - (1.0 - clampf(before, 0.0, 1.0)) * (1.0 - clampf(strength, 0.0, 1.0))
 	return before + strength
 

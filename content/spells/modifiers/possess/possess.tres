@@ -11,6 +11,6 @@ complexity = 4
 icon = ExtResource("2_icon")
 mana_mult = 2.5
 cooldown_mult = 2.0
-behaviour = 21
+behaviour_id = &"possess"
 behaviour_strength = 3.0
 look_layer = 20

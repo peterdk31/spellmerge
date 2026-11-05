@@ -206,7 +206,7 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [TWO_TARGETS]
 		ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT:
 			return [SHOOTER]
-		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL:
+		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.PENTA:
 			return [LINE]
 		ModifierBase.Behaviour.HOLD, ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.RETURN:
 			return [OPEN]

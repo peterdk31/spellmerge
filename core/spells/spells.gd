@@ -1217,7 +1217,11 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if spell.fallback != CompiledSpell.FALLBACK_NONE:
 		return _fallback_hit(spell, tag, actor, origin)
 	_echo_spell = spell if echoed else null
-	var launched: int = _launch(spell, tag, actor, origin, heading, source)
+	var launched: int = 0
+	if spell.behaviour(ModifierBase.Behaviour.PENTA) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
+		launched = _penta(spell, tag, actor, origin, heading, source)
+	else:
+		launched = _launch(spell, tag, actor, origin, heading, source)
 	if launched > 0:
 		_recoil(spell, tag, actor, heading)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
@@ -1245,6 +1249,54 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0 and not echoed and not again and echo > 0.0:
 		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster).echoed = true
 	return launched
+
+
+## `penta` (owner, 2026-11-05): `spell` is cast `behaviour_strength` times (5 a card), each copy from
+## a point on a ring round the nearest foe in front of `origin` along `heading` within the card's
+## reach, SpellLimits.PENTA_RING beyond its edge (or PENTA_WITHIN of the carrier's own reach, when
+## that is less), aimed in at it, the first on the caster's side;
+## with no foe there, round the point the carrier would reach along the aim (a nova turned inside
+## out). Each point stops short of a wall, and each copy is cast by its point (a beam stays there,
+## an orbit circles it). Returns the shots made.
+func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
+	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
+	var centre: Vector2 = Vector2.INF
+	var edge: float = 0.0
+	var reach: float = spell.penta_reach
+	if projectiles != null and reach > 0.0:
+		centre = projectiles.homing_point(actor, origin, way, PI * 0.5, ProjectilesScript.ACTOR_LAYERS, reach, 0, tag)
+		if centre.is_finite():
+			edge = projectiles.homing_target_radius
+	if not centre.is_finite():
+		var ahead: float = _carrier_of(spell).reach_of(spell)
+		if ahead <= 0.0:
+			ahead = SpellLimits.PENTA_REACH
+		if reach > 0.0:
+			ahead = minf(ahead, reach)
+		centre = origin + way * ahead
+		if projectiles != null:
+			centre = projectiles.clip_to_walls(origin, centre)
+	var first: Vector2 = centre.direction_to(origin) if not centre.is_equal_approx(origin) else -way
+	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
+	var carried: float = _carrier_of(spell).reach_of(spell)
+	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
+		# A ring of shots (a nova) is not aimed, but its shots fly this far.
+		carried = spell.speed * spell.lifetime
+	var radius: float = edge + (minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING)
+	var outer_caster: int = _caster
+	var outer_seq: int = _caster_seq
+	_caster = CASTER_POINT
+	var made: int = 0
+	for n in copies:
+		var point: Vector2 = centre + first.rotated(TAU * float(n) / float(copies)) * radius
+		if projectiles != null:
+			point = projectiles.clip_to_walls(centre, point)
+		var aim: Vector2 = point.direction_to(centre) if not point.is_equal_approx(centre) else way
+		made += _launch(spell, tag, actor, point, aim, source)
+	_caster = outer_caster
+	_caster_seq = outer_seq
+	return made
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way

@@ -75,6 +75,12 @@ enum Behaviour {
 	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
 	## cast it. Several hits make several pulls, and they add. Strength unused (1).
 	PULL,
+	## The carrier is cast `behaviour_strength` times (5 the card; more cards add) instead of once,
+	## each copy from a point on a ring round the nearest foe in front within `behaviour_reach`,
+	## all aimed in at it; with no foe in reach, round the point the carrier would reach along the
+	## aim: a nova turned inside out (owner, 2026-11-05). Each copy is cast by its point
+	## (`SpellRuntime._penta`). Not on a carrier that moves its caster or strikes from the hand.
+	PENTA,
 }
 
 ## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
@@ -105,6 +111,9 @@ const NEEDS: Dictionary = {
 	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
 	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
 	Behaviour.ZAP: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
+	# leaves from a point of a ring.
+	Behaviour.PENTA: {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE},
 }
 
 @export var damage_mult: float = 1.0

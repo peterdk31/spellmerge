@@ -3889,13 +3889,14 @@ func gate_outs(gate: int, out: PackedInt32Array) -> int:
 	return found
 
 
-## The way something going `way` into gate `from` leaves gate `to`: turned by the angle between the
-## two gates' facings, so what flies straight into a mouth leaves an exit along the exit's facing,
-## and what flies straight at an exit leaves the mouth back toward its caster (P3).
+## The way something going `way` into gate `from` leaves gate `to`: the same way. A gate is a
+## sphere with no front (owner, 2026-11-05): what hits it from one side leaves the other gate on the
+## far side, going on as it went; what is fired back at an exit leaves the mouth flying at the one
+## who opened it (P3). Every pass asks here, so a later rule for turning is one place.
 func gate_turn(from: int, to: int, way: Vector2) -> Vector2:
 	if not gate_open(from) or not gate_open(to):
 		return way
-	return way.rotated(_gate_face[to].angle() - _gate_face[from].angle())
+	return way
 
 
 ## The share (0 to 1) of the segment from `a` to `b` at which it first goes into an open gate's

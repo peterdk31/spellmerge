@@ -29,7 +29,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ZAP,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
-	ModifierBase.Behaviour.PULL,
+	ModifierBase.Behaviour.PULL, ModifierBase.Behaviour.PENTA,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -414,6 +414,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.ray_length *= modifier.reach_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ZAP:
 			spell.zap_reach = maxf(spell.zap_reach, modifier.behaviour_reach)
+		if modifier.behaviour == ModifierBase.Behaviour.PENTA:
+			spell.penta_reach = maxf(spell.penta_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
 			spell.behaviour_cues[modifier.behaviour] = modifier.cue

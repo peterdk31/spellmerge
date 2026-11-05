@@ -67,7 +67,7 @@ const SETS: Array = [
 		[&"faster", &"heavy", &"split", &"nova"],
 		[&"hold", &"split", &"orbit"],
 		[&"mend", &"split", &"nova"],
-		[&"mirror", &"split", &"rune"],
+		[&"mirror", &"split", &"rune", &"penta", &"bolt"],
 		[&"on_block", &"shield", &"split", &"orbit", &"split", &"nova"],
 		[&"on_cast", &"split", &"nova", &"split", &"bolt"],
 		[&"on_hurt", &"split", &"orbit", &"fire", &"nova"],

@@ -42,6 +42,7 @@ const LATER: Array[ModifierBase] = [
 	preload("res://content/spells/modifiers/sniper/sniper.tres"),
 	preload("res://content/spells/modifiers/spiral/spiral.tres"),
 	preload("res://content/spells/modifiers/sticky/sticky.tres"),
+	preload("res://content/spells/modifiers/penta/penta.tres"),
 ]
 
 const INFUSIONS: Array[ElementBase] = [
@@ -64,7 +65,7 @@ const ALLOWED_SHARES: Dictionary = {
 	17: ["spiral", "return", "relay", "recoil"],
 	18: ["bounce", "zap", "deflect"],
 	19: ["echo", "mirror", "ghost"],
-	20: ["magnet", "siphon", "possess"],
+	20: ["magnet", "siphon", "possess", "penta"],
 	21: ["slow", "hold", "short_delay"],
 }
 

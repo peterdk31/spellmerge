@@ -167,6 +167,24 @@ func test_a_shot_into_the_mouth_comes_out_of_every_exit() -> void:
 		check(_arena.projectiles.get_position_of(slot).length() > 150.0, "each out past its exit (%s)" % _arena.projectiles.get_position_of(slot))
 
 
+## A gate is a sphere (owner, 2026-11-05): a shot that hits the mouth from the side, across the
+## portal's aim, leaves the exit on its far side still going the way it went.
+func test_a_gate_is_a_sphere_what_hits_it_goes_on_the_way_it_went() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["portal"])
+	check(_arena.cast(0, 0), "the portal is cast")
+	# An enemy bolt falling straight down onto the mouth at (24, 0).
+	_arena.shoot_at(Vector2(24, -100), Vector2(24, 0))
+	_arena.run(0.6)
+	var through: bool = false
+	for slot in _live_shots():
+		var at: Vector2 = _arena.projectiles.get_position_of(slot)
+		var way: Vector2 = _arena.projectiles.get_velocity_of(slot).normalized()
+		if absf(at.x - 160.0) < 2.0 and at.y > 12.0 and way.dot(Vector2.DOWN) > 0.999:
+			through = true
+	check(through, "the bolt came out under the exit at (160, 0), still falling straight down")
+
+
 func test_a_shot_into_an_exit_comes_out_of_the_mouth_back_at_its_caster() -> void:
 	_arena = ArenaScript.new(root)
 	_arena.install_cards(0, 0, ["portal"])

@@ -4,9 +4,9 @@ extends Node2D
 ## `portal_gate_count`, `portal_gate`, `portal_caster`, `portal_tint`, `portal_left`) and the
 ## projectile manager's gates (`gate_position`, `gate_face`, `gate_radius`, `gate_is_mouth`).
 ##
-## Each gate is a ring in its caster's colour round a dark heart, with a white-hot inner edge in the
-## portal's tint (its infusion's colour, or white). A mouth's three short arcs swirl inward; an exit's
-## swirl outward, and a notch shows the way things come out of it. A faint dotted line joins a mouth
+## Each gate is a sphere (owner, 2026-11-05: it has no front): a ring in its caster's colour round a
+## dark heart, with a white-hot inner edge in the portal's tint (its infusion's colour, or white) and
+## a glint high on its left. A mouth's three short arcs swirl inward, an exit's outward. A faint dotted line joins a mouth
 ## to each of its exits, so anybody can read where a shot will come out (pillar 4). A portal fades
 ## over the last FADE of its life. Drawn only: nothing here feeds back into the game.
 
@@ -81,7 +81,7 @@ func _tether(a: Vector2, b: Vector2, player: Color, whole: float) -> void:
 		draw_rect(Rect2(at - Vector2.ONE * 0.5, Vector2.ONE * 2.0), colour)
 
 
-func _gate(centre: Vector2, face: Vector2, radius: float, is_mouth: bool, player: Color, tint: Color, whole: float) -> void:
+func _gate(centre: Vector2, _face: Vector2, radius: float, is_mouth: bool, player: Color, tint: Color, whole: float) -> void:
 	var points: int = maxi(16, int(radius * 2.0))
 	draw_circle(centre, radius, Color(HEART, HEART.a * whole))
 	draw_arc(centre, radius, 0.0, TAU, points, Color(player, whole), 2.0, false)
@@ -92,6 +92,5 @@ func _gate(centre: Vector2, face: Vector2, radius: float, is_mouth: bool, player
 	for k in 3:
 		var from: float = turn + TAU * k / 3.0
 		draw_arc(centre, inner, from, from + 0.9, 6, Color(player.lerp(Color.WHITE, 0.4), 0.7 * whole), 1.0, false)
-	if not is_mouth and not face.is_zero_approx():
-		var tip: Vector2 = centre + face * (radius + 3.0)
-		draw_line(centre + face * (radius - 1.0), tip, Color(Color.WHITE, whole), 1.0, false)
+	# A glint high on its left, so it reads as a sphere.
+	draw_arc(centre, maxf(radius - 4.0, 1.0), PI * 1.05, PI * 1.35, 4, Color(Color.WHITE, 0.6 * whole), 1.0, false)

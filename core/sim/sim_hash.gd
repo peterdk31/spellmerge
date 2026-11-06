@@ -36,15 +36,19 @@ static func areas(named: Dictionary, walk: StateWalk = null) -> Dictionary[Strin
 
 ## One area's hash by `walk`. With `also`, every leaf is handed to `also(path, value)` too (the
 ## desync report keeps a tick's leaves so); the walk's `with_paths` says whether paths are built.
+## Without `also`, the walk appends the leaves' values itself (`StateWalk.values`), with no call per
+## leaf: the hash of the whole is the same either way.
 static func area(walk: StateWalk, name: String, object: Object, also: Callable = Callable()) -> int:
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_MD5)
+	var values: Array = []
 	if also.is_valid():
 		walk.walk(name, object, func(path: String, value: Variant) -> void:
-			feed(context, value)
+			values.append(leaf(value))
 			also.call(path, value))
 	else:
-		walk.walk(name, object, func(_path: String, value: Variant) -> void: feed(context, value))
+		walk.values(name, object, values)
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_MD5)
+	context.update(var_to_bytes(values))
 	return context.finish().decode_s64(0)
 
 
@@ -58,14 +62,14 @@ static func whole(hashes: Dictionary[String, int]) -> int:
 	return context.finish().decode_s64(0)
 
 
-## Feeds one leaf to `context`: a packed or typed array as the engine's `hash()` of it (one call, no
-## copy of its bytes: 6,000 shots' arrays are megabytes), anything else by its bytes.
-static func feed(context: HashingContext, value: Variant) -> void:
+## One leaf as it is hashed: a packed or typed array as its type, size and the engine's `hash()` of it
+## (one call, no copy of its bytes: 6,000 shots' arrays are megabytes), anything else as it is. An
+## area's leaves are hashed together, by the bytes of the array of them (`var_to_bytes`).
+static func leaf(value: Variant) -> Variant:
 	var type: int = typeof(value)
 	if type >= TYPE_PACKED_BYTE_ARRAY or type == TYPE_ARRAY:
-		context.update(var_to_bytes(PackedInt64Array([type, (value as Variant).size(), hash(value)])))
-	else:
-		context.update(var_to_bytes(value))
+		return PackedInt64Array([type, (value as Variant).size(), hash(value)])
+	return value
 
 
 ## One object's hash (an area alone).

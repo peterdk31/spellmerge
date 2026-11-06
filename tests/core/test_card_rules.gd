@@ -47,6 +47,9 @@ extends "res://tests/support/suite.gd"
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
 ##
 ## godot --headless --path . --script res://tests/core/test_card_rules.gd
+##
+## The runner plays it in six processes side by side (tests/support/suite.gd, "shards"):
+# unit-test-shards: 6
 
 const World := preload("res://tests/support/card_rules_world.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -92,6 +95,8 @@ const SPREAD: float = 4.0
 const EXPLAIN: bool = false
 ## Only this carrier (for checking a probe by hand); empty for all.
 const ONLY_FORM: String = ""
+## How many tests the modifiers' matrix is split into (see `_modifier_part`).
+const MODIFIER_PARTS: int = 6
 
 var _registry: Node
 var _shelf: World.Shelf
@@ -330,10 +335,30 @@ func test_forcing_keeps_every_wasted_card() -> void:
 	check(forced > 0, "some card is wasted somewhere (%d)" % forced)
 
 
-func test_every_modifier_works_or_is_wasted_on_every_carrier() -> void:
-	var cards: Array[SpellComponent] = []
-	cards.assign(_modifiers)
-	_matrix("Modifiers", cards)
+# The modifiers are most of the matrix: they are played in MODIFIER_PARTS tests, so the runner can
+# play them side by side (`unit-test-shards` at the top).
+func test_every_modifier_works_or_is_wasted_on_every_carrier_1() -> void:
+	_modifier_part(0)
+
+
+func test_every_modifier_works_or_is_wasted_on_every_carrier_2() -> void:
+	_modifier_part(1)
+
+
+func test_every_modifier_works_or_is_wasted_on_every_carrier_3() -> void:
+	_modifier_part(2)
+
+
+func test_every_modifier_works_or_is_wasted_on_every_carrier_4() -> void:
+	_modifier_part(3)
+
+
+func test_every_modifier_works_or_is_wasted_on_every_carrier_5() -> void:
+	_modifier_part(4)
+
+
+func test_every_modifier_works_or_is_wasted_on_every_carrier_6() -> void:
+	_modifier_part(5)
 
 
 func test_every_trigger_works_or_is_wasted_on_every_carrier() -> void:
@@ -355,6 +380,24 @@ func test_every_multicast_works_or_is_wasted_on_every_carrier() -> void:
 
 
 # --- The matrix --------------------------------------------------------------------------------
+
+## The modifiers' part `part` (from 0) of MODIFIER_PARTS: every MODIFIER_PARTS-th modifier by id,
+## from the `part`-th, played by `_play_modifiers`.
+func _modifier_part(part: int) -> void:
+	var sorted: Array[ModifierBase] = _modifiers.duplicate()
+	sorted.sort_custom(func(a: ModifierBase, b: ModifierBase) -> bool: return String(a.id) < String(b.id))
+	var cards: Array[SpellComponent] = []
+	for i in sorted.size():
+		if i % MODIFIER_PARTS == part:
+			cards.append(sorted[i])
+	check(_modifiers.size() >= MODIFIER_PARTS, "every part has modifiers (%d)" % _modifiers.size())
+	_play_modifiers("Modifiers (part %d of %d)" % [part + 1, MODIFIER_PARTS], cards)
+
+
+## Plays one part of the modifiers: the works-or-wasted matrix (the swarm test plays its parity).
+func _play_modifiers(title: String, cards: Array[SpellComponent]) -> void:
+	_matrix(title, cards)
+
 
 func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 	if _payload == null or _shot == null:

@@ -11,11 +11,14 @@ extends "res://tests/core/test_card_rules.gd"
 ## wasted. Scenes in which no such enemy stands (the open floor, a shooter, a donor, the wizard
 ## hurt) are left out: they hold no swarmer.
 ##
-## It extends the card rules test for its probes and its world: the four matrix tests here play the
-## parity instead of the works-or-wasted check, and the test of two alike casts plays them on
-## swarmers.
+## It extends the card rules test for its probes and its world: the matrix tests here play the
+## parity instead of the works-or-wasted check (the modifiers' parts through `_play_modifiers`), and
+## the test of two alike casts plays them on swarmers.
 ##
 ## godot --headless --path . --script res://tests/core/test_card_rules_swarm.gd
+##
+## The runner plays it in six processes side by side (tests/support/suite.gd, "shards"):
+# unit-test-shards: 6
 
 const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const MiteData: EnemyBase = preload("res://content/enemies/crypt_mite/crypt_mite.tres")
@@ -65,10 +68,11 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 		check(not first.is_empty(), "`%s` on swarmers writes something" % form.id)
 
 
-func test_every_modifier_works_or_is_wasted_on_every_carrier() -> void:
-	var cards: Array[SpellComponent] = []
-	cards.assign(_modifiers)
-	_parity("Modifiers", cards, true)
+func _play_modifiers(title: String, cards: Array[SpellComponent]) -> void:
+	var with_possess: bool = false
+	for card in cards:
+		with_possess = with_possess or (card as ModifierBase).behaviour == ModifierBase.Behaviour.POSSESS
+	_parity(title, cards, with_possess)
 
 
 func test_every_trigger_works_or_is_wasted_on_every_carrier() -> void:

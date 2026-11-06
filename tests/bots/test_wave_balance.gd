@@ -8,8 +8,10 @@ extends SceneTree
 ## Gates, deliberately loose (the numbers are for people to read, not to pass):
 ##  - every run clears the room within TIME_LIMIT game seconds, or a wizard is
 ##    downed (a lost room restarts by itself, which is not a clear).
-## Who gets downed is only reported: the bots play in real (scaled) time, so the health
-## lost varies from run to run and a gate on it could break the daily build.
+## Who gets downed is only reported: the bots play in real (scaled) time when the game is not run
+## at fixed frames (`--fixed-fps`, as the unit test runner does), so the health lost varies from
+## run to run and a gate on it could break the daily build. The time is the game's (each frame's
+## delta), so a busy machine takes longer, not fewer game seconds.
 ## The numbers are in docs/LOG.md.
 ##
 ## godot --headless --path . --script res://tests/bots/test_wave_balance.gd
@@ -78,13 +80,10 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 	var lowest: Array[float] = []
 	lowest.resize(count)
 	lowest.fill(MAX_HEALTH)
-	var last: int = Time.get_ticks_usec()
 	while elapsed < TIME_LIMIT and not bool(tally["cleared"]) and int(tally["downed"]) < count:
 		await process_frame
-		var now: int = Time.get_ticks_usec()
-		var delta: float = float(now - last) / 1000000.0 * TIME_SCALE
-		last = now
-		elapsed += delta
+		# The frame's game time (TIME_SCALE included).
+		elapsed += root.get_process_delta_time()
 		for index in count:
 			if is_instance_valid(wizards[index]):
 				lowest[index] = minf(lowest[index], wizards[index].health.health)

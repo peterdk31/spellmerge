@@ -145,9 +145,6 @@ const BEAM_LEGS_START: int = 8
 const HOMING_STACK: float = 1.5
 ## Swing rows made at once (more are made when every one is on: no swing ends another).
 const SWING_ROWS_START: int = 16
-## A swing cast within this many seconds of the last one's sweep ending chains straight on: no
-## wind-up, the other way round (melee I2; the playground's chain window).
-const SWING_CHAIN: float = 0.25
 ## Degrees the staff leans back past the start of the arc before a sweep and swings on past its
 ## end; the sweep's ease runs over the whole turn, and only the arc itself hits.
 const SWING_LEAN: float = 22.5

@@ -10,7 +10,7 @@ extends RefCounted
 ## it plays for), the aim locked at the cast, which way it turns (a swing's side), its keys
 ## (`FormBase.packed_pose`), the carrier's tint (its glow's colour), and where the staff was when it
 ## began (POSE_CHANNELS numbers a body, in its own frame: what the first key starts from).
-var _pose_start: PackedFloat32Array = PackedFloat32Array()
+var _pose_start: PackedFloat64Array = PackedFloat64Array()
 var _pose_wind: PackedFloat32Array = PackedFloat32Array()
 var _pose_strike: PackedFloat32Array = PackedFloat32Array()
 var _pose_tag: PackedInt64Array = PackedInt64Array()

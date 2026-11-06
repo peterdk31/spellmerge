@@ -1,9 +1,9 @@
 extends "res://tests/support/suite.gd"
-## Tests for swings (melee I2; docs/milestones/M2-staffs.md, "Phase I: melee"): a swing leans back
-## for its wind-up, then sweeps its arc round the hand, centred on the aim locked at the cast,
-## striking each body in the wedge once (also between two steps of a fast sweep), skipping only
-## its caster; it turns clockwise and back by turns, chains on with no wind-up, and ends at the
-## end of its arc. It runs a real projectile manager and event bus, stepped by hand, with cards
+## Tests for swings (melee I2; docs/milestones/M2-staffs.md, "Phase I: melee"): its cast winds up
+## (the staff leans back, the aim following the caster; docs/milestones/cast-timing.md), then it
+## sweeps its arc round the hand, centred on the aim locked as it leaves, striking each body in the
+## wedge once (also between two steps of a fast sweep), skipping only its caster; it turns
+## clockwise and back by turns, winds up before every swing, and ends at the end of its arc. It runs a real projectile manager and event bus, stepped by hand, with cards
 ## built in code.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_swing.gd
@@ -15,6 +15,8 @@ const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
 const REACH: float = 24.0
+## Steps until a cast's 0.12 s wind-up is over and the swing has left.
+const WIND_STEPS: int = 8
 
 
 class FakeRegistry:
@@ -189,6 +191,7 @@ func test_swings_turn_clockwise_and_back_by_turns() -> void:
 	var lower: Node2D = _at(30.0)
 	_build()
 	_cast()
+	_tick(WIND_STEPS)
 	check_equal(CarrierSwing.of(_spells).swing_side(_row()), 1, "the first swing is a forehand (clockwise on screen)")
 	_tick(30)
 	check_equal(_hits.size(), 2, "it hits both")
@@ -196,39 +199,43 @@ func test_swings_turn_clockwise_and_back_by_turns() -> void:
 	_hits.clear()
 	_tick(30)
 	_cast()
+	_tick(WIND_STEPS)
 	check_equal(CarrierSwing.of(_spells).swing_side(_row()), -1, "the next is a backhand")
 	_tick(30)
 	check(_hits.size() == 2 and _hits[0][1] == lower and _hits[1][1] == upper, "turning back it meets the lower body first")
 
 
-func test_a_swing_right_after_the_last_chains_on_with_no_wind_up() -> void:
+func test_every_swing_winds_up_even_right_after_the_last() -> void:
+	# docs/milestones/cast-timing.md: swing follows the plain wind-up rule (owner, 2026-11-06); a
+	# swing right after the last used to chain on with none.
 	var front: Node2D = _at(0.0)
 	_build()
 	_cast()
 	_tick(12)
 	check_equal(_struck(front), 1, "the first swing hit")
 	check_equal(CarrierSwing.of(_spells).swing_count(), 0, "and is over")
-	_cast()
+	check(_cast() >= 0.0, "the next press starts at once")
 	_tick(5)
-	check_equal(_struck(front), 2, "a swing within the chain window sweeps at once")
-	_tick(60)
-	_cast()
-	_tick(5)
-	check_equal(_struck(front), 2, "after a pause it leans back first again")
+	check_equal(_struck(front), 1, "but it leans back first")
+	check_equal(CarrierSwing.of(_spells).swing_count(), 0, "no swing is out while it winds up")
 	_tick(10)
-	check_equal(_struck(front), 3, "then hits")
+	check_equal(_struck(front), 2, "then hits")
 
 
-func test_the_aim_is_locked_at_the_cast() -> void:
+func test_the_aim_follows_through_the_wind_up_and_locks_as_it_leaves() -> void:
+	# docs/milestones/cast-timing.md (owner, 2026-11-06): the aim follows the stick until the
+	# release; the sweep then keeps the aim it left with.
 	var front: Node2D = _at(0.0)
 	var below: Node2D = _at(90.0)
 	_build()
 	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	_cast()
 	_spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
+	_tick(WIND_STEPS)
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	_tick(30)
-	check_equal(_struck(front), 1, "it sweeps where it was aimed at the cast")
-	check_equal(_struck(below), 0, "turning the aim during the wind-up moves no arc")
+	check_equal(_struck(below), 1, "it sweeps where the aim was as it left")
+	check_equal(_struck(front), 0, "turning the aim during the sweep moves no arc")
 
 
 func test_it_turns_round_the_hand_and_follows_it() -> void:
@@ -289,11 +296,10 @@ func test_a_chained_backhand_starts_where_the_forehand_ended() -> void:
 	_build()
 	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	_cast()
-	_tick(12)
+	_tick(18)
 	var ended: float = _pose_angle()
-	_tick(6)
 	_cast()
-	check(absf(_pose_angle() - ended) < 1.0, "no jump: %s then %s" % [ended, _pose_angle()])
+	check(absf(_pose_angle() - ended) < 1.0, "no jump as the next winds up: %s then %s" % [ended, _pose_angle()])
 
 
 ## Degrees the body's staff points off right now (its animation's turn on its locked aim).
@@ -307,6 +313,7 @@ func test_the_split_swings_of_one_cast_turn_the_same_way() -> void:
 	_put(split, &"split")
 	_build([&"split", &"swing"])
 	_cast()
+	_tick(WIND_STEPS)
 	var sides: Array[int] = []
 	for at in CarrierSwing.of(_spells).swing_slots():
 		if CarrierSwing.of(_spells).swing_on(at):
@@ -319,6 +326,7 @@ func test_a_held_swing_sweeps_back_and_forth_until_switched_off() -> void:
 	var front: Node2D = _at(0.0)
 	_build([&"hold", &"swing"])
 	_cast()
+	_tick(WIND_STEPS)
 	check(_spells.is_holding(0, 0), "a held swing is on")
 	var sides: Array[int] = []
 	for step in 60:

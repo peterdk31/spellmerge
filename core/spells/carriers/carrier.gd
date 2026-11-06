@@ -73,6 +73,12 @@ func has_wind_down() -> bool:
 	return true
 
 
+## Which way the staff turns for a cast of it by `actor` along `dir` (`StaffPoses.start`'s
+## `side`), asked when the cast starts winding up, before it leaves (`Spells._wind_pose`).
+func pose_side(_actor: int, dir: Vector2) -> int:
+	return StaffPoses.up_side(dir)
+
+
 ## The kind of its hits (`HitProfile.kind`), &"" for a shot's own.
 func hit_kind() -> StringName:
 	return &""

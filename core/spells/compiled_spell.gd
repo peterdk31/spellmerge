@@ -42,7 +42,8 @@ var traits: int = 0
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
-## SWING: degrees its sweep hits over, and seconds it leans back first (`FormBase.arc`, `wind_up`).
+## SWING: degrees its sweep hits over (`FormBase.arc`). `wind_up`: the seconds its cast winds up
+## before it leaves, its form card's plus its modifiers' `wind_up_add` (docs/milestones/cast-timing.md).
 var arc: float = 0.0
 var wind_up: float = 0.0
 ## The carrier's staff animation (`FormBase.packed_pose`, shared, never written).

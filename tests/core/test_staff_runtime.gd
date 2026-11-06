@@ -244,3 +244,99 @@ func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> v
 	for i in tags.size():
 		if i != 5:
 			check(_spells.current_tag(floori(float(i) / SpellLimits.STAFFS), i % SpellLimits.STAFFS) == tags[i], "staff %d is untouched" % i)
+
+
+# --- Wind-up (docs/milestones/cast-timing.md, part T2) -----------------------------------------
+
+## A bolt that winds up `seconds` (its form card's `wind_up`), installed as `player`'s staff 0.
+func _wound_bolt(player: int, seconds: float) -> void:
+	var slow: FormBase = _form(&"slow_bolt", 300.0, 1.0)
+	slow.wind_up = seconds
+	slow.wind_down = 0.1
+	_install(player, 0, "slow_bolt")
+
+
+func test_a_cast_that_winds_up_leaves_when_its_wind_up_is_over() -> void:
+	_wound_bolt(0, 0.1)
+	var spent: Array = []
+	_bus.mana_spend_requested.connect(func(caster: int, staff: int, amount: float) -> void: spent.append([caster, staff, amount]))
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 0.0, "the press is taken and pays nothing yet")
+	check(_spells.is_winding(0, 0), "it winds up")
+	check_equal(_mgr.get_count(), 0, "nothing has left")
+	check(is_equal_approx(_spells.cooldown_left(0, 0), 0.1), "the staff is busy for the wind-up")
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "a press while it winds up is refused")
+	_tick(3)
+	check_equal(_mgr.get_count(), 0, "still winding after 0.05 s")
+	_tick(4)
+	check_equal(_mgr.get_count(), 1, "the bolt left once the wind-up was over")
+	check(not _spells.is_winding(0, 0), "and it winds up no more")
+	check_equal(spent, [[0, 0, 2.0]], "its mana is asked for as it leaves")
+	check(_spells.cooldown_left(0, 0) > 0.5, "then its wind-down and the staff's cooldown, got %s" % _spells.cooldown_left(0, 0))
+	check_equal(_spells.cast_index(0, 0), 0, "a one-cast cycle starts over as it leaves")
+
+
+func test_a_winding_cast_leaves_along_the_aim_it_has_then() -> void:
+	_wound_bolt(1, 0.1)
+	_spells.set_aim(1, Vector2.ZERO, Vector2.RIGHT)
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_spells.set_aim(1, Vector2(5.0, 0.0), Vector2.DOWN)
+	_tick(7)
+	check_equal(_mgr.get_count(), 1, "it left")
+	var velocity: Vector2 = Vector2.ZERO
+	for slot in 512:
+		if _mgr.is_alive(slot):
+			velocity = _mgr.get_velocity_of(slot)
+	check(velocity.normalized().dot(Vector2.DOWN) > 0.99, "along the aim at the release, not at the press: %s" % velocity)
+
+
+func test_being_downed_or_a_rebuild_cancels_a_wind_up_for_free() -> void:
+	var spent: Array = []
+	_bus.mana_spend_requested.connect(func(caster: int, staff: int, amount: float) -> void: spent.append(amount))
+	_wound_bolt(2, 0.1)
+	_spells.cast_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	_spells.clear_aim(2)
+	check(not _spells.is_winding(2, 0), "down: it winds up no more")
+	check_equal(_spells.cooldown_left(2, 0), 0.0, "and the staff is free")
+	_spells.set_aim(2, Vector2.ZERO, AIM)
+	_spells.cast_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	_install(2, 0, "slow_bolt")
+	check(not _spells.is_winding(2, 0), "a rebuild cancels it too")
+	_tick(20)
+	check_equal(_mgr.get_count(), 0, "nothing ever left")
+	check(spent.is_empty(), "and nothing was paid")
+
+
+func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
+	_staff.wind_up = 0.1
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_install(3, 0, "bolt bolt")
+	_spells.cast_staff(3, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(3, 0), "a plain bolt winds up on a staff that does (an enemy's telegraph)")
+	_tick(7)
+	check_equal(_mgr.get_count(), 1, "then leaves")
+	_spells.cast_staff(3, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(3, 0), "the next cast of the cycle winds up too")
+
+
+func test_a_payload_winds_up_where_its_trigger_fired() -> void:
+	_target(Vector2(30.0, 0.0))
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.1
+	var nova: FormBase = _form(&"slow_nova", 0.0, 0.2)
+	nova.carrier = &"atom"
+	nova.shots = 8
+	nova.spread = 360.0
+	nova.speed = 200.0
+	nova.wind_up = 0.2
+	_install(0, 2, "on_hit bolt slow_nova")
+	_spells.cast_staff(0, 2, Vector2.ZERO, AIM, 100.0)
+	check(not _spells.is_winding(0, 2), "the cast itself winds up nothing: the nova is a payload's")
+	var hit_at: int = -1
+	for step in 30:
+		_tick(1)
+		if hit_at < 0 and _mgr.get_count() == 0:
+			hit_at = step
+		if _mgr.get_count() > 1:
+			check(hit_at >= 0 and step - hit_at >= 10, "the nova left about 0.2 s after the hit (steps %d to %d)" % [hit_at, step])
+			check_equal(_mgr.get_count(), 8, "all eight of its shots")
+			return
+	check(false, "the nova never left (hit at step %d)" % hit_at)

@@ -43,7 +43,7 @@ func test_it_has_the_playgrounds_numbers() -> void:
 	check_equal(card.ray_length, 32.0, "32 px of reach (24 in the playground; one tile after the first playtest)")
 	check(is_equal_approx(card.wind_up, 0.12), "a 0.12 s wind-up")
 	check(is_equal_approx(card.lifetime, 0.06), "a 0.06 s sweep")
-	check(is_equal_approx(card.wind_down, 0.3), "a 0.3 s delay")
+	check(is_equal_approx(card.wind_up + card.wind_down, 0.3), "0.3 s from the press until the staff is free (docs/milestones/cast-timing.md)")
 	check_equal(card.base_damage, 2, "2 damage")
 	check_equal(card.knockback, 240.0, "240 px/s of knockback")
 
@@ -131,14 +131,16 @@ func test_heavy_bats_it_further() -> void:
 
 
 func test_two_presses_swing_forehand_then_backhand() -> void:
-	# The second press, inside the chain window, chains on: both hit the imp, one each way.
+	# Both hit the imp, one each way; each winds up first (docs/milestones/cast-timing.md).
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(18.0, 0.0))
 	arena.install_cards(0, 0, ["swing"])
 	arena.cast(0, 0)
+	arena.run(0.14)
 	var first: int = _live_side(arena)
-	arena.run(0.35)
-	check(arena.cast(0, 0), "the second swing is cast after the card's delay")
+	arena.run(0.21)
+	check(arena.cast(0, 0), "the second swing is cast after the card's wind-up and wind-down")
+	arena.run(0.14)
 	var second: int = _live_side(arena)
 	arena.run(0.5)
 	check_equal(arena.lost(imp), 4, "both swings struck it")

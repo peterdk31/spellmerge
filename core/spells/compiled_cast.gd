@@ -13,6 +13,8 @@ var mana: float = 0.0
 ## wind-down of every carrier of its own group (times its modifiers' `wind_down_mult`) and its
 ## multicast cards'. A payload adds none: no staff waits on it.
 var wind_down: float = 0.0
+## Seconds the cast winds up before it leaves: its staff's `wind_up` plus its group's.
+var wind_up: float = 0.0
 ## Seconds the staff waits after this cast in all: `wind_down`, plus the staff's `cooldown` when
 ## `ends_cycle`.
 var delay: float = 0.0

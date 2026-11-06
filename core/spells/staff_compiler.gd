@@ -97,10 +97,11 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_in_payload = false
 	_cast.group = _read_group(staff.draw if staff != null else 1, false)
 	_cast.ends_cycle = _reached_end or not _has_card_from(_pos)
+	_cast.wind_up = _cast.group.wind_up + (staff.wind_up if staff != null else 0.0)
 	_cast.delay = _cast.wind_down
 	if _cast.ends_cycle and staff != null:
 		_cast.delay += staff.cooldown
-	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
+	_cast.description = "%s. %s mana, %s%s s%s." % [_group_text(_cast.group), _number(_cast.mana), ("%s s wind-up, " % _number(_cast.wind_up)) if _cast.wind_up > 0.0 else "", _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
 	_cast.sense = CastSense.of(_cast)
 	return _cast
 
@@ -154,6 +155,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for t in triggers.size():
 				_read_trigger(spell, triggers[t], trigger_slots[t], form, kept_elements, kept_modifiers)
 			group.spells.append(spell)
+			group.wind_up += spell.wind_up
 			elements = []
 			modifiers = []
 			kept = PackedInt32Array()
@@ -171,6 +173,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		var fallback: CompiledSpell = _fallback(elements, modifiers, kept, payload)
 		if fallback != null:
 			group.spells.append(fallback)
+			group.wind_up += fallback.wind_up
 			landed = 1
 	_take_multicasts(group, multicasts, maxi(found + landed - asked, 0), found)
 	_in_payload = outer_payload
@@ -414,7 +417,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.orbit_radius = form.orbit_radius
 		spell.ray_length = form.ray_length
 		spell.arc = form.arc
-		spell.wind_up = form.wind_up
+		spell.wind_up = maxf(form.wind_up, 0.0)
 		spell.staff_pose = form.packed_pose()
 		spell.spread = form.spread
 		spell.body = BODIES.get(form.shot_body, 0)
@@ -445,6 +448,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		damage *= modifier.damage_mult
 		mana *= modifier.mana_mult
 		wind_down *= modifier.wind_down_mult
+		spell.wind_up += maxf(modifier.wind_up_add, 0.0)
 		speed *= modifier.speed_mult
 		radius *= modifier.radius_mult
 		shots *= modifier.shot_mult

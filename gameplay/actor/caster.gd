@@ -16,7 +16,9 @@ extends ActorComponent
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with that
 ## staff's free mana (`free_mana(at)`: its pool minus what its sustained cards hold) and pays what
-## Spells took from that pool, then sends `actor_cast` (any actor's cast, for visual reactions).
+## Spells took from that pool, then sends `actor_cast` (any actor's cast, for visual reactions). A
+## cast that winds up (docs/milestones/cast-timing.md) starts there and leaves later; its mana is
+## paid then (`mana_spend_requested`).
 ##
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and
@@ -105,6 +107,8 @@ func attach() -> void:
 	_open_number()
 	if actor.events != null and not actor.events.mana_refund_requested.is_connected(_on_mana_refund):
 		actor.events.mana_refund_requested.connect(_on_mana_refund)
+	if actor.events != null and not actor.events.mana_spend_requested.is_connected(_on_mana_spend):
+		actor.events.mana_spend_requested.connect(_on_mana_spend)
 	if number < 0:
 		return
 	own_hurtbox()
@@ -126,6 +130,8 @@ func attach() -> void:
 func detach() -> void:
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_refund_requested.is_connected(_on_mana_refund):
 		actor.events.mana_refund_requested.disconnect(_on_mana_refund)
+	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_spend_requested.is_connected(_on_mana_spend):
+		actor.events.mana_spend_requested.disconnect(_on_mana_spend)
 	_close_number()
 
 
@@ -447,3 +453,12 @@ func _on_mana_refund(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = minf(_mana[at] + amount, max_mana_of(at))
+
+
+## A cast that wound up left (`Spells`, docs/milestones/cast-timing.md): its mana is paid from the
+## staff that cast it now, not at the press.
+func _on_mana_spend(caster: int, at: int, amount: float) -> void:
+	if number < 0 or caster != number or not is_finite(amount) or amount <= 0.0:
+		return
+	if at >= 0 and at < staff_count:
+		_mana[at] = maxf(_mana[at] - amount, 0.0)

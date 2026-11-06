@@ -440,6 +440,24 @@ func test_a_shorter_wind_down_on_a_payload_is_wasted() -> void:
 	check(payload.wasted.has(2), "but not on a payload's: it adds no wind-down to shorten")
 
 
+func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void:
+	# docs/milestones/cast-timing.md, T2: the staff's wind-up, every carrier's of the cast's own
+	# group and its modifiers' `wind_up_add`; a payload's winds up on its own.
+	(_fake.items[&"nova"] as FormBase).wind_up = 0.3
+	var charge: ModifierBase = _modifier(&"charge")
+	charge.wind_up_add = 2.0
+	charge.damage_mult = 4.0
+	_staff.wind_up = 0.1
+	var cast: CompiledCast = _compile("charge bolt").casts[0]
+	check(is_equal_approx(cast.wind_up, 0.1 + 2.0), "the staff's and the charge's, got %s" % cast.wind_up)
+	check(not cast.wasted.has(0), "the charge counts: its damage")
+	var two: CompiledCast = _compile("double bolt nova").casts[0]
+	check(is_equal_approx(two.wind_up, 0.1 + 0.3), "two carriers add up, got %s" % two.wind_up)
+	var payload: CompiledCast = _compile("on_hit bolt nova").casts[0]
+	check(is_equal_approx(payload.wind_up, 0.1), "a payload's nova adds nothing to the cast, got %s" % payload.wind_up)
+	check(is_equal_approx(payload.group.spells[0].triggers[0].payload.wind_up, 0.3), "it winds up on its own, got %s" % payload.group.spells[0].triggers[0].payload.wind_up)
+
+
 func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:
 	check(_compile("- - -").is_empty(), "no cards, no cast")
 	var staff: CompiledStaff = _compile("nope bolt")

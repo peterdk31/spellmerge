@@ -62,8 +62,9 @@ const POSE_RANGES: Dictionary = {
 @export var ray_length: float = 0.0
 ## SWING: degrees the sweep hits over, centred on the aim.
 @export var arc: float = 0.0
-## SWING: seconds the staff leans back before it sweeps (none when it chains straight on from
-## the last swing, `SpellLimits.SWING_CHAIN`). SLAM: seconds it rises before it strikes.
+## Seconds a cast of it winds up before it leaves (docs/milestones/cast-timing.md): the staff's
+## pose winds, the aim follows the caster, then the carrier leaves and strikes at once. A swing
+## leans back, a slam rises; most carriers have none. A payload winds up where its trigger fired.
 @export var wind_up: float = 0.0
 ## How the staff moves when this carrier is cast (its look only; a wizard's own cast, not a payload's):
 ## keys, each a dictionary, played in order from the staff's pose at the cast (rest, or where the

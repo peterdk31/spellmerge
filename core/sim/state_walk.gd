@@ -24,7 +24,7 @@ extends RefCounted
 ## - a value (bool, int, float, a string, a vector, a colour, ...) or a packed array (one engine
 ##   call each, never element by element);
 ## - an array (element by element; a typed array of plain values in one call) or a dictionary (its
-##   keys in sorted order, each key then its value);
+##   keys in sorted order, StringNames by their text (`sorted_keys`), each key then its value);
 ## - an object of a script (an actor's intent, a compiled spell, a brain), walked member by member;
 ##   one met twice is walked once, and later meetings are the number of its first (in walk order);
 ## - a node of a simulation script that is the holder's own descendant (an actor's components), walked
@@ -203,8 +203,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 				_value(_index(path, i), items[i], holder)
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
-			var keys: Array = table.keys()
-			keys.sort()
+			var keys: Array = sorted_keys(table)
 			_sink.call(_join(path, "#"), keys.size())
 			for key: Variant in keys:
 				var at: String = _index(path, key)
@@ -239,8 +238,7 @@ func _ref(path: String, value: Variant) -> void:
 				_ref(_index(path, i), item)
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
-			var keys: Array = table.keys()
-			keys.sort()
+			var keys: Array = sorted_keys(table)
 			_sink.call(_join(path, "#"), keys.size())
 			for key: Variant in keys:
 				var at: String = _index(path, key)
@@ -248,6 +246,37 @@ func _ref(path: String, value: Variant) -> void:
 				_ref(at, table[key])
 		_:
 			_value(path, value, null)
+
+
+## `table`'s keys in an order that is the same on every machine. The engine's `sort` orders
+## StringNames by where they are in memory, not by their text (so the web walked Spells' carriers in
+## another order than Linux; found by N2b): a table with a StringName key is sorted by text (a
+## StringName and a String of the same text are one key in a dictionary).
+static func sorted_keys(table: Dictionary) -> Array:
+	var keys: Array = table.keys()
+	var named: bool = table.is_typed_key() and table.get_typed_key_builtin() == TYPE_STRING_NAME
+	if not named and not table.is_typed_key():
+		for key: Variant in keys:
+			if typeof(key) == TYPE_STRING_NAME:
+				named = true
+				break
+	if named:
+		keys.sort_custom(_key_before)
+	else:
+		keys.sort()
+	return keys
+
+
+## The order of `sorted_keys` for a table with StringName keys: by type (a StringName as a String),
+## then by value, a StringName's by its text.
+static func _key_before(a: Variant, b: Variant) -> bool:
+	var type_a: int = TYPE_STRING if typeof(a) == TYPE_STRING_NAME else typeof(a)
+	var type_b: int = TYPE_STRING if typeof(b) == TYPE_STRING_NAME else typeof(b)
+	if type_a != type_b:
+		return type_a < type_b
+	if type_a == TYPE_STRING:
+		return String(a) < String(b)
+	return a < b
 
 
 ## A dictionary's key: a value, never an object (its order and bytes would be its address).

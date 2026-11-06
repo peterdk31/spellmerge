@@ -290,8 +290,9 @@ func _ready() -> void:
 	events.player_left.connect(_on_player_left)
 
 
-func _process(delta: float) -> void:
-	step(delta)
+func _init() -> void:
+	# The tick runs its timers (`step`, core/sim/tick.gd): the flag says so; there is no callback.
+	set_process(true)
 
 
 ## Advance the intro, the next wave's and the restart timers by `delta` seconds.

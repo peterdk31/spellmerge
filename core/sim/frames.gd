@@ -5,9 +5,8 @@ extends Node
 ## `frame_of(seat)`. Devices, bots and replays all produce frames, and later the network will;
 ## the game never knows which.
 ##
-## - **The tick's start** is its physics step: it runs before every other node's
-##   (`process_physics_priority` PRIORITY), every physics frame, also while the tree is paused (the
-##   horde's level-up break takes its picks then). N3's Tick takes this over.
+## - **The tick's start:** the Tick autoload (core/sim/tick.gd) calls `tick` first in every tick,
+##   also while the tree is paused (the horde's level-up break takes its picks then).
 ## - **Where a frame comes from**, per seat: the replay being played (`play`); else the seat's
 ##   source (`set_source`: a bot, a `FrameSource`); else its device through the local input layer
 ##   (`LocalInput`: the walk, the aim with the mouse turned into a direction from the hand of the
@@ -36,16 +35,13 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const SEATS: int = 4
-## Before every other node's physics step: its step is the tick's start.
-const PRIORITY: int = -1000
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
 var input: InputManagerScript = null
 var actors: ActorsScript = null
 var registry: RegistryScript = null
-## Whether each physics frame starts a tick by itself (the game). A test that ticks it by hand
-## (`tick`) turns it off.
+## Whether the Tick starts its tick (the game). A test that ticks it by hand (`tick`) turns it off.
 var auto_tick: bool = true
 ## Ticks started since the game began.
 var ticks: int = 0
@@ -70,7 +66,6 @@ var _watched: InputFrame = InputFrame.new()
 
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	process_physics_priority = PRIORITY
 	for seat in SEATS:
 		var frame := InputFrame.new()
 		frame.seat = seat
@@ -98,11 +93,6 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if events != null and is_instance_valid(events) and events.command_sink == Callable(self, &"_on_command"):
 		events.command_sink = Callable()
-
-
-func _physics_process(delta: float) -> void:
-	if auto_tick:
-		tick(delta)
 
 
 ## Seat `seat`'s frame for the tick in progress (null for a seat outside 0-3). Read only.
@@ -136,13 +126,15 @@ func tick(delta: float) -> void:
 
 
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
-## tick. Returns the replay it records into (it grows each tick until `stop_recording`).
-func record(start: StringName, starter: int) -> Replay:
+## tick. Returns the replay it records into (it grows each tick until `stop_recording`). The run's
+## seed is `run_seed`, or a random one when it is 0 (the platform runs, N2b, pick theirs, so every
+## platform plays the same horde).
+func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	stop_playing()
 	var replay := Replay.new()
 	replay.build = Replay.build_of()
 	replay.content = Replay.content_of(registry)
-	replay.run_seed = SimSeed.pick()
+	replay.run_seed = run_seed if run_seed != 0 else SimSeed.pick()
 	replay.start = start
 	replay.starter = starter
 	replay.seats = _joined_seats()

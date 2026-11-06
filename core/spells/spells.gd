@@ -427,6 +427,8 @@ var _moves: CasterMoves = null
 
 
 func _init() -> void:
+	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
+	set_physics_process(true)
 	# Every cast seeds it before it rolls; a fixed start keeps two runs the same before the first
 	# cast too (online-ready N1: a new generator starts on a random seed).
 	_scatter.seed = 0
@@ -480,10 +482,6 @@ func _init() -> void:
 func _ready() -> void:
 	if projectiles == null:
 		bind(get_node_or_null("/root/Projectiles") as ProjectilesScript, get_node_or_null("/root/Events") as EventsScript)
-
-
-func _physics_process(delta: float) -> void:
-	step(delta)
 
 
 ## Connect to a projectile manager and an event bus (either may be null, then casting is

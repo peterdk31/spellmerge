@@ -144,7 +144,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 ## Spell runtime (found in M2 part 6)
 
 - **A beam has no timer trigger and no exclusion in time.** A ray is instant, so its timer never ticks; an on-expire trigger fires at the beam's end. Fine for the first combos; revisit if a combo wants a beam that "keeps firing".
-- **`tests/bots/test_wave_balance.gd` is timing-dependent.** The 1-player bot cleared the room in 39 s in one run and was not done after 120 game seconds (37 casts) in another, on unchanged gameplay code. It follows real frame time; make it deterministic (seeded, fixed step) in part 20. Fixed by phase N's one clock (N3, [milestones/online-ready.md](milestones/online-ready.md)).
+- **`tests/bots/test_wave_balance.gd` is timing-dependent.** The 1-player bot cleared the room in 39 s in one run and was not done after 120 game seconds (37 casts) in another, on unchanged gameplay code. It follows real frame time; make it deterministic (seeded, fixed step) in part 20. Fixed by phase N's one clock (N3, [milestones/online-ready.md](milestones/online-ready.md)). N3a (2026-11-06) moved the timers onto the tick; the flake did not reproduce before or after (three runs at once, the same clear); drop this once the daily runs agree.
 - **`player` must feed `Projectiles.set_anchor` every physics step** for orbit spells to cast (part 11); `Spells.cast` refuses an orbit with no anchor.
 
 ## Later milestones

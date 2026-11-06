@@ -2,7 +2,7 @@
 
 **Status (2026-11-04): approved by the owner** ("Go with your proposals on all four decisions"). The tasks are in the owner lane of [NEXT.md](../NEXT.md), after the lane's current work; phase N does not hold up D3 and C2, and ends before M3 starts. Asked by the owner on 2026-11-04: "Real online play is wanted. I hereby grant permission to change the design, such that it is possible to add. So I think we should follow your suggestion and tighten determinism." An exception to the milestone order like phases F–P ([ROADMAP.md](../ROADMAP.md)). The owner's decisions go in "Owner decisions"; what changes while building goes in docs/DECISIONS.md.
 
-**This phase builds no netcode.** Networking stays banned by hard rule 4 until the netcode phase sketched at the end, which needs its own owner exception (like the native module's of 2026-11-02). Phase N makes the game *ready* for it, and pays off without it: replays, bug reports that replay exactly, and tests that never flake on frame time.
+**This phase builds no netcode.** Networking stays banned by hard rule 4 until the netcode phase sketched at the end, which needs its own owner exception (like the native module's of 2026-11-02). The owner will give it (2026-11-06: "netcode can easily be allowed"): the rule and its check change when netcode work starts. Phase N makes the game *ready* for it, and pays off without it: replays, bug reports that replay exactly, and tests that never flake on frame time.
 
 ## Why
 
@@ -44,7 +44,7 @@ Decided by the owner on 2026-11-04 ("Go with your proposals on all four decision
 1. **Where it goes in the order:** right after the owner lane's current work, and before M3, so the run structure is born deterministic. It runs beside D3 and C2 and does not hold them up.
 2. **Hit-stop online (N4):** hit-stop stays a game-wide stop, counted in ticks of the simulation, so every machine stops on the same tick (not a view-only freeze).
 3. **Pause online:** offline the pause menu still stops the game for everyone; online it opens without stopping the game, like the builder (design rule 6, below).
-4. **The tick rate:** 60 ticks a second, fixed, as today.
+4. **The tick rate:** 60 ticks a second, fixed, as today. **Amended by the owner on 2026-11-06:** "Slowing the game is an option if we have to!" Online, a session may run the game slower when a machine cannot keep up (fewer ticks a second, or the game's speed lowered), as a last resort after the session rules (N11).
 
 ## The design change
 
@@ -155,6 +155,12 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - No CI job yet (that is N8): a script under `tests/` and a written result in docs/DECISIONS.md: the first tick and area that part on each platform, or that none does.
 - It shows what parts besides trig and the body move, which N6 and N7 take out of the engine anyway: if the platforms part somewhere else (inside the engine's own code), the owner hears it here, early.
 
+**Done (2026-11-06).** `tests/platforms/replay_hashes_runner.gd` (on `--replay-hashes` in the Linux Test, Windows Test and Web Test exports; the Windows Test preset is new) and `tools/platform_hashes.py` (exports, runs Linux headless, Windows through WSL and the web in headless Chromium, and names the first tick, area and members that part); the replay test's machinery is shared in `tests/support/replay_run.gd`. The result, in docs/DECISIONS.md (2026-11-06):
+
+- **Only trig parts, one float step apart:** Windows at the sandbox's tick 0 and the horde's tick 89 (`Vector2.angle_to`, atan2, in Spells' walk turn), the web at the sandbox's tick 1 (`Vector2.from_angle` in the atom's spread) and the horde's tick 117 (`Vector2.from_angle` of a frame's aim). Nothing inside the engine's own code parted first. What hides behind the first parting (the body move, A4) shows once N7 lands; N8 runs this again then.
+- **The inputs were the same bytes on every platform,** and each platform replayed its own recording exactly. Windows ran the GDScript twins (no MinGW here), the web the Emscripten kernels; Linux native and GDScript agree at all 600 ticks.
+- **Fixed in N1's and N2's tools:** StringName keys walked by text (the engine sorts them by address), kept leaves sliced (the native kernels write past copy-on-write; N10's snapshots must copy so too), and the native switch and the hit test's scratch listed in DERIVED.
+
 ### N3: one clock, one context
 
 - `core/sim/tick.gd` (`Tick`, autoload): the tick counter and the only driver of the simulation. Each physics frame it runs one tick, in a written order: input frames, commands, Flow, Coop's rules, actors (by id), Spells, projectiles, Combat, the swarm. Nothing in the simulation has its own `_process` or `_physics_process`; each area's step is called by the tick.
@@ -165,6 +171,10 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes `DT`, as today; online, the netcode decides how many ticks to run.
 - Fixes A2 and A3, and the flaky `test_wave_balance.gd` (docs/BACKLOG.md).
 - From N1: the state hash's cost measured on the stress run, now that the tick names the real areas (N1 measured the test worlds only).
+
+**Split in three (2026-11-06):** **N3a** the Tick, its order and the timers on it; **N3b** a run starts from a fresh game's state (every service's clocks, counters, free lists and slots as a fresh one's, so a replay recorded in any run plays in a fresh game; the proof is a replay played after other runs in the same game); **N3c** the `sim` service, chance by hash, order by id beyond the bodies, and the hash's cost on the stress run.
+
+**N3a done (2026-11-06).** `core/sim/tick.gd` (`Tick`) steps the frames, the services, the swarm, the bodies by actor id and the run's rules and timers, in the scene tree's old order (docs/DECISIONS.md, 2026-11-06); the areas' own callbacks are gone; `tests/core/test_tick.gd`. The replay test no longer holds Flow's, Coop's and the horde's timers, which showed that the horde's spawns read the eased camera: Coop now sends the fitted view on the tick (`view_fitted`) and the horde spawns outside it.
 
 ### N4: stops in ticks
 
@@ -256,7 +266,7 @@ The tasks are in NEXT.md's owner lane in this order.
 
 ## After phase N: the netcode (a sketch, not approved)
 
-Its own phase and its own owner exception to hard rule 4, best after M7 (Steamworks):
+Its own phase and its own owner exception to hard rule 4 (the owner, 2026-11-06: "netcode can easily be allowed"), best after M7 (Steamworks):
 
 - **Model:** host-ordered lockstep. Every machine sends its seats' input frames to the host (on Steam, through Steam's relay); the host fixes each tick's frames, with a short input delay (2–4 ticks), and sends them to all. A frame that arrives late is replaced by that seat's last one, so **a slow connection hurts only its own player and nobody waits** (pillar 2). Rollback on top is possible later, on N10's snapshots.
 - **Desync check:** machines exchange N1's hash every second; on a mismatch the host sends a snapshot.
@@ -264,7 +274,7 @@ Its own phase and its own owner exception to hard rule 4, best after M7 (Steamwo
 - **Security:** only input frames, hashes and snapshots cross the wire, each with a strict decoder and size limits; nothing from the wire is ever code, a resource or a path. All networking lives in one owner-only folder (like `native/`), and hard rule 4 stays for everything else.
 - **What it can and can't do (the limits, 2026-11-04):**
   - *Feel over distance.* A player's own input takes effect after the round trip to the host plus the input delay. Good under about 80 ms ping (the same country or region), sluggish above about 150 ms. To hide it, each machine draws its own staff moving at once, ahead of the agreed game (a view-only guess, corrected smoothly; the simulation stays exact). Full rollback would fix it, but re-running 6–8 ticks of 3,000 shots in one frame is likely too slow in GDScript; it is measured before it is promised.
-  - *The slowest machine sets the pace.* Every machine runs the whole game, so a machine that cannot keep 60 ticks a second holds the others back or falls out. The session rules (N11) are capped at the weakest machine's; web clients likely play smaller rooms, or only with other web clients (an owner decision then).
+  - *The slowest machine sets the pace.* Every machine runs the whole game, so a machine that cannot keep 60 ticks a second holds the others back or falls out. The session rules (N11) are capped at the weakest machine's, and if that is not enough the session may slow the game (the owner, 2026-11-06: "Slowing the game is an option if we have to!"); web clients likely play smaller rooms, or only with other web clients (an owner decision then).
   - *The same build.* Every machine must run the same build and content; the game refuses to join a session of another version. With a daily build, a session is "same nightly or same stable".
 - **Transport:** Steam networking on desktop; WebRTC with a small signalling server for the web build (infrastructure the project does not have yet).
 - **View:** each machine's camera follows its own seats; the HUD shows only local seats' builders.

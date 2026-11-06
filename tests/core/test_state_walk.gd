@@ -3,6 +3,12 @@ extends "res://tests/support/suite.gd"
 ## objects: what is walked, what is skipped, what is a problem, and what the report names.
 
 
+const NativeScript := preload("res://core/native/native.gd")
+const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+
+
 class Plain:
 	extends RefCounted
 	const DERIVED: Array[StringName] = [&"cache"]
@@ -215,6 +221,54 @@ func test_kept_leaves_are_copies() -> void:
 	desync.capture({"plain": plain})
 	plain.marks[0] = 99
 	check_equal(desync.leaves["plain"]["plain.marks"], PackedInt32Array([1, 2, 3]), "the leaf as captured")
+
+
+## A kept leaf of the projectile manager stays as captured when the native kernel steps: the kernel
+## writes into the manager's arrays in place, past copy-on-write, so a copy sharing the buffer
+## (`duplicate`) showed the next step's shots (found by N2b). Skipped without the native module.
+func test_kept_leaves_survive_the_native_kernel() -> void:
+	if not NativeScript.loaded():
+		check(OS.get_environment("SPELLMERGE_NATIVE") != "required", "SPELLMERGE_NATIVE=required, but the native module is not loaded")
+		return
+	var manager: ManagerScript = own(ManagerScript.new()) as ManagerScript
+	manager.actors = own(ActorSeats.table()) as Node
+	manager.events = own(EventsScript.new()) as Node
+	manager.set_native(true)
+	check(manager.is_native(), "the manager runs the native kernel")
+	manager.spawn(0, Vector2.ZERO, Vector2(60.0, 0.0), 1.0)
+	var desync := Desync.new(0)
+	desync.capture({"shots": manager})
+	var life: PackedFloat32Array = desync.leaves["shots"]["shots._life"]
+	manager.step(1.0 / 60.0)
+	check_equal(life[0], 1.0, "the kept life is the captured one")
+	check(manager.get(&"_life")[0] < 1.0, "the shot aged")
+
+
+## A table with StringName keys is walked by the keys' text, whatever order the names were made in:
+## the engine sorts StringNames by where they are in memory (the web walked Spells' carriers in
+## another order than Linux; found by N2b).
+func test_string_name_keys_are_walked_by_their_text() -> void:
+	var words: Array[String] = ["zebra", "kite", "apple", "moss", "berry", "yarn", "cloud", "ivy"]
+	var table: Dictionary = {}
+	for word in words:
+		# Made here, so the names are new and lie in memory in the order made.
+		table[StringName("n2b_%s_%d" % [word, word.length()])] = word
+	var paths: Array[String] = []
+	StateWalk.new().walk("t", Keyed.new(table), func(path: String, _value: Variant) -> void:
+		if path.ends_with("{}"):
+			paths.append(path))
+	var sorted: Array[String] = paths.duplicate()
+	sorted.sort()
+	check_equal(paths, sorted, "keys walked in text order")
+	check_equal(StateWalk.sorted_keys({&"b": 1, "c": 2, &"a": 3, 1: 4}), [1, &"a", &"b", "c"], "mixed keys: by type, then by text")
+
+
+class Keyed:
+	extends RefCounted
+	var table: Dictionary = {}
+
+	func _init(with: Dictionary) -> void:
+		table = with
 
 
 class Striker:

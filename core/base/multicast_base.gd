@@ -23,8 +23,8 @@ enum Mode {
 @export var repeat_interval: float = 0.0
 ## Mana this card adds to the cast.
 @export var mana_cost: float = 0.0
-## Seconds this card adds to the cast's delay.
-@export var cooldown: float = 0.0
+## Seconds this card adds to the cast's wind-down (`FormBase.wind_down`).
+@export var wind_down: float = 0.0
 
 
 func kind() -> StringName:
@@ -39,6 +39,6 @@ func ranges() -> Dictionary:
 		"repeats": Vector2(1, 8),
 		"repeat_interval": Vector2(0.0, 1.0),
 		"mana_cost": Vector2(0.0, 100.0),
-		"cooldown": Vector2(0.0, 2.0),
+		"wind_down": Vector2(0.0, 2.0),
 	})
 	return limits

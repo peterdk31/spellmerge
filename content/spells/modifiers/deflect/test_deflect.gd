@@ -78,8 +78,8 @@ func test_it_costs_more_than_a_shield() -> void:
 	var card: ModifierBase = _card()
 	var shield: ModifierBase = _shield()
 	check(card.mana_mult > shield.mana_mult, "more mana than a shield (%.2f)" % card.mana_mult)
-	check(card.cooldown_mult > shield.cooldown_mult, "a longer delay than a shield, which is its price on a swing (%.2f)" % card.cooldown_mult)
-	check(card.mana_mult <= 1.5 and card.cooldown_mult <= 1.5, "but not as dear as split or possess")
+	check(card.wind_down_mult > shield.wind_down_mult, "a longer delay than a shield, which is its price on a swing (%.2f)" % card.wind_down_mult)
+	check(card.mana_mult <= 1.5 and card.wind_down_mult <= 1.5, "but not as dear as split or possess")
 
 
 func test_the_combos_exist() -> void:

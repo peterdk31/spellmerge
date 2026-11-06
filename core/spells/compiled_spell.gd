@@ -20,7 +20,8 @@ var trigger_id: StringName:
 ## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
 var mana_cost: float = 0.0
-var cooldown: float = 0.5
+## Seconds its staff is busy after it leaves (`FormBase.wind_down` times the modifiers').
+var wind_down: float = 0.5
 var speed: float = 0.0
 var lifetime: float = 1.0
 var radius: float = 4.0

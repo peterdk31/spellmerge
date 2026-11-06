@@ -34,9 +34,10 @@ const POSE_RANGES: Dictionary = {
 @export var base_damage: float = 1.0
 ## Mana taken per cast.
 @export var mana_cost: float = 0.0
-## Seconds before the same player can cast this spell again. There is no separate cast
-## time: the cooldown is the cast time.
-@export var cooldown: float = 0.5
+## Seconds the staff is busy after this carrier leaves (its wind-down; docs/milestones/
+## cast-timing.md): a cast's wind-down is its own group's carriers' and multicast cards' added up;
+## a payload's adds nothing, as no staff waits on it.
+@export var wind_down: float = 0.5
 ## Pixels per second. Ignored by STILL and RAY.
 @export var speed: float = 0.0
 ## Seconds a shot lives. For RAY, how long the beam stays on (it hits every `SpellLimits.BEAM_TICK`).
@@ -181,7 +182,7 @@ func ranges() -> Dictionary:
 	limits.merge({
 		"base_damage": Vector2(0.05, 200),
 		"mana_cost": Vector2(0.0, 100.0),
-		"cooldown": Vector2(0.0, 10.0),
+		"wind_down": Vector2(0.0, 10.0),
 		"speed": Vector2(0.0, 2000.0),
 		"lifetime": Vector2(0.05, 20.0),
 		"radius": Vector2(1.0, 64.0),

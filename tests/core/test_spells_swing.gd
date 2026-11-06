@@ -58,7 +58,7 @@ func before_each() -> void:
 	_swing.ray_length = REACH
 	_swing.lifetime = 0.06
 	_swing.wind_up = 0.12
-	_swing.cooldown = 0.05
+	_swing.wind_down = 0.05
 	_swing.knockback = 240.0
 	# The swing card's staff animation: lean back past the arc, sweep past its end, hold, settle.
 	_swing.staff_pose = [{"phase": "wind", "at": 1.0, "turn": -67.5, "ease": "out"}, {"phase": "strike", "at": 1.0, "turn": 67.5}, {"phase": "after", "at": 0.08, "turn": 67.5}, {"phase": "after", "at": 0.38}] as Array[Dictionary]

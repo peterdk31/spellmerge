@@ -157,7 +157,7 @@ func test_every_staff_has_its_own_pool() -> void:
 func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
 	_world = Fixture.new(root)
 	var staff: StaffBase = StaffKit.plain_staff(2)
-	staff.cast_delay = 0.5
+	staff.cooldown = 0.5
 	var imp: Actor = _world.actor(Vector2.ZERO, [&"caster"], Fixture.Scripted.new(), [[&"fire", &"bolt"]], staff)
 	check(imp.caster.next_cast_mana() > 0.0, "the next cast costs mana")
 	check(imp.caster.next_cast_reach() > 0.0, "and reaches along the aim")

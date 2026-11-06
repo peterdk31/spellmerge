@@ -126,8 +126,7 @@ func start(scenario: Dictionary) -> bool:
 			ids.append(StringName(str(id)))
 		var plain := StaffBase.new()
 		plain.slots = maxi(ids.size(), 1)
-		plain.cast_delay = 0.0
-		plain.recharge = 0.0
+		plain.cooldown = 0.0
 		var built: CompiledStaff = spells.compile_staff(ids, plain)
 		if built.is_empty():
 			printerr("CLIP SKIPPED: %s: the staff casts nothing" % scenario["id"])

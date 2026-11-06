@@ -40,8 +40,7 @@ func _staff(spread: float) -> StaffBase:
 	var staff := StaffBase.new()
 	staff.id = &"test"
 	staff.slots = 8
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	staff.spread = spread
 	return staff
 

@@ -26,9 +26,9 @@ func test_faster_compiles_to_a_quicker_shot_and_cooldown() -> void:
 	var bare: CompiledSpell = _compile_with(&"bolt", [])
 	var faster: CompiledSpell = _compile_with(&"bolt", [&"faster"])
 	check(faster.speed > bare.speed, "quicker shot")
-	check(faster.cooldown < bare.cooldown, "shorter cooldown")
+	check(faster.wind_down < bare.wind_down, "shorter cooldown")
 	check(faster.damage < bare.damage, "but each shot is a little weaker")
-	check(faster.damage / faster.cooldown > bare.damage / bare.cooldown, "and it is still worth more per second")
+	check(faster.damage / faster.wind_down > bare.damage / bare.wind_down, "and it is still worth more per second")
 
 
 func test_faster_arrives_sooner() -> void:

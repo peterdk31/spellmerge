@@ -24,7 +24,7 @@ const STEP: float = 0.0625
 static var _exact: AIProfile = null
 
 
-## A plain staff (no delay unless `delay`, a pool of `max_mana` filling at `regen` a second)
+## A plain staff (no cooldown unless `delay`, a pool of `max_mana` filling at `regen` a second)
 ## holding `cards` (ids by slot), one per slot.
 static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0) -> StaffCards:
 	var ids: Array[StringName] = []
@@ -33,8 +33,7 @@ static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1
 	var staff := StaffBase.new()
 	staff.id = &"test"
 	staff.slots = maxi(ids.size(), 1)
-	staff.cast_delay = delay
-	staff.recharge = 0.0
+	staff.cooldown = delay
 	staff.max_mana = max_mana
 	staff.mana_regen = regen
 	return StaffCards.make(staff, ids)

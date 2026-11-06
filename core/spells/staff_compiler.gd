@@ -44,8 +44,10 @@ var _count: int = 0
 var _cast: CompiledCast = null
 var _used: PackedByteArray = PackedByteArray()
 var _pos: int = 0
-## True once a reading tried to go past the last slot: the staff recharges after this cast.
+## True once a reading tried to go past the last slot: the staff's cycle ends with this cast.
 var _reached_end: bool = false
+## True while a payload's group is read: its carriers and multicast cards add no wind-down.
+var _in_payload: bool = false
 ## Slots that did something in some cast, so they are not listed as wasted for the staff.
 var _useful: Dictionary = {}
 
@@ -75,7 +77,7 @@ func compile(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 	while _has_card_from(cursor) and _out.casts.size() < _count + 1:
 		var cast: CompiledCast = _read_cast(cursor, staff)
 		_out.casts.append(cast)
-		if cast.recharges:
+		if cast.ends_cycle:
 			break
 		cursor = _pos
 	for cast in _out.casts:
@@ -92,12 +94,13 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 	_used.resize(_count)
 	_pos = start
 	_reached_end = false
+	_in_payload = false
 	_cast.group = _read_group(staff.draw if staff != null else 1, false)
-	_cast.recharges = _reached_end or not _has_card_from(_pos)
-	_cast.delay += staff.cast_delay if staff != null else 0.0
-	if _cast.recharges and staff != null:
-		_cast.delay += staff.recharge
-	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.delay), ", then recharge" if _cast.recharges else ""]
+	_cast.ends_cycle = _reached_end or not _has_card_from(_pos)
+	_cast.delay = _cast.wind_down
+	if _cast.ends_cycle and staff != null:
+		_cast.delay += staff.cooldown
+	_cast.description = "%s. %s mana, %s s%s." % [_group_text(_cast.group), _number(_cast.mana), _number(_cast.wind_down), (", then %s s cooldown" % _number(staff.cooldown)) if _cast.ends_cycle and staff != null and staff.cooldown > 0.0 else ""]
 	_cast.sense = CastSense.of(_cast)
 	return _cast
 
@@ -105,6 +108,8 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 ## Reads one group that wants `want` carriers. `payload` is true for a trigger's (or a payload
 ## carrier's) group, whose fallback is the payload's origin instead of the caster.
 func _read_group(want: int, payload: bool) -> CompiledGroup:
+	var outer_payload: bool = _in_payload
+	_in_payload = payload
 	var group := CompiledGroup.new()
 	var elements: Array[ElementBase] = []
 	var modifiers: Array[ModifierBase] = []
@@ -137,7 +142,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		elif card is FormBase:
 			var form := card as FormBase
 			var on: Carrier = Carriers.of(form.carrier)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers)
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -168,6 +173,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			group.spells.append(fallback)
 			landed = 1
 	_take_multicasts(group, multicasts, maxi(found + landed - asked, 0), found)
+	_in_payload = outer_payload
 	return group
 
 
@@ -195,7 +201,8 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 		group.multicast_slots.append(slot)
 		_useful[slot] = true
 		_cast.mana += multicast.mana_cost
-		_cast.delay += multicast.cooldown
+		if not _in_payload:
+			_cast.wind_down += multicast.wind_down
 		match multicast.mode:
 			MulticastBase.Mode.SCATTER:
 				group.scatter = true
@@ -213,7 +220,7 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 	var never: bool = not keep_wasted and not _trigger_fires(trigger, form, elements, modifiers)
 	var first: int = _cast.slots.size()
 	var mana: float = _cast.mana
-	var delay: float = _cast.delay
+	var wind_down: float = _cast.wind_down
 	var useful: Dictionary = _useful.duplicate() if never else {}
 	var held: CompiledGroup = _read_group(1, true)
 	if held.is_empty():
@@ -221,7 +228,7 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 	elif never:
 		_waste(trigger_slot)
 		_cast.mana = mana
-		_cast.delay = delay
+		_cast.wind_down = wind_down
 		for at: int in _cast.slots.slice(first):
 			_cast.targets.erase(at)
 			if not useful.has(at):
@@ -245,7 +252,7 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 ## nothing lands and every one is wasted.
 func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kept: PackedInt32Array, payload: bool) -> CompiledSpell:
 	var on: Carrier = Carriers.fallback(payload)
-	var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers)
+	var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload)
 	var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 	if kept_modifiers.is_empty() and kept_elements.is_empty():
 		for at: int in kept:
@@ -260,8 +267,9 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 ## The modifiers of `modifiers` that do something on the carrier `on`, in order (every one with
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
-## a form's carrier and a fallback alike.
-static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase]) -> Array[ModifierBase]:
+## a form's carrier and a fallback alike. `payload`: the carrier is a payload's, which adds no
+## wind-down to a staff.
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool) -> Array[ModifierBase]:
 	var deflects: bool = false
 	var blasts: bool = false
 	for modifier in modifiers:
@@ -270,7 +278,7 @@ static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase]) -> Array[
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload)
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -319,7 +327,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false)
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false)
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
@@ -329,19 +337,19 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 
 ## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
-## uses that number: a shorter cooldown where it has one of its own (`Carrier.has_cooldown`, not a
-## fallback carrier), damage where it hits (or blasts), speed and lifetime where it moves or lasts,
+## uses that number: a shorter wind-down where it adds one to its staff (`Carrier.has_wind_down`:
+## not a fallback carrier, and not a payload's carrier, `payload`), damage where it hits (or blasts), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) -> bool:
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
 	if not is_equal_approx(modifier.radius_mult, 1.0):
 		return true
-	if modifier.cooldown_mult < 1.0:
+	if modifier.wind_down_mult < 1.0:
 		any = true
-		if on.has_cooldown():
+		if on.has_wind_down() and not payload:
 			return true
 	if modifier.damage_mult > 1.0:
 		any = true
@@ -386,7 +394,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.behaviours.resize(ModifierBase.Behaviour.size())
 	var damage: float = SpellLimits.FALLBACK_DAMAGE
 	var mana: float = 0.0
-	var cooldown: float = 0.0
+	var wind_down: float = 0.0
 	var speed: float = 0.0
 	var radius: float = SpellLimits.FALLBACK_RADIUS
 	var shots: int = 1
@@ -412,7 +420,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.body = BODIES.get(form.shot_body, 0)
 		damage = form.base_damage
 		mana = form.mana_cost
-		cooldown = form.cooldown
+		wind_down = form.wind_down
 		speed = form.speed
 		radius = form.radius
 		shots = form.shots
@@ -436,7 +444,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.modifier_ids.append(modifier.id)
 		damage *= modifier.damage_mult
 		mana *= modifier.mana_mult
-		cooldown *= modifier.cooldown_mult
+		wind_down *= modifier.wind_down_mult
 		speed *= modifier.speed_mult
 		radius *= modifier.radius_mult
 		shots *= modifier.shot_mult
@@ -469,7 +477,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.look = _look_of(elements, modifiers)
 	spell.damage = maxf(damage, SpellLimits.MIN_DAMAGE)
 	spell.mana_cost = mana
-	spell.cooldown = maxf(cooldown, 0.0)
+	spell.wind_down = maxf(wind_down, 0.0)
 	spell.speed = speed
 	spell.radius = radius
 	spell.shots = shots
@@ -517,7 +525,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		if spell.echo_hit != null:
 			spell.echo_zap_hit = zap_hit(spell.echo_hit)
 	_cast.mana += spell.mana_cost
-	_cast.delay += spell.cooldown
+	if not _in_payload:
+		_cast.wind_down += spell.wind_down
 	return spell
 
 

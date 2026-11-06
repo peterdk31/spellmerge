@@ -9,11 +9,16 @@ var group: CompiledGroup = null
 var slots: PackedInt32Array = PackedInt32Array()
 ## Mana the cast takes: every carrier, payloads included, and its multicast cards.
 var mana: float = 0.0
-## Seconds before the staff may cast again: the staff's delay, every carrier's cooldown and
-## the multicast cards', plus the staff's recharge when `recharges`.
+## Seconds the staff is busy after the cast leaves (docs/milestones/cast-timing.md): the
+## wind-down of every carrier of its own group (times its modifiers' `wind_down_mult`) and its
+## multicast cards'. A payload adds none: no staff waits on it.
+var wind_down: float = 0.0
+## Seconds the staff waits after this cast in all: `wind_down`, plus the staff's `cooldown` when
+## `ends_cycle`.
 var delay: float = 0.0
-## True when the staff starts over after this cast (it reached the end of its cards).
-var recharges: bool = false
+## True when the staff starts over after this cast (it reached the end of its cards); its
+## cooldown follows.
+var ends_cycle: bool = false
 ## True when the reading went past the last slot and on from the first.
 var wrapped: bool = false
 ## What each modifier, infusion and trigger read in this cast attached to: card slot -> the

@@ -53,8 +53,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_staff = StaffBase.new()
 	_staff.slots = CARDS
-	_staff.cast_delay = 0.1
-	_staff.recharge = 0.5
+	_staff.cooldown = 0.5
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	_hud.events = _bus
 	_hud.save = SaveFile.new(NO_SAVE)

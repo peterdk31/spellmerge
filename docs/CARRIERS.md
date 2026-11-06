@@ -88,8 +88,9 @@ the same needs as on every carrier: both `HITS` (one strike of everything within
 `SpellLimits.FALLBACK_RADIUS`, or the blast's strength, the caster too), and only `caster`
 `MEETS_SHOTS` (its shield is the caster's barrier, its deflect turns the shots round the caster as
 it is cast; a point guards no one). Neither flies, moves, stays, lasts or steers, and neither has a
-cooldown of its own (`has_cooldown`), so homing, bounce, hold, split or a shorter cooldown are wasted
-there, and chain, pull, possess, relay, penta and mirror work. The runtime launches them like any
+wind-down of its own (`has_wind_down`), so homing, bounce, hold, split or a shorter wind-down are
+wasted there (a shorter wind-down is wasted on any payload's carrier too: no staff waits on a
+payload; docs/milestones/cast-timing.md), and chain, pull, possess, relay, penta and mirror work. The runtime launches them like any
 other carrier, so echo strikes again, recoil pushes, mirror strikes twice and penta strikes from a
 ring. When none of the cards does anything there, nothing lands and every one is wasted.
 

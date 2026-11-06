@@ -48,8 +48,8 @@ signal staff_built(at: int)
 
 ## How many staffs (1-4): a wizard has four, an enemy one.
 @export_range(1, 4) var staff_count: int = 1
-## The staff of a button with none in `staffs` (its slots, delay, recharge and mana pool);
-## without one a staff has 4 slots, casts with no delay of its own and has StaffBase's default
+## The staff of a button with none in `staffs` (its slots, wind-up, cooldown and mana pool);
+## without one a staff has 4 slots, adds no wind-up or cooldown of its own and has StaffBase's default
 ## pool.
 @export var staff: StaffBase = null
 ## The staff of each button (a player's four heads); shorter or null entries fall back to `staff`.
@@ -416,8 +416,8 @@ func _staff_or_plain() -> StaffBase:
 	if _plain == null:
 		_plain = StaffBase.new()
 		_plain.slots = SpellLimits.STAFFS
-		_plain.cast_delay = 0.0
-		_plain.recharge = 0.0
+		_plain.wind_up = 0.0
+		_plain.cooldown = 0.0
 	return _plain
 
 

@@ -53,7 +53,7 @@ func before_each() -> void:
 	_form(&"slow", 5, 60.0, 5.0)
 	_form(&"short", 5, 300.0, 0.1)
 	var heavy: FormBase = _form(&"heavy", 5, 300.0, 1.0)
-	heavy.cooldown = 2.0
+	heavy.wind_down = 2.0
 	var ring: FormBase = _form(&"ring", 5, 300.0, 1.0)
 	ring.shots = 24
 	ring.spread = 360.0

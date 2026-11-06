@@ -32,7 +32,7 @@ func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetim
 	form.speed = 100.0
 	form.ray_length = 100.0
 	form.lifetime = lifetime
-	form.cooldown = 0.05
+	form.wind_down = 0.05
 	form.staff_pose = keys
 	(arena.registry.get("_resources")[&"spells"] as Dictionary)[id] = form
 	return form

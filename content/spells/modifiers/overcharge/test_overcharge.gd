@@ -53,7 +53,7 @@ func test_it_doubles_damage_and_mana() -> void:
 		return
 	check_equal(charged.damage, plain.damage * 2, "twice the damage")
 	check(is_equal_approx(charged.mana_cost, plain.mana_cost * 2.0), "twice the mana (%s)" % charged.mana_cost)
-	check(is_equal_approx(charged.cooldown, plain.cooldown), "the same delay")
+	check(is_equal_approx(charged.wind_down, plain.wind_down), "the same delay")
 
 
 func test_an_overcharged_bolt_hurts_twice_as_much() -> void:

@@ -10,8 +10,9 @@ extends Node
 ## (`hold`) carriers switched off.
 ##
 ## Casting: `cast_staff(actor, staff, origin, direction, mana)` fires the next cast of the
-## staff's cycle and returns the mana spent or `REFUSED`; delays (the staff's own, every
-## carrier's cooldown, the recharge after the last cast) are per actor and staff and tick in
+## staff's cycle and returns the mana spent or `REFUSED`; the wait after it (its carriers'
+## wind-down, and the staff's cooldown after the cycle's last cast; docs/milestones/
+## cast-timing.md) is per actor and staff and ticks in
 ## `step` (physics). A cast is a group: its carriers leave along the aim; each carrier's shots are
 ## a fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
 ## compiler; homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
@@ -534,7 +535,7 @@ func card_works(card_id: StringName, carrier: StringName) -> bool:
 
 
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
-## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
+## makes until its cycle ends (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
 ## card is listed in `wasted`.
 func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
@@ -543,7 +544,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
-## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
+## (read order), `text`, `mana`, `wind_down` (the seconds its staff is busy after it), `delay` (the wait in all: the wind-down, and the staff's cooldown when the cycle ends with it), `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `ends_cycle`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
 ## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
 ## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
@@ -553,9 +554,9 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var casts: Array[Dictionary] = []
 	for cast in compiled.casts:
 		casts.append({
-			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
+			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "wind_down": cast.wind_down, "delay": cast.delay,
 			"damage": _cast_damage(cast),
-			"recharges": cast.recharges, "wrapped": cast.wrapped,
+			"ends_cycle": cast.ends_cycle, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
 			"tree": cast_tree(cast),
 		})
@@ -655,7 +656,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
 		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
 		out.append("Mana " + _short(form.mana_cost))
-		out.append("Delay %ss" % _short(form.cooldown))
+		out.append("Delay %ss" % _short(form.wind_down))
 	elif component is ModifierBase:
 		var modifier: ModifierBase = component
 		var words: Dictionary = {
@@ -671,7 +672,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 			out.append("Pierce +%d" % modifier.extra_pierce)
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
-			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
+			["Delay", modifier.wind_down_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
 			["Spread", modifier.spread_mult], ["Reach", modifier.reach_mult],
 		]
 		for pair: Array in mults:
@@ -891,7 +892,7 @@ func cooldown_left(actor: int, slot: int) -> float:
 	return _cooldown[actor * SpellLimits.STAFFS + slot] if _in_range(actor, slot) else 0.0
 
 
-## Which cast of its cycle this actor's staff makes next (0 after a recharge).
+## Which cast of its cycle this actor's staff makes next (0 once its cycle ended).
 func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
@@ -930,9 +931,8 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if compiled == null or compiled.is_empty() or _cooldown[index] > 0.0:
 		return REFUSED
 	if not _hold_tags[index].is_empty():
+		# The switch-off press frees the staff at once (docs/milestones/cast-timing.md).
 		_release_hold(index)
-		_cooldown[index] = compiled.staff.cast_delay if compiled.staff != null else 0.0
-		_cooldown_rows = maxi(_cooldown_rows, index + 1)
 		return 0.0
 	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
 	if mana < cast.mana:
@@ -961,7 +961,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> void:
 	_cooldown[index] = cast.delay
 	_cooldown_rows = maxi(_cooldown_rows, index + 1)
-	_cursor[index] = 0 if cast.recharges else (_cursor[index] + 1) % compiled.casts.size()
+	_cursor[index] = 0 if cast.ends_cycle else (_cursor[index] + 1) % compiled.casts.size()
 
 
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for

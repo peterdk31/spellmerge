@@ -65,10 +65,11 @@ func required_fields() -> Dictionary:
 	return {}
 
 
-## True when a cast of it adds a cooldown of its own to its staff's delay (its form card's
-## `cooldown`), so a card's cooldown factor changes something: every carrier a form card fires,
-## not a fallback carrier (`CarrierFallback`), which has no form card.
-func has_cooldown() -> bool:
+## True when a cast of it adds a wind-down of its own to its staff's (its form card's
+## `wind_down`), so a card's wind-down factor changes something: every carrier a form card fires,
+## not a fallback carrier (`CarrierFallback`), which has no form card. A payload's carrier adds
+## none either; the compiler knows that one (`StaffCompiler._numbers_count`).
+func has_wind_down() -> bool:
 	return true
 
 

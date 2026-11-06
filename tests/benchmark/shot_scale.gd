@@ -270,8 +270,7 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	_feel.set_process(false)
 	var plain := StaffBase.new()
 	plain.slots = maxi(_cards.size(), 1)
-	plain.cast_delay = 0.0
-	plain.recharge = 0.0
+	plain.cooldown = 0.0
 	var built: CompiledStaff = _spells.compile_staff(_cards, plain)
 	if built.is_empty():
 		_fail("the cards %s cast nothing" % ",".join(_cards))

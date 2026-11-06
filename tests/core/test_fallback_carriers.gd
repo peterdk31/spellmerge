@@ -18,7 +18,7 @@ func test_they_are_carriers_no_form_card_fires() -> void:
 	check_equal(there.id(), Carriers.AT_POINT, "a payload lands on its origin")
 	check(on_you.hits() and there.hits(), "both strike what is there")
 	check(on_you.has(CarrierTraits.MEETS_SHOTS) and not there.has(CarrierTraits.MEETS_SHOTS), "only the caster meets the shots that reach it")
-	check(not on_you.has_cooldown() and not there.has_cooldown(), "no form card gives them a cooldown")
+	check(not on_you.has_wind_down() and not there.has_wind_down(), "no form card gives them a cooldown")
 	for id: StringName in [Carriers.ON_CASTER, Carriers.AT_POINT]:
 		check(not Carriers.ids().has(id), "%s is not among the carriers a form card may fire" % id)
 		check(not Carriers.exists(id), "and a form card naming %s is refused" % id)

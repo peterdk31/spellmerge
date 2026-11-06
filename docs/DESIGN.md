@@ -20,7 +20,7 @@ Spellmerge is a 2D top-down action roguelite for 1–4 co-op players (local co-o
 | Element | Role |
 | --- | --- |
 | Staff | The player character is a living staff (the owner, 2026-10-28): a floating face and four personalities, one per staff button, each with its own head and face. Cosmetics only beyond that. |
-| Staffs | Four per player, one per shoulder button (RB, RT, LB, LT; the face buttons work the menus). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
+| Staffs | Four per player, one per shoulder button (RB, RT, LB, LT; the face buttons work the menus). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, wind-up and cooldown (docs/milestones/cast-timing.md). |
 | Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
 | Relics | Passives found in runs, some altering how cards behave. |
 

@@ -183,8 +183,7 @@ static func plain_staff(slots: int) -> StaffBase:
 	var staff := StaffBase.new()
 	staff.id = &"arena"
 	staff.slots = clampi(slots, 1, 64)
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	return staff
 
 

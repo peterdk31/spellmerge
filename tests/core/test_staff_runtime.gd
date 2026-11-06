@@ -53,10 +53,9 @@ func before_each() -> void:
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 20
-	_staff.cast_delay = 0.1
-	_staff.recharge = 0.5
+	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
-	bolt.cooldown = 0.2
+	bolt.wind_down = 0.2
 	var nova: FormBase = _form(&"nova", 300.0, 1.0)
 	nova.shots = 8
 	nova.spread = 360.0
@@ -130,18 +129,18 @@ func _wait_ready(player: int, staff: int) -> void:
 		guard += 1
 
 
-func test_a_staff_casts_its_cycle_in_order_then_recharges() -> void:
+func test_a_staff_casts_its_cycle_in_order_then_cools_down() -> void:
 	_install(0, 1, "fire bolt nova")
 	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), 2.0, "cast 1 spends the bolt's mana")
 	check_equal(_mgr.get_count(), 1, "one bolt")
-	check(is_equal_approx(_spells.cooldown_left(0, 1), 0.1 + 0.2), "the staff's delay plus the bolt's cooldown, got %s" % _spells.cooldown_left(0, 1))
-	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "refused while in its delay")
+	check(is_equal_approx(_spells.cooldown_left(0, 1), 0.2), "the bolt's wind-down, got %s" % _spells.cooldown_left(0, 1))
+	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "refused while it winds down")
 	check_equal(_spells.cast_index(0, 1), 1, "the nova is next")
 	_wait_ready(0, 1)
 	_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0)
 	check_equal(_mgr.get_count(), 9, "eight nova shots joined the bolt")
 	check_equal(_spells.cast_index(0, 1), 0, "after the last card the staff starts over")
-	check(_spells.cooldown_left(0, 1) >= 0.5, "and recharges")
+	check(_spells.cooldown_left(0, 1) >= 0.5, "after its wind-down and the staff's cooldown")
 
 
 func test_a_cast_needs_its_mana() -> void:
@@ -204,6 +203,8 @@ func test_hold_keeps_its_shots_and_reserves_mana_until_switched_off() -> void:
 	check(not _spells.is_holding(0, 0), "it is off")
 	check_equal(_mgr.get_count(), 0, "its shot is gone")
 	check_equal(_reserved.get(0, -1.0), 0.0, "and the mana is free")
+	check_equal(_spells.cooldown_left(0, 0), 0.0, "and the switch-off press leaves the staff free at once")
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 2.0, "so the next press casts again straight away")
 
 
 func test_editing_a_staff_switches_its_hold_off() -> void:

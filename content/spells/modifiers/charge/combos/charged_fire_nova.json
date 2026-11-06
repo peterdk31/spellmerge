@@ -1,0 +1,9 @@
+{
+	"id": "charged_fire_nova",
+	"name": "Charged fire nova",
+	"does": "A fire nova that winds up two seconds, then bursts four times as hard round the caster and burns every imp near.",
+	"casts": [{"staff": 0, "cards": ["charge", "fire", "nova"]}],
+	"imps": [[40, 0], [-40, 0], [0, 40]],
+	"seconds": 3.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

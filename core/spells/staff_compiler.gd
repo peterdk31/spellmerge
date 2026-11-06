@@ -112,6 +112,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 	# The triggers kept for the next carrier, in slot order; each takes its own payload.
 	var triggers: Array[TriggerBase] = []
 	var trigger_slots: PackedInt32Array = PackedInt32Array()
+	# The multicast cards read, in slot order; whether each did anything is known at the end.
+	var multicasts: PackedInt32Array = PackedInt32Array()
+	# The carriers the group asked for before any multicast, and the ones it found.
+	var asked: int = want
+	var found: int = 0
 	while want > 0:
 		var slot: int = _next_slot()
 		if slot < 0:
@@ -124,19 +129,8 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			modifiers.append(card as ModifierBase)
 			kept.append(slot)
 		elif card is MulticastBase:
-			var multicast := card as MulticastBase
-			group.multicast_ids.append(multicast.id)
-			group.multicast_slots.append(slot)
-			_useful[slot] = true
-			_cast.mana += multicast.mana_cost
-			_cast.delay += multicast.cooldown
-			want += multicast.extra_draws
-			match multicast.mode:
-				MulticastBase.Mode.SCATTER:
-					group.scatter = true
-				MulticastBase.Mode.BURST:
-					group.repeats *= maxi(multicast.repeats, 1)
-					group.repeat_interval = maxf(group.repeat_interval, multicast.repeat_interval)
+			multicasts.append(slot)
+			want += (card as MulticastBase).extra_draws
 		elif card is TriggerBase:
 			triggers.append(card as TriggerBase)
 			trigger_slots.append(slot)
@@ -161,14 +155,53 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			triggers = []
 			trigger_slots = PackedInt32Array()
 			want -= 1
+			found += 1
 	# Triggers with no carrier after them are wasted.
 	for at: int in trigger_slots:
 		_waste(at)
+	# The fallback carrier is one the group drew too: a multicast that kept it reading pulled the
+	# cards that landed there into this cast (`triple · bolt · fire`: the fire lands on you now).
+	var landed: int = 0
 	if not elements.is_empty() or not modifiers.is_empty():
 		var fallback: CompiledSpell = _fallback(elements, modifiers, kept, payload)
 		if fallback != null:
 			group.spells.append(fallback)
+			landed = 1
+	_take_multicasts(group, multicasts, maxi(found + landed - asked, 0), found)
 	return group
+
+
+## The multicast cards of `group` (`slots`, in slot order) after it was read: `extra` carriers came
+## beyond what the group asked for (its fallback carrier counts), `found` of a form card's. Those
+## carriers go to the cards in slot order, each up to its `extra_draws`. A card works when it got one of them, or for what else it does: a
+## burst repeats a group that fires anything, a scatter turns the carriers it has. Any other is
+## wasted (owner, 2026-11-06: one that adds no carrier at all; one that adds fewer than it asks for
+## still works) and costs nothing. A card that works joins the group: its cost, its mode.
+func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int, found: int) -> void:
+	for slot: int in slots:
+		var multicast := _cards[slot] as MulticastBase
+		var got: int = mini(multicast.extra_draws, extra)
+		extra -= got
+		var works: bool = got > 0
+		match multicast.mode:
+			MulticastBase.Mode.BURST:
+				works = works or (multicast.repeats > 1 and not group.is_empty())
+			MulticastBase.Mode.SCATTER:
+				works = works or found > 0
+		if not works and not keep_wasted:
+			_waste(slot)
+			continue
+		group.multicast_ids.append(multicast.id)
+		group.multicast_slots.append(slot)
+		_useful[slot] = true
+		_cast.mana += multicast.mana_cost
+		_cast.delay += multicast.cooldown
+		match multicast.mode:
+			MulticastBase.Mode.SCATTER:
+				group.scatter = true
+			MulticastBase.Mode.BURST:
+				group.repeats *= maxi(multicast.repeats, 1)
+				group.repeat_interval = maxf(group.repeat_interval, multicast.repeat_interval)
 
 
 ## Reads the payload of `trigger` (in `trigger_slot`) on the carrier `spell` (in `form`): the group

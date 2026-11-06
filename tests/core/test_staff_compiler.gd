@@ -322,6 +322,41 @@ func test_payloads_nest_before_the_next_trigger_reads() -> void:
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "then on expire takes the fire bolt")
 
 
+func test_a_multicast_that_adds_no_carrier_is_wasted() -> void:
+	# Owner, 2026-11-06: a multicast whose extra draws find no carrier adds none, so it is wasted and
+	# costs nothing; one that finds fewer than it asks for still works.
+	(_fake.items[&"double"] as MulticastBase).mana_cost = 3.0
+	var staff: CompiledStaff = _compile("double fire")
+	check(staff.wasted.has(0), "a double with nothing to draw is wasted: %s" % staff.wasted)
+	check(not staff.wasted.has(1), "the fire still lands on the caster")
+	check(staff.casts[0].group.multicast_ids.is_empty(), "the group has no multicast")
+	check_equal(staff.casts[0].mana, 0.0, "and pays nothing for it")
+	staff = _compile("double bolt")
+	check(staff.wasted.has(0), "a double with one bolt is wasted too: %s" % staff.wasted)
+	_multicast(&"triple", 2, MulticastBase.Mode.TOGETHER)
+	staff = _compile("triple bolt bolt")
+	check(not staff.wasted.has(0), "a triple that finds one more bolt of its two works")
+	staff = _compile("double triple bolt bolt")
+	check(not staff.wasted.has(0), "the first multicast takes the extra bolt")
+	check(staff.wasted.has(1), "the second finds none: %s" % staff.wasted)
+	staff = _compile("triple bolt fire")
+	check(not staff.wasted.has(0), "a triple that reads on to cards with no carrier draws the caster's fallback: %s" % staff.wasted)
+	check_equal(staff.casts.size(), 1, "the fire lands on the caster in the same cast")
+
+
+func test_a_burst_or_scatter_works_without_adding_a_carrier() -> void:
+	var staff: CompiledStaff = _compile("burst fire")
+	check(not staff.wasted.has(0), "a burst repeats the strike on the caster")
+	check_equal(staff.casts[0].group.repeats, (_fake.items[&"burst"] as MulticastBase).repeats, "the group repeats")
+	staff = _compile("burst on_hit")
+	check(staff.wasted.has(0), "a burst of a group with nothing in it is wasted: %s" % staff.wasted)
+	staff = _compile("scatter bolt")
+	check(not staff.wasted.has(0), "a scatter turns the one bolt it has")
+	check(staff.casts[0].group.scatter, "the group scatters")
+	staff = _compile("scatter fire")
+	check(staff.wasted.has(0), "a scatter with no carrier to turn is wasted: %s" % staff.wasted)
+
+
 func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
 	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double nova nova bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")

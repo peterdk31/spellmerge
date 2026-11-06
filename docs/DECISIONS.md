@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-06: A row hits as the launch that made it (owner: "can we fix this more elegantly?")
+
+- **Before:** a held beam's later ticks, a swing's or slam's later sweep, a dash's pass, a shot's zaps and a teleport's landing hit in their carrier's own steps, when no caster is set, so a pull (or a swap's zap) on those hits moved the wizard even when a decoy, or a shot, had cast them. A chain jump from a shot's hit was registered with whatever caster was current when the hit came, the wizard's own, so a decoy's or a payload's jump returned to, and pulled, the wizard.
+- **Now:** everything a launch makes remembers who cast it. A row keeps the caster and seq it was launched with (the beam, swing and slam already did; a dash's pass now does), and each step of it runs between `CarrierKit.cast_as(caster, seq)` and `cast_done()`: one pair, at each carrier's step loop (and a beam's zap, a shot's zap, a move's landing), on one stack in `SpellRuntime` (`_cast_as`, `_cast_done`; scratch, no allocation once grown). The four places that swapped the caster by hand (`_launch_as`, `_penta`, `_run_pending`, a waiting fire in `_fire`) use the same pair.
+- **A chain jump belongs to the shot it jumped from (owner, same day):** the handling of a hit (`Spells._on_hit`) runs between the same pair, as that shot's caster (`shot_caster`; a ray's hit as the caster already casting it), so the jump shots it makes are cast by what cast that shot: they return to it, and their hits pull it. A jump of a ray waits in the jump queue with that caster (`_jq_caster`, `_jq_caster_seq`) and is cast by it, or by the point once a shot that cast it has ended (`_live_caster`). A payload the hit fires is still cast as `payload_cast_by` says (that shot while it flies on, else the point): it passes its own caster. No combo in the catalogue changes: every chain in it is the wizard's own cast, whose jumps were and are the wizard's.
+- **Unchanged:** a payload a row's hit fires is still cast by the point where it hit (`Carrier.payload_cast_by`); only what reads the caster on the hit itself (pull, a swap's zap) changed.
+
 ## 2026-11-06: A decoy is a regular actor; a body that fires a payload casts it (owner's decision)
 
 - **Before:** a decoy guarded itself with a guard of its own (`CarrierDecoy.guard_decoy`, every step, Entities' `_shield`/`_deflect` and `DECOY_GUARD`): a shield stopped shots within 16 px while its charges lasted, a deflect turned them for its whole life. Cards a payload read with no carrier after them always landed on a point, so a shield or a deflect in any payload was wasted.

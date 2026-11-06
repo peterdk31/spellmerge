@@ -199,7 +199,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies", &"_hurt_firing"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 
@@ -369,6 +369,10 @@ const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
 const CASTER_BODIES: int = -3
 var _caster: int = CASTER_BODY
 var _caster_seq: int = 0
+## The casters set aside while another casts (`_cast_as`, `_cast_done`): caster and seq side by
+## side, `_outer_count` pairs deep. Empty between calls.
+var _outer: PackedInt64Array = PackedInt64Array()
+var _outer_count: int = 0
 ## The shots cast by another actor's body (`_follow_body`): slot, birth and that body, `_fl_count`.
 var _fl_slot: PackedInt32Array = PackedInt32Array()
 var _fl_seq: PackedInt64Array = PackedInt64Array()
@@ -420,7 +424,8 @@ var _entity_keys: int = 0
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
 ## would recurse as deep as it jumps). The outermost beam casts them, first in first out, once
 ## its own `ray()` has returned. A ring of JUMP_QUEUE rows that doubles when it is full
-## (`_grow_jumps`), so no jump is lost and a busy frame allocates only the first time.
+## (`_grow_jumps`), so no jump is lost and a busy frame allocates only the first time. Each keeps
+## who cast the hit it jumps from (`_jq_caster`, `_jq_caster_seq`), and is cast by it.
 const JUMP_QUEUE: int = 64
 var _jq_spell: Array[CompiledSpell] = []
 var _jq_target: Array[Node2D] = []
@@ -432,6 +437,8 @@ var _jq_len: PackedFloat32Array = PackedFloat32Array()
 var _jq_chain: PackedInt32Array = PackedInt32Array()
 var _jq_prev: PackedInt64Array = PackedInt64Array()
 var _jq_hit: Array[HitProfile] = []
+var _jq_caster: PackedInt32Array = PackedInt32Array()
+var _jq_caster_seq: PackedInt64Array = PackedInt64Array()
 var _jq_head: int = 0
 var _jq_count: int = 0
 var _jq_busy: bool = false
@@ -514,6 +521,8 @@ func _init() -> void:
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
 	_jq_hit.resize(JUMP_QUEUE)
+	_jq_caster.resize(JUMP_QUEUE)
+	_jq_caster_seq.resize(JUMP_QUEUE)
 	_lc_grow(64)
 	_zappers.resize(64)
 	_magnets.resize(64)
@@ -1323,17 +1332,34 @@ func _live_caster(caster: int, seq: int) -> int:
 	return caster
 
 
-## `_launch_group` cast by `caster` (see `_caster`; one that can no longer cast leaves the point,
-## `_live_caster`), a body's launch following that body. The caster from before is set again
-## afterwards.
-func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int, seq: int) -> int:
-	var saved: int = _caster
-	var saved_seq: int = _caster_seq
-	_caster = _live_caster(caster, seq)
+## Everything from here to the matching `_cast_done` is cast by `caster` (the shot born `seq` when
+## it is a slot): a launch, and a row's later step that hits as the launch that made it did (a
+## beam, swing, slam or dash, `CarrierKit.cast_as`), so whatever reads the caster then (a pull, a
+## swap, a payload, recoil) reads the one that cast it (owner, 2026-11-06: everything a launch
+## makes remembers who cast it). The caster from before waits on `_outer`, a stack.
+func _cast_as(caster: int, seq: int) -> void:
+	if _outer_count * 2 + 2 > _outer.size():
+		_outer.resize(maxi(_outer.size() * 2, 16))
+	_outer[_outer_count * 2] = _caster
+	_outer[_outer_count * 2 + 1] = _caster_seq
+	_outer_count += 1
+	_caster = caster
 	_caster_seq = seq
+
+
+## Ends the newest `_cast_as`: the caster from before casts again.
+func _cast_done() -> void:
+	_outer_count -= 1
+	_caster = _outer[_outer_count * 2]
+	_caster_seq = _outer[_outer_count * 2 + 1]
+
+
+## `_launch_group` cast by `caster` (see `_caster`; one that can no longer cast leaves the point,
+## `_live_caster`), a body's launch following that body.
+func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int, seq: int) -> int:
+	_cast_as(_live_caster(caster, seq), seq)
 	var made: int = _launch_group(group, actor, staff, generation, origin, heading, source, body_of(_caster, actor) >= 0)
-	_caster = saved
-	_caster_seq = saved_seq
+	_cast_done()
 	return made
 
 
@@ -1516,9 +1542,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 		# A ring of shots (a nova) is not aimed, but its shots fly this far.
 		carried = spell.speed * spell.lifetime
 	var radius: float = minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING
-	var outer_caster: int = _caster
-	var outer_seq: int = _caster_seq
-	_caster = CASTER_POINT
+	_cast_as(CASTER_POINT, 0)
 	var made: int = 0
 	_ring_centre = centre
 	_ring_radius = radius
@@ -1532,8 +1556,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	_ring_angle = 0.0
 	_ring_turn = 0.0
 	_ring_centre = Vector2.ZERO
-	_caster = outer_caster
-	_caster_seq = outer_seq
+	_cast_done()
 	return made
 
 
@@ -1661,10 +1684,7 @@ func _run_pending() -> void:
 		var wound: bool = launch.wound
 		_scatter.seed = launch.seed
 		_release_launch(launch)
-		var saved: int = _caster
-		var saved_seq: int = _caster_seq
-		_caster = caster
-		_caster_seq = caster_seq
+		_cast_as(caster, caster_seq)
 		if landing != null:
 			_carrier_of(landing).land(landing, group, actor, staff, generation, origin, heading, echoed)
 		elif wound:
@@ -1679,8 +1699,7 @@ func _run_pending() -> void:
 			if holder >= 0 and _aim_dir[holder].is_finite():
 				heading = _aim_dir[holder]
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed, true)
-		_caster = saved
-		_caster_seq = saved_seq
+		_cast_done()
 		if keeps:
 			_generation_gone(SpellTag.make(actor, staff, 0, generation))
 
@@ -2038,7 +2057,10 @@ func _cast_jumps() -> void:
 		_jq_hit[at] = null
 		if spell == null or not is_instance_valid(target):
 			continue
+		# Cast by what cast the hit it jumps from, as it can cast now (`_live_caster`).
+		_cast_as(_live_caster(_jq_caster[at], _jq_caster_seq[at]), _jq_caster_seq[at])
 		_shoot_ray(spell, _jq_tag[at], _jq_actor[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], hit)
+		_cast_done()
 	_jq_busy = false
 
 
@@ -2055,6 +2077,8 @@ func _grow_jumps() -> void:
 	var chains := PackedInt32Array()
 	var prevs := PackedInt64Array()
 	var hits: Array[HitProfile] = []
+	var casters := PackedInt32Array()
+	var caster_seqs := PackedInt64Array()
 	for n in size * 2:
 		var at: int = (_jq_head + n) % size
 		var kept: bool = n < _jq_count
@@ -2068,6 +2092,8 @@ func _grow_jumps() -> void:
 		chains.append(_jq_chain[at] if kept else 0)
 		prevs.append(_jq_prev[at] if kept else 0)
 		hits.append(_jq_hit[at] if kept else null)
+		casters.append(_jq_caster[at] if kept else CASTER_POINT)
+		caster_seqs.append(_jq_caster_seq[at] if kept else 0)
 	_jq_spell = spells
 	_jq_target = targets
 	_jq_tag = tags
@@ -2078,6 +2104,8 @@ func _grow_jumps() -> void:
 	_jq_chain = chains
 	_jq_prev = prevs
 	_jq_hit = hits
+	_jq_caster = casters
+	_jq_caster_seq = caster_seqs
 	_jq_head = 0
 
 
@@ -2121,14 +2149,10 @@ func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Ve
 	var budget: int = _budget(actor)
 	var seq: int = projectiles.get_seq_of(caster) if caster >= 0 else 0
 	if _fires_used[budget] > 0 and _fires_used[budget] + cost > fire_shots_per_step:
-		var saved: int = _caster
-		var saved_seq: int = _caster_seq
-		_caster = _live_caster(caster, seq)
-		_caster_seq = seq
+		_cast_as(_live_caster(caster, seq), seq)
 		var launch: PendingLaunch = _delay(0.0, group, null, actor, staff, generation, at, heading, source, body_of(_caster, actor) >= 0)
 		launch.cost = cost
-		_caster = saved
-		_caster_seq = saved_seq
+		_cast_done()
 		fires_waited += 1
 		return
 	_fires_used[budget] += cost
@@ -2577,7 +2601,11 @@ func _step_magnets() -> void:
 ## `zap_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body.
 func _zap(slot: int, spell: CompiledSpell, aim: Vector2) -> void:
+	# It hits as the shot does: cast by what cast that shot.
+	var caster: int = shot_caster(slot)
+	_cast_as(caster, projectiles.get_seq_of(caster) if caster >= 0 else 0)
 	_zap_ray(spell, projectiles.get_tag_of(slot), projectiles.get_position_of(slot), aim, _rec_chain[slot], _rec_prev[slot], _rec_zap[slot] if _rec_zap[slot] != null else spell.zap_hit, slot)
+	_cast_done()
 
 
 ## A zap of the carrier `spell` with `tag` from `at` to `aim`, with `chain` jumps left after `prev`,
@@ -2636,10 +2664,15 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 		elif by_ray:
 			carried = _ray.hit
 	var struck: int = target.get_instance_id()
+	# The hit is the cast's that made it: a shot's hit is cast by what cast that shot (so its chain
+	# jumps belong to it), a ray's by the caster already casting it (its launch's or its row's).
+	var caster: int = _caster if by_ray else shot_caster(slot)
+	_cast_as(caster, _caster_seq if by_ray else (projectiles.get_seq_of(caster) if caster >= 0 else 0))
 	_on_hit_effects(spell, tag, actor, target, position, slot)
 	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot if slot >= 0 else CASTER_POINT)
 	if chain > 0:
 		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
+	_cast_done()
 
 
 ## What a hit of a carrier does besides its payload and chain: siphon refunds mana, possess takes
@@ -2711,6 +2744,8 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 		_jq_chain[end] = chain
 		_jq_prev[end] = struck
 		_jq_hit[end] = hit
+		_jq_caster[end] = _caster
+		_jq_caster_seq[end] = _caster_seq
 		return
 	# A flying jump is its carrier fired again from the hit (rules R1b, rule 2): every card it has
 	# (homing, bounce, ghost, spiral, linger, growth, sticky, return, shield, pierce, arc, magnet,
@@ -2948,6 +2983,7 @@ func clear() -> void:
 	_jq_count = 0
 	_moves.clear()
 	_caster = CASTER_BODY
+	_outer_count = 0
 	_fl_count = 0
 	for carrier: Carrier in _carriers.values():
 		carrier.clear()

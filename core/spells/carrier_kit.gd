@@ -91,6 +91,18 @@ func caster_place(actor: int, origin: Vector2) -> Vector2:
 	return _rt.projectiles.get_position_of(shot) if shot >= 0 else origin
 
 
+## What a carrier does from here to the matching `cast_done` is cast by `caster` (a value as
+## `caster()`, with `seq`, the shot's birth, for a slot): a row's later step hits as the launch that
+## made it (a held beam, a swing, a slam, a dash's pass), so its pull, swap or payload reads the
+## caster that row keeps. One pair, around each step of a row.
+func cast_as(caster: int, seq: int) -> void:
+	_rt._cast_as(caster, seq)
+
+
+func cast_done() -> void:
+	_rt._cast_done()
+
+
 ## Who cast the shot in `slot` (a value as `caster`): what its pull or swap moves.
 func shot_caster(slot: int) -> int:
 	return _rt.shot_caster(slot)

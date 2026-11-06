@@ -360,7 +360,9 @@ func step(delta: float) -> void:
 	var first_new: int = _sw_next_born
 	for at in _sw_on.size():
 		if _sw_on[at] != 0 and _sw_born[at] < first_new:
+			kit.cast_as(_sw_caster[at], _sw_caster_seq[at])
 			_swing_step(at, delta)
+			kit.cast_done()
 
 
 ## The live swings, for their look (`gameplay/feel`): `swing_slots()` rows, each on or off. A

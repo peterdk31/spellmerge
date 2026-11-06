@@ -313,7 +313,9 @@ func _zaps_due(at: int, near: int) -> void:
 func _zap(at: int, aim: Vector2) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var hit: HitProfile = _bm_zap_hit[at] if _bm_zap_hit[at] != null else spell.zap_hit
+	kit.cast_as(_bm_caster[at], _bm_caster_seq[at])
 	kit.zap(spell, _bm_tag[at], _nearest_on_line(at, aim), aim, _bm_chain[at], _bm_prev[at], hit)
+	kit.cast_done()
 
 
 ## The point of live beam `at`'s line, as far as it got, nearest to `point`.
@@ -1008,7 +1010,9 @@ func step(delta: float) -> void:
 	var first_new: int = _bm_next_born
 	for at in _bm_on.size():
 		if _bm_on[at] != 0 and _bm_born[at] < first_new:
+			kit.cast_as(_bm_caster[at], _bm_caster_seq[at])
 			_beam_step(at, delta)
+			kit.cast_done()
 	_pull_magnets()
 	_step_zaps(delta)
 

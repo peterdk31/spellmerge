@@ -353,11 +353,11 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int =
 		if count == 12 and node.name.begins_with("enemy") and (node.name.ends_with("0") or node.name.ends_with("5")):
 			_mgr.remove_target(node)
 	if tag == TAG_SPLITS and _children < 120:
-		# A payload: two children from the hit point that skip the target for a moment.
+		# A payload: two children from the hit point that skip the target until clear of it.
 		for k in 2:
 			_children += 1
 			var child: int = _mgr.spawn(caster, position, Vector2.from_angle(float(_children) * 2.3) * 140.0, 0.5, 3.0, ManagerScript.LAYER_ENEMY, 0, TAG_CHILD)
-			_mgr.exclude(child, target, 0.1)
+			_mgr.exclude(child, target)
 			_events.append("  child slot%d" % child)
 
 

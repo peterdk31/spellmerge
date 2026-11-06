@@ -3,6 +3,8 @@ extends "res://tests/support/card_rig.gd"
 ##
 ## godot --headless --path . --script res://content/spells/forms/rune/test_rune.gd
 
+const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
+
 
 func test_the_card_is_a_rune() -> void:
 	_check_card(&"rune", 2)
@@ -45,3 +47,33 @@ func test_its_moments_have_their_cues() -> void:
 	var card: FormBase = load("res://content/spells/forms/rune/rune.tres") as FormBase
 	check_equal(card.impact_cue, &"rune_burst", "its impact plays rune_burst")
 	check_equal(card.cast_cue, &"cast_rune", "its cast plays cast_rune")
+
+
+## A rune arms (owner, 2026-11-06): for SpellLimits.RUNE_ARM it hits nothing, even a body on it,
+## then it goes off.
+func test_a_rune_hits_nothing_until_it_is_armed() -> void:
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["rune"])
+	var placed: Vector2 = Vector2(_form(&"rune").radius * 2.0, 0.0)
+	var imp: Node2D = arena.add_imp(placed)
+	check(arena.cast(0, 0), "cast")
+	arena.run(SpellLimits.RUNE_ARM - 0.2)
+	check_equal(arena.lost(imp), 0, "an imp standing on it is not hit while it arms")
+	arena.run(0.4)
+	check(arena.lost(imp) > 0, "it goes off once armed")
+	arena.free_all()
+
+
+## The exception to a payload sparing the body whose hit fired it: a rune cast on a body arms and
+## goes off on that body.
+func test_a_rune_cast_on_a_hit_goes_off_on_that_body_once_armed() -> void:
+	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(Vector2(100, 0))
+	arena.install_cards(0, 0, ["on_hit", "bolt", "rune"])
+	check(arena.cast(0, 0), "cast")
+	arena.run(0.3)
+	var by_bolt: int = arena.lost(imp)
+	check(by_bolt > 0, "the bolt hit")
+	arena.run(SpellLimits.RUNE_ARM + 0.3)
+	check(arena.lost(imp) > by_bolt, "and the rune it left goes off on the same imp")
+	arena.free_all()

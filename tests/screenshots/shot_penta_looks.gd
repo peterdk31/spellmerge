@@ -1,16 +1,16 @@
 extends "res://tests/support/screenshot.gd"
-## Penta (docs/milestones/portal.md, "Penta") on four carriers: with homing, round a dummy, five
-## fire beams burning in at it, five runes ringing it and five frost bolts closing on it; without
-## homing, round its caster, five walls caging the caster. `penta_looks` is the whole screen.
+## Penta (docs/milestones/portal.md, "Penta") on four carriers, each ringing its caster: five held
+## fire beams burning in at it, five walls caging it, five runes round it, and five homing frost
+## bolts leaving the ring aimed in before they bend for a dummy. `penta_looks` is the whole screen.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
 ## Each: the cards, where they are cast from (aiming right) and the dummy (INF for none). The
 ## caster has no body here, so the wall row shows the ring round the point it is cast from.
 const CASTS: Array = [
-	[[&"hold", &"homing", &"penta", &"fire", &"beam"], Vector2(30.0, 90.0), Vector2(170.0, 90.0)],
+	[[&"hold", &"penta", &"fire", &"beam"], Vector2(130.0, 90.0), Vector2.INF],
 	[[&"penta", &"wall"], Vector2(400.0, 90.0), Vector2.INF],
-	[[&"homing", &"penta", &"rune"], Vector2(30.0, 270.0), Vector2(170.0, 270.0)],
+	[[&"penta", &"rune"], Vector2(130.0, 270.0), Vector2.INF],
 	[[&"homing", &"penta", &"frost", &"bolt"], Vector2(330.0, 270.0), Vector2(470.0, 270.0)],
 ]
 

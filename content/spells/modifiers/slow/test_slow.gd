@@ -74,3 +74,24 @@ func test_four_players_crawl_at_once() -> void:
 	for imp in imps:
 		check(arena.lost(imp) > 0, "every slow bolt arrives")
 	arena.free_all()
+
+
+## Regression (owner, 2026-11-06): a payload's exclusion was a 0.1 s timer, so a slowed nova born
+## on the imp its bolt hit was still on it when the time ran out, and all its shots hit that imp.
+## It is kept off that imp until clear of it: the imp takes the bolt and nothing of the nova.
+func test_a_slowed_nova_on_hit_does_not_shotgun_the_imp_it_was_born_on() -> void:
+	var plain := ArenaScript.new(root)
+	var alone: Node2D = plain.add_imp(Vector2(100, 0))
+	plain.install_cards(0, 0, ["bolt"])
+	plain.cast(0, 0)
+	plain.run(2.0)
+	var by_bolt: int = plain.lost(alone)
+	plain.free_all()
+	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(Vector2(100, 0))
+	arena.install_cards(0, 0, ["on_hit", "bolt", "slow", "nova"])
+	check(arena.cast(0, 0), "cast")
+	arena.run(2.0)
+	check(by_bolt > 0, "a bolt alone hurts it")
+	check_equal(arena.lost(imp), by_bolt, "the slow nova born on it crawls out without hitting it")
+	arena.free_all()

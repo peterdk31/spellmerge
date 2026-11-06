@@ -7,7 +7,7 @@
 script = ExtResource("1_base")
 id = &"rune"
 display_name = "Rune"
-description = "Sits where you put it and waits. Patience, on the floor."
+description = "Waits where you put it, arms in a second, then goes off."
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 8

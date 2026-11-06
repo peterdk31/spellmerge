@@ -26,8 +26,11 @@ extends Node
 ## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
-## ray) and cannot hit the target that fired it
-## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). A payload is cast by the
+## ray) and cannot hit the target that fired it until it has been clear of it
+## (`ProjectileManager.exclude`; owner, 2026-11-06; a beam, which never moves off it, never hits
+## it), as long as it starts touching it (`_launch`; owner, 2026-11-05): one that starts outside it,
+## a Penta copy on its ring, hits it as it hits anything. A rune is the exception: it arms
+## (`SpellLimits.RUNE_ARM`) and then hits whatever is on it, its source too. A payload is cast by the
 ## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, pull,
 ## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
@@ -342,6 +345,15 @@ const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
 var _caster: int = CASTER_WIZARD
 var _caster_seq: int = 0
+## The turning ring the copy being cast now stands on (`_penta`): its centre, its radius (0 when
+## the copy is on none) and the copy's angle on it now. A carrier whose copy stays on its point
+## and aims from it (a beam) keeps it, to turn with the ring (`CarrierKit.ring_*`). Empty between
+## launches.
+var _ring_centre: Vector2 = Vector2.ZERO
+var _ring_radius: float = 0.0
+var _ring_angle: float = 0.0
+## How fast and which way that ring turns, radians a second (negative: a mirror's ring).
+var _ring_turn: float = 0.0
 
 ## The ray being sent (`RayHit`): what a hit with no shot slot is (a beam's, a swing's, a slam's, a
 ## dash's, a rain's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
@@ -979,6 +991,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# A held carrier lives until switched off; one that repeats (`_repeats`) lives its own life each time.
 	var held: bool = _holds(spell, tag)
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if held and not _repeats(spell) else spell.lifetime
+	# A payload is kept off the body that fired it only while it starts touching that body (owner,
+	# 2026-11-05: "a payload that starts outside the body that fired it can hit it"), as a Penta
+	# copy on its ring does not.
+	if source != null and projectiles != null and not projectiles.touches_target(source, origin, spell.radius + SpellLimits.SOURCE_TOUCH):
+		source = null
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):
@@ -1011,7 +1028,7 @@ func _land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag:
 	if source != null:
 		for n in count:
 			if slots[n] >= 0:
-				projectiles.exclude(slots[n], source, SpellLimits.SOURCE_EXCLUSION)
+				projectiles.exclude(slots[n], source)
 	return made
 
 
@@ -1226,7 +1243,12 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, heading)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
-		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
+		# A Penta's mirror is a second ring turning the other way (owner, 2026-11-06).
+		var backwards: int = 0
+		if spell.behaviour(ModifierBase.Behaviour.PENTA) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
+			backwards = _penta(spell, tag, actor, origin, -heading, source, -1.0)
+		else:
+			backwards = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
 			_recoil(spell, tag, actor, -heading)
@@ -1253,52 +1275,66 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 
 ## `penta` (owner, 2026-11-05): `spell` is cast `behaviour_strength` times (5 a card), each copy from
-## a point on a ring round a centre, all aimed in at it (owner: "they should just aim towards the
-## point, even if it is the player"). The centre is the caster (its body, or the point or shot
-## that casts a payload), unless the spell homes: then the target its homing picks from `origin`
-## along `heading` (a flying shot's homing looks all round, an instant carrier's within its bend),
-## the caster again when there is none. The ring stands SpellLimits.PENTA_RING beyond the centre's
-## edge, or within PENTA_WITHIN of the carrier's own reach when that is less, turned at random each
-## cast (owner, 2026-11-05) by the cast's seeded generator, as scatter is. Each point stops
-## short of a wall, and each copy is cast by its point (a beam stays there, an orbit circles it).
-## Returns the shots made.
-func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+## a point on a ring round its caster, all aimed in at it (owner: "they should just aim towards the
+## point, even if it is the player"). The caster is a wizard's body, or the point or shot that casts
+## a payload, so `on hit · bolt · penta · beam` rings where the bolt hit. Penta reads no other card
+## (owner, 2026-11-05: homing no longer moves the ring; it steers each copy, as on any carrier).
+## The ring stands SpellLimits.PENTA_RING out, or within PENTA_WITHIN of the carrier's own reach
+## when that is less. It turns (owner, 2026-11-06: "rotate continuously"): its angle is a start of
+## its card's own (from its tag) plus SpellLimits.PENTA_TURN times the clock, so casts in a row (a
+## held button, a rain cast again) stand where the ring has turned to, and a copy that stays on
+## its point and aims from it (a beam) turns with it while it lasts (`_ring_*`, CarrierBeam). A
+## still shot stays where it was placed, as anywhere, and a flying one flies off. It does not
+## follow its centre (owner: "Don't let it follow the centre"). `mirror` casts a second ring
+## turning the other way (`way_round` -1; owner, 2026-11-06). Each point stops short of a wall,
+## and each copy is cast by its point. Returns the shots made.
+func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node, way_round: float = 1.0) -> int:
 	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
-	# The caster: a wizard's body (its anchor), else the point or shot casting this payload.
-	var caster_at: Vector2 = origin
+	# The centre: a wizard's body (its anchor), else the point or shot casting this payload.
+	var centre: Vector2 = origin
 	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
-		caster_at = projectiles.get_anchor(actor)
-	var centre: Vector2 = Vector2.INF
-	var edge: float = 0.0
-	if spell.homing_range > 0.0 and projectiles != null:
-		var bend: float = PI if spell.has_trait(CarrierTraits.FLIES) else deg_to_rad(spell.homing_angle)
-		centre = projectiles.homing_point(actor, origin, way, bend, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, tag)
-		if centre.is_finite():
-			edge = projectiles.homing_target_radius
-	if not centre.is_finite():
-		centre = caster_at
-	# Turned at random each cast, by the cast's own generator (the same on every machine).
-	var first: Vector2 = Vector2.from_angle(_scatter.randf() * TAU)
+		centre = projectiles.get_anchor(actor)
+	# Where the turning ring stands now: the card's own start, turned by the clock.
+	var turned: float = SpellRuntime.penta_angle(tag, _clock, way_round)
 	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
 	var carried: float = _carrier_of(spell).reach_of(spell)
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
 		# A ring of shots (a nova) is not aimed, but its shots fly this far.
 		carried = spell.speed * spell.lifetime
-	var radius: float = edge + (minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING)
+	var radius: float = minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING
 	var outer_caster: int = _caster
 	var outer_seq: int = _caster_seq
 	_caster = CASTER_POINT
 	var made: int = 0
+	_ring_centre = centre
+	_ring_radius = radius
+	_ring_turn = SpellLimits.PENTA_TURN * way_round
 	for n in copies:
-		var point: Vector2 = centre + first.rotated(TAU * float(n) / float(copies)) * radius
-		if projectiles != null:
-			point = projectiles.clip_to_walls(centre, point)
+		_ring_angle = turned + TAU * float(n) / float(copies)
+		var point: Vector2 = SpellRuntime.ring_point(projectiles, centre, radius, _ring_angle)
 		var aim: Vector2 = point.direction_to(centre) if not point.is_equal_approx(centre) else way
 		made += _launch(spell, tag, actor, point, aim, source)
+	_ring_radius = 0.0
+	_ring_angle = 0.0
+	_ring_turn = 0.0
+	_ring_centre = Vector2.ZERO
 	_caster = outer_caster
 	_caster_seq = outer_seq
 	return made
+
+
+## The angle a Penta ring of the card with `tag` stands at when the clock reads `at`: a start of
+## its own (the same on every machine, and another for another card or build) turned at
+## SpellLimits.PENTA_TURN, the other way for `way_round` -1 (a mirror's ring).
+static func penta_angle(tag: int, at: float, way_round: float = 1.0) -> float:
+	return float(posmod(hash(tag), 4096)) / 4096.0 * TAU + SpellLimits.PENTA_TURN * way_round * at
+
+
+## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.
+static func ring_point(manager: ProjectilesScript, centre: Vector2, radius: float, angle: float) -> Vector2:
+	var point: Vector2 = centre + Vector2.from_angle(angle) * radius
+	return manager.clip_to_walls(centre, point) if manager != null else point
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
@@ -2435,7 +2471,7 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 	_register(slot, tag, spell, chain, struck)
 	_rec_relay[slot] = hit
 	_rec_zap[slot] = zap
-	projectiles.exclude(slot, target, SpellLimits.SOURCE_EXCLUSION)
+	projectiles.exclude(slot, target)
 
 
 func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:

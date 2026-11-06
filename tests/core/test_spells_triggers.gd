@@ -262,12 +262,10 @@ func test_a_beam_on_kill_fires_at_every_kill() -> void:
 	var killed: int = _build(0, [&"on_kill", &"beam", &"rune"])
 	_cast(0)
 	_tick(30)
-	var from_kill: int = 0
-	for hit: Array in _hits:
-		if hit[3] == killed:
-			from_kill += 1
+	# The payload is a still probe born on each target: it never hits the body it was born on
+	# (`ProjectileManager.exclude`), so count the probes.
 	check(_hits.size() >= 2, "the beam hit both targets")
-	check_equal(from_kill, 2, "a beam that kills two targets fires its on kill twice")
+	check_equal(_slots(killed).size(), 2, "a beam that kills two targets fires its on kill twice")
 
 
 func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
@@ -284,17 +282,12 @@ func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
 	_cast(0)
 	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 10.0)
 	_tick(30)
-	# The payload is a rune born on the target, so it hits at once: count those hits.
-	var from_kill: int = 0
-	var from_reaction: int = 0
-	for hit: Array in _hits:
-		if hit[3] == killed:
-			from_kill += 1
-			check(absf((hit[2] as Vector2).x - 100.0) < 20.0, "on kill fired from the target")
-		elif hit[3] == reacted:
-			from_reaction += 1
-	check_equal(from_kill, 1, "on kill fired once")
-	check_equal(from_reaction, 1, "on reaction fired once")
+	# The payload is a still probe born on the target (which it never hits: count the probes).
+	var from_kill: Array[int] = _slots(killed)
+	check_equal(from_kill.size(), 1, "on kill fired once")
+	for slot in from_kill:
+		check(absf(_mgr.get_position_of(slot).x - 100.0) < 20.0, "on kill fired from the target")
+	check_equal(_slots(reacted).size(), 1, "on reaction fired once")
 
 
 func test_a_trigger_that_does_not_match_stays_quiet() -> void:
@@ -415,9 +408,5 @@ func test_a_swing_fires_on_hit() -> void:
 	var struck: int = _build(1, [&"on_hit", &"swing", &"rune"])
 	_cast(1)
 	_tick(20)
-	# The payload is a rune born on the target, so it hits at once: count those hits.
-	var from_swing: int = 0
-	for hit: Array in _hits:
-		if hit[3] == struck:
-			from_swing += 1
-	check_equal(from_swing, 1, "the swing's on hit fired")
+	# The payload is a still probe born on the target (which it never hits: count the probes).
+	check_equal(_slots(struck).size(), 1, "the swing's on hit fired")

@@ -71,6 +71,30 @@ func caster_seq() -> int:
 	return _rt._caster_seq
 
 
+## The turning Penta ring the copy being cast now stands on (`SpellRuntime._penta`): its centre,
+## its radius (0 when the copy is on none) and the copy's angle on it now.
+func ring_centre() -> Vector2:
+	return _rt._ring_centre
+
+
+func ring_radius() -> float:
+	return _rt._ring_radius
+
+
+func ring_angle() -> float:
+	return _rt._ring_angle
+
+
+## How fast and which way that ring turns, radians a second.
+func ring_turn() -> float:
+	return _rt._ring_turn
+
+
+## The point at `angle` on such a ring, stopped short of a wall.
+func ring_point(centre: Vector2, radius: float, angle: float) -> Vector2:
+	return SpellRuntime.ring_point(_rt.projectiles, centre, radius, angle)
+
+
 ## The live shot casting the launch being fired, or -1 when the caster is the wizard, a point, or
 ## a shot that has ended since: the shot a carrier cast by a shot moves or circles.
 func caster_shot() -> int:

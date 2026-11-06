@@ -26,5 +26,5 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	kit.projectiles.set_solid(slot, direction.orthogonal(), spell.shots, spell.spread if spell.spread > 0.0 else spell.radius * 2.0)
 	kit.register(slot, tag, spell, carried, prev)
 	if source != null:
-		kit.projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+		kit.projectiles.exclude(slot, source)
 	return 1

@@ -155,8 +155,13 @@ const SWING_LEAN: float = 22.5
 ## at once; more is made when needed.
 const SHOT_MOVES_START: int = 64
 
-## Seconds a payload's shots cannot hit the target that fired the trigger.
-const SOURCE_EXCLUSION: float = 0.1
+## Seconds a rune hits nothing after it is placed (owner, 2026-11-06: a trap arms): then it hits
+## whatever is on it, the body whose hit cast it too (`CarrierRune`).
+const RUNE_ARM: float = 1.0
+## Pixels of slack on "a payload starts touching the body that fired it": a payload starts where
+## the shot that hit was, whose centre may stand its own radius off the body, more than the
+## payload's when that shot was bigger (a `bigger` bolt's 8 px against a nova shot's 5).
+const SOURCE_TOUCH: float = 8.0
 ## Knockback of one hit in pixels per second (M1's fire bolt had 120).
 const KNOCKBACK: float = 120.0
 ## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).
@@ -183,11 +188,13 @@ const PORTAL_EXITS_MOST: int = 24
 ## Portal rows made at once; more are made when needed.
 const PORTAL_ROWS_START: int = 8
 
-## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands beyond the edge of what it
-## surrounds (its homing target, or its caster).
+## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands from its caster's centre.
 const PENTA_RING: float = 64.0
 ## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
 ## so a carrier that goes a short way (a nova's ring) still meets in the middle.
 const PENTA_WITHIN: float = 0.8
+## How fast a penta's ring turns, in radians a second (owner, 2026-11-06: "rotate continuously"):
+## once round every two seconds.
+const PENTA_TURN: float = PI
 ## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
 const PENTA_MOST: int = 24

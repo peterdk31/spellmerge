@@ -131,6 +131,9 @@ var _shot: FormBase = null
 var _columns: Array[FormBase] = []
 ## What comes before the cards of the `right there` column: `on hit`, a pierce card, `_shot`.
 var _point_prefix: Array[StringName] = []
+## True while a multicast is given one carrier only, not the ones it asks for: one that adds no
+## carrier at all must change the cast or be wasted (owner, 2026-11-06).
+var _one_carrier: bool = false
 ## Trace by scene key, for the casts without the card.
 var _baselines: Dictionary = {}
 
@@ -428,6 +431,16 @@ func test_every_multicast_works_or_is_wasted_on_every_carrier() -> void:
 	_matrix("Multicasts", cards)
 
 
+func test_every_multicast_with_one_carrier_works_or_is_wasted_on_every_carrier() -> void:
+	# A multicast that finds no carrier for its extra draws (`double · bolt` alone) adds none: it is
+	# wasted unless it does something else (a burst repeats, a scatter turns the one it has).
+	var cards: Array[SpellComponent] = []
+	cards.assign(_multicasts)
+	_one_carrier = true
+	_matrix("Multicasts with one carrier", cards)
+	_one_carrier = false
+
+
 # --- The matrix --------------------------------------------------------------------------------
 
 ## The modifiers' part `part` (from 0) of MODIFIER_PARTS: every MODIFIER_PARTS-th modifier by id,
@@ -563,7 +576,7 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: boo
 		without.append(_payload.id)
 	elif card is MulticastBase:
 		with.append(card.id)
-		for n in 1 + (card as MulticastBase).extra_draws:
+		for n in 1 if _one_carrier else 1 + (card as MulticastBase).extra_draws:
 			with.append_array(tail)
 			without.append_array(tail)
 	else:

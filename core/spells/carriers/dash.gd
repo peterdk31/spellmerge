@@ -16,6 +16,9 @@ class MovePass:
 	## a shot: the shot it moves and that shot's seq.
 	var body: int = -1
 	var shot: int = -1
+	## Who cast it (`CarrierKit.caster`, with the shot's birth): its strikes hit as that cast.
+	var caster: int = SpellRuntime.CASTER_BODY
+	var caster_seq: int = 0
 	var seq: int = 0
 	## Where the mover was at the last step (where it started, before the first), and the seconds left.
 	var last: Vector2 = Vector2.INF
@@ -121,6 +124,8 @@ func _start_pass(spell: CompiledSpell, tag: int, actor: int, body: int, shot: in
 	dash.tag = tag
 	dash.spell = spell
 	dash.actor = actor
+	dash.caster = kit.caster()
+	dash.caster_seq = kit.caster_seq()
 	dash.body = body
 	dash.shot = shot
 	dash.seq = kit.projectiles.get_seq_of(shot) if shot >= 0 else 0
@@ -147,7 +152,9 @@ func step(delta: float) -> void:
 		elif kit.projectiles.is_alive(dash.shot) and kit.projectiles.get_seq_of(dash.shot) == dash.seq:
 			at = kit.projectiles.get_position_of(dash.shot)
 		if dash.left > 0.0 and at.is_finite() and kit.spell_of(dash.tag) == dash.spell:
+			kit.cast_as(dash.caster, dash.caster_seq)
 			_pass_step(dash, dash.last if dash.last.is_finite() else at, at)
+			kit.cast_done()
 			dash.last = at
 			dash.left -= delta
 		else:

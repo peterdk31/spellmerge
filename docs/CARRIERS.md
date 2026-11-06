@@ -125,7 +125,13 @@ slot, or `CASTER_POINT`, carried through delayed fires and kept by the rows a ca
 carrier reads it with `SpellRuntime.body_of(caster, actor)` (the body, or -1), `caster_shot()`,
 `caster_body(actor)` and `caster_place(actor, origin)` (where it is now); `CasterMoves.moved_by` is
 the one rule for what a move moves; `shot_caster(slot)` is who cast a shot that hits (its pull or
-swap).
+swap). **Everything a launch makes remembers who cast it:** a shot by the projectile manager's
+caster, and a row a carrier keeps (a held beam, a swing, a slam, a dash's pass) by the caster and
+seq it was launched with; each later step of the row, its zaps and a move's landing run between
+`kit.cast_as(caster, seq)` and `kit.cast_done()`, so a pull, swap or payload on those hits reads
+that caster, not whoever is casting when the step comes (owner, 2026-11-06). A shot's hit is
+handled as that shot's caster too, so a chain jump belongs to the shot it jumped from (a ray's
+waiting jump keeps the caster of the hit it came from).
 
 Everything else is the one rule. Their yes/no answers decide which cards do something there, through
 the same needs as on every carrier: all three `HITS` (one strike of everything within
@@ -188,7 +194,7 @@ runtime's one rule for it, shared by every carrier:
 | Group | Calls |
 | --- | --- |
 | The world | `projectiles`, `events`, `clock()` |
-| The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()` (the one caster value), `caster_seq()`, `caster_shot()`, `caster_body(actor)`, `caster_place(actor, origin)`, `shot_caster(slot)`, `is_echo(spell)`, `shot_started`, `shot_ended` |
+| The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()` (the one caster value), `caster_seq()`, `caster_shot()`, `caster_body(actor)`, `caster_place(actor, origin)`, `shot_caster(slot)`, `cast_as(caster, seq)`/`cast_done()` (a row steps as its caster), `is_echo(spell)`, `shot_started`, `shot_ended` |
 | The aim | `aim_origin`, `aim_dir`, `aim_pivot`, `aim_seen`, `walk_turn` (by actor) |
 | Shots | `fan_angle`, `staff_spread`, `placed_at`, `land_shot` (or `apply_travel` then `register`) |
 | Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as its block form), `guard_path`, `turn_shots_round` (a deflect round one point, once), `bounces`, `ghost` |

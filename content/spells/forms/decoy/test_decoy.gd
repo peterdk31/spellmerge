@@ -319,6 +319,114 @@ func test_a_decoy_that_ends_mid_dash_is_placed_again_standing() -> void:
 	world.free_all()
 
 
+## Every pull asked while `world` runs `seconds`, as the actor it moves.
+func _pulls(world: World, seconds: float) -> Array[int]:
+	var pulled: Array[int] = []
+	var listen: Callable = func(actor: int, mode: StringName, _move: Vector2, _seconds: float, _tag: int) -> void:
+		if mode == &"pull":
+			pulled.append(actor)
+	world.bus.caster_move_requested.connect(listen)
+	world.run(seconds, seconds)
+	world.bus.caster_move_requested.disconnect(listen)
+	return pulled
+
+
+func test_a_decoys_beam_pulls_the_decoy_on_its_later_hits_too() -> void:
+	# A beam hits again in its own steps, after its cast: it still hits as the decoy that cast it
+	# (`CarrierKit.cast_as`), so its pull moves the decoy, never the wizard.
+	var made: Array = _decoy_world([&"timer", &"decoy", &"pull", &"beam"], Vector2(120.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	if decoy != null:
+		var pulled: Array[int] = _pulls(world, 0.6)
+		check(pulled.size() >= 2, "the beam hit and pulled more than once (%s)" % [pulled])
+		check(pulled.count(decoy.id) == pulled.size(), "every pull moves the decoy (%s, the decoy %d)" % [pulled, decoy.id])
+		check((made[1] as Actor).global_position.is_equal_approx(made[4]), "the wizard stayed")
+	world.free_all()
+
+
+func test_a_decoys_swap_trades_the_decoy_also_by_its_zaps() -> void:
+	# A swap is a shot, so its own hits know their caster; its zaps are hits of no shot that come in
+	# the shots' later steps: they hit as the shot's caster too, and trade the decoy, not the wizard.
+	var made: Array = _world([&"timer", &"decoy", &"zap", &"swap"], Vector2(160.0, 0.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	# One more foe beside its path, which only its zaps reach.
+	world.add_enemy(&"B", Vector2(110.0, 40.0))
+	var swaps: Array[int] = []
+	world.bus.caster_move_requested.connect(func(actor: int, mode: StringName, _move: Vector2, _seconds: float, _tag: int) -> void:
+		if mode == &"swap":
+			swaps.append(actor))
+	world.run(2.0, 2.0)
+	check(swaps.size() >= 3, "its swaps traded more than its direct hits (%s)" % [swaps])
+	check(not swaps.has(wizard.id), "none moved the wizard (%s, the wizard %d)" % [swaps, wizard.id])
+	world.free_all()
+
+
+func test_a_decoys_chain_jump_pulls_the_decoy() -> void:
+	# A chain jump belongs to the shot it jumped from: it is cast by what cast that shot (the decoy),
+	# so the jump's hit pulls the decoy, never the wizard.
+	var made: Array = _decoy_world([&"timer", &"decoy", &"pull", &"chain", &"bolt"], Vector2(120.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	world.add_enemy(&"B", Vector2(140.0, 50.0))
+	if decoy != null:
+		var pulled: Array[int] = _pulls(world, 0.8)
+		check(pulled.size() >= 2, "the bolt and its jump both pulled (%s)" % [pulled])
+		check(pulled.count(decoy.id) == pulled.size(), "every pull moves the decoy (%s, the decoy %d)" % [pulled, decoy.id])
+		check((made[1] as Actor).global_position.is_equal_approx(made[4]), "the wizard stayed")
+	world.free_all()
+
+
+func test_a_decoys_chain_jumps_return_to_the_decoy() -> void:
+	var made: Array = _decoy_world([&"timer", &"decoy", &"return", &"chain", &"bolt"], Vector2(120.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	world.add_enemy(&"B", Vector2(140.0, 50.0))
+	if decoy != null:
+		var bolts: Dictionary = {}
+		var astray: int = 0
+		for step in 60:
+			world.run(World.STEP, World.STEP)
+			for slot in world.projectiles.get_cap():
+				if not world.projectiles.is_alive(slot):
+					continue
+				var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
+				if spell == null or spell.form_id != &"bolt":
+					continue
+				bolts[world.projectiles.get_seq_of(slot)] = true
+				if world.projectiles.get_caster_of(slot).distance_to(world.projectiles.get_anchor(decoy.id)) > 1.0:
+					astray += 1
+		check(bolts.size() >= 2, "a bolt and a jump of it flew (%d)" % bolts.size())
+		check_equal(astray, 0, "every bolt and jump comes back to the decoy, none to the wizard")
+	world.free_all()
+
+
+func test_your_own_chain_jump_still_pulls_you() -> void:
+	var made: Array = _world([&"pull", &"chain", &"bolt"], Vector2(120.0, 0.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.add_enemy(&"B", Vector2(140.0, 50.0))
+	# Another body that casts stands far off, so a pull sent to the wrong body would show.
+	world.add_enemy(&"F", Vector2(-300.0, -300.0), World.HEALTH, [&"atom"], Vector2.UP)
+	var pulled: Array[int] = _pulls(world, 0.8)
+	check(pulled.size() >= 2, "the bolt and its jump both pulled (%s)" % [pulled])
+	check(pulled.count(wizard.id) == pulled.size(), "every pull moves the wizard (%s, the wizard %d)" % [pulled, wizard.id])
+	world.free_all()
+
+
+func test_the_wizards_own_held_beam_still_pulls_the_wizard_on_its_later_hits() -> void:
+	var made: Array = _world([&"hold", &"pull", &"beam"], Vector2(120.0, 0.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	# Another body that casts stands far off, so a pull sent to the wrong body would show.
+	world.add_enemy(&"F", Vector2(-300.0, -300.0), World.HEALTH, [&"atom"], Vector2.UP)
+	var pulled: Array[int] = _pulls(world, 0.6)
+	check(pulled.size() >= 2, "the held beam hit and pulled more than once (%s)" % [pulled])
+	check(pulled.count(wizard.id) == pulled.size(), "every pull moves the wizard (%s, the wizard %d)" % [pulled, wizard.id])
+	world.free_all()
+
+
 ## The distance of every live orbit shot from `centre`.
 func _orbits_from(world: World, centre: Vector2) -> PackedFloat32Array:
 	var out := PackedFloat32Array()

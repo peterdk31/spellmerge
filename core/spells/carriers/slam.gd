@@ -282,7 +282,9 @@ func step(delta: float) -> void:
 	var first_new: int = _sl_next_born
 	for at in _sl_on.size():
 		if _sl_on[at] != 0 and _sl_born[at] < first_new:
+			kit.cast_as(_sl_caster[at], _sl_caster_seq[at])
 			_slam_step(at, delta)
+			kit.cast_done()
 
 
 ## Live slams over every caster, and whether row `at` is one, for tests.

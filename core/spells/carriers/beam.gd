@@ -53,6 +53,10 @@ var _wave_points: PackedVector2Array = PackedVector2Array()
 var _wave_index: PackedInt32Array = PackedInt32Array()
 var _bm_count: PackedInt32Array = PackedInt32Array()
 var _bm_turn: PackedFloat32Array = PackedFloat32Array()
+## A Penta copy turns with its ring (`CarrierKit.ring_radius`): the ring's centre, and its radius,
+## the copy's angle on it at the clock `z` it started (radius 0: on no ring).
+var _bm_ring_centre: PackedVector2Array = PackedVector2Array()
+var _bm_ring: PackedVector3Array = PackedVector3Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
 var _bm_prev: PackedInt64Array = PackedInt64Array()
 ## What live beam `at` hits with when not its spell's own `hit` (null): an echo's half, and what
@@ -147,7 +151,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_jumps, _bm_steer]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_jumps, _bm_steer, _bm_ring_centre, _bm_ring]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -425,6 +429,8 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_caster[at] = caster
 	_bm_caster_seq[at] = caster_seq
 	_bm_turn[at] = 0.0
+	_bm_ring_centre[at] = kit.ring_centre()
+	_bm_ring[at] = Vector3(kit.ring_radius(), kit.ring_angle(), kit.clock())
 	var legs: int = maxi(spell.pierce, 0) + 1
 	_fit_beam_legs(legs)
 	for leg in legs:
@@ -494,6 +500,14 @@ func _beam_follow(at: int) -> void:
 				_bm_dir[at] = way.normalized().rotated(_bm_turn[at])
 		else:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
+	elif _bm_ring[at].x > 0.0:
+		# A Penta copy cast by its point turns with its ring, still aimed in at the centre.
+		var ring: Vector3 = _bm_ring[at]
+		var centre: Vector2 = _bm_ring_centre[at]
+		var angle: float = ring.y + SpellLimits.PENTA_TURN * (kit.clock() - ring.z)
+		_bm_origin[at] = kit.ring_point(centre, ring.x, angle)
+		if not _bm_origin[at].is_equal_approx(centre):
+			_bm_dir[at] = _bm_origin[at].direction_to(centre).rotated(_bm_turn[at])
 
 
 ## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,
@@ -921,6 +935,8 @@ func _grow_beams() -> void:
 	_bm_span.resize(size)
 	_bm_tick.resize(size)
 	_bm_turn.resize(size)
+	_bm_ring_centre.resize(size)
+	_bm_ring.resize(size)
 	_bm_count.resize(size)
 	_bm_chain.resize(size)
 	_bm_prev.resize(size)

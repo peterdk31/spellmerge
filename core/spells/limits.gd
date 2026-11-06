@@ -193,5 +193,8 @@ const PENTA_RING: float = 64.0
 ## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
 ## so a carrier that goes a short way (a nova's ring) still meets in the middle.
 const PENTA_WITHIN: float = 0.8
+## How fast a penta's ring turns, in radians a second (owner, 2026-11-06: "rotate continuously"):
+## once round every two seconds.
+const PENTA_TURN: float = PI
 ## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
 const PENTA_MOST: int = 24

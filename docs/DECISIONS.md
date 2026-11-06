@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-06: Penta's ring turns (owner's decision)
+
+- **Before:** each cast turned the ring to a new random angle, so casts in a row jumped, and a held ring stood still.
+- **Now (owner: "Instead of Penta rotating in steps. It should rotate continuously if eg. Held"; "Both"):** the ring's angle is `SpellRuntime.penta_angle(tag, clock)`: a start of the card's own plus `SpellLimits.PENTA_TURN` (π a second) times the clock. Casts in a row stand where it has turned to; a beam copy (`CarrierBeam`, `_bm_ring`) turns with its ring while it lasts, still aimed in at the centre. Nothing else needed a rule: a still shot stays where it was placed and a flying shot flies off, as they do from any caster.
+- **Not:** the ring does not follow its centre ("Don't let it follow the centre"). `mirror` does not turn it the other way: that did not come out of the rules ("Only if the mirror thing is a case that makes sense logically").
+
 ## 2026-11-06: A payload spares the body that fired it until clear of it; runes arm (owner's decision)
 
 - **Before:** a payload's shots could not hit the body whose hit fired them for `SOURCE_EXCLUSION` (0.1 s). A slow shot was still on that body when the time ran out, so `on hit · bolt · slow · nova` put all eight shots on the imp the bolt hit (the owner: it "can possibly be abused"). A fast shot born at the contact point could also cross the body and hit it (both in docs/BACKLOG.md, now gone).

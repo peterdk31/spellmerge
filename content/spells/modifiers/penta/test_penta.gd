@@ -112,27 +112,64 @@ func test_without_homing_it_rings_its_caster_aimed_in() -> void:
 		check(is_equal_approx(gap, TAU / 5.0), "evenly round it (%s)" % gap)
 
 
-## The ring is turned at random each cast (owner, 2026-11-05), by the cast's seeded generator: two
-## casts in a row stand differently, and the same casts again stand the same.
-func test_the_ring_turns_at_random_each_cast_the_same_every_run() -> void:
-	var first: Array[Vector2] = _two_rings()
-	var again: Array[Vector2] = _two_rings()
-	check(not first[0].is_equal_approx(first[1]), "two casts in a row turn differently (%s, %s)" % [first[0], first[1]])
-	check_equal(again, first, "and the same casts turn the same")
+## The ring turns (owner, 2026-11-06: "rotate continuously"): casts in a row stand where it has
+## turned to, SpellLimits.PENTA_TURN a second, not at a new random angle; the same on every run.
+func test_casts_in_a_row_stand_where_the_ring_has_turned_to() -> void:
+	var first: Array[float] = _ring_turns()
+	check_equal(first.size(), 2, "two casts")
+	var gap: float = fposmod(first[1] - first[0], TAU / 5.0)
+	var want: float = fposmod(SpellLimits.PENTA_TURN * 1.5, TAU / 5.0)
+	check(absf(gap - want) < 0.02, "the second stands 1.5 s of turning on (%s, want %s)" % [gap, want])
+	check_equal(_ring_turns(), first, "and the same casts stand the same")
 
 
-## Where the first bolt of each of two casts stood.
-func _two_rings() -> Array[Vector2]:
+## Where the ring of each of two casts 1.5 s apart stood: the least angle of its bolts, within a
+## fifth of a turn (the ring looks the same turned by a fifth).
+func _ring_turns() -> Array[float]:
 	_arena = ArenaScript.new(root)
 	_arena.install_cards(0, 0, ["penta", "bolt"])
-	var out: Array[Vector2] = []
+	var out: Array[float] = []
 	for n in 2:
 		_arena.cast(0, 0)
-		var shots: Array[int] = _shots()
-		out.append(_arena.projectiles.get_position_of(shots[shots.size() - 1]).round())
+		var least: float = TAU
+		for slot in _shots():
+			if _arena.projectiles.get_position_of(slot).length() > SpellLimits.PENTA_RING - 1.0:
+				least = minf(least, fposmod(_arena.projectiles.get_position_of(slot).angle(), TAU / 5.0))
+		out.append(snappedf(least, 0.001))
 		_arena.run(1.5)
 	_arena.free_all()
 	_arena = null
+	return out
+
+
+## A copy that stays on its point turns with the ring while it lasts: held beams sweep round
+## their centre, still on the ring and aimed in.
+func test_held_beams_turn_with_the_ring_and_stay_aimed_in() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["hold", "penta", "beam"])
+	check(_arena.cast(0, 0), "cast")
+	var beams: CarrierBeam = CarrierBeam.of(_arena.spells)
+	_arena.run(1.0 / 60.0)
+	var before: Array[Vector2] = _beam_origins(beams)
+	_arena.run(0.25)
+	var after: Array[Vector2] = _beam_origins(beams)
+	check_equal(after.size(), 5, "five held beams")
+	for n in after.size():
+		check(is_equal_approx(after[n].length(), SpellLimits.PENTA_RING), "each still on the ring (%s)" % after[n])
+		var turned: float = before[n].angle_to(after[n])
+		check(absf(turned - SpellLimits.PENTA_TURN * 0.25) < 0.05, "and turned with it (%s)" % turned)
+	for at in beams.beam_slots():
+		if beams.beam_on(at) and beams.beam_point_count(at) >= 2:
+			var origin: Vector2 = beams.beam_origin(at)
+			var way: Vector2 = origin.direction_to(beams.beam_point(at, 1))
+			check(way.dot(-origin.normalized()) > 0.99, "aimed in at the centre (%s)" % way)
+
+
+func _beam_origins(beams: CarrierBeam) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	for at in beams.beam_slots():
+		if beams.beam_on(at):
+			out.append(beams.beam_origin(at))
 	return out
 
 

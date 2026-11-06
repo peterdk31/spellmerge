@@ -15,12 +15,12 @@ func traits() -> int:
 
 
 ## It strikes what is where it landed (rules R4c): each body within SpellLimits.LAND_REACH
-## (`Spells._strike_round`) but the one that moved, and with `deflect` turns the shots within
-## MOVE_GUARD_REACH.
+## (`Spells._strike_round`), the one that moved too (a teleport deals no damage of its own), and
+## with `deflect` turns the shots within MOVE_GUARD_REACH.
 func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2) -> void:
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
 		kit.turn_shots_round(actor, tag, at, SpellLimits.MOVE_GUARD_REACH, id())
-	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null, false, kit.body_node(kit.caster_body(actor)))
+	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null)
 
 
 ## A homing teleport goes to a target in its homing reach of what it moves (`from`, the body's

@@ -42,7 +42,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	_before_strike(spell, tag, actor, origin, reach)
 	if spell.strikes:
 		var way: Vector2 = direction if not direction.is_zero_approx() else Vector2.RIGHT
-		kit.strike_round(spell, tag, actor, origin, way, reach, spell.echo_hit if kit.is_echo(spell) else null, true)
+		kit.strike_round(spell, tag, actor, origin, way, reach, spell.echo_hit if kit.is_echo(spell) else null)
 	_after_strike(spell, tag, actor, origin)
 	return 1
 

@@ -292,10 +292,9 @@ func strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arra
 
 
 ## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own),
-## its caster's own too, except `spare` (the body it is cast from); with `explosion` a wall hides
-## no body (a fallback's strike, as a blast's).
-func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, explosion: bool = false, spare: Node = null) -> void:
-	_rt._strike_round(spell, tag, actor, at, way, reach, hit, explosion, -1, 0, spare)
+## its caster's own too; a wall hides none.
+func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile) -> void:
+	_rt._strike_round(spell, tag, actor, at, way, reach, hit)
 
 
 ## The node of the actor `body`'s body (`caster_body`), null for -1 or none: what a carrier that

@@ -1295,12 +1295,11 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 
 
 ## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once (`_strike`),
-## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. With
-## `explosion` (a blast, the cards that land on a point) a wall hides no body: an explosion at a
-## shot's end on a wall is in the wall. It strikes its caster's own body like any other, except
-## `spare`, the body it is cast from (a teleport's, which lands with it).
-func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, explosion: bool = false, chain: int = -1, prev: int = 0, spare: Node = null) -> void:
-	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS, spare, not explosion)
+## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. It strikes
+## every body there, its caster's own too, and a wall hides none (owner, 2026-11-06: one rule for
+## every strike; a teleport, whose landing strikes the body that lands, deals no damage).
+func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, chain: int = -1, prev: int = 0) -> void:
+	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS, null, false)
 	if found > 0:
 		_strike(spell, tag, actor, found, [], at, spell.chain_jumps if chain < 0 else chain, prev, hit)
 
@@ -1632,7 +1631,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 		prev = _rec_prev[shot]
 	var was: bool = _blasting
 	_blasting = true
-	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), true, chain, prev)
+	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), chain, prev)
 	_blasting = was
 
 

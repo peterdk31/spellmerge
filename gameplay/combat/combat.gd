@@ -696,6 +696,15 @@ func give_shield(actor: Variant, charges: int, seconds: float, tag: int = 0) -> 
 	_shield[row] = (_shield[row] if _shield_left[row] > 0.0 else 0) + charges
 	_shield_left[row] = maxf(_shield_left[row], maxf(seconds, SHIELD_MIN_TIME))
 	_shield_tag[row] = tag
+	_send_barrier(row, Vector2.ZERO)
+
+
+## `barrier_changed` for the barrier on `row` as it is now; `way` the way a hit it blocked flew
+## (zero for no block).
+func _send_barrier(row: int, way: Vector2) -> void:
+	if events != null:
+		var left: float = _shield_left[row]
+		events.barrier_changed.emit(_cast_id(row), _shield[row] if left > 0.0 else 0, left, _shield_tag[row], way, _hurt_radius[row])
 
 
 ## Hits the barrier on `actor` still blocks; 0 when none.
@@ -803,6 +812,8 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 			events.shield_blocked.emit(actor, where, _shield_tag[row])
 			# Its look is content's (S6, item 13): turned back the way the hit came.
 			events.cue_shown.emit(actor, SHIELD_BLOCK_CUE, where + _hurt_offset[row], -direction, 0.0, Color.WHITE, 0)
+			# A hit with no way of its own (contact) is drawn as one from straight above.
+			_send_barrier(row, direction if direction != Vector2.ZERO else Vector2.DOWN)
 		return false
 	var discharge_share: float = 0.0
 	var team: int = _team(row)
@@ -1310,6 +1321,7 @@ func _tick(row: int, delta: float) -> void:
 		_shield_left[row] = maxf(_shield_left[row] - delta, 0.0)
 		if _shield_left[row] == 0.0:
 			_shield[row] = 0
+			_send_barrier(row, Vector2.ZERO)
 	if _burn_left[row] > 0.0:
 		var burned: float = minf(delta, _burn_left[row])
 		_burn_left[row] -= burned
@@ -1586,8 +1598,11 @@ func _clear_state(row: int) -> void:
 	_static_left[row] = 0.0
 	_static_share[row] = 0.0
 	_react_wait[row] = 0.0
+	var shielded: bool = _shield_left[row] > 0.0
 	_shield[row] = 0
 	_shield_left[row] = 0.0
+	if shielded:
+		_send_barrier(row, Vector2.ZERO)
 	_shield_tag[row] = 0
 	_slam[row] = 0
 	_slam_by[row] = EventsScript.NO_PLAYER

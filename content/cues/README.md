@@ -30,6 +30,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 | `cast_atom`, `cast_swing`, `cast_bolt`, `cast_beam`, `cast_wall` | the atom's, swing's, bolt's and slam's, beam's and wall's `cast_cue` | the cast flash, shorter or longer (and twice as big for a wall), and the kick |
 | `cast_orbit`, `cast_rune`, `cast_gather` | the orbit's, rune's, and the rain's, swap's and teleport's `cast_cue` | the cast flash and a ring gathering in (`ring_in`), the build-up; a rune's flash twice as big |
 | `cast_nova`, `cast_ring` | the nova's and the dash's `cast_cue` | the cast flash and a ring flashing out (`ring_out`); a nova's flash twice as big |
+| `cast_self` | a cast with no carrier card, whose cards land on the caster (`CarrierCaster.cast_cue`) | the cast flash small, a ring drawing in (`ring_in`) and a few `glimmer` motes round the staff head; no kick |
 | `impact` | a carrier card's `impact_cue` when it names none, and a shot of no card | a small burst where the shot strikes, in its colour and cards |
 | `impact_ring` | the nova's, wall's, swap's, rain's, dash's and teleport's `impact_cue` | the burst and a ring in the shot's colour without its cards (`no_cards`) |
 | `hit` | Feel, for a hit on a body with the way its shot flew (`damage_dealt` after `projectile_impact`), `size` its zoom steps (12 px each, bigger for more damage) | a spray along the way in the hit body's colours (ember for an enemy, its own ramp for a wizard) and its `spark` motes (`often`: a hit is one of many a frame) |

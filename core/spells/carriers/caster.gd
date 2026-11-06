@@ -14,6 +14,23 @@ func traits() -> int:
 	return HITS | MEETS_SHOTS
 
 
+## A cast on yourself (the owner, 2026-11-06: such a cast showed nothing): the staff swung upright,
+## drawn in to the body and glowing a moment, then back.
+const POSE: Array[Dictionary] = [
+	{"phase": "after", "at": 0.06, "turn": -70.0, "push": -3.0, "stretch": -0.15, "ease": "out"},
+	{"phase": "after", "at": 0.16, "turn": -80.0, "push": -3.0, "lift": 2.0, "glow": 0.7, "stretch": 0.1, "mood": "raised"},
+	{"phase": "after", "at": 0.36},
+]
+
+func staff_pose() -> PackedFloat32Array:
+	return FormBase.pack_pose(POSE)
+
+
+## Its cast cue (content/cues/cast_self.tres): drawn in to the caster, not thrown out.
+func cast_cue() -> StringName:
+	return &"cast_self"
+
+
 ## A deflect turns the shots of other teams within its strike, or within MOVE_GUARD_REACH (a
 ## teleport's landing) when that is wider, before the strike.
 func _before_strike(spell: CompiledSpell, tag: int, actor: int, at: Vector2, reach: float) -> void:

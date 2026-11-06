@@ -77,6 +77,17 @@ func hit_kind() -> StringName:
 	return &""
 
 
+## A carrier no form card fires (a fallback) has its own look here, where a form card would carry
+## it: its staff animation (`FormBase.staff_pose`, packed) and the cue a seat's cast of it plays
+## (`FormBase.cast_cue`; &"" for Feel's default). A form card's carrier answers none: its card says.
+func staff_pose() -> PackedFloat32Array:
+	return PackedFloat32Array()
+
+
+func cast_cue() -> StringName:
+	return &""
+
+
 func has(flag: int) -> bool:
 	return traits() & flag != 0
 

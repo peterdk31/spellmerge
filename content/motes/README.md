@@ -46,6 +46,7 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `tail` | none (`tail`, A) | a shot's tail as single pixels, as the tail shader drew it: a thin line that cools where the shot was | a pixel |
 | `tail_streak` | none (`tail`, B, the default) | a shot's tail as short streaks along its way, overlapping into one line | a line along its way that shortens over its life (`###`, `##`, `#`) |
 | `tail_long` | none (`tail`, C) | a longer, smoky tail: lives twice as long, drifts up and sways | a pixel |
+| `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
 
 ## Allowed files
 

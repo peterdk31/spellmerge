@@ -366,6 +366,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.lifetime = SpellLimits.MIN_LIFETIME
 	var carrier: Carrier = on
 	spell.carrier = on.id()
+	# A fallback carrier's own animation; a form card's carrier takes its card's below.
+	spell.staff_pose = on.staff_pose()
 	if form != null:
 		spell.form_id = form.id
 		spell.form_name = _name(form)

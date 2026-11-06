@@ -8,6 +8,9 @@ extends "res://tests/support/suite.gd"
 ## The runs (a scripted player in the sandbox, a wave of two bots, a horde run of a bot), how each
 ## starts from a fresh game and what is held to the tick until N3 and N4 are in
 ## tests/support/replay_run.gd, which the platform runner (N2b) shares.
+##
+## Each run takes seconds: the runner plays them in processes of their own (tests/support/suite.gd):
+# unit-test-shards: 4
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 

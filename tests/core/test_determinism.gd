@@ -4,6 +4,9 @@ extends "res://tests/support/suite.gd"
 ## same start gives the same state hash in every area at every tick. When two runs part, the desync
 ## report names the first tick, the areas and each differing member with both values: a cache filled
 ## in another order or a timing stat goes into DERIVED, anything else is a bug to fix.
+##
+## Each scene takes seconds: the runner plays them in processes of their own (tests/support/suite.gd):
+# unit-test-shards: 3
 
 const SimScenes := preload("res://tests/core/sim_scenes.gd")
 

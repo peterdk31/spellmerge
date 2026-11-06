@@ -6,8 +6,13 @@ extends SceneTree
 ## `stress.gd`.
 ##
 ## godot --headless --path . --script res://tests/benchmark/test_stress.gd
+##
+## The unit test runner plays each scenario in a process of its own (`--shard=K/N`, as
+## tests/support/suite.gd takes it; the checks before the run are made in each):
+# unit-test-shards: 4
 
 const RunnerScript := preload("res://tests/benchmark/stress_runner.gd")
+const Suite := preload("res://tests/support/suite.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 
@@ -81,4 +86,11 @@ func _initialize() -> void:
 		return
 	runner.set("warm_up", 3.0)
 	runner.set("measure", 2.0)
+	var shard: Vector2i = Suite.shard_of(OS.get_cmdline_user_args())
+	if shard.y > 1:
+		var mine: Array[int] = []
+		for i in all.size():
+			if i % shard.y == shard.x:
+				mine.append(all[i])
+		runner.set("scenarios", mine)
 	root.add_child(runner)

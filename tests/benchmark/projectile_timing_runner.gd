@@ -67,6 +67,10 @@ var _hits: int = 0
 var _native: bool = false
 ## Time the GDScript too, beside the native kernel (see the class doc).
 var compare: bool = false
+## Of the rounds (each kernel at each cap, in order), only every `parts`-th from the `part`-th (the
+## unit test runner plays them side by side).
+var part: int = 0
+var parts: int = 1
 
 
 func _ready() -> void:
@@ -76,10 +80,13 @@ func _ready() -> void:
 	var rounds: Array[bool] = [NativeScript.loaded()]
 	if compare and NativeScript.loaded():
 		rounds.append(false)
+	var index: int = 0
 	for native in rounds:
 		_native = native
 		for cap in [ManagerScript.DEFAULT_CAP_WEB, ManagerScript.DEFAULT_CAP_DESKTOP]:
-			_run_cap(cap)
+			if index % parts == part:
+				_run_cap(cap)
+			index += 1
 	_teardown()
 	if _failures.is_empty():
 		print("test_projectile_timing: OK")

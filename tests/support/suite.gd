@@ -18,6 +18,13 @@ extends SceneTree
 ##       check(1 + 1 == 2, "arithmetic works")
 ##
 ## godot --headless --path . --script res://tests/<area>/test_<name>.gd
+##
+## A long test file can be run in several processes side by side: a line `# unit-test-shards: N`
+## in it makes the runner (ci/build/unit_tests.sh) start it N times, with the user argument
+## `--shard=K/N` (K from 0), and each process runs every Nth test method (by name), from the Kth.
+## A long matrix is split into several methods for it (tests/core/test_card_rules.gd).
+##
+##   godot --headless --path . --script res://tests/core/test_card_rules.gd -- --shard=0/6
 
 var _failures: Array[String] = []
 var _current: String = ""
@@ -34,15 +41,22 @@ func _initialize() -> void:
 		if method_name.begins_with("test_") and not names.has(method_name):
 			names.append(method_name)
 	names.sort()
+	var label: String = String(get_script().resource_path).get_file().get_basename()
+	if names.is_empty():
+		_failures.append("%s: the script has no test_* method" % label)
+	var shard: Vector2i = shard_of(OS.get_cmdline_user_args())
+	if shard.y > 1:
+		names = of_shard(names, shard)
+		label += " (shard %d of %d)" % [shard.x + 1, shard.y]
 	for method_name in names:
 		_current = method_name
+		var started: int = Time.get_ticks_msec()
 		await before_each()
 		await call(method_name)
 		await after_each()
 		_free_owned()
-	var label: String = String(get_script().resource_path).get_file().get_basename()
-	if names.is_empty():
-		_failures.append("%s: the script has no test_* method" % label)
+		# The slow ones show in the log (a test of seconds is a candidate for shards).
+		print("TEST TIME: %s %d ms" % [method_name, Time.get_ticks_msec() - started])
 	if _failures.is_empty():
 		print("TEST OK: %s (%d tests)" % [label, names.size()])
 		quit(0)
@@ -50,6 +64,30 @@ func _initialize() -> void:
 		for failure in _failures:
 			printerr("TEST FAILED: " + failure)
 		quit(1)
+
+
+## The shard a run's user arguments ask for, as (K, N) from `--shard=K/N`; (0, 1) (the whole file)
+## without one, or with one that makes no sense.
+static func shard_of(args: PackedStringArray) -> Vector2i:
+	for arg in args:
+		if not arg.begins_with("--shard="):
+			continue
+		var parts: PackedStringArray = arg.trim_prefix("--shard=").split("/")
+		if parts.size() == 2 and parts[0].is_valid_int() and parts[1].is_valid_int():
+			var k: int = parts[0].to_int()
+			var n: int = parts[1].to_int()
+			if n >= 1 and k >= 0 and k < n:
+				return Vector2i(k, n)
+	return Vector2i(0, 1)
+
+
+## The test methods of `names` (sorted) that `shard` (K, N) runs: every Nth, from the Kth.
+static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
+	var mine: Array[String] = []
+	for i in names.size():
+		if i % shard.y == shard.x:
+			mine.append(names[i])
+	return mine
 
 
 ## Runs before every test. Override it for setup the tests share.

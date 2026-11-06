@@ -148,7 +148,7 @@ A modifier or infusion affects **only the next carrier**, not every carrier of a
 
 ### Numbers of a cast
 
-- **Mana:** the sum over every carrier in the cast, payloads included, of its `mana_cost` times the `mana_mult` of its modifiers, plus each multicast card's `mana_cost`. Paid at the cast.
+- **Mana:** the sum over every carrier in the cast, payloads included, of its `mana_cost` times the `mana_mult` of its modifiers, plus each multicast card's `mana_cost`. Paid at the cast (as it leaves, for one that winds up). A cast its staff cannot pay is skipped ([cast-timing.md](cast-timing.md)).
 - **Delay** (replaced on 2026-11-06, [cast-timing.md](cast-timing.md)): the cast's **wind-down** is every carrier of its own group's `wind_down` times the `wind_down_mult` of its modifiers, plus its multicast cards'; a payload adds none. When the cycle ends ("the staff recharges" below), the staff's `cooldown` follows.
 - **Damage, speed, radius, shots, pierce:** the carrier's numbers, then each infusion's `damage_scale`, then each modifier in slot order, as today. No build limit clamps them; the ranges in each class's `ranges()` stay for the validator.
 - **Several infusions:** the hit carries all of them. The first one's status lands first; each later element then reacts with it through the reaction table, so `fire · frost · bolt` thaws on its own hit. The shot's tint and shape come from the first infusion.

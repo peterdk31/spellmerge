@@ -933,10 +933,12 @@ func is_holding(actor: int, staff: int) -> bool:
 
 ## Fires the next cast of this actor's staff from `origin` along `direction`. `mana` is what
 ## the caster has. Returns the mana spent (0.0 or more) when it fired, or `REFUSED` when it did
-## not (nothing built, still in its delay, too little mana, no direction, or every shot starting
-## inside a wall); the caller then takes that much mana and reads no field. A refused cast
-## changes nothing, except that a cast with nothing in it (every card wasted) still moves the
-## staff on, so it never sticks there.
+## not (nothing built, still in its delay, no cast left its mana pays, no direction, or every shot
+## starting inside a wall); the caller then takes that much mana and reads no field. A cast the
+## mana does not pay is skipped (docs/milestones/cast-timing.md, T3): the press fires the first
+## one after it that it pays, up to the cycle's end; with none, the cycle ends (its cooldown runs,
+## `cast_fizzled`) and nothing is paid. A refused cast changes nothing else, except that a cast
+## with nothing in it (every card wasted) still moves the staff on, so it never sticks there.
 ##
 ## While the staff has sustained (`hold`) carriers on, a cast switches them all off instead,
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
@@ -957,9 +959,19 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 		# The switch-off press frees the staff at once (docs/milestones/cast-timing.md).
 		_release_hold(index)
 		return 0.0
-	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
-	if mana < cast.mana:
+	# A cast the staff cannot pay is skipped (docs/milestones/cast-timing.md, T3): the press fires
+	# the first one after it that it can, up to the cycle's end. With none, the cycle ends there:
+	# its cooldown runs, nothing leaves and nothing is paid.
+	var firing: int = _firing_cast(index, mana)
+	if firing < 0:
+		_cursor[index] = 0
+		_cooldown[index] = compiled.staff.cooldown if compiled.staff != null else 0.0
+		_cooldown_rows = maxi(_cooldown_rows, index + 1)
+		if events != null:
+			events.cast_fizzled.emit(actor, staff)
 		return REFUSED
+	_cursor[index] = firing
+	var cast: CompiledCast = compiled.casts[firing]
 	var aim: Vector2 = direction.normalized()
 	var turn: float = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
 	if cast.group.is_empty():
@@ -2868,25 +2880,51 @@ func close_caster(actor: int) -> void:
 	_reset_caster(actor)
 
 
-## The mana the next cast of this caster's staff costs (`cast_staff` refuses with less), 0.0
-## while its sustained carriers are on (that press switches them off), or REFUSED when it has no
-## build. An enemy's AI asks before it winds up, so a telegraph is always followed by its cast.
-func next_cast_mana(actor: int, staff: int) -> float:
+## Which cast of staff `index`'s cycle a press with `mana` fires (docs/milestones/cast-timing.md,
+## T3): the one at the cursor, or the first after it the mana pays, up to the cycle's end (the
+## ones before it are skipped); -1 when the mana pays none of them, or the staff has no build.
+## INF mana: the one at the cursor.
+func _firing_cast(index: int, mana: float) -> int:
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return -1
+	var count: int = compiled.casts.size()
+	for at in range(mini(_cursor[index], count - 1), count):
+		if mana >= compiled.casts[at].mana:
+			return at
+	return -1
+
+
+## The cast a press of this staff with `mana` would fire (`_firing_cast`), else the one at its
+## cursor; null with no build.
+func _next_cast(actor: int, staff: int, mana: float) -> CompiledCast:
 	if not _in_range(actor, staff):
-		return REFUSED
+		return null
 	var index: int = actor * SpellLimits.STAFFS + staff
 	var compiled: CompiledStaff = _installed[index]
 	if compiled == null or compiled.is_empty():
+		return null
+	var at: int = _firing_cast(index, mana)
+	return compiled.casts[at if at >= 0 else mini(_cursor[index], compiled.casts.size() - 1)]
+
+
+## The mana the next cast of this caster's staff costs: the one a press with `mana` would fire
+## (an unaffordable one is skipped; with INF, the one at the cursor), 0.0 while its sustained
+## carriers are on (that press switches them off), or REFUSED when it has no build. An enemy's AI
+## asks before it winds up, so a telegraph is always followed by its cast.
+func next_cast_mana(actor: int, staff: int, mana: float = INF) -> float:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	if cast == null:
 		return REFUSED
-	if not _hold_tags[index].is_empty():
+	if not _hold_tags[actor * SpellLimits.STAFFS + staff].is_empty():
 		return 0.0
-	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
+	return cast.mana
 
 
-## True when the next cast of this actor's staff can leave within `within` seconds with `mana`
-## (that staff's pool): its delay is no longer than that, and `mana` less what the staff's
-## sustained carriers hold
-## (`reserved_mana`) pays `next_cast_mana`. False with no build. One call for what an enemy's AI
+## True when a cast of this actor's staff can leave within `within` seconds with `mana` (that
+## staff's pool): its delay is no longer than that, and `mana` less what the staff's sustained
+## carriers hold (`reserved_mana`) pays a cast before the cycle's end (the ones it cannot pay are
+## skipped; docs/milestones/cast-timing.md). False with no build. One call for what an enemy's AI
 ## asks every step while its target is in reach (performance pass, 2026-10-28).
 func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 	if not _in_range(actor, staff):
@@ -2897,50 +2935,39 @@ func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 	var compiled: CompiledStaff = _installed[index]
 	if compiled == null or compiled.is_empty():
 		return false
-	var cost: float = 0.0
-	if _hold_tags[index].is_empty():
-		cost = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
-	return maxf(mana - _hold_mana[index], 0.0) >= cost
+	if not _hold_tags[index].is_empty():
+		return true
+	return _firing_cast(index, maxf(mana - _hold_mana[index], 0.0)) >= 0
 
 
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
 ## its first carrier's flight (speed x life), a beam's or swing's length, a rain's aim point;
 ## 0 for one that is not aimed (a nova's ring, an orbit, a still shot, a decoy...) or no build.
-func next_cast_reach(actor: int, staff: int) -> float:
-	var first: CompiledSpell = _next_carrier(actor, staff)
+func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
+	var first: CompiledSpell = _next_carrier(actor, staff, mana)
 	if first == null:
 		return 0.0
 	return _carrier_of(first).reach_of(first)
 
 
 ## What the next cast of this caster's staff does (`CastSense`; docs/milestones/M2-enemy-ai.md),
-## for an AI that plays whatever staffs it holds; null with no build.
-func next_cast_sense(actor: int, staff: int) -> CastSense:
-	if not _in_range(actor, staff):
-		return null
-	var index: int = actor * SpellLimits.STAFFS + staff
-	var compiled: CompiledStaff = _installed[index]
-	if compiled == null or compiled.is_empty():
-		return null
-	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].sense
+## for an AI that plays whatever staffs it holds: the one a press with `mana` would fire; null
+## with no build.
+func next_cast_sense(actor: int, staff: int, mana: float = INF) -> CastSense:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	return cast.sense if cast != null else null
 
 
 ## The hit radius of the next cast's first carrier (0 for none), for the width of a telegraph.
-func next_cast_radius(actor: int, staff: int) -> float:
-	var first: CompiledSpell = _next_carrier(actor, staff)
+func next_cast_radius(actor: int, staff: int, mana: float = INF) -> float:
+	var first: CompiledSpell = _next_carrier(actor, staff, mana)
 	return first.radius if first != null else 0.0
 
 
 ## The first carrier of the next cast of this staff, or null (no build, or nothing in the cast).
-func _next_carrier(actor: int, staff: int) -> CompiledSpell:
-	if not _in_range(actor, staff):
-		return null
-	var index: int = actor * SpellLimits.STAFFS + staff
-	var compiled: CompiledStaff = _installed[index]
-	if compiled == null or compiled.is_empty():
-		return null
-	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
-	return null if cast.group.is_empty() else cast.group.spells[0]
+func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	return null if cast == null or cast.group.is_empty() else cast.group.spells[0]
 
 
 ## Siphon: mana comes back to staff `staff` of the actor `actor`, whoever it is; its Caster

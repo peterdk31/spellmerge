@@ -358,28 +358,30 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 			staff_built.emit(at)
 
 
-## The next cast's mana (`Spells.next_cast_mana`): REFUSED (-1) with no build.
+## The next cast's mana (`Spells.next_cast_mana`): the cast a press would fire with the staff's
+## free mana (one it cannot pay is skipped); REFUSED (-1) with no build.
 func next_cast_mana(at: int = 0) -> float:
-	return actor.spells.next_cast_mana(number, at) if has_staff(at) else SpellsScript.REFUSED
+	return actor.spells.next_cast_mana(number, at, free_mana(at)) if has_staff(at) else SpellsScript.REFUSED
 
 
 ## How far the next cast reaches along the aim (0 for one that is not aimed, or no build).
 func next_cast_reach(at: int = 0) -> float:
-	return actor.spells.next_cast_reach(number, at) if has_staff(at) else 0.0
+	return actor.spells.next_cast_reach(number, at, free_mana(at)) if has_staff(at) else 0.0
 
 
 ## What the next cast of staff `at` does (`Spells.next_cast_sense`, a `CastSense`), or null with
 ## no build: what an AI reads to play whatever staffs the actor holds (docs/milestones/M2-enemy-ai.md).
 func next_cast_sense(at: int = 0) -> CastSense:
-	return actor.spells.next_cast_sense(number, at) if has_staff(at) else null
+	return actor.spells.next_cast_sense(number, at, free_mana(at)) if has_staff(at) else null
 
 
 ## The hit radius of the next cast's first carrier (0 for none).
 func next_cast_radius(at: int = 0) -> float:
-	return actor.spells.next_cast_radius(number, at) if has_staff(at) else 0.0
+	return actor.spells.next_cast_radius(number, at, free_mana(at)) if has_staff(at) else 0.0
 
 
-## True when the next cast of staff `at` can leave within `within` seconds: its delay is no
+## True when a cast of staff `at` can leave within `within` seconds (one it cannot pay is skipped,
+## docs/milestones/cast-timing.md): its delay is no
 ## longer than that and the mana is there.
 func cast_ready(within: float, at: int = 0) -> bool:
 	# An AI asks every step while its target is in reach: one call to Spells.

@@ -147,7 +147,7 @@ func test_a_cast_needs_its_mana() -> void:
 	_install(2, 3, "bolt")
 	check_equal(_spells.cast_staff(2, 3, Vector2.ZERO, AIM, 1.0), SpellsScript.REFUSED, "1 mana is not enough for 2")
 	check_equal(_mgr.get_count(), 0, "nothing flew")
-	check_equal(_spells.cast_index(2, 3), 0, "a refused cast changes nothing")
+	check_equal(_spells.cast_index(2, 3), 0, "the cycle ended where it was: it starts over (docs/milestones/cast-timing.md, T3)")
 
 
 func test_multicast_fires_two_carriers_along_the_aim() -> void:
@@ -340,3 +340,46 @@ func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 			check_equal(_mgr.get_count(), 8, "all eight of its shots")
 			return
 	check(false, "the nova never left (hit at step %d)" % hit_at)
+
+
+# --- Skipping (docs/milestones/cast-timing.md, part T3) ----------------------------------------
+
+## A staff whose first cast is a dear nova (`dear`, 10 mana) and then two bolts (2 each).
+func _dear_then_bolts(player: int) -> void:
+	var dear: FormBase = _form(&"dear", 0.0, 0.3)
+	dear.mana_cost = 10.0
+	dear.wind_down = 0.0
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_install(player, 0, "dear bolt bolt")
+
+
+func test_a_cast_the_mana_does_not_pay_is_skipped() -> void:
+	_dear_then_bolts(0)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 5.0), 2.0, "with 5 mana the press skips the dear cast and fires a bolt")
+	check_equal(_spells.cast_index(0, 0), 2, "the cycle moved on past the bolt it fired")
+	_tick(1)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 2.0, "the last bolt; skipping is no rebuild")
+	_tick(40)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 10.0, "the next cycle starts with the dear cast again, now it is paid")
+
+
+func test_with_no_cast_left_to_pay_the_cycle_ends_and_nothing_leaves() -> void:
+	var fizzled: Array = []
+	_bus.cast_fizzled.connect(func(caster: int, staff: int) -> void: fizzled.append([caster, staff]))
+	_dear_then_bolts(1)
+	_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	_tick(1)
+	check_equal(_spells.cast_index(1, 0), 1, "the dear cast left; a bolt is next")
+	check_equal(_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 1.0), SpellsScript.REFUSED, "1 mana pays no cast left in the cycle")
+	check_equal(fizzled, [[1, 0]], "it fizzled")
+	check_equal(_spells.cast_index(1, 0), 0, "the cycle ended")
+	check(is_equal_approx(_spells.cooldown_left(1, 0), 0.5), "and the staff's cooldown runs, got %s" % _spells.cooldown_left(1, 0))
+	check_equal(_mgr.get_count(), 1, "nothing left but the dear cast's shot")
+
+
+func test_the_ai_reads_the_cast_a_press_would_fire() -> void:
+	_dear_then_bolts(2)
+	check(_spells.cast_ready(2, 0, 0.0, 5.0), "5 mana is ready: it pays a bolt")
+	check_equal(_spells.next_cast_mana(2, 0, 5.0), 2.0, "and the cast it would fire is a bolt's")
+	check_equal(_spells.next_cast_mana(2, 0), 10.0, "with no mana given, the cast at the cursor")
+	check(not _spells.cast_ready(2, 0, 0.0, 1.0), "1 mana pays none")

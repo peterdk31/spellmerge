@@ -721,7 +721,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 			out.append("Pierce +%d" % modifier.extra_pierce)
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
-			["Delay", modifier.wind_down_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
+			["Wind-up", modifier.wind_up_mult], ["Delay", modifier.wind_down_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
 			["Spread", modifier.spread_mult], ["Reach", modifier.reach_mult],
 		]
 		for pair: Array in mults:

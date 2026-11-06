@@ -33,9 +33,9 @@ const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
 const FOUR_ORIGINS: Array[Vector2] = [Vector2(0.0, -42.0), Vector2(0.0, -14.0), Vector2(0.0, 14.0), Vector2(0.0, 42.0)]
 const FOUR_PLAYER_CARDS: Array = [&"fire", &"frost", &"bigger", &"bolt"]
 const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova"]
-## A card that does something only with others round it has its own row (docs/milestones/
-## cast-timing.md: quicken shortens a wind-up, so it shows on a charged bolt).
-const OWN_ROWS: Dictionary = {&"quicken": [&"quicken", &"charge", &"bolt"]}
+## A card that does something only with others round it has its own row (none today: faster
+## casting, which replaced quicken, works on a plain bolt; docs/milestones/cast-timing.md, T9).
+const OWN_ROWS: Dictionary = {}
 ## The card a trigger's clip puts on its bolt, for a trigger whose event needs one (otherwise the
 ## compiler lists it as wasted, rules R2b).
 const TRIGGER_NEEDS: Dictionary = {&"on_block": &"shield", &"on_reaction": &"fire"}

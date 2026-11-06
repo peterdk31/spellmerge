@@ -1,0 +1,12 @@
+{
+	"id": "faster_casting_bolts",
+	"name": "Faster casting bolts",
+	"does": "Two bolts close together: with Faster Casting the second cast, at 0.25 s, is ready in time.",
+	"casts": [
+		{"staff": 0, "cards": ["faster_casting", "bolt"]},
+		{"staff": 0, "cards": ["faster_casting", "bolt"], "at": 0.25}
+	],
+	"imps": [[80, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

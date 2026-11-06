@@ -724,6 +724,7 @@ func _costs_of(card: SpellComponent) -> StringName:
 		costs.id = id
 		costs.damage_mult = minf(modifier.damage_mult, 1.0)
 		costs.wind_down_mult = maxf(modifier.wind_down_mult, 1.0)
+		costs.wind_up_mult = maxf(modifier.wind_up_mult, 1.0)
 		costs.speed_mult = 1.0
 		costs.radius_mult = 1.0
 		costs.lifetime_mult = 1.0

@@ -1,7 +1,7 @@
 {
 	"assets": [
 		{
-			"path": "content/spells/multicasts/quicken/icon.svg",
+			"path": "content/spells/modifiers/faster_casting/icon.svg",
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",

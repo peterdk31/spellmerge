@@ -61,7 +61,7 @@ func test_the_rule_decides_not_a_list() -> void:
 	check(lone.call(&"penta"), "a lone penta strikes from a ring round the caster")
 	check(lone.call(&"deflect"), "a lone deflect turns the shots round the caster")
 	check(not lone.call(&"split"), "a lone split is wasted: the strike fires no shots")
-	check(not lone.call(&"short_delay"), "a lone short delay is wasted: there is no cooldown to shorten")
+	check(not lone.call(&"faster_casting"), "a lone faster casting is wasted: there is no cast time to shorten")
 	check(not lone.call(&"hold"), "a lone hold is wasted: the strike is over at once")
 	var there: CompiledStaff = arena.spells.compile_staff([&"on_hit", &"bolt", &"shield"] as Array[StringName], ArenaScript.plain_staff(3))
 	check(there.wasted.has(2), "a shield on a point guards no one")

@@ -77,7 +77,7 @@ const SETS: Array = [
 		[&"on_wall", &"bounce", &"split", &"nova", &"split", &"atom"],
 		[&"possess", &"pull", &"split", &"bolt"],
 		[&"reach", &"recoil", &"relay", &"split", &"nova"],
-		[&"scatter", &"short_delay", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt"],
+		[&"scatter", &"faster_casting", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt"],
 	],
 ]
 ## The spread of the staff they are on, in degrees: every shot draws from the generator.

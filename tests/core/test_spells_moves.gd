@@ -638,12 +638,14 @@ func test_a_homing_teleport_lands_at_the_edge_of_a_target_within_its_distance() 
 	check(absf(to.angle_to(target.global_position)) < 0.01, "straight at it")
 
 
-func test_a_homing_teleport_with_nothing_in_reach_stays_put() -> void:
+func test_a_homing_teleport_with_nothing_in_reach_teleports_in_place() -> void:
+	# Owner, 2026-11-06: with no target it teleports in place (a blink of 0), so it is still a cast.
 	_distance_cards()
 	_target(Vector2(400.0, 0.0))
 	_build(0, [&"homing", &"blink"])
-	check_equal(_cast(0), SpellsScript.REFUSED, "nothing to blink to: no cast")
-	check(_moves.is_empty(), "and no move: %s" % [_moves])
+	check(_cast(0) != SpellsScript.REFUSED, "nothing to blink to: still a cast")
+	check(_moves.size() == 1 and (_moves[0][2] as Vector2).is_zero_approx(), "a blink of 0, in place: %s" % [_moves])
+	_moves.clear()
 	_build(1, [&"blink"])
 	_mgr.set_anchor(1, Vector2.ZERO)
 	_cast(1)

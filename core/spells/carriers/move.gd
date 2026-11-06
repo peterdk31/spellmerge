@@ -39,8 +39,6 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if not from.is_finite():
 		from = origin
 	var aimed: Vector3 = _aim_move(spell, tag, actor, origin, from, way, distance)
-	if aimed.z < 0.0:
-		return 0
 	way = Vector2(aimed.x, aimed.y)
 	distance = aimed.z
 	var offset: Vector2 = way * distance

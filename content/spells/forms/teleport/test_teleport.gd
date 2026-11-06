@@ -147,13 +147,28 @@ func test_a_homing_teleport_lands_on_a_target_in_reach_and_strikes_it() -> void:
 	world.free_all()
 
 
-func test_a_homing_teleport_with_no_target_in_reach_stays_put() -> void:
-	var made: Array = _flicker_world([&"homing", &"teleport"], [Vector2(600.0, 0.0)])
+## Owner, 2026-11-06: with no target in reach a homing teleport teleports in place: the wizard stays
+## where it is, but the cast happens and the teleport lands there, so what it carries goes off.
+func test_a_homing_teleport_with_no_target_in_reach_teleports_in_place() -> void:
+	var made: Array = _flicker_world([&"on_expire", &"homing", &"teleport", &"swing"], [Vector2(600.0, 0.0)])
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	var start: Vector2 = wizard.global_position
-	world.run(0.5, 0.5)
-	check(wizard.global_position.is_equal_approx(start), "no blink: %s" % wizard.global_position)
+	var landed: Array[int] = [0]
+	var swung: Array[int] = [0]
+	world.bus.caster_move_finished.connect(func(actor: int, mode: StringName, _at: Vector2, _tag: int) -> void:
+		if mode == &"teleport" and actor == wizard.id:
+			landed[0] += 1)
+	# The swing its landing casts: a live sweep of the wizard's, seen as the world steps.
+	var swings: CarrierSwing = world.spells.carrier(&"swing") as CarrierSwing
+	for i in 8:
+		world.run(0.0625, 0.0625)
+		for at in swings.swing_slots():
+			if swings.swing_on(at) and swings.swing_actor(at) == wizard.id:
+				swung[0] += 1
+	check(wizard.global_position.is_equal_approx(start), "it stays where it is: %s" % wizard.global_position)
+	check(landed[0] >= 1, "but it teleported, in place")
+	check(swung[0] >= 1, "and its landing's payload went off there (the swing)")
 	world.free_all()
 
 

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-06: A payload spares the body that fired it until clear of it; runes arm (owner's decision)
+
+- **Before:** a payload's shots could not hit the body whose hit fired them for `SOURCE_EXCLUSION` (0.1 s). A slow shot was still on that body when the time ran out, so `on hit · bolt · slow · nova` put all eight shots on the imp the bolt hit (the owner: it "can possibly be abused"). A fast shot born at the contact point could also cross the body and hit it (both in docs/BACKLOG.md, now gone).
+- **Now (owner: "I really like that rule! Fix it"):** no timer. `ProjectileManager.exclude(slot, node)` keeps the shot off that body until a hit test finds it clear of it where its step starts; from then on it hits that body like any other (a `return`, a bounce, the body stepping back into its way). The manager's `_hit_test` and the C++ `ShotKernel::scan` do the same (`_skip_on`), checked by `test_native_kernel`. A payload that starts off the body is clear at once, so yesterday's rule (`SpellRuntime._launch`, `touches_target`) is now part of this one; it stays in `_launch` for the carriers that are not shots (a beam never moves off its source, so one born on it never hits it).
+- **Runes arm (owner: "they should have an arm time and only explode after eg. 1s (and that should hurt the enemy it spawned on)"):** a rune hits nothing for `SpellLimits.RUNE_ARM` (1 s), as a local stop (`freeze_shot`: its life, hits and cards wait, so it still lives its 8 s once armed), then goes off on whatever is on it. It is the exception to the rule above: `CarrierRune.launch` sets no exclusion, so a rune cast by a hit goes off on that body once armed. Every rune arms, a cast one too: a foe that crosses a fresh rune in its first second is not hit.
+- **Tests:** `test_projectiles_ends.gd` (held while on it, a slow shot crawls out, hit when they meet again, a shot starting off it hits it), `test_slow.gd` (a slowed on-hit nova does not shotgun its imp), `test_rune.gd` (arming, and a rune cast on a hit goes off on that imp). The trigger tests that counted a still probe's hits on its own source count the probes now; `fire_trap` and `overcharged_fire_rune` run a second longer for the arm time.
+
 ## 2026-11-05: Penta always rings its caster; homing no longer moves the ring (owner's decision)
 
 - **Before:** with homing on the same carrier, Penta's ring stood round the target the homing picked, and homing also steered each copy. That gave homing a second job only Penta had: a rule between two cards, the kind the portal dropped the same day ("to not have custom rules").

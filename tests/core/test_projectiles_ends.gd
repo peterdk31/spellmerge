@@ -179,27 +179,50 @@ func test_the_readers_follow_a_slot() -> void:
 	check_equal(_mgr.get_anchor(0), Vector2(1, 2), "the anchor")
 
 
-func test_exclude_blocks_one_target_for_a_while() -> void:
+func test_exclude_holds_while_the_shot_stays_on_its_source() -> void:
 	var node: Node2D = _target(Vector2(0, 0))
 	var slot: int = _mgr.spawn(0, Vector2(-5, 0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG, ManagerScript.MOTION_STILL)
-	_mgr.exclude(slot, node, 0.1)
-	_step(5)
-	check_equal(_hits, 0, "inside the circle but excluded")
-	_step(3)
-	check_equal(_hits, 1, "hit once the time is over")
+	_mgr.exclude(slot, node)
+	_step(60)
+	check_equal(_hits, 0, "a still shot on its source never hits it, however long")
+	node.position = Vector2(100, 0)
+	_step(2)
+	node.position = Vector2(0, 0)
+	_step(2)
+	check_equal(_hits, 1, "once the body has left it and come back, it is hit")
 
 
-## Pins a known gap (BACKLOG, casting part 10): the exclusion is a timer, not "until the shot
-## has left the circle", so a slow shot born on its source hits it once the time is over.
-## When the exclusion is made to last until the shot is clear, change this to expect 0.
-func test_a_slow_excluded_shot_still_hits_its_source_after_the_time() -> void:
+## Regression (BACKLOG, casting part 10; owner, 2026-11-06): the exclusion was a 0.1 s timer, so a
+## slow shot born on its source (`on hit · bolt · slow · nova`) was still on it when the time ran
+## out and hit it. Now it holds until the shot is clear.
+func test_a_slow_excluded_shot_never_hits_its_source_as_it_crawls_out() -> void:
 	var node: Node2D = _target(Vector2(0, 0))
 	var slot: int = _mgr.spawn(0, Vector2(0, 0), Vector2(20, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
-	_mgr.exclude(slot, node, 0.1)
-	_step(5)
-	check_equal(_hits, 0, "excluded while the time lasts")
-	_step(3)
-	check_equal(_hits, 1, "hit its source once the time is over, though it has not left the circle")
+	_mgr.exclude(slot, node)
+	_step(60)
+	check_equal(_hits, 0, "it crawled out without hitting it")
+
+
+## A shot that has been clear of its source hits it when they meet again (a return, a bounce, or
+## the body stepping into its way).
+func test_a_shot_clear_of_its_source_hits_it_when_they_meet_again() -> void:
+	var node: Node2D = _target(Vector2(0, 0))
+	var slot: int = _mgr.spawn(0, Vector2(0, 0), Vector2(300, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
+	_mgr.exclude(slot, node)
+	_step(12)
+	check_equal(_hits, 0, "it left without hitting it")
+	node.position = _mgr.get_position_of(slot) + Vector2(40, 0)
+	_step(12)
+	check_equal(_hits, 1, "and hits it once the body steps into its way")
+
+
+## A payload that starts off its source is clear at once: aimed at it, it hits it.
+func test_a_shot_that_starts_off_its_source_hits_it() -> void:
+	var node: Node2D = _target(Vector2(0, 0))
+	var slot: int = _mgr.spawn(0, Vector2(-60, 0), Vector2(300, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
+	_mgr.exclude(slot, node)
+	_step(20)
+	check_equal(_hits, 1, "it hits the body it was kept off")
 
 
 ## `touches_target` (a payload is kept off its source only while it starts touching it,
@@ -219,7 +242,7 @@ func test_touches_target_is_an_overlap_with_the_body_where_it_stands() -> void:
 func test_exclude_is_cleared_when_the_slot_is_reused() -> void:
 	var node: Node2D = _target(Vector2(0, 0))
 	var slot: int = _mgr.spawn(0, Vector2(-5, 0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG, ManagerScript.MOTION_STILL)
-	_mgr.exclude(slot, node, 100.0)
+	_mgr.exclude(slot, node)
 	_mgr.remove_by_tag(TAG)
 	_mgr.spawn(0, Vector2(-5, 0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG, ManagerScript.MOTION_STILL)
 	_step(2)

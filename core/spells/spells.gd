@@ -26,10 +26,11 @@ extends Node
 ## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
-## ray) and cannot hit the target that fired it
-## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it), as long as it starts touching
-## it (`_launch`; owner, 2026-11-05): one that starts outside it, a Penta copy on its ring, hits it
-## as it hits anything. A payload is cast by the
+## ray) and cannot hit the target that fired it until it has been clear of it
+## (`ProjectileManager.exclude`; owner, 2026-11-06; a beam, which never moves off it, never hits
+## it), as long as it starts touching it (`_launch`; owner, 2026-11-05): one that starts outside it,
+## a Penta copy on its ring, hits it as it hits anything. A rune is the exception: it arms
+## (`SpellLimits.RUNE_ARM`) and then hits whatever is on it, its source too. A payload is cast by the
 ## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, pull,
 ## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
@@ -1020,7 +1021,7 @@ func _land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag:
 	if source != null:
 		for n in count:
 			if slots[n] >= 0:
-				projectiles.exclude(slots[n], source, SpellLimits.SOURCE_EXCLUSION)
+				projectiles.exclude(slots[n], source)
 	return made
 
 
@@ -2434,7 +2435,7 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 	_register(slot, tag, spell, chain, struck)
 	_rec_relay[slot] = hit
 	_rec_zap[slot] = zap
-	projectiles.exclude(slot, target, SpellLimits.SOURCE_EXCLUSION)
+	projectiles.exclude(slot, target)
 
 
 func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:

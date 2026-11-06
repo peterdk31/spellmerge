@@ -135,7 +135,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(alive, "_alive", PACKED_BYTE_ARRAY) \
 	X(freeze, "_freeze", PACKED_FLOAT32_ARRAY) \
 	X(life, "_life", PACKED_FLOAT32_ARRAY) \
-	X(skip_left, "_skip_left", PACKED_FLOAT32_ARRAY) \
+	X(skip_on, "_skip_on", PACKED_FLOAT32_ARRAY) \
 	X(pos, "_pos", PACKED_VECTOR2_ARRAY) \
 	X(prev, "_prev", PACKED_VECTOR2_ARRAY) \
 	X(untested, "_untested", PACKED_VECTOR2_ARRAY) \
@@ -315,7 +315,7 @@ struct HitPass {
 	Arr<PackedByteArray> state, motion, wall_cells;
 	Arr<PackedVector2Array> pos, prev, target_pos, cand_point, untested;
 	Arr<PackedInt32Array> flags, layers, actor, mem_head;
-	Arr<PackedFloat32Array> radius, skip_left, target_radius, cand_along;
+	Arr<PackedFloat32Array> radius, skip_on, target_radius, cand_along;
 	Arr<PackedInt64Array> skip_id, target_id, mem_id;
 	Arr<PackedInt32Array> target_owner, target_layer, target_next, target_mark, target_entry;
 	Arr<PackedInt32Array> cell_head, cell_count, cell_filled;
@@ -469,7 +469,7 @@ struct HitPass {
 		actor.load(m, k.actor);
 		mem_head.load(m, k.mem_head);
 		radius.load(m, k.radius);
-		skip_left.load(m, k.skip_left);
+		skip_on.load(m, k.skip_on);
 		target_radius.load(m, k.target_radius);
 		cand_along.load(m, k.cand_along);
 		skip_id.load(m, k.skip_id);
@@ -683,6 +683,8 @@ struct HitPass {
 			flags[slot] &= ~F_DEFERRED;
 			from = untested[slot];
 		}
+		// Where the step starts: a payload still on the body that fired it there is not clear of it.
+		const Vector2 start = from;
 		const double rad = radius[slot];
 		const Vector2 lowest = vmin(from, to);
 		const Vector2 highest = vmax(from, to);
@@ -705,6 +707,7 @@ struct HitPass {
 		int64_t shooter = 0;
 		const int64_t flg = flags[slot];
 		bool skip = false;
+		bool skip_inside = false;
 		int64_t stamp = 0;
 		int64_t found = 0;
 		bool inside = false;
@@ -731,7 +734,7 @@ struct HitPass {
 					half = std::sqrt(path_sq) * 0.5 + 0.01;
 					lay = layers[slot];
 					shooter = actor[slot];
-					skip = skip_left[slot] > 0.0f;
+					skip = skip_on[slot] > 0.0f;
 					stamp = mark_memory(slot);
 				}
 				int64_t t = cell_head[cell];
@@ -773,7 +776,9 @@ struct HitPass {
 						t = target_next[t];
 						continue;
 					}
-					if (skip && skip_id[slot] == target_id[t]) {
+					if (skip && skip_id[slot] == target_id[t] && (double)start.distance_squared_to(centre) <= reach * reach) {
+						// Still on the body that fired it where this step starts: not clear of it yet.
+						skip_inside = true;
 						t = target_next[t];
 						continue;
 					}
@@ -784,6 +789,10 @@ struct HitPass {
 		}
 		if ((flg & F_SELF) != 0 && (flg & F_SELF_LIVE) == 0 && !inside) {
 			flags[slot] |= F_SELF_LIVE;
+		}
+		// Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
+		if (skip_on[slot] > 0.0f && !skip_inside) {
+			skip_on[slot] = 0.0f;
 		}
 		return found;
 	}
@@ -921,14 +930,13 @@ PackedStringArray ShotKernel::check_fields(Object *manager) const {
 void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, state, motion;
-	Arr<PackedFloat32Array> freeze, life, skip_left;
+	Arr<PackedFloat32Array> freeze, life;
 	Arr<PackedVector2Array> pos, prev, vel;
 	alive.load(m, k.alive);
 	state.load(m, k.state);
 	motion.load(m, k.motion);
 	freeze.load(m, k.freeze);
 	life.load(m, k.life);
-	skip_left.load(m, k.skip_left);
 	pos.load(m, k.pos);
 	prev.load(m, k.prev);
 	vel.load(m, k.vel);
@@ -944,9 +952,6 @@ void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 			continue;
 		}
 		life[slot] = (float)((double)life[slot] - delta);
-		if (skip_left[slot] > 0.0f) {
-			skip_left[slot] = (float)((double)skip_left[slot] - delta);
-		}
 		const Vector2 at = pos[slot];
 		prev[slot] = at;
 		if (life[slot] <= 0.0f) {

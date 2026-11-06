@@ -907,9 +907,10 @@ var step_profile: PackedInt64Array = PackedInt64Array()
 var profile_clock: Callable = Callable()
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
-## Per slot: the target a shot must not hit, and the seconds left of that.
+## Per slot: the body a payload must not hit (the one that fired it, `exclude`), and above 0 while
+## that holds: until a hit test finds the shot clear of that body where its step starts.
 var _skip_id: PackedInt64Array = PackedInt64Array()
-var _skip_left: PackedFloat32Array = PackedFloat32Array()
+var _skip_on: PackedFloat32Array = PackedFloat32Array()
 ## Where each actor's orbit shots circle (INF for no anchor), see `set_anchor`; ACTORS of them.
 var _anchors: PackedVector2Array = PackedVector2Array()
 ## Scratch for `ray`, one set per nesting level (a hit handler may fire a ray of its own, as deep
@@ -1335,7 +1336,7 @@ func set_cap(value: int) -> void:
 	_drawn_size.resize(_cap)
 	_drawn_particles.resize(_cap)
 	_skip_id.resize(_cap)
-	_skip_left.resize(_cap)
+	_skip_on.resize(_cap)
 	var heads: int = _mem_head.size()
 	_mem_head.resize(_cap)
 	for slot in range(heads, _cap):
@@ -2429,7 +2430,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	_caster_slot[slot] = CASTER_WIZARD
 	_home_target[slot] = 0
 	_home_at[slot] = Vector2.INF
-	_skip_left[slot] = 0.0
+	_skip_on[slot] = 0.0
 	_forget_all(slot)
 	# Its colours are its new caster's: work its look out again.
 	_drawn_seq[slot] = -1
@@ -2871,7 +2872,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_tail_carry[slot] = TAIL_SPACING * tail_hash(_seq[slot], -1)
 	_tail_n[slot] = 0
 	_join_group(slot, group_of(caster, tag))
-	_skip_left[slot] = 0.0
+	_skip_on[slot] = 0.0
 	_flags[slot] = 0
 	_bounce[slot] = 0
 	_shield[slot] = 0
@@ -2999,9 +3000,6 @@ func _pass_common(top: int, delta: float) -> void:
 			_state[slot] = S_FROZEN
 			continue
 		_life[slot] -= delta
-		if _skip_left[slot] > 0.0:
-			# Only a payload's skip counts down (read only while above 0).
-			_skip_left[slot] -= delta
 		var at: Vector2 = _pos[slot]
 		_prev[slot] = at
 		if _life[slot] <= 0.0:
@@ -5257,10 +5255,14 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 	return point.distance_to(body.global_position + _target_offset[at]) <= _target_radius[at] + radius
 
 
-func exclude(slot: int, node: Node, seconds: float) -> void:
+## The shot in `slot` does not hit `node` (the body whose hit fired it, as a payload) until it has
+## been clear of it: the first hit test whose step starts with the shot off that body's hit circle
+## ends the exclusion, and from then on it hits that body as any other (owner, 2026-11-06: no
+## timer, so a slow shot born on its source can no longer hit it as it crawls out).
+func exclude(slot: int, node: Node) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
 		_skip_id[slot] = node.get_instance_id()
-		_skip_left[slot] = seconds
+		_skip_on[slot] = 1.0
 
 
 ## The spawn number of the shot in `slot`: it changes when the slot is reused, so a
@@ -5525,6 +5527,8 @@ func _hit_test(slot: int) -> bool:
 	if (_flags[slot] & F_DEFERRED) != 0:
 		_flags[slot] &= ~F_DEFERRED
 		from = _untested[slot]
+	# Where the step starts: a payload still on the body that fired it there is not clear of it.
+	var start: Vector2 = from
 	if _any_solid and _solids.has(slot):
 		# A solid shot hits along its row.
 		var half: Vector2 = _solid_half(slot, _solids[slot])
@@ -5556,7 +5560,8 @@ func _hit_test(slot: int) -> bool:
 	var layers: int = 0
 	var shooter: int = 0
 	var flags: int = _flags[slot]
-	var skip_left: bool = false
+	var skip_on: bool = false
+	var skip_inside: bool = false
 	var stamp: int = 0
 	var found: int = 0
 	var inside: bool = false
@@ -5586,7 +5591,7 @@ func _hit_test(slot: int) -> bool:
 				half = sqrt(path_sq) * 0.5 + 0.01
 				layers = _layers[slot]
 				shooter = _actor[slot]
-				skip_left = _skip_left[slot] > 0.0
+				skip_on = _skip_on[slot] > 0.0
 				stamp = _mark_memory(slot)
 			var t: int = _cell_head[cell]
 			while t >= 0:
@@ -5621,13 +5626,18 @@ func _hit_test(slot: int) -> bool:
 					_mem_seen[_target_entry[t]] = _mem_step
 					t = _target_next[t]
 					continue
-				if skip_left and _skip_id[slot] == _target_id[t]:
+				if skip_on and _skip_id[slot] == _target_id[t] and start.distance_squared_to(centre) <= reach * reach:
+					# Still on the body that fired it where this step starts: not clear of it yet.
+					skip_inside = true
 					t = _target_next[t]
 					continue
 				found = _keep_candidate(found, t, along, closest)
 				t = _target_next[t]
 	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
 		_flags[slot] |= F_SELF_LIVE
+	# Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
+	if _skip_on[slot] > 0.0 and not skip_inside:
+		_skip_on[slot] = 0.0
 	return _hit_candidates(slot, found)
 
 

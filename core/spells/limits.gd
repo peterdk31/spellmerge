@@ -155,9 +155,9 @@ const SWING_LEAN: float = 22.5
 ## at once; more is made when needed.
 const SHOT_MOVES_START: int = 64
 
-## Seconds a payload's shots cannot hit the target that fired the trigger (one that starts
-## touching it; `SpellRuntime._launch`).
-const SOURCE_EXCLUSION: float = 0.1
+## Seconds a rune hits nothing after it is placed (owner, 2026-11-06: a trap arms): then it hits
+## whatever is on it, the body whose hit cast it too (`CarrierRune`).
+const RUNE_ARM: float = 1.0
 ## Pixels of slack on "a payload starts touching the body that fired it": a payload starts where
 ## the shot that hit was, whose centre may stand its own radius off the body, more than the
 ## payload's when that shot was bigger (a `bigger` bolt's 8 px against a nova shot's 5).

@@ -18,7 +18,9 @@ const REACHES: int = 1 << 4
 const GUARDS: int = 1 << 5
 ## Homing can steer it (turn it, bend it or place it on a target).
 const STEERS: int = 1 << 6
-## It uses `speed` and `lifetime` (all but a teleport, which is over at once).
+## It uses `speed`: it, or the shots it is made of, travels (not a teleport, over at once, nor a
+## decoy, a familiar or a portal, which stand where they are made). Its `lifetime` counts where
+## it LASTS too.
 const SPEED: int = 1 << 7
 ## It fires `shots` (a split makes more).
 const SHOTS: int = 1 << 8

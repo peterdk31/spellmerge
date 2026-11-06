@@ -304,7 +304,7 @@ func body_node(body: int) -> Node:
 
 ## What a strike of `spell` spares: `body`, the body it is cast from (or the one a move carries),
 ## when its carrier is melee (`Carrier.MELEE`: it never leaves that body, so never hits it), else
-## nothing. The one rule every carrier that strikes or rays reads (owner, 2026-11-06).
+## nothing (a ranged one spares it only until it has left it, which the projectile manager measures). The one rule every carrier that strikes or rays reads (owner, 2026-11-06).
 func spared(spell: CompiledSpell, body: Node) -> Node:
 	return body if carrier_of(spell).has(Carrier.MELEE) else null
 

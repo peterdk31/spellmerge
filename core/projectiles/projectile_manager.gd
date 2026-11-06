@@ -67,7 +67,8 @@ extends Node2D
 ##   beam hits both actor layers (ACTOR_LAYERS, actors G3c, owner 2026-10-28: "Everything should
 ##   be able to damage everything."), its own caster's body too: a shot spares only the body it
 ##   started on, until it has left it (`exclude`; owner, 2026-11-06: "a players own spells should
-##   hurt the player"), and a ray or sweep spares the body it is cast from (their `exclude`).
+##   hurt the player"), a ray the same along its path, and a sweep spares the body it is cast from
+##   (their `exclude`).
 ## - **ramp** (`ramp_of`): which batch draws it and in which colours (`look_color`, `tint_of`).
 ## - **budget** (`budget_of`): whose share of the pool the cap drops from first: one bucket per
 ##   seat and one that every actor no seat drives shares (`Actors.SHARED`).
@@ -3844,12 +3845,13 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## `caster`. It holds no row in the pool. It stops at the first wall (or, with `bounces`, turns
 ## off it as a bouncing shot does, that many times, and goes on for the length it has left) and
 ## hits the nearest `pierce + 1` targets on `layers` whose circle the beam touches (`width`
-## pixels either side of the line; `exclude` is a target it never hits: the body the beam is cast
-## from, its caster's own or the one whose hit fired it). For each, nearest first, it sends `projectile_impact` and
+## pixels either side of the line; `exclude` is the body the beam is cast from, its caster's own or
+## the one whose hit fired it, which it spares until a piece of its path starts off that body: one
+## that bounces or bends back into it hits it, as a shot that comes back does). For each, nearest first, it sends `projectile_impact` and
 ## `projectile_hit(caster, target, point, tag)`, the point being where the beam passes closest
 ## to the target; a beam that ends on a wall sends an impact with a `null` target there, and one
 ## that turns at a wall one at every turn (each wall also sends `wall_met`, after the hits).
-## Its caster's own body is hit like any other unless it is `exclude` and, as in `spawn`, it hits ACTOR_LAYERS
+## Its caster's own body is hit like any other (but as `exclude`) and, as in `spawn`, it hits ACTOR_LAYERS
 ## whatever `layers` says. Returns how far the beam got in pixels: the length, the distance to
 ## the wall, or the distance to the last target it could hit. 0.0 for bad arguments or an origin
 ## inside a wall. The hits are found before any event is sent, so a handler may remove or free
@@ -4333,9 +4335,17 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var wide: float = maxf(width, 0.0)
 		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
 		var start: float = 0.0
+		# `exclude`, the body it is cast from, is spared until a piece of the path starts off it (as a
+		# shot's step does, `exclude`): a beam that bounces or bends back into it hits it.
+		var skip_at: int = _target_id.find(skip) if skip != 0 else -1
 		for i in used:
 			var a: Vector2 = _path[i]
 			var b: Vector2 = _path[i + 1]
+			if skip_at >= 0:
+				var on: float = wide + _target_radius[skip_at]
+				if a.distance_squared_to(_target_pos[skip_at]) > on * on:
+					skip = 0
+					skip_at = -1
 			var piece: float = a.distance_to(b)
 			if piece <= 0.0:
 				continue

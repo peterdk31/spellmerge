@@ -126,7 +126,7 @@ static func of(spells: SpellRuntime) -> CarrierBeam:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS | MELEE
+	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS
 
 
 ## It dissolves over the last SpellLimits.BEAM_FADE of its life, zapping nothing then.
@@ -667,7 +667,8 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	var actor: int = _bm_actor[at]
-	var source: Node = kit.spared(spell, _bm_source[at] if is_instance_valid(_bm_source[at]) else null)
+	# Ranged along its length: it spares the body it is cast from until its path has left it.
+	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	var bounces: int = kit.bounces(spell)
 	var ghost: bool = kit.ghost(spell)
 	var width: float = _beam_width(at)

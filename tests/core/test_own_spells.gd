@@ -45,12 +45,12 @@ func test_melee_is_the_carriers_that_never_leave_their_body() -> void:
 		if Carriers.of(id).has(Carrier.MELEE):
 			melee.append(String(id))
 	melee.sort()
-	check_equal(melee, ["beam", "dash", "slam", "swing", "teleport"] as Array[String], "the melee carriers")
+	check_equal(melee, ["dash", "slam", "swing", "teleport"] as Array[String], "the melee carriers")
 
 
 ## Every melee carrier never hits the body that casts it, a move's (dash, teleport) as it goes.
 func test_melee_spares_its_caster() -> void:
-	for form: String in ["swing", "beam", "slam", "dash", "teleport"]:
+	for form: String in ["swing", "slam", "dash", "teleport"]:
 		var arena := ArenaScript.new(root)
 		arena.answer_moves()
 		var body: Node2D = arena.add_guard(0, Vector2.ZERO)
@@ -63,6 +63,13 @@ func test_melee_spares_its_caster() -> void:
 		arena.run(1.0)
 		check_equal(struck[0], 0, "a %s never hits the body that casts it" % form)
 		arena.free_all()
+
+
+## A beam is ranged along its length: straight it never comes back to its caster; bounced back off a
+## wall it hits them.
+func test_a_beam_spares_its_caster_until_it_turns_back() -> void:
+	check_equal(_self_lost(["beam"], 1.0), 0, "a straight beam never hits the body it is cast from")
+	check(_self_lost(["bounce", "beam"], 1.0, Rect2(40.0, -100.0, 16.0, 200.0)) > 0, "a beam bounced back off a wall hits its caster")
 
 
 ## A ranged strike spares nobody: a teleport's landing spares the body that lands, a blast where

@@ -308,7 +308,7 @@ func _spawn_kit() -> void:
 			m.set_sticky(s, 0.3)
 	for i in 3:
 		var s: int = m.spawn(i, _wizards[i].global_position, Vector2(0.0, -40.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 2, TAG_KIT)
-		m.set_self_hit(s)
+		m.exclude(s, _wizards[i])
 		m.move_shot(s, Vector2(0.0, 60.0), 0.4)
 	# Shields of the wizards, and the imp's shots that run into them.
 	for i in 3:

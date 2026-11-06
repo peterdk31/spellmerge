@@ -123,7 +123,7 @@ func _test_a_plain_shot_has_no_behaviours() -> void:
 	var slot: int = _fire(Vector2(120.0, 0.0), Vector2(50.0, 100.0), 1.0)
 	_run(30)
 	_check(_mgr.get_position_of(slot).is_equal_approx(Vector2(110.0, 100.0)), "a plain shot flies straight (%s)" % _mgr.get_position_of(slot))
-	_check(is_equal_approx(_mgr.get_growth_of(slot), 1.0) and _mgr.get_shield_of(slot) == 0 and not _mgr.is_self_live(slot), "and has no growth, shield or self-hit")
+	_check(is_equal_approx(_mgr.get_growth_of(slot), 1.0) and _mgr.get_shield_of(slot) == 0, "and has no growth or shield")
 	_run(40)
 	_check(_expired.size() == 1 and not _expired[0][3], "it expires by its life, not on a wall")
 
@@ -440,31 +440,26 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	_setup()
 	_mgr.set_walls([Rect2(160.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	var caster: Node2D = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
-	# Without the flag a shot never hits its caster.
-	var harmless: int = _fire(Vector2(200.0, 0.0))
-	_mgr.set_bounce(harmless, 1)
-	_run(100)
-	_check(_hits.is_empty(), "a shot without the flag passes its caster")
+	# The manager spares nothing by itself: a shot born in its caster with no `exclude` hits them.
+	var plain: int = _fire(Vector2(200.0, 0.0))
+	_run(2)
+	_check(_hits.size() == 1 and _hits[0][1] == caster and not _mgr.is_alive(plain), "a shot never spares its caster by itself")
 	_setup()
 	_mgr.set_walls([Rect2(160.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	caster = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _fire(Vector2(200.0, 0.0))
 	_mgr.set_bounce(slot, 1)
-	_check(_mgr.set_self_hit(slot), "self-hit is accepted for a wizard's shot")
+	_mgr.exclude(slot, caster)
 	_run(3)
 	_check(_hits.is_empty() and _mgr.is_alive(slot), "it does not hit the caster it starts inside")
-	_check(not _mgr.is_self_live(slot) or _mgr.get_position_of(slot).distance_to(Vector2(50.0, 100.0)) > 10.0, "and is not live while it overlaps them")
-	_run(10)
-	_check(_mgr.is_self_live(slot), "it goes live once it has left the caster's hitbox")
 	_run(100)
 	_check(_hits.size() == 1 and _hits[0][1] == caster and _hits[0][0] == 0, "and hits the caster when it comes back")
 	_check(_hits[0][2].x > 50.0 and _hits[0][2].x < 70.0, "at the caster")
 	_check(not _mgr.is_alive(slot), "that spends it")
-	_check(not _mgr.set_self_hit(_mgr.spawn(EventsScript.NO_PLAYER, Vector2(10.0, 10.0), Vector2.ZERO, 1.0)), "a shot of no actor has no caster to hit")
 
 
 ## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one;
-## an enemy's hits another enemy; a shot of no actor hits a wizard and an enemy alike. Only the caster's own body is skipped.
+## an enemy's hits another enemy; a shot of no actor hits a wizard and an enemy alike.
 func _test_every_shot_hits_both_sides() -> void:
 	_setup()
 	var friend: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)

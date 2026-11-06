@@ -122,6 +122,8 @@ func add_guard(player: int, at: Vector2) -> Node2D:
 	_root.add_child(guard)
 	guard.global_position = at
 	combat.register_actor(guard, IMP_HEALTH, IMP_RADIUS)
+	# The actor's node, as an Actor sets its own: what its spells start on and spare (`Spells._launch`).
+	projectiles.actors.set_node(player, guard)
 	bodies.append(guard)
 	return guard
 

@@ -10,8 +10,8 @@ extends Node
 ## Downed component, so the run simply goes on.
 ##
 ## Friendly fire is no option any more (actors G3c): a player's shots always hit the other
-## players, never the shooter (`core/projectiles`), and `combat` turns the hits into damage as
-## for any wizard.
+## players, and the shooter too once a shot has left them (owner, 2026-11-06; `Spells._launch`),
+## and `combat` turns the hits into damage as for any wizard.
 ##
 ## The shared camera: after `room_entered` Coop takes the current `Camera2D` and,
 ## every frame, moves it to the middle of all wizards (downed ones too, so a

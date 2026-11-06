@@ -83,7 +83,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 ## ahead (short of a wall) and a ring grows from there to its `radius` over SLAM_GROW of its
 ## `lifetime` and holds for the rest. The ring strikes each body in it once (`Projectiles.sweep`
 ## all round the impact, so a wall between hides a body), outward from the impact, so the hit's
-## knockback throws it outward; its caster's own body is skipped, a teammate is hit. Its hits carry
+## knockback throws it outward; the body that slams is spared (it never leaves it), any other is hit. Its hits carry
 ## payloads and chains as a beam's do, and a shield or deflect works on the shots in its ring. Its
 ## `blast` and `on expire` happen at the impact when the ring is done. `form_shown` tells looks of
 ## the impact (`slam`), the point it strikes (`STRIKES_POINT`): its staff animation's `land` puts the

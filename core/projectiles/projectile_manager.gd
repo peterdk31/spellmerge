@@ -65,8 +65,9 @@ extends Node2D
 ## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick other
 ##   teams, and a shield stops other teams' shots. Never for whether a hit lands: every shot and
 ##   beam hits both actor layers (ACTOR_LAYERS, actors G3c, owner 2026-10-28: "Everything should
-##   be able to damage everything."), and only the caster's own body (and decoys) is skipped,
-##   unless the shot is self-hitting.
+##   be able to damage everything."), its own caster's body too: a shot spares only the body it
+##   started on, until it has left it (`exclude`; owner, 2026-11-06: "a players own spells should
+##   hurt the player"), and a ray or sweep spares the body it is cast from (their `exclude`).
 ## - **ramp** (`ramp_of`): which batch draws it and in which colours (`look_color`, `tint_of`).
 ## - **budget** (`budget_of`): whose share of the pool the cap drops from first: one bucket per
 ##   seat and one that every actor no seat drives shares (`Actors.SHARED`).
@@ -160,8 +161,8 @@ extends Node2D
 ##   shield                 stops N shots of other teams that touch it (`shot_blocked`)
 ##   deflect                turns every shot of another team that touches it and makes it its
 ##                          caster's, 1.7x faster (`deflect_shot`, `shot_deflected`); before a shield
-##   self hit               may hit its caster once it has left the caster's hitbox
-## Self-hit is off until `gameplay/combat` is ready for it (B3). Teammates are always hit (G3c).
+## No shot spares its caster (owner, 2026-11-06): it spares the body it started on until it has
+## left it (`exclude`, which the spell runtime gives every launch), then hits it as any other.
 ##
 ## Rays: `ray(...)` is an instant beam, `ray_curve(...)` a bent one, `ray_points(...)` one along
 ## any path of points (a live beam, which a homing one bends from target to target). They hold
@@ -225,8 +226,8 @@ const MOTION_ORBIT: int = 2
 const CASTER_BODY: int = -1
 const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
-const F_SELF: int = 1
-const F_SELF_LIVE: int = 2
+## Bits 1 and 2 were F_SELF and F_SELF_LIVE (a shot that may hit its caster once it has left it),
+## gone 2026-11-06: every shot does, by `exclude`.
 ## Bit 4 was F_ALLY (a mend shot that hits teammates), gone in actors G3c: every shot does.
 const F_GHOST: int = 8
 const F_STUCK: int = 16
@@ -1830,9 +1831,9 @@ func _team_of_target(owner: int, layer: int) -> int:
 
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
-## `owner` is the actor whose body it is (or whose decoy), or Events.NO_PLAYER: shots of that
-## actor never hit it (unless they self-hit), and its team is what aim reads (see
-## `_team_of_target`). `offset` moves the hit circle from the
+## `owner` is the actor whose body it is (or whose decoy), or Events.NO_PLAYER: aim reads it
+## (homing never picks its own actor's body) and its team (see `_team_of_target`); a hit never
+## asks it. `offset` moves the hit circle from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
 ## the sprite does hit.
 func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
@@ -2783,22 +2784,6 @@ func _team_now(caster: int) -> int:
 	return table.team_of(caster) if table != null and table.is_open(caster) else ActorsScript.NONE
 
 
-## The shot may hit its own caster, once it has left the caster's hitbox (the first step it
-## no longer overlaps it). Off by default; `gameplay/combat` decides what such a hit does. A shot
-## of no actor has no caster to hit.
-func set_self_hit(slot: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _actor[slot] < 0:
-		return false
-	_flags[slot] |= F_SELF
-	_flags[slot] &= ~F_SELF_LIVE
-	return true
-
-
-## True once a self-hitting shot has left its caster, so that it can hit them.
-func is_self_live(slot: int) -> bool:
-	return slot >= 0 and slot < _cap and _alive[slot] != 0 and (_flags[slot] & F_SELF_LIVE) != 0
-
-
 func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
 	# An orbit shot is held by its caster and ignores walls. One born in a solid shot's row is
 	# made: it ends on that wall at its first step, unless the wall cast it (`_own_solid`).
@@ -3218,7 +3203,7 @@ func _hit_found(slot: int) -> void:
 # have it, from a list kept up to date as shots get and lose it. The passes run in the order of
 # their numbers (B_*) and of BEHAVIOUR_PASSES, which must match: the one place that says which
 # behaviours there are and in which order they run. Behaviours that act only at a wall or a hit
-# (bounce, ghost, sticky before it sticks, self-hit, pierce) have no pass: `_pass_hits`,
+# (bounce, ghost, sticky before it sticks, pierce) have no pass: `_pass_hits`,
 # `_wall_end` and `_register_hit` read their numbers.
 #
 # A pass gets (list, first, count, delta): the shots are list[first] to list[first + count - 1].
@@ -3858,12 +3843,12 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## `caster`. It holds no row in the pool. It stops at the first wall (or, with `bounces`, turns
 ## off it as a bouncing shot does, that many times, and goes on for the length it has left) and
 ## hits the nearest `pierce + 1` targets on `layers` whose circle the beam touches (`width`
-## pixels either side of the line; `exclude` is a target it never hits, for a beam that starts
-## on the one that fired it). For each, nearest first, it sends `projectile_impact` and
+## pixels either side of the line; `exclude` is a target it never hits: the body the beam is cast
+## from, its caster's own or the one whose hit fired it). For each, nearest first, it sends `projectile_impact` and
 ## `projectile_hit(caster, target, point, tag)`, the point being where the beam passes closest
 ## to the target; a beam that ends on a wall sends an impact with a `null` target there, and one
 ## that turns at a wall one at every turn (each wall also sends `wall_met`, after the hits).
-## Targets owned by `caster` (its own body) are skipped and, as in `spawn`, it hits ACTOR_LAYERS
+## Its caster's own body is hit like any other unless it is `exclude` and, as in `spawn`, it hits ACTOR_LAYERS
 ## whatever `layers` says. Returns how far the beam got in pixels: the length, the distance to
 ## the wall, or the distance to the last target it could hit. 0.0 for bad arguments or an origin
 ## inside a wall. The hits are found before any event is sent, so a handler may remove or free
@@ -4149,7 +4134,8 @@ func _ray_level(level: int) -> void:
 ## in `ray`) whose hit circle reaches into the wedge round `origin` from `from_angle` to
 ## `to_angle` radians off `direction` (`side` 1 counts clockwise on screen, -1 the other way;
 ## `to_angle` not below `from_angle`), out to `reach` pixels, with no wall between it and
-## `origin`. Targets `caster` owns (its body) and `exclude` are skipped. It sends nothing: it
+## `origin`. Only `exclude` is skipped (the body it is cast from: its caster's own body is hit
+## like any other). It sends nothing: it
 ## fills `sweep_nodes`, `sweep_points` (where the wedge meets the body, on its line from
 ## `origin`; for a whole circle `origin` itself, what strikes from there) and `sweep_heads` (the
 ## way the sweep moves there: round `origin`, or outward for a whole circle) and returns how many (every one: the results grow). Each step of a swing asks for
@@ -4176,7 +4162,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+				if (_target_layer[t] & layers) != 0 and _target_id[t] != skip and is_instance_valid(_targets[t]):
 					var to: Vector2 = _target_pos[t] - origin
 					var radius: float = _target_radius[t]
 					var distance: float = to.length()
@@ -4363,7 +4349,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 				for x in range(x0, x1 + 1):
 					var t: int = _cell_head[y * _grid_w + x]
 					while t >= 0:
-						if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+						if (_target_layer[t] & layers) != 0 and _target_id[t] != skip and is_instance_valid(_targets[t]):
 							var along: float = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
 							var closest: Vector2 = a + heading * along
 							var touch: float = wide + _target_radius[t]
@@ -5337,7 +5323,8 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 	return point.distance_to(body.global_position + _target_offset[at]) <= _target_radius[at] + radius
 
 
-## The shot in `slot` does not hit `node` (the body whose hit fired it, as a payload) until it has
+## The shot in `slot` does not hit `node` (the body it started on: its caster's own, or the body whose
+## hit fired it, as a payload; the spell runtime gives every launch one) until it has
 ## been clear of it: the first hit test whose step starts with the shot off that body's hit circle
 ## ends the exclusion, and from then on it hits that body as any other (owner, 2026-11-06: no
 ## timer, so a slow shot born on its source can no longer hit it as it crawls out).
@@ -5626,7 +5613,7 @@ func _hit_test(slot: int) -> bool:
 	var x1: int = clampi(floori((high.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
 	var y0: int = clampi(floori((low.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
 	var y1: int = clampi(floori((high.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
-	# What a target must touch to be hit (or to hold a self-hitting shot): the path's box widened
+	# What a target must touch to be hit: the path's box widened
 	# by the shot's radius (and a little, for rounding).
 	var margin: Vector2 = Vector2.ONE * (radius + 0.05)
 	var near_low: Vector2 = lowest - margin
@@ -5640,13 +5627,10 @@ func _hit_test(slot: int) -> bool:
 	var middle: Vector2 = Vector2.ZERO
 	var half: float = 0.0
 	var layers: int = 0
-	var shooter: int = 0
-	var flags: int = _flags[slot]
 	var skip_on: bool = false
 	var skip_inside: bool = false
 	var stamp: int = 0
 	var found: int = 0
-	var inside: bool = false
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
 			var cell: int = y * _grid_w + x
@@ -5672,7 +5656,6 @@ func _hit_test(slot: int) -> bool:
 				middle = (from + to) * 0.5
 				half = sqrt(path_sq) * 0.5 + 0.01
 				layers = _layers[slot]
-				shooter = _actor[slot]
 				skip_on = _skip_on[slot] > 0.0
 				stamp = _mark_memory(slot)
 			var t: int = _cell_head[cell]
@@ -5683,17 +5666,7 @@ func _hit_test(slot: int) -> bool:
 				if middle.distance_squared_to(centre) > far * far:
 					t = _target_next[t]
 					continue
-				if shooter >= 0 and _target_owner[t] == shooter:
-					# The shooter's own body: only a self-hitting shot that has left it.
-					if (flags & F_SELF) == 0:
-						t = _target_next[t]
-						continue
-					if (flags & F_SELF_LIVE) == 0:
-						if to.distance_squared_to(centre) <= reach * reach:
-							inside = true
-						t = _target_next[t]
-						continue
-				elif (_target_layer[t] & layers) == 0:
+				if (_target_layer[t] & layers) == 0:
 					t = _target_next[t]
 					continue
 				var along: float = 0.0
@@ -5715,8 +5688,6 @@ func _hit_test(slot: int) -> bool:
 					continue
 				found = _keep_candidate(found, t, along, closest)
 				t = _target_next[t]
-	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
-		_flags[slot] |= F_SELF_LIVE
 	# Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
 	if _skip_on[slot] > 0.0 and not skip_inside:
 		_skip_on[slot] = 0.0

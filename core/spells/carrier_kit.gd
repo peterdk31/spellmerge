@@ -291,10 +291,17 @@ func strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arra
 	return _rt._strike(spell, tag, actor, found, struck, centre, chain, prev, hit)
 
 
-## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own);
-## with `everyone`, its caster's own body too (a fallback's strike, as a blast's).
-func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, everyone: bool = false) -> void:
-	_rt._strike_round(spell, tag, actor, at, way, reach, hit, everyone)
+## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own),
+## its caster's own too, except `spare` (the body it is cast from); with `explosion` a wall hides
+## no body (a fallback's strike, as a blast's).
+func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, explosion: bool = false, spare: Node = null) -> void:
+	_rt._strike_round(spell, tag, actor, at, way, reach, hit, explosion, -1, 0, spare)
+
+
+## The node of the actor `body`'s body (`caster_body`), null for -1 or none: what a carrier that
+## moves or holds a body spares.
+func body_node(body: int) -> Node:
+	return _rt._body_node(body)
 
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of

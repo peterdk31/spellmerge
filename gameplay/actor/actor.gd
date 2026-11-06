@@ -152,6 +152,8 @@ var _leaving: bool = false
 
 
 func _init() -> void:
+	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
+	set_physics_process(true)
 	collision_layer = 0
 	collision_mask = LAYER_WALLS
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
@@ -201,13 +203,14 @@ func _exit_tree() -> void:
 	_close_id()
 
 
-func _physics_process(delta: float) -> void:
+## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move.
+func tick_step(delta: float) -> void:
 	step(delta)
 	move_and_slide()
 
 
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
-## caller moves the body (`_physics_process` does).
+## caller moves the body (`tick_step` does).
 func step(delta: float) -> void:
 	# Each component is called only when it has something to do (performance pass, 2026-10-28):
 	# a step runs for every actor every frame, and a call costs more than the checks here.

@@ -55,6 +55,28 @@ func test_spawns_follow_the_view_when_the_camera_moves() -> void:
 		check(run.director.arena().has_point(enemy.position), "an enemy appeared off the floor at %s" % enemy.position)
 
 
+## The spawns never read the camera (online-ready N3): it eases as it is drawn, on real time, so a
+## run read from it played differently at another frame rate. The same run with the camera
+## elsewhere spawns the same enemies at the same places; the view is Coop's `view_fitted`.
+func test_the_spawns_never_read_the_camera() -> void:
+	var places: Array = []
+	for camera_at: Vector2 in [Vector2(320.0, 180.0), Vector2(900.0, 40.0)]:
+		var run: Fixture = _make()
+		run.director.curve = Fixture.curve([[0.0, 30.0, 200]], {Fixture.ENEMY_A: 1.0})
+		run.start()
+		run.camera.position = camera_at
+		run.camera.zoom = Vector2(0.5, 0.5)
+		run.run(1.0)
+		var at: Array[Vector2] = []
+		for enemy: Node2D in run.enemies():
+			at.append(enemy.position)
+		places.append(at)
+		run.free_all()
+		_run = null
+	check(not (places[0] as Array).is_empty(), "enemies appeared")
+	check_equal(places[1], places[0], "the same places wherever the camera is")
+
+
 func test_the_cap_holds() -> void:
 	var run: Fixture = _make()
 	run.director.curve = Fixture.curve([[0.0, 500.0, 12]], {Fixture.ENEMY_A: 1.0})

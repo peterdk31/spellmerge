@@ -280,6 +280,8 @@ var _auto_table: ActorsScript = null
 
 
 func _init() -> void:
+	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
+	set_physics_process(true)
 	_body.resize(ACTORS)
 	_owned.resize(ACTORS)
 	_nodes.resize(ACTORS)
@@ -369,10 +371,6 @@ func setup() -> void:
 		events.pull_requested.connect(_on_pull_requested)
 	if not events.status_requested.is_connected(_on_status_requested):
 		events.status_requested.connect(_on_status_requested)
-
-
-func _physics_process(delta: float) -> void:
-	step(delta)
 
 
 # --- Bodies ------------------------------------------------------------------

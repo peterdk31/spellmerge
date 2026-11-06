@@ -172,6 +172,10 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Fixes A2 and A3, and the flaky `test_wave_balance.gd` (docs/BACKLOG.md).
 - From N1: the state hash's cost measured on the stress run, now that the tick names the real areas (N1 measured the test worlds only).
 
+**Split in three (2026-11-06):** **N3a** the Tick, its order and the timers on it; **N3b** a run starts from a fresh game's state (every service's clocks, counters, free lists and slots as a fresh one's, so a replay recorded in any run plays in a fresh game; the proof is a replay played after other runs in the same game); **N3c** the `sim` service, chance by hash, order by id beyond the bodies, and the hash's cost on the stress run.
+
+**N3a done (2026-11-06).** `core/sim/tick.gd` (`Tick`) steps the frames, the services, the swarm, the bodies by actor id and the run's rules and timers, in the scene tree's old order (docs/DECISIONS.md, 2026-11-06); the areas' own callbacks are gone; `tests/core/test_tick.gd`. The replay test no longer holds Flow's, Coop's and the horde's timers, which showed that the horde's spawns read the eased camera: Coop now sends the fitted view on the tick (`view_fitted`) and the horde spawns outside it.
+
 ### N4: stops in ticks
 
 - Hit-stop and the downed stop become a number of ticks the simulation stands still (`Tick.hold(ticks)`), started by the simulation events that cause them; Feel only draws them.

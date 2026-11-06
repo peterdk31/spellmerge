@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_camera_eases()
 	_test_camera_respects_room_limits()
 	_test_nobody_leaves_the_view_while_easing()
+	_test_the_fitted_view_follows_the_wizards_not_the_camera()
 	_test_joiner_is_protected()
 	_test_camera_survives_a_restart()
 	_test_revive_two_players()
@@ -390,6 +391,35 @@ func _test_camera_respects_room_limits() -> void:
 		_coop.step(0.016)
 		_check(room.grow(0.01).encloses(_coop.visible_rect()), "easing %d: the view stays inside the room" % i)
 		_check(_everyone_in_view(), "easing %d: everyone is in view" % i)
+	_stop()
+
+
+## The view sent on the tick (`view_fitted`, online-ready N3) is worked out from where the wizards
+## stand: moving the camera changes nothing, moving a wizard sends a new view holding everyone.
+func _test_the_fitted_view_follows_the_wizards_not_the_camera() -> void:
+	_stop()
+	_start_with(0)
+	_input.add_virtual_device(1)
+	var camera: Camera2D = _coop.camera
+	if camera == null:
+		_check(false, "the camera exists for the fitted view test")
+		return
+	_open_limits(camera)
+	var sent: Array[Rect2] = []
+	var hear := func(view: Rect2) -> void: sent.append(view)
+	_events.connect("view_fitted", hear)
+	_wizard(0).global_position = Vector2(100.0, 100.0)
+	_wizard(1).global_position = Vector2(300.0, 160.0)
+	_coop.step_rules(0.0)
+	_check(sent.size() == 1, "a first view is sent (%d)" % sent.size())
+	camera.position += Vector2(400.0, 300.0)
+	camera.zoom = Vector2(0.3, 0.3)
+	_coop.step_rules(0.0)
+	_check(sent.size() == 1, "moving the camera sends nothing (%d)" % sent.size())
+	_wizard(1).global_position = Vector2(600.0, 400.0)
+	_coop.step_rules(0.0)
+	_check(sent.size() == 2 and sent[1].has_point(_wizard(0).global_position) and sent[1].has_point(_wizard(1).global_position), "a wizard moved: a new view holding both")
+	_events.disconnect("view_fitted", hear)
 	_stop()
 
 

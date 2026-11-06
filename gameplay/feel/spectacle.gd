@@ -31,6 +31,7 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const StreamsScript := preload("res://gameplay/feel/streams.gd")
 const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -103,6 +104,9 @@ var marks: MarksScript = null
 var floor_marks: bool = FloorMarks.default_on()
 ## Spell light (null with the setting off, or with no projectile manager), and the setting.
 var light: SpellLightScript = null
+## The barriers' shells (`barriers.gd`: a Shield's bubble of motes round an actor), stepped with
+## the motes and drawn with their material.
+var barriers: BarriersScript = null
 var spell_light: bool = SpellLightSetting.default_on()
 ## The room's light where nothing lights it (`RoomBase.ambient`, from `room_entered`; P3b), kept
 ## for a light made later. Read only.
@@ -143,6 +147,9 @@ func _ready() -> void:
 	ShaderWarmupScript.want(SpellLightScript.APPLY_SHADER, ShaderWarmupScript.RECT)
 	ShaderWarmupScript.want(SpellLightScript.BEAM_SHADER, ShaderWarmupScript.MESH)
 	_make_motes(mote_cap)
+	barriers = BarriersScript.new(MOTE_Z)
+	barriers.name = "Barriers"
+	add_child(barriers)
 	ShaderWarmupScript.want(MarksScript.SHADER, ShaderWarmupScript.BATCH)
 	set_floor_marks(floor_marks)
 	if events == null:
@@ -165,19 +172,44 @@ func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 
 
 ## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams' and Feel's own
-## drawings' given off, then the motes and the marks stepped.
-func step(now: float) -> void:
+## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
+## table), then the motes and the marks stepped.
+func step(now: float, table: ActorsScript = null) -> void:
 	_clock = now
 	cards.new_frame()
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
 	_drawn_motes()
+	if barriers != null:
+		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
 		pool.step(now)
 	if marks != null:
 		marks.step(now)
 	if light != null:
 		light.step_cues(now)
+
+
+## The barrier on `actor` changed (combat's `barrier_changed`; `ramp` the actor's): its shell, in
+## the colours of the spell with `tag` (its tint and looks; a plain Shield's are its caster's).
+func barrier_changed(actor: int, charges: int, seconds: float, tag: int, way: Vector2, radius: float, ramp: int) -> void:
+	if barriers == null:
+		return
+	var core: Color = Color.WHITE
+	var look: int = 0
+	if spells != null and tag != 0 and spells.has_method(&"profile"):
+		var spell: Variant = spells.call(&"profile", tag)
+		if spell is CompiledSpell:
+			core = (spell as CompiledSpell).tint
+			look = (spell as CompiledSpell).look
+	barriers.change(actor, charges, seconds, way, radius, MotesScript.spell_source(ramp, look), core, pool if motes_on() else null)
+
+
+## A shot's shield blocked another (`shot_blocked` naming the shielded `shot`) at `at`: its shell
+## loses that charge's share.
+func shot_blocked(shot: int, at: Vector2) -> void:
+	if barriers != null:
+		barriers.shot_blocked(shot, at, projectiles, pool if motes_on() else null)
 
 
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a

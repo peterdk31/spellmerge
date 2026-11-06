@@ -63,3 +63,13 @@ const SPAWNS: int = 1 << 24
 ## Does it open a way through the world that shots and bodies take (a portal)? Read only by
 ## `CastSense.opens`; no card needs it.
 const GATES: int = 1 << 25
+## Is it shots of the projectile manager, each of which casts what it fires while it lives (a bolt,
+## a rune, an orbit, a wall's stones)? A payload such a shot fires lands its left-over cards on that
+## shot (`Carrier.payload_cast_by`, docs/CARRIERS.md "The fallback carriers").
+const CASTS_FROM_SHOT: int = 1 << 26
+## Is it a body of its own, an actor (a decoy)? What it fires while it lives is cast from that body,
+## and a payload's left-over cards land on it (`Carrier.payload_cast_by`).
+const CASTS_FROM_BODY: int = 1 << 27
+## Is it cast by nothing a push could move (a point: a payload whose shot is gone)? Recoil needs
+## something to push.
+const CASTERLESS: int = 1 << 28

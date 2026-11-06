@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## The Decoy card (content/spells/forms/decoy/, staffs C): a copy of the wizard, an actor that aims
 ## itself (enemies chase it when it is nearest). The engine side is tested in `tests/core/test_spells_payload_carriers.gd` and
-## `tests/gameplay/ai/test_entities.gd`; here the card's data and the entity it asks for. The
-## combo arena has no `ai`, so its combos only check what the wizard's other staffs do beside it.
+## `tests/gameplay/ai/test_entities.gd`; here the card's data, the entity it asks for and its body:
+## a regular actor (owner, 2026-11-06) with a barrier for its shield, a deflect as it appears, and
+## a payload's left-over cards landing on it.
 ##
 ## godot --headless --path . --script res://content/spells/forms/decoy/test_decoy.gd
 
@@ -81,9 +82,12 @@ func test_four_players_leave_their_own() -> void:
 			check_equal(spawns[0][0], seat, "player %d: the decoy is theirs" % seat)
 
 
-## Casts `cards` once while an enemy past the aim shoots bolts at the wizard all along, and counts
-## the wizard's blocks and deflects by the decoy's card (its node), and the payloads fired.
-func _guarded(cards: Array[StringName]) -> Dictionary:
+## Casts `cards` once while an enemy past the aim shoots bolts at the wizard all along (when an
+## enemy bolt is within `press_within` pixels of the wizard's hand; at the first step for 0), and
+## counts the blocks of a barrier on a body other than the wizard's (its decoy) by the cast's first
+## card (its node), the shots the wizard turned with it, the payloads fired and the decoy's health
+## lost.
+func _guarded(cards: Array[StringName], press_within: float = 0.0) -> Dictionary:
 	var registry: Node = own(RegistryScript.new()) as Node
 	registry.call("scan")
 	var shelf := own(World.Shelf.new()) as World.Shelf
@@ -95,39 +99,304 @@ func _guarded(cards: Array[StringName]) -> Dictionary:
 	var world := World.new(root, shelf, staff)
 	var wizard: Actor = world.add_wizard(cards)
 	world.add_enemy(&"E", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
-	var got: Dictionary = {"blocked": 0, "deflected": 0, "fired": 0}
+	var got: Dictionary = {"blocked": 0, "deflected": 0, "fired": 0, "barrier": 0, "lost": 0.0}
 	var me: int = wizard.caster_number()
-	world.bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int, _shot: int) -> void:
-		if caster == me and SpellTag.node_of(tag) == 0:
+	world.bus.shield_blocked.connect(func(actor: int, _at: Vector2, tag: int) -> void:
+		if actor != me and SpellTag.caster_of(tag) == me and SpellTag.node_of(tag) == 0:
 			got["blocked"] += 1)
 	world.bus.shot_deflected.connect(func(caster: int, _at: Vector2, tag: int, _shot: int) -> void:
 		if caster == me and SpellTag.node_of(tag) == 0:
 			got["deflected"] += 1)
-	world.press()
+	world.bus.wizard_shield_requested.connect(func(actor: int, charges: int, _seconds: float, tag: int) -> void:
+		if actor != me and SpellTag.caster_of(tag) == me:
+			got["barrier"] += charges)
+	world.bus.damage_dealt.connect(func(_by: int, target: Node, amount: float, _at: Vector2) -> void:
+		if target is Actor and target != wizard and (target as Actor).belongs_to == me:
+			got["lost"] += amount)
+	if press_within > 0.0:
+		world.press_when_shot_within(press_within)
+	else:
+		world.press()
 	world.run(2.0, 2.0)
 	got["fired"] = world.spells.fires_made
 	world.free_all()
 	return got
 
 
-func test_a_shielded_decoy_blocks_shots_that_touch_it() -> void:
-	# Rules R4g: a shield on a decoy stops the other teams' shots at it, one charge each.
-	check_equal(_guarded([&"decoy"])["blocked"], 0, "a plain decoy blocks nothing")
+func test_a_shielded_decoy_has_a_barrier_that_blocks_hits() -> void:
+	# Owner, 2026-11-06: the decoy is a regular actor; its shield is a barrier on it, as on a caster.
+	var plain: Dictionary = _guarded([&"decoy"])
+	check_equal(plain["blocked"], 0, "a plain decoy blocks nothing")
+	check_equal(plain["barrier"], 0, "and has no barrier")
+	check(plain["lost"] > 0.0, "the enemy's bolts hurt it (%s)" % plain["lost"])
 	var shield: ModifierBase = load("res://content/spells/modifiers/shield/shield.tres") as ModifierBase
 	var got: Dictionary = _guarded([&"shield", &"decoy"])
-	check_equal(got["blocked"], roundi(shield.behaviour_strength), "a shielded one blocks as many as its charges")
+	check_equal(got["barrier"], roundi(shield.behaviour_strength), "a shielded one gets a barrier of its charges")
+	check_equal(got["blocked"], roundi(shield.behaviour_strength), "which blocks as many hits")
 
 
-func test_a_deflecting_decoy_turns_shots_away() -> void:
-	var got: Dictionary = _guarded([&"deflect", &"decoy"])
-	check(got["deflected"] > 1, "it turns every shot that reaches it (%d)" % got["deflected"])
-	check_equal(got["blocked"], 0, "and stops none")
+func test_a_deflecting_decoy_turns_the_shots_round_it_once_as_it_appears() -> void:
+	# Owner, 2026-11-06: the caster's rule. Cast as an enemy bolt comes near, it turns that one; the
+	# later ones reach it.
+	var near: Dictionary = _guarded([&"deflect", &"decoy"], 32.0)
+	check(near["deflected"] >= 1, "it turns the shot near it as it appears (%d)" % near["deflected"])
+	check(near["lost"] > 0.0, "and no more: the later bolts hurt it (%s)" % near["lost"])
+	check_equal(near["blocked"], 0, "it stops none")
+	var early: Dictionary = _guarded([&"deflect", &"decoy"])
+	check_equal(early["deflected"], 0, "cast with no shot near, it turns none later (%d)" % early["deflected"])
 
 
-func test_on_block_fires_from_a_decoy() -> void:
+func test_on_block_fires_from_a_decoys_barrier() -> void:
 	var got: Dictionary = _guarded([&"on_block", &"shield", &"decoy", &"bolt"])
-	check(got["blocked"] > 0, "it blocks")
+	check(got["blocked"] > 0, "its barrier blocks")
 	check_equal(got["fired"], got["blocked"], "and each block fires its payload")
+
+
+## The barrier charges (Combat's) on the wizard's oldest decoy in `world`, -1 with none.
+func _decoy_barrier(world: World, wizard: Actor) -> int:
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	return world.combat.shield(decoy.id) if decoy != null and decoy.is_inside_tree() else -1
+
+
+func test_a_decoy_placed_again_starts_with_its_own_barrier_only() -> void:
+	# A decoy's actor is kept by its row and placed again: the barrier goes with the decoy, not the row.
+	var quick: FormBase = _card().duplicate() as FormBase
+	quick.wind_down = 0.0
+	quick.lifetime = 0.25
+	var made: Array = _world([&"shield", &"decoy", &"decoy"], Vector2(400.0, 300.0), {&"decoy": quick})
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(World.STEP, World.STEP)
+	check_equal(_decoy_barrier(world, wizard), 1, "the shielded decoy has its barrier at once (Combat knows its body)")
+	world.run(0.5, 0.5)
+	check_equal(world.entities.count(&"decoy", wizard.id), 0, "it is gone")
+	world.brain.presses = [0]
+	world.run(World.STEP, World.STEP)
+	check_equal(world.entities.count(&"decoy", wizard.id), 1, "the plain one stands")
+	check_equal(_decoy_barrier(world, wizard), 0, "with no barrier from the one before")
+	world.free_all()
+
+
+func test_a_timer_on_a_decoy_shields_the_decoy() -> void:
+	# The wider rule (owner, 2026-11-06): a payload's left-over cards land on the body that fired it.
+	var made: Array = _world([&"timer", &"decoy", &"shield"], Vector2(400.0, 300.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var compiled: CompiledStaff = world.spells.compile_staff([&"timer", &"decoy", &"shield"] as Array[StringName], _plain(3))
+	check(not compiled.wasted.has(2), "the shield is not wasted: it lands on the decoy")
+	world.run(0.125, 0.125)
+	check_equal(_decoy_barrier(world, wizard), 0, "no barrier before the first tick")
+	world.run(0.5, 0.5)
+	check(_decoy_barrier(world, wizard) >= 1, "a barrier after it (%d)" % _decoy_barrier(world, wizard))
+	check_equal(world.combat.shield(wizard.id), 0, "on the decoy, not the wizard")
+	world.free_all()
+
+
+func test_a_decoys_payload_waiting_for_its_turn_still_lands_on_the_decoy() -> void:
+	# The body is carried through a delayed fire (`PendingLaunch.caster`), as a shot caster is:
+	# an echo of the landing, and a fire past the step's budget, which waits for the next step.
+	var made: Array = _world([&"timer", &"mirror", &"decoy", &"echo", &"shield"], Vector2(400.0, 300.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.spells.fire_shots_per_step = 0
+	var shielded: Dictionary = {}
+	world.bus.wizard_shield_requested.connect(func(actor: int, _charges: int, _seconds: float, _tag: int) -> void:
+		shielded[actor] = int(shielded.get(actor, 0)) + 1)
+	world.run(1.0, 1.0)
+	check_equal(world.entities.count(&"decoy", wizard.id), 2, "two decoys (a mirror's)")
+	check(world.spells.fires_waited > 0, "a tick waited for the next step (%d)" % world.spells.fires_waited)
+	check(not shielded.has(wizard.id), "no barrier on the wizard: %s" % [shielded])
+	check_equal(shielded.size(), 2, "a barrier on each decoy: %s" % [shielded])
+	for actor: int in shielded:
+		check(int(shielded[actor]) >= 2, "each by its tick and its echo: %s" % [shielded])
+	world.free_all()
+
+
+func test_an_on_hurt_payload_that_hurts_its_decoy_does_not_fire_itself_again() -> void:
+	# Regression: the strike of what lands on a decoy hurt it, which fired its `on hurt` again inside
+	# itself, for ever (a stack overflow).
+	var made: Array = _world([&"on_hurt", &"decoy", &"fire"], Vector2(400.0, 300.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(0.25, 0.25)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null, "a decoy")
+	if decoy == null:
+		world.free_all()
+		return
+	var before: int = world.spells.fires_made
+	var by: int = world.table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	world.combat.hit(by, decoy, 1)
+	check_equal(world.spells.fires_made, before + 1, "one hurt, one payload, though its fire hurt the decoy too")
+	world.free_all()
+
+
+# --- The decoy's body casts its payloads (owner, 2026-11-06) ----------------------------------
+
+## A world with the wizard casting `cards` at once and a still enemy at `enemy_at`, run until the
+## decoy stands: [world, wizard, decoy, where the decoy stands, where the wizard stands].
+func _decoy_world(cards: Array[StringName], enemy_at: Vector2) -> Array:
+	var made: Array = _world(cards, enemy_at)
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(0.25, 0.25)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null, "%s: a decoy" % [cards])
+	return [world, wizard, decoy, decoy.global_position if decoy != null else Vector2.INF, wizard.global_position]
+
+
+func test_a_decoys_timer_dash_moves_the_decoy_not_the_wizard() -> void:
+	var made: Array = _decoy_world([&"timer", &"decoy", &"dash"], Vector2(240.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	if decoy != null:
+		world.run(0.5, 0.5)
+		check(decoy.global_position.distance_to(made[3]) > 40.0, "the decoy dashed (%s to %s)" % [made[3], decoy.global_position])
+		check(decoy.global_position.x > (made[3] as Vector2).x, "toward its foe, the way it aims")
+		check((made[1] as Actor).global_position.is_equal_approx(made[4]), "the wizard stayed (%s)" % (made[1] as Actor).global_position)
+	world.free_all()
+
+
+func test_a_decoys_timer_teleport_moves_the_decoy() -> void:
+	var made: Array = _decoy_world([&"timer", &"decoy", &"teleport"], Vector2(240.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	if decoy != null:
+		world.run(0.5, 0.5)
+		check(decoy.global_position.distance_to(made[3]) > 60.0, "the decoy teleported (%s to %s)" % [made[3], decoy.global_position])
+		check((made[1] as Actor).global_position.is_equal_approx(made[4]), "the wizard stayed (%s)" % (made[1] as Actor).global_position)
+	world.free_all()
+
+
+func test_a_decoys_timer_pull_and_swap_move_the_decoy() -> void:
+	for raw: Array in [[&"timer", &"decoy", &"pull", &"bolt"], [&"timer", &"decoy", &"swap"]]:
+		var cards: Array[StringName] = []
+		cards.assign(raw)
+		var made: Array = _decoy_world(cards, Vector2(120.0, 0.0))
+		var world: World = made[0]
+		var decoy: Actor = made[2]
+		if decoy != null:
+			world.run(1.0, 1.0)
+			check(decoy.global_position.x > (made[3] as Vector2).x + 40.0, "%s: the decoy went toward what its shot hit (%s to %s)" % [cards, made[3], decoy.global_position])
+			check((made[1] as Actor).global_position.is_equal_approx(made[4]), "%s: the wizard stayed (%s)" % [cards, (made[1] as Actor).global_position])
+		world.free_all()
+
+
+func test_a_decoys_timer_recoil_pushes_the_decoy() -> void:
+	var made: Array = _decoy_world([&"timer", &"decoy", &"recoil", &"bolt"], Vector2(240.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	if decoy != null:
+		world.run(0.6, 0.6)
+		check(decoy.global_position.x < (made[3] as Vector2).x - 10.0, "pushed back from its bolt (%s to %s)" % [made[3], decoy.global_position])
+		check((made[1] as Actor).global_position.is_equal_approx(made[4]), "the wizard stayed")
+	world.free_all()
+
+
+func test_a_decoy_that_ends_mid_dash_is_placed_again_standing() -> void:
+	# A decoy's actor is kept by its row: the dash its payload asked of it ends with it.
+	var quick: FormBase = _card().duplicate() as FormBase
+	quick.wind_down = 0.0
+	quick.lifetime = 0.3
+	var made: Array = _world([&"timer", &"decoy", &"dash", &"decoy"], Vector2(240.0, 0.0), {&"decoy": quick})
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(0.5, 0.5)
+	check_equal(world.entities.count(&"decoy", wizard.id), 0, "the first ended mid-dash")
+	for wait in 240:
+		if world.spells.cooldown_left(wizard.id, 0) <= 0.0:
+			break
+		world.run(World.STEP, World.STEP)
+	world.brain.presses = [0]
+	world.run(World.STEP * 2.0, World.STEP * 2.0)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null, "the second stands")
+	if decoy != null:
+		var at: Vector2 = decoy.global_position
+		world.run(0.2, 0.2)
+		check(decoy.global_position.distance_to(at) < 1.0, "and keeps no move of the one before (%s to %s)" % [at, decoy.global_position])
+	world.free_all()
+
+
+## The distance of every live orbit shot from `centre`.
+func _orbits_from(world: World, centre: Vector2) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	for slot in world.projectiles.get_cap():
+		if not world.projectiles.is_alive(slot):
+			continue
+		var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
+		if spell != null and spell.carrier == &"orbit":
+			out.append(world.projectiles.get_position_of(slot).distance_to(centre))
+	return out
+
+
+func test_a_decoys_timer_orbit_circles_the_decoy_and_follows_it() -> void:
+	var orbit: FormBase = load("res://content/spells/forms/orbit/orbit.tres") as FormBase
+	var made: Array = _decoy_world([&"timer", &"homing", &"decoy", &"orbit"], Vector2(140.0, 0.0))
+	var world: World = made[0]
+	var decoy: Actor = made[2]
+	if decoy != null:
+		for seconds: float in [0.35, 1.0]:
+			world.run(seconds, seconds)
+			var around: PackedFloat32Array = _orbits_from(world, world.projectiles.get_anchor(decoy.id))
+			check(not around.is_empty(), "orbs fly")
+			for distance in around:
+				check(absf(distance - orbit.orbit_radius) < 3.0, "every orb circles the decoy at its radius (%s)" % around)
+		check(decoy.global_position.distance_to(made[3]) > 15.0, "and the decoy crept on meanwhile (%s to %s)" % [made[3], decoy.global_position])
+	world.free_all()
+
+
+func test_an_orbit_in_a_dashs_timer_circles_the_wizard() -> void:
+	var orbit: FormBase = load("res://content/spells/forms/orbit/orbit.tres") as FormBase
+	var made: Array = _world([&"timer", &"dash", &"orbit"], Vector2(400.0, 300.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var start: Vector2 = wizard.global_position
+	world.run(0.6, 0.6)
+	check(wizard.global_position.distance_to(start) > 40.0, "the wizard dashed")
+	var around: PackedFloat32Array = _orbits_from(world, world.projectiles.get_anchor(wizard.id))
+	check(not around.is_empty(), "an orbit flies")
+	for distance in around:
+		check(absf(distance - orbit.orbit_radius) < 3.0, "it circles the wizard, not a spot on its way (%s)" % around)
+	world.free_all()
+
+
+## A staff of `slots` with no delay of its own.
+func _plain(slots: int) -> StaffBase:
+	var staff := StaffBase.new()
+	staff.id = &"decoy_plain"
+	staff.slots = slots
+	staff.cooldown = 0.0
+	return staff
+
+
+func test_on_hurt_on_a_decoy_turns_the_shots_round_it() -> void:
+	# The wider rule (owner, 2026-11-06): the deflect left in the payload lands on the decoy's body.
+	var made: Array = _world([&"on_hurt", &"decoy", &"deflect"], Vector2(400.0, 300.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.add_enemy(&"S", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
+	var turned: Array[int] = [0]
+	world.bus.shot_deflected.connect(func(caster: int, _at: Vector2, _tag: int, _shot: int) -> void:
+		if caster == wizard.id:
+			turned[0] += 1)
+	world.run(World.STEP, World.STEP)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null, "a decoy")
+	if decoy == null:
+		world.free_all()
+		return
+	var centre: Vector2 = decoy.global_position + decoy.body_offset
+	for step in 120:
+		if world.projectiles.shots_on_segment(wizard.id, centre, centre, 16.0) > 0:
+			break
+		world.run(World.STEP, World.STEP)
+	check_equal(turned[0], 0, "nothing turned before it is hurt")
+	var by: int = world.table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	world.combat.hit(by, decoy, 1)
+	world.run(World.STEP, World.STEP)
+	check(turned[0] >= 1, "hurt, it turns the bolt coming at it (%d)" % turned[0])
+	world.free_all()
 
 
 ## A world with the wizard's staff `cards` (cast once at the first step) and a still enemy whose hurt
@@ -332,3 +601,28 @@ func test_its_moments_have_their_cues() -> void:
 	check_equal(card.shown_cue, &"conjure", "its shown plays conjure")
 	check_equal(card.end_cue, &"dismiss", "its end plays dismiss")
 	check_equal(card.cast_cue, &"cast", "its cast plays cast")
+
+
+## Cards that only guard strike nothing (owner, 2026-11-06): a decoy whose timer gives it a barrier
+## every tick keeps its health for its whole life, and a wizard's lone Shield or Deflect costs it
+## none; a lone infusion still strikes its caster (self-harm is on).
+func test_guard_cards_landing_on_a_body_cost_it_no_health() -> void:
+	var made: Array = _world([&"timer", &"decoy", &"shield"], Vector2(4000.0, 3000.0))
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	world.run(2.5, 2.5)
+	var decoy: Actor = world.entities.decoy_of(wizard.id)
+	check(decoy != null and decoy.is_inside_tree(), "the decoy lives on past its fourth tick")
+	if decoy != null and decoy.is_inside_tree():
+		check_equal(decoy.health.health, decoy.health.max_health, "at full health")
+	world.free_all()
+	for cards: Array[StringName] in [[&"shield"] as Array[StringName], [&"deflect"] as Array[StringName], [&"fire"] as Array[StringName]]:
+		var alone: Array = _world(cards, Vector2(4000.0, 3000.0))
+		var w: World = alone[0]
+		var caster: Actor = alone[1]
+		w.run(0.5, 0.5)
+		if cards[0] == &"fire":
+			check(caster.health.health < caster.health.max_health, "a lone infusion still strikes its caster")
+		else:
+			check_equal(caster.health.health, caster.health.max_health, "a lone %s costs its caster no health" % cards[0])
+		w.free_all()

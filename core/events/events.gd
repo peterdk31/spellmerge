@@ -118,7 +118,7 @@ signal caster_move_requested(caster: int, mode: StringName, move: Vector2, secon
 signal caster_move_finished(caster: int, mode: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (swap) moves `target` to `to`. Heard by ai.
 signal target_move_requested(caster: int, target: Node, to: Vector2)
-## Sender: core/spells. A card of the actor `caster` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. `anchor` is what a familiar circles: -1 the caster's body, a `core/projectiles` slot for the shot whose trigger made it, or -2 the point `position` (that shot is gone). Heard by ai, which names the actor it made for a decoy in `Spells.entity_body` while this is sent.
+## Sender: core/spells. A card of the actor `caster` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. `anchor` is what a familiar circles: -1 the caster's body, -3 - id the body of the actor `id` whose payload made it (a decoy's: `SpellRuntime.body_caster`), a `core/projectiles` slot for the shot whose trigger made it, or -2 the point `position` (that shot is gone). Heard by ai, which names the actor it made for a decoy in `Spells.entity_body` while this is sent.
 signal entity_spawn_requested(caster: int, kind: StringName, position: Vector2, seconds: float, tag: int, anchor: int)
 ## Sender: core/spells. The entities of the actor `caster` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
 signal entity_end_requested(caster: int, tag: int)
@@ -154,6 +154,8 @@ signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 
 ## Sender: combat. A barrier on the actor `actor` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
 signal shield_blocked(actor: int, position: Vector2, tag: int)
+## Sender: combat. The barrier on the actor `actor` changed: it now blocks `charges` more hits for `seconds` more (0 and 0: it is gone), from the card with `tag`. `way` is the way the hit a block stopped flew (zero when no block changed it: given, grown, run out or cleared), `radius` the actor's hurt circle. For looks only (feel draws the barrier). Heard by feel.
+signal barrier_changed(actor: int, charges: int, seconds: float, tag: int, way: Vector2, radius: float)
 ## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal kill_landed(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).

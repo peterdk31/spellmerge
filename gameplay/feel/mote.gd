@@ -799,6 +799,16 @@ func shader_parameter(name: StringName) -> Variant:
 	return _material.get_shader_parameter(name)
 
 
+## The motes' material and quad, for a batch of rows of its own drawn the same way (the barriers'
+## shells, `barriers.gd`, rewrite theirs every frame). `step` moves the material's clock on.
+func draw_material() -> ShaderMaterial:
+	return _material
+
+
+func draw_quad() -> Mesh:
+	return _mesh
+
+
 ## Chunks with a batch made, and those drawn now (for tests).
 func chunks_made() -> int:
 	var made: int = 0

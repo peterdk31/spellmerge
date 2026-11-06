@@ -30,7 +30,7 @@ var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
 ## The id of its carrier (`FormBase.carrier`, `Carriers.of`); a fallback's is a fallback carrier's
-## (`Carriers.ON_CASTER`, `AT_POINT`), which no form card fires.
+## (`Carriers.ON_CASTER`, `ON_BEARER`, `AT_POINT`), which no form card fires.
 ## Setting it reads the carrier's `traits` once.
 var carrier: StringName = &"":
 	set(value):
@@ -107,12 +107,16 @@ var zap_hit: HitProfile = null
 ## An echoed shot's zap: `zap_hit` at ECHO_DAMAGE. Null without both `zap` and `echo`.
 var echo_zap_hit: HitProfile = null
 
-## `fallback` values: a carrier's spell, the cards that landed on the caster, or on a
-## payload's origin.
+## `fallback` values: a carrier's spell, the cards that landed on the caster, on a payload's
+## origin, or on the body or shot that fired a payload (docs/CARRIERS.md, "The fallback carriers").
 const FALLBACK_NONE: int = 0
 const FALLBACK_CASTER: int = 1
 const FALLBACK_POINT: int = 2
+const FALLBACK_BEARER: int = 3
 var fallback: int = FALLBACK_NONE
+## A fallback carrier's: whether a card that landed on it uses its strike (`CarrierFallback.uses_strike`:
+## cards that only guard, a shield or a deflect, strike nothing). True for any other carrier.
+var strikes: bool = true
 ## Every infusion on the shot, in slot order; `element_id` is the first.
 var element_ids: Array[StringName] = []
 ## The stacked `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`

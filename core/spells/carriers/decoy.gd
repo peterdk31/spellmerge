@@ -3,7 +3,10 @@ extends CarrierEntity
 ## A copy of its caster that the other teams target, for `lifetime` seconds (`&"decoy"`): an
 ## actor `ai` makes (`Entities`) that aims itself at the nearest foe, so what its triggers cast goes
 ## at its foes. Homing makes it creep toward its target, as a rune (`homing_reach`). It hits nothing
-## itself: only a blast carries hit cards and infusions; its shield or deflect guards it.
+## itself: only a blast carries hit cards and infusions. It is a regular actor (owner, 2026-11-06):
+## its shield is a barrier on its body for its life, and its deflect turns the shots round it once,
+## as it appears, as on a caster (`_body_made`). What its triggers fire is cast from its body, and a
+## payload's left-over cards land there (`CASTS_FROM_BODY`, `CarrierBearer`).
 
 
 func id() -> StringName:
@@ -18,14 +21,7 @@ static func of(spells: SpellRuntime) -> CarrierDecoy:
 
 
 func traits() -> int:
-	return LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS
-
-
-## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as
-## it makes one; none for a tag no build knows.
-func decoy_shield(tag: int) -> int:
-	var spell: CompiledSpell = kit.spell_of(tag)
-	return roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)) if spell != null else 0
+	return LASTS | STEERS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS | CASTS_FROM_BODY
 
 
 ## How far the decoy with `tag` creeps toward a target (its homing reach); 0 when it does not
@@ -35,21 +31,12 @@ func homing_reach(tag: int) -> float:
 	return spell.homing_range if spell != null else 0.0
 
 
-func decoy_deflects(tag: int) -> bool:
-	var spell: CompiledSpell = kit.spell_of(tag)
-	return spell != null and spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-
-
-## A decoy's guard (rules R4g), asked by Entities every step for each decoy with a shield or
-## deflect: the shots of other teams than `actor`'s within `reach` of `at` are deflected outward
-## by the decoy with `tag` when it deflects, else stopped while its `charges` last, each sending
-## its block (`on block`); the one guard of swings and slams (`_guard`). Returns the charges left.
-func guard_decoy(actor: int, tag: int, at: Vector2, reach: float, charges: int) -> int:
-	var spell: CompiledSpell = kit.spell_of(tag)
-	if spell == null or kit.projectiles == null:
-		return charges
-	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	if not deflects and charges <= 0:
-		return charges
-	var found: int = kit.projectiles.shots_in_wedge(actor, at, Vector2.RIGHT, 1, -PI, PI, reach)
-	return kit.guard(found, actor, tag, deflects, charges, at, Vector2.INF, id())
+## Its body `body` (an actor Combat already knows) stands at `at`: a deflect turns the other teams'
+## shots round it once, now (`CarrierKit.turn_shots_round`, as a caster's deflect is cast), and a
+## shield is a barrier on it for its `lifetime` (`CasterMoves.shield_caster`, as a caster's). A decoy
+## placed again is a new actor in Combat, so it never keeps an old one's barrier.
+func _body_made(spell: CompiledSpell, tag: int, actor: int, body: int, at: Vector2, lifetime: float) -> void:
+	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+		var centre: Vector2 = kit.projectiles.get_anchor(body) if kit.projectiles != null else Vector2.INF
+		kit.turn_shots_round(actor, tag, centre if centre.is_finite() else at, 0.0, id())
+	kit.moves().shield_caster(spell, tag, body, lifetime)

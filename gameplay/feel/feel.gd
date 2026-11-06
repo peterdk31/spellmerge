@@ -214,6 +214,8 @@ const CUE_END: int = 3
 const CUE_RADIUS: int = 4
 const CUE_WIND: int = 5
 const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
+## The cue of a shield's block (combat plays it for a barrier's, Feel for a shot's own shield).
+const SHIELD_BLOCK_CUE: StringName = &"shield_block"
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
 ## `spray` and `puff` kinds' own step).
 const HIT_STEP: float = 12.0
@@ -635,6 +637,7 @@ func _ready() -> void:
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
+	events.barrier_changed.connect(_on_barrier_changed)
 	events.staff_shown.connect(_on_staff_shown)
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
@@ -708,7 +711,7 @@ func step(real_delta: float) -> void:
 	if _portal_rings != null:
 		_portal_rings.step(spells.call("carrier", &"portal") if spells != null and spells.has_method("carrier") else null, projectiles, _clock)
 	_status_motes(real_delta)
-	_spectacle.step(_clock)
+	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
 		_lanes.spells = spells
 		_lanes.step()
@@ -1278,13 +1281,21 @@ func _on_shot_deflected(caster: int, position: Vector2, _tag: int, shot: int) ->
 	play_cue(&"deflect", caster, position, heading)
 
 
-## A shot was blocked. A swing's block is a parry (`shield · swing`; the projectile manager's
-## `impact_form` says which carrier blocked): the cue `parry`, a big four-point star in Spark gold
-## and a local stop on the parrying actor alone. Other blocks show nothing of their own.
-func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
-	if projectiles == null or projectiles.impact_form != &"swing":
+## A shot was blocked. A shot's own shield (`shot`, the shielded shot) blocks as a barrier does: its
+## shell loses that charge's motes (`barriers.gd`) and the cue `shield_block` plays where the
+## blocked shot was, turned back toward the shield. A swing's block is a parry (`shield · swing`; the
+## projectile manager's `impact_form` says which carrier blocked): the cue `parry`, a big
+## four-point star in Spark gold and a local stop on the parrying actor alone. Other carriers'
+## blocks show nothing of their own.
+func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> void:
+	if projectiles == null or not position.is_finite():
 		return
-	if not position.is_finite():
+	if shot >= 0:
+		var from: Vector2 = projectiles.get_position_of(shot)
+		play_cue(SHIELD_BLOCK_CUE, caster, position, (position - from).normalized() if from.is_finite() and from != position else Vector2.ZERO)
+		_spectacle.shot_blocked(shot, position)
+		return
+	if projectiles.impact_form != &"swing":
 		return
 	play_cue(&"parry", caster, position)
 
@@ -2122,7 +2133,8 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
 ## shown_cue, impact_cue, end_cue, radius], CUE_CAST to CUE_RADIUS), the defaults (`cast` and `impact`, radius
-## 0) for an id that is no carrier card; a modifier that shows itself (`form_shown` `zap`) brings its
+## 0) for an id that is no carrier card; a fallback carrier (`caster`) casts with its own
+## `Carrier.cast_cue`; a modifier that shows itself (`form_shown` `zap`) brings its
 ## own `cue` as its shown cue. Read once per card id, then kept: a cast or a hit allocates nothing.
 ## With no registry yet, or no form id, the defaults are answered but not kept.
 func _form_cues_of(form: StringName) -> Array:
@@ -2135,6 +2147,10 @@ func _form_cues_of(form: StringName) -> Array:
 	var cues: Array = NO_FORM_CUES
 	if card is FormBase:
 		cues = (card as FormBase).look_cues()
+	elif card == null and Carriers.is_fallback(form) and Carriers.of(form).cast_cue() != &"":
+		# A cast with no carrier card (its cards landed on the caster): its fallback carrier's own cue.
+		cues = NO_FORM_CUES.duplicate()
+		cues[CUE_CAST] = Carriers.of(form).cast_cue()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
 		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
 		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0, NO_FORM_CUES[CUE_WIND]]
@@ -2182,6 +2198,12 @@ func _play_lane(part: Variant, cue: CueContextScript) -> void:
 ## The lanes under way (for tests).
 func lanes() -> LanesScript:
 	return _lanes
+
+
+## A barrier on an actor changed (combat's `barrier_changed`): the spectacle draws its shell, a
+## bubble of motes round the actor in its spell's colours (`barriers.gd`).
+func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way: Vector2, radius: float) -> void:
+	_spectacle.barrier_changed(actor, charges, seconds, tag, way, radius, _ramp_of(actor))
 
 
 ## A carrier showed itself: its card's `shown_cue` (a nova's ring, a rain's telegraph

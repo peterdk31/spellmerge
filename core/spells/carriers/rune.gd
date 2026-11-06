@@ -9,7 +9,7 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD | MEETS_SHOTS
+	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD | MEETS_SHOTS | CASTS_FROM_SHOT
 
 
 ## A rune arms (owner, 2026-11-06): it hits nothing for `SpellLimits.RUNE_ARM` seconds, then

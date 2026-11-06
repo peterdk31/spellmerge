@@ -177,10 +177,12 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sw_hit[at] = spell.echo_hit if echoed else null
 	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sw_struck[at].clear()
-	if caster == SpellRuntime.CASTER_BODY:
-		if mine and kit.aim_pivot(actor).is_finite():
-			_sw_origin[at] = kit.aim_pivot(actor)
-		if mine and first:
+	var holder: int = SpellRuntime.body_of(caster, actor)
+	if holder >= 0:
+		if mine and kit.aim_pivot(holder).is_finite():
+			_sw_origin[at] = kit.aim_pivot(holder)
+		# Only the actor's own body has a staff to swing (a decoy's has none).
+		if mine and first and holder == actor:
 			poses.start(actor, spell, tag, wind, maxf(spell.lifetime, 0.001), _sw_dir[at], side, true)
 	elif kit.live_caster_shot(caster, caster_seq) < 0:
 		_sw_caster[at] = SpellRuntime.CASTER_POINT
@@ -235,17 +237,18 @@ static func swing_ease(x: float) -> float:
 	return 2.0 * x * x if x < 0.5 else 1.0 - 2.0 * (1.0 - x) * (1.0 - x)
 
 
-## Puts swing `at` where its caster holds it now: the wizard's hand (a wizard with no aim any more,
-## down or gone, ends it quietly), or the shot that cast it while that flies.
+## Puts swing `at` where its caster holds it now: the hand of its body (the wizard's, or one that
+## fired its payload; one with no aim any more, down or gone, ends it quietly), or the shot that
+## cast it while that flies.
 func _swing_follow(at: int) -> void:
 	var caster: int = _sw_caster[at]
-	if caster == SpellRuntime.CASTER_BODY:
-		var actor: int = _sw_actor[at]
-		if actor < 0 or actor >= SpellRuntime.ACTORS:
+	var holder: int = SpellRuntime.body_of(caster, _sw_actor[at])
+	if holder >= 0:
+		if holder >= SpellRuntime.ACTORS:
 			return
-		if kit.aim_origin(actor).is_finite():
-			_sw_origin[at] = kit.aim_pivot(actor) if kit.aim_pivot(actor).is_finite() else kit.aim_origin(actor)
-		elif kit.aim_seen(actor):
+		if kit.aim_origin(holder).is_finite():
+			_sw_origin[at] = kit.aim_pivot(holder) if kit.aim_pivot(holder).is_finite() else kit.aim_origin(holder)
+		elif kit.aim_seen(holder):
 			_end_swing(at, false)
 	elif caster >= 0:
 		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _sw_caster_seq[at]:

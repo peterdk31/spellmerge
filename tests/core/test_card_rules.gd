@@ -43,13 +43,17 @@ extends "res://tests/support/suite.gd"
 ## with a copy of it that keeps only its costs (`_costs_of`: mana, a slower cast, less damage), a
 ## behaviour modifier with its plain copy as above.
 ##
-## The two fallback carriers (docs/CARRIERS.md, "The fallback carriers") are columns too, `on you`
-## and `right there`: no form card fires them, so each is played the way a staff reaches it. On
-## you: the card alone, with a card that changes nothing (`LAND`) in both casts so a strike happens
-## with or without it. Right there: the same as the payload of `on hit` on a piercing shot that hits
-## the target (`_point_prefix`; it pierces so the shot that cast the payload is still there for
-## the cards that move it). Only modifiers and infusions land on them, so the triggers' and
-## multicasts' cells there are `–`.
+## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers") are columns too, `on
+## you`, `on it`, `on its body` and `right there`: no form card fires them, so each is played the way a staff
+## reaches it. On you: the card alone, with a card that changes nothing (`LAND`) in both casts so a
+## strike happens with or without it. On it: the same as the payload of `on hit` on a piercing shot
+## that hits the target (`_bearer_prefix`): it pierces, so the shot that fired the payload flies on
+## and the cards land on it. On its body: the payload of `on cast` on a shot (`_body_prefix`), which
+## the wizard's body casts, so the cards land on that body (as a decoy's or a dashing wizard's
+## payload's do; owner, 2026-11-06). Right there: the same as on it with a shot that does not pierce
+## (`_point_prefix`), spent by its hit, so the payload is a point's. Both are cast at once in the
+## enemy shooter's scene: its shots end on the target, so none comes near the wizard. Only modifiers and infusions
+## land on them, so the triggers' and multicasts' cells there are `–`.
 ##
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
@@ -126,11 +130,23 @@ var _payload: FormBase = null
 ## What the enemy shooter and the relay donor cast: the straight carrier of one shot that reaches
 ## furthest.
 var _shot: FormBase = null
+## What the `on it` column's payload is fired from in the enemy shooter's scene: the straight
+## carrier of one shot that lives longest, so it flies on through the shooter's stream long enough
+## to meet its shots (`_shot`, small and fast, passes them between two steps).
+var _lasting: FormBase = null
 ## The matrix's columns: every form card, then a stand-in form for each fallback carrier (its
 ## `carrier` names it; not a card, never in a staff).
 var _columns: Array[FormBase] = []
-## What comes before the cards of the `right there` column: `on hit`, a pierce card, `_shot`.
+## What comes before the cards of the `on it` column (`on hit`, a pierce card, `_shot`; `_lasting`
+## in the shooter's scene: `_bearer_shooter_prefix`) and of the `right there` column (`on hit`,
+## `_shot`).
+var _bearer_prefix: Array[StringName] = []
+var _bearer_shooter_prefix: Array[StringName] = []
 var _point_prefix: Array[StringName] = []
+## What comes before the cards of the `on its body` column: `on cast`, `_shot`.
+var _body_prefix: Array[StringName] = []
+## The id of that column's stand-in form.
+const BODY_COLUMN: StringName = &"on its body"
 ## True while a multicast is given one carrier only, not the ones it asks for: one that adds no
 ## carrier at all must change the cast or be wasted (owner, 2026-11-06).
 var _one_carrier: bool = false
@@ -173,6 +189,7 @@ func _discover() -> void:
 			_multicasts.append(card as MulticastBase)
 	_payload = null
 	_shot = null
+	_lasting = null
 	for form in _forms:
 		if form.carrier != &"atom":
 			continue
@@ -180,7 +197,12 @@ func _discover() -> void:
 			_payload = form
 		if form.shots == 1 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
 			_shot = form
+		if form.shots == 1 and (_lasting == null or form.lifetime > _lasting.lifetime):
+			_lasting = form
 	_columns.assign(_forms)
+	_bearer_prefix.clear()
+	_body_prefix.clear()
+	_bearer_shooter_prefix.clear()
 	_point_prefix.clear()
 	if _shot == null:
 		return
@@ -194,13 +216,30 @@ func _discover() -> void:
 	_columns.append(on_you)
 	for trigger in _triggers:
 		if trigger.event == TriggerBase.Event.HIT:
+			_bearer_prefix.append(trigger.id)
 			_point_prefix.append(trigger.id)
-			break
+		elif trigger.event == TriggerBase.Event.CAST:
+			_body_prefix.append(trigger.id)
+	_body_prefix.append(_shot.id)
 	for modifier in _modifiers:
 		if modifier.behaviour == ModifierBase.Behaviour.NONE and modifier.extra_pierce > 0:
-			_point_prefix.append(modifier.id)
+			_bearer_prefix.append(modifier.id)
 			break
+	_bearer_shooter_prefix.assign(_bearer_prefix)
+	_bearer_prefix.append(_shot.id)
+	_bearer_shooter_prefix.append(_lasting.id)
 	_point_prefix.append(_shot.id)
+	var on_it := FormBase.new()
+	on_it.id = &"on it"
+	on_it.carrier = Carriers.ON_BEARER
+	on_it.speed = _shot.speed
+	on_it.lifetime = _shot.lifetime
+	_columns.append(on_it)
+	var on_body := FormBase.new()
+	on_body.id = BODY_COLUMN
+	on_body.carrier = Carriers.ON_BEARER
+	on_body.lifetime = SpellLimits.MIN_LIFETIME
+	_columns.append(on_body)
 	var there := FormBase.new()
 	there.id = &"right there"
 	there.carrier = Carriers.AT_POINT
@@ -297,9 +336,13 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## How far along the aim a carrier of `form` acts (where its target stands), by its carrier; -1
 ## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
+	if form.id == BODY_COLUMN:
+		# On its body: within its strike round the wizard's hand, as on you.
+		return SpellLimits.FALLBACK_RADIUS
 	match form.carrier:
-		&"atom", &"swap", Carriers.AT_POINT:
-			# Right there: where the shot that casts it hits (its stand-in has that shot's numbers).
+		&"atom", &"swap", Carriers.ON_BEARER, Carriers.AT_POINT:
+			# On it and right there: where the shot that fires it hits (its stand-in has that shot's
+			# numbers).
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
 		Carriers.ON_CASTER:
 			# On you: within its strike round the wizard's hand.
@@ -325,7 +368,11 @@ static func reach(form: FormBase) -> float:
 		&"teleport":
 			# Where it lands: a teleport strikes what is there (rules R4c).
 			return form.ray_length
-		&"decoy", &"familiar":
+		&"decoy":
+			# Its body stands a step ahead (twice its size) and turns the shots near it as it appears:
+			# a shot this near the wizard's hand when it is cast is near its body.
+			return 30.0
+		&"familiar":
 			return 60.0
 		&"portal":
 			# Its exit: what stands there goes through to the mouth.
@@ -548,9 +595,16 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: boo
 	var without: Array[StringName] = []
 	var extra: Array[StringName] = _extra_cards(scene)
 	if Carriers.is_fallback(form.carrier):
-		# The card lands with LAND and the scene's cards, and nothing after them: on the caster, or on
-		# the point where `on hit`'s shot hit.
-		if form.carrier == Carriers.AT_POINT:
+		# The card lands with LAND and the scene's cards, and nothing after them: on the caster, on the
+		# shot that hit and flies on, or on the point where `on hit`'s shot was spent.
+		if form.id == BODY_COLUMN:
+			with.append_array(_body_prefix)
+			without.append_array(_body_prefix)
+		elif form.carrier == Carriers.ON_BEARER:
+			var prefix: Array[StringName] = _bearer_shooter_prefix if scene.get("shooter", false) else _bearer_prefix
+			with.append_array(prefix)
+			without.append_array(prefix)
+		elif form.carrier == Carriers.AT_POINT:
 			with.append_array(_point_prefix)
 			without.append_array(_point_prefix)
 		for cards: Array[StringName] in [with, without]:
@@ -689,8 +743,8 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	var r: float = reach(form)
 	world.add_wizard(cards)
 	world.add_ally(ALLY_AT)
-	# Right there is cast where `on hit`'s shot hits: always a target on the line for it to hit.
-	if scene.get("line", false) or form.carrier == Carriers.AT_POINT:
+	# On it and right there are cast where `on hit`'s shot hits: always a target on the line for it.
+	if scene.get("line", false) or _cast_by_a_hit(form):
 		var donor: Array[StringName] = []
 		if scene.get("donor", false):
 			for element in _elements:
@@ -731,7 +785,11 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("hurt", false):
 		for step in HURT_STEPS:
 			world.hurt_wizard_at(step, 1)
-	if scene.get("shooter", false):
+	if scene.get("shooter", false) and _cast_by_a_hit(form):
+		# On it and right there: the shooter's shots end on the target their shot hits, so none comes
+		# near the wizard; cast at once, the shot that hit flies on through them.
+		world.press()
+	elif scene.get("shooter", false):
 		# A carrier that leans back first (a swing) is cast that much sooner.
 		world.press_when_shot_within(r + SHOT_NEAR + form.wind_up * _shot.speed)
 	elif scene.get("donor", false):
@@ -743,6 +801,12 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	var trace: PackedStringArray = world.trace
 	world.free_all()
 	return trace
+
+
+## True for the columns whose payload a shot's hit fires (on it, right there): a target always
+## stands on the line for that shot.
+static func _cast_by_a_hit(form: FormBase) -> bool:
+	return form.id != BODY_COLUMN and (form.carrier == Carriers.AT_POINT or form.carrier == Carriers.ON_BEARER)
 
 
 ## The world a cast runs in (tests/core/test_card_rules_swarm.gd makes its enemies swarmers).

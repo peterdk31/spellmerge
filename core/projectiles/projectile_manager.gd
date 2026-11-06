@@ -2377,6 +2377,24 @@ func get_shield_of(slot: int) -> int:
 	return _shield[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0
 
 
+## The shots that guard now (a shield or a deflect: `set_shield`, `set_deflect`): how many, and the
+## slot of the `n`th, in no order (for looks, read in one pass: Feel draws a shield's shell).
+func guarded_count() -> int:
+	return _member_count[B_SHIELD]
+
+
+func guarded_slot(n: int) -> int:
+	return _members[B_SHIELD * _cap + n] if n >= 0 and n < _member_count[B_SHIELD] else -1
+
+
+## Half of a solid shot's row (`set_solid`: from its middle to its end stone's centre, along it),
+## zero for any other shot (for looks: a wall's shell is a capsule round its row).
+func get_solid_half_of(slot: int) -> Vector2:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not _solids.has(slot):
+		return Vector2.ZERO
+	return _solid_half(slot, _solids[slot])
+
+
 ## The shot turns every shot of another team that touches it and makes it its caster's
 ## (`deflect_shot`; melee I3), as many as touch it while it lives. Deflect goes before a shield
 ## (owner, 2026-10-29): a touching shot is turned, and the shield keeps its charge. A shot of no

@@ -5,9 +5,11 @@ extends RefCounted
 ## trades it, and recoil pushes it; every move adds up (rules R4 F1). A body is asked through its
 ## owner (`caster_move_requested`, the way and the distance) and answers where it stopped
 ## (`caster_move_finished`, `finished`); a shot is moved by the projectile manager and its end comes
-## when the move is over (`track`, `step`). Where a move ends is its carrier's end point (`end`):
-## the carrier's own part there (`Carrier.on_move_end`: a teleport's landing strike), its blast and
-## its `on expire` payload. A move's shield guards what it moves (`shield`).
+## when the move is over (`track`, `step`). The body is the caster's: the wizard's for its own cast,
+## or the body that fired a payload (a decoy's; `CarrierKit.caster_body`), whose actor is not the
+## card's (`asked`). Where a move ends is its carrier's end point (`end`): the carrier's own part
+## there (`Carrier.on_move_end`: a teleport's landing strike), its blast and its `on expire` payload,
+## cast by what moved. A move's shield guards what it moves (`shield`).
 
 ## The runtime these moves belong to (`CarrierKit`): its projectile manager, event bus and the
 ## shared end-point path.
@@ -17,6 +19,9 @@ var move_heading: PackedVector2Array = PackedVector2Array()
 ## tag -> the pulls of the wizard under way whose hit spent their shot, so the arrival is the
 ## carrier's end point; a shot that flies on ends by itself (rules R4a).
 var pull_ends: Dictionary = {}
+## Vector2i(body, tag) -> the moves under way of a body that is not the card's caster's (a decoy's
+## dash), so its answer (`finished`) is the card's end point too.
+var _others: Dictionary = {}
 ## Moves of shots whose end point is still to come (a dash whose caster is a shot): the shot, its
 ## sequence number, the carrier's tag, seconds left, its heading and where it was last seen.
 var _mv_slot: PackedInt32Array = PackedInt32Array()
@@ -41,6 +46,7 @@ func clear() -> void:
 	_mv_count = 0
 	move_heading.fill(Vector2.RIGHT)
 	pull_ends.clear()
+	_others.clear()
 
 
 ## How many moves of shots are still under way (their end point to come).
@@ -54,6 +60,9 @@ func reset_actor(actor: int) -> void:
 	for tag: int in pull_ends.keys():
 		if SpellTag.caster_of(tag) == actor:
 			pull_ends.erase(tag)
+	for key: Vector2i in _others.keys():
+		if key.x == actor or SpellTag.caster_of(key.y) == actor:
+			_others.erase(key)
 
 
 ## How far a dash or teleport card moves its caster: its `ray_length` (a card made before moves
@@ -124,7 +133,7 @@ func step(delta: float) -> void:
 ## A move by the carrier `tag` ended at `at`: it is shown ending there (`carrier_ended`, its card's
 ## impact cue: where a teleport lands), a teleport strikes what is where it landed
 ## (`Carrier.on_move_end`), its `blast` goes off there and its `on expire` payload leaves from there,
-## cast by `caster` (the wizard, the shot that moved, or the point).
+## cast by `caster` (a value as `CarrierKit.caster`: the body or the shot that moved, or the point).
 func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	var spell: CompiledSpell = kit.spell_of(tag)
 	var actor: int = SpellTag.caster_of(tag)
@@ -141,20 +150,36 @@ func end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 			kit.fire(trigger.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
 
 
+## The body of the actor `body` was asked to make a move for the card `tag` that it answers with
+## `caster_move_finished` (a dash, a teleport, a pull whose hit spent its shot): one that is not
+## the card's caster's is noted, so its answer counts (`finished`).
+func asked(body: int, tag: int) -> void:
+	if body != SpellTag.caster_of(tag):
+		var key := Vector2i(body, tag)
+		_others[key] = int(_others.get(key, 0)) + 1
+
+
 ## Where a dash or teleport ended, or a pull whose hit spent its shot (`pull_ends`): the carrier's
-## end point. Its `blast` and its `on expire` payload happen there. A move whose build has been
-## forgotten does nothing.
+## end point. Its `blast` and its `on expire` payload happen there, cast by the body that moved. A
+## move whose build has been forgotten, or that no card of `tag` asked of that body, does nothing.
 func finished(actor: int, mode: StringName, position: Vector2, tag: int) -> void:
-	if not SpellTag.is_spell_tag(tag) or actor != SpellTag.caster_of(tag) or not position.is_finite():
+	if not SpellTag.is_spell_tag(tag) or not position.is_finite() or (mode != &"pull" and mode != &"dash" and mode != &"teleport"):
 		return
+	if actor != SpellTag.caster_of(tag):
+		var key := Vector2i(actor, tag)
+		if not _others.has(key):
+			return
+		_others[key] = int(_others[key]) - 1
+		if _others[key] <= 0:
+			_others.erase(key)
 	if mode == &"pull" and pull_ends.get(tag, 0) > 0:
 		pull_ends[tag] -= 1
 		if pull_ends[tag] == 0:
 			pull_ends.erase(tag)
-	elif mode != &"dash" and mode != &"teleport":
+	elif mode == &"pull":
 		return
-	# The caster's body moved, so it casts what its end point fires.
-	end(tag, position, move_heading[actor], SpellRuntime.CASTER_BODY)
+	# The body moved, so it casts what its end point fires.
+	end(tag, position, move_heading[actor], SpellRuntime.body_caster(actor))
 
 
 ## `pull` (rules R4 F1): the caster of the carrier with `tag` is pulled to `position`, where it hit
@@ -164,41 +189,53 @@ func finished(actor: int, mode: StringName, position: Vector2, tag: int) -> void
 ## (rules R4a); one with pierce left flies on and ends by itself, and a line or a strike ends as it
 ## does. True when it pulled, so the hit's blast waits for the arrival.
 func pull(spell: CompiledSpell, tag: int, actor: int, position: Vector2, slot: int, spent: bool) -> bool:
-	var caster: int = kit.projectiles.caster_shot_of(slot) if slot >= 0 and not kit.projectiles.is_cast_by_wizard(slot) else -1
-	if caster < 0:
-		var anchor: Vector2 = kit.projectiles.get_anchor(actor)
+	var moved: int = moved_by(kit.shot_caster(slot) if slot >= 0 else kit.caster(), actor)
+	if moved < 0:
+		var body: int = SpellRuntime.body_of(moved, actor)
+		var anchor: Vector2 = kit.projectiles.get_anchor(body)
 		if kit.events == null or not anchor.is_finite():
 			return false
-		move_heading[actor] = anchor.direction_to(position) if not anchor.is_equal_approx(position) else Vector2.RIGHT
-		kit.events.caster_move_requested.emit(actor, &"pull", position - anchor, SpellLimits.PULL_SECONDS, tag)
+		move_heading[body] = anchor.direction_to(position) if not anchor.is_equal_approx(position) else Vector2.RIGHT
 		if spent:
 			pull_ends[tag] = pull_ends.get(tag, 0) + 1
-		shield(spell, tag, actor, -1, SpellLimits.PULL_SECONDS)
+			asked(body, tag)
+		kit.events.caster_move_requested.emit(body, &"pull", position - anchor, SpellLimits.PULL_SECONDS, tag)
+		shield(spell, tag, body, -1, SpellLimits.PULL_SECONDS)
 		return true
-	var from: Vector2 = kit.projectiles.get_position_of(caster)
-	if not kit.projectiles.move_shot(caster, position - from, SpellLimits.PULL_SECONDS):
+	var from: Vector2 = kit.projectiles.get_position_of(moved)
+	if not kit.projectiles.move_shot(moved, position - from, SpellLimits.PULL_SECONDS):
 		return false
-	shield(spell, tag, actor, caster, SpellLimits.PULL_SECONDS)
+	shield(spell, tag, -1, moved, SpellLimits.PULL_SECONDS)
 	if spent:
-		track(caster, tag, SpellLimits.PULL_SECONDS, from.direction_to(position))
+		track(moved, tag, SpellLimits.PULL_SECONDS, from.direction_to(position))
 	return true
 
 
+## What a move by a card of `actor` whose caster is `caster` (a value as `CarrierKit.caster`) moves:
+## that shot (its slot) or that body (`SpellRuntime.body_caster`); a point cannot move, so a move
+## cast by one moves the wizard's body (rules R4c). One rule for dash, teleport, pull and swap.
+static func moved_by(caster: int, actor: int) -> int:
+	if caster >= 0 or SpellRuntime.body_of(caster, actor) >= 0:
+		return caster
+	return SpellRuntime.body_caster(actor)
+
+
 ## `shield` on a move, one rule for every spell that moves its caster (dash, teleport, pull, swap;
-## rules R4c): what it moves is guarded for the move, the wizard (`shot` -1) by a barrier
+## rules R4c): what it moves is guarded for the move, the body of `body` (`shot` -1) by a barrier
 ## (`shield_caster`), a shot by that many more shield charges, kept until they are spent.
-func shield(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float) -> void:
+func shield(spell: CompiledSpell, tag: int, body: int, shot: int, seconds: float) -> void:
 	if shot < 0:
-		shield_caster(spell, tag, actor, seconds)
+		shield_caster(spell, tag, body, seconds)
 		return
 	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	if charges > 0:
 		kit.projectiles.set_shield(shot, kit.projectiles.get_shield_of(shot) + charges)
 
 
-## `shield` on the caster itself: a barrier on the casting actor with the card's charges, for as
-## long as the carrier lasts (a move's own time at least). It comes with every move of the
-## wizard (`shield`) and the cards landing on the caster. Combat gives it a minimum time.
+## `shield` on a body: a barrier on the actor `actor` with the card's charges, for as long as the
+## carrier lasts (a move's own time at least). It comes with every move of the wizard (`shield`),
+## the cards landing on the caster or on the body that fired a payload (`CarrierBearer`), and a
+## decoy's body (`CarrierDecoy`). Combat gives it a minimum time; its block is the card `tag`'s.
 func shield_caster(spell: CompiledSpell, tag: int, actor: int, move_seconds: float) -> void:
 	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	if charges > 0 and kit.events != null:

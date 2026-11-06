@@ -39,6 +39,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
 | `entity_ended` | `ai` (Entities) | `core/spells` |
 | `shot_blocked` | `core/projectiles` | `core/spells` (on block) |
+| `barrier_changed` | `combat` (a barrier given, grown, blocking, run out or cleared) | `feel` (the barrier's bubble) |
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` (for every actor: `actor_hurt` and `shield_blocked` name the hurt or shielded actor) | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel` |

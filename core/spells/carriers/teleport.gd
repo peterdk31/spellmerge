@@ -24,16 +24,17 @@ func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, headin
 
 ## A homing teleport goes to a target in its homing reach of what it moves (`from`, the body's
 ## anchor), landing with that at the target's edge (LAND_CLEARANCE short of it), so its landing
-## strike, round where the body lands, reaches the target; nothing in reach: no blink. One without
-## homing goes its way and distance.
+## strike, round where the body lands, reaches the target; nothing in reach: it teleports in place
+## (owner, 2026-11-06: distance 0, so the cast, its landing strike and its payloads still happen
+## where it stands). One without homing goes its way and distance.
 func _aim_move(spell: CompiledSpell, _tag: int, actor: int, origin: Vector2, from: Vector2, way: Vector2, distance: float) -> Vector3:
 	if spell.homing_range > 0.0:
 		var goal: Vector2 = kit.pick_target(actor, from, spell.homing_range)
-		if not goal.is_finite():
-			return Vector3(way.x, way.y, -1.0)
-		if not goal.is_equal_approx(from):
-			way = from.direction_to(goal)
-		distance = maxf(from.distance_to(goal) - kit.projectiles.homing_target_radius - SpellLimits.LAND_CLEARANCE, 0.0)
+		distance = 0.0
+		if goal.is_finite():
+			if not goal.is_equal_approx(from):
+				way = from.direction_to(goal)
+			distance = maxf(from.distance_to(goal) - kit.projectiles.homing_target_radius - SpellLimits.LAND_CLEARANCE, 0.0)
 	# Where it leaves shows now, as it is aimed (a teleport is over at once); where it lands shows at
 	# its end point (`carrier_ended`, `CasterMoves.end`).
 	if kit.events != null:

@@ -1296,10 +1296,10 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 
 ## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once (`_strike`),
 ## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. It strikes
-## every body there, its caster's own too, and a wall hides none (owner, 2026-11-06: one rule for
-## every strike; a teleport, whose landing strikes the body that lands, deals no damage).
-func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, chain: int = -1, prev: int = 0) -> void:
-	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS, null, false)
+## every body there, its caster's own too, but `spare` (a melee carrier's body, `CarrierKit.spared`:
+## a teleport's, which lands with it), and a wall hides none (owner, 2026-11-06).
+func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, chain: int = -1, prev: int = 0, spare: Node = null) -> void:
+	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS, spare, false)
 	if found > 0:
 		_strike(spell, tag, actor, found, [], at, spell.chain_jumps if chain < 0 else chain, prev, hit)
 

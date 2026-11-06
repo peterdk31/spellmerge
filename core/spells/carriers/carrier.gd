@@ -42,6 +42,7 @@ const GATES: int = CarrierTraits.GATES
 const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
 const CASTERLESS: int = CarrierTraits.CASTERLESS
+const MELEE: int = CarrierTraits.MELEE
 
 ## Who may cast a group (`payload_cast_by`, `StaffCompiler`), as bits: an actor's body (the
 ## caster's own, or a body of its own carrier's: a decoy), a live shot, a point.
@@ -79,13 +80,6 @@ func required_fields() -> Dictionary:
 ## not a fallback carrier (`CarrierFallback`), which has no form card. A payload's carrier adds
 ## none either; the compiler knows that one (`StaffCompiler._numbers_count`).
 func has_wind_down() -> bool:
-	return true
-
-
-## True when its hits deal damage of their own (its form card's `base_damage`, which every damage
-## factor scales), so a card's damage factor changes something: every carrier but the teleport,
-## whose landing strikes the body that lands too and so deals none (owner, 2026-11-06).
-func deals_damage() -> bool:
 	return true
 
 

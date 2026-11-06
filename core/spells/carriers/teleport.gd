@@ -11,22 +11,16 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return HITS | REACHES | STEERS | INSTANT_HOMING | MOVES_CASTER | MEETS_SHOTS
-
-
-## Its landing strikes the body that lands too, so it deals no damage (the card's `base_damage` 0):
-## its hits carry only what else they do (an infusion's status, a push, an `on hit`).
-func deals_damage() -> bool:
-	return false
+	return HITS | REACHES | STEERS | INSTANT_HOMING | MOVES_CASTER | MEETS_SHOTS | MELEE
 
 
 ## It strikes what is where it landed (rules R4c): each body within SpellLimits.LAND_REACH
-## (`Spells._strike_round`), the one that moved too (a teleport deals no damage of its own), and
-## with `deflect` turns the shots within MOVE_GUARD_REACH.
+## (`Spells._strike_round`) but the one that moved (melee, `CarrierKit.spared`), and with `deflect`
+## turns the shots within MOVE_GUARD_REACH.
 func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2) -> void:
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
 		kit.turn_shots_round(actor, tag, at, SpellLimits.MOVE_GUARD_REACH, id())
-	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null)
+	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null, kit.spared(spell, kit.body_node(kit.caster_body(actor))))
 
 
 ## A homing teleport goes to a target in its homing reach of what it moves (`from`, the body's

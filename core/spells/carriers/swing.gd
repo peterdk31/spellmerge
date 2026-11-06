@@ -62,7 +62,7 @@ static func of(spells: SpellRuntime) -> CarrierSwing:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS
+	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS | MELEE
 
 
 func step_order() -> int:
@@ -276,7 +276,7 @@ func _swing_guard(at: int, from: float, to: float, ahead: float) -> void:
 func _swing_cast(at: int, from: float, to: float) -> void:
 	var spell: CompiledSpell = _sw_spell[at]
 	var tag: int = _sw_tag[at]
-	var source: Node = _sw_source[at] if is_instance_valid(_sw_source[at]) else null
+	var source: Node = kit.spared(spell, _sw_source[at] if is_instance_valid(_sw_source[at]) else null)
 	var found: int = kit.projectiles.sweep(_sw_actor[at], _sw_origin[at], _sw_dir[at], _sw_side[at], from, to, spell.ray_length, SpellRuntime.HITS, source)
 	if found == 0:
 		return

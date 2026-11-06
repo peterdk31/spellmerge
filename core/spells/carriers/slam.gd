@@ -52,7 +52,7 @@ static func of(spells: SpellRuntime) -> CarrierSlam:
 
 
 func traits() -> int:
-	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS | STRIKES_POINT
+	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS | STRIKES_POINT | MELEE
 
 
 func step_order() -> int:
@@ -197,7 +197,7 @@ func _slam_cast(at: int, reach: float) -> void:
 		return
 	var spell: CompiledSpell = _sl_spell[at]
 	var tag: int = _sl_tag[at]
-	var source: Node = _sl_source[at] if is_instance_valid(_sl_source[at]) else null
+	var source: Node = kit.spared(spell, _sl_source[at] if is_instance_valid(_sl_source[at]) else null)
 	var found: int = kit.projectiles.sweep(_sl_actor[at], _sl_impact[at], _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
 	if found == 0:
 		return

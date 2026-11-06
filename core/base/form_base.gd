@@ -185,7 +185,7 @@ func carries_payload() -> bool:
 func ranges() -> Dictionary:
 	var limits: Dictionary = super()
 	limits.merge({
-		"base_damage": Vector2(0.0, 200),
+		"base_damage": Vector2(0.05, 200),
 		"mana_cost": Vector2(0.0, 100.0),
 		"wind_down": Vector2(0.0, 10.0),
 		"speed": Vector2(0.0, 2000.0),

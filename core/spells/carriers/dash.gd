@@ -50,7 +50,7 @@ static func of(spells: SpellRuntime) -> CarrierDash:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
+	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS | MELEE
 
 
 func step_order() -> int:
@@ -181,8 +181,8 @@ func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
 		kit.guard(kit.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to, id())
 	var samples: int = maxi(ceili(from.distance_to(to) / reach), 1)
-	# The body that dashes is not struck by its own pass (a dashing shot is no body).
-	var spare: Node = kit.body_node(dash.body)
+	# The body that dashes is not struck by its own pass (melee; a dashing shot is no body).
+	var spare: Node = kit.spared(spell, kit.body_node(dash.body))
 	for n in samples:
 		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
 		var found: int = kit.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS, spare)

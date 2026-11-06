@@ -154,7 +154,7 @@ func finished(actor: int, mode: StringName, position: Vector2, tag: int) -> void
 	elif mode != &"dash" and mode != &"teleport":
 		return
 	# The caster's body moved, so it casts what its end point fires.
-	end(tag, position, move_heading[actor], SpellRuntime.CASTER_WIZARD)
+	end(tag, position, move_heading[actor], SpellRuntime.CASTER_BODY)
 
 
 ## `pull` (rules R4 F1): the caster of the carrier with `tag` is pulled to `position`, where it hit

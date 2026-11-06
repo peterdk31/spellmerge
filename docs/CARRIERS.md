@@ -72,6 +72,30 @@ placed, with the same rules as a compile; for the builder, a reward screen or a 
 **Required fields**, in `required_fields()`: what a form card of this carrier must set above 0 (a
 beam's `ray_length`); the spell validator checks them.
 
+## The fallback carriers: where cards with no carrier land
+
+A group that ends with modifiers or infusions and no carrier after them (reading rule 5,
+docs/milestones/M2-staffs.md) does not drop them: they land on a **fallback carrier**, `caster`
+for the cast's own group and `point` for a payload (the point it began at: where its shot hit,
+ended or ticked). A lone `blast` explodes on you; `on hit · bolt · blast` explodes where the bolt
+hits, with no second carrier. Both are carriers like any other (`caster.gd`, `point.gd`, on the
+shared base `fallback.gd`, `CarrierFallback`), with two differences: no form card fires them, so
+`Carriers.ids()` leaves them out and a form card may not name them (`Carriers.is_fallback`); and the
+compiler picks one itself (`Carriers.fallback(payload)`) for the cards left over.
+
+Everything else is the one rule. Their yes/no answers decide which cards do something there, through
+the same needs as on every carrier: both `HITS` (one strike of everything within
+`SpellLimits.FALLBACK_RADIUS`, or the blast's strength, the caster too), and only `caster`
+`MEETS_SHOTS` (its shield is the caster's barrier, its deflect turns the shots round the caster as
+it is cast; a point guards no one). Neither flies, moves, stays, lasts or steers, and neither has a
+cooldown of its own (`has_cooldown`), so homing, bounce, hold, split or a shorter cooldown are wasted
+there, and chain, pull, possess, relay, penta and mirror work. The runtime launches them like any
+other carrier, so echo strikes again, recoil pushes, mirror strikes twice and penta strikes from a
+ring. When none of the cards does anything there, nothing lands and every one is wasted.
+
+`tests/core/test_card_rules.gd` plays every modifier and infusion on both (the columns `on you` and
+`right there`), and `tests/core/test_fallback_carriers.gd` checks the rest.
+
 ## What a carrier runs
 
 At runtime `Spells` makes its own carriers (`Carriers.make_all`), binds them and hands every launch

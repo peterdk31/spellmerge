@@ -3,7 +3,7 @@ extends RefCounted
 ## One carrier of a staff turned into final numbers (`StaffCompiler`, docs/milestones/
 ## M2-staffs.md): what it fires, with the infusions, modifiers and triggers that attached to it,
 ## and the payload each trigger fires (`triggers`). A fallback (cards that landed on the caster or on a
-## payload's origin) is one too, with `fallback` set. It is read-only data for the spell runtime;
+## payload's origin) is one too, with `fallback` set and a fallback carrier (docs/CARRIERS.md). It is read-only data for the spell runtime;
 ## nothing but `core/spells/` reads it (the builder gets plain values from `Spells.staff_view`).
 
 var form_id: StringName = &""
@@ -28,7 +28,8 @@ var radius: float = 4.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## The id of its carrier (`FormBase.carrier`, `Carriers.of`); &"" for a fallback, which has none.
+## The id of its carrier (`FormBase.carrier`, `Carriers.of`); a fallback's is a fallback carrier's
+## (`Carriers.ON_CASTER`, `AT_POINT`), which no form card fires.
 ## Setting it reads the carrier's `traits` once.
 var carrier: StringName = &"":
 	set(value):

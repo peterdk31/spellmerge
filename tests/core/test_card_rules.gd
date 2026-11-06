@@ -43,6 +43,14 @@ extends "res://tests/support/suite.gd"
 ## with a copy of it that keeps only its costs (`_costs_of`: mana, a slower cast, less damage), a
 ## behaviour modifier with its plain copy as above.
 ##
+## The two fallback carriers (docs/CARRIERS.md, "The fallback carriers") are columns too, `on you`
+## and `right there`: no form card fires them, so each is played the way a staff reaches it. On
+## you: the card alone, with a card that changes nothing (`LAND`) in both casts so a strike happens
+## with or without it. Right there: the same as the payload of `on hit` on a piercing shot that hits
+## the target (`_point_prefix`; it pierces so the shot that cast the payload is still there for
+## the cards that move it). Only modifiers and infusions land on them, so the triggers' and
+## multicasts' cells there are `–`.
+##
 ## It prints the matrix of every kind (✓ works, W wasted, ✗ silent no-op) so a PR shows coverage.
 ## Rule 2 (a card's effect survives a bounce, a jump, an echo, a payload) is not checked here yet.
 ##
@@ -58,6 +66,11 @@ const WORKS: String = "✓"
 const WASTED: String = "W"
 const SILENT: String = "✗"
 const NO_PROBE: String = "?"
+## A card that never lands on a fallback carrier (a trigger, a multicast).
+const NOT_THERE: String = "–"
+## The card both casts on a fallback carrier have: a modifier with no behaviour and no numbers, so
+## it lands and changes nothing (put on the shelf).
+const LAND: StringName = &"~land"
 
 ## The longest a cast runs (a familiar lives 8 s).
 const LONGEST: float = 9.5
@@ -108,6 +121,11 @@ var _payload: FormBase = null
 ## What the enemy shooter and the relay donor cast: the straight carrier of one shot that reaches
 ## furthest.
 var _shot: FormBase = null
+## The matrix's columns: every form card, then a stand-in form for each fallback carrier (its
+## `carrier` names it; not a card, never in a staff).
+var _columns: Array[FormBase] = []
+## What comes before the cards of the `right there` column: `on hit`, a pierce card, `_shot`.
+var _point_prefix: Array[StringName] = []
 ## Trace by scene key, for the casts without the card.
 var _baselines: Dictionary = {}
 
@@ -155,6 +173,33 @@ func _discover() -> void:
 			_payload = form
 		if form.shots == 1 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
 			_shot = form
+	_columns.assign(_forms)
+	_point_prefix.clear()
+	if _shot == null:
+		return
+	var land := ModifierBase.new()
+	land.id = LAND
+	_shelf.extra[LAND] = land
+	var on_you := FormBase.new()
+	on_you.id = &"on you"
+	on_you.carrier = Carriers.ON_CASTER
+	on_you.lifetime = SpellLimits.MIN_LIFETIME
+	_columns.append(on_you)
+	for trigger in _triggers:
+		if trigger.event == TriggerBase.Event.HIT:
+			_point_prefix.append(trigger.id)
+			break
+	for modifier in _modifiers:
+		if modifier.behaviour == ModifierBase.Behaviour.NONE and modifier.extra_pierce > 0:
+			_point_prefix.append(modifier.id)
+			break
+	_point_prefix.append(_shot.id)
+	var there := FormBase.new()
+	there.id = &"right there"
+	there.carrier = Carriers.AT_POINT
+	there.speed = _shot.speed
+	there.lifetime = _shot.lifetime
+	_columns.append(there)
 
 
 # --- The probes --------------------------------------------------------------------------------
@@ -246,8 +291,12 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
 	match form.carrier:
-		&"atom", &"swap":
+		&"atom", &"swap", Carriers.AT_POINT:
+			# Right there: where the shot that casts it hits (its stand-in has that shot's numbers).
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
+		Carriers.ON_CASTER:
+			# On you: within its strike round the wizard's hand.
+			return SpellLimits.FALLBACK_RADIUS
 		&"beam":
 			return minf(form.ray_length * 0.5, 90.0)
 		&"swing":
@@ -361,7 +410,7 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 		return
 	var started: int = Time.get_ticks_msec()
 	var header: PackedStringArray = PackedStringArray(["", ""])
-	for form in _forms:
+	for form in _columns:
 		header.append(String(form.id))
 	var lines: PackedStringArray = PackedStringArray()
 	lines.append("| %s |" % " | ".join(header.slice(1)))
@@ -372,8 +421,8 @@ func _matrix(title: String, cards: Array[SpellComponent]) -> void:
 	var silent: int = 0
 	for card in cards:
 		var row: PackedStringArray = PackedStringArray([String(card.id)])
-		for form in _forms:
-			var cell: String = _cell(card, form)
+		for form in _columns:
+			var cell: String = NOT_THERE if Carriers.is_fallback(form.carrier) and not _lands(card) else _cell(card, form)
 			if cell == SILENT:
 				silent += 1
 			row.append(cell)
@@ -393,8 +442,9 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 	var names: PackedStringArray = PackedStringArray()
 	for scene in scenes:
 		names.append(scene["name"])
-		var compiled: CompiledStaff = _compiler.compile_staff(_casts(card, form, scene, false)[0], _staff)
-		if compiled.wasted.has(0):
+		var casts: Array = _casts(card, form, scene, false)
+		var compiled: CompiledStaff = _compiler.compile_staff(casts[0], _staff)
+		if compiled.wasted.has(int(casts[2])):
 			# The other way round: forced on, a wasted card must still change nothing.
 			for forced in scenes:
 				if _changes(card, form, forced, true):
@@ -435,16 +485,31 @@ func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: b
 	return after != before
 
 
-## The cards of the cast with `card` and of the same cast without it, as [with, without]. `forced`
-## (a wasted card forced on): a modifier of numbers only is swapped for a copy of its costs, so
-## both casts pay them (a slower cast is no effect).
+## The cards of the cast with `card` and of the same cast without it, and the slot of `card` in the
+## first, as [with, without, slot]. `forced` (a wasted card forced on): a modifier of numbers only
+## is swapped for a copy of its costs, so both casts pay them (a slower cast is no effect).
 func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> Array:
-	var tail: Array[StringName] = [form.id]
-	if form.carries_payload():
-		tail.append(_payload.id)
 	var with: Array[StringName] = []
 	var without: Array[StringName] = []
 	var extra: Array[StringName] = _extra_cards(scene)
+	if Carriers.is_fallback(form.carrier):
+		# The card lands with LAND and the scene's cards, and nothing after them: on the caster, or on
+		# the point where `on hit`'s shot hit.
+		if form.carrier == Carriers.AT_POINT:
+			with.append_array(_point_prefix)
+			without.append_array(_point_prefix)
+		for cards: Array[StringName] in [with, without]:
+			cards.append_array(extra)
+			cards.append(LAND)
+		var slot: int = with.size()
+		with.append(card.id)
+		var plain: StringName = _costs_of(card) if forced else _plain_of(card)
+		if plain != &"":
+			without.append(plain)
+		return [with, without, slot]
+	var tail: Array[StringName] = [form.id]
+	if form.carries_payload():
+		tail.append(_payload.id)
 	if card is TriggerBase:
 		with.append(card.id)
 		with.append_array(extra)
@@ -467,7 +532,13 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: boo
 		without.append_array(extra)
 		with.append_array(tail)
 		without.append_array(tail)
-	return [with, without]
+	return [with, without, 0]
+
+
+## True when `card` can land on a fallback carrier: a modifier or an infusion (a trigger with no
+## carrier after it is wasted, and a multicast asks for carriers).
+static func _lands(card: SpellComponent) -> bool:
+	return card is ModifierBase or card is ElementBase
 
 
 func _scenes_of(card: SpellComponent) -> Array[Dictionary]:
@@ -563,7 +634,8 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	var r: float = reach(form)
 	world.add_wizard(cards)
 	world.add_ally(ALLY_AT)
-	if scene.get("line", false):
+	# Right there is cast where `on hit`'s shot hits: always a target on the line for it to hit.
+	if scene.get("line", false) or form.carrier == Carriers.AT_POINT:
 		var donor: Array[StringName] = []
 		if scene.get("donor", false):
 			for element in _elements:

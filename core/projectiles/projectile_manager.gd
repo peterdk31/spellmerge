@@ -220,8 +220,9 @@ const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
 ## Only `spawn_orbit` makes this one.
 const MOTION_ORBIT: int = 2
-## `_caster_slot` values that are no slot: the caster's anchor, or a fixed point.
-const CASTER_WIZARD: int = -1
+## `_caster_slot` values that are no slot: the casting actor's own body (its anchor; any actor, a
+## player's or an enemy's), or a fixed point.
+const CASTER_BODY: int = -1
 const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
 const F_SELF: int = 1
@@ -712,7 +713,7 @@ var _stuck_to: Array = []
 var _stuck_off: PackedVector2Array = PackedVector2Array()
 var _speed: PackedFloat32Array = PackedFloat32Array()
 ## The shot's caster, which an orbit circles and a returning shot flies back to: its actor's
-## anchor (CASTER_WIZARD), a fixed point in `_caster_at` (CASTER_POINT), or the shot in that slot
+## anchor (CASTER_BODY), a fixed point in `_caster_at` (CASTER_POINT), or the shot in that slot
 ## while it is the one with `_caster_seq` (a payload's carrier); once that shot is gone, the
 ## point where it was last seen.
 var _caster_slot: PackedInt32Array = PackedInt32Array()
@@ -2033,12 +2034,12 @@ func caster_shot_of(slot: int) -> int:
 ## True when the shot in `slot` was cast by its actor's body (not by another shot or from a
 ## point). Like `caster_shot_of`, it still answers for a shot ended by the hit being sent.
 func is_cast_by_wizard(slot: int) -> bool:
-	return slot >= 0 and slot < _cap and _caster_slot[slot] == CASTER_WIZARD
+	return slot >= 0 and slot < _cap and _caster_slot[slot] == CASTER_BODY
 
 
 func _caster_position(slot: int) -> Vector2:
 	var caster: int = _caster_slot[slot]
-	if caster == CASTER_WIZARD:
+	if caster == CASTER_BODY:
 		return _anchors[_actor[slot]] if _actor[slot] >= 0 else Vector2.INF
 	if caster >= 0:
 		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
@@ -2436,7 +2437,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	_owned[_budget[slot]] -= 1
 	_budget[slot] = budget
 	_owned[budget] += 1
-	_caster_slot[slot] = CASTER_WIZARD
+	_caster_slot[slot] = CASTER_BODY
 	_home_target[slot] = 0
 	_home_at[slot] = Vector2.INF
 	_skip_on[slot] = 0.0
@@ -2902,7 +2903,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_stick[slot] = 0.0
 	_stuck_to[slot] = null
 	_base[slot] = origin
-	_caster_slot[slot] = CASTER_WIZARD
+	_caster_slot[slot] = CASTER_BODY
 	_caster_at[slot] = Vector2.INF
 	_drop_moves(slot)
 	_forget_all(slot)
@@ -3381,7 +3382,7 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 			continue
 		var caster: int = _caster_slot[slot]
 		var centre: Vector2 = _caster_at[slot]
-		if caster == CASTER_WIZARD:
+		if caster == CASTER_BODY:
 			centre = _anchors[_actor[slot]] if _actor[slot] >= 0 else Vector2.INF
 		elif caster >= 0:
 			if not _catching_up:

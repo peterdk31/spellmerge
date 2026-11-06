@@ -116,7 +116,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sl_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sl_struck[at].clear()
 	var mine: bool = actor >= 0 and actor < SpellRuntime.ACTORS
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		if mine and kit.aim_pivot(actor).is_finite():
 			_sl_origin[at] = kit.aim_pivot(actor)
 		if mine and poses.started_at(actor) != kit.clock():
@@ -139,7 +139,7 @@ func _slam_step(at: int, delta: float) -> void:
 			return
 		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
 		_sl_impact[at] = impact
-		if _sl_caster[at] == SpellRuntime.CASTER_WIZARD:
+		if _sl_caster[at] == SpellRuntime.CASTER_BODY:
 			poses.land_at(tag, impact - _sl_origin[at])
 		if kit.events != null:
 			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
@@ -159,7 +159,7 @@ func _slam_step(at: int, delta: float) -> void:
 ## Puts slam `at` where its caster holds it now, until it strikes (as `_swing_follow`).
 func _slam_follow(at: int) -> void:
 	var caster: int = _sl_caster[at]
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		var actor: int = _sl_actor[at]
 		if actor < 0 or actor >= SpellRuntime.ACTORS:
 			return

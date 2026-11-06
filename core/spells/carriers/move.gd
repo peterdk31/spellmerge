@@ -18,7 +18,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var distance: float = CasterMoves.move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	var way: Vector2 = direction
 	var shot: int = kit.caster_shot()
-	var wizard: bool = kit.caster() == SpellRuntime.CASTER_WIZARD
+	var wizard: bool = kit.caster() == SpellRuntime.CASTER_BODY
 	if wizard and _walks():
 		# Turned as far as the walk is off the aim (staffs A6a), so a mirrored one goes the other way.
 		way = way.rotated(kit.walk_turn(actor))

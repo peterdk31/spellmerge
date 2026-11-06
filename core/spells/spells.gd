@@ -336,14 +336,15 @@ var _echo_spell: CompiledSpell = null
 ## One slot, for the one-shot forms of `_land_shots`, `_travel_shots` and `_register_shots`.
 var _one_slot: PackedInt32Array = PackedInt32Array([-1])
 
-## Who casts the launch being fired: the actor's body (CASTER_WIZARD, a staff's own cast), the
+## Who casts the launch being fired: the actor's own body (CASTER_BODY, a staff's own cast, by any
+## actor: a player's wizard or an enemy), the
 ## point it starts from (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or an
 ## entity fired), or the slot of the shot that fired the payload, while it is the shot with
 ## `_caster_seq`. One rule for every card that names the caster: dash, teleport, pull, swap and
 ## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
-const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
+const CASTER_BODY: int = ProjectilesScript.CASTER_BODY
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
-var _caster: int = CASTER_WIZARD
+var _caster: int = CASTER_BODY
 var _caster_seq: int = 0
 ## The turning ring the copy being cast now stands on (`_penta`): its centre, its radius (0 when
 ## the copy is on none) and the copy's angle on it now. A carrier whose copy stays on its point
@@ -758,7 +759,7 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 	_release_hold(index)
 	# The old build casts no more: its cast's later firings go (a payload of a shot in the air
 	# fires on, as the shot flies on).
-	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.caster == CASTER_WIZARD)
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.caster == CASTER_BODY)
 	var old: int = _current[index]
 	if compiled.is_empty():
 		_installed[index] = null
@@ -1002,12 +1003,13 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):
-		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
+		if _caster == CASTER_BODY and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
 			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
 
-## The carrier that runs `spell` (`Carrier`, by its id; one that runs nothing for a fallback).
+## The carrier that runs `spell` (`Carrier`, by its id, a fallback carrier's too; one that runs
+## nothing for an id no carrier has).
 func _carrier_of(spell: CompiledSpell) -> Carrier:
 	var carrier: Carrier = _carriers.get(spell.carrier)
 	return carrier if carrier != null else _no_carrier
@@ -1114,18 +1116,18 @@ func live_caster_shot(caster: int, seq: int) -> int:
 	return -1
 
 
-## `_launch_group` cast by `caster`: CASTER_WIZARD, CASTER_POINT, or a shot's slot (a shot that
+## `_launch_group` cast by `caster`: CASTER_BODY, CASTER_POINT, or a shot's slot (a shot that
 ## is not alive makes the point the caster). The caster from before is set again afterwards.
 func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int) -> int:
 	var saved: int = _caster
 	var saved_seq: int = _caster_seq
 	_caster = CASTER_POINT
-	if caster == CASTER_WIZARD:
-		_caster = CASTER_WIZARD
+	if caster == CASTER_BODY:
+		_caster = CASTER_BODY
 	elif caster >= 0 and projectiles.is_alive(caster):
 		_caster = caster
 		_caster_seq = projectiles.get_seq_of(caster)
-	var made: int = _launch_group(group, actor, staff, generation, origin, heading, source, _caster == CASTER_WIZARD)
+	var made: int = _launch_group(group, actor, staff, generation, origin, heading, source, _caster == CASTER_BODY)
 	_caster = saved
 	_caster_seq = saved_seq
 	return made
@@ -1201,8 +1203,8 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 ## made (a fallback counts as one). The carriers of one group leave along the same aim (only the
 ## staff's `spread` sets them apart, shot by shot); a scatter group sends each in a random
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
-## apart (at once when that is 0), reading nothing again. A fallback strikes everything on the
-## spot: the caster's for a cast, the payload's origin for a payload. `source` is the target that
+## apart (at once when that is 0), reading nothing again. A fallback carrier (the cards that landed
+## on the caster, or on a payload's origin) is launched like any other. `source` is the target that
 ## fired the payload, or null. `from_caster` is true for the cast's own group, whose later
 ## firings (burst, echo) start from where the caster has moved to.
 func _launch_group(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool = false) -> int:
@@ -1235,8 +1237,6 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 ## (`_repeats`): it echoes no more.
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
-	if spell.fallback != CompiledSpell.FALLBACK_NONE:
-		return _fallback_hit(spell, tag, actor, origin)
 	_echo_spell = spell if echoed else null
 	var launched: int = _cast_once(spell, tag, actor, origin, heading, source)
 	if launched > 0:
@@ -1298,7 +1298,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
 	# The centre: a wizard's body (its anchor), else the point or shot casting this payload.
 	var centre: Vector2 = origin
-	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
+	if _caster == CASTER_BODY and projectiles != null and projectiles.get_anchor(actor).is_finite():
 		centre = projectiles.get_anchor(actor)
 	# Where the card's last ring has turned to (its own start the first time), turning back.
 	var turned: float = SpellRuntime.penta_start(tag)
@@ -1354,7 +1354,7 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, heading: Vector2) -> vo
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
 	if push <= 0.0:
 		return
-	if _caster != CASTER_WIZARD:
+	if _caster != CASTER_BODY:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
 		var shot: int = _caster_shot()
 		if shot >= 0:
@@ -1393,7 +1393,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
 ## `spell` (an echo). The queue grows as needed; nothing is dropped for room. A launch the wizard
-## casts (`caster` CASTER_WIZARD: the cast's later firings) goes when its staff is rebuilt; any
+## casts (`caster` CASTER_BODY: the cast's later firings) goes when its staff is rebuilt; any
 ## other (a payload of a shot or a point) keeps its build, as a shot in the air does, and fires.
 func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> PendingLaunch:
 	if _pending_free.is_empty():
@@ -1418,7 +1418,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.caster_seq = _caster_seq
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(actor)
-	if launch.caster != CASTER_WIZARD:
+	if launch.caster != CASTER_BODY:
 		var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
 		_generation_live[key] = _generation_live.get(key, 0) + 1
 	_pending.append(launch)
@@ -1435,10 +1435,10 @@ func _run_pending() -> void:
 			i += 1
 			continue
 		_pending.remove_at(i)
-		if launch.caster == CASTER_WIZARD and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
+		if launch.caster == CASTER_BODY and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
 			_release_launch(launch)
 			continue
-		var keeps: bool = launch.caster != CASTER_WIZARD
+		var keeps: bool = launch.caster != CASTER_BODY
 		var origin: Vector2 = launch.origin
 		var from_caster: bool = launch.anchor.is_finite()
 		if from_caster and projectiles != null:
@@ -1474,7 +1474,7 @@ func _run_pending() -> void:
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed)
 		elif _hold_tags[actor * SpellLimits.STAFFS + staff].has(SpellTag.make(actor, staff, spell.node, generation)):
 			# A held carrier cast again while it is on, along where its wizard aims now.
-			if caster == CASTER_WIZARD and _aim_dir[actor].is_finite():
+			if caster == CASTER_BODY and _aim_dir[actor].is_finite():
 				heading = _aim_dir[actor]
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed, true)
 		_caster = saved
@@ -1504,7 +1504,7 @@ func _drop_pending(drops: Callable) -> void:
 			_pending.remove_at(i)
 			if launch.landing != null:
 				_lc_leave(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation), false)
-			var keeps: bool = launch.caster != CASTER_WIZARD
+			var keeps: bool = launch.caster != CASTER_BODY
 			var tag: int = SpellTag.make(launch.actor, launch.staff, 0, launch.generation)
 			_release_launch(launch)
 			if keeps:
@@ -1524,22 +1524,6 @@ func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 			if tags.has(SpellTag.make(launch.actor, launch.staff, spell.node, launch.generation)):
 				return true
 	return false
-
-
-## The cards that landed on the caster or on a payload's origin: a strike of everything there
-## (`_strike_round`, `everyone`; a blast is as wide as its strength, and explodes).
-func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
-	var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
-	if blast > 0.0 and events != null and at.is_finite():
-		cue_tag = tag
-		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
-		cue_tag = 0
-	if at.is_finite():
-		_strike_round(spell, tag, actor, at, Vector2.RIGHT, maxf(spell.radius, blast), null, true)
-	# After the strike, which can reach the caster itself and would spend the barrier.
-	if _caster == CASTER_WIZARD:
-		_moves.shield_caster(spell, tag, actor, 0.0)
-	return 1
 
 
 ## Degrees (as radians) off the aim of shot `n` of `count`: none for one shot, an even ring
@@ -1588,7 +1572,7 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 	var zap_relay: HitProfile = spell.echo_zap_hit if spell == _echo_spell else null
 	# A payload's shot: an orbit circles the shot that cast it and a returning one flies back to it,
 	# or to the point it was cast from.
-	var payload: bool = _caster != CASTER_WIZARD
+	var payload: bool = _caster != CASTER_BODY
 	var caster_shot: int = _caster_shot() if payload else -1
 	var lifecycle: bool = _lc_rows(spell) > 0
 	var zaps: bool = spell.zap_chance > 0.0 and spell.zap_reach > 0.0
@@ -1901,10 +1885,10 @@ func _run_waiting_fires() -> void:
 			i += 1
 			continue
 		_pending.remove_at(i)
-		if launch.caster == CASTER_WIZARD and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
+		if launch.caster == CASTER_BODY and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
 			_release_launch(launch)
 			continue
-		var keeps: bool = launch.caster != CASTER_WIZARD
+		var keeps: bool = launch.caster != CASTER_BODY
 		_fires_used[budget] += launch.cost
 		fires_made += 1
 		var origin: Vector2 = launch.origin
@@ -2690,7 +2674,7 @@ func clear() -> void:
 	_jq_head = 0
 	_jq_count = 0
 	_moves.clear()
-	_caster = CASTER_WIZARD
+	_caster = CASTER_BODY
 	for carrier: Carrier in _carriers.values():
 		carrier.clear()
 	_poses.clear()
@@ -2753,7 +2737,7 @@ func open_caster(actor: int) -> bool:
 func close_caster(actor: int) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
-	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.caster == CASTER_WIZARD)
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.caster == CASTER_BODY)
 	for staff in SpellLimits.STAFFS:
 		var index: int = actor * SpellLimits.STAFFS + staff
 		_release_hold(index)

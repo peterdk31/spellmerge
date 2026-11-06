@@ -56,7 +56,7 @@ constexpr int S_GONE = 7;
 constexpr int F_TURNED = 64;
 constexpr int F_WAVE = 128;
 constexpr int F_DEFERRED = 256;
-constexpr int CASTER_WIZARD = -1;
+constexpr int CASTER_BODY = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
 constexpr double RETURN_BEND = PI_D / 3.0;
@@ -842,7 +842,7 @@ const Constant CONSTANTS[] = {
 	{ "F_TURNED", (double)F_TURNED },
 	{ "F_WAVE", (double)F_WAVE },
 	{ "F_DEFERRED", (double)F_DEFERRED },
-	{ "CASTER_WIZARD", (double)CASTER_WIZARD },
+	{ "CASTER_BODY", (double)CASTER_BODY },
 	{ "CASTER_POINT", (double)CASTER_POINT },
 	{ "SPIRAL_PERIOD", (double)SPIRAL_PERIOD },
 	{ "RETURN_BEND", (double)RETURN_BEND },
@@ -1244,7 +1244,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			}
 			const int64_t caster = caster_slot[slot];
 			Vector2 centre = caster_at[slot];
-			if (caster == CASTER_WIZARD) {
+			if (caster == CASTER_BODY) {
 				centre = actor[slot] >= 0 ? anchors[actor[slot]] : Vector2(INFINITY, INFINITY);
 			} else if (caster >= 0) {
 				wait(slot);
@@ -1348,7 +1348,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 				mem_head[slot] = -1;
 			}
 			// `_caster_position` of a wizard or a point.
-			const Vector2 anchor = caster_slot[slot] == CASTER_WIZARD
+			const Vector2 anchor = caster_slot[slot] == CASTER_BODY
 					? (actor[slot] >= 0 ? anchors[actor[slot]] : Vector2(INFINITY, INFINITY))
 					: caster_at[slot];
 			if (!anchor.is_finite()) {

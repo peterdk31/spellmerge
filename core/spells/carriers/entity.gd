@@ -57,7 +57,7 @@ func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Ve
 ## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
 ## cast it, or nothing (-2: it stays where it was made).
 func _entity_caster() -> int:
-	if kit.caster() == SpellRuntime.CASTER_WIZARD:
+	if kit.caster() == SpellRuntime.CASTER_BODY:
 		return -1
 	var shot: int = kit.caster_shot()
 	return shot if shot >= 0 else -2

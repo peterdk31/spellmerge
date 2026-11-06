@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-06: Online play may slow the game, and netcode can be allowed (owner)
+
+- **Slowing the game is allowed** (owner: "Slowing the game is an option if we have to!"). Owner decision 4 of online-ready (60 ticks a second, fixed) stands for normal play, but online a session may run slower when a machine cannot keep up: fewer ticks a second, or the game's speed lowered. A last resort, after the session rules (N11) are capped at the weakest machine's.
+- **Netcode can be allowed** (owner: "netcode can easily be allowed"). The netcode phase's exception to hard rule 4 is a formality, not an open question. The rule (AGENTS.md) and its check (`ci/smbot/rules.py`, owner-only) change when netcode work starts; until then networking stays banned.
+- **Asked in the same talk, still open:** whether online play is lockstep (the plan) or host-authoritative with Godot's own multiplayer (the host simulates, clients draw; lighter for weak machines and the web, more bandwidth), and whether to pause the lockstep-only parts (N6, N7, N8, N10) for a netcode spike first.
+
 ## 2026-11-06: One clock: the Tick (online-ready N3a, owner session)
 
 - **N3 is three PRs:** N3a the Tick (this), N3b a run starts from a fresh game's state, N3c the `sim` service and chance by hash. N3 as one PR touched five large files' resets, every seeded outcome and the clock at once; each part is checked by its own test.

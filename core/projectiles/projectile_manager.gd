@@ -579,7 +579,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame"]
+const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame"]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -1008,6 +1008,13 @@ var _tail_n: PackedInt32Array = PackedInt32Array()
 ## The tail asked for while drawing (births at TAIL_SPACING), and the births of thinned groups laid.
 var _tail_wanted: float = 0.0
 var _tail_thin: int = 0
+## Tails' ends (`_end_tail`): the births of the last stretch of every shot that ended in flight since
+## the last frame (from where it was drawn last to where it ended), SPARK_BIRTH_STRIDE floats each,
+## `_end_count` of them, and the tail they asked for; the next frame lays them after the drawn
+## shots' tails (`_lay_ends`).
+var _end_births: PackedFloat32Array = PackedFloat32Array()
+var _end_count: int = 0
+var _end_wanted: float = 0.0
 ## The groups (see GROUPS). Per slot: its group (`group_of`, set at its spawn). Per group: its live
 ## shots; and the groups with any, the first `_group_live` of `_groups` (`_group_at`: a group's
 ## place there).
@@ -1747,6 +1754,8 @@ func clear() -> void:
 	_group_live = 0
 	_gate_on.fill(0)
 	_gate_live = 0
+	_end_count = 0
+	_end_wanted = 0.0
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -2451,6 +2460,7 @@ func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
 	var at: Vector2 = _pos[slot]
+	_end_tail(slot, at)
 	_kill(slot)
 	if events != null:
 		var outer_form: StringName = impact_form
@@ -4512,8 +4522,12 @@ func update_draw(fraction: float = -1.0) -> void:
 	spark_birth_count = 0
 	if _draw_node == null:
 		drawn = 0
+		_end_count = 0
+		_end_wanted = 0.0
 		return
-	if _high == 0 and drawn == 0:
+	# A shot that ended since the last frame still lays its tail's end (`_lay_ends`), even if it was
+	# never drawn (fired and spent within a step).
+	if _high == 0 and drawn == 0 and _end_count == 0:
 		return
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
@@ -4538,9 +4552,13 @@ func update_draw(fraction: float = -1.0) -> void:
 		_kernel.call(&"draw_shots", self, fraction)
 	else:
 		_draw_shots(fraction)
-	tail_births = _draw_out[BATCHES + 4]
-	tail_demand = _draw_out[BATCHES + 5]
-	spark_birth_count = tail_births
+	spark_birth_count = _draw_out[BATCHES + 4]
+	tail_demand = _draw_out[BATCHES + 5] + int(_end_wanted)
+	if tail_births_on:
+		_lay_ends()
+	_end_count = 0
+	_end_wanted = 0.0
+	tail_births = spark_birth_count
 	for batch in BATCHES:
 		var out: int = _draw_out[batch]
 		var multimesh: MultiMesh = _nodes[batch].multimesh
@@ -4623,21 +4641,26 @@ func _give_off_spark(slot: int, fraction: float, span: float) -> bool:
 ## off back along `back`, from a shot of the caster's `ramp`, the look `look` and the core colour
 ## `core`, of the spell tagged `tag` (S2). Returns false once the frame's SPARK_BIRTHS_MAX are taken.
 func _add_birth(at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> bool:
-	var i: int = spark_birth_count * SPARK_BIRTH_STRIDE
-	spark_births[i + SPARK_X] = at.x
-	spark_births[i + SPARK_Y] = at.y
-	spark_births[i + SPARK_BACK_X] = back.x
-	spark_births[i + SPARK_BACK_Y] = back.y
-	spark_births[i + SPARK_KIND] = float(kind)
-	spark_births[i + SPARK_RAMP] = float(ramp)
-	spark_births[i + SPARK_LOOK] = float(look)
-	spark_births[i + SPARK_CORE] = core.r
-	spark_births[i + SPARK_CORE + 1] = core.g
-	spark_births[i + SPARK_CORE + 2] = core.b
-	spark_births[i + SPARK_TAG] = float(tag & ((1 << SPARK_TAG_BITS) - 1))
-	spark_births[i + SPARK_TAG + 1] = float(tag >> SPARK_TAG_BITS)
+	_put_birth(spark_births, spark_birth_count, at, back, kind, ramp, look, core, tag)
 	spark_birth_count += 1
 	return spark_birth_count < SPARK_BIRTHS_MAX
+
+
+## Write a birth (see `_add_birth`) as birth `n` of `births`.
+static func _put_birth(births: PackedFloat32Array, n: int, at: Vector2, back: Vector2, kind: int, ramp: int, look: int, core: Color, tag: int) -> void:
+	var i: int = n * SPARK_BIRTH_STRIDE
+	births[i + SPARK_X] = at.x
+	births[i + SPARK_Y] = at.y
+	births[i + SPARK_BACK_X] = back.x
+	births[i + SPARK_BACK_Y] = back.y
+	births[i + SPARK_KIND] = float(kind)
+	births[i + SPARK_RAMP] = float(ramp)
+	births[i + SPARK_LOOK] = float(look)
+	births[i + SPARK_CORE] = core.r
+	births[i + SPARK_CORE + 1] = core.g
+	births[i + SPARK_CORE + 2] = core.b
+	births[i + SPARK_TAG] = float(tag & ((1 << SPARK_TAG_BITS) - 1))
+	births[i + SPARK_TAG + 1] = float(tag >> SPARK_TAG_BITS)
 
 
 ## The tag of the birth that starts at `i` in `births` (SPARK_TAG's two floats).
@@ -4723,11 +4746,34 @@ func _draw_shots(fraction: float) -> void:
 func _lay_tail(slot: int, at: Vector2) -> void:
 	var from: Vector2 = _tail_from[slot]
 	_tail_from[slot] = at
+	_tail_wanted += _lay_path(slot, from, at, false)
+
+
+## The last stretch of the tail of the shot in `slot`, which ends in flight at `to` (a hit, a wall,
+## its life run out, a block): from where it was drawn last to where it ended, which no frame draws
+## it along (the owner, 2026-11-06: an Atom fired at a target close by left its tail a step or two
+## short, the gap between its last drawn point and the hit). Laid now, while its slot is still its
+## own, into `_end_births`; the next frame lays them after the drawn shots' tails (`_lay_ends`).
+## A rune (still) lays no tail, and an orbit shot ends where it would have been drawn.
+func _end_tail(slot: int, to: Vector2) -> void:
+	if not tail_births_on or _motion[slot] == MOTION_STILL:
+		return
+	if _motion[slot] == MOTION_ORBIT:
+		to = _drawn_at(slot, to)
+	if _end_births.size() < tail_births_cap * SPARK_BIRTH_STRIDE:
+		_end_births.resize(tail_births_cap * SPARK_BIRTH_STRIDE)
+	_end_wanted += _lay_path(slot, _tail_from[slot], to, true)
+
+
+## Lay the tail of the shot in `slot` along the path from `from` to `at` (see `_lay_tail`), from its
+## next tail point; `ending`: the last stretch of a shot that ended (`_end_tail`), into
+## `_end_births`, else into the frame's births. Returns the tail it asked for (births at
+## TAIL_SPACING); none across a jump.
+func _lay_path(slot: int, from: Vector2, at: Vector2, ending: bool) -> float:
 	var way: Vector2 = at - from
 	var d: float = way.length()
 	if not (d > 0.0) or d > TAIL_JUMP:
-		return
-	_tail_wanted += d / TAIL_SPACING
+		return 0.0
 	var group: int = _group[slot]
 	_group_tail[group] += d / TAIL_SPACING
 	var spacing: float = _group_spacing[group]
@@ -4740,18 +4786,40 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 	var back: Vector2 = way / -d
 	var code: int = tail_code(seq)
 	while carry < d:
-		if spark_birth_count >= tail_births_cap or (thinned and _tail_thin >= tail_thin_most):
+		if ending:
+			if _end_count >= tail_births_cap:
+				carry = d
+				break
+		elif spark_birth_count >= tail_births_cap or (thinned and _tail_thin >= tail_thin_most):
 			carry = d
 			break
 		var colour: Color = core
 		if mixed and tail_hash(seq, n * 2) < TAIL_PLAYER_SHARE:
 			colour = Color.WHITE
-		_add_birth(from.lerp(at, carry / d), back, code, _ramp[slot], _look[slot], colour, _tag[slot])
-		_tail_thin += 1 if thinned else 0
+		if ending:
+			_put_birth(_end_births, _end_count, from.lerp(at, carry / d), back, code, _ramp[slot], _look[slot], colour, _tag[slot])
+			_end_count += 1
+		else:
+			_add_birth(from.lerp(at, carry / d), back, code, _ramp[slot], _look[slot], colour, _tag[slot])
+			_tail_thin += 1 if thinned else 0
 		carry += spacing * (0.5 + tail_hash(seq, n * 2 + 1))
 		n += 1
 	_tail_carry[slot] = carry - d
 	_tail_n[slot] = n
+	return d / TAIL_SPACING
+
+
+## After the drawn shots' tails: the ended shots' last stretches (`_end_tail`), while the frame's
+## most lasts (`tail_births_cap`; they come last, so they never cut a flying shot's tail).
+func _lay_ends() -> void:
+	var take: int = clampi(tail_births_cap - spark_birth_count, 0, _end_count)
+	if take > 0:
+		var into: int = spark_birth_count * SPARK_BIRTH_STRIDE
+		for i in take * SPARK_BIRTH_STRIDE:
+			spark_births[into + i] = _end_births[i]
+		spark_birth_count += take
+	_end_count = 0
+	_end_wanted = 0.0
 
 
 ## The tail code of the shot of sequence `seq` (SPARK_TAIL + 0 to TAIL_KINDS - 1): its tail kind,
@@ -5191,6 +5259,7 @@ func _expire(slot: int) -> void:
 	var caster: int = _actor[slot]
 	var at: Vector2 = _pos[slot]
 	var tag: int = _tag[slot]
+	_end_tail(slot, at)
 	_kill(slot, false)
 	if events != null:
 		_event_slot = slot
@@ -5849,6 +5918,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_remember(slot, target)
 	else:
 		spent = true
+		_end_tail(slot, at)
 		_kill(slot, false)
 	if events != null and is_instance_valid(node):
 		impact_form = _form_of(slot)

@@ -458,13 +458,15 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	_check(not _mgr.is_alive(slot), "that spends it")
 
 
-## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one;
+## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one, and
+## spares the body it starts on (`exclude`);
 ## an enemy's hits another enemy; a shot of no actor hits a wizard and an enemy alike.
 func _test_every_shot_hits_both_sides() -> void:
 	_setup()
 	var friend: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	_target(Vector2(60.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
+	var mine: Node2D = _target(Vector2(60.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 2.0, 12)
+	_mgr.exclude(slot, mine)
 	_run(30)
 	_check(_hits.size() == 1 and _hits[0][1] == friend and _hits[0][0] == 0 and _hits[0][3] == 12, "a wizard's shot hits the teammate in its way, not its own wizard (%d hits)" % _hits.size())
 	_check(not _mgr.is_alive(slot), "the hit spends it")
@@ -478,7 +480,7 @@ func _test_every_shot_hits_both_sides() -> void:
 	_setup()
 	var own: Node2D = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, _imp)
 	var other: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
-	_mgr.spawn(_imp, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_mgr.exclude(_mgr.spawn(_imp, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0), own)
 	_run(30)
 	_check(_hits.size() == 1 and _hits[0][1] == other and _hits[0][1] != own, "an enemy's shot hits another enemy (%d hits)" % _hits.size())
 	# A shot of no actor, piercing, hits a wizard and an enemy on its line.

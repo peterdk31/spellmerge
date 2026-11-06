@@ -2385,7 +2385,7 @@ func _step_live(delta: float) -> void:
 ## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2410,7 +2410,7 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, null, caster, wound)
+	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
 
 
 ## The trigger live carrier `i` fires, or null.
@@ -2883,7 +2883,8 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		elif _lc_tied[i] == 1:
 			continue
 		_hurt_firing.append(tag)
-		_lc_fire(i, trigger.payload, position)
+		# It starts on the hurt body, so it spares that body until it has left it (`_launch`).
+		_lc_fire(i, trigger.payload, position, false, _body_node(actor))
 		_hurt_firing.resize(_hurt_firing.size() - 1)
 
 

@@ -3,7 +3,7 @@ extends SceneTree
 ## (the first is in when Play is pressed, the rest join mid-run), every leave
 ## order, no duplicate events, the camera keeps everyone in view (zooms out as the
 ## players spread, never past its limits, eases instead of jumping), and a
-## wizard's bolt hits a teammate (friendly fire is always on), never the shooter.
+## wizard's bolt hits a teammate (friendly fire is always on), not the shooter it leaves.
 ##
 ## godot --headless --path . --script res://tests/gameplay/coop/test_coop.gd
 
@@ -614,7 +614,7 @@ func _test_camera_survives_a_restart() -> void:
 
 
 ## Friendly fire is always on (actors G3c): a wizard's bolt hits a teammate in its way, through
-## the real projectile manager and Combat, never the shooter and never a wizard off its line.
+## the real projectile manager and Combat, not the shooter it leaves and never a wizard off its line.
 func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	# What the test shots do: a spell's hit profile under BOLT_TAG in Spells (Combat reads only
 	# those), set after the start, which resets Spells.
@@ -637,9 +637,10 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_wizard(2).global_position = Vector2(100.0, 300.0)
 	_projectiles.clear()
 	# The shot is cast by wizard 0's actor (actors G3b: the caster is the actor id the wizard opened).
-	_projectiles.spawn(_wizard(0).id, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
+	# It starts on the shooter, and spares them until it has left them, as Spells has every launch.
+	_projectiles.exclude(_projectiles.spawn(_wizard(0).id, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG), _wizard(0))
 	_projectiles.step(0.1)
-	_check(_health(0) == _wizard(0).health.max_health, "the shooter is never hit by its own shot")
+	_check(_health(0) == _wizard(0).health.max_health, "the shooter is not hit by the shot leaving them")
 	_check(_health(2) == _wizard(2).health.max_health, "a wizard off the line of fire is untouched")
 	_check(_health(1) == _wizard(1).health.max_health - SHOT_DAMAGE, "the teammate is hurt, health %s" % _health(1))
 	_check(_projectiles.get_count() == 0, "the shot ended on the hit")

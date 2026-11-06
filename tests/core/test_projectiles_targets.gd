@@ -43,6 +43,8 @@ var _actors: ActorsScript
 var _casters: PackedInt32Array
 var _holder: Node2D
 var _bodies: Array[Node2D] = []
+## Each seat's wizard body, which its shots start on.
+var _wizards: Array[Node2D] = []
 var _owners: PackedInt32Array = PackedInt32Array()
 var _index_of: Dictionary = {}
 var _hits: int = 0
@@ -70,6 +72,7 @@ func before_each() -> void:
 	_holder.position = Vector2(3.0, -2.0)
 	root.add_child(_holder)
 	_bodies.clear()
+	_wizards.clear()
 	_owners.clear()
 	_index_of.clear()
 	_hits = 0
@@ -82,6 +85,7 @@ func before_each() -> void:
 		_holder.add_child(wizard)
 		_mgr.add_target(wizard, 7.0, ManagerScript.LAYER_PLAYER, _casters[seat], Vector2(0.0, -8.0))
 		_index_of[wizard.get_instance_id()] = -1 - seat
+		_wizards.append(wizard)
 	for i in BODIES:
 		_add_body(i)
 
@@ -156,6 +160,8 @@ func _top_up() -> void:
 		var origin: Vector2 = ROOM * 0.5 + Vector2(-30.0 + 20.0 * seat, 32.0)
 		var pierce: int = 2 if _fired % 3 == 0 else 0
 		var slot: int = _mgr.spawn(_casters[seat], origin, way.normalized() * 420.0, 1.5, 4.0, ManagerScript.LAYER_ENEMY, pierce, _fired + 1)
+		# It starts on its wizard and spares them until it has left them, as the spell runtime has it.
+		_mgr.exclude(slot, _wizards[seat])
 		if _fired % 7 == 0:
 			_mgr.set_homing(slot, 6.0, 120.0)
 		_fired += 1

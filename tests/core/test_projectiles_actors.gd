@@ -139,27 +139,40 @@ func test_a_shield_block_carries_the_shields_actor_id() -> void:
 
 
 ## Everything hurts everything (actors G3c): an enemy's spell hits the other enemies whatever
-## layer it was given, never its own body; a shot of no actor hits enemies too.
+## layer it was given, sparing its own body only while it starts on it (`exclude`, which the spell
+## runtime gives every launch); a shot of no actor hits enemies too.
 func test_an_enemys_spell_hits_the_others_but_never_itself() -> void:
 	var imp: Node2D = _enemy(Vector2(100.0, 100.0), IMP)
 	var other: Node2D = _enemy(Vector2(200.0, 100.0), OTHER_IMP)
-	mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
+	mgr.exclude(mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER), imp)
 	mgr.spawn(EventsScript.NO_PLAYER, Vector2(200.0, 160.0), Vector2(0.0, -300.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
 	_run(40)
 	check_equal(_hit_targets(), [other, other] as Array[Node], "the enemy's shot and the no-actor one each hit the other enemy")
-	check(not _hit_targets().has(imp), "never the caster's own body")
+	check(not _hit_targets().has(imp), "not the caster's own body it left")
 	hits.clear()
-	mgr.ray(IMP, Vector2(100.0, 100.0), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_PLAYER)
+	mgr.ray(IMP, Vector2(100.0, 100.0), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_PLAYER, 0, 0.0, imp)
 	check_equal(_hit_targets(), [other] as Array[Node], "its beam hits the other enemy too")
 
 
 func test_a_wizards_spell_hits_a_teammate_but_never_itself() -> void:
 	var own_body: Node2D = _target(Vector2(100.0, 100.0), ManagerScript.LAYER_PLAYER, WIZ_0)
 	var mate: Node2D = _target(Vector2(200.0, 100.0), ManagerScript.LAYER_PLAYER, WIZ_1)
-	mgr.spawn(WIZ_0, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY)
+	mgr.exclude(mgr.spawn(WIZ_0, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY), own_body)
 	_run(30)
 	check_equal(_hit_targets(), [mate] as Array[Node], "a shot given only the enemy layer hits the teammate")
-	check(not _hit_targets().has(own_body), "never its caster's own body")
+	check(not _hit_targets().has(own_body), "not the caster's own body it left")
+
+
+## Nothing spares a caster by itself (owner, 2026-11-06): a shot with no `exclude` born on its
+## caster's body hits it, and a ray with none hits the body it starts in.
+func test_nothing_spares_its_caster_by_itself() -> void:
+	var own_body: Node2D = _target(Vector2(100.0, 100.0), ManagerScript.LAYER_PLAYER, WIZ_0)
+	mgr.spawn(WIZ_0, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY)
+	_run(5)
+	check_equal(_hit_targets(), [own_body] as Array[Node], "a shot hits its caster's own body")
+	hits.clear()
+	mgr.ray(WIZ_0, Vector2(100.0, 100.0), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_ENEMY)
+	check_equal(_hit_targets(), [own_body] as Array[Node], "so does a ray")
 
 
 func test_a_seats_wizard_counts_in_its_seats_bucket() -> void:

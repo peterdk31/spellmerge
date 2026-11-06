@@ -11,6 +11,7 @@ extends "res://tests/support/suite.gd"
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
@@ -177,12 +178,15 @@ func test_a_sweep_faster_than_a_step_still_hits_everything_it_turned_through() -
 
 
 func test_the_caster_is_skipped_and_a_teammate_is_hit() -> void:
+	# The caster's body is actor 0's node, as an Actor sets its own: what its swing is cast from.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	var own_body: Node2D = _target(Vector2(10, 0), 6.0, ManagerScript.LAYER_PLAYER, 0)
+	_mgr.actors.set_node(0, own_body)
 	var mate: Node2D = _target(Vector2(18, 4), 4.0, ManagerScript.LAYER_PLAYER, 1)
 	_build()
 	_cast()
 	_tick(30)
-	check_equal(_struck(own_body), 0, "its own body is skipped")
+	check_equal(_struck(own_body), 0, "the body that swings is spared")
 	check_equal(_struck(mate), 1, "everything hurts everything: a teammate in the arc is hit")
 
 

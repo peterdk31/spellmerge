@@ -178,6 +178,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `payload_cast_by` | from its traits (the fallback carriers above) | none: every carrier answers by its yes/no flags |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
+| `deals_damage` | true | teleport: its landing strikes the body that lands too, so it deals none and a damage factor (overcharge) is wasted there |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam, rain (for an enemy's telegraph) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |

@@ -82,6 +82,13 @@ func has_wind_down() -> bool:
 	return true
 
 
+## True when its hits deal damage of their own (its form card's `base_damage`, which every damage
+## factor scales), so a card's damage factor changes something: every carrier but the teleport,
+## whose landing strikes the body that lands too and so deals none (owner, 2026-11-06).
+func deals_damage() -> bool:
+	return true
+
+
 ## Which way the staff turns for a cast of it by `actor` along `dir` (`StaffPoses.start`'s
 ## `side`), asked when the cast starts winding up, before it leaves (`Spells._wind_pose`).
 func pose_side(_actor: int, dir: Vector2) -> int:

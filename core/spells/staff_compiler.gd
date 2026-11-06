@@ -367,7 +367,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: a shorter wind-down where it adds one to its staff (`Carrier.has_wind_down`:
 ## not a fallback carrier, and not a payload's carrier, `payload`), a shorter wind-up where the
-## carrier winds up (`winds_up`), damage where it hits (or blasts), speed where it travels and lifetime where it moves or lasts,
+## carrier winds up (`winds_up`), damage where it hits (or blasts) and deals damage (`Carrier.deals_damage`), speed where it travels and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
 static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
@@ -386,7 +386,7 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 			return true
 	if modifier.damage_mult > 1.0:
 		any = true
-		if on.hits() or blasts:
+		if on.deals_damage() and (on.hits() or blasts):
 			return true
 	if not is_equal_approx(modifier.speed_mult, 1.0):
 		any = true

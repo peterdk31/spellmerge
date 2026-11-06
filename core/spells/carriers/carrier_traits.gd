@@ -75,3 +75,8 @@ const CASTS_FROM_BODY: int = 1 << 27
 ## Is it cast by nothing a push could move (a point: a payload whose shot is gone)? Recoil needs
 ## something to push.
 const CASTERLESS: int = 1 << 28
+## Is it melee: held by or carried with the body that casts it, never leaving it (a swing, a slam, a
+## dash's pass, a teleport's landing)? Then it never hits that body (`CarrierKit.spared`); anything
+## else (ranged) spares it only until it has left it: a shot over time, a beam along its path
+## (owner, 2026-11-06).
+const MELEE: int = 1 << 29

@@ -42,6 +42,7 @@ const GATES: int = CarrierTraits.GATES
 const CASTS_FROM_SHOT: int = CarrierTraits.CASTS_FROM_SHOT
 const CASTS_FROM_BODY: int = CarrierTraits.CASTS_FROM_BODY
 const CASTERLESS: int = CarrierTraits.CASTERLESS
+const MELEE: int = CarrierTraits.MELEE
 
 ## Who may cast a group (`payload_cast_by`, `StaffCompiler`), as bits: an actor's body (the
 ## caster's own, or a body of its own carrier's: a decoy), a live shot, a point.

@@ -120,7 +120,8 @@ extends Node
 ## `caster` of every event. Nothing here asks whether a caster is a wizard or an enemy; the
 ## actor table (`actors`, else the projectile manager's, else the `Actors` autoload) answers:
 ## - damage asks nothing: every spell hits every actor's hurtbox (`HITS`; everything hurts
-##   everything), and only its caster's own body is skipped;
+##   everything), its caster's own too (owner, 2026-11-06), sparing only the body it is cast from
+##   until it has left it (`_launch`);
 ## - aim asks the **team** (`Actors.team_of`): a chain's jump and an arc's zap go to another
 ##   team's body (the manager's homing does the same);
 ## - the per-step fire pacing and the live beams ask the **budget** (`Actors.budget_of`): a
@@ -1194,6 +1195,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# copy on its ring does not.
 	if source != null and projectiles != null and not projectiles.touches_target(source, origin, spell.radius + SpellLimits.SOURCE_TOUCH):
 		source = null
+	# Else it starts on the body that casts it, if a body does (owner, 2026-11-06: a player's own
+	# spells hurt them, once they have left them): a shot spares it until it is clear of it, a
+	# carrier that never leaves it (a swing, a slam, a beam) always.
+	if source == null:
+		source = _body_node(body_of(_caster, actor))
 	# Any carrier may move the staff (its card's `staff_pose`) of the body that casts it, when that is
 	# the actor's own (another body, a decoy, has no staff); a swing's and a slam's start theirs with
 	# their side and strike. Its wind-up ran before it left (`_wind_pose`).
@@ -1289,11 +1295,11 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 
 
 ## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once (`_strike`),
-## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. With
-## `everyone` (a blast, the cards that land on a point) its caster's own body is struck too, and a
-## wall hides no body: an explosion at a shot's end on a wall is in the wall.
-func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, everyone: bool = false, chain: int = -1, prev: int = 0) -> void:
-	var found: int = projectiles.sweep(ActorsScript.NONE if everyone else actor, at, way, 1, -PI, PI, reach, HITS, null, not everyone)
+## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. It strikes
+## every body there, its caster's own too, but `spare` (a melee carrier's body, `CarrierKit.spared`:
+## a teleport's, which lands with it), and a wall hides none (owner, 2026-11-06).
+func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, chain: int = -1, prev: int = 0, spare: Node = null) -> void:
+	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS, spare, false)
 	if found > 0:
 		_strike(spell, tag, actor, found, [], at, spell.chain_jumps if chain < 0 else chain, prev, hit)
 
@@ -1625,7 +1631,7 @@ func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int =
 		prev = _rec_prev[shot]
 	var was: bool = _blasting
 	_blasting = true
-	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), true, chain, prev)
+	_strike_round(spell, tag, actor, at, Vector2.RIGHT, radius, _blast_hit(spell, hit_profile(tag, shot)), chain, prev)
 	_blasting = was
 
 
@@ -2378,7 +2384,7 @@ func _step_live(delta: float) -> void:
 ## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false, source: Node = null) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2403,7 +2409,7 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, null, caster, wound)
+	_fire_payload(payload, tag, actor, from, way, source, caster, wound)
 
 
 ## The trigger live carrier `i` fires, or null.
@@ -2876,7 +2882,8 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		elif _lc_tied[i] == 1:
 			continue
 		_hurt_firing.append(tag)
-		_lc_fire(i, trigger.payload, position)
+		# It starts on the hurt body, so it spares that body until it has left it (`_launch`).
+		_lc_fire(i, trigger.payload, position, false, _body_node(actor))
 		_hurt_firing.resize(_hurt_firing.size() - 1)
 
 
@@ -3182,6 +3189,14 @@ func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
 func _refund(actor: int, staff: int, amount: float) -> void:
 	if events != null and actor >= 0 and actor < ACTORS:
 		events.mana_refund_requested.emit(actor, staff, amount)
+
+
+## The node of the actor `body`'s body (null for -1, an actor with none, or no table).
+func _body_node(body: int) -> Node:
+	if body < 0:
+		return null
+	var table: ActorsScript = _actor_table()
+	return table.node_of(body) if table != null else null
 
 
 ## The actor table: the injected one, else the projectile manager's (its own or the `Actors`

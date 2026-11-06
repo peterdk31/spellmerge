@@ -667,6 +667,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var tag: int = _bm_tag[at]
 	var actor: int = _bm_actor[at]
+	# Ranged along its length: it spares the body it is cast from until its path has left it.
 	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	var bounces: int = kit.bounces(spell)
 	var ghost: bool = kit.ghost(spell)

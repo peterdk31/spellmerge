@@ -52,7 +52,7 @@ static func of(spells: SpellRuntime) -> CarrierSlam:
 
 
 func traits() -> int:
-	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS | STRIKES_POINT
+	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS | STRIKES_POINT | MELEE
 
 
 func step_order() -> int:
@@ -83,7 +83,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 ## ahead (short of a wall) and a ring grows from there to its `radius` over SLAM_GROW of its
 ## `lifetime` and holds for the rest. The ring strikes each body in it once (`Projectiles.sweep`
 ## all round the impact, so a wall between hides a body), outward from the impact, so the hit's
-## knockback throws it outward; its caster's own body is skipped, a teammate is hit. Its hits carry
+## knockback throws it outward; the body that slams is spared (it never leaves it), any other is hit. Its hits carry
 ## payloads and chains as a beam's do, and a shield or deflect works on the shots in its ring. Its
 ## `blast` and `on expire` happen at the impact when the ring is done. `form_shown` tells looks of
 ## the impact (`slam`), the point it strikes (`STRIKES_POINT`): its staff animation's `land` puts the
@@ -197,7 +197,7 @@ func _slam_cast(at: int, reach: float) -> void:
 		return
 	var spell: CompiledSpell = _sl_spell[at]
 	var tag: int = _sl_tag[at]
-	var source: Node = _sl_source[at] if is_instance_valid(_sl_source[at]) else null
+	var source: Node = kit.spared(spell, _sl_source[at] if is_instance_valid(_sl_source[at]) else null)
 	var found: int = kit.projectiles.sweep(_sl_actor[at], _sl_impact[at], _sl_dir[at], 1, -PI, PI, reach, SpellRuntime.HITS, source)
 	if found == 0:
 		return

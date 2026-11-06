@@ -37,8 +37,6 @@ constexpr double TAU_D = 6.2831853071795864769252867666;
 constexpr int MOTION_STRAIGHT = 0;
 constexpr int MOTION_STILL = 1;
 constexpr int MOTION_ORBIT = 2;
-constexpr int F_SELF = 1;
-constexpr int F_SELF_LIVE = 2;
 constexpr int F_GHOST = 8;
 constexpr int S_IDLE = 0;
 constexpr int S_MOVING = 1;
@@ -704,13 +702,10 @@ struct HitPass {
 		Vector2 middle;
 		double half = 0.0;
 		int64_t lay = 0;
-		int64_t shooter = 0;
-		const int64_t flg = flags[slot];
 		bool skip = false;
 		bool skip_inside = false;
 		int64_t stamp = 0;
 		int64_t found = 0;
-		bool inside = false;
 		for (int64_t y = y0; y <= y1; y++) {
 			for (int64_t x = x0; x <= x1; x++) {
 				const int64_t cell = y * grid_w + x;
@@ -733,7 +728,6 @@ struct HitPass {
 					middle = (from + to) * (real_t)0.5;
 					half = std::sqrt(path_sq) * 0.5 + 0.01;
 					lay = layers[slot];
-					shooter = actor[slot];
 					skip = skip_on[slot] > 0.0f;
 					stamp = mark_memory(slot);
 				}
@@ -746,19 +740,7 @@ struct HitPass {
 						t = target_next[t];
 						continue;
 					}
-					if (shooter >= 0 && target_owner[t] == shooter) {
-						if ((flg & F_SELF) == 0) {
-							t = target_next[t];
-							continue;
-						}
-						if ((flg & F_SELF_LIVE) == 0) {
-							if ((double)to.distance_squared_to(centre) <= reach * reach) {
-								inside = true;
-							}
-							t = target_next[t];
-							continue;
-						}
-					} else if ((target_layer[t] & lay) == 0) {
+					if ((target_layer[t] & lay) == 0) {
 						t = target_next[t];
 						continue;
 					}
@@ -786,9 +768,6 @@ struct HitPass {
 					t = target_next[t];
 				}
 			}
-		}
-		if ((flg & F_SELF) != 0 && (flg & F_SELF_LIVE) == 0 && !inside) {
-			flags[slot] |= F_SELF_LIVE;
 		}
 		// Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
 		if (skip_on[slot] > 0.0f && !skip_inside) {
@@ -823,8 +802,6 @@ const Constant CONSTANTS[] = {
 	{ "MOTION_STRAIGHT", (double)MOTION_STRAIGHT },
 	{ "MOTION_STILL", (double)MOTION_STILL },
 	{ "MOTION_ORBIT", (double)MOTION_ORBIT },
-	{ "F_SELF", (double)F_SELF },
-	{ "F_SELF_LIVE", (double)F_SELF_LIVE },
 	{ "F_GHOST", (double)F_GHOST },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },

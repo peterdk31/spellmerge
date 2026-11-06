@@ -291,10 +291,22 @@ func strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arra
 	return _rt._strike(spell, tag, actor, found, struck, centre, chain, prev, hit)
 
 
-## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own);
-## with `everyone`, its caster's own body too (a fallback's strike, as a blast's).
-func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, everyone: bool = false) -> void:
-	_rt._strike_round(spell, tag, actor, at, way, reach, hit, everyone)
+## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own),
+## its caster's own too but `spare` (`spared`); a wall hides none.
+func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, spare: Node = null) -> void:
+	_rt._strike_round(spell, tag, actor, at, way, reach, hit, -1, 0, spare)
+
+
+## The node of the actor `body`'s body (`caster_body`), null for -1 or none.
+func body_node(body: int) -> Node:
+	return _rt._body_node(body)
+
+
+## What a strike of `spell` spares: `body`, the body it is cast from (or the one a move carries),
+## when its carrier is melee (`Carrier.MELEE`: it never leaves that body, so never hits it), else
+## nothing (a ranged one spares it only until it has left it, which the projectile manager measures). The one rule every carrier that strikes or rays reads (owner, 2026-11-06).
+func spared(spell: CompiledSpell, body: Node) -> Node:
+	return body if carrier_of(spell).has(Carrier.MELEE) else null
 
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of

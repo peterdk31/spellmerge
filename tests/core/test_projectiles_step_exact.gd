@@ -17,11 +17,14 @@ extends SceneTree
 ## budget where it cost 40, the scene has a budget of its own (BUDGET, about the hits it had), and a
 ## shot the budget passed over sweeps its whole untested path when it is next tested, or before it
 ## ends: the events differ in the steps the flood spends the budget, from step 0 on in the state
-## line's work left).
+## line's work left; and again 2026-11-06 when a shot stopped sparing its caster (owner: "A players
+## own spells should hurt the player"): it spares only the body it starts on, until it has left it
+## (`exclude`), so the wizards' shots hit them from step 10 on, and the self-hit flags left the
+## state line).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
-## returning shots (to a wizard and to a shot), spiral, linger, growth, sticky, shield, self-hit,
+## returning shots (to a wizard and to a shot), spiral, linger, growth, sticky, shield, a spared body,
 ## bounce, ghost, still runes, a card's moves (a homing dash, a recoil, a blink), shots that leave
 ## the bounds, an anchor that is cleared, the cap dropping shots, and a crowd dense enough that the
 ## hit-work budget runs out and the next step resumes. Hit and expiry handlers spawn more shots,
@@ -285,7 +288,7 @@ func _spawn_kit() -> void:
 			m.set_homing(s, 2.0, 120.0)
 		if i == 3:
 			m.set_linger(s, 0.2)
-	# Spiral, linger, growth, sticky, self-hit, bounce and ghost shots.
+	# Spiral, linger, growth, sticky, spared-body, bounce and ghost shots.
 	for i in 6:
 		var from: Vector2 = Vector2(60.0 + float(i) * 90.0, 250.0)
 		var s: int = m.spawn(i % 4, from, Vector2.from_angle(-PI * 0.5 + float(i - 3) * 0.25) * (150.0 + float(i) * 20.0), 1.4, 3.0, ManagerScript.LAYER_ENEMY, i % 2, TAG_KIT)
@@ -308,7 +311,7 @@ func _spawn_kit() -> void:
 			m.set_sticky(s, 0.3)
 	for i in 3:
 		var s: int = m.spawn(i, _wizards[i].global_position, Vector2(0.0, -40.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 2, TAG_KIT)
-		m.set_self_hit(s)
+		m.exclude(s, _wizards[i])
 		m.move_shot(s, Vector2(0.0, 60.0), 0.4)
 	# Shields of the wizards, and the imp's shots that run into them.
 	for i in 3:

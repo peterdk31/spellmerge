@@ -15,7 +15,10 @@ extends ActorComponent
 ## `caster_move_finished` where it ended: a teleport at once, the others the step after their
 ## last, once the body has walked it (the last step is shortened, so a move goes exactly its
 ## distance). A card's move is the actor's own when the card's tag names the actor's caster
-## number (`Actor.caster_number`, its actor id), which is also the event's `caster`.
+## number (`Actor.caster_number`, its actor id), which is also the event's `caster`, unless the
+## event names a body that belongs to the actor (its decoy). A body that belongs to an actor (a
+## decoy, `Actor.belongs_to`) takes its owner's card's move when the event names it: a payload its
+## body fired is cast by that body (owner, 2026-11-06), so its dash or teleport moves it.
 ##
 ## A dash is the actor's own legs: it walks instead of the intent while it runs, and statuses
 ## (`Combat.pace`: chill slows, freeze stops) scale it as they scale walking. The other moves are
@@ -27,6 +30,7 @@ extends ActorComponent
 ## Nothing here allocates in `step` (but the list of moves growing when full).
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## A teleport that meets a wall ends this many pixels short of it, and is then backed off in
 ## steps of TELEPORT_BACKOFF until the body is clear.
@@ -122,16 +126,24 @@ func move_direction() -> Vector2:
 	return _moved.normalized()
 
 
-## End every move now and answer each where the actor is (an overlay opened).
+## End every move now and answer each where the actor is (an overlay opened, a decoy ended).
 func stop() -> void:
 	for at in _count:
 		_lefts[at] = 0.0
 	_answer()
 
 
+## End every move now, quietly, with no answer (a decoy cleared with its room): a body placed again
+## starts with none.
+func drop() -> void:
+	_count = 0
+	_homings.fill(null)
+	_moved = Vector2.ZERO
+
+
 ## A card of this actor asked to move it by `move` over `seconds` (see the class doc).
-func _on_caster_move_requested(_player: int, mode: StringName, move: Vector2, seconds: float, tag: int) -> void:
-	if not _owns(tag) or actor.is_down() or not move.is_finite():
+func _on_caster_move_requested(player: int, mode: StringName, move: Vector2, seconds: float, tag: int) -> void:
+	if not _owns(player, tag) or actor.is_down() or not move.is_finite():
 		return
 	if mode == &"teleport":
 		_teleport(move, tag)
@@ -156,10 +168,23 @@ func _grow(size: int) -> void:
 	_homings.resize(size)
 
 
-## True when `tag` is a spell of this actor's caster number.
-func _owns(tag: int) -> bool:
+## True when the move the event names `player` asks with the card `tag` is this actor's: a card of
+## its own caster number, unless the event names a body of its own (that body moves), or a card of
+## its owner's that the event names it for (see the class doc).
+func _owns(player: int, tag: int) -> bool:
 	var number: int = _caster_number()
-	return number >= 0 and SpellTag.is_spell_tag(tag) and SpellTag.caster_of(tag) == number
+	if number < 0 or not SpellTag.is_spell_tag(tag):
+		return false
+	var card: int = SpellTag.caster_of(tag)
+	if card == number:
+		return player == number or _owner_of(player) != number
+	return player == number and card == actor.belongs_to
+
+
+## The actor the body of the actor `id` belongs to (its owner: a decoy's wizard), or Actors.NONE.
+func _owner_of(id: int) -> int:
+	var body: Actor = actor.actors.node_of(id) as Actor if actor.actors != null else null
+	return body.belongs_to if body != null else ActorsScript.NONE
 
 
 func _caster_number() -> int:

@@ -437,9 +437,10 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	for leg in legs:
 		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
 	_bm_count[at] = 0
-	if caster == SpellRuntime.CASTER_BODY:
-		if kit.aim_dir(actor).is_finite():
-			_bm_turn[at] = kit.aim_dir(actor).angle_to(heading)
+	var holder: int = SpellRuntime.body_of(caster, actor)
+	if holder >= 0:
+		if kit.aim_dir(holder).is_finite():
+			_bm_turn[at] = kit.aim_dir(holder).angle_to(heading)
 	else:
 		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = kit.live_caster_shot(caster, caster_seq)
@@ -479,19 +480,20 @@ func _beam_step(at: int, delta: float) -> void:
 		_bm_shield[at] = kit.guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at])
 
 
-## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
-## (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
+## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its
+## payload, a decoy's) at its staff along its aim, a shot as it flies. A beam whose body has no aim
+## any more (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
 func _beam_follow(at: int) -> void:
 	if _bm_parent[at] >= 0:
 		_leg_follow(at)
 		return
 	var caster: int = _bm_caster[at]
-	if caster == SpellRuntime.CASTER_BODY:
-		var actor: int = _bm_actor[at]
-		if kit.aim_origin(actor).is_finite():
-			_bm_origin[at] = kit.aim_origin(actor)
-			_bm_dir[at] = kit.aim_dir(actor).rotated(_bm_turn[at])
-		elif kit.aim_seen(actor):
+	var holder: int = SpellRuntime.body_of(caster, _bm_actor[at])
+	if holder >= 0:
+		if kit.aim_origin(holder).is_finite():
+			_bm_origin[at] = kit.aim_origin(holder)
+			_bm_dir[at] = kit.aim_dir(holder).rotated(_bm_turn[at])
+		elif kit.aim_seen(holder):
 			_end_beam(at, false)
 	elif caster >= 0:
 		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _bm_caster_seq[at]:

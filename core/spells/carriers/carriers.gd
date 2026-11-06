@@ -11,10 +11,12 @@ extends RefCounted
 ## is a carrier (the bases, `Carrier`, `CarrierMove`, `CarrierEntity` and `CarrierFallback`, have none).
 const FOLDER: String = "res://core/spells/carriers/"
 
-## The two fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the cards a group read
-## with no carrier after them land on, the caster for a cast's own group and the payload's origin for
-## a payload. No form card fires them, so they are not in `ids` and a form card may not name them.
+## The three fallback carriers (docs/CARRIERS.md, "The fallback carriers"): what the cards a group
+## read with no carrier after them land on: the caster for a cast's own group; for a payload, what
+## fired it (a body or a shot) when one may have, else the point it began at. No form card fires
+## them, so they are not in `ids` and a form card may not name them.
 const ON_CASTER: StringName = &"caster"
+const ON_BEARER: StringName = &"bearer"
 const AT_POINT: StringName = &"point"
 
 ## Not state: the carriers made once per script, shared by every runtime (core/sim/README.md).
@@ -31,15 +33,18 @@ static func of(id: StringName) -> Carrier:
 	return _shared.get(id, _none) as Carrier
 
 
-## The fallback carrier the cards with no carrier after them land on: `AT_POINT` in a payload
-## (`payload`), else `ON_CASTER`.
-static func fallback(payload: bool) -> Carrier:
-	return of(AT_POINT if payload else ON_CASTER)
+## The fallback carrier the cards with no carrier after them land on: `ON_CASTER` in a cast's own
+## group; in a payload (`payload`), `ON_BEARER` when a body or a live shot may cast it (`by`, the
+## `Carrier.BY_*` bits of `Carrier.payload_cast_by`), else `AT_POINT`.
+static func fallback(payload: bool, by: int = Carrier.BY_POINT) -> Carrier:
+	if not payload:
+		return of(ON_CASTER)
+	return of(ON_BEARER if by & (Carrier.BY_BODY | Carrier.BY_SHOT) != 0 else AT_POINT)
 
 
-## True when `id` is one of the two fallback carriers.
+## True when `id` is one of the fallback carriers.
 static func is_fallback(id: StringName) -> bool:
-	return id == ON_CASTER or id == AT_POINT
+	return id == ON_CASTER or id == ON_BEARER or id == AT_POINT
 
 
 ## True when `id` names a carrier a form card may fire (&"" names none: it is the id of the one that

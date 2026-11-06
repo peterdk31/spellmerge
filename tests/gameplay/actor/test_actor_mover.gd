@@ -306,6 +306,21 @@ func test_other_casters_moves_are_ignored() -> void:
 			check_equal(bodies[other].global_position, want, "actor %d moves, actor %d stays" % [mover, other])
 
 
+func test_a_body_that_belongs_to_an_actor_takes_its_owners_move_when_named() -> void:
+	# A decoy's payload is cast by the decoy's body (owner, 2026-11-06): the move is asked with its
+	# wizard's card and names the decoy, which moves; the wizard, whose card it is, stays.
+	var owner: Actor = _mover(0)
+	var decoy: Actor = _mover(1)
+	decoy.belongs_to = owner.caster_number()
+	var other: Actor = _mover(2)
+	_world.bus.caster_move_requested.emit(decoy.caster_number(), &"teleport", Vector2(40.0, 0.0), 0.0, _world.tag_of(owner))
+	check_equal(decoy.global_position, START + Vector2(40.0, 0.0), "the body it belongs to's card, naming it, moves it")
+	check_equal(owner.global_position, START, "the owner's body stays: the event names its decoy")
+	_world.bus.caster_move_requested.emit(other.caster_number(), &"teleport", Vector2(40.0, 0.0), 0.0, _world.tag_of(owner))
+	check_equal(other.global_position, START, "a body that is not the owner's does not take its card")
+	check_equal(owner.global_position, START + Vector2(40.0, 0.0), "and that card moves its owner, as before (the tag says whose move it is)")
+
+
 func test_a_move_without_a_spell_tag_is_nobodys() -> void:
 	var body: Actor = _mover()
 	_world.bus.caster_move_requested.emit(0, &"teleport", Vector2(40.0, 0.0), 0.0, 7)

@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`, `dir` [x, y] to cast toward), `imps` ([x, y] from the caster at (0, 0), aiming
-## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), optional `guard` (true: the caster's own body stands at (0, 0), so a barrier on it works) and `foes` ([x, y] each: an enemy shot sent from there at the caster, which needs a `guard`), optional `allies` ([x, y, player]: a teammate's wizard body that heals and damage reach), `hurt` (health each wizard body, the `guard` and the `allies`, has lost before the casts, so a heal has room) and `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), optional `guard` (true: the caster's own body stands at (0, 0), so a barrier on it works) and `foes` ([x, y] each: an enemy shot sent from there at the caster, up to four), optional `entities` (true: the decoys and familiars a cast asks for are made, so a decoy is a body that is hurt and guarded), optional `allies` ([x, y, player]: a teammate's wizard body that heals and damage reach), `hurt` (health each wizard body, the `guard` and the `allies`, has lost before the casts, so a heal has room) and `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash), `blocked` (min: enemy shots a barrier or a shielded shot stopped), `deflected` (min: enemy shots a deflect turned), `healed` (min: health heals gave wizard bodies), `lost_at_most` (imps, max: health each imp lost, for a hit that should barely hurt), `spawned` (entity, min: decoys or familiars a cast asked for).
 ##
@@ -34,6 +34,8 @@ func before_each() -> void:
 func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	arena.pushable = bool(combo.get("pushed", false))
+	if bool(combo.get("entities", false)):
+		arena.add_entities()
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])), float(at[2]) if at.size() > 2 else ArenaScript.IMP_HEALTH)
 	for mate: Array in combo.get("mates", []):

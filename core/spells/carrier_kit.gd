@@ -60,15 +60,40 @@ func carrier_of(spell: CompiledSpell) -> Carrier:
 	return _rt._carrier_of(spell)
 
 
-## Who casts the launch being fired: `SpellRuntime.CASTER_BODY` (the actor's body),
-## `CASTER_POINT` (a point), or the slot of the shot that fired it (see `caster_seq`).
+## Who casts the launch being fired, one value: the actor's own body (`SpellRuntime.CASTER_BODY`),
+## the body of an actor that fired a payload (`SpellRuntime.body_caster`), the slot of the live shot
+## that fired it (see `caster_seq`), or `CASTER_POINT` (a point, also for a shot that has ended
+## since). Every carrier asks this one: `SpellRuntime.body_of(caster, actor)` names the body, a slot
+## is the shot; a row its caster holds keeps the value (`live_caster_shot` for a shot later).
 func caster() -> int:
-	return _rt._caster
+	return _rt._live_caster(_rt._caster, _rt._caster_seq)
 
 
 ## The birth (`Projectiles.get_seq_of`) of the shot `caster` names, when it names one.
 func caster_seq() -> int:
 	return _rt._caster_seq
+
+
+## The actor whose body casts the launch being fired by `actor`: `actor` itself for its own cast,
+## the body that fired a payload (a decoy, the wizard dashing), or -1 for a shot or a point: what a
+## move moves, an orbit circles, a held carrier follows and a payload's left-over cards land on.
+func caster_body(actor: int) -> int:
+	return SpellRuntime.body_of(_rt._caster, actor)
+
+
+## Where the caster of the launch being fired by `actor` is now: the body's anchor, the shot's
+## place, else `origin` (the point it is cast from).
+func caster_place(actor: int, origin: Vector2) -> Vector2:
+	var body: int = caster_body(actor)
+	if body >= 0 and _rt.projectiles.get_anchor(body).is_finite():
+		return _rt.projectiles.get_anchor(body)
+	var shot: int = caster_shot()
+	return _rt.projectiles.get_position_of(shot) if shot >= 0 else origin
+
+
+## Who cast the shot in `slot` (a value as `caster`): what its pull or swap moves.
+func shot_caster(slot: int) -> int:
+	return _rt.shot_caster(slot)
 
 
 ## The turning Penta ring the copy being cast now stands on (`SpellRuntime._penta`): its centre,
@@ -261,6 +286,17 @@ func guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Ve
 	return _rt._guard(found, actor, tag, deflects, charges, a, b, form)
 
 
+## Turns the shots of other teams than `actor`'s within `reach` of `at` (MOVE_GUARD_REACH at
+## least) outward from it, once, for the carrier with `tag` (`guard` with a deflect; the block is
+## sent as `form`'s): a deflect on the caster as it is cast, a teleport's landing, a decoy as it
+## appears, a payload's deflect landing on the body that fired it.
+func turn_shots_round(actor: int, tag: int, at: Vector2, reach: float, form: StringName) -> void:
+	if _rt.projectiles == null or not at.is_finite():
+		return
+	var around: float = maxf(reach, SpellLimits.MOVE_GUARD_REACH)
+	_rt._guard(_rt.projectiles.shots_on_segment(actor, at, at, around), actor, tag, true, 0, at, at, form)
+
+
 ## `guard` along the path `points[first]` to `points[first + count - 1]` (cut `reach` pixels along),
 ## `width` pixels either side: a beam's line. Returns the charges left.
 func guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
@@ -290,10 +326,10 @@ func fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: V
 	_rt._fire_payloads(spell, event, tag, actor, at, heading, source)
 
 
-## A trigger fires `group` from `at` along `heading`, cast by `caster` (`CASTER_POINT`,
-## `CASTER_BODY` or a shot's slot), now or when this step's budget has room. Nothing is dropped.
-func fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster_slot: int) -> void:
-	_rt._fire(group, actor, staff, generation, at, heading, source, caster_slot)
+## A trigger fires `group` from `at` along `heading`, cast by `caster` (a value as `caster()`: a
+## shot's slot, a body, a point), now or when this step's budget has room. Nothing is dropped.
+func fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster: int) -> void:
+	_rt._fire(group, actor, staff, generation, at, heading, source, caster)
 
 
 ## Queues a launch of `group` (or, with none, `spell`) `wait` seconds from now; returns the

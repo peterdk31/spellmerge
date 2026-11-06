@@ -31,8 +31,12 @@ extends Node
 ## it), as long as it starts touching it (`_launch`; owner, 2026-11-05): one that starts outside it,
 ## a Penta copy on its ring, hits it as it hits anything. A rune is the exception: it arms
 ## (`SpellLimits.RUNE_ARM`) and then hits whatever is on it, its source too. A payload is cast by the
-## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, pull,
-## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
+## shot that fired it while that shot flies, by the body that fired it (a decoy's, a dashing wizard's
+## timer, `on hurt` or end, a barrier's block: `body_caster`; owner, 2026-11-06), else by the point
+## (`_caster`): dash, teleport, pull, swap and recoil move that shot or body, orbit, familiar and
+## return circle it, a beam, swing or slam is held by it. The cards a payload leaves with no carrier
+## land on it too (`CarrierBearer`), or on the point (`CarrierPoint`; docs/CARRIERS.md, "The
+## fallback carriers"); its actor stays the wizard. A trigger fires every
 ## time its event happens, as long as its carrier lives (owner, 2026-10-29: no per-shot count).
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
@@ -83,9 +87,9 @@ extends Node
 ## hit and cards and drops its payload there (a `form_shown` cue `&"rain"` says where and when; an
 ## `on expire` trigger on it fires as it lands); `familiar` and `decoy` ask `ai` for an entity
 ## (`entity_spawn_requested`) a step ahead along the aim, as a rune is placed (`_placed_at`),
-## count it as a live shot of their tag until `entity_ended`, guard a decoy with its shield or
-## deflect (`guard_decoy`), and fire an entity's `on expire` payload and `blast` at its end
-## point. A familiar casts only what its triggers give it (rules R4 F3), as any carrier that lasts; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
+## count it as a live shot of their tag until `entity_ended`, give a decoy's body its shield as a
+## barrier and turn the shots round it with its deflect as it appears (`CarrierDecoy`), and fire an
+## entity's `on expire` payload and `blast` at its end point. A familiar casts only what its triggers give it (rules R4 F3), as any carrier that lasts; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
 ## is one solid still shot across the aim, a short-lived wall (`CarrierWall.launch`).
 ##
 ## Moves, areas and refunds (B2d): a `dash` or `teleport` asks the caster's body to move along
@@ -190,7 +194,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies", &"_hurt_firing"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 
@@ -336,16 +340,31 @@ var _echo_spell: CompiledSpell = null
 ## One slot, for the one-shot forms of `_land_shots`, `_travel_shots` and `_register_shots`.
 var _one_slot: PackedInt32Array = PackedInt32Array([-1])
 
-## Who casts the launch being fired: the actor's own body (CASTER_BODY, a staff's own cast, by any
-## actor: a player's wizard or an enemy), the
-## point it starts from (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or an
-## entity fired), or the slot of the shot that fired the payload, while it is the shot with
-## `_caster_seq`. One rule for every card that names the caster: dash, teleport, pull, swap and
-## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
+## Who casts the launch being fired, one value (`_caster`): the actor's own body for its own cast
+## (CASTER_BODY, a staff's cast, by any actor: a player's wizard or an enemy); the body of an actor
+## that fired a payload (`body_caster(id)`, CASTER_BODIES and below: a decoy's, or the wizard's for a
+## dash's timer or end, a barrier's block; owner, 2026-11-06); the point it starts from
+## (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or a familiar fired); or the
+## slot of the shot that fired the payload, while it is the shot with `_caster_seq`. One rule for
+## every card that names the caster: dash, teleport, pull, swap and recoil move it; orbit, familiar
+## and a returning shot circle it or come back to it; a beam, swing or slam is held by it; the cards
+## a payload leaves with no carrier land on it. The actor stays the cast's own: credit, budgets,
+## colours and tag. A payload's caster keeps the payload's build, as a shot in the air does; only
+## the actor's own cast (CASTER_BODY) goes with its staff's rebuild.
 const CASTER_BODY: int = ProjectilesScript.CASTER_BODY
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
+const CASTER_BODIES: int = -3
 var _caster: int = CASTER_BODY
 var _caster_seq: int = 0
+## The shots cast by another actor's body (`_follow_body`): slot, birth and that body, `_fl_count`.
+var _fl_slot: PackedInt32Array = PackedInt32Array()
+var _fl_seq: PackedInt64Array = PackedInt64Array()
+var _fl_body: PackedInt32Array = PackedInt32Array()
+var _fl_count: int = 0
+## The tags of the `on hurt` carriers whose payload is being fired now (`_on_hurt`): a hurt that
+## payload deals at once to the same body (its strike round a decoy) does not fire it again inside
+## itself. Empty between calls.
+var _hurt_firing: PackedInt64Array = PackedInt64Array()
 ## The turning ring the copy being cast now stands on (`_penta`): its centre, its radius (0 when
 ## the copy is on none) and the copy's angle on it now. A carrier whose copy stays on its point
 ## and aims from it (a beam) keeps it, to turn with the ring (`CarrierKit.ring_*`). Empty between
@@ -564,8 +583,10 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
-## Shown as a tree's row for a fallback: the cards that landed on the caster, or where a payload began.
+## Shown as a tree's row for a fallback: the cards that landed on the caster, on the body or shot
+## that fired a payload, or where a payload began.
 const TREE_ON_CASTER: String = "On you"
+const TREE_ON_BEARER: String = "On what fired it"
 const TREE_AT_POINT: String = "Where it ends"
 
 
@@ -612,6 +633,8 @@ func _tree_group(group: CompiledGroup, depth: int, trigger: int, trigger_id: Str
 func _tree_carrier_name(spell: CompiledSpell) -> String:
 	if spell.fallback == CompiledSpell.FALLBACK_CASTER:
 		return TREE_ON_CASTER
+	if spell.fallback == CompiledSpell.FALLBACK_BEARER:
+		return TREE_ON_BEARER
 	if spell.fallback == CompiledSpell.FALLBACK_POINT:
 		return TREE_AT_POINT
 	return spell.form_name if spell.form_name != "" else String(spell.form_id)
@@ -980,6 +1003,7 @@ func step(delta: float) -> void:
 	_zaps_used = 0
 	_clock += delta
 	_run_waiting_fires()
+	_step_followers()
 	_moves.step(delta)
 	for carrier: Carrier in _carriers.values():
 		carrier.step(delta)
@@ -1002,10 +1026,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# copy on its ring does not.
 	if source != null and projectiles != null and not projectiles.touches_target(source, origin, spell.radius + SpellLimits.SOURCE_TOUCH):
 		source = null
-	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
-	# with their own wind-up, side and strike.
+	# Any carrier may move the staff (its card's `staff_pose`) of the body that casts it, when that is
+	# the actor's own (another body, a decoy, has no staff); a swing's and a slam's start theirs with
+	# their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):
-		if _caster == CASTER_BODY and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
+		if body_of(_caster, actor) == actor and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
 			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
@@ -1118,18 +1143,38 @@ func live_caster_shot(caster: int, seq: int) -> int:
 	return -1
 
 
-## `_launch_group` cast by `caster`: CASTER_BODY, CASTER_POINT, or a shot's slot (a shot that
-## is not alive makes the point the caster). The caster from before is set again afterwards.
-func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int) -> int:
+## The caster (`_caster`) that is the body of the actor `body`: what a payload it fired is cast by.
+static func body_caster(body: int) -> int:
+	return CASTER_BODIES - body
+
+
+## The actor whose body the caster `caster` is, in a launch by `actor`: `actor` for its own cast,
+## the actor a `body_caster` names; -1 for a shot or a point.
+static func body_of(caster: int, actor: int) -> int:
+	if caster == CASTER_BODY:
+		return actor
+	return CASTER_BODIES - caster if caster <= CASTER_BODIES else -1
+
+
+## `caster` as it can cast now: a shot that has ended (or is no longer the one born `seq`), or a
+## body that is gone (no anchor), leaves the point.
+func _live_caster(caster: int, seq: int) -> int:
+	if caster >= 0:
+		return caster if live_caster_shot(caster, seq) >= 0 else CASTER_POINT
+	if caster <= CASTER_BODIES:
+		return caster if projectiles.get_anchor(CASTER_BODIES - caster).is_finite() else CASTER_POINT
+	return caster
+
+
+## `_launch_group` cast by `caster` (see `_caster`; one that can no longer cast leaves the point,
+## `_live_caster`), a body's launch following that body. The caster from before is set again
+## afterwards.
+func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int, seq: int) -> int:
 	var saved: int = _caster
 	var saved_seq: int = _caster_seq
-	_caster = CASTER_POINT
-	if caster == CASTER_BODY:
-		_caster = CASTER_BODY
-	elif caster >= 0 and projectiles.is_alive(caster):
-		_caster = caster
-		_caster_seq = projectiles.get_seq_of(caster)
-	var made: int = _launch_group(group, actor, staff, generation, origin, heading, source, _caster == CASTER_BODY)
+	_caster = _live_caster(caster, seq)
+	_caster_seq = seq
+	var made: int = _launch_group(group, actor, staff, generation, origin, heading, source, body_of(_caster, actor) >= 0)
 	_caster = saved
 	_caster_seq = saved_seq
 	return made
@@ -1207,7 +1252,7 @@ func _travel_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell) ->
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
 ## apart (at once when that is 0), reading nothing again. A fallback carrier (the cards that landed
 ## on the caster, or on a payload's origin) is launched like any other. `source` is the target that
-## fired the payload, or null. `from_caster` is true for the cast's own group, whose later
+## fired the payload, or null. `from_caster` is true for a launch a body casts (the cast's own group, a body's payload), whose later
 ## firings (burst, echo) start from where the caster has moved to.
 func _launch_group(group: CompiledGroup, actor: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool = false) -> int:
 	var made: int = _fire_group(group, actor, staff, generation, origin, direction, source, from_caster)
@@ -1261,10 +1306,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 		for trigger in spell.triggers:
 			if trigger.event != TriggerBase.Event.CAST:
 				continue
-			if from_caster:
-				_fire(trigger.payload, actor, staff, generation, origin, heading, source, _caster, true)
-			else:
-				_fire(trigger.payload, actor, staff, generation, origin, heading, source, _caster)
+			_fire(trigger.payload, actor, staff, generation, origin, heading, source, _live_caster(_caster, _caster_seq))
 	var echo: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
 	if launched > 0 and not echoed and not again and echo > 0.0:
 		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster).echoed = true
@@ -1298,10 +1340,11 @@ func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
 	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
-	# The centre: a wizard's body (its anchor), else the point or shot casting this payload.
+	# The centre: the body casting it (its anchor), else the point or shot casting this payload.
 	var centre: Vector2 = origin
-	if _caster == CASTER_BODY and projectiles != null and projectiles.get_anchor(actor).is_finite():
-		centre = projectiles.get_anchor(actor)
+	var body: int = body_of(_caster, actor)
+	if body >= 0 and projectiles != null and projectiles.get_anchor(body).is_finite():
+		centre = projectiles.get_anchor(body)
 	# Where the card's last ring has turned to (its own start the first time), turning back.
 	var turned: float = SpellRuntime.penta_start(tag)
 	var turn: float = SpellLimits.PENTA_TURN
@@ -1356,14 +1399,15 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, heading: Vector2) -> vo
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
 	if push <= 0.0:
 		return
-	if _caster != CASTER_BODY:
-		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
-		var shot: int = _caster_shot()
-		if shot >= 0:
-			projectiles.move_shot(shot, -heading * push, SpellLimits.RECOIL_SECONDS)
+	var body: int = body_of(_caster, actor)
+	if body >= 0:
+		if events != null:
+			events.caster_move_requested.emit(body, &"recoil", -heading * push, SpellLimits.RECOIL_SECONDS, tag)
 		return
-	if events != null:
-		events.caster_move_requested.emit(actor, &"recoil", -heading * push, SpellLimits.RECOIL_SECONDS, tag)
+	# A payload's recoil pushes the shot that cast it (a point has nothing to push).
+	var shot: int = _caster_shot()
+	if shot >= 0:
+		projectiles.move_shot(shot, -heading * push, SpellLimits.RECOIL_SECONDS)
 
 
 ## A `blast` at the end point `at` of the carrier with `tag`: its explosion (`cue_shown`, the cue
@@ -1419,7 +1463,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.caster = _caster
 	launch.caster_seq = _caster_seq
 	if from_caster and projectiles != null:
-		launch.anchor = projectiles.get_anchor(actor)
+		launch.anchor = projectiles.get_anchor(body_of(_caster, actor))
 	if launch.caster != CASTER_BODY:
 		var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
 		_generation_live[key] = _generation_live.get(key, 0) + 1
@@ -1441,16 +1485,10 @@ func _run_pending() -> void:
 			_release_launch(launch)
 			continue
 		var keeps: bool = launch.caster != CASTER_BODY
-		var origin: Vector2 = launch.origin
+		var origin: Vector2 = _moved_origin(launch)
 		var from_caster: bool = launch.anchor.is_finite()
-		if from_caster and projectiles != null:
-			var now: Vector2 = projectiles.get_anchor(launch.actor)
-			if now.is_finite():
-				origin += now - launch.anchor
-		# A payload's later firing is cast by its shot if that still flies, else from the point.
-		var caster: int = launch.caster
-		if caster >= 0 and not (projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == launch.caster_seq):
-			caster = CASTER_POINT
+		# A payload's later firing is cast by its shot or body if that is still there, else from the point.
+		var caster: int = _live_caster(launch.caster, launch.caster_seq)
 		var caster_seq: int = launch.caster_seq
 		var source: Node = launch.source if is_instance_valid(launch.source) else null
 		var group: CompiledGroup = launch.group
@@ -1475,14 +1513,24 @@ func _run_pending() -> void:
 		elif not again:
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed)
 		elif _hold_tags[actor * SpellLimits.STAFFS + staff].has(SpellTag.make(actor, staff, spell.node, generation)):
-			# A held carrier cast again while it is on, along where its wizard aims now.
-			if caster == CASTER_BODY and _aim_dir[actor].is_finite():
-				heading = _aim_dir[actor]
+			# A held carrier cast again while it is on, along where its body aims now.
+			var holder: int = body_of(caster, actor)
+			if holder >= 0 and _aim_dir[holder].is_finite():
+				heading = _aim_dir[holder]
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed, true)
 		_caster = saved
 		_caster_seq = saved_seq
 		if keeps:
 			_generation_gone(SpellTag.make(actor, staff, 0, generation))
+
+
+## Where the waiting `launch` starts now: a body's launch as far from where it was scheduled as
+## that body has moved since (`PendingLaunch.anchor`), any other where it was scheduled.
+func _moved_origin(launch: PendingLaunch) -> Vector2:
+	if not launch.anchor.is_finite() or projectiles == null:
+		return launch.origin
+	var now: Vector2 = projectiles.get_anchor(body_of(launch.caster, launch.actor))
+	return launch.origin + (now - launch.anchor if now.is_finite() else Vector2.ZERO)
 
 
 ## Gives a finished record back to the pool.
@@ -1572,10 +1620,10 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null
 	var zap_relay: HitProfile = spell.echo_zap_hit if spell == _echo_spell else null
-	# A payload's shot: an orbit circles the shot that cast it and a returning one flies back to it,
-	# or to the point it was cast from.
-	var payload: bool = _caster != CASTER_BODY
-	var caster_shot: int = _caster_shot() if payload else -1
+	# A payload's shot: an orbit circles the shot or body that cast it and a returning one flies back
+	# to it, or to the point it was cast from. The actor's own body is the manager's own caster.
+	var body: int = body_of(_caster, SpellTag.caster_of(tag))
+	var caster_shot: int = _caster_shot()
 	var lifecycle: bool = _lc_rows(spell) > 0
 	var zaps: bool = spell.zap_chance > 0.0 and spell.zap_reach > 0.0
 	var magnet: bool = spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0
@@ -1587,12 +1635,13 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 		made += 1
 		_rec_relay[slot] = relay
 		_rec_zap[slot] = zap_relay
-		if payload:
-			if caster_shot >= 0:
-				projectiles.set_caster_shot(slot, caster_shot)
-			elif projectiles.is_cast_by_wizard(slot):
-				projectiles.set_caster_point(slot, projectiles.get_position_of(slot))
 		var seq: int = projectiles.get_seq_of(slot)
+		if caster_shot >= 0:
+			projectiles.set_caster_shot(slot, caster_shot)
+		elif body < 0 and projectiles.is_cast_by_wizard(slot):
+			projectiles.set_caster_point(slot, projectiles.get_position_of(slot))
+		elif body >= 0 and body != SpellTag.caster_of(tag):
+			_follow_body(slot, seq, body)
 		_rec_seq[slot] = seq
 		_rec_chain[slot] = chain
 		_rec_prev[slot] = prev
@@ -1617,6 +1666,54 @@ func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: Compi
 			_magnet_count += 1
 			_rec_magnet[slot] = 1
 	return made
+
+
+## The shot in `slot` (born `seq`) was cast by the body of the actor `body`, not its own actor's: the
+## manager knows it as a point (its caster's place, `set_caster_point`), which follows that body
+## every step while both are there (`_step_followers`), and stays where the body was last once it
+## has gone. One list, so the projectile manager (and its native kernel) need no caster of another
+## actor's body.
+func _follow_body(slot: int, seq: int, body: int) -> void:
+	projectiles.set_caster_point(slot, projectiles.get_anchor(body))
+	if _fl_count == _fl_slot.size():
+		var size: int = maxi(_fl_count * 2, 8)
+		_fl_slot.resize(size)
+		_fl_seq.resize(size)
+		_fl_body.resize(size)
+	_fl_slot[_fl_count] = slot
+	_fl_seq[_fl_count] = seq
+	_fl_body[_fl_count] = body
+	_fl_count += 1
+
+
+## Moves the place of every shot cast by another actor's body to where that body is now; one whose
+## shot ended or whose body has gone leaves the list.
+func _step_followers() -> void:
+	var i: int = 0
+	while i < _fl_count:
+		var slot: int = _fl_slot[i]
+		var at: Vector2 = projectiles.get_anchor(_fl_body[i])
+		if projectiles.is_alive(slot) and projectiles.get_seq_of(slot) == _fl_seq[i] and at.is_finite():
+			projectiles.set_caster_point(slot, at)
+			i += 1
+			continue
+		_fl_count -= 1
+		_fl_slot[i] = _fl_slot[_fl_count]
+		_fl_seq[i] = _fl_seq[_fl_count]
+		_fl_body[i] = _fl_body[_fl_count]
+
+
+## Who cast the shot in `slot` (see `_caster`): the live shot that cast it, the body that cast it
+## (its own actor's: CASTER_BODY; another's while it follows it: `body_caster`), else the point. It
+## still answers for a shot ended by the hit being sent (a pull's), until its slot is used again.
+func shot_caster(slot: int) -> int:
+	var shot: int = projectiles.caster_shot_of(slot)
+	if shot >= 0:
+		return shot
+	for i in _fl_count:
+		if _fl_slot[i] == slot and _fl_seq[i] == projectiles.get_seq_of(slot):
+			return body_caster(_fl_body[i])
+	return CASTER_BODY if projectiles.is_cast_by_wizard(slot) else CASTER_POINT
 
 
 ## Room in the shots' records for `size` slots (the manager's cap); a new slot has no record.
@@ -1820,38 +1917,39 @@ func _grow_jumps() -> void:
 	_jq_head = 0
 
 
-## Fires `payload` of a shot with `tag` from `at` along `heading`, in the same actor's staff and
-## generation as the shot. Its caster is the shot in `slot` that fired it while that shot still
-## flies, otherwise the point `at` (see `_caster`).
-func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
-	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
+## Fires `payload` of a carrier with `tag` from `at` along `heading`, in the same actor's staff and
+## generation, cast by `caster` (see `_caster`): the shot that fired it while that shot still
+## flies, the body that fired it (`body_caster`), else the point `at`.
+func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, caster: int = CASTER_POINT) -> void:
+	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, caster)
 
 
 ## Fires the payload of every trigger of `spell` that goes off on `event` (a carrier's triggers
 ## each fire their own; see `CompiledSpell.triggers`), as `_fire_payload`.
-func _fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
+func _fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, caster: int = CASTER_POINT) -> void:
 	for trigger in spell.triggers:
 		if trigger.event == event:
-			_fire_payload(trigger.payload, tag, actor, at, heading, source, slot)
+			_fire_payload(trigger.payload, tag, actor, at, heading, source, caster)
 
 
 ## A trigger fires `group`: now, when this step's budget (`fire_shots_per_step` shots for the
 ## caster's budget: every actor no seat drives shares one) has room or nothing has fired from it
 ## yet, else it waits for the next step's room, oldest first (`_run_waiting_fires`), and is cast
-## then by `caster` if that shot still flies, else from the point. Nothing is dropped (owner,
-## 2026-10-29). With `from_caster` (`on cast`) it leaves as the cast's own launch does.
-func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster: int, from_caster: bool = false) -> void:
+## then by `caster` (see `_caster`) if that is still there, else from the point. Nothing is dropped
+## (owner, 2026-10-29). One the actor's own body casts (`on cast` of its own cast) leaves as that
+## cast's own launch does.
+func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster: int) -> void:
 	if group == null or group.is_empty():
 		return
 	var cost: int = _shots_of(group)
 	var budget: int = _budget(actor)
+	var seq: int = projectiles.get_seq_of(caster) if caster >= 0 else 0
 	if _fires_used[budget] > 0 and _fires_used[budget] + cost > fire_shots_per_step:
 		var saved: int = _caster
 		var saved_seq: int = _caster_seq
-		if not from_caster:
-			_caster = caster if caster >= 0 and projectiles.is_alive(caster) else CASTER_POINT
-			_caster_seq = projectiles.get_seq_of(caster) if _caster >= 0 else 0
-		var launch: PendingLaunch = _delay(0.0, group, null, actor, staff, generation, at, heading, source, from_caster)
+		_caster = _live_caster(caster, seq)
+		_caster_seq = seq
+		var launch: PendingLaunch = _delay(0.0, group, null, actor, staff, generation, at, heading, source, body_of(_caster, actor) >= 0)
 		launch.cost = cost
 		_caster = saved
 		_caster_seq = saved_seq
@@ -1859,10 +1957,7 @@ func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Ve
 		return
 	_fires_used[budget] += cost
 	fires_made += 1
-	if from_caster:
-		_launch_group(group, actor, staff, generation, at, heading, source, true)
-	else:
-		_launch_as(group, actor, staff, generation, at, heading, source, caster)
+	_launch_as(group, actor, staff, generation, at, heading, source, caster, seq)
 
 
 ## The shots one firing of `group` makes, at least 1 for each carrier (a beam, a move, an area).
@@ -1893,15 +1988,9 @@ func _run_waiting_fires() -> void:
 		var keeps: bool = launch.caster != CASTER_BODY
 		_fires_used[budget] += launch.cost
 		fires_made += 1
-		var origin: Vector2 = launch.origin
-		var from_caster: bool = launch.anchor.is_finite()
-		if from_caster and projectiles != null:
-			var now: Vector2 = projectiles.get_anchor(launch.actor)
-			if now.is_finite():
-				origin += now - launch.anchor
+		var origin: Vector2 = _moved_origin(launch)
 		var caster: int = launch.caster
-		if caster >= 0 and not (projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == launch.caster_seq):
-			caster = CASTER_POINT
+		var caster_seq: int = launch.caster_seq
 		var source: Node = launch.source if is_instance_valid(launch.source) else null
 		var group: CompiledGroup = launch.group
 		var actor: int = launch.actor
@@ -1910,16 +1999,7 @@ func _run_waiting_fires() -> void:
 		var heading: Vector2 = launch.heading
 		_scatter.seed = launch.seed
 		_release_launch(launch)
-		if from_caster:
-			var saved: int = _caster
-			var saved_seq: int = _caster_seq
-			_caster = caster
-			_caster_seq = launch.caster_seq
-			_launch_group(group, actor, staff, generation, origin, heading, source, true)
-			_caster = saved
-			_caster_seq = saved_seq
-		else:
-			_launch_as(group, actor, staff, generation, origin, heading, source, caster)
+		_launch_as(group, actor, staff, generation, origin, heading, source, caster, caster_seq)
 		if keeps:
 			_generation_gone(SpellTag.make(actor, staff, 0, generation))
 
@@ -2083,8 +2163,8 @@ func _step_live(delta: float) -> void:
 
 ## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
 ## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
-## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies,
-## else the point does.
+## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
+## actor's body while it is there (owner, 2026-11-06), else the point does.
 func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
@@ -2096,11 +2176,13 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 	if _lc_kind[i] != LC_SLOT or not projectiles.is_alive(slot) or projectiles.get_seq_of(slot) != _lc_seq[i]:
 		slot = -1
 	var way: Vector2 = _lc_way[i]
+	var caster: int = slot if slot >= 0 else CASTER_POINT
 	if slot >= 0:
 		way = _heading(spell, slot, at, actor)
 	elif _lc_kind[i] == LC_ACTOR:
 		# An actor's body (a wizard's dash, a decoy): the way that actor aims now.
 		var body: int = _lc_ref[i]
+		caster = body_caster(body)
 		# A body that went down has its aim cleared (INF, `clear_aim`): its way stays as it was.
 		if body >= 0 and body < ACTORS and _aim_seen[body] != 0 and _aim_dir[body].is_finite():
 			way = _aim_dir[body]
@@ -2108,7 +2190,7 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, null, slot)
+	_fire_payload(payload, tag, actor, from, way, null, caster)
 
 
 ## The trigger live carrier `i` fires, or null.
@@ -2378,7 +2460,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 			carried = _ray.hit
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, actor, target, position, slot)
-	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot)
+	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot if slot >= 0 else CASTER_POINT)
 	if chain > 0:
 		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
 
@@ -2495,9 +2577,13 @@ func _on_shot_blocked(actor: int, position: Vector2, tag: int, shot: int) -> voi
 	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null, shot)
 
 
+## A barrier blocks (combat's `shield_blocked`): on `actor`, the wizard that cast it or a body of
+## its card's own (a decoy). No shot of the carrier is part of it: its payload is cast by that body
+## (`body_caster`), in the name of the card's caster.
 func _on_shield_blocked(actor: int, position: Vector2, tag: int) -> void:
-	# A barrier on the caster blocks: no shot of this carrier is part of it.
-	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null, -1)
+	if not SpellTag.is_spell_tag(tag):
+		return
+	_fire_event(TriggerBase.Event.BLOCK, SpellTag.caster_of(tag), position, tag, null, -1, false, Vector2.ZERO, body_caster(actor))
 
 
 ## A deflect is a block (owner, 2026-10-29): it sets off `on block` too.
@@ -2516,8 +2602,9 @@ func _on_reaction(actor: int, _reaction_id: StringName, target: Node, position: 
 ## Fires the payload of the shot with `tag` from `at`, when that shot's trigger is `event` (the
 ## shared way of the events that name a shot's tag). When the event is being sent for that
 ## very shot (`shot`, the event's), its record limits how often it fires. `back_off` pulls the
-## point out of a wall; `way`, when given, is the way the payload goes.
-func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, shot: int, back_off: bool = false, way: Vector2 = Vector2.ZERO) -> void:
+## point out of a wall; `way`, when given, is the way the payload goes; `by`, who casts it when the
+## event names no shot of the carrier (a barrier's body; the point by default).
+func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, shot: int, back_off: bool = false, way: Vector2 = Vector2.ZERO, by: int = CASTER_POINT) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
@@ -2531,13 +2618,16 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, sh
 	var heading: Vector2 = way if not way.is_zero_approx() else (_ray.dir if by_ray else _heading(spell, slot, at, actor))
 	if back_off:
 		at -= heading * SpellLimits.EXPIRE_BACKOFF
-	_fire_payloads(spell, event, tag, actor, at, heading, source, slot)
+	_fire_payloads(spell, event, tag, actor, at, heading, source, slot if slot >= 0 else by)
 
 
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
 ## the actor was hurt (a wizard or an enemy alike, actors G3b), whatever the carrier is (a shot, a
 ## beam, a dash, an entity...; `_lc_tag`). A carrier that is a body of its own (a decoy, an actor:
-## `LC_ACTOR`) is hurt when that body is (owner, 2026-11-02); a dash's body is its caster's.
+## `LC_ACTOR`) is hurt when that body is (owner, 2026-11-02); a dash's body is its caster's. A
+## payload does not set its own carrier's `on hurt` off again while it is fired (`_hurt_firing`):
+## its strike round the body that fired it (the cards it left landing there) hurts that body, and
+## would fire it again inside itself, for ever.
 func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: StringName) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
@@ -2548,14 +2638,16 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		var spell: CompiledSpell = _profiles.get(tag)
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
 		var body: int = _lc_ref[i] if _lc_kind[i] == LC_ACTOR else SpellTag.caster_of(tag)
-		if trigger == null or trigger.event != TriggerBase.Event.HURT or body != actor:
+		if trigger == null or trigger.event != TriggerBase.Event.HURT or body != actor or _hurt_firing.has(tag):
 			continue
 		var at: Vector2 = _lc_where(i)
 		if at.is_finite():
 			_lc_at[i] = at
 		elif _lc_tied[i] == 1:
 			continue
+		_hurt_firing.append(tag)
 		_lc_fire(i, trigger.payload, position)
+		_hurt_firing.resize(_hurt_firing.size() - 1)
 
 
 ## `relay` (owner, 2026-10-28): a shot with it that hits any actor (a wizard, an enemy, a
@@ -2677,6 +2769,7 @@ func clear() -> void:
 	_jq_count = 0
 	_moves.clear()
 	_caster = CASTER_BODY
+	_fl_count = 0
 	for carrier: Carrier in _carriers.values():
 		carrier.clear()
 	_poses.clear()

@@ -47,8 +47,7 @@ func test_every_card_walks_without_problems() -> void:
 	var staff := StaffBase.new()
 	staff.id = &"state_walk"
 	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	var forms: Array[FormBase] = []
 	var others: Array[SpellComponent] = []
 	var payload: FormBase = null

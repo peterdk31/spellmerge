@@ -105,10 +105,12 @@ func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D]) -> vo
 
 
 ## The staff's next cast and the seconds of its delay left (`Spells.cast_index`,
-## `Spells.cooldown_left`). Called every frame for a shown row; allocates nothing.
-func set_staff_timing(staff: int, cursor: int, left: float) -> void:
+## `Spells.cooldown_left`), whether it winds up (`is_winding`) and the cast a press would fire
+## with its mana (`firing_cast`; `StaffRow.set_timing`). Called every frame for a shown row;
+## allocates nothing.
+func set_staff_timing(staff: int, cursor: int, left: float, winding: bool = false, firing: int = StaffRowScript.FIRING_UNKNOWN) -> void:
 	if staff >= 0 and staff < STAFF_COUNT and _rows[staff].visible:
-		_rows[staff].set_timing(cursor, left)
+		_rows[staff].set_timing(cursor, left, winding, firing)
 	if staff == STAFF_COUNT - 1:
 		# Once a frame: a glyph that changed width (another device) lines the rows up again.
 		var widest: float = 0.0
@@ -116,6 +118,12 @@ func set_staff_timing(staff: int, cursor: int, left: float) -> void:
 			widest = maxf(widest, row.glyph_room())
 		if not is_equal_approx(widest, _rows[0].cards_left):
 			_align_rows()
+
+
+## A press of staff `staff` found no cast its mana pays: its row flashes (`StaffRow.fizzle`).
+func staff_fizzled(staff: int) -> void:
+	if staff >= 0 and staff < STAFF_COUNT and _rows[staff].visible:
+		_rows[staff].fizzle()
 
 
 ## How every row shows its staff's delay: on the button glyph (the default) or on the next cast

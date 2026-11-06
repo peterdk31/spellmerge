@@ -34,9 +34,10 @@ const POSE_RANGES: Dictionary = {
 @export var base_damage: float = 1.0
 ## Mana taken per cast.
 @export var mana_cost: float = 0.0
-## Seconds before the same player can cast this spell again. There is no separate cast
-## time: the cooldown is the cast time.
-@export var cooldown: float = 0.5
+## Seconds the staff is busy after this carrier leaves (its wind-down; docs/milestones/
+## cast-timing.md): a cast's wind-down is its own group's carriers' and multicast cards' added up;
+## a payload's adds nothing, as no staff waits on it.
+@export var wind_down: float = 0.5
 ## Pixels per second. Ignored by STILL and RAY.
 @export var speed: float = 0.0
 ## Seconds a shot lives. For RAY, how long the beam stays on (it hits every `SpellLimits.BEAM_TICK`).
@@ -61,8 +62,9 @@ const POSE_RANGES: Dictionary = {
 @export var ray_length: float = 0.0
 ## SWING: degrees the sweep hits over, centred on the aim.
 @export var arc: float = 0.0
-## SWING: seconds the staff leans back before it sweeps (none when it chains straight on from
-## the last swing, `SpellLimits.SWING_CHAIN`). SLAM: seconds it rises before it strikes.
+## Seconds a cast of it winds up before it leaves (docs/milestones/cast-timing.md): the staff's
+## pose winds, the aim follows the caster, then the carrier leaves and strikes at once. A swing
+## leans back, a slam rises; most carriers have none. A payload winds up where its trigger fired.
 @export var wind_up: float = 0.0
 ## How the staff moves when this carrier is cast (its look only; a wizard's own cast, not a payload's):
 ## keys, each a dictionary, played in order from the staff's pose at the cast (rest, or where the
@@ -100,12 +102,16 @@ var _pose_packed: bool = false
 ## where its shots strike, on a body or a wall (`projectile_impact`: the flare in the shot's colours
 ## and cards; `impact` when not given), as big as its `radius`; and `end_cue` where a carrier with no
 ## shot ends (`carrier_ended`: a teleport or dash landing, a rain falling, a slam's strike, a decoy or
-## familiar going), as big as that event says. Empty plays nothing there. A new carrier names its cues
-## in its own `.tres`; Feel's preset has none of them.
+## familiar going), as big as that event says; `wind_cue` while a cast of it winds up (`cast_winding`:
+## an enemy's telegraph, only for a caster not on the players' team; its `size` the wind-up's
+## seconds; `wind`, a lane along the aim, when not given; docs/milestones/cast-timing.md, T6b).
+## Empty plays nothing there. A new carrier names its cues in its own `.tres`; Feel's preset has none
+## of them.
 @export var cast_cue: StringName = &"cast"
 @export var shown_cue: StringName = &""
 @export var impact_cue: StringName = &"impact"
 @export var end_cue: StringName = &""
+@export var wind_cue: StringName = &"wind"
 ## What its shots are drawn as: `&""` for their motion's own body (a flying shot a bolt with its
 ## tail, a still one a rune's diamond, an orbiting one an orbit shot), or a still body of its own for
 ## a still shot: `&"stone"`, a standing ward stone (a wall's). One of SHOT_BODIES; a body its shots'
@@ -120,9 +126,9 @@ func kind() -> StringName:
 
 
 ## Its cues and how big its impact cue plays, for looks (`gameplay/feel`, which reads no spell
-## field): [cast_cue, shown_cue, impact_cue, end_cue, radius]. A new Array each call.
+## field): [cast_cue, shown_cue, impact_cue, end_cue, radius, wind_cue]. A new Array each call.
 func look_cues() -> Array:
-	return [cast_cue, shown_cue, impact_cue, end_cue, radius]
+	return [cast_cue, shown_cue, impact_cue, end_cue, radius, wind_cue]
 
 
 ## What is wrong with its looks, one line each (empty when nothing is): a body that is none.
@@ -181,7 +187,7 @@ func ranges() -> Dictionary:
 	limits.merge({
 		"base_damage": Vector2(0.05, 200),
 		"mana_cost": Vector2(0.0, 100.0),
-		"cooldown": Vector2(0.0, 10.0),
+		"wind_down": Vector2(0.0, 10.0),
 		"speed": Vector2(0.0, 2000.0),
 		"lifetime": Vector2(0.05, 20.0),
 		"radius": Vector2(1.0, 64.0),

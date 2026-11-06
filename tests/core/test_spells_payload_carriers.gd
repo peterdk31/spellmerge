@@ -98,7 +98,7 @@ func before_each() -> void:
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 0.2)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
-	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 

@@ -10,8 +10,9 @@ extends Node
 ## (`hold`) carriers switched off.
 ##
 ## Casting: `cast_staff(actor, staff, origin, direction, mana)` fires the next cast of the
-## staff's cycle and returns the mana spent or `REFUSED`; delays (the staff's own, every
-## carrier's cooldown, the recharge after the last cast) are per actor and staff and tick in
+## staff's cycle and returns the mana spent or `REFUSED`; the wait after it (its carriers'
+## wind-down, and the staff's cooldown after the cycle's last cast; docs/milestones/
+## cast-timing.md) is per actor and staff and ticks in
 ## `step` (physics). A cast is a group: its carriers leave along the aim; each carrier's shots are
 ## a fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
 ## compiler; homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
@@ -21,8 +22,9 @@ extends Node
 ##
 ## Payloads: each trigger of a carrier has its own payload (a group; `CompiledSpell.triggers`),
 ## fired by its shot's `projectile_hit` (on hit), `projectile_expired` (on expire) or every
-## `interval` seconds of that timer (timer, `_step_live`; the
-## first tick after the interval or half the carrier's life, whichever is shorter). It starts at
+## tick of that timer (timer, `_step_live`; a tick is the payload's whole wind-up, docs/
+## milestones/cast-timing.md T8, and the payload then leaves without waiting again; the first tick
+## after that or half the carrier's life, whichever is shorter). It starts at
 ## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
@@ -188,6 +190,9 @@ class PendingLaunch:
 	## The rain whose payload this is, so it strikes and its own trigger (`on expire`) fires as it
 	## lands; `echoed` when that rain is an echo (it strikes at half damage).
 	var landing: CompiledSpell = null
+	## A payload that waited out its wind-up (`_fire`): it fires now as `_fire` would, its wind-up
+	## over.
+	var wound: bool = false
 
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
@@ -254,6 +259,14 @@ var _cooldown: PackedFloat32Array = PackedFloat32Array()
 ## ACTORS x STAFFS of them (4,096 since Horde H1, about 0.3 ms a physics step in GDScript).
 ## Actor ids are handed out lowest first, so it stays near the highest id that ever cast.
 var _cooldown_rows: int = 0
+## actor * STAFFS + staff -> when its winding cast leaves (`_clock`; INF: none winds up), the
+## walk turn, place and aim it was pressed with (the place and aim the cast leaves along when the
+## caster's are not known then), and how many staffs wind up now (docs/milestones/cast-timing.md).
+var _wind_due: PackedFloat64Array = PackedFloat64Array()
+var _wind_walk: PackedFloat32Array = PackedFloat32Array()
+var _wind_origin: PackedVector2Array = PackedVector2Array()
+var _wind_dir: PackedVector2Array = PackedVector2Array()
+var _winding: int = 0
 ## Payloads each actor has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
@@ -490,6 +503,11 @@ func _init() -> void:
 	_ring.resize(ACTORS * SpellLimits.STAFFS)
 	_ring.fill(-1)
 	_cooldown.resize(ACTORS * SpellLimits.STAFFS)
+	_wind_due.resize(ACTORS * SpellLimits.STAFFS)
+	_wind_due.fill(INF)
+	_wind_walk.resize(ACTORS * SpellLimits.STAFFS)
+	_wind_origin.resize(ACTORS * SpellLimits.STAFFS)
+	_wind_dir.resize(ACTORS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.BUDGETS)
 	for i in SpellLimits.PENDING_START:
 		_pending_free.append(PendingLaunch.new())
@@ -562,7 +580,7 @@ func card_works(card_id: StringName, carrier: StringName) -> bool:
 
 
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
-## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
+## makes until its cycle ends (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
 ## card is listed in `wasted`.
 func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
@@ -571,7 +589,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
-## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
+## (read order), `text`, `mana`, `wind_up` (the seconds it winds up before it leaves), `wind_down` (the seconds its staff is busy after it), `delay` (the wait in all: the wind-down, and the staff's cooldown when the cycle ends with it), `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `ends_cycle`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
 ## true), and `tree` (the cast as the builder's tree draws it, `cast_tree`); `wasted` for the
 ## staff (cards that did nothing in any cast that read them); and `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
@@ -581,9 +599,9 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var casts: Array[Dictionary] = []
 	for cast in compiled.casts:
 		casts.append({
-			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
+			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "wind_up": cast.wind_up, "wind_down": cast.wind_down, "delay": cast.delay,
 			"damage": _cast_damage(cast),
-			"recharges": cast.recharges, "wrapped": cast.wrapped,
+			"ends_cycle": cast.ends_cycle, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
 			"tree": cast_tree(cast),
 		})
@@ -687,7 +705,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
 		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
 		out.append("Mana " + _short(form.mana_cost))
-		out.append("Delay %ss" % _short(form.cooldown))
+		out.append("Delay %ss" % _short(form.wind_down))
 	elif component is ModifierBase:
 		var modifier: ModifierBase = component
 		var words: Dictionary = {
@@ -703,7 +721,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 			out.append("Pierce +%d" % modifier.extra_pierce)
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
-			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
+			["Delay", modifier.wind_down_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
 			["Spread", modifier.spread_mult], ["Reach", modifier.reach_mult],
 		]
 		for pair: Array in mults:
@@ -722,7 +740,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	elif component is TriggerBase:
 		var trigger: TriggerBase = component
 		if trigger.event == TriggerBase.Event.TIMER:
-			out.append("Every %ss" % _short(trigger.interval))
+			out.append("Every %ss" % _short(trigger.wind_up))
 		else:
 			out.append("On " + String(TriggerBase.Event.keys()[trigger.event]).to_lower())
 	elif component is MulticastBase:
@@ -789,6 +807,7 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 		return 0
 	var index: int = actor * SpellLimits.STAFFS + staff
 	_release_hold(index)
+	_cancel_wind(index)
 	# The old build casts no more: its cast's later firings go (a payload of a shot in the air
 	# fires on, as the shot flies on).
 	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.caster == CASTER_BODY)
@@ -918,12 +937,41 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 	return tag
 
 
+## How far the carrier of `tag` reaches along its aim (its flight, a beam's or swing's length, a
+## rain's aim point; 0 for one that is not aimed) and its hit radius: a telegraph lane's length
+## and width (gameplay/feel/lanes.gd). 0 for a tag with no carrier.
+func carrier_reach(tag: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	return _carrier_of(spell).reach_of(spell) if spell != null else 0.0
+
+
+func carrier_radius(tag: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	return spell.radius if spell != null else 0.0
+
+
+## Where `actor` holds its staff's tip and the way it aims (`set_aim`), INF while it has none: what a
+## telegraph lane follows while the cast winds up.
+func aim_origin_of(actor: int) -> Vector2:
+	return _aim_origin[actor] if actor >= 0 and actor < ACTORS and _aim_seen[actor] != 0 else Vector2.INF
+
+
+func aim_of(actor: int) -> Vector2:
+	return _aim_dir[actor] if actor >= 0 and actor < ACTORS and _aim_seen[actor] != 0 else Vector2.INF
+
+
+## True while this actor's staff winds up a cast (docs/milestones/cast-timing.md): pressed, not
+## yet left. `cooldown_left` counts the wind-up down then.
+func is_winding(actor: int, staff: int) -> bool:
+	return _in_range(actor, staff) and _wind_due[actor * SpellLimits.STAFFS + staff] != INF
+
+
 ## Seconds before this actor's staff may cast again.
 func cooldown_left(actor: int, slot: int) -> float:
 	return _cooldown[actor * SpellLimits.STAFFS + slot] if _in_range(actor, slot) else 0.0
 
 
-## Which cast of its cycle this actor's staff makes next (0 after a recharge).
+## Which cast of its cycle this actor's staff makes next (0 once its cycle ended).
 func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
@@ -942,10 +990,12 @@ func is_holding(actor: int, staff: int) -> bool:
 
 ## Fires the next cast of this actor's staff from `origin` along `direction`. `mana` is what
 ## the caster has. Returns the mana spent (0.0 or more) when it fired, or `REFUSED` when it did
-## not (nothing built, still in its delay, too little mana, no direction, or every shot starting
-## inside a wall); the caller then takes that much mana and reads no field. A refused cast
-## changes nothing, except that a cast with nothing in it (every card wasted) still moves the
-## staff on, so it never sticks there.
+## not (nothing built, still in its delay, no cast left its mana pays, no direction, or every shot
+## starting inside a wall); the caller then takes that much mana and reads no field. A cast the
+## mana does not pay is skipped (docs/milestones/cast-timing.md, T3): the press fires the first
+## one after it that it pays, up to the cycle's end; with none, the cycle ends (its cooldown runs,
+## `cast_fizzled`) and nothing is paid. A refused cast changes nothing else, except that a cast
+## with nothing in it (every card wasted) still moves the staff on, so it never sticks there.
 ##
 ## While the staff has sustained (`hold`) carriers on, a cast switches them all off instead,
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
@@ -960,24 +1010,62 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 		return REFUSED
 	var index: int = actor * SpellLimits.STAFFS + staff
 	var compiled: CompiledStaff = _installed[index]
-	if compiled == null or compiled.is_empty() or _cooldown[index] > 0.0:
+	if compiled == null or compiled.is_empty() or _cooldown[index] > 0.0 or _wind_due[index] != INF:
 		return REFUSED
 	if not _hold_tags[index].is_empty():
+		# The switch-off press frees the staff at once (docs/milestones/cast-timing.md).
 		_release_hold(index)
-		_cooldown[index] = compiled.staff.cast_delay if compiled.staff != null else 0.0
-		_cooldown_rows = maxi(_cooldown_rows, index + 1)
 		return 0.0
-	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
-	if mana < cast.mana:
+	# A cast the staff cannot pay is skipped (docs/milestones/cast-timing.md, T3): the press fires
+	# the first one after it that it can, up to the cycle's end. With none, the cycle ends there:
+	# its cooldown runs, nothing leaves and nothing is paid.
+	var firing: int = _firing_cast(index, mana)
+	if firing < 0:
+		_cursor[index] = 0
+		_cooldown[index] = compiled.staff.cooldown if compiled.staff != null else 0.0
+		_cooldown_rows = maxi(_cooldown_rows, index + 1)
+		if events != null:
+			events.cast_fizzled.emit(actor, staff)
 		return REFUSED
+	_cursor[index] = firing
+	var cast: CompiledCast = compiled.casts[firing]
 	var aim: Vector2 = direction.normalized()
-	_walk_turn[actor] = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
+	var turn: float = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
+	if cast.wind_up > 0.0:
+		# It winds up first (docs/milestones/cast-timing.md): the staff is busy, its pose winds,
+		# and the cast leaves from where the caster holds the staff then (`_release_winds`), its
+		# mana paid as it leaves (`mana_spend_requested`).
+		_wind_due[index] = _clock + cast.wind_up
+		_wind_walk[index] = turn
+		_wind_origin[index] = origin
+		_wind_dir[index] = aim
+		_winding += 1
+		_cooldown[index] = cast.wind_up
+		_cooldown_rows = maxi(_cooldown_rows, index + 1)
+		_wind_pose(actor, staff, cast, aim)
+		if events != null:
+			# Its look (an enemy's telegraph) is the first carrier card's `wind_cue` (T6b).
+			var first_spell: CompiledSpell = cast.group.spells[0]
+			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]))
+		return 0.0
+	_walk_turn[actor] = turn
+	if not _leave(index, compiled, cast, origin, aim):
+		return REFUSED
+	return cast.mana
+
+
+## The cast `cast` of staff `index`'s cycle leaves from `origin` along `aim`: its group launched,
+## the cycle moved on. False when no shot could start (every one inside a wall): then nothing
+## changed.
+func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vector2, aim: Vector2) -> bool:
+	var actor: int = floori(float(index) / SpellLimits.STAFFS)
+	var staff: int = index % SpellLimits.STAFFS
 	_scatter.seed = hash(Vector3i(actor, staff, _cast_count[index]))
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
-		return REFUSED
+		return false
 	_cast_count[index] += 1
 	_after_cast(index, compiled, cast)
 	_last_infused[actor] = null
@@ -988,14 +1076,81 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	var first: CompiledSpell = cast.group.spells[0]
 	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
 	_last_form[index] = first.form_id if first.form_id != &"" else first.carrier
-	return cast.mana
+	return true
+
+
+## The staff's pose winds for a cast that winds up, from its press: the first carrier's keys, its
+## wind-up the cast's, turning with the live aim (the aim follows the caster until the cast
+## leaves); the carrier starts its strike when it leaves.
+func _wind_pose(actor: int, staff: int, cast: CompiledCast, aim: Vector2) -> void:
+	var spell: CompiledSpell = cast.group.spells[0]
+	if spell.staff_pose.is_empty() or actor < 0 or actor >= ACTORS:
+		return
+	var tag: int = SpellTag.make(actor, staff, spell.node, _current[actor * SpellLimits.STAFFS + staff])
+	_poses.start(actor, spell, tag, cast.wind_up, StaffPoses.strike_of(spell, spell.lifetime), aim, _carrier_of(spell).pose_side(actor, aim))
+
+
+## The casts whose wind-up is over leave now, from where their caster holds the staff and along
+## where it aims (`set_aim`; where it was pressed when that is not known), and their mana is paid.
+## One that cannot leave (every shot inside a wall) frees its staff and costs nothing.
+func _release_winds() -> void:
+	for index in _cooldown_rows:
+		if _wind_due[index] > _clock:
+			continue
+		_wind_due[index] = INF
+		_winding -= 1
+		_cooldown[index] = 0.0
+		var actor: int = floori(float(index) / SpellLimits.STAFFS)
+		var staff: int = index % SpellLimits.STAFFS
+		var compiled: CompiledStaff = _installed[index]
+		if compiled == null or compiled.is_empty():
+			continue
+		var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
+		var origin: Vector2 = _aim_origin[actor] if _aim_seen[actor] != 0 and _aim_origin[actor].is_finite() else _wind_origin[index]
+		var aim: Vector2 = _aim_dir[actor] if _aim_seen[actor] != 0 and _aim_dir[actor].is_finite() else _wind_dir[index]
+		_walk_turn[actor] = _wind_walk[index]
+		if _leave(index, compiled, cast, origin, aim) and events != null and cast.mana > 0.0:
+			events.mana_spend_requested.emit(actor, staff, cast.mana)
+		if _winding <= 0:
+			return
+
+
+## `actor`'s winding casts leave no more and its staffs are free (a new driver took the body: the
+## cast was the old one's; docs/milestones/cast-timing.md).
+func cancel_winds(actor: int) -> void:
+	if _winding <= 0 or actor < 0 or actor >= ACTORS:
+		return
+	for staff in SpellLimits.STAFFS:
+		_cancel_wind(actor * SpellLimits.STAFFS + staff)
+
+
+## `actor`'s winding casts wait `seconds` longer (its Caster asks while the body is slowed: a chill
+## stretches a wind-up, a freeze holds it; docs/milestones/cast-timing.md). Allocates nothing.
+func hold_winds(actor: int, seconds: float) -> void:
+	if _winding <= 0 or seconds <= 0.0 or actor < 0 or actor >= ACTORS:
+		return
+	for staff in SpellLimits.STAFFS:
+		var index: int = actor * SpellLimits.STAFFS + staff
+		if _wind_due[index] != INF:
+			_wind_due[index] += seconds
+			_cooldown[index] += seconds
+
+
+## Staff `index`'s winding cast leaves no more (down, rebuilt, its caster gone): the staff is free
+## and nothing was paid.
+func _cancel_wind(index: int) -> void:
+	if _wind_due[index] == INF:
+		return
+	_wind_due[index] = INF
+	_winding -= 1
+	_cooldown[index] = 0.0
 
 
 ## The delay and the next cast of the cycle, after `cast` fired (or had nothing in it).
 func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> void:
 	_cooldown[index] = cast.delay
 	_cooldown_rows = maxi(_cooldown_rows, index + 1)
-	_cursor[index] = 0 if cast.recharges else (_cursor[index] + 1) % compiled.casts.size()
+	_cursor[index] = 0 if cast.ends_cycle else (_cursor[index] + 1) % compiled.casts.size()
 
 
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for
@@ -1011,6 +1166,8 @@ func step(delta: float) -> void:
 	# The zap cap's window opens before the carriers step: a live beam zaps in its `step`.
 	_zaps_used = 0
 	_clock += delta
+	if _winding > 0:
+		_release_winds()
 	_run_waiting_fires()
 	_step_followers()
 	_moves.step(delta)
@@ -1037,10 +1194,10 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 		source = null
 	# Any carrier may move the staff (its card's `staff_pose`) of the body that casts it, when that is
 	# the actor's own (another body, a decoy, has no staff); a swing's and a slam's start theirs with
-	# their own wind-up, side and strike.
+	# their side and strike. Its wind-up ran before it left (`_wind_pose`).
 	if not spell.staff_pose.is_empty() and not spell.has_trait(Carrier.OWN_POSE):
 		if body_of(_caster, actor) == actor and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
-			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
+			_poses.start(actor, spell, tag, 0.0, StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
 
@@ -1472,6 +1629,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.landing = null
 	launch.echoed = false
 	launch.again = false
+	launch.wound = false
 	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.actor = actor
@@ -1523,11 +1681,14 @@ func _run_pending() -> void:
 		var landing: CompiledSpell = launch.landing
 		var echoed: bool = launch.echoed
 		var again: bool = launch.again
+		var wound: bool = launch.wound
 		_scatter.seed = launch.seed
 		_release_launch(launch)
 		_cast_as(caster, caster_seq)
 		if landing != null:
 			_carrier_of(landing).land(landing, group, actor, staff, generation, origin, heading, echoed)
+		elif wound:
+			_fire(group, actor, staff, generation, origin, heading, source, caster, true)
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
 		elif not again:
@@ -1873,6 +2034,9 @@ func clear_aim(actor: int) -> void:
 		return
 	_aim_origin[actor] = Vector2.INF
 	_aim_dir[actor] = Vector2.INF
+	# Down or gone: its winding casts leave no more.
+	for staff in SpellLimits.STAFFS:
+		_cancel_wind(actor * SpellLimits.STAFFS + staff)
 
 
 ## Casts the queued beam jumps, if this is the outermost beam. Each jump's own jumps join the
@@ -1948,8 +2112,8 @@ func _grow_jumps() -> void:
 ## Fires `payload` of a carrier with `tag` from `at` along `heading`, in the same actor's staff and
 ## generation, cast by `caster` (see `_caster`): the shot that fired it while that shot still
 ## flies, the body that fired it (`body_caster`), else the point `at`.
-func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, caster: int = CASTER_POINT) -> void:
-	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, caster)
+func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, caster: int = CASTER_POINT, wound: bool = false) -> void:
+	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, caster, wound)
 
 
 ## Fires the payload of every trigger of `spell` that goes off on `event` (a carrier's triggers
@@ -1966,8 +2130,20 @@ func _fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: 
 ## then by `caster` (see `_caster`) if that is still there, else from the point. Nothing is dropped
 ## (owner, 2026-10-29). One the actor's own body casts (`on cast` of its own cast) leaves as that
 ## cast's own launch does.
-func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster: int) -> void:
+func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster: int, wound: bool = false) -> void:
 	if group == null or group.is_empty():
+		return
+	if group.wind_up > 0.0 and not wound:
+		# A payload winds up where its trigger fired, as a cast does (docs/milestones/
+		# cast-timing.md), then fires as now, cast by what fired it if that is still there.
+		var saved_wind: int = _caster
+		var saved_wind_seq: int = _caster_seq
+		var wind_seq: int = projectiles.get_seq_of(caster) if caster >= 0 else 0
+		_caster = _live_caster(caster, wind_seq)
+		_caster_seq = wind_seq
+		_delay(group.wind_up, group, null, actor, staff, generation, at, heading, source, body_of(_caster, actor) >= 0).wound = true
+		_caster = saved_wind
+		_caster_seq = saved_wind_seq
 		return
 	var cost: int = _shots_of(group)
 	var budget: int = _budget(actor)
@@ -2181,7 +2357,8 @@ func _step_live(delta: float) -> void:
 			_lc_clock[i] -= delta
 			if _lc_clock[i] <= 0.0:
 				_lc_clock[i] += trigger.interval
-				_lc_fire(i, trigger.payload, _lc_at[i])
+				# The tick was its payload's wind-up: it leaves now.
+				_lc_fire(i, trigger.payload, _lc_at[i], true)
 		i += 1
 
 
@@ -2189,7 +2366,7 @@ func _step_live(delta: float) -> void:
 ## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies, an
 ## actor's body while it is there (owner, 2026-11-06), else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2214,7 +2391,7 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, null, caster)
+	_fire_payload(payload, tag, actor, from, way, null, caster, wound)
 
 
 ## The trigger live carrier `i` fires, or null.
@@ -2799,6 +2976,8 @@ static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
 func clear() -> void:
 	_cooldown.fill(0.0)
 	_cooldown_rows = 0
+	_wind_due.fill(INF)
+	_winding = 0
 	_fires_used.fill(0)
 	_jq_head = 0
 	_jq_count = 0
@@ -2882,25 +3061,58 @@ func close_caster(actor: int) -> void:
 	_reset_caster(actor)
 
 
-## The mana the next cast of this caster's staff costs (`cast_staff` refuses with less), 0.0
-## while its sustained carriers are on (that press switches them off), or REFUSED when it has no
-## build. An enemy's AI asks before it winds up, so a telegraph is always followed by its cast.
-func next_cast_mana(actor: int, staff: int) -> float:
+## Which cast of staff `index`'s cycle a press with `mana` fires (docs/milestones/cast-timing.md,
+## T3): the one at the cursor, or the first after it the mana pays, up to the cycle's end (the
+## ones before it are skipped); -1 when the mana pays none of them, or the staff has no build.
+## INF mana: the one at the cursor.
+func _firing_cast(index: int, mana: float) -> int:
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return -1
+	var count: int = compiled.casts.size()
+	for at in range(mini(_cursor[index], count - 1), count):
+		if mana >= compiled.casts[at].mana:
+			return at
+	return -1
+
+
+## Which cast of this actor's staff's cycle a press with `mana` fires (an unaffordable one is
+## skipped; docs/milestones/cast-timing.md, T3), -1 when the mana pays none left in the cycle or it
+## has no build: what the corner panel marks.
+func firing_cast(actor: int, staff: int, mana: float) -> int:
+	return _firing_cast(actor * SpellLimits.STAFFS + staff, mana) if _in_range(actor, staff) else -1
+
+
+## The cast a press of this staff with `mana` would fire (`_firing_cast`), else the one at its
+## cursor; null with no build.
+func _next_cast(actor: int, staff: int, mana: float) -> CompiledCast:
 	if not _in_range(actor, staff):
-		return REFUSED
+		return null
 	var index: int = actor * SpellLimits.STAFFS + staff
 	var compiled: CompiledStaff = _installed[index]
 	if compiled == null or compiled.is_empty():
+		return null
+	var at: int = _firing_cast(index, mana)
+	return compiled.casts[at if at >= 0 else mini(_cursor[index], compiled.casts.size() - 1)]
+
+
+## The mana the next cast of this caster's staff costs: the one a press with `mana` would fire
+## (an unaffordable one is skipped; with INF, the one at the cursor), 0.0 while its sustained
+## carriers are on (that press switches them off), or REFUSED when it has no build. An enemy's AI
+## asks before it winds up, so a telegraph is always followed by its cast.
+func next_cast_mana(actor: int, staff: int, mana: float = INF) -> float:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	if cast == null:
 		return REFUSED
-	if not _hold_tags[index].is_empty():
+	if not _hold_tags[actor * SpellLimits.STAFFS + staff].is_empty():
 		return 0.0
-	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
+	return cast.mana
 
 
-## True when the next cast of this actor's staff can leave within `within` seconds with `mana`
-## (that staff's pool): its delay is no longer than that, and `mana` less what the staff's
-## sustained carriers hold
-## (`reserved_mana`) pays `next_cast_mana`. False with no build. One call for what an enemy's AI
+## True when a cast of this actor's staff can leave within `within` seconds with `mana` (that
+## staff's pool): its delay is no longer than that, and `mana` less what the staff's sustained
+## carriers hold (`reserved_mana`) pays a cast before the cycle's end (the ones it cannot pay are
+## skipped; docs/milestones/cast-timing.md). False with no build. One call for what an enemy's AI
 ## asks every step while its target is in reach (performance pass, 2026-10-28).
 func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 	if not _in_range(actor, staff):
@@ -2911,50 +3123,39 @@ func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 	var compiled: CompiledStaff = _installed[index]
 	if compiled == null or compiled.is_empty():
 		return false
-	var cost: float = 0.0
-	if _hold_tags[index].is_empty():
-		cost = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
-	return maxf(mana - _hold_mana[index], 0.0) >= cost
+	if not _hold_tags[index].is_empty():
+		return true
+	return _firing_cast(index, maxf(mana - _hold_mana[index], 0.0)) >= 0
 
 
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
 ## its first carrier's flight (speed x life), a beam's or swing's length, a rain's aim point;
 ## 0 for one that is not aimed (a nova's ring, an orbit, a still shot, a decoy...) or no build.
-func next_cast_reach(actor: int, staff: int) -> float:
-	var first: CompiledSpell = _next_carrier(actor, staff)
+func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
+	var first: CompiledSpell = _next_carrier(actor, staff, mana)
 	if first == null:
 		return 0.0
 	return _carrier_of(first).reach_of(first)
 
 
 ## What the next cast of this caster's staff does (`CastSense`; docs/milestones/M2-enemy-ai.md),
-## for an AI that plays whatever staffs it holds; null with no build.
-func next_cast_sense(actor: int, staff: int) -> CastSense:
-	if not _in_range(actor, staff):
-		return null
-	var index: int = actor * SpellLimits.STAFFS + staff
-	var compiled: CompiledStaff = _installed[index]
-	if compiled == null or compiled.is_empty():
-		return null
-	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].sense
+## for an AI that plays whatever staffs it holds: the one a press with `mana` would fire; null
+## with no build.
+func next_cast_sense(actor: int, staff: int, mana: float = INF) -> CastSense:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	return cast.sense if cast != null else null
 
 
 ## The hit radius of the next cast's first carrier (0 for none), for the width of a telegraph.
-func next_cast_radius(actor: int, staff: int) -> float:
-	var first: CompiledSpell = _next_carrier(actor, staff)
+func next_cast_radius(actor: int, staff: int, mana: float = INF) -> float:
+	var first: CompiledSpell = _next_carrier(actor, staff, mana)
 	return first.radius if first != null else 0.0
 
 
 ## The first carrier of the next cast of this staff, or null (no build, or nothing in the cast).
-func _next_carrier(actor: int, staff: int) -> CompiledSpell:
-	if not _in_range(actor, staff):
-		return null
-	var index: int = actor * SpellLimits.STAFFS + staff
-	var compiled: CompiledStaff = _installed[index]
-	if compiled == null or compiled.is_empty():
-		return null
-	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
-	return null if cast.group.is_empty() else cast.group.spells[0]
+func _next_carrier(actor: int, staff: int, mana: float = INF) -> CompiledSpell:
+	var cast: CompiledCast = _next_cast(actor, staff, mana)
+	return null if cast == null or cast.group.is_empty() else cast.group.spells[0]
 
 
 ## Siphon: mana comes back to staff `staff` of the actor `actor`, whoever it is; its Caster
@@ -3001,6 +3202,7 @@ func _budget(actor: int) -> int:
 func _reset_caster(caster: int) -> void:
 	for staff in SpellLimits.STAFFS:
 		var index: int = caster * SpellLimits.STAFFS + staff
+		_cancel_wind(index)
 		_cooldown[index] = 0.0
 		_cursor[index] = 0
 		_cast_count[index] = 0

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The imp's telegraph and poses (gameplay/ai's CreatureLook, reading its AIController;
-## content/enemies/ember_imp, the Cinder Rod): the warning comes before the shot, the aim is
-## locked, the line, lane and arrowhead show where the shot goes and how close it is, and the
+## content/enemies/ember_imp, the Cinder Rod): the warning comes before the shot for as long as
+## its staff winds up (docs/milestones/cast-timing.md), the aim follows the target, the line, lane and arrowhead show where the shot goes and how close it is, and the
 ## windup and hurt poses never change when damage lands. The strays' faces carry their mood
 ## (living staffs H5), so no stray has pose strips; the poses are tested on strips made in code.
 ## Enemies telegraph, allies don't (owner, 2026-11-01): the same AI on the players' team casts the
@@ -48,13 +48,19 @@ func test_shot_leaves_exactly_when_the_telegraph_ends() -> void:
 	var steps: int = int(Fixture.ai(imp).windup_time / Fixture.STEP)
 	fx.run(imp, steps - 2)
 	check(Fixture.ai(imp).is_telegraphing() and fx.projectiles.get_count() == 0, "still telegraphing, still no shot, just before the end")
-	check(Fixture.ai(imp).telegraph_progress() > 0.8 and Fixture.ai(imp).telegraph_progress() < 1.0, "progress is near the end")
-	fx.run(imp, 2)
+	check(Fixture.ai(imp).telegraph_progress() > 0.7 and Fixture.ai(imp).telegraph_progress() < 1.0, "progress is near the end")
+	var guard: int = 0
+	while Fixture.ai(imp).is_telegraphing() and guard < 10:
+		check_equal(fx.projectiles.get_count(), 0, "no shot while it telegraphs")
+		fx.run(imp, 1)
+		guard += 1
 	check(not Fixture.ai(imp).is_telegraphing(), "the telegraph ended")
-	check_equal(fx.projectiles.get_count(), 1, "exactly one shot left")
+	check_equal(fx.projectiles.get_count(), 1, "exactly one shot left as it ended")
 
 
-func test_imp_stands_still_and_keeps_its_aim() -> void:
+func test_imp_stands_still_and_its_aim_follows() -> void:
+	# docs/milestones/cast-timing.md (owner, 2026-11-06): the AI aims through its wind-up, as a
+	# player's aim follows the stick.
 	var imp: Actor = fx.imp_facing_player(60.0)
 	imp.step(Fixture.STEP)
 	check(imp.aim.is_equal_approx(Vector2.RIGHT), "the aim points at the player")
@@ -62,14 +68,16 @@ func test_imp_stands_still_and_keeps_its_aim() -> void:
 	fx.players[0].position = Vector2(0.0, 60.0)
 	fx.run(imp, 4)
 	check(imp.position == at and imp.velocity == Vector2.ZERO, "the imp stands still")
-	check(imp.aim.is_equal_approx(Vector2.RIGHT), "the aim stays on where the player was")
+	check(imp.aim.dot(Vector2.DOWN) > 0.9, "the aim follows the player: %s" % imp.aim)
 
 
-func test_a_wizard_who_steps_aside_is_not_hit() -> void:
+func test_a_wizard_who_steps_aside_once_the_shot_left_is_not_hit() -> void:
 	var imp: Actor = fx.imp_facing_player(60.0)
 	imp.step(Fixture.STEP)
+	while Fixture.ai(imp).is_telegraphing():
+		fx.run(imp, 1)
 	fx.players[0].position = Vector2(60.0, 40.0)
-	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 20)
+	fx.run(imp, 20)
 	check_equal(fx.players[0].health.health, fx.players[0].health.max_health, "the shot missed")
 
 
@@ -80,54 +88,59 @@ func test_a_wizard_who_stays_is_hit() -> void:
 	check(fx.players[0].health.health < fx.players[0].health.max_health, "the shot hit")
 
 
+## The lane of an imp (Feel's `lane` cue part, the card's `wind_cue`; docs/milestones/cast-timing.md,
+## T6b), or null while it shows none.
+func _lane(imp: Actor) -> Sprite2D:
+	return fx.lanes().call("sprite_of", imp.id) as Sprite2D
+
+
 func test_line_is_hidden_outside_the_windup() -> void:
 	var imp: Actor = fx.imp_facing_player()
-	var line: Sprite2D = imp.get_node("Telegraph")
-	check(not line.visible, "hidden before the windup")
-	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 2)
-	check(not line.visible, "hidden after the shot")
+	fx.with_feel()
+	check(_lane(imp) == null, "no lane before the windup")
+	fx.run(imp, 1)
+	check(_lane(imp) != null and _lane(imp).visible, "a lane while it winds up")
+	while Fixture.ai(imp).is_telegraphing():
+		fx.run(imp, 1)
+	fx.run(imp, 1)
+	check(_lane(imp) == null, "gone once the shot left")
 	check(imp.get_node("Sprite").modulate == Color.WHITE, "the sprite is white again after the shot")
 
 
 func test_line_is_as_long_as_the_shot_flies() -> void:
 	var imp: Actor = fx.imp_facing_player()
-	imp.step(Fixture.STEP)
+	fx.with_feel()
+	fx.run(imp, 1)
 	var bolt: FormBase = fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
 	var reach: float = bolt.speed * bolt.lifetime
-	check(is_equal_approx(Fixture.look(imp).telegraph_reach(), reach), "the far end is the real reach of its bolt (%.1f)" % Fixture.look(imp).telegraph_reach())
-	var material: ShaderMaterial = (imp.get_node("Telegraph") as Sprite2D).material as ShaderMaterial
-	check(is_equal_approx(material.get_shader_parameter(&"beam_length"), reach - CreatureLook.TELEGRAPH_START), "the shader draws it that long")
+	check(is_equal_approx(float(fx.lanes().call("reach_of", imp.id)), reach), "the far end is the real reach of its bolt (%.1f)" % float(fx.lanes().call("reach_of", imp.id)))
+	var line: Sprite2D = _lane(imp)
+	check(line.offset.x + line.region_rect.size.x == reach, "the lane and its arrowhead end where the bolt ends")
+	var material: ShaderMaterial = line.material as ShaderMaterial
+	check(float(material.get_shader_parameter(&"telegraph_lane")) >= bolt.radius, "the lane is at least as wide as the bolt")
 
 
-func test_line_turns_toward_the_locked_aim() -> void:
-	var imp: Actor = fx.imp_facing_player()
-	imp.step(Fixture.STEP)
-	var line: Sprite2D = imp.get_node("Telegraph")
-	check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the line shows, turned to the aim")
+func test_line_follows_the_aim() -> void:
+	var imp: Actor = fx.imp_facing_player(60.0)
+	fx.with_feel()
+	fx.run(imp, 1)
+	check(is_equal_approx(_lane(imp).rotation, imp.aim.angle()), "the lane shows, turned to the aim")
+	fx.players[0].position = Vector2(0.0, 60.0)
+	fx.run(imp, 3)
+	check(is_equal_approx(_lane(imp).rotation, imp.aim.angle()) and imp.aim.dot(Vector2.DOWN) > 0.9, "and turns as the aim follows the player")
 
 
 func test_telegraph_grows_brighter_and_bigger() -> void:
 	var imp: Actor = fx.imp_facing_player()
-	imp.step(Fixture.STEP)
-	var line: Sprite2D = imp.get_node("Telegraph")
-	var material: ShaderMaterial = line.material as ShaderMaterial
+	fx.with_feel()
+	fx.run(imp, 1)
+	var material: ShaderMaterial = _lane(imp).material as ShaderMaterial
 	var early: float = material.get_shader_parameter(&"telegraph_progress")
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) - 4)
 	check(float(material.get_shader_parameter(&"telegraph_progress")) > early + 0.5, "the shader is told the shot is near: dashes on, arrowhead bigger, brighter")
-	check_equal(material.shader.resource_path, "res://gameplay/ai/telegraph.gdshader", "drawn by the telegraph's own shader, not the shot shader (its cost in a crowd)")
-	check(material.get_shader_parameter(&"ramp_base") is Color and material.get_shader_parameter(&"ramp_light") is Color, "the ramp loads from the scene")
-	var other: Actor = fx.imp(Vector2(0.0, 400.0))
-	check(other.get_node("Telegraph").material != line.material, "each enemy has its own telegraph material")
-
-
-func test_lane_and_arrowhead_follow_the_reach() -> void:
-	var imp: Actor = fx.imp_facing_player()
-	imp.step(Fixture.STEP)
-	var line: Sprite2D = imp.get_node("Telegraph")
-	var material: ShaderMaterial = line.material as ShaderMaterial
-	var bolt: FormBase = fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
-	check(is_equal_approx(line.offset.x + line.region_rect.size.x, bolt.speed * bolt.lifetime), "the lane and its arrowhead end where the bolt ends")
-	check(float(material.get_shader_parameter(&"telegraph_lane")) >= bolt.radius, "the lane is at least as wide as the bolt")
+	check_equal(material.shader.resource_path, "res://gameplay/feel/telegraph.gdshader", "drawn by the telegraph's own shader, not the shot shader (its cost in a crowd)")
+	var base: Color = material.get_shader_parameter(&"ramp_base")
+	check(base.r > base.b, "in the cast's colour: the imp's fire bolt is warm (%s)" % base)
 
 
 func test_windup_pose_has_two_frames_and_idle_returns() -> void:
@@ -190,7 +203,7 @@ func test_hit_does_not_cancel_the_windup_or_delay_the_shot() -> void:
 	fx.run(imp, 3)
 	imp.damaged.emit(0, 1)
 	fx.run(imp, 1)
-	check(Fixture.ai(imp).state == AIController.State.WINDUP and imp.get_node("Telegraph").visible, "still winding up, line still shown")
+	check(Fixture.ai(imp).is_telegraphing(), "still winding up, still telegraphing")
 	# Four frames have run; the shot leaves the frame the windup ends, before it can reach anyone.
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) - 3)
 	check_equal(fx.projectiles.get_count(), 1, "the shot still came on time")
@@ -233,22 +246,25 @@ func _face(body: Actor) -> Face:
 	return null
 
 
+## Cast timing (docs/milestones/cast-timing.md): a cast winds up as long as its staff says, whoever
+## holds it; only an enemy shows it (the telegraph, the furious face).
 func test_an_ally_casts_the_step_its_staff_is_ready_with_no_warning() -> void:
 	var casts := PackedInt32Array([0, 0, 0, 0])
+	fx.with_feel()
 	var foe: Actor = fx.imp(Vector2(80.0, 0.0), Fixture.staffed([]))
 	var ally: Actor = _imp_of(Fixture.ActorsScript.TEAM_WIZARDS, [["fire", "bolt"]], Vector2.ZERO, casts)
 	var mind: AIController = Fixture.ai(ally)
 	var face: Face = _face(ally)
 	check(face != null, "the imp has a face")
-	check_equal(mind.brain.windup_for(0), 0.0, "an ally's cast winds up nothing")
+	check_equal(mind.brain.windup_for(0), Fixture.WIND_UP, "an ally's cast winds up as its staff says")
 	fx.run(ally, 1)
 	check(mind.target == foe, "it fights the enemy")
-	check_equal(casts[0], 1, "and casts the first step its staff is ready")
+	check_equal(casts[0], 1, "and starts its cast the first step its staff is ready")
 	var warned: bool = false
 	var furious: bool = false
 	for i in 30:
 		fx.run(ally, 1)
-		warned = warned or mind.is_telegraphing() or ally.get_node("Telegraph").visible
+		warned = warned or mind.is_telegraphing() or fx.lanes().call("sprite_of", ally.id) != null
 		furious = furious or (face != null and face.mood() == Face.Mood.FURIOUS)
 	check(casts[0] > 1, "it goes on casting: %s" % casts)
 	check(not warned, "never a telegraph")
@@ -257,13 +273,14 @@ func test_an_ally_casts_the_step_its_staff_is_ready_with_no_warning() -> void:
 
 func test_the_same_ai_on_the_enemies_team_telegraphs() -> void:
 	var casts := PackedInt32Array([0, 0, 0, 0])
+	fx.with_feel()
 	fx.players[0].position = Vector2(80.0, 0.0)
 	var enemy: Actor = _imp_of(Fixture.ActorsScript.TEAM_ENEMIES, [["fire", "bolt"]], Vector2.ZERO, casts)
 	var mind: AIController = Fixture.ai(enemy)
-	check(mind.brain.windup_for(0) >= AIBrain.WINDUP_MIN, "an enemy's cast winds up: %.3f" % mind.brain.windup_for(0))
+	check_equal(mind.brain.windup_for(0), Fixture.WIND_UP, "an enemy's cast winds up as its staff says")
 	fx.run(enemy, 1)
-	check(mind.is_telegraphing() and enemy.get_node("Telegraph").visible, "it telegraphs first")
+	check(mind.is_telegraphing() and fx.lanes().call("sprite_of", enemy.id) != null, "it telegraphs first, its lane shown")
 	check(_face(enemy).mood() == Face.Mood.FURIOUS, "with a furious face")
-	check_equal(casts[0], 0, "and casts nothing yet")
-	fx.run(enemy, int(mind.windup_time / Fixture.STEP))
-	check_equal(casts[0], 1, "then its cast leaves")
+	check_equal(fx.projectiles.get_count(), 0, "and nothing has left yet")
+	fx.run(enemy, ceili(mind.windup_time / Fixture.STEP) + 1)
+	check(fx.projectiles.get_count() > 0, "then its cast leaves")

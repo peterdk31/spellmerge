@@ -96,8 +96,6 @@ const FAMILIAR_SIZE: float = 3.0
 ## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
 ## style (`DecoyLook`), a familiar an orbit shot drawn whole with its tail bent round its circle.
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
-## A creature's telegraph (`creature_look.gd`), compiled before the first room (shader_warmup.gd).
-const TELEGRAPH_SHADER: Shader = preload("res://gameplay/ai/telegraph.gdshader")
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const STRIDE: int = 16
@@ -205,7 +203,6 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	ShaderWarmupScript.want(TELEGRAPH_SHADER, ShaderWarmupScript.RECT)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if projectiles == null:

@@ -9,6 +9,7 @@ extends RefCounted
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -24,17 +25,21 @@ const STEP: float = 0.0625
 static var _exact: AIProfile = null
 
 
-## A plain staff (no delay unless `delay`, a pool of `max_mana` filling at `regen` a second)
-## holding `cards` (ids by slot), one per slot.
-static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0) -> StaffCards:
+## Seconds an enemy test staff winds up (its telegraph; docs/milestones/cast-timing.md).
+const WIND_UP: float = 0.5
+
+
+## A plain enemy staff (winding up `wind_up`, no cooldown unless `delay`, a pool of `max_mana`
+## filling at `regen` a second) holding `cards` (ids by slot), one per slot.
+static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0, wind_up: float = WIND_UP) -> StaffCards:
 	var ids: Array[StringName] = []
 	for id: Variant in cards:
 		ids.append(StringName(str(id)))
 	var staff := StaffBase.new()
 	staff.id = &"test"
 	staff.slots = maxi(ids.size(), 1)
-	staff.cast_delay = delay
-	staff.recharge = 0.0
+	staff.cooldown = delay
+	staff.wind_up = wind_up
 	staff.max_mana = max_mana
 	staff.mana_regen = regen
 	return StaffCards.make(staff, ids)
@@ -74,6 +79,9 @@ var entities: EntitiesScript = null
 var board: TeamBoard = TeamBoard.new()
 var enemies: Array[Actor] = []
 var players: Array[Actor] = []
+## Feel, for the telegraph lanes (`with_feel`; docs/milestones/cast-timing.md, T6b); null until
+## asked, then stepped with the world.
+var feel: Node = null
 var _root: Node
 
 
@@ -188,8 +196,28 @@ static func look(body: Actor) -> CreatureLook:
 	return null
 
 
+## Feel on this world (its bus, actors, registry, projectiles and Spells), in the tree and stepped
+## with it: what draws an enemy's telegraph lane (`Feel.lanes()`). Made once.
+func with_feel() -> Node:
+	if feel == null:
+		feel = FeelScript.new()
+		feel.set("events", bus)
+		feel.set("actors", actors)
+		feel.set("drive_engine", false)
+		feel.set("registry", registry)
+		feel.set("projectiles", projectiles)
+		feel.set("spells", spells)
+		_root.add_child(feel)
+	return feel
+
+
+## The telegraph lanes Feel draws (`with_feel` first).
+func lanes() -> Node:
+	return with_feel().call("lanes") as Node
+
+
 ## `count` physics frames: the actor, then the body moves, then Combat, the projectiles and
-## Spells.
+## Spells (and Feel, when there is one).
 func run(body: Actor, count: int) -> void:
 	for i in count:
 		body.step(STEP)
@@ -198,6 +226,8 @@ func run(body: Actor, count: int) -> void:
 		projectiles.step(STEP)
 		spells.call("step", STEP)
 		board.step(STEP)
+		if feel != null:
+			feel.call("step", STEP)
 
 
 ## `count` physics frames of every enemy, then the systems.
@@ -224,6 +254,9 @@ func free_all() -> void:
 		if is_instance_valid(body):
 			body.free()
 	players.clear()
+	if feel != null and is_instance_valid(feel):
+		feel.free()
+	feel = null
 	for node: Node in [combat, spells, registry, projectiles, actors, bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

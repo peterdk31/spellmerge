@@ -11,5 +11,4 @@ accuracy = 1.0
 lead = 0.0
 dodge = 0.0
 randomness = 0.0
-windup_scale = 2.0
 teamwork = 0.0

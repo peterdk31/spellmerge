@@ -19,11 +19,11 @@ func test_they_are_carriers_no_form_card_fires() -> void:
 	check_equal(there.id(), Carriers.AT_POINT, "a payload lands on its origin")
 	check(on_you.hits() and there.hits(), "both strike what is there")
 	check(on_you.has(CarrierTraits.MEETS_SHOTS) and not there.has(CarrierTraits.MEETS_SHOTS), "only the caster meets the shots that reach it")
-	check(not on_you.has_cooldown() and not there.has_cooldown(), "no form card gives them a cooldown")
+	check(not on_you.has_wind_down() and not there.has_wind_down(), "no form card gives them a cooldown")
 	var on_it: Carrier = Carriers.fallback(true, Carrier.BY_SHOT | Carrier.BY_POINT)
 	check_equal(on_it.id(), Carriers.ON_BEARER, "a payload a shot or body may cast lands on it")
 	check_equal(Carriers.fallback(true, Carrier.BY_POINT).id(), Carriers.AT_POINT, "one only a point casts lands there")
-	check(on_it.hits() and on_it.has(CarrierTraits.MEETS_SHOTS) and not on_it.has_cooldown(), "what fired it is struck round and meets shots")
+	check(on_it.hits() and on_it.has(CarrierTraits.MEETS_SHOTS) and not on_it.has_wind_down(), "what fired it is struck round and meets shots")
 	check(there.has(CarrierTraits.CASTERLESS) and not on_it.has(CarrierTraits.CASTERLESS) and not on_you.has(CarrierTraits.CASTERLESS), "only a point has nothing to push")
 	for id: StringName in [Carriers.ON_CASTER, Carriers.ON_BEARER, Carriers.AT_POINT]:
 		check(not Carriers.ids().has(id), "%s is not among the carriers a form card may fire" % id)

@@ -154,10 +154,27 @@ func test_every_staff_has_its_own_pool() -> void:
 	check(wizard.caster.cast(0), "while another staff's pool still pays")
 
 
+func test_a_cast_that_winds_up_pays_its_mana_as_it_leaves() -> void:
+	# docs/milestones/cast-timing.md: mana is checked at the press and paid at the release, so a
+	# cast that never leaves costs nothing.
+	_world = Fixture.new(root)
+	var staff: StaffBase = StaffKit.plain_staff(2)
+	staff.wind_up = 0.1
+	staff.max_mana = 50.0
+	staff.mana_regen = 0.0
+	var imp: Actor = _world.actor(Vector2.ZERO, [&"caster"], Fixture.Scripted.new(), [[&"fire", &"bolt"]], staff)
+	var cost: float = imp.caster.next_cast_mana()
+	_press(imp)
+	_world.run(1)
+	check_equal(imp.caster.mana_of(0), 50.0, "nothing is paid while it winds up")
+	_world.run(8)
+	check(is_equal_approx(imp.caster.mana_of(0), 50.0 - cost), "its mana is paid as it leaves: %s" % imp.caster.mana_of(0))
+
+
 func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
 	_world = Fixture.new(root)
 	var staff: StaffBase = StaffKit.plain_staff(2)
-	staff.cast_delay = 0.5
+	staff.cooldown = 0.5
 	var imp: Actor = _world.actor(Vector2.ZERO, [&"caster"], Fixture.Scripted.new(), [[&"fire", &"bolt"]], staff)
 	check(imp.caster.next_cast_mana() > 0.0, "the next cast costs mana")
 	check(imp.caster.next_cast_reach() > 0.0, "and reaches along the aim")

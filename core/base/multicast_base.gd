@@ -23,8 +23,12 @@ enum Mode {
 @export var repeat_interval: float = 0.0
 ## Mana this card adds to the cast.
 @export var mana_cost: float = 0.0
-## Seconds this card adds to the cast's delay.
-@export var cooldown: float = 0.0
+## Seconds this card adds to the cast's wind-down (`FormBase.wind_down`).
+@export var wind_down: float = 0.0
+## Factor on the wind-up of the group it is read into (`CompiledGroup.wind_up`: its carriers' and
+## a trigger's own; not its staff's): `quicken` shortens a charge or a timer's tick (docs/
+## milestones/cast-timing.md, T8). It works only where the group winds up.
+@export var wind_up_mult: float = 1.0
 
 
 func kind() -> StringName:
@@ -39,6 +43,7 @@ func ranges() -> Dictionary:
 		"repeats": Vector2(1, 8),
 		"repeat_interval": Vector2(0.0, 1.0),
 		"mana_cost": Vector2(0.0, 100.0),
-		"cooldown": Vector2(0.0, 2.0),
+		"wind_down": Vector2(0.0, 2.0),
+		"wind_up_mult": Vector2(0.1, 4.0),
 	})
 	return limits

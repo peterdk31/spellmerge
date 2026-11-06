@@ -14,6 +14,12 @@ extends Resource
 ## docs/milestones/spell-spectacle-2.md, S1), so a new kind of part is a row in PART_TYPES (and
 ## its checks in `_type_problems`, if it has any) and a player in Feel or its spectacle.
 ##
+## A `lane` part (docs/milestones/cast-timing.md, T6b) is a telegraph: a lane from its caster's
+## staff tip along its live aim, as long as the carrier of the cue's `tag` reaches (times `reach`,
+## 1 by default) and as wide as it hits, in the cue's tint, brightening, its dashes marching and its
+## arrowhead growing until the cast leaves (`Spells.is_winding`; `size` is the wind-up's seconds).
+## A carrier that is not aimed (a nova, an orbit) shows none. `gameplay/feel/lanes.gd` draws it.
+##
 ## A part with no `part` (or `"part": "flash"`) is a flash Feel draws:
 ##   `flash`      a flash kind's id (required; content/flashes, `FlashKind`)
 ##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given; a fraction is
@@ -145,8 +151,9 @@ const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]
 const STREAM_KEYS: Array[String] = ["part", "kind", "rate", "side", "ahead", "feet_layers", "below", "seconds"]
+const LANE_KEYS: Array[String] = ["part", "reach"]
 ## The part types a cue may have (a part's `part`; none is `flash`), each with the keys it may have.
-const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS}
+const PART_TYPES: Dictionary = {&"flash": PART_KEYS, &"motes": MOTE_KEYS, &"mark": MARK_KEYS, &"light": LIGHT_KEYS, &"stream": STREAM_KEYS, &"lane": LANE_KEYS}
 ## What a `stream` part gives off (its `kind`).
 const STREAM_KINDS: Array[StringName] = [&"dash_path", &"spell"]
 ## The kinds a `motes` part names besides a kind's id, and a mark part's turns.

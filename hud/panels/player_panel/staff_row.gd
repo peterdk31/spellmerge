@@ -17,6 +17,13 @@ extends Control
 ##     right; during the recharge it covers the whole sequence, with an orange edge and no gold
 ##     frame. The glyph greys while the staff is not ready.
 ##   Either way the glyph gets a white rim for a few frames when the staff is ready again.
+## - A cast that winds up (docs/milestones/cast-timing.md) charges: on the glyph a shade grows up
+##   from the bottom with a gold edge (`BUTTON`), or over the cast from the left (`NEXT_CAST`),
+##   so a wind-up reads apart from a wait by its direction as well as its colour.
+## - The gold frame is on the cast a press would fire with the staff's mana: casts before it that
+##   the mana does not pay are skipped (cast-timing T3) and have a red frame, as has every cast
+##   left in the cycle when the mana pays none. A press that found none (a fizzle) gives the
+##   glyph a red rim for a few frames.
 ## - A staff longer than the row shows "+N" for the cards that do not fit (gold when the next
 ##   cast is among them).
 ##
@@ -45,6 +52,8 @@ const RIM_FRAMES: int = 7
 
 ## How the staff's delay shows (see the top).
 enum Style { BUTTON, NEXT_CAST }
+## `set_timing`'s `firing` when the row is not told what the mana pays.
+const FIRING_UNKNOWN: int = -2
 
 const FRAME: Color = Color("#4a4663")
 const FILL: Color = Color(0.11, 0.1, 0.16, 0.85)
@@ -57,6 +66,10 @@ const OTHER_TINT: Color = Color(0.72, 0.72, 0.78, 1.0)
 const SHADE: Color = Color(0.04, 0.03, 0.07, 0.74)
 const EDGE_DELAY: Color = Color("#7fd6f5")
 const EDGE_RECHARGE: Color = Color("#f08a3c")
+## The edge of a wind-up's charge, a frame the mana does not pay, and a fizzle's rim.
+const EDGE_WIND: Color = Color("#f2c230")
+const SHORT: Color = Color("#d8443a")
+const SHORT_TINT: Color = Color(0.6, 0.5, 0.55, 0.8)
 const RIM: Color = Color.WHITE
 const GLYPH_DIM: Color = Color(0.5, 0.5, 0.58, 1.0)
 const PLACEHOLDER: Color = Color("#7a7694")
@@ -89,6 +102,13 @@ var _cursor: int = 0
 var _left: float = 0.0
 var _total: float = 0.0
 var _recharging: bool = false
+## True while the staff winds up a cast (`Spells.is_winding`).
+var _winding: bool = false
+## The cast a press would fire with the staff's mana (`Spells.firing_cast`): -1 when the mana
+## pays none left in the cycle, FIRING_UNKNOWN when no mana was given (then the cursor's).
+var _firing: int = FIRING_UNKNOWN
+## Frames left of the red rim of a fizzle.
+var _fizzle_frames: int = 0
 ## "+N", made when the plan or the width changes, never per frame.
 var _plus_text: String = ""
 var _shown: int = 0
@@ -155,6 +175,9 @@ func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
 	_left = 0.0
 	_total = 0.0
 	_recharging = false
+	_winding = false
+	_firing = FIRING_UNKNOWN
+	_fizzle_frames = 0
 	_rim_frames = 0
 	_measure()
 	_redraw_all()
@@ -166,21 +189,29 @@ func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
 ## compared exactly: a delay counted down in float steps can end on a sliver (1e-7 s) for one
 ## frame, and the step from that sliver to 0 is the one that ends the recharge look. Reaching 0
 ## starts the white rim, which this call counts down a frame at a time.
-func set_timing(cursor: int, left: float) -> void:
+##
+## `winding`: the staff winds up a cast (`Spells.is_winding`; the seconds left are its wind-up's).
+## `firing`: the cast a press would fire with the staff's mana (`Spells.firing_cast`, -1 for none).
+func set_timing(cursor: int, left: float, winding: bool = false, firing: int = FIRING_UNKNOWN) -> void:
 	left = maxf(left, 0.0)
 	var was_recharging: bool = is_recharging()
 	var was_waiting: bool = _left > 0.0
-	if left > _left + 0.0001:
+	if left > _left + 0.0001 or winding != _winding:
 		_total = left
-		_recharging = cursor == 0
+		_recharging = cursor == 0 and not winding
 	if left <= 0.0:
 		_recharging = false
-	var changed: bool = cursor != _cursor or left != _left
+	var changed: bool = cursor != _cursor or left != _left or winding != _winding or firing != _firing
 	_cursor = cursor
 	_left = left
+	_winding = winding
+	_firing = firing
 	if _rim_frames > 0:
 		_rim_frames -= 1
 		changed = changed or _rim_frames == 0
+	if _fizzle_frames > 0:
+		_fizzle_frames -= 1
+		changed = changed or _fizzle_frames == 0
 	if was_waiting and left <= 0.0:
 		_rim_frames = RIM_FRAMES
 	if changed or is_recharging() != was_recharging:
@@ -202,7 +233,30 @@ func cast_count() -> int:
 
 
 func next_cast() -> int:
-	return clampi(_cursor, 0, maxi(_cast_size.size() - 1, 0))
+	var at: int = _firing if _firing >= 0 else _cursor
+	return clampi(at, 0, maxi(_cast_size.size() - 1, 0))
+
+
+## True when the mana does not pay cast `c` of the cycle and a press would skip it: a cast from the
+## cursor up to the one that fires, or every one left when none does.
+func is_short(c: int) -> bool:
+	if _firing == FIRING_UNKNOWN or c < _cursor:
+		return false
+	return _firing < 0 or c < _firing
+
+
+## A press found no cast its mana pays (`cast_fizzled`): a red rim on the glyph for a few frames.
+func fizzle() -> void:
+	_fizzle_frames = RIM_FRAMES
+	_redraw_all()
+
+
+func is_fizzling() -> bool:
+	return _fizzle_frames > 0
+
+
+func is_winding() -> bool:
+	return _winding and _left > 0.0
 
 
 ## The share of the delay still to run, 1 just after a cast and 0 when ready.
@@ -300,7 +354,8 @@ func _draw() -> void:
 		var count: int = mini(_cast_size[c], _shown - first)
 		if count <= 0:
 			continue
-		var is_next: bool = c == next
+		var is_next: bool = c == next and _firing != -1
+		var short: bool = is_short(c)
 		# A recharge keeps the next cast marked on the button style (dashed), and drops the mark
 		# on the next-cast style (the shade covers the whole cycle).
 		var marked: bool = is_next and (on_button or not recharging)
@@ -312,6 +367,8 @@ func _draw() -> void:
 			var tint: Color = Color.WHITE
 			if wasted:
 				tint = WASTE_TINT
+			elif short:
+				tint = SHORT_TINT
 			elif not is_next:
 				tint = OTHER_TINT
 			var icon: Texture2D = _icons[first + i]
@@ -325,7 +382,7 @@ func _draw() -> void:
 			_draw_dashed(box, GOLD)
 			_drawn_dashed = c
 		else:
-			draw_rect(box, GOLD if marked else FRAME, false, 1.0)
+			draw_rect(box, GOLD if marked else (SHORT if short else FRAME), false, 1.0)
 			if marked:
 				_drawn_outline = c
 		var inside := box.grow(-1.0)
@@ -341,7 +398,13 @@ func _draw() -> void:
 		_drawn_shade = Rect2()
 		var fill: float = cooldown_fill()
 		var under: Rect2 = all_inside if recharging else next_inside
-		if fill > 0.0 and under.size.x > 0.0:
+		if is_winding() and under.size.x > 0.0:
+			# A wind-up charges from the left: what has wound up is shaded, its edge gold.
+			var charged: float = maxf(1.0, floorf(under.size.x * (1.0 - fill)))
+			_drawn_shade = Rect2(under.position, Vector2(charged, under.size.y))
+			draw_rect(_drawn_shade, SHADE)
+			draw_rect(Rect2(_drawn_shade.end.x - 1.0, under.position.y, 1.0, under.size.y), EDGE_WIND)
+		elif fill > 0.0 and under.size.x > 0.0:
 			# Pulls back left to right: what is still to wait is on the right.
 			var width: float = maxf(1.0, floorf(under.size.x * fill))
 			_drawn_shade = Rect2(under.end.x - width, under.position.y, width, under.size.y)
@@ -356,14 +419,23 @@ func _draw_cover() -> void:
 	if style == Style.BUTTON:
 		_drawn_shade = Rect2()
 		var fill: float = cooldown_fill()
-		if fill > 0.0:
+		if is_winding():
+			# A wind-up charges up from the bottom, its edge gold.
+			var low: Rect2 = cap.grow(-1.0)
+			var risen: float = maxf(1.0, ceilf(low.size.y * (1.0 - fill)))
+			_drawn_shade = Rect2(low.position.x, low.end.y - risen, low.size.x, risen)
+			_cover.draw_rect(_drawn_shade, SHADE)
+			_cover.draw_rect(Rect2(low.position.x, _drawn_shade.position.y, low.size.x, 1.0), EDGE_WIND)
+		elif fill > 0.0:
 			var inside: Rect2 = cap.grow(-1.0)
 			var height: float = maxf(1.0, ceilf(inside.size.y * fill))
 			_drawn_shade = Rect2(inside.position, Vector2(inside.size.x, height))
 			_cover.draw_rect(_drawn_shade, SHADE)
 			var edge := Rect2(inside.position.x, _drawn_shade.end.y - 1.0, inside.size.x, 1.0)
 			_cover.draw_rect(edge, EDGE_RECHARGE if is_recharging() else EDGE_DELAY)
-	if _rim_frames > 0:
+	if _fizzle_frames > 0:
+		_cover.draw_rect(cap, SHORT, false, 1.0)
+	elif _rim_frames > 0:
 		_cover.draw_rect(cap, RIM, false, 1.0)
 
 

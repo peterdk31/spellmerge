@@ -144,9 +144,9 @@ func test_the_broken_trigger_fails() -> void:
 func test_a_timer_trigger_needs_an_interval() -> void:
 	var trigger := _fine(TriggerBase.new()) as TriggerBase
 	trigger.event = TriggerBase.Event.TIMER
-	trigger.interval = 0.0
-	check_equal(_fields(SpellValidator.check_component(trigger, _listed()), "required-field"), ["interval"] as Array[String], "a timer without interval")
-	trigger.interval = 0.5
+	trigger.wind_up = 0.0
+	check_equal(_fields(SpellValidator.check_component(trigger, _listed()), "required-field"), ["wind_up"] as Array[String], "a timer without a wind-up (its tick)")
+	trigger.wind_up = 0.5
 	check_equal(SpellValidator.check_component(trigger, _listed()).size(), 0, "a timer with an interval is fine")
 
 

@@ -69,11 +69,11 @@ func before_each() -> void:
 	_put(arc, &"zap")
 	var timer := TriggerBase.new()
 	timer.event = TriggerBase.Event.TIMER
-	timer.interval = 0.5
+	timer.wind_up = 0.5
 	_put(timer, &"on_timer")
 	var second := TriggerBase.new()
 	second.event = TriggerBase.Event.TIMER
-	second.interval = 0.5
+	second.wind_up = 0.5
 	_put(second, &"on_timer_2")
 	var hurt := TriggerBase.new()
 	hurt.event = TriggerBase.Event.HURT

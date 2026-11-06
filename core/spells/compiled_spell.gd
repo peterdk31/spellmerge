@@ -20,7 +20,8 @@ var trigger_id: StringName:
 ## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0
 var mana_cost: float = 0.0
-var cooldown: float = 0.5
+## Seconds its staff is busy after it leaves (`FormBase.wind_down` times the modifiers').
+var wind_down: float = 0.5
 var speed: float = 0.0
 var lifetime: float = 1.0
 var radius: float = 4.0
@@ -41,7 +42,8 @@ var traits: int = 0
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
-## SWING: degrees its sweep hits over, and seconds it leans back first (`FormBase.arc`, `wind_up`).
+## SWING: degrees its sweep hits over (`FormBase.arc`). `wind_up`: the seconds its cast winds up
+## before it leaves, its form card's plus its modifiers' `wind_up_add` (docs/milestones/cast-timing.md).
 var arc: float = 0.0
 var wind_up: float = 0.0
 ## The carrier's staff animation (`FormBase.packed_pose`, shared, never written).
@@ -198,7 +200,8 @@ class Trigger:
 	var id: StringName = &""
 	## A `TriggerBase.Event` value.
 	var event: int = TriggerBase.Event.HIT
-	## Seconds between fires, for a timer.
+	## Seconds between fires, for a timer: its payload's whole wind-up (the timer card's and the
+	## payload's cards'; docs/milestones/cast-timing.md, T8), which the tick then fires without.
 	var interval: float = 0.0
 	var payload: CompiledGroup = null
 	## The trigger card's slot in the staff.

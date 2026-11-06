@@ -95,8 +95,7 @@ func _guarded(cards: Array[StringName], press_within: float = 0.0) -> Dictionary
 	var staff := StaffBase.new()
 	staff.id = &"decoy_guard"
 	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	var world := World.new(root, shelf, staff)
 	var wizard: Actor = world.add_wizard(cards)
 	world.add_enemy(&"E", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
@@ -162,7 +161,7 @@ func _decoy_barrier(world: World, wizard: Actor) -> int:
 func test_a_decoy_placed_again_starts_with_its_own_barrier_only() -> void:
 	# A decoy's actor is kept by its row and placed again: the barrier goes with the decoy, not the row.
 	var quick: FormBase = _card().duplicate() as FormBase
-	quick.cooldown = 0.0
+	quick.wind_down = 0.0
 	quick.lifetime = 0.25
 	var made: Array = _world([&"shield", &"decoy", &"decoy"], Vector2(400.0, 300.0), {&"decoy": quick})
 	var world: World = made[0]
@@ -297,7 +296,7 @@ func test_a_decoys_timer_recoil_pushes_the_decoy() -> void:
 func test_a_decoy_that_ends_mid_dash_is_placed_again_standing() -> void:
 	# A decoy's actor is kept by its row: the dash its payload asked of it ends with it.
 	var quick: FormBase = _card().duplicate() as FormBase
-	quick.cooldown = 0.0
+	quick.wind_down = 0.0
 	quick.lifetime = 0.3
 	var made: Array = _world([&"timer", &"decoy", &"dash", &"decoy"], Vector2(240.0, 0.0), {&"decoy": quick})
 	var world: World = made[0]
@@ -475,8 +474,7 @@ func _plain(slots: int) -> StaffBase:
 	var staff := StaffBase.new()
 	staff.id = &"decoy_plain"
 	staff.slots = slots
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	return staff
 
 
@@ -520,8 +518,7 @@ func _world(cards: Array[StringName], enemy_at: Vector2, extra: Dictionary = {})
 	var staff := StaffBase.new()
 	staff.id = &"decoy_aim"
 	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	var world := World.new(root, shelf, staff)
 	var wizard: Actor = world.add_wizard(cards)
 	var enemy: Node2D = world.add_enemy(&"E", enemy_at)
@@ -593,7 +590,7 @@ func test_a_homing_decoy_creeps_toward_its_target_and_a_plain_one_stands() -> vo
 func test_a_broken_decoy_takes_only_its_own_timer() -> void:
 	# A decoy card with no cooldown, so the staff casts a second while the first stands.
 	var quick: FormBase = _card().duplicate() as FormBase
-	quick.cooldown = 0.0
+	quick.wind_down = 0.0
 	var made: Array = _world([&"timer", &"decoy", &"bolt"], Vector2(400.0, 300.0), {&"decoy": quick})
 	var world: World = made[0]
 	var wizard: Actor = made[1]

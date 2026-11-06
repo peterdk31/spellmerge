@@ -41,12 +41,10 @@ var _sw_hit: Array[HitProfile] = []
 ## Shield charges swing `at` has left for shots its sweep touches (melee I3, `_swing_guard`).
 var _sw_shield: PackedInt32Array = PackedInt32Array()
 var _sw_struck: Array[Array] = []
-## actor -> which way its last swing turned (the next turns the other way) and when its last sweep
-## ended (a swing within SWING_CHAIN of it has no wind-up).
+## actor -> which way its last swing turned (the next turns the other way).
 var _sw_last_side: PackedInt32Array = PackedInt32Array()
-var _sw_last_end: PackedFloat32Array = PackedFloat32Array()
 ## actor -> when its last swing started: the swings of one cast (a split, a mirror) turn the same way.
-var _sw_last_start: PackedFloat32Array = PackedFloat32Array()
+var _sw_last_start: PackedFloat64Array = PackedFloat64Array()
 
 ## The staff animations its carrier plays on the caster's body.
 var poses: StaffPoses = null
@@ -87,7 +85,6 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	poses = staff_poses
 	_sw_last_side.resize(SpellRuntime.ACTORS)
-	_sw_last_end.resize(SpellRuntime.ACTORS)
 	_sw_last_start.resize(SpellRuntime.ACTORS)
 	_grow_swings(SpellLimits.SWING_ROWS_START)
 	clear()
@@ -107,14 +104,12 @@ func clear() -> void:
 	for at in _sw_struck.size():
 		_sw_struck[at].clear()
 	_sw_last_side.fill(-1)
-	_sw_last_end.fill(-INF)
 	_sw_last_start.fill(-INF)
 
 
 ## `actor` has not swung (a caster opened or closed under its id).
 func reset_actor(actor: int) -> void:
 	_sw_last_side[actor] = -1
-	_sw_last_end[actor] = -INF
 	_sw_last_start[actor] = -INF
 
 
@@ -131,13 +126,13 @@ func tip_of(at: int, born: int) -> Vector2:
 	return swing_tip(at) if _sw_on[at] != 0 and _sw_born[at] == born else Vector2.INF
 
 
-## A swing (`swing` carrier, melee I2; docs/milestones/M2-staffs.md, "Phase I: melee"): the staff
-## leans back for the carrier's `wind_up`, then sweeps its `arc` round the wizard's hand in its
+## A swing (`swing` carrier, melee I2; docs/milestones/M2-staffs.md, "Phase I: melee"): it leaves
+## once its cast has wound up (the staff leaning back, `Spells._wind_pose`; docs/milestones/
+## cast-timing.md), then sweeps its `arc` round the wizard's hand in its
 ## `lifetime`, out to its `ray_length`, centred on the aim locked now. Each step it strikes every
 ## body in the wedge it turned through since the last step (`Projectiles.sweep`), so a fast
 ## sweep misses nothing, and each body once; its hits carry payloads and chains as a beam's do.
-## Swings turn clockwise and back by turns, and one cast within SWING_CHAIN of the last sweep's
-## end has no wind-up. It is held by its caster as a beam is: the wizard's hand (`set_aim`), the
+## Swings turn clockwise and back by turns (`pose_side`). It is held by its caster as a beam is: the wizard's hand (`set_aim`), the
 ## shot that cast it, or a fixed point. Its `blast` and `on expire` happen at the end of the arc.
 ## Returns false when it could not start (no direction). `caster` and `caster_seq` are who casts it (`Spells._caster`:
 ## the wizard, a point or a shot), `echoed` whether it is an echo's firing (half damage).
@@ -150,7 +145,8 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		at = _sw_on.size()
 		_grow_swings(at * 2)
 	var side: int = 1
-	var wind: float = maxf(spell.wind_up, 0.0)
+	# The cast wound up before it left (docs/milestones/cast-timing.md): the sweep starts now.
+	var wind: float = 0.0
 	var mine: bool = actor >= 0 and actor < SpellRuntime.ACTORS
 	# The first swing of a cast is the body's; the others of the same cast (a split, a mirror) turn
 	# the same way and move no body of their own.
@@ -160,8 +156,6 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		side = -_sw_last_side[actor] if first else _sw_last_side[actor]
 		_sw_last_side[actor] = side
 		_sw_last_start[actor] = kit.clock()
-		if kit.clock() - _sw_last_end[actor] <= SpellLimits.SWING_CHAIN:
-			wind = 0.0
 	var half: float = deg_to_rad(spell.arc) * 0.5
 	_sw_on[at] = 1
 	_sw_born[at] = _sw_next_born
@@ -197,6 +191,14 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	if _sw_on[at] != 0:
 		kit.live_join(spell, tag, SpellRuntime.LC_ROW, at, _sw_born[at], true, wind + spell.lifetime, swing_tip(at), _sw_dir[at])
 	return true
+
+
+## The way the next swing of `actor` turns: the other way from its last, or the same within one
+## cast (a split, a mirror).
+func pose_side(actor: int, _dir: Vector2) -> int:
+	if actor < 0 or actor >= SpellRuntime.ACTORS:
+		return 1
+	return _sw_last_side[actor] if _sw_last_start[actor] == kit.clock() else -_sw_last_side[actor]
 
 
 ## Runs swing `at` on by `delta`: where its caster holds it, then, past its wind-up, its sweep.
@@ -299,8 +301,6 @@ func _end_swing(at: int, finished: bool) -> void:
 	_sw_hit[at] = null
 	_sw_struck[at].clear()
 	if finished and spell != null:
-		if actor >= 0 and actor < SpellRuntime.ACTORS:
-			_sw_last_end[actor] = kit.clock()
 		var end: Vector2 = swing_end_point(_sw_origin[at], _sw_dir[at], _sw_side[at], spell.arc, spell.ray_length)
 		end = kit.projectiles.clip_to_walls(_sw_origin[at], end)
 		kit.blast(spell, tag, actor, end)

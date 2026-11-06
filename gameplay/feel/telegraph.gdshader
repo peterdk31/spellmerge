@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// An enemy's telegraph (staffs F8b): drawn on the enemy's own Telegraph Sprite2D, whose region is
-// the lane (gameplay/ai/ai.gd). Where its next cast goes, `beam_length` pixels along the aim and
+// A telegraph lane (staffs F8b; a cue's `lane` part since cast timing T6b, gameplay/feel/lanes.gd):
+// drawn on a Sprite2D whose region is the lane. Where the cast winding up goes, `beam_length` pixels along the aim and
 // `telegraph_lane` pixels either side of the middle. `telegraph_progress` runs 0 to 1 over the
 // windup: the dashes march toward the tip, the arrowhead grows, the lane brightens, and the last
 // part is white-hot.

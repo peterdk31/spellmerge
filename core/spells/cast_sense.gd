@@ -56,6 +56,9 @@ var repeats_held: bool = false
 ## Its cost and its delay (`CompiledCast.mana`, `delay`).
 var mana: float = 0.0
 var delay: float = 0.0
+## Seconds it winds up before it leaves (`CompiledCast.wind_up`: its staff's and its cards'; an
+## enemy's telegraph, docs/milestones/cast-timing.md).
+var wind_up: float = 0.0
 ## The longest life of its carriers (seconds): how long a held cast lasts once.
 var lasts: float = 0.0
 ## True when the cast fires nothing at all (only wasted cards).
@@ -72,6 +75,7 @@ static func of(cast: CompiledCast) -> CastSense:
 	var sense := CastSense.new()
 	sense.mana = cast.mana
 	sense.delay = cast.delay
+	sense.wind_up = cast.wind_up
 	if cast.group == null or cast.group.is_empty():
 		return sense
 	sense.empty = false

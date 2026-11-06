@@ -18,7 +18,7 @@ extends RefCounted
 ## is listed in the art manifest; every number inside `ranges()` (which keeps a component's
 ## `complexity` to 1-4, well inside the whole-spell budget); and the fields its kind needs (a form's speed, orbit radius or ray
 ## length for its carrier (`Carrier.required_fields`); an element's known status and duration; a modifier's strength
-## for its behaviour; a timer trigger's interval). Across the list: no id twice. For the
+## for its behaviour; a timer trigger's wind-up). Across the list: no id twice. For the
 ## reaction table: each row names a known status, an existing element and a real effect,
 ## has the numbers its effect uses, and no pair of status and element is listed twice.
 
@@ -283,8 +283,8 @@ static func _check_modifier(modifier: ModifierBase) -> Array[Dictionary]:
 
 static func _check_trigger(trigger: TriggerBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
-	if trigger.event == TriggerBase.Event.TIMER and not trigger.interval > 0.0:
-		problems.append(_problem("required-field", trigger.resource_path, "interval", "A TIMER trigger needs an `interval` above 0 seconds (it fires at most once a physics step)."))
+	if trigger.event == TriggerBase.Event.TIMER and not trigger.wind_up > 0.0:
+		problems.append(_problem("required-field", trigger.resource_path, "wind_up", "A TIMER trigger needs a `wind_up` above 0 seconds: its tick (it fires at most once a physics step)."))
 	return problems
 
 

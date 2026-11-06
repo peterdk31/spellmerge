@@ -36,8 +36,7 @@ func _staff(spread: float) -> StaffBase:
 	var staff := StaffBase.new()
 	staff.id = &"test"
 	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	staff.spread = spread
 	return staff
 
@@ -91,7 +90,7 @@ func test_it_quarters_the_spread_and_two_multiply() -> void:
 func test_it_changes_nothing_else() -> void:
 	var plain: CompiledSpell = _first([&"bolt"])
 	var sharp: CompiledSpell = _first([&"sniper", &"bolt"])
-	check_equal([sharp.damage, sharp.mana_cost, sharp.cooldown, sharp.speed], [plain.damage, plain.mana_cost, plain.cooldown, plain.speed], "the same numbers")
+	check_equal([sharp.damage, sharp.mana_cost, sharp.wind_down, sharp.speed], [plain.damage, plain.mana_cost, plain.wind_down, plain.speed], "the same numbers")
 
 
 func test_its_shots_stay_inside_a_quarter_of_the_spread() -> void:

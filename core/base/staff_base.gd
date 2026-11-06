@@ -17,10 +17,12 @@ extends Resource
 @export var slots: int = 4
 ## Carriers one cast wants (the group size before multicast cards add to it).
 @export var draw: int = 1
-## Seconds added to the delay of every cast.
-@export var cast_delay: float = 0.1
-## Seconds added when the staff has read all its cards and starts over.
-@export var recharge: float = 0.5
+## Seconds every cast of this staff winds up before it leaves, on top of its cards' (an enemy's
+## telegraph; docs/milestones/cast-timing.md). Not used yet: the wind-up runs from part T2.
+@export var wind_up: float = 0.0
+## Seconds the staff waits after the last cast of its cycle, after that cast's wind-down, before
+## it starts over (docs/milestones/cast-timing.md).
+@export var cooldown: float = 0.5
 ## Degrees a shot may leave off its line, either side, at random (seeded per cast); 0 aims true.
 ## The carriers of a multicast leave along one aim, so only this sets them apart.
 @export var spread: float = 0.0
@@ -52,8 +54,8 @@ func ranges() -> Dictionary:
 	return {
 		"slots": Vector2(1, 64),
 		"draw": Vector2(1, 4),
-		"cast_delay": Vector2(0.0, 2.0),
-		"recharge": Vector2(0.0, 5.0),
+		"wind_up": Vector2(0.0, 2.0),
+		"cooldown": Vector2(0.0, 5.0),
 		"spread": Vector2(0.0, 45.0),
 		"tip": Vector2(0.0, 32.0),
 		"max_mana": Vector2(0.0, 1000000.0),

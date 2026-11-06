@@ -53,10 +53,9 @@ func before_each() -> void:
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 20
-	_staff.cast_delay = 0.1
-	_staff.recharge = 0.5
+	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
-	bolt.cooldown = 0.2
+	bolt.wind_down = 0.2
 	var nova: FormBase = _form(&"nova", 300.0, 1.0)
 	nova.shots = 8
 	nova.spread = 360.0
@@ -130,25 +129,25 @@ func _wait_ready(player: int, staff: int) -> void:
 		guard += 1
 
 
-func test_a_staff_casts_its_cycle_in_order_then_recharges() -> void:
+func test_a_staff_casts_its_cycle_in_order_then_cools_down() -> void:
 	_install(0, 1, "fire bolt nova")
 	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), 2.0, "cast 1 spends the bolt's mana")
 	check_equal(_mgr.get_count(), 1, "one bolt")
-	check(is_equal_approx(_spells.cooldown_left(0, 1), 0.1 + 0.2), "the staff's delay plus the bolt's cooldown, got %s" % _spells.cooldown_left(0, 1))
-	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "refused while in its delay")
+	check(is_equal_approx(_spells.cooldown_left(0, 1), 0.2), "the bolt's wind-down, got %s" % _spells.cooldown_left(0, 1))
+	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "refused while it winds down")
 	check_equal(_spells.cast_index(0, 1), 1, "the nova is next")
 	_wait_ready(0, 1)
 	_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0)
 	check_equal(_mgr.get_count(), 9, "eight nova shots joined the bolt")
 	check_equal(_spells.cast_index(0, 1), 0, "after the last card the staff starts over")
-	check(_spells.cooldown_left(0, 1) >= 0.5, "and recharges")
+	check(_spells.cooldown_left(0, 1) >= 0.5, "after its wind-down and the staff's cooldown")
 
 
 func test_a_cast_needs_its_mana() -> void:
 	_install(2, 3, "bolt")
 	check_equal(_spells.cast_staff(2, 3, Vector2.ZERO, AIM, 1.0), SpellsScript.REFUSED, "1 mana is not enough for 2")
 	check_equal(_mgr.get_count(), 0, "nothing flew")
-	check_equal(_spells.cast_index(2, 3), 0, "a refused cast changes nothing")
+	check_equal(_spells.cast_index(2, 3), 0, "the cycle ended where it was: it starts over (docs/milestones/cast-timing.md, T3)")
 
 
 func test_multicast_fires_two_carriers_along_the_aim() -> void:
@@ -204,6 +203,8 @@ func test_hold_keeps_its_shots_and_reserves_mana_until_switched_off() -> void:
 	check(not _spells.is_holding(0, 0), "it is off")
 	check_equal(_mgr.get_count(), 0, "its shot is gone")
 	check_equal(_reserved.get(0, -1.0), 0.0, "and the mana is free")
+	check_equal(_spells.cooldown_left(0, 0), 0.0, "and the switch-off press leaves the staff free at once")
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 2.0, "so the next press casts again straight away")
 
 
 func test_editing_a_staff_switches_its_hold_off() -> void:
@@ -243,3 +244,142 @@ func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> v
 	for i in tags.size():
 		if i != 5:
 			check(_spells.current_tag(floori(float(i) / SpellLimits.STAFFS), i % SpellLimits.STAFFS) == tags[i], "staff %d is untouched" % i)
+
+
+# --- Wind-up (docs/milestones/cast-timing.md, part T2) -----------------------------------------
+
+## A bolt that winds up `seconds` (its form card's `wind_up`), installed as `player`'s staff 0.
+func _wound_bolt(player: int, seconds: float) -> void:
+	var slow: FormBase = _form(&"slow_bolt", 300.0, 1.0)
+	slow.wind_up = seconds
+	slow.wind_down = 0.1
+	_install(player, 0, "slow_bolt")
+
+
+func test_a_cast_that_winds_up_leaves_when_its_wind_up_is_over() -> void:
+	_wound_bolt(0, 0.1)
+	var spent: Array = []
+	_bus.mana_spend_requested.connect(func(caster: int, staff: int, amount: float) -> void: spent.append([caster, staff, amount]))
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 0.0, "the press is taken and pays nothing yet")
+	check(_spells.is_winding(0, 0), "it winds up")
+	check_equal(_mgr.get_count(), 0, "nothing has left")
+	check(is_equal_approx(_spells.cooldown_left(0, 0), 0.1), "the staff is busy for the wind-up")
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "a press while it winds up is refused")
+	_tick(3)
+	check_equal(_mgr.get_count(), 0, "still winding after 0.05 s")
+	_tick(4)
+	check_equal(_mgr.get_count(), 1, "the bolt left once the wind-up was over")
+	check(not _spells.is_winding(0, 0), "and it winds up no more")
+	check_equal(spent, [[0, 0, 2.0]], "its mana is asked for as it leaves")
+	check(_spells.cooldown_left(0, 0) > 0.5, "then its wind-down and the staff's cooldown, got %s" % _spells.cooldown_left(0, 0))
+	check_equal(_spells.cast_index(0, 0), 0, "a one-cast cycle starts over as it leaves")
+
+
+func test_a_winding_cast_leaves_along_the_aim_it_has_then() -> void:
+	_wound_bolt(1, 0.1)
+	_spells.set_aim(1, Vector2.ZERO, Vector2.RIGHT)
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_spells.set_aim(1, Vector2(5.0, 0.0), Vector2.DOWN)
+	_tick(7)
+	check_equal(_mgr.get_count(), 1, "it left")
+	var velocity: Vector2 = Vector2.ZERO
+	for slot in 512:
+		if _mgr.is_alive(slot):
+			velocity = _mgr.get_velocity_of(slot)
+	check(velocity.normalized().dot(Vector2.DOWN) > 0.99, "along the aim at the release, not at the press: %s" % velocity)
+
+
+func test_being_downed_or_a_rebuild_cancels_a_wind_up_for_free() -> void:
+	var spent: Array = []
+	_bus.mana_spend_requested.connect(func(caster: int, staff: int, amount: float) -> void: spent.append(amount))
+	_wound_bolt(2, 0.1)
+	_spells.cast_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	_spells.clear_aim(2)
+	check(not _spells.is_winding(2, 0), "down: it winds up no more")
+	check_equal(_spells.cooldown_left(2, 0), 0.0, "and the staff is free")
+	_spells.set_aim(2, Vector2.ZERO, AIM)
+	_spells.cast_staff(2, 0, Vector2.ZERO, AIM, 100.0)
+	_install(2, 0, "slow_bolt")
+	check(not _spells.is_winding(2, 0), "a rebuild cancels it too")
+	_tick(20)
+	check_equal(_mgr.get_count(), 0, "nothing ever left")
+	check(spent.is_empty(), "and nothing was paid")
+
+
+func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
+	_staff.wind_up = 0.1
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_install(3, 0, "bolt bolt")
+	_spells.cast_staff(3, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(3, 0), "a plain bolt winds up on a staff that does (an enemy's telegraph)")
+	_tick(7)
+	check_equal(_mgr.get_count(), 1, "then leaves")
+	_spells.cast_staff(3, 0, Vector2.ZERO, AIM, 100.0)
+	check(_spells.is_winding(3, 0), "the next cast of the cycle winds up too")
+
+
+func test_a_payload_winds_up_where_its_trigger_fired() -> void:
+	_target(Vector2(30.0, 0.0))
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.1
+	var nova: FormBase = _form(&"slow_nova", 0.0, 0.2)
+	nova.carrier = &"atom"
+	nova.shots = 8
+	nova.spread = 360.0
+	nova.speed = 200.0
+	nova.wind_up = 0.2
+	_install(0, 2, "on_hit bolt slow_nova")
+	_spells.cast_staff(0, 2, Vector2.ZERO, AIM, 100.0)
+	check(not _spells.is_winding(0, 2), "the cast itself winds up nothing: the nova is a payload's")
+	var hit_at: int = -1
+	for step in 30:
+		_tick(1)
+		if hit_at < 0 and _mgr.get_count() == 0:
+			hit_at = step
+		if _mgr.get_count() > 1:
+			check(hit_at >= 0 and step - hit_at >= 10, "the nova left about 0.2 s after the hit (steps %d to %d)" % [hit_at, step])
+			check_equal(_mgr.get_count(), 8, "all eight of its shots")
+			return
+	check(false, "the nova never left (hit at step %d)" % hit_at)
+
+
+# --- Skipping (docs/milestones/cast-timing.md, part T3) ----------------------------------------
+
+## A staff whose first cast is a dear nova (`dear`, 10 mana) and then two bolts (2 each).
+func _dear_then_bolts(player: int) -> void:
+	var dear: FormBase = _form(&"dear", 0.0, 0.3)
+	dear.mana_cost = 10.0
+	dear.wind_down = 0.0
+	_form(&"bolt", 300.0, 1.0).wind_down = 0.0
+	_install(player, 0, "dear bolt bolt")
+
+
+func test_a_cast_the_mana_does_not_pay_is_skipped() -> void:
+	_dear_then_bolts(0)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 5.0), 2.0, "with 5 mana the press skips the dear cast and fires a bolt")
+	check_equal(_spells.cast_index(0, 0), 2, "the cycle moved on past the bolt it fired")
+	_tick(1)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 2.0, "the last bolt; skipping is no rebuild")
+	_tick(40)
+	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 10.0, "the next cycle starts with the dear cast again, now it is paid")
+
+
+func test_with_no_cast_left_to_pay_the_cycle_ends_and_nothing_leaves() -> void:
+	var fizzled: Array = []
+	_bus.cast_fizzled.connect(func(caster: int, staff: int) -> void: fizzled.append([caster, staff]))
+	_dear_then_bolts(1)
+	_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 100.0)
+	_tick(1)
+	check_equal(_spells.cast_index(1, 0), 1, "the dear cast left; a bolt is next")
+	check_equal(_spells.cast_staff(1, 0, Vector2.ZERO, AIM, 1.0), SpellsScript.REFUSED, "1 mana pays no cast left in the cycle")
+	check_equal(fizzled, [[1, 0]], "it fizzled")
+	check_equal(_spells.cast_index(1, 0), 0, "the cycle ended")
+	check(is_equal_approx(_spells.cooldown_left(1, 0), 0.5), "and the staff's cooldown runs, got %s" % _spells.cooldown_left(1, 0))
+	check_equal(_mgr.get_count(), 1, "nothing left but the dear cast's shot")
+
+
+func test_the_ai_reads_the_cast_a_press_would_fire() -> void:
+	_dear_then_bolts(2)
+	check(_spells.cast_ready(2, 0, 0.0, 5.0), "5 mana is ready: it pays a bolt")
+	check_equal(_spells.next_cast_mana(2, 0, 5.0), 2.0, "and the cast it would fire is a bolt's")
+	check_equal(_spells.next_cast_mana(2, 0), 10.0, "with no mana given, the cast at the cursor")
+	check(not _spells.cast_ready(2, 0, 0.0, 1.0), "1 mana pays none")

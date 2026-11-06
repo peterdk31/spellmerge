@@ -206,8 +206,7 @@ func _run(together: bool, cap: int, set_index: int) -> Dictionary:
 	var staff := StaffBase.new()
 	staff.id = &"together"
 	staff.slots = 16
-	staff.cast_delay = 0.0
-	staff.recharge = 0.0
+	staff.cooldown = 0.0
 	staff.spread = SPREAD
 	var staffs: Array = _sets()[set_index]
 	for seat in 4:

@@ -164,8 +164,7 @@ func before_each() -> void:
 	_staff = StaffBase.new()
 	_staff.id = &"card_rules"
 	_staff.slots = 16
-	_staff.cast_delay = 0.0
-	_staff.recharge = 0.0
+	_staff.cooldown = 0.0
 	_staff.spread = SPREAD
 	_baselines.clear()
 	_discover()
@@ -724,7 +723,7 @@ func _costs_of(card: SpellComponent) -> StringName:
 		var costs := modifier.duplicate() as ModifierBase
 		costs.id = id
 		costs.damage_mult = minf(modifier.damage_mult, 1.0)
-		costs.cooldown_mult = maxf(modifier.cooldown_mult, 1.0)
+		costs.wind_down_mult = maxf(modifier.wind_down_mult, 1.0)
 		costs.speed_mult = 1.0
 		costs.radius_mult = 1.0
 		costs.lifetime_mult = 1.0

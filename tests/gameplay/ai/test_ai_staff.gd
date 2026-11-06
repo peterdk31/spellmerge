@@ -226,15 +226,18 @@ func test_the_windup_waits_for_the_staffs_delay() -> void:
 
 func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
+	# The lane is Feel's (the card's wind cue, docs/milestones/cast-timing.md T6b); what it is told:
+	var winding: Array = []
+	_bus.cast_winding.connect(func(caster: int, _staff: int, form: StringName, _origin: Vector2, _direction: Vector2, seconds: float, _tint: Color, _look: int, tag: int) -> void: winding.append([caster, form, seconds, tag]))
 	_until_windup(enemy, 1.0)
-	var line: Sprite2D = enemy.get_node("Telegraph") as Sprite2D
-	check(line.visible, "a bolt shows its line")
-	check(is_equal_approx(_look(enemy).telegraph_reach(), 200.0), "as far as the bolt flies (%.1f)" % _look(enemy).telegraph_reach())
-	check(is_equal_approx(float((line.material as ShaderMaterial).get_shader_parameter(&"telegraph_lane")), 4.0 + CreatureLook.TELEGRAPH_LANE_MARGIN * 0.5), "as wide as the bolt, with a margin")
+	check(winding.size() == 1 and winding[0][0] == enemy.id and winding[0][1] == &"bolt", "a bolt winding up is told: %s" % [winding])
+	if winding.size() == 1:
+		check(is_equal_approx(_spells.carrier_reach(winding[0][3]), 200.0), "its lane as far as the bolt flies (%.1f)" % _spells.carrier_reach(winding[0][3]))
+		check(is_equal_approx(_spells.carrier_radius(winding[0][3]), 4.0), "as wide as the bolt")
 	var ring := _enemy(_data([&"nova"]), Vector2(0.0, 40.0))
 	_until_windup(ring, 1.0)
 	check(_ai(ring).is_telegraphing(), "a nova winds up too")
-	check(not (ring.get_node("Telegraph") as Node2D).visible, "but shows no line: the pose and flash say it")
+	check(winding.size() == 2 and _spells.carrier_reach(winding[1][3]) == 0.0, "but its lane shows none: it is not aimed")
 
 
 func test_one_compile_per_enemy_type_and_its_actor_closes() -> void:

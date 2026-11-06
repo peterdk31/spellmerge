@@ -125,16 +125,20 @@ func test_an_echoed_beams_jumps_hit_at_half_on_every_tick() -> void:
 	var full: float = spell.hit.damage
 	var half: float = spell.echo_hit.damage
 	check(half < full, "the echo is weaker (%.2f < %.2f)" % [half, full])
-	# The beam lives 0.3 s and its echo comes 0.3 s after it; each hits every 0.15 s.
+	# The echo comes its strength in seconds after the beam (0.3 s), which lives its lifetime; each
+	# hits every 0.15 s. While both are on, a hit may be either's.
+	var echo_at: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
 	var later_jumps: int = 0
 	for row: Array in hits:
 		var at: float = row[0]
-		if at < 0.29:
+		if at < echo_at - 0.01:
 			check_equal(row[2], full, "the beam hits at full damage at %.2f s" % at)
-		else:
+		elif at > spell.lifetime + 0.01:
 			check_equal(row[2], half, "the echo hits at half at %.2f s" % at)
-			if row[1] == second and at > 0.31:
-				later_jumps += 1
+		else:
+			check(row[2] == full or row[2] == half, "a hit while both are on is one of theirs at %.2f s" % at)
+		if row[1] == second and at > echo_at + 0.01 and row[2] == half:
+			later_jumps += 1
 	check(later_jumps > 0, "the echo's jumps hit after its first tick (%d)" % later_jumps)
 	check(_lost_big(arena, first) > 0 and _lost_big(arena, second) > 0, "both imps are hit")
 	arena.free_all()

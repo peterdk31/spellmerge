@@ -20,7 +20,7 @@ func test_it_compiles_into_the_spell_numbers() -> void:
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
-	check_equal(spell.triggers[0].interval, trigger.interval, "the interval is compiled")
+	check_equal(spell.triggers[0].interval, 0.0, "no timer: no tick (docs/milestones/cast-timing.md, T8)")
 	check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "the payload is the nova")
 
 

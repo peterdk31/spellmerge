@@ -43,11 +43,11 @@ func test_every_kind_checks_complexity() -> void:
 func test_an_out_of_range_field_is_named() -> void:
 	var form := FormBase.new()
 	form.shots = 0
-	form.cooldown = 99.0
+	form.wind_down = 99.0
 	var problems: PackedStringArray = form.range_problems()
 	check_equal(problems.size(), 2, "two fields out of range give two problems")
 	var text: String = " ".join(problems)
-	check(text.contains("shots:") and text.contains("cooldown:"), "each problem names its field")
+	check(text.contains("shots:") and text.contains("wind_down:"), "each problem names its field")
 
 
 func test_enum_fields_are_range_checked() -> void:

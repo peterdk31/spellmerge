@@ -130,7 +130,7 @@ func test_the_ai_starts_over_when_it_drives_again() -> void:
 	imp.drive(null)
 	check(not ai.is_telegraphing() and ai.target == null, "put aside, it forgets its windup and target")
 	fx.run(imp, 2)
-	check(fx.projectiles.get_count() == 0 and not Fixture.look(imp).telegraph.visible, "with no controller the body casts nothing and shows no telegraph")
+	check(fx.projectiles.get_count() == 0 and not ai.is_telegraphing(), "with no controller the body casts nothing and shows no telegraph")
 	imp.release()
 	fx.run(imp, 1)
 	check(ai.is_telegraphing() and ai.telegraph_progress() < 0.2, "back home, it winds up from the start")

@@ -9,6 +9,7 @@ extends RefCounted
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -78,6 +79,9 @@ var entities: EntitiesScript = null
 var board: TeamBoard = TeamBoard.new()
 var enemies: Array[Actor] = []
 var players: Array[Actor] = []
+## Feel, for the telegraph lanes (`with_feel`; docs/milestones/cast-timing.md, T6b); null until
+## asked, then stepped with the world.
+var feel: Node = null
 var _root: Node
 
 
@@ -192,8 +196,28 @@ static func look(body: Actor) -> CreatureLook:
 	return null
 
 
+## Feel on this world (its bus, actors, registry, projectiles and Spells), in the tree and stepped
+## with it: what draws an enemy's telegraph lane (`Feel.lanes()`). Made once.
+func with_feel() -> Node:
+	if feel == null:
+		feel = FeelScript.new()
+		feel.set("events", bus)
+		feel.set("actors", actors)
+		feel.set("drive_engine", false)
+		feel.set("registry", registry)
+		feel.set("projectiles", projectiles)
+		feel.set("spells", spells)
+		_root.add_child(feel)
+	return feel
+
+
+## The telegraph lanes Feel draws (`with_feel` first).
+func lanes() -> Node:
+	return with_feel().call("lanes") as Node
+
+
 ## `count` physics frames: the actor, then the body moves, then Combat, the projectiles and
-## Spells.
+## Spells (and Feel, when there is one).
 func run(body: Actor, count: int) -> void:
 	for i in count:
 		body.step(STEP)
@@ -202,6 +226,8 @@ func run(body: Actor, count: int) -> void:
 		projectiles.step(STEP)
 		spells.call("step", STEP)
 		board.step(STEP)
+		if feel != null:
+			feel.call("step", STEP)
 
 
 ## `count` physics frames of every enemy, then the systems.
@@ -228,6 +254,9 @@ func free_all() -> void:
 		if is_instance_valid(body):
 			body.free()
 	players.clear()
+	if feel != null and is_instance_valid(feel):
+		feel.free()
+	feel = null
 	for node: Node in [combat, spells, registry, projectiles, actors, bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

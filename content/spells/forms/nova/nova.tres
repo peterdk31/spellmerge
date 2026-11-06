@@ -24,3 +24,4 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.05, "lift": -1, "stre
 cast_cue = &"cast_nova"
 shown_cue = &"nova"
 impact_cue = &"impact_ring"
+wind_cue = &"wind_area"

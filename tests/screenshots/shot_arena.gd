@@ -145,7 +145,8 @@ func take() -> void:
 	await create_timer(0.3).timeout
 
 
-## Enemy readability: an imp half-way through its windup (telegraph line, glowing pose), an
+## Enemy readability: an imp half-way through its windup (its lane, the card's wind cue, and its
+## glowing pose), an
 ## imp one frame after a hit (hurt pose), and an enemy shot beside a player's shot.
 ## Returns false after a failure. The imps are held still so the poses can be framed.
 func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
@@ -169,11 +170,19 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	# The imps are actors (actors G6): the AI and the look are their own nodes. The wizard is the
 	# nearest of the other team, so it is the target.
 	var winding_ai: Node = winding.get_node("AIController")
-	# From chasing, whatever it was doing (a slow frame rate can leave it recovering from an
-	# attack), so the 8 steps always end half-way through the windup.
-	winding_ai.set("state", 0)
-	for i in 8:
+	# Stepped by hand, with Spells, where its cast winds up (docs/milestones/cast-timing.md), until it
+	# winds up (it may be resting after an attack), then half-way through its windup.
+	var spells: Node = root.get_node("Spells")
+	for i in 64:
+		if winding_ai.call("is_telegraphing"):
+			break
 		winding.call("step", 0.0625)
+		# It may walk to where it likes to cast from (its band) first.
+		winding.global_position += winding.get("velocity") * 0.0625
+		spells.call("step", 0.0625)
+	for i in roundi(float(winding_ai.get("windup_time")) * 0.5 / 0.0625):
+		winding.call("step", 0.0625)
+		spells.call("step", 0.0625)
 	if not winding_ai.call("is_telegraphing"):
 		fail("the imp is not winding up in enemy_windup")
 		return false

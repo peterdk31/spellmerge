@@ -102,12 +102,16 @@ var _pose_packed: bool = false
 ## where its shots strike, on a body or a wall (`projectile_impact`: the flare in the shot's colours
 ## and cards; `impact` when not given), as big as its `radius`; and `end_cue` where a carrier with no
 ## shot ends (`carrier_ended`: a teleport or dash landing, a rain falling, a slam's strike, a decoy or
-## familiar going), as big as that event says. Empty plays nothing there. A new carrier names its cues
-## in its own `.tres`; Feel's preset has none of them.
+## familiar going), as big as that event says; `wind_cue` while a cast of it winds up (`cast_winding`:
+## an enemy's telegraph, only for a caster not on the players' team; its `size` the wind-up's
+## seconds; `wind`, a lane along the aim, when not given; docs/milestones/cast-timing.md, T6b).
+## Empty plays nothing there. A new carrier names its cues in its own `.tres`; Feel's preset has none
+## of them.
 @export var cast_cue: StringName = &"cast"
 @export var shown_cue: StringName = &""
 @export var impact_cue: StringName = &"impact"
 @export var end_cue: StringName = &""
+@export var wind_cue: StringName = &"wind"
 ## What its shots are drawn as: `&""` for their motion's own body (a flying shot a bolt with its
 ## tail, a still one a rune's diamond, an orbiting one an orbit shot), or a still body of its own for
 ## a still shot: `&"stone"`, a standing ward stone (a wall's). One of SHOT_BODIES; a body its shots'
@@ -122,9 +126,9 @@ func kind() -> StringName:
 
 
 ## Its cues and how big its impact cue plays, for looks (`gameplay/feel`, which reads no spell
-## field): [cast_cue, shown_cue, impact_cue, end_cue, radius]. A new Array each call.
+## field): [cast_cue, shown_cue, impact_cue, end_cue, radius, wind_cue]. A new Array each call.
 func look_cues() -> Array:
-	return [cast_cue, shown_cue, impact_cue, end_cue, radius]
+	return [cast_cue, shown_cue, impact_cue, end_cue, radius, wind_cue]
 
 
 ## What is wrong with its looks, one line each (empty when nothing is): a body that is none.

@@ -905,6 +905,29 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 	return tag
 
 
+## How far the carrier of `tag` reaches along its aim (its flight, a beam's or swing's length, a
+## rain's aim point; 0 for one that is not aimed) and its hit radius: a telegraph lane's length
+## and width (gameplay/feel/lanes.gd). 0 for a tag with no carrier.
+func carrier_reach(tag: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	return _carrier_of(spell).reach_of(spell) if spell != null else 0.0
+
+
+func carrier_radius(tag: int) -> float:
+	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
+	return spell.radius if spell != null else 0.0
+
+
+## Where `actor` holds its staff's tip and the way it aims (`set_aim`), INF while it has none: what a
+## telegraph lane follows while the cast winds up.
+func aim_origin_of(actor: int) -> Vector2:
+	return _aim_origin[actor] if actor >= 0 and actor < ACTORS and _aim_seen[actor] != 0 else Vector2.INF
+
+
+func aim_of(actor: int) -> Vector2:
+	return _aim_dir[actor] if actor >= 0 and actor < ACTORS and _aim_seen[actor] != 0 else Vector2.INF
+
+
 ## True while this actor's staff winds up a cast (docs/milestones/cast-timing.md): pressed, not
 ## yet left. `cooldown_left` counts the wind-up down then.
 func is_winding(actor: int, staff: int) -> bool:
@@ -990,6 +1013,10 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 		_cooldown[index] = cast.wind_up
 		_cooldown_rows = maxi(_cooldown_rows, index + 1)
 		_wind_pose(actor, staff, cast, aim)
+		if events != null:
+			# Its look (an enemy's telegraph) is the first carrier card's `wind_cue` (T6b).
+			var first_spell: CompiledSpell = cast.group.spells[0]
+			events.cast_winding.emit(actor, staff, first_spell.form_id, origin, aim, cast.wind_up, first_spell.tint, first_spell.look, SpellTag.make(actor, staff, first_spell.node, _current[index]))
 		return 0.0
 	_walk_turn[actor] = turn
 	if not _leave(index, compiled, cast, origin, aim):

@@ -13,6 +13,7 @@ icon = ExtResource("2_icon")
 base_damage = 3
 mana_cost = 30.0
 wind_down = 0.5
+wind_cue = &"wind_area"
 speed = 144.0
 lifetime = 3.0
 radius = 6.0

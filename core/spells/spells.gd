@@ -896,8 +896,9 @@ func cast_index(actor: int, staff: int) -> int:
 	return _cursor[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else 0
 
 
-## The carrier (form id) of the last cast this actor's staff made, `&""` before any or for a
-## cast with no carrier (cards that landed on the caster). The wizard's player sends it with `spell_cast`.
+## The carrier (form id) of the last cast this actor's staff made, `&""` before any; for a cast with
+## no carrier card, its fallback carrier's id (`caster`: the cards landed on the caster). The
+## wizard's player sends it with `spell_cast`.
 func last_form(actor: int, staff: int) -> StringName:
 	return _last_form[actor * SpellLimits.STAFFS + staff] if _in_range(actor, staff) else &""
 
@@ -953,7 +954,8 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 			_last_infused[actor] = carrier
 			break
 	var first: CompiledSpell = cast.group.spells[0]
-	_last_form[index] = first.form_id
+	# A cast with no carrier card names its fallback carrier (`caster`), so it is still a cast to show.
+	_last_form[index] = first.form_id if first.form_id != &"" else first.carrier
 	return cast.mana
 
 

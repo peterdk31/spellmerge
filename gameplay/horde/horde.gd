@@ -4,7 +4,9 @@ extends Node
 ## it forgets the old world and starts over).
 ##
 ## - **Spawning:** who and how many comes from the curve (`horde_curve.tres`, a `HordeCurve`).
-##   Enemies appear on a ring just outside the camera's view around the party's middle, clamped
+##   Enemies appear on a ring just outside the party's view around the party's middle (the view
+##   the shared camera is fitted to, `view_fitted` from Coop, worked out on the tick; never the
+##   camera itself, which eases as it is drawn: online-ready N3), clamped
 ##   inside the arena's floor (the room's walls, WALL_MARGIN in), never closer than
 ##   SPAWN_MIN_DISTANCE to a wizard, at most SPAWN_PER_FRAME a step, never more alive than
 ##   `max_alive()` (MAX_ALIVE_DESKTOP, or MAX_ALIVE_WEB on the web). They are ordinary enemy
@@ -109,8 +111,6 @@ var registry: RegistryScript = null
 var actors: ActorsScript = null
 ## The curve the next start uses.
 var curve: HordeCurve = DefaultCurve
-## The size of the view in pixels. Only tests set this; otherwise the viewport's.
-var view_size: Vector2 = Vector2.ZERO
 ## The randomness of spawns and offers. Tests seed it. While a replay records or plays, each run
 ## starts it from the replay's seeds (`SimSeed.is_dealing`, online-ready N2), so the run is the same.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
@@ -139,6 +139,8 @@ var missing_warnings: int = 0
 var _horde: Node2D = null
 var _gems: GemsScript = null
 var _camera: Camera2D = null
+## The party's view (`view_fitted`), or Rect2() before one is heard: then the arena.
+var _view: Rect2 = Rect2()
 ## The floor enemies may appear on, in world pixels.
 var _arena: Rect2 = FALLBACK_ARENA
 ## The curve's enemies, by `curve.ids` index (null for an id the registry lacks).
@@ -168,6 +170,10 @@ var _present: PackedByteArray = PackedByteArray()
 
 
 func _init() -> void:
+	# The tick steps its swarm and runs its timers (core/sim/tick.gd): the flags say so; there is
+	# no callback.
+	set_physics_process(true)
+	set_process(true)
 	_wizard_at.resize(SEATS)
 	_standing.resize(SEATS)
 	_present.resize(SEATS)
@@ -190,6 +196,7 @@ func _ready() -> void:
 		return
 	events.horde_started.connect(_on_horde_started)
 	events.horde_ended.connect(stop)
+	events.view_fitted.connect(_on_view_fitted)
 	events.enemy_died.connect(_on_enemy_died)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"horde_pick_requested", _on_pick_requested)
@@ -200,15 +207,12 @@ func _ready() -> void:
 	events.player_left.connect(_on_player_left)
 
 
-func _process(delta: float) -> void:
-	# Runs while paused (to give a joiner its bag in a break), but the pause menu's pause stops it.
-	if get_tree().paused and not _break_on:
+## The director's timers, once a tick (core/sim/tick.gd, after the bodies): `step`, also while the
+## tree stands paused for a build break (to give a joiner its bag), but not in the pause menu's pause.
+func step_timers(delta: float) -> void:
+	if is_inside_tree() and get_tree().paused and not _break_on:
 		return
 	step(delta)
-
-
-func _physics_process(delta: float) -> void:
-	physics_step(delta)
 
 
 ## Moves the swarm on by `delta` seconds (a physics step, as the full actors move), unless no run
@@ -309,6 +313,7 @@ func start(new_world: Node2D) -> void:
 	world.move_child(_gems, mini(1, world.get_child_count() - 1))
 	_camera = _find_camera()
 	_arena = _find_arena()
+	_view = Rect2()
 	if swarm != null:
 		_start_swarm()
 	_read_kinds()
@@ -480,33 +485,14 @@ func spawn_point() -> Vector2:
 	return best
 
 
-## The part of the world the camera shows now (world pixels): the camera's position kept inside
-## its limits, the view's size over its zoom. Without a camera, the arena.
+## The party's view (world pixels): the view the shared camera is fitted to (`view_fitted`, heard
+## from Coop), or the arena before one is heard.
 func view_rect() -> Rect2:
-	if _camera == null or not is_instance_valid(_camera):
-		return _arena
-	var zoom: float = maxf(_camera.zoom.x, 0.01)
-	var size: Vector2 = _view_size() / zoom
-	var centre: Vector2 = _camera.position
-	var half: Vector2 = size * 0.5
-	if _camera.limit_right - _camera.limit_left < NO_LIMIT:
-		var low: float = float(_camera.limit_left) + half.x
-		var high: float = float(_camera.limit_right) - half.x
-		centre.x = clampf(centre.x, low, high) if low <= high else (low + high) * 0.5
-	if _camera.limit_bottom - _camera.limit_top < NO_LIMIT:
-		var low: float = float(_camera.limit_top) + half.y
-		var high: float = float(_camera.limit_bottom) - half.y
-		centre.y = clampf(centre.y, low, high) if low <= high else (low + high) * 0.5
-	return Rect2(centre - half, size)
+	return _view if _view.has_area() else _arena
 
 
-func _view_size() -> Vector2:
-	if view_size != Vector2.ZERO:
-		return view_size
-	var viewport: Viewport = get_viewport()
-	if viewport == null:
-		return Vector2(640.0, 360.0)
-	return viewport.get_visible_rect().size
+func _on_view_fitted(view: Rect2) -> void:
+	_view = view
 
 
 ## How far from `from` along `direction` the ray leaves `rect` (0 when it never does, from

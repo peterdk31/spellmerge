@@ -65,6 +65,8 @@ var held_count: int = 0
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
+## One past the highest open id (0 when none is open): where `open_ids` stops looking.
+var _high: int = 0
 
 
 func _init() -> void:
@@ -98,6 +100,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_node[id] = 0
 	_release_hold(id)
 	_lowest_free = id + 1
+	_high = maxi(_high, id + 1)
 	_count += 1
 	_take_seat(id, seat)
 	return id
@@ -117,6 +120,8 @@ func close(id: int) -> void:
 	_count -= 1
 	if id < _lowest_free:
 		_lowest_free = id
+	while _high > 0 and _open[_high - 1] == 0:
+		_high -= 1
 
 
 ## True while `id` is an open actor.
@@ -127,6 +132,19 @@ func is_open(id: int) -> bool:
 ## Actors open now.
 func open_count() -> int:
 	return _count
+
+
+## The open ids, lowest first, written into `out` (grown when short, never shrunk, so a caller
+## reuses it); returns how many. The tick steps the bodies in this order (core/sim/tick.gd).
+func open_ids(out: PackedInt32Array) -> int:
+	if out.size() < _count:
+		out.resize(ACTORS)
+	var n: int = 0
+	for id in _high:
+		if _open[id] != 0:
+			out[n] = id
+			n += 1
+	return n
 
 
 ## Whom it aims at: TEAM_WIZARDS, TEAM_ENEMIES, ...; NONE for no actor.
@@ -283,6 +301,7 @@ func clear() -> void:
 	_home_seat.fill(NONE)
 	_seat_home.fill(NONE)
 	_lowest_free = 0
+	_high = 0
 	_count = 0
 
 

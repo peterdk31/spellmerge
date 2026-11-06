@@ -92,7 +92,6 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	director.events = bus
 	director.actors = actors
 	director.registry = registry
-	director.view_size = VIEW
 	director.web = false
 	director.curve = curve([[0.0, 4.0, 50]], {ENEMY_A: 1.0})
 	director.rng.seed = 7
@@ -163,8 +162,10 @@ func add_wizard(parent: Node2D, seat: int, at: Vector2) -> Node2D:
 	return wizard
 
 
+## The run starts, and the party's view is the camera's (as Coop sends it on the tick).
 func start() -> void:
 	bus.horde_started.emit(world)
+	bus.view_fitted.emit(Rect2(camera.position - VIEW * 0.5, VIEW))
 
 
 ## `seconds` of steps of 1/60 s.

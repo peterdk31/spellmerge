@@ -18,11 +18,9 @@ extends RefCounted
 ## made again, tests/support/fresh_game.gd) the same number of steps before its start, as a replay
 ## is played after the game starts: the services' clocks run from the game's start and their
 ## counters carry over from run to run (N3 starts the one clock with the run). What still runs on
-## real time is held to the tick here, as the plan leaves it to later parts: Feel's stops (its clock
-## is real time; N4 counts them in ticks) are frozen, and the `_process` timers of Flow, Coop's
-## revive and the horde director (its spawns, offers and breaks) are stepped once a tick instead of
-## once a drawn frame, as N3's tick will step them (A2). In an exported game Flow's loading screen
-## and intro are off too, so a run starts on the tick it is asked for, as under a test script.
+## real time is held to the tick here, as the plan leaves it to N4: Feel's stops (its clock is real
+## time) are frozen. In an exported game Flow's loading screen and intro are off too, so a run
+## starts on the tick it is asked for, as under a test script.
 ##
 ##     var run := ReplayRun.new(tree)
 ##     var recorded := Desync.new()
@@ -35,8 +33,6 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
-## A tick's seconds.
-const DT: float = 1.0 / 60.0
 ## The most actor ids looked at for bodies.
 const MAX_ACTORS: int = 1024
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
@@ -190,12 +186,11 @@ func areas() -> Dictionary:
 	return out
 
 
-## One tick: its hashes to `into`, then the `_process` timers stepped.
+## One tick: its hashes to `into`.
 func _capture(into: Desync) -> void:
 	if not native:
 		_kernels_off()
 	into.capture(areas())
-	_step_timers()
 
 
 func _join_bots(count: int) -> Array[BotScript]:
@@ -217,9 +212,6 @@ func _find() -> void:
 	# Feel's stops end by real time (A1): frozen, they hold the same bodies in both runs (N4).
 	_feel.drive_engine = false
 	_feel.set_process(false)
-	# The timers that run in `_process` (A2) run once a tick instead (`_step_timers`; N3).
-	for area: String in ["Flow", "Coop", "Horde"]:
-		_root.get_node(area).set_process(false)
 	# In an exported game: no loading screen and no intro before a run (real time and drawing), as
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
@@ -245,10 +237,3 @@ func _kernels_off() -> void:
 	if swarm != null:
 		swarm.set(&"native", false)
 
-
-## The `_process` timers, once a tick at its start, as N3's tick will run them: Flow's waves and
-## restarts, Coop's revive, the horde director.
-func _step_timers() -> void:
-	_flow.call("step", DT)
-	_root.get_node("Coop").call("step_revive", DT)
-	_root.get_node("Horde").call("step", DT)

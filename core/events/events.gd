@@ -196,6 +196,11 @@ signal run_started(player_count: int)
 signal run_ended(victory: bool)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
+## Sender: coop. The part of the world (world pixels) the party's shared camera is fitted to show,
+## worked out on the tick from where the wizards stand; sent when it changes. The camera eases
+## towards it as it is drawn, so the simulation never reads the camera (online-ready N3). Heard by
+## horde: enemies appear just outside it.
+signal view_fitted(view: Rect2)
 ## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
 ## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
 signal loading_started()

@@ -1075,6 +1075,8 @@ var _cand_found: int = 0
 
 
 func _init() -> void:
+	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
+	set_physics_process(true)
 	for pass_name in BEHAVIOUR_PASSES:
 		_passes.append(Callable(self, pass_name))
 	assert(_passes.size() == BEHAVIOURS, "one pass per behaviour, in the order of B_*")
@@ -1247,10 +1249,6 @@ func _apply_textures() -> void:
 	for batch in _nodes.size():
 		if BATCH_TEXTURED[batch]:
 			_nodes[batch].texture = texture
-
-
-func _physics_process(delta: float) -> void:
-	step(delta)
 
 
 func _process(_delta: float) -> void:

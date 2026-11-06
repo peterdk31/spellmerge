@@ -168,6 +168,8 @@ var board: TeamBoard = TeamBoard.new()
 
 
 func _init() -> void:
+	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
+	set_physics_process(true)
 	z_index = DRAW_Z
 	_familiar_node = MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
@@ -221,10 +223,6 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.ai_view_changed.connect(_on_ai_view_changed)
 	events.run_ended.connect(_on_run_ended)
-
-
-func _physics_process(delta: float) -> void:
-	step(delta)
 
 
 ## Move time on: lifetimes and familiar orbits.

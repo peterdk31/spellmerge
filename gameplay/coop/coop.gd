@@ -79,6 +79,10 @@ var events: EventsScript = null
 ## The size of the view in pixels. Only tests set this; otherwise the viewport's.
 var view_size: Vector2 = Vector2.ZERO
 
+## The part of the world the camera is fitted to show, worked out on the tick (`step_rules`) and
+## sent as `view_fitted` when it changes; Rect2() before the first fit of a room.
+var fitted_view: Rect2 = Rect2()
+
 ## The camera being driven (null before the first `room_entered`).
 var camera: Camera2D = null
 ## Where the camera is heading, and how far it zooms out (1 = no zoom).
@@ -106,8 +110,24 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 
 
+## The camera (view). The rules are the tick's (`step_rules`, core/sim/tick.gd).
 func _process(delta: float) -> void:
 	step(delta)
+
+
+## Coop's rules, once a tick (core/sim/tick.gd): the view the camera is fitted to (`view_fitted`),
+## then the revives.
+func step_rules(delta: float) -> void:
+	if not _all_valid():
+		refresh_wizards()
+	var fit: Vector3 = _fit()
+	if fit.z > 0.0:
+		var size: Vector2 = _view_size() / fit.z
+		var view := Rect2(Vector2(fit.x, fit.y) - size * 0.5, size)
+		if view != fitted_view:
+			fitted_view = view
+			if events != null:
+				events.view_fitted.emit(view)
 	step_revive(delta)
 
 
@@ -144,6 +164,18 @@ func refresh_wizards() -> void:
 ## Work out where the camera should be and how far out, from the wizards now.
 ## Does nothing with no wizards. Returns false in that case.
 func fit_camera() -> bool:
+	var fit: Vector3 = _fit()
+	if fit.z <= 0.0:
+		return false
+	target_zoom = fit.z
+	target_position = Vector2(fit.x, fit.y)
+	return true
+
+
+## Where a camera holding every wizard (and the bodies they drive) would be and its zoom, from the
+## wizards now: (centre x, centre y, zoom), or a zoom of 0 with no wizards. Reads no camera but its
+## limits (the room's).
+func _fit() -> Vector3:
 	var low := Vector2.INF
 	var high := -Vector2.INF
 	var seen: int = 0
@@ -164,13 +196,13 @@ func fit_camera() -> bool:
 			low = low.min(driven.global_position)
 			high = high.max(driven.global_position)
 	if seen == 0:
-		return false
+		return Vector3.ZERO
 	var view: Vector2 = _view_size()
 	var need: Vector2 = high - low + Vector2.ONE * (CAMERA_MARGIN * 2.0)
 	var floor_zoom: float = _min_zoom()
-	target_zoom = clampf(minf(view.x / need.x, view.y / need.y), floor_zoom, maxf(MAX_ZOOM, floor_zoom))
-	target_position = _clamp_centre((low + high) * 0.5, target_zoom)
-	return true
+	var zoom: float = clampf(minf(view.x / need.x, view.y / need.y), floor_zoom, maxf(MAX_ZOOM, floor_zoom))
+	var centre: Vector2 = _clamp_centre((low + high) * 0.5, zoom)
+	return Vector3(centre.x, centre.y, zoom)
 
 
 ## The smallest zoom allowed: MIN_ZOOM, but never so far out that the view is
@@ -379,6 +411,7 @@ func _find_camera() -> Camera2D:
 
 ## A new world is up: find its camera and put it on the players.
 func _on_room_entered(_room_id: StringName) -> void:
+	fitted_view = Rect2()
 	camera = _find_camera()
 	refresh_wizards()
 	_clear_revives()

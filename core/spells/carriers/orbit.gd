@@ -25,7 +25,7 @@ func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, dire
 	if spell.speed > 0.0 and spell.orbit_radius > 0.0:
 		turn = spell.speed / spell.orbit_radius
 	var centre: Vector2 = Vector2.INF
-	if kit.caster() != SpellRuntime.CASTER_WIZARD:
+	if kit.caster() != SpellRuntime.CASTER_BODY:
 		var shot: int = kit.caster_shot()
 		centre = kit.projectiles.get_position_of(shot) if shot >= 0 else origin
 	return kit.projectiles.spawn_orbit(actor, spell.orbit_radius, direction.angle() + TAU * n / count, turn, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, centre)

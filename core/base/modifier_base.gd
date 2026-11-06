@@ -96,40 +96,38 @@ enum Stack { ADD, MULTIPLY, CHANCE }
 ##   blast strikes is the carrier's hit, rules R4 F2). None: it works on every carrier (numbers,
 ##   blast, echo, recoil, mirror: a move and its mirror add up to none, rules R4 F1).
 ## - "stacks": a `Stack` (ADD when missing).
-## - "travel_only": true when it only means something on a shot in flight, so it is wasted on the
-##   cards that land on a caster or a point.
 ## A card names its behaviour by its name (`behaviour_id`), so a behaviour added or taken out never
 ## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
 const RULES: Dictionary = {
 	Behaviour.NONE: {},
-	Behaviour.HOMING: {"needs": {"any": CarrierTraits.STEERS}, "travel_only": true},
+	Behaviour.HOMING: {"needs": {"any": CarrierTraits.STEERS}},
 	# What a blast strikes is the carrier's hit (rules R4 F2), so the hit cards work with one too.
-	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
+	Behaviour.CHAIN: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
 	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	Behaviour.BLAST: {},
 	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
 	Behaviour.RECOIL: {},
-	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}, "travel_only": true},
+	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
 	Behaviour.ECHO: {},
-	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES}, "travel_only": true},
+	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES}},
 	Behaviour.HEAVY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "stacks": Stack.MULTIPLY},
 	Behaviour.SIPHON: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
-	Behaviour.STICKY: {"needs": {"any": CarrierTraits.MOVES}, "travel_only": true},
-	Behaviour.MAGNET: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "travel_only": true},
-	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}, "travel_only": true},
-	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE}, "travel_only": true},
-	Behaviour.MIRROR: {"travel_only": true},
-	Behaviour.GROWTH: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.MULTIPLY, "travel_only": true},
-	Behaviour.RELAY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
-	Behaviour.RETURN: {"needs": {"any": CarrierTraits.FLIES}, "travel_only": true},
-	Behaviour.ZAP: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.CHANCE, "travel_only": true},
-	Behaviour.POSSESS: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}, "travel_only": true},
-	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS}, "travel_only": true},
+	Behaviour.STICKY: {"needs": {"any": CarrierTraits.MOVES}},
+	Behaviour.MAGNET: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}},
+	Behaviour.GHOST: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
+	Behaviour.SPIRAL: {"needs": {"any": CarrierTraits.MOVES | CarrierTraits.LINE}},
+	Behaviour.MIRROR: {},
+	Behaviour.GROWTH: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.MULTIPLY},
+	Behaviour.RELAY: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
+	Behaviour.RETURN: {"needs": {"any": CarrierTraits.FLIES}},
+	Behaviour.ZAP: {"needs": {"any": CarrierTraits.STAYS | CarrierTraits.LINE}, "stacks": Stack.CHANCE},
+	Behaviour.POSSESS: {"needs": {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]}},
+	Behaviour.DEFLECT: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
-	Behaviour.PULL: {"needs": {"any": CarrierTraits.HITS}, "travel_only": true},
+	Behaviour.PULL: {"needs": {"any": CarrierTraits.HITS}},
 	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
 	# leaves from a point of a ring. More cards add copies.
-	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}, "travel_only": true},
+	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.
@@ -166,11 +164,6 @@ static func needs(behaviour: int) -> Dictionary:
 ## How cards of `behaviour` combine (`RULES` "stacks").
 static func stacks(behaviour: int) -> Stack:
 	return (RULES.get(behaviour, {}) as Dictionary).get("stacks", Stack.ADD)
-
-
-## True when `behaviour` only means something on a shot in flight (`RULES` "travel_only").
-static func travel_only(behaviour: int) -> bool:
-	return bool((RULES.get(behaviour, {}) as Dictionary).get("travel_only", false))
 
 
 @export var damage_mult: float = 1.0

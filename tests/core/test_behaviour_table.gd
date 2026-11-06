@@ -23,7 +23,7 @@ func test_every_behaviour_has_one_row_of_known_rules() -> void:
 	check_equal(ModifierBase.RULES.size(), ModifierBase.Behaviour.size(), "and only they do")
 	for behaviour: int in ModifierBase.RULES:
 		for rule: String in ModifierBase.RULES[behaviour]:
-			check(["needs", "stacks", "travel_only"].has(rule), "%s is a rule a behaviour has" % rule)
+			check(["needs", "stacks"].has(rule), "%s is a rule a behaviour has" % rule)
 
 
 func test_cards_name_their_behaviour() -> void:

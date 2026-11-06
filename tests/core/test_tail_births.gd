@@ -103,6 +103,80 @@ func test_the_cards_births_are_not_at_fixed_distances() -> void:
 	check(_evenness(laid) > 0.5, "anywhere along a step's flight (the emptiest bin %.2f of even)" % _evenness(laid))
 
 
+## The x of every tail birth of the shot tagged `tag` laid while one atom flies from ORIGIN for
+## `steps` steps (each drawn half way through), sorted; an `_end_*` check reads `mgr` after.
+func _atom_tail(tag: int, life: float, steps: int) -> PackedFloat32Array:
+	mgr.update_draw(0.5)
+	mgr.spawn(0, ORIGIN, Vector2(SPEED, 0.0), life, 1.5, ManagerScript.LAYER_ENEMY, 0, tag)
+	var xs: PackedFloat32Array = PackedFloat32Array()
+	for n in steps:
+		mgr.step(DT)
+		mgr.update_draw(0.5)
+		for b in _births_of(ManagerScript.SPARK_TAIL):
+			if int(b[3]) == tag:
+				xs.append(b[0])
+	xs.sort()
+	return xs
+
+
+## Whether the sorted tail `xs` runs whole from ORIGIN to `end`: its first birth within a spacing and
+## a half of the start, its last of `end`, and no gap wider than that between.
+func _whole_to(xs: PackedFloat32Array, end: float, what: String) -> void:
+	var gap: float = ManagerScript.TAIL_SPACING * 1.5 + 0.01
+	check(not xs.is_empty(), "%s: a tail" % what)
+	if xs.is_empty():
+		return
+	check(xs[0] - ORIGIN.x <= gap, "%s: from where it was fired (%.1f)" % [what, xs[0]])
+	check(end - xs[-1] <= gap and xs[-1] <= end + 0.01, "%s: right to where it ended at %.1f (the last at %.1f)" % [what, end, xs[-1]])
+	var widest: float = 0.0
+	for i in range(1, xs.size()):
+		widest = maxf(widest, xs[i] - xs[i - 1])
+	check(widest <= gap, "%s: no gap along it (%.2f)" % [what, widest])
+
+
+## The regression (the owner, 2026-11-06: an Atom fired at a target close by left its tail short of
+## it): the drawing lays a tail only up to where a shot was drawn last, a step or two behind where it
+## hit, and a spent shot is never drawn again, so the last stretch was never laid. A shot that ends
+## in flight lays it the next frame (`_end_tail`), up to the hit; one spent within its first step,
+## never drawn, lays its whole tail so.
+func test_a_spent_shots_tail_reaches_what_it_hit() -> void:
+	var target: Node2D = own(Node2D.new()) as Node2D
+	root.add_child(target)
+	target.global_position = ORIGIN + Vector2(60.0, 0.0)
+	mgr.add_target(target, 6.0, ManagerScript.LAYER_ENEMY)
+	var xs: PackedFloat32Array = _atom_tail(7, 1.0, 5)
+	check_equal(mgr.get_count(), 0, "the atom is spent on the target")
+	# The step that met the target ends at 3 steps' flight, inside its radius: the hit is there.
+	_whole_to(xs, ORIGIN.x + 3.0 * STEP, "a target 60 px away")
+	target.global_position = ORIGIN + Vector2(12.0, 0.0)
+	xs = _atom_tail(8, 1.0, 2)
+	check_equal(mgr.get_count(), 0, "spent in its first step")
+	_whole_to(xs, target.global_position.x, "a target 12 px away, never drawn")
+
+
+## The same for a shot whose life ran out: its tail reaches where it ended.
+func test_an_expired_shots_tail_reaches_its_end() -> void:
+	var ends: Array[Vector2] = []
+	mgr.events.projectile_expired.connect(func(_caster: int, at: Vector2, _tag: int, _slot: int) -> void: ends.append(at))
+	var xs: PackedFloat32Array = _atom_tail(9, 2.5 * DT, 5)
+	check_equal(ends.size(), 1, "its life ran out")
+	if ends.size() == 1:
+		check(ends[0].x > ORIGIN.x + STEP * 1.5, "it flew a step and more (%.1f)" % ends[0].x)
+		_whole_to(xs, ends[0].x, "an atom of 2.5 steps' life")
+
+
+## The ends share the frame's most: past `tail_births_cap` none is laid, and a frame never lays more.
+func test_the_ends_keep_to_the_most() -> void:
+	mgr.tail_births_cap = 4
+	for n in 10:
+		mgr.update_draw(0.5)
+		mgr.spawn(0, ORIGIN + Vector2(0.0, float(n) * 5.0), Vector2(SPEED, 0.0), DT * 0.5, 1.5)
+		mgr.step(DT)
+		mgr.update_draw(0.5)
+		check(mgr.tail_births <= 4, "the frame keeps to the most (%d)" % mgr.tail_births)
+	check_equal(mgr.get_count(), 0, "every shot ended")
+
+
 ## Past `tail_births_cap` a frame, the frame lays the most, and the next frame's spacing widens by
 ## its ask over the most, so every tail thins (none is left whole while others are cut).
 func test_a_busy_frame_thins_every_tail() -> void:

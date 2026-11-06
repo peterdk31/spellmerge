@@ -183,7 +183,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sw_hit[at] = spell.echo_hit if echoed else null
 	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sw_struck[at].clear()
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		if mine and kit.aim_pivot(actor).is_finite():
 			_sw_origin[at] = kit.aim_pivot(actor)
 		if mine and first:
@@ -237,7 +237,7 @@ static func swing_ease(x: float) -> float:
 ## down or gone, ends it quietly), or the shot that cast it while that flies.
 func _swing_follow(at: int) -> void:
 	var caster: int = _sw_caster[at]
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		var actor: int = _sw_actor[at]
 		if actor < 0 or actor >= SpellRuntime.ACTORS:
 			return

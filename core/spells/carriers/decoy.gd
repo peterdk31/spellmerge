@@ -21,7 +21,7 @@ static func of(spells: SpellRuntime) -> CarrierDecoy:
 
 
 func traits() -> int:
-	return LASTS | STEERS | SPEED | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS | CASTS_FROM_BODY
+	return LASTS | STEERS | SHOTS | SPREAD | MEETS_SHOTS | SPAWNS | CASTS_FROM_BODY
 
 
 ## How far the decoy with `tag` creeps toward a target (its homing reach); 0 when it does not

@@ -46,7 +46,7 @@ A form card, `content/spells/forms/portal/`, `carrier = &"portal"`, a new `core/
 
 ## What every card does on a portal
 
-The traits it answers (`traits()`): `STAYS | LASTS | STEERS | REACHES | SPEED | SHOTS | SPREAD`. Not `HITS` (it hurts nothing), not `MEETS_SHOTS` (a shot that touches it goes through: shield and deflect do nothing) and not `FLIES` or `MOVES`. `SPEED` because it lives its `lifetime` (slow keeps it open longer). An infusion counts on it when it has a status to pass on (`Carrier.takes_element`): mend, which only heals, is wasted unless a blast carries it. `NEEDS` works out the rest; `tests/core/test_card_rules.gd` plays every card on it and fails where the answer is wrong. The ones that matter:
+The traits it answers (`traits()`): `STAYS | LASTS | STEERS | REACHES | SHOTS | SPREAD` (`SPEED` until 2026-11-06: it does not travel, so a speed card does nothing there). Not `HITS` (it hurts nothing), not `MEETS_SHOTS` (a shot that touches it goes through: shield and deflect do nothing) and not `FLIES` or `MOVES`. `SPEED` because it lives its `lifetime` (slow keeps it open longer). An infusion counts on it when it has a status to pass on (`Carrier.takes_element`): mend, which only heals, is wasted unless a blast carries it. `NEEDS` works out the rest; `tests/core/test_card_rules.gd` plays every card on it and fails where the answer is wrong. The ones that matter:
 
 | Card | On a portal |
 | --- | --- |

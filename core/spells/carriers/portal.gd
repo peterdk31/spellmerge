@@ -72,7 +72,7 @@ static func of(spells: SpellRuntime) -> CarrierPortal:
 ## nothing itself and meets no shot (a shot that touches it goes through), so shield, deflect and
 ## the hit cards do nothing on it.
 func traits() -> int:
-	return STAYS | LASTS | STEERS | REACHES | SPEED | SHOTS | SPREAD | GATES
+	return STAYS | LASTS | STEERS | REACHES | SHOTS | SPREAD | GATES
 
 
 func step_order() -> int:

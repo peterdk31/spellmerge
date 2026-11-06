@@ -1,9 +1,0 @@
-{
-	"id": "quick_timer_rune",
-	"name": "Quick timer rune",
-	"does": "A rune whose timer ticks twice as fast: every quarter second it casts a bolt at the imp ahead.",
-	"casts": [{"staff": 0, "cards": ["timer", "rune", "quicken", "bolt"]}],
-	"imps": [[80, 0]],
-	"seconds": 2.0,
-	"checks": [{"kind": "damaged", "imps": [0]}]
-}

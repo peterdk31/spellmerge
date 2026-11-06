@@ -47,8 +47,9 @@ const NEEDS: Dictionary = {
 @export var event: Event = Event.HIT
 ## Seconds its payload winds up where it fired, before the payload's own cards' wind-up (every
 ## card has one; docs/milestones/cast-timing.md). A timer ticks over and over: each tick its
-## payload winds up (this and the payload's, shortened by a `quicken` read into it), leaves, and
-## the next starts, so cards change its pace (T8; it had a fixed `interval`). A trigger fires every
+## payload winds up (this and the payload's), leaves, and the next starts, so the payload's cards
+## change its pace (T8; it had a fixed `interval`); this share no card changes (a staff or a relic
+## may, later: T9). A trigger fires every
 ## time its event happens, for as long as its carrier lives (owner, 2026-10-29: no per-shot count;
 ## the spell runtime's per-step fire cap is the only bound).
 @export var wind_up: float = 0.0

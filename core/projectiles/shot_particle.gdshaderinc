@@ -151,7 +151,7 @@ Particle place_particle(float look, vec2 from, float a, float i, float cyc, floa
 		p.run = 1.0;
 		p.rgb = a < 0.6 ? SPARK_LIGHT : BONE_LIGHT;
 	} else if (look == L_DRIFT) {
-		// Slow, hold, short delay: a cool grey pixel that hangs where it was and fades.
+		// Slow, hold, faster casting: a cool grey pixel that hangs where it was and fades.
 		p.at = from + vec2(-2.0 * z - (h - 0.5) * 3.0 * z, (h - 0.5) * 3.0 * z);
 		p.shown = a < 0.95 && mod(floor(sim_time * 12.0 + i), 3.0) > 0.5;
 		p.rgb = a < 0.5 ? BONE_SHADOW : STONE_LIGHT;

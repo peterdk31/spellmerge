@@ -117,8 +117,8 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 	var outer_payload: bool = _in_payload
 	_in_payload = payload
 	var group := CompiledGroup.new()
-	# A trigger's own wind-up starts its payload's (`wind_up`), so a quicken read into the payload
-	# shortens it too.
+	# A trigger's own wind-up starts its payload's (`wind_up`); no card changes it (a staff or a
+	# relic may, later: docs/milestones/cast-timing.md, T9).
 	group.wind_up = maxf(wind_up, 0.0)
 	var elements: Array[ElementBase] = []
 	var modifiers: Array[ModifierBase] = []
@@ -151,7 +151,7 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 		elif card is FormBase:
 			var form := card as FormBase
 			var on: Carrier = Carriers.of(form.carrier)
-			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload)
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers, payload, form.wind_up)
 			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
 			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -206,8 +206,6 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 				works = works or (multicast.repeats > 1 and not group.is_empty())
 			MulticastBase.Mode.SCATTER:
 				works = works or found > 0
-		# A quicken shortens the group's wind-up: it works where there is one (cast timing T8).
-		works = works or (not is_equal_approx(multicast.wind_up_mult, 1.0) and group.wind_up > 0.0)
 		if not works and not keep_wasted:
 			_waste(slot)
 			continue
@@ -217,7 +215,6 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 		_cast.mana += multicast.mana_cost
 		if not _in_payload:
 			_cast.wind_down += multicast.wind_down
-		group.wind_up *= maxf(multicast.wind_up_mult, 0.0)
 		match multicast.mode:
 			MulticastBase.Mode.SCATTER:
 				group.scatter = true
@@ -293,17 +290,22 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 ## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
 ## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
 ## a form's carrier and a fallback alike. `payload`: the carrier is a payload's, which adds no
-## wind-down to a staff.
-static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool) -> Array[ModifierBase]:
+## wind-down to a staff. `wind_up`: its form card's wind-up (0 for a fallback carrier); with a
+## charge kept on it the carrier winds up too, so a shorter wind-up counts there.
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase], payload: bool, wind_up: float = 0.0) -> Array[ModifierBase]:
 	var deflects: bool = false
 	var blasts: bool = false
 	for modifier in modifiers:
 		deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
 		blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
+	var winds_up: bool = wind_up > 0.0
+	for modifier in modifiers:
+		# A charge's wind-up is a cost: it is there when the charge is kept for what else it does.
+		winds_up = winds_up or (modifier.wind_up_add > 0.0 and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, false))
 	var out: Array[ModifierBase] = []
 	for modifier in modifiers:
 		# A deflect turns every shot that touches it first, so a shield with it never blocks.
-		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload)
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts, payload, winds_up)
 		if works or keep_wasted:
 			out.append(modifier)
 	return out
@@ -353,7 +355,7 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	var on: Carrier = Carriers.of(carrier)
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false)
+		return on.works(modifier.behaviour) and _numbers_count(modifier, on, false, false, false)
 	if card is ElementBase:
 		return on.takes_element(card as ElementBase, false)
 	if card is TriggerBase:
@@ -364,15 +366,20 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 ## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: a shorter wind-down where it adds one to its staff (`Carrier.has_wind_down`:
-## not a fallback carrier, and not a payload's carrier, `payload`), damage where it hits (or blasts), speed and lifetime where it moves or lasts,
+## not a fallback carrier, and not a payload's carrier, `payload`), a shorter wind-up where the
+## carrier winds up (`winds_up`), damage where it hits (or blasts), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
-static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool) -> bool:
+static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, payload: bool, winds_up: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
 	if not is_equal_approx(modifier.radius_mult, 1.0):
 		return true
+	if modifier.wind_up_mult < 1.0:
+		any = true
+		if winds_up:
+			return true
 	if modifier.wind_down_mult < 1.0:
 		any = true
 		if on.has_wind_down() and not payload:
@@ -428,6 +435,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	var homing_reach: float = 0.0
 	var heals: bool = false
 	var later_ids: Array[StringName] = []
+	# Every `wind_up_mult` on the carrier, applied to its whole wind-up once all are read.
+	var wind_up_mult: float = 1.0
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	spell.lifetime = SpellLimits.MIN_LIFETIME
@@ -474,6 +483,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		mana *= modifier.mana_mult
 		wind_down *= modifier.wind_down_mult
 		spell.wind_up += maxf(modifier.wind_up_add, 0.0)
+		wind_up_mult *= maxf(modifier.wind_up_mult, 0.0)
 		speed *= modifier.speed_mult
 		radius *= modifier.radius_mult
 		shots *= modifier.shot_mult
@@ -507,6 +517,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.damage = maxf(damage, SpellLimits.MIN_DAMAGE)
 	spell.mana_cost = mana
 	spell.wind_down = maxf(wind_down, 0.0)
+	spell.wind_up *= wind_up_mult
 	spell.speed = speed
 	spell.radius = radius
 	spell.shots = shots

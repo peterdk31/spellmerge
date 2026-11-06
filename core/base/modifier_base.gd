@@ -175,6 +175,9 @@ static func stacks(behaviour: int) -> Stack:
 ## Seconds added to the carrier's wind-up (`FormBase.wind_up`): a charge; a cost, never an effect
 ## of its own (docs/milestones/cast-timing.md).
 @export var wind_up_add: float = 0.0
+## Factor on the carrier's whole wind-up, its form card's plus every `wind_up_add` on it, whatever
+## the slot order (faster casting; docs/milestones/cast-timing.md, T9).
+@export var wind_up_mult: float = 1.0
 @export var mana_mult: float = 1.0
 ## Factor on the number of shots per cast, spread in a fan (split). The compiled spell is
 ## clamped to the shot limit.
@@ -245,6 +248,7 @@ func ranges() -> Dictionary:
 		"radius_mult": Vector2(0.25, 4.0),
 		"wind_down_mult": Vector2(0.1, 4.0),
 		"wind_up_add": Vector2(0.0, 5.0),
+		"wind_up_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
 		"shot_mult": Vector2(1, 8),
 		"look_layer": Vector2(0.0, 21.0),

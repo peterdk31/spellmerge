@@ -13,9 +13,10 @@ extends RefCounted
 ## is one, chased when it is the nearest), a teammate that hurt it for GRUDGE_TIME (infighting).
 ##
 ## **The steps of the executor** (`state`): CHASE (walk as planned, aim at the target, wind up the
-## planned staff once it is ready), WINDUP (stand, the aim locked, with lead and the profile's aim
-## error added once; the telegraph shows it; it lasts longer for a more dangerous cast), the cast
-## (`intent.press`), CHANNEL (a cast that goes on while held: hold the button while the target
+## planned staff once it is ready), WINDUP (it presses the staff at once and stands while the
+## cast winds up in Spells, its staff's and cards' `wind_up`: docs/milestones/cast-timing.md; it
+## keeps aiming at the target, with lead and the profile's aim error drawn once, as a player's aim
+## follows the stick (owner, 2026-11-06); the telegraph shows it), CHANNEL (a cast that goes on while held: hold the button while the target
 ## stays in its lane, the mana lasts and `channel_max` is not up, turning after the target at
 ## `track_speed`), RECOVER (stand, the aim locked; a shot about to hit may still make it dodge),
 ## REPOSITION (walk round a wall for REPOSITION_TIME or until the line is clear), TRANSITION (a
@@ -23,16 +24,19 @@ extends RefCounted
 ## glances at the teammate for `TeamBoard.CALL_TIME`, its Face's brows raised, and the board's call
 ## makes the teammates near keener to join in; then it winds up). A profile that presses on
 ## (`AIProfile.press_on`, a test bot's) walks toward its target wherever an enemy stands in a
-## fight, and with no rest goes on at once. The windup starts only when the cast can leave within
-## it (`Caster.cast_ready`), so a telegraph is always followed by its cast. An urgent plan (a dodge,
-## an escape) presses a staff whose next cast moves the caster once, with no windup, and the move
-## goes the way it walks. Timers slow by `Combat.pace` (freeze stops an attack).
+## fight, and with no rest goes on at once. The windup starts only when the staff can cast now
+## (`Caster.cast_ready`), and nothing but being downed stops a wind-up, so a telegraph is always
+## followed by its cast. An urgent plan (a dodge,
+## an escape) presses a staff whose next cast moves the caster once (after that staff's wind-up,
+## so a dodging enemy holds its dash on a staff with none), and the move goes the way it walks.
+## Its own timers slow by `Combat.pace`; a cast's wind-up is the staff's and does not.
 ##
 ## **Enemies telegraph, allies don't** (owner, 2026-11-01): a telegraph is a warning for the
-## players, so a brain driving an actor of the players' team winds up nothing (`warns()` false:
-## `windup_for` is 0 and the cast leaves the step its staff is ready, so no telegraph and no
-## furious face). It follows the driven actor's team, which is its driver's: a bot, a minion, and
-## an enemy body a player's side drives cast at once; an enemy's AI possessing a wizard still warns.
+## players. How long a cast winds up is its staff's data (an enemy's staff has a `wind_up`, a
+## player's none; cast-timing, owner 2026-11-06), whoever holds it; only a brain driving an actor
+## of another team than the players' shows it (`warns()`, `is_telegraphing`). It follows the driven
+## actor's team, which is its driver's: a bot, a minion, and an enemy body a player's side drives
+## show none; an enemy's AI possessing a wizard still warns.
 ##
 ## Nothing here allocates per step.
 
@@ -61,19 +65,10 @@ const DETOUR_PROBE: float = 40.0
 const COVER_PROBE: float = 48.0
 ## Seconds it walks one way round a wall before it looks again.
 const REPOSITION_TIME: float = 0.4
-## A windup: BASE, plus PER_DAMAGE a point of the cast's damage and AREA for a cast that hits round
-## a point or explodes, kept between MIN and MAX, times the profile's `windup_scale`. A cast that
-## hurts nobody (a move, a wall, a decoy) winds up HARMLESS.
-const WINDUP_BASE: float = 0.6
-const WINDUP_PER_DAMAGE: float = 0.02
-const WINDUP_AREA: float = 0.15
-const WINDUP_MIN: float = 0.3
-const WINDUP_MAX: float = 2.0
-const WINDUP_HARMLESS: float = 0.2
 ## The rest after a cast: REST_BASE plus half its delay (at most a second), times `rest_scale`.
 const REST_BASE: float = 0.6
-## Windups and rests are whole sixteenths of a second, so a telegraph's length reads the same on
-## every frame rate and a test's fixed step meets it exactly.
+## Rests are whole sixteenths of a second, so they read the same on every frame rate and a test's
+## fixed step meets them exactly.
 const TIME_GRAIN: float = 0.0625
 ## The widest aim error (radians), at accuracy 0.
 const AIM_ERROR: float = deg_to_rad(14.0)
@@ -174,6 +169,8 @@ var _chosen_sense: CastSense = null
 ## The intent `think` wrote last (the actor's own, or a bot's spare one), for letting go of holds.
 var _last_intent: ActorIntent = null
 var _locked_aim: Vector2 = Vector2.DOWN
+## The aim error of the attack under way (radians), drawn once as it starts winding up.
+var _aim_error: float = 0.0
 var _state_left: float = 0.0
 var _channel_left: float = 0.0
 var _decide_left: float = 0.0
@@ -261,10 +258,16 @@ func think(delta: float, intent: ActorIntent) -> void:
 				_decide()
 			_chase(intent)
 		State.WINDUP:
+			# The cast winds up in Spells; the aim follows the target until it leaves.
+			var aimed: Node2D = _aim_node()
+			if aimed != null:
+				_locked_aim = _aim_for(_chosen_sense, aimed.global_position - actor.global_position, _aim_error)
 			intent.aim = _locked_aim
 			_press_on(intent)
-			_state_left -= delta * _pace()
-			if _state_left <= 0.0:
+			# Its own clock only shows the telegraph's progress, slowed as the wind-up is (a chill,
+			# a freeze: `Caster` holds the cast in Spells); the attack goes on once the cast left.
+			_state_left = maxf(_state_left - delta * _pace(), 0.0)
+			if actor.caster == null or not actor.caster.is_winding(chosen):
 				_release(intent)
 		State.CHANNEL:
 			_channel(delta, intent)
@@ -300,12 +303,13 @@ func think(delta: float, intent: ActorIntent) -> void:
 
 ## True from the start of a windup until its cast leaves: the attack is coming.
 func is_telegraphing() -> bool:
-	return state == State.WINDUP
+	# Read from the cast itself, so the warning ends the step the cast leaves.
+	return state == State.WINDUP and warns() and actor.caster != null and actor.caster.is_winding(chosen)
 
 
 ## 0.0 at the start of the telegraph, 1.0 when the cast leaves; 0.0 when not telegraphing.
 func telegraph_progress() -> float:
-	if state != State.WINDUP or windup_time <= 0.0:
+	if not is_telegraphing() or windup_time <= 0.0:
 		return 0.0
 	return clampf(1.0 - _state_left / windup_time, 0.0, 1.0)
 
@@ -322,20 +326,11 @@ func warns() -> bool:
 	return actor == null or actor.team() != ActorsScript.TEAM_WIZARDS
 
 
-## The windup the next attack of staff `at` would take (seconds), for its telegraph; 0 for an ally
-## (`warns`).
+## The windup the next attack of staff `at` would take (seconds): its cast's wind-up, its staff's
+## and its cards' (`CastSense.wind_up`; docs/milestones/cast-timing.md), whoever drives it.
 func windup_for(at: int) -> float:
-	if not warns():
-		return 0.0
 	var sense: CastSense = _sense_of(at)
-	if sense == null:
-		return snappedf(WINDUP_BASE * profile.windup_scale, TIME_GRAIN)
-	if not sense.harms():
-		return maxf(snappedf(WINDUP_HARMLESS * profile.windup_scale, TIME_GRAIN), TIME_GRAIN)
-	var danger: float = sense.damage * WINDUP_PER_DAMAGE
-	if sense.area or sense.blast > 0.0:
-		danger += WINDUP_AREA
-	return maxf(snappedf(clampf(WINDUP_BASE + danger, WINDUP_MIN, WINDUP_MAX) * profile.windup_scale, TIME_GRAIN), TIME_GRAIN)
+	return sense.wind_up if sense != null else 0.0
 
 
 ## The rest after a cast of staff `at` (seconds).
@@ -673,15 +668,12 @@ func _chase(intent: ActorIntent) -> void:
 	if plan_staff < 0 or actor.caster == null:
 		return
 	var windup: float = windup_for(plan_staff)
-	if not actor.caster.cast_ready(windup, plan_staff):
+	if not actor.caster.cast_ready(0.0, plan_staff):
 		# Not ready yet: wait as planned, so the telegraph only ever shows a cast that comes.
 		return
 	if _begin_call(windup, intent):
 		return
 	_begin_windup(plan_staff, windup, aim_way, intent)
-	if windup <= 0.0:
-		# No warning to give (an ally): the cast leaves this step.
-		_release(intent)
 
 
 ## Before an attack that winds up, with teamwork (as often as `teamwork`), its team not calling
@@ -721,12 +713,14 @@ func _call(delta: float, intent: ActorIntent) -> void:
 	if _state_left > 0.0:
 		return
 	var windup: float = windup_for(plan_staff) if plan_staff >= 0 else 0.0
-	if plan_staff >= 0 and actor.caster != null and actor.caster.cast_ready(windup, plan_staff):
+	if plan_staff >= 0 and actor.caster != null and actor.caster.cast_ready(0.0, plan_staff):
 		_begin_windup(plan_staff, windup, now, intent)
 	else:
 		_to_chase()
 
 
+## The attack starts: the staff is pressed now and its cast winds up in Spells for `windup`
+## seconds (docs/milestones/cast-timing.md); with none it leaves this step.
 func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) -> void:
 	chosen = at
 	_chosen_sense = _sense_of(at)
@@ -734,16 +728,19 @@ func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) ->
 	recover_time = rest_for(at)
 	state = State.WINDUP
 	_state_left = windup
-	_locked_aim = _aim_for(_chosen_sense, now)
+	_aim_error = rng.randf_range(-1.0, 1.0) * (1.0 - profile.accuracy) * AIM_ERROR
+	_locked_aim = _aim_for(_chosen_sense, now, _aim_error)
 	intent.aim = _locked_aim
+	intent.press(at)
 	_press_on(intent)
 	if board != null:
 		board.started(actor.team(), actor.id)
+	if windup <= 0.0:
+		_release(intent)
 
 
-## The windup is over: the cast leaves, then it channels or rests.
+## The windup is over and the cast has left: it channels or rests.
 func _release(intent: ActorIntent) -> void:
-	intent.press(chosen)
 	var sense: CastSense = _chosen_sense
 	if sense != null and sense.repeats_held and not sense.sustained and profile.channel_max > 0.0:
 		state = State.CHANNEL
@@ -811,8 +808,9 @@ func _press_on(intent: ActorIntent) -> void:
 
 
 ## Where to aim a cast of `sense` at what the plan aims at (`_aim_node`), `now` away: ahead of a
-## moving one by its flight (`lead`), then off by the profile's aim error, once.
-func _aim_for(sense: CastSense, now: Vector2) -> Vector2:
+## moving one by its flight (`lead`), then off by `error` radians (the profile's aim error, drawn
+## once an attack).
+func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
 	var point: Vector2 = now
 	var aimed: Node2D = _aim_node()
 	var aimed_actor: Actor = aimed as Actor
@@ -824,7 +822,6 @@ func _aim_for(sense: CastSense, now: Vector2) -> Vector2:
 			point += body.velocity * (point.length() / sense.speed) * profile.lead
 	if point == Vector2.ZERO:
 		point = actor.aim
-	var error: float = rng.randf_range(-1.0, 1.0) * (1.0 - profile.accuracy) * AIM_ERROR
 	return point.normalized().rotated(error)
 
 

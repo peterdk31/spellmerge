@@ -12,6 +12,7 @@ id = &"storm_fork"
 display_name = "Storm Fork's staff"
 slots = 3
 draw = 1
+wind_up = 0.75
 cooldown = 0.0
 spread = 0.0
 max_mana = 30.0

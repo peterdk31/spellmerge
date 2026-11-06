@@ -12,6 +12,7 @@ id = &"bone_scepter"
 display_name = "Bone Scepter's staff"
 slots = 3
 draw = 1
+wind_up = 1.0
 cooldown = 0.0
 spread = 0.0
 max_mana = 30.0

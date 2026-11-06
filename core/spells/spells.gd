@@ -1053,6 +1053,27 @@ func _release_winds() -> void:
 			return
 
 
+## `actor`'s winding casts leave no more and its staffs are free (a new driver took the body: the
+## cast was the old one's; docs/milestones/cast-timing.md).
+func cancel_winds(actor: int) -> void:
+	if _winding <= 0 or actor < 0 or actor >= ACTORS:
+		return
+	for staff in SpellLimits.STAFFS:
+		_cancel_wind(actor * SpellLimits.STAFFS + staff)
+
+
+## `actor`'s winding casts wait `seconds` longer (its Caster asks while the body is slowed: a chill
+## stretches a wind-up, a freeze holds it; docs/milestones/cast-timing.md). Allocates nothing.
+func hold_winds(actor: int, seconds: float) -> void:
+	if _winding <= 0 or seconds <= 0.0 or actor < 0 or actor >= ACTORS:
+		return
+	for staff in SpellLimits.STAFFS:
+		var index: int = actor * SpellLimits.STAFFS + staff
+		if _wind_due[index] != INF:
+			_wind_due[index] += seconds
+			_cooldown[index] += seconds
+
+
 ## Staff `index`'s winding cast leaves no more (down, rebuilt, its caster gone): the staff is free
 ## and nothing was paid.
 func _cancel_wind(index: int) -> void:

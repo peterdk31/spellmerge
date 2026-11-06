@@ -150,6 +150,12 @@ func step(delta: float) -> void:
 	for at in staff_count:
 		var base: StaffBase = staff_of(at)
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
+	if actor.spells != null and actor.combat != null:
+		# A slowed body winds up slower: a chill stretches a wind-up, a freeze holds it
+		# (docs/milestones/cast-timing.md).
+		var pace: float = actor.combat.own_pace(actor, actor.id)
+		if pace < 1.0:
+			actor.spells.hold_winds(number, delta * (1.0 - pace))
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
 		# was sent (performance pass, 2026-10-28).
@@ -259,6 +265,17 @@ func free_mana(at: int) -> float:
 ## True when staff `at` has a build that can cast.
 func has_staff(at: int) -> bool:
 	return actor.spells != null and number >= 0 and at >= 0 and at < staff_count and _has_build[at] != 0
+
+
+## True while staff `at` winds up a cast (pressed, not yet left; docs/milestones/cast-timing.md).
+func is_winding(at: int) -> bool:
+	return has_staff(at) and actor.spells.is_winding(number, at)
+
+
+## Every cast this actor winds up leaves no more, for free (its driver changed: `Actor.drive`).
+func cancel_winds() -> void:
+	if actor.spells != null and number >= 0:
+		actor.spells.cancel_winds(number)
 
 
 ## True while staff `at` holds a sustained card on.

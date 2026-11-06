@@ -12,6 +12,7 @@ id = &"rime_crook"
 display_name = "Rime Crook's staff"
 slots = 3
 draw = 1
+wind_up = 0.7
 cooldown = 0.0
 spread = 0.0
 max_mana = 20.0

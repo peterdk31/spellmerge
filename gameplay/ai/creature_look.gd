@@ -135,7 +135,7 @@ func step(delta: float) -> void:
 	if ai_view or _ai_label != null:
 		_show_ai_view()
 	var ai: AIController = _ai
-	var telegraphing: bool = ai != null and ai.state == AIController.State.WINDUP
+	var telegraphing: bool = ai != null and ai.is_telegraphing()
 	if telegraphing != _showing:
 		_show_telegraph(telegraphing, ai)
 	elif telegraphing:
@@ -229,7 +229,7 @@ func _update_telegraph(progress: float) -> void:
 		sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
 	if telegraph == null:
 		return
-	# The aim is locked through the windup; a swap or a possession may still turn the actor.
+	# The aim follows the target through the windup (docs/milestones/cast-timing.md).
 	telegraph.rotation = actor.aim.angle()
 	var material: ShaderMaterial = telegraph.material as ShaderMaterial
 	if material != null:

@@ -89,8 +89,13 @@ Each part is one PR; in this order.
 3. **T3: skipping.** An unaffordable cast is skipped (the cursor moves on, a fizzle cue, the cooldown past the cycle's end). `cast_ready` and `next_cast_*` read the cast a press would fire.
 4. **T4: the retune.** The table above, the staffs' numbers.
 5. **T5: the corner panel and the builder.** The staff row's bar shows the wind-up, the wind-down and the cooldown (dashed); an unaffordable cast shows dimmed. The builder's plan shows each cast's wind-up and wind-down and the cycle's time.
-6. **T6: enemies.** Enemy staffs' `wind_up`; the telegraph read from the caster's wind-up; the brain's `WINDUP` timer, `windup_scale` and the aim lock gone, the AI aiming through the wind-up.
+6. **T6: enemies.** Enemy staffs' `wind_up`; the telegraph read from the caster's wind-up; the brain's `WINDUP` timer, `windup_scale` and the aim lock gone, the AI aiming through the wind-up. A chill stretches a wind-up and a freeze holds it, for every caster (`Spells.hold_winds`); a new driver cancels a body's winding casts.
 7. **T7: the charge card.**
+
+Proposed by the owner while T6 was built (2026-11-06), not yet planned:
+
+- **T6b (proposed, after T7): the telegraph as a cue.** A card names a `wind_cue` (a lane, a ring where a slam lands, a circle round a nova), played for the wind-up's length and following the aim, only for a caster not on the players' team; `CreatureLook` drops its own line.
+- **T8 (proposed, after T7): the timer winds up.** `timer` loses `interval` for a `wind_up` of its own; each tick its payload winds up and leaves, then it re-arms, so cards change its pace (a `wind_up_mult` to shorten one).
 
 The native kernels are untouched: cast timing lives in `Spells` (GDScript). Pending launches are already sim state (core/sim/README.md).
 

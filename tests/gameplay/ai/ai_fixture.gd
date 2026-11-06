@@ -24,9 +24,13 @@ const STEP: float = 0.0625
 static var _exact: AIProfile = null
 
 
-## A plain staff (no cooldown unless `delay`, a pool of `max_mana` filling at `regen` a second)
-## holding `cards` (ids by slot), one per slot.
-static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0) -> StaffCards:
+## Seconds an enemy test staff winds up (its telegraph; docs/milestones/cast-timing.md).
+const WIND_UP: float = 0.5
+
+
+## A plain enemy staff (winding up `wind_up`, no cooldown unless `delay`, a pool of `max_mana`
+## filling at `regen` a second) holding `cards` (ids by slot), one per slot.
+static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1000.0, delay: float = 0.0, wind_up: float = WIND_UP) -> StaffCards:
 	var ids: Array[StringName] = []
 	for id: Variant in cards:
 		ids.append(StringName(str(id)))
@@ -34,6 +38,7 @@ static func staff_entry(cards: Array, max_mana: float = 1000.0, regen: float = 1
 	staff.id = &"test"
 	staff.slots = maxi(ids.size(), 1)
 	staff.cooldown = delay
+	staff.wind_up = wind_up
 	staff.max_mana = max_mana
 	staff.mana_regen = regen
 	return StaffCards.make(staff, ids)

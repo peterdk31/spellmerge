@@ -12,6 +12,7 @@ id = &"splinter"
 display_name = "Splinter's staff"
 slots = 1
 draw = 1
+wind_up = 0.6
 cooldown = 1.75
 spread = 0.0
 max_mana = 25.0

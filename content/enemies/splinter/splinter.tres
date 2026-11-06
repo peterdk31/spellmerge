@@ -12,10 +12,10 @@ id = &"splinter"
 display_name = "Splinter's staff"
 slots = 1
 draw = 1
-cooldown = 0.0
+cooldown = 1.75
 spread = 0.0
-max_mana = 20.0
-mana_regen = 5.0
+max_mana = 25.0
+mana_regen = 12.5
 
 [sub_resource type="Resource" id="Resource_entry"]
 script = ExtResource("4_entry")

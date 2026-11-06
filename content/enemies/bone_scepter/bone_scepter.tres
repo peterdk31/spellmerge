@@ -15,7 +15,7 @@ draw = 1
 cooldown = 0.0
 spread = 0.0
 max_mana = 30.0
-mana_regen = 4.0
+mana_regen = 5.5
 
 [sub_resource type="Resource" id="Resource_entry"]
 script = ExtResource("4_entry")

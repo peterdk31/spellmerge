@@ -54,9 +54,10 @@ var _wave_index: PackedInt32Array = PackedInt32Array()
 var _bm_count: PackedInt32Array = PackedInt32Array()
 var _bm_turn: PackedFloat32Array = PackedFloat32Array()
 ## A Penta copy turns with its ring (`CarrierKit.ring_radius`): the ring's centre, and its radius,
-## the copy's angle on it at the clock `z` it started (radius 0: on no ring).
+## the copy's angle on it at the clock `z` it started and how fast it turns, `w` (radius 0: on no
+## ring).
 var _bm_ring_centre: PackedVector2Array = PackedVector2Array()
-var _bm_ring: PackedVector3Array = PackedVector3Array()
+var _bm_ring: PackedVector4Array = PackedVector4Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
 var _bm_prev: PackedInt64Array = PackedInt64Array()
 ## What live beam `at` hits with when not its spell's own `hit` (null): an echo's half, and what
@@ -430,7 +431,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_caster_seq[at] = caster_seq
 	_bm_turn[at] = 0.0
 	_bm_ring_centre[at] = kit.ring_centre()
-	_bm_ring[at] = Vector3(kit.ring_radius(), kit.ring_angle(), kit.clock())
+	_bm_ring[at] = Vector4(kit.ring_radius(), kit.ring_angle(), kit.clock(), kit.ring_turn())
 	var legs: int = maxi(spell.pierce, 0) + 1
 	_fit_beam_legs(legs)
 	for leg in legs:
@@ -502,9 +503,9 @@ func _beam_follow(at: int) -> void:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 	elif _bm_ring[at].x > 0.0:
 		# A Penta copy cast by its point turns with its ring, still aimed in at the centre.
-		var ring: Vector3 = _bm_ring[at]
+		var ring: Vector4 = _bm_ring[at]
 		var centre: Vector2 = _bm_ring_centre[at]
-		var angle: float = ring.y + SpellLimits.PENTA_TURN * (kit.clock() - ring.z)
+		var angle: float = ring.y + ring.w * (kit.clock() - ring.z)
 		_bm_origin[at] = kit.ring_point(centre, ring.x, angle)
 		if not _bm_origin[at].is_equal_approx(centre):
 			_bm_dir[at] = _bm_origin[at].direction_to(centre).rotated(_bm_turn[at])

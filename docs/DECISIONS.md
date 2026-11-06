@@ -6,7 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 - **Before:** each cast turned the ring to a new random angle, so casts in a row jumped, and a held ring stood still.
 - **Now (owner: "Instead of Penta rotating in steps. It should rotate continuously if eg. Held"; "Both"):** the ring's angle is `SpellRuntime.penta_angle(tag, clock)`: a start of the card's own plus `SpellLimits.PENTA_TURN` (π a second) times the clock. Casts in a row stand where it has turned to; a beam copy (`CarrierBeam`, `_bm_ring`) turns with its ring while it lasts, still aimed in at the centre. Nothing else needed a rule: a still shot stays where it was placed and a flying shot flies off, as they do from any caster.
-- **Not:** the ring does not follow its centre ("Don't let it follow the centre"). `mirror` does not turn it the other way: that did not come out of the rules ("Only if the mirror thing is a case that makes sense logically").
+- **Not:** the ring does not follow its centre ("Don't let it follow the centre"). `mirror` first did not turn it the other way (it did not come out of the rules, and its second cast skipped Penta: five ring copies and one plain copy backwards); the owner then asked for it ("Make mirror cast a second ring turning the other way"): `_fire_spell` casts a mirror's Penta as a second ring, `way_round` -1.
 
 ## 2026-11-06: A payload spares the body that fired it until clear of it; runes arm (owner's decision)
 

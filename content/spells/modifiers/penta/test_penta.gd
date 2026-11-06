@@ -165,6 +165,31 @@ func test_held_beams_turn_with_the_ring_and_stay_aimed_in() -> void:
 			check(way.dot(-origin.normalized()) > 0.99, "aimed in at the centre (%s)" % way)
 
 
+## Mirror casts a second ring turning the other way (owner, 2026-11-06): ten held beams, five
+## turning each way, all on the ring round the caster.
+func test_mirror_casts_a_second_ring_turning_the_other_way() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["mirror", "hold", "penta", "beam"])
+	check(_arena.cast(0, 0), "cast")
+	var beams: CarrierBeam = CarrierBeam.of(_arena.spells)
+	_arena.run(1.0 / 60.0)
+	var before: Array[Vector2] = _beam_origins(beams)
+	_arena.run(0.25)
+	var after: Array[Vector2] = _beam_origins(beams)
+	check_equal(after.size(), 10, "two rings of five")
+	var forward: int = 0
+	var back: int = 0
+	for n in after.size():
+		check(is_equal_approx(after[n].length(), SpellLimits.PENTA_RING), "each on the ring (%s)" % after[n])
+		var turned: float = before[n].angle_to(after[n])
+		if absf(turned - SpellLimits.PENTA_TURN * 0.25) < 0.05:
+			forward += 1
+		elif absf(turned + SpellLimits.PENTA_TURN * 0.25) < 0.05:
+			back += 1
+	check_equal(forward, 5, "five turn one way")
+	check_equal(back, 5, "and five the other")
+
+
 func _beam_origins(beams: CarrierBeam) -> Array[Vector2]:
 	var out: Array[Vector2] = []
 	for at in beams.beam_slots():

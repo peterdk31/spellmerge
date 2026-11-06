@@ -352,6 +352,8 @@ var _caster_seq: int = 0
 var _ring_centre: Vector2 = Vector2.ZERO
 var _ring_radius: float = 0.0
 var _ring_angle: float = 0.0
+## How fast and which way that ring turns, radians a second (negative: a mirror's ring).
+var _ring_turn: float = 0.0
 
 ## The ray being sent (`RayHit`): what a hit with no shot slot is (a beam's, a swing's, a slam's, a
 ## dash's, a rain's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
@@ -1243,7 +1245,12 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, heading)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
-		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
+		# A Penta's mirror is a second ring turning the other way (owner, 2026-11-06).
+		var backwards: int = 0
+		if spell.behaviour(ModifierBase.Behaviour.PENTA) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
+			backwards = _penta(spell, tag, actor, origin, -heading, source, -1.0)
+		else:
+			backwards = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
 			_recoil(spell, tag, actor, -heading)
@@ -1280,9 +1287,10 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 ## held button, a rain cast again) stand where the ring has turned to, and a copy that stays on
 ## its point and aims from it (a beam) turns with it while it lasts (`_ring_*`, CarrierBeam). A
 ## still shot stays where it was placed, as anywhere, and a flying one flies off. It does not
-## follow its centre (owner: "Don't let it follow the centre"). Each point stops short of a wall,
+## follow its centre (owner: "Don't let it follow the centre"). `mirror` casts a second ring
+## turning the other way (`way_round` -1; owner, 2026-11-06). Each point stops short of a wall,
 ## and each copy is cast by its point. Returns the shots made.
-func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node, way_round: float = 1.0) -> int:
 	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
 	# The centre: a wizard's body (its anchor), else the point or shot casting this payload.
@@ -1290,7 +1298,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	if _caster == CASTER_WIZARD and projectiles != null and projectiles.get_anchor(actor).is_finite():
 		centre = projectiles.get_anchor(actor)
 	# Where the turning ring stands now: the card's own start, turned by the clock.
-	var turned: float = SpellRuntime.penta_angle(tag, _clock)
+	var turned: float = SpellRuntime.penta_angle(tag, _clock, way_round)
 	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
 	var carried: float = _carrier_of(spell).reach_of(spell)
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
@@ -1303,6 +1311,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	var made: int = 0
 	_ring_centre = centre
 	_ring_radius = radius
+	_ring_turn = SpellLimits.PENTA_TURN * way_round
 	for n in copies:
 		_ring_angle = turned + TAU * float(n) / float(copies)
 		var point: Vector2 = SpellRuntime.ring_point(projectiles, centre, radius, _ring_angle)
@@ -1310,6 +1319,7 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 		made += _launch(spell, tag, actor, point, aim, source)
 	_ring_radius = 0.0
 	_ring_angle = 0.0
+	_ring_turn = 0.0
 	_ring_centre = Vector2.ZERO
 	_caster = outer_caster
 	_caster_seq = outer_seq
@@ -1318,9 +1328,9 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 
 ## The angle a Penta ring of the card with `tag` stands at when the clock reads `at`: a start of
 ## its own (the same on every machine, and another for another card or build) turned at
-## SpellLimits.PENTA_TURN.
-static func penta_angle(tag: int, at: float) -> float:
-	return float(posmod(hash(tag), 4096)) / 4096.0 * TAU + SpellLimits.PENTA_TURN * at
+## SpellLimits.PENTA_TURN, the other way for `way_round` -1 (a mirror's ring).
+static func penta_angle(tag: int, at: float, way_round: float = 1.0) -> float:
+	return float(posmod(hash(tag), 4096)) / 4096.0 * TAU + SpellLimits.PENTA_TURN * way_round * at
 
 
 ## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.

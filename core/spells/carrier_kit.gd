@@ -85,6 +85,11 @@ func ring_angle() -> float:
 	return _rt._ring_angle
 
 
+## How fast and which way that ring turns, radians a second.
+func ring_turn() -> float:
+	return _rt._ring_turn
+
+
 ## The point at `angle` on such a ring, stopped short of a wall.
 func ring_point(centre: Vector2, radius: float, angle: float) -> Vector2:
 	return SpellRuntime.ring_point(_rt.projectiles, centre, radius, angle)

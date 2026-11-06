@@ -8,7 +8,8 @@ extends "res://tests/support/screenshot.gd"
 ## staff, one with a wasted card and a long one. Shots: one player just after casting (with a 3x
 ## crop of the panel), then four players, each having cast something else (with a 3x crop of
 ## each corner), and the same four corners again with the pause menu's other reload switch, the
-## shade on the next cast (`hud_staffs_next_cast_p1-4`).
+## shade on the next cast (`hud_staffs_next_cast_p1-4`); and cast timing's looks by hand
+## (`hud_staffs_cast_timing`: a wind-up, casts short of mana, a fizzle).
 
 ## The staffs every wizard starts with: a dash; three casts; two triggers before the same
 ## carrier, the second with nothing left to fire (wasted); a long staff that does not fit the row.
@@ -46,6 +47,7 @@ func take() -> void:
 	var image: Image = await grab()
 	save(image, "hud_staffs_one_player")
 	save_crop(image, CORNERS[0], "hud_staffs_one_player_panel", HALF, 3)
+	await _cast_timing_states()
 	_flow.call("stop_run")
 	await settle(3)
 	for index in range(1, 4):
@@ -85,3 +87,24 @@ func _cast_all(players: int) -> void:
 				tap(index, casts[round])
 		await settle(8)
 	await settle(6)
+
+
+## Cast timing's looks (docs/milestones/cast-timing.md, T5), set by hand on player 1's rows (the
+## dev staff's mana pays everything): the dash winding up half way, the three-cast staff skipping
+## to its third cast (the two before it short of mana), the third staff paying none (every cast
+## left short), and the long staff just fizzled (`hud_staffs_cast_timing`).
+func _cast_timing_states() -> void:
+	var hud: Node = root.get_node("Hud")
+	hud.set_process(false)
+	var panel: Node = hud.call("get_panel", 0)
+	(panel.call("staff_row", 0) as Object).call("set_timing", 0, 0.4, true)
+	(panel.call("staff_row", 0) as Object).call("set_timing", 0, 0.2, true)
+	(panel.call("staff_row", 1) as Object).call("set_timing", 0, 0.0, false, 2)
+	(panel.call("staff_row", 2) as Object).call("set_timing", 0, 0.0, false, -1)
+	(panel.call("staff_row", 3) as Object).call("set_timing", 0, 0.0, false)
+	(panel.call("staff_row", 3) as Object).call("fizzle")
+	await settle(1)
+	var image: Image = await grab()
+	save_crop(image, CORNERS[0], "hud_staffs_cast_timing", HALF, 3)
+	hud.set_process(true)
+

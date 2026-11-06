@@ -2895,6 +2895,13 @@ func _firing_cast(index: int, mana: float) -> int:
 	return -1
 
 
+## Which cast of this actor's staff's cycle a press with `mana` fires (an unaffordable one is
+## skipped; docs/milestones/cast-timing.md, T3), -1 when the mana pays none left in the cycle or it
+## has no build: what the corner panel marks.
+func firing_cast(actor: int, staff: int, mana: float) -> int:
+	return _firing_cast(actor * SpellLimits.STAFFS + staff, mana) if _in_range(actor, staff) else -1
+
+
 ## The cast a press of this staff with `mana` would fire (`_firing_cast`), else the one at its
 ## cursor; null with no build.
 func _next_cast(actor: int, staff: int, mana: float) -> CompiledCast:

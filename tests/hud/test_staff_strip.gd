@@ -333,3 +333,58 @@ func test_a_rim_marks_the_staff_ready_for_a_few_frames() -> void:
 	for i in RowScript.RIM_FRAMES:
 		row.set_timing(1, 0.0)
 	check(not row.is_rimmed(), "and goes after a few frames")
+
+
+# --- Cast timing (docs/milestones/cast-timing.md, part T5) --------------------------------------
+
+func test_a_wind_up_charges_up_from_the_bottom() -> void:
+	var row: RowScript = _hand_row()
+	row.set_timing(0, 0.4, true)
+	await process_frame
+	await process_frame
+	var early: Rect2 = row.drawn_shade()
+	row.set_timing(0, 0.1, true)
+	await process_frame
+	await process_frame
+	var late: Rect2 = row.drawn_shade()
+	check(row.is_winding(), "it winds up")
+	check(late.size.y > early.size.y, "the charge grows as it winds up: %s then %s" % [early, late])
+	check_equal(late.end.y, early.end.y, "from the bottom, where a wait pulls back from the top")
+	check(not row.is_recharging(), "a wind-up is no recharge")
+	check_equal(row.drawn_outline(), 0, "the cast winding up keeps its gold frame")
+
+
+func test_the_gold_frame_marks_the_cast_the_mana_pays() -> void:
+	var row: RowScript = _hand_row()
+	row.set_timing(0, 0.0, false, 2)
+	await process_frame
+	await process_frame
+	check_equal(row.drawn_outline(), 2, "the press skips to the third cast: it is marked")
+	check(row.is_short(0) and row.is_short(1), "the two it skips are short of mana")
+	check(not row.is_short(2), "the one it fires is not")
+	row.set_timing(1, 0.0, false, -1)
+	await process_frame
+	await process_frame
+	check_equal(row.drawn_outline(), -1, "with no cast left the mana pays, none is marked")
+	check(not row.is_short(0) and row.is_short(1) and row.is_short(2), "every cast left is short")
+
+
+func test_the_hud_reads_the_staffs_mana_and_wind_up() -> void:
+	_build(0, 0, 2)
+	_bus.staff_mana_changed.emit(0, 0, 0.0, 100.0)
+	_hud.step_staffs()
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	check(row.is_short(0) and row.is_short(1), "no mana: both casts are short")
+	_bus.staff_mana_changed.emit(0, 0, 100.0, 100.0)
+	_hud.step_staffs()
+	check(not row.is_short(0), "with mana they are not")
+
+
+func test_a_fizzle_flashes_the_glyph() -> void:
+	_build(0, 0, 2)
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	_spells.cast_staff(_caster(0), 0, Vector2.ZERO, Vector2.RIGHT, 0.0)
+	check(row.is_fizzling(), "a press its mana pays nothing for flashes the row")
+	for frame in RowScript.RIM_FRAMES + 1:
+		_tick(1)
+	check(not row.is_fizzling(), "for a few frames")

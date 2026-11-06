@@ -138,7 +138,9 @@ func test_carriers_ask_the_runtime_only_through_the_kit_and_the_runtime_names_no
 			number += 1
 			check(not line.contains("._rt") and not line.contains("SpellRuntime._"), "%s:%d asks the runtime only through the kit: %s" % [path, number, line.strip_edges()])
 	var names: PackedStringArray = []
-	for id: StringName in Carriers.ids():
+	var every: Array[StringName] = Carriers.ids()
+	every.append_array([Carriers.ON_CASTER, Carriers.AT_POINT])
+	for id: StringName in every:
 		names.append('&"%s"' % id)
 		names.append(String(Carriers.of(id).get_script().get_global_name()))
 	var number: int = 0

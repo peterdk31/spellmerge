@@ -63,7 +63,7 @@ const DECOY: StringName = &"decoy"
 const FAMILIAR: StringName = &"familiar"
 const PLAYER_SLOTS: int = 4
 ## `entity_spawn_requested`'s anchor when it is the caster's body, and when it is the point it was made at.
-const CASTER_WIZARD: int = -1
+const CASTER_BODY: int = -1
 const CASTER_POINT: int = -2
 ## Live entities of one kind a seated owner, or another owner, may have.
 const PER_PLAYER: int = 4
@@ -321,7 +321,7 @@ func clear() -> void:
 	queue_redraw()
 
 
-func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: float, tag: int, anchor: int = CASTER_WIZARD) -> void:
+func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: float, tag: int, anchor: int = CASTER_BODY) -> void:
 	var owner: int = _owner_of(caster, tag)
 	if owner < 0 or not at.is_finite() or is_nan(seconds):
 		return
@@ -352,10 +352,10 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_born[row] = _spawned
 	_spawned += 1
 	_live += 1
-	var wizard: Node2D = _body_of(owner) if anchor == CASTER_WIZARD or kind == DECOY else null
+	var wizard: Node2D = _body_of(owner) if anchor == CASTER_BODY or kind == DECOY else null
 	_centre_at[row] = Vector2.INF
 	_centre_slot[row] = -1
-	if kind == FAMILIAR and anchor != CASTER_WIZARD:
+	if kind == FAMILIAR and anchor != CASTER_BODY:
 		# A trigger made it: it circles the shot that fired the trigger, or the point.
 		_centre_at[row] = at
 		if anchor >= 0 and projectiles != null and projectiles.is_alive(anchor):

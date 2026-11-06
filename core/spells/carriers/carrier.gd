@@ -65,6 +65,13 @@ func required_fields() -> Dictionary:
 	return {}
 
 
+## True when a cast of it adds a cooldown of its own to its staff's delay (its form card's
+## `cooldown`), so a card's cooldown factor changes something: every carrier a form card fires,
+## not a fallback carrier (`CarrierFallback`), which has no form card.
+func has_cooldown() -> bool:
+	return true
+
+
 ## The kind of its hits (`HitProfile.kind`), &"" for a shot's own.
 func hit_kind() -> StringName:
 	return &""

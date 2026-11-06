@@ -5,7 +5,7 @@ extends RefCounted
 ## leaves behind. A carrier (and the runtime's own helpers, `CasterMoves` and `StaffPoses`) uses
 ## only this, never the runtime's own members, so this file is the whole of what a new carrier
 ## needs to know about `Spells`. Each call is the runtime's one rule for it, shared by every carrier.
-## The runtime's constants (`SpellRuntime.ACTORS`, `HITS`, `CASTER_WIZARD`, `CASTER_POINT`, the
+## The runtime's constants (`SpellRuntime.ACTORS`, `HITS`, `CASTER_BODY`, `CASTER_POINT`, the
 ## live carrier kinds `LC_*`) are read from `SpellRuntime` itself.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -60,7 +60,7 @@ func carrier_of(spell: CompiledSpell) -> Carrier:
 	return _rt._carrier_of(spell)
 
 
-## Who casts the launch being fired: `SpellRuntime.CASTER_WIZARD` (the actor's body),
+## Who casts the launch being fired: `SpellRuntime.CASTER_BODY` (the actor's body),
 ## `CASTER_POINT` (a point), or the slot of the shot that fired it (see `caster_seq`).
 func caster() -> int:
 	return _rt._caster
@@ -247,9 +247,10 @@ func strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arra
 	return _rt._strike(spell, tag, actor, found, struck, centre, chain, prev, hit)
 
 
-## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own).
-func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile) -> void:
-	_rt._strike_round(spell, tag, actor, at, way, reach, hit)
+## `spell` with `tag` strikes every body within `reach` of `at` at once, with `hit` (null: its own);
+## with `everyone`, its caster's own body too (a fallback's strike, as a blast's).
+func strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, everyone: bool = false) -> void:
+	_rt._strike_round(spell, tag, actor, at, way, reach, hit, everyone)
 
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
@@ -290,7 +291,7 @@ func fire_payloads(spell: CompiledSpell, event: int, tag: int, actor: int, at: V
 
 
 ## A trigger fires `group` from `at` along `heading`, cast by `caster` (`CASTER_POINT`,
-## `CASTER_WIZARD` or a shot's slot), now or when this step's budget has room. Nothing is dropped.
+## `CASTER_BODY` or a shot's slot), now or when this step's budget has room. Nothing is dropped.
 func fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Vector2, heading: Vector2, source: Node, caster_slot: int) -> void:
 	_rt._fire(group, actor, staff, generation, at, heading, source, caster_slot)
 

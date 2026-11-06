@@ -437,7 +437,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	for leg in legs:
 		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
 	_bm_count[at] = 0
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		if kit.aim_dir(actor).is_finite():
 			_bm_turn[at] = kit.aim_dir(actor).angle_to(heading)
 	else:
@@ -486,7 +486,7 @@ func _beam_follow(at: int) -> void:
 		_leg_follow(at)
 		return
 	var caster: int = _bm_caster[at]
-	if caster == SpellRuntime.CASTER_WIZARD:
+	if caster == SpellRuntime.CASTER_BODY:
 		var actor: int = _bm_actor[at]
 		if kit.aim_origin(actor).is_finite():
 			_bm_origin[at] = kit.aim_origin(actor)

@@ -9,8 +9,9 @@ extends RefCounted
 ## for the next carrier, whose payload is the group read right after it (with more triggers, each
 ## takes the next group in turn). Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
-## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
-## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
+## land on a fallback carrier (`Carriers.fallback`): the caster (the cast's own group) or the
+## payload's origin (a payload), by the same rules as any carrier. Nothing is refused: a card that
+## does nothing is listed as wasted (`wasted`); the builder shows it.
 
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
@@ -142,36 +143,12 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		elif card is FormBase:
 			var form := card as FormBase
 			var on: Carrier = Carriers.of(form.carrier)
-			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
-			# changes nothing else either.
-			var kept_modifiers: Array[ModifierBase] = []
-			var deflects: bool = false
-			var blasts: bool = false
-			for modifier in modifiers:
-				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
-				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
-			for modifier in modifiers:
-				# A deflect turns every shot that touches it first, so a shield with it never blocks.
-				var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts)
-				if works or keep_wasted:
-					kept_modifiers.append(modifier)
-			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
-			var kept_elements: Array[ElementBase] = []
-			for element in elements:
-				if on.takes_element(element, blasts) or keep_wasted:
-					kept_elements.append(element)
-			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
+			var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers)
+			var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
+			var spell: CompiledSpell = _build(form, on, kept_elements, kept_modifiers, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
-			for at: int in kept:
-				var modifier := _cards[at] as ModifierBase
-				if modifier != null and not kept_modifiers.has(modifier):
-					_waste(at)
-				elif _cards[at] is ElementBase and not kept_elements.has(_cards[at]):
-					_waste(at)
-				else:
-					_attach(at, slot)
-					spell.card_slots.append(at)
+			_land(spell, kept, kept_modifiers, kept_elements, slot)
 			spell.card_slots.append(slot)
 			if form.carries_payload():
 				spell.own_payload = _read_group(1, true)
@@ -229,42 +206,68 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		spell.triggers.append(fires)
 
 
-## The cards left without a carrier, on the caster or on the payload's origin. Elements always
-## mean something there; a modifier that only steers a shot in flight is wasted.
+## The cards left without a carrier land on a fallback carrier (`Carriers.fallback`): the caster's
+## for the cast's own group, the payload origin's for a payload. Which of them do something there is
+## the same rule as on any carrier (its yes/no answers and what each card needs); when none does,
+## nothing lands and every one is wasted.
 func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kept: PackedInt32Array, payload: bool) -> CompiledSpell:
-	var target: int = TARGET_POINT if payload else TARGET_CASTER
-	var kept_modifiers: Array[ModifierBase] = []
-	var kept_slots: PackedInt32Array = PackedInt32Array()
-	for at: int in kept:
-		var card: SpellComponent = _cards[at]
-		if card is ElementBase:
-			kept_slots.append(at)
-			continue
-		var modifier := card as ModifierBase
-		if _means_something_there(modifier, payload):
-			kept_modifiers.append(modifier)
-			kept_slots.append(at)
-		else:
+	var on: Carrier = Carriers.fallback(payload)
+	var kept_modifiers: Array[ModifierBase] = _modifiers_on(on, modifiers)
+	var kept_elements: Array[ElementBase] = _elements_on(on, elements, kept_modifiers)
+	if kept_modifiers.is_empty() and kept_elements.is_empty():
+		for at: int in kept:
 			_waste(at)
-	if elements.is_empty() and kept_modifiers.is_empty():
 		return null
 	var kind: int = CompiledSpell.FALLBACK_POINT if payload else CompiledSpell.FALLBACK_CASTER
-	var spell: CompiledSpell = _build(null, elements, kept_modifiers, kind)
-	for at: int in kept_slots:
-		_attach(at, target)
-	spell.card_slots = kept_slots
+	var spell: CompiledSpell = _build(null, on, kept_elements, kept_modifiers, kind)
+	_land(spell, kept, kept_modifiers, kept_elements, TARGET_POINT if payload else TARGET_CASTER)
 	return spell
 
 
-func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
-	if ModifierBase.travel_only(modifier.behaviour):
-		return false
-	if modifier.behaviour == ModifierBase.Behaviour.SHIELD:
-		return not payload
-	if modifier.behaviour != ModifierBase.Behaviour.NONE:
-		return true
-	# A modifier of numbers only: it scales a hit (damage, size) or does nothing here.
-	return not is_equal_approx(modifier.damage_mult, 1.0) or not is_equal_approx(modifier.radius_mult, 1.0)
+## The modifiers of `modifiers` that do something on the carrier `on`, in order (every one with
+## `keep_wasted`): a behaviour it runs (`Carrier.works`; homing on a rune, return on a beam do
+## nothing, and change nothing else either) and numbers it uses (`_numbers_count`). The one rule for
+## a form's carrier and a fallback alike.
+static func _modifiers_on(on: Carrier, modifiers: Array[ModifierBase]) -> Array[ModifierBase]:
+	var deflects: bool = false
+	var blasts: bool = false
+	for modifier in modifiers:
+		deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and on.works(modifier.behaviour))
+		blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
+	var out: Array[ModifierBase] = []
+	for modifier in modifiers:
+		# A deflect turns every shot that touches it first, so a shield with it never blocks.
+		var works: bool = not (deflects and _shield_outrun(modifier, on)) and on.works(modifier.behaviour, blasts) and _numbers_count(modifier, on, blasts)
+		if works or keep_wasted:
+			out.append(modifier)
+	return out
+
+
+## The infusions of `elements` that count on the carrier `on` with `modifiers` on it (every one with
+## `keep_wasted`): an infusion is a hit's element, so on a carrier that hits nothing itself only a
+## blast carries it (`Carrier.takes_element`).
+static func _elements_on(on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> Array[ElementBase]:
+	var blasts: bool = false
+	for modifier in modifiers:
+		blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and on.works(modifier.behaviour))
+	var out: Array[ElementBase] = []
+	for element in elements:
+		if on.takes_element(element, blasts) or keep_wasted:
+			out.append(element)
+	return out
+
+
+## Each card of `kept` (slots, in order) on `spell`: attached to `target` (its carrier's slot, or
+## TARGET_CASTER / TARGET_POINT) when it is in `modifiers` or `elements`, the cards that work there,
+## else wasted.
+func _land(spell: CompiledSpell, kept: PackedInt32Array, modifiers: Array[ModifierBase], elements: Array[ElementBase], target: int) -> void:
+	for at: int in kept:
+		var card: SpellComponent = _cards[at]
+		if (card is ModifierBase and not modifiers.has(card)) or (card is ElementBase and not elements.has(card)):
+			_waste(at)
+		else:
+			_attach(at, target)
+			spell.card_slots.append(at)
 
 
 ## True when `trigger` can fire on `form` with these infusions and kept modifiers: all the trigger
@@ -293,15 +296,20 @@ static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 
 ## True when one of a modifier's numbers counts on the carrier `on` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
-## uses that number: damage where it hits (or blasts), speed and lifetime where it moves or lasts,
+## uses that number: a shorter cooldown where it has one of its own (`Carrier.has_cooldown`, not a
+## fallback carrier), damage where it hits (or blasts), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`Carrier.works`), its numbers ride with it.
 static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
 		return true
 	var any: bool = false
-	if modifier.cooldown_mult < 1.0 or not is_equal_approx(modifier.radius_mult, 1.0):
+	if not is_equal_approx(modifier.radius_mult, 1.0):
 		return true
+	if modifier.cooldown_mult < 1.0:
+		any = true
+		if on.has_cooldown():
+			return true
 	if modifier.damage_mult > 1.0:
 		any = true
 		if on.hits() or blasts:
@@ -335,8 +343,9 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool) ->
 	return not any
 
 
-## A compiled spell from a carrier (or none, for a fallback) and the cards that attach to it.
-func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
+## A compiled spell of the carrier `on` from its form card (none for a fallback carrier, whose
+## numbers are SpellLimits.FALLBACK_*) and the cards that attach to it.
+func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers: Array[ModifierBase], fallback: int) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.node = _out.nodes.size()
 	_out.nodes.append(spell)
@@ -355,11 +364,11 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
 	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	spell.lifetime = SpellLimits.MIN_LIFETIME
-	var carrier: Carrier = Carriers.of(form.carrier if form != null else &"")
+	var carrier: Carrier = on
+	spell.carrier = on.id()
 	if form != null:
 		spell.form_id = form.id
 		spell.form_name = _name(form)
-		spell.carrier = form.carrier
 		spell.lifetime = form.lifetime
 		spell.orbit_radius = form.orbit_radius
 		spell.ray_length = form.ray_length
@@ -466,9 +475,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.blast_hit = blast_hit(spell.hit)
 		if spell.echo_hit != null:
 			spell.echo_blast_hit = blast_hit(spell.echo_hit)
-	# The cards that land on a point strike everything there: an explosion too.
-	if form == null:
-		spell.hit.kind = &"burst"
 	var zap: float = spell.behaviour(ModifierBase.Behaviour.ZAP)
 	if zap > 0.0:
 		# The chance each body the shot passes is zapped, once (zap cards combine as chances,

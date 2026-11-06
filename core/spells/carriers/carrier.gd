@@ -185,7 +185,8 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 ## - `on expire` fires where it ended: a move's end is what it moved; a shot that pulls ends where
 ##   what it pulled arrives (that caster); anything else is gone, a point.
 ## - `on hit`, `on kill` and `on reaction` fire from a shot that may fly on after its hit (it
-##   pierces, sticks, or its hits never spend it: a wall), else from the point.
+##   pierces, sticks, or its hits never spend it: a wall), from what a move moves (its strikes are
+##   that body's: a dash's pass, a teleport's landing; `hit_caster`), else from the point.
 ## - `on wall` fires from a shot that bounces on, else from the point.
 ## - `on block` fires from what its shield stopped the shot with: the shot, or the body its barrier
 ##   is on; a deflect's block is the turned shot's, from the point.
@@ -204,6 +205,8 @@ func payload_cast_by(event: int, spell: CompiledSpell, by: int) -> int:
 				return _moved(by) | BY_POINT
 			return BY_POINT
 		TriggerBase.Event.HIT, TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
+			if has(MOVES_CASTER):
+				return _moved(by) | BY_POINT
 			var flies_on: bool = not has(PIERCE) or (spell != null and spell.pierce > 0) or _with(spell, ModifierBase.Behaviour.STICKY)
 			return BY_SHOT | BY_POINT if has(CASTS_FROM_SHOT) and flies_on else BY_POINT
 		TriggerBase.Event.WALL:
@@ -219,6 +222,14 @@ func payload_cast_by(event: int, spell: CompiledSpell, by: int) -> int:
 				# Its shield is a barrier on the wizard's body it moves (`CasterMoves.shield`).
 				return BY_BODY
 	return BY_POINT
+
+
+## Who casts the payload a hit of this carrier with no shot fires (a strike, a ray: `on hit`,
+## `on kill`, `on reaction`), while `caster` (a value as `CarrierKit.caster`) casts the hit for a card
+## of `actor`: the point it hit, by default; a carrier whose strikes are the body or shot it moves
+## (a dash, a teleport: `CarrierMove`) says that one. The runtime's side of `payload_cast_by`.
+func hit_caster(_caster: int, _actor: int) -> int:
+	return SpellRuntime.CASTER_POINT
 
 
 ## True when `spell` has a card of `behaviour` on it.

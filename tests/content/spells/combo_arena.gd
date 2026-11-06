@@ -152,6 +152,22 @@ func shoot_at(from: Vector2, to: Vector2) -> void:
 	spells.cast_staff(enemy, staff, from, from.direction_to(to), MANA)
 
 
+## Moves each player where its cards ask (`caster_move_requested`: a dash, a teleport, a pull...),
+## at once, and answers where it landed (`caster_move_finished`), so a move's end point and its
+## landing strike happen there, as a wizard's Mover would (a step later for all but a teleport).
+## Its guard body, if it has one, goes along.
+func answer_moves() -> void:
+	bus.caster_move_requested.connect(func(player: int, mode: StringName, move: Vector2, _seconds: float, tag: int) -> void:
+		if player < 0 or player >= _casters.size() or not move.is_finite():
+			return
+		_casters[player] += move
+		projectiles.set_anchor(player, _casters[player])
+		for body: Node2D in bodies:
+			if (body as Guard).actor_id == player:
+				body.global_position = _casters[player]
+		bus.caster_move_finished.emit(player, mode, _casters[player], tag))
+
+
 ## Makes the decoys and familiars cards ask for (`Entities`, stepped by `run`): a decoy is an actor
 ## that is hurt, guarded and fires its payloads from its body.
 func add_entities() -> void:

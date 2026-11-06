@@ -369,6 +369,8 @@ const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
 const CASTER_BODIES: int = -3
 var _caster: int = CASTER_BODY
 var _caster_seq: int = 0
+## One-off homing picks made so far (`pick_target`), so each rolls afresh.
+var _picks: int = 0
 ## The casters set aside while another casts (`_cast_as`, `_cast_done`): caster and seq side by
 ## side, `_outer_count` pairs deep. Empty between calls.
 var _outer: PackedInt64Array = PackedInt64Array()
@@ -1345,6 +1347,16 @@ func _cast_as(caster: int, seq: int) -> void:
 	_outer_count += 1
 	_caster = caster
 	_caster_seq = seq
+
+
+## A one-off homing pick for a card of `actor` (a teleport's target, a rain's spot): a target of
+## another team within `within` pixels of `at`, any way round, picked at random, rolled afresh for
+## each pick (owner, 2026-11-06: "homing should just always pick a random enemy in range"; it may
+## be the one picked last). Its centre, or INF for none; `projectiles.homing_target_radius` is its
+## hit radius. A flying shot's steering keeps its target (`Projectiles.home_velocity`).
+func pick_target(actor: int, at: Vector2, within: float) -> Vector2:
+	_picks += 1
+	return projectiles.homing_point(actor, at, Vector2.RIGHT, PI, ProjectilesScript.ACTOR_LAYERS, within, 0, hash(Vector2i(actor, _picks)))
 
 
 ## Ends the newest `_cast_as`: the caster from before casts again.
@@ -2669,7 +2681,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 	var caster: int = _caster if by_ray else shot_caster(slot)
 	_cast_as(caster, _caster_seq if by_ray else (projectiles.get_seq_of(caster) if caster >= 0 else 0))
 	_on_hit_effects(spell, tag, actor, target, position, slot)
-	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot if slot >= 0 else CASTER_POINT)
+	_fire_payloads(spell, TriggerBase.Event.HIT, tag, actor, position, heading, target, slot if slot >= 0 else _hit_caster(spell, actor))
 	if chain > 0:
 		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
 	_cast_done()
@@ -2804,11 +2816,17 @@ func _on_shot_deflected(actor: int, position: Vector2, tag: int, shot: int) -> v
 
 
 func _on_kill(actor: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
-	_fire_event(TriggerBase.Event.KILL, actor, position, tag, target if is_instance_valid(target) else null, shot)
+	_fire_event(TriggerBase.Event.KILL, actor, position, tag, target if is_instance_valid(target) else null, shot, false, Vector2.ZERO, _hit_caster(_profiles.get(tag), actor))
 
 
 func _on_reaction(actor: int, _reaction_id: StringName, target: Node, position: Vector2, tag: int, shot: int) -> void:
-	_fire_event(TriggerBase.Event.REACTION, actor, position, tag, target if is_instance_valid(target) else null, shot)
+	_fire_event(TriggerBase.Event.REACTION, actor, position, tag, target if is_instance_valid(target) else null, shot, false, Vector2.ZERO, _hit_caster(_profiles.get(tag), actor))
+
+
+## Who casts the payload of a hit of `spell` with no shot (a strike, a ray) for a card of `actor`,
+## as the caster casting that hit now (`Carrier.hit_caster`: what a move moves, else the point).
+func _hit_caster(spell: CompiledSpell, actor: int) -> int:
+	return _carrier_of(spell).hit_caster(_caster, actor) if spell != null else CASTER_POINT
 
 
 ## Fires the payload of the shot with `tag` from `at`, when that shot's trigger is `event` (the
@@ -2983,6 +3001,7 @@ func clear() -> void:
 	_jq_count = 0
 	_moves.clear()
 	_caster = CASTER_BODY
+	_picks = 0
 	_outer_count = 0
 	_fl_count = 0
 	for carrier: Carrier in _carriers.values():

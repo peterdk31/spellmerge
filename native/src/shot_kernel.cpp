@@ -354,7 +354,7 @@ struct HitPass {
 		step_index = m->get(k.step_index);
 	}
 
-	// `_home_pick` for the shot in `slot` (any way round, nothing avoided).
+	// `_home_pick` for the shot in `slot` (any way round).
 	int64_t home_pick(int64_t slot, const Vector2 &origin) {
 		const int64_t caster = actor[slot];
 		const int64_t tm = team[slot];

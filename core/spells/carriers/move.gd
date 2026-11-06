@@ -33,7 +33,14 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		way = anchor.direction_to(origin)
 		distance = anchor.distance_to(origin)
 		origin = anchor
-	var aimed: Vector3 = _aim_move(spell, tag, actor, origin, way, distance)
+	# Where what it moves is now: its way and distance are measured from there (the body's anchor,
+	# the shot's place), not from the staff tip it is cast from.
+	var from: Vector2 = kit.projectiles.get_anchor(body) if body >= 0 else kit.projectiles.get_position_of(moved)
+	if not from.is_finite():
+		from = origin
+	var aimed: Vector3 = _aim_move(spell, tag, actor, origin, from, way, distance)
+	if aimed.z < 0.0:
+		return 0
 	way = Vector2(aimed.x, aimed.y)
 	distance = aimed.z
 	var offset: Vector2 = way * distance
@@ -57,14 +64,21 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	return 1
 
 
+## Its strikes (a dash's pass, a teleport's landing) are what it moves: a payload their hit fires is
+## cast by that body or shot (`Carrier.hit_caster`).
+func hit_caster(caster: int, actor: int) -> int:
+	return CasterMoves.moved_by(caster, actor)
+
+
 ## True when the wizard's own cast of it goes the way its body walks (a dash).
 func _walks() -> bool:
 	return false
 
 
-## The way (x, y) and distance (z) of the move about to start from `origin` along `way` for
-## `distance` (a teleport's homing changes them).
-func _aim_move(_spell: CompiledSpell, _tag: int, _actor: int, _origin: Vector2, way: Vector2, distance: float) -> Vector3:
+## The way (x, y) and distance (z) of the move about to start, cast from `origin`, of what is at
+## `from` (the body's anchor, the shot), along `way` for `distance` (a teleport's homing changes
+## them); a distance below 0: it does not move at all (a homing teleport with nothing in reach).
+func _aim_move(_spell: CompiledSpell, _tag: int, _actor: int, _origin: Vector2, _from: Vector2, way: Vector2, distance: float) -> Vector3:
 	return Vector3(way.x, way.y, distance)
 
 

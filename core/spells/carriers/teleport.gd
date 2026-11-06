@@ -1,12 +1,9 @@
 class_name CarrierTeleport
 extends CarrierMove
 ## Blinks its caster `ray_length` along the aim, stopping before walls, and strikes the bodies where
-## it lands (`&"teleport"`). Over at once: homing bends its way.
-
-
-## Its homing, and actor -> the target its last teleport landed at (so the next one picks another).
-var _teleport_homing: Homing = Homing.new()
-var _landed_at: PackedInt64Array = PackedInt64Array()
+## it lands (`&"teleport"`). With homing it blinks to a target instead: one picked at random among
+## those within its homing reach, any way round (`CarrierKit.pick_target`), landing at its edge, where
+## its landing strike reaches it; with none in reach it does not blink (owner, 2026-11-06).
 
 
 func id() -> StringName:
@@ -25,37 +22,18 @@ func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, headin
 	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null)
 
 
-func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
-	super(runtime_kit, staff_poses)
-	_landed_at.resize(SpellRuntime.ACTORS)
-
-
-## The swarm promoted a body (`Carrier.replace_body`): a teleport that landed at `old` landed at
-## `new`.
-func replace_body(old: Node, new: Node) -> void:
-	_replace_in_rows(old, new, [], _landed_at)
-
-
-func clear() -> void:
-	_landed_at.fill(0)
-
-
-func reset_actor(actor: int) -> void:
-	_landed_at[actor] = 0
-
-
-## A teleport is over at once: like a beam it bends its way toward a target, and like a beam it
-## ends there when the target is within its distance, at the target's edge.
-func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, distance: float) -> Vector3:
-	_teleport_homing.start(spell, hash(Vector3i(actor, tag, roundi(kit.clock() * 1000.0))))
-	_teleport_homing.avoid = _landed_at[actor] if actor >= 0 and actor < _landed_at.size() else 0
-	var goal: Vector2 = _teleport_homing.point(kit.projectiles, actor, origin, way)
-	if goal.is_finite() and not goal.is_equal_approx(origin):
-		way = origin.direction_to(goal)
-		var gap: float = origin.distance_to(goal) - _teleport_homing.target_radius - SpellLimits.LAND_CLEARANCE
-		if gap <= distance and actor >= 0 and actor < _landed_at.size():
-			_landed_at[actor] = _teleport_homing.keep
-		distance = minf(distance, maxf(gap, 0.0))
+## A homing teleport goes to a target in its homing reach of what it moves (`from`, the body's
+## anchor), landing with that at the target's edge (LAND_CLEARANCE short of it), so its landing
+## strike, round where the body lands, reaches the target; nothing in reach: no blink. One without
+## homing goes its way and distance.
+func _aim_move(spell: CompiledSpell, _tag: int, actor: int, origin: Vector2, from: Vector2, way: Vector2, distance: float) -> Vector3:
+	if spell.homing_range > 0.0:
+		var goal: Vector2 = kit.pick_target(actor, from, spell.homing_range)
+		if not goal.is_finite():
+			return Vector3(way.x, way.y, -1.0)
+		if not goal.is_equal_approx(from):
+			way = from.direction_to(goal)
+		distance = maxf(from.distance_to(goal) - kit.projectiles.homing_target_radius - SpellLimits.LAND_CLEARANCE, 0.0)
 	# Where it leaves shows now, as it is aimed (a teleport is over at once); where it lands shows at
 	# its end point (`carrier_ended`, `CasterMoves.end`).
 	if kit.events != null:
@@ -65,4 +43,3 @@ func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way:
 
 func _move_body(_spell: CompiledSpell, tag: int, _actor: int, body: int, _origin: Vector2, _way: Vector2, offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
 	kit.events.caster_move_requested.emit(body, &"teleport", offset, 0.0, tag)
-

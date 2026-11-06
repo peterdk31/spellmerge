@@ -123,8 +123,8 @@ const INSTANT_HOMING_REACH: float = 55.0
 ## slowest walking enemy (30), so a rune that homes is a trap that follows, never a chaser one can
 ## not walk away from, and over a rune's 8 s it creeps about the Homing card's reach (160 px).
 const HOMING_DRIFT: float = 24.0
-## A homing teleport whose target is within its distance lands this far outside the target's
-## hit circle (a wizard's body radius), not on it.
+## A homing teleport lands with its body's centre this far outside its target's hit circle (a
+## wizard's body radius), not on it.
 const LAND_CLEARANCE: float = 6.0
 ## A dash strikes the bodies within this many pixels of its mover's way (about a body: rules
 ## R4c), and a teleport those within LAND_REACH of where it lands (a small circle that still

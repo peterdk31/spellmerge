@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-06: A homing teleport goes to a target and strikes it; one-off homing picks are random (owner's decision: a flicker strike)
+
+- **Before:** a homing teleport bent its way toward a target in a cone and blinked its card's distance (so a farther target was not reached), measured from the staff tip it was cast from rather than the body it moves, so its landing strike often missed (`homing · teleport` did 0 damage and `on hit` chains never fired). It avoided the target it landed at last (`_landed_at`, `Homing.avoid`). Its landing hit's payload was cast by the point.
+- **Now:** a homing teleport picks a target within its homing reach and blinks to it, however far, landing with the body's centre at the target's edge (`LAND_CLEARANCE` short), measured from the body it moves (`CarrierMove`: its anchor), so its landing strike reaches it; with nothing in reach it does not blink (the cast is not made). A teleport without homing is unchanged. Its landing hit's payload (and a dash's pass hits') is cast by what it moved (`Carrier.hit_caster`, `payload_cast_by`), so `on hit · homing · teleport · on hit · homing · teleport · homing · teleport` hops from enemy to enemy, each blink cast by the wizard's body where it landed.
+- **One-off homing picks are "a random enemy in range" (owner: "no special rules about hitting the same enemy twice etc"):** `Spells.pick_target` picks any enemy within the homing reach, any way round, at random, rolled afresh for each pick (`_picks`); it may pick the same one again. A teleport's target and a rain's spot use it. `_landed_at`, `Homing.avoid`, `Homing.aim`, `Homing.target_radius` and `homing_point`'s `avoid` are gone.
+- **Unchanged:** a flying shot's steering (`home_velocity`, the manager's homing) keeps its target and its "not just hit" rule, so it does not wobble; a beam's legs keep their target while the beam lasts (a beam bends every step, so it is steering too); a dash steers as it goes.
+
 ## 2026-11-06: A row hits as the launch that made it (owner: "can we fix this more elegantly?")
 
 - **Before:** a held beam's later ticks, a swing's or slam's later sweep, a dash's pass, a shot's zaps and a teleport's landing hit in their carrier's own steps, when no caster is set, so a pull (or a swap's zap) on those hits moved the wizard even when a decoy, or a shot, had cast them. A chain jump from a shot's hit was registered with whatever caster was current when the hit came, the wizard's own, so a decoy's or a payload's jump returned to, and pulled, the wizard.

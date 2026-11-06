@@ -78,7 +78,7 @@ func before_each() -> void:
 	piercing.extra_pierce = 1
 	_put(piercing, &"pierce")
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
-	timer.interval = 0.25
+	timer.wind_up = 0.25
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 
 

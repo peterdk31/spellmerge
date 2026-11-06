@@ -108,10 +108,13 @@ func _read_cast(start: int, staff: StaffBase) -> CompiledCast:
 
 ## Reads one group that wants `want` carriers. `payload` is true for a trigger's (or a payload
 ## carrier's) group, whose fallback is the payload's origin instead of the caster.
-func _read_group(want: int, payload: bool) -> CompiledGroup:
+func _read_group(want: int, payload: bool, wind_up: float = 0.0) -> CompiledGroup:
 	var outer_payload: bool = _in_payload
 	_in_payload = payload
 	var group := CompiledGroup.new()
+	# A trigger's own wind-up starts its payload's (`wind_up`), so a quicken read into the payload
+	# shortens it too.
+	group.wind_up = maxf(wind_up, 0.0)
 	var elements: Array[ElementBase] = []
 	var modifiers: Array[ModifierBase] = []
 	var kept: PackedInt32Array = PackedInt32Array()
@@ -197,6 +200,8 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 				works = works or (multicast.repeats > 1 and not group.is_empty())
 			MulticastBase.Mode.SCATTER:
 				works = works or found > 0
+		# A quicken shortens the group's wind-up: it works where there is one (cast timing T8).
+		works = works or (not is_equal_approx(multicast.wind_up_mult, 1.0) and group.wind_up > 0.0)
 		if not works and not keep_wasted:
 			_waste(slot)
 			continue
@@ -206,6 +211,7 @@ func _take_multicasts(group: CompiledGroup, slots: PackedInt32Array, extra: int,
 		_cast.mana += multicast.mana_cost
 		if not _in_payload:
 			_cast.wind_down += multicast.wind_down
+		group.wind_up *= maxf(multicast.wind_up_mult, 0.0)
 		match multicast.mode:
 			MulticastBase.Mode.SCATTER:
 				group.scatter = true
@@ -225,7 +231,7 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 	var mana: float = _cast.mana
 	var wind_down: float = _cast.wind_down
 	var useful: Dictionary = _useful.duplicate() if never else {}
-	var held: CompiledGroup = _read_group(1, true)
+	var held: CompiledGroup = _read_group(1, true, trigger.wind_up)
 	if held.is_empty():
 		_waste(trigger_slot)
 	elif never:
@@ -243,7 +249,8 @@ func _read_trigger(spell: CompiledSpell, trigger: TriggerBase, trigger_slot: int
 		var fires := CompiledSpell.Trigger.new()
 		fires.id = trigger.id
 		fires.event = trigger.event
-		fires.interval = trigger.interval
+		# A timer's tick is its payload's whole wind-up (cast timing T8).
+		fires.interval = held.wind_up if trigger.event == TriggerBase.Event.TIMER else 0.0
 		fires.payload = held
 		fires.slot = trigger_slot
 		spell.triggers.append(fires)

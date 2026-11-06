@@ -11,4 +11,4 @@ description = "Casts its spell the moment you cast, from where you stand."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 5
-interval = 0.0
+wind_up = 0.0

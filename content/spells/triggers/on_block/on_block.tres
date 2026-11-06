@@ -11,4 +11,4 @@ description = "Casts its spell where its shield blocks an enemy shot."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 3
-interval = 0.0
+wind_up = 0.0

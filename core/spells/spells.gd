@@ -22,8 +22,9 @@ extends Node
 ##
 ## Payloads: each trigger of a carrier has its own payload (a group; `CompiledSpell.triggers`),
 ## fired by its shot's `projectile_hit` (on hit), `projectile_expired` (on expire) or every
-## `interval` seconds of that timer (timer, `_step_live`; the
-## first tick after the interval or half the carrier's life, whichever is shorter). It starts at
+## tick of that timer (timer, `_step_live`; a tick is the payload's whole wind-up, docs/
+## milestones/cast-timing.md T8, and the payload then leaves without waiting again; the first tick
+## after that or half the carrier's life, whichever is shorter). It starts at
 ## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
 ## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
 ## (outward from the caster through the shot for an orbit or still shot, along the beam for a
@@ -707,7 +708,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	elif component is TriggerBase:
 		var trigger: TriggerBase = component
 		if trigger.event == TriggerBase.Event.TIMER:
-			out.append("Every %ss" % _short(trigger.interval))
+			out.append("Every %ss" % _short(trigger.wind_up))
 		else:
 			out.append("On " + String(TriggerBase.Event.keys()[trigger.event]).to_lower())
 	elif component is MulticastBase:
@@ -1957,8 +1958,8 @@ func _grow_jumps() -> void:
 ## Fires `payload` of a shot with `tag` from `at` along `heading`, in the same actor's staff and
 ## generation as the shot. Its caster is the shot in `slot` that fired it while that shot still
 ## flies, otherwise the point `at` (see `_caster`).
-func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> void:
-	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
+func _fire_payload(payload: CompiledGroup, tag: int, actor: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1, wound: bool = false) -> void:
+	_fire(payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT, false, wound)
 
 
 ## Fires the payload of every trigger of `spell` that goes off on `event` (a carrier's triggers
@@ -2223,7 +2224,8 @@ func _step_live(delta: float) -> void:
 			_lc_clock[i] -= delta
 			if _lc_clock[i] <= 0.0:
 				_lc_clock[i] += trigger.interval
-				_lc_fire(i, trigger.payload, _lc_at[i])
+				# The tick was its payload's wind-up: it leaves now.
+				_lc_fire(i, trigger.payload, _lc_at[i], true)
 		i += 1
 
 
@@ -2231,7 +2233,7 @@ func _step_live(delta: float) -> void:
 ## (`_heading`); on an actor's body (a dash, a decoy) the way that actor aims now; else outward from
 ## its caster's body through it; else its `_lc_way`. Its shot casts the payload while it flies,
 ## else the point does.
-func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
+func _lc_fire(i: int, payload: CompiledGroup, from: Vector2, wound: bool = false) -> void:
 	var spell: CompiledSpell = _profiles.get(_lc_tag[i])
 	if spell == null:
 		return
@@ -2254,7 +2256,7 @@ func _lc_fire(i: int, payload: CompiledGroup, from: Vector2) -> void:
 		var body: Vector2 = projectiles.get_anchor(actor)
 		if body.is_finite() and not (at - body).is_zero_approx():
 			way = (at - body).normalized()
-	_fire_payload(payload, tag, actor, from, way, null, slot)
+	_fire_payload(payload, tag, actor, from, way, null, slot, wound)
 
 
 ## The trigger live carrier `i` fires, or null.

@@ -11,4 +11,4 @@ description = "Casts its spell where its shot kills."
 complexity = 1
 icon = ExtResource("2_icon")
 event = 4
-interval = 0.0
+wind_up = 0.0

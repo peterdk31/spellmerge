@@ -20,7 +20,7 @@ func test_it_compiles_into_the_spell_numbers() -> void:
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
-	check_equal(spell.triggers[0].interval, trigger.interval, "the interval is compiled")
+	check_equal(spell.triggers[0].interval, trigger.wind_up, "its tick is its wind-up (its payload adds none here; docs/milestones/cast-timing.md, T8)")
 	check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "the payload is the nova")
 
 
@@ -38,7 +38,7 @@ func test_it_works_for_all_four_players_at_once() -> void:
 
 func test_the_timer_waits_half_a_second() -> void:
 	var timer: TriggerBase = _trigger(&"timer")
-	check_equal(timer.interval, 0.5, "the timer fires every half second")
+	check_equal(timer.wind_up, 0.5, "the timer ticks every half second (its wind-up; docs/milestones/cast-timing.md, T8)")
 	check(not &"max_fires" in timer, "no trigger counts its fires (owner, 2026-10-29)")
 
 

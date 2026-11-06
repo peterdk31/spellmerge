@@ -95,7 +95,7 @@ Each part is one PR; in this order.
 Proposed by the owner while T6 was built (2026-11-06), not yet planned:
 
 - **T6b (proposed, after T7): the telegraph as a cue.** A card names a `wind_cue` (a lane, a ring where a slam lands, a circle round a nova), played for the wind-up's length and following the aim, only for a caster not on the players' team; `CreatureLook` drops its own line.
-- **T8 (proposed, after T7): the timer winds up.** `timer` loses `interval` for a `wind_up` of its own; each tick its payload winds up and leaves, then it re-arms, so cards change its pace (a `wind_up_mult` to shorten one).
+- **T8: the timer winds up** (owner, 2026-11-06: "Should the Timer trigger also just have a wind_up and no fixed delay? This way it can be altered with other cards aswell?"). Every trigger has a `wind_up` (`interval` is gone): its payload winds up that long where it fired, before the payload's own cards'. A timer ticks over and over, each tick its payload's whole wind-up, then the payload leaves at once; so a `charge` in its payload slows it. The new multicast `quicken` (`MulticastBase.wind_up_mult` 0.5) halves the wind-up of the group it is read into, a charge's or a timer's tick (a group-level card, as multicasts are, so it also shortens the trigger's own share); it is wasted where its group winds up nothing. The first tick still comes at half a short carrier's life when that is sooner.
 
 The native kernels are untouched: cast timing lives in `Spells` (GDScript). Pending launches are already sim state (core/sim/README.md).
 

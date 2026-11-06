@@ -366,7 +366,7 @@ func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
 
 func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
 	_form(&"slam", 1, 1).carrier = &"slam"
-	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 	# A slam is over at once: its timer never fires, but it still reads the nova, so on hit gets the bolt.
 	var staff: CompiledStaff = _compile("timer on_hit slam nova bolt")
 	var slam: CompiledSpell = staff.casts[0].group.spells[0]
@@ -456,6 +456,21 @@ func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void
 	var payload: CompiledCast = _compile("on_hit bolt nova").casts[0]
 	check(is_equal_approx(payload.wind_up, 0.1), "a payload's nova adds nothing to the cast, got %s" % payload.wind_up)
 	check(is_equal_approx(payload.group.spells[0].triggers[0].payload.wind_up, 0.3), "it winds up on its own, got %s" % payload.group.spells[0].triggers[0].payload.wind_up)
+
+
+func test_a_timer_ticks_its_payload_s_whole_wind_up() -> void:
+	# docs/milestones/cast-timing.md, T8: the timer card's wind-up and its payload's cards' are its
+	# tick, so a charge in the payload slows it.
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
+	var charge: ModifierBase = _modifier(&"charge")
+	charge.wind_up_add = 2.0
+	charge.damage_mult = 4.0
+	var plain: CompiledSpell = _compile("timer bolt nova").casts[0].group.spells[0]
+	check(is_equal_approx(plain.triggers[0].interval, 0.5), "a plain payload: the timer's own, got %s" % plain.triggers[0].interval)
+	var slow: CompiledSpell = _compile("timer bolt charge nova").casts[0].group.spells[0]
+	check(is_equal_approx(slow.triggers[0].interval, 2.5), "a charged payload ticks slower, got %s" % slow.triggers[0].interval)
+	var hit: CompiledSpell = _compile("on_hit bolt nova").casts[0].group.spells[0]
+	check_equal(hit.triggers[0].interval, 0.0, "a trigger that is no timer has no tick")
 
 
 func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:

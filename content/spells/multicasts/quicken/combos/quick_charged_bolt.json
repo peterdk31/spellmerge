@@ -1,0 +1,9 @@
+{
+	"id": "quick_charged_bolt",
+	"name": "Quick charged bolt",
+	"does": "A charged bolt whose two-second wind-up is halved: it hits an imp four times as hard after one second.",
+	"casts": [{"staff": 0, "cards": ["quicken", "charge", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

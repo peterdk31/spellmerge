@@ -488,7 +488,7 @@ func _distance_cards() -> void:
 	blink.carrier = &"teleport"
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
-	timer.interval = 0.25
+	timer.wind_up = 0.25
 	var orbit: FormBase = _form(&"ring", 3.0, 1.0)
 	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 20.0

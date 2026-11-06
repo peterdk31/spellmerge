@@ -196,7 +196,8 @@ class Trigger:
 	var id: StringName = &""
 	## A `TriggerBase.Event` value.
 	var event: int = TriggerBase.Event.HIT
-	## Seconds between fires, for a timer.
+	## Seconds between fires, for a timer: its payload's whole wind-up (the timer card's and the
+	## payload's cards'; docs/milestones/cast-timing.md, T8), which the tick then fires without.
 	var interval: float = 0.0
 	var payload: CompiledGroup = null
 	## The trigger card's slot in the staff.

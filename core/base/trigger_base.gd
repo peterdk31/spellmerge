@@ -10,7 +10,8 @@ enum Event {
 	HIT,
 	## A shot ends (its life runs out or it reaches a wall); the held spell fires there.
 	EXPIRE,
-	## Every `interval` seconds while the shot lives.
+	## Over and over while the shot lives: its payload winds up (this card's `wind_up` and the
+	## payload's own; docs/milestones/cast-timing.md, T8), leaves, and the next tick starts.
 	TIMER,
 	# Staffs (A3, docs/milestones/M2-staffs.md). Each is run by the kit named.
 	## A shield on the carrier absorbs a hit; the payload fires from there (B1, B2, B3).
@@ -44,10 +45,13 @@ const NEEDS: Dictionary = {
 }
 
 @export var event: Event = Event.HIT
-## TIMER only: seconds between fires. A trigger fires every time its event happens, for as
-## long as its carrier lives (owner, 2026-10-29: no per-shot count; the spell runtime's per-step
-## fire cap is the only bound).
-@export var interval: float = 0.0
+## Seconds its payload winds up where it fired, before the payload's own cards' wind-up (every
+## card has one; docs/milestones/cast-timing.md). A timer ticks over and over: each tick its
+## payload winds up (this and the payload's, shortened by a `quicken` read into it), leaves, and
+## the next starts, so cards change its pace (T8; it had a fixed `interval`). A trigger fires every
+## time its event happens, for as long as its carrier lives (owner, 2026-10-29: no per-shot count;
+## the spell runtime's per-step fire cap is the only bound).
+@export var wind_up: float = 0.0
 
 
 func kind() -> StringName:
@@ -58,6 +62,6 @@ func ranges() -> Dictionary:
 	var limits: Dictionary = super()
 	limits.merge({
 		"event": Vector2(0, Event.size() - 1),
-		"interval": Vector2(0.0, 10.0),
+		"wind_up": Vector2(0.0, 10.0),
 	})
 	return limits

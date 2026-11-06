@@ -36,7 +36,7 @@ func before_each() -> void:
 	for event: int in E.size():
 		var trigger := TriggerBase.new()
 		trigger.event = event as TriggerBase.Event
-		trigger.interval = 0.5
+		trigger.wind_up = 0.5
 		_put(trigger, StringName("on_" + String(E.keys()[event]).to_lower()))
 	for behaviour: int in [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT, ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.GHOST, ModifierBase.Behaviour.RELAY]:
 		var modifier := ModifierBase.new()

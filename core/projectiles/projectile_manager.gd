@@ -4335,13 +4335,14 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var wide: float = maxf(width, 0.0)
 		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
 		var start: float = 0.0
-		# `exclude`, the body it is cast from, is spared until a piece of the path starts off it (as a
-		# shot's step does, `exclude`): a beam that bounces or bends back into it hits it.
+		# `exclude`, the body it is cast from (the caller found it starts on it), is spared until a
+		# later piece of the path starts off it (as a shot's step does, `exclude`): a beam that
+		# bounces or bends back into it hits it.
 		var skip_at: int = _target_id.find(skip) if skip != 0 else -1
 		for i in used:
 			var a: Vector2 = _path[i]
 			var b: Vector2 = _path[i + 1]
-			if skip_at >= 0:
+			if skip_at >= 0 and i > 0:
 				var on: float = wide + _target_radius[skip_at]
 				if a.distance_squared_to(_target_pos[skip_at]) > on * on:
 					skip = 0

@@ -165,8 +165,28 @@ func test_held_beams_turn_with_the_ring_and_stay_aimed_in() -> void:
 			check(way.dot(-origin.normalized()) > 0.99, "aimed in at the centre (%s)" % way)
 
 
-## Mirror casts a second ring turning the other way (owner, 2026-11-06): ten held beams, five
-## turning each way, all on the ring round the caster.
+## Each cast turns the other way from the one before (owner, 2026-11-06): beams of one cast turn
+## one way, the next cast's the other, and the one after that the first way again.
+func test_each_cast_turns_the_other_way_from_the_one_before() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["penta", "beam"])
+	var beams: CarrierBeam = CarrierBeam.of(_arena.spells)
+	var ways: Array[float] = []
+	for n in 3:
+		check(_arena.cast(0, 0), "cast %d" % n)
+		_arena.run(1.0 / 60.0)
+		var before: Array[Vector2] = _beam_origins(beams)
+		_arena.run(0.1)
+		var after: Array[Vector2] = _beam_origins(beams)
+		check_equal(after.size(), 5, "five beams on cast %d" % n)
+		ways.append(signf(before[0].angle_to(after[0])) if not after.is_empty() else 0.0)
+		_arena.run(1.0)
+	check_equal(ways, [1.0, -1.0, 1.0] as Array[float], "back and forth")
+
+
+## Mirror is the same cast again with its aim reversed (owner, 2026-11-06), so a Penta's mirror is
+## a second ring, and, as the next cast, it turns the other way: ten held beams, five turning each
+## way, all on the ring round the caster.
 func test_mirror_casts_a_second_ring_turning_the_other_way() -> void:
 	_arena = ArenaScript.new(root)
 	_arena.install_cards(0, 0, ["mirror", "hold", "penta", "beam"])

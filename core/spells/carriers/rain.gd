@@ -29,7 +29,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	var placed: int = 0
 	for n in spell.shots:
 		var along: Vector2 = heading.rotated(kit.fan_angle(n, spell.shots, spell))
-		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, kit.projectiles.clip_to_walls(origin, origin + along * reach))
+		var point: Vector2 = _homed_place(spell, actor, origin, kit.projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: SpellRuntime.PendingLaunch = kit.delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
@@ -60,10 +60,10 @@ func land(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, ge
 
 
 ## Where a carrier placed at `point` ahead of its caster at `origin` (a rain) goes when it
-## homes (rules R4i): onto a target within its homing reach of the point, picked as a homing
-## shot picks one (`homing_point`, any way round), stopped at a wall on the way; else `point`.
-func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:
+## homes (rules R4i): onto a target within its homing reach of the point, a random one, any way
+## round (`CarrierKit.pick_target`), stopped at a wall on the way; else `point`.
+func _homed_place(spell: CompiledSpell, actor: int, origin: Vector2, point: Vector2) -> Vector2:
 	if spell.homing_range <= 0.0:
 		return point
-	var goal: Vector2 = kit.projectiles.homing_point(actor, point, Vector2.RIGHT, PI, SpellRuntime.ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(kit.clock() * 1000.0))))
+	var goal: Vector2 = kit.pick_target(actor, point, spell.homing_range)
 	return point if not goal.is_finite() else kit.projectiles.clip_to_walls(origin, goal)

@@ -85,3 +85,122 @@ func test_its_moments_have_their_cues() -> void:
 	var card: FormBase = load("res://content/spells/forms/teleport/teleport.tres") as FormBase
 	check_equal(card.shown_cue, &"vanish", "its shown plays vanish")
 	check_equal(card.end_cue, &"appear", "its end plays appear")
+
+
+# --- Homing: a flicker strike (owner, 2026-11-06) -------------------------------------------------
+
+const World := preload("res://tests/support/card_rules_world.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+## The enemies of the flicker scene: all within a homing teleport's reach of the wizard's body.
+const FOES: Array[Vector2] = [Vector2(70.0, 30.0), Vector2(120.0, -60.0), Vector2(-40.0, 90.0)]
+
+
+## A world with the wizard's first staff `cards`, pressed once at the first step, and an enemy at
+## each of `foes`: [world, wizard, enemies].
+func _flicker_world(cards: Array[StringName], foes: Array[Vector2] = FOES) -> Array:
+	var registry: Node = own(RegistryScript.new()) as Node
+	registry.call("scan")
+	var shelf := own(World.Shelf.new()) as World.Shelf
+	shelf.base = registry
+	var staff := StaffBase.new()
+	staff.id = &"flicker"
+	staff.slots = 16
+	staff.cooldown = 0.0
+	var world := World.new(root, shelf, staff)
+	var wizard: Actor = world.add_wizard(cards)
+	var enemies: Array[Node2D] = []
+	for at in foes:
+		enemies.append(world.add_enemy(&"E", at))
+	world.press()
+	return [world, wizard, enemies]
+
+
+## How many of `enemies` lost health.
+static func _hurt(world: World, enemies: Array[Node2D]) -> int:
+	var hurt: int = 0
+	for enemy in enemies:
+		if world.combat.health_of(enemy) < World.HEALTH:
+			hurt += 1
+	return hurt
+
+
+func test_a_homing_teleport_lands_on_a_target_in_reach_and_strikes_it() -> void:
+	# Before: it blinked its card's distance toward the farther target and its strike missed.
+	var made: Array = _flicker_world([&"homing", &"teleport"], [Vector2(120.0, -60.0)])
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var enemy: Node2D = (made[2] as Array[Node2D])[0]
+	# A staff that reaches ahead of the hand, as a wizard's does: the cast leaves from its tip.
+	wizard.staff_reach = 14.0
+	# Where the wizard's body (its centre) landed from the enemy's hurt circle, as it lands.
+	var gap: Array[float] = [-1.0]
+	world.bus.caster_move_finished.connect(func(_actor: int, _mode: StringName, _at: Vector2, _tag: int) -> void:
+		gap[0] = (wizard.global_position + wizard.body_offset).distance_to(enemy.global_position + (enemy as Actor).body_offset))
+	world.run(0.5, 0.5)
+	check(world.combat.health_of(enemy) < World.HEALTH, "its landing strike hit the target (health %s)" % world.combat.health_of(enemy))
+	# Measured from the body it moves, not the staff tip it is cast from: the body's centre lands at
+	# the target's edge, LAND_CLEARANCE short of it.
+	var hurtbox := Hurtbox.new()
+	var want: float = hurtbox.radius + SpellLimits.LAND_CLEARANCE
+	hurtbox.free()
+	check(absf(gap[0] - want) < 1.0, "the wizard's body lands at the target's edge: %s px from its centre, want %s" % [gap[0], want])
+	world.free_all()
+
+
+func test_a_homing_teleport_with_no_target_in_reach_stays_put() -> void:
+	var made: Array = _flicker_world([&"homing", &"teleport"], [Vector2(600.0, 0.0)])
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var start: Vector2 = wizard.global_position
+	world.run(0.5, 0.5)
+	check(wizard.global_position.is_equal_approx(start), "no blink: %s" % wizard.global_position)
+	world.free_all()
+
+
+func test_a_plain_teleport_still_blinks_its_distance_along_the_aim() -> void:
+	var made: Array = _flicker_world([&"teleport"])
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var start: Vector2 = wizard.global_position
+	world.run(0.5, 0.5)
+	var moved: Vector2 = wizard.global_position - start
+	check(is_equal_approx(moved.length(), _card().ray_length) and absf(moved.angle()) < 0.01, "its card's distance along +x: %s" % moved)
+	world.free_all()
+
+
+func test_the_flicker_strike_hops_from_enemy_to_enemy() -> void:
+	# Each landing hit fires the next blink (`on hit`), cast by the wizard's body where it landed.
+	var made: Array = _flicker_world([&"on_hit", &"homing", &"teleport", &"on_hit", &"homing", &"teleport", &"homing", &"teleport", &"swing"])
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var blinks: Array[int] = [0]
+	world.bus.caster_move_requested.connect(func(actor: int, mode: StringName, _move: Vector2, _seconds: float, _tag: int) -> void:
+		if mode == &"teleport" and actor == wizard.id:
+			blinks[0] += 1)
+	world.run(0.5, 0.5)
+	check_equal(blinks[0], 3, "one press, three blinks: each landing hit fires the next")
+	check(_hurt(world, made[2]) >= 2, "it struck more than one enemy (%d)" % _hurt(world, made[2]))
+	world.free_all()
+
+
+func test_homing_picks_spread_over_the_enemies_across_casts() -> void:
+	# A fresh random pick each time, any way round: over a few casts every enemy in reach is picked.
+	var made: Array = _flicker_world([&"homing", &"teleport"])
+	var world: World = made[0]
+	world.press(true)
+	world.run(8.0, 8.0)
+	check_equal(_hurt(world, made[2]), FOES.size(), "every enemy in reach was struck, the one behind too")
+	world.free_all()
+
+
+func test_a_payload_of_its_landing_hit_is_cast_by_the_wizards_body() -> void:
+	# What a move moves casts its hits' payloads (`Carrier.hit_caster`): a shield left over in the
+	# payload is a barrier on the wizard, not a card wasted on a point.
+	var made: Array = _flicker_world([&"on_hit", &"homing", &"teleport", &"shield"], [Vector2(70.0, 30.0)])
+	var world: World = made[0]
+	var wizard: Actor = made[1]
+	var compiled: CompiledStaff = world.spells.compile_staff([&"on_hit", &"homing", &"teleport", &"shield"] as Array[StringName], StaffBase.new())
+	check(not compiled.wasted.has(3), "the shield is not wasted")
+	world.run(0.1, 0.1)
+	check(world.combat.shield(wizard.id) > 0, "the wizard has a barrier from its landing hit")
+	world.free_all()

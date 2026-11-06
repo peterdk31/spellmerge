@@ -105,7 +105,7 @@ may cast the payload could use it:
 | `on cast` | whoever cast the carrier (its group's `by`) |
 | `timer`, `on hurt` | its own shot (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`: a decoy), or what it moves (`MOVES_CASTER`: the shot that cast it, else the wizard's body); a beam's or swing's tip, a rain, a familiar, a portal: a point |
 | `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; anything else: a point |
-| `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), else a point |
+| `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), what a move moves (a dash's pass and a teleport's landing are that body's or shot's strikes: `Carrier.hit_caster`), else a point |
 | `on wall` | a shot that bounces on, else a point |
 | `on block` | the shot whose shield stopped one, or the body its barrier is on (a decoy, a dashing or teleporting wizard); a deflect's block is a point's |
 
@@ -177,6 +177,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `payload_cast_by` | from its traits (the fallback carriers above) | none: every carrier answers by its yes/no flags |
+| `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
 | `reach_of` | 0 | atom, beam, swing, slam, rain (for an enemy's telegraph) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
@@ -196,7 +197,7 @@ runtime's one rule for it, shared by every carrier:
 | Group | Calls |
 | --- | --- |
 | The world | `projectiles`, `events`, `clock()` |
-| The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()` (the one caster value), `caster_seq()`, `caster_shot()`, `caster_body(actor)`, `caster_place(actor, origin)`, `shot_caster(slot)`, `cast_as(caster, seq)`/`cast_done()` (a row steps as its caster), `is_echo(spell)`, `shot_started`, `shot_ended` |
+| The cast under way | `spell_of(tag)`, `carrier_of(spell)`, `caster()` (the one caster value), `caster_seq()`, `caster_shot()`, `caster_body(actor)`, `caster_place(actor, origin)`, `shot_caster(slot)`, `pick_target(actor, at, within)` (a one-off homing pick: any enemy in reach, at random, afresh each time), `cast_as(caster, seq)`/`cast_done()` (a row steps as its caster), `is_echo(spell)`, `shot_started`, `shot_ended` |
 | The aim | `aim_origin`, `aim_dir`, `aim_pivot`, `aim_seen`, `walk_turn` (by actor) |
 | Shots | `fan_angle`, `staff_spread`, `placed_at`, `land_shot` (or `apply_travel` then `register`) |
 | Hits with no shot slot | `ray_begin`/`ray_end`, `cast_jumps`, `strike`, `strike_round`, `guard` (with the carrier's `id()` as its block form), `guard_path`, `turn_shots_round` (a deflect round one point, once), `bounces`, `ghost` |

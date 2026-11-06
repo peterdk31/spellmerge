@@ -3789,7 +3789,7 @@ func home_velocity(caster: int, from: Vector2, velocity: Vector2, turn_rate: flo
 ## Where a homing shot at `from` steers: the target it kept, while it may still home on it, or else
 ## a new one picked at random (`_home_pick`), or INF. Charges the work budget.
 func _homing_point(slot: int, from: Vector2) -> Vector2:
-	var t: int = _home_pick(_actor[slot], _team[slot], from, Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot, 0)
+	var t: int = _home_pick(_actor[slot], _team[slot], from, Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot)
 	_home_target[slot] = _target_id[t] if t >= 0 else 0
 	return _target_pos[t] if t >= 0 else Vector2.INF
 
@@ -3807,16 +3807,15 @@ func homing_aim(caster: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## other teams only, actors G3a) are skipped. The target whose
 ## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
 ## among those that do, from `pick_seed` (the same seed and targets give the same pick), so a
-## group of shots spreads over a group of enemies. The target whose id is `avoid` (the one it
-## just reached) is picked only when no other qualifies. `homing_target` is left at the pick's
-## id (0 for none), for the caller to keep. Allocation-free.
-func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, avoid: int = 0) -> Vector2:
+## group of shots spreads over a group of enemies. `homing_target` is left at the pick's id (0 for
+## none), for the caller to keep. Allocation-free.
+func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
 	homing_target = 0
 	homing_target_radius = 0.0
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle) or not is_finite(within) or within <= 0.0:
 		return Vector2.INF
 	_query_ready()
-	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, within, keep, pick_seed, -1, avoid)
+	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, within, keep, pick_seed, -1)
 	if t < 0:
 		return Vector2.INF
 	homing_target = _target_id[t]
@@ -3827,13 +3826,12 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 ## The one homing search: the target (an index, or -1) `homing_point` describes, for `caster`
 ## of `team` (NONE: no team, every target but its own body). For a shot (`slot` 0 or more) it
 ## also skips the targets the shot just hit and charges the work budget.
-func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
+func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int) -> int:
 	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it, nor
 	# a target the shot is still on (`_mark_memory`).
 	var stamp: int = _mark_memory(slot) if slot >= 0 else -1
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
-	var avoided: int = -1
 	var seen: int = 0
 	var cells: Vector4i = _query_cells(origin, within)
 	for y in range(cells.y, cells.w + 1):
@@ -3848,16 +3846,12 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle)):
 						if keep != 0 and _target_id[t] == keep:
 							return t
-						if avoid != 0 and _target_id[t] == avoid:
-							avoided = t
-							t = _target_next[t]
-							continue
 						# Reservoir pick: the n-th target seen replaces the pick one time in n.
 						seen += 1
 						if posmod(hash(Vector2i(pick_seed, seen)), seen) == 0:
 							pick = t
 				t = _target_next[t]
-	return pick if pick >= 0 else avoided
+	return pick
 
 
 ## An instant beam from `origin` along `direction` for `length` pixels, fired by the actor

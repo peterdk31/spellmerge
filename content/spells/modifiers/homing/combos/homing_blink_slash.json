@@ -1,0 +1,11 @@
+{
+	"id": "homing_blink_slash",
+	"name": "Blink and slash",
+	"does": "A homing teleport blinks to the imp and strikes it, then its end swings the staff where it landed.",
+	"needs": "homing",
+	"moves": true,
+	"casts": [{"staff": 0, "cards": ["on_expire", "homing", "teleport", "swing"]}],
+	"imps": [[110, -50]],
+	"seconds": 1.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 2}]
+}

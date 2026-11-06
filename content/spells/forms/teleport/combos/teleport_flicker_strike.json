@@ -1,0 +1,11 @@
+{
+	"id": "teleport_flicker_strike",
+	"name": "Flicker strike",
+	"does": "A homing teleport blinks to a random imp in reach and strikes it; each landing hit blinks on again, so one press hops from imp to imp, and the last blink ends in a swing.",
+	"needs": "homing",
+	"moves": true,
+	"casts": [{"staff": 0, "cards": ["on_hit", "homing", "teleport", "on_hit", "homing", "teleport", "on_expire", "homing", "teleport", "swing"]}],
+	"imps": [[70, 30], [120, -60], [-40, 90]],
+	"seconds": 0.5,
+	"checks": [{"kind": "damaged_count", "min": 2}, {"kind": "caster_moved", "mode": "teleport"}]
+}

@@ -613,16 +613,17 @@ func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() 
 	check(not CarrierDash.of(_spells).move_homing(0).homes(), "nor does the next plain dash of the same wizard")
 
 
-func test_a_homing_teleport_bends_its_way_toward_a_target_and_blinks_its_distance() -> void:
+func test_a_homing_teleport_blinks_to_a_target_in_reach_however_far() -> void:
+	# Owner, 2026-11-06: a homing teleport goes to a target and strikes it, not its card's distance.
 	_distance_cards()
-	# Further than the blink's 64 px: it turns toward the target and keeps its distance.
+	# Further than the blink's 64 px, within the homing reach (160).
 	var target := _target(Vector2(100.0, 50.0))
 	_build(0, [&"homing", &"blink"])
 	_cast(0)
 	check_equal(_moves.size(), 1, "one move")
 	var to: Vector2 = _moves[0][2]
-	check(to.y > 1.0, "bent toward the target, off the aim: %s" % to)
-	check(is_equal_approx(to.length(), 64.0), "still its card's distance: %s" % to.length())
+	var want: float = target.global_position.length() - 10.0 - SpellLimits.LAND_CLEARANCE
+	check(absf(to.length() - want) < 0.01, "to the target's edge, past its own distance: %s px, want %s" % [to.length(), want])
 	check(absf(to.angle_to(target.global_position)) < 0.01, "straight at it: %s" % to)
 
 
@@ -637,40 +638,50 @@ func test_a_homing_teleport_lands_at_the_edge_of_a_target_within_its_distance() 
 	check(absf(to.angle_to(target.global_position)) < 0.01, "straight at it")
 
 
-func test_a_chain_of_homing_teleports_hops_on_to_another_enemy() -> void:
+func test_a_homing_teleport_with_nothing_in_reach_stays_put() -> void:
 	_distance_cards()
-	# The second enemy is out of reach from the start, and in reach from beside the first.
-	var first := _target(Vector2(50.0, 0.0))
-	var second := _target(Vector2(190.0, 30.0))
-	# Each cast picks with its own seed; every one must go on to the second.
-	for cast in 8:
+	_target(Vector2(400.0, 0.0))
+	_build(0, [&"homing", &"blink"])
+	check_equal(_cast(0), SpellsScript.REFUSED, "nothing to blink to: no cast")
+	check(_moves.is_empty(), "and no move: %s" % [_moves])
+	_build(1, [&"blink"])
+	_mgr.set_anchor(1, Vector2.ZERO)
+	_cast(1)
+	check(_moves.size() == 1 and is_equal_approx((_moves[0][2] as Vector2).length(), 64.0), "a plain teleport still blinks its distance: %s" % [_moves])
+
+
+func test_a_homing_teleport_picks_any_enemy_in_reach_at_random() -> void:
+	# Owner, 2026-11-06: "homing should just always pick a random enemy in range": any way round,
+	# rolled afresh each time, the one picked last too.
+	_distance_cards()
+	var ahead := _target(Vector2(60.0, 0.0))
+	var behind := _target(Vector2(-60.0, 20.0))
+	var picked: Dictionary = {}
+	for cast in 12:
 		_moves.clear()
-		var tag: int = _build(0, [&"homing", &"on_expire", &"blink", &"homing", &"blink"])
-		var cost: float = _cast(0)
-		check(cost != SpellsScript.REFUSED and _moves.size() == 1, "cast %d: one hop asked for (cost %s, %d moves)" % [cast, cost, _moves.size()])
+		_build(0, [&"homing", &"blink"])
+		check(_cast(0) != SpellsScript.REFUSED and _moves.size() == 1, "cast %d blinks" % cast)
 		if _moves.size() != 1:
 			return
-		var landed: Vector2 = _moves[0][2]
-		check(landed.is_equal_approx(Vector2(50.0 - 10.0 - SpellLimits.LAND_CLEARANCE, 0.0)), "the first hop lands beside the first enemy: %s" % landed)
-		_bus.caster_move_finished.emit(0, &"teleport", landed, tag)
-		check_equal(_moves.size(), 2, "its payload teleports again from where it landed")
-		# A move carries its way and distance (rules R4 F1).
-		var hop: Vector2 = _moves[1][2]
-		check(hop.length() > 1.0 and absf(hop.angle_to(second.global_position - landed)) < 0.01, "cast %d: on toward the other enemy, though the first is nearer: %s" % [cast, hop])
-		check(first.global_position.distance_to(landed + hop) > 20.0, "not staying at the first")
-		# Past the cast's delay (two blinks), so the next cast goes out.
+		var to: Vector2 = _moves[0][2]
+		var at: Node2D = ahead if absf(to.angle_to(ahead.global_position)) < 0.01 else behind
+		check(absf(to.angle_to(at.global_position)) < 0.01, "cast %d goes straight at one of them: %s" % [cast, to])
+		picked[at] = true
 		_tick(90)
+	check_equal(picked.size(), 2, "over a dozen casts it went to both, the one behind it too")
 
 
-func test_a_homing_teleport_hops_back_to_a_lone_enemy() -> void:
+func test_a_chain_of_homing_teleports_may_hop_to_the_same_enemy() -> void:
 	_distance_cards()
 	var lone := _target(Vector2(50.0, 0.0))
 	var tag: int = _build(0, [&"homing", &"on_expire", &"blink", &"homing", &"blink"])
 	_cast(0)
 	var landed: Vector2 = _moves[0][2]
+	# The body landed there (a test moves no body: its anchor goes with it here).
+	_mgr.set_anchor(0, landed)
 	_bus.caster_move_finished.emit(0, &"teleport", landed, tag)
 	check_equal(_moves.size(), 2, "a second hop")
-	check(_moves[1][2].length() < 0.01, "with nobody else in reach it stays on the one enemy: %s" % _moves[1][2])
+	check(_moves[1][2].length() < 0.01, "the one enemy in reach is picked again: it stays beside it: %s" % _moves[1][2])
 	check(lone != null, "the enemy is there")
 
 

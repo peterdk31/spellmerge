@@ -40,6 +40,15 @@ class Pointer:
 	var due: Array[Node] = []
 
 
+## A carrier's per-actor table: a slot per actor, mostly empty.
+class Slots:
+	extends RefCounted
+	var count: int = 2
+	var label: String = "slots"
+	var slots: Array[Plain] = [null, null, null, null]
+	var loose: Array = [1, null, "x"]
+
+
 class Based:
 	extends RefCounted
 	const DERIVED: Array[StringName] = [&"cache"]
@@ -159,6 +168,48 @@ func test_a_reference_is_hashed_as_who_it_points_at() -> void:
 	var empty: int = SimHash.of(a)
 	a.due = [null, null]
 	check(SimHash.of(a) != empty, "an empty array's size counts")
+
+
+## An array with empty slots walks only its filled ones, each after its index (the hash's walk was
+## mostly the empty slots of the carriers' per-actor tables): where an object is still counts.
+func test_an_array_with_empty_slots_hashes_where_its_objects_are() -> void:
+	var a := Slots.new()
+	var plain := Plain.new()
+	a.slots[1] = plain
+	var at_one: int = SimHash.of(a)
+	a.slots[1] = null
+	a.slots[2] = plain
+	check(SimHash.of(a) != at_one, "the same object in another slot changes the hash")
+	a.slots[2] = null
+	var empty: int = SimHash.of(a)
+	a.slots.resize(5)
+	check(SimHash.of(a) != empty, "an empty array's size counts")
+	var paths: Array[String] = []
+	var b := Slots.new()
+	b.slots[3] = plain
+	StateWalk.new().walk("b", b, func(path: String, _value: Variant) -> void: paths.append(path))
+	check(paths.has("b.slots[3].health"), "the filled slot is walked: %s" % [paths])
+	check(not paths.has("b.slots[0]"), "an empty slot is not a leaf: %s" % [paths])
+	check(paths.has("b.loose[0]") and not paths.has("b.loose[1]"), "an untyped array with a null is walked the same way: %s" % [paths])
+
+
+## The hash's own walk (`StateWalk.values`: no sink, plain members appended as they are) hashes as the
+## walk with a sink (a desync report's kept tick) does, whatever the area holds.
+func test_the_hash_is_the_same_with_or_without_a_sink() -> void:
+	var a := Slots.new()
+	a.slots[0] = Plain.new()
+	a.slots[0].child = Plain.new()
+	a.slots[0].table = {&"b": 1, "a": [2, null, Vector2.ONE]}
+	a.slots[2] = a.slots[0]
+	var walk := StateWalk.new()
+	walk.with_paths = false
+	var without: int = SimHash.area(walk, "a", a)
+	var kept: Dictionary = {}
+	var with_sink: int = SimHash.area(StateWalk.new(), "a", a, func(path: String, value: Variant) -> void: kept[path] = value)
+	check_equal(with_sink, without, "the same hash either way")
+	check(not kept.is_empty(), "the sink was handed the leaves")
+	a.slots[0].health = 3.0
+	check(SimHash.area(walk, "a", a) != without, "a plain member changes the hash's own walk")
 
 
 func test_a_list_may_carry_a_name_of_its_own() -> void:

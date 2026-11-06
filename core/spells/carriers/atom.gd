@@ -11,7 +11,7 @@ func id() -> StringName:
 
 
 func traits() -> int:
-	return FLIES | STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
+	return FLIES | STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS | CASTS_FROM_SHOT
 
 
 func required_fields() -> Dictionary:

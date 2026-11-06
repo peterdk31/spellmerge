@@ -22,11 +22,12 @@ extends Node2D
 ## `downable`: Entities ends it instead of letting it die) or its time runs out; where it ended is
 ## its end point. Each row makes its decoy actor the first time it holds one and keeps it: an ended
 ## decoy leaves the tree and is placed again later. Entities steps its decoys itself, in `step`. A
-## decoy whose card has a shield or deflect guards itself (rules R4g): every step Spells turns away
-## (`CarrierDecoy.guard_decoy`) the other teams' shots within DECOY_GUARD of its body, deflecting them
-## or stopping them while its shield charges last, as a swing's guard does; each is a block.
+## decoy is a regular actor (owner, 2026-11-06): a shield on its card is a barrier Combat keeps on
+## it, and a deflect turns the shots round it as it appears, both given by core/spells
+## (`CarrierDecoy`) once the decoy is in the world; nothing here guards it.
 ##
-## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
+## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, the body that
+## fired the payload that made it (a decoy's; it stays where that was once the decoy ends), or for a
 ## familiar a trigger made the shot that fired it (a `core/projectiles` slot, followed while it
 ## flies) or the point it was made at, starting on the side where the card put it. It casts
 ## nothing itself: core/spells fires what its triggers give it (rules R4 F3), from the orb: every
@@ -62,9 +63,12 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const DECOY: StringName = &"decoy"
 const FAMILIAR: StringName = &"familiar"
 const PLAYER_SLOTS: int = 4
-## `entity_spawn_requested`'s anchor when it is the caster's body, and when it is the point it was made at.
+## `entity_spawn_requested`'s anchor when it is the caster's body, when it is the point it was made
+## at, and the first of another actor's bodies (CASTER_BODIES - id: the body whose payload made it,
+## a decoy's), as core/spells counts casters (`SpellRuntime.body_caster`).
 const CASTER_BODY: int = -1
 const CASTER_POINT: int = -2
+const CASTER_BODIES: int = -3
 ## Live entities of one kind a seated owner, or another owner, may have.
 const PER_PLAYER: int = 4
 const PER_ENEMY: int = 2
@@ -81,9 +85,6 @@ const DECOY_HEALTH: float = 15.0
 ## for a wizard, see flow.gd).
 const DECOY_RADIUS: float = 8.0
 const DECOY_OFFSET: Vector2 = Vector2(0.0, -12.0)
-## How far from its body's centre a guarding decoy turns shots away: twice its hit circle, so a
-## shot is met a step before it would hit.
-const DECOY_GUARD: float = DECOY_RADIUS * 2.0
 
 ## The familiar circles this far from the wizard's body, this fast (radians a second).
 const FAMILIAR_ORBIT: float = 20.0
@@ -116,7 +117,8 @@ const VIEW: Array[StringName] = [&"_familiar_node"]
 ## otherwise the "Events" and "Projectiles" autoloads.
 var events: EventsScript = null
 var projectiles: ProjectileManagerScript = null
-## Spells, for a decoy's guard and where a familiar is. Only tests set it; otherwise the "Spells" autoload.
+## Spells, for a decoy's homing, its actor id and where a familiar is. Only tests set it; otherwise
+## the "Spells" autoload.
 var spells: SpellsScript = null
 ## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
 ## autoload.
@@ -132,9 +134,6 @@ var _owner: PackedInt32Array = PackedInt32Array()
 var _ramp: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt32Array = PackedInt32Array()
 var _left: PackedFloat32Array = PackedFloat32Array()
-## A decoy's shield charges left, and 1 when it deflects (its guard, rules R4g).
-var _shield: PackedInt32Array = PackedInt32Array()
-var _deflect: PackedByteArray = PackedByteArray()
 var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
 ## Spawn order, to find an owner's oldest.
@@ -199,8 +198,6 @@ func _init() -> void:
 	_ramp.resize(POOL_SIZE)
 	_tag.resize(POOL_SIZE)
 	_left.resize(POOL_SIZE)
-	_shield.resize(POOL_SIZE)
-	_deflect.resize(POOL_SIZE)
 	_key.resize(POOL_SIZE)
 	_angle.resize(POOL_SIZE)
 	_position.resize(POOL_SIZE)
@@ -254,8 +251,6 @@ func step(delta: float) -> void:
 		_position[row] = decoy.global_position
 		if decoy.health != null and decoy.health.is_depleted():
 			_end(row, true)
-		elif (_shield[row] > 0 or _deflect[row] != 0) and spells != null:
-			_shield[row] = CarrierDecoy.of(spells).guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
 	queue_redraw()
 	_write_familiars()
 
@@ -344,8 +339,6 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_ramp[row] = _ramp_of(owner)
 	_tag[row] = tag
 	_left[row] = seconds if seconds > 0.0 else INF
-	_shield[row] = CarrierDecoy.of(spells).decoy_shield(tag) if kind == DECOY and spells != null else 0
-	_deflect[row] = 1 if kind == DECOY and spells != null and CarrierDecoy.of(spells).decoy_deflects(tag) else 0
 	_angle[row] = 0.0
 	_position[row] = at
 	_key[row] = spells.entity_key if spells != null else 0
@@ -353,9 +346,12 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_spawned += 1
 	_live += 1
 	var wizard: Node2D = _body_of(owner) if anchor == CASTER_BODY or kind == DECOY else null
+	if kind == FAMILIAR and anchor <= CASTER_BODIES:
+		# A payload of another body made it (a decoy's): it circles that body, as its wizard's.
+		wizard = _body_of(CASTER_BODIES - anchor)
 	_centre_at[row] = Vector2.INF
 	_centre_slot[row] = -1
-	if kind == FAMILIAR and anchor != CASTER_BODY:
+	if kind == FAMILIAR and (anchor >= 0 or anchor == CASTER_POINT):
 		# A trigger made it: it circles the shot that fired the trigger, or the point.
 		_centre_at[row] = at
 		if anchor >= 0 and projectiles != null and projectiles.is_alive(anchor):
@@ -471,7 +467,12 @@ func _on_run_ended(_victory: bool) -> void:
 
 func _step_familiar(row: int, delta: float) -> void:
 	_angle[row] = wrapf(_angle[row] + FAMILIAR_TURN * delta, -PI, PI)
-	if not is_instance_valid(_caster[row]):
+	var body: Node2D = _caster[row]
+	if not is_instance_valid(body):
+		_caster[row] = null
+	elif body is Actor and (body as Actor).belongs_to == _owner[row] and not body.is_inside_tree():
+		# A body of its owner's that it circles (a decoy) has ended: it stays where that was.
+		_centre_at[row] = _centre_of(body)
 		_caster[row] = null
 	_position[row] = _orbit_point(row)
 
@@ -502,6 +503,13 @@ func _end(row: int, announce: bool) -> void:
 	_live -= 1
 	var decoy: Actor = _decoys[row]
 	if decoy != null and decoy.get_parent() == self:
+		# A move its payload asked of it (a dash) ends where it is: answered as it ends, so the
+		# move's end point fires there, else dropped quietly; a decoy placed again starts with none.
+		if decoy.mover != null:
+			if announce:
+				decoy.mover.stop()
+			else:
+				decoy.mover.drop()
 		_position[row] = decoy.global_position
 		# Out of the tree: its id, hurt circle and caster close, and nothing aims at it any more.
 		remove_child(decoy)

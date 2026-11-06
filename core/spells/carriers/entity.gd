@@ -38,7 +38,7 @@ func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Ve
 	if kit.events == null or kit.spell_of(tag) == null:
 		return 0
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
-	var anchor: int = _entity_caster()
+	var anchor: int = _entity_caster(actor)
 	_entities[tag] = _entities.get(tag, 0) + 1
 	kit.shot_started(tag)
 	# Where it is: a body Entities made (a decoy, an actor), which casts along its own aim; else a
@@ -49,18 +49,25 @@ func _spawn(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Ve
 	var body: int = kit.entity_body()
 	if body >= 0:
 		kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, body, key, false, seconds, at, heading)
+		_body_made(spell, tag, actor, body, at, lifetime)
 	else:
 		kit.live_join(spell, tag, SpellRuntime.LC_POINT, -1, key, false, seconds, at, heading)
 	return 1
 
 
-## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
-## cast it, or nothing (-2: it stays where it was made).
-func _entity_caster() -> int:
-	if kit.caster() == SpellRuntime.CASTER_BODY:
-		return -1
-	var shot: int = kit.caster_shot()
-	return shot if shot >= 0 else -2
+## The entity is a body, the actor `body`, standing at `at` for `lifetime` seconds (a hold's is
+## SpellLimits.HOLD_LIFETIME): Combat knows it by now (Entities put it in the world). What the
+## carrier does to it as it appears (a decoy's shield and deflect, `CarrierDecoy`).
+func _body_made(_spell: CompiledSpell, _tag: int, _actor: int, _body: int, _at: Vector2, _lifetime: float) -> void:
+	pass
+
+
+## What an entity of `actor` circles, for `entity_spawn_requested`: its caster (`CarrierKit.caster`),
+## the actor's own body as CASTER_BODY (-1), another actor's body (`SpellRuntime.body_caster`), the
+## shot that cast it, or the point (-2: it stays where it was made).
+func _entity_caster(actor: int) -> int:
+	var caster: int = kit.caster()
+	return SpellRuntime.CASTER_BODY if SpellRuntime.body_of(caster, actor) == actor else caster
 
 
 ## An entity of this actor ended where it stood (`entity_ended`, handed on by `Spells`): its `blast` and its `on expire` payload happen

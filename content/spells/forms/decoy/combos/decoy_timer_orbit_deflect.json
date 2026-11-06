@@ -1,0 +1,12 @@
+{
+	"id": "decoy_timer_orbit_deflect",
+	"name": "Spinning decoy",
+	"does": "Every tick the decoy casts a ring of deflecting orbs that circles it (the decoy's body casts its timer's payload), and the rings turn the enemy bolt coming at it.",
+	"needs": "deflect",
+	"entities": true,
+	"casts": [{"staff": 0, "cards": ["timer", "decoy", "deflect", "orbit"]}],
+	"imps": [],
+	"foes": [[270, -12]],
+	"seconds": 3.0,
+	"checks": [{"kind": "spawned", "entity": "decoy", "min": 1}, {"kind": "deflected", "min": 1}]
+}

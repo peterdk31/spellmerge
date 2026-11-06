@@ -21,7 +21,7 @@ func traits() -> int:
 ## (`Spells._strike_round`), and with `deflect` turns the shots within MOVE_GUARD_REACH.
 func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2) -> void:
 	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-		kit.guard(kit.projectiles.shots_on_segment(actor, at, at, SpellLimits.MOVE_GUARD_REACH), actor, tag, true, 0, at, at, id())
+		kit.turn_shots_round(actor, tag, at, SpellLimits.MOVE_GUARD_REACH, id())
 	kit.strike_round(spell, tag, actor, at, heading, SpellLimits.LAND_REACH, spell.echo_hit if kit.is_echo(spell) else null)
 
 
@@ -63,6 +63,6 @@ func _aim_move(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way:
 	return Vector3(way.x, way.y, distance)
 
 
-func _move_body(_spell: CompiledSpell, tag: int, actor: int, _origin: Vector2, _way: Vector2, offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
-	kit.events.caster_move_requested.emit(actor, &"teleport", offset, 0.0, tag)
+func _move_body(_spell: CompiledSpell, tag: int, _actor: int, body: int, _origin: Vector2, _way: Vector2, offset: Vector2, _seconds: float, _chain: int, _prev: int) -> void:
+	kit.events.caster_move_requested.emit(body, &"teleport", offset, 0.0, tag)
 

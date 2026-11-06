@@ -116,10 +116,12 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sl_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sl_struck[at].clear()
 	var mine: bool = actor >= 0 and actor < SpellRuntime.ACTORS
-	if caster == SpellRuntime.CASTER_BODY:
-		if mine and kit.aim_pivot(actor).is_finite():
-			_sl_origin[at] = kit.aim_pivot(actor)
-		if mine and poses.started_at(actor) != kit.clock():
+	var holder: int = SpellRuntime.body_of(caster, actor)
+	if holder >= 0:
+		if mine and kit.aim_pivot(holder).is_finite():
+			_sl_origin[at] = kit.aim_pivot(holder)
+		# Only the actor's own body has a staff to slam with (a decoy's has none).
+		if mine and holder == actor and poses.started_at(actor) != kit.clock():
 			poses.start(actor, spell, tag, _sl_wind[at], maxf(spell.lifetime, 0.001), _sl_dir[at], StaffPoses.up_side(_sl_dir[at]), true)
 	elif kit.live_caster_shot(caster, caster_seq) < 0:
 		_sl_caster[at] = SpellRuntime.CASTER_POINT
@@ -139,7 +141,7 @@ func _slam_step(at: int, delta: float) -> void:
 			return
 		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
 		_sl_impact[at] = impact
-		if _sl_caster[at] == SpellRuntime.CASTER_BODY:
+		if SpellRuntime.body_of(_sl_caster[at], _sl_actor[at]) == _sl_actor[at]:
 			poses.land_at(tag, impact - _sl_origin[at])
 		if kit.events != null:
 			kit.events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
@@ -159,13 +161,13 @@ func _slam_step(at: int, delta: float) -> void:
 ## Puts slam `at` where its caster holds it now, until it strikes (as `_swing_follow`).
 func _slam_follow(at: int) -> void:
 	var caster: int = _sl_caster[at]
-	if caster == SpellRuntime.CASTER_BODY:
-		var actor: int = _sl_actor[at]
-		if actor < 0 or actor >= SpellRuntime.ACTORS:
+	var holder: int = SpellRuntime.body_of(caster, _sl_actor[at])
+	if holder >= 0:
+		if holder >= SpellRuntime.ACTORS:
 			return
-		if kit.aim_origin(actor).is_finite():
-			_sl_origin[at] = kit.aim_pivot(actor) if kit.aim_pivot(actor).is_finite() else kit.aim_origin(actor)
-		elif kit.aim_seen(actor):
+		if kit.aim_origin(holder).is_finite():
+			_sl_origin[at] = kit.aim_pivot(holder) if kit.aim_pivot(holder).is_finite() else kit.aim_origin(holder)
+		elif kit.aim_seen(holder):
 			_end_slam(at, false)
 	elif caster >= 0:
 		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _sl_caster_seq[at]:

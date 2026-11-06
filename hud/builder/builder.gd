@@ -915,6 +915,8 @@ func _target_word(target: int) -> String:
 		return "you"
 	if target == StaffCompiler.TARGET_POINT:
 		return "aim"
+	if target == StaffCompiler.TARGET_BEARER:
+		return "it"
 	return str(target + 1)
 
 
@@ -928,6 +930,8 @@ func _link_sentence(slot: int) -> String:
 			return "Goes on you."
 		if target == StaffCompiler.TARGET_POINT:
 			return "Goes where you aim."
+		if target == StaffCompiler.TARGET_BEARER:
+			return "Goes on what fired it."
 		var cards: Array[StringName] = cards_of(_viewed)
 		var carrier: String = _name_of(cards[target]) if target < cards.size() else ""
 		return "Goes into %s (slot %d)." % [carrier, target + 1]

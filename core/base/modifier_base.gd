@@ -94,7 +94,7 @@ enum Stack { ADD, MULTIPLY, CHANCE }
 ##   carrier's yes/no answers (`CarrierTraits`): "any": at least one of these flags; "not": none of
 ##   these; "or_cards": a card with one of these behaviours on the carrier does instead (what a
 ##   blast strikes is the carrier's hit, rules R4 F2). None: it works on every carrier (numbers,
-##   blast, echo, recoil, mirror: a move and its mirror add up to none, rules R4 F1).
+##   blast, echo, mirror: a move and its mirror add up to none, rules R4 F1).
 ## - "stacks": a `Stack` (ADD when missing).
 ## A card names its behaviour by its name (`behaviour_id`), so a behaviour added or taken out never
 ## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
@@ -106,7 +106,8 @@ const RULES: Dictionary = {
 	Behaviour.SHIELD: {"needs": {"any": CarrierTraits.MEETS_SHOTS}},
 	Behaviour.BLAST: {},
 	Behaviour.HOLD: {"needs": {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER}},
-	Behaviour.RECOIL: {},
+	# It pushes the carrier's caster back: a body or a shot, never a point.
+	Behaviour.RECOIL: {"needs": {"not": CarrierTraits.CASTERLESS}},
 	Behaviour.BOUNCE: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE}},
 	Behaviour.ECHO: {},
 	Behaviour.LINGER: {"needs": {"any": CarrierTraits.MOVES}},

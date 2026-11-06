@@ -17,6 +17,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
+const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 1.0 / 60.0
@@ -35,6 +36,9 @@ var bus: EventsScript
 var projectiles: ManagerScript
 var spells: SpellsScript
 var combat: CombatScript
+## The decoys and familiars cards make, once `add_entities` made them (null before: a decoy or a
+## familiar is then only asked for, `spawns`).
+var entities: EntitiesScript = null
 ## Every imp added, in order.
 var imps: Array[Node2D] = []
 ## Every caster_move_requested as [caster, mode] (a dash card moves its caster, staffs A6a).
@@ -62,6 +66,8 @@ var pushable: bool = false
 var time: float = 0.0
 
 var _walls: Array[Rect2] = []
+## Enemy shots sent so far (`shoot_at`): each goes from a staff of its own, so none waits for another's cooldown.
+var _foe_shots: int = 0
 var _root: Node
 var _owned: Array[Object] = []
 ## Where each player stands (the origin of casts and the orbit anchor).
@@ -135,13 +141,29 @@ func healed() -> int:
 
 
 ## Sends an enemy bolt (a real cast, with a hit that hurts) from `from` toward `to`, cast by an
-## actor no wizard drives.
+## actor no wizard drives (from a staff of its own each time, up to SpellLimits.STAFFS at once).
 func shoot_at(from: Vector2, to: Vector2) -> void:
 	var enemy: int = ActorSeats.enemy(projectiles.actors)
+	var staff: int = _foe_shots % SpellLimits.STAFFS
+	_foe_shots += 1
 	var ids: Array[StringName] = [&"bolt"]
-	spells.install_staff(enemy, 0, spells.compile_staff(ids, plain_staff(1)))
+	spells.install_staff(enemy, staff, spells.compile_staff(ids, plain_staff(1)))
 	projectiles.set_anchor(enemy, from)
-	spells.cast_staff(enemy, 0, from, from.direction_to(to), MANA)
+	spells.cast_staff(enemy, staff, from, from.direction_to(to), MANA)
+
+
+## Makes the decoys and familiars cards ask for (`Entities`, stepped by `run`): a decoy is an actor
+## that is hurt, guarded and fires its payloads from its body.
+func add_entities() -> void:
+	entities = EntitiesScript.new()
+	entities.events = bus
+	entities.projectiles = projectiles
+	entities.spells = spells
+	entities.actors = projectiles.actors
+	entities.combat = combat
+	_root.add_child(entities)
+	entities.set_physics_process(false)
+	_owned.push_front(entities)
 
 
 ## Puts the body of teammate `player` at `at`: a shot of another actor hits it (and `relay` reads
@@ -204,6 +226,8 @@ func run(seconds: float) -> void:
 		projectiles.step(STEP)
 		spells.step(STEP)
 		combat.step(STEP)
+		if entities != null:
+			entities.step(STEP)
 		if pushable:
 			for imp in imps:
 				if is_instance_valid(imp):

@@ -51,8 +51,7 @@ func test_each_stray_is_one_body_with_its_telegraph_parts() -> void:
 		check(sprite != null and sprite.texture != null, "%s: a body sprite" % data.id)
 		if sprite != null and sprite.texture != null:
 			check_equal(sprite.texture.get_size(), Vector2(FRAME, FRAME), "%s: one 32 px body" % data.id)
-		var telegraph := body.get_node_or_null(^"Telegraph") as Sprite2D
-		check(telegraph != null and telegraph.material is ShaderMaterial and not telegraph.visible, "%s: a hidden telegraph drawn by a shader" % data.id)
+		check(body.get_node_or_null(^"Telegraph") == null, "%s: no telegraph node: its lane is Feel's (docs/milestones/cast-timing.md, T6b)" % data.id)
 		var look := body.get_node_or_null(^"CreatureLook")
 		var face := body.get_node_or_null(^"Face")
 		check(look != null and face != null and look.get_index() < face.get_index(), "%s: the body's look steps before the face" % data.id)

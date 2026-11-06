@@ -34,12 +34,12 @@ func test_a_staff_out_of_range_names_the_field() -> void:
 	var staff := StaffBase.new()
 	staff.id = &"broken"
 	staff.slots = 0
-	staff.recharge = -1.0
+	staff.cooldown = -1.0
 	var fields: Array[String] = []
 	for problem: Dictionary in SpellValidator.check_staff(staff):
 		fields.append(String(problem["field"]))
 	check(fields.has("slots"), "0 slots is reported")
-	check(fields.has("recharge"), "a negative recharge is reported")
+	check(fields.has("cooldown"), "a negative cooldown is reported")
 
 
 func test_a_staff_needs_an_id() -> void:

@@ -1,0 +1,9 @@
+{
+	"id": "charged_bolt",
+	"name": "Charged bolt",
+	"does": "A bolt that winds up two seconds, then hits an imp four times as hard.",
+	"casts": [{"staff": 0, "cards": ["charge", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 3.0,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

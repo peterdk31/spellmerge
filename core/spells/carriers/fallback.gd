@@ -19,8 +19,8 @@ func traits() -> int:
 	return HITS
 
 
-## No form card gives it a cooldown, so a card's cooldown factor has nothing to shorten.
-func has_cooldown() -> bool:
+## No form card gives it a wind-down, so a card's wind-down factor has nothing to shorten.
+func has_wind_down() -> bool:
 	return false
 
 

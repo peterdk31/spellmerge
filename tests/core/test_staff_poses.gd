@@ -32,7 +32,7 @@ func _card(id: StringName, carrier: StringName, keys: Array[Dictionary], lifetim
 	form.speed = 100.0
 	form.ray_length = 100.0
 	form.lifetime = lifetime
-	form.cooldown = 0.05
+	form.wind_down = 0.05
 	form.staff_pose = keys
 	(arena.registry.get("_resources")[&"spells"] as Dictionary)[id] = form
 	return form
@@ -88,7 +88,7 @@ func test_a_new_cast_starts_from_where_the_staff_is() -> void:
 	check(arena.spells.poses().staff_pose(0).y > 8.0, "the next cast starts from up there, no jump: %s" % arena.spells.poses().staff_pose(0))
 
 
-func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim() -> void:
+func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim_as_it_leaves() -> void:
 	_card(&"loose", &"atom", [{"phase": "after", "at": 0.4, "lift": 2}, {"phase": "after", "at": 0.5}] as Array[Dictionary])
 	_cast(&"loose")
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
@@ -99,8 +99,12 @@ func test_it_turns_with_the_live_aim_unless_its_carrier_locks_the_aim() -> void:
 	arena.cast(0, 1)
 	arena.run(1.0 / 60.0)
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
-	arena.run(0.05)
-	check(arena.spells.poses().staff_pose_dir(0).is_equal_approx(Vector2.RIGHT), "a swing's keeps the aim of its cast")
+	arena.run(1.0 / 60.0)
+	check(arena.spells.poses().staff_pose_dir(0).is_equal_approx(Vector2.DOWN), "a swing's wind-up turns with the aim (docs/milestones/cast-timing.md)")
+	arena.run(0.12)
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.run(1.0 / 60.0)
+	check(arena.spells.poses().staff_pose_dir(0).is_equal_approx(Vector2.DOWN), "and once it has left it keeps the aim it left with")
 
 
 func test_every_carrier_moves_the_staff() -> void:

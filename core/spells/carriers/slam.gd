@@ -76,9 +76,10 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	_grow_slams(SpellLimits.SLAM_ROWS_START)
 
 
-## A slam (`slam` carrier, melee I8; docs/milestones/M2-staffs.md, "Phase I: melee"): the staff
-## rises for the carrier's `wind_up`, held by its caster as a swing is (the wizard's hand, the shot
-## that cast it, or a point), with the aim locked now; then it strikes the floor `ray_length`
+## A slam (`slam` carrier, melee I8; docs/milestones/M2-staffs.md, "Phase I: melee"): it leaves
+## once its cast has wound up (the staff rising, `Spells._wind_pose`; docs/milestones/
+## cast-timing.md), held by its caster as a swing is (the wizard's hand, the shot that cast it, or
+## a point), with the aim locked now; then it strikes the floor `ray_length`
 ## ahead (short of a wall) and a ring grows from there to its `radius` over SLAM_GROW of its
 ## `lifetime` and holds for the rest. The ring strikes each body in it once (`Projectiles.sweep`
 ## all round the impact, so a wall between hides a body), outward from the impact, so the hit's
@@ -109,7 +110,8 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_sl_dir[at] = heading.normalized()
 	_sl_impact[at] = Vector2.INF
 	_sl_age[at] = 0.0
-	_sl_wind[at] = maxf(spell.wind_up, 0.0)
+	# The cast wound up before it left (docs/milestones/cast-timing.md): it strikes now.
+	_sl_wind[at] = 0.0
 	_sl_chain[at] = chain
 	_sl_prev[at] = prev
 	_sl_hit[at] = spell.echo_hit if echoed else null

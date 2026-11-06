@@ -286,6 +286,9 @@ func drive(guest: ActorController) -> void:
 				before.driving = null
 	controller = guest
 	intent.clear()
+	if caster != null:
+		# A cast the old driver wound up was its decision: it leaves no more (cast timing).
+		caster.cancel_winds()
 	if controller != null:
 		controller.driving = self
 		controller.started(self)

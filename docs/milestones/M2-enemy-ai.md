@@ -83,7 +83,7 @@ Shared presets live as files (`content/enemies/profiles/*.tres`); an enemy names
 | `lead` | 0–1 | How far it aims ahead of a moving target |
 | `reaction` | seconds | How often it looks and decides (also how late it notices a shot) |
 | `dodge` | 0–1 | How well it dodges (0: never; the horde's swarmers) |
-| `windup_scale` | × | Every telegraph |
+| ~~`windup_scale`~~ | × | Every telegraph (gone: the staff's `wind_up`, cast timing T6) |
 | `rest_scale` | × | The recovery after a cast |
 | `track_speed` | °/s | How fast a held cast turns after its target (0: locked, as today) |
 | `channel_max` | seconds | Longest it holds a cast |
@@ -93,7 +93,7 @@ Shared presets live as files (`content/enemies/profiles/*.tres`); an enemy names
 
 **Difficulty** (gameplay/difficulty, when built): one multiplier set from `difficulty_changed`, held by the TeamBoard (one listener, not one per enemy). It scales `reaction`, `accuracy`, `dodge` and `windup_scale` of every profile.
 
-**Fair telegraphs by rule:** a windup lasts `base + k × danger` × `windup_scale`, where danger comes from the cast's `damage` and `area`. A big spell telegraphs longer without hand-tuning, so "every attack has a readable telegraph" holds for staffs nobody checked by hand. A floor keeps any harmful cast above a minimum windup.
+**Fair telegraphs by rule** (replaced on 2026-11-06 by cast timing: a telegraph is the staff's `wind_up`, [cast-timing.md](cast-timing.md)): a windup lasted `base + k × danger` × `windup_scale`, where danger comes from the cast's `damage` and `area`. A big spell telegraphs longer without hand-tuning, so "every attack has a readable telegraph" holds for staffs nobody checked by hand. A floor keeps any harmful cast above a minimum windup.
 
 ## The enemy's data (core/base)
 

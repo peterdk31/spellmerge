@@ -16,7 +16,9 @@ extends ActorComponent
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with that
 ## staff's free mana (`free_mana(at)`: its pool minus what its sustained cards hold) and pays what
-## Spells took from that pool, then sends `actor_cast` (any actor's cast, for visual reactions).
+## Spells took from that pool, then sends `actor_cast` (any actor's cast, for visual reactions). A
+## cast that winds up (docs/milestones/cast-timing.md) starts there and leaves later; its mana is
+## paid then (`mana_spend_requested`).
 ##
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and
@@ -48,8 +50,8 @@ signal staff_built(at: int)
 
 ## How many staffs (1-4): a wizard has four, an enemy one.
 @export_range(1, 4) var staff_count: int = 1
-## The staff of a button with none in `staffs` (its slots, delay, recharge and mana pool);
-## without one a staff has 4 slots, casts with no delay of its own and has StaffBase's default
+## The staff of a button with none in `staffs` (its slots, wind-up, cooldown and mana pool);
+## without one a staff has 4 slots, adds no wind-up or cooldown of its own and has StaffBase's default
 ## pool.
 @export var staff: StaffBase = null
 ## The staff of each button (a player's four heads); shorter or null entries fall back to `staff`.
@@ -105,6 +107,8 @@ func attach() -> void:
 	_open_number()
 	if actor.events != null and not actor.events.mana_refund_requested.is_connected(_on_mana_refund):
 		actor.events.mana_refund_requested.connect(_on_mana_refund)
+	if actor.events != null and not actor.events.mana_spend_requested.is_connected(_on_mana_spend):
+		actor.events.mana_spend_requested.connect(_on_mana_spend)
 	if number < 0:
 		return
 	own_hurtbox()
@@ -126,6 +130,8 @@ func attach() -> void:
 func detach() -> void:
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_refund_requested.is_connected(_on_mana_refund):
 		actor.events.mana_refund_requested.disconnect(_on_mana_refund)
+	if actor.events != null and is_instance_valid(actor.events) and actor.events.mana_spend_requested.is_connected(_on_mana_spend):
+		actor.events.mana_spend_requested.disconnect(_on_mana_spend)
 	_close_number()
 
 
@@ -144,6 +150,12 @@ func step(delta: float) -> void:
 	for at in staff_count:
 		var base: StaffBase = staff_of(at)
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
+	if actor.spells != null and actor.combat != null:
+		# A slowed body winds up slower: a chill stretches a wind-up, a freeze holds it
+		# (docs/milestones/cast-timing.md).
+		var pace: float = actor.combat.own_pace(actor, actor.id)
+		if pace < 1.0:
+			actor.spells.hold_winds(number, delta * (1.0 - pace))
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
 		# was sent (performance pass, 2026-10-28).
@@ -255,6 +267,17 @@ func has_staff(at: int) -> bool:
 	return actor.spells != null and number >= 0 and at >= 0 and at < staff_count and _has_build[at] != 0
 
 
+## True while staff `at` winds up a cast (pressed, not yet left; docs/milestones/cast-timing.md).
+func is_winding(at: int) -> bool:
+	return has_staff(at) and actor.spells.is_winding(number, at)
+
+
+## Every cast this actor winds up leaves no more, for free (its driver changed: `Actor.drive`).
+func cancel_winds() -> void:
+	if actor.spells != null and number >= 0:
+		actor.spells.cancel_winds(number)
+
+
 ## True while staff `at` holds a sustained card on.
 func is_holding(at: int) -> bool:
 	return has_staff(at) and actor.spells.is_holding(number, at)
@@ -352,28 +375,30 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 			staff_built.emit(at)
 
 
-## The next cast's mana (`Spells.next_cast_mana`): REFUSED (-1) with no build.
+## The next cast's mana (`Spells.next_cast_mana`): the cast a press would fire with the staff's
+## free mana (one it cannot pay is skipped); REFUSED (-1) with no build.
 func next_cast_mana(at: int = 0) -> float:
-	return actor.spells.next_cast_mana(number, at) if has_staff(at) else SpellsScript.REFUSED
+	return actor.spells.next_cast_mana(number, at, free_mana(at)) if has_staff(at) else SpellsScript.REFUSED
 
 
 ## How far the next cast reaches along the aim (0 for one that is not aimed, or no build).
 func next_cast_reach(at: int = 0) -> float:
-	return actor.spells.next_cast_reach(number, at) if has_staff(at) else 0.0
+	return actor.spells.next_cast_reach(number, at, free_mana(at)) if has_staff(at) else 0.0
 
 
 ## What the next cast of staff `at` does (`Spells.next_cast_sense`, a `CastSense`), or null with
 ## no build: what an AI reads to play whatever staffs the actor holds (docs/milestones/M2-enemy-ai.md).
 func next_cast_sense(at: int = 0) -> CastSense:
-	return actor.spells.next_cast_sense(number, at) if has_staff(at) else null
+	return actor.spells.next_cast_sense(number, at, free_mana(at)) if has_staff(at) else null
 
 
 ## The hit radius of the next cast's first carrier (0 for none).
 func next_cast_radius(at: int = 0) -> float:
-	return actor.spells.next_cast_radius(number, at) if has_staff(at) else 0.0
+	return actor.spells.next_cast_radius(number, at, free_mana(at)) if has_staff(at) else 0.0
 
 
-## True when the next cast of staff `at` can leave within `within` seconds: its delay is no
+## True when a cast of staff `at` can leave within `within` seconds (one it cannot pay is skipped,
+## docs/milestones/cast-timing.md): its delay is no
 ## longer than that and the mana is there.
 func cast_ready(within: float, at: int = 0) -> bool:
 	# An AI asks every step while its target is in reach: one call to Spells.
@@ -416,8 +441,8 @@ func _staff_or_plain() -> StaffBase:
 	if _plain == null:
 		_plain = StaffBase.new()
 		_plain.slots = SpellLimits.STAFFS
-		_plain.cast_delay = 0.0
-		_plain.recharge = 0.0
+		_plain.wind_up = 0.0
+		_plain.cooldown = 0.0
 	return _plain
 
 
@@ -447,3 +472,12 @@ func _on_mana_refund(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = minf(_mana[at] + amount, max_mana_of(at))
+
+
+## A cast that wound up left (`Spells`, docs/milestones/cast-timing.md): its mana is paid from the
+## staff that cast it now, not at the press.
+func _on_mana_spend(caster: int, at: int, amount: float) -> void:
+	if number < 0 or caster != number or not is_finite(amount) or amount <= 0.0:
+		return
+	if at >= 0 and at < staff_count:
+		_mana[at] = maxf(_mana[at] - amount, 0.0)

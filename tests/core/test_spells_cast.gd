@@ -53,7 +53,7 @@ func before_each() -> void:
 	_form(&"slow", 5, 60.0, 5.0)
 	_form(&"short", 5, 300.0, 0.1)
 	var heavy: FormBase = _form(&"heavy", 5, 300.0, 1.0)
-	heavy.cooldown = 2.0
+	heavy.wind_down = 2.0
 	var ring: FormBase = _form(&"ring", 5, 300.0, 1.0)
 	ring.shots = 24
 	ring.spread = 360.0
@@ -95,7 +95,7 @@ func before_each() -> void:
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
-	timer.interval = 0.5
+	timer.wind_up = 0.5
 
 
 func _put(component: SpellComponent, id: StringName) -> void:

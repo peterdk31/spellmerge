@@ -635,10 +635,11 @@ func _face_of(body: Actor) -> Face:
 	return null
 
 
-## Enemies telegraph, allies don't (owner, 2026-11-01): the wizard an enemy's AI possesses is on
-## the enemies' team meanwhile, so the AI winds its casts up there too and the other players are
-## warned: the telegraph and the wizard's furious face.
-func test_an_enemy_ai_driving_a_wizard_telegraphs() -> void:
+## Cast timing (docs/milestones/cast-timing.md, owner 2026-11-06): how long a cast winds up is its
+## staff's, whoever holds it. The wizard an enemy's AI possesses is on the enemies' team meanwhile,
+## but its staffs wind up nothing, so the AI casts them at once and shows no telegraph (it used to
+## add its own windup there: owner, 2026-11-01). A staff with a wind-up warns from the same body.
+func test_an_enemy_ai_driving_a_wizard_casts_its_staffs_as_they_are() -> void:
 	var data := ImpData.duplicate() as EnemyBase
 	var staff: StaffBase = ImpData.staffs[0].staff.duplicate() as StaffBase
 	staff.max_mana = 40.0
@@ -647,6 +648,10 @@ func test_an_enemy_ai_driving_a_wizard_telegraphs() -> void:
 	_world.wizard(1, Vector2(0.0, -110.0))
 	var imp := _ember_imp(Vector2(80.0, 0.0), data)
 	var mind := _mind(imp)
+	# A lambda keeps a copy of a local, so the casts go in an array.
+	var casts: Array[bool] = []
+	var warned: bool = false
+	wizard.caster.cast_done.connect(func(_at: int, _origin: Vector2, _direction: Vector2) -> void: casts.append(wizard.controller == mind))
 	var taken: bool = false
 	for i in 64:
 		_world.run(1)
@@ -655,13 +660,10 @@ func test_an_enemy_ai_driving_a_wizard_telegraphs() -> void:
 			break
 	check(taken, "the imp's AI takes the nearer wizard")
 	check_equal(wizard.team(), ActorsScript.TEAM_ENEMIES, "which is on the enemies' team meanwhile")
-	check(mind.brain.windup_for(0) > 0.0, "so its casts wind up")
-	var warned: bool = false
-	var furious: bool = false
+	check_equal(wizard.caster.next_cast_sense(0).wind_up, 0.0, "the wizard's staff winds up nothing")
 	for i in 30:
 		_world.run(1)
 		if wizard.controller == mind and mind.is_telegraphing():
 			warned = true
-			furious = furious or _face_of(wizard).mood() == Face.Mood.FURIOUS
-	check(warned, "it telegraphs from the wizard's body")
-	check(furious, "with the wizard's furious face")
+	check(casts.has(true), "the AI casts the wizard's staff")
+	check(not warned, "with no telegraph: the staff gives none")

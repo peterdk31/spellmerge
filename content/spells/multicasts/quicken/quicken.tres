@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MulticastBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/multicast_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/multicasts/quicken/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"quicken"
+display_name = "Quicken"
+description = "Halves its group's wind-up: a charge, a timer's tick."
+complexity = 2
+icon = ExtResource("2_icon")
+extra_draws = 0
+mode = 0
+mana_cost = 3.0
+wind_up_mult = 0.5

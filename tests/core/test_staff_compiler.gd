@@ -29,13 +29,12 @@ func before_each() -> void:
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 20
-	_staff.cast_delay = 0.1
-	_staff.recharge = 0.5
+	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 5, 1)
-	bolt.cooldown = 0.2
+	bolt.wind_down = 0.2
 	var nova: FormBase = _form(&"nova", 4, 8)
 	nova.spread = 360.0
-	nova.cooldown = 0.4
+	nova.wind_down = 0.4
 	_form(&"rain", 3, 1).carrier = &"rain"
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
@@ -134,8 +133,8 @@ func test_two_casts_then_recharge() -> void:
 	check_equal([first.form_id, first.element_id], [&"bolt", &"fire"], "cast 1 is a fire bolt")
 	var second: CompiledSpell = staff.casts[1].group.spells[0]
 	check_equal([second.form_id, second.element_id], [&"nova", &"frost"], "cast 2 is a frost nova")
-	check(not staff.casts[0].recharges, "cast 1 does not recharge")
-	check(staff.casts[1].recharges, "cast 2 recharges")
+	check(not staff.casts[0].ends_cycle, "cast 1 does not end the cycle")
+	check(staff.casts[1].ends_cycle, "cast 2 ends it")
 
 
 func test_a_trailing_modifier_wraps_onto_the_first_carrier() -> void:
@@ -146,7 +145,7 @@ func test_a_trailing_modifier_wraps_onto_the_first_carrier() -> void:
 	check_equal(second.form_id, &"bolt", "cast 2 wraps to the bolt")
 	check_equal(second.modifier_ids, [&"blast", &"blast"] as Array[StringName], "cast 2: a bolt with two blasts")
 	check(staff.casts[1].wrapped, "cast 2 wrapped")
-	check(staff.casts[1].recharges, "a wrapped cast recharges")
+	check(staff.casts[1].ends_cycle, "a wrapped cast ends the cycle")
 
 
 func test_a_lone_blast_explodes_on_the_caster() -> void:
@@ -156,7 +155,7 @@ func test_a_lone_blast_explodes_on_the_caster() -> void:
 	check_equal(spell.fallback, CompiledSpell.FALLBACK_CASTER, "it lands on the caster")
 	check(spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0, "it blasts")
 	check_equal(staff.casts[0].targets[0], StaffCompiler.TARGET_CASTER, "the plan links it to the caster")
-	check(staff.casts[0].recharges, "and the staff recharges")
+	check(staff.casts[0].ends_cycle, "and the cycle ends")
 
 
 func test_double_with_a_payload_on_the_second_bolt() -> void:
@@ -180,7 +179,7 @@ func test_a_group_resumes_after_its_payload() -> void:
 	check_equal(_forms(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
 	check_equal(_forms(group.spells[0].payload), [&"nova"] as Array[StringName], "the first fires a nova on hit")
 	check(group.spells[1].payload == null, "the last bolt holds nothing")
-	check(staff.casts[0].recharges, "then recharge")
+	check(staff.casts[0].ends_cycle, "then recharge")
 
 
 func test_a_lone_modifier_in_a_payload_lands_on_its_origin() -> void:
@@ -197,7 +196,7 @@ func test_a_trigger_with_nothing_after_it_is_wasted() -> void:
 	check_equal(staff.casts.size(), 1, "one cast")
 	check(staff.casts[0].group.spells[0].payload == null, "no payload")
 	check(staff.wasted.has(0), "the trigger is wasted: %s" % staff.wasted)
-	check(staff.casts[0].recharges, "it wrapped, so it recharges")
+	check(staff.casts[0].ends_cycle, "it wrapped, so the cycle ends")
 
 
 func test_magnet_on_a_payload_fired_from_a_point_is_wasted() -> void:
@@ -291,7 +290,7 @@ func test_each_trigger_takes_its_own_payload_in_order() -> void:
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "with its fire")
 	check_equal(staff.casts[0].targets.get(0, -1), 2, "on hit goes on the bolt")
 	check_equal(staff.casts[0].targets.get(1, -1), 2, "on expire goes on the bolt")
-	check(staff.casts[0].recharges, "no card is left: recharge")
+	check(staff.casts[0].ends_cycle, "no card is left: recharge")
 
 
 func test_the_same_trigger_twice_fires_two_payloads() -> void:
@@ -367,7 +366,7 @@ func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
 
 func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
 	_form(&"slam", 1, 1).carrier = &"slam"
-	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 	# A slam is over at once: its timer never fires, but it still reads the nova, so on hit gets the bolt.
 	var staff: CompiledStaff = _compile("timer on_hit slam nova bolt")
 	var slam: CompiledSpell = staff.casts[0].group.spells[0]
@@ -401,11 +400,77 @@ func test_rain_carries_its_own_payload() -> void:
 func test_the_numbers_of_a_cast() -> void:
 	var cast: CompiledCast = _compile("fire bolt").casts[0]
 	check_equal(cast.mana, 2.0, "the bolt's mana")
-	check(is_equal_approx(cast.delay, 0.1 + 0.2 + 0.5), "staff delay + bolt cooldown + recharge, got %s" % cast.delay)
+	check(is_equal_approx(cast.wind_down, 0.2), "the bolt's wind-down, got %s" % cast.wind_down)
+	check(is_equal_approx(cast.delay, 0.2 + 0.5), "the wind-down, then the staff's cooldown: the cycle ends, got %s" % cast.delay)
 	var split: CompiledSpell = _compile("split bolt").casts[0].group.spells[0]
 	check_equal(split.shots, 3, "split triples the shots")
 	var many: CompiledSpell = _compile("split split split nova").casts[0].group.spells[0]
 	check_equal(many.shots, 216, "no shot limit any more")
+
+
+func test_the_staff_cooldown_follows_only_the_cycle_s_last_cast() -> void:
+	var staff: CompiledStaff = _compile("bolt nova")
+	check(is_equal_approx(staff.casts[0].delay, 0.2), "a cast inside the cycle waits its wind-down only, got %s" % staff.casts[0].delay)
+	check(is_equal_approx(staff.casts[1].delay, 0.4 + 0.5), "the last waits its wind-down and the cooldown, got %s" % staff.casts[1].delay)
+
+
+func test_a_payload_adds_no_wind_down() -> void:
+	# docs/milestones/cast-timing.md: no staff waits on a payload, so a slow nova fired on hit
+	# keeps the bolt's pace (it used to add its 0.4 s to every bolt, hit or miss).
+	var cast: CompiledCast = _compile("on_hit bolt nova").casts[0]
+	check(is_equal_approx(cast.wind_down, 0.2), "the bolt's wind-down alone, got %s" % cast.wind_down)
+	check(not cast.wasted.has(2), "the nova still fires on hit")
+	var rain: CompiledCast = _compile("rain nova").casts[0]
+	check(is_equal_approx(rain.wind_down, _fake.items[&"rain"].wind_down), "a rain's own payload adds none either, got %s" % rain.wind_down)
+
+
+func test_a_payload_multicast_adds_no_wind_down() -> void:
+	(_fake.items[&"double"] as MulticastBase).wind_down = 1.0
+	var cast: CompiledCast = _compile("on_hit bolt double nova nova").casts[0]
+	check(is_equal_approx(cast.wind_down, 0.2), "a double in a payload adds no time, got %s" % cast.wind_down)
+	var own: CompiledCast = _compile("double bolt bolt").casts[0]
+	check(is_equal_approx(own.wind_down, 0.2 + 0.2 + 1.0), "the cast's own double does, got %s" % own.wind_down)
+
+
+func test_a_shorter_wind_down_on_a_payload_is_wasted() -> void:
+	var quick: ModifierBase = _modifier(&"quick")
+	quick.wind_down_mult = 0.5
+	check(not _compile("quick bolt").casts[0].wasted.has(0), "a shorter wind-down counts on the cast's own carrier")
+	var payload: CompiledCast = _compile("on_hit bolt quick nova").casts[0]
+	check(payload.wasted.has(2), "but not on a payload's: it adds no wind-down to shorten")
+
+
+func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void:
+	# docs/milestones/cast-timing.md, T2: the staff's wind-up, every carrier's of the cast's own
+	# group and its modifiers' `wind_up_add`; a payload's winds up on its own.
+	(_fake.items[&"nova"] as FormBase).wind_up = 0.3
+	var charge: ModifierBase = _modifier(&"charge")
+	charge.wind_up_add = 2.0
+	charge.damage_mult = 4.0
+	_staff.wind_up = 0.1
+	var cast: CompiledCast = _compile("charge bolt").casts[0]
+	check(is_equal_approx(cast.wind_up, 0.1 + 2.0), "the staff's and the charge's, got %s" % cast.wind_up)
+	check(not cast.wasted.has(0), "the charge counts: its damage")
+	var two: CompiledCast = _compile("double bolt nova").casts[0]
+	check(is_equal_approx(two.wind_up, 0.1 + 0.3), "two carriers add up, got %s" % two.wind_up)
+	var payload: CompiledCast = _compile("on_hit bolt nova").casts[0]
+	check(is_equal_approx(payload.wind_up, 0.1), "a payload's nova adds nothing to the cast, got %s" % payload.wind_up)
+	check(is_equal_approx(payload.group.spells[0].triggers[0].payload.wind_up, 0.3), "it winds up on its own, got %s" % payload.group.spells[0].triggers[0].payload.wind_up)
+
+
+func test_a_timer_ticks_its_payload_s_whole_wind_up() -> void:
+	# docs/milestones/cast-timing.md, T8: the timer card's wind-up and its payload's cards' are its
+	# tick, so a charge in the payload slows it.
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
+	var charge: ModifierBase = _modifier(&"charge")
+	charge.wind_up_add = 2.0
+	charge.damage_mult = 4.0
+	var plain: CompiledSpell = _compile("timer bolt nova").casts[0].group.spells[0]
+	check(is_equal_approx(plain.triggers[0].interval, 0.5), "a plain payload: the timer's own, got %s" % plain.triggers[0].interval)
+	var slow: CompiledSpell = _compile("timer bolt charge nova").casts[0].group.spells[0]
+	check(is_equal_approx(slow.triggers[0].interval, 2.5), "a charged payload ticks slower, got %s" % slow.triggers[0].interval)
+	var hit: CompiledSpell = _compile("on_hit bolt nova").casts[0].group.spells[0]
+	check_equal(hit.triggers[0].interval, 0.0, "a trigger that is no timer has no tick")
 
 
 func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:

@@ -119,6 +119,10 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _had_menu: Array[bool] = [false, false, false, false]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
+## Each seat's staffs' mana and what their sustained cards hold (`staff_mana_changed`,
+## `mana_reserved`), by seat * STAFF_COUNT + staff: what a press could pay, for the staff rows.
+var _staff_mana: PackedFloat32Array = PackedFloat32Array()
+var _staff_reserved: PackedFloat32Array = PackedFloat32Array()
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
@@ -138,6 +142,9 @@ var _fps: FpsCounterScript = null
 
 
 func _ready() -> void:
+	_staff_mana.resize(PLAYER_COUNT * PlayerPanelScript.STAFF_COUNT)
+	_staff_mana.fill(INF)
+	_staff_reserved.resize(PLAYER_COUNT * PlayerPanelScript.STAFF_COUNT)
 	# The pause menu is worked while the game is paused, so the HUD runs then too.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Behind the panels: the first child of Root.
@@ -257,6 +264,9 @@ func _ready() -> void:
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
 		events.staff_changed.connect(_on_staff_changed)
+		events.staff_mana_changed.connect(_on_staff_mana_changed)
+		events.mana_reserved.connect(_on_mana_reserved)
+		events.cast_fizzled.connect(_on_cast_fizzled)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
 	if ui_focus != null:
@@ -508,7 +518,13 @@ func step_staffs() -> void:
 		# drives another actor.
 		var actor: int = spells.home_of_seat(player)
 		for staff in PlayerPanelScript.STAFF_COUNT:
-			panel.set_staff_timing(staff, spells.cast_index(actor, staff), spells.cooldown_left(actor, staff))
+			# The cast a press would fire with the staff's mana (one it cannot pay is skipped;
+			# docs/milestones/cast-timing.md); unknown until the staff's mana was told.
+			var mana: float = _staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff]
+			var firing: int = StaffRowScript.FIRING_UNKNOWN
+			if is_finite(mana):
+				firing = spells.firing_cast(actor, staff, maxf(mana - _staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff], 0.0))
+			panel.set_staff_timing(staff, spells.cast_index(actor, staff), spells.cooldown_left(actor, staff), spells.is_winding(actor, staff), firing)
 
 
 ## The "Wave N" line, or null before the script's `_ready`.
@@ -519,6 +535,8 @@ func get_wave_label() -> Label:
 ## A new run starts with no room entered yet: panels wait for `room_entered`.
 func _on_run_started(_player_count: int) -> void:
 	_reset_all()
+	_staff_mana.fill(INF)
+	_staff_reserved.fill(0.0)
 
 
 ## A run is over: no panels over the menu, and the next run starts clean (its wizards announce
@@ -564,3 +582,26 @@ func _on_menu_closed(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(false)
 		_refresh(player)
+
+
+## A seat's staff's mana changed (the player sends whole numbers).
+func _on_staff_mana_changed(player: int, staff: int, mana: float, _max_mana: float) -> void:
+	if player >= 0 and player < PLAYER_COUNT and staff >= 0 and staff < PlayerPanelScript.STAFF_COUNT:
+		_staff_mana[player * PlayerPanelScript.STAFF_COUNT + staff] = mana
+
+
+## What a seat's staff's sustained cards hold of its mana.
+func _on_mana_reserved(player: int, staff: int, amount: float) -> void:
+	if player >= 0 and player < PLAYER_COUNT and staff >= 0 and staff < PlayerPanelScript.STAFF_COUNT:
+		_staff_reserved[player * PlayerPanelScript.STAFF_COUNT + staff] = amount
+
+
+## A press found no cast its mana pays (docs/milestones/cast-timing.md): the seat whose own wizard
+## it was shows it on that staff's row.
+func _on_cast_fizzled(caster: int, staff: int) -> void:
+	if spells == null:
+		return
+	for player in PLAYER_COUNT:
+		if spells.home_of_seat(player) == caster:
+			_panels[player].staff_fizzled(staff)
+

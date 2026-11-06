@@ -10,4 +10,3 @@ caution = 0.65
 accuracy = 0.9
 lead = 0.6
 dodge = 0.4
-windup_scale = 1.25

@@ -95,7 +95,7 @@ func before_each() -> void:
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"zap", ModifierBase.Behaviour.ZAP, 2.0).behaviour_reach = 60.0
 	_trigger(&"on_hurt", TriggerBase.Event.HURT)
-	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
+	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 
 
 func _put(component: SpellComponent, id: StringName) -> void:

@@ -30,8 +30,7 @@ func take() -> void:
 	var staff_base := StaffBase.new()
 	staff_base.id = &"penta_looks"
 	staff_base.slots = 8
-	staff_base.cast_delay = 0.0
-	staff_base.recharge = 0.0
+	staff_base.cooldown = 0.0
 	staff_base.spread = 0.0
 	lay_floor()
 	for row: Array in CASTS:

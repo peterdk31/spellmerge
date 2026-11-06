@@ -396,7 +396,7 @@ func test_a_mirrored_returning_shot_goes_both_ways() -> void:
 
 
 func test_switching_a_hold_off_drops_its_waiting_firings() -> void:
-	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	(_fake.items[&"bolt"] as FormBase).wind_down = 0.0
 	_build(0, [&"burst", &"hold", &"bolt"])
 	_cast()
 	check(_spells.is_holding(0, 0), "the burst's first firing switched the hold on")
@@ -407,7 +407,7 @@ func test_switching_a_hold_off_drops_its_waiting_firings() -> void:
 
 ## Regression (rules R4a): a switch-off dropped every waiting launch of the staff.
 func test_switching_a_hold_off_keeps_the_staffs_other_waiting_firings() -> void:
-	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	(_fake.items[&"bolt"] as FormBase).wind_down = 0.0
 	_build(0, [&"burst", &"bolt", &"hold", &"bolt"])
 	_cast()
 	_cast()

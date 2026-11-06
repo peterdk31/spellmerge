@@ -1,7 +1,7 @@
 class_name CompiledStaff
 extends RefCounted
 ## A staff's cards compiled into its cycle (`Spells.compile_staff`, staffs A4): the casts it
-## makes from its first card until it recharges. Reading is deterministic, so the cycle is
+## makes from its first card until its cycle ends. Reading is deterministic, so the cycle is
 ## computed once per build change. Read-only data for the spell runtime and the builder view.
 
 ## The staff the cards sit in, and the card ids by slot (`&""` for an empty slot).

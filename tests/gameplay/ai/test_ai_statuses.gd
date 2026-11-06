@@ -66,5 +66,5 @@ func test_a_chilled_windup_takes_longer() -> void:
 	slow.step(Fixture.STEP)
 	fx.run(slow, int(Fixture.ai(slow).windup_time / Fixture.STEP) + 1)
 	check(Fixture.ai(slow).is_telegraphing(), "still winding up after the normal windup time")
-	fx.run(slow, int(Fixture.ai(slow).windup_time / Fixture.STEP))
+	fx.run(slow, ceili(Fixture.ai(slow).windup_time / Fixture.STEP) + 1)
 	check(not Fixture.ai(slow).is_telegraphing(), "done after about twice as long")

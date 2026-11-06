@@ -34,12 +34,12 @@ func _test_spell() -> void:
 	spell.id = &"fire_bolt"
 	spell.display_name = "Fire Bolt"
 	spell.mana_cost = 5.0
-	spell.cooldown = 0.4
+	spell.wind_down = 0.4
 	spell.base_damage = 3
 	spell.speed = 220.0
 	spell.lifetime = 1.5
 	_check(spell.id == &"fire_bolt" and spell.display_name == "Fire Bolt", "spell id and name")
-	_check(spell.mana_cost == 5.0 and spell.cooldown == 0.4, "spell cost and cooldown")
+	_check(spell.mana_cost == 5.0 and spell.wind_down == 0.4, "spell cost and cooldown")
 	_check(spell.base_damage == 3 and spell.speed == 220.0 and spell.lifetime == 1.5, "spell damage, speed, lifetime")
 
 

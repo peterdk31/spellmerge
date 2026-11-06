@@ -26,18 +26,17 @@ func before_each() -> void:
 	_compiler = StaffCompiler.new(func(id: StringName) -> SpellComponent: return _items.get(id))
 	_staff = StaffBase.new()
 	_staff.slots = 12
-	_staff.cast_delay = 0.0
-	_staff.recharge = 0.0
+	_staff.cooldown = 0.0
 	for carrier: StringName in Carriers.ids():
 		var form := FormBase.new()
 		form.carrier = carrier
 		form.mana_cost = 2.0
-		form.cooldown = 0.25
+		form.wind_down = 0.25
 		_put(form, carrier)
 	for event: int in E.size():
 		var trigger := TriggerBase.new()
 		trigger.event = event as TriggerBase.Event
-		trigger.interval = 0.5
+		trigger.wind_up = 0.5
 		_put(trigger, StringName("on_" + String(E.keys()[event]).to_lower()))
 	for behaviour: int in [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT, ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.GHOST, ModifierBase.Behaviour.RELAY]:
 		var modifier := ModifierBase.new()

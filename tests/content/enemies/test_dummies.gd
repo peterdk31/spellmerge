@@ -173,6 +173,8 @@ func test_the_shooting_dummy_fires_slow_telegraphed_shots_at_the_nearest_wizard(
 	check(dummy.aim.is_equal_approx(Vector2.DOWN), "it aims at the nearest wizard")
 	check(ai.windup_time >= 1.0, "the telegraph is long (%s s)" % ai.windup_time)
 	dummy.step(ai.windup_time)
+	# The cast winds up in Spells (docs/milestones/cast-timing.md): it leaves as Spells steps on.
+	(root.get_node("Spells") as Node).call("step", ai.windup_time)
 	check_equal(projectiles.call("get_count") as int, 1, "the shot flies")
 	# Every shot leaves SpellLimits.SHOT_SPEED_START times its speed and slows (the default motion).
 	var speed: float = (projectiles.call("get_velocity_of", 0) as Vector2).length() / SpellLimits.SHOT_SPEED_START

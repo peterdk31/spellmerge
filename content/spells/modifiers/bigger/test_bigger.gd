@@ -24,7 +24,7 @@ func test_bigger_compiles_to_a_wider_slower_harder_hit() -> void:
 	check(bigger.radius > bare.radius, "wider")
 	check(bigger.damage > bare.damage, "harder")
 	check(bigger.speed < bare.speed, "slower")
-	check(bigger.cooldown > bare.cooldown, "and the next cast comes later")
+	check(bigger.wind_down > bare.wind_down, "and the next cast comes later")
 
 
 func test_bigger_hits_a_target_that_a_bare_bolt_misses() -> void:

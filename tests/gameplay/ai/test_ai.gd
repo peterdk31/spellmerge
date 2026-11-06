@@ -98,7 +98,7 @@ func _test_imp_resource_and_scene() -> void:
 	for kind: String in ["Health", "Hurtbox", "Contact", "Mover", "Caster"]:
 		_check(imp.get_node_or_null(kind) != null, "the scene has its %s" % kind)
 	_check(imp.get_node_or_null("Sprite") is Sprite2D and (imp.get_node("Sprite") as Sprite2D).texture != null, "the scene shows the part 4 sprite")
-	_check(imp.get_node_or_null("Telegraph") is Sprite2D, "the scene has a telegraph, drawn by its shader")
+	_check(imp.get_node_or_null("Telegraph") == null, "the scene has no telegraph node: its lane is Feel's, the card's wind cue (docs/milestones/cast-timing.md, T6b)")
 	_check(is_equal_approx((imp.get_node("Hurtbox") as Hurtbox).radius, 11.0) and (imp.get_node("Hurtbox") as Hurtbox).offset == Vector2(0.0, -12.0), "its hurt circle is 11 px round the body")
 	_check((imp as Actor).hand_offset == Vector2(0.0, -12.0) and (imp as Actor).staff_reach == 0.0, "its spells start at its body")
 	imp.free()
@@ -219,10 +219,15 @@ func _test_shot_and_telegraph_start_at_the_body() -> void:
 	var imp := _imp(Vector2(10.0, 20.0))
 	imp.aim = Vector2.RIGHT
 	imp.caster.cast(0)
+	# Its staff winds up first (docs/milestones/cast-timing.md): the shot leaves when that is over.
+	var guard: int = 0
+	while _fx.projectiles.get_count() == 0 and guard < 120:
+		_run(imp, 1)
+		guard += 1
 	_check(_fx.projectiles.get_count() == 1, "the imp's cast spawns one shot")
-	_check(_fx.projectiles.get_position_of(0) == Vector2(10.0, 20.0) + Vector2(0.0, -12.0), "the shot leaves from the body")
-	var line: Node2D = imp.get_node("Telegraph") as Node2D
-	_check(line.position == imp.hand_offset, "the scene's telegraph starts where the shot does")
+	var from: Vector2 = Vector2(10.0, 20.0) + Vector2(0.0, -12.0)
+	var at: Vector2 = _fx.projectiles.get_position_of(0)
+	_check(is_equal_approx(at.y, from.y) and at.x >= from.x and at.x <= from.x + _bolt().speed * STEP * 3.0, "the shot leaves from the body (%s, from %s)" % [at, from])
 
 
 func _test_shot_can_be_dodged_by_stepping_aside() -> void:
@@ -237,9 +242,12 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_players()[0].position = Vector2(60.0, 0.0)
 	var imp := _imp()
 	imp.step(STEP)
+	# The aim follows through the windup (owner, 2026-11-06): the step aside that counts is the
+	# one once the shot has left.
+	_run(imp, int(_ai(imp).windup_time / STEP) + 1)
 	_players()[0].position = Vector2(60.0, 40.0)
-	_run(imp, int(_ai(imp).windup_time / STEP) + 20)
-	_check(_players()[0].health.health == _players()[0].health.max_health, "a player who stepped aside during the telegraph is not hit")
+	_run(imp, 20)
+	_check(_players()[0].health.health == _players()[0].health.max_health, "a player who stepped aside once the shot left is not hit")
 
 
 ## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by the imp's bolt passing
@@ -252,8 +260,9 @@ func _test_shot_is_small_and_dodgeable() -> void:
 		_players()[0].position = Vector2(60.0, 0.0)
 		var imp := _imp()
 		imp.step(STEP)
+		_run(imp, int(_ai(imp).windup_time / STEP) + 1)
 		_players()[0].position = Vector2(60.0, offset)
-		_run(imp, int(_ai(imp).windup_time / STEP) + 20)
+		_run(imp, 20)
 		var hit: bool = _players()[0].health.health < _players()[0].health.max_health
 		_check(hit == (offset < reach), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < reach else "misses"])
 

@@ -17,6 +17,9 @@ var multicast_ids: Array[StringName] = []
 ## Their slots, in the same order (for the builder's tree).
 var multicast_slots: PackedInt32Array = PackedInt32Array()
 var repeat_interval: float = 0.0
+## Seconds the group winds up before it leaves: its carriers' `wind_up` added up (docs/milestones/
+## cast-timing.md). A cast adds its staff's; a payload's winds up where its trigger fired.
+var wind_up: float = 0.0
 
 
 func is_empty() -> bool:

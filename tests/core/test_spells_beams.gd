@@ -66,7 +66,7 @@ func before_each() -> void:
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
 	var timer := TriggerBase.new()
 	timer.event = TriggerBase.Event.TIMER
-	timer.interval = 0.25
+	timer.wind_up = 0.25
 	_put(timer, &"timer")
 
 

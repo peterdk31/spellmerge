@@ -72,8 +72,7 @@ func before_each() -> void:
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 6
-	_staff.cast_delay = 0.0
-	_staff.recharge = 0.0
+	_staff.cooldown = 0.0
 	_players.clear()
 	_changed.clear()
 	_refused.clear()
@@ -87,7 +86,7 @@ func before_each() -> void:
 	bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
 	bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void: _stats.append([p, h, mh, m, mm]))
 	var bolt := _card(FormBase.new(), &"bolt") as FormBase
-	bolt.cooldown = 0.25
+	bolt.wind_down = 0.25
 	var orbit := _card(FormBase.new(), &"orbit") as FormBase
 	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 30.0

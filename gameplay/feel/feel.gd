@@ -97,6 +97,7 @@ const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const SpellLightScript := preload("res://gameplay/feel/spell_light.gd")
 const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
+const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
@@ -211,7 +212,8 @@ const CUE_SHOWN: int = 1
 const CUE_IMPACT: int = 2
 const CUE_END: int = 3
 const CUE_RADIUS: int = 4
-const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0]
+const CUE_WIND: int = 5
+const NO_FORM_CUES: Array = [&"cast", &"", &"impact", &"", 0.0, &"wind"]
 ## The cue of a shield's block (combat plays it for a barrier's, Feel for a shot's own shield).
 const SHIELD_BLOCK_CUE: StringName = &"shield_block"
 ## The pixels a step of a hit's spray or puff is (its cue's size is its steps times this: the
@@ -388,6 +390,8 @@ var _swing_trails: SwingTrailsScript = null
 var _portal_rings: PortalRingsScript = null
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
+## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
+var _lanes: LanesScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -586,7 +590,13 @@ func _ready() -> void:
 	_spectacle.registry = registry
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
+	_lanes = LanesScript.new()
+	_lanes.name = "Lanes"
+	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
+	_lanes.z_index = FORM_Z + 2
+	add_child(_lanes)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
+	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
 	for type: StringName in parts:
 		var row: Array = parts[type] as Array
@@ -633,6 +643,7 @@ func _ready() -> void:
 	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
+	events.cast_winding.connect(_on_cast_winding)
 	events.carrier_ended.connect(_on_carrier_ended)
 	events.cue_shown.connect(_on_cue_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
@@ -701,6 +712,9 @@ func step(real_delta: float) -> void:
 		_portal_rings.step(spells.call("carrier", &"portal") if spells != null and spells.has_method("carrier") else null, projectiles, _clock)
 	_status_motes(real_delta)
 	_spectacle.step(_clock, _actor_table())
+	if _lanes != null:
+		_lanes.spells = spells
+		_lanes.step()
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 
@@ -2139,7 +2153,7 @@ func _form_cues_of(form: StringName) -> Array:
 		cues[CUE_CAST] = Carriers.of(form).cast_cue()
 	elif card is ModifierBase and (card as ModifierBase).cue != &"":
 		# A modifier that shows itself (a zap: `form_shown` names its card) plays its own cue there.
-		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0]
+		cues = [NO_FORM_CUES[CUE_CAST], (card as ModifierBase).cue, NO_FORM_CUES[CUE_IMPACT], &"", 0.0, NO_FORM_CUES[CUE_WIND]]
 	_form_cues[form] = cues
 	return cues
 
@@ -2153,6 +2167,37 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 	var table: ActorsScript = _actor_table()
 	var actor: int = table.actor_of_seat(player) if table != null else ActorsScript.NONE
 	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
+
+
+## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): its carrier
+## card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that is not
+## aimed) from the staff tip, its size the wind-up's seconds, following the caster's body. Only for
+## a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
+func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int) -> void:
+	if caster < 0 or caster >= ActorsScript.ACTORS or not origin.is_finite():
+		return
+	var table: ActorsScript = _actor_table()
+	if table == null or table.team_of(caster) == ActorsScript.TEAM_WIZARDS:
+		return
+	var cue: StringName = _form_cues_of(form)[CUE_WIND] as StringName
+	if cue == &"":
+		return
+	play_cue(cue, caster, origin, direction, seconds, tint, look, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, _ramp_of(caster), table.node_of(caster) as Node2D)
+
+
+## A cue's `lane` part (`CueBase`; T6b): a telegraph lane for the cast of the cue's tag, as long as
+## the cue's size in seconds (`lanes.gd`).
+func _play_lane(part: Variant, cue: CueContextScript) -> void:
+	if _lanes == null:
+		return
+	var reach: float = float((part as Dictionary).get("reach", 1.0)) if part is Dictionary else 1.0
+	_lanes.spells = spells
+	_lanes.play(cue.caster, cue.tag, cue.size, cue.tint, reach)
+
+
+## The lanes under way (for tests).
+func lanes() -> LanesScript:
+	return _lanes
 
 
 ## A barrier on an actor changed (combat's `barrier_changed`): the spectacle draws its shell, a

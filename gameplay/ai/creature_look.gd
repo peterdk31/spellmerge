@@ -1,23 +1,19 @@
 class_name CreatureLook
 extends ActorLook
-## How a creature looks (actors G6, docs/milestones/M2-actors.md, "The components"): the poses,
-## the flash and the telegraph of an enemy actor (content/enemies/ember_imp/ember_imp.tscn). It
+## How a creature looks (actors G6, docs/milestones/M2-actors.md, "The components"): the poses
+## and the flash of an enemy actor (content/enemies/ember_imp/ember_imp.tscn). It
 ## reads the actor and the AI driving it and draws; it changes nothing the game plays by. All of
 ## an enemy's drawing is here, none in the AI (a straight port of what ai.gd drew before G6).
 ##
-## It draws with three nodes of the actor's scene: `sprite` (the body, named "Sprite": Feel and
-## Entities find it by that name), `telegraph` (a Sprite2D drawn by `telegraph.gdshader` in this
-## folder, its material local to the scene) and `animation` (the idle animation). Left empty,
-## each is the actor's child of that name ("Sprite", "Telegraph", "AnimationPlayer"); none is
-## required.
+## It draws with two nodes of the actor's scene: `sprite` (the body, named "Sprite": Feel and
+## Entities find it by that name) and `animation` (the idle animation). Left empty, each is the
+## actor's child of that name ("Sprite", "AnimationPlayer"); neither is required.
 ##
-## Telegraph: while the AI driving the actor winds up (`AIController.is_telegraphing`), the
-## sprite flashes (`modulate`) and the telegraph turns toward the locked aim and shows. It runs
-## from TELEGRAPH_START to the real reach of the next cast (`Caster.next_cast_reach`), its lane as
-## wide as what is coming plus a margin, and its dashes march, its arrowhead grows and it
-## brightens with `telegraph_progress()`. A cast that is not aimed (a nova, an orbit) shows only
-## the pose and the flash. An actor driven by a seat (possess, G9) shows no telegraph: a human
-## casts when they like.
+## Telegraph: while the AI driving the actor winds up (`AIController.is_telegraphing`: an enemy's
+## cast winding up), the sprite flashes (`modulate`), brighter for the last part. The lane along
+## the aim is the cast card's `wind_cue`, which Feel plays (`lane` cue part; docs/milestones/
+## cast-timing.md, T6b). An actor driven by a seat (possess, G9) shows none: a human casts when
+## they like.
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the sprite shows it from the start
 ## of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and goes
@@ -41,12 +37,6 @@ extends ActorLook
 
 enum Pose { IDLE, WINDUP, HURT }
 
-## The telegraph line starts this far from the hand (where the cast leaves).
-const TELEGRAPH_START: float = 10.0
-## The telegraph's lane is the hit width of what is coming plus this margin.
-const TELEGRAPH_LANE_MARGIN: float = 8.0
-## The telegraph sprite's region height (its texture's), with the lane in its middle.
-const TELEGRAPH_HEIGHT: float = 32.0
 ## `sprite` modulate while the telegraph shows, and for its last part.
 const TELEGRAPH_COLOR: Color = Color(1.6, 1.3, 1.3)
 const TELEGRAPH_COLOR_LAST: Color = Color(2.0, 1.8, 1.5)
@@ -69,7 +59,6 @@ const HOP_IDLE: float = 1.0
 @export var hurt_texture: Texture2D = null
 ## The nodes it draws with (see the class doc); empty: the actor's child of that name.
 @export var sprite: Sprite2D = null
-@export var telegraph: Sprite2D = null
 @export var animation: AnimationPlayer = null
 
 var _idle_texture: Texture2D = null
@@ -100,8 +89,6 @@ func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	if sprite == null:
 		sprite = actor.get_node_or_null(^"Sprite") as Sprite2D
-	if telegraph == null:
-		telegraph = actor.get_node_or_null(^"Telegraph") as Sprite2D
 	if animation == null:
 		animation = actor.get_node_or_null(^"AnimationPlayer") as AnimationPlayer
 	if sprite != null:
@@ -112,12 +99,6 @@ func setup(owner_actor: Actor) -> void:
 		if child is Face:
 			_face = child as Face
 			break
-	if telegraph != null:
-		telegraph.visible = false
-		# Starts where the cast does (the hand; an imp's is its body), whatever the scene says.
-		telegraph.position = actor.hand_offset
-		telegraph.centered = false
-		telegraph.region_enabled = true
 	# Connected once, on its own actor (not the bus, where a listener per enemy was called for
 	# every hit on anyone).
 	if not actor.damaged.is_connected(_on_damaged):
@@ -135,7 +116,7 @@ func step(delta: float) -> void:
 	if ai_view or _ai_label != null:
 		_show_ai_view()
 	var ai: AIController = _ai
-	var telegraphing: bool = ai != null and ai.state == AIController.State.WINDUP
+	var telegraphing: bool = ai != null and ai.is_telegraphing()
 	if telegraphing != _showing:
 		_show_telegraph(telegraphing, ai)
 	elif telegraphing:
@@ -185,55 +166,18 @@ func is_hurt() -> bool:
 	return _hurt_left > 0.0
 
 
-## How far the telegraph reaches now (0 when hidden), for tests.
-func telegraph_reach() -> float:
-	if telegraph == null or not telegraph.visible:
-		return 0.0
-	return TELEGRAPH_START + telegraph.region_rect.size.x
-
-
-## The telegraph from TELEGRAPH_START to `reach` along +X, its lane `radius` plus half the margin
-## either side (its sprite's region and the shader's length and lane).
-func _fit_telegraph(reach: float, radius: float) -> void:
-	var length: float = maxf(reach - TELEGRAPH_START, 1.0)
-	telegraph.offset = Vector2(TELEGRAPH_START, -TELEGRAPH_HEIGHT * 0.5)
-	telegraph.region_rect = Rect2(0.0, 0.0, length, TELEGRAPH_HEIGHT)
-	var material: ShaderMaterial = telegraph.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter(&"beam_length", length)
-		material.set_shader_parameter(&"telegraph_lane", radius + TELEGRAPH_LANE_MARGIN * 0.5)
-
-
 func _show_telegraph(on: bool, ai: AIController) -> void:
 	_showing = on
-	if telegraph != null:
-		var caster: Caster = actor.caster
-		# The staff the AI winds up (enemy AI AI5: it may hold several).
-		var at: int = ai.telegraph_staff() if ai != null else 0
-		var reach: float = caster.next_cast_reach(at) if on and caster != null else 0.0
-		if reach > TELEGRAPH_START:
-			_fit_telegraph(reach, caster.next_cast_radius(at))
-		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
-		telegraph.visible = on and reach > TELEGRAPH_START
-		if on:
-			telegraph.rotation = actor.aim.angle()
 	if on:
 		_update_telegraph(ai.telegraph_progress())
 	elif sprite != null:
 		sprite.modulate = Color.WHITE
 
 
-## Make the telegraph brighter, its dashes march and its arrowhead grow as the cast gets closer.
+## Make the sprite brighter as the cast gets closer (the lane is Feel's: the card's `wind_cue`).
 func _update_telegraph(progress: float) -> void:
 	if sprite != null:
 		sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
-	if telegraph == null:
-		return
-	# The aim is locked through the windup; a swap or a possession may still turn the actor.
-	telegraph.rotation = actor.aim.angle()
-	var material: ShaderMaterial = telegraph.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter(&"telegraph_progress", progress)
 
 
 ## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose

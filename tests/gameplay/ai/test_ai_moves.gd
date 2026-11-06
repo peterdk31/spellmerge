@@ -184,7 +184,7 @@ func test_a_dash_card_dashes_the_enemy_and_its_blast_goes_off_where_it_ends() ->
 	var enemy := _enemy(_data([&"blast", &"dash"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
 	check(_until_windup(enemy, 1.0), "a dash staff winds up")
-	check_equal(_look(enemy).telegraph_reach(), 0.0, "with no line: a dash is not a shot")
+	check_equal(_spells.carrier_reach(tag), 0.0, "with no lane: a dash is not a shot (its wind cue's lane shows none)")
 	_run(_ai(enemy).windup_time + STEP)
 	check(enemy.mover.is_moving(), "then the enemy dashes")
 	_run(0.5)

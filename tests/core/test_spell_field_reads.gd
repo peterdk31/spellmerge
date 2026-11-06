@@ -11,10 +11,10 @@ extends "res://tests/support/suite.gd"
 
 ## Fields that only a spell has: any receiver counts. (`burst.lifetime` is a CPUParticles2D
 ## property in gameplay/feel, and is dropped before the scan.)
-const UNIQUE_FIELDS: String = "(mana_cost|cooldown|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|cooldown_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_curve|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|form_name)"
+const UNIQUE_FIELDS: String = "(mana_cost|wind_down|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|wind_down_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_curve|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|form_name)"
 ## Fields with common names (`HitProfile` has some of them, and `gameplay/combat` may read that):
 ## only a variable named like a spell, or declared as a spell class.
-const COMMON_FIELDS: String = "(id|damage|speed|complexity|shots|radius|pierce|tint|carrier|spread|icon|event|interval|status_id|status_duration|status_strength|element_id|form_id|trigger_id|behaviour)"
+const COMMON_FIELDS: String = "(id|damage|speed|complexity|shots|radius|pierce|tint|carrier|spread|icon|event|interval|wind_up|status_id|status_duration|status_strength|element_id|form_id|trigger_id|behaviour)"
 ## The classes a variable may be declared as. `HitProfile` is left out on purpose: `gameplay/combat`
 ## reads it, which is what it is for.
 const SPELL_CLASSES: String = "(SpellComponent|FormBase|ElementBase|ModifierBase|TriggerBase|CompiledSpell)"
@@ -28,10 +28,10 @@ const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd", "tests/
 func test_the_scanner_catches_field_reads() -> void:
 	var bad: PackedStringArray = [
 		"var cost: float = spell.mana_cost",
-		"if player_spell.cooldown > 0.0:",
+		"if player_spell.wind_down > 0.0:",
 		"x = _spell.damage",
 		"label.text = bolt.display_name",
-		"var left = something.cooldown",
+		"var left = something.wind_down",
 		"var life := s.lifetime",
 		"var scale: float = element.damage_scale",
 		"n = spell.complexity",

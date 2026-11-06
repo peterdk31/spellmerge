@@ -84,7 +84,7 @@ func before_each() -> void:
 	_put(familiar, &"familiar")
 	var timer := TriggerBase.new()
 	timer.event = TriggerBase.Event.TIMER
-	timer.interval = 0.25
+	timer.wind_up = 0.25
 	_put(timer, &"timer")
 	var decoy := FormBase.new()
 	decoy.carrier = &"decoy"

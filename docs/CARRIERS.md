@@ -143,8 +143,10 @@ than shots to meet, so a lone shield or deflect strikes nothing and costs no hea
 - On a point, or when that shot has ended or that body has gone: a shield or deflect guards no one,
   and a recoil has nothing to push (`CASTERLESS`; it is wasted on `point`).
 
-None of them flies, moves, stays, lasts or steers, and none has a cooldown of its own
-(`has_cooldown`), so homing, bounce, hold, split or a shorter cooldown are wasted there, and chain,
+None of them flies, moves, stays, lasts or steers, and none has a wind-down of its own
+(`has_wind_down`), so homing, bounce, hold, split or a shorter wind-down are wasted there (a shorter
+wind-down is wasted on any payload's carrier too: no staff waits on a payload;
+docs/milestones/cast-timing.md), and chain,
 pull, possess, relay, penta and mirror work. The runtime launches them like any other carrier, so
 echo strikes again, recoil pushes, mirror strikes twice and penta strikes from a ring (whose copies
 are cast by points). When none of the cards does anything there, nothing lands and every one is

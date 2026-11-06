@@ -973,7 +973,8 @@ func _numbers(plan: Dictionary) -> Dictionary:
 			if cast is Dictionary:
 				mana = maxf(mana, float((cast as Dictionary).get("mana", 0.0)))
 				damage += float((cast as Dictionary).get("damage", 0.0))
-				seconds += float((cast as Dictionary).get("delay", 0.0))
+				# Its wind-up, then its wait (docs/milestones/cast-timing.md).
+				seconds += float((cast as Dictionary).get("wind_up", 0.0)) + float((cast as Dictionary).get("delay", 0.0))
 	return {"mana": mana, "damage": damage, "seconds": seconds}
 
 

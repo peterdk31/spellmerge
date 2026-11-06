@@ -19,8 +19,6 @@ extends Resource
 @export_range(0.05, 2.0) var reaction: float = 0.3
 ## 0-1: how well it dodges shots (0: never, and it never looks).
 @export_range(0.0, 1.0) var dodge: float = 0.5
-## Times every telegraph (a windup lasts longer for a more dangerous cast in any case).
-@export_range(0.25, 4.0) var windup_scale: float = 1.0
 ## Times the rest after each cast (0: none, it goes on at once).
 @export_range(0.0, 4.0) var rest_scale: float = 1.0
 ## 0-1: how it presses on in a fight, as a person does: where an enemy stands (planning a cast,

@@ -148,8 +148,8 @@ A modifier or infusion affects **only the next carrier**, not every carrier of a
 
 ### Numbers of a cast
 
-- **Mana:** the sum over every carrier in the cast, payloads included, of its `mana_cost` times the `mana_mult` of its modifiers, plus each multicast card's `mana_cost`. Paid at the cast.
-- **Delay:** the staff's `cast_delay` plus every carrier's `cooldown` times the `cooldown_mult` of its modifiers. When the staff recharges, its `recharge` is added.
+- **Mana:** the sum over every carrier in the cast, payloads included, of its `mana_cost` times the `mana_mult` of its modifiers, plus each multicast card's `mana_cost`. Paid at the cast (as it leaves, for one that winds up). A cast its staff cannot pay is skipped ([cast-timing.md](cast-timing.md)).
+- **Delay** (replaced on 2026-11-06, [cast-timing.md](cast-timing.md)): the cast's **wind-down** is every carrier of its own group's `wind_down` times the `wind_down_mult` of its modifiers, plus its multicast cards'; a payload adds none. When the cycle ends ("the staff recharges" below), the staff's `cooldown` follows.
 - **Damage, speed, radius, shots, pierce:** the carrier's numbers, then each infusion's `damage_scale`, then each modifier in slot order, as today. No build limit clamps them; the ranges in each class's `ranges()` stay for the validator.
 - **Several infusions:** the hit carries all of them. The first one's status lands first; each later element then reacts with it through the reaction table, so `fire · frost · bolt` thaws on its own hit. The shot's tint and shape come from the first infusion.
 
@@ -169,16 +169,16 @@ These are not build rules: they keep a frame from running away, never refuse or 
 | --- | --- | --- |
 | `slots` | Number of card slots | 1–64 |
 | `draw` | Carriers one cast wants | 1–4 |
-| `cast_delay` | Seconds added to every cast's delay | 0–2 |
-| `recharge` | Seconds added when the staff recharges | 0–5 |
+| `wind_up` | Seconds added to every cast's wind-up (an enemy's telegraph; [cast-timing.md](cast-timing.md)) | 0–2 |
+| `cooldown` | Seconds the staff waits after its cycle's last cast (was `cast_delay` and `recharge`) | 0–5 |
 | `spread` | Degrees a shot may leave off its line, either side, at random (seeded per cast); the carriers of a multicast leave along one aim and only this sets them apart (owner, 2026-10-27) | 0–45 |
 
 - **`starter`:** 4 slots. Used by `nightly` and `stable` builds.
 - **Spread:** both staffs aim true (0). Later staffs (M3) get spread, at random or high and upgradable to lower; a modifier's `spread_mult` scales it for the next carrier (Sniper).
-- **`dev`:** 20 slots, short delay and recharge. Used by `dev` and `preview` builds. The slot count is one field in `content/wizard/staffs/dev/dev.tres`.
+- **`dev`:** 20 slots, no cooldown. Used by `dev` and `preview` builds. The slot count is one field in `content/wizard/staffs/dev/dev.tres`.
 - **Start cards:** A `dash`; X `fire · bolt`; Y and B empty. The bag holds every card until M3's rewards fill it.
 - **The build channel** comes from `BuildInfo.channel()` (`core/base/build_info.gd`), which `ci/build/build.sh --channel` already writes (`preview.yml` passes `preview`). No owner change is needed.
-- Every staff of a player has its own cursor, delay and recharge; they share one mana pool. Holding two buttons casts both staffs.
+- Every staff of a player has its own cursor, wind-down and cooldown, and its own mana pool (owner, 2026-11-01). Holding two buttons casts both staffs.
 - Staff customization (found staffs, staff types) is M3 (rewards, staffs).
 
 ## Self-harm and hits
@@ -193,7 +193,7 @@ These are not build rules: they keep a frame from running away, never refuse or 
 
 ## Mana
 
-- One pool per wizard (`gameplay/player` keeps it, as today), shared by all four staffs.
+- One pool per staff (owner, 2026-11-01; was one per wizard): `Caster` keeps them, each sized by its staff (`max_mana`, `mana_regen`).
 - `hold` reserves the held carrier's mana: the pool's usable maximum shrinks by it while the carrier is on.
 - **Switching off:** pressing a staff's button while any of that staff's held carriers is on switches them all off and frees their reservations; that press casts nothing. The next press casts normally. A held carrier also ends (and frees its reservation) when its shot ends for any reason, and **editing a staff switches its held carriers off**, so a build change never leaves a stale reservation or an orphaned sustained shot.
 - `siphon` refunds mana on hits through an event (`mana_refund_requested`), so `core/spells` never writes the player's numbers.

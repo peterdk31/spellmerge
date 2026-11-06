@@ -126,6 +126,12 @@ signal entity_end_requested(caster: int, tag: int)
 signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. Mana of the actor `caster`'s staff `staff` (the staff whose shot hit) comes back (siphon). Heard by every actor's Caster, each for its own actor.
 signal mana_refund_requested(caster: int, staff: int, amount: float)
+## Sender: core/spells. A cast of the actor `caster`'s staff `staff` that wound up has left, and costs `amount` mana now (docs/milestones/cast-timing.md: checked at the press, paid as it leaves). Heard by every actor's Caster, each for its own actor.
+signal mana_spend_requested(caster: int, staff: int, amount: float)
+## Sender: core/spells. A press of the actor `caster`'s staff `staff` found no cast left in its cycle that its mana pays: each was skipped, the cycle ended there and its cooldown runs (docs/milestones/cast-timing.md, T3). Heard by nobody yet (a fizzle's look and sound come with the corner panel's part, T5).
+signal cast_fizzled(caster: int, staff: int)
+## Sender: core/spells. A cast of the actor `caster`'s staff `staff` started winding up (docs/milestones/cast-timing.md): its first carrier is the form card `form`, from `origin` along `direction` (the aim follows the caster until it leaves), for `seconds` (a chill or a freeze stretches it; `Spells.is_winding` says when it is over), in its element's `tint` with its packed `look`, under `tag`. Heard by gameplay/feel, which plays the card's `wind_cue` (an enemy's telegraph: only for a caster not on the players' team).
+signal cast_winding(caster: int, staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int)
 ## Sender: core/spells. `amount` of the mana of staff `staff` of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, staff: int, amount: float)
 ## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges (or a carrier's own shield did: `Projectiles.impact_form` is then that carrier's id, `swing`, `beam`, `slam` or `decoy`, while this is sent; a swing's is a parry). Heard by core/spells and feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.

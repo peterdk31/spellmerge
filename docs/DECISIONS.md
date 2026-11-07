@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: Every run starts from a fresh game's state (online-ready N3b, owner session)
+
+- **A run's start resets the areas by construction, not by hand-kept lists.** `Tick.begin_run` (called by Flow's `start_run`) counts the clock from 0 and makes each service and the horde director take every state member from a blank of its own script (`SimFresh.take`, core/sim/sim_fresh.gd), so a member added later is reset too. The `clear` functions stay (tests use them; a run's start calls them first, so their events still go out). The alternative, completing each `clear` by hand, would list every member of five large scripts again and go stale with the next one added.
+- **What stays:** settings of the session (`RUN_KEEPS`: the shot cap, the tailless pool, a benchmark's budgets, the horde's curve, web cap and generator), and what is not state (DERIVED, VIEW). An object held by a member or in a dictionary (a carrier, the kit, the AI board every brain shares) stays the same object; a pool (an array of objects) takes the blank's items, with the area's references into it kept pointing into it (`Spells._ray`).
+- **A blank deals no seeds** (`SimSeed.aside`): making the horde director's blank would otherwise take one of the replay's seeds and change the horde.
+- **Feel's rests and reaction repeats** start again at `room_entered`: they gate the simulation's holds on Feel's real-time clock (A1) until N4.
+- **Proof:** a sandbox run and a horde run each replay tick for tick after other runs in the same game, and record the same there as in a fresh game (`test_replay_game.gd`); before, they parted at tick 0. Cost about 19 ms per run start at the desktop cap.
+
 ## 2026-11-06: A homing teleport goes to a target and strikes it; one-off homing picks are random (owner's decision: a flicker strike)
 
 - **Before:** a homing teleport bent its way toward a target in a cone and blinked its card's distance (so a farther target was not reached), measured from the staff tip it was cast from rather than the body it moves, so its landing strike often missed (`homing · teleport` did 0 damage and `on hit` chains never fired). It avoided the target it landed at last (`_landed_at`, `Homing.avoid`). Its landing hit's payload was cast by the point.

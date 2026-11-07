@@ -38,6 +38,9 @@ class Area:
 	func step_timers(delta: float) -> void:
 		calls.append(["%s.step_timers" % name, delta])
 
+	func begin_run() -> void:
+		calls.append(["%s.begin_run" % name, 0.0])
+
 
 ## A body: an Actor that only records its tick (none of an actor's set-up runs).
 class Body:
@@ -153,3 +156,16 @@ func test_every_delta_is_the_physics_step() -> void:
 	check(calls.size() > 0, "the tick ran in the tree")
 	for call: Array in calls:
 		check_equal(call[1], TickScript.DT, "%s got DT" % call[0])
+
+
+## A run's start (online-ready N3b): the clock counts from 0 again, and the services, then the horde
+## director, are made fresh, in the tick's order; the rest is not asked.
+func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
+	for i in 3:
+		_tick.run(TickScript.DT)
+	calls.clear()
+	_tick.begin_run()
+	check_equal(_tick.count, 0, "the clock from 0")
+	check_equal(_names(), ["Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Entities.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
+	_tick.run(TickScript.DT)
+	check_equal(_tick.count, 1, "the run's first tick")

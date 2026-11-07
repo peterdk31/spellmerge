@@ -104,6 +104,10 @@ const NO_LIMIT: int = 1000000
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"world", &"_horde", &"_camera", &"_gems"]
+## The session's settings a new run keeps (`begin_run`): the curve and the web cap (tests and the
+## stress runs set them), the generator (each horde run's start deals it its seed while a replay
+## records or plays, and a test seeds it), the warnings already given.
+const RUN_KEEPS: Array[StringName] = [&"curve", &"web", &"rng", &"missing_warnings"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
@@ -326,6 +330,17 @@ func start(new_world: Node2D) -> void:
 		if _joined[seat]:
 			_give_start_bag(seat)
 	_send_status()
+
+
+## A run starts, of any mode (`Tick.begin_run`, online-ready N3b): a horde run in progress stops,
+## and the director is a fresh one's state (core/sim/sim_fresh.gd): no swarm until its first spawn,
+## no seat's bag, offers or place, with this session's settings (RUN_KEEPS). A horde run then
+## starts from there (`horde_started`).
+func begin_run() -> void:
+	stop()
+	var blank: Object = SimFresh.blank_of(get_script() as Script)
+	SimFresh.take(self, blank, RUN_KEEPS)
+	blank.free()
 
 
 ## Stops the run in progress (if any): the open offers are dropped, a break ends, the director's

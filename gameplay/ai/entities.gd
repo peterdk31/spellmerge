@@ -305,6 +305,22 @@ func enemy_gone(caster: int) -> void:
 			_end(row, true)
 
 
+## A run starts (`Tick.begin_run`, online-ready N3b): every entity ends quietly (`clear`), and
+## Entities is a fresh one's state (core/sim/sim_fresh.gd): its clock, rows and the AI board (the
+## same board every brain holds). Its decoy bodies go too: a fresh game makes a row's the first
+## time it holds a decoy.
+func begin_run() -> void:
+	clear()
+	for row in _decoys.size():
+		var decoy: Actor = _decoys[row]
+		if decoy != null:
+			decoy.free()
+		_decoys[row] = null
+	var blank: Object = SimFresh.blank_of(get_script() as Script)
+	SimFresh.take(self, blank)
+	blank.free()
+
+
 ## End every entity quietly (no `entity_ended`).
 func clear() -> void:
 	for row in POOL_SIZE:

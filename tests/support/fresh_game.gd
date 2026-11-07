@@ -1,11 +1,10 @@
 extends RefCounted
 ## A fresh game in the same process, for tests: every autoload of project.godot is freed and made
-## again, in the project's order, as the game starts them. The services keep clocks, counters
-## and pools from run to run (the projectile manager's `sim_time` and `_next_seq`, Spells'
-## clock, Combat's steps, the AI board's clock), so a run's state depends on the runs before it in
-## the process; a test that compares two runs from the same start (a recorded run and its
-## replay, tests/core/test_replay_game.gd) starts each from a fresh game. Static members (caches)
-## stay. The current scene is left alone: stop the run first.
+## again, in the project's order, as the game starts them: what a game is before its first run. A
+## run starts from a fresh game's state anyway (`Tick.begin_run`, online-ready N3b); the replay
+## test (tests/core/test_replay_game.gd) starts runs from a fresh game and in the same game after
+## others, and compares them. Static members (caches) stay. The current scene is left alone: stop
+## the run first.
 ##
 ##     FreshGame.restart(root)
 

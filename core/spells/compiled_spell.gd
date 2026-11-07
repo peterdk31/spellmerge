@@ -6,6 +6,11 @@ extends RefCounted
 ## payload's origin) is one too, with `fallback` set and a fallback carrier (docs/CARRIERS.md). It is read-only data for the spell runtime;
 ## nothing but `core/spells/` reads it (the builder gets plain values from `Spells.staff_view`).
 
+## Not state (core/sim/README.md): `plain_hit`'s answer, worked out from the spell's own numbers the
+## first time a hit asks. A compiled staff outlives a run (the compile cache), so it would carry
+## from one run into the next (online-ready N3b).
+const DERIVED: Array[StringName] = [&"_plain_hit"]
+
 var form_id: StringName = &""
 var element_id: StringName = &""
 ## Display names taken while compiling, so a description needs no second look-up.

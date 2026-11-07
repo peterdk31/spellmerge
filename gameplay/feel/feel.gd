@@ -655,6 +655,7 @@ func _ready() -> void:
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.body_replaced.connect(_on_body_replaced)
+	events.room_entered.connect(_on_room_entered)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -837,6 +838,22 @@ func _grow_reactions(size: int) -> void:
 	_react_left.resize(size)
 	_react_total.resize(size)
 	_react_amount.resize(size)
+
+
+## A run starts (`room_entered`): what decides whether a hit or a cue holds bodies starts as in a
+## fresh game (online-ready N3b): no body rests from a hold, no reaction was heard and no hit was
+## juiced. They run on Feel's clock, real time until N4 counts the stops in ticks, and the holds
+## they let through are the simulation's (`Actors.hold`), so a run's would otherwise depend on the
+## runs before it.
+func _on_room_entered(_room_id: StringName) -> void:
+	_rest_until.fill(0.0)
+	_rest_body.fill(0)
+	_reaction_heard.clear()
+	_juiced_frame.fill(0)
+	_juiced_step.fill(0)
+	_juiced_body.fill(0)
+	_juiced_by.fill(0)
+	_juiced_kind.fill(&"")
 
 
 ## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's

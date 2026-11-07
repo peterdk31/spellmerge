@@ -42,10 +42,15 @@ static func area(walk: StateWalk, name: String, object: Object, also: Callable =
 	var values: Array = []
 	if also.is_valid():
 		walk.walk(name, object, func(path: String, value: Variant) -> void:
-			values.append(leaf(value))
+			add_leaf(values, value)
 			also.call(path, value))
 	else:
 		walk.values(name, object, values)
+	return of_leaves(values)
+
+
+## The 64-bit hash of a list of leaves (`add_leaf`): of its bytes.
+static func of_leaves(values: Array) -> int:
 	var context := HashingContext.new()
 	context.start(HashingContext.HASH_MD5)
 	context.update(var_to_bytes(values))
@@ -62,14 +67,18 @@ static func whole(hashes: Dictionary[String, int]) -> int:
 	return context.finish().decode_s64(0)
 
 
-## One leaf as it is hashed: a packed or typed array as its type, size and the engine's `hash()` of it
-## (one call, no copy of its bytes: 6,000 shots' arrays are megabytes), anything else as it is. An
-## area's leaves are hashed together, by the bytes of the array of them (`var_to_bytes`).
-static func leaf(value: Variant) -> Variant:
+## One leaf as it is hashed, appended to `into`: a packed or typed array as its type, size and the
+## engine's `hash()` of it (one call, no copy of its bytes: 6,000 shots' arrays are megabytes; three
+## values, no array made for them, N3c), anything else as it is. An area's leaves are hashed
+## together, by the bytes of the array of them (`var_to_bytes`).
+static func add_leaf(into: Array, value: Variant) -> void:
 	var type: int = typeof(value)
 	if type >= TYPE_PACKED_BYTE_ARRAY or type == TYPE_ARRAY:
-		return PackedInt64Array([type, (value as Variant).size(), hash(value)])
-	return value
+		into.append(type)
+		into.append((value as Variant).size())
+		into.append(hash(value))
+	else:
+		into.append(value)
 
 
 ## One object's hash (an area alone).

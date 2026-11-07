@@ -200,9 +200,12 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
+## State as its size alone: the spare launch records, each set whole when `_delay` takes it
+## (core/sim/README.md).
+const SPARES: Array[StringName] = [&"_pending_free"]
 ## The session's settings a new run keeps (`begin_run`): a benchmark's fire budget.
 const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 
@@ -216,6 +219,8 @@ var fires_waited: int = 0
 ## The projectile manager and the event bus; `bind` sets them.
 var projectiles: ProjectilesScript = null
 var events: EventsScript = null
+## The game's chance (core/sim/sim.gd): found at the first roll (`Sim.found`); a test may set its own.
+var sim: Sim = null
 
 ## Tags whose shots the last `begin_generation` call revoked, because all 8 generations of
 ## the slot were in the air. Until the caller removes those shots from the projectile
@@ -348,9 +353,12 @@ var _pending: Array[PendingLaunch] = []
 ## and `_release_launch` gives it back.
 var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
-## actor * STAFFS + staff -> casts made, which seeds the next cast's scatter and staff spread.
+## actor * STAFFS + staff -> casts made, which names the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
-var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
+## The scatter and spread rolls of the cast or later firing being launched: its key (the cast's
+## actor, staff and count; a later firing's from it) and the rolls made by it so far (`_scatter_roll`).
+var _scatter_key: int = 0
+var _scatter_rolls: int = 0
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
 var _echo_spell: CompiledSpell = null
 ## One slot, for the one-shot forms of `_land_shots`, `_travel_shots` and `_register_shots`.
@@ -477,9 +485,6 @@ var _moves: CasterMoves = null
 func _init() -> void:
 	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
 	set_physics_process(true)
-	# Every cast seeds it before it rolls; a fixed start keeps two runs the same before the first
-	# cast too (online-ready N1: a new generator starts on a random seed).
-	_scatter.seed = 0
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)
@@ -1068,7 +1073,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 func _leave(index: int, compiled: CompiledStaff, cast: CompiledCast, origin: Vector2, aim: Vector2) -> bool:
 	var actor: int = floori(float(index) / SpellLimits.STAFFS)
 	var staff: int = index % SpellLimits.STAFFS
-	_scatter.seed = hash(Vector3i(actor, staff, _cast_count[index]))
+	_scatter_from(hash(Vector3i(actor, staff, _cast_count[index])))
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return false
 	_cast_count[index] += 1
@@ -1474,7 +1479,7 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	for spell in group.spells:
 		var heading: Vector2 = direction
 		if spell.fallback == CompiledSpell.FALLBACK_NONE and group.scatter:
-			heading = direction.rotated(_scatter.randf() * TAU)
+			heading = direction.rotated(_scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made
 
@@ -1650,7 +1655,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.echoed = false
 	launch.again = false
 	launch.wound = false
-	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
+	launch.seed = hash(Vector3i(_scatter_key, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.actor = actor
 	launch.staff = staff
@@ -1702,7 +1707,7 @@ func _run_pending() -> void:
 		var echoed: bool = launch.echoed
 		var again: bool = launch.again
 		var wound: bool = launch.wound
-		_scatter.seed = launch.seed
+		_scatter_from(launch.seed)
 		_release_launch(launch)
 		_cast_as(caster, caster_seq)
 		if landing != null:
@@ -1801,7 +1806,22 @@ func _staff_spread(tag: int, spell: CompiledSpell) -> float:
 	var degrees: float = compiled.staff.spread * spell.spread_mult
 	if degrees <= 0.0:
 		return 0.0
-	return deg_to_rad(degrees) * (_scatter.randf() * 2.0 - 1.0)
+	return deg_to_rad(degrees) * (_scatter_roll() * 2.0 - 1.0)
+
+
+## The scatter and spread rolls from here on are those of the cast or later firing named `key`.
+func _scatter_from(key: int) -> void:
+	_scatter_key = key
+	_scatter_rolls = 0
+
+
+## The next scatter or spread roll of the cast being launched, in [0, 1).
+func _scatter_roll() -> float:
+	if sim == null:
+		sim = Sim.found(self)
+	var roll: float = sim.chance(&"scatter", _scatter_key, _scatter_rolls)
+	_scatter_rolls += 1
+	return roll
 
 
 ## Gives the manager's shot in `slot` its record and counts it.
@@ -2217,7 +2237,7 @@ func _run_waiting_fires() -> void:
 		var staff: int = launch.staff
 		var generation: int = launch.generation
 		var heading: Vector2 = launch.heading
-		_scatter.seed = launch.seed
+		_scatter_from(launch.seed)
 		_release_launch(launch)
 		_launch_as(group, actor, staff, generation, origin, heading, source, caster, caster_seq)
 		if keeps:

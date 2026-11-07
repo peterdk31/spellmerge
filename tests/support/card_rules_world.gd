@@ -337,7 +337,7 @@ func _kind_body(label: StringName, at: Vector2, kind: SwarmKind) -> Node2D:
 			swarm.spells = spells
 			swarm.actors = table
 			swarm.entities = entities
-			swarm.rng.seed = 7
+			swarm.sim = Sim.seeded(7)
 			# Full actors walk through each other: so do these, so only the cards are compared.
 			swarm.spacing = 0.0
 			swarm.start(_swarm_parent, Rect2(-480.0, -480.0, 960.0, 960.0))

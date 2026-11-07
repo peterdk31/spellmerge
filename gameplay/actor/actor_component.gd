@@ -10,6 +10,11 @@ extends Node
 ## then `attach` (and again each time it re-enters the tree), `detach` when it leaves the tree.
 ## `attach` and `detach` are where a component registers the actor with a system and forgets it.
 
+## Not state: the actor a component belongs to is its parent, set again by `setup` (core/sim/README.md;
+## walked in every component, its identity was a third of a body's hash, N3c). A component's own
+## list is DERIVED, so this one is named after the base.
+const DERIVED_COMPONENT: Array[StringName] = [&"actor"]
+
 ## The actor this component belongs to (set by `setup`).
 var actor: Actor = null
 

@@ -11,6 +11,10 @@ extends RefCounted
 ## fire later is not part of the cast's summary, except that a cast whose carriers only carry
 ## payloads (a rain) counts the payload's damage.
 
+## Made whole by the staff compiler (`CastSense.of`) and never changed after: the state walk
+## hashes it once (core/sim/README.md).
+const FROZEN: bool = true
+
 ## How far it goes along the aim (the carriers' `reach_of`, as the telegraph shows it); 0 when it
 ## is not aimed (a nova, an orbit, a decoy) or does nothing.
 var reach: float = 0.0

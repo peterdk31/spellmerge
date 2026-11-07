@@ -29,6 +29,10 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## The human seat (0-3) it is, or -1 for none (an AI).
 @export var seat: int = ActorsScript.NONE
 
+## State as who they point at: the bodies it drives and is home to, never entered (core/sim/README.md;
+## a controller's own list is REFS, so this one is named after the base).
+const REFS_CONTROLLER: Array[StringName] = [&"driving", &"home_actor"]
+
 ## The actor it drives now, or null. Set by `Actor.drive` (and the home actor's `_ready`) only.
 var driving: Actor = null
 ## The actor whose home controller it is (set by that actor's `_ready`), or null.

@@ -47,6 +47,39 @@ func test_without_bounces_a_ray_stops_at_the_wall() -> void:
 	check_equal(impacts.size(), 1, "one impact, on the wall")
 
 
+## A run's start (`begin_run`, online-ready N3b) keeps a ray's scratch whole: before N3c it emptied
+## five of its six lists, and the next ray read past them and stopped.
+func test_a_ray_after_a_runs_start_goes_as_before() -> void:
+	mgr.set_walls([Rect2(200.0, 0.0, 16.0, 360.0)] as Array[Rect2])
+	var before: float = mgr.ray(0, Vector2(100.0, 100.0), DIAGONAL, 300.0, 0, ManagerScript.LAYER_ENEMY, 0, 0.0, null, 1)
+	mgr.begin_run()
+	mgr.set_walls([Rect2(200.0, 0.0, 16.0, 360.0)] as Array[Rect2])
+	var after: float = mgr.ray(0, Vector2(100.0, 100.0), DIAGONAL, 300.0, 0, ManagerScript.LAYER_ENEMY, 0, 0.0, null, 1)
+	check_equal(after, before, "the same length after a run's start")
+	check_equal(mgr.ray_path_count, 3, "and the same turn")
+
+
+## So does a sweep's results (`sweep_nodes`, `sweep_points`, `sweep_heads`), which grow together:
+## before N3c a run's start shrank two of them, and a sweep finding more bodies than they held
+## wrote past them (found by the horde stress run).
+func test_a_sweep_after_a_runs_start_finds_as_many_as_before() -> void:
+	var count: int = ManagerScript.SWEEP_START + 8
+	var bodies: Array[Node2D] = []
+	for i in count:
+		bodies.append(_target(Vector2(320.0, 180.0) + Vector2.from_angle(TAU * float(i) / float(count)) * 40.0))
+	var before: int = mgr.sweep(0, Vector2(320.0, 180.0), Vector2.RIGHT, 1, -PI, PI, 60.0)
+	for body in bodies:
+		mgr.remove_target(body)
+	mgr.begin_run()
+	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	for body in bodies:
+		mgr.add_target(body, 10.0, ManagerScript.LAYER_ENEMY)
+	var after: int = mgr.sweep(0, Vector2(320.0, 180.0), Vector2.RIGHT, 1, -PI, PI, 60.0)
+	check_equal(before, count, "every body round it, before")
+	check_equal(after, count, "and after a run's start")
+	check(mgr.sweep_points.size() >= after and mgr.sweep_heads.size() >= after, "its results hold them all")
+
+
 func test_a_bouncing_ray_turns_off_the_wall_face_and_goes_on_for_its_length() -> void:
 	mgr.set_walls([Rect2(200.0, 0.0, 16.0, 360.0)] as Array[Rect2])
 	var got: float = mgr.ray(0, Vector2(100.0, 100.0), DIAGONAL, 300.0, 0, ManagerScript.LAYER_ENEMY, 0, 0.0, null, 1)

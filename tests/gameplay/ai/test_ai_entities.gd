@@ -18,6 +18,7 @@ const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const TickScript := preload("res://core/sim/tick.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const STEP: float = 0.0625
@@ -252,6 +253,33 @@ func test_an_enemys_entities_end_with_it() -> void:
 	root.remove_child(enemy)
 	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, caster), 0, "the enemy gone, its familiar ends")
 	check(_ended.size() == 1 and _ended[0][0] == caster and _ended[0][2] == tag, "with entity_ended, so its end still counts")
+
+
+## A wizard's decoy outlives its wizard until the next run starts, where Entities frees it
+## (`begin_run`). The run's start renews Entities first (`Tick.FRESH_AT_RUN`), so the decoy has left
+## the manager's target table and Combat before they are renewed. Before, the manager was renewed
+## under the decoy: its target numbers emptied, the next body's row was written past them (found by
+## N3c's stress run).
+func test_a_wizards_decoy_leaves_before_the_services_are_renewed_at_a_runs_start() -> void:
+	_bus.entity_spawn_requested.emit(_wizard.id, EntitiesScript.DECOY, Vector2(40.0, 0.0), 30.0, 0, EntitiesScript.CASTER_BODY)
+	var decoy: Actor = _entities.decoy_of(_wizard.id)
+	check(decoy != null and decoy.is_inside_tree(), "the wizard's decoy is out")
+	if decoy == null:
+		return
+	check_equal(_projectiles.target_owner_of(decoy), _wizard.id, "a target of the wizard's")
+	# Flow clears the last run's world: the wizard leaves, its decoy stays.
+	root.remove_child(_wizard)
+	check(decoy.is_inside_tree(), "the decoy outlives its wizard")
+	var areas: Dictionary = {&"Projectiles": _projectiles, &"Spells": _spells, &"Combat": _combat, &"Entities": _entities}
+	for area: StringName in TickScript.FRESH_AT_RUN:
+		if areas.has(area):
+			areas[area].call(&"begin_run")
+	check(not is_instance_valid(decoy), "the run's start freed the decoy")
+	var enemy := _enemy(_data([&"bolt"]), Vector2(200.0, 0.0))
+	check_equal(_projectiles.target_owner_of(enemy), enemy.id, "the next body takes its own row whole")
+	check(_combat.is_registered(enemy), "and Combat's")
+	root.add_child(_wizard)
+	check_equal(_projectiles.target_owner_of(_wizard), _wizard.id, "so does the one after it")
 
 
 func test_enemies_keep_their_share_and_never_take_a_wizards_rows() -> void:

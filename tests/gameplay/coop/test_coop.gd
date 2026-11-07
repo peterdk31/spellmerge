@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_join_before_play()
 	_test_duplicate_device_events()
 	_test_leave_and_rejoin_same_slot()
+	_test_wizards_go_by_actor_id()
 	_test_last_standing_leaves_restarts_the_room()
 	_test_camera_zooms_out_to_fit()
 	_test_camera_eases()
@@ -270,6 +271,25 @@ func _test_leave_and_rejoin_same_slot() -> void:
 	_check(_wizard(1) != null and _wizard_count() == 2, "slot 2 rejoined with a fresh wizard")
 	_check(_health(1) == _wizard(1).health.max_health, "the rejoined wizard is at full health")
 	_check(_joined_events == [0, 1, 1] and _left_events == [1], "events: joined 0, 1, 1 and left 1, got %s and %s" % [_joined_events, _left_events])
+	_stop()
+
+
+## Coop keeps its wizards by actor id, not by the tree's order (online-ready N3c: a game rebuilt
+## from a snapshot need not add them in the same order), so revives go the same way.
+func _test_wizards_go_by_actor_id() -> void:
+	_stop()
+	_start_with(0)
+	_input.add_virtual_device(1)
+	_input.add_virtual_device(2)
+	var first: Actor = _wizard(0)
+	first.get_parent().move_child(first, -1)
+	_coop.refresh_wizards()
+	var ids: Array[int] = []
+	for body: Node2D in _coop._wizards:
+		ids.append((body as Actor).id)
+	var sorted: Array[int] = ids.duplicate()
+	sorted.sort()
+	_check(ids.size() == 3 and ids == sorted, "the wizards go by actor id whatever the tree's order: %s" % [ids])
 	_stop()
 
 

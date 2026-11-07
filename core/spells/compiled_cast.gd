@@ -3,6 +3,10 @@ extends RefCounted
 ## One cast of a staff's cycle (docs/milestones/M2-staffs.md, "Reading a staff"): the group it
 ## fires, the slots it read and its numbers. Made by `StaffCompiler`; read-only.
 
+## Made whole by the staff compiler and never changed after: the state walk hashes it once
+## (core/sim/README.md).
+const FROZEN: bool = true
+
 ## The group the cast fires; payloads hang below its spells.
 var group: CompiledGroup = null
 ## The slots the cast read, in reading order (a slot read after a wrap comes after the end).

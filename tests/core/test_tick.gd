@@ -109,6 +109,25 @@ func test_a_tick_runs_the_areas_in_the_written_order() -> void:
 	check_equal(_tick.count, 1, "one tick counted")
 
 
+## The game's state in parts (`state_slice`, N3c): each area in exactly one part, the parts together
+## the whole, the services spread one to a part, each body in the part of its id.
+func test_the_state_splits_into_parts_that_cover_it_once() -> void:
+	for i in 5:
+		_body("b%d" % i)
+	var whole: Dictionary = _tick.state_areas()
+	check(whole.has("Sim") and whole.has("Spells") and whole.has("actor 4"), "the whole names the sim, the areas and the bodies: %s" % [whole.keys()])
+	for slices: int in [1, 2, 7, 60]:
+		var met: Dictionary = {}
+		for slice in slices:
+			for name: String in _tick.state_slice(slice, slices):
+				check(not met.has(name), "%s is in one part of %d" % [name, slices])
+				met[name] = slice
+		check_equal(met.size(), whole.size(), "the %d parts cover the whole" % slices)
+		if slices >= TickScript.STATE_AREAS.size() + 1:
+			check(met["Sim"] != met["Spells"] and met["Spells"] != met["Projectiles"], "services one to a part of %d" % slices)
+		check_equal(met["actor 3"], 3 % slices, "a body by its id, of %d" % slices)
+
+
 func test_the_bodies_go_by_actor_id_not_by_tree_order() -> void:
 	var first: Body = _body("first")
 	var second: Body = _body("second")
@@ -166,14 +185,14 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	calls.clear()
 	_tick.begin_run()
 	check_equal(_tick.count, 0, "the clock from 0")
-	check_equal(_names(), ["Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Entities.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
+	check_equal(_names(), ["Entities.begin_run", "Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
 	_tick.run(TickScript.DT)
 	check_equal(_tick.count, 1, "the run's first tick")
 
 
 ## Every autoload of a simulation script is either made fresh at a run's start (with a `begin_run`)
 ## or says why it need not be (`RENEWED_OTHERWISE`), so a new area cannot carry one run's state into
-## the next unnoticed.
+## the next unnoticed; and the state hash sees each (`STATE_AREAS`, N3c).
 func test_every_simulation_autoload_starts_each_run_fresh_or_says_why() -> void:
 	var autoloads: Dictionary[StringName, Script] = {}
 	for info: Dictionary in ProjectSettings.get_property_list():
@@ -193,5 +212,7 @@ func test_every_simulation_autoload_starts_each_run_fresh_or_says_why() -> void:
 			for method: Dictionary in script.get_script_method_list():
 				methods.append(String(method["name"]))
 			check(methods.has("begin_run"), "%s is in Tick.FRESH_AT_RUN but has no begin_run" % area)
-	for area: StringName in TickScript.FRESH_AT_RUN + TickScript.RENEWED_OTHERWISE.keys():
+		# Its state is the game's: the hash and the desync report see it (N3c).
+		check(TickScript.STATE_AREAS.has(area), "%s (%s) is a simulation area: list it in Tick.STATE_AREAS, so the state hash sees it (core/sim/README.md, \"The hash\")" % [area, script.resource_path])
+	for area: StringName in TickScript.FRESH_AT_RUN + TickScript.RENEWED_OTHERWISE.keys() + TickScript.STATE_AREAS:
 		check(autoloads.has(area), "Tick lists %s, which is no autoload (renamed?)" % area)

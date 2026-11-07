@@ -41,6 +41,13 @@ func stop() -> void:
 	keep = 0
 
 
+## True while it is as a fresh one is, waiting to be started (stopped, keeping no target): the state
+## walk then hashes it as one leaf (core/sim/state_walk.gd; a carrier keeps one per row). Its pick's
+## seed is set again by `start`.
+func idle() -> bool:
+	return curve == 0.0 and reach == 0.0 and bend == 0.0 and keep == 0
+
+
 func homes() -> bool:
 	return reach > 0.0 and curve > 0.0
 

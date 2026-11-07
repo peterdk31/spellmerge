@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: Chance by name, from the sim (online-ready N3c, owner session)
+
+- **One source of chance:** `Sim` (core/sim/sim.gd), owned by the Tick, holding the tick and the run's seed (dealt at each run's start by `SimSeed.fresh()`: a replay's while one records or plays). The simulation keeps no `RandomNumberGenerator` (a test fails on one). Spells' scatter, the brain, the horde director and the swarm's row seeds moved onto it; the horde's own seeds are gone, so a run has one seed.
+- **A roll is a hash of the run's seed and the name its caller gives it** (purpose, key, counter), and **the tick is not in it**, unlike the plan: a test that steps an area by hand would otherwise roll by whatever the game's clock read, and a caller that rolls more than once a tick needs a counter anyway. Each caller counts its rolls as state. A new roll in one system never shifts another's.
+- **Every seeded outcome changed once** (the planned one-time churn): runs now differ by seed, where Spells' scatter and the brain's rolls were the same in every run before.
+- **Coop's wizards go by actor id**, not the tree's order, so revives go the same way in a game rebuilt from a snapshot (N10).
+- **The state hash was brought down in N3c, not left for later** (owner: "Bring it down now"): from 55, 90 and 189 ms (web, desktop, 600-enemy horde; headless) to 19, 34 and 67 ms, and spread over ticks (`Tick.state_slice`) to under 2 ms a tick on average and 5.4 ms at worst over 60. Fewer leaves (a component's parent DERIVED; spare records by their count, `SPARES`; a waiting per-row record as one leaf, `idle()`; a compiled build as one leaf, `FROZEN`) and cheaper ones (the walker plans each script's members once). A frozen build is checked against its members on every card's walk, and the quick walk against the desync report's on played scenes (milestones/online-ready.md, N3c).
+- **A run's start renews Entities first** (`Tick.FRESH_AT_RUN`): it frees the last run's decoys, which the manager and Combat still held; renewed after them, it left a stale target row that the next body wrote past (found by the stress run).
+
 ## 2026-11-07: Every run starts from a fresh game's state (online-ready N3b, owner session)
 
 - **A run's start resets the areas by construction, not by hand-kept lists.** `Tick.begin_run` (called by Flow's `start_run`) counts the clock from 0 and makes each service and the horde director take every state member from a blank of its own script (`SimFresh.renew`, core/sim/sim_fresh.gd), so a member added later is reset too. The `clear` functions stay (tests use them; a run's start calls them first, so their events still go out). The alternative, completing each `clear` by hand, would list every member of five large scripts again and go stale with the next one added.

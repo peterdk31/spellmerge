@@ -5,6 +5,10 @@ extends RefCounted
 ## a trigger's payload, and the payload of `rain` and `familiar`, is another. Read-only data
 ## made by `StaffCompiler`; nothing outside `core/spells/` and the builder view reads it.
 
+## Made whole by the staff compiler and never changed after: the state walk hashes it once
+## (core/sim/README.md).
+const FROZEN: bool = true
+
 ## The carriers of the group, in slot order; a fallback (the caster or the payload's origin)
 ## comes last.
 var spells: Array[CompiledSpell] = []

@@ -5,6 +5,7 @@
 // `float` is a double; Vector2 and PackedFloat32Array single precision).
 
 #include "swarm_kernel.h"
+#include "dmath.h"
 #include "packed.h"
 
 #include <godot_cpp/classes/node2d.hpp>
@@ -276,7 +277,7 @@ void SwarmKernel::space_and_keep_in(Object *s) {
 						if (far > 0.0001) {
 							normal = d / (real_t)far;
 						} else {
-							normal = Vector2::from_angle((real_t)((double)((seeds[i] ^ seeds[j]) & 1023) * (TAU_D / 1024.0)));
+							normal = dmath::from_angle((double)((seeds[i] ^ seeds[j]) & 1023) * (TAU_D / 1024.0));
 						}
 						const Vector2 shift = vmul(normal, (reach - far) * share / gv);
 						push_i -= vmul(shift, gi);

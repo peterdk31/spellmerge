@@ -3,7 +3,7 @@ extends RefCounted
 ## and loaded as a GDExtension (`native/spellmerge.gdextension`, written by `ci/build/native.sh`).
 ## It holds only faster versions of GDScript the game already has (the projectile manager's hot
 ## loops, `ShotKernel`; the horde swarm's, `SwarmKernel` and `SwarmLookKernel`; the motes' trail
-## births, `MoteKernel`), so the game runs
+## births, `MoteKernel`; the deterministic maths, `DMathKernel`), so the game runs
 ## the same without it: a checkout where it was never built (slower). This file is the one place
 ## that asks whether it is there.
 ##
@@ -38,6 +38,14 @@ static func swarm_look_kernel() -> Object:
 	if not _loaded_or_tell():
 		return null
 	return ClassDB.instantiate(&"SwarmLookKernel")
+
+
+## A new `DMathKernel` (the deterministic maths of online-ready N7, `DMath` in core/sim/dmath.gd), or
+## null when the module is not loaded.
+static func dmath_kernel() -> Object:
+	if not _loaded_or_tell():
+		return null
+	return ClassDB.instantiate(&"DMathKernel")
 
 
 ## A new `MoteKernel` (the motes' trail births), or null when the module is not loaded.

@@ -19,6 +19,10 @@ ARGUMENTS.setdefault("build_profile", File("build_profile.json").abspath)
 env = SConscript(os.path.join(godot_cpp, "SConstruct"), {"api_version": "4.7"})
 
 env.Append(CPPPATH=["src/"])
+# The same floats on every platform (online-ready N7, src/dmath.h): no multiply fused with an add
+# (an FMA rounds once where the GDScript twin rounds twice) and no fast-math, for every compiler the
+# module is built with (GCC for Linux and MinGW, Clang for the web).
+env.Append(CCFLAGS=["-ffp-contract=off", "-fno-fast-math"])
 sources = Glob("src/*.cpp")
 
 library = env.SharedLibrary(

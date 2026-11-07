@@ -10,6 +10,7 @@ Spellmerge's own C++, loaded by Godot as a GDExtension: faster versions of hot l
 | `SwarmKernel` (`src/swarm_kernel.cpp`) | the horde swarm's spacing and its move onto the floor | `gameplay/horde/swarm.gd` |
 | `SwarmLookKernel` (same file) | the swarm look's step over the rows and its batch writing | `gameplay/horde/swarm_look.gd` |
 | `MoteKernel` (`src/mote_kernel.cpp`) | the motes' trail births: each birth's kind picked and its row written, the settling motes' marks worked out (handed back for the mark layer, a script) | `gameplay/feel/mote.gd` (`give_off` and the one-mote `burst` it calls) |
+| `DMathKernel` (`src/dmath_kernel.cpp`, the maths in `src/dmath.h`) | deterministic maths (online-ready N7): sin, cos, tan, atan, atan2, asin, acos, exp, log, pow, lerp_angle and the Vector2 turns, the same bits on every platform | `core/sim/dmath.gd` (`DMath`, whose functions call it when the module is loaded) |
 
 **The GDScript stays**, as the reference the side-by-side tests compare with, as the fallback for a checkout or editor without a compiler, and as the readable spec. It is not a second way to ship: every exported build has the module, and an exported game without it logs an error (`core/native/native.gd`).
 
@@ -26,6 +27,12 @@ The owner lifted hard rule 4's ban on native code for this module (2026-11-02, d
 - **No script runs while a kernel holds the arrays.** A script writing one then would get its own copy, and the two would part. Kernels call engine methods only (a swarmer's node has no script).
 - **One loader.** `core/native/native.gd` is the only GDScript that asks whether the module is loaded and makes its classes, by literal name (`NATIVE_FILE` in the rules).
 - **Nothing built is committed** (hard rule 2 still holds). `ci/build/native.sh` builds the libraries into `native/bin/` and writes `native/spellmerge.gdextension` naming the ones that exist. Both are ignored by git, so are SCons' object files.
+
+## The same on every platform (online-ready N7)
+
+The simulation's kernels must give the same bits on Linux, Windows and the web, so a game played online is one game. What a kernel computes for the simulation uses `src/dmath.h` for every function the C library would give (sin, cos, tan, atan2, exp, log, pow, and the Vector2 helpers `from_angle`, `rotated`, `angle`, `angle_to`), never `std::sin` or the engine's `Vector2::rotated`: those call each platform's C library, which differs in the last digit now and then. dmath.h uses `+ - * /` and `sqrt` (correctly rounded everywhere) and `floor` and `fmod` (exact), and `native/SConstruct` builds everything, godot-cpp too, with `-ffp-contract=off` and `-fno-fast-math`, so no compiler fuses a multiply and an add on one platform and not on another. `DMath` (`core/sim/dmath.gd`) is its GDScript twin, compared to the bit by `tests/core/test_dmath.gd`; GDScript the kernels mirror calls `DMath` where they call dmath.h.
+
+What only draws (`SwarmLookKernel`'s hops, `MoteKernel`) keeps `std::` maths: it differs between machines without changing the game.
 
 ## Building
 

@@ -237,9 +237,6 @@ const F_TURNED: int = 64
 const F_WAVE: int = 128
 ## Passed over by the hit-work budget (WORK_PER_STEP): its path from `_untested` on is still to test.
 const F_DEFERRED: int = 256
-## Spent by a hit of the batch being filled (H3b): it ends once the batch's damage is done, unless
-## that hit is lost; until then the hit pass does nothing more with it.
-const F_BATCH_END: int = 512
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
@@ -585,7 +582,7 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_cand_from", &"hit_batch", &"_batching", &"_holding", &"_held_slots", &"_held_count", &"_batch_ended", &"_batch_ended_count", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -1110,31 +1107,6 @@ var native_threads: int = 0:
 ## hit pass found for the shot it handed back (`_hit_found`).
 var _starved_at: int = -1
 var _cand_found: int = 0
-## Where the path of the latest hit test began (`_hit_test`, and the native one that handed its
-## shot back): a batched hit that is lost tests its shot again from there (H3b).
-var _cand_from: Vector2 = Vector2.ZERO
-
-## Bundled hits (shot scale H3b, the first part, to measure; off by default): the hit pass of
-## flying shots fills `hit_batch` instead of sending each hit as it is found, and resolves it in
-## phases once the pass is done (`Events.projectile_hits`; see core/events/hit_batch.gd). A shot a
-## hit spends ends after the batch's damage; a hit on a body an earlier hit of the batch killed is
-## lost, and its shot is tested again at the next step from the start of its path, so it flies on
-## and hits what is behind (no damage is lost).
-var batch_hits: bool = false
-## The step's hits while the hit pass runs and is resolved (empty between steps).
-var hit_batch: HitBatch = HitBatch.new()
-## While the hit pass fills the batch.
-var _batching: bool = false
-## While the batch is filled and resolved: a shot that ends keeps its slot from new shots until it
-## is done, so each hit's listeners read its own shot (`_held_slots`). A shot a hit spends takes its
-## place in that list when the hit is found, so the slots are freed in the order they would have been
-## with each hit sent at once (and the next shots take the same slots).
-var _holding: bool = false
-var _held_slots: PackedInt32Array = PackedInt32Array()
-var _held_count: int = 0
-## The tags of the shots the batch spent, for `shot_ended` once their cards have run.
-var _batch_ended: PackedInt64Array = PackedInt64Array()
-var _batch_ended_count: int = 0
 
 
 func _init() -> void:
@@ -1980,9 +1952,6 @@ func remove_target(node: Node2D) -> void:
 		return
 	if _stepping:
 		_target_layer[at] = 0
-		var b: HitBatch = hit_batch
-		if b.count > 0 and (_batching or (b.phase >= HitBatch.PHASE_PRE and b.phase <= HitBatch.PHASE_COMBAT)):
-			b.lose_target(_target_key[at])
 	else:
 		_remove_target_at(at)
 		_grid_stale = true
@@ -3126,19 +3095,12 @@ func _pass_hits(top: int, delta: float) -> void:
 	var resume: int = _resume if _resume < top else 0
 	_starved_at = -1
 	var n: int = 0
-	_batching = batch_hits
-	_holding = batch_hits
 	if _kernel != null and not _any_solid:
 		n = _pass_hits_native(top, delta, limit, resume)
 	# Every shot the kernel did not reach (all of them without it).
 	while n < top:
 		_hit_slot(_wrapped(n + resume, top), delta, limit)
 		n += 1
-	_batching = false
-	if hit_batch.count > 0:
-		_resolve_batch()
-	elif _holding:
-		_release_held()
 	if not step_profile.is_empty() and _starved_at >= 0:
 		# The shots from the first starved one round to where the pass began.
 		step_profile[PROF_PAST_BUDGET] = top - ((_starved_at - resume + top) % top)
@@ -3262,7 +3224,7 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 			_forget_left(slot)
 	# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
 	# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
-	if walled and _alive[slot] != 0 and (_flags[slot] & (F_STUCK | F_BATCH_END)) == 0 and not (_any_solid and _solid_guard(slot)):
+	if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
 		_wall_end(slot)
 
 
@@ -3286,7 +3248,7 @@ func _test_deferred(slot: int) -> bool:
 		return true
 	var seq: int = _seq[slot]
 	_hit_test(slot)
-	return _alive[slot] != 0 and _seq[slot] == seq and (_flags[slot] & F_BATCH_END) == 0
+	return _alive[slot] != 0 and _seq[slot] == seq
 
 
 ## The rest of a shot's turn once the native hit pass found `_cand_found` targets on its path (it
@@ -5344,14 +5306,8 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_alive[slot] = 0
 	_state[slot] = S_IDLE
 	_leave_group(slot)
-	if (_flags[slot] & F_BATCH_END) != 0:
-		# Spent by a hit of the batch: its place is kept already.
-		_flags[slot] &= ~F_BATCH_END
-	elif _holding:
-		_hold_slot(slot)
-	else:
-		_free_slots[_free_count] = slot
-		_free_count += 1
+	_free_slots[_free_count] = slot
+	_free_count += 1
 	_count -= 1
 	var owner_index: int = _budget[slot]
 	_owned[owner_index] -= 1
@@ -5747,7 +5703,6 @@ func _hit_test(slot: int) -> bool:
 	if (_flags[slot] & F_DEFERRED) != 0:
 		_flags[slot] &= ~F_DEFERRED
 		from = _untested[slot]
-	_cand_from = from
 	# Where the step starts: a payload still on the body that fired it there is not clear of it.
 	var start: Vector2 = from
 	if _any_solid and _solids.has(slot):
@@ -5875,7 +5830,7 @@ func _hit_candidates(slot: int, found: int) -> bool:
 	var seq: int = _seq[slot]
 	var hit: bool = false
 	for n in found:
-		if _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & (F_STUCK | F_BATCH_END)) != 0:
+		if _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & F_STUCK) != 0:
 			break
 		var t: int = _cand_target[n]
 		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
@@ -6043,16 +5998,35 @@ func _form_of(slot: int) -> StringName:
 
 
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
-	if _batching:
-		_batch_hit(slot, target, at)
-		return
 	var node: Variant = _targets[target]
 	var caster: int = _actor[slot]
 	var tag: int = _tag[slot]
-	var heading: Vector2 = _hit_heading(slot, target, at)
+	var heading: Vector2 = _vel[slot].normalized()
+	if heading == Vector2.ZERO:
+		# A still shot has no heading: point from the shot to the target instead.
+		heading = at.direction_to(_target_pos[target])
+		if heading == Vector2.ZERO:
+			heading = Vector2.RIGHT
 	var spent: bool = false
 	if _stick[slot] > 0.0 and is_instance_valid(node):
-		_stick_to(slot, node, at, heading)
+		# Stick to the target: it carries the shot until the stick time is up.
+		_flags[slot] |= F_STUCK
+		_stuck_to[slot] = node
+		# Where its line of flight comes closest to the target's centre (a head-on shot: the
+		# centre), not `at`, the point of this step's path nearest it: that one lies anywhere from
+		# the centre to the rim by when in its step the shot met the target, so what a stuck shot
+		# fires from inside (a nova) hit all or half of its ring by chance. Only a straight shot
+		# has such a line: an orbit (on its circle) and a still shot stick where they are.
+		var centre: Vector2 = (node as Node2D).global_position
+		var stick_at: Vector2 = at
+		if _motion[slot] == MOTION_STRAIGHT and not _vel[slot].is_zero_approx():
+			stick_at = at + heading * heading.dot(centre - at)
+		_stuck_off[slot] = stick_at - centre
+		_life[slot] = _stick[slot]
+		_stick[slot] = 0.0
+		_join(slot, B_STUCK)
+		# `_vel` stays: `_pass_stuck` never moves a stuck shot by it, and a payload it fires (on hit
+		# or on a timer) still goes the way the shot was flying.
 	elif _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		_remember(slot, target)
@@ -6077,210 +6051,3 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_event_slot = -1
 	if spent and tag != 0:
 		shot_ended.emit(tag)
-
-
-## The way the shot in `slot` was going when it hit target `t` at `at`.
-func _hit_heading(slot: int, t: int, at: Vector2) -> Vector2:
-	var heading: Vector2 = _vel[slot].normalized()
-	if heading == Vector2.ZERO:
-		# A still shot has no heading: point from the shot to the target instead.
-		heading = at.direction_to(_target_pos[t])
-		if heading == Vector2.ZERO:
-			heading = Vector2.RIGHT
-	return heading
-
-
-## Stick the shot in `slot` to `node`, which it hit at `at` going `heading`: the body carries it
-## until the stick time is up.
-func _stick_to(slot: int, node: Node2D, at: Vector2, heading: Vector2) -> void:
-	_flags[slot] |= F_STUCK
-	_stuck_to[slot] = node
-	# Where its line of flight comes closest to the target's centre (a head-on shot: the
-	# centre), not `at`, the point of this step's path nearest it: that one lies anywhere from
-	# the centre to the rim by when in its step the shot met the target, so what a stuck shot
-	# fires from inside (a nova) hit all or half of its ring by chance. Only a straight shot
-	# has such a line: an orbit (on its circle) and a still shot stick where they are.
-	var centre: Vector2 = node.global_position
-	var stick_at: Vector2 = at
-	if _motion[slot] == MOTION_STRAIGHT and not _vel[slot].is_zero_approx():
-		stick_at = at + heading * heading.dot(centre - at)
-	_stuck_off[slot] = stick_at - centre
-	_life[slot] = _stick[slot]
-	_stick[slot] = 0.0
-	_join(slot, B_STUCK)
-	# `_vel` stays: `_pass_stuck` never moves a stuck shot by it, and a payload it fires (on hit
-	# or on a timer) still goes the way the shot was flying.
-
-
-# --- Bundled hits (shot scale H3b, the first part; `batch_hits`) ------------------------------
-
-## The hit of the shot in `slot` on target `t` at `at`, into the step's batch: what it does to the
-## shot (a pierce, a stick) is done now, as for a hit sent at once, but a shot it spends goes on to
-## the batch's end (F_BATCH_END) and sends nothing yet.
-func _batch_hit(slot: int, t: int, at: Vector2) -> void:
-	var node: Node2D = _targets[t]
-	var heading: Vector2 = _hit_heading(slot, t, at)
-	var b: HitBatch = hit_batch
-	var i: int = b.add()
-	b.caster[i] = _actor[slot]
-	b.target[i] = node
-	b.target_index[i] = t
-	b.target_key[i] = _target_key[t]
-	b.point[i] = at
-	b.heading[i] = heading
-	b.tag[i] = _tag[slot]
-	b.shot[i] = slot
-	b.seq[i] = _seq[slot]
-	b.form[i] = _form_of(slot)
-	b.body[i] = _kind_of(slot)
-	b.core[i] = _core[slot]
-	b.look[i] = _look[slot]
-	b.pierce_before[i] = _pierce[slot]
-	b.life_before[i] = _life[slot]
-	b.stick_before[i] = _stick[slot]
-	b.path_from[i] = _cand_from
-	if _stick[slot] > 0.0:
-		_stick_to(slot, node, at, heading)
-		b.did[i] = HitBatch.SHOT_STUCK
-	elif _pierce[slot] > 0:
-		_pierce[slot] -= 1
-		_remember(slot, t)
-		b.did[i] = HitBatch.SHOT_PIERCED
-	else:
-		_flags[slot] |= F_BATCH_END
-		_hold_slot(slot)
-		b.did[i] = HitBatch.SHOT_SPENT
-
-
-## Keep `slot` from new shots until the batch is done.
-func _hold_slot(slot: int) -> void:
-	if _held_count == _held_slots.size():
-		_held_slots.resize(maxi(64, _held_count * 2))
-	_held_slots[_held_count] = slot
-	_held_count += 1
-
-
-## Give back the place `_hold_slot` kept for `slot` (its spending hit was lost: it lives on).
-func _unhold_slot(slot: int) -> void:
-	for k in _held_count:
-		if _held_slots[k] == slot:
-			for m in range(k, _held_count - 1):
-				_held_slots[m] = _held_slots[m + 1]
-			_held_count -= 1
-			return
-
-
-## Send the step's batch, phase by phase, and settle its shots between the damage and the cards:
-## the spent ones end, and one with a lost hit goes on as if that hit never was. The slots that end
-## meanwhile take no new shot until it is done.
-func _resolve_batch() -> void:
-	var b: HitBatch = hit_batch
-	if events != null:
-		_send_phase(HitBatch.PHASE_PRE)
-		_send_phase(HitBatch.PHASE_COMBAT)
-	_settle_batch()
-	if events != null:
-		_send_phase(HitBatch.PHASE_SPELLS)
-	for k in _batch_ended_count:
-		shot_ended.emit(_batch_ended[k])
-	_batch_ended_count = 0
-	_release_held()
-	b.clear()
-
-
-## The slots held while the batch was filled and resolved go to the free list, in the order they ended.
-func _release_held() -> void:
-	_holding = false
-	for k in _held_count:
-		_free_slots[_free_count] = _held_slots[k]
-		_free_count += 1
-	_held_count = 0
-
-
-func _send_phase(phase: int) -> void:
-	var b: HitBatch = hit_batch
-	b.phase = phase
-	b.current = -1
-	events.projectile_hits.emit(b, phase)
-	b.phase = -1
-	_event_slot = -1
-	impact_form = &""
-	impact_body = 0
-	impact_core = Color.WHITE
-	impact_look = 0
-	impact_tag = 0
-
-
-## A listener of `Events.projectile_hits` takes hit `i` of the batch: false when it is lost (an
-## earlier hit removed its body), else true, and while the listener handles it the manager tells
-## what it tells while a hit is sent (`impact_*`, the shot's slot for `get_*_of`).
-func batch_turn(i: int) -> bool:
-	var b: HitBatch = hit_batch
-	b.current = i
-	if b.lost[i] != 0 or not is_instance_valid(b.target[i]):
-		return false
-	_event_slot = b.shot[i]
-	impact_form = b.form[i]
-	impact_body = b.body[i]
-	impact_core = b.core[i]
-	impact_look = b.look[i]
-	impact_tag = b.tag[i]
-	return true
-
-
-## After the batch's damage: each shot with hits in it (a run of hits, in a row), unless something
-## ended it meanwhile.
-func _settle_batch() -> void:
-	var b: HitBatch = hit_batch
-	# Removed bodies no longer lose hits: their damage is done.
-	b.current = b.count
-	var i: int = 0
-	while i < b.count:
-		var slot: int = b.shot[i]
-		var j: int = i + 1
-		while j < b.count and b.shot[j] == slot and b.seq[j] == b.seq[i]:
-			j += 1
-		if _alive[slot] != 0 and _seq[slot] == b.seq[i]:
-			_settle_shot(i, j)
-		i = j
-
-
-## The hits `first` to `end - 1` of the batch are all of one shot's this step. With none lost, a
-## shot the last one spent ends now. With some lost, the shot goes on as if those never were (its
-## pierce back, unstuck, its life back), remembering the bodies it did hit, and is tested again at
-## the next step from where its path began (as a deferred shot, F_DEFERRED), so it hits what was
-## behind the body that died.
-func _settle_shot(first: int, end: int) -> void:
-	var b: HitBatch = hit_batch
-	var slot: int = b.shot[first]
-	var last: int = end - 1
-	var valid: int = 0
-	for k in range(first, end):
-		if b.lost[k] == 0:
-			valid += 1
-	if valid == end - first:
-		if b.did[last] == HitBatch.SHOT_SPENT:
-			_end_tail(slot, b.point[last])
-			_kill(slot, false)
-			if b.tag[last] != 0:
-				if _batch_ended_count == _batch_ended.size():
-					_batch_ended.resize(maxi(64, _batch_ended_count * 2))
-				_batch_ended[_batch_ended_count] = b.tag[last]
-				_batch_ended_count += 1
-		return
-	if b.did[last] == HitBatch.SHOT_SPENT:
-		_flags[slot] &= ~F_BATCH_END
-		_unhold_slot(slot)
-	if b.did[first] == HitBatch.SHOT_STUCK:
-		# (A hit that sticks is its shot's only hit in a step.)
-		_flags[slot] &= ~F_STUCK
-		_stuck_to[slot] = null
-		_life[slot] = b.life_before[first]
-		_stick[slot] = b.stick_before[first]
-		_leave(slot, B_STUCK)
-	else:
-		_pierce[slot] = b.pierce_before[first] - valid
-		if b.did[last] == HitBatch.SHOT_SPENT and b.lost[last] == 0:
-			_remember(slot, b.target_index[last])
-	_untested[slot] = b.path_from[first]
-	_flags[slot] |= F_DEFERRED

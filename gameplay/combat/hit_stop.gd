@@ -148,11 +148,6 @@ func impact(caster: int, form: StringName) -> void:
 		cue(id, caster)
 
 
-## The card `form`'s impact cue (what `impact` plays), &"" for none: a batch of hits asks once a card.
-func impact_cue(form: StringName) -> StringName:
-	return _form_cue(form, 0)
-
-
 func _freeze(shot: int, seconds: float) -> void:
 	if projectiles != null:
 		projectiles.freeze_shot(shot, seconds)

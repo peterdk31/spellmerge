@@ -43,7 +43,6 @@ const EVENTS: Dictionary = {
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_hit": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"projectile_impact": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"projectile_hits": [["batch", TYPE_OBJECT], ["phase", TYPE_INT]],
 	&"projectile_expired": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"form_shown": [["caster", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
 	&"carrier_ended": [["caster", TYPE_INT], ["form", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["size", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
@@ -125,8 +124,6 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	# A batch of many casters' hits (each hit names its own).
-	&"projectile_hits",
 	&"run_started", &"run_ended", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"horde_started", &"horde_ended", &"horde_status", &"horde_break_changed", &"horde_over",

@@ -107,7 +107,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
 - [x] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3. Done (#623).
 - [ ] **Shot scale: cheaper hits (H3).** (`gameplay/combat/`, `gameplay/feel/`, `core/spells/`) H3, one PR per listener, biggest first by H0. After N3.
-- [ ] **Shot scale: bundled hit events (H3b).** (`core/events/`, `core/projectiles/`, `gameplay/combat/`, `core/spells/`, `gameplay/feel/`, tests) H3b, only if H3 leaves the hits as the largest part of a step. After H3; touches the projectile manager, so it waits for the projectiles lane's PR of the moment.
+- [x] ~~**Shot scale: bundled hit events (H3b).**~~ Dropped 2026-11-07 by the owner after its first two parts were measured on a branch: about 10-15% of a hit's cost for a second hit path every feature would have to know (DECISIONS 2026-11-07). Speed work on hits goes into each listener (H3) and the caps (H7).
 - [ ] **Shot scale: caps (H7).** Projectiles lane. (`core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS) H7: defaults as session rules (T4). After N11.
 - [ ] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4, N5, N6 and N7b.
 - [ ] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N8 and N11.

@@ -215,7 +215,19 @@ func shot_blocked(shot: int, at: Vector2) -> void:
 ## The cue parts the spectacle plays (`CueBase.PART_TYPES`), for Feel's table: part type -> a
 ## Callable taking the part and the cue's `CueContext`.
 func cue_parts() -> Dictionary:
-	return {&"motes": [play_motes_part, prepare_motes_part], &"mark": [play_mark_part], &"light": [play_light_part], &"stream": [play_stream_part, prepare_stream_part]}
+	return {&"motes": [play_motes_part, prepare_motes_part, motes_need_spray], &"mark": [play_mark_part], &"light": [play_light_part], &"stream": [play_stream_part, prepare_stream_part]}
+
+
+## Whether the motes part `part` shows only for a hit whose motes spray (an `often` part, a hit's
+## sparks: `play_motes_part`), for Feel's `add_cue_part`.
+static func motes_need_spray(part: MotesPart) -> bool:
+	return part.often
+
+
+## Whether the hit framed now (`begin_hit`, `hold_hit`) is one whose motes do not spray: its `often`
+## parts show nothing. False with no hit framed (a part then rolls a hit of its own).
+func hit_unsprayed() -> bool:
+	return _hit_held and not _hit_on
 
 
 # --- Where motes come from (Feel calls these, in the order it draws) ------------------------

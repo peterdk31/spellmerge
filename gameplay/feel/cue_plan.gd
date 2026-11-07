@@ -71,10 +71,20 @@ var lights: bool = false
 var every: float = 0.0
 var color: Color = Color(0.0, 0.0, 0.0, 0.0)
 var power: float = 1.0
+## What it shows when played as a hit's look (`Feel.play_cue` while a hit is shown): a hit past the
+## frame's share of hit flashes skips every flash, and one whose motes do not spray skips every part
+## its type says needs a spray (`Feel.add_cue_part`'s `needs_spray`), so a cue of only those parts
+## shows nothing for such a hit and Feel does not play it. `shows_always`: a part that plays whatever
+## the hit (a mark, a light, an unknown part, counted when played); `has_flashes`, `has_spray_parts`:
+## which of the two gates it has.
+var shows_always: bool = false
+var has_flashes: bool = false
+var has_spray_parts: bool = false
 
 
-## The plan of `cue` with the players `types` (part type -> [player, prepare], `prepare` an empty
-## Callable for a type whose player takes the part itself).
+## The plan of `cue` with the players `types` (part type -> [player, prepare, needs_spray], `prepare`
+## an empty Callable for a type whose player takes the part itself, `needs_spray` one for a type
+## whose parts all play whatever the hit).
 static func make(of: CueBase, types: Dictionary) -> RefCounted:
 	var plan: RefCounted = new()
 	plan.cue = of
@@ -83,6 +93,7 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 		var row: Variant = types.get(type)
 		if row == null:
 			plan.unknown.append(type)
+			plan.shows_always = true
 			continue
 		var prepare: Callable = (row as Array)[1]
 		var made: Variant = prepare.call(part) if prepare.is_valid() else part
@@ -91,6 +102,13 @@ static func make(of: CueBase, types: Dictionary) -> RefCounted:
 			continue
 		plan.players.append((row as Array)[0] as Callable)
 		plan.prepared.append(made)
+		var needs_spray: Callable = (row as Array)[2]
+		if made is Flash:
+			plan.has_flashes = true
+		elif needs_spray.is_valid() and needs_spray.call(made):
+			plan.has_spray_parts = true
+		else:
+			plan.shows_always = true
 	plan.color = of.color
 	plan.power = of.power
 	plan.holds = of.hold > 0.0 or of.hold_target > 0.0

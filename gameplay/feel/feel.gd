@@ -98,6 +98,7 @@ const SpectacleScript := preload("res://gameplay/feel/spectacle.gd")
 const LanesScript := preload("res://gameplay/feel/lanes.gd")
 const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
+const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -536,6 +537,11 @@ var _impact_frame: int = -1
 ## impact, `Spectacle.begin_hit`): the damage's spray follows the same roll.
 var _impact_tag: int = 0
 var _impact_shown: bool = false
+## Whether that hit shows its look (`_body_looks`: a few hits of a staff on a body a frame); its damage
+## follows the same answer.
+var _impact_looked: bool = true
+## The hit looks each body showed this frame, per staff (`body_looks.gd`).
+var _body_looks: BodyLooksScript = BodyLooksScript.new()
 ## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
 ## wizard hit themselves. `damage_dealt` follows at once, or the record is stale.
 var _kind_target: int = 0
@@ -605,7 +611,7 @@ func _ready() -> void:
 	var parts: Dictionary = _spectacle.cue_parts()
 	for type: StringName in parts:
 		var row: Array = parts[type] as Array
-		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable())
+		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable(), row[2] as Callable if row.size() > 2 else Callable())
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -685,6 +691,7 @@ func _process(delta: float) -> void:
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
 func step(real_delta: float) -> void:
 	_steps += 1
+	_body_looks.new_frame()
 	_hit_slot = -1
 	_hit_voice = -1
 	_clock += real_delta
@@ -878,6 +885,11 @@ func trauma() -> float:
 
 
 func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector2) -> void:
+	if not _damage_look_shown(target, caster):
+		# Past its body's looks this frame for its staff: no spray, squash, shake or sound.
+		_impact_target = 0
+		_kind_target = 0
+		return
 	var hit_id: int = _actor_of(target)
 	var repeat: bool = _repeat_hit(hit_id, target, caster)
 	if not repeat:
@@ -1234,30 +1246,53 @@ func live_labels() -> int:
 	return count
 
 
-## A shot struck. On a character, remember how, for the damage event that follows at once;
-## on a wall or pillar (`target` is null), show the impact.
+## Whether the hit on `target` by `caster` that `damage_dealt` announces shows its look: as its shot's
+## impact decided (`_impact_looked`), else counted now (`_body_looks`, by the caster's first staff). A
+## hit of no body always shows.
+func _damage_look_shown(target: Node, caster: int) -> bool:
+	if target == null or not is_instance_valid(target):
+		return true
+	var body: int = target.get_instance_id()
+	if body == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
+		return _impact_looked
+	return _body_looks.take(body, SpectacleScript.hit_group(caster, 0))
+
+
+## A shot struck. On a character, remember how, for the damage event that follows at once; a hit
+## past its body's looks this frame for its staff (`_body_looks`) shows nothing, nor does its damage.
+## On a wall or pillar (`target` is null), show the impact.
 func _on_projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
+	var tag: int = projectiles.impact_tag if projectiles != null else 0
+	if target == null:
+		_wall_impact(caster, tag, position, direction)
+		return
+	_impact_target = target.get_instance_id()
+	_impact_caster = caster
+	_impact_frame = Engine.get_physics_frames()
+	_impact_looked = _body_looks.take(_impact_target, SpectacleScript.hit_group(caster, tag))
+	if not _impact_looked:
+		_impact_shown = false
+		return
 	var ramp: int = _ramp_of(caster)
 	# One hit: its motes all spray or none do, by its staff's share of the frame's (`hit_shares.gd`).
-	var tag: int = projectiles.impact_tag if projectiles != null else 0
-	var shown: bool = _spectacle.begin_hit(caster, tag)
-	if target != null:
-		_impact_target = target.get_instance_id()
-		_impact_caster = caster
-		_impact_frame = Engine.get_physics_frames()
-		_impact_at = position
-		_impact_aim = direction
-		_impact_tag = tag
-		_impact_shown = shown
-		# Its cards' motes back along the way it came, in its own ramp.
-		if projectiles != null:
-			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, tag)
-		_hit_flash = true
-		_show_impact(caster, ramp, position, direction)
-		_hit_flash = false
-		_spectacle.end_hit()
-		return
-	# Knocked back off the surface: the shot's own motes and the wall's.
+	_impact_shown = _spectacle.begin_hit(caster, tag)
+	_impact_at = position
+	_impact_aim = direction
+	_impact_tag = tag
+	# Its cards' motes back along the way it came, in its own ramp.
+	if projectiles != null:
+		_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, tag)
+	_hit_flash = true
+	_show_impact(caster, ramp, position, direction)
+	_hit_flash = false
+	_spectacle.end_hit()
+
+
+## A shot of `caster`'s (tagged `tag`) ended on a wall or pillar at `position`, flying `direction`:
+## knocked back off the surface, the shot's own motes and the wall's, and its impact.
+func _wall_impact(caster: int, tag: int, position: Vector2, direction: Vector2) -> void:
+	var ramp: int = _ramp_of(caster)
+	_spectacle.begin_hit(caster, tag)
 	_spectacle.shed_on_wall(ramp, position, -direction)
 	_show_impact(caster, ramp, position, direction)
 	_spectacle.end_hit()
@@ -1358,6 +1393,10 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			return
 	if plan.every > 0.0 and not _cue_due(plan.cue, caster):
 		return
+	if _hit_flash and not (weight and plan.weighted) and _hides_hit(plan):
+		# A hit's look that would show nothing is not played (hundreds of hits a frame in a crowd).
+		_cue_flash = -1
+		return
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	if _cue_depth == _cue_contexts.size():
 		_cue_contexts.append(CueContextScript.new())
@@ -1404,7 +1443,7 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	var table: ActorsScript = _actor_table() if cue.kick_way == &"away" else null
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0):
 		_refresh_camera()
-		_trauma = minf(_trauma + cue.shake * power, 1.0)
+		_shake(cue.shake * power)
 		var way: Vector2 = Vector2.DOWN
 		var kick_way: StringName = cue.kick_way
 		# Back or along its way only when it has one (a cast with no aim kicks nowhere).
@@ -1418,6 +1457,17 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 				way = body.global_position.direction_to(at)
 		_kick = (_kick + way * cue.kick * power).limit_length(MAX_KICK_PIXELS)
 	_play(cue.sound)
+
+
+## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
+## is a flash past the frame's share of hit flashes or a part that needs a spray of a hit whose motes
+## do not spray (`CuePlan.shows_always` and the two gates).
+func _hides_hit(plan: CuePlanScript) -> bool:
+	if plan.shows_always:
+		return false
+	if plan.has_flashes and not _hit_flashes_full():
+		return false
+	return not plan.has_spray_parts or (_spectacle != null and _spectacle.hit_unsprayed())
 
 
 ## Whether the cue `cue` (which has an `every`) may play for `caster` now, and if so, not again for
@@ -1441,10 +1491,14 @@ func _cue_due(cue: CueBase, caster: int) -> bool:
 ## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. With
 ## `prepare` (a Callable taking the part), each part is prepared once when its cue is first played
 ## and `player` takes what it made instead, so a part played often reads no key while it plays
-## (a flash's keys as typed fields: `CuePlan.Flash`). Feel's own flashes are `flash`, the
-## spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
-func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable()) -> void:
-	_cue_parts[type] = [player, prepare]
+## (a flash's keys as typed fields: `CuePlan.Flash`). With `needs_spray` (a Callable taking what
+## `player` takes), the parts it says true for show nothing for a hit whose motes do not spray
+## (`Spectacle.hit_unsprayed`: the spectacle's `often` motes), so a hit's cue of only such parts and
+## flashes is not played at all for a hit that would show none of them (`_hides_hit`). Leave it out
+## for a type whose parts play whatever the hit. Feel's own flashes are `flash`, the spectacle's
+## `motes` and `mark` (`Spectacle.cue_parts`).
+func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable(), needs_spray: Callable = Callable()) -> void:
+	_cue_parts[type] = [player, prepare, needs_spray]
 	_cue_plans.clear()
 
 
@@ -2578,13 +2632,21 @@ func _on_player_downed(player: int) -> void:
 	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
+## Shake the screen by `amount` (trauma, 0 to 1; its pixels are its square times `max_shake_pixels`):
+## it raises the shake to `amount` and never adds to it (owner, 2026-11-07: a storm's hits each adding
+## theirs kept the screen at its most), so a stream of small shakes holds at one's, and a bigger
+## moment (a blast, a swing) still shows bigger.
+func _shake(amount: float) -> void:
+	_trauma = maxf(_trauma, minf(amount, 1.0))
+
+
 ## A hit's shake, looks and sound (its stop is the game's, `HitStop`).
 ## A hit with an `aim` (the way the shot flew) sprays along it, `size` times as big, from `at`,
 ## in the ramp of `tint` (white: `player`'s colours); without one it is a puff at `position`.
 func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
 	if shake_enabled:
 		_refresh_camera()
-		_trauma = minf(_trauma + shake, 1.0)
+		_shake(shake)
 	if position != Vector2.INF:
 		# The cue `hit` (a spray and its sparks along the way the shot flew) or, with no way,
 		# `hit_puff`, `size` steps of HIT_STEP pixels big, in the hit body's colours.

@@ -2,6 +2,18 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-07: Feel: a few hit looks per body a frame, and shake that does not pile up (owner session)
+
+The owner asked whether Feel should bundle per target. Measured: 77-93% of hits land on a body already hit that step. A body now shows the looks of at most three hits of one staff a frame (`gameplay/feel/body_looks.gd`; each staff apart, so a lone cast still shows in a storm), and screen shake raises to a moment's own instead of adding (`Feel._shake`), which the owner found unwatchable in the storm. Feel's hit listeners in the storm from about 36 to 14-16 us a hit, crowd_all 57 to 49 ms a step at 30,000 bolts, the same hits and damage. Tests: test_body_looks.gd, test_feel_repeat_hits.gd (its old "each still sprays" is now three a frame). DECISIONS has the rule.
+
+## 2026-11-07: Shot scale H3, Feel skips a hit's look that shows nothing (owner session)
+
+Past the frame's share of hit flashes and on a hit whose motes do not spray, a hit's cues (its spray, its impact) already drew nothing but still ran their parts to find out. A cue's plan now knows what it can show for such a hit, from each part type's `needs_spray` (`add_cue_part`; the spectacle's `often` motes), and `play_cue` skips it (`_hides_hit`); a part type that says nothing always plays. 76% of a crowd's hit cues are skipped; Feel's two hit listeners about 3.3 us a hit cheaper (crowd_all 62 to 53.5 ms a step at 30,000 bolts), the same hits, damage and drawing. Tests in test_feel_cues.gd; shot-scale.md has the numbers.
+
+## 2026-11-07: Shot scale H3b tried and dropped (owner session)
+
+Built on a branch and measured, never merged: a step's hits as one batch in phases (the retest of a shot whose body died earlier in the batch, so no damage was lost), then Combat's lookups shared across a batch. At 30,000 bolts, with the same hits and damage as one by one, a hit's GDScript went from about 58-63 to 48-49 us: too little for what it asked of every later feature (two paths for hits, phases, a subtle order). The owner dropped it for one event per hit; the code is as before, and DECISIONS (2026-11-07) has the numbers and the rule for later speed work (share work inside a listener's own area, never through a second hit event).
+
 ## 2026-11-05: The trail shader is the head shader (owner session)
 
 Since tails are motes, `shot_trail.gdshader` drew only a shot's core and its light; it is `shot_head.gdshader` now, and the names that said "trail" for the head say so: `HEAD_SHADER`, `head_mesh()`, the flags `HEAD_LIVE`, `HEAD_ORBIT` (the shader's `HF_*`, also in `light.gdshader`), the quad kinds `HEAD_Q_LIGHT`, `HEAD_Q_CORE` (renumbered 0, 1), `HEAD_QUAD_VERTICES`, `HEAD_QUAD_KINDS`; `TRAIL_JUMP` is `TAIL_JUMP` (the native kernel's too); spell light's `ROWS_TRAIL` is `ROWS_SHOT`; the benchmark is `tests/benchmark/shot_gpu.gd` (`BENCH: shot gpu`, `--tail-motes`). Gone: the familiars' shader's `trail_share` uniform (nothing set it). Comments and the spells README no longer describe tails the shader drew. Nothing is drawn differently: every frame of `shot_gpu.gd --frames` is pixel-identical to before. Older entries here and in DECISIONS keep the old names.

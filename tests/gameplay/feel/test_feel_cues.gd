@@ -401,3 +401,67 @@ func test_a_light_part_is_checked() -> void:
 		check(not wrong.problems().is_empty(), "%s is a problem" % [bad])
 	check(not feel.cue_of(&"blast").lights(), "a cue with no light part lights by its flashes")
 	check(feel.has_cue_part(&"light"), "a light part has a player")
+
+
+## A hit's look is not played when it would show nothing (most of a crowd's hits): its flashes past
+## the frame's share of hit flashes and its parts that need a spray on a hit whose motes do not spray.
+## `probe` needs a spray, `steady` plays whatever the hit (as a mark does); each counts its plays.
+func _probe_parts(played: Array[StringName]) -> void:
+	feel.add_cue_part(&"probe", func(_part: Dictionary, _cue: RefCounted) -> void: played.append(&"probe"),
+		Callable(), func(_part: Dictionary) -> bool: return true)
+	feel.add_cue_part(&"steady", func(_part: Dictionary, _cue: RefCounted) -> void: played.append(&"steady"))
+
+
+## Plays `test_cue` as the look of a hit: past the frame's share of hit flashes or not (`full`), its
+## motes sprayed or not (`sprayed`; a framed hit, as Feel's impact and damage frame theirs).
+func _play_as_hit(full: bool, sprayed: bool, hit: bool = true) -> void:
+	feel._flashes_shown = feel.effect_slots if full else 0
+	feel.spectacle().hold_hit(0, 0, sprayed)
+	feel._hit_flash = hit
+	feel.play_cue(&"test_cue", 0, Vector2(100.0, 50.0), Vector2.RIGHT, 20.0)
+	feel._hit_flash = false
+	feel.spectacle().end_hit()
+
+
+func test_a_hit_look_that_shows_nothing_is_not_played() -> void:
+	var played: Array[StringName] = []
+	_probe_parts(played)
+	_made([{"flash": &"spray", "reach": 1.0}, {"part": &"probe"}] as Array[Dictionary])
+	_play_as_hit(true, false)
+	check_equal(played, [] as Array[StringName], "past the share and not sprayed: none of its parts played")
+	check_equal(feel.live_flashes(), 0, "and no flash shown")
+	_play_as_hit(false, false)
+	check_equal(feel.flashes_of(&"spray"), 1, "under the share its flash is shown")
+	check_equal(played, [&"probe"] as Array[StringName], "and the cue played")
+
+
+func test_a_sprayed_hit_plays_its_look_past_the_flash_share() -> void:
+	if feel.motes() == null:
+		return
+	var played: Array[StringName] = []
+	_probe_parts(played)
+	_made([{"flash": &"spray", "reach": 1.0}, {"part": &"probe"}] as Array[Dictionary])
+	_play_as_hit(true, true)
+	check_equal(played, [&"probe"] as Array[StringName], "a sprayed hit past the share plays its parts")
+	check_equal(feel.live_flashes(), 0, "but not its flash")
+
+
+func test_a_part_that_plays_whatever_the_hit_keeps_its_cue() -> void:
+	var played: Array[StringName] = []
+	_probe_parts(played)
+	_made([{"flash": &"spray", "reach": 1.0}, {"part": &"probe"}, {"part": &"steady"}] as Array[Dictionary])
+	_play_as_hit(true, false)
+	check(played.has(&"steady"), "a part with no spray gate (a mark, a light) plays for a hidden hit: %s" % [played])
+
+
+func test_a_weighted_cue_or_one_not_of_a_hit_is_played() -> void:
+	var played: Array[StringName] = []
+	_probe_parts(played)
+	var cue: CueBase = _made([{"part": &"probe"}] as Array[Dictionary])
+	_play_as_hit(true, false, false)
+	check_equal(played, [&"probe"] as Array[StringName], "a cue played as no hit's look is played")
+	played.clear()
+	cue.shake = 0.2
+	feel.forget_cues()
+	_play_as_hit(true, false)
+	check_equal(played, [&"probe"] as Array[StringName], "a cue with weight (its shake) is played for a hidden hit")

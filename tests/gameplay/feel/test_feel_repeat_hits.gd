@@ -65,7 +65,9 @@ func _hit(by: int, target: Node, kind: StringName = &"shot") -> void:
 	bus.damage_dealt.emit(by, target, 5, Vector2(4.0, 0.0))
 
 
-func test_a_repeat_hit_is_not_heard_again_but_still_sprays() -> void:
+## A repeat is not heard again, and a body shows the looks of at most `BodyLooks.PER_BODY` hits of
+## one staff a frame (owner, 2026-11-07); the next frame it shows them again.
+func test_a_repeat_hit_is_not_heard_again_and_a_body_sprays_a_few_a_frame() -> void:
 	var target: Actor = _wizard(1)
 	var by: int = FIRST_WIZARD_ID
 	_hit(by, target)
@@ -75,8 +77,13 @@ func test_a_repeat_hit_is_not_heard_again_but_still_sprays() -> void:
 	for i in 5:
 		_hit(by, target)
 	check_equal(registry.asked.size(), 1, "five more by the same attacker in the same frame are not")
-	check_equal(feel.flashes_of(&"puff") + feel.flashes_of(&"spray"), sprays + 5, "each still sprays")
-	check(feel.trauma() >= shake, "and still shakes")
+	var most: int = FeelScript.BodyLooksScript.PER_BODY
+	check_equal(feel.flashes_of(&"puff") + feel.flashes_of(&"spray"), sprays + most - 1, "of the six, %d spray" % most)
+	check_equal(feel.trauma(), shake, "and the shake does not pile up")
+	feel.step(STEP)
+	var before: int = feel.flashes_of(&"puff") + feel.flashes_of(&"spray")
+	_hit(by, target)
+	check_equal(feel.flashes_of(&"puff") + feel.flashes_of(&"spray"), before + 1, "the next frame the body sprays again")
 
 
 func test_another_attacker_kind_or_step_is_a_hit_of_its_own() -> void:
@@ -114,3 +121,21 @@ func test_the_actor_table_is_kept_while_it_is_there() -> void:
 	root.add_child(auto)
 	root.move_child(auto, index)
 	check(feel._actor_table() == auto, "the autoload once it is back")
+
+
+## Screen shake raises to a moment's own and never adds (owner, 2026-11-07: a storm's hits each
+## adding theirs kept the screen at its most): many hits shake as one, a bigger moment still more.
+func test_shake_does_not_pile_up() -> void:
+	var by: int = FIRST_WIZARD_ID
+	_hit(by, _wizard(1))
+	var one: float = feel.trauma()
+	check(one > 0.0, "a hit shakes")
+	for seat in [2, 3]:
+		for i in 4:
+			_hit(by + seat, _wizard(seat))
+	check_equal(feel.trauma(), one, "hits on other bodies by others in the same frame shake no more than one")
+	feel.play_cue(&"blast", 0, Vector2(50.0, 50.0))
+	var blast: float = feel.trauma()
+	check(blast > one, "a blast shakes more than a hit")
+	feel.play_cue(&"blast", 0, Vector2(60.0, 50.0))
+	check_equal(feel.trauma(), blast, "a second blast in the frame no more than one")

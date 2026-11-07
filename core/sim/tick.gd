@@ -23,7 +23,7 @@ extends Node
 ## **Time:** `step(delta)` keeps its signature everywhere, and the delta is the physics step's: 1/60
 ## of a second (`DT`), except while Feel's stops scale the engine's time (A1; N4 counts them in
 ## ticks). A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes the delta.
-## `count` is the ticks since the game began (N3b starts it again with each run).
+## `count` is the ticks since the run began (`begin_run`), or since the game began before any run.
 ##
 ## No `class_name` (it would hide the autoload): preload it, `const TickScript := preload(...)`, for
 ## `TickScript.DT`.
@@ -36,8 +36,10 @@ const DT: float = 1.0 / 60.0
 const PRIORITY: int = -1000
 ## The services stepped in step 2, in order: their autoload names.
 const SERVICES: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities"]
+## What a run's start makes fresh (`begin_run`), in order: the services, then the horde director.
+const FRESH_AT_RUN: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", &"Horde"]
 
-## Ticks since the game began.
+## Ticks since the run began (or the game, before any run).
 var count: int = 0
 ## Where the areas are found by name. Only tests set this (stand-ins); otherwise the tree's root.
 var areas: Node = null
@@ -79,6 +81,20 @@ func run(delta: float) -> void:
 	if horde != null and _times(horde):
 		horde.call(&"step_timers", delta)
 	count += 1
+
+
+## A run starts (Flow, once the last run's world is gone and before the new one is made;
+## online-ready N3b): the clock counts from 0 again, and every service takes a fresh game's state
+## (its `begin_run`; core/sim/sim_fresh.gd), in the tick's order, then the horde director. So a run
+## plays the same whatever ran before it in this game, and a replay recorded in any run plays the
+## same in any other.
+func begin_run() -> void:
+	count = 0
+	var root: Node = areas if areas != null else get_tree().root
+	for service in FRESH_AT_RUN:
+		var area: Node = root.get_node_or_null(NodePath(service))
+		if area != null and area.has_method(&"begin_run"):
+			area.call(&"begin_run")
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes

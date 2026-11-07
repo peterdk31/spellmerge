@@ -584,6 +584,9 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame"]
+## The session's settings a new run keeps (`begin_run`): the cap, the tailless motes' pool (a dev
+## slider), whether something takes the births, a benchmark's step budget.
+const RUN_KEEPS: Array[StringName] = [&"_cap", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"work_per_step"]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -1761,6 +1764,19 @@ func clear() -> void:
 	_end_count = 0
 	_end_wanted = 0.0
 	# `drawn` stays: the next update_draw() must still empty the batch.
+
+
+## A run starts (`Tick.begin_run`, online-ready N3b): every shot ends (`clear`), and the manager is
+## a fresh one's state (core/sim/sim_fresh.gd): its clock, sequence numbers, groups, grid and every
+## dead slot's leftovers, with this session's settings (RUN_KEEPS, the cap) and the room's bounds.
+func begin_run() -> void:
+	clear()
+	var bounds: Rect2 = _bounds
+	var blank: Object = SimFresh.blank_of(get_script() as Script)
+	blank.call(&"set_cap", _cap)
+	SimFresh.take(self, blank, RUN_KEEPS)
+	blank.free()
+	set_bounds(bounds)
 
 
 ## Live projectiles.

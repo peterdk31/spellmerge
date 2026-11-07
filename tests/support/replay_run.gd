@@ -15,11 +15,10 @@ extends RefCounted
 ##   (their frames dropped; core/sim/frames.gd).
 ##
 ## The ticks are the game's own physics steps. Each run starts from a fresh game (every autoload
-## made again, tests/support/fresh_game.gd) the same number of steps before its start, as a replay
-## is played after the game starts: the services' clocks run from the game's start and their
-## counters carry over from run to run (N3 starts the one clock with the run). What still runs on
-## real time is held to the tick here, as the plan leaves it to N4: Feel's stops (its clock is real
-## time) are frozen. In an exported game Flow's loading screen and intro are off too, so a run
+## made again, tests/support/fresh_game.gd), or, with `fresh_game` off, in the same game after
+## whatever ran before: a run starts from a fresh game's state either way (`Tick.begin_run`,
+## online-ready N3b), which the replay test proves. What still runs on real time is held to the
+## tick here, as the plan leaves it to N4: Feel's stops (its clock is real time) are frozen. In an exported game Flow's loading screen and intro are off too, so a run
 ## starts on the tick it is asked for, as under a test script.
 ##
 ##     var run := ReplayRun.new(tree)
@@ -53,6 +52,10 @@ var horde_web: int = -1
 var run_seed: int = 0
 ## What went wrong on the way, in words (empty when all went as asked).
 var problems: PackedStringArray = PackedStringArray()
+## True: each run starts from a fresh game (every autoload made again). False: in the same game,
+## after whatever ran before, as a player starts one run after another (N3b: the run starts from
+## a fresh game's state all the same).
+var fresh_game: bool = true
 
 var _tree: SceneTree
 var _root: Window
@@ -98,8 +101,7 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 	for at in scripted:
 		_input.call("add_virtual_device", bots + at)
 		_frames.call("set_source", bots + at, Scripted.new())
-	# As many physics steps from the fresh game to the run's start as `play` takes: the services'
-	# clocks run from the game's start, not the run's (N3 starts the one clock with the run).
+	# One physics step after the game is fresh, as `play` takes.
 	await _tree.physics_frame
 	# At the start of a physics step, before the tick: the run starts and its first tick is this step's.
 	var replay: Replay = _frames.call("record", start, 0, run_seed)
@@ -151,7 +153,8 @@ static func has_command(replay: Replay) -> bool:
 	return false
 
 
-## Whatever runs stops, and the game starts afresh.
+## Whatever runs stops, and the game starts afresh (with `fresh_game`; else it goes on in the same
+## game, idle).
 func fresh() -> void:
 	_frames.call("stop_recording")
 	_frames.call("stop_playing")
@@ -161,7 +164,8 @@ func fresh() -> void:
 		_input.call("leave", seat)
 	await _tree.process_frame
 	await _tree.process_frame
-	FreshGame.restart(_root)
+	if fresh_game:
+		FreshGame.restart(_root)
 	_find()
 	await _tree.physics_frame
 

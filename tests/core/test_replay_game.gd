@@ -10,7 +10,7 @@ extends "res://tests/support/suite.gd"
 ## tests/support/replay_run.gd, which the platform runner (N2b) shares.
 ##
 ## Each run takes seconds: the runner plays them in processes of their own (tests/support/suite.gd):
-# unit-test-shards: 4
+# unit-test-shards: 6
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
 
@@ -39,6 +39,67 @@ func test_a_wave_of_bots_replays_tick_for_tick() -> void:
 
 func test_a_horde_run_of_a_bot_replays_tick_for_tick() -> void:
 	await _check_replay(&"horde_requested", 1, 0)
+
+
+## A run starts from a fresh game's state (online-ready N3b): a replay recorded in a fresh game
+## plays the same after other runs in the same game, and a run recorded after other runs plays the
+## same as the one recorded fresh (the same frames and seed). The other runs between use what the
+## run does not (a horde's swarm and director, a wave's AI), and every service's clocks, counters,
+## pools and slots. Without `Tick.begin_run` the runs part at tick 0.
+func test_a_sandbox_replay_plays_the_same_after_other_runs() -> void:
+	await _check_after_other_runs(&"sandbox_requested", 0, 1, [&"horde_requested", &"play_requested"])
+
+
+func test_a_horde_replay_plays_the_same_after_other_runs() -> void:
+	await _check_after_other_runs(&"horde_requested", 1, 0, [&"sandbox_requested", &"horde_requested"])
+
+
+## The run started by `start` with `bots` bots and `scripted` scripted players, recorded fresh,
+## played after `others[0]`, and recorded again after `others[1]`: all three agree at every tick.
+func _check_after_other_runs(start: StringName, bots: int, scripted: int, others: Array[StringName]) -> void:
+	var runs: Array[Desync] = await _after_other_runs(start, bots, scripted, others, -1)
+	for problem in _run.problems:
+		check(false, problem)
+	check_equal(runs[1].hashes.size(), TICKS, "%s: the replay after other runs played every tick" % start)
+	var what: Array[String] = ["", "a replay played after other runs plays as recorded", "a run recorded after other runs plays as one recorded fresh"]
+	for at in [1, 2]:
+		var tick: int = Desync.first_parting(runs[0], runs[at])
+		if tick < 0:
+			continue
+		# Again, keeping the parting tick's leaves, so the report names the members.
+		var again: Array[Desync] = await _after_other_runs(start, bots, scripted, others, tick)
+		check_equal(Desync.compare(again[0], again[at]), "", "%s: %s" % [start, what[at]])
+
+
+## The run recorded in a fresh game; the first other run; its replay played in the same game (its
+## bots watching); the second other run; the run recorded again in the same game. The hashes of the
+## first, the replay and the last, keeping tick `keep`'s leaves.
+func _after_other_runs(start: StringName, bots: int, scripted: int, others: Array[StringName], keep: int) -> Array[Desync]:
+	_run.run_seed = 0x5eed
+	_run.fresh_game = true
+	var fresh := Desync.new(keep)
+	var replay: Replay = await _run.record(start, bots, scripted, fresh)
+	_run.fresh_game = false
+	await _other_run(others[0])
+	var played := Desync.new(keep)
+	if replay != null:
+		await _run.play(replay, bots, played)
+	await _other_run(others[1])
+	var late := Desync.new(keep)
+	await _run.record(start, bots, scripted, late)
+	_run.fresh_game = true
+	return [fresh, played, late]
+
+
+## A run of two fighter bots started by `start`, half as long, for its leftovers only (its own
+## seed: another game than the one replayed).
+func _other_run(start: StringName) -> void:
+	var seed_before: int = _run.run_seed
+	_run.run_seed = 0x0dd
+	_run.ticks = TICKS / 2
+	await _run.record(start, 2, 0, Desync.new())
+	_run.ticks = TICKS
+	_run.run_seed = seed_before
 
 
 ## A replay of other content is not played.

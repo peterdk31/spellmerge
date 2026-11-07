@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; N2 the one input path (input frames, the frames service, replays); N3a the one clock (the Tick); a run's start from a fresh state, the `sim` service and snapshots come in later parts (N3b, N3c, N10).
+The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; N2 the one input path (input frames, the frames service, replays); N3a the one clock (the Tick); N3b a run's start from a fresh game's state; the `sim` service and snapshots come in later parts (N3c, N10).
 
 ## The simulation folders
 
@@ -46,6 +46,13 @@ Every script in these folders, and every inner class of one, is a **simulation s
 - **Time:** every step gets the physics step's delta, `Tick.DT` (1/60 s; `tests/core/test_tick.gd`), except while Feel's stops scale the engine's time (A1, N4). A slow frame runs up to `max_physics_steps_per_frame` ticks, each of `DT`.
 - **Nothing in the simulation reads the camera.** The camera eases as it is drawn, on real time; Coop works out the view it is fitted to on the tick and sends it (`view_fitted`), and the horde spawns outside that.
 
+## A run's start (N3b)
+
+- **Every run starts from a fresh game's state.** When a run starts (Flow's `start_run`, once the last run's world is gone and before the new one is made), `Tick.begin_run` counts the clock from 0 again and makes each service fresh, then the horde director (`Tick.FRESH_AT_RUN`): each area's `begin_run` ends what it holds (`clear`) and takes every state member from a blank of its own script (`sim_fresh.gd`, `SimFresh.take`). So its clocks, counters, free lists, pools and the leftovers of its dead slots are a fresh game's, a run plays the same whatever ran before it in the game, and a replay recorded in any run plays the same in any other (`tests/core/test_replay_game.gd`, "after other runs").
+- **By construction, not by a list.** `SimFresh` resets what `StateWalk` walks (state and REFS; DERIVED and VIEW stay), so a member added later is reset too. An object the area keeps (a carrier, the AI board every brain shares) stays the same object and takes the blank's members in turn; what the blank shares the area shares the same way (`Spells._ray` is the first of `_rays` again); a node is never taken from the blank. A blank deals the run no seeds (`SimFresh.blank_of`, `SimSeed.aside`).
+- **Settings stay.** What is the session's, not the run's (the shot cap, a dev slider, a benchmark's budget, the horde's curve), an area lists in `const RUN_KEEPS: Array[StringName]`. A cache that would carry a run's answer into the next (a compiled staff outlives a run) is DERIVED.
+- **Feel**, which is view, still decides some holds on real time until N4 (A1): its rests and repeats start again at `room_entered`.
+
 ## Input (N2)
 
 - **One input path.** The simulation takes input from `InputFrame`s only (`input_frame.gd`): one seat's input for one tick, its move (a signed byte per axis), its aim (a 16-bit angle, or keep), the staff buttons held and pressed, captured (an overlay of the seat is open), and the tick's commands. A seat's `PlayerController` builds its actor's intent from its frame; nothing in the simulation reads a device, the mouse or the camera. Devices (`LocalInput`, core/input), bots (`FrameSource`, `frame_source.gd`), replays and later the network all produce frames.
@@ -53,7 +60,7 @@ Every script in these folders, and every inner class of one, is a **simulation s
 - **Commands at the tick's start.** The HUD's requests the simulation hears (`InputFrame.COMMAND_NAMES`) are commands: the bus hands each to the frames service (`Events.command_sink`), which puts it into its seat's next frame and applies it when that tick starts (`Events.apply_command`); the simulation hears them through `Events.listen`, never by connecting to the signal. A frame speaks for its own seat only (the seat is not in the command). A device's join and leave are in the frame too (JOIN, LEAVE): they happen as the device joins (Flow and Coop read the joined seats at a run's start), and a replay played joins and leaves its seats at their tick. The requests that start a run (`play_requested`, `sandbox_requested`, `horde_requested`) are not commands: they are a replay's start.
 - **The bytes** (`InputFrame.to_bytes`, `Replay.to_bytes`) have strict decoders: every size and value is checked, an id is letters, digits and `_` only (never a path), nothing is left over, no `bytes_to_var`; a bad frame or file is rejected whole and says why (`decode`).
 - **Replays** (`replay.gd`): a run's build, content (a hash of every content id), seed, start (the request and the seat) and seats, then every tick's frames, inputs only. `Frames.record(start, starter, run_seed)` starts a run and records it (a random seed when `run_seed` is 0); `Frames.play(replay)` joins its seats, starts its run the same way and feeds its frames until they run out (live input and commands are dropped meanwhile). Each tick says whether the game stood paused: a paused tick plays while the game stands paused (the horde's level-up break), a pause of the recording's own (the pause menu) is skipped through at once with its commands, and a pause while playing holds the replay (N4 makes a stop part of the state). Files live in `user://replays/` only (`save(name)`, `open(name)`). While one records or plays, the seeds nobody chose are dealt from its seed (`SimSeed.begin`), and the horde director and the swarm take a new one at each run's start.
-- **What a replay does not hold yet.** The services' clocks run from the game's start and their counters carry over from run to run (`sim_time`, Spells' clock, Combat's steps, the AI board's clock, the shots' sequence), so a replay plays the same only from a fresh game, the same number of ticks after the start: N3b starts every run from a fresh game's state. Feel's real-time stops (A1, N4) still run on real time; `tests/core/test_replay_game.gd` freezes them. A bot reads the game through queries that fill the services' caches, and those count as state (the projectile manager's threat grid and target table), so a bot's run replays exactly with the bot watching again (a source set while a replay plays is asked each tick and its frame dropped); a person's input reads nothing of the game but where the hand is. Shots keep homing targets and skips by instance id (`_home_target`, `_skip_id`, A5): a run with homing parts until N5.
+- **What a replay does not hold yet.** Feel's real-time stops (A1, N4) still run on real time; `tests/core/test_replay_game.gd` freezes them. A bot reads the game through queries that fill the services' caches, and those count as state (the projectile manager's threat grid and target table), so a bot's run replays exactly with the bot watching again (a source set while a replay plays is asked each tick and its frame dropped); a person's input reads nothing of the game but where the hand is. Shots keep homing targets and skips by instance id (`_home_target`, `_skip_id`, A5): a run with homing parts until N5.
 
 ## Allowed files
 
@@ -70,6 +77,7 @@ A new member of a simulation script, by what it holds:
 | a cache, scratch refilled within a step, an instance id, a switch that gives the same game either way | `DERIVED` | `Spells._zap_near`, `Combat._row_by_node`, `ProjectileManager.native` |
 | another body the game would miss if it were lost | `REFS` | `AIBrain.target`, `ProjectileManager._stuck_to` |
 | what only the drawing reads and writes | `VIEW` | `ProjectileManager._drawn_seq`, `Actor._looks` |
+| a setting of the session a new run keeps (in an area with `begin_run`) | `RUN_KEEPS` (and state or DERIVED as above) | `ProjectileManager._cap`, `Horde.curve` |
 
 And around it:
 - A `static var`: `DERIVED` (a cache, a test switch); it never holds state.
@@ -88,7 +96,8 @@ The tests say what is missed: `tests/core/test_state_declared.gd` from the types
 ```sh
 tools/check.sh
 ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_state_walked, test_determinism,
-                                    # test_input_frame, test_frames, test_replay, test_replay_game
+                                    # test_input_frame, test_frames, test_replay, test_replay_game,
+                                    # test_tick, test_sim_fresh
 ```
 
 ## Review questions
@@ -96,3 +105,4 @@ ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test
 - Is every name in DERIVED really rebuilt or set up again, not state that would be lost? A body the game would miss goes in REFS.
 - Does a new scene in `tests/core/sim_scenes.gd` play the same twice?
 - Does any simulation code read a device, the mouse or the camera, or connect to a command's signal instead of `Events.listen`?
+- Is a new area that keeps state between runs made fresh at a run's start (`begin_run`, in `Tick.FRESH_AT_RUN`), and is each name in its `RUN_KEEPS` a setting, not the run's state?

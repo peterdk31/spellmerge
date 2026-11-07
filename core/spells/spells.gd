@@ -203,6 +203,8 @@ const REFUSED: float = -1.0
 const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
+## The session's settings a new run keeps (`begin_run`): a benchmark's fire budget.
+const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 
 ## The shots one budget's trigger fires may make in one step (`SpellLimits.FIRE_SHOTS_PER_STEP`
 ## unless a benchmark sets another); a fire past it waits for the next step.
@@ -2995,6 +2997,16 @@ static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
 	onto.later_status_ids.append(id)
 	onto.later_status_durations.append(duration)
 	onto.later_status_strengths.append(strength)
+
+
+## A run starts (`Tick.begin_run`, online-ready N3b): everything `clear` forgets, then a fresh
+## runtime's state (core/sim/sim_fresh.gd): its clock, record sequence numbers, pools, staffs, poses
+## and carriers, the same objects, with this session's settings (RUN_KEEPS).
+func begin_run() -> void:
+	clear()
+	var blank: Object = SimFresh.blank_of(get_script() as Script)
+	SimFresh.take(self, blank, RUN_KEEPS)
+	blank.free()
 
 
 ## Forgets every registered spell and shot count (a new run, and tests).

@@ -163,6 +163,8 @@ signal stepping()
 const DERIVED: Array[StringName] = [&"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_nodes"]
+## The session's settings a new run keeps (`begin_run`): the reaction table.
+const RUN_KEEPS: Array[StringName] = [&"reactions"]
 
 ## The event bus, the projectile manager and the registry. Only tests set these, before
 ## adding the node; otherwise the "Events", "Projectiles" and "Registry" autoloads are used.
@@ -371,6 +373,22 @@ func setup() -> void:
 		events.pull_requested.connect(_on_pull_requested)
 	if not events.status_requested.is_connected(_on_status_requested):
 		events.status_requested.connect(_on_status_requested)
+
+
+## A run starts (`Tick.begin_run`, online-ready N3b): any body still registered leaves, and Combat
+## is a fresh one's state (core/sim/sim_fresh.gd): its step count, rows, pools and scratch, with
+## the session's reaction table (RUN_KEEPS).
+func begin_run() -> void:
+	for row in _nodes.size():
+		var node: Variant = _nodes[row]
+		if node != null and is_instance_valid(node):
+			unregister_actor(node)
+	var blank: Object = SimFresh.blank_of(get_script() as Script)
+	SimFresh.take(self, blank, RUN_KEEPS)
+	blank.free()
+	# Its caches by node follow the rows, which are all free now.
+	_row_by_node.clear()
+	_node_id.fill(0)
 
 
 # --- Bodies ------------------------------------------------------------------

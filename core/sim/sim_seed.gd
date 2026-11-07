@@ -40,6 +40,19 @@ static func end() -> void:
 	_run = null
 
 
+## Set the run's dealer aside (returned; null when none deals) while something that is not the game
+## takes seeds (a blank, `SimFresh.blank_of`): they come from the engine's generator, and the
+## run's seeds are dealt as if it had taken none. `back` puts the dealer back.
+static func aside() -> RandomNumberGenerator:
+	var dealer: RandomNumberGenerator = _run
+	_run = null
+	return dealer
+
+
+static func back(dealer: RandomNumberGenerator) -> void:
+	_run = dealer
+
+
 ## True while the seeds are dealt from a run's seed.
 static func is_dealing() -> bool:
 	return _run != null

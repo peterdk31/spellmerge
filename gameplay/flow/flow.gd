@@ -406,9 +406,15 @@ func start_run(requester: int) -> bool:
 	_room = room
 	_enemy_data = enemy_data
 	_wizard_scene = wizard_scene
-	if projectiles != null:
-		projectiles.clear()
-	spells.clear()
+	# The run starts from a fresh game's state (online-ready N3b): the one clock from 0, and every
+	# service as a fresh one's (`Tick.begin_run`). Without the Tick (a test's own tree), the old clears.
+	var tick: Node = get_node_or_null(^"/root/Tick")
+	if tick != null:
+		tick.call(&"begin_run")
+	else:
+		if projectiles != null:
+			projectiles.clear()
+		spells.clear()
 	var layout: Node = room.scene.instantiate()
 	var size: Vector2 = room_size(room, layout)
 	if projectiles != null:

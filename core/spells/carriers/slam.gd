@@ -261,7 +261,7 @@ func end_of(tag: int) -> void:
 ## Every slam gone at once, quietly (`Spells.clear`).
 ## The swarm promoted a body (`Carrier.replace_body`): a ring that struck `old` has struck `new`.
 func replace_body(old: Node, new: Node) -> void:
-	_replace_in_rows(old, new, _sl_struck, _sl_prev)
+	_replace_in_rows(old, new, _sl_struck)
 
 
 func clear() -> void:

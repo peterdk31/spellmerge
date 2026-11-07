@@ -321,3 +321,36 @@ func test_teams_is_team_of_for_every_id() -> void:
 	_actors.close(ids[1])
 	check_equal(teams[ids[0]], ActorsScript.TEAM_WIZARDS, "the table's own array: a later change shows in it")
 	check_equal(teams[ids[1]], ActorsScript.NONE, "and a close")
+
+
+## An actor's key (online-ready N5) is its id and its birth: the same in every run that opens the
+## same ids in the same order, never 0, and another key for an id opened again (a new body), so a
+## shot homing on an actor that died never follows the next actor given its id.
+func test_a_key_names_the_actor_and_an_id_opened_again_is_another() -> void:
+	var ids: Array[int] = _open_enemies(3)
+	var first: int = _actors.key_of(ids[1])
+	check(first != 0, "an open actor has a key")
+	check(first != _actors.key_of(ids[0]) and first != _actors.key_of(ids[2]), "each its own")
+	check_equal(_actors.id_of_key(first), ids[1], "the key finds the actor")
+	_actors.close(ids[1])
+	check_equal(_actors.key_of(ids[1]), 0, "a closed id has no key")
+	check_equal(_actors.id_of_key(first), ActorsScript.NONE, "and its old key finds nobody")
+	check_equal(_actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY), ids[1], "the id is handed out again")
+	var again: int = _actors.key_of(ids[1])
+	check(again != 0 and again != first, "under another key")
+	check_equal(_actors.id_of_key(first), ActorsScript.NONE, "the old key still finds nobody")
+	check_equal(_actors.id_of_key(again), ids[1], "the new one finds it")
+	check_equal(_actors.id_of_key(0), ActorsScript.NONE, "0 is no key")
+
+
+## A run's start (`begin_run`) counts the births from 0 again, so a run's keys are a fresh game's
+## whatever ran before; with an actor still open it keeps counting (and says so).
+func test_a_runs_start_counts_the_births_again() -> void:
+	var fresh := own(ActorsScript.new()) as ActorsScript
+	var fresh_id: int = fresh.open(ActorsScript.TEAM_WIZARDS, 0, 0)
+	for id in _open_enemies(5):
+		_actors.close(id)
+	_actors.begin_run()
+	var id: int = _actors.open(ActorsScript.TEAM_WIZARDS, 0, 0)
+	check_equal(id, fresh_id, "the same id")
+	check_equal(_actors.key_of(id), fresh.key_of(fresh_id), "and the same key as a fresh game's")

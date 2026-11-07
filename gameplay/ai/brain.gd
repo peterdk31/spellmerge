@@ -90,12 +90,14 @@ const LANE_MARGIN: float = 10.0
 const REACTION_JITTER: float = 0.2
 ## Spreading round a target: the most it turns round the target toward its slot in one plan, and
 ## the bonus Fight gets alone on a target (times teamwork, shared by its attackers).
+## The target key of a body that is no open actor (a test's plain node): a target, of no identity.
+const NO_KEY: int = -1
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
 ## Entities' (hashed there), handed over by the controller.
-const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_target_id"]
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor"]
 
@@ -184,7 +186,8 @@ var _looked: bool = false
 var _decide_now: bool = true
 var _tapped: bool = false
 var _strafe_side: float = 1.0
-## Instance id of `target` when it was chosen, or 0 for none; `target` typed when an actor.
+## The key of `target` when it was chosen (`Actors.key_of`, N5; NO_KEY for a body of no actor), or 0
+## for none; `target` typed when an actor.
 var _target_id: int = 0
 var _target_actor: Actor = null
 ## The actor's Face (the actor kit's), for the call's glance; null without one.
@@ -499,10 +502,23 @@ func _track_target() -> void:
 		_looked = true
 		var before: int = _target_id
 		target = _find_target()
-		_target_id = target.get_instance_id() if target != null else 0
+		_target_id = _key_of(target)
 		_target_actor = target as Actor
 		if _target_id != before:
 			_decide_now = true
+
+
+## The identity of the body `body` (online-ready N5): its actor's key (`Actors.key_of`), NO_KEY for a
+## body that is no open actor, 0 for none.
+func _key_of(body: Node2D) -> int:
+	if body == null:
+		return 0
+	var as_actor: Actor = body as Actor
+	if as_actor != null and actor != null and actor.actors != null:
+		var key: int = actor.actors.key_of(as_actor.id)
+		if key != 0:
+			return key
+	return NO_KEY
 
 
 func _perceive() -> void:

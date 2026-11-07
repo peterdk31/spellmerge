@@ -280,7 +280,7 @@ var _fires_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
 var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
-## Instance id of the target a chain came from.
+## The key (`ProjectileManager.key_of`, N5) of the target a chain came from, 0 for none.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
@@ -309,8 +309,8 @@ var _lc_way: PackedVector2Array = PackedVector2Array()
 var _lc_count: int = 0
 ## Slots of live shots with `zap`, `_zapper_count` of them, flagged in `_rec_zapper`;
 ## `_rec_zap_rolls` is how many random numbers each has drawn (its rolls are a hash of its sequence
-## number and that count: the same every run, `_zap_roll`), and `_rec_zapped` the instance ids of
-## the bodies it has rolled for, with `_rec_zapped_at` the moment each was zapped or lost its roll,
+## number and that count: the same every run, `_zap_roll`), and `_rec_zapped` the keys of the bodies
+## it has rolled for (`ProjectileManager.key_of`, N5), with `_rec_zapped_at` the moment each was zapped or lost its roll,
 ## ZAP_MEMORY a slot side by side, `_rec_zapped_count` of them (a body rolls again
 ## SpellLimits.ZAP_AGAIN after that moment; past ZAP_MEMORY the oldest is forgotten).
 var _zappers: PackedInt32Array = PackedInt32Array()
@@ -2479,16 +2479,17 @@ func _step_zaps(delta: float) -> void:
 			if _zaps_used >= SpellLimits.MAX_ZAPS_PER_STEP or not _knows(slot):
 				break
 			var body: Node2D = _zap_near[k]
-			if not is_instance_valid(body) or _has_rolled(slot, body.get_instance_id()):
+			var key: int = projectiles.key_of(body)
+			if key == 0 or _has_rolled(slot, key):
 				continue
 			if _zap_roll(slot) >= spell.zap_chance:
-				_rolled(slot, body.get_instance_id(), _clock)
+				_rolled(slot, key, _clock)
 			else:
 				# It waits a random moment of the time the body stays in reach, less a look's step so
 				# it is made before the shot hits it or leaves it; it rolls again ZAP_AGAIN after.
 				var window: float = _zap_window(slot, spell, _zap_centres[k], _zap_radii[k])
 				var wait: float = _zap_roll(slot) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
-				_rolled(slot, body.get_instance_id(), _clock + wait)
+				_rolled(slot, key, _clock + wait)
 				if wait <= 0.0 or _rec_due_count[slot] >= ZAP_DUE:
 					_zap(slot, spell, _zap_centres[k])
 				else:
@@ -2560,7 +2561,7 @@ func _drop_zaps(slot: int) -> void:
 	_rec_due_count[slot] = 0
 
 
-## True when the zap shot in `slot` has rolled for the body of instance id `id` less than
+## True when the zap shot in `slot` has rolled for the body of key `id` less than
 ## SpellLimits.ZAP_AGAIN ago (from its zap, or the roll it lost).
 func _has_rolled(slot: int, id: int) -> bool:
 	var first: int = slot * ZAP_MEMORY
@@ -2570,7 +2571,7 @@ func _has_rolled(slot: int, id: int) -> bool:
 	return false
 
 
-## The zap shot in `slot` has rolled for the body of instance id `id`, which is zapped (or lost its
+## The zap shot in `slot` has rolled for the body of key `id`, which is zapped (or lost its
 ## roll) at `when` (in a ring: past ZAP_MEMORY the oldest is forgotten).
 func _rolled(slot: int, id: int, when: float) -> void:
 	var n: int = _rec_zapped_count[slot]
@@ -2703,7 +2704,8 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 			carried_zap = _rec_zap[from]
 		elif by_ray:
 			carried = _ray.hit
-	var struck: int = target.get_instance_id()
+	# The chain's last body, by its key (N5): what the next jump must not go back to.
+	var struck: int = projectiles.key_of(target)
 	# The hit is the cast's that made it: a shot's hit is cast by what cast that shot (so its chain
 	# jumps belong to it), a ray's by the caster already casting it (its launch's or its row's).
 	var caster: int = _caster if by_ray else shot_caster(slot)
@@ -2760,7 +2762,7 @@ func _possess(actor: int, target: Node, seconds: float, tag: int) -> void:
 func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target: Node2D, struck: int, prev: int, chain: int, by_ray: bool, hit: HitProfile = null, zap: HitProfile = null) -> void:
 	var before: Node2D = null
 	if prev != 0:
-		before = instance_from_id(prev) as Node2D
+		before = projectiles.target_of_key(prev)
 	var best: Node2D = projectiles.nearest_target(position, SpellLimits.CHAIN_RANGE, HITS, target, before, _team(actor))
 	if best == null:
 		return
@@ -3452,21 +3454,16 @@ func familiar_at(key: int, at: Vector2) -> void:
 ## familiar) runs its end (`CarrierEntity.entity_ended`).
 ## The body `old` was replaced by `new` for the same actor (`body_replaced`: the swarm's
 ## promotion): what keeps `old` keeps `new` from now on: the projectile manager's shots
-## (`replace_body`), a chain's last body (by shot and in the jump queue) and each carrier's rows (a
-## sweep's struck bodies, its chain's last body: `Carrier.replace_body`).
+## (`replace_body`), the jump queue's targets and each carrier's rows (a sweep's struck bodies:
+## `Carrier.replace_body`). What keeps a body by its key (a chain's last body, a zap's rolls, a
+## shot's homing: N5) keeps the actor's key, which is the same.
 func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 	if old == null or new == null or old == new:
 		return
 	if projectiles != null:
 		projectiles.replace_body(old, new)
-	var from: int = old.get_instance_id()
-	var to: int = new.get_instance_id()
-	for slot in _rec_prev.size():
-		if _rec_prev[slot] == from:
-			_rec_prev[slot] = to
-	for at in _jq_prev.size():
-		if _jq_prev[at] == from:
-			_jq_prev[at] = to
+	# A chain's last body is a key, the same actor's (N5): only the nodes kept are replaced.
+	for at in _jq_target.size():
 		var held: Variant = _jq_target[at]
 		if is_instance_valid(held) and held == old:
 			_jq_target[at] = new as Node2D

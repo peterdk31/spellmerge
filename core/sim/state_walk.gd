@@ -11,8 +11,9 @@ extends RefCounted
 ## - `VIEW` (what only the drawing reads and writes: N9 draws the line), never walked;
 ## - `REFS` (references to bodies it does not own that are state all the same: an AI's target, the
 ##   body a shot is stuck to, the bodies a zap is due on): walked as **who** they point at and never
-##   entered (`identity`): an actor by its id, anything else by what it is, until N5 gives every body
-##   an identity of its own;
+##   entered (`identity`): an actor by its id (a reference is to a live body, so its id says which;
+##   what a body keeps of one that may be gone is its key, `Actors.key_of`, N5), anything else by
+##   what it is;
 ## - `SPARES` (free lists of spare records, each set whole when it is taken: Spells' spare launches),
 ##   walked as their size alone (N3c: their contents cannot change the game, and walking them was a
 ##   fifth of the spells area's hash).

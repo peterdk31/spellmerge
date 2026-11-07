@@ -577,12 +577,12 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
 ## which gives the same game either way (native/README.md), and the hit test's scratch, which only
-## the native pass sizes ahead (both found by N2b's platform runs); `_skip_id`, the instance id
-## of the body each shot spares, which differs from run to run (`_skip_on`, whether it holds, is state);
+## the native pass sizes ahead (both found by N2b's platform runs); `_target_id`, each target's
+## node by instance id, a lookup from the node (equality only: a target's identity is its key, N5);
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_skip_id", &"_head_mesh", &"step_profile", &"profile_clock"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -680,7 +680,7 @@ var _orbit_centre: PackedVector2Array = PackedVector2Array()
 var _turn: PackedFloat32Array = PackedFloat32Array()
 var _home_at: PackedVector2Array = PackedVector2Array()
 var _home_range: PackedFloat32Array = PackedFloat32Array()
-## The instance id of the target each homing shot keeps, 0 for none.
+## The key (`_target_key`) of the target each homing shot keeps, 0 for none.
 var _home_target: PackedInt64Array = PackedInt64Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
@@ -772,11 +772,11 @@ var _scan_step: int = -1
 var expired_on_wall: bool = false
 ## The targets each shot is touching and has hit, so it hits them once until it leaves them: a
 ## list per slot (`_mem_head`, -1 for none) through one growing pool (`_mem_id` the target's
-## instance id, `_mem_seen` the step its path last touched it, `_mem_next` the link; `_mem_free`
+## key, `_target_key`, `_mem_seen` the step its path last touched it, `_mem_next` the link; `_mem_free`
 ## heads the free entries). `_mem_step` counts the steps.
 var _mem_head: PackedInt32Array = PackedInt32Array()
 var _mem_id: PackedInt64Array = PackedInt64Array()
-## The target's index when it was hit: a hint, checked against its id (`_mark_memory`).
+## The target's index when it was hit: a hint, checked against its key (`_mark_memory`).
 var _mem_target: PackedInt32Array = PackedInt32Array()
 var _mem_seen: PackedInt32Array = PackedInt32Array()
 var _mem_next: PackedInt32Array = PackedInt32Array()
@@ -813,6 +813,12 @@ var _target_pos: PackedVector2Array = PackedVector2Array()
 ## Where each target's hit circle sits, relative to its node (the body, not the feet).
 var _target_offset: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
+## Each target's identity (online-ready N5): its actor's key (`Actors.key_of`, handed over by Combat),
+## else one the manager gives it (`_minted_keys`, below 0). What a shot keeps of a target (its homing
+## target, what it hit, the body it spares) is this key, the same on every machine; never 0.
+var _target_key: PackedInt64Array = PackedInt64Array()
+## Keys given to targets registered without one (tests' plain nodes): -1, -2, ...
+var _minted_keys: int = 0
 var _target_owner: PackedInt32Array = PackedInt32Array()
 ## Each target's team, read from its owner actor when the grid is filled (see `_team_of_target`).
 var _target_team: PackedInt32Array = PackedInt32Array()
@@ -919,8 +925,8 @@ var step_profile: PackedInt64Array = PackedInt64Array()
 var profile_clock: Callable = Callable()
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
-## Per slot: the body a payload must not hit (the one that fired it, `exclude`), and above 0 while
-## that holds: until a hit test finds the shot clear of that body where its step starts.
+## Per slot: the key (`_target_key`) of the body a payload must not hit (the one that fired it,
+## `exclude`), and above 0 while that holds: until a hit test finds the shot clear of that body where its step starts.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_on: PackedFloat32Array = PackedFloat32Array()
 ## Per slot: how far off that body's hit circle the shot was cast, when the body is its own caster's
@@ -1867,13 +1873,16 @@ func _team_of_target(owner: int, layer: int) -> int:
 ## (homing never picks its own actor's body) and its team (see `_team_of_target`); a hit never
 ## asks it. `offset` moves the hit circle from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
-## the sprite does hit.
-func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
+## the sprite does hit. `key` is its identity (`_target_key`): its actor's key (`Actors.key_of`); 0
+## gives it one of the manager's own (a plain node, in tests). Registered again with a key, it takes it.
+func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO, key: int = 0) -> void:
 	if node == null or layer == 0:
 		return
 	var id: int = node.get_instance_id()
 	var at: int = _target_id.find(id)
 	if at >= 0:
+		if key != 0:
+			_target_key[at] = key
 		_target_radius[at] = radius
 		_target_layer[at] = layer
 		_target_owner[at] = owner
@@ -1881,8 +1890,12 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 		_target_offset[at] = offset
 		_max_target_radius = maxf(_max_target_radius, radius)
 		return
+	if key == 0:
+		_minted_keys -= 1
+		key = _minted_keys
 	_targets.append(node)
 	_target_id.append(id)
+	_target_key.append(key)
 	_target_radius.append(radius)
 	_target_layer.append(layer)
 	_target_owner.append(owner)
@@ -1922,31 +1935,22 @@ func remove_target(node: Node2D) -> void:
 
 ## The body `old` is replaced by `new` for the same actor (the swarm's promotion, the event
 ## `body_replaced`; Spells passes it on): `old`'s target entry becomes `new`'s in place (its
-## order among the targets kept), and every shot that keeps `old` keeps `new` instead: its
-## homing target, its memory of what it hit, the body it sticks to and the body its payload skips.
-## Call it before `new` registers (its `add_target` then updates the entry).
+## order among the targets kept, and its key: the same actor's), so every shot that keeps it (its
+## homing target, its memory of what it hit, the body its payload skips: keys, N5) keeps `new`;
+## a shot stuck to `old` sticks to `new`. Call it before `new` registers (its `add_target` then
+## updates the entry).
 func replace_body(old: Node, new: Node) -> void:
 	if old == null or new == null or old == new or not new is Node2D:
 		return
-	var from: int = old.get_instance_id()
+	var at: int = _target_id.find(old.get_instance_id())
 	var to: int = new.get_instance_id()
-	var at: int = _target_id.find(from)
 	if at >= 0 and _target_id.find(to) < 0:
 		_targets[at] = new
 		_target_id[at] = to
 	for slot in _cap:
-		if _home_target[slot] == from:
-			_home_target[slot] = to
-		if _skip_id[slot] == from:
-			_skip_id[slot] = to
 		var stuck: Variant = _stuck_to[slot]
 		if is_instance_valid(stuck) and stuck == old:
 			_stuck_to[slot] = new
-	for entry in _mem_id.size():
-		if _mem_id[entry] == from:
-			_mem_id[entry] = to
-	if homing_target == from:
-		homing_target = to
 
 
 func get_target_count() -> int:
@@ -3809,7 +3813,7 @@ func home_velocity(caster: int, from: Vector2, velocity: Vector2, turn_rate: flo
 ## a new one picked at random (`_home_pick`), or INF. Charges the work budget.
 func _homing_point(slot: int, from: Vector2) -> Vector2:
 	var t: int = _home_pick(_actor[slot], _team[slot], from, Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot)
-	_home_target[slot] = _target_id[t] if t >= 0 else 0
+	_home_target[slot] = _target_key[t] if t >= 0 else 0
 	return _target_pos[t] if t >= 0 else Vector2.INF
 
 
@@ -3824,9 +3828,9 @@ func homing_aim(caster: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## INF when there is none: one on `layers` no further than `within` pixels whose centre lies within `max_angle` radians of `direction` (PI for any
 ## way). Targets owned by `caster` and those of its team (`Actors.team_of`; homing aims at
 ## other teams only, actors G3a) are skipped. The target whose
-## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
+## key (`_target_key`) is `keep` stays the pick while it qualifies; otherwise one is picked at random
 ## among those that do, from `pick_seed` (the same seed and targets give the same pick), so a
-## group of shots spreads over a group of enemies. `homing_target` is left at the pick's id (0 for
+## group of shots spreads over a group of enemies. `homing_target` is left at the pick's key (0 for
 ## none), for the caller to keep. Allocation-free.
 func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
 	homing_target = 0
@@ -3837,7 +3841,7 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, within, keep, pick_seed, -1)
 	if t < 0:
 		return Vector2.INF
-	homing_target = _target_id[t]
+	homing_target = _target_key[t]
 	homing_target_radius = _target_radius[t]
 	return _target_pos[t]
 
@@ -3863,7 +3867,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
-						if keep != 0 and _target_id[t] == keep:
+						if keep != 0 and _target_key[t] == keep:
 							return t
 						# Reservoir pick: the n-th target seen replaces the pick one time in n.
 						seen += 1
@@ -5377,10 +5381,11 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 ## across its caster (a nova's, a mirror's) passes them (owner, 2026-11-07).
 func exclude(slot: int, node: Node) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
-		_skip_id[slot] = node.get_instance_id()
+		# Kept by its key (N5); a node that is no target (none registered) is never hit anyway.
+		var at: int = _target_id.find(node.get_instance_id())
+		_skip_id[slot] = _target_key[at] if at >= 0 else 0
 		_skip_on[slot] = 1.0
 		_skip_near[slot] = 0.0
-		var at: int = _target_id.find(_skip_id[slot])
 		if at < 0 or _actor[slot] < 0 or _target_owner[at] != _actor[slot]:
 			return
 		var body: Node2D = _targets[at] as Node2D
@@ -5440,7 +5445,27 @@ func target_owner_of(node: Node) -> int:
 	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
 
 
-## The instance id of the target the last `homing_point`, `homing_aim` or `home_velocity`
+## The identity of the registered target `node` (`_target_key`, online-ready N5: its actor's key),
+## or 0 for a node that is not registered. What the simulation keeps for "that body" (a chain's last
+## body, a zap's roll for it) is this, never an instance id.
+func key_of(node: Node) -> int:
+	if node == null or not is_instance_valid(node):
+		return 0
+	var at: int = _target_id.find(node.get_instance_id())
+	return _target_key[at] if at >= 0 else 0
+
+
+## The registered target whose key is `key` (`key_of`), or null: none, or no longer registered.
+func target_of_key(key: int) -> Node2D:
+	if key == 0:
+		return null
+	var at: int = _target_key.find(key)
+	if at < 0 or not is_instance_valid(_targets[at]):
+		return null
+	return _targets[at] as Node2D
+
+
+## The key (`_target_key`) of the target the last `homing_point`, `homing_aim` or `home_velocity`
 ## picked, 0 for none: hand it back as `keep` so a homing thing stays on one target. And that
 ## target's hit radius (0 for none), for something that stops at its edge (a teleport).
 var homing_target: int = 0
@@ -5465,6 +5490,7 @@ func _remove_target_at(at: int) -> void:
 	var last: int = _targets.size() - 1
 	_targets[at] = _targets[last]
 	_target_id[at] = _target_id[last]
+	_target_key[at] = _target_key[last]
 	_target_radius[at] = _target_radius[last]
 	_target_layer[at] = _target_layer[last]
 	_target_owner[at] = _target_owner[last]
@@ -5473,6 +5499,7 @@ func _remove_target_at(at: int) -> void:
 	_target_offset[at] = _target_offset[last]
 	_targets.resize(last)
 	_target_id.resize(last)
+	_target_key.resize(last)
 	_target_radius.resize(last)
 	_target_layer.resize(last)
 	_target_owner.resize(last)
@@ -5736,7 +5763,7 @@ func _hit_test(slot: int) -> bool:
 					_mem_seen[_target_entry[t]] = _mem_step
 					t = _target_next[t]
 					continue
-				if spared and _skip_id[slot] == _target_id[t]:
+				if spared and _skip_id[slot] == _target_key[t]:
 					t = _target_next[t]
 					continue
 				found = _keep_candidate(found, t, along, closest)
@@ -5754,7 +5781,7 @@ func _hit_test(slot: int) -> bool:
 ## it on its way out (owner, 2026-11-07: a nova's shot aimed back across the wizard hit them); one
 ## that has passed it, or turns back (return, bounce), does.
 func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
-	var t: int = _target_id.find(_skip_id[slot])
+	var t: int = _target_key.find(_skip_id[slot]) if _skip_id[slot] != 0 else -1
 	if t < 0 or (_target_layer[t] & _layers[slot]) == 0:
 		return false
 	var reach: float = _radius[slot] + _target_radius[t]
@@ -5846,8 +5873,8 @@ func _mark_memory(slot: int) -> int:
 	while at >= 0:
 		var next: int = _mem_next[at]
 		var t: int = _mem_target[at]
-		if t < 0 or t >= _targets.size() or _target_id[t] != _mem_id[at]:
-			t = _target_id.find(_mem_id[at])
+		if t < 0 or t >= _targets.size() or _target_key[t] != _mem_id[at]:
+			t = _target_key.find(_mem_id[at])
 			_mem_target[at] = t
 		if t < 0:
 			if before < 0:
@@ -5870,7 +5897,7 @@ func _remember(slot: int, t: int) -> void:
 		_grow_memory(_mem_id.size() * 2)
 	var at: int = _mem_free
 	_mem_free = _mem_next[at]
-	_mem_id[at] = _target_id[t]
+	_mem_id[at] = _target_key[t]
 	_mem_target[at] = t
 	_mem_seen[at] = _mem_step
 	_mem_next[at] = _mem_head[slot]

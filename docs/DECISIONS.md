@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: A body is its actor's key, not an instance id (online-ready N5, owner session)
+
+- **A body's identity is its actor's key** (`Actors.key_of`): its id and its birth in the run, so an id handed out again after a death is another identity, as the new body's instance id was. An id alone would let a shot homing on a dead enemy follow the next enemy given its id; the birth keeps today's behaviour exactly.
+- **The births count from 0 at each run's start** (the actor table renewed last), so a run's keys are a fresh game's whatever ran before.
+- **Combat hands the manager the key** when it registers a body (every hittable body is a Combat row, which is its actor id); the manager keeps it beside each target, and everything that kept a target's instance id (homing, hit memory, the spared body, a chain's last body, zap rolls, the AI's target and the team board's attacks) keeps the key. The native kernel compares keys and still checks a node is alive by its instance id.
+- **Instance ids stay only as lookups** from a node to its row (DERIVED), never as state, an order or a seed.
+- **No gameplay change intended:** the same body is the same key wherever an instance id was used; a swarm promotion keeps the key, so nothing is remapped. One edge differs: a payload asked to spare a body that is not registered at that moment spares nothing (before, it would have spared it once registered); none was seen.
+
 ## 2026-11-07: The simulation's maths is our own (online-ready N7, owner session)
 
 - **`DMath` in place of the engine's trig in every simulation script, `dmath.h` in the kernels:** sin, cos, tan, atan, atan2, asin, acos, exp, log, pow, lerp_angle and the Vector2 turns, from `+ - * /` and `sqrt` only (plus exact `floor` and `fmod`), so the same bits on Linux, Windows and the web. The C library's differ in the last digit now and then (N2b), and online every machine must play the same game.

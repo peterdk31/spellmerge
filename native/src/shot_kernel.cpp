@@ -153,6 +153,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(target_owner, "_target_owner", PACKED_INT32_ARRAY) \
 	X(target_layer, "_target_layer", PACKED_INT32_ARRAY) \
 	X(target_id, "_target_id", PACKED_INT64_ARRAY) \
+	X(target_key, "_target_key", PACKED_INT64_ARRAY) \
 	X(target_next, "_target_next", PACKED_INT32_ARRAY) \
 	X(target_mark, "_target_mark", PACKED_INT32_ARRAY) \
 	X(target_entry, "_target_entry", PACKED_INT32_ARRAY) \
@@ -316,7 +317,9 @@ struct HitPass {
 	Arr<PackedVector2Array> pos, prev, target_pos, cand_point, untested;
 	Arr<PackedInt32Array> flags, layers, actor, mem_head;
 	Arr<PackedFloat32Array> radius, skip_on, skip_near, target_radius, cand_along;
-	Arr<PackedInt64Array> skip_id, target_id, mem_id;
+	// `target_id` finds a target's node (instance ids: equality only); `target_key` is its identity,
+	// which the shots keep (online-ready N5).
+	Arr<PackedInt64Array> skip_id, target_id, target_key, mem_id;
 	Arr<PackedInt32Array> target_owner, target_layer, target_next, target_mark, target_entry;
 	Arr<PackedInt32Array> cell_head, cell_count, cell_filled;
 	Arr<PackedVector4Array> cell_box;
@@ -386,7 +389,7 @@ struct HitPass {
 						const Vector2 to_target = target_pos[t] - origin;
 						const double reach = within + (double)target_radius[t];
 						if ((double)to_target.length_squared() <= reach * reach) {
-							if (keep != 0 && target_id[t] == keep) {
+							if (keep != 0 && target_key[t] == keep) {
 								return t;
 							}
 							// Reservoir pick, with the engine's own hash.
@@ -414,7 +417,7 @@ struct HitPass {
 		if (((slot + step_index) % HOMING_PERIOD) == 0 && work_left > 0) {
 			// `_homing_point`.
 			const int64_t t = home_pick(slot, prev[slot]);
-			home_target[slot] = t >= 0 ? target_id[t] : 0;
+			home_target[slot] = t >= 0 ? target_key[t] : 0;
 			steer.home_at[slot] = t >= 0 ? target_pos[t] : Vector2(INFINITY, INFINITY);
 		}
 		if (st == S_RETURNING) {
@@ -434,6 +437,7 @@ struct HitPass {
 		flags.load(m, k.flags);
 		layers.load(m, k.layers);
 		target_id.load(m, k.target_id);
+		target_key.load(m, k.target_key);
 		wall_w = m->get(k.wall_w);
 		wall_h = m->get(k.wall_h);
 		work_left = m->get(k.work_left);
@@ -605,16 +609,16 @@ struct HitPass {
 	// `_mark_memory`.
 	int64_t mark_memory(int64_t slot) {
 		mark_stamp += 1;
-		const int64_t targets = target_id.n;
+		const int64_t targets = target_key.n;
 		int64_t before = -1;
 		int64_t at = mem_head[slot];
 		while (at >= 0) {
 			const int64_t next = mem_next[at];
 			int64_t t = mem_target[at];
-			if (t < 0 || t >= targets || target_id[t] != mem_id[at]) {
+			if (t < 0 || t >= targets || target_key[t] != mem_id[at]) {
 				t = -1;
 				for (int64_t i = 0; i < targets; i++) {
-					if (target_id[i] == mem_id[at]) {
+					if (target_key[i] == mem_id[at]) {
 						t = i;
 						break;
 					}
@@ -759,7 +763,7 @@ struct HitPass {
 						t = target_next[t];
 						continue;
 					}
-					if (spared && skip_id[slot] == target_id[t]) {
+					if (spared && skip_id[slot] == target_key[t]) {
 						t = target_next[t];
 						continue;
 					}
@@ -778,8 +782,8 @@ struct HitPass {
 	// `_still_spares`.
 	bool still_spares(int64_t slot, const Vector2 &start, const Vector2 &way) {
 		int64_t t = -1;
-		for (int64_t i = 0; i < target_id.n; i++) {
-			if (target_id[i] == skip_id[slot]) {
+		for (int64_t i = 0; skip_id[slot] != 0 && i < target_key.n; i++) {
+			if (target_key[i] == skip_id[slot]) {
 				t = i;
 				break;
 			}

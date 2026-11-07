@@ -64,13 +64,10 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 
 
 ## The swarm promoted a body (`Carrier.replace_body`): a dash under way that struck `old` has
-## struck `new`, and its chain came from `new`.
+## struck `new` (its chain's last body is a key, the same actor's: N5).
 func replace_body(old: Node, new: Node) -> void:
-	var to: int = new.get_instance_id()
 	for pass_on: MovePass in _passes:
-		_replace_in_rows(old, new, [pass_on.struck], PackedInt64Array())
-		if pass_on.prev == old.get_instance_id():
-			pass_on.prev = to
+		_replace_in_rows(old, new, [pass_on.struck])
 
 
 ## Every dash under way ends quietly (`Spells.clear`).

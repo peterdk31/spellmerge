@@ -568,7 +568,7 @@ func _test_homing_picks_at_random_and_keeps_its_pick() -> void:
 	var centre: Vector2 = Vector2(300.0, 300.0)
 	var ids: Array[int] = []
 	for offset: Vector2 in [Vector2(60.0, 0.0), Vector2(-60.0, 0.0), Vector2(0.0, 60.0), Vector2(0.0, -60.0)]:
-		ids.append(_target(centre + offset, 8.0).get_instance_id())
+		ids.append(_mgr.key_of(_target(centre + offset, 8.0)))
 	var far: Node2D = _target(centre + Vector2(400.0, 0.0), 8.0)
 	var picked: Dictionary = {}
 	for pick_seed in 32:
@@ -582,7 +582,7 @@ func _test_homing_picks_at_random_and_keeps_its_pick() -> void:
 	for pick_seed in 16:
 		_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, kept, pick_seed)
 		_check(_mgr.homing_target == kept, "a kept target stays the pick while it is in reach")
-	_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, far.get_instance_id(), 3)
+	_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, _mgr.key_of(far), 3)
 	_check(ids.has(_mgr.homing_target), "a kept target out of reach gives way to a new pick")
 	# A fan of homing shots from one point spreads over the group instead of all taking one.
 	var slots: Array[int] = []

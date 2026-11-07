@@ -216,6 +216,16 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 - Actor ids stay "lowest free first" (already deterministic).
 - Fixes A5.
 
+**Done (2026-11-07).** A body's identity is its actor's key (`Actors.key_of`): the id and its birth (how many ids the run had opened when it was opened), so an id handed out again is another key, as a new body was another instance id. The births count from 0 at a run's start: the actor table is renewed last in `Tick.FRESH_AT_RUN`, after every area that lets bodies go, and names an id still open. What was decided and found:
+
+- **One identity for every target.** Every body a shot can hit is registered by Combat, whose row is its actor id, so Combat hands the manager the actor's key (`add_target(..., key)`); a plain node (tests only) gets one of the manager's own, below 0. The manager keeps it beside each target (`_target_key`, state); `_target_id` (instance ids) stays as a DERIVED lookup from the node, which the native kernel also uses for its "is the node still there" check.
+- **Moved to keys** (state now, hashed and comparable across machines): the shots' homing targets (`_home_target`, `homing_target`, a move's `_move_home`, `Homing.keep`), the hit memory (`_mem_id`), the body a payload spares (`_skip_id`), a chain's last body (Spells' `_rec_prev`, the jump queue, every carrier's `prev`), the zap rolls (Spells' `_rec_zapped`, the beam's `_bm_zapped`), the AI's target (`AIBrain._target_id`) and the team board's attack targets. `ProjectileManager.key_of(node)` and `target_of_key(key)` are how core asks; the brain asks the actor table. The native shot kernel compares keys too, bit for bit with the GDScript (`test_native_kernel.gd` now compares those arrays, which it skipped while they held instance ids).
+- **Promotions need no remapping.** A swarmer promoted to an actor keeps its actor id, so its key: the manager's, Spells' and the carriers' `replace_body` now replace only nodes (a stuck shot, a sweep's struck bodies, the jump queue's targets).
+- **Stays an instance id, as a lookup only:** `Actors._node`, Combat's `_node_id` / `_row_by_node`, the manager's `_target_id`, the swarm's `_node_ids` / `_row_by_node` (each finds a row from a node, by equality), the compiled-staff cache key in `Caster`, and the view's `Face` and `SwarmLook` (drawing only). A REFS reference is still hashed as its actor's id: it points at a live body.
+- **A payload's spared body is the target's key when it is cast;** a body that is not registered then (no row) is spared by no one, where an instance id would have matched it once it registered. No such case was found in the tests or the stress runs.
+- **The proof:** `test_determinism.gd`'s storm now also casts a homing lightning bolt aimed away from the imps; with instance ids its two runs part at tick 12 in the projectile manager, with keys they agree at every tick. `test_actors.gd` (keys, an id opened again, the births at a run's start), `test_projectiles_actors.gd` (a target's key, minted keys, `target_of_key`, a re-registered body), `test_swarm_promotion.gd` (the actor keeps the swarmer's key).
+- **Left for N10:** a REFS reference restored from a snapshot needs the key (`Actors.id_of_key`).
+
 ### N6: our own body movement, in C++
 
 C++ from the start, whatever N2b finds (the owner, 2026-11-04).

@@ -93,7 +93,7 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 ## Every swing gone at once, quietly, and no actor has swung (`Spells.clear`).
 ## The swarm promoted a body (`Carrier.replace_body`): a sweep that struck `old` has struck `new`.
 func replace_body(old: Node, new: Node) -> void:
-	_replace_in_rows(old, new, _sw_struck, _sw_prev)
+	_replace_in_rows(old, new, _sw_struck)
 
 
 func clear() -> void:

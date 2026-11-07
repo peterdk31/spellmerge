@@ -362,3 +362,29 @@ func test_place_caster_sets_the_anchor_and_clips_like_the_two_calls() -> void:
 	check_equal(mgr.get_anchor(IMP), Vector2(150.0, 100.0), "and the anchor is set")
 	check_equal(mgr.place_caster(IMP, Vector2.INF, Vector2(10.0, 10.0), Vector2(20.0, 10.0)), Vector2(20.0, 10.0), "a clear segment is not cut")
 	check_equal(mgr.get_anchor(IMP), Vector2(150.0, 100.0), "and an anchor that is no point is ignored, as by set_anchor")
+
+
+## A target's identity is its key (online-ready N5): the one it is registered with (an actor's,
+## handed over by Combat), else one the manager gives it. A homing pick, a payload's spared body
+## and `key_of` / `target_of_key` all speak keys, never instance ids.
+func test_a_target_is_named_by_its_key() -> void:
+	var with_key := own(Node2D.new()) as Node2D
+	root.add_child(with_key)
+	with_key.position = Vector2(100.0, 60.0)
+	var plain := own(Node2D.new()) as Node2D
+	root.add_child(plain)
+	plain.position = Vector2(400.0, 300.0)
+	var key: int = table.key_of(IMP)
+	mgr.add_target(with_key, 8.0, ManagerScript.LAYER_ENEMY, IMP, Vector2.ZERO, key)
+	mgr.add_target(plain, 8.0, ManagerScript.LAYER_ENEMY)
+	check_equal(mgr.key_of(with_key), key, "the key it was registered with")
+	var minted: int = mgr.key_of(plain)
+	check(minted < 0, "a plain node is given a key of the manager's own (%d)" % minted)
+	check(mgr.target_of_key(key) == with_key and mgr.target_of_key(minted) == plain, "a key finds its target")
+	check(mgr.target_of_key(0) == null and mgr.key_of(own(Node2D.new()) as Node2D) == 0, "0 is no target, and no target has 0")
+	mgr.homing_point(WIZ_0, Vector2(100.0, 100.0), Vector2.UP, PI, ManagerScript.LAYER_ENEMY, 80.0, 0, 1)
+	check_equal(mgr.homing_target, key, "a homing pick is the target's key")
+	mgr.remove_target(with_key)
+	check(mgr.target_of_key(key) == null, "a target that left is no longer found by its key")
+	mgr.add_target(with_key, 8.0, ManagerScript.LAYER_ENEMY, IMP, Vector2.ZERO, key)
+	check(mgr.target_of_key(key) == with_key, "registered again (a revived wizard), the same key")

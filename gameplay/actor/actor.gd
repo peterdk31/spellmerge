@@ -215,9 +215,10 @@ func tick_step(delta: float) -> void:
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
 ## caller moves the body (`tick_step` does).
 func step(delta: float) -> void:
+	var full: float = delta
 	# Each component is called only when it has something to do (performance pass, 2026-10-28):
 	# a step runs for every actor every frame, and a call costs more than the checks here.
-	if actors != null and actors.held_count > 0 and id != ActorsScript.NONE:
+	if actors != null and (actors.held_count > 0 or actors.resting_count > 0) and id != ActorsScript.NONE:
 		# A local stop (hit-stop in co-op): the body holds still while it lasts; the rest of the
 		# game runs on. A step that outlasts it runs for what is left.
 		delta = actors.spend_hold(id, delta)
@@ -248,6 +249,10 @@ func step(delta: float) -> void:
 		caster.step(delta)
 	if mover != null:
 		mover.step(delta)
+		if delta < full:
+			# A step a hold covered part of moves the body for what is left of it, as a swarm row
+			# moves (online-ready N4): whoever moves it by its velocity moves it that far.
+			velocity *= delta / full
 	else:
 		velocity = Vector2.ZERO
 	if hurtbox != null and hurtbox.registered == _down:

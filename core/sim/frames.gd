@@ -6,7 +6,11 @@ extends Node
 ## the game never knows which.
 ##
 ## - **The tick's start:** the Tick autoload (core/sim/tick.gd) calls `tick` first in every tick,
-##   also while the tree is paused (the horde's level-up break takes its picks then).
+##   also while the game is stopped or held (the horde's level-up break takes its picks then).
+## - **A tick that stands still** (online-ready N4: the game stopped or held; the Tick calls
+##   `stood`): its presses carry to the next tick that steps, ORed into its frames, so a tap during a
+##   downed wizard's stop is not lost. The recording keeps each tick's own frames; a replay carries
+##   them the same way, its stops being the game's state.
 ## - **Where a frame comes from**, per seat: the replay being played (`play`); else the seat's
 ##   source (`set_source`: a bot, a `FrameSource`); else its device through the local input layer
 ##   (`LocalInput`: the walk, the aim with the mouse turned into a direction from the hand of the
@@ -19,8 +23,9 @@ extends Node
 ## - **Replays:** `record(start, starter)` starts a run and records every tick's frames (the seats
 ##   joined, or with a command) into a `Replay`, `stop_recording` hands it over; `play(replay)`
 ##   joins its seats, starts its run the same way and feeds its frames, one a tick, until they run
-##   out (live input and commands are dropped meanwhile; each tick says whether the game stood
-##   paused, `_read_replay`). Both deal the seeds nobody chose from the
+##   out (live input and commands are dropped meanwhile), one a tick: the game's stops are part of
+##   its state (N4), so it stands still where the recording did. Each recorded tick still says
+##   whether the game stood stopped (the format's flag; read by nothing). Both deal the seeds nobody chose from the
 ##   replay's seed (`SimSeed.begin`). A source set while a replay plays is still asked each tick
 ##   and its frame dropped: a bot reads the game through queries that fill the services' caches
 ##   (the projectile manager's threat grid and target table), which count as state and change the
@@ -62,6 +67,8 @@ var _hand: Vector2 = Vector2.INF
 var _mouse: Vector2 = Vector2.INF
 ## The frame a source watching a replay fills, dropped.
 var _watched: InputFrame = InputFrame.new()
+## Per seat: the presses of the ticks that stood still since the last tick that stepped (`stood`).
+var _carried: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 
 
 func _init() -> void:
@@ -119,10 +126,21 @@ func tick(delta: float) -> void:
 	else:
 		_build(delta)
 		if _recording != null:
-			_recording.add_tick(_frames, _recorded_seats(), _paused())
+			_recording.add_tick(_frames, _recorded_seats(), _stopped())
 		_apply()
+	for seat in SEATS:
+		if _carried[seat] != 0:
+			_frames[seat].pressed_bits |= _carried[seat]
+			_carried[seat] = 0
 	if _playing != null and _play_at >= _playing.tick_count():
 		stop_playing()
+
+
+## The tick just started stands still (the Tick, N4): its frames' presses wait for the next tick
+## that steps.
+func stood() -> void:
+	for seat in SEATS:
+		_carried[seat] |= _frames[seat].pressed_bits
 
 
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
@@ -140,6 +158,7 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.seats = _joined_seats()
 	replay.rules = SessionRules.machine().copy()
 	_recording = replay
+	_carried.fill(0)
 	SimSeed.begin(replay.run_seed)
 	SessionRules.begin(replay.rules)
 	_send_start(start, starter)
@@ -175,6 +194,7 @@ func play(replay: Replay) -> bool:
 	stop_recording()
 	_playing = replay
 	_play_at = 0
+	_carried.fill(0)
 	for seat in SEATS:
 		_pending[seat].clear()
 		if replay.seats & (1 << seat) != 0 and input != null and not input.is_joined(seat):
@@ -258,30 +278,19 @@ func _find_hand(seat: int) -> void:
 	_mouse = body.get_global_mouse_position()
 
 
-## The replay's next tick, read and applied. A tick that stood paused is played while the game
-## stands paused (the horde's break), and one that ran while it runs: a pause of the recording's
-## own (the pause menu) is skipped through at once, its commands applied in order, and a pause of
-## the player's waits (N4 makes a stop part of the game's state).
+## The replay's next tick, read and applied: one a tick. Where the recording stood stopped or held,
+## the game stands so too, its stops being state (N4); a pause of the player's while it plays (the
+## pause menu) runs no tick, so the replay waits.
 func _read_replay(delta: float) -> void:
 	for seat in SEATS:
 		if _sources[seat] != null:
 			_watched.seat = seat
 			_watched.clear()
 			_sources[seat].fill_frame(_watched, delta)
-	var paused: bool = _paused()
-	while _play_at < _playing.tick_count():
-		var stood: bool = _playing.is_paused_at(_play_at)
-		if stood == paused:
-			_read_tick()
-			_apply()
-			return
-		if not stood:
-			# Paused here, running in the recording: wait.
-			for seat in SEATS:
-				_frames[seat].clear()
-			return
+	if _play_at < _playing.tick_count():
 		_read_tick()
 		_apply()
+		return
 	for seat in SEATS:
 		_frames[seat].clear()
 
@@ -320,9 +329,10 @@ func _apply() -> void:
 			events.apply_command(command_name, args)
 
 
-## True while the tree stands paused (the pause menu, the horde's level-up break).
-func _paused() -> bool:
-	return is_inside_tree() and get_tree().paused
+## True while the game stands stopped (the pause menu, the horde's level-up break): the recording's
+## flag, read by nothing since N4.
+func _stopped() -> bool:
+	return Sim.found(self).is_stopped()
 
 
 ## A bit per seat joined now.

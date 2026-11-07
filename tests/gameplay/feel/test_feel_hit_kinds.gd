@@ -68,49 +68,54 @@ func _hit(player: int, target: Node, kind: StringName) -> void:
 	bus.damage_dealt.emit(player, target, 5, Vector2.ZERO)
 
 
-func test_a_burst_holds_its_attacker_longer_and_shakes_harder_than_a_shot() -> void:
+## The shake of a plain shot's hit (the yardstick), with the trauma put back after.
+func _shot_shake() -> float:
 	_hit(0, _enemy(), &"shot")
-	var shot_stop: float = actors.held_left(0)
-	var shot_shake: float = feel.trauma()
-	check(shot_stop > 0.0 and shot_shake > 0.0, "a shot holds and shakes")
+	var shake: float = feel.trauma()
 	feel._trauma = 0.0
+	return shake
+
+
+# The stops of the kinds are the game's (gameplay/combat/hit_stop.gd, tests/gameplay/combat/
+# test_hit_stop.gd); Feel holds nothing (online-ready N4). These are their looks.
+func test_a_burst_shakes_harder_than_a_shot() -> void:
+	var shot_shake: float = _shot_shake()
+	check(shot_shake > 0.0, "a shot shakes")
 	_hit(1, _enemy(), &"burst")
-	check(actors.held_left(1) > shot_stop, "a burst holds longer")
-	check(feel.trauma() > shot_shake, "and shakes harder")
-	check_equal(feel.stop_left, 0.0, "neither stops the whole game")
+	check(feel.trauma() > shot_shake, "a burst shakes harder")
+	check_equal(actors.held_count, 0, "Feel holds nobody")
 
 
-func test_damage_over_time_neither_stops_nor_shakes() -> void:
+func test_damage_over_time_does_not_shake() -> void:
 	_hit(0, _enemy(), &"status")
-	check_equal(actors.held_left(0), 0.0, "no stop")
 	check_equal(feel.trauma(), 0.0, "no shake")
 
 
 func test_a_beam_is_gentler_than_a_shot() -> void:
+	var shot_shake: float = _shot_shake()
 	_hit(0, _enemy(), &"ray")
-	var held: float = actors.held_left(0)
-	check(held > 0.0 and held < preset.hit_stop_seconds, "a shorter stop")
+	check(feel.trauma() > 0.0 and feel.trauma() < shot_shake, "a smaller shake")
 
 
-func test_a_swing_holds_a_little_longer_and_shakes_the_screen_about_two_pixels() -> void:
-	# The melee playground's numbers (owner, 2026-10-29): a 0.05 s local stop, a 2 px shake.
+func test_a_swing_shakes_the_screen_about_two_pixels() -> void:
+	# The melee playground's numbers (owner, 2026-10-29): a 2 px shake (its 0.05 s stop: HitStop).
 	_hit(0, _enemy(), &"swing")
-	check(is_equal_approx(actors.held_left(0), 0.05), "a 0.05 s stop: %f" % actors.held_left(0))
 	var pixels: float = feel.trauma() * feel.trauma() * preset.max_shake_pixels
 	check(pixels > 1.5 and pixels < 2.5, "about 2 px of shake: %f" % pixels)
-	check_equal(feel.stop_left, 0.0, "it does not stop the whole game")
 
 
 func test_a_hit_with_no_kind_feels_like_a_shot() -> void:
+	var shot_shake: float = _shot_shake()
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
-	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the old default")
+	check(is_equal_approx(feel.trauma(), shot_shake), "a shot's shake")
 
 
 func test_a_stale_kind_is_not_applied_to_a_later_hit() -> void:
+	var shot_shake: float = _shot_shake()
 	var other: Node2D = _enemy()
 	bus.hit_landed.emit(0, other, 5, Vector2.ZERO, &"burst", -1)
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
-	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the kind belongs to the target it was sent for")
+	check(is_equal_approx(feel.trauma(), shot_shake), "the kind belongs to the target it was sent for")
 
 
 func test_a_wizard_hit_by_their_own_spell_gets_a_ring() -> void:
@@ -141,8 +146,6 @@ func test_a_heal_shows_a_ring_without_stop_or_shake() -> void:
 	var before: int = feel.flashes_of(&"ring_out")
 	bus.heal_dealt.emit(1, wizard, 5, Vector2(10.0, 10.0))
 	check(feel.flashes_of(&"ring_out") > before, "a ring")
-	check_equal(feel.stop_left, 0.0, "no stop")
-	check_equal(actors.held_count, 0, "nobody held")
 	check_equal(feel.trauma(), 0.0, "no shake")
 
 

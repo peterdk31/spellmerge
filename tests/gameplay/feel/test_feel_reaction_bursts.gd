@@ -81,8 +81,6 @@ func test_a_reaction_stops_longer_and_shakes_more_than_a_plain_hit() -> void:
 	check(flare.hold * flare.power >= death.hold, "at least as long as a death's stop")
 	check(flare.shake * flare.power > death.shake * 0.5, "a strong shake")
 	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO, -1)
-	check(_actors.held_left(0) >= flare.hold * flare.power - 0.0001, "its caster is held for the reaction, times its power")
-	check_equal(_feel.stop_left, 0.0, "and the game runs on")
 	check(_feel.trauma() >= flare.shake * flare.power - 0.0001, "and shake, times its power")
 
 

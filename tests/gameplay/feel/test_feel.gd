@@ -48,8 +48,6 @@ func _initialize() -> void:
 	# The root joins the scene tree only after _initialize returns: wait one frame.
 	await process_frame
 	_test_default_preset_loads()
-	_test_hit_stop_is_short_and_the_same_for_every_player()
-	_test_hit_stop_longest_wins()
 	_test_shake_moves_the_camera_and_settles()
 	_test_shake_off_does_nothing()
 	_test_particle_limit_holds_with_four_players()
@@ -60,9 +58,7 @@ func _initialize() -> void:
 	_test_downed_has_no_particles()
 	_test_feel_never_changes_damage()
 	_test_bursts_survive_the_world_being_freed()
-	_test_hit_stops_are_limited()
 	_test_a_kill_uses_one_slot_and_beats_a_full_pool()
-	_test_engine_time_scale_comes_back()
 	_test_camera_change_is_followed()
 	_test_hit_flash_and_squash()
 	_test_cast_flash_and_kick()
@@ -73,7 +69,6 @@ func _initialize() -> void:
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
 	await create_timer(0.3).timeout
-	Engine.time_scale = 1.0
 	if _failures.is_empty():
 		print("TEST OK: gameplay/feel (hit-stop, shake, particle limit)")
 		quit(0)
@@ -149,34 +144,9 @@ func _test_default_preset_loads() -> void:
 		return
 	_check(preset.id == &"punchy", "the preset names itself")
 	var death := load("res://content/cues/enemy_death.tres") as CueBase
-	_check(preset.hit_stop_seconds <= 0.1 and death != null and death.hold <= 0.15, "hit-stop is short")
-	_check(preset.hit_stop_scale > 0.0, "hit-stop never freezes the physics step")
+	_check(HitStop.SECONDS <= 0.1 and death != null and death.hold <= 0.15, "hit-stop is short (the game's, HitStop)")
 
 
-func _test_hit_stop_is_short_and_the_same_for_every_player() -> void:
-	_setup()
-	var lengths: Array[float] = []
-	for player in 4:
-		_hit(player)
-		lengths.append(_actors.held_left(player))
-	_check(lengths[0] > 0.0, "a hit holds its attacker")
-	for length in lengths:
-		_check(is_equal_approx(length, lengths[0]), "hit-stop is the same length for every player")
-	_check(lengths[0] <= 0.1, "hit-stop is short")
-	_check(_feel.stop_left == 0.0, "a hit does not stop the game")
-
-
-func _test_hit_stop_longest_wins() -> void:
-	_setup()
-	_bus.player_downed.emit(0)
-	var down: float = _feel.stop_left
-	_check(down > 0.0, "a downed player stops the game")
-	for player in 4:
-		_hit(player)
-	_check(is_equal_approx(_feel.stop_left, down), "four hits in the same frame do not stack the stop")
-	_bus.player_downed.emit(1)
-	_check(is_equal_approx(_feel.stop_left, down), "nor do two downs")
-	_check(down >= _feel.preset.hit_stop_seconds, "a down stops at least as long as a hit")
 
 
 func _test_shake_moves_the_camera_and_settles() -> void:
@@ -204,7 +174,6 @@ func _test_shake_off_does_nothing() -> void:
 	_feel.step(0.015625)
 	_check(_feel.trauma() == 0.0, "no trauma with shake off")
 	_check(_camera.offset == Vector2.ZERO, "the camera never moves with shake off")
-	_check(_feel.stop_left > 0.0, "hit-stop still works with shake off")
 	_feel.shake_enabled = true
 	_hit(0)
 	_check(_feel.trauma() > 0.0, "shake comes back when turned on")
@@ -282,7 +251,7 @@ func _test_downed_has_no_particles() -> void:
 	_setup()
 	_bus.player_downed.emit(3)
 	_check(_feel.live_flashes() == 0, "a downed event names no position, so no flash")
-	_check(_feel.stop_left > 0.0 and _feel.trauma() > 0.0, "a downed wizard still gets stop and shake")
+	_check(_feel.trauma() > 0.0, "a downed wizard still gets its shake (its stop is the game's, HitStop)")
 
 
 func _test_feel_never_changes_damage() -> void:
@@ -332,33 +301,6 @@ func _test_bursts_survive_the_world_being_freed() -> void:
 	_check(_feel.live_flashes() == 12, "after the world was freed three times, flashes still show")
 
 
-func _test_hit_stops_are_limited() -> void:
-	_setup()
-	var stopped: float = 0.0
-	var total: float = 0.0
-	for frame in 256:
-		for player in 4:
-			_hit(player)
-		if _actors.held_left(0) > 0.0:
-			stopped += 0.015625
-		total += 0.015625
-		for player in 4:
-			_actors.spend_hold(player, 0.015625)
-		_feel.step(0.015625)
-	_check(stopped / total < 0.3, "a stream of hits keeps a body held under 30%% of the time (was %.2f)" % (stopped / total))
-	_check(stopped > 0.0, "a stream of hits still holds a body now and then")
-	_setup()
-	_hit(0)
-	_actors.spend_hold(0, 1.0)
-	_feel.step(0.0625)
-	_hit(0)
-	_check(_actors.held_left(0) == 0.0, "a plain hit in the rest does not hold the body again")
-	_hit(1)
-	_check(_actors.held_left(1) > 0.0, "but another body's rest is its own")
-	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
-	_check(_actors.held_left(0) > 0.0, "a kill holds its killer even in the rest")
-	_check(_feel.stop_left == 0.0, "and does not stop the game")
-
 
 func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_setup()
@@ -375,22 +317,6 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_check(_feel.flashes_of(&"puff") >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
 	_check(_feel.live_flashes() == _feel.effect_slots, "taking one over keeps the limit")
 
-
-func _test_engine_time_scale_comes_back() -> void:
-	_setup()
-	_feel.drive_engine = true
-	_hit(0)
-	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
-	_check(Engine.time_scale == 1.0, "a hit and a kill leave the engine alone")
-	_bus.player_downed.emit(0)
-	_check(Engine.time_scale < 1.0, "a down slows the engine")
-	_feel.step(STEP)
-	_feel.step(STEP)
-	_check(Engine.time_scale == 1.0, "the engine is back to full speed when the stop ends")
-	_bus.player_downed.emit(1)
-	_check(Engine.time_scale < 1.0, "a second down slows it again")
-	_teardown()
-	_check(Engine.time_scale == 1.0, "removing feel mid-stop restores the engine speed")
 
 
 func _test_camera_change_is_followed() -> void:

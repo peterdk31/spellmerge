@@ -384,7 +384,7 @@ func step(delta: float) -> void:
 	# Every row's local stop, then its pace and push, each asked once for all rows (a call per row
 	# each cost more than the rest of the row's step; S4). The rows do not touch each other's stops
 	# or Combat rows, so asking first answers as asking row by row did.
-	var held: bool = actors != null and actors.held_count > 0
+	var held: bool = actors != null and (actors.held_count > 0 or actors.resting_count > 0)
 	if held:
 		actors.spend_holds(actor_ids, count, delta, ran)
 	else:

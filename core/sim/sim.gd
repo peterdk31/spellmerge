@@ -33,6 +33,12 @@ var tick: int = 0
 ## What the run plays by (core/sim/session_rules.gd, online-ready N11): set at the run's start
 ## (`Tick.begin_run`), from a replay's header while one plays, else from this machine's settings.
 var rules: SessionRules = SessionRules.defaults()
+## Ticks the whole simulation still stands still (online-ready N4: the game-wide stop of a downed
+## wizard or a boss's death, `hold`). Nothing steps then but the input frames; the drawing runs on.
+var hold_left: int = 0
+## Why the game stands stopped, one reason each (`stop`): the horde's build break, the pause
+## menu. Stopped while any is here; the drawing stops too (the Tick pauses the tree).
+var stops: Array[StringName] = []
 
 ## What `found` gives a node out of the tree: a sim at seed 0, shared.
 static var _still: Sim = null
@@ -56,6 +62,38 @@ static func found(node: Node) -> Sim:
 	if _still == null:
 		_still = Sim.new()
 	return _still
+
+
+## The whole simulation stands still for `ticks` ticks from the next one (a longer hold replaces a
+## shorter one; overlapping holds do not add up).
+func hold(ticks: int) -> void:
+	hold_left = maxi(hold_left, ticks)
+
+
+## The game stops for `reason` until `go(reason)`; stopping twice for one reason is once.
+func stop(reason: StringName) -> void:
+	if not stops.has(reason):
+		stops.append(reason)
+
+
+## `reason` no longer stops the game (the game goes on once no reason is left).
+func go(reason: StringName) -> void:
+	stops.erase(reason)
+
+
+## True while some reason stops the game.
+func is_stopped() -> bool:
+	return not stops.is_empty()
+
+
+## True while the game is stopped for `reason`.
+func stopped_for(reason: StringName) -> bool:
+	return stops.has(reason)
+
+
+## True when the simulation does not step this tick: stopped, or held.
+func stands_still() -> bool:
+	return hold_left > 0 or not stops.is_empty()
 
 
 ## 32 random bits (0 to 2^32 - 1) named by `purpose`, `key` and `counter`.

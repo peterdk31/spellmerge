@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: Hit-stop is the game's, stops are its state (online-ready N4, owner session)
+
+- **Hit-stop moved from Feel to Combat** (`HitStop`): which moments hold which bodies and shots, the rest after a hold, and the game-wide stop. The holds already changed the game (a held body does nothing), so a view deciding them made a game that differed with Feel's real-time clock and with Feel absent. The same numbers, the same cues; Feel draws only.
+- **The game-wide stop is 5 ticks of standing still** (`stop_game` 0.09 s rounded), not `Engine.time_scale` at 5% for 0.09 s of real time: about the same stop, but a number in the state, and the drawing runs on through it.
+- **A rest counts the body's own steps; a reaction's repeat, Combat's steps.** The global tick was tried first: test worlds stepped by hand then parted from the game.
+- **A partly held step moves the body for the time it ran** (velocity scaled), as the swarm moved its rows: the swarmer and the full mite now agree under holds.
+- **Stops have reasons** (`Sim.stops`: the horde's break, the pause menu by the command `pause_requested`), the tree's pause follows them for the picture only. The menu's special case for a break ending under it is gone.
+- **Taps during a stop carry** to the first tick that steps (`Frames.stood`), as presses during the old slow-motion stop were read.
+
 ## 2026-11-07: Settings that change the game are the run's rules (online-ready N11, owner session)
 
 - **One object holds them:** `SessionRules` (core/sim/session_rules.gd) in the sim (`sim.rules`, hashed): the shot cap, the horde's cap on enemies alive, the hit-test work a projectile step may do and the shots a trigger's fires may make in a step. A run takes them at its start (`Tick.begin_run` hands them to the areas, `take_rules`, before they are renewed): a replay's while one records or plays, else this machine's. A replay's header carries them (format 2), so a replay plays the same on a machine whose own settings are others. A plain object, not a `Resource` as the plan said: the state walk walks its members, and a resource would be hashed by its path.

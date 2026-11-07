@@ -17,9 +17,10 @@ extends RefCounted
 ## The ticks are the game's own physics steps. Each run starts from a fresh game (every autoload
 ## made again, tests/support/fresh_game.gd), or, with `fresh_game` off, in the same game after
 ## whatever ran before: a run starts from a fresh game's state either way (`Tick.begin_run`,
-## online-ready N3b), which the replay test proves. What still runs on real time is held to the
-## tick here, as the plan leaves it to N4: Feel's stops (its clock is real time) are frozen. In an exported game Flow's loading screen and intro are off too, so a run
-## starts on the tick it is asked for, as under a test script.
+## online-ready N3b), which the replay test proves. Feel runs as in the game, on real time: since
+## N4 it holds nothing (hit-stop is Combat's `HitStop`, counted on the game's steps), so it cannot
+## part two runs. In an exported game Flow's loading screen and intro are off, so a run starts on
+## the tick it is asked for, as under a test script.
 ##
 ##     var run := ReplayRun.new(tree)
 ##     var recorded := Desync.new()
@@ -35,6 +36,10 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
 const REBUILD_AT: int = 100
 const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
+## The ticks the scripted run's pause menu opens and closes (the command `pause_requested`): the game
+## stands stopped between, and a replay stands stopped there too (online-ready N4).
+const PAUSE_AT: int = 150
+const RESUME_AT: int = 170
 
 ## Ticks recorded and played (four seconds of game by default).
 var ticks: int = 240
@@ -116,6 +121,12 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
 		if i == cap_request.x:
 			events.emit_signal("shot_cap_requested", 0, cap_request.y)
+		if scripted > 0 and i == PAUSE_AT:
+			events.emit_signal("pause_requested", bots, 1)
+		if scripted > 0 and i == RESUME_AT:
+			events.emit_signal("pause_requested", bots, 0)
+		if scripted > 0:
+			_check_stopped(start + " recorded", i)
 	replay = _frames.call("stop_recording")
 	if scripted > 0 and ticks > REBUILD_AT + 1:
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
@@ -135,16 +146,30 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 	await _tree.physics_frame
 	if not bool(_frames.call("play", replay)):
 		problems.append("%s: the replay did not play" % replay.start)
+	var paused_run: bool = has_command(replay, &"pause_requested")
 	for i in replay.tick_count():
 		await _tree.physics_frame
 		_capture(into)
+		if paused_run:
+			_check_stopped(replay.start + " played", i)
 	if bool(_frames.call("is_playing")):
 		problems.append("%s: the replay did not run out after its last tick" % replay.start)
 	_check_settings(replay.start)
 
 
-## True when some tick of `replay` carries a `staff_cards_requested` command (the rebuild).
-static func has_command(replay: Replay) -> bool:
+## A tick inside the scripted pause stands stopped by the menu, and none outside it does (the
+## commands apply at the next tick's start).
+func _check_stopped(run: String, i: int) -> void:
+	if i < PAUSE_AT + 2 or (i > RESUME_AT and i < RESUME_AT + 2):
+		return
+	var game: Sim = _root.get_node("Tick").get(&"sim") as Sim
+	var inside: bool = i > PAUSE_AT and i <= RESUME_AT
+	if game.stopped_for(&"menu") != inside:
+		problems.append("%s: tick %d %s by the pause menu" % [run, i, "is not stopped" if inside else "is stopped"])
+
+
+## True when some tick of `replay` carries the command `command` (the rebuild by default).
+static func has_command(replay: Replay, command_name: StringName = &"staff_cards_requested") -> bool:
 	var frames: Array[InputFrame] = []
 	for seat in 4:
 		frames.append(InputFrame.new())
@@ -152,7 +177,7 @@ static func has_command(replay: Replay) -> bool:
 		replay.read_tick(tick, frames)
 		for frame in frames:
 			for command in frame.commands:
-				if command[0] == &"staff_cards_requested":
+				if command[0] == command_name:
 					return true
 	return false
 
@@ -203,9 +228,6 @@ func _find() -> void:
 	_input = _root.get_node("PlayerInput")
 	_flow = _root.get_node("Flow")
 	_feel = _root.get_node("Feel") as FeelScript
-	# Feel's stops end by real time (A1): frozen, they hold the same bodies in both runs (N4).
-	_feel.drive_engine = false
-	_feel.set_process(false)
 	# In an exported game: no loading screen and no intro before a run (real time and drawing), as
 	# under a test script.
 	_flow.set(&"loading_enabled", false)

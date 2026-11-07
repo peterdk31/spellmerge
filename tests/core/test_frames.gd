@@ -222,22 +222,20 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	check(not _frames.is_playing(), "it stops when its frames run out")
 
 
-func test_a_pause_in_the_recording_is_skipped_through() -> void:
+## A replay plays one recorded tick each tick (online-ready N4): where the game stood stopped or
+## held when it was recorded, it stands so again from its own state, so nothing is skipped.
+func test_a_replay_plays_a_recorded_tick_each_tick() -> void:
 	_input.add_virtual_device(0)
 	var replay: Replay = _frames.record(&"sandbox_requested", 0)
 	_input.send_virtual(0, &"move_right", 1.0)
 	_frames.tick(DT)
-	paused = true
 	_bus.staff_change_requested.emit(0, 1, 0, &"fire")
 	_frames.tick(DT)
-	_frames.tick(DT)
-	paused = false
 	_input.send_virtual(0, &"move_right", 0.0)
 	_input.send_virtual(0, &"move_left", 1.0)
 	_frames.tick(DT)
 	_frames.stop_recording()
-	check(not replay.is_paused_at(0) and replay.is_paused_at(1) and replay.is_paused_at(2) and not replay.is_paused_at(3), "the paused ticks are marked")
-	check_equal(_heard.size(), 1, "the command applied while paused, as the horde's picks do")
+	check_equal(_heard.size(), 1, "the command applied")
 	_heard.clear()
 	_input.leave(0)
 	check(_frames.play(replay), "it plays")
@@ -245,19 +243,25 @@ func test_a_pause_in_the_recording_is_skipped_through() -> void:
 	check_equal(_frames.frame_of(0).move_vector(), Vector2.RIGHT, "the first tick")
 	check(_heard.is_empty(), "no command yet")
 	_frames.tick(DT)
-	check_equal(_heard.size(), 1, "a running game goes through the paused ticks at once, their commands applied")
-	check_equal(_frames.frame_of(0).move_vector(), Vector2.LEFT, "and plays the next running tick")
+	check_equal(_heard.size(), 1, "the second tick's command")
+	_frames.tick(DT)
+	check_equal(_frames.frame_of(0).move_vector(), Vector2.LEFT, "the third tick")
+	_frames.tick(DT)
 	check(not _frames.is_playing(), "done")
-	# Paused while playing: a tick that ran waits.
-	check(_frames.play(replay), "again")
-	paused = true
-	_frames.tick(DT)
-	check_equal(_frames.play_tick(), 0, "a running tick waits while the game stands paused")
-	paused = false
-	_frames.tick(DT)
-	check_equal(_frames.play_tick(), 1, "and plays once it runs")
-	_frames.stop_playing()
 
+
+## A tick that stands still (the Tick calls `stood`) keeps its presses for the next tick that
+## steps, so a tap during a downed wizard's stop is not lost; the press is spent there, once.
+func test_a_press_in_a_tick_that_stood_still_carries_to_the_next() -> void:
+	_frames.tick(DT)
+	_frames.frame_of(0).press(2)
+	_frames.stood()
+	_frames.tick(DT)
+	_frames.stood()
+	_frames.tick(DT)
+	check(_frames.frame_of(0).is_pressed(2), "the press reaches the tick that steps, through two that stood")
+	_frames.tick(DT)
+	check(not _frames.frame_of(0).is_pressed(2), "and only that one")
 
 func test_a_wizard_takes_its_intent_from_its_seats_frame() -> void:
 	var world := WizardFixture.new(root, true)

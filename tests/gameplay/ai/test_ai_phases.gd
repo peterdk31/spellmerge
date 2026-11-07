@@ -80,7 +80,13 @@ func test_a_phase_by_time() -> void:
 	fx.players[0].position = Vector2(150.0, 0.0)
 	var boss: Actor = fx.imp(Vector2.ZERO, _boss())
 	boss.phases.begin(0)
-	fx.run(boss, int(6.0 / Fixture.STEP) + 1)
+	# Six seconds of the boss's own time: its beam's hits hold it now and then (hit-stop, online-ready
+	# N4), and its clock stands while it is held.
+	var steps: int = 0
+	while boss.phases.current == 0 and steps < int(9.0 / Fixture.STEP):
+		fx.run(boss, 1)
+		steps += 1
+	check(float(steps) * Fixture.STEP >= 6.0, "not before six seconds (%d steps)" % steps)
 	check_equal(boss.phases.current, 1, "after six seconds the next phase")
 	check_equal(boss.caster.staff_count, 1, "one staff again")
 	check(boss.caster.next_cast_sense(0).repeats_held, "a beam")

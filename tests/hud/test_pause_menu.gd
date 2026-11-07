@@ -5,9 +5,8 @@ extends SceneTree
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
 ## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
-## open builder; in the horde's build break (the game paused until every player is ready) the
-## menu opens and closes and leaves the game paused, also when the break ends while it is open
-## (then closing it un-pauses). Input goes through the real input manager's virtual devices.
+## open builder; in the horde's build break (the game stopped until every player is ready) the
+## menu opens and closes as always, its own stop apart from the break's (online-ready N4). Input goes through the real input manager's virtual devices.
 ##
 ## godot --headless --path . --script res://tests/hud/test_pause_menu.gd
 
@@ -24,6 +23,8 @@ const RingKindsScript := preload("res://hud/builder/rings/ring_kinds.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 
 var _failures: Array[String] = []
+## Whether the menu's last `pause_requested` asked the game to stop.
+var _stops: bool = false
 var _bus: EventsScript
 var _input: InputManagerScript
 var _focus: UIFocusScript
@@ -70,7 +71,7 @@ func _initialize() -> void:
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
-	_test_a_horde_break_keeps_the_game_paused()
+	_test_a_horde_break_is_its_own_stop()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -105,6 +106,9 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
 	_bus.spell_light_changed.connect(func(on: bool) -> void: _lights.append(on))
 	_bus.tailless_motes_changed.connect(func(pool: int) -> void: _tailless.append(pool))
+	# The menu's pause is a command (online-ready N4): the stop it asks for, last heard.
+	_stops = false
+	_bus.pause_requested.connect(func(_player: int, on: int) -> void: _stops = on != 0)
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -122,6 +126,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 
 func _teardown() -> void:
 	paused = false
+	_stops = false
 	_actions.clear()
 	_slots.clear()
 	_shakes.clear()
@@ -173,12 +178,12 @@ func _press(player: int, button_name: String) -> void:
 
 func _test_start_opens_it_and_pauses_everyone() -> void:
 	_setup(2)
-	_check(not _menu().visible and not paused, "closed and running at the start")
+	_check(not _menu().visible and not _stops, "closed and running at the start")
 	_tap(1, &"pause")
 	_frame()
 	_check(_menu().is_open() and _menu().visible, "Start opens the pause menu")
 	_check(_menu().owner_player == 1, "for the player who pressed it")
-	_check(paused, "the game is paused for everyone")
+	_check(_stops, "the game stops for everyone (the command pause_requested)")
 	_check(_names() == ["Resume", "Settings"], "the main page out of the sandbox, got %s" % [_names()])
 	_check(_menu().button("Resume").text.begins_with("> "), "the focus is marked with text")
 
@@ -201,11 +206,11 @@ func _test_resume_back_and_start_close_it() -> void:
 	for way: StringName in [&"accept", &"back", &"pause"]:
 		_tap(0, &"pause")
 		_frame()
-		_check(_menu().is_open() and paused, "%s: open" % way)
+		_check(_menu().is_open() and _stops, "%s: open" % way)
 		_tap(0, way)  # accept lands on Resume, the first button.
 		_frame()
 		_check(not _menu().is_open() and not _menu().visible, "%s closes the menu" % way)
-		_check(not paused, "%s: the game goes on" % way)
+		_check(not _stops, "%s: the game goes on" % way)
 		_check(not _hud.get_radial(0).is_open(), "%s: closing with B does not open the builder" % way)
 
 
@@ -704,33 +709,19 @@ func _test_the_run_ending_closes_it() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_bus.run_ended.emit(false)
-	_check(not _menu().is_open() and not paused, "a run ending closes the menu and un-pauses")
+	_check(not _menu().is_open() and not _stops, "a run ending closes the menu and lets the game go")
 
 
-func _test_a_horde_break_keeps_the_game_paused() -> void:
+func _test_a_horde_break_is_its_own_stop() -> void:
 	_setup(2)
-	# The director starts a build break: the game paused, then the event.
-	paused = true
+	# The director's build break stops the game with a reason of its own (Sim.stops), so the menu
+	# opens and closes in it as always: its own stop comes and goes, the break's stands apart.
 	_bus.horde_break_changed.emit(true)
 	for way: StringName in [&"accept", &"back", &"pause"]:
 		_tap(0, &"pause")
 		_frame()
-		_check(_menu().is_open() and _menu().owner_player == 0, "%s: the menu opens in a horde break" % way)
+		_check(_menu().is_open() and _menu().owner_player == 0 and _stops, "%s: the menu opens in a horde break and asks its stop" % way)
 		_tap(0, way)
 		_frame()
-		_check(not _menu().is_open(), "%s: it closes" % way)
-		_check(paused, "%s: closing it leaves the break's pause" % way)
-	_tap(1, &"pause")
-	_frame()
-	# Every player got ready: the director un-pauses and says the break ended.
-	paused = false
+		_check(not _menu().is_open() and not _stops, "%s: it closes and lets its own stop go" % way)
 	_bus.horde_break_changed.emit(false)
-	_check(_menu().is_open() and paused, "a break ending under the open menu keeps the game paused")
-	_tap(1, &"pause")
-	_frame()
-	_check(not _menu().is_open() and not paused, "then closing the menu un-pauses")
-	_tap(0, &"pause")
-	_frame()
-	_tap(0, &"pause")
-	_frame()
-	_check(not paused, "after the break the menu un-pauses as always")

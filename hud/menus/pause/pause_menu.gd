@@ -66,11 +66,11 @@ extends PanelContainer
 ## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
 ## again closes it (panels.gd). Every button of every page is in one UIFocus list and the
 ## buttons of the other pages are hidden, so UIFocus skips them. The focused button is marked
-## with "> ", never by colour alone. Closing it (or its player's device leaving) un-pauses,
-## except in the horde's build break (`horde_break_changed(true)` until `(false)`; owner,
-## 2026-10-31), which keeps the game paused until every player is ready: closing the menu then
-## leaves the tree paused, and a break that ends while the menu is open (the director
-## un-pauses) is paused again here, until the menu closes.
+## with "> ", never by colour alone. Opening it stops the game and closing it (or its player's
+## device leaving) lets it go: the command `pause_requested` (online-ready N4: a stop is the game's
+## state, `Sim.stop`, one reason of its own, so the horde's build break stands apart and the game
+## goes on only when neither stops it). The Tick pauses the tree for the picture. While a replay
+## plays (its commands are the recording's) the menu pauses the tree itself, and the replay waits.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -142,8 +142,8 @@ var page: Page = Page.MAIN
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _sandbox_on: bool = false
-## True during the horde's build break (it holds the game paused).
-var _horde_break: bool = false
+## The player whose menu is closing, for the command that lets the game go.
+var _closing_player: int = 0
 var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
@@ -246,7 +246,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_load_fps()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
-		_events.horde_break_changed.connect(_on_horde_break_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -453,16 +452,13 @@ func _mark_focus() -> void:
 
 
 func _set_paused(on: bool) -> void:
-	if is_inside_tree():
+	if not is_inside_tree():
+		return
+	var frames: Node = get_node_or_null(^"/root/Frames")
+	if frames != null and bool(frames.call(&"is_playing")):
 		get_tree().paused = on
-
-
-## The horde's build break began or ended. The director un-pauses before it says the break ended,
-## so an open menu pauses again.
-func _on_horde_break_changed(on: bool) -> void:
-	_horde_break = on
-	if not on and is_open():
-		_set_paused(true)
+	elif _events != null:
+		_events.pause_requested.emit(owner_player if owner_player >= 0 else _closing_player, 1 if on else 0)
 
 
 func _on_sandbox_changed(on: bool) -> void:
@@ -480,8 +476,8 @@ func _on_closed(player: int) -> void:
 	_focused = null
 	visible = false
 	_show_page(Page.MAIN)
-	# The horde's build break keeps the game paused after the menu.
-	_set_paused(_horde_break)
+	_closing_player = player
+	_set_paused(false)
 	closed_menu.emit(player)
 
 

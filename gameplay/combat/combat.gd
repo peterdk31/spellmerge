@@ -177,6 +177,9 @@ var registry: RegistryScript = null
 var spells: SpellsScript = null
 ## The reaction table. Tests may set another one; null means REACTIONS.
 var reactions: ReactionTable = null
+## Hit-stop, the game's rule (online-ready N4): which moments hold which bodies, and the game-wide
+## stop. State (its reactions' repeat clocks); its Combat is set by `setup`.
+var hit_stop: HitStop = HitStop.new()
 ## The actor table. Null uses the projectile manager's, else the `Actors` autoload, else one
 ## of Combat's own (a scene with neither).
 var actors: ActorsScript = null
@@ -361,6 +364,7 @@ func setup() -> void:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if reactions == null:
 		reactions = REACTIONS
+	hit_stop.combat = self
 	if events == null:
 		return
 	if not events.projectile_hit.is_connected(_on_projectile_hit):
@@ -375,6 +379,36 @@ func setup() -> void:
 		events.pull_requested.connect(_on_pull_requested)
 	if not events.status_requested.is_connected(_on_status_requested):
 		events.status_requested.connect(_on_status_requested)
+	# The moments of other areas that hold bodies (online-ready N4, `hit_stop.gd`).
+	if not events.shot_blocked.is_connected(_on_shot_blocked):
+		events.shot_blocked.connect(_on_shot_blocked)
+	if not events.carrier_ended.is_connected(_on_carrier_ended):
+		events.carrier_ended.connect(_on_carrier_ended)
+	if not events.cue_shown.is_connected(_on_cue_shown):
+		events.cue_shown.connect(_on_cue_shown)
+	if not events.projectile_impact.is_connected(_on_projectile_impact):
+		events.projectile_impact.connect(_on_projectile_impact)
+
+
+## A swing's block (the projectile manager's `impact_form` while it is sent, no shot of its own)
+## is a parry: its stop.
+func _on_shot_blocked(caster: int, _position: Vector2, _tag: int, shot: int) -> void:
+	if shot < 0 and projectiles != null and projectiles.impact_form == &"swing":
+		hit_stop.parried(caster)
+
+
+## A shot struck (the projectile manager's `impact_form` while it is sent names its card).
+func _on_projectile_impact(caster: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
+	if projectiles != null:
+		hit_stop.impact(caster, projectiles.impact_form)
+
+
+func _on_carrier_ended(caster: int, form: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+	hit_stop.carrier_ended(caster, form)
+
+
+func _on_cue_shown(caster: int, cue: StringName, _at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
+	hit_stop.cue(cue, caster)
 
 
 ## A run starts (`Tick.begin_run`, online-ready N3b): any body still registered leaves, and Combat
@@ -851,6 +885,8 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 	if events != null and not (quiet and left != 0.0):
 		events.hit_landed.emit(by, node, amount, where, kind, _slot)
 		events.damage_dealt.emit(by, node, amount, where)
+		# Its stop (online-ready N4): the attacker, this body (its row is its actor id) and the shot.
+		hit_stop.hit(by, row, kind, _slot)
 		if node is Actor:
 			# The actor's own listeners (its AI's grudge, its look's hurt pose) hear it directly.
 			(node as Actor).damaged.emit(by, amount)
@@ -902,6 +938,7 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 		var own_team: int = kit.home_controller.team if kit != null and kit.home_controller != null else team
 		if own_team != ActorsScript.TEAM_WIZARDS:
 			events.enemy_died.emit(by, node, where, _slot)
+			hit_stop.killed(by, node, _slot)
 	if kit != null:
 		kit.die(by)
 	elif is_instance_valid(node) and node.is_inside_tree():
@@ -1076,6 +1113,7 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: fl
 			# Feel shows a burst on each actor zapped and a jagged arc from the struck one.
 			var zapped: Vector2 = _position_of(other_node) + _hurt_offset[other]
 			events.reaction_triggered.emit(actor, DISCHARGE, zapped, _slot)
+			hit_stop.reaction(actor, DISCHARGE, _slot)
 			events.discharge_arc.emit(actor, from, zapped)
 			# A listener may have changed the registrations.
 			other = _row_of_node(other_node)
@@ -1128,6 +1166,7 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 	_react_wait[row] = REACTION_WAIT
 	if events != null:
 		events.reaction_triggered.emit(by, reaction.reaction_id, centre, _slot)
+		hit_stop.reaction(by, reaction.reaction_id, _slot)
 		if _tag != 0:
 			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag, _slot)
 		if not _same(row, node):
@@ -1277,6 +1316,8 @@ func _on_pull_requested(caster: int, position: Vector2, radius: float, strength:
 ## A wizard of seat `player` went down: its statuses, push and barrier go, and shots fly past it
 ## (its target is removed) until it is revived. What hurt it last stays, for `downed_note_of`.
 func _on_player_downed(player: int) -> void:
+	# The game-wide stop of a downed wizard (online-ready N4).
+	hit_stop.downed()
 	var row: int = _seat_row_of(player)
 	if row == ActorsScript.NONE:
 		return

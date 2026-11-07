@@ -6,7 +6,8 @@ extends RefCounted
 ## every hit of the step in hit order:
 ##
 ## 1. PHASE_PRE: what must be read before any damage: Spells' `relay` (it changes the profile
-##    Combat reads), and Feel's impact looks.
+##    Combat reads), each hit's profile right after its own relay (`profile`), and Feel's impact
+##    looks.
 ## 2. PHASE_COMBAT: damage, statuses, reactions and kills, hit by hit, as before. A hit on a body
 ##    an earlier hit of the batch removed (killed) is *lost*: no listener takes it, and its shot is
 ##    handed back to the manager, which tests it again from the start of its path at the next step
@@ -57,6 +58,9 @@ var form: Array[StringName] = []
 var body: PackedInt32Array = PackedInt32Array()
 var core: PackedColorArray = PackedColorArray()
 var look: PackedInt32Array = PackedInt32Array()
+## What the hit does (`Spells.hit_profile`), written by Spells in PHASE_PRE right after the hit's own
+## relay, as the profile Combat read when each hit was sent at once; null for no spell's hit.
+var profile: Array[HitProfile] = []
 # What the hit did to its shot (SHOT_*), and the shot as it was before it: its pierce, life and
 # stick time, and where the path it was tested on began.
 var did: PackedByteArray = PackedByteArray()
@@ -70,6 +74,7 @@ var path_from: PackedVector2Array = PackedVector2Array()
 func clear() -> void:
 	for i in count:
 		target[i] = null
+		profile[i] = null
 	count = 0
 	phase = -1
 	current = -1
@@ -83,6 +88,7 @@ func add() -> int:
 		_grow(maxi(64, i * 2))
 	count = i + 1
 	lost[i] = 0
+	profile[i] = null
 	return i
 
 
@@ -101,11 +107,19 @@ func _grow(size: int) -> void:
 	body.resize(size)
 	core.resize(size)
 	look.resize(size)
+	profile.resize(size)
 	did.resize(size)
 	pierce_before.resize(size)
 	life_before.resize(size)
 	stick_before.resize(size)
 	path_from.resize(size)
+
+
+## Hit `i` is taken (by a listener that needs none of what `Projectiles.batch_turn` tells): false
+## when it is lost.
+func take(i: int) -> bool:
+	current = i
+	return lost[i] == 0
 
 
 ## The body with the key `key` was removed (killed): every later hit of the batch on it is lost.

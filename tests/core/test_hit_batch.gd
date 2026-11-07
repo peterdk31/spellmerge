@@ -15,6 +15,7 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ComboArena := preload("res://tests/content/spells/combo_arena.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -156,6 +157,53 @@ func test_a_shot_spawned_in_the_batch_takes_no_spent_shots_slot() -> void:
 		for slot in spawned:
 			check(not shots.has(slot), "%s: slot %d is none of the spent shots'" % [label, slot])
 		_free(scene)
+
+
+## A relay shot that pierces two donors in one step, each the body of a player whose last cast was
+## infused (frost, then fire): the first hit takes on only the first donor's element, the second
+## both, batched as when each hit is sent at once (Combat reads each hit's profile as it was right
+## after its own relay, not after the later hit's: `HitBatch.profile`).
+func test_a_relay_hit_reads_its_profile_before_a_later_hits_relay() -> void:
+	var records: Array = []
+	for batched: bool in [false, true]:
+		var arena := ComboArena.new(root)
+		arena.projectiles.batch_hits = batched
+		# Two donors on the line, 6 px apart across it: one step of the bolt touches both.
+		var first := arena.add_imp(Vector2(60.0, -3.0), 1000.0)
+		var second := arena.add_imp(Vector2(60.0, 3.0), 1000.0)
+		arena.projectiles.set_target_owner(first, 1)
+		arena.projectiles.set_target_owner(second, 2)
+		for player in 3:
+			arena.place_caster(player, Vector2.ZERO)
+		arena.install_cards(1, 0, ["frost", "bolt"])
+		arena.install_cards(2, 0, ["fire", "bolt"])
+		arena.install_cards(0, 0, ["relay", "pierce", "bolt"])
+		check(arena.cast(1, 0, Vector2.DOWN) and arena.cast(2, 0, Vector2.DOWN), "the donors cast")
+		arena.run(0.1)
+		var before: int = arena.statuses.size()
+		var reacted: int = arena.reactions.size()
+		check(arena.cast(0, 0), "the relay bolt is cast")
+		arena.run(1.0)
+		# Each donor's statuses and reactions from the relay bolt (a reaction by where it was).
+		var seen: Array = []
+		for k in range(before, arena.statuses.size()):
+			var row: Array = arena.statuses[k]
+			if row[0] == 0:
+				seen.append([[first, second].find(row[1]), row[2]])
+		for k in range(reacted, arena.reactions.size()):
+			var row: Array = arena.reactions[k]
+			if row[0] == 0:
+				seen.append([0 if (row[2] as Vector2).y < 0.0 else 1, row[1]])
+		records.append(seen)
+		arena.free_all()
+	var label: String = str(records[0])
+	check(records[0].size() >= 2, "the relay bolt put statuses on the donors: %s" % label)
+	var on_first: Array = []
+	var on_second: Array = []
+	for row: Array in records[0]:
+		(on_first if row[0] == 0 else on_second).append(row[1])
+	check(on_first.size() < on_second.size() or on_second.size() < on_first.size(), "one donor's hit had one element, the other's both: %s" % label)
+	check_equal(records[1], records[0], "batched, each hit read its profile as when sent at once")
 
 
 ## The real Spells and Combat, a crowd under a stream of bolts that kills its front rows: every body

@@ -835,13 +835,14 @@ func hit(caster: int, target: Variant, amount: float, direction: Vector2 = Vecto
 ## stutter, shake or flinch twice a second per burning actor; a status tick is no hit for a
 ## barrier, a hex, a static charge or `actor_hurt`. `amount` may be part of a point (an atom's
 ## speck takes 0.3 health). `team` is the row's team when the caller read it already (a spell's
-## hit, `_apply_spell`), else TEAM_UNREAD. Sets `_discharged`.
-func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool, team: int = TEAM_UNREAD) -> bool:
+## hit, `_apply_spell`), else TEAM_UNREAD; `place` the body's place when the caller read it already
+## (`_position_of`), else INF. Sets `_discharged`.
+func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool, team: int = TEAM_UNREAD, place: Vector2 = Vector2.INF) -> bool:
 	_discharged = false
 	if amount <= 0.0 or not _can_hurt(row):
 		return false
 	var node: Node2D = _nodes[row]
-	var where: Vector2 = _position_of(node)
+	var where: Vector2 = place if place != Vector2.INF else _position_of(node)
 	var actor: int = _cast_id(row)
 	var tick: bool = kind == KIND_STATUS
 	# A barrier takes the hit whole: no damage, no status, no push.
@@ -981,16 +982,36 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 
 ## A step's hits as one batch (shot scale H3b, `HitBatch`): the damage phase, hit by hit in order,
 ## each with its impact's hold first (as `projectile_impact` came just before its hit). A hit whose
-## body an earlier hit of the batch killed is lost (`batch_turn`): its shot flies on.
+## body an earlier hit of the batch killed is lost (`HitBatch.take`): its shot flies on. What the
+## hits share is read once: each card's impact cue (a run of hits of one card asks once), and the
+## profile Spells wrote for each hit before the damage (`HitBatch.profile`, no call a hit).
 func _on_projectile_hits(batch: HitBatch, phase: int) -> void:
 	if phase != HitBatch.PHASE_COMBAT or projectiles == null:
 		return
+	var saved_tag: int = _tag
+	var saved_slot: int = _slot
+	var form: StringName = &""
+	var cue: StringName = hit_stop.impact_cue(form)
 	for i in batch.count:
-		if not projectiles.batch_turn(i):
+		if not batch.take(i):
 			continue
 		var caster: int = batch.caster[i]
-		hit_stop.impact(caster, projectiles.impact_form)
-		_on_projectile_hit(caster, batch.target[i], batch.point[i], batch.tag[i], batch.shot[i])
+		if batch.form[i] != form:
+			form = batch.form[i]
+			cue = hit_stop.impact_cue(form)
+		if cue != &"":
+			hit_stop.cue(cue, caster)
+		var profile: HitProfile = batch.profile[i]
+		if profile == null:
+			continue
+		var row: int = _row_of_node(batch.target[i])
+		if row == ActorsScript.NONE:
+			continue
+		_tag = batch.tag[i]
+		_slot = batch.shot[i]
+		_apply_spell(caster, row, batch.point[i], profile, profile.kind)
+	_tag = saved_tag
+	_slot = saved_slot
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals an actor of the caster's
@@ -1023,7 +1044,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	var reaction: ReactionRow = null
 	if profile.element_id != &"" and _react_wait[row] <= 0.0:
 		reaction = _reaction_for(row, profile.element_id)
-	if not _hit(by, row, damage, direction, strength, kind, profile, false, team):
+	if not _hit(by, row, damage, direction, strength, kind, profile, false, team, feet):
 		return
 	var discharged: bool = _discharged
 	if _same(row, node):

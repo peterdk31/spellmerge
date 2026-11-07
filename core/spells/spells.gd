@@ -924,6 +924,11 @@ func hit_profile(tag: int, shot: int = -1) -> HitProfile:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return null
+	return _profile_of(spell, tag, shot)
+
+
+## `hit_profile` of a hit of `spell` (its tag's), by `shot`.
+func _profile_of(spell: CompiledSpell, tag: int, shot: int) -> HitProfile:
 	# A relay shot hits with what it took on (the hit names its shot).
 	var slot: int = shot if projectiles != null else -1
 	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
@@ -2681,7 +2686,7 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 
 
 ## A step's hits as one batch (shot scale H3b, `HitBatch`): every relay before any damage (it
-## changes the profile Combat reads), then, after all of the step's damage, every hit's cards in hit
+## changes the profile Combat reads) and each hit's profile for Combat (`HitBatch.profile`), then, after all of the step's damage, every hit's cards in hit
 ## order (they read the state after the whole step's damage, not only their own hit's).
 func _on_hits(batch: HitBatch, phase: int) -> void:
 	if (phase != HitBatch.PHASE_PRE and phase != HitBatch.PHASE_SPELLS) or projectiles == null:
@@ -2696,6 +2701,8 @@ func _on_hits(batch: HitBatch, phase: int) -> void:
 			continue
 		if pre:
 			_relay(spell, batch.target[i], tag, batch.shot[i])
+			# What Combat reads of this hit: as it was right after its own relay, before a later hit's.
+			batch.profile[i] = _profile_of(spell, tag, batch.shot[i])
 		else:
 			_hit_cards(spell, batch.caster[i], batch.target[i], batch.point[i], tag, batch.shot[i])
 

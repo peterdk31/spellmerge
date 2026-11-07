@@ -130,6 +130,25 @@ func test_line_follows_the_aim() -> void:
 	check(is_equal_approx(_lane(imp).rotation, imp.aim.angle()) and imp.aim.dot(Vector2.DOWN) > 0.9, "and turns as the aim follows the player")
 
 
+func test_its_gathering_ring_stays_on_the_staff_tip_as_the_aim_turns() -> void:
+	# Regression: the wind cue's ring sat where the staff tip was at the press, moved only with the
+	# body, so as the aim followed the player it stayed behind while the tip and the lane turned.
+	var imp: Actor = fx.imp_facing_player(60.0)
+	# A staff with a length, so its tip swings round the hand as the aim turns.
+	imp.staff_reach = 10.0
+	var feel: Node = fx.with_feel()
+	fx.run(imp, 1)
+	var ring: Dictionary = feel.call("flash_info", &"ring_in")
+	check(not ring.is_empty(), "a ring gathers as it winds up")
+	var pressed: Vector2 = fx.spells.call("aim_origin_of", imp.id)
+	fx.players[0].position = Vector2(0.0, 60.0)
+	fx.run(imp, 3)
+	var tip: Vector2 = fx.spells.call("aim_origin_of", imp.id)
+	ring = feel.call("flash_info", &"ring_in")
+	check(not tip.is_equal_approx(pressed), "the staff tip moved as the aim turned: %s to %s" % [pressed, tip])
+	check(not ring.is_empty() and (ring["at"] as Vector2).distance_to(tip) <= 1.0, "the ring is on the tip as it is now: %s, the tip %s" % [ring.get("at"), tip])
+
+
 func test_telegraph_grows_brighter_and_bigger() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	fx.with_feel()

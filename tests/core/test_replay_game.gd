@@ -102,6 +102,42 @@ func _other_run(start: StringName) -> void:
 	_run.run_seed = seed_before
 
 
+## A run plays by its rules (online-ready N11, core/sim/session_rules.gd): a replay recorded on a
+## machine whose "Max shots" is 750, with a seat moving it to 500 mid-run, plays to the same hashes
+## at every tick on a machine whose own cap is 6,000; the run's cap is the replay's, then the
+## command's, and the machine keeps its own.
+func test_a_replay_plays_by_its_rules_on_a_machine_with_other_settings() -> void:
+	_run.cap = 750
+	_run.cap_request = Vector2i(120, 500)
+	var recorded := Desync.new()
+	var replay: Replay = await _run.record(&"sandbox_requested", 0, 1, recorded)
+	check(replay != null and replay.rules.shot_cap == 750, "the replay carries the run's cap")
+	if replay == null:
+		return
+	var game: Sim = root.get_node("Tick").get(&"sim") as Sim
+	check_equal(game.rules.shot_cap, 500, "the seat's request applied in the run")
+	var asked: bool = false
+	var frames: Array[InputFrame] = []
+	for seat in 4:
+		frames.append(InputFrame.new())
+	for tick in replay.tick_count():
+		replay.read_tick(tick, frames)
+		for command in frames[0].commands:
+			asked = asked or (command[0] == &"shot_cap_requested" and command[1] == 500)
+	check(asked, "the request is in the replay, at its tick")
+	_run.cap = 6000
+	_run.cap_request = Vector2i(-1, 0)
+	var played := Desync.new()
+	await _run.play(Replay.from_bytes(replay.to_bytes()), 0, played)
+	for problem in _run.problems:
+		check(false, problem)
+	check_equal(played.hashes.size(), TICKS, "the replay played every tick")
+	check_equal(Desync.first_parting(recorded, played), -1, "it plays as recorded, on this machine's other cap")
+	game = root.get_node("Tick").get(&"sim") as Sim
+	check_equal(game.rules.shot_cap, 500, "the run's cap, not this machine's")
+	check_equal(SessionRules.machine().shot_cap, 6000, "the machine keeps its own")
+
+
 ## A replay of other content is not played.
 func test_a_replay_of_other_content_is_refused() -> void:
 	var frames: Node = root.get_node("Frames")

@@ -19,8 +19,8 @@ extends Node
 ##   has no native module where MinGW is missing; `--no-native` on Linux shows that changes nothing).
 ##
 ## Every platform plays the same game: the run's seed is fixed (RUN_SEED), and the projectile cap and
-## the horde's alive cap are the web's everywhere (CAP, `Horde.web`; per-machine settings until N11
-## makes them a run's). The lines, one
+## the horde's alive cap are the web's everywhere (CAP and the web's horde cap: this machine's
+## session rules the run is recorded with, N11; the replay then carries them). The lines, one
 ## per tick of the played run (fields separated by tabs, hashes in hex):
 ##
 ##     REPLAY START	<scene>	<platform>	ticks=<n>	native=<on|off>	cap=<n>

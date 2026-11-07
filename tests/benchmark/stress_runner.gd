@@ -395,6 +395,9 @@ func _next_scenario() -> void:
 	RenderingServer.render_loop_enabled = scenario.get("render", true)
 	if _feel != null:
 		_feel.set("particles_enabled", scenario.get("particles", true))
+	# The run takes this machine's rules at its start (online-ready N11): the scenario's cap is this
+	# machine's "Max shots" for its run.
+	SessionRules.machine().shot_cap = _target_shots
 	_projectiles.call("set_cap", _target_shots)
 	for index in PLAYERS:
 		var bot := BotScript.new()
@@ -889,6 +892,7 @@ func _finish(failed: Array[String]) -> void:
 	_stop_logging()
 	_restore_diagnostics()
 	if _projectiles != null and _default_cap > 0:
+		SessionRules.machine().shot_cap = _default_cap
 		_projectiles.call("set_cap", _default_cap)
 	if failed.is_empty():
 		print("STRESS OK: %d scenarios, 4 players with built spells, enemies and shots at the targets, no errors logged" % scenarios.size())

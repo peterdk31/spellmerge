@@ -539,7 +539,7 @@ func test_the_cap_alive_is_clamped_on_desktop_and_web() -> void:
 	check_equal(run.director.max_alive(), HordeScript.MAX_ALIVE_DESKTOP, "the desktop cap")
 	run.run(10.0)
 	check_equal(run.director.alive, HordeScript.MAX_ALIVE_DESKTOP, "the curve's 5000 is held at the desktop cap")
-	run.director.web = true
+	run.director.alive_cap = HordeScript.MAX_ALIVE_WEB
 	check_equal(run.director.max_alive(), HordeScript.MAX_ALIVE_WEB, "the web cap")
 	run.world = run.make_world([0])
 	var old_world: Node2D = run.director.world

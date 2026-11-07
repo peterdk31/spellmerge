@@ -586,10 +586,12 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame"]
-## The session's settings a new run keeps (`begin_run`): the cap, the tailless motes' pool (a dev
-## slider), whether something takes the births, a benchmark's step budget.
-const RUN_KEEPS: Array[StringName] = [&"_cap", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes", &"work_per_step"]
+const VIEW: Array[StringName] = [&"texture", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
+## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
+## its tail births and whether something takes the births are this machine's look (VIEW): they
+## only write what is drawn.
+const RUN_KEEPS: Array[StringName] = [&"_cap", &"work_per_step"]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -1177,8 +1179,6 @@ func is_native() -> bool:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	if events != null and not events.projectile_cap_changed.is_connected(_on_projectile_cap_changed):
-		events.projectile_cap_changed.connect(_on_projectile_cap_changed)
 	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):
 		events.tailless_motes_changed.connect(set_tailless_pool)
 	_nodes.resize(BATCHES)
@@ -1402,9 +1402,15 @@ func get_cap() -> int:
 
 ## The "Max shots" setting (`projectile_cap_changed`): a new cap applies at once, which ends the
 ## shots in the air (`set_cap`); the same cap changes nothing.
-func _on_projectile_cap_changed(cap: int) -> void:
-	if cap != _cap:
-		set_cap(cap)
+## The run's rules (core/sim/session_rules.gd; the Tick hands them over at a run's start, before
+## `begin_run`, and when a seat changes the cap in a run): the cap (`set_cap` when it differs: the
+## shots in the air end) and the hit-test work a step may do.
+func take_rules(rules: SessionRules) -> void:
+	if rules == null:
+		return
+	if rules.shot_cap != _cap:
+		set_cap(rules.shot_cap)
+	work_per_step = rules.hit_work
 
 
 ## The spark pool while the tails are off (`tailless_particle_cap`; the "Tailless motes" dev

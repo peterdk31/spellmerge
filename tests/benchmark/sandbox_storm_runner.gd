@@ -131,7 +131,9 @@ func _ready() -> void:
 		if arg.begins_with("--seconds="):
 			seconds = maxf(arg.trim_prefix("--seconds=").to_float(), 1.0)
 		elif arg.begins_with("--cap="):
-			_projectiles.call("set_cap", maxi(arg.trim_prefix("--cap=").to_int(), 1))
+			# The run takes this machine's rules at its start (online-ready N11).
+			SessionRules.machine().shot_cap = maxi(arg.trim_prefix("--cap=").to_int(), 1)
+			_projectiles.call("set_cap", SessionRules.machine().shot_cap)
 	if _feel != null:
 		for arg in args:
 			if arg.begins_with("--motes="):

@@ -41,6 +41,9 @@ class Area:
 	func begin_run() -> void:
 		calls.append(["%s.begin_run" % name, 0.0])
 
+	func take_rules(rules: SessionRules) -> void:
+		calls.append(["%s.take_rules" % name, float(rules.shot_cap)])
+
 
 ## A body: an Actor that only records its tick (none of an actor's set-up runs).
 class Body:
@@ -185,9 +188,50 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	calls.clear()
 	_tick.begin_run()
 	check_equal(_tick.count, 0, "the clock from 0")
-	check_equal(_names(), ["Entities.begin_run", "Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
+	var expected: Array[String] = []
+	for area: String in ["Entities", "Projectiles", "Spells", "Combat", "Horde"]:
+		expected.append("%s.take_rules" % area)
+		expected.append("%s.begin_run" % area)
+	check_equal(_names(), expected, "the areas made fresh, in order, each under the run's rules")
 	_tick.run(TickScript.DT)
 	check_equal(_tick.count, 1, "the run's first tick")
+
+
+## A run takes this machine's rules, or a replay's while one deals them (online-ready N11), as a copy
+## of its own: a later change of the machine's is the next run's.
+func test_a_run_takes_the_machines_rules_or_a_replays() -> void:
+	SessionRules.machine().shot_cap = 750
+	_tick.begin_run()
+	check_equal(_tick.sim.rules.shot_cap, 750, "the machine's")
+	check(calls.has(["Projectiles.take_rules", 750.0]), "handed to the areas")
+	SessionRules.machine().shot_cap = 1500
+	check_equal(_tick.sim.rules.shot_cap, 750, "the run keeps its own")
+	var replayed := SessionRules.new()
+	replayed.shot_cap = 250
+	SessionRules.begin(replayed)
+	replayed.shot_cap = 4000
+	_tick.begin_run()
+	check_equal(_tick.sim.rules.shot_cap, 250, "a replay's while it deals them")
+	SessionRules.end()
+	_tick.begin_run()
+	check_equal(_tick.sim.rules.shot_cap, 1500, "the machine's again after")
+
+
+## A seat's "Max shots" in a run (`shot_cap_requested`, applied at the next tick by the frames):
+## the run's cap from then on, handed to the areas; this machine's is the setting's, not the
+## command's. A cap out of range or the same again does nothing.
+func test_a_cap_request_changes_the_runs_cap() -> void:
+	_tick.begin_run()
+	calls.clear()
+	_tick.apply_shot_cap(500)
+	check_equal(_tick.sim.rules.shot_cap, 500, "the run's cap")
+	check(calls.has(["Projectiles.take_rules", 500.0]), "handed to the areas")
+	check_equal(SessionRules.machine().shot_cap, SessionRules.defaults().shot_cap, "not this machine's")
+	calls.clear()
+	_tick.apply_shot_cap(500)
+	_tick.apply_shot_cap(0)
+	_tick.apply_shot_cap(SessionRules.MAX_SHOT_CAP + 1)
+	check(calls.is_empty() and _tick.sim.rules.shot_cap == 500, "the same cap or one out of range: nothing")
 
 
 ## Every autoload of a simulation script is either made fresh at a run's start (with a `begin_run`)

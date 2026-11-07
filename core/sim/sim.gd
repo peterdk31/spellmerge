@@ -30,6 +30,9 @@ const SPAN: float = 4294967296.0
 var run_seed: int = 0
 ## Ticks since the run began (the Tick keeps it equal to `Tick.count`).
 var tick: int = 0
+## What the run plays by (core/sim/session_rules.gd, online-ready N11): set at the run's start
+## (`Tick.begin_run`), from a replay's header while one plays, else from this machine's settings.
+var rules: SessionRules = SessionRules.defaults()
 
 ## What `found` gives a node out of the tree: a sim at seed 0, shared.
 static var _still: Sim = null

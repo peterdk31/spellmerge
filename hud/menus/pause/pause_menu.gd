@@ -607,8 +607,8 @@ func _set_shake(on: bool) -> void:
 		_events.screen_shake_changed.emit(on)
 
 
-## Read the saved cap and show it; the manager is told only when it is not the platform's (the
-## manager's own default).
+## Read the saved cap and show it; the simulation is told only when it is not the platform's (the
+## machine's default, `SessionRules.defaults()`): the next run takes it.
 func _load_shot_cap() -> void:
 	var saved: int = ShotCap.snap(int(save.get_setting(SHOT_CAP_SETTING, ShotCap.default_cap())))
 	_show_shot_cap(saved)
@@ -616,7 +616,9 @@ func _load_shot_cap() -> void:
 		_events.projectile_cap_changed.emit(saved)
 
 
-## Move the "Max shots" slider to `cap` (a stop): show it, save it and tell the manager.
+## Move the "Max shots" slider to `cap` (a stop): show it, save it, make it this machine's (the
+## next run's) and ask for it in the run playing now (a command, applied at the next tick: the
+## shots in the air end; online-ready N11).
 func _set_shot_cap(cap: int) -> void:
 	if cap == shot_cap:
 		return
@@ -624,6 +626,8 @@ func _set_shot_cap(cap: int) -> void:
 	save.set_setting(SHOT_CAP_SETTING, cap)
 	if _events != null:
 		_events.projectile_cap_changed.emit(cap)
+		if owner_player >= 0:
+			_events.shot_cap_requested.emit(owner_player, cap)
 
 
 func _show_shot_cap(cap: int) -> void:

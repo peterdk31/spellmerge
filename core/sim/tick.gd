@@ -25,10 +25,17 @@ extends Node
 ## ticks). A slow frame runs up to `max_physics_steps_per_frame` ticks and never changes the delta.
 ## `count` is the ticks since the run began (`begin_run`), or since the game began before any run.
 ##
+## **The run's rules** (online-ready N11, core/sim/session_rules.gd): `begin_run` sets `sim.rules`
+## (a replay's, else this machine's) and hands them to every area of FRESH_AT_RUN that takes them
+## (`take_rules(rules)`) before it is renewed, so it renews under them. This machine's "Max shots"
+## (`projectile_cap_changed`) is heard here and goes to the next run; a change while a run plays is
+## the command `shot_cap_requested`, applied at the next tick's start (and recorded with it).
+##
 ## No `class_name` (it would hide the autoload): preload it, `const TickScript := preload(...)`, for
 ## `TickScript.DT`.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
+const EventsScript := preload("res://core/events/events.gd")
 
 ## A tick's seconds: 60 ticks a second (owner decision 4, online-ready.md).
 const DT: float = 1.0 / 60.0
@@ -61,6 +68,8 @@ var count: int = 0
 var sim: Sim = Sim.new()
 ## Where the areas are found by name. Only tests set this (stand-ins); otherwise the tree's root.
 var areas: Node = null
+## The event bus (the "Events" autoload, found in `_ready`; tests may set it).
+var events: EventsScript = null
 
 ## The open actor ids of this tick, in order (reused).
 var _ids: PackedInt32Array = PackedInt32Array()
@@ -69,6 +78,15 @@ var _ids: PackedInt32Array = PackedInt32Array()
 func _init() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_physics_priority = PRIORITY
+
+
+func _ready() -> void:
+	if events == null:
+		events = get_node_or_null(^"/root/Events") as EventsScript
+	if events != null:
+		if not events.projectile_cap_changed.is_connected(_on_machine_cap):
+			events.projectile_cap_changed.connect(_on_machine_cap)
+		events.listen(&"shot_cap_requested", _on_shot_cap_requested)
 
 
 func _physics_process(delta: float) -> void:
@@ -112,15 +130,41 @@ func begin_run() -> void:
 	count = 0
 	sim.tick = 0
 	sim.run_seed = SimSeed.fresh()
+	sim.rules = SessionRules.for_run()
 	var root: Node = areas if areas != null else get_tree().root
 	for service in FRESH_AT_RUN:
 		var area: Node = root.get_node_or_null(NodePath(service))
 		if area == null:
 			continue
+		if area.has_method(&"take_rules"):
+			area.call(&"take_rules", sim.rules)
 		if not area.has_method(&"begin_run"):
 			push_error("Tick: %s has no begin_run, so it keeps the last run's state (core/sim/sim_fresh.gd)" % service)
 			continue
 		area.call(&"begin_run")
+
+
+## This machine's "Max shots" changed (the pause menu's setting, or the saved one loaded): the
+## cap the next run takes. A run playing now changes only by the command (`shot_cap_requested`).
+func _on_machine_cap(cap: int) -> void:
+	SessionRules.machine().shot_cap = cap
+
+
+## The command `shot_cap_requested` (a seat moved "Max shots" in a run; online-ready N11): the run's
+## shot cap from this tick on, handed to the areas that take the rules (the shots in the air end).
+func apply_shot_cap(cap: int) -> void:
+	if cap < 1 or cap > SessionRules.MAX_SHOT_CAP or cap == sim.rules.shot_cap:
+		return
+	sim.rules.shot_cap = cap
+	var root: Node = areas if areas != null else get_tree().root
+	for service in FRESH_AT_RUN:
+		var area: Node = root.get_node_or_null(NodePath(service))
+		if area != null and area.has_method(&"take_rules"):
+			area.call(&"take_rules", sim.rules)
+
+
+func _on_shot_cap_requested(_seat: int, cap: int) -> void:
+	apply_shot_cap(cap)
 
 
 ## The game's state by area (online-ready N1's `SimHash.areas`, `Desync.capture`): "Sim" (the tick

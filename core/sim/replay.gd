@@ -9,7 +9,9 @@ extends RefCounted
 ## - **The header:** the build (`build`: its version and commit), the content (`content`: a hash of
 ##   every content id, `content_of`), the run's seed (`run_seed`, which `SimSeed` deals the seeds
 ##   nobody chose from), how it started (`start`, one of STARTS, and `starter`, the seat that
-##   asked) and the seats joined at the start (`seats`, a bit per seat).
+##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
+##   the shot cap, the horde's cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
+##   so it plays the same on a machine whose own settings are others.
 ## - **The ticks:** per tick a byte of the seats with a frame (a bit each) and whether the game stood
 ##   paused (PAUSED: the pause menu, the horde's level-up break), then each seat's frame (its
 ##   length, then `InputFrame` bytes). Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
@@ -23,8 +25,8 @@ extends RefCounted
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
-## The file format's version.
-const FORMAT: int = 1
+## The file format's version (2: the run's rules in the header, N11; a replay of format 1 is refused).
+const FORMAT: int = 2
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): Play, the sandbox, the horde.
@@ -43,6 +45,8 @@ var run_seed: int = 0
 var start: StringName = &"sandbox_requested"
 var starter: int = 0
 var seats: int = 0
+## The rules the run played by (`Frames.record` takes this machine's; `Frames.play` deals them).
+var rules: SessionRules = SessionRules.defaults()
 
 var _data: PackedByteArray = PackedByteArray()
 ## Where each tick starts in `_data`.
@@ -107,6 +111,7 @@ func to_bytes() -> PackedByteArray:
 	out.append(maxi(STARTS.find(start), 0))
 	out.append(starter)
 	out.append(seats & 0x0f)
+	rules.encode_into(out)
 	at = out.size()
 	out.resize(at + 4)
 	out.encode_u32(at, _offsets.size())
@@ -130,6 +135,7 @@ func decode(bytes: PackedByteArray) -> String:
 		run_seed = 0
 		starter = 0
 		seats = 0
+		rules = SessionRules.defaults()
 		_data = PackedByteArray()
 		_offsets = PackedInt32Array()
 	return problem
@@ -144,7 +150,7 @@ func _decode(bytes: PackedByteArray) -> String:
 		return "format %d, not %d" % [bytes[4], FORMAT]
 	var size: int = bytes[5]
 	var at: int = 6
-	if size > MAX_BUILD or at + size + 23 > bytes.size():
+	if size > MAX_BUILD or at + size + 23 + SessionRules.BYTES > bytes.size():
 		return "the header is cut short"
 	var text: PackedByteArray = bytes.slice(at, at + size)
 	for byte in text:
@@ -164,8 +170,15 @@ func _decode(bytes: PackedByteArray) -> String:
 	if bytes[at + 2] > 0x0f:
 		return "seats %d" % bytes[at + 2]
 	seats = bytes[at + 2]
-	var ticks: int = bytes.decode_u32(at + 3)
-	at += 7
+	at += 3
+	var read_rules := SessionRules.new()
+	var rules_problem: String = read_rules.decode_at(bytes, at)
+	if rules_problem != "":
+		return rules_problem
+	rules = read_rules
+	at += SessionRules.BYTES
+	var ticks: int = bytes.decode_u32(at)
+	at += 4
 	if ticks > MAX_TICKS:
 		return "%d ticks" % ticks
 	_data = bytes.slice(at)

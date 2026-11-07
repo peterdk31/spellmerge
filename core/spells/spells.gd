@@ -210,7 +210,8 @@ const SPARES: Array[StringName] = [&"_pending_free"]
 const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 
 ## The shots one budget's trigger fires may make in one step (`SpellLimits.FIRE_SHOTS_PER_STEP`
-## unless a benchmark sets another); a fire past it waits for the next step.
+## unless a benchmark sets another); a fire past it waits for the next step. A run's comes from its
+## rules (`take_rules`, online-ready N11).
 var fire_shots_per_step: int = SpellLimits.FIRE_SHOTS_PER_STEP
 ## Payloads fired, and fires that had to wait for a later step, since the last `clear`.
 var fires_made: int = 0
@@ -3020,6 +3021,12 @@ static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
 	onto.later_status_durations.append(duration)
 	onto.later_status_strengths.append(strength)
 
+
+## The run's rules (core/sim/session_rules.gd; the Tick hands them over before `begin_run`): the
+## shots a trigger's fires may make in one step.
+func take_rules(rules: SessionRules) -> void:
+	if rules != null:
+		fire_shots_per_step = rules.fire_shots
 
 ## A run starts (`Tick.begin_run`, online-ready N3b): everything `clear` forgets, then a fresh
 ## runtime's state (core/sim/sim_fresh.gd): its clock, record sequence numbers, pools, staffs, poses

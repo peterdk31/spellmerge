@@ -66,9 +66,7 @@ func before_each() -> void:
 	_mgr.actors = _actors
 	_mgr.events = _bus
 	root.add_child(_mgr)
-	# Stepped by hand only: in the frame the crowd waits for, the engine would also step it, as
-	# many times as it catches up (`max_physics_steps_per_frame`), and the hits with it.
-	_mgr.set_physics_process(false)
+	# Stepped by hand only: a manager of the test's own, which the game's Tick never steps.
 	_mgr.set_cap(SHOTS)
 	_mgr.work_per_step = BUDGET
 	_mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))

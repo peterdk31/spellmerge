@@ -205,6 +205,9 @@ func started(actor: Actor) -> void:
 ## with that body).
 func _bind_home(actor: Actor) -> void:
 	_home = actor
+	# The seat's mouse aims from its wizard's hand (the frames service's local input layer).
+	if frames != null:
+		frames.set_aim_pivot(seat, _home_pivot)
 	if actor.caster != null:
 		actor.caster.staff_built.connect(_on_staff_built)
 	if actor.health != null:
@@ -220,6 +223,14 @@ func _bind_home(actor: Actor) -> void:
 			_fill_bag()
 		else:
 			_announce_bag()
+
+
+## Where the seat's mouse aims from: its home wizard's hand (`Actor.aim_pivot`), INF while it has
+## none in the world.
+func _home_pivot() -> Vector2:
+	if _home == null or not is_instance_valid(_home) or not _home.is_inside_tree():
+		return Vector2.INF
+	return _home.aim_pivot()
 
 
 ## A possession took the actor it drove for `seconds`: it drives nothing until `started`.

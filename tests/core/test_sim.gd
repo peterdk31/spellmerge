@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 ## deals the run's seed at a run's start.
 
 const TickScript := preload("res://core/sim/tick.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 
 
 func test_the_same_name_rolls_the_same() -> void:
@@ -81,24 +82,28 @@ func test_a_node_in_the_tree_finds_the_ticks_sim() -> void:
 
 
 func test_a_run_deals_its_seed_and_counts_from_zero() -> void:
-	var tick: Node = TickScript.new()
-	tick.areas = Node.new()
-	own(tick.areas)
+	var tick: TickScript = TickScript.new()
+	var frames: FramesScript = FramesScript.new()
+	tick.frames = frames
 	tick.run(TickScript.DT)
 	tick.run(TickScript.DT)
 	var sim: Sim = tick.sim
 	check_equal(sim.tick, 1, "the sim's tick is the tick being run")
-	SimSeed.begin(31)
+	var replay := Replay.new()
+	replay.run_seed = 31
+	frames.set(&"_tape", ReplayTape.playing(replay))
 	tick.begin_run()
 	var first: int = sim.run_seed
 	check_equal(sim.tick, 0, "a run counts from 0")
 	tick.run(TickScript.DT)
 	check_equal(sim.tick, 0, "its first tick is 0")
-	SimSeed.begin(31)
+	frames.set(&"_tape", ReplayTape.playing(replay))
 	tick.begin_run()
 	check_equal(sim.run_seed, first, "a replay's run takes the same seed")
-	SimSeed.begin(32)
+	var other := Replay.new()
+	other.run_seed = 32
+	frames.set(&"_tape", ReplayTape.playing(other))
 	tick.begin_run()
 	check(sim.run_seed != first, "another replay's another")
-	SimSeed.end()
+	frames.free()
 	tick.free()

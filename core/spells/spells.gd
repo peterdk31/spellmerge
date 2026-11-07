@@ -484,8 +484,6 @@ var _moves: CasterMoves = null
 
 
 func _init() -> void:
-	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
-	set_physics_process(true)
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)
@@ -541,6 +539,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Spells").steps(&"Spells", step).renewed_by(begin_run).takes_rules(take_rules)
 	if projectiles == null:
 		bind(get_node_or_null("/root/Projectiles") as ProjectilesScript, get_node_or_null("/root/Events") as EventsScript)
 

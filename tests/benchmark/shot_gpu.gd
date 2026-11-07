@@ -183,7 +183,6 @@ func _scenario(scenario: Dictionary) -> void:
 		root.add_child(_motes)
 		_mgr.spark_motes = true
 	# Stepped and drawn by hand only (see the top).
-	_mgr.set_physics_process(false)
 	_mgr.set_process(false)
 	_mgr.set_walls([Rect2(0.0, 0.0, 640.0, 8.0), Rect2(0.0, 352.0, 640.0, 8.0), Rect2(0.0, 0.0, 8.0, 360.0), Rect2(632.0, 0.0, 8.0, 360.0)] as Array[Rect2])
 	for seat in 4:

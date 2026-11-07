@@ -32,6 +32,7 @@ extends RefCounted
 const BotScript := preload("res://tests/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const TickScript := preload("res://core/sim/tick.gd")
 
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
 const REBUILD_AT: int = 100
@@ -162,7 +163,7 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 func _check_stopped(run: String, i: int) -> void:
 	if i < PAUSE_AT + 2 or (i > RESUME_AT and i < RESUME_AT + 2):
 		return
-	var game: Sim = _root.get_node("Tick").get(&"sim") as Sim
+	var game: Sim = (_root.get_node("Tick") as TickScript).sim
 	var inside: bool = i > PAUSE_AT and i <= RESUME_AT
 	if game.stopped_for(&"menu") != inside:
 		problems.append("%s: tick %d %s by the pause menu" % [run, i, "is not stopped" if inside else "is stopped"])
@@ -202,7 +203,7 @@ func fresh() -> void:
 ## The game's areas by name, as the Tick names them (`state_areas`): the run's time and chance,
 ## the autoloads that simulate, and every actor's body by actor id.
 func areas() -> Dictionary:
-	return _root.get_node("Tick").call(&"state_areas")
+	return (_root.get_node("Tick") as TickScript).state_areas()
 
 
 ## One tick: its hashes to `into`.
@@ -244,7 +245,7 @@ func _find() -> void:
 
 ## A problem when the run's shot cap is not its rules' (a machine setting applied in the run).
 func _check_settings(start: StringName) -> void:
-	var game: Sim = _root.get_node("Tick").get(&"sim") as Sim
+	var game: Sim = (_root.get_node("Tick") as TickScript).sim
 	var now: int = int(_root.get_node("Projectiles").call("get_cap"))
 	if game != null and now != game.rules.shot_cap:
 		problems.append("%s: the shot cap is %d, not the run's %d" % [start, now, game.rules.shot_cap])

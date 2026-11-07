@@ -13,8 +13,10 @@ extends Node
 ##   them the same way, its stops being the game's state.
 ## - **Where a frame comes from**, per seat: the replay being played (`play`); else the seat's
 ##   source (`set_source`: a bot, a `FrameSource`); else its device through the local input layer
-##   (`LocalInput`: the walk, the aim with the mouse turned into a direction from the hand of the
-##   actor the seat drives, the buttons, captured); else nothing (a cleared frame).
+##   (`LocalInput`: the walk, the aim with the mouse turned into a direction from the seat's aim
+##   pivot, the buttons, captured); else nothing (a cleared frame). The pivot (the hand the seat's
+##   wizard aims from) is told by whoever drives the seat (`set_aim_pivot`: its PlayerController),
+##   so the input layer knows no body.
 ## - **Commands:** the HUD's requests (core/events, `command_sink`) and the seat's device joining
 ##   or leaving go into the seat's next frame, and the frame's commands apply when its tick starts,
 ##   seat by seat, in the order they were sent (`EventsScript.apply_command`). Joins and leaves
@@ -23,20 +25,22 @@ extends Node
 ## - **Replays:** `record(start, starter)` starts a run and records every tick's frames (the seats
 ##   joined, or with a command) into a `Replay`, `stop_recording` hands it over; `play(replay)`
 ##   joins its seats, starts its run the same way and feeds its frames, one a tick, until they run
-##   out (live input and commands are dropped meanwhile), one a tick: the game's stops are part of
-##   its state (N4), so it stands still where the recording did. Each recorded tick still says
-##   whether the game stood stopped (the format's flag; read by nothing). Both deal the seeds nobody chose from the
-##   replay's seed (`SimSeed.begin`). A source set while a replay plays is still asked each tick
+##   out (live input and commands are dropped meanwhile): the game's stops are part of its state
+##   (N4), so it stands still where the recording did. The replay on the deck is a `ReplayTape`
+##   (core/sim/replay_tape.gd). A source set while a replay plays is still asked each tick
 ##   and its frame dropped: a bot reads the game through queries that fill the services' caches
 ##   (the projectile manager's threat grid and target table), which count as state and change the
 ##   next step, so a bot's run replays exactly only with the bot watching again (docs/DECISIONS.md,
 ##   2026-11-05). A person's input reads nothing of the game but where the hand is.
+## - **A run's start** (`next_run_seed`, `next_run_rules`; the Tick asks at `begin_run`): the seed
+##   and rules of the replay on the deck, else a random seed and this machine's rules
+##   (`SessionRules.machine()`, changed by the "Max shots" setting, `projectile_cap_changed`). Online
+##   (later), the host's come in here too, beside its inputs.
 ##
 ## Nothing here allocates per tick, but a command (an array) and a recorded tick (its bytes).
 
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
-const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const SEATS: int = 4
@@ -44,7 +48,6 @@ const SEATS: int = 4
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
 var input: InputManagerScript = null
-var actors: ActorsScript = null
 var registry: RegistryScript = null
 ## Whether the Tick starts its tick (the game). A test that ticks it by hand (`tick`) turns it off.
 var auto_tick: bool = true
@@ -59,12 +62,10 @@ var _local: Array[LocalInput] = []
 var _sources: Array[FrameSource] = [null, null, null, null]
 ## Per seat: the commands sent since the last tick's start, each `[name, args...]`.
 var _pending: Array[Array] = [[], [], [], []]
-var _recording: Replay = null
-var _playing: Replay = null
-var _play_at: int = 0
-## Where the seat's actor holds its staff and where the mouse is, for the local layer.
-var _hand: Vector2 = Vector2.INF
-var _mouse: Vector2 = Vector2.INF
+## The replay being recorded or played, or null.
+var _tape: ReplayTape = null
+## Per seat: where the seat aims from (`set_aim_pivot`: a world point, INF for none), or invalid.
+var _pivots: Array[Callable] = [Callable(), Callable(), Callable(), Callable()]
 ## The frame a source watching a replay fills, dropped.
 var _watched: InputFrame = InputFrame.new()
 ## Per seat: the presses of the ticks that stood still since the last tick that stepped (`stood`).
@@ -85,8 +86,6 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
-	if actors == null:
-		actors = get_node_or_null("/root/Actors") as ActorsScript
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if events == null:
@@ -95,6 +94,7 @@ func _ready() -> void:
 	events.command_sink = _on_command
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
+	events.projectile_cap_changed.connect(_on_machine_cap)
 
 
 func _exit_tree() -> void:
@@ -117,22 +117,40 @@ func source_of(seat: int) -> FrameSource:
 	return _sources[seat] if seat >= 0 and seat < SEATS else null
 
 
+## Seat `seat` aims its mouse from `pivot()` (a world point; INF for none): its wizard's hand. An
+## invalid Callable: from nowhere (the mouse gives no aim).
+func set_aim_pivot(seat: int, pivot: Callable) -> void:
+	if seat >= 0 and seat < SEATS:
+		_pivots[seat] = pivot
+
+
+## The seed of the run that starts next (the Tick's `begin_run`): the replay's on the deck, else
+## random.
+func next_run_seed() -> int:
+	return _tape.next_run_seed() if _tape != null else SimSeed.fresh()
+
+
+## The rules of the run that starts next: the replay's on the deck, else this machine's (a copy).
+func next_run_rules() -> SessionRules:
+	return _tape.run_rules() if _tape != null else SessionRules.machine().copy()
+
+
 ## A tick starts: every seat's frame is built (or read from the replay played), recorded, and its
 ## commands applied. `delta` is the tick's length in seconds.
 func tick(delta: float) -> void:
 	ticks += 1
-	if _playing != null:
+	if is_playing():
 		_read_replay(delta)
 	else:
 		_build(delta)
-		if _recording != null:
-			_recording.add_tick(_frames, _recorded_seats(), _stopped())
+		if _tape != null:
+			_tape.record_tick(_frames, _recorded_seats())
 		_apply()
 	for seat in SEATS:
 		if _carried[seat] != 0:
 			_frames[seat].pressed_bits |= _carried[seat]
 			_carried[seat] = 0
-	if _playing != null and _play_at >= _playing.tick_count():
+	if is_playing() and not _tape.has_tick():
 		stop_playing()
 
 
@@ -157,26 +175,23 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.starter = starter
 	replay.seats = _joined_seats()
 	replay.rules = SessionRules.machine().copy()
-	_recording = replay
+	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
-	SimSeed.begin(replay.run_seed)
-	SessionRules.begin(replay.rules)
 	_send_start(start, starter)
 	return replay
 
 
 ## Stop recording; returns the replay (null when none was recorded).
 func stop_recording() -> Replay:
-	var replay: Replay = _recording
-	if replay != null:
-		_recording = null
-		SimSeed.end()
-		SessionRules.end()
+	if not is_recording():
+		return null
+	var replay: Replay = _tape.replay
+	_tape = null
 	return replay
 
 
 func is_recording() -> bool:
-	return _recording != null
+	return _tape != null and not _tape.plays
 
 
 ## Play `replay` from its first tick: its seats join (virtual devices, where free), its run starts
@@ -192,50 +207,39 @@ func play(replay: Replay) -> bool:
 	if replay.build != Replay.build_of():
 		push_warning("Frames: the replay was recorded by %s, this is %s; it may play differently." % [replay.build, Replay.build_of()])
 	stop_recording()
-	_playing = replay
-	_play_at = 0
+	_tape = ReplayTape.playing(replay)
 	_carried.fill(0)
 	for seat in SEATS:
 		_pending[seat].clear()
 		if replay.seats & (1 << seat) != 0 and input != null and not input.is_joined(seat):
 			input.add_virtual_device(seat)
-	SimSeed.begin(replay.run_seed)
-	SessionRules.begin(replay.rules)
 	_send_start(replay.start, replay.starter)
 	return true
 
 
 ## Stop playing (by itself once the frames run out): the seats take their own input again.
 func stop_playing() -> void:
-	if _playing == null:
-		return
-	_playing = null
-	_play_at = 0
-	SimSeed.end()
-	SessionRules.end()
+	if is_playing():
+		_tape = null
 
 
 func is_playing() -> bool:
-	return _playing != null
+	return _tape != null and _tape.plays
 
 
 ## The tick of the replay played that comes next (0 before its first).
 func play_tick() -> int:
-	return _play_at
+	return _tape.at if is_playing() else 0
 
 
+## Send the request `start` (one of `Replay.STARTS`, each an event with the seat that asks).
 func _send_start(start: StringName, starter: int) -> void:
 	if events == null:
 		return
-	match start:
-		&"play_requested":
-			events.play_requested.emit(starter)
-		&"sandbox_requested":
-			events.sandbox_requested.emit(starter)
-		&"horde_requested":
-			events.horde_requested.emit(starter)
-		_:
-			push_warning("Frames: %s does not start a run." % start)
+	if not Replay.STARTS.has(start):
+		push_warning("Frames: %s does not start a run." % start)
+		return
+	events.emit_signal(start, starter)
 
 
 func _build(delta: float) -> void:
@@ -252,8 +256,8 @@ func _build(delta: float) -> void:
 				frame.pressed_bits = 0
 				frame.captured = true
 		elif input != null and input.is_joined(seat):
-			_find_hand(seat)
-			_local[seat].fill(frame, input, seat, delta, _hand, _mouse)
+			var hand: Vector2 = _pivot(seat)
+			_local[seat].fill(frame, input, seat, delta, hand, _mouse_world() if hand != Vector2.INF else Vector2.INF)
 		var pending: Array = _pending[seat]
 		if pending.is_empty():
 			continue
@@ -263,19 +267,20 @@ func _build(delta: float) -> void:
 		pending.clear()
 
 
-## Where the hand of the actor seat `seat` drives is, and the mouse in its world (INF for none), but
-## only while the seat aims with the mouse.
-func _find_hand(seat: int) -> void:
-	_hand = Vector2.INF
-	_mouse = Vector2.INF
-	if actors == null or not input.is_mouse_aiming(seat):
-		return
-	var body := actors.node_of(actors.actor_of_seat(seat)) as Node2D
-	if body == null or not body.is_inside_tree():
-		return
-	var offset: Variant = body.get(&"hand_offset")
-	_hand = body.global_position + (offset as Vector2 if offset is Vector2 else Vector2.ZERO)
-	_mouse = body.get_global_mouse_position()
+## Where seat `seat` aims its mouse from (its pivot's point), INF while it aims otherwise or has
+## no pivot.
+func _pivot(seat: int) -> Vector2:
+	if not input.is_mouse_aiming(seat) or not _pivots[seat].is_valid():
+		return Vector2.INF
+	return _pivots[seat].call() as Vector2
+
+
+## The mouse in the world: the viewport's mouse through its canvas transform (the world's camera).
+func _mouse_world() -> Vector2:
+	if not is_inside_tree():
+		return Vector2.INF
+	var viewport: Viewport = get_viewport()
+	return viewport.get_canvas_transform().affine_inverse() * viewport.get_mouse_position()
 
 
 ## The replay's next tick, read and applied: one a tick. Where the recording stood stopped or held,
@@ -287,7 +292,7 @@ func _read_replay(delta: float) -> void:
 			_watched.seat = seat
 			_watched.clear()
 			_sources[seat].fill_frame(_watched, delta)
-	if _play_at < _playing.tick_count():
+	if _tape.has_tick():
 		_read_tick()
 		_apply()
 		return
@@ -296,8 +301,7 @@ func _read_replay(delta: float) -> void:
 
 
 func _read_tick() -> void:
-	_playing.read_tick(_play_at, _frames)
-	_play_at += 1
+	_tape.read_tick(_frames)
 	for seat in SEATS:
 		_pending[seat].clear()
 		if input == null:
@@ -329,12 +333,6 @@ func _apply() -> void:
 			events.apply_command(command_name, args)
 
 
-## True while the game stands stopped (the pause menu, the horde's level-up break): the recording's
-## flag, read by nothing since N4.
-func _stopped() -> bool:
-	return Sim.found(self).is_stopped()
-
-
 ## A bit per seat joined now.
 func _joined_seats() -> int:
 	var mask: int = 0
@@ -356,7 +354,7 @@ func _recorded_seats() -> int:
 
 ## A command was sent (core/events): into its seat's next frame. Dropped while a replay plays.
 func _on_command(command: StringName, args: Array) -> void:
-	if _playing != null:
+	if is_playing():
 		return
 	if args.is_empty() or typeof(args[0]) != TYPE_INT or int(args[0]) < 0 or int(args[0]) >= SEATS:
 		push_warning("Frames: %s for no seat is dropped." % command)
@@ -367,10 +365,17 @@ func _on_command(command: StringName, args: Array) -> void:
 
 
 func _on_device_joined(player: int, _device: int) -> void:
-	if player >= 0 and player < SEATS and _playing == null:
+	if player >= 0 and player < SEATS and not is_playing():
 		_pending[player].append([InputFrame.JOIN])
 
 
 func _on_device_left(player: int, _device: int) -> void:
-	if player >= 0 and player < SEATS and _playing == null:
+	if player >= 0 and player < SEATS and not is_playing():
 		_pending[player].append([InputFrame.LEAVE])
+
+
+## This machine's "Max shots" changed (the pause menu's setting, or the saved one loaded): the cap
+## of the runs that start from now on with this machine's rules. A run playing now changes only by
+## the command (`shot_cap_requested`).
+func _on_machine_cap(cap: int) -> void:
+	SessionRules.machine().shot_cap = cap

@@ -20,6 +20,37 @@ extends RefCounted
 ##     var whole: int = SimHash.whole(hashes)
 ##     assert(walk.problems.is_empty())
 
+## What a body's name starts with in a state's areas (`Tick.state_areas`: "actor 7").
+const BODY_PREFIX: String = "actor "
+
+
+## Part `slice` (0 to `slices` - 1) of the areas `named` (`Tick.state_areas`), so a check of the
+## whole state can be spread over `slices` ticks (N3c: hashing it all in one tick took tens of
+## milliseconds in a crowd; a netcode checking once a second hashes part `count % 60` each tick, and
+## every machine hashes the same part at the same tick). The areas that are not bodies go one to a
+## part, spread evenly in the order given; a body ("actor 7") goes to part `id % slices`. Each
+## area is in exactly one part.
+static func slice(named: Dictionary, part: int, slices: int) -> Dictionary:
+	if slices <= 1:
+		return named
+	var services: int = 0
+	for name: Variant in named:
+		if not String(name).begins_with(BODY_PREFIX):
+			services += 1
+	var out: Dictionary = {}
+	var index: int = 0
+	for name: Variant in named:
+		var text: String = String(name)
+		var at: int
+		if text.begins_with(BODY_PREFIX):
+			at = posmod(int(text.trim_prefix(BODY_PREFIX)), slices)
+		else:
+			at = floori(float(index) * float(slices) / float(services))
+			index += 1
+		if at == part:
+			out[name] = named[name]
+	return out
+
 
 ## Each area's hash, by name, in the order given. Problems go to `walk.problems`: a walk of the
 ## caller's (with its own settings; paths off is several times faster), or one of its own without

@@ -5,6 +5,7 @@ extends "res://tests/support/screenshot.gd"
 ## not depend on the frame rate.
 
 
+const TickScript := preload("res://core/sim/tick.gd")
 const SAVE_PATH: String = "user://shot_intro_save.cfg"
 const MOMENTS: Array = [[1.5, "intro_walk_in"], [5.0, "intro_oops"], [6.6, "intro_fall"], [7.9, "intro_thud"], [11.0, "intro_obviously"], [12.6, "intro_home_is_up_there"]]
 
@@ -24,11 +25,11 @@ func take() -> void:
 	if intro == null:
 		fail("the intro did not start")
 		return
-	# Hold it still between shots: Flow steps it only through its own process.
-	flow.set_process(false)
+	# Hold it still between shots: the Tick steps Flow, and its intro with it.
+	(root.get_node("Tick") as TickScript).set_ticking(flow, false)
 	for moment: Array in MOMENTS:
 		intro.set("time", float(moment[0]))
 		intro.call("step", 0.0)
 		await shot(String(moment[1]))
-	flow.set_process(true)
+	(root.get_node("Tick") as TickScript).set_ticking(flow, true)
 	DirAccess.remove_absolute(SAVE_PATH)

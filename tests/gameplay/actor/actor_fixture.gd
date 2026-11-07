@@ -134,7 +134,7 @@ func add(body: Actor, at: Vector2) -> Actor:
 	_wire(body)
 	body.position = at
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	actors.append(body)
 	return body
 

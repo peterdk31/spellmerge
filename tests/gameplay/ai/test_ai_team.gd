@@ -119,7 +119,7 @@ func _waiting_imp(at: Vector2, teamwork: float) -> Actor:
 	body.position = at
 	fx.wire(body)
 	root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	fx.enemies.append(body)
 	return body
 
@@ -198,7 +198,7 @@ func _standing_imp(at: Vector2, teamwork: float) -> Actor:
 	body.position = at
 	fx.wire(body)
 	root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	fx.enemies.append(body)
 	return body
 

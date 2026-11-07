@@ -131,7 +131,7 @@ func wizard(at: Vector2, seat: int = 0) -> Actor:
 	body.actors = actors
 	body.position = at
 	world.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	wizards.append(body)
 	return body
 

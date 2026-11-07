@@ -252,7 +252,7 @@ func _imp_of(team: int, rows: Array, at: Vector2, casts: PackedInt32Array) -> Ac
 	body.position = at
 	fx.wire(body)
 	root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	fx.enemies.append(body)
 	body.caster.cast_done.connect(func(staff: int, _o: Vector2, _d: Vector2) -> void: casts[staff] += 1)
 	return body

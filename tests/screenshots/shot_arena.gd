@@ -162,8 +162,8 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 			(other as Node2D).process_mode = Node.PROCESS_MODE_DISABLED
 	var winding: Node2D = spare[0]
 	var hurt: Node2D = spare[1]
-	winding.set_physics_process(false)
-	hurt.set_physics_process(false)
+	(winding as Actor).ticking = false
+	(hurt as Actor).ticking = false
 	wizard.global_position = Vector2(200.0, 180.0)
 	winding.global_position = Vector2(200.0, 130.0)
 	hurt.global_position = Vector2(470.0, 130.0)

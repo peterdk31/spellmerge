@@ -34,7 +34,7 @@ func _made() -> Replay:
 		frames[2].set_aim(Vector2.UP)
 		if tick == 1:
 			frames[2].add_command(&"horde_pick_requested", [1])
-		replay.add_tick(frames, 0b0101, tick == 2)
+		replay.add_tick(frames, 0b0101)
 		frames[0].pressed_bits = 0
 	return replay
 
@@ -64,7 +64,6 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check_equal(b[2].commands, [[&"horde_pick_requested", 1]], "a command at its tick")
 	check(b[1].move == Vector2i.ZERO and b[1].commands.is_empty(), "a seat with no frame reads cleared")
 	check_equal(back.read_tick(3, b), -1, "no tick past the end")
-	check(back.is_paused_at(2) and not back.is_paused_at(1), "the paused tick")
 	check_equal(back.to_bytes(), replay.to_bytes(), "the same bytes again")
 
 
@@ -172,10 +171,16 @@ func test_the_content_hash_follows_the_ids() -> void:
 
 
 func test_the_run_seed_deals_the_same_seeds() -> void:
-	SimSeed.begin(77)
-	var first: Array[int] = [SimSeed.fresh(), SimSeed.fresh()]
-	SimSeed.begin(77)
-	var again: Array[int] = [SimSeed.fresh(), SimSeed.fresh()]
-	SimSeed.end()
-	check_equal(again, first, "the same seeds in the same order")
-	check(not SimSeed.is_dealing(), "random again after end")
+	var replay := Replay.new()
+	replay.run_seed = 77
+	var tape := ReplayTape.recording(replay)
+	var first: Array[int] = [tape.next_run_seed(), tape.next_run_seed()]
+	var again_tape := ReplayTape.playing(replay)
+	var again: Array[int] = [again_tape.next_run_seed(), again_tape.next_run_seed()]
+	check_equal(again, first, "the same seeds in the same order, recorded and played")
+	check(first[0] != first[1], "each run its own")
+	replay.rules.shot_cap = 321
+	var rules: SessionRules = tape.run_rules()
+	rules.shot_cap = 5
+	check_equal(tape.run_rules().shot_cap, 321, "each run takes a copy of the replay's rules")
+

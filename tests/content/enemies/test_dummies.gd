@@ -33,7 +33,7 @@ func _training() -> Actor:
 	dummy.data = TrainingData
 	dummy.position = Vector2(100.0, 100.0)
 	root.add_child(own(dummy))
-	dummy.set_physics_process(false)
+	dummy.ticking = false
 	return dummy
 
 
@@ -166,7 +166,7 @@ func test_the_shooting_dummy_fires_slow_telegraphed_shots_at_the_nearest_wizard(
 		root.add_child(wizard)
 		projectiles.call("add_target", wizard, 8.0, ProjectileManagerScript.LAYER_PLAYER)
 	root.add_child(own(dummy))
-	dummy.set_physics_process(false)
+	dummy.ticking = false
 	var ai := dummy.get_node("AIController") as AIController
 	dummy.step(0.05)
 	check(ai.is_telegraphing(), "a wizard 200 px away is in range: the telegraph shows")

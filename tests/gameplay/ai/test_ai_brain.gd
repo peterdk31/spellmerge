@@ -77,7 +77,7 @@ func test_it_never_blasts_a_target_inside_its_own_blast() -> void:
 	var profile: AIProfile = _profile()
 	profile.caution = 0.0
 	var imp: Actor = _enemy([["blast", "bolt"]], Vector2.ZERO, profile)
-	fx.players[0].set_physics_process(false)
+	(fx.players[0] as Actor).ticking = false
 	var brain: AIBrain = Fixture.ai(imp).brain
 	for i in 20:
 		# Hold it where it is: the test is about the choice, not the walk away.

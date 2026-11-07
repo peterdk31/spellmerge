@@ -165,8 +165,6 @@ var board: TeamBoard = TeamBoard.new()
 
 
 func _init() -> void:
-	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
-	set_physics_process(true)
 	z_index = DRAW_Z
 	_familiar_node = MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
@@ -203,6 +201,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Entities").steps(&"Entities", step).renewed_by(begin_run)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if projectiles == null:
@@ -408,8 +408,8 @@ func _place_decoy(row: int, owner: int, tag: int, at: Vector2, body: Node2D) -> 
 	look.copy_look(body)
 	look.tint(ProjectileManagerScript.ramp_color(_ramp[row]).lerp(Color.WHITE, 0.4))
 	add_child(decoy)
-	# Entities steps it (`step`), not its own physics callback.
-	decoy.set_physics_process(false)
+	# Entities steps it (`step`), not the Tick.
+	decoy.ticking = false
 	if spells != null and decoy.id >= 0:
 		spells.entity_body = decoy.id
 

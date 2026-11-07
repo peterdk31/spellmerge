@@ -180,7 +180,6 @@ func add_entities() -> void:
 	entities.actors = projectiles.actors
 	entities.combat = combat
 	_root.add_child(entities)
-	entities.set_physics_process(false)
 	_owned.push_front(entities)
 
 

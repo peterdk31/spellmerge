@@ -96,7 +96,6 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	director.curve = curve([[0.0, 4.0, 50]], {ENEMY_A: 1.0})
 	director.sim = Sim.seeded(7)
 	root.add_child(director)
-	director.set_process(false)
 	world = make_world(seats)
 	bus.horde_status.connect(func(_s: float, _k: int, _a: int, _l: int, _x: int, _n: int) -> void: statuses += 1)
 	bus.horde_picks_offered.connect(func(seat: int, ids: Array[StringName]) -> void: offers.append([seat, ids]))

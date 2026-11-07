@@ -92,7 +92,7 @@ func wizard(seat: int, at: Vector2 = Vector2.ZERO, cards: Array = NO_CARDS, staf
 func add(body: Actor) -> Actor:
 	_wire(body)
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	if not wizards.has(body):
 		wizards.append(body)
 	return body

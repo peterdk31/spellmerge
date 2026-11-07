@@ -89,6 +89,7 @@ extends Node
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
+const TickScript := preload("res://core/sim/tick.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -188,6 +189,9 @@ const DERIVED: Array[StringName] = [&"events", &"registry", &"input", &"combat",
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 
+## Why Flow needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
+const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's members itself"
+
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
@@ -255,6 +259,8 @@ var _enemy_data: EnemyBase = null
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Flow").steps(&"Flow", step).fresh_because(FRESH_BECAUSE)
 	if save == null:
 		save = SaveFile.new()
 	if _is_automated():
@@ -288,11 +294,6 @@ func _ready() -> void:
 	events.player_revived.connect(_on_player_revived)
 	events.player_joined.connect(_on_player_joined)
 	events.player_left.connect(_on_player_left)
-
-
-func _init() -> void:
-	# The tick runs its timers (`step`, core/sim/tick.gd): the flag says so; there is no callback.
-	set_process(true)
 
 
 ## Advance the intro, the next wave's and the restart timers by `delta` seconds.
@@ -408,11 +409,11 @@ func start_run(requester: int) -> bool:
 	_wizard_scene = wizard_scene
 	# The run starts from a fresh game's state (online-ready N3b): the one clock from 0, and every
 	# service as a fresh one's (`Tick.begin_run`; the autoload, found on use).
-	var tick: Node = get_node_or_null(^"/root/Tick")
+	var tick: TickScript = TickScript.of(self) as TickScript
 	if tick == null:
 		push_error("Flow: the Tick autoload is missing, so the run starts on the last run's state.")
 	else:
-		tick.call(&"begin_run")
+		tick.begin_run()
 	var layout: Node = room.scene.instantiate()
 	var size: Vector2 = room_size(room, layout)
 	if projectiles != null:

@@ -81,7 +81,7 @@ func _wizard(index: int, at: Vector2) -> Actor:
 	wizard.actors = _actors
 	wizard.position = at
 	root.add_child(wizard)
-	wizard.set_physics_process(false)
+	wizard.ticking = false
 	# Its hurtbox registered it in Combat's seat slot.
 	_wizards.append(wizard)
 	return wizard

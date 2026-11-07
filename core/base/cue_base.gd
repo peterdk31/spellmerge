@@ -145,6 +145,17 @@ extends Resource
 ## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
 ## weight. 0 (the default) plays every time.
 
+## The cues of moments both the game's hit-stop (gameplay/combat/hit_stop.gd) and Feel play: one
+## name each, here, so the two always pick the same cue.
+const REACTION_CUE: StringName = &"reaction"
+const PARRY_CUE: StringName = &"parry"
+const DOWNED_CUE: StringName = &"player_downed"
+const ENEMY_DEATH_CUE: StringName = &"enemy_death"
+const BOSS_DEATH_CUE: StringName = &"boss_death"
+## A reaction's cue weighs in (its holds; Feel's sound and shake) at most once in this many
+## seconds, per reaction.
+const REACTION_REPEAT: float = 0.3
+
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`flash`), motes and a floor mark.
@@ -355,3 +366,10 @@ func _stream_problems(i: int, part: Dictionary) -> PackedStringArray:
 		if int(layer) < 1 or int(layer) > MoteKind.LOOK_LAYERS:
 			found.append("%s: stream part %d's feet layer %s is not a look layer (1-%d)" % [id, i, layer, MoteKind.LOOK_LAYERS])
 	return found
+
+
+## The cue of the reaction `reaction_id`: its own (`reaction_<id>`) where `find` (a cue id to its
+## CueBase, or null) has one, else REACTION_CUE.
+static func reaction_cue(reaction_id: StringName, find: Callable) -> StringName:
+	var own: StringName = StringName("reaction_" + String(reaction_id))
+	return own if find.call(own) != null else REACTION_CUE

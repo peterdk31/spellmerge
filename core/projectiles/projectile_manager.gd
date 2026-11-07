@@ -1105,8 +1105,6 @@ var _cand_found: int = 0
 
 
 func _init() -> void:
-	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
-	set_physics_process(true)
 	for pass_name in BEHAVIOUR_PASSES:
 		_passes.append(Callable(self, pass_name))
 	assert(_passes.size() == BEHAVIOURS, "one pass per behaviour, in the order of B_*")
@@ -1177,6 +1175,8 @@ func is_native() -> bool:
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Projectiles").steps(&"Projectiles", step).renewed_by(begin_run).takes_rules(take_rules)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if events != null and not events.tailless_motes_changed.is_connected(set_tailless_pool):

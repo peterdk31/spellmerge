@@ -209,7 +209,7 @@ func test_a_reaction_holds_its_caster_not_the_game_once_in_a_while() -> void:
 	# The same reaction again soon holds nobody; after REACTION_REPEAT of Combat's steps it does.
 	_stop.reaction(other.id, &"steam", -1)
 	check_equal(_world.table.held_left(other.id), 0.0, "the same reaction soon after holds nothing")
-	for _i in roundi(HitStop.REACTION_REPEAT / STEP):
+	for _i in roundi(CueBase.REACTION_REPEAT / STEP):
 		_world.combat.step(STEP)
 	_stop.reaction(other.id, &"steam", -1)
 	check(_world.table.held_left(other.id) > 0.0, "later it holds again")

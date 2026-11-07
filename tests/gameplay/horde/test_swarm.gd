@@ -412,8 +412,6 @@ func _director_on(run: Fixture, weights: Dictionary) -> HordeScript:
 	_director.sim = Sim.seeded(3)
 	_director.swarm = run.swarm
 	root.add_child(_director)
-	_director.set_process(false)
-	_director.set_physics_process(false)
 	_director.start(run.world)
 	return _director
 

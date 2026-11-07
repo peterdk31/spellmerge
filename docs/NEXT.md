@@ -94,18 +94,18 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] ~~**Shot scale: fewer hand-backs (H1).**~~ Dropped 2026-11-05 by the owner after measuring it: a hand-back costs about 3-4 us, 12-15 ms of a 211 ms step at 100,000 shots all tested and under 1 ms in a budgeted step, and an exact run of hits needs the kernel to scan ahead and undo; H3b folds it in (shot-scale.md, DECISIONS 2026-11-05).
 - [x] **Online-ready: input frames and replays (N2).** (`core/sim/`, `gameplay/player/`, `core/events/`, `tests/bots/`) N2. After N1. Done (#573).
 - [x] **Shot scale: the hit budget sized by measurement, and no lost damage (H2).** Projectiles lane. (`core/projectiles/`, `native/`) H2: a fixed budget in work units (T1). After H0. Done (#575): a hit costs 400 units, `WORK_PER_STEP` 150,000, and a deferred shot sweeps its untested path, so no damage is lost.
-- [ ] **Online-ready: a first look across platforms (N2b).** (`tests/`, `docs/DECISIONS.md`) N2b. After N2.
-- [ ] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b. Re-records the hit traces; H3b's are recorded with them if H3b comes soon after.
-- [ ] **Online-ready: identity without instance ids (N5).** Projectiles lane. (`core/projectiles/`, `core/spells/`) N5. After H2 and N3.
-- [ ] **Online-ready: deterministic maths in C++, the kernel side (N7a).** Projectiles lane. (`native/`: `dmath.h`, the kernels' trig) N7, its C++ part. After N5; the owner edits `native/SConstruct`.
+- [x] **Online-ready: a first look across platforms (N2b).** (`tests/`, `docs/DECISIONS.md`) N2b. After N2. Done (#585).
+- [x] **Online-ready: one clock, the `sim` service and chance by hash (N3).** (`core/sim/`, `gameplay/flow/`, `gameplay/coop/`, `gameplay/horde/`, `core/spells/`, `gameplay/ai/`) N3. After N2b. Re-records the hit traces; H3b's are recorded with them if H3b comes soon after. Done (#586, #614, #615, #619).
+- [x] **Online-ready: identity without instance ids (N5).** Projectiles lane. (`core/projectiles/`, `core/spells/`) N5. After H2 and N3. Done (#622).
+- [x] **Online-ready: deterministic maths in C++, the kernel side (N7a).** Projectiles lane. (`native/`: `dmath.h`, the kernels' trig) N7, its C++ part. After N5; the owner edits `native/SConstruct`. Done (#620).
 - [ ] **Shot scale: threads in the kernel (H5).** Projectiles lane. (`native/`, the owner's `ci/smbot/rules.py` and `native/build_profile.json`) H5, with T2's one-against-several test. After N7a and N1; the owner merges it.
 - [ ] **Shot scale: threads on the web (H5w).** Projectiles lane. (`export_presets.cfg`, the owner's `ci/build/native.sh`) H5w, only if the web supports threads. After H5.
 - [ ] **Shot scale: shots-first queries (H6).** Projectiles lane. (`core/projectiles/`, `native/`) H6, only if H0 or H5 measures the need. After H5.
 - [x] ~~**Shot scale: draw cost by count (H4).**~~ Dropped 2026-11-05: the tails became motes (#562), and H0 measures `update_draw` at 4.7 ms at 100,000 (shot-scale.md).
-- [ ] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3.
-- [ ] **Online-ready: deterministic maths, the GDScript side (N7b).** (`core/native/`, `core/sim/dmath.gd`, simulation trig calls) N7: the `DMath` class, its GDScript twin and every simulation trig call. After N7a.
+- [x] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3. Done (#624).
+- [x] **Online-ready: deterministic maths, the GDScript side (N7b).** (`core/native/`, `core/sim/dmath.gd`, simulation trig calls) N7: the `DMath` class, its GDScript twin and every simulation trig call. After N7a. Done (#621).
 - [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
-- [ ] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3.
+- [x] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3. Done (#623).
 - [ ] **Shot scale: cheaper hits (H3).** (`gameplay/combat/`, `gameplay/feel/`, `core/spells/`) H3, one PR per listener, biggest first by H0. After N3.
 - [ ] **Shot scale: bundled hit events (H3b).** (`core/events/`, `core/projectiles/`, `gameplay/combat/`, `core/spells/`, `gameplay/feel/`, tests) H3b, only if H3 leaves the hits as the largest part of a step. After H3; touches the projectile manager, so it waits for the projectiles lane's PR of the moment.
 - [ ] **Shot scale: caps (H7).** Projectiles lane. (`core/projectiles/`, `core/settings/shot_cap.gd`, DECISIONS) H7: defaults as session rules (T4). After N11.

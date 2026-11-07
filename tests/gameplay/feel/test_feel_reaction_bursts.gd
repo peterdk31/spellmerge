@@ -184,8 +184,9 @@ func test_a_status_comes_back_when_a_crowd_of_flashes_took_its_slot() -> void:
 	_feel.set_effect_slots(EffectSlots.MIN)
 	var enemy: Enemy = _enemy()
 	_status_on(enemy, &"static")
+	# (Flashes that are no hit's: a frame's hits leave a share of the slots free, shot scale H3.)
 	for i in _feel.effect_slots:
-		_bus.damage_dealt.emit(0, null, 5, Vector2(float(i), 0.0))
+		_feel.show_flash(&"burst", Vector2(float(i), 0.0), Vector2.UP, Color.WHITE, 0, 0, 1, 0.5)
 	check_equal(_feel.live_statuses(), 0, "the crowd took the oldest slot, the status's")
 	_feel.step(STEP)
 	check_equal(_feel.live_statuses(), 1, "the next step shows it again")

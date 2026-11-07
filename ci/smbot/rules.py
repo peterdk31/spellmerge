@@ -80,13 +80,22 @@ BOT_NATIVE_NAMES = frozenset({"SConstruct"})
 # names (native/build_profile.json, owner-only), godot-cpp's core and variant headers, a few
 # standard headers and its own.
 NATIVE_CLASS_HEADERS = frozenset({"ref_counted", "object", "node2d", "random_number_generator"})
-NATIVE_STD_HEADERS = frozenset({"cmath", "cstdint", "type_traits", "utility"})
+NATIVE_STD_HEADERS = frozenset({"cmath", "cstdint", "type_traits", "utility", "vector"})
+# Threads (shot scale H5; the owner, 2026-11-07: the module's own std::thread pool, allowed wherever
+# it is faster): one file runs a loop on several threads (native/src/jobs.h), and only it may
+# include these or make a thread; any kernel uses them through it, so a kernel's code computes on
+# its arrays alone, as before.
+NATIVE_THREADS_FILE = "native/src/jobs.cpp"
+NATIVE_THREAD_HEADERS = frozenset({"atomic", "condition_variable", "mutex", "thread"})
+_NATIVE_THREADS = re.compile(r"\bstd::(thread|jthread|async|mutex|condition_variable|atomic)\b|\bpthread_\w+|\bthread_local\b")
 _NATIVE_INCLUDE = re.compile(r"^\s*#\s*include\s*([<\"])([^>\"]+)[>\"]", re.MULTILINE)
-# What it may not call: programs, files, sockets, loading code, threads, inline assembly, and the
-# engine by name (a call by name reaches any API the includes leave out).
+# What it may not call: programs, files, sockets, loading code, threads other than std::thread in
+# NATIVE_THREADS_FILE, inline assembly, and the engine by name (a call by name reaches any API the
+# includes leave out).
 _NATIVE_BANNED = re.compile(
     r"\b(system|popen|fork|execl|execlp|execle|execv|execvp|execve|socket|connect|dlopen|dlsym|LoadLibrary\w*|"
-    r"GetProcAddress|CreateProcess\w*|ShellExecute\w*|fopen|freopen|getenv)\s*\(|\bstd::thread\b|\b(asm|__asm__)\b|"
+    r"GetProcAddress|CreateProcess\w*|ShellExecute\w*|fopen|freopen|getenv)\s*\(|\bstd::(jthread|async)\b|"
+    r"\bpthread_\w+|\b(CreateThread|_beginthread\w*)\b|\b(asm|__asm__)\b|"
     r"(->|\.)\s*(call|callv|call_deferred)\s*\(|\bget_singleton\b|\bClassDB::instantiate\b|"
     r"\bgdextension_interface::(?!object_get_instance_from_id\b)\w+")
 ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
@@ -432,6 +441,7 @@ def check_native_source(path: str, text: str) -> list[Finding]:
         cls = re.fullmatch(r"godot_cpp/classes/(\w+)\.hpp", header)
         allowed = ((quote == '"' and re.fullmatch(r"\w+\.h", header) is not None)
                    or header in NATIVE_STD_HEADERS or header in ("gdextension_interface.h", "godot_cpp/godot.hpp")
+                   or (path == NATIVE_THREADS_FILE and header in NATIVE_THREAD_HEADERS)
                    or re.fullmatch(r"godot_cpp/(core|variant)/\w+\.hpp", header) is not None
                    or (cls is not None and cls.group(1) in NATIVE_CLASS_HEADERS))
         if not allowed:
@@ -444,6 +454,11 @@ def check_native_source(path: str, text: str) -> list[Finding]:
                                 f"The native module may not call this (found `{m.group(0).strip()}`): it only "
                                 "computes on the arrays the game hands it.",
                                 "Remove the call; anything that reaches the system or the engine by name stays in GDScript."))
+    if path != NATIVE_THREADS_FILE:
+        for m in _NATIVE_THREADS.finditer(text):
+            findings.append(Finding("native-source", "error", path, _line_of(text, m.start()),
+                                    f"Only {NATIVE_THREADS_FILE} makes threads (found `{m.group(0)}`).",
+                                    "Run the loop through jobs::for_spans (native/src/jobs.h)."))
     return findings
 
 

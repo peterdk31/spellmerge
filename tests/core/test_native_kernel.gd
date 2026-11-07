@@ -13,7 +13,13 @@ extends SceneTree
 ## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
 ## while one lives the hit pass and the drawing run in GDScript, so the two switch mid-run); hit
-## handlers that spawn shots and remove a target now and then.
+## handlers that spawn shots (which spare the body hit), remove a target, register one again
+## larger and make a shot further on a ghost now and then.
+##
+## The scene runs twice: the native kernel on one thread, then on four (shot scale H5, rule T2).
+## Both are compared with the GDScript to the bit, so one thread and several give the same bits
+## too. A scene of its own grows targets mid-pass: a cell the pass already took keeps its count
+## and box until the next filling, in both.
 ##
 ## Without the native module the test only says so (SPELLMERGE_NATIVE=required fails it, as in
 ## ci/build/build.sh).
@@ -27,6 +33,9 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const STEPS: int = 150
+## The native kernel's threads in each run: one, then several (more than most CI machines' cores,
+## so the threads really share the work out).
+const THREADS: Array[int] = [1, 4]
 const ROOM: Vector2 = Vector2(960.0, 540.0)
 ## The draw arrays the native kernel writes into buffers of its own, so the manager's stay as they
 ## were: compared batch by batch in `_compare_draw`, not by name.
@@ -37,7 +46,7 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
-const NOT_COMPARED: Array[StringName] = [&"_target_id",
+const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 var _failures: Array[String] = []
@@ -70,7 +79,10 @@ func _initialize() -> void:
 		quit(0)
 		return
 	_test_the_constants_are_checked()
-	_test_both_step_alike()
+	for threads: int in THREADS:
+		_test_both_step_alike(threads)
+		_teardown()
+	_test_a_target_grown_mid_pass()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: native kernel")
@@ -100,6 +112,7 @@ func _teardown() -> void:
 	_buses.clear()
 	_tables.clear()
 	_holders.clear()
+	_events = [[], []]
 
 
 ## A kernel built against other constants or members is refused, and the manager runs its GDScript:
@@ -129,12 +142,13 @@ func _test_the_constants_are_checked() -> void:
 	mgr.free()
 
 
-func _test_both_step_alike() -> void:
+func _test_both_step_alike(threads: int) -> void:
 	for side in 2:
 		var bus := EventsScript.new()
 		var table: ActorSeats.ActorsScript = ActorSeats.table()
 		_imp = ActorSeats.enemy(table)
 		var mgr := ManagerScript.new()
+		mgr.native_threads = threads
 		mgr.native = side == 1
 		mgr.actors = table
 		mgr.events = bus
@@ -162,8 +176,15 @@ func _test_both_step_alike() -> void:
 		bus.projectile_hit.connect(_on_hit.bind(side))
 		bus.projectile_expired.connect(_on_expired.bind(side))
 	_check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
+	# A build without threads (the web's) runs every loop on one.
+	var running: int = _mgrs[1].native_thread_count()
+	_check(running == threads or running == 1, "the native kernel runs on %d threads (%d)" % [threads, running])
+	if running < threads:
+		print("NOTE: this build of the native module has no threads; %d asked, 1 runs" % threads)
 	_batch_seen.resize(ManagerScript.BATCHES)
 	_batch_seen.fill(0)
+	_tails_laid = 0
+	_tails_capped = false
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -202,6 +223,62 @@ func _test_both_step_alike() -> void:
 		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
+
+
+
+## A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
+## the GDScript does. It keeps a cell's count and box once taken in a filling (`_cell_info`), so a
+## shot passing the grown `near` (whose cell an earlier shot of the pass took) still sees its old
+## box and misses it, and one passing the grown `far` (whose cell nothing took yet) sees the new
+## one and hits it.
+func _test_a_target_grown_mid_pass() -> void:
+	for side in 2:
+		var bus := EventsScript.new()
+		var table: ActorSeats.ActorsScript = ActorSeats.table()
+		var mgr := ManagerScript.new()
+		mgr.native_threads = THREADS[THREADS.size() - 1]
+		mgr.native = side == 1
+		mgr.actors = table
+		mgr.events = bus
+		root.add_child(mgr)
+		mgr.set_cap(600)
+		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
+		_mgrs.append(mgr)
+		_buses.append(bus)
+		_tables.append(table)
+		var holder := Node2D.new()
+		root.add_child(holder)
+		_holders.append(holder)
+		var first: Node2D = _add_body(side, "first", Vector2(100.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		var near: Node2D = _add_body(side, "near", Vector2(500.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		var far: Node2D = _add_body(side, "far", Vector2(800.0, 270.0), 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+		(_targets[side] as Array).append_array([first, near, far])
+		bus.projectile_hit.connect(_on_grow_hit.bind(side, first, [near, far]))
+		# First in the pass: a shot past `near` (its cell is taken, its box as it is), then one into `first`.
+		mgr.spawn(0, Vector2(440.0, 300.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
+		mgr.spawn(0, Vector2(85.0, 270.0), Vector2(900.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
+		# Then shots 40 px off `near` and `far`: only a grown one reaches them.
+		for i in 200:
+			mgr.spawn(0, Vector2(470.0 + float(i) * 0.3, 310.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
+			mgr.spawn(0, Vector2(770.0 + float(i) * 0.3, 310.0), Vector2(600.0, 0.0), 1.0, 3.0, ManagerScript.LAYER_ENEMY)
+	for step in 3:
+		for side in 2:
+			_events[side].clear()
+			_mgrs[side].step(DT)
+		if _events[0] != _events[1]:
+			_failures.append("grown mid-pass, step %d: the same events (%s)" % [step, _first_difference(_events[0], _events[1]) + " / " + _first_difference(_events[1], _events[0])])
+		_compare_arrays(step)
+		if step == 0:
+			var on_near: int = _events[0].filter(func(e: String) -> bool: return " near " in e).size()
+			var on_far: int = _events[0].filter(func(e: String) -> bool: return " far " in e).size()
+			_check(on_near == 0 and on_far > 100, "after the hit, the shots miss the grown near (%d hits) and hit the grown far (%d)" % [on_near, on_far])
+
+
+func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int, first: Node2D, grown: Array) -> void:
+	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
+	if target == first:
+		for node: Node2D in grown:
+			_mgrs[side].add_target(node, 60.0)
 
 
 func _add_body(side: int, name: String, at: Vector2, radius: float, layer: int, owner: int) -> Node2D:
@@ -291,12 +368,22 @@ func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, 
 	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
 	var m: ManagerScript = _mgrs[side]
 	if tag == 2:
-		# A splitting shot: two children from the hit.
+		# A splitting shot: two children from the hit, which spare the body they burst from until clear
+		# of it (as a payload does).
 		for k in 2:
-			m.spawn(caster, position, Vector2.from_angle(float(shot + k) * 2.1) * 200.0, 0.4, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
+			var child: int = m.spawn(caster, position, Vector2.from_angle(float(shot + k) * 2.1) * 200.0, 0.4, 3.0, ManagerScript.LAYER_ENEMY, 0, 1)
+			m.exclude(child, target)
 	if shot % 97 == 13 and target.name.begins_with("enemy"):
 		# Now and then a hit takes its target away (it died).
 		m.remove_target(target as Node2D)
+	elif shot % 89 == 7 and target.name.begins_with("enemy"):
+		# Or makes it much larger (registered again) for the shots after it.
+		m.add_target(target as Node2D, 60.0)
+	if shot % 13 == 5:
+		# Or changes a shot further on in the pass (a ghost now, pulled a little, as a pull would).
+		var later: int = (shot + 31) % m.get_cap()
+		if m.set_ghost(later):
+			m._pos[later] += Vector2(6.0, -4.0)
 
 
 func _on_expired(caster: int, position: Vector2, tag: int, shot: int, side: int) -> void:

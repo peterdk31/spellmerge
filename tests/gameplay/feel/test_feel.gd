@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_test_particles_can_be_turned_off()
 	_test_missing_sound_is_silent()
 	_test_known_sound_plays()
+	_test_a_frame_s_hit_sounds_leave_voices_free()
 	_test_downed_has_no_particles()
 	_test_feel_never_changes_damage()
 	_test_bursts_survive_the_world_being_freed()
@@ -247,6 +248,18 @@ func _test_known_sound_plays() -> void:
 	_check(_voices_with_stream() <= FeelScript.SOUND_VOICES, "sounds never use more voices than SOUND_VOICES")
 
 
+## A frame's hit sounds start at most HIT_SOUNDS_PER_FRAME voices (shot scale H3: past them each
+## would only cut short one of the same frame), and the next frame's start again.
+func _test_a_frame_s_hit_sounds_leave_voices_free() -> void:
+	_setup(&"zap")
+	for i in 20:
+		_hit(i % 4, Vector2(float(i), 0.0))
+	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME voices (got %d)" % _voices_with_stream())
+	_feel.step(0.015625)
+	_hit(0, Vector2(-30.0, 0.0))
+	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
+
+
 func _test_downed_has_no_particles() -> void:
 	_setup()
 	_bus.player_downed.emit(3)
@@ -312,7 +325,11 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_feel.set_effect_slots(EffectSlots.MIN)
 	for i in _feel.effect_slots:
 		_hit(i % 4, Vector2(100.0 + i, 0.0))
-	_check(_feel.live_flashes() == _feel.effect_slots, "the slots are full of hit flashes")
+	# A frame's hits take their share of the slots (shot scale H3); other flashes the rest.
+	_check(_feel.live_flashes() == _feel.effect_slots - _feel.effect_slots / FeelScript.HIT_FLASH_RESERVE, "the hits take their share")
+	for i in _feel.effect_slots:
+		_feel.show_flash(&"burst", Vector2(100.0 + i, 20.0), Vector2.UP, Color.WHITE, 0, 0, 1, 0.5)
+	_check(_feel.live_flashes() == _feel.effect_slots, "the slots are full")
 	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0), -1)
 	_check(_feel.flashes_of(&"puff") >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
 	_check(_feel.live_flashes() == _feel.effect_slots, "taking one over keeps the limit")

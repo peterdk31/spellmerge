@@ -28,6 +28,12 @@ class ShotKernel : public RefCounted {
 
 public:
 	ShotKernel();
+	~ShotKernel();
+
+	// The threads a loop of the kernel runs on (jobs.h): 0 (and at first) the machine's cores less
+	// one, 1 without threads (the web). Never changes a result (rule T2): tests compare 1 with several.
+	void set_threads(int64_t threads);
+	int64_t get_threads() const;
 
 	// The manager's constants this code was written against, against `constants` (name to value:
 	// the manager's constant map and a few from other scripts): one line for each the kernel holds
@@ -58,6 +64,12 @@ protected:
 	static void _bind_methods();
 
 private:
+	// The threads a loop runs on (jobs.h).
+	int _width = 1;
+	// The kernel's own memory between calls (the .cpp): the drawing's counts and tail plans.
+	struct Scratch;
+	Scratch *_scratch = nullptr;
+
 	void homing_pass(Object *manager, int64_t first, int64_t count, double delta);
 	// The draw batches' instance data (BATCH_* of the manager, BATCHES of them), handed to the MultiMeshes.
 	PackedFloat32Array _buffers[10];

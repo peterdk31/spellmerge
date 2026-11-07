@@ -151,6 +151,29 @@ func test_sprays_stay_inside_the_effect_slots_with_four_players() -> void:
 		check(feel.live_flashes() <= feel.effect_slots, "within the effect slots (frame %d)" % frame)
 
 
+## A frame's hit flashes (each hit's impact burst and spray) stop at their share of the slots
+## (shot scale H3: past it each would take the slot of one of the same frame before it was drawn),
+## and the rest stay free for what is not a hit.
+func test_a_frame_s_hits_leave_a_share_of_the_slots_to_the_rest() -> void:
+	feel.set_effect_slots(EffectSlots.MIN)
+	var share: int = feel.effect_slots - feel.effect_slots / FeelScript.HIT_FLASH_RESERVE
+	for i in feel.effect_slots:
+		_strike(i % 4, _enemy(), Vector2(float(i), 0.0), Vector2.RIGHT, 5)
+	check_equal(feel.live_flashes(), share, "the hits take their share and no more")
+	check((feel.flash_info(&"spray")["at"] as Vector2).x < float(share), "the frame's first hits are the ones shown")
+	check(feel.show_flash(&"burst", Vector2(-50.0, 0.0), Vector2.UP, Color.WHITE, 0, 0, 1, 0.5) >= 0, "a flash that is no hit still shows")
+	check_equal(feel.live_flashes(), share + 1, "beside them")
+
+
+func test_the_hits_share_of_the_slots_is_free_again_after_a_step() -> void:
+	feel.set_effect_slots(EffectSlots.MIN)
+	for i in feel.effect_slots:
+		_strike(0, _enemy(), Vector2(float(i), 0.0), Vector2.RIGHT, 5)
+	feel.step(STEP / 4.0)
+	_strike(1, _enemy(), Vector2(-40.0, 0.0), Vector2.RIGHT, 5)
+	check((feel.flash_info(&"spray")["at"] as Vector2).is_equal_approx(Vector2(-40.0, 0.0)), "the next frame's hit sprays")
+
+
 func test_a_wall_hit_shows_a_flash_in_its_casters_ramp() -> void:
 	for player in 4:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)

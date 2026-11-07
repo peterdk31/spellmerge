@@ -46,7 +46,8 @@ extends SceneTree
 ## User arguments: `--counts=a,b,c` (the shot counts), `--only=storm|crowd|crowd_all` (or several,
 ## comma separated), `--steps=N` (the steps measured, STEPS), `--crowd=N` (the crowd's bodies,
 ## CROWD), `--cards=a,b,c` (card ids, in staff order), `--no-native` (the manager's GDScript),
-## `--work=N` (the hit-work budget of the storm and the crowd),
+## `--work=N` (the hit-work budget of the storm and the crowd), `--threads=N` (the native kernel's
+## threads, H5; its own choice without),
 ## `--no-listeners` (skip the listener pass). Not run in the build: a few minutes headless with the
 ## native module, longer without.
 
@@ -138,6 +139,8 @@ class Timed:
 var _registry: Node
 var _cards: Array[StringName] = [&"bolt"]
 var _native: bool = true
+## The native kernel's threads (`--threads=N`; 0: its own choice).
+var _threads: int = 0
 var _work: int = ManagerScript.WORK_PER_STEP
 var _headless: bool = true
 
@@ -202,13 +205,16 @@ func _initialize() -> void:
 			_work = maxi(arg.trim_prefix("--work=").to_int(), 1)
 		elif arg == "--no-native":
 			_native = false
+		elif arg.begins_with("--threads="):
+			_threads = maxi(arg.trim_prefix("--threads=").to_int(), 0)
 		elif arg == "--no-listeners":
 			listeners = false
 	if not _build(16, 1, false, _work):
 		return
 	var native_on: bool = _mgr.is_native()
+	var threads: int = _mgr.native_thread_count()
 	_free_all()
-	print("BENCH: shot scale, cards %s, native %s, tails motes, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", crowd, _work, steps, "headless" if _headless else "in a window"])
+	print("BENCH: shot scale, cards %s, native %s (%d threads), tails motes, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", threads, crowd, _work, steps, "headless" if _headless else "in a window"])
 	for scene: String in SCENES:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -236,6 +242,7 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	_mgr = _own(ManagerScript.new()) as ManagerScript
 	_mgr.actors = _actors
 	_mgr.events = _bus
+	_mgr.native_threads = _threads
 	_mgr.set_native(_native)
 	_mgr.set_cap(count)
 	_mgr.set_bounds(ARENA)

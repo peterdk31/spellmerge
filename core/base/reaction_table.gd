@@ -14,8 +14,12 @@ extends Resource
 var _by_element: Dictionary = {}
 var _indexed: int = -1
 var _indexed_rows: Array[ReactionRow] = []
+## `in_order`'s rows by element, for the order `_order`.
+var _ordered: Dictionary = {}
+var _order: Array[StringName] = []
 
 const NONE: Dictionary = {}
+const NO_ROWS: Array[ReactionRow] = []
 
 
 ## The row for a hit of `element_id` on a target with `status_id`, or null when the two
@@ -32,8 +36,31 @@ func for_element(element_id: StringName) -> Dictionary:
 	return _by_element.get(element_id, NONE)
 
 
+## Every reaction a hit of `element_id` can set off, lined up with the statuses `order` (Combat's
+## REACTING_STATUSES): the one at `i` needs `order[i]` on the target, null where that status sets
+## off none; empty for an element that reacts with nothing. Kept per element. Read only.
+func in_order(element_id: StringName, order: Array[StringName]) -> Array[ReactionRow]:
+	# (`for_element`'s check, here: this is on every elemental hit.)
+	if _indexed != rows.size() or not is_same(_indexed_rows, rows):
+		_index()
+	if not is_same(order, _order) and order != _order:
+		_ordered = {}
+		_order = order
+	var known: Variant = _ordered.get(element_id)
+	if known != null:
+		return known
+	var by_status: Dictionary = _by_element.get(element_id, NONE)
+	var made: Array[ReactionRow] = []
+	if not by_status.is_empty():
+		for status in order:
+			made.append(by_status.get(status) as ReactionRow)
+	_ordered[element_id] = made
+	return made
+
+
 func _index() -> void:
 	_by_element = {}
+	_ordered = {}
 	for row in rows:
 		if row == null:
 			continue

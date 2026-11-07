@@ -175,12 +175,15 @@ func _reaction_cue(reaction_id: StringName) -> StringName:
 
 ## The card `form`'s impact cue (`which` 0) or end cue (1), &"" for none.
 func _form_cue(form: StringName, which: int) -> StringName:
-	if not _form_cues.has(form):
-		var cues: PackedStringArray = PackedStringArray(["", ""])
+	# (Kept as names, read with one lookup: a shot's impact asks on every hit.)
+	var cues: Variant = _form_cues.get(form)
+	if cues == null:
+		var made: Array[StringName] = [&"", &""]
 		if registry != null and form != &"":
 			var card: Resource = registry.get_resource(&"spells", form)
 			if card is FormBase:
-				cues[0] = String((card as FormBase).impact_cue)
-				cues[1] = String((card as FormBase).end_cue)
-		_form_cues[form] = cues
-	return StringName((_form_cues[form] as PackedStringArray)[which])
+				made[0] = (card as FormBase).impact_cue
+				made[1] = (card as FormBase).end_cue
+		_form_cues[form] = made
+		cues = made
+	return (cues as Array[StringName])[which]

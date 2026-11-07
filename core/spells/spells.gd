@@ -2705,8 +2705,9 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 			carried_zap = _rec_zap[from]
 		elif by_ray:
 			carried = _ray.hit
-	# The chain's last body, by its key (N5): what the next jump must not go back to.
-	var struck: int = projectiles.key_of(target)
+	# The chain's last body, by its key (N5): what the next jump must not go back to (looked up only
+	# for a chain: the lookup walks the targets).
+	var struck: int = projectiles.key_of(target) if chain > 0 else 0
 	# The hit is the cast's that made it: a shot's hit is cast by what cast that shot (so its chain
 	# jumps belong to it), a ray's by the caster already casting it (its launch's or its row's).
 	var caster: int = _caster if by_ray else shot_caster(slot)

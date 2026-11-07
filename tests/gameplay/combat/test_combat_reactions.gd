@@ -555,3 +555,47 @@ func test_superconduct_the_other_way_frost_drains_a_charge_for_damage() -> void:
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 4, "the hit plus the bonus")
 	check(not _combat.has_status(enemy, &"static"), "the charge is used up")
 	check(not _combat.has_status(enemy, &"chill"), "frost's chill did not go on")
+
+
+# --- the lookup (shot scale H3) ---
+
+
+## The reaction a hit picks is the plain rule's, read only through Combat's own calls: the row of
+## the first of REACTING_STATUSES the target has (a frozen one counts as chilled) for the hit's
+## element. For every element of the table and every mix of the statuses, a freeze too, so a
+## status added to REACTING_STATUSES without its line in `_status_bits` fails here.
+func test_a_hit_reacts_with_the_first_reacting_status_the_target_has() -> void:
+	var table: ReactionTable = CombatScript.REACTIONS
+	var elements: Array[StringName] = []
+	for reaction: ReactionRow in table.rows:
+		if reaction != null and not elements.has(reaction.element_id):
+			elements.append(reaction.element_id)
+	check(elements.size() >= 4, "the table has elements")
+	# Each reacting status, then a freeze (chills enough to freeze).
+	var statuses: Array[StringName] = []
+	statuses.assign(CombatScript.REACTING_STATUSES)
+	statuses.append(&"freeze")
+	var wrong: Array = []
+	var tried: int = 0
+	for mix in 1 << statuses.size():
+		var enemy := _enemy()
+		if (mix >> (statuses.size() - 1)) & 1 == 1:
+			for i in CombatScript.CHILL_STACKS_TO_FREEZE:
+				_combat.apply_status(0, enemy, &"chill", 100.0, 10.0)
+		for i in statuses.size() - 1:
+			if (mix >> i) & 1 == 1:
+				_combat.apply_status(0, enemy, statuses[i], 100.0, 10.0)
+		var row: int = _combat._row_of_node(enemy)
+		for element in elements:
+			var expected: ReactionRow = null
+			for status in CombatScript.REACTING_STATUSES:
+				var on: bool = _combat.has_status(enemy, status) or (status == &"chill" and _combat.has_status(enemy, &"freeze"))
+				if on and table.find(status, element) != null:
+					expected = table.find(status, element)
+					break
+			if expected != null:
+				tried += 1
+			if _combat._reaction_for(row, element) != expected:
+				wrong.append([mix, element])
+	check(tried > 0, "some mixes react")
+	check_equal(wrong, [], "the same reaction for every element and mix of statuses")

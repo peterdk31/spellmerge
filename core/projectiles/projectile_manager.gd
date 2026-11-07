@@ -920,6 +920,10 @@ var _step_index: int = 0
 ## that holds: until a hit test finds the shot clear of that body where its step starts.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_on: PackedFloat32Array = PackedFloat32Array()
+## Per slot: how far off that body's hit circle the shot was cast, when the body is its own caster's
+## (the staff tip stands off it; 0 for any other body): within this, coming at the body, it is
+## still leaving it (`_still_spares`).
+var _skip_near: PackedFloat32Array = PackedFloat32Array()
 ## Where each actor's orbit shots circle (INF for no anchor), see `set_anchor`; ACTORS of them.
 var _anchors: PackedVector2Array = PackedVector2Array()
 ## Scratch for `ray`, one set per nesting level (a hit handler may fire a ray of its own, as deep
@@ -1351,6 +1355,7 @@ func set_cap(value: int) -> void:
 	_drawn_particles.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_on.resize(_cap)
+	_skip_near.resize(_cap)
 	var heads: int = _mem_head.size()
 	_mem_head.resize(_cap)
 	for slot in range(heads, _cap):
@@ -2476,6 +2481,7 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	_home_target[slot] = 0
 	_home_at[slot] = Vector2.INF
 	_skip_on[slot] = 0.0
+	_skip_near[slot] = 0.0
 	_forget_all(slot)
 	# Its colours are its new caster's: work its look out again.
 	_drawn_seq[slot] = -1
@@ -2903,6 +2909,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_tail_n[slot] = 0
 	_join_group(slot, group_of(caster, tag))
 	_skip_on[slot] = 0.0
+	_skip_near[slot] = 0.0
 	_flags[slot] = 0
 	_bounce[slot] = 0
 	_shield[slot] = 0
@@ -5352,12 +5359,24 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 ## The shot in `slot` does not hit `node` (the body it started on: its caster's own, or the body whose
 ## hit fired it, as a payload; the spell runtime gives every launch one) until it has
 ## been clear of it: the first hit test whose step starts with the shot off that body's hit circle
-## ends the exclusion, and from then on it hits that body as any other (owner, 2026-11-06: no
-## timer, so a slow shot born on its source can no longer hit it as it crawls out).
+## ends the exclusion (`_still_spares`), and from then on it hits that body as any other (owner,
+## 2026-11-06: no timer, so a slow shot born on its source can no longer hit it as it crawls out).
+## A body its own caster owns is the one it was cast from, at the staff tip off that body: how far
+## off it was cast (`_skip_near`) it still spares the body while coming at it, so a shot aimed back
+## across its caster (a nova's, a mirror's) passes them (owner, 2026-11-07).
 func exclude(slot: int, node: Node) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
 		_skip_id[slot] = node.get_instance_id()
 		_skip_on[slot] = 1.0
+		_skip_near[slot] = 0.0
+		var at: int = _target_id.find(_skip_id[slot])
+		if at < 0 or _actor[slot] < 0 or _target_owner[at] != _actor[slot]:
+			return
+		var body: Node2D = _targets[at] as Node2D
+		if body == null or not body.is_inside_tree():
+			return
+		var off: float = _pos[slot].distance_to(body.global_position + _target_offset[at]) - _radius[slot] - _target_radius[at]
+		_skip_near[slot] = off if off > 0.0 and is_finite(off) else 0.0
 
 
 ## The spawn number of the shot in `slot`: it changes when the slot is reused, so a
@@ -5653,8 +5672,8 @@ func _hit_test(slot: int) -> bool:
 	var middle: Vector2 = Vector2.ZERO
 	var half: float = 0.0
 	var layers: int = 0
-	var skip_on: bool = false
-	var skip_inside: bool = false
+	# Whether it still spares the body it started on (`exclude`): on it, or coming at it from close by.
+	var spared: bool = _skip_on[slot] > 0.0 and _still_spares(slot, start, _pos[slot] - start)
 	var stamp: int = 0
 	var found: int = 0
 	for y in range(y0, y1 + 1):
@@ -5682,7 +5701,6 @@ func _hit_test(slot: int) -> bool:
 				middle = (from + to) * 0.5
 				half = sqrt(path_sq) * 0.5 + 0.01
 				layers = _layers[slot]
-				skip_on = _skip_on[slot] > 0.0
 				stamp = _mark_memory(slot)
 			var t: int = _cell_head[cell]
 			while t >= 0:
@@ -5707,17 +5725,41 @@ func _hit_test(slot: int) -> bool:
 					_mem_seen[_target_entry[t]] = _mem_step
 					t = _target_next[t]
 					continue
-				if skip_on and _skip_id[slot] == _target_id[t] and start.distance_squared_to(centre) <= reach * reach:
-					# Still on the body that fired it where this step starts: not clear of it yet.
-					skip_inside = true
+				if spared and _skip_id[slot] == _target_id[t]:
 					t = _target_next[t]
 					continue
 				found = _keep_candidate(found, t, along, closest)
 				t = _target_next[t]
-	# Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
-	if _skip_on[slot] > 0.0 and not skip_inside:
+	# Clear of the body it started on, and not coming back across it: it hits it from now.
+	if _skip_on[slot] > 0.0 and not spared:
 		_skip_on[slot] = 0.0
 	return _hit_candidates(slot, found)
+
+
+## Whether the shot in `slot`, its step starting at `start` and going `way`, still spares the body
+## it started on (`exclude`): its step starts on that body's hit circle, or, cast from that body
+## (`_skip_near` off it), it is coming at it, its line going into it, and ends no farther off than it
+## was cast. A shot cast from a staff tip off its caster's body does not hit that body as it crosses
+## it on its way out (owner, 2026-11-07: a nova's shot aimed back across the wizard hit them); one
+## that has passed it, or turns back (return, bounce), does.
+func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
+	var t: int = _target_id.find(_skip_id[slot])
+	if t < 0 or (_target_layer[t] & _layers[slot]) == 0:
+		return false
+	var reach: float = _radius[slot] + _target_radius[t]
+	var to_centre: Vector2 = _target_pos[t] - start
+	var apart_sq: float = to_centre.length_squared()
+	if apart_sq <= reach * reach:
+		return true
+	var near: float = _skip_near[slot]
+	if near <= 0.0:
+		return false
+	var ahead: float = to_centre.dot(way)
+	var within: float = reach + near
+	if ahead <= 0.0 or (to_centre - way).length_squared() > within * within:
+		return false
+	# The square of how far the body's centre stands off the shot's line.
+	return apart_sq - ahead * ahead / way.length_squared() <= reach * reach
 
 
 ## Hit the `found` targets `_hit_test` kept for the shot in `slot` (`_cand_*`), nearest first;

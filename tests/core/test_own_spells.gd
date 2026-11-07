@@ -30,6 +30,22 @@ func test_a_bolt_spares_the_body_it_leaves() -> void:
 	check_equal(_self_lost(["bolt"]), 0, "a bolt flies off its caster without hurting them")
 
 
+## A spell starts at the staff tip, off its caster's body (the wizard's tip is 14-18 px from its
+## hand, its hit circle's centre, and a nova shot's reach 13): a nova's shot aimed back across its
+## caster passes them (owner, 2026-11-07: "When firing the nova. Its hitting my own character with
+## one of the bolts").
+func test_a_nova_from_the_staff_tip_spares_its_caster() -> void:
+	for off: float in [18.0, 24.0]:
+		var arena := ArenaScript.new(root)
+		arena.answer_moves()
+		var body: Node2D = arena.add_guard(0, Vector2(-off, 0.0))
+		arena.install_cards(0, 0, ["nova"])
+		check(arena.cast(0, 0), "a nova is cast")
+		arena.run(1.0)
+		check_equal(arena.lost(body), 0, "a nova cast %d px off its caster's body never hits it" % int(off))
+		arena.free_all()
+
+
 func test_a_return_bolt_hurts_its_caster() -> void:
 	check(_self_lost(["return", "bolt"]) > 0, "a bolt that comes back hits its caster")
 

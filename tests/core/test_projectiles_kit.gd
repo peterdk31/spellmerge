@@ -458,6 +458,30 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	_check(not _mgr.is_alive(slot), "that spends it")
 
 
+## A shot cast from beside its own caster's body and aimed back across it (a nova's ring from a staff
+## tip, owner 2026-11-07) passes that body, however far off it was cast, and hits it when it comes
+## back; a shot that spares a body not its caster's (a payload's source) and starts off it hits it.
+func _test_a_shot_from_beside_its_caster_passes_them() -> void:
+	for off: float in [18.0, 40.0]:
+		_setup()
+		_mgr.set_walls([Rect2(10.0, 0.0, 16.0, 200.0)] as Array[Rect2])
+		var caster: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
+		# Cast `off` px from the centre, the reach 11 (8 + the shot's 3): a staff tip's place.
+		var slot: int = _fire(Vector2(-200.0, 0.0), Vector2(100.0 + off, 100.0))
+		_mgr.set_bounce(slot, 1)
+		_mgr.exclude(slot, caster)
+		_run(10 + int(off / 3.0))
+		_check(_hits.is_empty() and _mgr.is_alive(slot), "a shot cast %d px off its caster, aimed back across them, passes them (%d hits)" % [int(off), _hits.size()])
+		_run(80)
+		_check(_hits.size() == 1 and _hits[0][1] == caster, "and hits them when it bounces back (%d hits)" % _hits.size())
+	_setup()
+	var source: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
+	var payload: int = _fire(Vector2(-200.0, 0.0), Vector2(118.0, 100.0))
+	_mgr.exclude(payload, source)
+	_run(20)
+	_check(_hits.size() == 1 and _hits[0][1] == source, "a payload that starts off its source and comes at it hits it (%d hits)" % _hits.size())
+
+
 ## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one, and
 ## spares the body it starts on (`exclude`);
 ## an enemy's hits another enemy; a shot of no actor hits a wizard and an enemy alike.

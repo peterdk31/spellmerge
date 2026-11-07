@@ -109,6 +109,25 @@ func test_a_tick_runs_the_areas_in_the_written_order() -> void:
 	check_equal(_tick.count, 1, "one tick counted")
 
 
+## The game's state in parts (`state_slice`, N3c): each area in exactly one part, the parts together
+## the whole, the services spread one to a part, each body in the part of its id.
+func test_the_state_splits_into_parts_that_cover_it_once() -> void:
+	for i in 5:
+		_body("b%d" % i)
+	var whole: Dictionary = _tick.state_areas()
+	check(whole.has("Sim") and whole.has("Spells") and whole.has("actor 4"), "the whole names the sim, the areas and the bodies: %s" % [whole.keys()])
+	for slices: int in [1, 2, 7, 60]:
+		var met: Dictionary = {}
+		for slice in slices:
+			for name: String in _tick.state_slice(slice, slices):
+				check(not met.has(name), "%s is in one part of %d" % [name, slices])
+				met[name] = slice
+		check_equal(met.size(), whole.size(), "the %d parts cover the whole" % slices)
+		if slices >= TickScript.STATE_AREAS.size() + 1:
+			check(met["Sim"] != met["Spells"] and met["Spells"] != met["Projectiles"], "services one to a part of %d" % slices)
+		check_equal(met["actor 3"], 3 % slices, "a body by its id, of %d" % slices)
+
+
 func test_the_bodies_go_by_actor_id_not_by_tree_order() -> void:
 	var first: Body = _body("first")
 	var second: Body = _body("second")
@@ -166,7 +185,7 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	calls.clear()
 	_tick.begin_run()
 	check_equal(_tick.count, 0, "the clock from 0")
-	check_equal(_names(), ["Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Entities.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
+	check_equal(_names(), ["Entities.begin_run", "Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
 	_tick.run(TickScript.DT)
 	check_equal(_tick.count, 1, "the run's first tick")
 

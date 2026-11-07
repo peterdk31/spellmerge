@@ -36,9 +36,12 @@ const DT: float = 1.0 / 60.0
 const PRIORITY: int = -1000
 ## The services stepped in step 2, in order: their autoload names.
 const SERVICES: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities"]
-## What a run's start makes fresh (`begin_run`), in order: the services, then the horde director.
-## Every autoload of a simulation script is here or in RENEWED_OTHERWISE (`tests/core/test_tick.gd`).
-const FRESH_AT_RUN: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", &"Horde"]
+## What a run's start makes fresh (`begin_run`), in order: Entities first, whose `begin_run` frees
+## the last run's decoys (bodies outside Flow's world, still registered in the manager and Combat),
+## so no service is renewed under a body that leaves after; then the other services in the tick's
+## order, then the horde director. Every autoload of a simulation script is here or in
+## RENEWED_OTHERWISE (`tests/core/test_tick.gd`).
+const FRESH_AT_RUN: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde"]
 ## The autoloads of simulation scripts a run's start does not renew, and why each starts a run as a
 ## fresh game's all the same (the replay test's "after other runs" hashes them too).
 const RENEWED_OTHERWISE: Dictionary[StringName, String] = {
@@ -102,7 +105,7 @@ func run(delta: float) -> void:
 ## A run starts (Flow, once the last run's world is gone and before the new one is made;
 ## online-ready N3b): the clock counts from 0 again, the run takes its seed (`SimSeed.fresh`: a
 ## replay's while one records or plays, else random; N3c), and every service takes a fresh game's
-## state (its `begin_run`; core/sim/sim_fresh.gd), in the tick's order, then the horde director. So
+## state (its `begin_run`; core/sim/sim_fresh.gd), in FRESH_AT_RUN's order. So
 ## a run plays the same whatever ran before it in this game, and a replay recorded in any run plays
 ## the same in any other.
 func begin_run() -> void:
@@ -138,6 +141,29 @@ func state_areas() -> Dictionary:
 			var body: Actor = actors.node_of(_ids[i]) as Actor
 			if body != null:
 				out["actor %d" % _ids[i]] = body
+	return out
+
+
+## Part `slice` (0 to `slices` - 1) of `state_areas()`, so a check of the whole state can be spread
+## over `slices` ticks (N3c: hashing it all in one tick took tens of milliseconds in a crowd; a
+## netcode checking once a second hashes part `count % 60` each tick, and every machine hashes the
+## same part at the same tick). "Sim" and STATE_AREAS go one to a part, spread evenly; a body goes
+## to part `id % slices`. Each area is in exactly one part.
+func state_slice(slice: int, slices: int) -> Dictionary:
+	var all: Dictionary = state_areas()
+	if slices <= 1:
+		return all
+	var out: Dictionary = {}
+	var services: int = STATE_AREAS.size() + 1
+	for name: String in all:
+		var part: int
+		if name.begins_with("actor "):
+			part = posmod(int(name.trim_prefix("actor ")), slices)
+		else:
+			var index: int = 0 if name == "Sim" else STATE_AREAS.find(StringName(name)) + 1
+			part = floori(float(index) * float(slices) / float(services))
+		if part == slice:
+			out[name] = all[name]
 	return out
 
 

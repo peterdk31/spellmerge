@@ -76,8 +76,9 @@ signal died(killer: int)
 ## called for every hit on anyone (performance pass, 2026-10-28).
 signal damaged(by: int, amount: float)
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); its components' list,
+## found again from its children (`_find_components`; each component is walked as its member).
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_looks"]
 

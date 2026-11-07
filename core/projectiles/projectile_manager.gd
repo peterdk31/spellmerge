@@ -1780,9 +1780,13 @@ func clear() -> void:
 func begin_run() -> void:
 	clear()
 	# The target table's nodes are kept (DERIVED) and its numbers renewed: a body still registered
-	# would lose its row. The last run's bodies have left by now (Flow), so none is.
+	# would lose its row. The last run's bodies have left by now (Flow's world, and Entities' decoys:
+	# Tick renews Entities first), so none is.
 	if not _targets.is_empty():
-		push_error("ProjectileManager.begin_run: %d targets are still registered; the last run's bodies must leave before a run starts" % _targets.size())
+		var names: PackedStringArray = PackedStringArray()
+		for target in _targets:
+			names.append(str(target.get_path()) if is_instance_valid(target) and target.is_inside_tree() else str(target))
+		push_error("ProjectileManager.begin_run: %d targets are still registered (%s); the last run's bodies must leave before a run starts" % [_targets.size(), ", ".join(names)])
 	var bounds: Rect2 = _bounds
 	# The blank's arrays as big as this one's: the cap is kept (RUN_KEEPS).
 	SimFresh.renew(self, func(blank: Object) -> void: blank.call(&"set_cap", _cap))

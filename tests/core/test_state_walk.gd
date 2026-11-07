@@ -49,6 +49,37 @@ class Slots:
 	var loose: Array = [1, null, "x"]
 
 
+## Made whole and never changed after (a compiled build): hashed once (N3c).
+class Built:
+	extends RefCounted
+	const FROZEN: bool = true
+	var power: float = 1.0
+	var parts: PackedInt32Array = PackedInt32Array([4, 5])
+
+
+class UsesBuilt:
+	extends RefCounted
+	var first: Built = null
+	var again: Built = null
+
+
+## A row's record that says when it is idle (a carrier's homing per row, N3c).
+class Row:
+	extends RefCounted
+	var reach: float = 0.0
+	var seed: int = 0
+
+	func idle() -> bool:
+		return reach == 0.0
+
+
+class Rows:
+	extends RefCounted
+	const SPARES: Array[StringName] = [&"spare"]
+	var rows: Array[Row] = []
+	var spare: Array[Row] = []
+
+
 class Based:
 	extends RefCounted
 	const DERIVED: Array[StringName] = [&"cache"]
@@ -339,3 +370,48 @@ func test_refs_of_arrays_of_arrays() -> void:
 	walk.walk("s", striker, func(path: String, value: Variant) -> void: leaves[path] = value)
 	check(walk.problems.is_empty(), "no problem: %s" % walk.problems)
 	check(leaves.values().has("Body#3") or str(leaves).contains("#3"), "the struck body by who it is: %s" % leaves)
+
+
+func test_a_frozen_object_is_hashed_by_its_contents_once() -> void:
+	var a := UsesBuilt.new()
+	a.first = Built.new()
+	a.again = a.first
+	var b := UsesBuilt.new()
+	b.first = Built.new()
+	b.again = Built.new()
+	check_equal(SimHash.of(a), SimHash.of(b), "met twice, or two with the same contents: the same leaves")
+	var c := UsesBuilt.new()
+	c.first = Built.new()
+	c.first.power = 2.0
+	c.again = a.first
+	check(SimHash.of(c) != SimHash.of(a), "other contents hash otherwise")
+	var walk := StateWalk.new()
+	SimHash.area(walk, "a", a)
+	a.first.power = 3.0
+	var again := StateWalk.new()
+	again.verify_frozen = true
+	SimHash.area(again, "a", a)
+	check(again.problems.size() > 0 and again.problems[0].contains("FROZEN"), "one changed after it was made is named: %s" % [again.problems])
+
+
+func test_idle_rows_and_spare_records_hash_as_little() -> void:
+	var a := Rows.new()
+	var b := Rows.new()
+	for i in 4:
+		a.rows.append(Row.new())
+		var row := Row.new()
+		row.seed = 99
+		b.rows.append(row)
+	a.spare.append(Row.new())
+	var spare := Row.new()
+	spare.reach = 5.0
+	b.spare.append(spare)
+	check_equal(SimHash.of(a), SimHash.of(b), "an idle row is one leaf (its seed is set when it starts); a spare by the pool's size")
+	b.rows[2].reach = 1.0
+	check(SimHash.of(a) != SimHash.of(b), "a row at work is walked")
+	b.rows[2].reach = 0.0
+	b.spare.append(Row.new())
+	check(SimHash.of(a) != SimHash.of(b), "the pool's size counts")
+	var walked := StateWalk.new()
+	var report: int = SimHash.area(walked, "a", a, func(_p: String, _v: Variant) -> void: pass)
+	check_equal(report, SimHash.of(a), "the report's walk hashes the same")

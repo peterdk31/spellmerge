@@ -102,12 +102,29 @@ func _check_scene(name: StringName) -> void:
 		scene.step()
 	for problem in _walk(scene.areas()):
 		check(false, "%s: %s" % [name, problem])
+	_check_hash_modes(name, scene.areas())
 	scene.free_all()
+
+
+## The hash's two walks agree on every area (core/sim/sim_hash.gd): the quick one (no paths, the
+## values appended by the walk itself, its short ways: plain members, packed arrays, idle rows, spare
+## pools) and the desync report's (paths, every leaf handed over).
+func _check_hash_modes(scene: StringName, areas: Dictionary) -> void:
+	for name: Variant in areas:
+		var quick := StateWalk.new()
+		quick.with_paths = false
+		var report := StateWalk.new()
+		var leaves: Array[int] = [0]
+		var a: int = SimHash.area(quick, String(name), areas[name] as Object)
+		var b: int = SimHash.area(report, String(name), areas[name] as Object, func(_path: String, _value: Variant) -> void: leaves[0] += 1)
+		check(a == b and leaves[0] > 0, "%s: %s hashes the same with paths and without" % [scene, name])
 
 
 ## The problems one walk of `areas` meets (it must reach some state).
 func _walk(areas: Dictionary) -> PackedStringArray:
 	var walk := StateWalk.new()
+	# A FROZEN object (a compiled build) must not have changed since it was made.
+	walk.verify_frozen = true
 	# The card world's bodies are driven by the fixture's scripted controller, which stands in for a
 	# player's (a simulation script): walked as one.
 	walk.also_simulation = [ActorFixture.Scripted]

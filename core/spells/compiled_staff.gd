@@ -4,6 +4,10 @@ extends RefCounted
 ## makes from its first card until its cycle ends. Reading is deterministic, so the cycle is
 ## computed once per build change. Read-only data for the spell runtime and the builder view.
 
+## Made whole by the staff compiler and never changed after: the state walk hashes it once
+## (core/sim/README.md).
+const FROZEN: bool = true
+
 ## The staff the cards sit in, and the card ids by slot (`&""` for an empty slot).
 var staff: StaffBase = null
 var cards: Array[StringName] = []

@@ -76,6 +76,8 @@ const BAG: int = -1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"input", &"registry", &"frames", &"mouse_world_override", &"_local", &"_own_frame"]
+## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_actor", &"_home"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_sound_player"]
 

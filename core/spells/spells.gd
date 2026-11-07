@@ -203,6 +203,9 @@ const REFUSED: float = -1.0
 const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
+## State as its size alone: the spare launch records, each set whole when `_delay` takes it
+## (core/sim/README.md).
+const SPARES: Array[StringName] = [&"_pending_free"]
 ## The session's settings a new run keeps (`begin_run`): a benchmark's fire budget.
 const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 

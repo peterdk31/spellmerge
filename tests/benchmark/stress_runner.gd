@@ -129,6 +129,8 @@ const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 const PARTS_EVERY: int = 30
 ## The state hashes timed at a scenario's end (`_report_state_hash`).
 const HASH_PASSES: int = 5
+## The parts the spread hash is timed in (`Tick.state_slice`): one a tick for a second.
+const HASH_SLICES: int = 60
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
 const FILLER_SPEED_MIN: float = 80.0
 const FILLER_SPEED_MAX: float = 260.0
@@ -779,7 +781,8 @@ func _report_parts() -> void:
 ## The state hash's cost at the scenario's full load (online-ready N3c; core/sim/README.md, "The
 ## hash"): HASH_PASSES hashes of every area the Tick names (`state_areas`), as the netcode would
 ## make them (no paths), after the measured window so they stay out of its frames; with the areas
-## that cost most (the bodies together). The netcode would hash once a second.
+## that cost most (the bodies together), and spread over a second, one part a tick
+## (`Tick.state_slice`), as a netcode checking once a second would.
 func _report_state_hash(label: String) -> void:
 	var tick: Node = get_tree().root.get_node_or_null("Tick")
 	if tick == null:
@@ -814,6 +817,18 @@ func _report_state_hash(label: String) -> void:
 	print("BENCH: stress %s: state hash avg %.2f ms max %.2f ms over %d areas (%d bodies; most: %s ms), %d problems" % [label, float(total) / float(HASH_PASSES) / 1000.0, float(most) / 1000.0, named.size(), bodies, ", ".join(parts), problems.size()])
 	for problem in problems.slice(0, 5):
 		print("BENCH: stress %s: state hash problem: %s" % [label, problem])
+	# Spread over a second, one part a tick (`Tick.state_slice`): what a tick pays.
+	var part_total: int = 0
+	var part_most: int = 0
+	for slice in HASH_SLICES:
+		var part_start: int = Time.get_ticks_usec()
+		var part_walk := StateWalk.new()
+		part_walk.with_paths = false
+		SimHash.areas(tick.call(&"state_slice", slice, HASH_SLICES), part_walk)
+		var part_took: int = Time.get_ticks_usec() - part_start
+		part_total += part_took
+		part_most = maxi(part_most, part_took)
+	print("BENCH: stress %s: state hash spread over %d ticks: avg %.2f ms max %.2f ms a tick" % [label, HASH_SLICES, float(part_total) / float(HASH_SLICES) / 1000.0, float(part_most) / 1000.0])
 
 
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.

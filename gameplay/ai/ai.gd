@@ -30,8 +30,11 @@ const GRUDGE_TIME: float = AIBrain.GRUDGE_TIME
 const SIGHT: float = AIBrain.SIGHT
 const CLOSE_ENOUGH: float = AIBrain.CLOSE_ENOUGH
 
-## Not state: the Entities service, and `target` and `grudge`, getters of the brain's REFS (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"entities", &"target", &"grudge"]
+## Not state: the Entities service and its team board (hashed with Entities), and `target` and `grudge`,
+## getters of the brain's REFS (core/sim/README.md).
+const DERIVED: Array[StringName] = [&"entities", &"board", &"target", &"grudge"]
+## State as who it points at: the actor it drives, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"_actor"]
 
 ## How it plays (null: its home actor's data's profile, else the shared default).
 @export var profile: AIProfile = null

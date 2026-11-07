@@ -93,10 +93,11 @@ const REACTION_JITTER: float = 0.2
 const SLOT_TURN: float = deg_to_rad(50.0)
 const SPREAD_BONUS: float = 0.1
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"entities", &"_face", &"_target_id"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); the team board is
+## Entities' (hashed there), handed over by the controller.
+const DERIVED: Array[StringName] = [&"entities", &"board", &"_face", &"_target_id"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"target", &"grudge", &"plan_target"]
+const REFS: Array[StringName] = [&"actor", &"target", &"grudge", &"plan_target", &"_target_actor"]
 
 ## The actor it drives, the profile it plays by and Entities (its team board; null: none).
 var actor: Actor = null

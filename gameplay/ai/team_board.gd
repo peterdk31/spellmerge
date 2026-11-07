@@ -49,10 +49,6 @@ const CALL_REACH: float = 160.0
 const CALL_GAP: float = 3.0
 const CALL_BOOST: float = 0.5
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md): the attacks' targets
-## are instance ids, which differ between runs (until N5 gives identities; found by N2's replays).
-const DERIVED: Array[StringName] = [&"_att_target"]
-
 ## Seconds it has run (moved on by `step`).
 var clock: float = 0.0
 var _last_start: PackedFloat32Array = PackedFloat32Array()
@@ -63,8 +59,8 @@ var _who: PackedInt32Array = PackedInt32Array()
 var _at: PackedVector2Array = PackedVector2Array()
 var _health: PackedFloat32Array = PackedFloat32Array()
 var _when: PackedFloat32Array = PackedFloat32Array()
-## The attacks, ATTACKS per team (team × ATTACKS + slot): who (-1 for none), its target (instance
-## id), where the target and the attacker stood, and when; from the last count, how many of the
+## The attacks, ATTACKS per team (team × ATTACKS + slot): who (-1 for none), its target (its key,
+## `AIBrain`'s: the actor's, N5), where the target and the attacker stood, and when; from the last count, how many of the
 ## team were on that target (0 for a note that no longer counts) and the angle of this one's slot.
 var _att_who: PackedInt32Array = PackedInt32Array()
 var _att_target: PackedInt64Array = PackedInt64Array()
@@ -212,7 +208,7 @@ func _slot_for(base: int, who: int) -> int:
 	return oldest_well if oldest_well >= 0 else oldest
 
 
-## The actor `who` of `team`, standing at `at`, attacks `target` (its instance id), which stands at
+## The actor `who` of `team`, standing at `at`, attacks `target` (its key, `Actors.key_of`), which stands at
 ## `target_at`. `hint` is the slot it was given last time (-1 for none). Returns its slot, or -1.
 func note_attack(team: int, who: int, target: int, target_at: Vector2, at: Vector2, hint: int = -1) -> int:
 	if team < 0 or team >= TEAMS or who < 0:

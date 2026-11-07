@@ -125,8 +125,10 @@ func test_whatever_kept_the_swarmer_keeps_the_actor() -> void:
 	var wizard: Actor = run.wizard(Vector2(300.0, 0.0))
 	var feel: Node = _feel_on(run)
 	var node: Node2D = run.swarmer(Vector2(0.0, 0.0))
-	var old_id: int = node.get_instance_id()
 	var id: int = run.combat.actor_of(node)
+	# What keeps the swarmer by its key (N5) keeps the actor without a change: the same actor's key.
+	var key: int = run.projectiles.key_of(node)
+	check(key != 0 and key == run.actors.key_of(id), "the swarmer's target key is its actor's")
 	run.combat.apply_status(wizard.id, node, CombatScript.BURN, 3.0, 1.0)
 	check_equal(feel.call(&"status_shown", node), CombatScript.BURN, "Feel shows the swarmer's burn")
 	# A shot homing on it, remembering it, sticking to it and skipping it; a chain that came from
@@ -138,28 +140,29 @@ func test_whatever_kept_the_swarmer_keeps_the_actor() -> void:
 	if manager._cap < 4 or manager._mem_id.size() < 4:
 		check(false, "the projectile manager and Spells have rows (cap %d, memory %d, records %d)" % [manager._cap, manager._mem_id.size(), run.spells._rec_prev.size()])
 		return
-	manager._home_target[0] = old_id
-	manager._skip_id[1] = old_id
+	manager._home_target[0] = key
+	manager._skip_id[1] = key
 	manager._stuck_to[2] = node
-	manager._mem_id[3] = old_id
-	run.spells._rec_prev[4] = old_id
+	manager._mem_id[3] = key
+	run.spells._rec_prev[4] = key
 	var swing: CarrierSwing = CarrierSwing.of(run.spells)
 	swing._sw_struck[0].append(node)
-	swing._sw_prev[1] = old_id
+	swing._sw_prev[1] = key
 	run.bus.possess_requested.emit(wizard.id, id, 2.0, 0)
 	run.swarm.step(Fixture.STEP)
 	var actor := run.actors.node_of(id) as Actor
 	if actor == null:
 		check(false, "promoted")
 		return
-	var new_id: int = actor.get_instance_id()
-	check_equal(manager._home_target[0], new_id, "the homing shot homes on the actor")
-	check_equal(manager._skip_id[1], new_id, "a payload skips the actor")
+	check_equal(manager.key_of(actor), key, "the actor is the swarmer's target, by the same key")
+	check(manager.target_of_key(key) == actor, "and the key finds the actor")
+	check_equal(manager._home_target[0], key, "the homing shot homes on the actor")
+	check_equal(manager._skip_id[1], key, "a payload skips the actor")
 	check_equal(manager._stuck_to[2], actor, "a stuck shot rides the actor")
-	check_equal(manager._mem_id[3], new_id, "a shot remembers it hit the actor")
-	check_equal(run.spells._rec_prev[4], new_id, "a chain came from the actor")
+	check_equal(manager._mem_id[3], key, "a shot remembers it hit the actor")
+	check_equal(run.spells._rec_prev[4], key, "a chain came from the actor")
 	check(swing._sw_struck[0].has(actor) and not swing._sw_struck[0].has(null), "a sweep struck the actor")
-	check_equal(swing._sw_prev[1], new_id, "and its chain came from it")
+	check_equal(swing._sw_prev[1], key, "and its chain came from it")
 	check_equal(feel.call(&"status_shown", actor), CombatScript.BURN, "the burn shows on the actor")
 	manager._stuck_to[2] = null
 

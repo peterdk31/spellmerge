@@ -164,12 +164,6 @@ func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 
 
 ## Every beam gone at once, quietly (`Spells.clear`).
-## The swarm promoted a body (`Carrier.replace_body`): a beam's chain that came from `old` came
-## from `new`.
-func replace_body(old: Node, new: Node) -> void:
-	_replace_in_rows(old, new, [], _bm_prev)
-
-
 func clear() -> void:
 	_bm_on.fill(0)
 	_bm_spell.fill(null)
@@ -235,16 +229,17 @@ func _step_zaps(delta: float) -> void:
 			if not kit.zap_room() or _bm_on[at] == 0 or _bm_spell[at] != spell:
 				break
 			var body: Node2D = _zap_near[k]
-			if not is_instance_valid(body) or _has_rolled(at, body.get_instance_id()):
+			var key: int = kit.projectiles.key_of(body)
+			if key == 0 or _has_rolled(at, key):
 				continue
 			if _zap_roll(at) >= spell.zap_chance:
-				_rolled(at, body.get_instance_id(), kit.clock())
+				_rolled(at, key, kit.clock())
 			else:
 				# It waits a random moment of the time it stays in reach, less a look's step; it rolls
 				# again ZAP_AGAIN after.
 				var window: float = minf(SpellLimits.ZAP_WAIT_MOST, left)
 				var wait: float = _zap_roll(at) * maxf(window - delta * SpellLimits.ZAP_EVERY, 0.0)
-				_rolled(at, body.get_instance_id(), kit.clock() + wait)
+				_rolled(at, key, kit.clock() + wait)
 				if wait <= 0.0 or _bm_due_count[at] >= SpellRuntime.ZAP_DUE:
 					_zap(at, _zap_centres[k])
 				else:
@@ -354,7 +349,7 @@ func _point_along(at: int, distance: float) -> Vector2:
 	return _bm_points[base + _bm_count[at] - 1]
 
 
-## True when live beam `at` has rolled for the body of instance id `id` less than
+## True when live beam `at` has rolled for the body of key `id` (`ProjectileManager.key_of`) less than
 ## SpellLimits.ZAP_AGAIN ago (from its zap, or the roll it lost).
 func _has_rolled(at: int, id: int) -> bool:
 	var first: int = at * SpellRuntime.ZAP_MEMORY
@@ -364,7 +359,7 @@ func _has_rolled(at: int, id: int) -> bool:
 	return false
 
 
-## Live beam `at` has rolled for the body of instance id `id`, which is zapped (or lost its roll) at
+## Live beam `at` has rolled for the body of key `id`, which is zapped (or lost its roll) at
 ## `when` (in a ring: past ZAP_MEMORY the oldest is forgotten).
 func _rolled(at: int, id: int, when: float) -> void:
 	var n: int = _bm_zapped_count[at]

@@ -117,7 +117,8 @@ const TARGET_SLOTS: int = 64
 const WALL_LAYER: int = 1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the rows' nodes by
-## instance id, which differ between runs (until N5; found by N2's replays); the native switch,
+## instance id, a lookup from a node to its row (equality only: a row is held by its node, `nodes`,
+## walked as its actor; N5); the native switch,
 ## which gives the same game either way (native/README.md; found by N2b's platform runs).
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"sim", &"_parent", &"_cand_nodes", &"_kernel", &"native", &"_node_ids", &"_row_by_node"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).

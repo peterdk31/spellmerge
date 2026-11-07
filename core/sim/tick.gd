@@ -39,13 +39,13 @@ const SERVICES: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Ent
 ## What a run's start makes fresh (`begin_run`), in order: Entities first, whose `begin_run` frees
 ## the last run's decoys (bodies outside Flow's world, still registered in the manager and Combat),
 ## so no service is renewed under a body that leaves after; then the other services in the tick's
-## order, then the horde director. Every autoload of a simulation script is here or in
+## order, then the horde director; the actor table last, once every area has let its bodies go: its
+## births count from 0 again (the keys, N5). Every autoload of a simulation script is here or in
 ## RENEWED_OTHERWISE (`tests/core/test_tick.gd`).
-const FRESH_AT_RUN: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde"]
+const FRESH_AT_RUN: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde", &"Actors"]
 ## The autoloads of simulation scripts a run's start does not renew, and why each starts a run as a
 ## fresh game's all the same (the replay test's "after other runs" hashes them too).
 const RENEWED_OTHERWISE: Dictionary[StringName, String] = {
-	&"Actors": "every body closes its own id as it leaves the tree, and the last run's bodies have left",
 	&"Flow": "it starts the run: start_run sets the run's members itself",
 	&"Coop": "the seats' joins are the session's; room_entered sets the run's view, wizards and revives",
 }

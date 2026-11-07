@@ -31,12 +31,13 @@ const ROOM: Vector2 = Vector2(960.0, 540.0)
 ## The draw arrays the native kernel writes into buffers of its own, so the manager's stay as they
 ## were: compared batch by batch in `_compare_draw`, not by name.
 const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
-## Not compared: node instance ids (each side has its own nodes), the hit test's scratch (the native
+## Not compared: node instance ids (each side has its own nodes; what a shot keeps of a target is
+## its key, which is compared: online-ready N5), the hit test's scratch (the native
 ## pass sizes it for every target at once), what only the native drawing writes, the GDScript
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
 ## `tail_demand`, which is compared, and the births themselves are compared).
-const NOT_COMPARED: Array[StringName] = [&"_target_id", &"_mem_id", &"_skip_id", &"_home_target", &"homing_target",
+const NOT_COMPARED: Array[StringName] = [&"_target_id",
 		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 var _failures: Array[String] = []

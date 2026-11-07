@@ -20,6 +20,11 @@ extends Node
 ##   it, else `SHARED`, the one budget every actor no seat drives shares.
 ## - `set_node(id, node)` and `node_of(id)` find the actor's node; only its instance id is kept,
 ##   so a freed node gives null.
+## - `key_of(id)` is the actor's identity (online-ready N5): its id and its birth, the number of
+##   opens in this run when it was opened, so an id handed out again is another identity, as a new
+##   body is. It is what the simulation keeps for "that body" (a shot's homing target, what it hit,
+##   a chain's last body, an AI's target), never an instance id, which differs between machines
+##   and runs. The births count from 0 at each run's start (`begin_run`).
 ##
 ## Packed arrays sized ACTORS, nothing allocated after start. An id outside the table or not
 ## open is safe everywhere: the questions answer NONE (`budget_of` SHARED, `node_of` null) and
@@ -44,7 +49,9 @@ const TEAM_ENEMIES: int = 1
 ## The enemy ramp (Blight); 0-3 are the four hat colours.
 const RAMP_ENEMY: int = 4
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
+## Not state: services, caches and scratch, set up again (core/sim/README.md); the node of each id,
+## kept by its instance id: a lookup from the id (`node_of`), set again by each body as it opens
+## (equality only, never an identity: N5).
 const DERIVED: Array[StringName] = [&"_node"]
 
 var _open: PackedByteArray = PackedByteArray()
@@ -62,6 +69,10 @@ var _seat_home: PackedInt32Array = PackedInt32Array()
 ## actors are held now, so a step with none held costs one comparison.
 var _held: PackedFloat32Array = PackedFloat32Array()
 var held_count: int = 0
+## Each open id's birth (`key_of`): `_births` when it was opened; 0 for an id not open.
+var _birth: PackedInt64Array = PackedInt64Array()
+## How many ids this run has opened: the next birth less one.
+var _births: int = 0
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -75,6 +86,7 @@ func _init() -> void:
 	_ramp.resize(ACTORS)
 	_seat.resize(ACTORS)
 	_node.resize(ACTORS)
+	_birth.resize(ACTORS)
 	_held.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
@@ -98,6 +110,8 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_seat[id] = NONE
 	_home_seat[id] = NONE
 	_node[id] = 0
+	_births += 1
+	_birth[id] = _births
 	_release_hold(id)
 	_lowest_free = id + 1
 	_high = maxi(_high, id + 1)
@@ -116,6 +130,7 @@ func close(id: int) -> void:
 	_team[id] = NONE
 	_ramp[id] = NONE
 	_node[id] = 0
+	_birth[id] = 0
 	_release_hold(id)
 	_count -= 1
 	if id < _lowest_free:
@@ -217,6 +232,38 @@ func budget_of(id: int) -> int:
 	return seat if seat != NONE else SHARED
 
 
+## The identity of the open actor `id` (online-ready N5): its id and its birth in one number, never
+## 0, the same on every machine and in every run that opens the same ids in the same order; an id
+## opened again is another key. 0 for an id not open.
+func key_of(id: int) -> int:
+	return _birth[id] * ACTORS + id if is_open(id) else 0
+
+
+## The open actor whose key is `key` (`key_of`), or NONE: closed since, or never.
+func id_of_key(key: int) -> int:
+	if key <= 0:
+		return NONE
+	var id: int = key % ACTORS
+	return id if key_of(id) == key else NONE
+
+
+## A run starts (`Tick.begin_run`, after every area that frees bodies): the births count from 0
+## again, so a run's keys are the same whatever ran before it in the game. Every body of the last
+## run has closed its id by now (it left the tree, or its area's `begin_run` freed it); an id still
+## open would keep a key of the last run's count, so it is named.
+func begin_run() -> void:
+	if _count > 0:
+		var open: PackedStringArray = PackedStringArray()
+		for id in _high:
+			if _open[id] != 0:
+				var node: Node = node_of(id)
+				open.append("%d (%s)" % [id, node.get_path() if node != null and node.is_inside_tree() else "no node"])
+		push_error("Actors.begin_run: %d actors are still open (%s); the last run's bodies must close their ids before a run starts" % [_count, ", ".join(open)])
+		return
+	_births = 0
+	_birth.fill(0)
+
+
 ## The node of an actor (null to forget it). Only its instance id is kept.
 func set_node(id: int, node: Node) -> void:
 	if is_open(id):
@@ -295,6 +342,8 @@ func clear() -> void:
 	_ramp.fill(NONE)
 	_seat.fill(NONE)
 	_node.fill(0)
+	_birth.fill(0)
+	_births = 0
 	_held.fill(0.0)
 	held_count = 0
 	_seat_actor.fill(NONE)

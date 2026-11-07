@@ -65,7 +65,7 @@ var _feel: FeelScript
 
 ## A player that reads nothing of the game: it walks a square, turns its aim a step each tick,
 ## taps the storm (staff 2) and dashes (staff 0) now and then, and holds the fire bolt (staff 1) in
-## bursts. Not the decoy turret: its homing bolts keep their targets by instance id (A5, N5).
+## bursts. Homing and chains, kept by key since N5, are played twice by test_determinism's storm.
 class Scripted:
 	extends FrameSource
 	var tick: int = 0

@@ -17,7 +17,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 var curve: float = 0.0
 var reach: float = 0.0
 var bend: float = 0.0
-## The instance id of the target it keeps (0 for none yet), and the seed of its random pick.
+## The key of the target it keeps (`ProjectileManager.key_of`, N5; 0 for none yet), and the seed of its random pick.
 var keep: int = 0
 var pick_seed: int = 0
 

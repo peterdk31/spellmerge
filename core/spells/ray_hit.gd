@@ -10,7 +10,7 @@ extends RefCounted
 var tag: int = 0
 ## The way the ray goes at the body being hit: a payload fired by the hit leaves along it.
 var dir: Vector2 = Vector2.ZERO
-## Chain jumps the hit still has, and the target it jumped from (instance id, 0 for none).
+## Chain jumps the hit still has, and the target it jumped from (its key, `ProjectileManager.key_of`; 0 for none).
 var chain: int = 0
 var prev: int = 0
 ## What the hit does when it is not its spell's own `hit` (null): an echo's half, a zap's share,

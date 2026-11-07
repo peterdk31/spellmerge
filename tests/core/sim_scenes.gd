@@ -4,7 +4,8 @@ extends RefCounted
 ##
 ## - `fight`: three staffed enemies with brains (fire bolts and frost novas, the enemy tests'
 ##   exact profile) against two wizards, on the enemy tests' world (tests/gameplay/ai/ai_fixture.gd).
-## - `storm`: a frost nova split and a fire chain cast on three imps, on the clip stage
+## - `storm`: a frost nova split, a fire chain and a homing lightning bolt (aimed away, so it picks a
+##   target and keeps it: by key since N5) cast on three imps, on the clip stage
 ##   (tests/clips/stage.gd): the spell runtime, the projectile manager, Combat and Feel.
 ## - `horde`: a horde wave of made-up swarmers round one wizard (tests/gameplay/horde/horde_fixture.gd).
 ##
@@ -26,6 +27,7 @@ const STORM: Dictionary = {
 	"casts": [
 		{"player": 0, "staff": 0, "cards": ["split", "frost", "nova"], "at": 0.0, "origin": Vector2(-80.0, 0.0), "aim": Vector2.RIGHT},
 		{"player": 1, "staff": 0, "cards": ["chain", "fire", "bolt"], "at": 0.5, "origin": Vector2(-80.0, 40.0), "aim": Vector2.RIGHT},
+		{"player": 2, "staff": 0, "cards": ["homing", "lightning", "bolt"], "at": 0.2, "origin": Vector2(-60.0, -60.0), "aim": Vector2.UP},
 	],
 	"imps": [Vector2(40.0, -20.0), Vector2(60.0, 20.0), Vector2(90.0, 0.0)],
 }

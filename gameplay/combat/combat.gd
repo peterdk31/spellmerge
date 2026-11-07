@@ -159,7 +159,9 @@ const OWN_ID_PROPERTIES: Array[StringName] = [&"actor_id", &"caster"]
 ## for here (docs/milestones/horde-swarm.md, S3), so the full actor stands before anything touches.
 signal stepping()
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
+## Not state: services, caches and scratch, set up again (core/sim/README.md); `_node_id` and
+## `_row_by_node`, a lookup from a body's node to its row (by instance id, equality only: a row is
+## its actor id, and the row's identity is its actor's key, N5).
 const DERIVED: Array[StringName] = [&"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_nodes"]
@@ -1563,7 +1565,10 @@ func _add_target(row: int) -> void:
 	var owner: int = _cast_id(row)
 	if _body[row] == BODY_ACTOR and (_nodes[row] as Actor).belongs_to != ActorsScript.NONE:
 		owner = (_nodes[row] as Actor).belongs_to
-	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, owner, _hurt_offset[row])
+	# Its identity is the actor's key (N5): shots keep it, not the node's instance id.
+	var table: ActorsScript = _table()
+	var key: int = table.key_of(row) if table != null else 0
+	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, owner, _hurt_offset[row], key)
 
 
 ## Forget the row: its target, its node and, if Combat opened it, its actor id. O(1).

@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_test_particles_can_be_turned_off()
 	_test_missing_sound_is_silent()
 	_test_known_sound_plays()
+	_test_a_frame_s_hit_sounds_leave_voices_free()
 	_test_downed_has_no_particles()
 	_test_feel_never_changes_damage()
 	_test_bursts_survive_the_world_being_freed()
@@ -245,6 +246,18 @@ func _test_known_sound_plays() -> void:
 	for i in 20:
 		_hit(i % 4)
 	_check(_voices_with_stream() <= FeelScript.SOUND_VOICES, "sounds never use more voices than SOUND_VOICES")
+
+
+## A frame's hit sounds start at most HIT_SOUNDS_PER_FRAME voices (shot scale H3: past them each
+## would only cut short one of the same frame), and the next frame's start again.
+func _test_a_frame_s_hit_sounds_leave_voices_free() -> void:
+	_setup(&"zap")
+	for i in 20:
+		_hit(i % 4, Vector2(float(i), 0.0))
+	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME, "a frame's hits start HIT_SOUNDS_PER_FRAME voices (got %d)" % _voices_with_stream())
+	_feel.step(0.015625)
+	_hit(0, Vector2(-30.0, 0.0))
+	_check(_voices_with_stream() == FeelScript.HIT_SOUNDS_PER_FRAME + 1, "the next frame's hit sounds")
 
 
 func _test_downed_has_no_particles() -> void:

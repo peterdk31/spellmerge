@@ -149,6 +149,9 @@ const BEAM_PARTICLES_MOST: int = 12
 
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
+## The share of the effect slots a frame's hit flashes leave to the rest (casts, kills,
+## statuses): `effect_slots` / this (`_flashes_shown`).
+const HIT_FLASH_RESERVE: int = 4
 ## Room for sprites reacting to a hit made at first; every hit sprite flashes (owner,
 ## 2026-10-31: no limit on interactions), and the room doubles when a crowd needs more, up to the
 ## largest crowd seen, and is kept.
@@ -494,6 +497,12 @@ var _flash_tip: PackedInt32Array = PackedInt32Array()
 ## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE.
 var _cue_tip: int = ActorsScript.NONE
 var _next_flash: int = 0
+## The flashes shown since the last step drew them (`_show_flash`), and whether the flash being
+## shown is a hit's own (its spray or impact, `_hit_flash`). A frame's hit flashes stop at
+## `effect_slots` less HIT_FLASH_RESERVE (shot scale H3): past it, each would take the slot of a
+## flash of the same frame before it was ever drawn, and the rest stay free for what is not a hit.
+var _flashes_shown: int = 0
+var _hit_flash: bool = false
 ## The flash kinds (content/flashes, `_read_flash_kinds`), in id order: a table kind's row is its
 ## place here. Each id's code (`_flash_kind` of a slot), its row for a cue's flash part
 ## (`CuePlan.flash_of`: code, step, seconds, drawn along a length), and each code's room light; the
@@ -684,6 +693,7 @@ func step(real_delta: float) -> void:
 	_step_reactions(real_delta)
 	_step_forms(real_delta)
 	_step_flashes(real_delta)
+	_flashes_shown = 0
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
@@ -1230,7 +1240,9 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		# Its cards' motes back along the way it came, in its own ramp.
 		if projectiles != null:
 			_spectacle.shed_hit(position, -direction, projectiles.impact_core, ramp, projectiles.impact_look, preset.hit_mote_share, tag)
+		_hit_flash = true
 		_show_impact(caster, ramp, position, direction)
+		_hit_flash = false
 		_spectacle.end_hit()
 		return
 	# Knocked back off the surface: the shot's own motes and the wall's.
@@ -1445,6 +1457,9 @@ func _prepare_flash(part: Dictionary) -> Variant:
 ## the cue's own colour, or the cue's ramp and tint with its cards (without them for `no_cards`).
 func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 	if flash.particles and not particles_enabled:
+		return
+	if _hit_flash and _hit_flashes_full():
+		_cue_flash = -1
 		return
 	if flash.gated:
 		# Only for the cards it names: any card's layer, or one look layer (lightning's arc).
@@ -1846,16 +1861,25 @@ func _on_screen_shake_changed(enabled: bool) -> void:
 ## from NONE up the enemy ramp) with the particles of the packed `look`, at `zoom`, for
 ## `seconds`. An arc runs `length` pixels from `at` along `dir` (its zoom is then the length). A
 ## flash given a `follow` node moves with it, and ends when it is gone. It takes the next slot, the
-## oldest flash when they are all busy, and returns it (-1 for none, or a kind there is not).
+## oldest flash when they are all busy, and returns it (-1 for none, or a kind there is not; a hit's
+## own flash past its share of a frame's, `_hit_flashes_full`, is none).
 func show_flash(id: StringName, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
 	var code: int = int(_flash_codes.get(id, -1))
 	return _show_flash(code, at, dir, core, ramp, look, zoom, seconds, length, follow) if code >= 0 else -1
+
+
+## True when this frame's hit flashes have taken their share of the slots (`_flashes_shown`).
+func _hit_flashes_full() -> bool:
+	return _flashes_shown >= effect_slots - effect_slots / HIT_FLASH_RESERVE
 
 
 ## `show_flash` by Feel's code for the kind (`_flash_codes`; KIND_STATUS for a status's glow).
 func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
 	if _flash_node == null or not at.is_finite() or ramp < ActorsScript.NONE or ramp > ActorsScript.RAMP_ENEMY:
 		return -1
+	if _hit_flash and _hit_flashes_full():
+		return -1
+	_flashes_shown += 1
 	var slot: int = _next_flash
 	_next_flash = (_next_flash + 1) % effect_slots
 	_flash_kind[slot] = kind
@@ -2546,7 +2570,9 @@ func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = V
 		var from: Vector2 = position if at == Vector2.INF else at
 		var zoom: int = clampi(roundi(size), 1, 3)
 		_cue_flash = -1
+		_hit_flash = true
 		play_cue(&"hit" if aim != Vector2.ZERO else &"hit_puff", ActorsScript.NONE, from, aim, zoom * HIT_STEP, tint, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
+		_hit_flash = false
 		_hit_slot = _cue_flash
 		_hit_position = position
 	_hit_voice = _play(sound)

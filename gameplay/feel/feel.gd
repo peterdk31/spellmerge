@@ -545,6 +545,13 @@ var _kind_own: bool = false
 ## The shot whose hit `hit_landed` announced (its `shot`, -1 for none): the one a hit's stop holds.
 var _kind_shot: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
+## The same records for each hit of a batch (shot scale H3b, `HitBatch`): the impacts are all shown
+## before the batch's damage, which takes its own hit's (`_batch_impact`) once.
+var _batch_aim: PackedVector2Array = PackedVector2Array()
+var _batch_at: PackedVector2Array = PackedVector2Array()
+var _batch_tag: PackedInt64Array = PackedInt64Array()
+var _batch_shown: PackedByteArray = PackedByteArray()
+var _batch_ready: PackedByteArray = PackedByteArray()
 var _impact_aim: Vector2 = Vector2.ZERO
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
@@ -647,6 +654,7 @@ func _ready() -> void:
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
+	events.projectile_hits.connect(_on_projectile_hits)
 	events.form_shown.connect(_on_form_shown)
 	events.cast_winding.connect(_on_cast_winding)
 	events.carrier_ended.connect(_on_carrier_ended)
@@ -890,6 +898,7 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 	# The spray's motes are a hit's: the shot's impact's roll when it did this hit, else one of its own.
 	var held: bool = false
 	if target != null and is_instance_valid(target):
+		_batch_impact(target, caster)
 		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in their own
 		# colour (`EnemyBase.hit_color`).
 		var ramp: int = _hat_ramp_of_id(hit_id)
@@ -1232,6 +1241,53 @@ func live_labels() -> int:
 		if _label_left[i] > 0.0:
 			count += 1
 	return count
+
+
+## A step's hits as one batch (shot scale H3b, `HitBatch`): before its damage, every hit's impact,
+## each remembered by its hit for the damage that comes in the next phase.
+func _on_projectile_hits(batch: HitBatch, phase: int) -> void:
+	if phase != HitBatch.PHASE_PRE or projectiles == null:
+		return
+	var count: int = batch.count
+	if _batch_ready.size() < count:
+		var size: int = maxi(64, count * 2)
+		_batch_aim.resize(size)
+		_batch_at.resize(size)
+		_batch_tag.resize(size)
+		_batch_shown.resize(size)
+		_batch_ready.resize(size)
+	for i in count:
+		_batch_ready[i] = 0
+		if not projectiles.batch_turn(i):
+			continue
+		_on_projectile_impact(batch.caster[i], batch.target[i], batch.point[i], batch.heading[i])
+		_batch_aim[i] = _impact_aim
+		_batch_at[i] = _impact_at
+		_batch_tag[i] = _impact_tag
+		_batch_shown[i] = 1 if _impact_shown else 0
+		_batch_ready[i] = 1
+	_impact_target = 0
+
+
+## In a batch's damage phase, the impact of the hit being resolved, if `target` and `caster` are
+## its, taken as the latest impact (once: what else the hit damages is not aimed, as before).
+func _batch_impact(target: Node, caster: int) -> void:
+	var batch: HitBatch = projectiles.hit_batch if projectiles != null else null
+	if batch == null or batch.phase != HitBatch.PHASE_COMBAT:
+		return
+	var i: int = batch.current
+	if i < 0 or i >= batch.count or i >= _batch_ready.size() or _batch_ready[i] == 0:
+		return
+	if batch.target[i] != target or batch.caster[i] != caster:
+		return
+	_batch_ready[i] = 0
+	_impact_target = target.get_instance_id()
+	_impact_caster = caster
+	_impact_frame = Engine.get_physics_frames()
+	_impact_aim = _batch_aim[i]
+	_impact_at = _batch_at[i]
+	_impact_tag = _batch_tag[i]
+	_impact_shown = _batch_shown[i] != 0
 
 
 ## A shot struck. On a character, remember how, for the damage event that follows at once;

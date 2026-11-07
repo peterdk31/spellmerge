@@ -48,7 +48,8 @@ extends SceneTree
 ## CROWD), `--cards=a,b,c` (card ids, in staff order), `--no-native` (the manager's GDScript),
 ## `--work=N` (the hit-work budget of the storm and the crowd), `--threads=N` (the native kernel's
 ## threads, H5; its own choice without),
-## `--no-listeners` (skip the listener pass). Not run in the build: a few minutes headless with the
+## `--no-listeners` (skip the listener pass), `--batch` (the manager's bundled hits, H3b's first part:
+## `batch_hits`; a listener's `projectile_hits` time is all of its phases). Not run in the build: a few minutes headless with the
 ## native module, longer without.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -80,7 +81,7 @@ const PIERCE: int = 2
 const BODY_HEALTH: float = 1.0e12
 const BODY_RADIUS: float = 7.0
 ## The events a shot's hit or end sends (the sandbox storm's PROFILED_SIGNALS).
-const TIMED_SIGNALS: Array[StringName] = [&"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
+const TIMED_SIGNALS: Array[StringName] = [&"projectile_hits", &"projectile_hit", &"projectile_impact", &"projectile_expired", &"damage_dealt", &"hit_landed", &"status_applied", &"reaction_triggered"]
 ## The lines printed: the manager's parts (its PROF_* times, in step order), then the rest of the tick.
 const PARTS: Array[String] = ["refresh targets", "common pass", "passes before hits", "hit pass", "  in the kernel", "  hand-backs and their listeners (GDScript)", "passes after hits", "manager step", "Spells step", "Combat step", "Feel step", "spawn (the script's)", "update_draw"]
 const P_REFRESH: int = 0
@@ -139,6 +140,8 @@ class Timed:
 var _registry: Node
 var _cards: Array[StringName] = [&"bolt"]
 var _native: bool = true
+## Bundled hits (`--batch`).
+var _batch: bool = false
 ## The native kernel's threads (`--threads=N`; 0: its own choice).
 var _threads: int = 0
 var _work: int = ManagerScript.WORK_PER_STEP
@@ -205,6 +208,8 @@ func _initialize() -> void:
 			_work = maxi(arg.trim_prefix("--work=").to_int(), 1)
 		elif arg == "--no-native":
 			_native = false
+		elif arg == "--batch":
+			_batch = true
 		elif arg.begins_with("--threads="):
 			_threads = maxi(arg.trim_prefix("--threads=").to_int(), 0)
 		elif arg == "--no-listeners":
@@ -214,7 +219,7 @@ func _initialize() -> void:
 	var native_on: bool = _mgr.is_native()
 	var threads: int = _mgr.native_thread_count()
 	_free_all()
-	print("BENCH: shot scale, cards %s, native %s (%d threads), tails motes, crowd %d, hit-work budget %d, %d steps measured, %s" % [",".join(_cards), "on" if native_on else "off", threads, crowd, _work, steps, "headless" if _headless else "in a window"])
+	print("BENCH: shot scale, cards %s, native %s (%d threads), tails motes, crowd %d, hit-work budget %d, %d steps measured, %s%s" % [",".join(_cards), "on" if native_on else "off", threads, crowd, _work, steps, "headless" if _headless else "in a window", ", hits batched" if _batch else ""])
 	for scene: String in SCENES:
 		if not only.is_empty() and not only.has(scene):
 			continue
@@ -247,6 +252,7 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	_mgr.set_cap(count)
 	_mgr.set_bounds(ARENA)
 	_mgr.work_per_step = work
+	_mgr.batch_hits = _batch
 	_mgr.profile_clock = Time.get_ticks_usec
 	_spells = _own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
@@ -303,6 +309,7 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 		_bodies.append(body)
 		_index_of[body.get_instance_id()] = i
 	_bus.projectile_hit.connect(_on_hit)
+	_bus.projectile_hits.connect(_on_hits)
 	_shots = count
 	_fired = 0
 	_step_no = 0
@@ -410,7 +417,7 @@ func _time_listeners(scene: String, count: int, steps: int) -> void:
 				arity = (info["args"] as Array).size()
 		for connection: Dictionary in _bus.get_signal_connection_list(signal_name):
 			var callable: Callable = connection["callable"]
-			if int(connection["flags"]) & (CONNECT_DEFERRED | CONNECT_ONE_SHOT) != 0 or callable == Callable(self, &"_on_hit"):
+			if int(connection["flags"]) & (CONNECT_DEFERRED | CONNECT_ONE_SHOT) != 0 or callable == Callable(self, &"_on_hit") or callable == Callable(self, &"_on_hits"):
 				continue
 			var object: Object = callable.get_object()
 			var script: Script = object.get_script() as Script if object != null else null
@@ -470,6 +477,15 @@ func _on_hit(caster: int, target: Node, point: Vector2, tag: int, _shot: int) ->
 	_handler_usec += Time.get_ticks_usec() - start
 
 
+## A batch's hits, counted as `_on_hit` counts one (in its damage phase; a lost hit is none).
+func _on_hits(batch: HitBatch, phase: int) -> void:
+	if phase != HitBatch.PHASE_COMBAT:
+		return
+	for i in batch.count:
+		if batch.lost[i] == 0:
+			_on_hit(batch.caster[i], batch.target[i], batch.point[i], batch.tag[i], batch.shot[i])
+
+
 ## Every body's damage taken: the total and a hash of the totals in body order.
 func _damage_line() -> String:
 	var total: float = 0.0
@@ -505,6 +521,8 @@ func _own(object: Object) -> Object:
 func _free_all() -> void:
 	if _bus != null and _bus.projectile_hit.is_connected(_on_hit):
 		_bus.projectile_hit.disconnect(_on_hit)
+	if _bus != null and _bus.projectile_hits.is_connected(_on_hits):
+		_bus.projectile_hits.disconnect(_on_hits)
 	for object in _owned:
 		if is_instance_valid(object):
 			if object is Node and (object as Node).is_inside_tree():

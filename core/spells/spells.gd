@@ -553,6 +553,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		projectiles.wall_met.disconnect(_on_wall_met)
 	if events != null and is_instance_valid(events):
 		events.projectile_hit.disconnect(_on_hit)
+		events.projectile_hits.disconnect(_on_hits)
 		events.projectile_expired.disconnect(_on_expired)
 		events.shot_blocked.disconnect(_on_shot_blocked)
 		events.shield_blocked.disconnect(_on_shield_blocked)
@@ -570,6 +571,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		projectiles.wall_met.connect(_on_wall_met)
 	if events != null:
 		events.projectile_hit.connect(_on_hit)
+		events.projectile_hits.connect(_on_hits)
 		events.projectile_expired.connect(_on_expired)
 		events.shot_blocked.connect(_on_shot_blocked)
 		events.shield_blocked.connect(_on_shield_blocked)
@@ -2675,6 +2677,31 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -
 	# `relay` takes on what the actor hit last cast, before Combat reads this hit's profile (Spells
 	# hears `projectile_hit` first: its autoload comes before Combat's).
 	_relay(spell, target, tag, shot)
+	_hit_cards(spell, actor, target, position, tag, shot)
+
+
+## A step's hits as one batch (shot scale H3b, `HitBatch`): every relay before any damage (it
+## changes the profile Combat reads), then, after all of the step's damage, every hit's cards in hit
+## order (they read the state after the whole step's damage, not only their own hit's).
+func _on_hits(batch: HitBatch, phase: int) -> void:
+	if (phase != HitBatch.PHASE_PRE and phase != HitBatch.PHASE_SPELLS) or projectiles == null:
+		return
+	var pre: bool = phase == HitBatch.PHASE_PRE
+	for i in batch.count:
+		var tag: int = batch.tag[i]
+		if not SpellTag.is_spell_tag(tag) or not projectiles.batch_turn(i):
+			continue
+		var spell: CompiledSpell = _profiles.get(tag)
+		if spell == null:
+			continue
+		if pre:
+			_relay(spell, batch.target[i], tag, batch.shot[i])
+		else:
+			_hit_cards(spell, batch.caster[i], batch.target[i], batch.point[i], tag, batch.shot[i])
+
+
+## What a hit of `spell` does besides its damage: its on-hit effects, payloads and chain.
+func _hit_cards(spell: CompiledSpell, actor: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
 	var slot: int = shot
 	var chain: int = spell.chain_jumps
 	var prev: int = 0

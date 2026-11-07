@@ -379,6 +379,8 @@ func setup() -> void:
 		return
 	if not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
+	if not events.projectile_hits.is_connected(_on_projectile_hits):
+		events.projectile_hits.connect(_on_projectile_hits)
 	if not events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.connect(_on_player_downed)
 	if not events.player_revived.is_connected(_on_player_revived):
@@ -975,6 +977,20 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
 	_slot = saved_slot
+
+
+## A step's hits as one batch (shot scale H3b, `HitBatch`): the damage phase, hit by hit in order,
+## each with its impact's hold first (as `projectile_impact` came just before its hit). A hit whose
+## body an earlier hit of the batch killed is lost (`batch_turn`): its shot flies on.
+func _on_projectile_hits(batch: HitBatch, phase: int) -> void:
+	if phase != HitBatch.PHASE_COMBAT or projectiles == null:
+		return
+	for i in batch.count:
+		if not projectiles.batch_turn(i):
+			continue
+		var caster: int = batch.caster[i]
+		hit_stop.impact(caster, projectiles.impact_form)
+		_on_projectile_hit(caster, batch.target[i], batch.point[i], batch.tag[i], batch.shot[i])
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals an actor of the caster's

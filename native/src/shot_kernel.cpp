@@ -189,6 +189,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(mark_stamp, "_mark_stamp", INT) \
 	X(mem_free, "_mem_free", INT) \
 	X(cand_found, "_cand_found", INT) \
+	X(cand_from, "_cand_from", VECTOR2) \
 	X(high, "_high", INT) \
 	X(sim_time, "sim_time", FLOAT) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
@@ -335,6 +336,8 @@ struct HitPass {
 	double grid_x = 0.0, grid_y = 0.0, max_target_radius = 0.0;
 
 	bool targets_loaded = false;
+	// Where the latest `scan` began (`_cand_from`, handed back with its hits).
+	Vector2 scan_from;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
 	bool untested_loaded = false;
 	// For catching up a waiting homing shot (`load_homing`).
@@ -520,6 +523,7 @@ struct HitPass {
 		}
 		if (found > 0) {
 			m->set(k.cand_found, found);
+			m->set(k.cand_from, scan_from);
 		}
 	}
 
@@ -692,6 +696,7 @@ struct HitPass {
 			flags[slot] &= ~F_DEFERRED;
 			from = untested[slot];
 		}
+		scan_from = from;
 		// Where the step starts: a payload still on the body that fired it there is not clear of it.
 		const Vector2 start = from;
 		const double rad = radius[slot];

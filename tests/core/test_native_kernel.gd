@@ -45,9 +45,11 @@ const OWN_BUFFERS: Array[StringName] = [&"_buffers"]
 ## pass sizes it for every target at once), what only the native drawing writes, the GDScript
 ## catch-up's one-shot list and the GDScript drawing's sum of the tail asked for and count of the
 ## thinned groups' tail births (the native keeps them in locals; the sum is handed out as
-## `tail_demand`, which is compared, and the births themselves are compared).
+## `tail_demand`, which is compared, and the births themselves are compared), and where the latest
+## hit test's path began (`_cand_from`: scratch read at once by a batched hit; the GDScript writes it
+## at every test, the native pass only for a shot it hands back with hits).
 const NOT_COMPARED: Array[StringName] = [&"_target_id", &"native_threads",
-		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
+		&"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_cand_from", &"_draw_out", &"_one", &"_tail_wanted", &"_tail_thin"]
 
 var _failures: Array[String] = []
 ## Per manager (0 the GDScript, 1 the native): its bus, actor table, targets and what it sent.

@@ -119,7 +119,7 @@ const WALL_LAYER: int = 1
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the rows' nodes by
 ## instance id, which differ between runs (until N5; found by N2's replays); the native switch,
 ## which gives the same game either way (native/README.md; found by N2b's platform runs).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"_parent", &"_cand_nodes", &"_kernel", &"native", &"_node_ids", &"_row_by_node"]
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"sim", &"_parent", &"_cand_nodes", &"_kernel", &"native", &"_node_ids", &"_row_by_node"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"nodes", &"_slot_nodes"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -133,6 +133,8 @@ var projectiles: ProjectileManagerScript = null
 var actors: ActorsScript = null
 var entities: EntitiesScript = null
 var spells: SpellsScript = null
+## The run's chance (core/sim/sim.gd): each row's seed.
+var sim: Sim = null
 
 ## The rows (see the class doc). Only the swarm writes them.
 var nodes: Array[Node2D] = []
@@ -169,9 +171,8 @@ var native: bool = true:
 	set = set_native
 var _kernel: Object = null
 
-## The randomness of the seeds. Tests seed it. While a replay records or plays, each run starts it
-## from the replay's seeds (`SimSeed.is_dealing`, online-ready N2).
-var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## The rows spawned since the start: the name of the next row's seed (`spawn`).
+var spawned: int = 0
 
 ## The node the swarmers stand under, and the floor they stand on (its space).
 var _parent: Node2D = null
@@ -229,7 +230,6 @@ var _asked: int = 0
 
 
 func _init() -> void:
-	rng.seed = SimSeed.fresh()
 	set_native(native)
 	_grow(START_ROOM)
 	_slot_nodes.resize(TARGET_SLOTS)
@@ -270,8 +270,7 @@ static func kind_for(data: EnemyBase) -> SwarmKind:
 ## parent's parent's static bodies on the wall layer) become the wall grid.
 func start(parent: Node2D, arena: Rect2) -> void:
 	stop()
-	if SimSeed.is_dealing():
-		rng.seed = SimSeed.fresh()
+	spawned = 0
 	_find_services()
 	_parent = parent
 	_arena = arena
@@ -347,7 +346,10 @@ func spawn(kind: SwarmKind, at: Vector2) -> int:
 	velocities[row] = Vector2.ZERO
 	ran[row] = 0.0
 	aims[row] = Vector2.DOWN
-	seeds[row] = rng.randi() & 0x7fffffff
+	if sim == null:
+		sim = Sim.found(_parent)
+	seeds[row] = sim.bits(&"swarm_row", 0, spawned) & 0x7fffffff
+	spawned += 1
 	hurt_left[row] = 0.0
 	down[row] = 0
 	actor_ids[row] = id
@@ -870,6 +872,7 @@ func promote(row: int) -> Actor:
 	actor.data = kind.enemy
 	actor.events = events
 	actor.combat = combat
+	actor.sim = sim
 	actor.projectiles = projectiles
 	actor.spells = spells
 	actor.actors = actors
@@ -988,3 +991,5 @@ func _find_services() -> void:
 		entities = root.get_node_or_null(^"Entities") as EntitiesScript
 	if spells == null:
 		spells = root.get_node_or_null(^"Spells") as SpellsScript
+	if sim == null:
+		sim = Sim.found(root)

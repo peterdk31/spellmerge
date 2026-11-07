@@ -578,8 +578,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
 ## which gives the same game either way (native/README.md), and the hit test's scratch, which only
 ## the native pass sizes ahead (both found by N2b's platform runs); `_skip_id`, the instance id
-## of the body each shot spares, which differs from run to run (`_skip_on`, whether it holds, is state).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"sweep_nodes", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_skip_id", &"_head_mesh", &"step_profile", &"profile_clock"]
+## of the body each shot spares, which differs from run to run (`_skip_on`, whether it holds, is state);
+## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
+## each, which a run's start must keep whole: they grow together, by the size of the first (found by
+## N3c's stress runs).
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_skip_id", &"_head_mesh", &"step_profile", &"profile_clock"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -1776,6 +1779,10 @@ func clear() -> void:
 ## dead slot's leftovers, with this session's settings (RUN_KEEPS, the cap) and the room's bounds.
 func begin_run() -> void:
 	clear()
+	# The target table's nodes are kept (DERIVED) and its numbers renewed: a body still registered
+	# would lose its row. The last run's bodies have left by now (Flow), so none is.
+	if not _targets.is_empty():
+		push_error("ProjectileManager.begin_run: %d targets are still registered; the last run's bodies must leave before a run starts" % _targets.size())
 	var bounds: Rect2 = _bounds
 	# The blank's arrays as big as this one's: the cap is kept (RUN_KEEPS).
 	SimFresh.renew(self, func(blank: Object) -> void: blank.call(&"set_cap", _cap))

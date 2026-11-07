@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: Chance by name, from the sim (online-ready N3c, owner session)
+
+- **One source of chance:** `Sim` (core/sim/sim.gd), owned by the Tick, holding the tick and the run's seed (dealt at each run's start by `SimSeed.fresh()`: a replay's while one records or plays). The simulation keeps no `RandomNumberGenerator` (a test fails on one). Spells' scatter, the brain, the horde director and the swarm's row seeds moved onto it; the horde's own seeds are gone, so a run has one seed.
+- **A roll is a hash of the run's seed and the name its caller gives it** (purpose, key, counter), and **the tick is not in it**, unlike the plan: a test that steps an area by hand would otherwise roll by whatever the game's clock read, and a caller that rolls more than once a tick needs a counter anyway. Each caller counts its rolls as state. A new roll in one system never shifts another's.
+- **Every seeded outcome changed once** (the planned one-time churn): runs now differ by seed, where Spells' scatter and the brain's rolls were the same in every run before.
+- **Coop's wizards go by actor id**, not the tree's order, so revives go the same way in a game rebuilt from a snapshot (N10).
+- **The state hash is too slow for once a second as it is:** 55 ms on the web stress scenario, 90 ms on the desktop one, 189 ms with a 600-enemy horde (headless), mostly the bodies (milestones/online-ready.md, N3c). Left for a follow-up before the netcode, with the levers listed there.
+
 ## 2026-11-07: Every run starts from a fresh game's state (online-ready N3b, owner session)
 
 - **A run's start resets the areas by construction, not by hand-kept lists.** `Tick.begin_run` (called by Flow's `start_run`) counts the clock from 0 and makes each service and the horde director take every state member from a blank of its own script (`SimFresh.renew`, core/sim/sim_fresh.gd), so a member added later is reset too. The `clear` functions stay (tests use them; a run's start calls them first, so their events still go out). The alternative, completing each `clear` by hand, would list every member of five large scripts again and go stale with the next one added.

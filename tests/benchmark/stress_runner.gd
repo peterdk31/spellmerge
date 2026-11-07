@@ -59,6 +59,7 @@ const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
+const TickScript := preload("res://core/sim/tick.gd")
 
 const PLAYERS: int = 4
 ## The horde scenarios' frame line (p95, milliseconds; headless, so game logic only):
@@ -126,6 +127,8 @@ const TOP_UP_SHARE: int = 25
 const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 ## The timing pass over the crowd (`_time_parts`) runs on every PARTS_EVERY-th drawn frame.
 const PARTS_EVERY: int = 30
+## The state hashes timed at a scenario's end (`_report_state_hash`).
+const HASH_PASSES: int = 5
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
 const FILLER_SPEED_MIN: float = 80.0
 const FILLER_SPEED_MAX: float = 260.0
@@ -721,6 +724,7 @@ func _end_scenario() -> void:
 		_probe.call("report")
 		_warn_when_slow(label)
 		_report_parts()
+		_report_state_hash(label)
 		if _tree_profile != null:
 			_tree_profile.call(&"report")
 			_tree_profile.queue_free()
@@ -770,6 +774,46 @@ func _report_parts() -> void:
 		print("BENCH: stress parts, physics step (%d steps, %d swarmers at the end): swarm without its look avg %.3f ms (max with it %.3f), swarm look step avg %.3f ms, projectile manager avg %.3f ms max %.3f, Spells avg %.3f ms max %.3f, Combat avg %.3f ms max %.3f" % [_timed_steps, _swarm.count if _swarm != null else 0, float(_swarm_usec - _look_usec) / steps / 1000.0, float(_swarm_max_usec) / 1000.0, float(_look_usec) / steps / 1000.0, float(_projectiles_usec) / steps / 1000.0, float(_projectiles_max_usec) / 1000.0, float(_spells_usec) / steps / 1000.0, float(_spells_max_usec) / 1000.0, float(_combat_usec) / steps / 1000.0, float(_combat_max_usec) / 1000.0])
 		print("BENCH: stress parts, swarm look drawing (Feel's flash and squash, the batches' buffers; its _process): avg %.3f ms a frame" % (float(_look_draw_usec) / maxf(1.0, float(_look_draw_frames)) / 1000.0))
 	print("BENCH: stress parts, Feel step (hit particles, flashes, labels; the particles' own work is in the renderer and the particles-off run): avg %.3f ms per pass" % (float(_feel_step_usec) / frames / 1000.0))
+
+
+## The state hash's cost at the scenario's full load (online-ready N3c; core/sim/README.md, "The
+## hash"): HASH_PASSES hashes of every area the Tick names (`state_areas`), as the netcode would
+## make them (no paths), after the measured window so they stay out of its frames; with the areas
+## that cost most (the bodies together). The netcode would hash once a second.
+func _report_state_hash(label: String) -> void:
+	var tick: Node = get_tree().root.get_node_or_null("Tick")
+	if tick == null:
+		return
+	var total: int = 0
+	var most: int = 0
+	var named: Dictionary = {}
+	var problems: PackedStringArray = PackedStringArray()
+	var by_area: Dictionary[String, int] = {}
+	for i in HASH_PASSES:
+		var start: int = Time.get_ticks_usec()
+		named = tick.call(&"state_areas")
+		var walk := StateWalk.new()
+		walk.with_paths = false
+		var hashes: Dictionary[String, int] = {}
+		for name: String in named:
+			var area_start: int = Time.get_ticks_usec()
+			hashes[name] = SimHash.area(walk, name, named[name] as Object)
+			var key: String = "bodies" if name.begins_with("actor ") else name
+			by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
+		SimHash.whole(hashes)
+		problems = walk.problems
+		var took: int = Time.get_ticks_usec() - start
+		total += took
+		most = maxi(most, took)
+	var bodies: int = named.size() - 1 - TickScript.STATE_AREAS.size()
+	var parts: Array[String] = []
+	var keys: Array = by_area.keys()
+	keys.sort_custom(func(a: String, b: String) -> bool: return by_area[a] > by_area[b])
+	for key: String in keys.slice(0, 4):
+		parts.append("%s %.2f" % [key, float(by_area[key]) / float(HASH_PASSES) / 1000.0])
+	print("BENCH: stress %s: state hash avg %.2f ms max %.2f ms over %d areas (%d bodies; most: %s ms), %d problems" % [label, float(total) / float(HASH_PASSES) / 1000.0, float(most) / 1000.0, named.size(), bodies, ", ".join(parts), problems.size()])
+	for problem in problems.slice(0, 5):
+		print("BENCH: stress %s: state hash problem: %s" % [label, problem])
 
 
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.

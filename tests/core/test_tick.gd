@@ -173,7 +173,7 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 
 ## Every autoload of a simulation script is either made fresh at a run's start (with a `begin_run`)
 ## or says why it need not be (`RENEWED_OTHERWISE`), so a new area cannot carry one run's state into
-## the next unnoticed.
+## the next unnoticed; and the state hash sees each (`STATE_AREAS`, N3c).
 func test_every_simulation_autoload_starts_each_run_fresh_or_says_why() -> void:
 	var autoloads: Dictionary[StringName, Script] = {}
 	for info: Dictionary in ProjectSettings.get_property_list():
@@ -193,5 +193,7 @@ func test_every_simulation_autoload_starts_each_run_fresh_or_says_why() -> void:
 			for method: Dictionary in script.get_script_method_list():
 				methods.append(String(method["name"]))
 			check(methods.has("begin_run"), "%s is in Tick.FRESH_AT_RUN but has no begin_run" % area)
-	for area: StringName in TickScript.FRESH_AT_RUN + TickScript.RENEWED_OTHERWISE.keys():
+		# Its state is the game's: the hash and the desync report see it (N3c).
+		check(TickScript.STATE_AREAS.has(area), "%s (%s) is a simulation area: list it in Tick.STATE_AREAS, so the state hash sees it (core/sim/README.md, \"The hash\")" % [area, script.resource_path])
+	for area: StringName in TickScript.FRESH_AT_RUN + TickScript.RENEWED_OTHERWISE.keys() + TickScript.STATE_AREAS:
 		check(autoloads.has(area), "Tick lists %s, which is no autoload (renamed?)" % area)

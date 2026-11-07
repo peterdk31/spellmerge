@@ -47,8 +47,15 @@ const RENEWED_OTHERWISE: Dictionary[StringName, String] = {
 	&"Coop": "the seats' joins are the session's; room_entered sets the run's view, wizards and revives",
 }
 
+## The areas whose state is the game's, by autoload name, for `state_areas` (with the sim and the
+## bodies): the hash, the desync report and later snapshots.
+const STATE_AREAS: Array[StringName] = [&"Actors", &"Projectiles", &"Spells", &"Combat", &"Entities", &"Flow", &"Coop", &"Horde"]
+
 ## Ticks since the run began (or the game, before any run).
 var count: int = 0
+## The game's time and chance (`sim.gd`, online-ready N3c): the tick (`count`) and the run's seed,
+## dealt at each run's start. Areas and bodies take it as their `sim` (`Sim.found`).
+var sim: Sim = Sim.new()
 ## Where the areas are found by name. Only tests set this (stand-ins); otherwise the tree's root.
 var areas: Node = null
 
@@ -68,6 +75,7 @@ func _physics_process(delta: float) -> void:
 ## One tick of `delta` seconds, in the written order (see the class doc).
 func run(delta: float) -> void:
 	var root: Node = areas if areas != null else get_tree().root
+	sim.tick = count
 	# The frames run while the tree stands paused too (the horde's break takes its picks then).
 	var frames: Node = root.get_node_or_null(^"Frames")
 	if frames != null and bool(frames.get(&"auto_tick")):
@@ -92,12 +100,15 @@ func run(delta: float) -> void:
 
 
 ## A run starts (Flow, once the last run's world is gone and before the new one is made;
-## online-ready N3b): the clock counts from 0 again, and every service takes a fresh game's state
-## (its `begin_run`; core/sim/sim_fresh.gd), in the tick's order, then the horde director. So a run
-## plays the same whatever ran before it in this game, and a replay recorded in any run plays the
-## same in any other.
+## online-ready N3b): the clock counts from 0 again, the run takes its seed (`SimSeed.fresh`: a
+## replay's while one records or plays, else random; N3c), and every service takes a fresh game's
+## state (its `begin_run`; core/sim/sim_fresh.gd), in the tick's order, then the horde director. So
+## a run plays the same whatever ran before it in this game, and a replay recorded in any run plays
+## the same in any other.
 func begin_run() -> void:
 	count = 0
+	sim.tick = 0
+	sim.run_seed = SimSeed.fresh()
 	var root: Node = areas if areas != null else get_tree().root
 	for service in FRESH_AT_RUN:
 		var area: Node = root.get_node_or_null(NodePath(service))
@@ -107,6 +118,27 @@ func begin_run() -> void:
 			push_error("Tick: %s has no begin_run, so it keeps the last run's state (core/sim/sim_fresh.gd)" % service)
 			continue
 		area.call(&"begin_run")
+
+
+## The game's state by area (online-ready N1's `SimHash.areas`, `Desync.capture`): "Sim" (the tick
+## and the run's seed), each of STATE_AREAS there is, then every actor's body by actor id
+## ("actor 3"). Areas never reach into each other: the tick names them (N3c).
+func state_areas() -> Dictionary:
+	var root: Node = areas if areas != null else get_tree().root
+	var out: Dictionary = {"Sim": sim}
+	for name in STATE_AREAS:
+		var area: Node = root.get_node_or_null(NodePath(name))
+		if area != null:
+			out[String(name)] = area
+	var actors: ActorsScript = root.get_node_or_null(^"Actors") as ActorsScript
+	if actors != null:
+		var n: int = actors.open_ids(_ids)
+		for i in n:
+			# Actor bodies only: a swarm row's target node holds an id too, and is the swarm's.
+			var body: Actor = actors.node_of(_ids[i]) as Actor
+			if body != null:
+				out["actor %d" % _ids[i]] = body
+	return out
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes

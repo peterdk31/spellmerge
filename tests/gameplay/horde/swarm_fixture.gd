@@ -93,7 +93,7 @@ func _init(root: Node) -> void:
 	swarm.projectiles = projectiles
 	swarm.actors = actors
 	swarm.entities = null
-	swarm.rng.seed = 11
+	swarm.sim = Sim.seeded(11)
 	swarm.start(horde, ARENA)
 
 

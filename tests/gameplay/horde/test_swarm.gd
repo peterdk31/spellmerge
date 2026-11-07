@@ -409,7 +409,7 @@ func _director_on(run: Fixture, weights: Dictionary) -> HordeScript:
 	_director.actors = run.actors
 	_director.registry = run.registry
 	_director.curve = HordeFixture.curve([[0.0, 30.0, 200]], weights)
-	_director.rng.seed = 3
+	_director.sim = Sim.seeded(3)
 	_director.swarm = run.swarm
 	root.add_child(_director)
 	_director.set_process(false)

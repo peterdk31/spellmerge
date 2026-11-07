@@ -148,7 +148,8 @@ func set_camera(node: Camera2D) -> void:
 
 
 ## Read the wizards in the `wizards` group again. Done by itself after a join, a
-## leave and `room_entered`.
+## leave and `room_entered`. They are kept by actor id (online-ready N3c: the group's order is the
+## tree's, which a game rebuilt from a snapshot need not repeat), so revives go in that order.
 func refresh_wizards() -> void:
 	_wizards.clear()
 	_downs.clear()
@@ -157,8 +158,17 @@ func refresh_wizards() -> void:
 		return
 	for node: Node in tree.get_nodes_in_group(WIZARDS_GROUP):
 		if node is Node2D:
-			_wizards.append(node as Node2D)
-			_downs.append(DownedScript.of(node))
+			var at: int = _wizards.size()
+			while at > 0 and _id_of(_wizards[at - 1]) > _id_of(node):
+				at -= 1
+			_wizards.insert(at, node as Node2D)
+			_downs.insert(at, DownedScript.of(node))
+
+
+## A wizard's actor id (the order of `_wizards`), or -1 for a body without one.
+static func _id_of(body: Node) -> int:
+	var id: Variant = body.get(&"id")
+	return id if id is int else -1
 
 
 ## Work out where the camera should be and how far out, from the wizards now.

@@ -32,8 +32,6 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 
-## The most actor ids looked at for bodies.
-const MAX_ACTORS: int = 1024
 ## The tick the scripted run's "HUD" rebuilds staff 0 (a command).
 const REBUILD_AT: int = 100
 const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
@@ -170,24 +168,10 @@ func fresh() -> void:
 	await _tree.physics_frame
 
 
-## The game's areas by name: the autoloads that simulate, and every actor's body by actor id.
+## The game's areas by name, as the Tick names them (`state_areas`): the run's time and chance,
+## the autoloads that simulate, and every actor's body by actor id.
 func areas() -> Dictionary:
-	var out: Dictionary = {}
-	for area: String in ["Actors", "Projectiles", "Spells", "Combat", "Entities", "Flow", "Coop"]:
-		out[area] = _root.get_node(area)
-	# The horde director only in a horde run: outside one its generator holds the seed it was made
-	# with (random in each game; a run deals it a new one).
-	if bool(_root.get_node("Horde").call("is_running")):
-		out["Horde"] = _root.get_node("Horde")
-	var actors: Node = _root.get_node("Actors")
-	for id in MAX_ACTORS:
-		if not bool(actors.call("is_open", id)):
-			continue
-		# Actor bodies only: a swarm row's target node holds an id too, and is the swarm's.
-		var body: Actor = actors.call("node_of", id) as Actor
-		if body != null:
-			out["actor %d" % id] = body
-	return out
+	return _root.get_node("Tick").call(&"state_areas")
 
 
 ## One tick: its hashes to `into`.

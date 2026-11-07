@@ -77,7 +77,7 @@ signal died(killer: int)
 signal damaged(by: int, amount: float)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors"]
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_looks"]
 
@@ -95,13 +95,15 @@ const VIEW: Array[StringName] = [&"_looks"]
 ## The enemy's numbers, applied to the components in `_ready`. Set before adding the actor.
 var data: EnemyBase = null
 
-## The event bus, Combat, the projectile manager, the spell runtime and the actor table. Only
-## tests set these, before adding the actor; otherwise the autoloads are used.
+## The event bus, Combat, the projectile manager, the spell runtime, the actor table and the game's
+## time and chance (`Sim`). Only tests set these, before adding the actor; otherwise the autoloads
+## are used (the Tick's sim).
 var events: EventsScript = null
 var combat: CombatScript = null
 var projectiles: ProjectilesScript = null
 var spells: SpellsScript = null
 var actors: ActorsScript = null
+var sim: Sim = null
 
 ## Its id in the actor table, or -1 while it has none (out of the tree, or the table full).
 var id: int = ActorsScript.NONE
@@ -458,6 +460,8 @@ func _find_services() -> void:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if actors == null:
 		actors = get_node_or_null("/root/Actors") as ActorsScript
+	if sim == null:
+		sim = Sim.found(self)
 
 
 ## Each kind of component once (the first child of its kind), the looks, the home controller.

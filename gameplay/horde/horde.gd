@@ -103,21 +103,19 @@ const HORDE_NODE_NAME: String = "Horde"
 const NO_LIMIT: int = 1000000
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"world", &"_horde", &"_camera", &"_gems"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_camera", &"_gems"]
 ## The session's settings a new run keeps (`begin_run`): the curve and the web cap (tests and the
-## stress runs set them), the generator (each horde run's start deals it its seed while a replay
-## records or plays, and a test seeds it), the warnings already given.
-const RUN_KEEPS: Array[StringName] = [&"curve", &"web", &"rng", &"missing_warnings"]
+## stress runs set them), the warnings already given.
+const RUN_KEEPS: Array[StringName] = [&"curve", &"web", &"missing_warnings"]
 
-## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
+## The services. Only tests set these, before adding the node; otherwise the autoloads are used
+## (the Tick's sim: the run's chance, core/sim/sim.gd).
 var events: EventsScript = null
 var registry: RegistryScript = null
 var actors: ActorsScript = null
+var sim: Sim = null
 ## The curve the next start uses.
 var curve: HordeCurve = DefaultCurve
-## The randomness of spawns and offers. Tests seed it. While a replay records or plays, each run
-## starts it from the replay's seeds (`SimSeed.is_dealing`, online-ready N2), so the run is the same.
-var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
 var web: bool = OS.has_feature("web")
 ## The swarm (`swarm.gd`, docs/milestones/horde-swarm.md): an enemy with a `SwarmKind` spawns
@@ -152,6 +150,11 @@ var _kinds: Array[EnemyBase] = []
 ## Every spell card id in the registry, read on start.
 var _cards: Array[StringName] = []
 var _spawn_debt: float = 0.0
+## The rolls made this run, by what they pick: the kind of each spawn, the spot of each spawn try,
+## and each seat's offers (named by the run's sim, `_roll`).
+var _kind_rolls: int = 0
+var _spot_rolls: int = 0
+var _offer_rolls: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## True while a build break holds the game paused.
 var _break_on: bool = false
 ## Per seat: ready to end the build break (only meaningful in one).
@@ -181,7 +184,6 @@ func _init() -> void:
 	_wizard_at.resize(SEATS)
 	_standing.resize(SEATS)
 	_present.resize(SEATS)
-	rng.seed = SimSeed.fresh()
 
 
 func _ready() -> void:
@@ -195,6 +197,8 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if actors == null:
 		actors = get_node_or_null("/root/Actors") as ActorsScript
+	if sim == null:
+		sim = Sim.found(self)
 	if events == null:
 		push_warning("Horde: the Events autoload is missing, so no horde run can start.")
 		return
@@ -298,8 +302,6 @@ func start(new_world: Node2D) -> void:
 	if new_world == null or not is_instance_valid(new_world):
 		return
 	world = new_world
-	if SimSeed.is_dealing():
-		rng.seed = SimSeed.fresh()
 	seconds = 0.0
 	kills = 0
 	level = 1
@@ -307,6 +309,9 @@ func start(new_world: Node2D) -> void:
 	alive = 0
 	over = false
 	_spawn_debt = 0.0
+	_kind_rolls = 0
+	_spot_rolls = 0
+	_offer_rolls.fill(0)
 	_status_left = 0.0
 	_horde = Node2D.new()
 	_horde.name = HORDE_NODE_NAME
@@ -424,7 +429,8 @@ func _pick_kind() -> EnemyBase:
 			total += curve.weight_at(seconds, i)
 	if total <= 0.0:
 		return null
-	var roll: float = rng.randf() * total
+	var roll: float = _roll(&"horde_kind", 0, _kind_rolls) * total
+	_kind_rolls += 1
 	var last: EnemyBase = null
 	for i in _kinds.size():
 		if _kinds[i] == null:
@@ -458,6 +464,7 @@ func _add_enemy(data: EnemyBase, at: Vector2) -> bool:
 			swarm = SwarmScript.new()
 			swarm.events = events
 			swarm.actors = actors
+			swarm.sim = sim
 			_start_swarm()
 		if swarm.spawn(kind, at) < 0:
 			return false
@@ -486,7 +493,8 @@ func spawn_point() -> Vector2:
 	var middle: Vector2 = _party_middle(view)
 	var best: Vector2 = Vector2.INF
 	for attempt in SPAWN_TRIES:
-		var direction: Vector2 = Vector2.from_angle(rng.randf() * TAU)
+		var direction: Vector2 = Vector2.from_angle(_roll(&"horde_spot", 0, _spot_rolls) * TAU)
+		_spot_rolls += 1
 		var reach: float = _exit_distance(middle, direction, view) + SPAWN_RING_MARGIN
 		var at: Vector2 = (middle + direction * reach).clamp(_arena.position, _arena.end)
 		if not _clear_of_wizards(at):
@@ -599,6 +607,13 @@ func _show_on_wizards(cue: StringName, only: PackedInt32Array = PackedInt32Array
 			events.cue_shown.emit(actors.home_of_seat(seat), cue, wizard.global_position, Vector2.ZERO, 0.0, Color.WHITE, 0)
 
 
+## A roll in [0, 1) named by `purpose`, `key` and `counter`, from the run's sim (core/sim/sim.gd).
+func _roll(purpose: StringName, key: int, counter: int) -> float:
+	if sim == null:
+		sim = Sim.found(self)
+	return sim.chance(purpose, key, counter)
+
+
 ## Opens a new offer for `seat` from the cards not in its bag; with every card owned, none.
 func _offer(seat: int) -> bool:
 	var choices: Array[StringName] = []
@@ -611,7 +626,8 @@ func _offer(seat: int) -> bool:
 		return false
 	var take: int = mini(OFFER_SIZE, choices.size())
 	for i in take:
-		var j: int = i + rng.randi_range(0, choices.size() - 1 - i)
+		var j: int = i + floori(_roll(&"horde_offer", seat, _offer_rolls[seat]) * float(choices.size() - i))
+		_offer_rolls[seat] += 1
 		var swap: StringName = choices[i]
 		choices[i] = choices[j]
 		choices[j] = swap

@@ -51,6 +51,7 @@ func _initialize() -> void:
 	for method_name in names:
 		_current = method_name
 		var started: int = Time.get_ticks_msec()
+		_still_chance()
 		await before_each()
 		await call(method_name)
 		await after_each()
@@ -88,6 +89,16 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 		if i % shard.y == shard.x:
 			mine.append(names[i])
 	return mine
+
+
+## The game's chance starts each test at seed 0 (core/sim/sim.gd), as a fresh process has it: a run
+## an earlier test started dealt the game's sim a random seed, and whatever this test makes rolls
+## from that sim unless it hands its own.
+func _still_chance() -> void:
+	var clock: Node = root.get_node_or_null(^"Tick")
+	var game: Sim = clock.get(&"sim") as Sim if clock != null else null
+	if game != null:
+		game.run_seed = 0
 
 
 ## Runs before every test. Override it for setup the tests share.

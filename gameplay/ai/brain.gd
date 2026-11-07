@@ -105,8 +105,10 @@ var entities: EntitiesScript = null
 ## The team board (gameplay/ai/team_board.gd), or null: staggered fire, calls, and where its
 ## teammates stand and how hurt they are (it reports itself at each decision).
 var board: TeamBoard = null
-## Seeded per actor (`setup`), so a test repeats.
-var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## Its chance (online-ready N3c): its rolls are named by this key (`setup`: per actor, so a test
+## repeats) and counted, from the actor's `sim` (`_roll`).
+var dice: int = 0
+var rolls: int = 0
 
 # What it perceived at its last decision.
 ## What it chases (an actor, a decoy), or null.
@@ -193,12 +195,13 @@ var _report_slot: int = -1
 var _attack_slot: int = -1
 
 
-## Start driving `with_actor` by `with_profile` (null: the shared default). `seed_value` seeds its
-## randomness and staggers its timers.
+## Start driving `with_actor` by `with_profile` (null: the shared default). `seed_value` names its
+## rolls and staggers its timers.
 func setup(with_actor: Actor, with_profile: AIProfile, seed_value: int) -> void:
 	actor = with_actor
 	profile = with_profile if with_profile != null else AIProfile.fallback()
-	rng.seed = seed_value
+	dice = seed_value
+	rolls = 0
 	_retarget_offset = RETARGET_TIME * float(absi(seed_value) % 8) / 8.0
 	_strafe_side = 1.0 if seed_value % 2 == 0 else -1.0
 	_face = null
@@ -531,7 +534,7 @@ func _perceive_threat() -> void:
 	threat_away = actor.projectiles.threat_away
 	if threat_time < 0.0:
 		_read_telegraph()
-	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and rng.randf() < profile.randomness * 0.3:
+	if threat_time >= 0.0 and profile.dodge > 0.0 and profile.randomness > 0.0 and _roll() < profile.randomness * 0.3:
 		# Sometimes it sees the shot late.
 		threat_time = -1.0
 
@@ -617,7 +620,7 @@ func _decide() -> void:
 		elif wanted > second_want:
 			second = candidate
 			second_want = wanted
-	if second != null and second_want >= best_want * 0.7 and rng.randf() < profile.randomness * 0.5:
+	if second != null and second_want >= best_want * 0.7 and _roll() < profile.randomness * 0.5:
 		best = second
 	behaviour = best
 	_clear_plan()
@@ -689,7 +692,7 @@ func _begin_call(windup: float, intent: ActorIntent) -> bool:
 	if sense == null or not sense.harms():
 		return false
 	var mate: Vector2 = board.nearest_mate(team, actor.id, actor.global_position, TeamBoard.CALL_REACH)
-	if mate == Vector2.INF or rng.randf() >= profile.teamwork:
+	if mate == Vector2.INF or _roll() >= profile.teamwork:
 		return false
 	state = State.CALL
 	_state_left = TeamBoard.CALL_TIME
@@ -728,7 +731,7 @@ func _begin_windup(at: int, windup: float, now: Vector2, intent: ActorIntent) ->
 	recover_time = rest_for(at)
 	state = State.WINDUP
 	_state_left = windup
-	_aim_error = rng.randf_range(-1.0, 1.0) * (1.0 - profile.accuracy) * AIM_ERROR
+	_aim_error = (_roll() * 2.0 - 1.0) * (1.0 - profile.accuracy) * AIM_ERROR
 	_locked_aim = _aim_for(_chosen_sense, now, _aim_error)
 	intent.aim = _locked_aim
 	intent.press(at)
@@ -847,7 +850,15 @@ func _sense_of(at: int) -> CastSense:
 
 
 func _reaction() -> float:
-	return profile.reaction * rng.randf_range(1.0 - REACTION_JITTER, 1.0 + REACTION_JITTER)
+	return profile.reaction * (1.0 + REACTION_JITTER * (_roll() * 2.0 - 1.0))
+
+
+## Its next roll in [0, 1), from its actor's sim (core/sim/sim.gd).
+func _roll() -> float:
+	var game: Sim = actor.sim if actor != null and actor.sim != null else Sim.found(actor)
+	var roll: float = game.chance(&"brain", dice, rolls)
+	rolls += 1
+	return roll
 
 
 func _target_radius() -> float:

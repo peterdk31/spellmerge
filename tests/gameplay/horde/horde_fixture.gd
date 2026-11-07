@@ -94,7 +94,7 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	director.registry = registry
 	director.web = false
 	director.curve = curve([[0.0, 4.0, 50]], {ENEMY_A: 1.0})
-	director.rng.seed = 7
+	director.sim = Sim.seeded(7)
 	root.add_child(director)
 	director.set_process(false)
 	world = make_world(seats)

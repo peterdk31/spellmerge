@@ -12,8 +12,9 @@ extends "res://tests/support/suite.gd"
 ## - What the walker cannot see, from the source: a static member belongs to no object, so it is
 ##   listed in DERIVED or VIEW (a cache, a test switch) and never holds state; and simulation code
 ##   reads no clock (`Time`, `OS.get_ticks_*`) and rolls no global dice (`randomize()`, `randf()`,
-##   `randi()`, `seed()`): a seed nobody chose comes from `SimSeed.fresh()` (core/sim). View-only
-##   scripts (`VIEW_ONLY`) may do both.
+##   `randi()`, `seed()`) and keeps no generator of its own: chance comes from `sim`
+##   (core/sim/sim.gd, N3c), and a seed nobody chose from `SimSeed.fresh()`. View-only scripts
+##   (`VIEW_ONLY`) and VIEW members may do all three.
 ## - The simulation folders in core/sim/README.md's table are StateWalk.FOLDERS.
 ##
 ## Each failure names the file, the member and the fix ("add it to DERIVED, it is set up again, not
@@ -22,7 +23,7 @@ extends "res://tests/support/suite.gd"
 ## Code a simulation script may not hold outside a comment (see the class doc), and why.
 const FORBIDDEN: Dictionary = {
 	"(^|[^\\w])randomize\\(": "seeds a generator by the clock; take `SimSeed.fresh()` (core/sim)",
-	"(^|[^.\\w])(randf|randi|randf_range|randi_range|randfn|seed)\\(": "rolls the engine's global dice; use a generator of its own, seeded by the game",
+	"(^|[^.\\w])(randf|randi|randf_range|randi_range|randfn|seed)\\(": "rolls the engine's global dice; take chance from `sim` (core/sim/sim.gd): `sim.chance(purpose, key, counter)`",
 	"(^|[^\\w])Time\\.": "reads the clock; the simulation runs on its own time (`delta`, `sim_time`)",
 	"(^|[^\\w])OS\\.get_(ticks|unix)": "reads the clock; the simulation runs on its own time (`delta`, `sim_time`)",
 }
@@ -73,6 +74,19 @@ func test_no_static_member_holds_state() -> void:
 		var listed: PackedStringArray = StateWalk.listed(script, "DERIVED") + StateWalk.listed(script, "VIEW")
 		for name in _statics_of(script):
 			check(listed.has(name), "%s: the static member %s belongs to no object, so no walk sees it; a cache or a switch goes in DERIVED, state goes in an object's member (core/sim/README.md, \"Steps\")" % [entry["name"], name])
+
+
+func test_no_state_member_keeps_a_generator() -> void:
+	for entry in _simulation_scripts():
+		var script: Script = entry["script"]
+		if StateWalk.is_view_only(script):
+			continue
+		var skip: PackedStringArray = StateWalk.listed(script, "VIEW")
+		for info: Dictionary in script.get_script_property_list():
+			var name: String = info["name"]
+			if int(info["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0 or skip.has(name):
+				continue
+			check(String(info["class_name"]) != "RandomNumberGenerator", "%s: %s keeps a generator; the simulation takes chance from its `sim` (core/sim/sim.gd): `sim.chance(purpose, key, counter)`, with a counter of its rolls as state (core/sim/README.md, \"Chance\")" % [entry["name"], name])
 
 
 func test_simulation_code_reads_no_clock_and_rolls_no_global_dice() -> void:

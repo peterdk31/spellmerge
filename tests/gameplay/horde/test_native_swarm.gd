@@ -63,7 +63,7 @@ func _side_by_side(swarmers: int, steps: int, standing: bool) -> void:
 	for side in 2:
 		var run: Fixture = Fixture.new(root)
 		run.swarm.native = side == 1
-		run.swarm.rng.seed = 11
+		run.swarm.sim = Sim.seeded(11)
 		var look := SwarmLook.new()
 		look.native = side == 1
 		look.real_time = false

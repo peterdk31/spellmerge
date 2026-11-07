@@ -10,6 +10,7 @@
 #include <godot_cpp/godot.hpp>
 
 #include "dmath_kernel.h"
+#include "jobs.h"
 #include "mote_kernel.h"
 #include "shot_kernel.h"
 #include "swarm_kernel.h"
@@ -34,6 +35,7 @@ static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
 	ShotKernel::free_names();
 	SwarmKernel::free_names();
 	MoteKernel::free_names();
+	jobs::shutdown();
 }
 
 extern "C" {

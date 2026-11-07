@@ -94,9 +94,25 @@ class BannedApiTest(unittest.TestCase):
         for bad in ['#include <godot_cpp/classes/os.hpp>', '#include <godot_cpp/classes/http_request.hpp>',
                     '#include <cstdlib>', '#include "../../secret.h"', 'system("rm -rf /");', 'FILE *f = fopen(p, "r");',
                     'void *h = dlopen("x", 0);', 'obj->call("execute", args);', 'Engine::get_singleton();',
-                    'std::thread t(f);', 'asm("nop");', '::godot::gdextension_interface::classdb_construct_object(n);']:
+                    'std::thread t(f);', '#include <thread>', '#include <mutex>', 'std::atomic<int> n;',
+                    'pthread_create(&t, 0, f, 0);', 'std::async(f);', 'thread_local int n;',
+                    'asm("nop");', '::godot::gdextension_interface::classdb_construct_object(n);']:
             with self.subTest(bad=bad):
                 self.assertTrue(native(good + bad + "\n"), f"not flagged: {bad}")
+
+    def test_only_the_jobs_file_makes_threads(self) -> None:
+        def native(path: str, text: str) -> list[str]:
+            return [f.message for f in rules.check_native_source(path, text)]
+        pool = ('#include "jobs.h"\n#include <atomic>\n#include <condition_variable>\n#include <mutex>\n'
+                '#include <thread>\n#include <vector>\nstd::vector<std::thread> workers; std::mutex lock;\n'
+                'std::atomic<int> next{0}; std::condition_variable wake; std::this_thread::yield();\n')
+        self.assertEqual(native(rules.NATIVE_THREADS_FILE, pool), [])
+        self.assertTrue(native("native/src/shot_kernel.cpp", pool))
+        self.assertEqual(native("native/src/shot_kernel.cpp", '#include <vector>\nstd::vector<int> list;\n'), [])
+        for bad in ['pthread_create(&t, 0, f, 0);', 'std::async(f);', 'std::jthread t(f);', 'CreateThread(0, 0, f, 0, 0, 0);',
+                    '#include <future>', 'system("x");']:
+            with self.subTest(bad=bad):
+                self.assertTrue(native(rules.NATIVE_THREADS_FILE, pool + bad + "\n"), f"not flagged in the jobs file: {bad}")
 
     def test_reports_line_numbers(self) -> None:
         found = rules.check_banned_apis("a.gd", 'extends Node\n\nfunc _ready() -> void:\n\tOS.execute("x", [])\n')

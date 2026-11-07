@@ -23,6 +23,12 @@ env.Append(CPPPATH=["src/"])
 # (an FMA rounds once where the GDScript twin rounds twice) and no fast-math, for every compiler the
 # module is built with (GCC for Linux and MinGW, Clang for the web).
 env.Append(CCFLAGS=["-ffp-contract=off", "-fno-fast-math"])
+# The module's own threads (src/jobs.cpp, shot scale H5): std::thread wants -pthread on Linux.
+# MinGW links its thread runtime in with the C++ one (godot-cpp's use_static_cpp: -static), and the
+# web is built without threads (ci/build/native.sh: threads=no, so jobs.cpp runs every loop on the
+# calling thread).
+if env["platform"] == "linux":
+    env.Append(CCFLAGS=["-pthread"], LINKFLAGS=["-pthread"])
 sources = Glob("src/*.cpp")
 
 library = env.SharedLibrary(

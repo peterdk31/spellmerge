@@ -10,9 +10,11 @@
 
 #include "shot_kernel.h"
 #include "dmath.h"
+#include "jobs.h"
 #include "packed.h"
 
 #include <cmath>
+#include <vector>
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
@@ -120,6 +122,8 @@ constexpr int RAMP_ENEMY = 4;
 constexpr int TEAM_NONE = -1;
 // The threat grid.
 constexpr int THREAT_SPAN_MAX = 16;
+// The slots one task of a loop over every shot takes (jobs.h: fixed, whatever the threads).
+constexpr int64_t SLOT_SPAN = 512;
 
 // What `hits` hands back to GDScript for the shot it stopped at (its n x 2 plus one of these).
 constexpr int64_t YIELD_WHOLE = 0; // the whole shot: its end, the bounds, a wall
@@ -811,12 +815,42 @@ struct HitPass {
 	}
 };
 
+// A tail's first half (`plan_tail` in `draw_shots`): where the shot is drawn, how far it went, and
+// the births its carry would lay to the end of its path.
+struct TailPlan {
+	Vector2 at;
+	double d = 0.0;
+	int64_t births = 0;
+	bool in_reach = false;
+};
+
 } // namespace
 
-ShotKernel::ShotKernel() {
+// What the kernel keeps between its calls, for its own work only (no array of the manager's).
+struct ShotKernel::Scratch {
+	// What each span of a drawing loop counted: its shots per batch, turned into where its rows start.
+	std::vector<int64_t> draw_counts;
+	// Each slot's tail plan.
+	std::vector<TailPlan> tails;
+};
+
+ShotKernel::ShotKernel() :
+		_width(jobs::default_width()), _scratch(new Scratch()) {
 	if (names == nullptr) {
 		names = new Names();
 	}
+}
+
+ShotKernel::~ShotKernel() {
+	delete _scratch;
+}
+
+void ShotKernel::set_threads(int64_t threads) {
+	_width = threads <= 0 ? jobs::default_width() : (int)clampi(threads, 1, jobs::available() ? jobs::MAX_WIDTH : 1);
+}
+
+int64_t ShotKernel::get_threads() const {
+	return _width;
 }
 
 void ShotKernel::free_names() {
@@ -952,28 +986,31 @@ void ShotKernel::pass_common(Object *m, int64_t top, double delta) {
 	prev.load(m, k.prev);
 	vel.load(m, k.vel);
 	ERR_FAIL_COND(top > alive.n || top > pos.n);
-	for (int64_t slot = 0; slot < top; slot++) {
-		if (alive[slot] == 0) {
-			continue;
+	// Every shot alone: spread over the threads.
+	jobs::for_spans(top, SLOT_SPAN, _width, [&](int64_t, int64_t begin, int64_t end) {
+		for (int64_t slot = begin; slot < end; slot++) {
+			if (alive[slot] == 0) {
+				continue;
+			}
+			if (freeze[slot] > 0.0f) {
+				freeze[slot] = (float)((double)freeze[slot] - delta);
+				prev[slot] = pos[slot];
+				state[slot] = S_FROZEN;
+				continue;
+			}
+			life[slot] = (float)((double)life[slot] - delta);
+			const Vector2 at = pos[slot];
+			prev[slot] = at;
+			if (life[slot] <= 0.0f) {
+				state[slot] = S_EXPIRE;
+				continue;
+			}
+			state[slot] = S_MOVING;
+			if (motion[slot] == MOTION_STRAIGHT) {
+				pos[slot] = at + vmul(vel[slot], delta);
+			}
 		}
-		if (freeze[slot] > 0.0f) {
-			freeze[slot] = (float)((double)freeze[slot] - delta);
-			prev[slot] = pos[slot];
-			state[slot] = S_FROZEN;
-			continue;
-		}
-		life[slot] = (float)((double)life[slot] - delta);
-		const Vector2 at = pos[slot];
-		prev[slot] = at;
-		if (life[slot] <= 0.0f) {
-			state[slot] = S_EXPIRE;
-			continue;
-		}
-		state[slot] = S_MOVING;
-		if (motion[slot] == MOTION_STRAIGHT) {
-			pos[slot] = at + vmul(vel[slot], delta);
-		}
-	}
+	});
 }
 
 // `_pass_hits` from its `n`-th shot on (slot n + resume, wrapped at `top`): every shot that needs
@@ -1128,6 +1165,17 @@ inline void write_quad(float *b, const Vector2 &dir, double diameter, const Vect
 	b[15] = (float)(1.0 - ((double)kind + code) / KIND_STEPS);
 }
 
+// `body(n)` for every member n of a behaviour from `first` (`count` of them), spread over the
+// threads: each member is a shot of its own, and a pass writes only its shot's arrays.
+template <typename F>
+void each_member(int64_t first, int64_t count, int width, F &&body) {
+	jobs::for_spans(count, SLOT_SPAN, width, [&](int64_t, int64_t begin, int64_t end) {
+		for (int64_t n = first + begin; n < first + end; n++) {
+			body(n);
+		}
+	});
+}
+
 } // namespace
 
 // `_pass_homing` (not catching up): turn every homing shot, and let each whose search is due wait
@@ -1147,23 +1195,23 @@ void ShotKernel::homing_pass(Object *m, int64_t first, int64_t count, double del
 	steer.load(m);
 	const int64_t step_index = m->get(k.step_index);
 	ERR_FAIL_COND(first + count > members.n);
-	for (int64_t n = first; n < first + count; n++) {
+	each_member(first, count, _width, [&](int64_t n) {
 		const int64_t slot = members[n];
 		const int64_t st = state[slot];
 		if (st != S_MOVING && st != S_RETURNING) {
-			continue;
+			return;
 		}
 		if (((slot + step_index) % HOMING_PERIOD) == 0) {
 			wait_state[slot] = state[slot];
 			wait_from[slot] = B_HOMING;
 			state[slot] = S_WAITING;
-			continue;
+			return;
 		}
 		if (st == S_RETURNING) {
-			continue;
+			return;
 		}
 		steer.steer(slot, pos.p, prev.p, delta);
-	}
+	});
 }
 
 // The behaviour passes that need nothing of GDScript (`_pass_growth`, `_pass_linger`, `_pass_orbit`,
@@ -1188,13 +1236,14 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 	prev.load(m, k.prev);
 	vel.load(m, k.vel);
 	ERR_FAIL_COND_V(first + count > members.n, true);
-	// `_wait`.
+	// `_wait` (for the passes whose shot may circle or return to another shot). Its arrays are
+	// read before the loop, which may run on several threads.
 	Arr<PackedByteArray> wait_state, wait_from;
+	if (kind == B_ORBIT || kind == B_RETURN) {
+		wait_state.load(m, k.wait_state);
+		wait_from.load(m, k.wait_from);
+	}
 	auto wait = [&](int64_t slot) {
-		if (wait_state.p == nullptr) {
-			wait_state.load(m, k.wait_state);
-			wait_from.load(m, k.wait_from);
-		}
 		wait_state[slot] = state[slot];
 		wait_from[slot] = (uint8_t)kind;
 		state[slot] = S_WAITING;
@@ -1206,22 +1255,22 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		radius0.load(m, k.radius0);
 		const Rect2 bounds = m->get(k.bounds);
 		const double room = MAX((double)bounds.size.x, (double)bounds.size.y);
-		for (int64_t n = first; n < first + count; n++) {
+		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			if (state[slot] == S_MOVING) {
 				radius[slot] = (float)MIN((double)radius[slot] * dmath::pow((double)growth[slot], delta), MAX(room, (double)radius0[slot]));
 			}
-		}
+		});
 	} else if (kind == B_LINGER) {
 		Arr<PackedFloat32Array> hold, life, span, linger;
 		hold.load(m, k.hold);
 		life.load(m, k.life);
 		span.load(m, k.span);
 		linger.load(m, k.linger);
-		for (int64_t n = first; n < first + count; n++) {
+		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			if (state[slot] != S_MOVING) {
-				continue;
+				return;
 			}
 			if (hold[slot] < 0.0f && (double)life[slot] <= (double)span[slot] * 0.5) {
 				hold[slot] = linger[slot];
@@ -1232,7 +1281,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 				pos[slot] = prev[slot];
 				state[slot] = S_HELD;
 			}
-		}
+		});
 	} else if (kind == B_ORBIT) {
 		Arr<PackedInt32Array> caster_slot, actor;
 		Arr<PackedVector2Array> caster_at, anchors, orbit_centre;
@@ -1247,11 +1296,11 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		orbit_radius.load(m, k.orbit_radius);
 		wave.load(m, k.wave);
 		wave_age.load(m, k.wave_age);
-		for (int64_t n = first; n < first + count; n++) {
+		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			const int64_t st = state[slot];
 			if (st != S_MOVING && st != S_HELD) {
-				continue;
+				return;
 			}
 			const int64_t caster = caster_slot[slot];
 			Vector2 centre = caster_at[slot];
@@ -1259,11 +1308,11 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 				centre = actor[slot] >= 0 ? anchors[actor[slot]] : Vector2(INFINITY, INFINITY);
 			} else if (caster >= 0) {
 				wait(slot);
-				continue;
+				return;
 			}
 			if (!centre.is_finite()) {
 				state[slot] = S_GONE;
-				continue;
+				return;
 			}
 			if (st == S_MOVING) {
 				orbit_angle[slot] = (float)UtilityFunctions::wrapf((double)orbit_angle[slot] + (double)orbit_speed[slot] * delta, -PI_D, PI_D);
@@ -1274,7 +1323,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			pos[slot] = centre + vmul(away, reach);
 			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * (double)orbit_speed[slot]);
 			orbit_centre[slot] = centre;
-		}
+		});
 	} else if (kind == B_CURVE) {
 		Arr<PackedFloat32Array> life, span, curve_from, curve_to, curve_ease, curve_speed;
 		life.load(m, k.life);
@@ -1283,10 +1332,10 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		curve_to.load(m, k.curve_to);
 		curve_ease.load(m, k.curve_ease);
 		curve_speed.load(m, k.curve_speed);
-		for (int64_t n = first; n < first + count; n++) {
+		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			if (state[slot] != S_MOVING) {
-				continue;
+				return;
 			}
 			// At the middle of the step, as `_pass_curve`.
 			const double left = clampf(((double)life[slot] + delta * 0.5) / (double)span[slot], 0.0, 1.0);
@@ -1294,25 +1343,25 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - dmath::pow(left, (double)curve_ease[slot]));
 			vel[slot] = vmul(vel[slot].normalized(), (double)curve_speed[slot] * factor);
 			pos[slot] = prev[slot] + vmul(vel[slot], delta);
-		}
+		});
 	} else if (kind == B_SPIRAL) {
 		Arr<PackedVector2Array> base;
 		Arr<PackedFloat32Array> wave, wave_age;
 		base.load(m, k.base);
 		wave.load(m, k.wave);
 		wave_age.load(m, k.wave_age);
-		for (int64_t n = first; n < first + count; n++) {
+		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			const int64_t st = state[slot];
 			if (st != S_MOVING && st != S_RETURNING) {
-				continue;
+				return;
 			}
 			const Vector2 velocity = vel[slot];
 			base[slot] = base[slot] + vmul(velocity, delta);
 			wave_age[slot] = (float)((double)wave_age[slot] + delta);
 			const Vector2 side = Vector2(-velocity.y, velocity.x).normalized();
 			pos[slot] = base[slot] + vmul(side, (double)wave[slot] * dmath::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD));
-		}
+		});
 	} else if (kind == B_RETURN) {
 		Arr<PackedInt32Array> caster_slot, actor, mem_head, mem_next;
 		Arr<PackedVector2Array> caster_at, anchors, base, home_at;
@@ -1419,36 +1468,46 @@ void ShotKernel::count_draw(Object *m) {
 	drawn_color.load(m, k.drawn_color);
 	const int64_t high = m->get(k.high);
 	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || batch_counts.n < BATCHES);
-	for (int64_t b = 0; b < BATCHES; b++) {
-		batch_counts[b] = 0;
-	}
-	for (int64_t slot = 0; slot < high; slot++) {
-		if (alive[slot] == 0) {
-			continue;
-		}
-		if (drawn_seq[slot] != seq[slot] || drawn_radius[slot] != radius[slot] || drawn_look[slot] != look[slot]) {
-			// `_remember_drawn`.
-			const double r = radius[slot];
-			const int64_t rmp = ramp[slot];
-			const int64_t mot = motion[slot];
-			drawn_seq[slot] = seq[slot];
-			drawn_radius[slot] = radius[slot];
-			drawn_look[slot] = look[slot];
-			// `_batch_of`.
-			int64_t batch = BATCH_BOLT;
-			if (!is_hat_ramp(rmp)) {
-				batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
-			} else if (mot == MOTION_STILL) {
-				batch = BATCH_RUNE;
-			} else if (mot == MOTION_ORBIT) {
-				batch = BATCH_ORBIT;
+	// Each span counts its own batches (`_scratch->draw_counts`), added up after in span order.
+	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
+	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		for (int64_t slot = begin; slot < end; slot++) {
+			if (alive[slot] == 0) {
+				continue;
 			}
-			drawn_batch[slot] = (uint8_t)batch;
-			drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
-			drawn_size[slot] = (float)look_size(r);
-			drawn_particles[slot] = (int32_t)particles_of(look[slot]);
+			if (drawn_seq[slot] != seq[slot] || drawn_radius[slot] != radius[slot] || drawn_look[slot] != look[slot]) {
+				// `_remember_drawn`.
+				const double r = radius[slot];
+				const int64_t rmp = ramp[slot];
+				const int64_t mot = motion[slot];
+				drawn_seq[slot] = seq[slot];
+				drawn_radius[slot] = radius[slot];
+				drawn_look[slot] = look[slot];
+				// `_batch_of`.
+				int64_t batch = BATCH_BOLT;
+				if (!is_hat_ramp(rmp)) {
+					batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
+				} else if (mot == MOTION_STILL) {
+					batch = BATCH_RUNE;
+				} else if (mot == MOTION_ORBIT) {
+					batch = BATCH_ORBIT;
+				}
+				drawn_batch[slot] = (uint8_t)batch;
+				drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
+				drawn_size[slot] = (float)look_size(r);
+				drawn_particles[slot] = (int32_t)particles_of(look[slot]);
+			}
+			counts[drawn_batch[slot]] += 1;
 		}
-		batch_counts[drawn_batch[slot]] += 1;
+	});
+	for (int64_t b = 0; b < BATCHES; b++) {
+		int64_t count = 0;
+		for (int64_t span = 0; span < spans; span++) {
+			count += _scratch->draw_counts[span * BATCHES + b];
+		}
+		batch_counts[b] = (int32_t)count;
 	}
 }
 
@@ -1533,19 +1592,48 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	int64_t tail_count = 0;
 	int64_t thin_count = 0;
 	double tail_wanted = 0.0;
-	auto lay_tail = [&](int64_t slot, const Vector2 &at) {
-		const Vector2 from = tail_from[slot];
-		tail_from[slot] = at;
-		const Vector2 way = at - from;
-		const double d = way.length();
-		if (!(d > 0.0) || d > TAIL_JUMP) {
+	// A tail in two halves (`_lay_tail`): `plan_tail` reads only, so it runs with the heads on any
+	// thread: the shot's carry run on to the end of its path as if no cap stopped it. `lay_tail`
+	// runs in slot order: it adds up what the tail asked for (floats, in the GDScript's order), lays
+	// the births the caps leave room for and keeps where the carry ended (at the path's end where a
+	// cap stopped it).
+	auto plan_tail = [&](int64_t slot, const Vector2 &at, TailPlan &plan) {
+		plan.at = at;
+		plan.d = (at - tail_from[slot]).length();
+		plan.in_reach = plan.d > 0.0 && plan.d <= TAIL_JUMP;
+		plan.births = 0;
+		if (!plan.in_reach) {
 			return;
 		}
+		const double spacing = (double)group_spacing[group[slot]];
+		const int64_t sq = seq[slot];
+		double carry = tail_carry[slot];
+		int64_t n = tail_n[slot];
+		while (carry < plan.d) {
+			carry += spacing * (0.5 + tail_hash(sq, n * 2 + 1));
+			n += 1;
+			plan.births += 1;
+		}
+	};
+	auto lay_tail = [&](int64_t slot, const TailPlan &plan) {
+		const Vector2 from = tail_from[slot];
+		const Vector2 at = plan.at;
+		tail_from[slot] = at;
+		if (!plan.in_reach) {
+			return;
+		}
+		const Vector2 way = at - from;
+		const double d = plan.d;
 		tail_wanted += d / TAIL_SPACING;
 		const int64_t g = group[slot];
 		group_tail[g] = (float)((double)group_tail[g] + d / TAIL_SPACING);
 		const double spacing = (double)group_spacing[g];
 		const bool thinned = spacing > TAIL_SPACING;
+		int64_t room_left = tail_cap - tail_count;
+		if (thinned) {
+			room_left = MIN(room_left, thin_most - thin_count);
+		}
+		const int64_t laid = MAX(MIN(plan.births, room_left), (int64_t)0);
 		double carry = tail_carry[slot];
 		int64_t n = tail_n[slot];
 		const int64_t sq = seq[slot];
@@ -1554,11 +1642,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		const Vector2 back = way / (real_t)(-d);
 		const int64_t tg = tag[slot];
 		const double code = (double)tail_code(sq);
-		while (carry < d) {
-			if (tail_count >= tail_cap || (thinned && thin_count >= thin_most)) {
-				carry = d;
-				break;
-			}
+		for (int64_t i = 0; i < laid; i++) {
 			Color colour = cr;
 			if (mixed && tail_hash(sq, n * 2) < TAIL_PLAYER_SHARE) {
 				colour = Color(1, 1, 1, 1);
@@ -1583,6 +1667,10 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			carry += spacing * (0.5 + tail_hash(sq, n * 2 + 1));
 			n += 1;
 		}
+		// A cap stopped it: the rest of its path lays nothing.
+		if (laid < plan.births) {
+			carry = d;
+		}
 		tail_carry[slot] = (float)(carry - d);
 		tail_n[slot] = (int32_t)n;
 	};
@@ -1597,14 +1685,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		out_buffer[b] = _buffers[b].ptrw();
 		room[b] = rooms[b];
 	}
-	// `_write_head` into batch `b`, or nothing past its room (the GDScript would fail there): no path
-	// (-1), and the way it flies, `way`.
-	auto write_head = [&](int64_t b, const Vector2 &at, int64_t flags, const Color &color, const Color &cr, const Vector2 &way) {
-		if (used[b] >= room[b]) {
-			return;
-		}
-		float *buf = out_buffer[b] + used[b] * DRAW_STRIDE;
-		used[b] += 1;
+	// `_write_head` into the row at `buf`: no path (-1), and the way it flies, `way`.
+	auto write_head = [](float *buf, const Vector2 &at, int64_t flags, const Color &color, const Color &cr, const Vector2 &way) {
 		buf[0] = -1.0f;
 		buf[1] = (float)way.x;
 		buf[2] = 0.0f;
@@ -1622,43 +1704,88 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		buf[14] = cr.b;
 		buf[15] = (float)(1.0 - (double)KIND_BOLT / KIND_STEPS);
 	};
+	// A shot that lays a tail: a head, not a stone, and not a rune.
+	auto is_tail = [](int64_t mot, int64_t batch) {
+		return mot != MOTION_STILL && batch != BATCH_ENEMY_RUNE && batch != BATCH_RUNE;
+	};
+	std::vector<TailPlan> &tails = _scratch->tails;
+	if (tails_on && (int64_t)tails.size() < high) {
+		tails.resize(high);
+	}
+	// Where a live shot is drawn, `prev` to `pos` by the fraction (`_drawn_at` for an orbit).
+	auto drawn_point = [&](int64_t slot, int64_t mot) {
+		const Vector2 at = prev[slot].lerp(pos[slot], (real_t)fraction);
+		return mot == MOTION_ORBIT ? drawn_at(mot, sim_time, born[slot], orbit_centre[slot], at) : at;
+	};
+	// The heads and stones, spread over the threads: each span counts its shots per batch first, so
+	// it knows where its rows start (the shots before it, in slot order); rows past a batch's room
+	// are not written, as in the GDScript.
+	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
+	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		for (int64_t slot = begin; slot < end; slot++) {
+			if (alive[slot] != 0) {
+				counts[drawn_batch[slot]] += 1;
+			}
+		}
+	});
+	for (int64_t b = 0; b < BATCHES; b++) {
+		int64_t before = 0;
+		for (int64_t span = 0; span < spans; span++) {
+			const int64_t count = _scratch->draw_counts[span * BATCHES + b];
+			_scratch->draw_counts[span * BATCHES + b] = before;
+			before += count;
+		}
+		used[b] = MIN(before, room[b]);
+	}
+	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
+		int64_t *row = _scratch->draw_counts.data() + span * BATCHES;
+		for (int64_t slot = begin; slot < end; slot++) {
+			if (alive[slot] == 0) {
+				continue;
+			}
+			const int64_t mot = motion[slot];
+			const Vector2 at = drawn_point(slot, mot);
+			const int64_t batch = drawn_batch[slot];
+			if (tails_on && is_tail(mot, batch)) {
+				plan_tail(slot, at, tails[slot]);
+			}
+			const int64_t index = row[batch];
+			row[batch] += 1;
+			if (index >= room[batch]) {
+				continue;
+			}
+			float *b = out_buffer[batch] + index * DRAW_STRIDE;
+			const double size = drawn_size[slot];
+			const Color look_data = drawn_color[slot];
+			if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
+				// `_write_stones` for a shot that is not solid: one stone.
+				Vector2 dir = Vector2(1, 0);
+				if (mot == MOTION_STILL && vel[slot].length_squared() > 0.0f) {
+					dir = vel[slot].normalized();
+				}
+				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, trace_code(sim_time - (double)born[slot]));
+			} else {
+				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
+			}
+		}
+	});
+	// In slot order, on this thread: what adds up (the particles asked for, each group's shots and
+	// asks; floats, so in the GDScript's order) and the tails, whose births run until the cap.
 	int64_t asked = 0;
 	for (int64_t slot = 0; slot < high; slot++) {
 		if (alive[slot] == 0) {
 			continue;
 		}
-		const int64_t mot = motion[slot];
-		Vector2 at = prev[slot].lerp(pos[slot], (real_t)fraction);
-		if (mot == MOTION_ORBIT) {
-			at = drawn_at(mot, sim_time, born[slot], orbit_centre[slot], at);
-		}
-		const int64_t batch = drawn_batch[slot];
-		const double size = drawn_size[slot];
-		const Color look_data = drawn_color[slot];
 		asked += drawn_particles[slot];
 		const int64_t g = group[slot];
 		const int64_t particles = drawn_particles[slot];
 		group_ask[g] = (float)((double)group_ask[g] + (double)(particles > 1 ? particles : 1));
 		by_group[group_end[g]] = (int32_t)slot;
 		group_end[g] += 1;
-		const bool rune = mot == MOTION_STILL;
-		Vector2 dir = Vector2(1, 0);
-		if (rune && vel[slot].length_squared() > 0.0f) {
-			dir = vel[slot].normalized();
-		}
-		const int64_t flags = HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0);
-		if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
-			// `_write_stones` for a shot that is not solid: one stone.
-			if (used[batch] < room[batch]) {
-				write_quad(out_buffer[batch] + used[batch] * DRAW_STRIDE, dir, size, at, look_data, core[slot], KIND_RUNE,
-						trace_code(sim_time - (double)born[slot]));
-				used[batch] += 1;
-			}
-		} else {
-			write_head(batch, at, flags, look_data, core[slot], pos[slot] - prev[slot]);
-			if (tails_on && !rune) {
-				lay_tail(slot, at);
-			}
+		if (tails_on && is_tail(motion[slot], drawn_batch[slot])) {
+			lay_tail(slot, tails[slot]);
 		}
 	}
 	int64_t shots = 0;
@@ -1902,6 +2029,9 @@ double ShotKernel::threat_query(Object *m, const Vector2 &point, double radius, 
 
 void ShotKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("check", "constants"), &ShotKernel::check);
+	ClassDB::bind_method(D_METHOD("set_threads", "threads"), &ShotKernel::set_threads);
+	ClassDB::bind_method(D_METHOD("get_threads"), &ShotKernel::get_threads);
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "threads"), "set_threads", "get_threads");
 	ClassDB::bind_method(D_METHOD("check_fields", "manager"), &ShotKernel::check_fields);
 	ClassDB::bind_method(D_METHOD("pass_common", "manager", "top", "delta"), &ShotKernel::pass_common);
 	ClassDB::bind_method(D_METHOD("hits", "manager", "n", "top", "resume", "limit", "delta"), &ShotKernel::hits);

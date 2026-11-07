@@ -582,7 +582,7 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -1098,6 +1098,11 @@ var _threat_stamp: int = 0
 var native: bool = true:
 	set = set_native
 var _kernel: Object = null
+## The threads the native kernel's loops run on: 0 for its own choice (the machine's cores less
+## one; 1 on the web). This machine's, never a run's: the kernel gives the same bits on one thread
+## or many (shot scale H5, rule T2), and tests compare the two.
+var native_threads: int = 0:
+	set = set_native_threads
 ## The first shot the hit pass left untested (the budget ran out), and how many targets the native
 ## hit pass found for the shot it handed back (`_hit_found`).
 var _starved_at: int = -1
@@ -1153,6 +1158,19 @@ func set_native(on: bool) -> void:
 		push_error("Projectiles: the native ShotKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		return
 	_kernel = kernel
+	set_native_threads(native_threads)
+
+
+## The threads the native kernel's loops run on now (0 without the kernel).
+func native_thread_count() -> int:
+	return _kernel.get(&"threads") if _kernel != null else 0
+
+
+## Run the native kernel's loops on `threads` threads (see `native_threads`).
+func set_native_threads(threads: int) -> void:
+	native_threads = maxi(threads, 0)
+	if _kernel != null:
+		_kernel.set(&"threads", native_threads)
 
 
 ## The constants the native kernel checks its own copies against: this script's (with those of the

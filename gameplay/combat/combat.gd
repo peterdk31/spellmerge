@@ -134,6 +134,8 @@ const HEX_PULL_SHARE: float = 0.5
 const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at.
 const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX, STATIC]
+## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
+const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
 const FROZEN_BONUS: int = 2
 ## An actor reacts at most once per this many seconds; a hit inside the wait does its own
@@ -845,8 +847,9 @@ func hit(caster: int, target: Variant, amount: float, direction: Vector2 = Vecto
 ## deaths included, but sends no event for an actor that survives, so Feel and the AI do not
 ## stutter, shake or flinch twice a second per burning actor; a status tick is no hit for a
 ## barrier, a hex, a static charge or `actor_hurt`. `amount` may be part of a point (an atom's
-## speck takes 0.3 health). Sets `_discharged`.
-func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool) -> bool:
+## speck takes 0.3 health). `team` is the row's team when the caller read it already (a spell's
+## hit, `_apply_spell`), else TEAM_UNREAD. Sets `_discharged`.
+func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool, team: int = TEAM_UNREAD) -> bool:
 	_discharged = false
 	if amount <= 0.0 or not _can_hurt(row):
 		return false
@@ -867,7 +870,8 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 			_send_barrier(row, direction if direction != Vector2.ZERO else Vector2.DOWN)
 		return false
 	var discharge_share: float = 0.0
-	var team: int = _team(row)
+	if team == TEAM_UNREAD:
+		team = _team(row)
 	var centre: Vector2 = where + _hurt_offset[row]
 	if not tick:
 		if _hex_left[row] > 0.0:
@@ -1016,7 +1020,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	var reaction: ReactionRow = null
 	if profile.element_id != &"" and _react_wait[row] <= 0.0:
 		reaction = _reaction_for(row, profile.element_id)
-	if not _hit(by, row, damage, direction, strength, kind, profile, false):
+	if not _hit(by, row, damage, direction, strength, kind, profile, false, team):
 		return
 	var discharged: bool = _discharged
 	if _same(row, node):
@@ -1036,6 +1040,9 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	# next element read what is left.)
 	var reacted: bool = false
 	var elements: int = maxi(profile.element_ids.size(), profile.later_status_ids.size() + 1)
+	# A hit of one element or none, with no reaction and no status of its own, has nothing more to do.
+	if elements == 1 and reaction == null and profile.status_id == &"":
+		return
 	for i in elements:
 		if not _same(row, node) or _is_down(row):
 			return
@@ -1137,9 +1144,18 @@ func _reaction_for(row: int, element_id: StringName) -> ReactionRow:
 	var by_status: Dictionary = table.for_element(element_id)
 	if by_status.is_empty():
 		return null
-	for status in REACTING_STATUSES:
-		if by_status.has(status) and _status_on(row, status):
-			return by_status[status] as ReactionRow
+	# `_status_on` of each, written out (shot scale H3: a call each cost more than the rest of the
+	# lookup on every elemental hit; test_combat_reactions.gd holds it to REACTING_STATUSES).
+	if _burn_left[row] > 0.0 and by_status.has(BURN):
+		return by_status[BURN] as ReactionRow
+	if (_chill_left[row] > 0.0 or _freeze_left[row] > 0.0) and by_status.has(CHILL):
+		return by_status[CHILL] as ReactionRow
+	if _shock_left[row] > 0.0 and by_status.has(SHOCK):
+		return by_status[SHOCK] as ReactionRow
+	if _hex_left[row] > 0.0 and by_status.has(HEX):
+		return by_status[HEX] as ReactionRow
+	if _static_left[row] > 0.0 and by_status.has(STATIC):
+		return by_status[STATIC] as ReactionRow
 	return null
 
 

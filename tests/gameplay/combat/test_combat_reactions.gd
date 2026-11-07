@@ -555,3 +555,37 @@ func test_superconduct_the_other_way_frost_drains_a_charge_for_damage() -> void:
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 4, "the hit plus the bonus")
 	check(not _combat.has_status(enemy, &"static"), "the charge is used up")
 	check(not _combat.has_status(enemy, &"chill"), "frost's chill did not go on")
+
+
+# --- the lookup (shot scale H3) ---
+
+
+## `_reaction_for` checks the statuses written out, for speed: it picks what the plain rule picks
+## (the first of REACTING_STATUSES on the body with a row for the element; frozen counts as
+## chilled), for every element of the table and every mix of the six statuses.
+func test_the_reaction_lookup_follows_the_reacting_statuses_in_order() -> void:
+	var enemy := _enemy()
+	var row: int = _combat._row_of_node(enemy)
+	var table: ReactionTable = CombatScript.REACTIONS
+	var elements: Array[StringName] = []
+	for reaction: ReactionRow in table.rows:
+		if reaction != null and not elements.has(reaction.element_id):
+			elements.append(reaction.element_id)
+	check(elements.size() >= 4, "the table has elements")
+	var lefts: Array[StringName] = [&"_burn_left", &"_chill_left", &"_freeze_left", &"_shock_left", &"_hex_left", &"_static_left"]
+	var wrong: Array = []
+	for mix in 1 << lefts.size():
+		for i in lefts.size():
+			var left: PackedFloat32Array = _combat.get(lefts[i])
+			left[row] = 1.0 if (mix >> i) & 1 == 1 else 0.0
+			_combat.set(lefts[i], left)
+		for element in elements:
+			var expected: ReactionRow = null
+			var by_status: Dictionary = table.for_element(element)
+			for status in CombatScript.REACTING_STATUSES:
+				if by_status.has(status) and _combat._status_on(row, status):
+					expected = by_status[status] as ReactionRow
+					break
+			if _combat._reaction_for(row, element) != expected:
+				wrong.append([mix, element])
+	check_equal(wrong, [], "the same reaction for every element and mix of statuses")

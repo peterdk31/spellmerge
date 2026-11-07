@@ -1772,10 +1772,8 @@ func clear() -> void:
 func begin_run() -> void:
 	clear()
 	var bounds: Rect2 = _bounds
-	var blank: Object = SimFresh.blank_of(get_script() as Script)
-	blank.call(&"set_cap", _cap)
-	SimFresh.take(self, blank, RUN_KEEPS)
-	blank.free()
+	# The blank's arrays as big as this one's: the cap is kept (RUN_KEEPS).
+	SimFresh.renew(self, func(blank: Object) -> void: blank.call(&"set_cap", _cap))
 	set_bounds(bounds)
 
 

@@ -3004,9 +3004,7 @@ static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
 ## and carriers, the same objects, with this session's settings (RUN_KEEPS).
 func begin_run() -> void:
 	clear()
-	var blank: Object = SimFresh.blank_of(get_script() as Script)
-	SimFresh.take(self, blank, RUN_KEEPS)
-	blank.free()
+	SimFresh.renew(self)
 
 
 ## Forgets every registered spell and shot count (a new run, and tests).

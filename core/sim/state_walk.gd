@@ -61,8 +61,9 @@ const FOLDERS: Array[String] = [
 	"res://gameplay/horde/",
 	"res://gameplay/player/",
 ]
-## The kinds of list a simulation script may declare (see the class doc).
-const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS"]
+## The kinds of list a simulation script may declare (see the class doc; RUN_KEEPS, the settings a
+## new run keeps, is `SimFresh`'s).
+const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS", "RUN_KEEPS"]
 
 ## Each problem, as "path: what it holds; the fix".
 var problems: PackedStringArray = PackedStringArray()

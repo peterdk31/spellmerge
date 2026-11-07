@@ -37,6 +37,16 @@ func test_every_listed_name_is_a_member() -> void:
 				check(members.has(name), "%s: %s lists %s, which is no member (renamed?); take it out" % [entry["name"], list, name])
 
 
+## A setting a new run keeps (RUN_KEEPS, core/sim/sim_fresh.gd) is a state member: one in DERIVED or
+## VIEW is never reset anyway, so listing it there too says the wrong thing.
+func test_every_run_keep_is_state() -> void:
+	for entry in _simulation_scripts():
+		var script: Script = entry["script"]
+		var not_state: PackedStringArray = StateWalk.listed(script, "DERIVED") + StateWalk.listed(script, "VIEW")
+		for name in StateWalk.listed(script, "RUN_KEEPS"):
+			check(not not_state.has(name), "%s: RUN_KEEPS lists %s, which is DERIVED or VIEW (never reset at a run's start anyway); take it out of one" % [entry["name"], name])
+
+
 func test_no_state_member_is_typed_as_something_it_cannot_save() -> void:
 	var classes: Dictionary[String, String] = {}
 	for entry: Dictionary in ProjectSettings.get_global_class_list():

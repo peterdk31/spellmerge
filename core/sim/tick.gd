@@ -37,7 +37,15 @@ const PRIORITY: int = -1000
 ## The services stepped in step 2, in order: their autoload names.
 const SERVICES: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities"]
 ## What a run's start makes fresh (`begin_run`), in order: the services, then the horde director.
+## Every autoload of a simulation script is here or in RENEWED_OTHERWISE (`tests/core/test_tick.gd`).
 const FRESH_AT_RUN: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", &"Horde"]
+## The autoloads of simulation scripts a run's start does not renew, and why each starts a run as a
+## fresh game's all the same (the replay test's "after other runs" hashes them too).
+const RENEWED_OTHERWISE: Dictionary[StringName, String] = {
+	&"Actors": "every body closes its own id as it leaves the tree, and the last run's bodies have left",
+	&"Flow": "it starts the run: start_run sets the run's members itself",
+	&"Coop": "the seats' joins are the session's; room_entered sets the run's view, wizards and revives",
+}
 
 ## Ticks since the run began (or the game, before any run).
 var count: int = 0
@@ -93,8 +101,12 @@ func begin_run() -> void:
 	var root: Node = areas if areas != null else get_tree().root
 	for service in FRESH_AT_RUN:
 		var area: Node = root.get_node_or_null(NodePath(service))
-		if area != null and area.has_method(&"begin_run"):
-			area.call(&"begin_run")
+		if area == null:
+			continue
+		if not area.has_method(&"begin_run"):
+			push_error("Tick: %s has no begin_run, so it keeps the last run's state (core/sim/sim_fresh.gd)" % service)
+			continue
+		area.call(&"begin_run")
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes

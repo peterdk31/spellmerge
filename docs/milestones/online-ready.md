@@ -176,20 +176,21 @@ Each part is one PR, in this order: N1, N2, N2b, N3, then N4, N5, N6, N7 and N11
 
 **N3a done (2026-11-06).** `core/sim/tick.gd` (`Tick`) steps the frames, the services, the swarm, the bodies by actor id and the run's rules and timers, in the scene tree's old order (docs/DECISIONS.md, 2026-11-06); the areas' own callbacks are gone; `tests/core/test_tick.gd`. The replay test no longer holds Flow's, Coop's and the horde's timers, which showed that the horde's spawns read the eased camera: Coop now sends the fitted view on the tick (`view_fitted`) and the horde spawns outside it.
 
-**N3b done (2026-11-07).** A run starts from a fresh game's state: Flow's `start_run` calls `Tick.begin_run`, which counts the clock from 0 again and makes the services and the horde director fresh (`Tick.FRESH_AT_RUN`, each one's `begin_run`). An area takes every state member from a blank of its own script (`core/sim/sim_fresh.gd`, `SimFresh`): by construction, so a member added later is reset too; settings stay (`RUN_KEEPS`). The proof is `tests/core/test_replay_game.gd`'s two "after other runs" tests: a sandbox run and a horde run, each recorded in a fresh game, played after other runs in the same game and recorded again there, agree at every tick (before, they parted at tick 0 in every service). What the runs found:
+**N3b done (2026-11-07).** A run starts from a fresh game's state: Flow's `start_run` calls `Tick.begin_run`, which counts the clock from 0 again and makes the services and the horde director fresh (`Tick.FRESH_AT_RUN`, each one's `begin_run`). An area's `begin_run` is its `clear` then `SimFresh.renew(self)` (`core/sim/sim_fresh.gd`): every state member as a new object of its script has it, by construction, so a member added later is reset too; settings stay (`RUN_KEEPS`). A simulation autoload neither renewed nor excused with a reason (`Tick.RENEWED_OTHERWISE`) fails a test, and a node `renew` would drop is an error. The proof is `tests/core/test_replay_game.gd`'s two "after other runs" tests: a sandbox run and a horde run, each recorded in a fresh game, played after other runs in the same game and recorded again there, agree at every tick (before, they parted at tick 0 in every service). What the runs found:
 
 - **Dead slots, pools and free lists** (the projectile manager's per-slot arrays, Spells' pending launches, a dash's passes, Combat's pool): the blank's, as a fresh game has them. A member that points into a pool (`Spells._ray`, the first of `_rays`) points into it again: `SimFresh` keeps what the blank shares shared.
 - **A cache carried a run's answer:** `CompiledSpell._plain_hit` (worked out on the first hit) lives on a compiled staff, which outlives a run in the compile cache: DERIVED.
 - **Feel's rests and repeats** (view, but they decide the simulation's holds, A1) run on Feel's clock: a reaction heard in the last run kept the next run's first one from holding. They start again at `room_entered` until N4 counts the stops in ticks.
 - **The horde director** kept its swarm and the last run's seats' bags: made fresh too. A blank deals the run no seeds (`SimSeed.aside`), so making one changes no horde.
 - **Entities' decoy bodies** (a pool out of the tree) are freed at a run's start, as a fresh game has none; dropped, they leaked.
-- **Cost:** `Tick.begin_run` takes about 19 ms at the desktop cap (6,000) and 38 ms at 100,000 (the owner's machine, headless), once per run start; copying a pool's items member by member took 238 ms, so a pool takes the blank's items whole.
+- **Cost:** `Tick.begin_run` takes about 19 ms at the desktop cap (6,000) and 38 to 47 ms at 100,000 (the owner's machine, headless, two measurements), once per run start; copying a pool's items member by member took 238 ms, so a pool takes the blank's items whole.
 
 ### N4: stops in ticks
 
 - Hit-stop and the downed stop become a number of ticks the simulation stands still (`Tick.hold(ticks)`), started by the simulation events that cause them; Feel only draws them.
 - The horde's level-up break and, offline, the pause menu stop the tick (`Tick.stop(reason)` / `Tick.go(reason)`, part of the state) instead of pausing the scene tree for the simulation; the HUD and Feel run on as they do today. Fixes A12. `Engine.time_scale` is no longer set by the game (the dev time-scale switch, if kept, scales the tick rate on one machine only, offline).
 - Fixes A1. Feel's feel is checked side by side with today's in the sandbox before it merges.
+- Feel's rests and reaction repeats then need no reset at `room_entered` (N3b's stopgap, `Feel._on_room_entered`): the holds are counted by the simulation.
 
 ### N5: identity without instance ids
 

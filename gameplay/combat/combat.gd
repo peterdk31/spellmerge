@@ -383,12 +383,8 @@ func begin_run() -> void:
 		var node: Variant = _nodes[row]
 		if node != null and is_instance_valid(node):
 			unregister_actor(node)
-	var blank: Object = SimFresh.blank_of(get_script() as Script)
-	SimFresh.take(self, blank, RUN_KEEPS)
-	blank.free()
-	# Its caches by node follow the rows, which are all free now.
-	_row_by_node.clear()
-	_node_id.fill(0)
+	# Its caches by node (DERIVED) went with the rows.
+	SimFresh.renew(self)
 
 
 # --- Bodies ------------------------------------------------------------------

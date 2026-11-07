@@ -316,9 +316,7 @@ func begin_run() -> void:
 		if decoy != null:
 			decoy.free()
 		_decoys[row] = null
-	var blank: Object = SimFresh.blank_of(get_script() as Script)
-	SimFresh.take(self, blank)
-	blank.free()
+	SimFresh.renew(self)
 
 
 ## End every entity quietly (no `entity_ended`).

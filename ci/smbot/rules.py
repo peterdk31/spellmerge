@@ -81,9 +81,10 @@ BOT_NATIVE_NAMES = frozenset({"SConstruct"})
 # standard headers and its own.
 NATIVE_CLASS_HEADERS = frozenset({"ref_counted", "object", "node2d", "random_number_generator"})
 NATIVE_STD_HEADERS = frozenset({"cmath", "cstdint", "type_traits", "utility", "vector"})
-# Threads (shot scale H5; the owner, 2026-11-07: the module's own std::thread pool): one file runs a
-# loop on several threads (native/src/jobs.h), and only it may include these or make a thread. Every
-# kernel goes through it, so a kernel's code computes on its arrays alone, as before.
+# Threads (shot scale H5; the owner, 2026-11-07: the module's own std::thread pool, allowed wherever
+# it is faster): one file runs a loop on several threads (native/src/jobs.h), and only it may
+# include these or make a thread; any kernel uses them through it, so a kernel's code computes on
+# its arrays alone, as before.
 NATIVE_THREADS_FILE = "native/src/jobs.cpp"
 NATIVE_THREAD_HEADERS = frozenset({"atomic", "condition_variable", "mutex", "thread"})
 _NATIVE_THREADS = re.compile(r"\bstd::(thread|jthread|async|mutex|condition_variable|atomic)\b|\bpthread_\w+|\bthread_local\b")

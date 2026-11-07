@@ -50,8 +50,6 @@ const IDLER: int = 3
 const BUILD_SEED: int = 2026
 ## Game seconds allowed for the room to be cleared.
 const TIME_LIMIT: float = 120.0
-## Engine.time_scale during the run: game seconds pass faster than real ones.
-const TIME_SCALE: float = 2.0
 ## Frames to let the world settle after the room is cleared, then the checks run.
 const SETTLE_FRAMES: int = 30
 
@@ -105,14 +103,14 @@ func _ready() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
-	Engine.time_scale = TIME_SCALE
+	# Game time runs at real speed: the game never scales the engine's time (online-ready N4; the
+	# bodies' move_and_slide takes the engine's step until N6).
 	_events.emit_signal("play_requested", 0)
 	_started = true
 
 
 ## Puts the global state back if the node is freed before it finished.
 func _exit_tree() -> void:
-	Engine.time_scale = 1.0
 	_stop_logging()
 
 
@@ -234,7 +232,6 @@ func _plain(value: Variant) -> Variant:
 
 func _finish(failed: Array[String]) -> void:
 	set_process(false)
-	Engine.time_scale = 1.0
 	_stop_logging()
 	for bot in _bots:
 		bot.leave()

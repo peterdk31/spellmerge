@@ -8,15 +8,8 @@ extends Resource
 
 ## Unique name of the preset, also its file name.
 @export var id: StringName = &""
-## Seconds a plain hit holds the bodies in it (attacker, target and the shot) and nothing else.
-## Short, and the same for every player.
-@export_range(0.0, 0.2, 0.005) var hit_stop_seconds: float = 0.04
-## Seconds after a body's plain hit-stop in which a plain hit does not hold that body again, per
-## body. Keeps a body in a crowded fight from being held for ever (0.04 s of every 0.19 s is 21%).
-@export_range(0.0, 0.5, 0.01) var hit_stop_rest: float = 0.15
-## Engine.time_scale while the game-wide stop lasts, which only a downed wizard and a boss kill
-## use (0 would freeze the physics step).
-@export_range(0.01, 1.0, 0.01) var hit_stop_scale: float = 0.05
+## Hit-stop (how long a hit holds its bodies, their rest, the kinds' stops, the game-wide stop) is
+## not a look: it is the game's rule, `gameplay/combat/hit_stop.gd` (online-ready N4).
 ## Shake added by a plain hit (0 to 1, "trauma").
 @export_range(0.0, 1.0, 0.01) var hit_shake: float = 0.15
 ## Biggest camera offset in pixels at full trauma.
@@ -66,18 +59,18 @@ extends Resource
 @export_range(1.0, 8.0, 0.5) var status_deep_motes: float = 2.0
 @export_range(0.0, 1.0, 0.05) var status_deep_white: float = 0.75
 ## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `swing`, `burst`, `reaction`,
-## `status`), so a new card feels like something before it has its own sound: `stop` and `shake`
-## scale `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the
-## registry (silent until an `.ogg` exists). A kind not listed uses the shot's look. A swing's hit
-## holds its bodies 0.05 s and shakes the screen about 2 px (the melee playground's, owner
-## 2026-10-29: trauma 0.57 of `max_shake_pixels` 6 is 0.57² x 6).
+## `status`), so a new card feels like something before it has its own sound: `shake` scales
+## `hit_shake` (0 turns it off), `sound` is the id asked from the registry (silent until an `.ogg`
+## exists). A kind not listed uses the shot's look. A swing's hit shakes the screen about 2 px (the
+## melee playground's, owner 2026-10-29: trauma 0.57 of `max_shake_pixels` 6 is 0.57² x 6); its
+## stop (0.05 s) is `HitStop.KIND_STOP`.
 @export var kind_looks: Dictionary = {
-	&"shot": {"stop": 1.0, "shake": 1.0, "sound": &"hit"},
-	&"ray": {"stop": 0.5, "shake": 0.5, "sound": &"hit_ray"},
-	&"swing": {"stop": 1.25, "shake": 3.8, "sound": &"hit_swing"},
-	&"burst": {"stop": 1.5, "shake": 2.0, "sound": &"hit_burst"},
-	&"reaction": {"stop": 1.0, "shake": 1.0, "sound": &"hit_reaction"},
-	&"status": {"stop": 0.0, "shake": 0.0, "sound": &""},
+	&"shot": {"shake": 1.0, "sound": &"hit"},
+	&"ray": {"shake": 0.5, "sound": &"hit_ray"},
+	&"swing": {"shake": 3.8, "sound": &"hit_swing"},
+	&"burst": {"shake": 2.0, "sound": &"hit_burst"},
+	&"reaction": {"shake": 1.0, "sound": &"hit_reaction"},
+	&"status": {"shake": 0.0, "sound": &""},
 }
 ## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
 @export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5

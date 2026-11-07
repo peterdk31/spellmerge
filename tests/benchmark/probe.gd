@@ -6,7 +6,7 @@ extends Node
 ## nothing yet: `report()` only prints.
 ##
 ## Frame time is measured between frames with `Time.get_ticks_usec()`, so it is real
-## time, not game time (the run uses Engine.time_scale). Headless runs do no
+## time (game time runs at real speed). Headless runs do no
 ## rendering, so this is game-logic time, as the PLAN says.
 ##
 ## Nothing is allocated per frame: the samples go into an array sized once.

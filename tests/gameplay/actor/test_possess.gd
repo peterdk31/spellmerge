@@ -324,7 +324,10 @@ func test_a_possession_from_the_driven_body_adds_a_puppet_and_the_seat_moves_on_
 	_tap(0, &"staff_1")
 	_world.run(8)
 	check(near.controller == seat, "the seat drives the near imp")
-	# From the near imp (aiming down) the seat possesses the far one.
+	# From the near imp (aiming down) the seat possesses the far one, straight below it wherever the
+	# first bolt's push left it (its hit-stop, online-ready N4, changes how far: the hold spends part
+	# of a step).
+	far.global_position = Vector2(near.global_position.x, 120.0)
 	_tap(0, &"staff_1")
 	_world.run(8)
 	check(far.controller is PuppetController, "the far imp is a puppet")

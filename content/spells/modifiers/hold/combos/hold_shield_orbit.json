@@ -5,7 +5,7 @@
 	"casts": [{"staff": 0, "cards": ["hold", "shield", "orbit"]}],
 	"imps": [[36, 0]],
 	"guard": true,
-	"foes": [[61, 35]],
+	"foes": [[61, 35], [61, -35], [-61, 35], [-61, -35]],
 	"seconds": 4.0,
 	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "blocked", "min": 1}]
 }

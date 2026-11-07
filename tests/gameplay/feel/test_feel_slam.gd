@@ -65,10 +65,11 @@ func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> vo
 	check_equal(feel._floor_node.multimesh.visible_instance_count, 0, "nothing left on the floor")
 
 
-func test_the_slammer_is_held_as_its_staff_lands_hit_or_miss() -> void:
+## The slammer's hold as its staff lands is the game's (`HitStop`, tests/gameplay/combat/
+## test_hit_stop.gd): Feel draws the strike and holds nobody.
+func test_feel_holds_nobody_as_the_staff_lands() -> void:
 	bus.carrier_ended.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
-	check(is_equal_approx(feel.actors.held_left(0), feel.cue_of(&"slam").hold), "the slammer holds")
-	check_equal(feel.actors.held_left(1), 0.0, "nobody else does")
+	check_equal(feel.actors.held_count, 0, "nobody held by Feel")
 
 
 func test_the_shake_setting_turns_its_shake_off() -> void:

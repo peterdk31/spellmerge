@@ -386,20 +386,25 @@ func test_a_level_up_pauses_the_game_until_every_seat_is_ready() -> void:
 	run.level_up()
 	var on: Array[bool] = [true]
 	check_equal(run.breaks, on, "the break is announced")
-	check(paused, "the whole game is paused")
+	check(_stopped(run), "the whole game is stopped (the sim's stop, online-ready N4)")
 	check(run.director.in_break(), "the director is in a break")
 	check(run.readies.has([0, false]) and run.readies.has([1, false]), "both seats start not ready")
-	check_equal(run.director.process_mode, Node.PROCESS_MODE_ALWAYS, "the director keeps hearing while paused")
+	check_equal(run.director.process_mode, Node.PROCESS_MODE_ALWAYS, "the director keeps hearing while the tree is paused")
 	run.take_all(0)
 	run.bus.horde_ready_requested.emit(0)
 	check(run.director.is_ready(0) and run.readies.back() == [0, true], "seat 0 is ready")
-	check(paused and run.director.in_break(), "still paused: seat 1 is not ready")
+	check(_stopped(run) and run.director.in_break(), "still stopped: seat 1 is not ready")
 	run.take_all(1)
-	check(paused, "a pick alone does not end the break")
+	check(_stopped(run), "a pick alone does not end the break")
 	run.bus.horde_ready_requested.emit(1)
 	var both: Array[bool] = [true, false]
 	check_equal(run.breaks, both, "the last ready ends the break")
-	check(not paused and not run.director.in_break(), "and the game goes on")
+	check(not _stopped(run) and not run.director.in_break(), "and the game goes on")
+
+
+## True while the director's sim is stopped by the build break.
+func _stopped(run: Fixture) -> bool:
+	return run.director.sim.stopped_for(&"horde_break")
 
 
 func test_the_break_blocks_spawns_and_stops_the_clock() -> void:
@@ -426,7 +431,7 @@ func test_a_ready_before_the_picks_are_taken_is_ignored() -> void:
 	check(not run.director.is_ready(0) and run.director.in_break(), "an open offer: not ready")
 	run.bus.horde_pick_requested.emit(0, 0)
 	run.bus.horde_ready_requested.emit(0)
-	check(not run.director.in_break() and not paused, "after the pick the ready counts")
+	check(not run.director.in_break() and not _stopped(run), "after the pick the ready counts")
 
 
 func test_queued_offers_must_all_be_taken_first() -> void:
@@ -454,9 +459,9 @@ func test_a_seat_with_no_offer_still_says_ready() -> void:
 	run.start()
 	run.level_up()
 	check(run.offers.is_empty(), "every card owned: no offer")
-	check(run.director.in_break() and paused, "but the break is on")
+	check(run.director.in_break() and _stopped(run), "but the break is on")
 	run.bus.horde_ready_requested.emit(0)
-	check(not run.director.in_break() and not paused, "the seat's ready ends it")
+	check(not run.director.in_break() and not _stopped(run), "the seat's ready ends it")
 
 
 func test_a_seat_that_leaves_no_longer_counts() -> void:
@@ -467,7 +472,7 @@ func test_a_seat_that_leaves_no_longer_counts() -> void:
 	run.bus.horde_ready_requested.emit(0)
 	check(run.director.in_break(), "seat 1 is still picking")
 	run.bus.player_left.emit(1)
-	check(not run.director.in_break() and not paused, "seat 1 left: everyone left is ready")
+	check(not run.director.in_break() and not _stopped(run), "seat 1 left: everyone left is ready")
 
 
 func test_a_seat_that_joins_in_a_break_counts_as_ready() -> void:
@@ -497,7 +502,7 @@ func test_a_level_up_in_a_break_unreadies_the_seats_it_offers_to() -> void:
 	check_equal(run.director.offer_of(0).size(), HordeScript.OFFER_SIZE, "with its new offer open")
 	check_equal(run.director.queued_of(1), 1, "seat 1's waits behind its open one")
 	run.all_ready()
-	check(not run.director.in_break() and not paused, "every offer taken and ready: it ends")
+	check(not run.director.in_break() and not _stopped(run), "every offer taken and ready: it ends")
 
 
 func test_the_end_and_a_stop_end_the_break() -> void:
@@ -506,16 +511,16 @@ func test_the_end_and_a_stop_end_the_break() -> void:
 	run.level_up()
 	run.bus.player_downed.emit(0)
 	check_equal(run.overs, 1, "the run is over")
-	check(not run.director.in_break() and not paused, "horde_over un-pauses")
+	check(not run.director.in_break() and not _stopped(run), "horde_over un-pauses")
 	check_equal(run.breaks.back(), false, "and says the break ended")
 	var old_world: Node2D = run.world
 	run.world = run.make_world([0])
 	run.start()
 	old_world.free()
 	run.level_up()
-	check(paused, "a new break")
+	check(_stopped(run), "a new break")
 	run.bus.horde_ended.emit()
-	check(not paused, "horde_ended un-pauses")
+	check(not _stopped(run), "horde_ended un-pauses")
 	check_equal(run.breaks.back(), false, "and ends the break")
 
 
@@ -526,7 +531,7 @@ func test_a_restart_ends_the_break() -> void:
 	var old_world: Node2D = run.world
 	run.world = run.make_world([0])
 	run.start()
-	check(not paused and not run.director.in_break(), "a restart un-pauses")
+	check(not _stopped(run) and not run.director.in_break(), "a restart un-pauses")
 	old_world.free()
 
 
@@ -623,7 +628,7 @@ func test_horde_ended_stops_the_director() -> void:
 	check(not run.director.is_running(), "it stopped")
 	check(run.taken.has([0, &""]), "the open offer was dropped")
 	check_equal(run.breaks.back(), false, "the break ended")
-	check(not paused, "and the game is not paused")
+	check(not _stopped(run), "and the game is not stopped")
 
 
 func test_a_real_enemy_is_an_actor_with_its_data() -> void:

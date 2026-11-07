@@ -95,6 +95,8 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 ## an earlier test started dealt the game's sim a random seed, and whatever this test makes rolls
 ## from that sim unless it hands its own. The machine's session rules start as its defaults too
 ## (core/sim/session_rules.gd, online-ready N11), whatever an earlier test set, and no replay deals.
+## And the game goes (online-ready N4): no stop or hold an earlier test left on the game's sim stands
+## this one still.
 func _still_chance() -> void:
 	SessionRules.reset_machine()
 	SessionRules.end()
@@ -103,6 +105,8 @@ func _still_chance() -> void:
 	if game != null:
 		game.run_seed = 0
 		game.rules = SessionRules.defaults()
+		game.hold_left = 0
+		game.stops.clear()
 
 
 ## Runs before every test. Override it for setup the tests share.

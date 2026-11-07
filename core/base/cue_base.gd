@@ -130,6 +130,8 @@ extends Resource
 ## `hold_target` on the target (each held alone; nobody else waits), `hold_shot` to hold the shot
 ## being sent too, `stop_game` seconds of the game-wide stop (only a downed player and a boss's
 ## death: melee I7), and the `sound` id asked from the registry (silent until an `.ogg` exists).
+## The holds and the game-wide stop are the game's: `gameplay/combat/hit_stop.gd` plays them where
+## the simulation's moments happen (online-ready N4), Feel only the rest.
 ##
 ## Its own colour and strength (S6): `color`, when it has one, is the exact colour of every flash and
 ## motes part that names no colour (nor `plain`, nor `bare`) of its own, and of what Feel draws of the

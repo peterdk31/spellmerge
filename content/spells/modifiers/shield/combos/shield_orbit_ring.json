@@ -6,7 +6,7 @@
 	"casts": [{"staff": 0, "cards": ["shield", "frost", "orbit"]}],
 	"imps": [[36, 0], [-36, 0]],
 	"guard": true,
-	"foes": [[61, 35]],
+	"foes": [[61, 35], [61, -35], [-61, 35], [-61, -35]],
 	"seconds": 2.5,
 	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}, {"kind": "blocked", "min": 1}]
 }

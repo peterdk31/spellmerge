@@ -289,7 +289,10 @@ func test_a_hit_pushes_the_wizard() -> void:
 	var player: Actor = _wizard(0)
 	check(_world.combat.hit(EventsScript.NO_PLAYER, player, 1, Vector2.DOWN, 120.0), "the hit lands")
 	_run(1)
-	check_equal(player.velocity, Vector2(0.0, 120.0), "the push from combat is added to the movement")
+	# The hit holds the wizard for HitStop.SECONDS of the step (online-ready N4): it moves for the
+	# rest of it, its velocity that share of the push.
+	var ran: float = (Fixture.STEP - HitStop.SECONDS) / Fixture.STEP
+	check(player.velocity.is_equal_approx(Vector2(0.0, 120.0 * ran)), "the push from combat is added to the movement: %s" % player.velocity)
 
 
 func test_siphon_refunds_mana_up_to_the_most() -> void:

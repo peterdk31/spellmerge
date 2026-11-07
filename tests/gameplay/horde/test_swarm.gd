@@ -480,7 +480,7 @@ func test_the_break_freezes_the_swarm() -> void:
 
 ## Regression (integration, 2026-10-31): the director runs while the tree is paused (it hears picks
 ## and readiness), so its physics step moved the swarm through every level-up break and the pause menu.
-func test_the_swarm_stands_still_in_a_break_and_while_paused() -> void:
+func test_the_swarm_stands_still_in_a_break() -> void:
 	var run: Fixture = _make()
 	run.wizard(Vector2.ZERO)
 	var director: HordeScript = _director_on(run, {Fixture.MiteData.id: 1.0})
@@ -493,11 +493,8 @@ func test_the_swarm_stands_still_in_a_break_and_while_paused() -> void:
 		director.physics_step(Fixture.STEP)
 	check_equal(run.swarm.nodes[0].position, before, "it stands through a level-up break")
 	director.call("_end_break")
-	paused = true
-	for i in 10:
-		director.physics_step(Fixture.STEP)
-	paused = false
-	check_equal(run.swarm.nodes[0].position, before, "and while the pause menu holds the game")
+	# The pause menu's stop is the Tick's: it does not step the director while the game is stopped
+	# (tests/core/test_tick.gd), so nothing here asks the tree's pause (online-ready N4).
 	run.projectiles.step(Fixture.STEP)
 	for i in 10:
 		director.physics_step(Fixture.STEP)

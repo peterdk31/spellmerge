@@ -81,7 +81,6 @@ func test_a_swing_block_is_a_parry_a_gold_star_and_a_local_stop() -> void:
 	check(is_equal_approx(_feel.cue_of(&"parry").hold, 0.06), "the playground's 0.06 s")
 	check_equal(_world.table.held_left(other.id), 0.0, "another actor is not")
 	check_equal(_world.table.held_left(shooter.id), 0.0, "nor the shooter")
-	check_equal(_feel.stop_left, 0.0, "the game runs on")
 	check_equal(_world.projectiles.impact_form, &"", "the form is only told while the block is sent")
 
 

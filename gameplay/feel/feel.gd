@@ -7,11 +7,9 @@ extends Node
 ##     Feel.preset = load("res://gameplay/feel/presets/punchy.tres")
 ##
 ## On a hit it does four things, all the same for every player:
-## - hit-stop, a local stop (freezes in co-op): the attacker, the target and the shot of a hit
-##   hold still for a few hundredths of a second while the rest of the game runs on. After a
-##   plain hit's stop a body rests, and plain hits do not hold it again (a crowded fight must
-##   not feel like lag); kills hold at once. Only a downed player and a boss kill drop
-##   Engine.time_scale (real time); overlapping stops do not add up: the longest one wins.
+## - hit-stop is not Feel's: which bodies a hit, a kill or a cue holds still, and the game-wide stop
+##   of a downed player or a boss kill, are the game's rule (Combat's `HitStop`, online-ready N4),
+##   counted in ticks, the same with or without Feel. Feel draws what they do.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
 ## - a flash (see "Flashes" below): a spray along the hit (a white-hot cross, and its sparks
 ##   as motes), or a puff all round for a hit with no way. A kill turns its killing blow's
@@ -308,7 +306,7 @@ var spells: Node = null
 var actors: ActorsScript = null
 ## The "Actors" autoload once found (`_actor_table`), while it is still there.
 var _auto_actors: ActorsScript = null
-## Tests turn this off: no Engine.time_scale changes.
+## Tests turn this off: Feel steps only when the test calls `step` (no real clock in `_process`).
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
 ## skipped as when the pool is empty; flashes, numbers and sound stay).
@@ -326,16 +324,6 @@ var shake_enabled: bool = true:
 			_trauma = 0.0
 			_kick = Vector2.ZERO
 			_reset_camera()
-## Seconds of the game-wide stop left, in real time (`Engine.time_scale`): only for a downed
-## player and a boss kill. Every other hit holds only its own bodies (see `_hold_bodies`).
-var stop_left: float = 0.0
-## Seconds left after a game-wide stop, in real time.
-var rest_left: float = 0.0
-## The time (`_clock`) before which a plain hit does not hold this actor again, by actor id, so a
-## stream of hits on one body cannot keep it held for ever.
-var _rest_until: PackedFloat32Array = PackedFloat32Array()
-## The body (instance id) each rest belongs to, so a reused actor id starts with no rest.
-var _rest_body: PackedInt64Array = PackedInt64Array()
 ## The last hit `_on_damage_dealt` gave its flash, hold and sound, by the hit actor's id: the
 ## physics frame and Feel's step (`_steps`), the body (instance id), the attacker and the kind.
 ## Another hit with all of them the same (no time has passed for Feel or the game) would only do
@@ -560,8 +548,6 @@ var _cue_next_at: PackedFloat32Array = PackedFloat32Array()
 
 func _ready() -> void:
 	_rng.seed = 1
-	_rest_until.resize(ActorsScript.ACTORS)
-	_rest_body.resize(ActorsScript.ACTORS)
 	_juiced_frame.resize(ActorsScript.ACTORS)
 	_juiced_frame.fill(-1)
 	_juiced_step.resize(ActorsScript.ACTORS)
@@ -672,15 +658,10 @@ func _ready() -> void:
 	_spectacle.attach(projectiles, spells)
 
 
-func _exit_tree() -> void:
-	if drive_engine:
-		Engine.time_scale = 1.0
-
-
 func _process(delta: float) -> void:
 	var real_delta: float = delta
 	if drive_engine:
-		# Real time from the clock, so other uses of Engine.time_scale cannot skew it.
+		# Real time from the clock, so a test's or benchmark's tick rate cannot skew it.
 		var now: int = Time.get_ticks_usec()
 		real_delta = minf(float(now - _last_usec) / 1000000.0, 0.25)
 		_last_usec = now
@@ -693,12 +674,6 @@ func step(real_delta: float) -> void:
 	_hit_slot = -1
 	_hit_voice = -1
 	_clock += real_delta
-	rest_left = maxf(rest_left - real_delta, 0.0)
-	if stop_left > 0.0:
-		stop_left = maxf(stop_left - real_delta, 0.0)
-		if stop_left == 0.0:
-			rest_left = preset.hit_stop_rest
-			_set_time_scale(1.0)
 	if _trauma > 0.0 or _kick != Vector2.ZERO:
 		_trauma = maxf(_trauma - preset.shake_decay * real_delta, 0.0)
 		var strength: float = _trauma * _trauma * preset.max_shake_pixels
@@ -845,14 +820,9 @@ func _grow_reactions(size: int) -> void:
 	_react_amount.resize(size)
 
 
-## A run starts (`room_entered`): what decides whether a hit or a cue holds bodies starts as in a
-## fresh game (online-ready N3b): no body rests from a hold, no reaction was heard and no hit was
-## juiced. They run on Feel's clock, real time until N4 counts the stops in ticks, and the holds
-## they let through are the simulation's (`Actors.hold`), so a run's would otherwise depend on the
-## runs before it.
+## A run starts (`room_entered`): no reaction was heard and no hit was juiced, so the first ones
+## shake and sound (view only since N4: the holds are the game's, `HitStop`).
 func _on_room_entered(_room_id: StringName) -> void:
-	_rest_until.fill(0.0)
-	_rest_body.fill(0)
 	_reaction_heard.clear()
 	_juiced_frame.fill(0)
 	_juiced_step.fill(0)
@@ -919,25 +889,20 @@ func _on_damage_dealt(caster: int, target: Node, amount: float, position: Vector
 			_spectacle.hold_hit(caster, _impact_tag, _impact_shown)
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
 	_impact_target = 0
-	# The kind of the hit came just before (`hit_landed`): its default stop, shake and sound.
-	var stop: float = preset.hit_stop_seconds
+	# The kind of the hit came just before (`hit_landed`): its shake and sound (its stop is the
+	# game's, `HitStop`).
 	# A hit of part of a point (an atom's speck) shakes as much as its share, so a stream of them
 	# is not a quake.
 	var shake: float = preset.hit_shake * minf(amount, 1.0)
 	var sound: StringName = preset.hit_sound
 	var own: bool = false
-	var shot: int = -1
 	if target != null and target.get_instance_id() == _kind_target and Engine.get_physics_frames() == _kind_frame:
-		shot = _kind_shot
 		var look_kind: StringName = _kind if preset.kind_looks.has(_kind) else &"shot"
 		var look: Dictionary = preset.kind_looks[look_kind] as Dictionary if preset.kind_looks.has(look_kind) else NO_LOOK
-		stop *= look.get("stop", 1.0) as float
 		shake *= look.get("shake", 1.0) as float
 		sound = look.get("sound", preset.hit_sound) as StringName
 		own = _kind_own
 	_kind_target = 0
-	if not repeat:
-		_hold_bodies(caster, hit_id, stop, false, shot)
 	var voice: int = _hit_voice
 	if not held:
 		_spectacle.begin_hit(caster, 0)
@@ -1409,14 +1374,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		return
 	var cue: CueBase = plan.cue
 	var power: float = plan.power
-	var table: ActorsScript = _actor_table() if plan.holds or cue.kick_way == &"away" else null
-	if table != null and plan.holds:
-		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold * power, true)
-		held = (cue.hold_target > 0.0 and _hold_actor(table, target, cue.hold_target * power, true)) or held
-		if cue.hold_shot and held and projectiles != null and shot >= 0:
-			projectiles.freeze_shot(shot, maxf(cue.hold, cue.hold_target) * power)
-	if cue.stop_game > 0.0:
-		_stop_game(cue.stop_game)
+	# Its holds and game-wide stop are the game's (`HitStop`, online-ready N4), not drawn here.
+	var table: ActorsScript = _actor_table() if cue.kick_way == &"away" else null
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0):
 		_refresh_camera()
 		_trauma = minf(_trauma + cue.shake * power, 1.0)
@@ -2577,7 +2536,7 @@ func _on_player_downed(player: int) -> void:
 	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
-## A hit's shake, looks and sound; its stop is already applied by the caller (`_hold_bodies`).
+## A hit's shake, looks and sound (its stop is the game's, `HitStop`).
 ## A hit with an `aim` (the way the shot flew) sprays along it, `size` times as big, from `at`,
 ## in the ramp of `tint` (white: `player`'s colours); without one it is a puff at `position`.
 func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
@@ -2611,45 +2570,6 @@ func _play(id: StringName) -> int:
 	return used
 
 
-## The game-wide stop: `Engine.time_scale` drops for `seconds` of real time, for everyone. Only a
-## downed player and a boss kill use it (melee I7, M2-staffs.md "Freezes in co-op"); a longer
-## stop replaces a shorter one.
-func _stop_game(seconds: float) -> void:
-	if seconds > stop_left:
-		stop_left = seconds
-		_set_time_scale(preset.hit_stop_scale)
-
-
-## The local stop of a hit or a kill: the attacker `attacker`, the target `target` and the shot
-## that hit (`shot`, the event's; -1 for none) hold for `seconds`, and nothing
-## else does: another player, another enemy and every other shot run on. A plain hit (not
-## `strong`) holds a body only when its rest from the last stop is over, so a crowd of hits does
-## not freeze it for ever; a kill or a reaction always holds. Either actor may be NONE.
-func _hold_bodies(attacker: int, target: int, seconds: float, strong: bool, shot: int = -1) -> void:
-	var table: ActorsScript = _actor_table()
-	if table == null or seconds <= 0.0:
-		return
-	var held: bool = _hold_actor(table, attacker, seconds, strong)
-	held = _hold_actor(table, target, seconds, strong) or held
-	if held and projectiles != null and shot >= 0:
-		projectiles.freeze_shot(shot, seconds)
-
-
-func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> bool:
-	if not table.is_open(id):
-		return false
-	# An id handed to a new body does not inherit the last body's rest.
-	var node: Node = table.node_of(id)
-	var body: int = node.get_instance_id() if node != null else 0
-	if _rest_body[id] != body:
-		_rest_body[id] = body
-		_rest_until[id] = 0.0
-	if not strong and _clock < _rest_until[id]:
-		return false
-	_rest_until[id] = _clock + seconds + preset.hit_stop_rest
-	return table.hold(id, seconds)
-
-
 ## True for the death of a boss: an enemy whose data says `boss`.
 ## The own colour of a body that is no wizard: its enemy data's `hit_color`, or the default for a
 ## body with none (a swarmer, a stand-in).
@@ -2661,11 +2581,6 @@ static func _hit_color_of(body: Node) -> Color:
 
 static func _is_boss(enemy: Node) -> bool:
 	return enemy is Actor and (enemy as Actor).data != null and (enemy as Actor).data.boss
-
-
-func _set_time_scale(value: float) -> void:
-	if drive_engine:
-		Engine.time_scale = value
 
 
 ## Follow the current camera: when it changed, the old one is put back at rest.

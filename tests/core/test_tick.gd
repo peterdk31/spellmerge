@@ -43,6 +43,8 @@ class Area:
 
 	func take_rules(rules: SessionRules) -> void:
 		calls.append(["%s.take_rules" % name, float(rules.shot_cap)])
+	func stood() -> void:
+		calls.append(["%s.stood" % name, 0.0])
 
 
 ## A body: an Actor that only records its tick (none of an actor's set-up runs).
@@ -158,13 +160,63 @@ func test_what_is_switched_off_is_not_stepped() -> void:
 	check(_names().has("Combat.step"), "the rest stepped")
 
 
-func test_a_paused_tree_steps_only_what_runs_while_paused() -> void:
+## A hold (online-ready N4: a downed wizard, a boss's death) stands the simulation still for its
+## ticks: they count, and only the frames run (their presses carry, `Frames.stood`).
+func test_a_held_game_runs_only_the_frames_for_its_ticks() -> void:
 	_body("a")
-	_areas.get_node(^"Frames").process_mode = Node.PROCESS_MODE_ALWAYS
-	_areas.get_node(^"Horde").process_mode = Node.PROCESS_MODE_ALWAYS
-	paused = true
+	_tick.hold(2)
 	_tick.run(TickScript.DT)
-	check_equal(_names(), ["Frames.tick", "Horde.physics_step", "Horde.step_timers"], "only the always-running areas")
+	_tick.run(TickScript.DT)
+	check_equal(_names(), ["Frames.tick", "Frames.stood", "Frames.tick", "Frames.stood"], "only the frames, and their presses kept")
+	check_equal(_tick.count, 2, "the held ticks count")
+	check_equal(_tick.sim.hold_left, 0, "the hold is spent")
+	calls.clear()
+	_tick.run(TickScript.DT)
+	check(_names().has("body a") and not _names().has("Frames.stood"), "then the game steps again")
+
+
+## A stop (the horde's build break, the pause menu) lasts until its `go`; in a break the director's
+## timers run on (a joiner's bag), but not while the menu stops the game too.
+func test_a_stopped_game_runs_the_frames_and_the_breaks_timers() -> void:
+	_body("a")
+	_tick.stop(TickScript.HORDE_BREAK)
+	_tick.run(TickScript.DT)
+	check_equal(_names(), ["Frames.tick", "Horde.step_timers", "Frames.stood"], "the frames and the break's timers")
+	calls.clear()
+	_tick._on_pause_requested(0, 1)
+	_tick.run(TickScript.DT)
+	check_equal(_names(), ["Frames.tick", "Frames.stood"], "with the menu open too, only the frames")
+	check(_tick.sim.stopped_for(TickScript.MENU), "the menu's command is a stop of its own")
+	_tick.go(TickScript.HORDE_BREAK)
+	calls.clear()
+	_tick.run(TickScript.DT)
+	check_equal(_names(), ["Frames.tick", "Frames.stood"], "the break over, the menu still stops it")
+	_tick._on_pause_requested(0, 0)
+	calls.clear()
+	_tick.run(TickScript.DT)
+	check(_names().has("body a"), "it steps again once nothing stops it")
+	check_equal(_tick.count, 4, "every tick counted")
+
+
+## The tree's pause is the picture's: a tree paused with the sim going (the pause menu while a replay
+## plays) runs no tick at all, and the Tick pauses the tree while the sim is stopped.
+func test_a_paused_tree_runs_no_tick_and_a_stop_pauses_the_tree() -> void:
+	_body("a")
+	root.add_child(_tick)
+	paused = true
+	await physics_frame
+	await physics_frame
+	check(calls.is_empty(), "no tick while the tree is paused and the sim goes")
+	paused = false
+	await physics_frame
+	check(not calls.is_empty(), "ticks once the tree goes")
+	_tick.stop(TickScript.MENU)
+	_tick.call(&"_show_stop")
+	check(paused, "a stopped sim pauses the tree")
+	_tick.go(TickScript.MENU)
+	_tick.call(&"_show_stop")
+	check(not paused, "and lets it go with the game")
+	root.remove_child(_tick)
 
 
 func test_every_delta_is_the_physics_step() -> void:

@@ -142,7 +142,6 @@ func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strike
 	check_equal(feel.flashes_of(&"quake"), 1, "the floor cracks where it ends on a wall")
 	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(12.0 * 1.5 / feel.flash_kind(&"quake").step), "as big as its radius")
 	check(is_equal_approx(feel.trauma(), feel.cue_of(&"quake").shake), "with the ground's shake")
-	check(is_equal_approx(actors.held_left(0), feel.cue_of(&"quake").hold), "and its caster held")
 	_impact(0, &"test_meteor", Color.WHITE, 0, own(Node2D.new()) as Node2D)
 	check_equal(feel.flashes_of(&"quake"), 2, "and where it strikes a body: one rule for every impact")
 	_impact(0, &"bolt")

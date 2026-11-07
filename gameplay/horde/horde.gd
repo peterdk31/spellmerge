@@ -20,8 +20,9 @@ extends Node
 ##   offer per seat; a level-up while one is open waits behind it. `horde_pick_requested` puts
 ##   the card in the bag (`bag_set_requested`) and sends `horde_pick_taken`.
 ## - **Build break** (owner, 2026-10-31: in Horde only, the game waits for every player): a
-##   level-up pauses the game for everyone with the SceneTree pause (`horde_break_changed(true)`),
-##   so wizards, enemies, shots, statuses and timers all stand still, and every joined seat is
+##   level-up stops the game for everyone (`horde_break_changed(true)`; the sim's stop
+##   `Tick.HORDE_BREAK`, part of the game's state since online-ready N4, and the Tick pauses the
+##   tree for the picture), so wizards, enemies, shots, statuses and timers all stand still, and every joined seat is
 ##   not ready (`horde_ready_changed(seat, false)`). A seat is ready when it sends
 ##   `horde_ready_requested` with every offer taken (open and queued); a ready sent before that
 ##   is ignored, and the HUD only offers it after the last pick. A seat with no offer (every card
@@ -29,8 +30,8 @@ extends Node
 ##   joined seat is ready: a seat that leaves no longer counts, one that joins in a break counts
 ##   as ready, and a level-up in a break adds offers and un-readies the seats that got one.
 ##   `horde_over`, `horde_ended` and a restart end it too. The run's clock stands still in a
-##   break. This node runs while paused (PROCESS_MODE_ALWAYS) but steps only in a break, so the
-##   pause menu still stops it.
+##   break. The Tick runs the director's timers in a break (a joiner's bag), but not while the
+##   pause menu stops the game too.
 ## - **Bags:** `bag_set_requested(seat, START_BAG)` for every wizard on start, and for a joiner on
 ##   the step after its `player_joined` (Flow adds its wizard in its own handler of that event).
 ## - **Status:** `horde_status` every STATUS_INTERVAL seconds.
@@ -45,6 +46,7 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const TickScript := preload("res://core/sim/tick.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
 const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const SwarmLookScript := preload("res://gameplay/horde/swarm_look.gd")
@@ -218,21 +220,20 @@ func _ready() -> void:
 	events.player_left.connect(_on_player_left)
 
 
-## The director's timers, once a tick (core/sim/tick.gd, after the bodies): `step`, also while the
-## tree stands paused for a build break (to give a joiner its bag), but not in the pause menu's pause.
+## The director's timers, once a tick (core/sim/tick.gd, after the bodies): `step`, also while a
+## build break stops the game (to give a joiner its bag), but not while the pause menu does (the
+## Tick decides).
 func step_timers(delta: float) -> void:
-	if is_inside_tree() and get_tree().paused and not _break_on:
-		return
 	step(delta)
 
 
 ## Moves the swarm on by `delta` seconds (a physics step, as the full actors move), unless no run
-## is up or the game stands still: a level-up break or the pause menu (this node runs while the
-## tree is paused, the swarm must not), or the `Horde` node disabled.
+## is up, a level-up break is on (the Tick does not step it while the game is stopped either), or
+## the `Horde` node is disabled.
 func physics_step(delta: float) -> void:
 	if swarm == null or world == null or _horde == null or not is_instance_valid(_horde):
 		return
-	if _break_on or (is_inside_tree() and get_tree().paused) or _horde.process_mode == Node.PROCESS_MODE_DISABLED:
+	if _break_on or _horde.process_mode == Node.PROCESS_MODE_DISABLED:
 		return
 	swarm.step(delta)
 
@@ -706,9 +707,13 @@ func _end_break() -> void:
 		events.horde_break_changed.emit(false)
 
 
+## The build break stops the game (the sim's stop, online-ready N4), or lets it go.
 func _set_paused(on: bool) -> void:
-	if is_inside_tree():
-		get_tree().paused = on
+	var game: Sim = sim if sim != null else Sim.found(self)
+	if on:
+		game.stop(TickScript.HORDE_BREAK)
+	else:
+		game.go(TickScript.HORDE_BREAK)
 
 
 func _set_ready(seat: int, on: bool) -> void:

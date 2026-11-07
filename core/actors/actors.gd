@@ -73,6 +73,12 @@ var held_count: int = 0
 var _birth: PackedInt64Array = PackedInt64Array()
 ## How many ids this run has opened: the next birth less one.
 var _births: int = 0
+## Seconds of each actor's own steps until a plain hold (`hold` with `plain`) takes it again: its
+## hold and its rest after it (online-ready N4; Feel kept it in real time before), so a stream of
+## hits cannot keep one body held for ever. Spent by its steps, as its hold is (`spend_hold`), so
+## it follows the game's time whoever steps the actor. And how many actors rest now.
+var _rest: PackedFloat32Array = PackedFloat32Array()
+var resting_count: int = 0
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -88,6 +94,7 @@ func _init() -> void:
 	_node.resize(ACTORS)
 	_birth.resize(ACTORS)
 	_held.resize(ACTORS)
+	_rest.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
@@ -278,11 +285,19 @@ func node_of(id: int) -> Node:
 
 
 ## Holds the actor `id` where it stands for `seconds` (a local stop: its body does nothing
-## meanwhile while the rest of the game runs on). The longer of two stops stands. Returns false
-## for an actor that is not open.
-func hold(id: int, seconds: float) -> bool:
+## meanwhile while the rest of the game runs on). The longer of two stops stands. After it the
+## actor rests for `rest` seconds more of its own steps, and a `plain` hold (a plain hit's) does
+## not take it while it rests; any other hold (a kill, a reaction, a cue's) always does. Returns
+## false for an actor that is not open, or a plain hold refused. An actor that rests or is held is
+## stepped through `spend_hold` (`held_count` or `resting_count` above 0).
+func hold(id: int, seconds: float, rest: float = 0.0, plain: bool = false) -> bool:
 	if not is_open(id) or seconds <= 0.0:
 		return false
+	if plain and _rest[id] > 0.0:
+		return false
+	if _rest[id] <= 0.0:
+		resting_count += 1
+	_rest[id] = maxf(_rest[id], seconds + rest)
 	if _held[id] <= 0.0:
 		held_count += 1
 	_held[id] = maxf(_held[id], seconds)
@@ -298,7 +313,11 @@ func held_left(id: int) -> float:
 ## step it still runs: `delta` when it is not held, 0 while the stop covers the whole step (the
 ## actor's own step calls it, and does nothing then).
 func spend_hold(id: int, delta: float) -> float:
-	if id < 0 or id >= ACTORS or _held[id] <= 0.0:
+	if id < 0 or id >= ACTORS:
+		return delta
+	if _rest[id] > 0.0:
+		_spend_rest(id, delta)
+	if _held[id] <= 0.0:
 		return delta
 	var held: float = _held[id]
 	if held > delta:
@@ -315,7 +334,12 @@ func spend_hold(id: int, delta: float) -> float:
 func spend_holds(ids: PackedInt32Array, count: int, delta: float, seconds: PackedFloat64Array) -> void:
 	for i in count:
 		var id: int = ids[i]
-		if id < 0 or id >= ACTORS or _held[id] <= 0.0:
+		if id < 0 or id >= ACTORS:
+			seconds[i] = maxf(delta, 0.0)
+			continue
+		if _rest[id] > 0.0:
+			_spend_rest(id, delta)
+		if _held[id] <= 0.0:
 			seconds[i] = maxf(delta, 0.0)
 			continue
 		# `spend_hold`, written out.
@@ -329,7 +353,17 @@ func spend_holds(ids: PackedInt32Array, count: int, delta: float, seconds: Packe
 		seconds[i] = maxf(delta - held, 0.0)
 
 
+func _spend_rest(id: int, delta: float) -> void:
+	_rest[id] -= delta
+	if _rest[id] <= 0.0:
+		_rest[id] = 0.0
+		resting_count -= 1
+
+
 func _release_hold(id: int) -> void:
+	if _rest[id] > 0.0:
+		_rest[id] = 0.0
+		resting_count -= 1
 	if _held[id] > 0.0:
 		_held[id] = 0.0
 		held_count -= 1
@@ -345,6 +379,8 @@ func clear() -> void:
 	_birth.fill(0)
 	_births = 0
 	_held.fill(0.0)
+	_rest.fill(0.0)
+	resting_count = 0
 	held_count = 0
 	_seat_actor.fill(NONE)
 	_home_seat.fill(NONE)

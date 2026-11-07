@@ -17,7 +17,7 @@ const EVENTS: Dictionary = {
 	&"staff_cards_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["cards", TYPE_ARRAY]],
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
-	&"pause_requested": [["player", TYPE_INT]],
+	&"pause_requested": [["player", TYPE_INT], ["on", TYPE_INT]],
 	&"sandbox_requested": [["player", TYPE_INT]],
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],

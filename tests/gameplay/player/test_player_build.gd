@@ -408,7 +408,8 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	check(not _stats.is_empty() and _stats.back()[1] == 90, "the wizard's numbers are sent again: %s" % [_stats])
 	check_equal(_changed.size(), 4, "the wizard's four staffs are announced again")
 	_world.hold(0, &"move_right")
-	_run(1)
+	# Two steps: a hit-stop of the possession's hits may still cover part of the first (N4).
+	_run(2)
 	check(is_equal_approx(wizard.velocity.x, wizard.mover.speed), "seat 0's stick walks the wizard again: %s" % wizard.velocity)
 	check_equal(creature.velocity, Vector2.ZERO, "the creature stands")
 

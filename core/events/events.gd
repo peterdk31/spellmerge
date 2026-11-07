@@ -41,8 +41,6 @@ signal staff_cards_requested(player: int, staff: int, cards: Array[StringName])
 signal reward_pick_requested(player: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.
 signal door_vote_requested(player: int, door: int)
-## A player asked to pause. Heard by run.
-signal pause_requested(player: int)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
 ## (the glowing flares of casts, impacts, rings and dashes) may show at once. Heard by feel.
 signal effect_slots_changed(slots: int)
@@ -74,6 +72,10 @@ signal ai_view_changed(on: bool)
 signal horde_requested(player: int)
 ## `player` picked offer number `choice` (0-2) of their open level-up pick. Heard by horde.
 signal horde_pick_requested(player: int, choice: int)
+## `player` opened (`on` 1) or closed (`on` 0) the pause menu: offline the game stops while it is
+## open (online-ready N4). A command: heard by the Tick (core/sim/tick.gd, `Sim.stop`), which pauses
+## the tree for the picture once the game stands stopped.
+signal pause_requested(player: int, on: int)
 ## `player` is done picking and building in the horde's level-up break (its picks all taken). Heard by
 ## horde, which ends the break once every joined seat is ready.
 signal horde_ready_requested(player: int)

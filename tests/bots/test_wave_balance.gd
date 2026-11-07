@@ -20,7 +20,6 @@ const BotScript := preload("res://tests/bots/bot.gd")
 
 const COUNTS: Array[int] = [1, 2, 3, 4]
 const TIME_LIMIT: float = 120.0
-const TIME_SCALE: float = 2.0
 ## A wizard's full health (the Health of content/wizard/base/wizard.tscn).
 const MAX_HEALTH: float = 100.0
 
@@ -70,7 +69,6 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 	events.connect("room_cleared", on_cleared)
 	events.connect("player_downed", on_downed)
 	events.connect("spell_cast", on_cast)
-	Engine.time_scale = TIME_SCALE
 	events.emit_signal("play_requested", 0)
 	var elapsed: float = 0.0
 	var wizards: Array[Actor] = []
@@ -82,13 +80,12 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 	lowest.fill(MAX_HEALTH)
 	while elapsed < TIME_LIMIT and not bool(tally["cleared"]) and int(tally["downed"]) < count:
 		await process_frame
-		# The frame's game time (TIME_SCALE included).
+		# The frame's game time (a tick's, at fixed frames).
 		elapsed += root.get_process_delta_time()
 		for index in count:
 			if is_instance_valid(wizards[index]):
 				lowest[index] = minf(lowest[index], wizards[index].health.health)
 		# The bots think at each tick's start, filling their seats' frames (the Frames autoload).
-	Engine.time_scale = 1.0
 	events.disconnect("room_cleared", on_cleared)
 	events.disconnect("player_downed", on_downed)
 	events.disconnect("spell_cast", on_cast)

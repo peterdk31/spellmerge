@@ -107,11 +107,10 @@ func test_the_rising_fireball_is_a_cue_of_its_own() -> void:
 	check_equal(feel.flashes_of(&"shell"), 0, "not the shell")
 
 
-func test_the_quake_strikes_the_ground_and_holds_its_caster() -> void:
+func test_the_quake_strikes_the_ground() -> void:
 	_cue(&"quake", Vector2(20.0, 0.0), 16.0)
 	check_equal(feel.flashes_of(&"quake"), 1, "a mark on the floor")
 	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(16.0 * 1.5 / feel.flash_kind(&"quake").step), "out past its reach")
-	check(is_equal_approx(feel.actors.held_left(0), feel.cue_of(&"quake").hold), "its caster held")
 	check(feel.kick().y > 0.0, "a punch down the screen")
 
 
@@ -200,16 +199,15 @@ func test_particles_off_leaves_out_the_parts_that_say_so() -> void:
 	check_equal(feel.flashes_of(&"fall"), 1, "the column still shows")
 
 
-func test_holds_and_the_game_stop_are_the_cues() -> void:
+## A cue's holds and game stop are the game's (`HitStop`, online-ready N4): Feel plays the cue and
+## holds nobody.
+func test_feel_plays_a_cues_holds_as_nothing() -> void:
 	var cue: CueBase = _made([])
 	cue.hold = 0.05
 	cue.hold_target = 0.07
 	cue.stop_game = 0.1
 	feel.play_cue(&"test_cue", 0, Vector2.ZERO, Vector2.ZERO, 0.0, Color.WHITE, 0, 2)
-	check(is_equal_approx(feel.actors.held_left(0), 0.05), "the caster held")
-	check(is_equal_approx(feel.actors.held_left(2), 0.07), "the target held")
-	check_equal(feel.actors.held_left(1), 0.0, "nobody else")
-	check(is_equal_approx(feel.stop_left, 0.1), "the whole game stopped")
+	check_equal(feel.actors.held_count, 0, "nobody held by Feel")
 
 
 func test_kick_ways() -> void:
@@ -245,16 +243,13 @@ func test_a_death_plays_its_cue() -> void:
 	bus.enemy_died.emit(0, null, Vector2(30.0, 30.0), -1)
 	check_equal(feel.flash_dress(&"ring_out"), [cue.parts[0]["color"], FeelScript.EXACT], "the white-hot ring, exactly its colour")
 	check_equal(feel.flash_info(&"ring_out").get("zoom"), cue.parts[0]["zoom"], "as big as the cue says")
-	check(is_equal_approx(feel.actors.held_left(0), cue.hold), "the killer held")
 	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
-	check_equal(feel.stop_left, 0.0, "the game runs on")
 	check_equal(feel.flashes_of(&"puff"), 1, "and its puff")
 
 
 func test_a_downed_wizard_plays_its_cue() -> void:
 	var cue: CueBase = feel.cue_of(&"player_downed")
 	bus.player_downed.emit(1)
-	check(is_equal_approx(feel.stop_left, cue.stop_game), "the whole game stopped")
 	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
 	check_equal(feel.live_flashes(), 0, "nothing drawn: the event names no position")
 	check_equal(feel.actors.held_count, 0, "nobody held")

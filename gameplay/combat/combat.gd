@@ -648,7 +648,8 @@ func _consume_knockback(row: int, delta: float) -> Vector2:
 ## `duration` seconds. `strength` is burn damage per second, the percent of speed chill takes,
 ## the percent of the hit that a shock jumps with, the percent of extra damage a hex adds, or the
 ## percent of a hit a static charge discharges. `caster` is credited with burn damage. A second
-## application refreshes the time and keeps the stronger number; the third chill in a row
+## application refreshes the time and keeps the stronger number (a status that ran out keeps none:
+## put on again it has its new one); the third chill in a row
 ## freezes (`freeze`, FREEZE_TIME seconds) and clears the chill, and a frozen actor takes no
 ## chill. Sends `status_applied`. Returns false for an unknown status, a time of 0, an actor
 ## that is not registered or is down, or a chill on a frozen actor.
@@ -671,11 +672,12 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 	var at: int = row * STATUS_COUNT
 	var power: float = strength / STATUS_STRENGTH_PER_POWER[st]
 	var froze: bool = false
-	if st == ST_BURN:
-		# A fresh burn starts from nothing; one still burning keeps its stronger rate.
-		if _status_left[at + ST_BURN] <= 0.0:
-			_status_power[at + ST_BURN] = 0.0
+	# A fresh status starts from its own strength; one still on keeps the stronger.
+	if _status_left[at + st] <= 0.0:
+		_status_power[at + st] = 0.0
+		if st == ST_BURN:
 			_burn_carry[row] = 0.0
+	if st == ST_BURN:
 		_burn_by[row] = caster
 	elif st == ST_CHILL:
 		# A frozen actor takes no chill; the third in a row freezes it.
@@ -1365,21 +1367,24 @@ func _tick(row: int, delta: float) -> void:
 		var burned: float = minf(delta, burning)
 		_status_left[at + ST_BURN] = burning - burned
 		_burn_carry[row] += _status_power[at + ST_BURN] * burned
+		if burning - burned <= 0.0:
+			_status_power[at + ST_BURN] = 0.0
 		var whole: int = int(_burn_carry[row])
 		if whole > 0:
 			_burn_carry[row] -= float(whole)
 			_due_node.append(_nodes[row])
 			_due_by.append(_burn_by[row])
 			_due_amount.append(whole)
-	# Every other status counts down; a chill that runs out takes its slow and stacks with it.
+	# Every other status counts down; one that runs out keeps no power (a chill no stacks either).
 	for st in range(ST_BURN + 1, STATUS_COUNT):
 		var left: float = _status_left[at + st]
 		if left != 0.0:
 			left = maxf(left - delta, 0.0)
 			_status_left[at + st] = left
-			if left == 0.0 and st == ST_CHILL:
-				_status_power[at + ST_CHILL] = 0.0
-				_chill_stacks[row] = 0
+			if left == 0.0:
+				_status_power[at + st] = 0.0
+				if st == ST_CHILL:
+					_chill_stacks[row] = 0
 	if _react_wait[row] != 0.0:
 		_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 

@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: A status that ran out keeps no strength (owner session)
+
+- **Asked:** the owner, on being told that shock, hex and static kept their strength after they ran out (so a weaker one put on later had the old, stronger number): "Yes fix it!"
+- **Now:** every status's power goes to 0 when its time does (`Combat._tick`), and a status put on fresh starts from its own strength (`_apply_status_row`), as burn and chill already did. A status still on keeps the stronger of the two, as before.
+- **Why it was so:** each status had its own arrays and rules, and only burn and chill cleared theirs; once every status was a row of one table (the same day), the rule is written once. `test_combat_statuses.gd` puts each status on, lets it run out and puts it on weaker.
+
 ## 2026-11-07: Threads in the shot kernel, the module's own (shot scale H5, owner session)
 
 - **Asked:** the owner: "You can use std::thread if it's faster! We want the most performance! Make sure to write it using good software architecture with low coupling."

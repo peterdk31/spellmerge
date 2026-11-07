@@ -577,3 +577,20 @@ func test_every_applied_status_goes_on_counts_down_and_comes_off() -> void:
 		check(not _combat.has_status(enemy, status), "%s runs out" % status)
 	var enemy := _enemy()
 	check(not _combat.apply_status(1, enemy, &"freeze", 1.0, 1.0), "a freeze only comes from chill")
+
+
+## A status that ran out keeps no strength: put on again weaker, it has the new strength, not the
+## old one (it did for shock, hex and static until 2026-11-07).
+func test_a_status_put_on_again_after_it_ran_out_has_its_new_strength() -> void:
+	for st in CombatScript.STATUS_COUNT:
+		if not CombatScript.STATUS_APPLIED[st]:
+			continue
+		var status: StringName = CombatScript.STATUSES[st]
+		var enemy := _enemy(Vector2(float(st) * 200.0, 0.0), 1.0e9)
+		var row: int = _combat._row_of_node(enemy)
+		_combat.apply_status(1, enemy, status, 0.25, 60.0)
+		for i in 8:
+			_combat.step(STEP)
+		check(not _combat.has_status(enemy, status), "%s ran out" % status)
+		_combat.apply_status(1, enemy, status, 1.0, 20.0)
+		check(is_equal_approx(_combat._strength_of(row, status), 20.0), "%s again has its new strength (got %s)" % [status, _combat._strength_of(row, status)])

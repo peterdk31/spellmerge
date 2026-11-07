@@ -229,7 +229,7 @@ func _step_zaps(delta: float) -> void:
 			if kit.zap_room() and _zap_roll(at) < SpellLimits.ZAP_SPARKS * delta * SpellLimits.ZAP_EVERY:
 				var from: Vector2 = _point_along(at, _zap_roll(at) * _bm_reach[at])
 				var length: float = lerpf(SpellLimits.ZAP_SPARK_SHORTEST, SpellLimits.ZAP_SPARK_LONGEST, _zap_roll(at))
-				kit.spark(spell, _bm_tag[at], from, Vector2.from_angle(_zap_roll(at) * TAU), length)
+				kit.spark(spell, _bm_tag[at], from, DMath.from_angle(_zap_roll(at) * TAU), length)
 			continue
 		for k in near:
 			if not kit.zap_room() or _bm_on[at] == 0 or _bm_spell[at] != spell:
@@ -442,7 +442,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	var holder: int = SpellRuntime.body_of(caster, actor)
 	if holder >= 0:
 		if kit.aim_dir(holder).is_finite():
-			_bm_turn[at] = kit.aim_dir(holder).angle_to(heading)
+			_bm_turn[at] = DMath.angle_to(kit.aim_dir(holder), heading)
 	else:
 		# A still caster (a rune, a wall) keeps it: the beam starts where it is and walks out of it.
 		var shot: int = kit.live_caster_shot(caster, caster_seq)
@@ -450,7 +450,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 		if shot < 0:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 		elif not way.is_zero_approx():
-			_bm_turn[at] = way.angle_to(heading)
+			_bm_turn[at] = DMath.angle_to(way, heading)
 	kit.shot_started(tag)
 	_beam_step(at, 0.0)
 	if _bm_on[at] != 0:
@@ -494,7 +494,7 @@ func _beam_follow(at: int) -> void:
 	if holder >= 0:
 		if kit.aim_origin(holder).is_finite():
 			_bm_origin[at] = kit.aim_origin(holder)
-			_bm_dir[at] = kit.aim_dir(holder).rotated(_bm_turn[at])
+			_bm_dir[at] = DMath.rotated(kit.aim_dir(holder), _bm_turn[at])
 		elif kit.aim_seen(holder):
 			_end_beam(at, false)
 	elif caster >= 0:
@@ -502,7 +502,7 @@ func _beam_follow(at: int) -> void:
 			_bm_origin[at] = kit.projectiles.get_position_of(caster)
 			var way: Vector2 = kit.projectiles.get_velocity_of(caster)
 			if not way.is_zero_approx():
-				_bm_dir[at] = way.normalized().rotated(_bm_turn[at])
+				_bm_dir[at] = DMath.rotated(way.normalized(), _bm_turn[at])
 		else:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 	elif _bm_ring[at].x > 0.0:
@@ -512,7 +512,7 @@ func _beam_follow(at: int) -> void:
 		var angle: float = ring.y + ring.w * (kit.clock() - ring.z)
 		_bm_origin[at] = kit.ring_point(centre, ring.x, angle)
 		if not _bm_origin[at].is_equal_approx(centre):
-			_bm_dir[at] = _bm_origin[at].direction_to(centre).rotated(_bm_turn[at])
+			_bm_dir[at] = DMath.rotated(_bm_origin[at].direction_to(centre), _bm_turn[at])
 
 
 ## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,
@@ -847,7 +847,7 @@ func _beam_width(at: int) -> float:
 	var width: float = spell.radius * 0.5
 	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
 	if growth > 1.0:
-		width = minf(width * pow(growth, _bm_span[at] - _bm_life[at]), maxf(kit.projectiles.room_size(), width))
+		width = minf(width * DMath.pow(growth, _bm_span[at] - _bm_life[at]), maxf(kit.projectiles.room_size(), width))
 	return width
 
 
@@ -892,7 +892,7 @@ func _wave(points: PackedVector2Array, first: int, count: int, amp: float, start
 			_wave_points.resize(maxi(made + pieces, _wave_points.size() * 2))
 		for n in range(1, pieces + 1):
 			var t: float = float(n) / pieces
-			_wave_points[made] = from.lerp(to, t) + side * (amp * sin(TAU * (walked + piece * t) / SpellLimits.BEAM_WAVE))
+			_wave_points[made] = from.lerp(to, t) + side * (amp * DMath.sin(TAU * (walked + piece * t) / SpellLimits.BEAM_WAVE))
 			made += 1
 		_wave_index[i] = made
 		walked += piece

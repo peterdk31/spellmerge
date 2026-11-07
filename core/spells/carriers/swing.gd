@@ -312,7 +312,7 @@ func _end_swing(at: int, finished: bool) -> void:
 ## The end point of a swing round `origin` aimed along `direction`, turning `side` through `arc`
 ## degrees out to `reach`: where its arc ends.
 static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
-	return origin + direction.normalized().rotated(deg_to_rad(arc) * 0.5 * (1.0 if side >= 0 else -1.0)) * reach
+	return origin + DMath.rotated(direction.normalized(), deg_to_rad(arc) * 0.5 * (1.0 if side >= 0 else -1.0)) * reach
 
 
 ## Where the tip of swing `at`'s staff is now: on its arc as far as it has turned (leaning back
@@ -320,7 +320,7 @@ static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc:
 func swing_tip(at: int) -> Vector2:
 	var half: float = deg_to_rad(swing_arc(at)) * 0.5
 	var turned: float = clampf(_sw_turned[at], -half, half) * (1.0 if _sw_side[at] >= 0 else -1.0)
-	return _sw_origin[at] + _sw_dir[at].rotated(turned) * swing_reach(at)
+	return _sw_origin[at] + DMath.rotated(_sw_dir[at], turned) * swing_reach(at)
 
 
 ## Makes room for `size` swing rows (the new ones off, each with its own struck list).

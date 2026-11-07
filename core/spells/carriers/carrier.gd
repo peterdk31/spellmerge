@@ -337,8 +337,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		return kit.land_shots(_slots, count, spell, tag, source, chain, prev)
 	var made: int = 0
 	for n in count:
-		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
-		made += shoot(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, source, lifetime, chain, prev)
+		var angle: float = DMath.angle(direction) + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
+		made += shoot(spell, tag, actor, origin, direction, DMath.from_angle(angle), n, count, source, lifetime, chain, prev)
 	return made
 
 
@@ -362,8 +362,8 @@ func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _dir
 ## (the spread drawn per shot, as one at a time). A carrier may make them faster, the same rows.
 func spawn_rows(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, count: int, lifetime: float, slots: PackedInt32Array) -> void:
 	for n in count:
-		var angle: float = direction.angle() + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
-		slots[n] = spawn_row(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, lifetime)
+		var angle: float = DMath.angle(direction) + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
+		slots[n] = spawn_row(spell, tag, actor, origin, direction, DMath.from_angle(angle), n, count, lifetime)
 
 
 ## True when this carrier's `shoot` is its `spawn_row` set up by `land_shot` and nothing else, so a

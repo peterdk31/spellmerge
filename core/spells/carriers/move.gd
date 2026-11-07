@@ -24,7 +24,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var body: int = SpellRuntime.body_of(moved, actor)
 	if caster == SpellRuntime.CASTER_BODY and _walks():
 		# Turned as far as the walk is off the aim (staffs A6a), so a mirrored one goes the other way.
-		way = way.rotated(kit.walk_turn(actor))
+		way = DMath.rotated(way, kit.walk_turn(actor))
 	if moved != caster:
 		var anchor: Vector2 = kit.projectiles.get_anchor(body)
 		if not anchor.is_finite() or anchor.is_equal_approx(origin):

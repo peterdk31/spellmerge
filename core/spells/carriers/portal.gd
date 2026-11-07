@@ -142,8 +142,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var exits: int = clampi(spell.shots, 1, SpellLimits.PORTAL_EXITS_MOST)
 	for n in exits:
 		# Fanned as a split fans shots, each facing out along its own way (P1).
-		var angle: float = way.angle() + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
-		var face: Vector2 = Vector2.from_angle(angle)
+		var angle: float = DMath.angle(way) + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
+		var face: Vector2 = DMath.from_angle(angle)
 		var exit_at: Vector2 = _clear_of_walls(origin, origin + face * spell.ray_length, spell.radius)
 		var exit: int = kit.projectiles.open_gate(born, tag, exit_at, face, spell.radius, false)
 		if exit >= 0:
@@ -196,7 +196,7 @@ func _grow(at: int) -> void:
 	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
 	if growth <= 1.0:
 		return
-	var radius: float = minf(_pt_radius[at] * pow(growth, _pt_span[at] - _pt_life[at]), maxf(kit.projectiles.room_size(), _pt_radius[at]))
+	var radius: float = minf(_pt_radius[at] * DMath.pow(growth, _pt_span[at] - _pt_life[at]), maxf(kit.projectiles.room_size(), _pt_radius[at]))
 	for k in _pt_gates_used[at]:
 		kit.projectiles.set_gate_radius(_pt_gates[at * _pt_stride + k], radius)
 

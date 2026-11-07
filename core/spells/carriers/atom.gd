@@ -44,10 +44,10 @@ func reach_of(spell: CompiledSpell) -> float:
 ## rows as `spawn_row` for each, along the same headings (the spread drawn per shot, in order).
 func spawn_rows(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, count: int, lifetime: float, slots: PackedInt32Array) -> void:
 	_velocities.resize(count)
-	var base: float = direction.angle()
+	var base: float = DMath.angle(direction)
 	for n in count:
 		var angle: float = base + kit.fan_angle(n, count, spell) + kit.staff_spread(tag, spell)
-		_velocities[n] = Vector2.from_angle(angle) * spell.speed
+		_velocities[n] = DMath.from_angle(angle) * spell.speed
 	if kit.projectiles.spawn_batch(actor, origin, _velocities, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, slots) < 0:
 		# Bad arguments (a caster or an origin `spawn` refuses): none made, as one by one.
 		for n in count:

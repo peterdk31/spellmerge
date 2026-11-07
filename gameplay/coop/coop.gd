@@ -259,7 +259,7 @@ func step(delta: float) -> void:
 		refresh_wizards()
 	if not fit_camera():
 		return
-	var weight: float = 1.0 - exp(-FOLLOW_SPEED * maxf(delta, 0.0))
+	var weight: float = 1.0 - DMath.exp(-FOLLOW_SPEED * maxf(delta, 0.0))
 	var at: Vector2 = camera.position.lerp(target_position, weight)
 	var zoom: float = lerpf(camera.zoom.x, target_zoom, weight)
 	# The target was fitted for where the camera is heading; fit against where it

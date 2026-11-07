@@ -376,7 +376,7 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 		if wizard != null:
 			# Start on the side of the wizard where the card put it.
 			var from: Vector2 = at - _centre_of(wizard)
-			_angle[row] = from.angle() if from != Vector2.ZERO else 0.0
+			_angle[row] = DMath.angle(from) if from != Vector2.ZERO else 0.0
 			_position[row] = _orbit_point(row)
 		elif _centre_at[row].is_finite():
 			_position[row] = _orbit_point(row)
@@ -493,7 +493,7 @@ func _step_familiar(row: int, delta: float) -> void:
 func _orbit_point(row: int) -> Vector2:
 	var wizard: Node2D = _caster[row]
 	if wizard != null:
-		return _centre_of(wizard) + Vector2.from_angle(_angle[row]) * FAMILIAR_ORBIT
+		return _centre_of(wizard) + DMath.from_angle(_angle[row]) * FAMILIAR_ORBIT
 	var shot: int = _centre_slot[row]
 	if shot >= 0:
 		if projectiles != null and projectiles.is_alive(shot) and projectiles.get_seq_of(shot) == _centre_seq[row]:
@@ -501,7 +501,7 @@ func _orbit_point(row: int) -> Vector2:
 		else:
 			_centre_slot[row] = -1
 	if _centre_at[row].is_finite():
-		return _centre_at[row] + Vector2.from_angle(_angle[row]) * FAMILIAR_ORBIT
+		return _centre_at[row] + DMath.from_angle(_angle[row]) * FAMILIAR_ORBIT
 	return _position[row]
 
 
@@ -629,7 +629,7 @@ func _write_familiars() -> void:
 		if _kind[row] != FAMILIAR:
 			continue
 		# The way it flies: along its circle as the angle grows.
-		var dir: Vector2 = Vector2(-sin(_angle[row]), cos(_angle[row]))
+		var dir: Vector2 = Vector2(-DMath.sin(_angle[row]), DMath.cos(_angle[row]))
 		var centre: Vector2 = _position[row] - dir * (length - size) * 0.5
 		var i: int = out * STRIDE
 		_familiar_buffer[i] = dir.x * length

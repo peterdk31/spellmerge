@@ -55,6 +55,13 @@ Every script in these folders, and every inner class of one, is a **simulation s
 - **The tick is not in it.** A roll is the same whenever it is made, so an area a test steps by hand rolls as it does in the game; a caller that rolls once a tick names `sim.tick` itself.
 - **Who rolls:** Spells' scatter and spread (`&"scatter"`, keyed by the cast; a later firing by its launch), the AI brain (`&"brain"`, keyed by its actor), the horde director (`&"horde_kind"`, `&"horde_spot"`, `&"horde_offer"` by seat), the swarm's row seeds (`&"swarm_row"`). Zaps, homing picks and the tails' hashes were already hashes of the shot (`Spells.zap_hash`, `tail_hash`): they stay so.
 
+## Maths (N7)
+
+- **The same bits on every platform.** The engine's `sin`, `cos`, `atan2`, `exp`, `log`, `pow`, `ease`, `Vector2.from_angle`, `rotated`, `angle` and `angle_to` call the platform's C library, which differs between Linux, Windows and the web in the last digit now and then (N2b found exactly that), and a game played online would part there. Simulation code calls `DMath` (`dmath.gd`) instead: the same functions, built from `+ - * /` and `sqrt` (and the exact `floor` and `fmod`), which IEEE 754 rounds the same everywhere.
+- **Native, with a twin.** Each `DMath` function runs the native module's (`DMathKernel`, `native/src/dmath.h`) when it is loaded, else its GDScript twin, the same operations in the same order: `tests/core/test_dmath.gd` compares the two to the bit and both to the engine (within 2 units in the last place; tan, asin and acos 4). The kernels call `dmath.h` directly where the GDScript they stand for calls `DMath`. A Vector2 helper works in doubles and rounds to the vector's floats once.
+- **Checked from the source:** `tests/core/test_state_declared.gd` fails on engine maths in a simulation script. A view-only script keeps the engine's; a line in a simulation script that only draws says so, `# view: why` (the horde gems' pulse).
+- **Not covered here:** `+ - * /` and `sqrt` inside the engine's own code (a Vector2's `normalized`, `length`, `lerp`) are correctly rounded everywhere already; a node's `rotation` turns its transform with the engine's sin and cos (a solid shot's physics body: the bodies' moves leave the engine in N6).
+
 ## Order (N3c)
 
 What the simulation goes through, it goes through in an order of its own, never the tree's or a signal's connections': the bodies by actor id (the Tick), the shots by slot, Combat's rows by row, Entities' rows by birth, Coop's wizards by actor id. An event several simulation areas hear goes to autoloads, in the project's autoload order; one a body hears (a mover's `target_move_requested`, a caster's `mana_spend_requested`, an actor's `possess_requested`) names the one body that acts on it.
@@ -109,6 +116,7 @@ And around it:
 - A look or another script that only draws: `const VIEW_ONLY: bool = true`.
 - A script whose objects are made whole and never changed after: `const FROZEN: bool = true`. A per-row record that waits most of the time: `func idle() -> bool`.
 - Chance: `sim.chance(purpose, key, counter)` with a counter of its rolls as state (above, "Chance"); a `sim` member in DERIVED. Time: `delta` and `sim_time`, never a clock.
+- Angles, curves and turns: `DMath` (above, "Maths"), never the engine's `sin`, `pow` or `Vector2.rotated`.
 - A list sits above the script's first member, with its one-line comment (`## Not state: ...`, `## State as who they point at: ...`); a subclass of a script with a list names its own (`DERIVED_BEAM`).
 
 The tests say what is missed: `tests/core/test_state_declared.gd` from the types and the source (every script and inner class), `tests/core/test_state_walked.gd` in running games (three scenes and every card), and `tests/core/test_determinism.gd` any member that parts between two runs of the same scene. Each names the file, the member and the list it belongs in.
@@ -131,4 +139,5 @@ ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test
 - Is every name in DERIVED really rebuilt or set up again, not state that would be lost? A body the game would miss goes in REFS.
 - Does a new scene in `tests/core/sim_scenes.gd` play the same twice?
 - Does any simulation code read a device, the mouse or the camera, or connect to a command's signal instead of `Events.listen`?
+- Does new simulation maths go through `DMath`, and a kernel's through `dmath.h`, the two the same to the bit?
 - Is a new area that keeps state between runs made fresh at a run's start (`begin_run` calling `SimFresh.renew`, in `Tick.FRESH_AT_RUN`), and is each name in its `RUN_KEEPS` a setting, not the run's state?

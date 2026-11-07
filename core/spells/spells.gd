@@ -1040,7 +1040,7 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	_cursor[index] = firing
 	var cast: CompiledCast = compiled.casts[firing]
 	var aim: Vector2 = direction.normalized()
-	var turn: float = aim.angle_to(walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
+	var turn: float = DMath.angle_to(aim, walk) if walk.is_finite() and not walk.is_zero_approx() else 0.0
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
@@ -1479,7 +1479,7 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	for spell in group.spells:
 		var heading: Vector2 = direction
 		if spell.fallback == CompiledSpell.FALLBACK_NONE and group.scatter:
-			heading = direction.rotated(_scatter_roll() * TAU)
+			heading = DMath.rotated(direction, _scatter_roll() * TAU)
 		made += _fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, false)
 	return made
 
@@ -1593,7 +1593,7 @@ static func penta_start(tag: int) -> float:
 
 ## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.
 static func ring_point(manager: ProjectilesScript, centre: Vector2, radius: float, angle: float) -> Vector2:
-	var point: Vector2 = centre + Vector2.from_angle(angle) * radius
+	var point: Vector2 = centre + DMath.from_angle(angle) * radius
 	return manager.clip_to_walls(centre, point) if manager != null else point
 
 
@@ -2601,7 +2601,7 @@ static func zap_hash(seed: int, n: int) -> float:
 func _spark(slot: int, spell: CompiledSpell) -> void:
 	if events == null:
 		return
-	var way: Vector2 = Vector2.from_angle(_zap_roll(slot) * TAU)
+	var way: Vector2 = DMath.from_angle(_zap_roll(slot) * TAU)
 	var length: float = lerpf(SpellLimits.ZAP_SPARK_SHORTEST, SpellLimits.ZAP_SPARK_LONGEST, _zap_roll(slot))
 	_zaps_used += 1
 	events.form_shown.emit(SpellTag.caster_of(projectiles.get_tag_of(slot)), ZAP_FORM, projectiles.get_position_of(slot), way, length, spell.tint, spell.look)

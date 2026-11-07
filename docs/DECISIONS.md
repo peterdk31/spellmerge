@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: The simulation's maths is our own (online-ready N7, owner session)
+
+- **`DMath` in place of the engine's trig in every simulation script, `dmath.h` in the kernels:** sin, cos, tan, atan, atan2, asin, acos, exp, log, pow, lerp_angle and the Vector2 turns, from `+ - * /` and `sqrt` only (plus exact `floor` and `fmod`), so the same bits on Linux, Windows and the web. The C library's differ in the last digit now and then (N2b), and online every machine must play the same game.
+- **Taylor series with plain-fraction coefficients**, not a copied maths library's minimax polynomials: nothing to license, and accurate to 2 units in the last place (tan, asin, acos 4) after a careful reduction. A few more terms cost nothing that shows.
+- **One function, two bodies:** `DMath` calls the native module's (`DMathKernel`) when it is loaded, else its GDScript twin, the same operations in the same order; `tests/core/test_dmath.gd` compares them to the bit on thousands of inputs and fails when one rounding in the C++ changes. A game without the module is the same game.
+- **The native class is `DMathKernel`**, not `DMath` as planned: the script's `class_name DMath` is what simulation code calls, and a native class of the same name would clash with it.
+- **N7a carries the GDScript the kernels mirror** (the projectile manager, the swarm's spacing): the kernels and their GDScript change together or their side-by-side tests part.
+- **Every angled outcome changed once**, by the last digit of a float; the recorded scenes give the same events and hits.
+- **Result:** the replay hashes now agree on Linux, Windows and the web at all 600 ticks of the sandbox fight and the horde run (N2b parted at ticks 0 to 117).
+- **`native/SConstruct` builds with `-ffp-contract=off -fno-fast-math`** for every platform, godot-cpp included (the owner's file).
+
 ## 2026-11-07: Chance by name, from the sim (online-ready N3c, owner session)
 
 - **One source of chance:** `Sim` (core/sim/sim.gd), owned by the Tick, holding the tick and the run's seed (dealt at each run's start by `SimSeed.fresh()`: a replay's while one records or plays). The simulation keeps no `RandomNumberGenerator` (a test fails on one). Spells' scatter, the brain, the horde director and the swarm's row seeds moved onto it; the horde's own seeds are gone, so a run has one seed.

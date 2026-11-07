@@ -22,6 +22,7 @@ const EVENTS: Dictionary = {
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
 	&"projectile_cap_changed": [["cap", TYPE_INT]],
+	&"shot_cap_requested": [["player", TYPE_INT], ["cap", TYPE_INT]],
 	&"mote_cap_changed": [["cap", TYPE_INT]],
 	&"mote_density_changed": [["density", TYPE_FLOAT]],
 	&"floor_marks_changed": [["on", TYPE_BOOL]],

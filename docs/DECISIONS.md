@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: Settings that change the game are the run's rules (online-ready N11, owner session)
+
+- **One object holds them:** `SessionRules` (core/sim/session_rules.gd) in the sim (`sim.rules`, hashed): the shot cap, the horde's cap on enemies alive, the hit-test work a projectile step may do and the shots a trigger's fires may make in a step. A run takes them at its start (`Tick.begin_run` hands them to the areas, `take_rules`, before they are renewed): a replay's while one records or plays, else this machine's. A replay's header carries them (format 2), so a replay plays the same on a machine whose own settings are others. A plain object, not a `Resource` as the plan said: the state walk walks its members, and a resource would be hashed by its path.
+- **The look stays this machine's:** the tailless motes' pool, its tail births and whether something takes the births were state (`RUN_KEEPS`) but only write the drawing's buffers: now VIEW. The horde's curve and Combat's reaction table are content, not settings (the replay's content hash covers them).
+- **"Max shots" moved in a run is a command** (`shot_cap_requested`, the seat that opened the menu), applied at the next tick as before and recorded; the setting itself (`projectile_cap_changed`) is this machine's, for the next run, and the projectile manager no longer hears it. The alternative, applying a mid-run change only from the next run, would change what the player sees offline.
+- **Online (later):** who may change the run's cap mid-run (the host only, or nobody) and the plan's "capped at what the weakest machine allows" are the netcode's; a command from any seat changes it today.
+
 ## 2026-11-07: A body is its actor's key, not an instance id (online-ready N5, owner session)
 
 - **A body's identity is its actor's key** (`Actors.key_of`): its id and its birth in the run, so an id handed out again after a death is another identity, as the new body's instance id was. An id alone would let a shot homing on a dead enemy follow the next enemy given its id; the birth keeps today's behaviour exactly.

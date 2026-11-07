@@ -62,6 +62,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"horde_pick_requested", &"horde_ready_requested",
 	&"sandbox_action_requested", &"sandbox_spawn_requested",
 	&"reward_pick_requested", &"door_vote_requested",
+	&"shot_cap_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -69,6 +70,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i", "",
 	"s", "si",
 	"i", "i",
+	"i",
 ]
 
 var seat: int = 0

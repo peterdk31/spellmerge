@@ -93,12 +93,16 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 
 ## The game's chance starts each test at seed 0 (core/sim/sim.gd), as a fresh process has it: a run
 ## an earlier test started dealt the game's sim a random seed, and whatever this test makes rolls
-## from that sim unless it hands its own.
+## from that sim unless it hands its own. The machine's session rules start as its defaults too
+## (core/sim/session_rules.gd, online-ready N11), whatever an earlier test set, and no replay deals.
 func _still_chance() -> void:
+	SessionRules.reset_machine()
+	SessionRules.end()
 	var clock: Node = root.get_node_or_null(^"Tick")
 	var game: Sim = clock.get(&"sim") as Sim if clock != null else null
 	if game != null:
 		game.run_seed = 0
+		game.rules = SessionRules.defaults()
 
 
 ## Runs before every test. Override it for setup the tests share.

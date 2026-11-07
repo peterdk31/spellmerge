@@ -40,11 +40,15 @@ const REBUILT: Array[StringName] = [&"triple", &"fire", &"bolt"]
 var ticks: int = 240
 ## False runs the projectile manager's and the swarm's GDScript instead of the native kernels.
 var native: bool = true
-## The per-machine settings the simulation reads (A10; N11 makes them a run's): the projectile cap
-## (0 leaves the platform's) and the horde's web cap (-1 leaves the platform's, 0 desktop, 1 web).
-## The platform runner sets both, so every platform plays the same game.
+## This machine's settings a run records with (online-ready N11: `SessionRules.machine()`; a replay
+## plays by the rules in its header whatever these say): the projectile cap (0 leaves the
+## platform's) and the horde's web cap (-1 leaves the platform's, 0 desktop, 1 web). The platform
+## runner sets both, so every platform records the same game.
 var cap: int = 0
 var horde_web: int = -1
+## A seat moves "Max shots" in the recorded run: at tick `x` (-1: never) it asks for the cap `y`, as
+## the pause menu does (`shot_cap_requested`, a command recorded with its tick; N11).
+var cap_request: Vector2i = Vector2i(-1, 0)
 ## The run's seed (the horde's spawns and offers, the swarm's rows), or 0 for a random one. The
 ## platform runner fixes it, so every platform deals the same seeds.
 var run_seed: int = 0
@@ -110,6 +114,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0 and i == REBUILD_AT:
 			# As the radial builder sends it: applied at the next tick's start, and recorded there.
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
+		if i == cap_request.x:
+			events.emit_signal("shot_cap_requested", 0, cap_request.y)
 	replay = _frames.call("stop_recording")
 	if scripted > 0 and ticks > REBUILD_AT + 1:
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
@@ -204,18 +210,22 @@ func _find() -> void:
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
-	if cap > 0:
-		_root.get_node("Projectiles").call("set_cap", cap)
+	var machine: SessionRules = SessionRules.machine()
+	machine.shot_cap = cap if cap > 0 else SessionRules.defaults().shot_cap
 	if horde_web >= 0:
-		_root.get_node("Horde").set(&"web", horde_web == 1)
+		machine.horde_alive = SessionRules.HORDE_ALIVE_WEB if horde_web == 1 else SessionRules.HORDE_ALIVE_DESKTOP
+	else:
+		machine.horde_alive = SessionRules.defaults().horde_alive
 	if not native:
 		_kernels_off()
 
 
-## A problem when a setting asked for changed during the run (a saved setting applied late).
+## A problem when the run's shot cap is not its rules' (a machine setting applied in the run).
 func _check_settings(start: StringName) -> void:
-	if cap > 0 and int(_root.get_node("Projectiles").call("get_cap")) != cap:
-		problems.append("%s: the shot cap changed during the run (%d, not %d)" % [start, int(_root.get_node("Projectiles").call("get_cap")), cap])
+	var game: Sim = _root.get_node("Tick").get(&"sim") as Sim
+	var now: int = int(_root.get_node("Projectiles").call("get_cap"))
+	if game != null and now != game.rules.shot_cap:
+		problems.append("%s: the shot cap is %d, not the run's %d" % [start, now, game.rules.shot_cap])
 
 
 ## The projectile manager and the swarm on their GDScript (`native` false).

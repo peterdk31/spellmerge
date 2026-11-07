@@ -34,6 +34,8 @@ var _slots: Array[int] = []
 var _shakes: Array[bool] = []
 ## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
 var _caps: Array[int] = []
+## Every `shot_cap_requested` the bus sent, as [player, cap] (online-ready N11: the run's cap).
+var _cap_requests: Array[Array] = []
 ## Every `mote_cap_changed` the bus sent, from before the Hud binds.
 var _mote_caps: Array[int] = []
 var _densities: Array[float] = []
@@ -97,6 +99,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
+	_bus.shot_cap_requested.connect(func(player: int, cap: int) -> void: _cap_requests.append([player, cap]))
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
 	_bus.mote_density_changed.connect(func(density: float) -> void: _densities.append(density))
 	_bus.floor_marks_changed.connect(func(on: bool) -> void: _floor_marks.append(on))
@@ -123,6 +126,7 @@ func _teardown() -> void:
 	_slots.clear()
 	_shakes.clear()
 	_caps.clear()
+	_cap_requests.clear()
 	_mote_caps.clear()
 	_densities.clear()
 	_floor_marks.clear()
@@ -541,6 +545,7 @@ func _test_the_max_shots_slider() -> void:
 	_tap(0, &"move_left")
 	_frame()
 	_check(_caps == [ShotCap.STOPS[at - 1]], "left asks for the stop below, got %s" % [_caps])
+	_check(_cap_requests == [[0, ShotCap.STOPS[at - 1]]], "and asks for it in the run, as the seat that opened the menu, got %s" % [_cap_requests])
 	_check(row.text.ends_with("Max shots: %d" % ShotCap.STOPS[at - 1]) and is_equal_approx(bar.value, float(at - 1)), "and shows it")
 	_check(_focus.focused(0) == row, "the focus stays on the slider")
 	_check(int(SaveFile.new(SAVE_PATH).get_setting(&"projectile_cap", 0)) == ShotCap.STOPS[at - 1], "the save remembers it")

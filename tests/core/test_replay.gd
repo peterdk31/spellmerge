@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
-## The replay (core/sim/replay.gd, online-ready N2): its header and ticks there and back through
-## bytes and a file in user://replays/, and the strict decoder rejecting what is not a whole valid
-## replay.
+## The replay (core/sim/replay.gd, online-ready N2): its header (with the run's rules since N11) and
+## ticks there and back through bytes and a file in user://replays/, and the strict decoder rejecting
+## what is not a whole valid replay.
 
 
 func _frames() -> Array[InputFrame]:
@@ -22,6 +22,10 @@ func _made() -> Replay:
 	replay.start = &"horde_requested"
 	replay.starter = 2
 	replay.seats = 0b0101
+	replay.rules.shot_cap = 750
+	replay.rules.horde_alive = 150
+	replay.rules.hit_work = 4000
+	replay.rules.fire_shots = 0
 	var frames: Array[InputFrame] = _frames()
 	for tick in 3:
 		frames[0].set_move(Vector2(1.0, 0.0).rotated(tick))
@@ -47,6 +51,8 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check_equal(back.start, &"horde_requested", "how it started")
 	check_equal(back.starter, 2, "who started it")
 	check_equal(back.seats, 0b0101, "the seats")
+	check_equal(str(back.rules), str(replay.rules), "the run's rules")
+	check(back.rules.equals(replay.rules), "every rule")
 	check_equal(back.tick_count(), 3, "every tick")
 	var a: Array[InputFrame] = _frames()
 	var b: Array[InputFrame] = _frames()
@@ -76,6 +82,9 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var format: PackedByteArray = good.duplicate()
 	format[4] = 9
 	cases["another format"] = format
+	var older: PackedByteArray = good.duplicate()
+	older[4] = 1
+	cases["format 1 (before the rules)"] = older
 	var build_end: int = 6 + good[5]
 	var start: PackedByteArray = good.duplicate()
 	start[build_end + 16] = 7
@@ -83,12 +92,29 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var starter: PackedByteArray = good.duplicate()
 	starter[build_end + 17] = 4
 	cases["starter 4"] = starter
+	# The rules: shot cap, horde cap, hit work, fire shots (four 32-bit numbers).
+	var rules_at: int = build_end + 19
+	var no_cap: PackedByteArray = good.duplicate()
+	no_cap.encode_u32(rules_at, 0)
+	cases["a shot cap of 0"] = no_cap
+	var huge_cap: PackedByteArray = good.duplicate()
+	huge_cap.encode_u32(rules_at, SessionRules.MAX_SHOT_CAP + 1)
+	cases["a shot cap past the most"] = huge_cap
+	var no_horde: PackedByteArray = good.duplicate()
+	no_horde.encode_u32(rules_at + 4, 0)
+	cases["a horde cap of 0"] = no_horde
+	var no_work: PackedByteArray = good.duplicate()
+	no_work.encode_u32(rules_at + 8, 0)
+	cases["no hit work"] = no_work
+	var fires: PackedByteArray = good.duplicate()
+	fires.encode_u32(rules_at + 12, 0x8000_0000)
+	cases["fire shots past the most"] = fires
 	var ticks: PackedByteArray = good.duplicate()
-	ticks.encode_u32(build_end + 19, 4)
+	ticks.encode_u32(rules_at + SessionRules.BYTES, 4)
 	cases["more ticks than it holds"] = ticks
 	var frame_seat: PackedByteArray = good.duplicate()
 	# The first tick: its seats byte, then seat 0's length (2 bytes) and frame; the frame's seat byte.
-	var first: int = build_end + 23
+	var first: int = rules_at + SessionRules.BYTES + 4
 	frame_seat[first + 3 + 1] = 1
 	cases["a frame under another seat"] = frame_seat
 	var frame_bad: PackedByteArray = good.duplicate()
@@ -100,7 +126,7 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	for name: String in cases:
 		var replay := Replay.new()
 		check(replay.decode(cases[name]) != "", "%s is rejected" % name)
-		check(replay.tick_count() == 0 and replay.build == "", "%s leaves it empty" % name)
+		check(replay.tick_count() == 0 and replay.build == "" and replay.rules.equals(SessionRules.defaults()), "%s leaves it empty" % name)
 	check(Replay.from_bytes(good) != null, "the good one is not")
 
 

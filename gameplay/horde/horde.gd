@@ -70,9 +70,11 @@ const OFFER_SIZE: int = 3
 ## heaviest mix (its last point: about 41% full actors). There, 225 holds 60 FPS on desktop
 ## (headless, four bots, 500 shots: frame 11-14 ms; 250 sits on the line); 150 costs on desktop
 ## what the old web cap's 100 full actors did, so the web keeps its old frame (scripts there run
-## roughly 2-3x slower). 500+ needs a cap per kind or a cost per kind (the same document).
-const MAX_ALIVE_DESKTOP: int = 225
-const MAX_ALIVE_WEB: int = 150
+## roughly 2-3x slower). 500+ needs a cap per kind or a cost per kind (the same document). The
+## numbers are the session rules' (core/sim/session_rules.gd, online-ready N11): a run plays by its
+## rules' cap (`alive_cap`), the same on every machine that plays it.
+const MAX_ALIVE_DESKTOP: int = SessionRules.HORDE_ALIVE_DESKTOP
+const MAX_ALIVE_WEB: int = SessionRules.HORDE_ALIVE_WEB
 ## At most this many enemies appear in one step, so a burst never hitches.
 const SPAWN_PER_FRAME: int = 4
 ## No enemy appears closer than this to a wizard (pixels).
@@ -104,9 +106,9 @@ const NO_LIMIT: int = 1000000
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_camera", &"_gems"]
-## The session's settings a new run keeps (`begin_run`): the curve and the web cap (tests and the
-## stress runs set them), the warnings already given.
-const RUN_KEEPS: Array[StringName] = [&"curve", &"web", &"missing_warnings"]
+## What a new run keeps (`begin_run`): the curve (content: tests and the stress runs set it), the
+## run's enemy cap (set from its rules just before, `take_rules`), the warnings already given.
+const RUN_KEEPS: Array[StringName] = [&"curve", &"alive_cap", &"missing_warnings"]
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used
 ## (the Tick's sim: the run's chance, core/sim/sim.gd).
@@ -116,8 +118,9 @@ var actors: ActorsScript = null
 var sim: Sim = null
 ## The curve the next start uses.
 var curve: HordeCurve = DefaultCurve
-## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
-var web: bool = OS.has_feature("web")
+## The most enemies alive at once (`max_alive`): the run's rules' (`take_rules`; MAX_ALIVE_WEB on
+## the web, else MAX_ALIVE_DESKTOP, unless a replay says otherwise). Tests set it.
+var alive_cap: int = SessionRules.defaults().horde_alive
 ## The swarm (`swarm.gd`, docs/milestones/horde-swarm.md): an enemy with a `SwarmKind` spawns
 ## there instead of as a full actor; it moves in physics steps (`physics_step`), not in a break.
 ## Made at the first such spawn with the director's services; tests may set one before `start`.
@@ -249,9 +252,16 @@ func is_ready(seat: int) -> bool:
 	return _break_on and seat >= 0 and seat < SEATS and _is_ready[seat]
 
 
-## The most enemies alive at once here: MAX_ALIVE_WEB on the web, else MAX_ALIVE_DESKTOP.
+## The most enemies alive at once in this run (`alive_cap`, its rules').
 func max_alive() -> int:
-	return MAX_ALIVE_WEB if web else MAX_ALIVE_DESKTOP
+	return alive_cap
+
+
+## The run's rules (core/sim/session_rules.gd; the Tick hands them over before `begin_run`): the
+## most enemies alive at once.
+func take_rules(rules: SessionRules) -> void:
+	if rules != null:
+		alive_cap = rules.horde_alive
 
 
 ## The `Horde` node the enemies stand under, or null while no run is up.

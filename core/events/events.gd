@@ -48,8 +48,10 @@ signal pause_requested(player: int)
 signal effect_slots_changed(slots: int)
 ## Sender: hud. The "Screen shake" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound. Heard by feel, which sets `shake_enabled`.
 signal screen_shake_changed(enabled: bool)
-## Sender: hud. The "Max shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the global cap on live shots (`ShotCap` in core/settings). Heard by core/projectiles, which applies it at once (`set_cap`: the shots in the air end).
+## Sender: hud. The "Max shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: this machine's cap on live shots (`ShotCap` in core/settings). Heard by core/sim (the Tick), which keeps it for the next run (`SessionRules.machine()`, online-ready N11); a run playing changes only by `shot_cap_requested`.
 signal projectile_cap_changed(cap: int)
+## Sender: hud. `player` moved the "Max shots" slider while a run plays: the run's cap on live shots from the next tick on (a command, recorded with the tick; online-ready N11). Heard by core/sim (the Tick), which sets `sim.rules.shot_cap` and hands it to core/projectiles (`set_cap`: the shots in the air end).
+signal shot_cap_requested(player: int, cap: int)
 ## Sender: hud. The "Particles" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: how many motes may be in the world at once (`MoteCap` in core/settings; 0 is off). Heard by feel, which remakes its mote ring (the motes in the air end).
 signal mote_cap_changed(cap: int)
 ## Sender: hud. The "Particle amount" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: the share of its count every moment's motes are thrown at (`MoteDensity` in core/settings; 0 throws none). Heard by feel, which hands it to its mote ring.

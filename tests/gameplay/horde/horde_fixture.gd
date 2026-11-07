@@ -92,7 +92,7 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	director.events = bus
 	director.actors = actors
 	director.registry = registry
-	director.web = false
+	director.alive_cap = HordeScript.MAX_ALIVE_DESKTOP
 	director.curve = curve([[0.0, 4.0, 50]], {ENEMY_A: 1.0})
 	director.sim = Sim.seeded(7)
 	root.add_child(director)

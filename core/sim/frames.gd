@@ -138,8 +138,10 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.start = start
 	replay.starter = starter
 	replay.seats = _joined_seats()
+	replay.rules = SessionRules.machine().copy()
 	_recording = replay
 	SimSeed.begin(replay.run_seed)
+	SessionRules.begin(replay.rules)
 	_send_start(start, starter)
 	return replay
 
@@ -150,6 +152,7 @@ func stop_recording() -> Replay:
 	if replay != null:
 		_recording = null
 		SimSeed.end()
+		SessionRules.end()
 	return replay
 
 
@@ -177,6 +180,7 @@ func play(replay: Replay) -> bool:
 		if replay.seats & (1 << seat) != 0 and input != null and not input.is_joined(seat):
 			input.add_virtual_device(seat)
 	SimSeed.begin(replay.run_seed)
+	SessionRules.begin(replay.rules)
 	_send_start(replay.start, replay.starter)
 	return true
 
@@ -188,6 +192,7 @@ func stop_playing() -> void:
 	_playing = null
 	_play_at = 0
 	SimSeed.end()
+	SessionRules.end()
 
 
 func is_playing() -> bool:

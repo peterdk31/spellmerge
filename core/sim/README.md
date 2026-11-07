@@ -78,7 +78,8 @@ What the simulation goes through, it goes through in an order of its own, never 
   ```
 
   `SimFresh.renew` (`sim_fresh.gd`) resets what `StateWalk` walks, so a member added later is reset too, with no list to keep. Its rules, in its class doc: `RUN_KEEPS` stay; an object held by a member or in a dictionary (a carrier, the AI board every brain shares) stays the same object and is renewed in turn; an array is the blank's, its objects too (a pool), and references into it follow (`Spells._ray` is the first of `_rays` again); DERIVED and VIEW are left alone. A blank deals the run no seeds (`SimSeed.aside`).
-- **Settings stay:** what is the session's, not the run's (the shot cap, a dev slider, a benchmark's budget, the horde's curve), a script lists in `const RUN_KEEPS: Array[StringName]`, read like DERIVED (`tests/core/test_state_declared.gd` checks each name is a state member).
+- **Settings stay:** what is the session's, not the run's (the shot cap, a benchmark's budget, the horde's curve), a script lists in `const RUN_KEEPS: Array[StringName]`, read like DERIVED (`tests/core/test_state_declared.gd` checks each name is a state member).
+- **The run's rules** (N11, `session_rules.gd`, `SessionRules`): every setting that changes the game (the shot cap, the horde's cap, the hit-test work a step may do, the shots a trigger's fires may make in a step) is one of the run's rules, in `sim.rules`. `Tick.begin_run` takes them (a replay's while one records or plays, else this machine's, `SessionRules.machine()`) and hands them to each area of `FRESH_AT_RUN` with `take_rules(rules)` before its `begin_run`; the area keeps the member it sets in `RUN_KEEPS`. A replay's header carries them. A new setting the simulation reads becomes a rule (a field, its bytes and range, `take_rules`); one that only changes the look is VIEW and never state. A change in a run is a command (`shot_cap_requested`), never a machine setting heard by the simulation.
 - **Lists that grow together are listed together.** Scratch kept in several lists grown at once, by a check on one of them (a ray's lists per nesting level, a sweep's results), is all DERIVED or all state: a run's start empties state and keeps DERIVED, so a split leaves the check saying there is room the others no longer have (N3c's stress runs found two).
 - **What fails loudly:** a simulation autoload neither in `Tick.FRESH_AT_RUN` nor in `Tick.RENEWED_OTHERWISE` with its reason (`test_tick.gd`); an area in `FRESH_AT_RUN` with no `begin_run`; a node out of the tree that `renew` would drop (a pool of bodies: free it before, as Entities frees its decoys).
 - **What it cannot see:** a cache in DERIVED that follows the state must be emptied by the area's `clear`; an object in an array that something outside the area holds on to is replaced, so keep such an object in a member or a dictionary. A cache that would carry a run's answer into the next (a compiled staff outlives a run) is DERIVED.
@@ -110,6 +111,8 @@ A new member of a simulation script, by what it holds:
 | what only the drawing reads and writes | `VIEW` | `ProjectileManager._drawn_seq`, `Actor._looks` |
 | a free list of spare records, each set whole when taken | `SPARES` | `Spells._pending_free` |
 | a setting of the session a new run keeps (in an area with `begin_run`) | `RUN_KEEPS` (it stays state) | `ProjectileManager._cap`, `Horde.curve` |
+| a setting that changes the game | a field of `SessionRules`, set by `take_rules`, and `RUN_KEEPS` | `shot_cap` (`ProjectileManager._cap`), `horde_alive` (`Horde.alive_cap`) |
+| a setting of this machine that only changes the look | `VIEW` | `ProjectileManager.tailless_particle_cap` |
 
 And around it:
 - A `static var`: `DERIVED` (a cache, a test switch); it never holds state.

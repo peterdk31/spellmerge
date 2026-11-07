@@ -8,7 +8,8 @@ extends RefCounted
 ##
 ## While a replay records or plays (N2, `Frames.record`, `Frames.play`), the seeds are dealt from
 ## the run's seed (`begin`), which the replay carries: the same run gives the same seeds in the same
-## order. Otherwise each is random. N11 makes the run's seed the session's.
+## order. Otherwise each is random. The replay's header carries the seed beside the run's rules
+## (`SessionRules`, N11), which a replay deals the same way.
 ##
 ##     rng.seed = SimSeed.fresh()
 

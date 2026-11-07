@@ -132,8 +132,16 @@ const HEX_PULL_SHARE: float = 0.5
 ## A charged (static) actor that is hit discharges to every actor of another team within this
 ## many pixels of it, once: the discharge is plain damage, so it sets off nothing else.
 const STATIC_RANGE: float = 96.0
-## The statuses a reaction can start from, in the order they are looked at.
+## The statuses a reaction can start from, in the order they are looked at: a hit reacts with the
+## first the target has that has a row for the hit's element. The one list of that order; a
+## status's place in it is its bit in `_status_bits` (its `AT_*` below). A new status is a name
+## here, its `AT_*` and its line in `_status_bits`; test_combat_reactions.gd fails for a missing one.
 const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX, STATIC]
+const AT_BURN: int = 0
+const AT_CHILL: int = 1
+const AT_SHOCK: int = 2
+const AT_HEX: int = 3
+const AT_STATIC: int = 4
 ## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
 const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
@@ -1134,44 +1142,38 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: fl
 
 # --- Reactions ---------------------------------------------------------------
 
-## The reaction a hit of `element_id` sets off on the row `row`, from the first of its statuses
-## that has a row for that element; null when none does. A frozen actor counts as chilled.
-## Allocation-free.
+## The reaction a hit of `element_id` sets off on the row `row`: the row of the first of
+## REACTING_STATUSES the target has that has one for that element; null when none does.
+## Allocation-free: the element's rows come lined up with REACTING_STATUSES from the table, and the
+## target's statuses as one mask (shot scale H3: a lookup by status cost more than the rest of an
+## elemental hit's own work).
 func _reaction_for(row: int, element_id: StringName) -> ReactionRow:
 	var table: ReactionTable = reactions if reactions != null else REACTIONS
-	# (The element's rows by status: most elements react with a few statuses, so only those are
-	# looked at, in REACTING_STATUSES' order.)
-	var by_status: Dictionary = table.for_element(element_id)
-	if by_status.is_empty():
+	var in_order: Array[ReactionRow] = table.in_order(element_id, REACTING_STATUSES)
+	if in_order.is_empty():
 		return null
-	# `_status_on` of each, written out (shot scale H3: a call each cost more than the rest of the
-	# lookup on every elemental hit; test_combat_reactions.gd holds it to REACTING_STATUSES).
-	if _burn_left[row] > 0.0 and by_status.has(BURN):
-		return by_status[BURN] as ReactionRow
-	if (_chill_left[row] > 0.0 or _freeze_left[row] > 0.0) and by_status.has(CHILL):
-		return by_status[CHILL] as ReactionRow
-	if _shock_left[row] > 0.0 and by_status.has(SHOCK):
-		return by_status[SHOCK] as ReactionRow
-	if _hex_left[row] > 0.0 and by_status.has(HEX):
-		return by_status[HEX] as ReactionRow
-	if _static_left[row] > 0.0 and by_status.has(STATIC):
-		return by_status[STATIC] as ReactionRow
+	var on: int = _status_bits(row)
+	for at in in_order.size():
+		if (on >> at) & 1 != 0 and in_order[at] != null:
+			return in_order[at]
 	return null
 
 
-func _status_on(row: int, status_id: StringName) -> bool:
-	match status_id:
-		BURN:
-			return _burn_left[row] > 0.0
-		CHILL:
-			return _chill_left[row] > 0.0 or _freeze_left[row] > 0.0
-		SHOCK:
-			return _shock_left[row] > 0.0
-		HEX:
-			return _hex_left[row] > 0.0
-		STATIC:
-			return _static_left[row] > 0.0
-	return false
+## Which of REACTING_STATUSES the row has, bit `AT_*` for each; a frozen actor counts as chilled
+## (a row for `chill` matches a frozen target). The one place a reaction reads the statuses.
+func _status_bits(row: int) -> int:
+	var on: int = 0
+	if _burn_left[row] > 0.0:
+		on |= 1 << AT_BURN
+	if _chill_left[row] > 0.0 or _freeze_left[row] > 0.0:
+		on |= 1 << AT_CHILL
+	if _shock_left[row] > 0.0:
+		on |= 1 << AT_SHOCK
+	if _hex_left[row] > 0.0:
+		on |= 1 << AT_HEX
+	if _static_left[row] > 0.0:
+		on |= 1 << AT_STATIC
+	return on
 
 
 ## Run `reaction` on the row `row`: announce it (`reaction_triggered` at the actor, and

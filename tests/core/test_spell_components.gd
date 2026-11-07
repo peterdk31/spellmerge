@@ -98,6 +98,30 @@ func test_reaction_table_index_follows_its_rows() -> void:
 	check(table.find(&"burn", &"storm") == null, "and only it")
 
 
+## `in_order` (what Combat looks a hit's reaction up by, shot scale H3) lines an element's rows up
+## with the statuses it is given, and follows the rows as the index does.
+func test_reaction_table_in_order_follows_its_rows() -> void:
+	var table := ReactionTable.new()
+	var order: Array[StringName] = [&"burn", &"chill", &"shock"]
+	check(table.in_order(&"storm", order).is_empty(), "an empty table: none")
+	var chill := ReactionRow.new()
+	chill.status_id = &"chill"
+	chill.element_id = &"storm"
+	table.rows.append(chill)
+	check_equal(table.in_order(&"storm", order), [null, chill, null] as Array[ReactionRow], "lined up with the statuses")
+	var burn := ReactionRow.new()
+	burn.status_id = &"burn"
+	burn.element_id = &"storm"
+	table.rows.append(burn)
+	check_equal(table.in_order(&"storm", order), [burn, chill, null] as Array[ReactionRow], "a row added after a search is in")
+	var other_order: Array[StringName] = [&"chill", &"burn"]
+	check_equal(table.in_order(&"storm", other_order), [chill, burn] as Array[ReactionRow], "another order")
+	var rows: Array[ReactionRow] = [burn]
+	table.rows = rows
+	check_equal(table.in_order(&"storm", order), [burn, null, null] as Array[ReactionRow], "a row taken out is gone")
+	check(table.in_order(&"fire", order).is_empty(), "an element with no rows: none")
+
+
 func test_registry_finds_components_but_not_the_reaction_table() -> void:
 	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
 	registry.scan(FIXTURE.path_join("content"), FIXTURE.path_join("audio"))

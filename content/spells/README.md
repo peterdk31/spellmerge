@@ -58,7 +58,7 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 
 These steps are not new files only (the report of #243, the fifth element):
 
-- **A status of its own** (`status_id` that combat does not know): code in `gameplay/combat/combat.gd` (arrays, apply, tick, remove, `REACTING_STATUSES`), a word in `core/spells/spells.gd` and a name in `core/spells/validator.gd`. An element that reuses `burn`, `chill`, `shock`, `hex` or `static` needs none.
+- **A status of its own** (`status_id` that combat does not know): code in `gameplay/combat/combat.gd` (arrays, apply, tick, remove, `REACTING_STATUSES` with its `AT_*` and its line in `_status_bits`), a word in `core/spells/spells.gd` and a name in `core/spells/validator.gd`. An element that reuses `burn`, `chill`, `shock`, `hex` or `static` needs none.
 - **A look of its own** when no free `look_layer` kind fits: a new `LOOK_*` number in `core/projectiles/projectile_manager.gd` with its rate in `SPARK_RATES` there, and its branch in `particle` (`core/projectiles/shot_particle.gdshaderinc`, for runes, beams and effects).
 - **A colour ramp** if the palette has no free hue: `docs/STYLE.md` and `art/kit/`.
 - **A look for its status** on the enemy: `status_looks` in the Feel preset.

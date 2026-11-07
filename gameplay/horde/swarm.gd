@@ -636,7 +636,7 @@ func _space() -> void:
 							normal = d / far
 						else:
 							# On the same spot: apart along a direction from the pair's seeds.
-							normal = Vector2.from_angle(float((seeds[i] ^ seeds[j]) & 1023) * (TAU / 1024.0))
+							normal = DMath.from_angle(float((seeds[i] ^ seeds[j]) & 1023) * (TAU / 1024.0))
 						var shift: Vector2 = normal * ((reach - far) * share / give)
 						push_i -= shift * gi
 						_push[j] += shift * gj

@@ -20,7 +20,9 @@ extends SceneTree
 ## line's work left; and again 2026-11-06 when a shot stopped sparing its caster (owner: "A players
 ## own spells should hurt the player"): it spares only the body it starts on, until it has left it
 ## (`exclude`), so the wizards' shots hit them from step 10 on, and the self-hit flags left the
-## state line).
+## state line; and again for online-ready N7, 2026-11-07, when the manager's trig became `DMath`'s,
+## the same on every platform: the same events in the same order at every step, a homing or
+## returning shot's velocity and place differing in the last digit of a float).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

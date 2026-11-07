@@ -34,8 +34,12 @@ const BUDGET: int = 80000
 ## Recorded again on this code for shot scale H2 (2026-11-05), which changes the hits on purpose: a
 ## hit costs 400 units of the budget where it cost 40, the crowd has a budget of its own (BUDGET),
 ## and a shot the budget passed over sweeps its whole untested path when it is next tested.
+## Recorded again for online-ready N7 (2026-11-07), when the manager's homing and return turns became
+## `DMath`'s (the same on every platform): the same 14,375 hits on the same bodies at the same steps
+## (compared hit by hit with main's manager, the native kernel off), 19 hit points differing in the
+## last digit of a float.
 const RECORDED_HITS: int = 14375
-const RECORDED_HASH: int = 3710008787
+const RECORDED_HASH: int = 3228771069
 
 var _bus: EventsScript
 var _mgr: ManagerScript

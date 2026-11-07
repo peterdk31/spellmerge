@@ -9,6 +9,7 @@
 // Vector2, which is the engine's own formulas.
 
 #include "shot_kernel.h"
+#include "dmath.h"
 #include "packed.h"
 
 #include <cmath>
@@ -302,7 +303,7 @@ struct Steer {
 			return;
 		}
 		const double most = (double)turn[slot] * (double)velocity.length() * delta;
-		vel[slot] = velocity.rotated((real_t)clampf((double)velocity.angle_to(want), -most, most));
+		vel[slot] = dmath::rotated(velocity, clampf(dmath::angle_to(velocity, want), -most, most));
 		pos[slot] = prev[slot] + vmul(vel[slot], delta);
 	}
 };
@@ -1204,7 +1205,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 		for (int64_t n = first; n < first + count; n++) {
 			const int64_t slot = members[n];
 			if (state[slot] == S_MOVING) {
-				radius[slot] = (float)MIN((double)radius[slot] * std::pow((double)growth[slot], delta), MAX(room, (double)radius0[slot]));
+				radius[slot] = (float)MIN((double)radius[slot] * dmath::pow((double)growth[slot], delta), MAX(room, (double)radius0[slot]));
 			}
 		}
 	} else if (kind == B_LINGER) {
@@ -1264,8 +1265,8 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 				orbit_angle[slot] = (float)UtilityFunctions::wrapf((double)orbit_angle[slot] + (double)orbit_speed[slot] * delta, -PI_D, PI_D);
 				wave_age[slot] = (float)((double)wave_age[slot] + delta);
 			}
-			const Vector2 away = Vector2::from_angle(orbit_angle[slot]);
-			const double reach = (double)orbit_radius[slot] + (double)wave[slot] * std::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD);
+			const Vector2 away = dmath::from_angle((double)orbit_angle[slot]);
+			const double reach = (double)orbit_radius[slot] + (double)wave[slot] * dmath::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD);
 			pos[slot] = centre + vmul(away, reach);
 			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * (double)orbit_speed[slot]);
 			orbit_centre[slot] = centre;
@@ -1286,7 +1287,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			// At the middle of the step, as `_pass_curve`.
 			const double left = clampf(((double)life[slot] + delta * 0.5) / (double)span[slot], 0.0, 1.0);
 			const double from = (double)curve_from[slot];
-			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - std::pow(left, (double)curve_ease[slot]));
+			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - dmath::pow(left, (double)curve_ease[slot]));
 			vel[slot] = vmul(vel[slot].normalized(), (double)curve_speed[slot] * factor);
 			pos[slot] = prev[slot] + vmul(vel[slot], delta);
 		}
@@ -1306,7 +1307,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			base[slot] = base[slot] + vmul(velocity, delta);
 			wave_age[slot] = (float)((double)wave_age[slot] + delta);
 			const Vector2 side = Vector2(-velocity.y, velocity.x).normalized();
-			pos[slot] = base[slot] + vmul(side, (double)wave[slot] * std::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD));
+			pos[slot] = base[slot] + vmul(side, (double)wave[slot] * dmath::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD));
 		}
 	} else if (kind == B_RETURN) {
 		Arr<PackedInt32Array> caster_slot, actor, mem_head, mem_next;
@@ -1371,13 +1372,13 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			}
 			Vector2 heading = way.normalized();
 			if (turn[slot] > 0.0f) {
-				const double bend = turned ? 0.0 : clampf((double)heading.angle_to(vel[slot]), -RETURN_BEND, RETURN_BEND);
+				const double bend = turned ? 0.0 : clampf(dmath::angle_to(heading, vel[slot]), -RETURN_BEND, RETURN_BEND);
 				const Vector2 goal = home_at[slot];
 				double want = 0.0;
 				if (goal.is_finite() && !goal.is_equal_approx(here)) {
-					want = clampf((double)heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND);
+					want = clampf(dmath::angle_to(heading, goal - here), -RETURN_BEND, RETURN_BEND);
 				}
-				heading = heading.rotated((real_t)UtilityFunctions::move_toward(bend, want, (double)turn[slot] * (double)speed[slot] * delta));
+				heading = dmath::rotated(heading, UtilityFunctions::move_toward(bend, want, (double)turn[slot] * (double)speed[slot] * delta));
 			}
 			vel[slot] = vmul(heading, (double)speed[slot]);
 			pos[slot] = prev[slot] + vmul(vel[slot], delta);

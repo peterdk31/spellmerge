@@ -1567,7 +1567,7 @@ func _lay_solid(slot: int, solid: Solid) -> void:
 	if solid.body != null:
 		solid.body.collision_layer = WALL_LAYER
 		solid.body.position = solid.at
-		solid.body.rotation = solid.across.angle()
+		solid.body.rotation = DMath.angle(solid.across)
 		var shape := (solid.body.get_child(0) as CollisionShape2D).shape as RectangleShape2D
 		shape.size = Vector2(half.length() + solid.radius, solid.radius) * 2.0
 
@@ -1663,7 +1663,7 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 	for n in 9:
 		var point: Vector2 = center
 		if n > 0:
-			point += Vector2.RIGHT.rotated(float(n - 1) * TAU / 8.0) * radius
+			point += DMath.from_angle(float(n - 1) * TAU / 8.0) * radius
 		if not _bounds.has_point(point):
 			return true
 		if not _has_walls:
@@ -1981,7 +1981,7 @@ func spawn_orbit(caster: int, orbit_radius: float, angle: float, angular_speed: 
 		return -1
 	if not (lifetime > 0.0) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(angular_speed):
 		return -1
-	var offset: Vector2 = Vector2.from_angle(angle) * maxf(orbit_radius, 0.0)
+	var offset: Vector2 = DMath.from_angle(angle) * maxf(orbit_radius, 0.0)
 	var around: Vector2 = centre if centre.is_finite() else _anchors[caster]
 	var slot: int = _spawn_row(caster, around + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
 	if centre.is_finite():
@@ -2536,7 +2536,7 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not (reach > 0.0) or to_angle < from_angle:
 		return 0
 	var mine: int = _team_now(caster)
-	var base: float = direction.angle()
+	var base: float = DMath.angle(direction)
 	var turn: float = 1.0 if side >= 0 else -1.0
 	var found: int = 0
 	for slot in _high:
@@ -2554,8 +2554,8 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 			var distance: float = to.length()
 			if distance > reach + radius:
 				continue
-			var width: float = PI if distance <= radius else asin(radius / distance)
-			var local: float = angle_difference(base, to.angle()) * turn
+			var width: float = PI if distance <= radius else DMath.asin(radius / distance)
+			var local: float = angle_difference(base, DMath.angle(to)) * turn
 			if local + width >= from_angle and local - width <= to_angle:
 				found = _guard_add(found, slot)
 				break
@@ -3388,7 +3388,7 @@ func _pass_growth(list: PackedInt32Array, first: int, count: int, delta: float) 
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] == S_MOVING:
-			_radius[slot] = minf(_radius[slot] * pow(_growth[slot], delta), maxf(room, _radius0[slot]))
+			_radius[slot] = minf(_radius[slot] * DMath.pow(_growth[slot], delta), maxf(room, _radius0[slot]))
 
 
 ## Linger (`set_linger`): half way through its life the shot stops for its linger time, which does
@@ -3432,8 +3432,8 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 		if state == S_MOVING:
 			_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
 			_wave_age[slot] += delta
-		var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
-		_pos[slot] = centre + away * (_orbit_radius[slot] + _wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
+		var away: Vector2 = DMath.from_angle(_orbit_angle[slot])
+		_pos[slot] = centre + away * (_orbit_radius[slot] + _wave[slot] * DMath.sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 		_vel[slot] = Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
 		_orbit_centre[slot] = centre
 
@@ -3474,12 +3474,12 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			# Homing bends the way home (rules R4a): the shot's angle off the line to its caster
 			# turns toward its target at the homing rate (back to 0 with none in reach), never past
 			# RETURN_BEND, so it always closes in on its caster and never circles.
-			var bend: float = 0.0 if turned else clampf(heading.angle_to(_vel[slot]), -RETURN_BEND, RETURN_BEND)
+			var bend: float = 0.0 if turned else clampf(DMath.angle_to(heading, _vel[slot]), -RETURN_BEND, RETURN_BEND)
 			var goal: Vector2 = _home_at[slot]
 			var want: float = 0.0
 			if goal.is_finite() and not goal.is_equal_approx(here):
-				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
-			heading = heading.rotated(move_toward(bend, want, _turn[slot] * _speed[slot] * delta))
+				want = clampf(DMath.angle_to(heading, goal - here), -RETURN_BEND, RETURN_BEND)
+			heading = DMath.rotated(heading, move_toward(bend, want, _turn[slot] * _speed[slot] * delta))
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
@@ -3496,7 +3496,7 @@ func _pass_curve(list: PackedInt32Array, first: int, count: int, delta: float) -
 		if _state[slot] != S_MOVING:
 			continue
 		var left: float = clampf((_life[slot] + delta * 0.5) / _span[slot], 0.0, 1.0)
-		var factor: float = _curve_from[slot] + (_curve_to[slot] - _curve_from[slot]) * (1.0 - pow(left, _curve_ease[slot]))
+		var factor: float = _curve_from[slot] + (_curve_to[slot] - _curve_from[slot]) * (1.0 - DMath.pow(left, _curve_ease[slot]))
 		_vel[slot] = _vel[slot].normalized() * (_curve_speed[slot] * factor)
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
@@ -3533,7 +3533,7 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 		# `turned_toward`, written out (this runs for every homing shot every step).
 		# Its bend a pixel times the pixels it flies: the same curve at any speed.
 		var most: float = _turn[slot] * velocity.length() * delta
-		_vel[slot] = velocity.rotated(clampf(velocity.angle_to(want), -most, most))
+		_vel[slot] = DMath.rotated(velocity, clampf(DMath.angle_to(velocity, want), -most, most))
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 
 
@@ -3549,7 +3549,7 @@ func _pass_spiral(list: PackedInt32Array, first: int, count: int, delta: float) 
 		_base[slot] += velocity * delta
 		_wave_age[slot] += delta
 		var side: Vector2 = Vector2(-velocity.y, velocity.x).normalized()
-		_pos[slot] = _base[slot] + side * (_wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
+		_pos[slot] = _base[slot] + side * (_wave[slot] * DMath.sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 
 
 ## A card's moves (`move_shot`): while each lasts, it carries the shot on top of its own motion (a
@@ -3776,7 +3776,7 @@ func _drawn_at(slot: int, at: Vector2) -> Vector2:
 
 
 func _orbit_tangent(slot: int) -> Vector2:
-	var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
+	var away: Vector2 = DMath.from_angle(_orbit_angle[slot])
 	return Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
 
 
@@ -3786,7 +3786,7 @@ func _orbit_tangent(slot: int) -> Vector2:
 static func turned_toward(velocity: Vector2, want: Vector2, most: float) -> Vector2:
 	if velocity.is_zero_approx() or want.is_zero_approx():
 		return velocity
-	return velocity.rotated(clampf(velocity.angle_to(want), -most, most))
+	return DMath.rotated(velocity, clampf(DMath.angle_to(velocity, want), -most, most))
 
 
 ## For anything else homing moves (a shot carried by a dash, a wizard dashing): `velocity` at
@@ -3862,7 +3862,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
-					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle)):
+					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
 						if keep != 0 and _target_id[t] == keep:
 							return t
 						# Reservoir pick: the n-th target seen replaces the pick one time in n.
@@ -4183,7 +4183,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 		return 0
 	_query_ready()
 	layers |= ACTOR_LAYERS
-	var base: float = direction.angle()
+	var base: float = DMath.angle(direction)
 	var turn: float = 1.0 if side >= 0 else -1.0
 	var whole: bool = to_angle - from_angle >= TAU
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
@@ -4203,8 +4203,8 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 					var distance: float = to.length()
 					if distance <= reach + radius:
 						# How far either side of its centre line the body's circle reaches.
-						var width: float = PI if distance <= radius else asin(radius / distance)
-						var local: float = angle_difference(base, to.angle()) * turn
+						var width: float = PI if distance <= radius else DMath.asin(radius / distance)
+						var local: float = angle_difference(base, DMath.angle(to)) * turn
 						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():

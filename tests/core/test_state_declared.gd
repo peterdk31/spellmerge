@@ -15,6 +15,10 @@ extends "res://tests/support/suite.gd"
 ##   `randi()`, `seed()`) and keeps no generator of its own: chance comes from `sim`
 ##   (core/sim/sim.gd, N3c), and a seed nobody chose from `SimSeed.fresh()`. View-only scripts
 ##   (`VIEW_ONLY`) and VIEW members may do all three.
+## - Simulation code calls no engine trig (`sin`, `atan2`, `pow`, `Vector2.rotated`, ...: the C
+##   library's, which differs between platforms in the last digit) but `DMath`'s (core/sim/dmath.gd,
+##   online-ready N7). View-only scripts may, and so may a line that only draws, marked `# view:`
+##   with why.
 ## - The simulation folders in core/sim/README.md's table are StateWalk.FOLDERS.
 ##
 ## Each failure names the file, the member and the fix ("add it to DERIVED, it is set up again, not
@@ -87,6 +91,36 @@ func test_no_state_member_keeps_a_generator() -> void:
 			if int(info["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0 or skip.has(name):
 				continue
 			check(String(info["class_name"]) != "RandomNumberGenerator", "%s: %s keeps a generator; the simulation takes chance from its `sim` (core/sim/sim.gd): `sim.chance(purpose, key, counter)`, with a counter of its rolls as state (core/sim/README.md, \"Chance\")" % [entry["name"], name])
+
+
+## Engine maths a simulation script may not call outside a comment (online-ready N7): the C library's,
+## which differs between Linux, Windows and the web in the last digit now and then.
+const ENGINE_TRIG: Array[String] = [
+	"(^|[^.\\w])(sin|cos|tan|atan|atan2|asin|acos|sinh|cosh|tanh|exp|log|pow|ease|lerp_angle)\\(",
+	"(?<!DMath)\\.(angle|angle_to|angle_to_point|rotated|from_angle|slerp)\\(",
+]
+
+
+func test_simulation_code_calls_no_engine_trig() -> void:
+	var patterns: Array[RegEx] = []
+	for pattern: String in ENGINE_TRIG:
+		patterns.append(RegEx.create_from_string(pattern))
+	var scanned: int = 0
+	for entry in _simulation_scripts():
+		var script: Script = entry["script"]
+		var source: String = _source_of(script)
+		if source.is_empty() or StateWalk.is_view_only(script):
+			continue
+		scanned += 1
+		var lines: PackedStringArray = source.split("\n")
+		for i in lines.size():
+			if lines[i].contains("# view:"):
+				continue
+			var code: String = _code_of(lines[i])
+			for pattern in patterns:
+				if pattern.search(code) != null:
+					check(false, "%s:%d calls the engine's maths, which differs between platforms: call DMath's (core/sim/dmath.gd), or mark a line that only draws `# view: why`: %s" % [entry["name"], i + 1, lines[i].strip_edges()])
+	check(scanned > 50, "the simulation scripts were read (%d)" % scanned)
 
 
 func test_simulation_code_reads_no_clock_and_rolls_no_global_dice() -> void:

@@ -90,7 +90,7 @@ func total_value() -> int:
 ## the experience picked up; `picked_by` says how many gems each wizard picked up in it.
 func step(delta: float, wizards: PackedVector2Array, standing: PackedByteArray, radius: float) -> int:
 	_clock += delta
-	self_modulate.a = 1.0 - LOOK.pulse_depth * (0.5 + 0.5 * sin(_clock * TAU * LOOK.pulse_rate))
+	self_modulate.a = 1.0 - LOOK.pulse_depth * (0.5 + 0.5 * sin(_clock * TAU * LOOK.pulse_rate))  # view: the pulse only draws
 	if picked_by.size() != wizards.size():
 		picked_by.resize(wizards.size())
 	picked_by.fill(0)

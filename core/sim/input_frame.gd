@@ -114,7 +114,7 @@ func set_aim(direction: Vector2) -> void:
 	if direction == Vector2.ZERO or not direction.is_finite():
 		aim = AIM_KEEP
 		return
-	aim = posmod(roundi(direction.angle() / TAU * AIM_STEPS), AIM_STEPS)
+	aim = posmod(roundi(DMath.angle(direction) / TAU * AIM_STEPS), AIM_STEPS)
 
 
 ## The aim the simulation takes: a unit vector, or ZERO to keep the actor's aim. (Engine trig:
@@ -122,7 +122,7 @@ func set_aim(direction: Vector2) -> void:
 func aim_vector() -> Vector2:
 	if aim == AIM_KEEP:
 		return Vector2.ZERO
-	return Vector2.from_angle(float(aim) * TAU / AIM_STEPS)
+	return DMath.from_angle(float(aim) * TAU / AIM_STEPS)
 
 
 ## Staff `staff` (0-3) went down since the last frame.

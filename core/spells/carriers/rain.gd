@@ -28,7 +28,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
 	for n in spell.shots:
-		var along: Vector2 = heading.rotated(kit.fan_angle(n, spell.shots, spell))
+		var along: Vector2 = DMath.rotated(heading, kit.fan_angle(n, spell.shots, spell))
 		var point: Vector2 = _homed_place(spell, actor, origin, kit.projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: SpellRuntime.PendingLaunch = kit.delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)

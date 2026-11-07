@@ -493,7 +493,7 @@ func spawn_point() -> Vector2:
 	var middle: Vector2 = _party_middle(view)
 	var best: Vector2 = Vector2.INF
 	for attempt in SPAWN_TRIES:
-		var direction: Vector2 = Vector2.from_angle(_roll(&"horde_spot", 0, _spot_rolls) * TAU)
+		var direction: Vector2 = DMath.from_angle(_roll(&"horde_spot", 0, _spot_rolls) * TAU)
 		_spot_rolls += 1
 		var reach: float = _exit_distance(middle, direction, view) + SPAWN_RING_MARGIN
 		var at: Vector2 = (middle + direction * reach).clamp(_arena.position, _arena.end)

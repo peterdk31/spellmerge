@@ -259,7 +259,7 @@ func _recount() -> void:
 				_theta[at] = INF
 				continue
 			live += 1
-			_theta[at] = (_att_at[row] - _att_from[row]).angle()
+			_theta[at] = DMath.angle(_att_at[row] - _att_from[row])
 		if live == 0:
 			continue
 		# Each one's count and its rank by angle among its target's attackers.
@@ -287,8 +287,8 @@ func _recount() -> void:
 			for other in ATTACKS:
 				if _theta[other] == INF or _att_target[base + other] != _att_target[row]:
 					continue
-				sum += Vector2.from_angle(_theta[other] - float(_rank[other]) * gap)
-			var turn: float = sum.angle() if sum.length_squared() > 0.0001 else _theta[at] - float(_rank[at]) * gap
+				sum += DMath.from_angle(_theta[other] - float(_rank[other]) * gap)
+			var turn: float = DMath.angle(sum) if sum.length_squared() > 0.0001 else _theta[at] - float(_rank[at]) * gap
 			_att_angle[row] = wrapf(turn + float(_rank[at]) * gap, -PI, PI)
 
 

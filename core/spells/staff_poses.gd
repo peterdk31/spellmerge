@@ -94,10 +94,10 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 			_pose_from[at + c] = 0.0
 	else:
 		_pose_now(actor)
-		var heading: float = was.angle() + deg_to_rad(_pose_out[0]) * _pose_side[actor]
+		var heading: float = DMath.angle(was) + deg_to_rad(_pose_out[0]) * _pose_side[actor]
 		for c in POSE_CHANNELS:
 			_pose_from[at + c] = _pose_out[c]
-		_pose_from[at] = rad_to_deg(angle_difference(dir.angle(), heading)) * side
+		_pose_from[at] = rad_to_deg(angle_difference(DMath.angle(dir), heading)) * side
 	_pose_out_actor = -1
 	if spell.staff_pose.is_empty():
 		_pose_start[actor] = INF

@@ -453,7 +453,7 @@ func team_beat() -> float:
 func slot_off() -> float:
 	if attackers < 2 or target == null or to_target == Vector2.ZERO:
 		return 0.0
-	return absf(angle_difference((-to_target).angle(), slot_angle))
+	return absf(angle_difference(DMath.angle(-to_target), slot_angle))
 
 
 ## Behaviours ask: the way to its slot round the target, at the middle of its band (turning round
@@ -462,9 +462,9 @@ func slot_off() -> float:
 func slot_way() -> Vector2:
 	if attackers < 2 or target == null or band_max <= 0.0 or to_target == Vector2.ZERO:
 		return Vector2.ZERO
-	var now: float = (-to_target).angle()
+	var now: float = DMath.angle(-to_target)
 	var turn: float = clampf(angle_difference(now, slot_angle), -SLOT_TURN, SLOT_TURN)
-	var point: Vector2 = target.global_position + Vector2.from_angle(now + turn) * (band_min + band_max) * 0.5
+	var point: Vector2 = target.global_position + DMath.from_angle(now + turn) * (band_min + band_max) * 0.5
 	var way: Vector2 = point - actor.global_position
 	return way.normalized() if way.length_squared() > 1.0 else Vector2.ZERO
 
@@ -768,8 +768,8 @@ func _channel(delta: float, intent: ActorIntent) -> void:
 		var now: Vector2 = aimed.global_position - actor.global_position
 		if profile.track_speed > 0.0 and now != Vector2.ZERO:
 			var turn: float = deg_to_rad(profile.track_speed) * delta * _pace()
-			var off: float = _locked_aim.angle_to(now)
-			_locked_aim = _locked_aim.rotated(clampf(off, -turn, turn))
+			var off: float = DMath.angle_to(_locked_aim, now)
+			_locked_aim = DMath.rotated(_locked_aim, clampf(off, -turn, turn))
 		keep = _in_lane(sense, now, _radius_of(aimed)) and actor.caster.free_mana(chosen) >= sense.mana
 	intent.aim = _locked_aim
 	_press_on(intent)
@@ -826,7 +826,7 @@ func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
 			point += body.velocity * (point.length() / sense.speed) * profile.lead
 	if point == Vector2.ZERO:
 		point = actor.aim
-	return point.normalized().rotated(error)
+	return DMath.rotated(point.normalized(), error)
 
 
 ## A staff whose next cast moves the caster and can leave now, or -1.

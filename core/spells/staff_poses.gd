@@ -23,8 +23,11 @@ var _pose_keys: Array[PackedFloat32Array] = []
 var _pose_tint: PackedColorArray = PackedColorArray()
 var _pose_from: PackedFloat32Array = PackedFloat32Array()
 ## Where the animation's carrier strikes, as an offset from the hand (`Carrier.strike_point`, short
-## of a wall; INF for nowhere): where its `land` channel puts the drawn tip.
+## of a wall; INF for nowhere): where its `land` channel puts the drawn tip. For an animation that
+## turns with the live aim (a cast winding up) it is worked out again along that aim when read.
 var _pose_land: PackedVector2Array = PackedVector2Array()
+## The card each animation plays for (its carrier's `strike_point` along the live aim).
+var _pose_spell: Array[CompiledSpell] = []
 ## The pose worked out last (`_pose_now`), for whom and when: the channels and the mood.
 var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
@@ -51,6 +54,7 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_lock.resize(SpellRuntime.ACTORS)
 	_pose_tint.resize(SpellRuntime.ACTORS)
 	_pose_land.resize(SpellRuntime.ACTORS)
+	_pose_spell.resize(SpellRuntime.ACTORS)
 	_pose_from.resize(SpellRuntime.ACTORS * POSE_CHANNELS)
 	_pose_out.resize(POSE_CHANNELS)
 	clear()
@@ -59,6 +63,7 @@ func _init(runtime_kit: CarrierKit) -> void:
 ## No actor's staff moves (`Spells.clear`).
 func clear() -> void:
 	_pose_start.fill(INF)
+	_pose_spell.fill(null)
 
 
 ## `actor`'s staff does not move (a caster opened or closed under its id).
@@ -106,6 +111,7 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 	_pose_side[actor] = side
 	_pose_keys[actor] = spell.staff_pose
 	_pose_tint[actor] = spell.tint
+	_pose_spell[actor] = spell
 	_pose_land[actor] = _land_point(actor, spell, dir)
 
 
@@ -182,8 +188,17 @@ func staff_land(actor: int) -> float:
 	return _pose_out[LAND] if _pose_now(actor) and _pose_land[actor].is_finite() else 0.0
 
 
+## An animation that turns with the live aim (the wind-up of a slam: its aim follows the stick
+## until it leaves) lands along that aim, not the one it was pressed along, so the staff never comes
+## down one way and jumps to the impact the other.
 func staff_land_point(actor: int) -> Vector2:
-	return _pose_land[actor] if actor >= 0 and actor < SpellRuntime.ACTORS and _pose_now(actor) else Vector2.INF
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor):
+		return Vector2.INF
+	if _pose_lock[actor] == 0 and _pose_land[actor].is_finite() and _pose_spell[actor] != null:
+		var live: Vector2 = staff_pose_dir(actor)
+		if live.is_finite() and not live.is_zero_approx():
+			return _land_point(actor, _pose_spell[actor], live.normalized())
+	return _pose_land[actor]
 
 
 ## The mood `actor`'s staff animation shows on its face now (`FormBase.POSE_MOODS`), or empty.

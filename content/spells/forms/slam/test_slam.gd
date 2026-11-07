@@ -183,6 +183,26 @@ func test_its_staff_lands_its_tip_on_the_impact_short_of_a_wall() -> void:
 	arena.free_all()
 
 
+func test_its_staff_lands_along_the_aim_turned_to_in_the_wind_up() -> void:
+	# Regression: the land point was worked out once, along the aim at the press, while the staff
+	# turned with the live aim through the wind-up; turned after the press (plainest with reach), the
+	# staff came down toward the press and jumped to the impact when it struck.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.1)
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
+	arena.run(0.12)
+	check(arena.spells.poses().staff_land(0) > 0.0, "coming down at the end of the wind-up: %f" % arena.spells.poses().staff_land(0))
+	var coming: Vector2 = arena.spells.poses().staff_land_point(0)
+	check(coming.is_equal_approx(Vector2(0.0, _card().ray_length)), "toward where it aims now: %s" % coming)
+	arena.run(0.04)
+	var impact: Vector2 = arena.spells.poses().staff_land_point(0)
+	check(impact.is_equal_approx(coming), "and on the impact, with no jump: %s then %s" % [coming, impact])
+	arena.free_all()
+
+
 func test_a_payload_slam_moves_no_body() -> void:
 	var arena := ArenaScript.new(root)
 	arena.install_cards(0, 0, ["on_hit", "bolt", "slam"])

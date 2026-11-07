@@ -502,6 +502,11 @@ var _flash_light: PackedFloat32Array = PackedFloat32Array()
 var _cue_unlit: bool = false
 ## Where a followed flash sits from its node (a status rises above it, a poof sits on the staff).
 var _flash_offset: PackedVector2Array = PackedVector2Array()
+## The actor whose staff tip each flash sits on, turning with its live aim (a wind-up's ring:
+## `Spells.aim_origin_of`), or NONE; its `_flash_offset` is then from the tip, along the aim.
+var _flash_tip: PackedInt32Array = PackedInt32Array()
+## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE.
+var _cue_tip: int = ActorsScript.NONE
 var _next_flash: int = 0
 ## The flash kinds (content/flashes, `_read_flash_kinds`), in id order: a table kind's row is its
 ## place here. Each id's code (`_flash_kind` of a slot), its row for a cue's flash part
@@ -1543,6 +1548,9 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 	# A followed cue's flash sits where it was played from its body (S6, item 9).
 	if follow != null and _cue_flash >= 0:
 		_flash_offset[_cue_flash] = at - follow.global_position
+	# One on a staff tip sits where it was played from the tip, along the aim, as the tip turns.
+	if _cue_flash >= 0 and _flash_tip[_cue_flash] != ActorsScript.NONE:
+		_flash_offset[_cue_flash] = (at - cue.at).rotated(-cue.aim.angle()) if cue.aim.is_finite() else Vector2.ZERO
 
 
 ## The cue `id` read for playing (`CuePlan`: its parts' players and prepared parts), made the first
@@ -1799,6 +1807,8 @@ func _size_flashes(slots: int) -> void:
 	_flash_light.resize(slots)
 	_flash_light.fill(0.0)
 	_flash_offset.resize(slots)
+	_flash_tip.resize(slots)
+	_flash_tip.fill(ActorsScript.NONE)
 	_next_flash = 0
 	# The statuses shown lost their flashes; the next step shows them again.
 	_status_effect.fill(-1)
@@ -1905,12 +1915,28 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_length[slot] = 0.0
 	_flash_follow[slot] = follow
 	_flash_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
+	_flash_tip[slot] = _cue_tip
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
 	if kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
 		_flash_zoom[slot] = steps
 		_flash_length[slot] = steps * 4.0
 	return slot
+
+
+## Flash `slot` on its actor's staff tip as it is now, turned with its live aim (a wind-up's ring
+## follows the staff as the aim follows the stick, as its lane does: `lanes.gd`); where it was while
+## the actor has no aim.
+func _place_on_tip(slot: int) -> void:
+	if spells == null:
+		return
+	var actor: int = _flash_tip[slot]
+	var tip: Vector2 = spells.call("aim_origin_of", actor)
+	var way: Vector2 = spells.call("aim_of", actor)
+	if not tip.is_finite() or not way.is_finite() or way.is_zero_approx():
+		return
+	_flash_at[slot] = (tip + _flash_offset[slot].rotated(way.angle())).round()
+	_flash_dir[slot] = way.normalized()
 
 
 ## Age the flashes by `real_delta` and write the live ones into their batches, oldest first.
@@ -1946,7 +1972,9 @@ func _step_flashes(real_delta: float) -> void:
 			_flash_seconds[slot] = 0.0
 			_flash_follow[slot] = null
 			continue
-		if follow != null:
+		if _flash_tip[slot] != ActorsScript.NONE:
+			_place_on_tip(slot)
+		elif follow != null:
 			_flash_at[slot] = (follow.global_position + _flash_offset[slot]).round()
 		var kind: int = _flash_kind[slot]
 		var buffer: PackedFloat32Array = _flash_buffer
@@ -2188,7 +2216,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 
 ## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): its carrier
 ## card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that is not
-## aimed) from the staff tip, its size the wind-up's seconds, following the caster's body. Only for
+## aimed) from the staff tip, its size the wind-up's seconds, on the staff tip as it turns. Only for
 ## a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
 func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int) -> void:
 	if caster < 0 or caster >= ActorsScript.ACTORS or not origin.is_finite():
@@ -2199,7 +2227,10 @@ func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector
 	var cue: StringName = _form_cues_of(form)[CUE_WIND] as StringName
 	if cue == &"":
 		return
+	# Its flashes sit on the staff tip as it turns (the aim follows the caster through the wind-up).
+	_cue_tip = caster
 	play_cue(cue, caster, origin, direction, seconds, tint, look, ActorsScript.NONE, -1, -1, tag, true, NO_BODY, _ramp_of(caster), table.node_of(caster) as Node2D)
+	_cue_tip = ActorsScript.NONE
 
 
 ## A cue's `lane` part (`CueBase`; T6b): a telegraph lane for the cast of the cue's tag, as long as

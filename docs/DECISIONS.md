@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: A body shows a few hit looks a frame; shake never piles up (shot scale H3, owner session)
+
+- **Asked:** the owner, on Feel adding a look for every one of many hits on one body: "Would It make sense to bundle Feel? Maybe per target? Like if a target is hit 1000 times in a frame, will Feel add hit motes a 1000 times?", then: "Yes build it like that. Screen shake should not pile up for each hit. It becomes unwatchable in the storm as it is now. So maybe limit it aswell".
+- **Measured first** (30,000 bolts, `shot_scale.gd`): 77% (crowd) to 93% (storm) of hits land on a body already hit that step, up to 4,350 hits on one body in a step; each hit's look was played and then mostly cut by the frame's caps.
+- **Looks:** a body shows the looks (spray, impact, sparks, squash, sound) of at most `BodyLooks.PER_BODY` (3) hits of one staff a frame (`gameplay/feel/body_looks.gd`); the hits after that show nothing. Each staff counts apart, so a lone cast hitting a body inside another staff's storm still shows (2026-11-05). A hit's damage follows its impact's answer. The frame's flash and mote shares are then spread over the bodies being hit instead of spent on the one in front. Drawn only (T5): no damage or game state changes.
+- **Shake:** a shake raises the screen's to its own and never adds (`Feel._shake`), for hits and cues alike (a crowd's deaths and reactions piled up the same way): a stream of small shakes holds at one's, a blast or a swing still shakes more. A single hit's shake is as the preset always meant it (a swing about 2 px).
+
 ## 2026-11-07: Bundled hit events dropped: one event per hit (shot scale H3b, owner session)
 
 - **Asked:** the owner, after H3b's first two parts were built and measured on a branch (never merged): "I'm very worried that all of these changes will make it extremely difficult to add new features to the game later on. It needs to be easy to add new features", then, of dropping it: "Yes do option 1. And make sure that the code is written using good software architecture and is easy to maintain in the future".

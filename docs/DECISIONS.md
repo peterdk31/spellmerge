@@ -2,6 +2,20 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-07: The online-ready foundation, cleaned before N6 (owner session, a review)
+
+The owner asked for a review of N1–N4, N5, N7 and N11 for structure and coupling before N6, and then for every finding to be fixed: "This needs to be a good foundation to build upon".
+
+- **Areas join the Tick; the Tick knows none.** Before, the Tick found each area by its autoload name and called its methods by name (`step`, `physics_step`, `step_rules`, `step_timers`, `take_rules`, `begin_run`), and the horde's break was a special case in core. Now an area joins in its `_ready` (`SimArea.join`, core/sim/sim_area.gd) with typed Callables: its steps under keys of `Tick.STEPS`, its run's start, its rules. The written order stays one list in the Tick (`STEPS`, `RUN_ORDER`), which is what N3 wanted; the keys are names only. A step that runs through a stop says so itself (`own_stops`: the horde's timers through `Horde.BREAK`), so no area's stop is the Tick's business. Rejected: each area giving its own order number (the order would be spread over files) and a common base class (the areas extend Node and Node2D).
+- **The engine's processing flags no longer mean "the tick steps me".** `Tick.set_ticking(node, on)` for an area, `Actor.ticking` for a body. Only a game autoload (`/root/<name>`) joins the game's Tick, so an area a test makes was never and is not stepped by the game's clock.
+- **No global switch deals a run's start.** `SimSeed` dealt seeds and `SessionRules` dealt rules from static state that the frames service set and the Tick read. Now the replay on the frames service's deck (`ReplayTape`, core/sim/replay_tape.gd) holds its dealer, and the Tick asks the frames service (`next_run_seed`, `next_run_rules`). The seeds dealt are the same as before (a generator seeded by the replay's seed, one draw per run), so no recorded hash changed for it. `SimSeed.aside` went with it. This machine's rules stay a static (`SessionRules.machine()`), as the machine's settings are; the frames service hears the setting.
+- **The frames service knows no body.** The mouse aims from a pivot the seat's PlayerController hands it (`Frames.set_aim_pivot`), not from `body.get(&"hand_offset")`; the mouse's world point is the viewport's.
+- **Hit-stop takes typed services** (`HitStop.bind`) and counts its own steps, instead of reading Combat's private `_steps` and `_table()` by name. The cue names and the reaction repeat it shares with Feel are `CueBase`'s, so the two cannot drift.
+- **The pause menu's stop is Coop's** (`Coop.MENU`, the command `pause_requested`), not the Tick's; the state's slicing is `SimHash.slice`, not the Tick's.
+- **A rule is one row** (`SessionRules.FIELDS`): copying, comparing and the header's bytes follow from it.
+- **Replay format 3:** the "paused" bit of a tick, read by nothing since N4, is gone.
+- **Kept, knowingly:** `SimFresh.renew` (reflection, but a member added later is reset with no list to keep; more edge cases tested now) and the state lists (`DERIVED`, `VIEW`, `REFS`, `SPARES`, `RUN_KEEPS`, `FROZEN`, `VIEW_ONLY`, `idle()`): none is added. `Sim` stays one record of the run's time, chance, rules and stops: it is the one "Sim" area of the state, and splitting it would split its hash.
+
 ## 2026-11-07: Hit-stop is the game's, stops are its state (online-ready N4, owner session)
 
 - **Hit-stop moved from Feel to Combat** (`HitStop`): which moments hold which bodies and shots, the rest after a hold, and the game-wide stop. The holds already changed the game (a held body does nothing), so a view deciding them made a game that differed with Feel's real-time clock and with Feel absent. The same numbers, the same cues; Feel draws only.

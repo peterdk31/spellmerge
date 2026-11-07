@@ -104,7 +104,7 @@ func _setup(player_count: int = 0, with_projectiles: bool = false) -> void:
 		wizard.actors = _actors
 		wizard.position = Vector2(1000.0 * index, 1000.0)
 		root.add_child(wizard)
-		wizard.set_physics_process(false)
+		wizard.ticking = false
 		_players.append(wizard)
 
 

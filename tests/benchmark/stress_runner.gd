@@ -129,7 +129,7 @@ const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 const PARTS_EVERY: int = 30
 ## The state hashes timed at a scenario's end (`_report_state_hash`).
 const HASH_PASSES: int = 5
-## The parts the spread hash is timed in (`Tick.state_slice`): one a tick for a second.
+## The parts the spread hash is timed in (`SimHash.slice`): one a tick for a second.
 const HASH_SLICES: int = 60
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
 const FILLER_SPEED_MIN: float = 80.0
@@ -484,9 +484,7 @@ func _start_swarm() -> bool:
 	_swarm_node.add_child(look)
 	_swarm.look = look
 	_look = look
-	_projectiles.set_physics_process(false)
-	_spells.set_physics_process(false)
-	_combat.set_physics_process(false)
+	_ticking(false)
 	return true
 
 
@@ -785,9 +783,9 @@ func _report_parts() -> void:
 ## hash"): HASH_PASSES hashes of every area the Tick names (`state_areas`), as the netcode would
 ## make them (no paths), after the measured window so they stay out of its frames; with the areas
 ## that cost most (the bodies together), and spread over a second, one part a tick
-## (`Tick.state_slice`), as a netcode checking once a second would.
+## (`SimHash.slice`), as a netcode checking once a second would.
 func _report_state_hash(label: String) -> void:
-	var tick: Node = get_tree().root.get_node_or_null("Tick")
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
 	if tick == null:
 		return
 	var total: int = 0
@@ -797,21 +795,24 @@ func _report_state_hash(label: String) -> void:
 	var by_area: Dictionary[String, int] = {}
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
-		named = tick.call(&"state_areas")
+		named = tick.state_areas()
 		var walk := StateWalk.new()
 		walk.with_paths = false
 		var hashes: Dictionary[String, int] = {}
 		for name: String in named:
 			var area_start: int = Time.get_ticks_usec()
 			hashes[name] = SimHash.area(walk, name, named[name] as Object)
-			var key: String = "bodies" if name.begins_with("actor ") else name
+			var key: String = "bodies" if name.begins_with(SimHash.BODY_PREFIX) else name
 			by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems
 		var took: int = Time.get_ticks_usec() - start
 		total += took
 		most = maxi(most, took)
-	var bodies: int = named.size() - 1 - TickScript.STATE_AREAS.size()
+	var bodies: int = 0
+	for name: String in named:
+		if name.begins_with(SimHash.BODY_PREFIX):
+			bodies += 1
 	var parts: Array[String] = []
 	var keys: Array = by_area.keys()
 	keys.sort_custom(func(a: String, b: String) -> bool: return by_area[a] > by_area[b])
@@ -820,14 +821,14 @@ func _report_state_hash(label: String) -> void:
 	print("BENCH: stress %s: state hash avg %.2f ms max %.2f ms over %d areas (%d bodies; most: %s ms), %d problems" % [label, float(total) / float(HASH_PASSES) / 1000.0, float(most) / 1000.0, named.size(), bodies, ", ".join(parts), problems.size()])
 	for problem in problems.slice(0, 5):
 		print("BENCH: stress %s: state hash problem: %s" % [label, problem])
-	# Spread over a second, one part a tick (`Tick.state_slice`): what a tick pays.
+	# Spread over a second, one part a tick (`SimHash.slice`): what a tick pays.
 	var part_total: int = 0
 	var part_most: int = 0
 	for slice in HASH_SLICES:
 		var part_start: int = Time.get_ticks_usec()
 		var part_walk := StateWalk.new()
 		part_walk.with_paths = false
-		SimHash.areas(tick.call(&"state_slice", slice, HASH_SLICES), part_walk)
+		SimHash.areas(SimHash.slice(tick.state_areas(), slice, HASH_SLICES), part_walk)
 		var part_took: int = Time.get_ticks_usec() - part_start
 		part_total += part_took
 		part_most = maxi(part_most, part_took)
@@ -856,6 +857,16 @@ func _teardown_scenario() -> void:
 
 
 ## The swarm scenario's end: the swarm forgotten, the systems step themselves again.
+## The game's Tick steps the services (`on`) or the swarm's run steps them by hand.
+func _ticking(on: bool) -> void:
+	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
+	if tick == null:
+		return
+	for area: Node in [_projectiles, _spells, _combat]:
+		if area != null:
+			tick.set_ticking(area, on)
+
+
 func _stop_swarm() -> void:
 	if _swarm != null:
 		_swarm.stop()
@@ -863,11 +874,7 @@ func _stop_swarm() -> void:
 	_look = null
 	_swarm_node = null
 	_target_swarm = 0
-	_projectiles.set_physics_process(true)
-	if _spells != null:
-		_spells.set_physics_process(true)
-	if _combat != null:
-		_combat.set_physics_process(true)
+	_ticking(true)
 
 
 ## Back to drawing with particles, after a variant (and when the run ends).

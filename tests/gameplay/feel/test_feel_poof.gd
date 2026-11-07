@@ -65,7 +65,7 @@ func _staff() -> Actor:
 	body.aim = Vector2.UP
 	body.position = Vector2(50.0, 60.0)
 	root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	return body
 
 

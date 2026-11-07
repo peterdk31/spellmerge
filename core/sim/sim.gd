@@ -40,6 +40,8 @@ var hold_left: int = 0
 ## menu. Stopped while any is here; the drawing stops too (the Tick pauses the tree).
 var stops: Array[StringName] = []
 
+const TickScript := preload("res://core/sim/tick.gd")
+
 ## What `found` gives a node out of the tree: a sim at seed 0, shared.
 static var _still: Sim = null
 
@@ -53,12 +55,9 @@ static func seeded(value: int) -> Sim:
 
 ## The game's sim (the Tick's) for a node in the tree, else a shared one at seed 0.
 static func found(node: Node) -> Sim:
-	if node != null and node.is_inside_tree():
-		var clock: Node = node.get_node_or_null(^"/root/Tick")
-		if clock != null:
-			var game: Sim = clock.get(&"sim") as Sim
-			if game != null:
-				return game
+	var clock: TickScript = TickScript.of(node) as TickScript
+	if clock != null and clock.sim != null:
+		return clock.sim
 	if _still == null:
 		_still = Sim.new()
 	return _still

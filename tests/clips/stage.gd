@@ -117,7 +117,6 @@ func start(scenario: Dictionary) -> bool:
 	# The drawing nodes enter the tree; nothing steps by itself.
 	world.add_child(projectiles)
 	world.add_child(feel)
-	projectiles.set_physics_process(false)
 	projectiles.set_process(false)
 	feel.set_process(false)
 	for entry: Dictionary in scenario["casts"]:

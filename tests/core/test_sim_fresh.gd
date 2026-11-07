@@ -61,15 +61,6 @@ class Area:
 		rng.seed = 7
 
 
-## Seeds itself from the run's dealer as it is made (as the horde director does).
-class Seeded:
-	extends RefCounted
-	var rng_seed: int = 0
-
-	func _init() -> void:
-		rng_seed = SimSeed.fresh()
-
-
 ## An area after a run: everything moved on.
 func _used() -> Area:
 	var area: Area = own(Area.new()) as Area
@@ -178,12 +169,91 @@ func test_a_node_out_of_the_tree_it_would_drop_is_named() -> void:
 	check(SimFresh.take(area, _blank()).is_empty(), "no problem for a node in the tree")
 
 
-func test_a_blank_deals_the_run_no_seeds() -> void:
-	SimSeed.begin(5)
-	var first: int = SimSeed.fresh()
-	SimSeed.begin(5)
-	var blank: Seeded = SimFresh.blank_of(Seeded) as Seeded
-	var after: int = SimSeed.fresh()
-	SimSeed.end()
-	check_equal(after, first, "the run's first seed is still dealt first")
-	check(blank != null, "the blank made")
+
+
+## An area whose blank holds two parts where a used one may share one (N3b's rule: one object takes
+## one blank's), a dictionary of parts, content, and a member a blank fills that a used one emptied.
+class Sharing:
+	extends Node
+	var left: Part = Part.new()
+	var right: Part = Part.new()
+	var by_name: Dictionary = {&"a": Part.new()}
+	var card: Resource = null
+	var maybe: Part = Part.new()
+
+	func _init() -> void:
+		card = Resource.new()
+		card.resource_name = "blank's"
+
+
+## An area that extends one with settings: its own list keeps beside its parent's, at every level.
+class Wider:
+	extends Area
+	const RUN_KEEPS_WIDER: Array[StringName] = [&"budget"]
+	var budget: int = 10
+	var spent: int = 0
+
+
+func test_one_object_shared_where_the_blank_holds_two_becomes_two() -> void:
+	var area: Sharing = own(Sharing.new()) as Sharing
+	area.right = area.left
+	area.left.clock = 4.0
+	var blank: Sharing = own(Sharing.new()) as Sharing
+	SimFresh.take(area, blank)
+	check(area.left != area.right, "two parts again, as the blank has")
+	check_equal(area.left.clock, 0.0, "each fresh")
+	check_equal(area.right.clock, 0.0, "each fresh")
+
+
+func test_a_dictionary_of_another_shape_is_the_blanks_again() -> void:
+	var area: Sharing = own(Sharing.new()) as Sharing
+	var kept: Part = area.by_name[&"a"]
+	area.by_name[&"b"] = Part.new()
+	var blank: Sharing = own(Sharing.new()) as Sharing
+	SimFresh.take(area, blank)
+	check_equal(area.by_name.keys(), [&"a"], "its keys are the blank's")
+	check(area.by_name[&"a"] == blank.by_name[&"a"] and area.by_name[&"a"] != kept, "taken from the blank whole, not kept")
+	check(area.by_name != blank.by_name or not is_same(area.by_name, blank.by_name), "a dictionary of its own")
+
+
+func test_a_dictionary_of_the_same_shape_keeps_its_objects() -> void:
+	var area: Sharing = own(Sharing.new()) as Sharing
+	var kept: Part = area.by_name[&"a"]
+	kept.clock = 3.0
+	SimFresh.take(area, own(Sharing.new()) as Sharing)
+	check(area.by_name[&"a"] == kept, "the same part")
+	check_equal(kept.clock, 0.0, "fresh")
+
+
+func test_content_and_emptied_members_are_the_blanks() -> void:
+	var area: Sharing = own(Sharing.new()) as Sharing
+	var used := Resource.new()
+	area.card = used
+	area.maybe = null
+	var blank: Sharing = own(Sharing.new()) as Sharing
+	SimFresh.take(area, blank)
+	check(area.card == blank.card, "a resource is data: the blank's")
+	check(area.maybe != null and area.maybe == blank.maybe, "a member emptied in the run is the blank's object again")
+
+
+func test_renew_readies_the_blank_first() -> void:
+	var area: Area = _used()
+	var seen: Array = []
+	SimFresh.renew(area, func(blank: Object) -> void:
+		seen.append(blank)
+		(blank as Area).next_seq = 77)
+	check_equal(seen.size(), 1, "the setup saw the blank")
+	check_equal(area.next_seq, 77, "and the area took the readied blank's state")
+
+
+func test_a_subclass_keeps_its_own_settings_and_its_parents() -> void:
+	var area: Wider = own(Wider.new()) as Wider
+	area.cap = 6
+	area.budget = 3
+	area.spent = 2
+	area.clock = 1.0
+	SimFresh.renew(area)
+	check_equal(area.cap, 6, "its parent's RUN_KEEPS")
+	check_equal(area.budget, 3, "its own")
+	check_equal(area.spent, 0, "the rest fresh")
+	check_equal(area.clock, 0.0, "its parent's state too")

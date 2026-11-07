@@ -58,7 +58,7 @@ func _initialize() -> void:
 		if mind != null:
 			mind.set("profile", null)
 		root.add_child(body)
-		body.set_physics_process(false)
+		body.ticking = false
 		# The crowd stays whole: shots still hit, nobody goes down.
 		body.health.protect(1.0e9)
 		world.enemies.append(body)

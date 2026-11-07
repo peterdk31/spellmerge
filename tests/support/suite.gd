@@ -26,6 +26,9 @@ extends SceneTree
 ##
 ##   godot --headless --path . --script res://tests/core/test_card_rules.gd -- --shard=0/6
 
+const _SUITE_FRAMES := preload("res://core/sim/frames.gd")
+const _SUITE_TICK := preload("res://core/sim/tick.gd")
+
 var _failures: Array[String] = []
 var _current: String = ""
 var _owned: Array[Object] = []
@@ -99,9 +102,12 @@ static func of_shard(names: Array[String], shard: Vector2i) -> Array[String]:
 ## this one still.
 func _still_chance() -> void:
 	SessionRules.reset_machine()
-	SessionRules.end()
-	var clock: Node = root.get_node_or_null(^"Tick")
-	var game: Sim = clock.get(&"sim") as Sim if clock != null else null
+	var frames: _SUITE_FRAMES = root.get_node_or_null(^"Frames") as _SUITE_FRAMES
+	if frames != null:
+		frames.stop_recording()
+		frames.stop_playing()
+	var clock: _SUITE_TICK = root.get_node_or_null(^"Tick") as _SUITE_TICK
+	var game: Sim = clock.sim if clock != null else null
 	if game != null:
 		game.run_seed = 0
 		game.rules = SessionRules.defaults()

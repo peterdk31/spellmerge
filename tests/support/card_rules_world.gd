@@ -136,7 +136,6 @@ func _init(root: Node, shelf: Shelf, staff: StaffBase) -> void:
 	entities.actors = table
 	entities.combat = combat
 	_root.add_child(entities)
-	entities.set_physics_process(false)
 	_listen()
 
 
@@ -314,7 +313,7 @@ func _body(label: StringName, centre: Vector2, mind: ActorController, cards: Arr
 	# The hurt circle and the hand sit `body_offset` above the feet.
 	body.position = centre - body.body_offset
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	_bodies.append(body)
 	_names[body.id] = String(label)
 	_traced.append([String(label), body])
@@ -361,7 +360,7 @@ func _kind_body(label: StringName, at: Vector2, kind: SwarmKind) -> Node2D:
 			(child as AIController).entities = entities
 	body.position = feet
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	_bodies.append(body)
 	_names[body.id] = String(label)
 	_traced.append([String(label), body])
@@ -373,7 +372,7 @@ func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
 	var actor := new as Actor
 	if actor == null:
 		return
-	actor.set_physics_process(false)
+	actor.ticking = false
 	# Stepped where the swarm steps, right after it (as its swarmer was).
 	_bodies.insert(clampi(_swarm_at + _promoted, 0, _bodies.size()), actor)
 	_promoted += 1

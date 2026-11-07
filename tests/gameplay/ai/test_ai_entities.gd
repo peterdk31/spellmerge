@@ -104,7 +104,7 @@ func before_each() -> void:
 	_wizard.actors = _actors
 	_wizard.position = Vector2(80.0, 0.0)
 	root.add_child(_wizard)
-	_wizard.set_physics_process(false)
+	_wizard.ticking = false
 
 
 func after_each() -> void:
@@ -256,7 +256,7 @@ func test_an_enemys_entities_end_with_it() -> void:
 
 
 ## A wizard's decoy outlives its wizard until the next run starts, where Entities frees it
-## (`begin_run`). The run's start renews Entities first (`Tick.FRESH_AT_RUN`), so the decoy has left
+## (`begin_run`). The run's start renews Entities first (`Tick.RUN_ORDER`), so the decoy has left
 ## the manager's target table and Combat before they are renewed. Before, the manager was renewed
 ## under the decoy: its target numbers emptied, the next body's row was written past them (found by
 ## N3c's stress run).
@@ -271,7 +271,7 @@ func test_a_wizards_decoy_leaves_before_the_services_are_renewed_at_a_runs_start
 	root.remove_child(_wizard)
 	check(decoy.is_inside_tree(), "the decoy outlives its wizard")
 	var areas: Dictionary = {&"Projectiles": _projectiles, &"Spells": _spells, &"Combat": _combat, &"Entities": _entities}
-	for area: StringName in TickScript.FRESH_AT_RUN:
+	for area: StringName in TickScript.RUN_ORDER:
 		if areas.has(area):
 			areas[area].call(&"begin_run")
 	check(not is_instance_valid(decoy), "the run's start freed the decoy")

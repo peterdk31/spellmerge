@@ -110,7 +110,7 @@ func test_a_repeated_reaction_shows_again_without_its_weight() -> void:
 
 func test_a_reaction_with_no_cue_of_its_own_plays_the_plain_one() -> void:
 	_bus.reaction_triggered.emit(0, &"steam", Vector2.ZERO, -1)
-	var plain: CueBase = _feel.cue_of(FeelScript.REACTION_CUE)
+	var plain: CueBase = _feel.cue_of(CueBase.REACTION_CUE)
 	check(plain != null, "there is a plain reaction cue")
 	check_equal(_feel.flash_info(&"ring_out")["core"], plain.color, "its ring in the plain cue's colour")
 

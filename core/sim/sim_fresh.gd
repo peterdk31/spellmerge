@@ -31,8 +31,9 @@ extends RefCounted
 ##
 ## DERIVED and VIEW are left alone: a cache that follows the state must be emptied by the area's
 ## `clear` (Combat's rows by node go as each row is freed). A blank that needs a setting before it is
-## taken from (the projectile manager's cap: its arrays' size) gets it in `setup`. A blank deals the
-## run no seeds (`SimSeed.aside`): making one changes no replay.
+## taken from (the projectile manager's cap: its arrays' size) gets it in `setup`. Making a blank
+## changes no replay: nothing deals seeds behind the game's back (a run's seed is the frames
+## service's to say, core/sim/frames.gd).
 
 ## Script to its REFS and RUN_KEEPS (cached: the lists are constants).
 static var _refs: Dictionary[Script, PackedStringArray] = {}
@@ -52,13 +53,9 @@ static func renew(area: Object, setup: Callable = Callable()) -> void:
 		push_error("SimFresh: %s" % problem)
 
 
-## A new object of `script` to take from, made with the run's seeds set aside (`SimSeed.aside`), so
-## a blank that seeds itself deals the run none. `renew` makes, uses and frees it.
+## A new object of `script` to take from. `renew` makes, uses and frees it.
 static func blank_of(script: Script) -> Object:
-	var dealer: RandomNumberGenerator = SimSeed.aside()
-	var blank: Object = script.new()
-	SimSeed.back(dealer)
-	return blank
+	return script.new()
 
 
 ## Every state member of `target` as in `blank` (a new object of the same script), by the rules

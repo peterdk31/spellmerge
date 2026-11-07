@@ -21,17 +21,17 @@ extends Node
 ##   the card in the bag (`bag_set_requested`) and sends `horde_pick_taken`.
 ## - **Build break** (owner, 2026-10-31: in Horde only, the game waits for every player): a
 ##   level-up stops the game for everyone (`horde_break_changed(true)`; the sim's stop
-##   `Tick.HORDE_BREAK`, part of the game's state since online-ready N4, and the Tick pauses the
-##   tree for the picture), so wizards, enemies, shots, statuses and timers all stand still, and every joined seat is
-##   not ready (`horde_ready_changed(seat, false)`). A seat is ready when it sends
+##   `BREAK`, part of the game's state since online-ready N4, and the Tick pauses the tree for
+##   the picture), so wizards, enemies, shots, statuses and timers all stand still, and every
+##   joined seat is not ready (`horde_ready_changed(seat, false)`). A seat is ready when it sends
 ##   `horde_ready_requested` with every offer taken (open and queued); a ready sent before that
 ##   is ignored, and the HUD only offers it after the last pick. A seat with no offer (every card
 ##   owned) still says ready. The break ends (`horde_break_changed(false)`, un-paused) once every
 ##   joined seat is ready: a seat that leaves no longer counts, one that joins in a break counts
 ##   as ready, and a level-up in a break adds offers and un-readies the seats that got one.
 ##   `horde_over`, `horde_ended` and a restart end it too. The run's clock stands still in a
-##   break. The Tick runs the director's timers in a break (a joiner's bag), but not while the
-##   pause menu stops the game too.
+##   break. The director's timers run through its own break (a joiner's bag: its step's own
+##   stop, core/sim/sim_area.gd), but not while the pause menu stops the game too.
 ## - **Bags:** `bag_set_requested(seat, START_BAG)` for every wizard on start, and for a joiner on
 ##   the step after its `player_joined` (Flow adds its wizard in its own handler of that event).
 ## - **Status:** `horde_status` every STATUS_INTERVAL seconds.
@@ -46,7 +46,6 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const TickScript := preload("res://core/sim/tick.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
 const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const SwarmLookScript := preload("res://gameplay/horde/swarm_look.gd")
@@ -75,6 +74,8 @@ const OFFER_SIZE: int = 3
 ## roughly 2-3x slower). 500+ needs a cap per kind or a cost per kind (the same document). The
 ## numbers are the session rules' (core/sim/session_rules.gd, online-ready N11): a run plays by its
 ## rules' cap (`alive_cap`), the same on every machine that plays it.
+## The reason the build break stops the game (`Sim.stop`).
+const BREAK: StringName = &"horde_break"
 const MAX_ALIVE_DESKTOP: int = SessionRules.HORDE_ALIVE_DESKTOP
 const MAX_ALIVE_WEB: int = SessionRules.HORDE_ALIVE_WEB
 ## At most this many enemies appear in one step, so a burst never hitches.
@@ -182,16 +183,19 @@ var _present: PackedByteArray = PackedByteArray()
 
 
 func _init() -> void:
-	# The tick steps its swarm and runs its timers (core/sim/tick.gd): the flags say so; there is
-	# no callback.
-	set_physics_process(true)
-	set_process(true)
 	_wizard_at.resize(SEATS)
 	_standing.resize(SEATS)
 	_present.resize(SEATS)
 
 
 func _ready() -> void:
+	# The tick steps its swarm, and its timers also through its own build break (core/sim/tick.gd,
+	# core/sim/sim_area.gd).
+	SimArea.join(self, &"Horde") \
+		.steps(&"Swarm", physics_step) \
+		.steps(&"Horde", step_timers, [BREAK] as Array[StringName]) \
+		.renewed_by(begin_run) \
+		.takes_rules(take_rules)
 	# A build break pauses the tree; the director goes on hearing picks and readiness (signals) and
 	# giving a joiner its bag (`_process`).
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -222,7 +226,7 @@ func _ready() -> void:
 
 ## The director's timers, once a tick (core/sim/tick.gd, after the bodies): `step`, also while a
 ## build break stops the game (to give a joiner its bag), but not while the pause menu does (the
-## Tick decides).
+## step runs through BREAK only).
 func step_timers(delta: float) -> void:
 	step(delta)
 
@@ -711,9 +715,9 @@ func _end_break() -> void:
 func _set_paused(on: bool) -> void:
 	var game: Sim = sim if sim != null else Sim.found(self)
 	if on:
-		game.stop(TickScript.HORDE_BREAK)
+		game.stop(BREAK)
 	else:
-		game.go(TickScript.HORDE_BREAK)
+		game.go(BREAK)
 
 
 func _set_ready(seat: int, on: bool) -> void:

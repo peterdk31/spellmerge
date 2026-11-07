@@ -265,7 +265,6 @@ func _build(count: int, bodies: int, crowd: bool, work: int) -> bool:
 	camera.make_current()
 	_world.add_child(_mgr)
 	_world.add_child(_feel)
-	_mgr.set_physics_process(false)
 	_mgr.set_process(false)
 	_feel.set_process(false)
 	var plain := StaffBase.new()

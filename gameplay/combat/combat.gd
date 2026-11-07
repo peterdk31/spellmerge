@@ -178,7 +178,8 @@ var spells: SpellsScript = null
 ## The reaction table. Tests may set another one; null means REACTIONS.
 var reactions: ReactionTable = null
 ## Hit-stop, the game's rule (online-ready N4): which moments hold which bodies, and the game-wide
-## stop. State (its reactions' repeat clocks); its Combat is set by `setup`.
+## stop. State (its step count and its reactions' repeat clocks); its services are Combat's
+## (`_bind_hit_stop`).
 var hit_stop: HitStop = HitStop.new()
 ## The actor table. Null uses the projectile manager's, else the `Actors` autoload, else one
 ## of Combat's own (a scene with neither).
@@ -287,8 +288,6 @@ var _auto_table: ActorsScript = null
 
 
 func _init() -> void:
-	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
-	set_physics_process(true)
 	_body.resize(ACTORS)
 	_owned.resize(ACTORS)
 	_nodes.resize(ACTORS)
@@ -334,6 +333,8 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Combat").steps(&"Combat", step).renewed_by(begin_run)
 	setup()
 
 
@@ -364,7 +365,7 @@ func setup() -> void:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if reactions == null:
 		reactions = REACTIONS
-	hit_stop.combat = self
+	_bind_hit_stop()
 	if events == null:
 		return
 	if not events.projectile_hit.is_connected(_on_projectile_hit):
@@ -1342,6 +1343,8 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 ## applied here (see the top).
 func step(delta: float) -> void:
 	_steps += 1
+	_bind_hit_stop()
+	hit_stop.step()
 	stepping.emit()
 	# Drop bodies freed from outside (backwards: a freed row takes the last one's place).
 	var n: int = _live.size() - 1
@@ -1782,6 +1785,21 @@ func _seat_row_of(seat: int) -> int:
 	if seat < 0 or seat >= PLAYER_SLOTS:
 		return ActorsScript.NONE
 	return _seat_row[seat]
+
+
+## Hand hit-stop the services it holds and stops through: Combat's actor table and projectile
+## manager, its registry (else the Registry autoload: a test world built out of the tree has the
+## game's content all the same), and the game's sim. At setup and at each step, since a test may
+## set them after; the sim once Combat is in the game's tree (a test hands its own).
+func _bind_hit_stop() -> void:
+	var content: RegistryScript = registry
+	if content == null:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree != null and tree.root != null:
+			content = tree.root.get_node_or_null(^"Registry") as RegistryScript
+	hit_stop.bind(_table(), projectiles, content)
+	if hit_stop.sim == null and is_inside_tree():
+		hit_stop.sim = Sim.found(self)
 
 
 ## The actor table: `actors`, else the projectile manager's, else the `Actors` autoload, else

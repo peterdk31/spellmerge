@@ -7,14 +7,14 @@ extends RefCounted
 ## through one (tests/core/test_replay_game.gd).
 ##
 ## - **The header:** the build (`build`: its version and commit), the content (`content`: a hash of
-##   every content id, `content_of`), the run's seed (`run_seed`, which `SimSeed` deals the seeds
-##   nobody chose from), how it started (`start`, one of STARTS, and `starter`, the seat that
+##   every content id, `content_of`), the run's seed (`run_seed`: the runs it starts deal theirs
+##   from it, core/sim/replay_tape.gd), how it started (`start`, one of STARTS, and `starter`, the seat that
 ##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
 ##   the shot cap, the horde's cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
 ##   so it plays the same on a machine whose own settings are others.
-## - **The ticks:** per tick a byte of the seats with a frame (a bit each) and whether the game stood
-##   paused (PAUSED: the pause menu, the horde's level-up break), then each seat's frame (its
-##   length, then `InputFrame` bytes). Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
+## - **The ticks:** per tick a byte of the seats with a frame (a bit each), then each seat's frame
+##   (its length, then `InputFrame` bytes). The game's stops need no mark: they are its state
+##   (online-ready N4), so a replay stands still where the recording did. Kept as bytes (`add_tick`, `read_tick`), so an hour of four seats is
 ##   a few megabytes and recording allocates no object per tick.
 ##
 ## Files live in `user://replays/` only (`save`, `open`), named by an id (letters, digits, `_`).
@@ -25,15 +25,14 @@ extends RefCounted
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
-## The file format's version (2: the run's rules in the header, N11; a replay of format 1 is refused).
-const FORMAT: int = 2
+## The file format's version (2: the run's rules in the header, N11; 3: no "paused" bit in a
+## tick's byte, the stops being state, N4). A replay of another format is refused.
+const FORMAT: int = 3
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
 ## The requests a run starts by (core/events): Play, the sandbox, the horde.
 const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"horde_requested"]
 const SEATS: int = 4
-## A tick's byte: the bit for "the game stood paused" beside the seats' bits.
-const PAUSED: int = 0x10
 ## Limits: four hours at 60 ticks a second, and the file's bytes.
 const MAX_TICKS: int = 60 * 60 * 60 * 4
 const MAX_BYTES: int = 64 * 1024 * 1024
@@ -45,7 +44,7 @@ var run_seed: int = 0
 var start: StringName = &"sandbox_requested"
 var starter: int = 0
 var seats: int = 0
-## The rules the run played by (`Frames.record` takes this machine's; `Frames.play` deals them).
+## The rules the run played by (`Frames.record` takes this machine's; the runs it plays take them).
 var rules: SessionRules = SessionRules.defaults()
 
 var _data: PackedByteArray = PackedByteArray()
@@ -58,11 +57,10 @@ func tick_count() -> int:
 	return _offsets.size()
 
 
-## Append a tick: the frame of every seat whose bit is set in `mask` (`frames` by seat), and
-## whether the game stood `paused`.
-func add_tick(frames: Array[InputFrame], mask: int, paused: bool = false) -> void:
+## Append a tick: the frame of every seat whose bit is set in `mask` (`frames` by seat).
+func add_tick(frames: Array[InputFrame], mask: int) -> void:
 	_offsets.append(_data.size())
-	_data.append((mask & 0x0f) | (PAUSED if paused else 0))
+	_data.append(mask & 0x0f)
 	for seat in SEATS:
 		if mask & (1 << seat) == 0:
 			continue
@@ -90,11 +88,6 @@ func read_tick(tick: int, frames: Array[InputFrame]) -> int:
 		frames[seat].decode(_data.slice(at + 2, at + 2 + size))
 		at += 2 + size
 	return mask
-
-
-## True when the game stood paused at tick `tick` (false for a tick it does not hold).
-func is_paused_at(tick: int) -> bool:
-	return tick >= 0 and tick < _offsets.size() and (_data[_offsets[tick]] & PAUSED) != 0
 
 
 ## The whole replay as bytes: the header, the tick count, the ticks.
@@ -191,7 +184,7 @@ func _decode(bytes: PackedByteArray) -> String:
 			return "tick %d is missing" % tick
 		_offsets[tick] = read
 		var mask: int = _data[read]
-		if mask > (0x0f | PAUSED):
+		if mask > 0x0f:
 			return "tick %d: seats %d" % [tick, mask]
 		read += 1
 		for seat in SEATS:

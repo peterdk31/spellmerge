@@ -74,6 +74,7 @@ extends PanelContainer
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 
 const PLAYER_COUNT: int = 4
 enum Page { MAIN, SANDBOX, SETTINGS }
@@ -451,11 +452,15 @@ func _mark_focus() -> void:
 		shown.text = (FOCUS_MARK if shown == _focused else "") + str(shown.get_meta(BASE_TEXT_META, ""))
 
 
+## Open or close the game's pause. Offline the game stops for everyone by the command
+## `pause_requested` (the simulation's own stop, Coop's). While a replay plays, a live command would
+## change what it replays, so the menu only stands the picture still (the tree's pause, which runs
+## no tick: core/sim/tick.gd) and the replay waits.
 func _set_paused(on: bool) -> void:
 	if not is_inside_tree():
 		return
-	var frames: Node = get_node_or_null(^"/root/Frames")
-	if frames != null and bool(frames.call(&"is_playing")):
+	var frames: FramesScript = get_node_or_null(^"/root/Frames") as FramesScript
+	if frames != null and frames.is_playing():
 		get_tree().paused = on
 	elif _events != null:
 		_events.pause_requested.emit(owner_player if owner_player >= 0 else _closing_player, 1 if on else 0)

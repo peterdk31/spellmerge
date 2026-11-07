@@ -122,7 +122,7 @@ func wizard(index: int, at: Vector2) -> Actor:
 	body.actors = actors
 	body.position = at
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	return body
 
 
@@ -139,7 +139,7 @@ func enemy(scene: PackedScene, data: EnemyBase, at: Vector2 = Vector2.ZERO) -> A
 	body.position = at
 	wire(body)
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	enemies.append(body)
 	return body
 
@@ -153,7 +153,7 @@ func staffed_enemy(rows: Array, at: Vector2 = Vector2.ZERO, profile: AIProfile =
 	body.position = at
 	wire(body)
 	_root.add_child(body)
-	body.set_physics_process(false)
+	body.ticking = false
 	enemies.append(body)
 	return body
 

@@ -161,13 +161,11 @@ const STATUS_SLOTS: int = 16
 const STATUS_POLL: float = 0.1
 ## How far a reaction's name rises while it shows, in pixels.
 const REACTION_RISE: float = 10.0
-## The same reaction makes its sound and shake at most this often, and its name is not shown
-## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
-const REACTION_REPEAT: float = 0.3
+## A reaction's name is not shown again while the first still rises within `REACTION_LABEL_NEAR`
+## pixels; its sound and shake come at most every `CueBase.REACTION_REPEAT` seconds (the game's
+## hit-stop counts the same).
 ## How long a reaction's name rises, in seconds.
 const REACTION_NAME_SECONDS: float = 0.75
-## The cue of a reaction with no cue of its own (`reaction_<id>`).
-const REACTION_CUE: StringName = &"reaction"
 const REACTION_LABEL_NEAR: float = 40.0
 ## The damage a hit spray is sized for (the fire bolt's); more is a bigger spray, less a smaller one.
 const SPRAY_REF_DAMAGE: int = 5
@@ -445,7 +443,7 @@ var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
 ## How each status is shown (`_status_card`: its element card's `status_look()`), found once; an
 ## empty Array for none.
 var _status_cards: Dictionary = {}
-## The cue of each reaction id (`reaction_<id>`, else REACTION_CUE), found the first time it is
+## The cue of each reaction id (`CueBase.reaction_cue`), found the first time it is
 ## seen (so it allocates once).
 var _reaction_cues: Dictionary = {}
 ## Display names by reaction id, built the same way.
@@ -971,16 +969,15 @@ func _show_note(text: String, position: Vector2, tint: Color, seconds: float) ->
 ## An element reaction fired at `position`: its cue (`reaction_<id>`, else `reaction`;
 ## content/cues: a puff, a ring and a ring of the reacting shot's motes in the reaction's own
 ## colour, a hold, shake and its sound, as strong as its `power`), and its name rising from the spot
-## in that colour. The cue's weight (hold, shake, sound) comes at most every REACTION_REPEAT seconds
+## in that colour. The cue's weight (hold, shake, sound) comes at most every `CueBase.REACTION_REPEAT` seconds
 ## per reaction, its looks every time. The same for every player; it changes nothing in the fight.
 func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vector2, shot: int) -> void:
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 	if not _reaction_cues.has(reaction_id) and registry != null:
-		var own: StringName = StringName("reaction_" + String(reaction_id))
-		_reaction_cues[reaction_id] = own if cue_of(own) != null else REACTION_CUE
-	var id: StringName = _reaction_cues.get(reaction_id, REACTION_CUE) as StringName
-	var heard: bool = _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT
+		_reaction_cues[reaction_id] = CueBase.reaction_cue(reaction_id, cue_of)
+	var id: StringName = _reaction_cues.get(reaction_id, CueBase.REACTION_CUE) as StringName
+	var heard: bool = _clock - (_reaction_heard.get(reaction_id, -CueBase.REACTION_REPEAT) as float) < CueBase.REACTION_REPEAT
 	if not heard:
 		_reaction_heard[reaction_id] = _clock
 	# The reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
@@ -1284,7 +1281,7 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> v
 		return
 	if projectiles.impact_form != &"swing":
 		return
-	play_cue(&"parry", caster, position)
+	play_cue(CueBase.PARRY_CUE, caster, position)
 
 
 ## The payoff of a shot, on a body or a wall: the `impact_cue` of the card the shot is (the
@@ -1317,7 +1314,7 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2)
 ## the caster's, `Actors.ramp_of`). Plays its parts, each by
 ## the player of its type (`add_cue_part`), then its weight: holds, the game-wide stop, shake and
 ## punch (both off with the screen shake setting) and its sound; with `weight` false, its parts
-## only (a reaction repeated within REACTION_REPEAT). `body_color` is the own colour of the body
+## only (a reaction repeated within `CueBase.REACTION_REPEAT`). `body_color` is the own colour of the body
 ## the cue is of (a dying enemy's `EnemyBase.hit_color`), for its `body` flashes (alpha 0: none).
 ## With `follow` (a body), its flashes move with that body while they last, where they were played
 ## from it, and end when it is gone (S6, item 9: a staff's swap, a possession's ring).
@@ -2132,7 +2129,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> v
 		core = projectiles.get_core_of(shot)
 	# What broke is the body: its surface kinds and marks in the colours of its own art, its puff in
 	# its own colour.
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
+	play_cue(CueBase.BOSS_DEATH_CUE if _is_boss(enemy) else CueBase.ENEMY_DEATH_CUE, killer, position, Vector2.ZERO, 0.0, core, look, ActorsScript.NONE, shot, _spectacle.body_source(body), 0, true, _hit_color_of(enemy))
 
 
 ## The cues the carrier card `form` names and its radius (`FormBase.look_cues`: [cast_cue,
@@ -2520,7 +2517,7 @@ func _cue_on_body(id: StringName, caster: int, actor: int) -> void:
 func _on_player_downed(player: int) -> void:
 	# The event names no position, so a downed wizard's cue draws nothing: the game-wide stop,
 	# shake and sound only (its point is never used)...
-	play_cue(&"player_downed", ActorsScript.NONE, Vector2.ZERO)
+	play_cue(CueBase.DOWNED_CUE, ActorsScript.NONE, Vector2.ZERO)
 	# ...and, when their own (or a teammate's) spell did it, a note over them saying so: the
 	# seat's own body (its home actor, also while the seat drives another), in its light shade.
 	if combat == null or not combat.has_method("home_actor_of"):

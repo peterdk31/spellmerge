@@ -111,7 +111,7 @@ func before_each() -> void:
 	_wizard.actors = _actors
 	_wizard.position = Vector2(80.0, 0.0)
 	root.add_child(_wizard)
-	_wizard.set_physics_process(false)
+	_wizard.ticking = false
 
 
 func after_each() -> void:

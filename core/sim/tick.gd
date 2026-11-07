@@ -1,32 +1,34 @@
 extends Node
 ## The one clock (online-ready N3, docs/milestones/online-ready.md; the autoload "Tick"): the only
-## driver of the simulation. Each physics frame it runs one tick, in this written order:
+## driver of the simulation. Each physics frame it runs one tick:
 ##
 ## 1. **The input frames** (`Frames.tick`): each seat's frame for the tick, and the commands.
-## 2. **The services:** the projectile manager, Spells, Combat, Entities (decoys, familiars, the AI
-##    board), then the horde's swarm.
-## 3. **The actors' bodies, by actor id** (`Actor.tick_step`: its step, then its move).
-## 4. **The run's rules and timers:** Flow's (the intro, the next wave, the restart), Coop's (the
-##    view the camera is fitted to, the revives), the horde director's (its spawns, offers, breaks).
+## 2. **The areas' steps, in STEPS' written order**, the actors' bodies among them (BODIES: every
+##    body by actor id, `Actor.tick_step`: its step, then its move).
 ##
-## This is the order the scene tree gave them before N3 (the autoloads first, in project order, then
-## the bodies of the world, then the frame's `_process` timers), so the game plays as it did; the
-## bodies now go by id, not by when they joined the tree. Nothing in the simulation has a
-## `_physics_process` or a `_process` of its own for the game; drawing stays in `_process` (view).
+## The Tick knows no area. Each joins it in its `_ready` (`SimArea.join`, core/sim/sim_area.gd)
+## and names its steps, its run's start and the rules it takes; the Tick calls those, in the order
+## of STEPS and RUN_ORDER, the keys it is written in. So the order is written in one place and nothing else
+## is: a new area adds its key here and joins. The keys are only names; the Tick calls nothing by
+## name. Only the actor table (core/actors) and the frames service are its own, by type.
 ##
-## **What the tick steps:** an area or a body is stepped while its physics processing is on (the
-## timers: its processing) and it can process (its process mode; the tree is never paused then). It has no callback: the flag only
-## says "the tick steps me", so a test that steps a body by hand turns it off as it always did
-## (`set_physics_process(false)`), and a body another area steps (a decoy: Entities) is off.
+## This is the order the scene tree gave them before N3 (the autoloads first, in project order,
+## then the bodies of the world, then the frame's `_process` timers), so the game plays as it did.
+## Nothing in the simulation has a `_physics_process` or a `_process` of its own for the game;
+## drawing stays in `_process` (view).
 ##
-## **Stops are the game's state** (online-ready N4; `sim.gd`): while the sim is held (`hold`: a
-## downed wizard, a boss's death, a number of ticks) or stopped (`stop(reason)`: the horde's build
-## break, the pause menu), a tick runs the input frames and nothing else, but the horde director's
-## break (its picks and a joiner's bag) while the break stops the game. Presses made meanwhile carry
-## to the first tick that steps (`Frames.stood`). The tree's pause is only the picture's: the Tick
-## pauses the tree while the sim is stopped (not while it is held: the drawing runs on through a
-## hold), and nothing in the simulation reads it. A tree paused while the sim is not stopped (the
-## pause menu while a replay plays) runs no tick at all.
+## **What the tick steps:** an area while it is `ticking` and its node may process
+## (`SimArea.is_stepped`); a body while its own `ticking` is on (an Actor's; a decoy, which
+## Entities steps, is off). `set_ticking` turns an area off, so a test steps it by hand.
+##
+## **Stops are the game's state** (online-ready N4; `sim.gd`): while the sim is stopped
+## (`stop(reason)`: the horde's build break, the pause menu) a tick runs the input frames and only
+## the steps that run through every reason it is stopped for (`SimArea.Step.own_stops`); while it
+## is held (`hold`: a downed wizard, a boss's death, a number of ticks), the frames alone. Presses
+## made meanwhile carry to the first tick that steps (`Frames.stood`). The tree's pause is only the
+## picture's: the Tick pauses the tree while the sim is stopped (not while it is held: the drawing
+## runs on through a hold), and nothing in the simulation reads it. A tree paused while the sim is
+## not stopped (the pause menu while a replay plays) runs no tick at all.
 ##
 ## **Time:** `step(delta)` keeps its signature everywhere, and the delta is always `DT`, 1/60 of a
 ## second: the game never scales the engine's time (N4). A slow frame runs up to
@@ -34,57 +36,56 @@ extends Node
 ## `Engine.physics_ticks_per_second`. `count` is the ticks since the run began (`begin_run`), or
 ## since the game began before any run, stopped and held ticks too.
 ##
-## **The run's rules** (online-ready N11, core/sim/session_rules.gd): `begin_run` sets `sim.rules`
-## (a replay's, else this machine's) and hands them to every area of FRESH_AT_RUN that takes them
-## (`take_rules(rules)`) before it is renewed, so it renews under them. This machine's "Max shots"
-## (`projectile_cap_changed`) is heard here and goes to the next run; a change while a run plays is
-## the command `shot_cap_requested`, applied at the next tick's start (and recorded with it).
+## **A run's start** (`begin_run`, online-ready N3b and N11): the run's seed and rules come from the
+## frames service (a replay's while one records or plays, else this machine's; `Frames.next_run`),
+## the rules go to every area that takes them, then each area is renewed in RUN_ORDER, the actor
+## table last. A change to the rules while a run plays is the command `shot_cap_requested`, applied
+## at the next tick's start (and recorded with it).
 ##
-## No `class_name` (it would hide the autoload): preload it, `const TickScript := preload(...)`, for
-## `TickScript.DT`.
+## No `class_name` (it would hide the autoload): preload it, `const TickScript := preload(...)`.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 
 ## A tick's seconds: 60 ticks a second (owner decision 4, online-ready.md).
 const DT: float = 1.0 / 60.0
 ## Before every other node's physics step.
 const PRIORITY: int = -1000
-## The reasons the game stops for (`stop`): the horde's build break, and offline the pause menu.
-const HORDE_BREAK: StringName = &"horde_break"
-const MENU: StringName = &"menu"
-## The services stepped in step 2, in order: their autoload names.
-const SERVICES: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities"]
-## What a run's start makes fresh (`begin_run`), in order: Entities first, whose `begin_run` frees
-## the last run's decoys (bodies outside Flow's world, still registered in the manager and Combat),
-## so no service is renewed under a body that leaves after; then the other services in the tick's
-## order, then the horde director; the actor table last, once every area has let its bodies go: its
-## births count from 0 again (the keys, N5). Every autoload of a simulation script is here or in
-## RENEWED_OTHERWISE (`tests/core/test_tick.gd`).
-const FRESH_AT_RUN: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde", &"Actors"]
-## The autoloads of simulation scripts a run's start does not renew, and why each starts a run as a
-## fresh game's all the same (the replay test's "after other runs" hashes them too).
-const RENEWED_OTHERWISE: Dictionary[StringName, String] = {
-	&"Flow": "it starts the run: start_run sets the run's members itself",
-	&"Coop": "the seats' joins are the session's; room_entered sets the run's view, wizards and revives",
-}
-
-## The areas whose state is the game's, by autoload name, for `state_areas` (with the sim and the
-## bodies): the hash, the desync report and later snapshots.
-const STATE_AREAS: Array[StringName] = [&"Actors", &"Projectiles", &"Spells", &"Combat", &"Entities", &"Flow", &"Coop", &"Horde"]
+## The step of the actors' bodies, the Tick's own.
+const BODIES: StringName = &"bodies"
+## The written order of the steps (`SimArea.steps`' keys): the services, the horde's swarm, the
+## bodies, then the run's rules and timers (Flow's: the intro, the next wave, the restart; Coop's:
+## the view the camera is fitted to, the revives; the horde director's: its spawns, offers, breaks).
+const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", &"Swarm", BODIES, &"Flow", &"Coop", &"Horde"]
+## The order areas are renewed in at a run's start (`SimArea.renewed_by`): Entities first, whose
+## `begin_run` frees the last run's decoys (bodies outside Flow's world, still registered in the
+## manager and Combat), so no area is renewed under a body that leaves after; then the services in
+## the tick's order, then the horde director. The actor table goes last, once every area has let
+## its bodies go: its births count from 0 again (the keys, N5).
+const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde"]
+## The name the actor table is part of the state under.
+const ACTORS: StringName = &"Actors"
 
 ## Ticks since the run began (or the game, before any run).
 var count: int = 0
 ## The game's time and chance (`sim.gd`, online-ready N3c): the tick (`count`) and the run's seed,
 ## dealt at each run's start. Areas and bodies take it as their `sim` (`Sim.found`).
 var sim: Sim = Sim.new()
-## Where the areas are found by name. Only tests set this (stand-ins); otherwise the tree's root.
-var areas: Node = null
-## The event bus (the "Events" autoload, found in `_ready`; tests may set it).
+## The services the Tick drives by type. Only tests set these; otherwise the autoloads.
 var events: EventsScript = null
+var frames: FramesScript = null
+var actors: ActorsScript = null
+
+## The areas joined, by name, in the order they joined.
+var _areas: Dictionary[StringName, SimArea] = {}
+## Every area's steps in STEPS' order, and the area of each (rebuilt when steps are added).
+var _order: Array[SimArea.Step] = []
+var _order_area: Array[SimArea] = []
+## The steps `_order` was built from (`_steps_known`), to see one added since.
+var _steps_seen: int = -1
 ## Whether the tree's pause last shown was the sim's stop (`_show_stop`).
 var _shown_stopped: bool = false
-
 ## The open actor ids of this tick, in order (reused).
 var _ids: PackedInt32Array = PackedInt32Array()
 
@@ -97,20 +98,45 @@ func _init() -> void:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null(^"/root/Events") as EventsScript
+	if frames == null:
+		frames = get_node_or_null(^"/root/Frames") as FramesScript
+	if actors == null:
+		actors = get_node_or_null(^"/root/Actors") as ActorsScript
 	if events != null:
-		if not events.projectile_cap_changed.is_connected(_on_machine_cap):
-			events.projectile_cap_changed.connect(_on_machine_cap)
 		events.listen(&"shot_cap_requested", _on_shot_cap_requested)
-		events.listen(&"pause_requested", _on_pause_requested)
 
 
-## The pause menu opened or closed (a command, at a tick's start): offline the game stops while it
-## is open (one menu is open at a time, MENU).
-func _on_pause_requested(_player: int, on: int) -> void:
-	if on != 0:
-		sim.stop(MENU)
-	else:
-		sim.go(MENU)
+## The game's Tick for a node in the game's tree (the autoload), else null. Typed callers take it
+## `as TickScript`.
+static func of(node: Node) -> Node:
+	if node == null or not node.is_inside_tree():
+		return null
+	return node.get_node_or_null(^"/root/Tick")
+
+
+## Add `node` as the area `name` (`SimArea.join` does this for the game's autoloads; tests call it with
+## stand-ins). An area joined again under its name replaces the first.
+func add_area(name: StringName, node: Node) -> SimArea:
+	var area := SimArea.new(name, node)
+	_areas[name] = area
+	_steps_seen = -1
+	return area
+
+
+## The area joined as `name`, or null.
+func area(name: StringName) -> SimArea:
+	return _areas.get(name, null) as SimArea
+
+
+## The tick steps the area whose node is `node` (`on`) or leaves it to its owner (a test that
+## steps it by hand). False when `node` is no area of this Tick's.
+func set_ticking(node: Node, on: bool) -> bool:
+	for name: StringName in _areas:
+		var joined: SimArea = _areas[name]
+		if joined.node == node:
+			joined.ticking = on
+			return true
+	return false
 
 
 func _physics_process(_delta: float) -> void:
@@ -123,51 +149,70 @@ func _physics_process(_delta: float) -> void:
 
 ## One tick of `delta` seconds (the game's is always DT), in the written order (see the class doc).
 func run(delta: float) -> void:
-	var root: Node = areas if areas != null else get_tree().root
 	sim.tick = count
 	# The frames run in every tick, stopped and held too (the horde's break takes its picks then).
-	var frames: Node = root.get_node_or_null(^"Frames")
-	var ticks_frames: bool = frames != null and bool(frames.get(&"auto_tick"))
+	var ticks_frames: bool = frames != null and frames.auto_tick
 	if ticks_frames:
-		frames.call(&"tick", delta)
+		frames.tick(delta)
 	# The frames' commands may have stopped the game or let it go: the picture follows at once, so
 	# the tree is never paused while the tick steps.
-	if areas == null:
+	if is_inside_tree():
 		_show_stop()
-	if sim.stands_still():
-		_stand_still(root, delta)
-		if ticks_frames:
-			frames.call(&"stood")
-		count += 1
-		return
-	for service in SERVICES:
-		var area: Node = root.get_node_or_null(NodePath(service))
-		if area != null and _steps(area):
-			area.call(&"step", delta)
-	var horde: Node = root.get_node_or_null(^"Horde")
-	if horde != null and _steps(horde):
-		horde.call(&"physics_step", delta)
-	_step_bodies(root.get_node_or_null(^"Actors") as ActorsScript, delta)
-	var flow: Node = root.get_node_or_null(^"Flow")
-	if flow != null and _times(flow):
-		flow.call(&"step", delta)
-	var coop: Node = root.get_node_or_null(^"Coop")
-	if coop != null and _times(coop):
-		coop.call(&"step_rules", delta)
-	if horde != null and _times(horde):
-		horde.call(&"step_timers", delta)
+	var stopped: bool = sim.is_stopped()
+	var held: bool = not stopped and sim.hold_left > 0
+	if held:
+		sim.hold_left -= 1
+	else:
+		_run_steps(delta, stopped)
+	if (stopped or held) and ticks_frames:
+		frames.stood()
 	count += 1
 
 
-## A tick the simulation stands still: a hold's tick is spent (a stop's waits for its `go`), and
-## the horde's break runs on while the break stops the game (but not while the pause menu does).
-func _stand_still(root: Node, delta: float) -> void:
-	if sim.is_stopped():
-		var horde: Node = root.get_node_or_null(^"Horde")
-		if horde != null and sim.stopped_for(HORDE_BREAK) and not sim.stopped_for(MENU) and _times(horde):
-			horde.call(&"step_timers", delta)
-		return
-	sim.hold_left -= 1
+## Every step in order; while the game is stopped, only those that run through its stops.
+func _run_steps(delta: float, stopped: bool) -> void:
+	if _steps_seen != _steps_known():
+		_build_order()
+	for i in _order.size():
+		var step: SimArea.Step = _order[i]
+		if stopped and not step.runs_through(sim.stops):
+			continue
+		if step.key == BODIES:
+			_step_bodies(delta)
+		elif _order_area[i].is_stepped() and step.call.is_valid():
+			step.call.call(delta)
+
+
+## The steps in STEPS' order: each area's under its key, in the order the areas joined; BODIES once,
+## the Tick's own. A key outside STEPS is an error (its area is not stepped there).
+func _build_order() -> void:
+	_order.clear()
+	_order_area.clear()
+	for key in STEPS:
+		if key == BODIES:
+			var bodies := SimArea.Step.new()
+			bodies.key = BODIES
+			_order.append(bodies)
+			_order_area.append(null)
+			continue
+		for name: StringName in _areas:
+			var joined: SimArea = _areas[name]
+			for step in joined.step_list:
+				if step.key == key:
+					_order.append(step)
+					_order_area.append(joined)
+	for name: StringName in _areas:
+		for step in (_areas[name] as SimArea).step_list:
+			if not STEPS.has(step.key) or step.key == BODIES:
+				push_error("Tick: %s's step %s is not one of Tick.STEPS, so it is never run (core/sim/tick.gd)" % [name, step.key])
+	_steps_seen = _steps_known()
+
+
+func _steps_known() -> int:
+	var n: int = 0
+	for name: StringName in _areas:
+		n += (_areas[name] as SimArea).step_list.size()
+	return n
 
 
 ## The tree's pause follows the sim's stop (the picture stands while the game is stopped); set
@@ -179,51 +224,35 @@ func _show_stop() -> void:
 		get_tree().paused = stopped
 
 
-## The whole simulation stands still for `ticks` ticks (a downed wizard, a boss's death).
-func hold(ticks: int) -> void:
-	sim.hold(ticks)
-
-
-## The game stops for `reason` (HORDE_BREAK, MENU) until `go(reason)`.
-func stop(reason: StringName) -> void:
-	sim.stop(reason)
-
-
-func go(reason: StringName) -> void:
-	sim.go(reason)
-
-
 ## A run starts (Flow, once the last run's world is gone and before the new one is made;
-## online-ready N3b): the clock counts from 0 again, the run takes its seed (`SimSeed.fresh`: a
-## replay's while one records or plays, else random; N3c), and every service takes a fresh game's
-## state (its `begin_run`; core/sim/sim_fresh.gd), in FRESH_AT_RUN's order. So
-## a run plays the same whatever ran before it in this game, and a replay recorded in any run plays
-## the same in any other.
+## online-ready N3b): the clock counts from 0 again, the run takes its seed and rules (the frames
+## service's: a replay's while one records or plays, else random and this machine's), every area
+## takes the rules, then a fresh game's state (its `begin_run`, core/sim/sim_fresh.gd) in
+## RUN_ORDER, and the actor table last. So a run plays the same whatever ran before it in this
+## game, and a replay recorded in any run plays the same in any other.
 func begin_run() -> void:
 	count = 0
 	sim.tick = 0
 	# The last run's stops and hold end with it (a new run starts with the game going).
 	sim.hold_left = 0
 	sim.stops.clear()
-	sim.run_seed = SimSeed.fresh()
-	sim.rules = SessionRules.for_run()
-	var root: Node = areas if areas != null else get_tree().root
-	for service in FRESH_AT_RUN:
-		var area: Node = root.get_node_or_null(NodePath(service))
-		if area == null:
-			continue
-		if area.has_method(&"take_rules"):
-			area.call(&"take_rules", sim.rules)
-		if not area.has_method(&"begin_run"):
-			push_error("Tick: %s has no begin_run, so it keeps the last run's state (core/sim/sim_fresh.gd)" % service)
-			continue
-		area.call(&"begin_run")
-
-
-## This machine's "Max shots" changed (the pause menu's setting, or the saved one loaded): the
-## cap the next run takes. A run playing now changes only by the command (`shot_cap_requested`).
-func _on_machine_cap(cap: int) -> void:
-	SessionRules.machine().shot_cap = cap
+	if frames != null:
+		sim.run_seed = frames.next_run_seed()
+		sim.rules = frames.next_run_rules()
+	else:
+		sim.run_seed = SimSeed.fresh()
+		sim.rules = SessionRules.machine().copy()
+	_hand_rules()
+	for name in RUN_ORDER:
+		var joined: SimArea = area(name)
+		if joined != null and joined.begin_run.is_valid():
+			joined.begin_run.call()
+	for name: StringName in _areas:
+		var joined: SimArea = _areas[name]
+		if not RUN_ORDER.has(name) and joined.begin_run.is_valid():
+			push_error("Tick: %s is renewed by its begin_run but is not in Tick.RUN_ORDER, so it keeps the last run's state (core/sim/tick.gd)" % name)
+	if actors != null:
+		actors.begin_run()
 
 
 ## The command `shot_cap_requested` (a seat moved "Max shots" in a run; online-ready N11): the run's
@@ -232,79 +261,48 @@ func apply_shot_cap(cap: int) -> void:
 	if cap < 1 or cap > SessionRules.MAX_SHOT_CAP or cap == sim.rules.shot_cap:
 		return
 	sim.rules.shot_cap = cap
-	var root: Node = areas if areas != null else get_tree().root
-	for service in FRESH_AT_RUN:
-		var area: Node = root.get_node_or_null(NodePath(service))
-		if area != null and area.has_method(&"take_rules"):
-			area.call(&"take_rules", sim.rules)
+	_hand_rules()
 
 
 func _on_shot_cap_requested(_seat: int, cap: int) -> void:
 	apply_shot_cap(cap)
 
 
+## The run's rules to every area that takes them.
+func _hand_rules() -> void:
+	for name: StringName in _areas:
+		var joined: SimArea = _areas[name]
+		if joined.take_rules.is_valid():
+			joined.take_rules.call(sim.rules)
+
+
 ## The game's state by area (online-ready N1's `SimHash.areas`, `Desync.capture`): "Sim" (the tick
-## and the run's seed), each of STATE_AREAS there is, then every actor's body by actor id
-## ("actor 3"). Areas never reach into each other: the tick names them (N3c).
+## and the run's seed), each area joined, the actor table, then every actor's body by actor id
+## ("actor 3"). `SimHash.slice` spreads it over ticks.
 func state_areas() -> Dictionary:
-	var root: Node = areas if areas != null else get_tree().root
 	var out: Dictionary = {"Sim": sim}
-	for name in STATE_AREAS:
-		var area: Node = root.get_node_or_null(NodePath(name))
-		if area != null:
-			out[String(name)] = area
-	var actors: ActorsScript = root.get_node_or_null(^"Actors") as ActorsScript
+	for name: StringName in _areas:
+		var node: Node = (_areas[name] as SimArea).node
+		if node != null and is_instance_valid(node):
+			out[String(name)] = node
 	if actors != null:
+		out[String(ACTORS)] = actors
 		var n: int = actors.open_ids(_ids)
 		for i in n:
 			# Actor bodies only: a swarm row's target node holds an id too, and is the swarm's.
 			var body: Actor = actors.node_of(_ids[i]) as Actor
 			if body != null:
-				out["actor %d" % _ids[i]] = body
-	return out
-
-
-## Part `slice` (0 to `slices` - 1) of `state_areas()`, so a check of the whole state can be spread
-## over `slices` ticks (N3c: hashing it all in one tick took tens of milliseconds in a crowd; a
-## netcode checking once a second hashes part `count % 60` each tick, and every machine hashes the
-## same part at the same tick). "Sim" and STATE_AREAS go one to a part, spread evenly; a body goes
-## to part `id % slices`. Each area is in exactly one part.
-func state_slice(slice: int, slices: int) -> Dictionary:
-	var all: Dictionary = state_areas()
-	if slices <= 1:
-		return all
-	var out: Dictionary = {}
-	var services: int = STATE_AREAS.size() + 1
-	for name: String in all:
-		var part: int
-		if name.begins_with("actor "):
-			part = posmod(int(name.trim_prefix("actor ")), slices)
-		else:
-			var index: int = 0 if name == "Sim" else STATE_AREAS.find(StringName(name)) + 1
-			part = floori(float(index) * float(slices) / float(services))
-		if part == slice:
-			out[name] = all[name]
+				out[SimHash.BODY_PREFIX + str(_ids[i])] = body
 	return out
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes
 ## its first step next tick).
-func _step_bodies(actors: ActorsScript, delta: float) -> void:
+func _step_bodies(delta: float) -> void:
 	if actors == null:
 		return
 	var n: int = actors.open_ids(_ids)
 	for i in n:
 		var body: Actor = actors.node_of(_ids[i]) as Actor
-		if body != null and body.is_inside_tree() and _steps(body):
+		if body != null and body.ticking and body.is_inside_tree() and body.can_process():
 			body.tick_step(delta)
-
-
-## True when the tick steps `node` now (its physics processing on, and it can process: in the game
-## the tree is never paused while the tick steps, so this is its process mode).
-static func _steps(node: Node) -> bool:
-	return node.is_physics_processing() and node.can_process()
-
-
-## True when the tick runs `node`'s timers now (its processing on, and it can process).
-static func _times(node: Node) -> bool:
-	return node.is_processing() and node.can_process()

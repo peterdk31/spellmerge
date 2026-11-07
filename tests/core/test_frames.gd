@@ -49,7 +49,8 @@ func before_each() -> void:
 
 
 func after_each() -> void:
-	SimSeed.end()
+	_frames.stop_recording()
+	_frames.stop_playing()
 
 
 func test_every_command_is_an_event_of_its_shape() -> void:
@@ -183,8 +184,8 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	_bus.sandbox_requested.connect(func(seat: int) -> void: starts.append(seat))
 	var replay: Replay = _frames.record(&"sandbox_requested", 0)
 	check_equal(starts, [0], "recording starts the run")
-	check(SimSeed.is_dealing(), "and deals the seeds from the run's")
-	var first_seed: int = SimSeed.fresh()
+	check(_frames.is_recording(), "and records it")
+	var first_seed: int = _frames.next_run_seed()
 	var recorded: Array[PackedByteArray] = []
 	for i in 12:
 		if i == 3:
@@ -195,7 +196,7 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 			_input.add_virtual_device(1)
 		_frames.tick(DT)
 		recorded.append(_frames_bytes())
-	check(_frames.stop_recording() == replay and not SimSeed.is_dealing(), "stopping hands the replay over")
+	check(_frames.stop_recording() == replay and not _frames.is_recording(), "stopping hands the replay over")
 	check_equal(replay.tick_count(), 12, "a tick a tick")
 	check_equal(replay.seats, 0b101, "the seats joined at the start")
 	var heard_live: Array = _heard.duplicate()
@@ -208,7 +209,7 @@ func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	var again: Replay = Replay.from_bytes(replay.to_bytes())
 	check(_frames.play(again), "it plays")
 	check_equal(starts, [0, 0], "its run starts the same way")
-	check_equal(SimSeed.fresh(), first_seed, "with the same seeds")
+	check_equal(_frames.next_run_seed(), first_seed, "with the same seeds")
 	check(_input.is_joined(0) and _input.is_joined(2) and not _input.is_joined(1), "its seats join")
 	for i in 12:
 		if i == 2:

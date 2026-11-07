@@ -147,6 +147,9 @@ var size: float = 1.0
 var _looks: Array[ActorLook] = []
 ## True once the looks have shown the start of the local stop the body is in (see `step`).
 var _hold_shown: bool = false
+## Whether the Tick steps this body (core/sim/tick.gd, by actor id): off for a body another
+## steps (a decoy: Entities) or a test steps by hand.
+var ticking: bool = true
 var _is_ready: bool = false
 var _down: bool = false
 var _dying: bool = false
@@ -155,8 +158,6 @@ var _leaving: bool = false
 
 
 func _init() -> void:
-	# The tick steps it (core/sim/tick.gd): the flag says so; there is no callback.
-	set_physics_process(true)
 	collision_layer = 0
 	collision_mask = LAYER_WALLS
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING

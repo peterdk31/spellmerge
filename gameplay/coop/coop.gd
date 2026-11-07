@@ -73,6 +73,12 @@ const VIEW: Array[StringName] = [&"target_position", &"target_zoom"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_wizards", &"_downs"]
 
+## Why Coop needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
+const FRESH_BECAUSE: String = "the seats' joins are the session's; room_entered sets the run's view, wizards and revives"
+## The reason the pause menu stops the game (`Sim.stop`): offline, any seat's open menu stops it
+## for everyone (one menu is open at a time).
+const MENU: StringName = &"menu"
+
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
@@ -100,6 +106,8 @@ var _revive_sent: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 
 func _ready() -> void:
+	# The tick steps it (core/sim/tick.gd, core/sim/sim_area.gd).
+	SimArea.join(self, &"Coop").steps(&"Coop", step_rules).fresh_because(FRESH_BECAUSE)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if events == null:
@@ -108,6 +116,19 @@ func _ready() -> void:
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
 	events.room_entered.connect(_on_room_entered)
+	# A command, heard at the tick's start (core/events, online-ready N2).
+	events.listen(&"pause_requested", _on_pause_requested)
+
+
+## `player` opened (`on` 1) or closed (`on` 0) the pause menu (a command, at a tick's start;
+## online-ready N4): the game stops while it is open (`Sim.stop`), and the Tick pauses the tree for
+## the picture.
+func _on_pause_requested(_player: int, on: int) -> void:
+	var game: Sim = Sim.found(self)
+	if on != 0:
+		game.stop(MENU)
+	else:
+		game.go(MENU)
 
 
 ## The camera (view). The rules are the tick's (`step_rules`, core/sim/tick.gd).

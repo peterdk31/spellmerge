@@ -134,6 +134,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(freeze, "_freeze", PACKED_FLOAT32_ARRAY) \
 	X(life, "_life", PACKED_FLOAT32_ARRAY) \
 	X(skip_on, "_skip_on", PACKED_FLOAT32_ARRAY) \
+	X(skip_near, "_skip_near", PACKED_FLOAT32_ARRAY) \
 	X(pos, "_pos", PACKED_VECTOR2_ARRAY) \
 	X(prev, "_prev", PACKED_VECTOR2_ARRAY) \
 	X(untested, "_untested", PACKED_VECTOR2_ARRAY) \
@@ -313,7 +314,7 @@ struct HitPass {
 	Arr<PackedByteArray> state, motion, wall_cells;
 	Arr<PackedVector2Array> pos, prev, target_pos, cand_point, untested;
 	Arr<PackedInt32Array> flags, layers, actor, mem_head;
-	Arr<PackedFloat32Array> radius, skip_on, target_radius, cand_along;
+	Arr<PackedFloat32Array> radius, skip_on, skip_near, target_radius, cand_along;
 	Arr<PackedInt64Array> skip_id, target_id, mem_id;
 	Arr<PackedInt32Array> target_owner, target_layer, target_next, target_mark, target_entry;
 	Arr<PackedInt32Array> cell_head, cell_count, cell_filled;
@@ -468,6 +469,7 @@ struct HitPass {
 		mem_head.load(m, k.mem_head);
 		radius.load(m, k.radius);
 		skip_on.load(m, k.skip_on);
+		skip_near.load(m, k.skip_near);
 		target_radius.load(m, k.target_radius);
 		cand_along.load(m, k.cand_along);
 		skip_id.load(m, k.skip_id);
@@ -702,8 +704,7 @@ struct HitPass {
 		Vector2 middle;
 		double half = 0.0;
 		int64_t lay = 0;
-		bool skip = false;
-		bool skip_inside = false;
+		const bool spared = skip_on[slot] > 0.0f && still_spares(slot, start, to - start);
 		int64_t stamp = 0;
 		int64_t found = 0;
 		for (int64_t y = y0; y <= y1; y++) {
@@ -728,7 +729,6 @@ struct HitPass {
 					middle = (from + to) * (real_t)0.5;
 					half = std::sqrt(path_sq) * 0.5 + 0.01;
 					lay = layers[slot];
-					skip = skip_on[slot] > 0.0f;
 					stamp = mark_memory(slot);
 				}
 				int64_t t = cell_head[cell];
@@ -758,9 +758,7 @@ struct HitPass {
 						t = target_next[t];
 						continue;
 					}
-					if (skip && skip_id[slot] == target_id[t] && (double)start.distance_squared_to(centre) <= reach * reach) {
-						// Still on the body that fired it where this step starts: not clear of it yet.
-						skip_inside = true;
+					if (spared && skip_id[slot] == target_id[t]) {
 						t = target_next[t];
 						continue;
 					}
@@ -769,11 +767,42 @@ struct HitPass {
 				}
 			}
 		}
-		// Clear of the body that fired it (a body never looked at is nowhere near): it hits it from now.
-		if (skip_on[slot] > 0.0f && !skip_inside) {
+		// Clear of the body it started on, and not coming back across it: it hits it from now.
+		if (skip_on[slot] > 0.0f && !spared) {
 			skip_on[slot] = 0.0f;
 		}
 		return found;
+	}
+
+	// `_still_spares`.
+	bool still_spares(int64_t slot, const Vector2 &start, const Vector2 &way) {
+		int64_t t = -1;
+		for (int64_t i = 0; i < target_id.n; i++) {
+			if (target_id[i] == skip_id[slot]) {
+				t = i;
+				break;
+			}
+		}
+		if (t < 0 || (target_layer[t] & layers[slot]) == 0) {
+			return false;
+		}
+		const double reach = (double)radius[slot] + (double)target_radius[t];
+		const Vector2 to_centre = target_pos[t] - start;
+		const double apart_sq = (double)to_centre.length_squared();
+		if (apart_sq <= reach * reach) {
+			return true;
+		}
+		const double near = (double)skip_near[slot];
+		if (near <= 0.0) {
+			return false;
+		}
+		const double ahead = (double)to_centre.dot(way);
+		const double within = reach + near;
+		if (ahead <= 0.0 || (double)(to_centre - way).length_squared() > within * within) {
+			return false;
+		}
+		// The square of how far the body's centre stands off the shot's line.
+		return apart_sq - ahead * ahead / (double)way.length_squared() <= reach * reach;
 	}
 };
 

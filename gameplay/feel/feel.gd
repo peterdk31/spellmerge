@@ -605,7 +605,7 @@ func _ready() -> void:
 	var parts: Dictionary = _spectacle.cue_parts()
 	for type: StringName in parts:
 		var row: Array = parts[type] as Array
-		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable())
+		add_cue_part(type, row[0] as Callable, row[1] as Callable if row.size() > 1 else Callable(), row[2] as Callable if row.size() > 2 else Callable())
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -1358,6 +1358,10 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			return
 	if plan.every > 0.0 and not _cue_due(plan.cue, caster):
 		return
+	if _hit_flash and not (weight and plan.weighted) and _hides_hit(plan):
+		# A hit's look that would show nothing is not played (hundreds of hits a frame in a crowd).
+		_cue_flash = -1
+		return
 	var aim: Vector2 = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	if _cue_depth == _cue_contexts.size():
 		_cue_contexts.append(CueContextScript.new())
@@ -1420,6 +1424,17 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	_play(cue.sound)
 
 
+## Whether `plan`, played as the look of the hit being shown, would show nothing: each of its parts
+## is a flash past the frame's share of hit flashes or a part that needs a spray of a hit whose motes
+## do not spray (`CuePlan.shows_always` and the two gates).
+func _hides_hit(plan: CuePlanScript) -> bool:
+	if plan.shows_always:
+		return false
+	if plan.has_flashes and not _hit_flashes_full():
+		return false
+	return not plan.has_spray_parts or (_spectacle != null and _spectacle.hit_unsprayed())
+
+
 ## Whether the cue `cue` (which has an `every`) may play for `caster` now, and if so, not again for
 ## its `every` seconds. Allocates only the first time a cue with an `every` plays.
 func _cue_due(cue: CueBase, caster: int) -> bool:
@@ -1441,10 +1456,14 @@ func _cue_due(cue: CueBase, caster: int) -> bool:
 ## the part (a Dictionary) and the cue's `CueContext`; a player already there is replaced. With
 ## `prepare` (a Callable taking the part), each part is prepared once when its cue is first played
 ## and `player` takes what it made instead, so a part played often reads no key while it plays
-## (a flash's keys as typed fields: `CuePlan.Flash`). Feel's own flashes are `flash`, the
-## spectacle's `motes` and `mark` (`Spectacle.cue_parts`).
-func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable()) -> void:
-	_cue_parts[type] = [player, prepare]
+## (a flash's keys as typed fields: `CuePlan.Flash`). With `needs_spray` (a Callable taking what
+## `player` takes), the parts it says true for show nothing for a hit whose motes do not spray
+## (`Spectacle.hit_unsprayed`: the spectacle's `often` motes), so a hit's cue of only such parts and
+## flashes is not played at all for a hit that would show none of them (`_hides_hit`). Leave it out
+## for a type whose parts play whatever the hit. Feel's own flashes are `flash`, the spectacle's
+## `motes` and `mark` (`Spectacle.cue_parts`).
+func add_cue_part(type: StringName, player: Callable, prepare: Callable = Callable(), needs_spray: Callable = Callable()) -> void:
+	_cue_parts[type] = [player, prepare, needs_spray]
 	_cue_plans.clear()
 
 

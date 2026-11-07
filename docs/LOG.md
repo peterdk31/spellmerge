@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-07: Shot scale H3, Feel skips a hit's look that shows nothing (owner session)
+
+Past the frame's share of hit flashes and on a hit whose motes do not spray, a hit's cues (its spray, its impact) already drew nothing but still ran their parts to find out. A cue's plan now knows what it can show for such a hit, from each part type's `needs_spray` (`add_cue_part`; the spectacle's `often` motes), and `play_cue` skips it (`_hides_hit`); a part type that says nothing always plays. 76% of a crowd's hit cues are skipped; Feel's two hit listeners about 3.3 us a hit cheaper (crowd_all 62 to 53.5 ms a step at 30,000 bolts), the same hits, damage and drawing. Tests in test_feel_cues.gd; shot-scale.md has the numbers.
+
 ## 2026-11-07: Shot scale H3b tried and dropped (owner session)
 
 Built on a branch and measured, never merged: a step's hits as one batch in phases (the retest of a shot whose body died earlier in the batch, so no damage was lost), then Combat's lookups shared across a batch. At 30,000 bolts, with the same hits and damage as one by one, a hit's GDScript went from about 58-63 to 48-49 us: too little for what it asked of every later feature (two paths for hits, phases, a subtle order). The owner dropped it for one event per hit; the code is as before, and DECISIONS (2026-11-07) has the numbers and the rule for later speed work (share work inside a listener's own area, never through a second hit event).

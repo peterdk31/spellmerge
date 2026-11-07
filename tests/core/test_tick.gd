@@ -169,3 +169,29 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	check_equal(_names(), ["Projectiles.begin_run", "Spells.begin_run", "Combat.begin_run", "Entities.begin_run", "Horde.begin_run"], "the areas made fresh, in order")
 	_tick.run(TickScript.DT)
 	check_equal(_tick.count, 1, "the run's first tick")
+
+
+## Every autoload of a simulation script is either made fresh at a run's start (with a `begin_run`)
+## or says why it need not be (`RENEWED_OTHERWISE`), so a new area cannot carry one run's state into
+## the next unnoticed.
+func test_every_simulation_autoload_starts_each_run_fresh_or_says_why() -> void:
+	var autoloads: Dictionary[StringName, Script] = {}
+	for info: Dictionary in ProjectSettings.get_property_list():
+		var key: String = info["name"]
+		if key.begins_with("autoload/"):
+			var path: String = String(ProjectSettings.get_setting(key)).trim_prefix("*")
+			autoloads[StringName(key.trim_prefix("autoload/"))] = load(path) as Script
+	for area: StringName in autoloads:
+		var script: Script = autoloads[area]
+		if script == null or not StateWalk.is_simulation(script):
+			continue
+		var renewed: bool = TickScript.FRESH_AT_RUN.has(area)
+		var otherwise: bool = TickScript.RENEWED_OTHERWISE.has(area)
+		check(renewed != otherwise, "%s (%s) is a simulation area: list it in Tick.FRESH_AT_RUN (with a begin_run that calls SimFresh.renew) or in Tick.RENEWED_OTHERWISE with the reason it starts each run fresh (core/sim/README.md, \"A run's start\")" % [area, script.resource_path])
+		if renewed:
+			var methods: Array[String] = []
+			for method: Dictionary in script.get_script_method_list():
+				methods.append(String(method["name"]))
+			check(methods.has("begin_run"), "%s is in Tick.FRESH_AT_RUN but has no begin_run" % area)
+	for area: StringName in TickScript.FRESH_AT_RUN + TickScript.RENEWED_OTHERWISE.keys():
+		check(autoloads.has(area), "Tick lists %s, which is no autoload (renamed?)" % area)

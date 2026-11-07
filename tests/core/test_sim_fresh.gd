@@ -1,14 +1,17 @@
 extends "res://tests/support/suite.gd"
 ## A run starts from a fresh game's state (core/sim/sim_fresh.gd, online-ready N3b): an area takes
-## every state member from a blank of its own script, keeps its settings, its objects (as the same
-## objects) and what is not state, and shares what the blank shares the way the blank does.
+## every state member from a blank of its own script, keeps its settings (RUN_KEEPS, at every level),
+## its objects (as the same objects) and what is not state, shares what the blank shares the way the
+## blank does, and names a node it would drop.
 
 
 ## A part an area keeps: the same object across runs (a carrier, the AI board).
 class Part:
 	extends RefCounted
 	const DERIVED: Array[StringName] = [&"owner"]
+	const RUN_KEEPS: Array[StringName] = [&"setting"]
 	var clock: float = 0.0
+	var setting: int = 1
 	var rows: PackedInt32Array = PackedInt32Array([0, 0])
 	## Back to the area that holds it (as a kit's runtime): not the blank's after.
 	var area: Object = null
@@ -27,6 +30,7 @@ class Area:
 	const DERIVED: Array[StringName] = [&"cache"]
 	const VIEW: Array[StringName] = [&"drawn"]
 	const REFS: Array[StringName] = [&"target"]
+	const RUN_KEEPS: Array[StringName] = [&"cap"]
 	var cap: int = 4
 	var clock: float = 0.0
 	var next_seq: int = 0
@@ -40,6 +44,8 @@ class Area:
 	var current: Item = null
 	var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 	var target: Node = null
+	## Bodies it keeps out of the tree between uses (as Entities' decoys).
+	var bodies: Array[Node2D] = []
 	var cache: Dictionary = {}
 	var drawn: int = 0
 
@@ -76,6 +82,7 @@ func _used() -> Area:
 	area.part.clock = 9.0
 	area.part.rows[1] = 6
 	area.part.owner = area
+	area.part.setting = 3
 	area.pool.append(Item.new())
 	area.pool[0].due = 2.0
 	area.current = area.pool[2]
@@ -90,12 +97,11 @@ func _blank() -> Area:
 	return own(SimFresh.blank_of(Area)) as Area
 
 
-func test_the_state_is_the_blanks() -> void:
+func test_renew_makes_the_state_the_blanks() -> void:
 	var area: Area = _used()
-	SimFresh.take(area, _blank())
+	SimFresh.renew(area)
 	check_equal(area.clock, 0.0, "the clock")
 	check_equal(area.next_seq, 0, "the counter")
-	check_equal(area.cap, 4, "a value not kept")
 	check_equal(area.slots, PackedFloat32Array([-1.0, -1.0, -1.0, -1.0]), "a packed array, sized and filled as a fresh one")
 	check(area.list.is_empty() and area.table.is_empty(), "an array and a dictionary")
 	check_equal(area.target, null, "a REFS member: who the blank points at (no one)")
@@ -103,8 +109,9 @@ func test_the_state_is_the_blanks() -> void:
 
 func test_settings_and_what_is_not_state_stay() -> void:
 	var area: Area = _used()
-	SimFresh.take(area, _blank(), [&"cap"])
-	check_equal(area.cap, 8, "a kept setting")
+	SimFresh.renew(area)
+	check_equal(area.cap, 8, "the area's RUN_KEEPS")
+	check_equal(area.part.setting, 3, "a kept object's own RUN_KEEPS")
 	check(area.cache.has("kept"), "DERIVED untouched")
 	check_equal(area.drawn, 99, "VIEW untouched")
 
@@ -155,6 +162,20 @@ func test_a_node_is_never_taken_from_the_blank() -> void:
 	blank.target = blank
 	SimFresh.take(area, blank)
 	check(area.target == area, "a REFS member pointing at the blank points at the area in its place")
+
+
+func test_a_node_out_of_the_tree_it_would_drop_is_named() -> void:
+	var area: Area = _used()
+	var body: Node2D = own(Node2D.new()) as Node2D
+	body.name = "Spare"
+	area.bodies.append(body)
+	var problems: PackedStringArray = SimFresh.take(area, _blank())
+	check_equal(problems.size(), 1, "one problem")
+	check(problems.size() == 1 and problems[0].contains("bodies") and problems[0].contains("Spare"), "it names the member and the node: %s" % [problems])
+	# In the tree, it is the tree's to free: nothing to say.
+	root.add_child(body)
+	area.bodies.append(body)
+	check(SimFresh.take(area, _blank()).is_empty(), "no problem for a node in the tree")
 
 
 func test_a_blank_deals_the_run_no_seeds() -> void:

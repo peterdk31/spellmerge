@@ -407,14 +407,12 @@ func start_run(requester: int) -> bool:
 	_enemy_data = enemy_data
 	_wizard_scene = wizard_scene
 	# The run starts from a fresh game's state (online-ready N3b): the one clock from 0, and every
-	# service as a fresh one's (`Tick.begin_run`). Without the Tick (a test's own tree), the old clears.
+	# service as a fresh one's (`Tick.begin_run`; the autoload, found on use).
 	var tick: Node = get_node_or_null(^"/root/Tick")
-	if tick != null:
-		tick.call(&"begin_run")
+	if tick == null:
+		push_error("Flow: the Tick autoload is missing, so the run starts on the last run's state.")
 	else:
-		if projectiles != null:
-			projectiles.clear()
-		spells.clear()
+		tick.call(&"begin_run")
 	var layout: Node = room.scene.instantiate()
 	var size: Vector2 = room_size(room, layout)
 	if projectiles != null:

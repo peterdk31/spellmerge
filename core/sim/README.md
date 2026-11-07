@@ -48,9 +48,19 @@ Every script in these folders, and every inner class of one, is a **simulation s
 
 ## A run's start (N3b)
 
-- **Every run starts from a fresh game's state.** When a run starts (Flow's `start_run`, once the last run's world is gone and before the new one is made), `Tick.begin_run` counts the clock from 0 again and makes each service fresh, then the horde director (`Tick.FRESH_AT_RUN`): each area's `begin_run` ends what it holds (`clear`) and takes every state member from a blank of its own script (`sim_fresh.gd`, `SimFresh.take`). So its clocks, counters, free lists, pools and the leftovers of its dead slots are a fresh game's, a run plays the same whatever ran before it in the game, and a replay recorded in any run plays the same in any other (`tests/core/test_replay_game.gd`, "after other runs").
-- **By construction, not by a list.** `SimFresh` resets what `StateWalk` walks (state and REFS; DERIVED and VIEW stay), so a member added later is reset too. An object the area keeps (a carrier, the AI board every brain shares) stays the same object and takes the blank's members in turn; what the blank shares the area shares the same way (`Spells._ray` is the first of `_rays` again); a node is never taken from the blank. A blank deals the run no seeds (`SimFresh.blank_of`, `SimSeed.aside`).
-- **Settings stay.** What is the session's, not the run's (the shot cap, a dev slider, a benchmark's budget, the horde's curve), an area lists in `const RUN_KEEPS: Array[StringName]`. A cache that would carry a run's answer into the next (a compiled staff outlives a run) is DERIVED.
+- **Every run starts from a fresh game's state.** When a run starts (Flow's `start_run`, once the last run's world is gone and before the new one is made), `Tick.begin_run` counts the clock from 0 again and calls `begin_run` on each area of `Tick.FRESH_AT_RUN` (the services, then the horde director). A run then plays the same whatever ran before it in the game, and a replay recorded in any run plays the same in any other (`tests/core/test_replay_game.gd`, "after other runs").
+- **An area's `begin_run`** ends what it holds and renews itself, nothing more:
+
+  ```gdscript
+  func begin_run() -> void:
+  	clear()                 # its shots, rows, entities end (their events go out)
+  	SimFresh.renew(self)    # every state member as a new object of its script has it
+  ```
+
+  `SimFresh.renew` (`sim_fresh.gd`) resets what `StateWalk` walks, so a member added later is reset too, with no list to keep. Its rules, in its class doc: `RUN_KEEPS` stay; an object held by a member or in a dictionary (a carrier, the AI board every brain shares) stays the same object and is renewed in turn; an array is the blank's, its objects too (a pool), and references into it follow (`Spells._ray` is the first of `_rays` again); DERIVED and VIEW are left alone. A blank deals the run no seeds (`SimSeed.aside`).
+- **Settings stay:** what is the session's, not the run's (the shot cap, a dev slider, a benchmark's budget, the horde's curve), a script lists in `const RUN_KEEPS: Array[StringName]`, read like DERIVED (`tests/core/test_state_declared.gd` checks each name is a state member).
+- **What fails loudly:** a simulation autoload neither in `Tick.FRESH_AT_RUN` nor in `Tick.RENEWED_OTHERWISE` with its reason (`test_tick.gd`); an area in `FRESH_AT_RUN` with no `begin_run`; a node out of the tree that `renew` would drop (a pool of bodies: free it before, as Entities frees its decoys).
+- **What it cannot see:** a cache in DERIVED that follows the state must be emptied by the area's `clear`; an object in an array that something outside the area holds on to is replaced, so keep such an object in a member or a dictionary. A cache that would carry a run's answer into the next (a compiled staff outlives a run) is DERIVED.
 - **Feel**, which is view, still decides some holds on real time until N4 (A1): its rests and repeats start again at `room_entered`.
 
 ## Input (N2)
@@ -77,7 +87,7 @@ A new member of a simulation script, by what it holds:
 | a cache, scratch refilled within a step, an instance id, a switch that gives the same game either way | `DERIVED` | `Spells._zap_near`, `Combat._row_by_node`, `ProjectileManager.native` |
 | another body the game would miss if it were lost | `REFS` | `AIBrain.target`, `ProjectileManager._stuck_to` |
 | what only the drawing reads and writes | `VIEW` | `ProjectileManager._drawn_seq`, `Actor._looks` |
-| a setting of the session a new run keeps (in an area with `begin_run`) | `RUN_KEEPS` (and state or DERIVED as above) | `ProjectileManager._cap`, `Horde.curve` |
+| a setting of the session a new run keeps (in an area with `begin_run`) | `RUN_KEEPS` (it stays state) | `ProjectileManager._cap`, `Horde.curve` |
 
 And around it:
 - A `static var`: `DERIVED` (a cache, a test switch); it never holds state.
@@ -105,4 +115,4 @@ ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test
 - Is every name in DERIVED really rebuilt or set up again, not state that would be lost? A body the game would miss goes in REFS.
 - Does a new scene in `tests/core/sim_scenes.gd` play the same twice?
 - Does any simulation code read a device, the mouse or the camera, or connect to a command's signal instead of `Events.listen`?
-- Is a new area that keeps state between runs made fresh at a run's start (`begin_run`, in `Tick.FRESH_AT_RUN`), and is each name in its `RUN_KEEPS` a setting, not the run's state?
+- Is a new area that keeps state between runs made fresh at a run's start (`begin_run` calling `SimFresh.renew`, in `Tick.FRESH_AT_RUN`), and is each name in its `RUN_KEEPS` a setting, not the run's state?

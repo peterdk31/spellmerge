@@ -338,9 +338,7 @@ func start(new_world: Node2D) -> void:
 ## starts from there (`horde_started`).
 func begin_run() -> void:
 	stop()
-	var blank: Object = SimFresh.blank_of(get_script() as Script)
-	SimFresh.take(self, blank, RUN_KEEPS)
-	blank.free()
+	SimFresh.renew(self)
 
 
 ## Stops the run in progress (if any): the open offers are dropped, a break ends, the director's

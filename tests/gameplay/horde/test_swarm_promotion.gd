@@ -77,7 +77,7 @@ func test_a_possession_promotes_the_swarmer_with_everything_it_had() -> void:
 	run.combat.give_shield(node, 2, 4.0, 7)
 	var before: Dictionary = run.combat.row_state(node)
 	check(before["health"] < float(Fixture.MiteData.max_health), "the swarmer is hurt")
-	check_equal((before["chill"] as Array)[2], 2, "and has two stacks of chill")
+	check_equal(before["chill_stacks"], 2, "and has two stacks of chill")
 	check((before["knock"] as Vector2) != Vector2.ZERO, "and a push")
 	var targets: int = run.projectiles.get_target_count()
 	var listed: int = run.projectiles._target_id.find(node.get_instance_id())

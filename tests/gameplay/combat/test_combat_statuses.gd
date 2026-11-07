@@ -535,3 +535,45 @@ func test_static_runs_out_and_registering_again_clears_it() -> void:
 	_combat.apply_status(0, enemy, &"static", 5.0, 60.0)
 	_combat.register_actor(enemy, 50, 10.0)
 	check(not _combat.has_status(enemy, &"static"), "registering again cleared it")
+
+
+# --- the status table ---
+
+
+## Every status is a row of the same tables (STATUSES, STATUS_AT and the tables by ST_*), so a new
+## one cannot be half added.
+func test_every_status_is_a_row_of_each_table() -> void:
+	check_equal(CombatScript.STATUSES.size(), CombatScript.STATUS_COUNT, "STATUS_COUNT statuses")
+	for st in CombatScript.STATUS_COUNT:
+		check_equal(CombatScript.STATUS_AT.get(CombatScript.STATUSES[st], -1), st, "%s is found at its index" % CombatScript.STATUSES[st])
+	check_equal(CombatScript.STATUS_AT.size(), CombatScript.STATUS_COUNT, "and nothing else is")
+	check_equal(CombatScript.STATUS_APPLIED.size(), CombatScript.STATUS_COUNT, "STATUS_APPLIED has a row a status")
+	check_equal(CombatScript.STATUS_STRENGTH_PER_POWER.size(), CombatScript.STATUS_COUNT, "STATUS_STRENGTH_PER_POWER too")
+	check_equal(CombatScript.STATUS_EXTENDED_MAX.size(), CombatScript.STATUS_COUNT, "STATUS_EXTENDED_MAX too")
+	for status in CombatScript.REACTING_STATUSES:
+		check(CombatScript.STATUS_AT.has(status), "%s, a reacting status, is a status" % status)
+	for status in SpellValidator.KNOWN_STATUSES:
+		var st: int = CombatScript.STATUS_AT.get(status, -1)
+		check(st >= 0 and CombatScript.STATUS_APPLIED[st], "%s, which an element may put on, is applied" % status)
+
+
+## Every status `apply_status` puts on: on for its time with its strength (what a SPREAD copies),
+## counted down to off by the steps, and off again when taken away.
+func test_every_applied_status_goes_on_counts_down_and_comes_off() -> void:
+	for st in CombatScript.STATUS_COUNT:
+		if not CombatScript.STATUS_APPLIED[st]:
+			continue
+		var status: StringName = CombatScript.STATUSES[st]
+		var enemy := _enemy(Vector2(float(st) * 200.0, 0.0), 1.0e9)
+		check(_combat.apply_status(1, enemy, status, 0.5, 30.0), "%s goes on" % status)
+		check_equal(_combat.status_left(enemy, status), 0.5, "%s for its time" % status)
+		var row: int = _combat._row_of_node(enemy)
+		check(is_equal_approx(_combat._strength_of(row, status), 30.0), "%s with its strength" % status)
+		_combat._remove_status(row, status)
+		check(not _combat.has_status(enemy, status), "%s comes off" % status)
+		_combat.apply_status(1, enemy, status, 0.5, 30.0)
+		for i in 10:
+			_combat.step(STEP)
+		check(not _combat.has_status(enemy, status), "%s runs out" % status)
+	var enemy := _enemy()
+	check(not _combat.apply_status(1, enemy, &"freeze", 1.0, 1.0), "a freeze only comes from chill")

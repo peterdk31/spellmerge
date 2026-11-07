@@ -70,6 +70,27 @@ const FREEZE: StringName = &"freeze"
 const SHOCK: StringName = &"shock"
 const HEX: StringName = &"hex"
 const STATIC: StringName = &"static"
+## Every status by its index (`ST_*`): a row keeps each one's seconds left and power in
+## `_status_left` and `_status_power`, at `row * STATUS_COUNT + ST_*`. A plain status (shock, hex,
+## static) is only its name, its index and its row in each table below; burn and chill have rules of
+## their own, in the few places that name them (`_apply_status_row`, `_extend`, `_remove_status`,
+## `_tick`). What a status does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
+const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, SHOCK, HEX, STATIC]
+const ST_BURN: int = 0
+const ST_CHILL: int = 1
+const ST_FREEZE: int = 2
+const ST_SHOCK: int = 3
+const ST_HEX: int = 4
+const ST_STATIC: int = 5
+const STATUS_COUNT: int = 6
+## A status's index by its name.
+const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, SHOCK: ST_SHOCK, HEX: ST_HEX, STATIC: ST_STATIC}
+## By ST_*: whether `apply_status` puts it on (freeze only comes from chill).
+const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true]
+## By ST_*: what `apply_status`'s strength is in its power (its power is the strength over this):
+## burn's damage a second, chill's share of speed (its strength a percent), shock's, hex's and
+## static's percent; freeze has none.
+const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0]
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
@@ -133,15 +154,9 @@ const HEX_PULL_SHARE: float = 0.5
 ## many pixels of it, once: the discharge is plain damage, so it sets off nothing else.
 const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at: a hit reacts with the
-## first the target has that has a row for the hit's element. The one list of that order; a
-## status's place in it is its bit in `_status_bits` (its `AT_*` below). A new status is a name
-## here, its `AT_*` and its line in `_status_bits`; test_combat_reactions.gd fails for a missing one.
+## first the target has that has a row for the hit's element (a frozen target counts as chilled).
+## The one list of that order (`_status_bits`).
 const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX, STATIC]
-const AT_BURN: int = 0
-const AT_CHILL: int = 1
-const AT_SHOCK: int = 2
-const AT_HEX: int = 3
-const AT_STATIC: int = 4
 ## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
 const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
@@ -155,6 +170,8 @@ const MAX_FREEZE: float = 4.0
 const MAX_EXTENDED_TIME: float = 8.0
 const MAX_EXTENDED_PERCENT: float = 100.0
 const MAX_EXTENDED_BURN: float = 20.0
+## By ST_*: the most power EXTEND gives a status (chill's EXTEND is a freeze, freeze has none).
+const STATUS_EXTENDED_MAX: Array[float] = [MAX_EXTENDED_BURN, 0.0, 0.0, MAX_EXTENDED_PERCENT, MAX_EXTENDED_PERCENT, MAX_EXTENDED_PERCENT]
 
 ## What a row holds: nothing, a kit Actor (health in its Health), or a plain body (health in the
 ## row).
@@ -172,7 +189,7 @@ signal stepping()
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `_node_id` and
 ## `_row_by_node`, a lookup from a body's node to its row (by instance id, equality only: a row is
 ## its actor id, and the row's identity is its actor's key, N5).
-const DERIVED: Array[StringName] = [&"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node"]
+const DERIVED: Array[StringName] = [&"events", &"projectiles", &"registry", &"spells", &"actors", &"_due_node", &"_slam_due_node", &"_touch_node", &"_auto_table", &"_node_id", &"_row_by_node", &"_reacting_at"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_nodes"]
 ## The session's settings a new run keeps (`begin_run`): the reaction table.
@@ -221,26 +238,17 @@ var _pulled_at: PackedInt32Array = PackedInt32Array()
 var _steps: int = 0
 var _contact_left: PackedFloat32Array = PackedFloat32Array()
 
-# Statuses (a time left of 0 means the status is off).
-# Burn: seconds left, damage per second, the fraction of a point not yet dealt, and who set it.
-var _burn_left: PackedFloat32Array = PackedFloat32Array()
-var _burn_rate: PackedFloat32Array = PackedFloat32Array()
+# Statuses, STATUS_COUNT a row (`row * STATUS_COUNT + ST_*`): seconds left (0: off) and power
+# (burn's damage a second, chill's share of speed taken, the percent a shock jumps with, a hex
+# adds, a static charge discharges; freeze has none).
+var _status_left: PackedFloat32Array = PackedFloat32Array()
+var _status_power: PackedFloat32Array = PackedFloat32Array()
+# Burn's own: the fraction of a point not yet dealt, and who set it. Chill's: its stacks.
 var _burn_carry: PackedFloat32Array = PackedFloat32Array()
 var _burn_by: PackedInt32Array = PackedInt32Array()
-# Chill: seconds left, the share of speed it takes, stacks. Freeze: seconds left.
-var _chill_left: PackedFloat32Array = PackedFloat32Array()
-var _chill_slow: PackedFloat32Array = PackedFloat32Array()
 var _chill_stacks: PackedInt32Array = PackedInt32Array()
-var _freeze_left: PackedFloat32Array = PackedFloat32Array()
-# Shock: seconds left and the percent of the hit's damage that jumps.
-var _shock_left: PackedFloat32Array = PackedFloat32Array()
-var _shock_share: PackedFloat32Array = PackedFloat32Array()
-# Hex: seconds left and the percent of extra damage taken.
-var _hex_left: PackedFloat32Array = PackedFloat32Array()
-var _hex_extra: PackedFloat32Array = PackedFloat32Array()
-# Static: seconds left and the percent of the hit's damage that discharges.
-var _static_left: PackedFloat32Array = PackedFloat32Array()
-var _static_share: PackedFloat32Array = PackedFloat32Array()
+## REACTING_STATUSES as ST_* (`_status_bits`). Not state: made from the constants.
+var _reacting_at: PackedInt32Array = _reacting_indices()
 # Seconds until the actor may react again.
 var _react_wait: PackedFloat32Array = PackedFloat32Array()
 # The barrier: blocked hits left, seconds left and the card's tag.
@@ -320,18 +328,9 @@ func _init() -> void:
 	_last_by.fill(EventsScript.NO_PLAYER)
 	_hurt_radius.resize(ACTORS)
 	_contact_left.resize(ACTORS)
-	_burn_left.resize(ACTORS)
-	_burn_rate.resize(ACTORS)
+	_status_left.resize(ACTORS * STATUS_COUNT)
+	_status_power.resize(ACTORS * STATUS_COUNT)
 	_burn_carry.resize(ACTORS)
-	_chill_left.resize(ACTORS)
-	_chill_slow.resize(ACTORS)
-	_freeze_left.resize(ACTORS)
-	_shock_left.resize(ACTORS)
-	_shock_share.resize(ACTORS)
-	_hex_left.resize(ACTORS)
-	_hex_extra.resize(ACTORS)
-	_static_left.resize(ACTORS)
-	_static_share.resize(ACTORS)
 	_react_wait.resize(ACTORS)
 	_shield_left.resize(ACTORS)
 	_hurt_offset.resize(ACTORS)
@@ -497,10 +496,9 @@ func row_state(actor: Variant) -> Dictionary:
 		return {}
 	return {
 		"health": health_of(row), "knock": _knock[row], "contact_left": _contact_left[row],
-		"burn": [_burn_left[row], _burn_rate[row], _burn_carry[row], _burn_by[row]],
-		"chill": [_chill_left[row], _chill_slow[row], _chill_stacks[row]], "freeze": _freeze_left[row],
-		"shock": [_shock_left[row], _shock_share[row]], "hex": [_hex_left[row], _hex_extra[row]],
-		"static": [_static_left[row], _static_share[row]], "react_wait": _react_wait[row],
+		"status_left": _status_left.slice(row * STATUS_COUNT, (row + 1) * STATUS_COUNT),
+		"status_power": _status_power.slice(row * STATUS_COUNT, (row + 1) * STATUS_COUNT),
+		"burn": [_burn_carry[row], _burn_by[row]], "chill_stacks": _chill_stacks[row], "react_wait": _react_wait[row],
 		"shield": [_shield[row], _shield_left[row], _shield_tag[row]], "slam": [_slam[row], _slam_by[row]],
 		"last": [_last_by[row], _last_kind[row], _last_name[row]],
 	}
@@ -523,25 +521,15 @@ func carry_row_state(actor: Variant, state: Dictionary) -> bool:
 			_health[row] = minf(health, _max_health[row])
 	_knock[row] = state["knock"] as Vector2
 	_contact_left[row] = state["contact_left"] as float
+	var lefts: PackedFloat32Array = state["status_left"]
+	var powers: PackedFloat32Array = state["status_power"]
+	for st in STATUS_COUNT:
+		_status_left[row * STATUS_COUNT + st] = lefts[st]
+		_status_power[row * STATUS_COUNT + st] = powers[st]
 	var burn: Array = state["burn"]
-	_burn_left[row] = burn[0]
-	_burn_rate[row] = burn[1]
-	_burn_carry[row] = burn[2]
-	_burn_by[row] = burn[3]
-	var chill: Array = state["chill"]
-	_chill_left[row] = chill[0]
-	_chill_slow[row] = chill[1]
-	_chill_stacks[row] = chill[2]
-	_freeze_left[row] = state["freeze"] as float
-	var shock: Array = state["shock"]
-	_shock_left[row] = shock[0]
-	_shock_share[row] = shock[1]
-	var hex: Array = state["hex"]
-	_hex_left[row] = hex[0]
-	_hex_extra[row] = hex[1]
-	var charge: Array = state["static"]
-	_static_left[row] = charge[0]
-	_static_share[row] = charge[1]
+	_burn_carry[row] = burn[0]
+	_burn_by[row] = burn[1]
+	_chill_stacks[row] = state["chill_stacks"] as int
 	_react_wait[row] = state["react_wait"] as float
 	var barrier: Array = state["shield"]
 	_shield[row] = barrier[0]
@@ -585,10 +573,11 @@ func own_pace(actor: Node2D, id: int) -> float:
 	if id < 0 or id >= ACTORS or _nodes[id] != actor or _body[id] == BODY_NONE:
 		return _pace(_row_of_node(actor))
 	# `_pace`, written out: this runs for every actor every step.
-	if _freeze_left[id] > 0.0:
+	var at: int = id * STATUS_COUNT
+	if _status_left[at + ST_FREEZE] > 0.0:
 		return 0.0
-	if _chill_left[id] > 0.0:
-		return 1.0 - _chill_slow[id]
+	if _status_left[at + ST_CHILL] > 0.0:
+		return 1.0 - _status_power[at + ST_CHILL]
 	return 1.0
 
 
@@ -620,10 +609,11 @@ func own_paces_and_pushes(nodes: Array[Node2D], ids: PackedInt32Array, count: in
 			pushes[i] = _consume_knockback(row, walk)
 			continue
 		# `own_pace` and `own_knockback`, written out.
-		if _freeze_left[id] > 0.0:
+		var at: int = id * STATUS_COUNT
+		if _status_left[at + ST_FREEZE] > 0.0:
 			paces[i] = 0.0
-		elif _chill_left[id] > 0.0:
-			paces[i] = 1.0 - _chill_slow[id]
+		elif _status_left[at + ST_CHILL] > 0.0:
+			paces[i] = 1.0 - _status_power[at + ST_CHILL]
 		else:
 			paces[i] = 1.0
 		var push: Vector2 = _knock[id]
@@ -635,10 +625,11 @@ func own_paces_and_pushes(nodes: Array[Node2D], ids: PackedInt32Array, count: in
 func _pace(row: int) -> float:
 	if row == ActorsScript.NONE:
 		return 1.0
-	if _freeze_left[row] > 0.0:
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_FREEZE] > 0.0:
 		return 0.0
-	if _chill_left[row] > 0.0:
-		return 1.0 - _chill_slow[row]
+	if _status_left[at + ST_CHILL] > 0.0:
+		return 1.0 - _status_power[at + ST_CHILL]
 	return 1.0
 
 
@@ -673,39 +664,35 @@ func apply_status(caster: int, actor: Variant, status_id: StringName, duration: 
 func _apply_status_row(caster: int, row: int, status_id: StringName, duration: float, strength: float) -> bool:
 	if duration <= 0.0 or not is_instance_valid(_nodes[row]) or _is_down(row):
 		return false
+	var st: int = STATUS_AT.get(status_id, -1)
+	if st < 0 or not STATUS_APPLIED[st]:
+		push_warning("Combat: unknown status '%s'." % status_id)
+		return false
+	var at: int = row * STATUS_COUNT
+	var power: float = strength / STATUS_STRENGTH_PER_POWER[st]
 	var froze: bool = false
-	match status_id:
-		BURN:
-			if _burn_left[row] <= 0.0:
-				_burn_rate[row] = 0.0
-				_burn_carry[row] = 0.0
-			_burn_left[row] = maxf(_burn_left[row], duration)
-			_burn_rate[row] = maxf(_burn_rate[row], strength)
-			_burn_by[row] = caster
-		CHILL:
-			if _freeze_left[row] > 0.0:
-				return false
-			_chill_left[row] = maxf(_chill_left[row], duration)
-			_chill_slow[row] = maxf(_chill_slow[row], clampf(strength / 100.0, 0.0, CHILL_SLOW_MAX))
-			_chill_stacks[row] += 1
-			if _chill_stacks[row] >= CHILL_STACKS_TO_FREEZE:
-				_chill_left[row] = 0.0
-				_chill_slow[row] = 0.0
-				_chill_stacks[row] = 0
-				_freeze_left[row] = FREEZE_TIME
-				froze = true
-		SHOCK:
-			_shock_left[row] = maxf(_shock_left[row], duration)
-			_shock_share[row] = maxf(_shock_share[row], strength)
-		HEX:
-			_hex_left[row] = maxf(_hex_left[row], duration)
-			_hex_extra[row] = maxf(_hex_extra[row], strength)
-		STATIC:
-			_static_left[row] = maxf(_static_left[row], duration)
-			_static_share[row] = maxf(_static_share[row], strength)
-		_:
-			push_warning("Combat: unknown status '%s'." % status_id)
+	if st == ST_BURN:
+		# A fresh burn starts from nothing; one still burning keeps its stronger rate.
+		if _status_left[at + ST_BURN] <= 0.0:
+			_status_power[at + ST_BURN] = 0.0
+			_burn_carry[row] = 0.0
+		_burn_by[row] = caster
+	elif st == ST_CHILL:
+		# A frozen actor takes no chill; the third in a row freezes it.
+		if _status_left[at + ST_FREEZE] > 0.0:
 			return false
+		power = clampf(power, 0.0, CHILL_SLOW_MAX)
+	# Every status: the longer time and the stronger power.
+	_status_left[at + st] = maxf(_status_left[at + st], duration)
+	_status_power[at + st] = maxf(_status_power[at + st], power)
+	if st == ST_CHILL:
+		_chill_stacks[row] += 1
+		if _chill_stacks[row] >= CHILL_STACKS_TO_FREEZE:
+			_status_left[at + ST_CHILL] = 0.0
+			_status_power[at + ST_CHILL] = 0.0
+			_chill_stacks[row] = 0
+			_status_left[at + ST_FREEZE] = FREEZE_TIME
+			froze = true
 	if events != null:
 		var node: Node2D = _nodes[row]
 		events.status_applied.emit(caster, node, status_id)
@@ -718,22 +705,10 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 ## it is off or the actor is not registered.
 func status_left(actor: Variant, status_id: StringName) -> float:
 	var row: int = _row_of(actor)
-	if row == ActorsScript.NONE:
+	var st: int = STATUS_AT.get(status_id, -1)
+	if row == ActorsScript.NONE or st < 0:
 		return 0.0
-	match status_id:
-		BURN:
-			return _burn_left[row]
-		CHILL:
-			return _chill_left[row]
-		FREEZE:
-			return _freeze_left[row]
-		SHOCK:
-			return _shock_left[row]
-		HEX:
-			return _hex_left[row]
-		STATIC:
-			return _static_left[row]
-	return 0.0
+	return _status_left[row * STATUS_COUNT + st]
 
 
 func has_status(actor: Variant, status_id: StringName) -> bool:
@@ -882,11 +857,12 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 		team = _team(row)
 	var centre: Vector2 = where + _hurt_offset[row]
 	if not tick:
-		if _hex_left[row] > 0.0:
-			amount += amount * _hex_extra[row] / 100.0
+		var at: int = row * STATUS_COUNT
+		if _status_left[at + ST_HEX] > 0.0:
+			amount += amount * _status_power[at + ST_HEX] / 100.0
 		# A charge goes off on any hit and is always spent (not by a discharge's own damage).
-		if _static_left[row] > 0.0 and not _discharging:
-			discharge_share = _static_share[row]
+		if _status_left[at + ST_STATIC] > 0.0 and not _discharging:
+			discharge_share = _status_power[at + ST_STATIC]
 			_remove_status(row, STATIC)
 	if strength > 0.0:
 		_knock[row] = direction * strength
@@ -1017,10 +993,11 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	# push it.
 	var feet: Vector2 = _position_of(node)
 	var direction: Vector2 = Vector2.ZERO if feet.is_equal_approx(position) else (feet + _hurt_offset[row] - position).normalized()
-	if _hex_left[row] > 0.0:
+	var at: int = row * STATUS_COUNT
+	if _status_left[at + ST_HEX] > 0.0:
 		direction = -direction
 		strength *= HEX_PULL_SHARE
-	var jump_share: float = _shock_share[row] if _shock_left[row] > 0.0 else 0.0
+	var jump_share: float = _status_power[at + ST_SHOCK] if _status_left[at + ST_SHOCK] > 0.0 else 0.0
 	var jump_from: Vector2 = feet + _hurt_offset[row]
 	# (Read now: a body the hit kills has no row, and so no team, after it.)
 	var team: int = _team(row)
@@ -1159,21 +1136,24 @@ func _reaction_for(row: int, element_id: StringName) -> ReactionRow:
 	return null
 
 
-## Which of REACTING_STATUSES the row has, bit `AT_*` for each; a frozen actor counts as chilled
-## (a row for `chill` matches a frozen target). The one place a reaction reads the statuses.
+## Which of REACTING_STATUSES the row has: bit `i` for `REACTING_STATUSES[i]`; a frozen actor counts
+## as chilled (a row for `chill` matches a frozen target). The one place a reaction reads them.
 func _status_bits(row: int) -> int:
+	var at: int = row * STATUS_COUNT
 	var on: int = 0
-	if _burn_left[row] > 0.0:
-		on |= 1 << AT_BURN
-	if _chill_left[row] > 0.0 or _freeze_left[row] > 0.0:
-		on |= 1 << AT_CHILL
-	if _shock_left[row] > 0.0:
-		on |= 1 << AT_SHOCK
-	if _hex_left[row] > 0.0:
-		on |= 1 << AT_HEX
-	if _static_left[row] > 0.0:
-		on |= 1 << AT_STATIC
+	for i in _reacting_at.size():
+		var st: int = _reacting_at[i]
+		if _status_left[at + st] > 0.0 or (st == ST_CHILL and _status_left[at + ST_FREEZE] > 0.0):
+			on |= 1 << i
 	return on
+
+
+## REACTING_STATUSES as ST_* (`_reacting_at`).
+static func _reacting_indices() -> PackedInt32Array:
+	var found := PackedInt32Array()
+	for status in REACTING_STATUSES:
+		found.append(STATUS_AT[status])
+	return found
 
 
 ## Run `reaction` on the row `row`: announce it (`reaction_triggered` at the actor, and
@@ -1195,7 +1175,7 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 	match reaction.effect:
 		ReactionRow.Effect.CONSUME:
 			var amount: float = reaction.damage
-			if _freeze_left[row] > 0.0:
+			if _status_left[row * STATUS_COUNT + ST_FREEZE] > 0.0:
 				amount *= FROZEN_BONUS
 				_remove_status(row, CHILL)
 			_remove_status(row, reaction.status_id)
@@ -1234,27 +1214,21 @@ func _burst(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
 ## EXTEND: the status lasts longer and is stronger. A chilled actor freezes for the row's
 ## duration; a frozen one stays frozen that much longer.
 func _extend(by: int, row: int, reaction: ReactionRow) -> void:
-	match reaction.status_id:
-		BURN:
-			_burn_left[row] = minf(_burn_left[row] + reaction.duration, MAX_EXTENDED_TIME)
-			_burn_rate[row] = minf(_burn_rate[row] + reaction.strength, MAX_EXTENDED_BURN)
-		CHILL:
-			var newly: bool = _freeze_left[row] <= 0.0
-			_chill_left[row] = 0.0
-			_chill_slow[row] = 0.0
-			_chill_stacks[row] = 0
-			_freeze_left[row] = minf(_freeze_left[row] + reaction.duration, MAX_FREEZE)
-			if newly and events != null:
-				events.status_applied.emit(by, _nodes[row], FREEZE)
-		SHOCK:
-			_shock_left[row] = minf(_shock_left[row] + reaction.duration, MAX_EXTENDED_TIME)
-			_shock_share[row] = minf(_shock_share[row] + reaction.strength, MAX_EXTENDED_PERCENT)
-		HEX:
-			_hex_left[row] = minf(_hex_left[row] + reaction.duration, MAX_EXTENDED_TIME)
-			_hex_extra[row] = minf(_hex_extra[row] + reaction.strength, MAX_EXTENDED_PERCENT)
-		STATIC:
-			_static_left[row] = minf(_static_left[row] + reaction.duration, MAX_EXTENDED_TIME)
-			_static_share[row] = minf(_static_share[row] + reaction.strength, MAX_EXTENDED_PERCENT)
+	var st: int = STATUS_AT.get(reaction.status_id, -1)
+	if st < 0 or st == ST_FREEZE:
+		return
+	var at: int = row * STATUS_COUNT
+	if st == ST_CHILL:
+		var newly: bool = _status_left[at + ST_FREEZE] <= 0.0
+		_status_left[at + ST_CHILL] = 0.0
+		_status_power[at + ST_CHILL] = 0.0
+		_chill_stacks[row] = 0
+		_status_left[at + ST_FREEZE] = minf(_status_left[at + ST_FREEZE] + reaction.duration, MAX_FREEZE)
+		if newly and events != null:
+			events.status_applied.emit(by, _nodes[row], FREEZE)
+		return
+	_status_left[at + st] = minf(_status_left[at + st] + reaction.duration, MAX_EXTENDED_TIME)
+	_status_power[at + st] = minf(_status_power[at + st] + reaction.strength, STATUS_EXTENDED_MAX[st])
 
 
 ## SPREAD: the status, as it is now, goes on every other actor in the circle.
@@ -1278,41 +1252,25 @@ func _spread(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
 
 ## The number `apply_status` takes as strength for the status on the row `row`.
 func _strength_of(row: int, status_id: StringName) -> float:
-	match status_id:
-		BURN:
-			return _burn_rate[row]
-		CHILL:
-			return _chill_slow[row] * 100.0
-		SHOCK:
-			return _shock_share[row]
-		HEX:
-			return _hex_extra[row]
-		STATIC:
-			return _static_share[row]
-	return 0.0
+	var st: int = STATUS_AT.get(status_id, -1)
+	if st < 0:
+		return 0.0
+	return _status_power[row * STATUS_COUNT + st] * STATUS_STRENGTH_PER_POWER[st]
 
 
 ## Switch `status_id` off on the row `row` (a frozen actor loses its freeze with its chill).
 func _remove_status(row: int, status_id: StringName) -> void:
-	match status_id:
-		BURN:
-			_burn_left[row] = 0.0
-			_burn_rate[row] = 0.0
-			_burn_carry[row] = 0.0
-		CHILL:
-			_chill_left[row] = 0.0
-			_chill_slow[row] = 0.0
-			_chill_stacks[row] = 0
-			_freeze_left[row] = 0.0
-		SHOCK:
-			_shock_left[row] = 0.0
-			_shock_share[row] = 0.0
-		HEX:
-			_hex_left[row] = 0.0
-			_hex_extra[row] = 0.0
-		STATIC:
-			_static_left[row] = 0.0
-			_static_share[row] = 0.0
+	var st: int = STATUS_AT.get(status_id, -1)
+	if st < 0 or st == ST_FREEZE:
+		return
+	var at: int = row * STATUS_COUNT
+	_status_left[at + st] = 0.0
+	_status_power[at + st] = 0.0
+	if st == ST_BURN:
+		_burn_carry[row] = 0.0
+	elif st == ST_CHILL:
+		_chill_stacks[row] = 0
+		_status_left[at + ST_FREEZE] = 0.0
 
 
 # --- Requests ---
@@ -1400,29 +1358,28 @@ func _tick(row: int, delta: float) -> void:
 		if _shield_left[row] == 0.0:
 			_shield[row] = 0
 			_send_barrier(row, Vector2.ZERO)
-	if _burn_left[row] > 0.0:
-		var burned: float = minf(delta, _burn_left[row])
-		_burn_left[row] -= burned
-		_burn_carry[row] += _burn_rate[row] * burned
+	var at: int = row * STATUS_COUNT
+	# Burn deals its rate for the seconds it still had.
+	var burning: float = _status_left[at + ST_BURN]
+	if burning > 0.0:
+		var burned: float = minf(delta, burning)
+		_status_left[at + ST_BURN] = burning - burned
+		_burn_carry[row] += _status_power[at + ST_BURN] * burned
 		var whole: int = int(_burn_carry[row])
 		if whole > 0:
 			_burn_carry[row] -= float(whole)
 			_due_node.append(_nodes[row])
 			_due_by.append(_burn_by[row])
 			_due_amount.append(whole)
-	if _chill_left[row] > 0.0:
-		_chill_left[row] = maxf(_chill_left[row] - delta, 0.0)
-		if _chill_left[row] == 0.0:
-			_chill_slow[row] = 0.0
-			_chill_stacks[row] = 0
-	if _freeze_left[row] != 0.0:
-		_freeze_left[row] = maxf(_freeze_left[row] - delta, 0.0)
-	if _shock_left[row] != 0.0:
-		_shock_left[row] = maxf(_shock_left[row] - delta, 0.0)
-	if _hex_left[row] != 0.0:
-		_hex_left[row] = maxf(_hex_left[row] - delta, 0.0)
-	if _static_left[row] != 0.0:
-		_static_left[row] = maxf(_static_left[row] - delta, 0.0)
+	# Every other status counts down; a chill that runs out takes its slow and stacks with it.
+	for st in range(ST_BURN + 1, STATUS_COUNT):
+		var left: float = _status_left[at + st]
+		if left != 0.0:
+			left = maxf(left - delta, 0.0)
+			_status_left[at + st] = left
+			if left == 0.0 and st == ST_CHILL:
+				_status_power[at + ST_CHILL] = 0.0
+				_chill_stacks[row] = 0
 	if _react_wait[row] != 0.0:
 		_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 
@@ -1664,20 +1621,12 @@ func _free_row(row: int) -> void:
 ## Statuses, push, barrier, reaction wait and slam off.
 func _clear_state(row: int) -> void:
 	_knock[row] = Vector2.ZERO
-	_burn_left[row] = 0.0
-	_burn_rate[row] = 0.0
+	for st in STATUS_COUNT:
+		_status_left[row * STATUS_COUNT + st] = 0.0
+		_status_power[row * STATUS_COUNT + st] = 0.0
 	_burn_carry[row] = 0.0
 	_burn_by[row] = EventsScript.NO_PLAYER
-	_chill_left[row] = 0.0
-	_chill_slow[row] = 0.0
 	_chill_stacks[row] = 0
-	_freeze_left[row] = 0.0
-	_shock_left[row] = 0.0
-	_shock_share[row] = 0.0
-	_hex_left[row] = 0.0
-	_hex_extra[row] = 0.0
-	_static_left[row] = 0.0
-	_static_share[row] = 0.0
 	_react_wait[row] = 0.0
 	var shielded: bool = _shield_left[row] > 0.0
 	_shield[row] = 0

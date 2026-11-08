@@ -96,6 +96,14 @@ func test_the_shaders_read_it_as_a_global_marked_texture() -> void:
 	check(look.contains("global uniform sampler2D %s;" % InfusionTable.PARAMETER), "the shared look reads it")
 	check(look.contains("const float INFUSION_MARK = 128.0 / 255.0;") and is_equal_approx(InfusionTable.MARK, 128.0 / 255.0), "with the table's mark")
 	check(look.contains("#ifndef LOOK_OWN_INFUSIONS"), "and weaves a look of several unless the shader shows them its own way")
+	# Its default use gives every infusion of the palette a slot of its own (the owner, 2026-11-08:
+	# the third of four was skipped): the second the shadow, the third the glow, the fourth the core.
+	var woven: String = look.substr(look.find("#ifndef LOOK_OWN_INFUSIONS"))
+	woven = woven.substr(0, woven.find("#endif"))
+	check(woven.contains("L.lo = palette_shade(materials.y"), "the second's: the shadow")
+	check(woven.contains("count > 2 ? materials.z : materials.y") and woven.contains("L.glow = mix(palette_shade(glows"), "the third's (else the second's): the glow")
+	check(woven.contains("L.hot = mix(palette_shade(materials.w"), "the fourth's: the white-hot core")
+	check(look.contains("const int PALETTE_MOST = 4;"), "four in a palette, each with its slot")
 	# These show each infusion their own way (the beam's strands) or are in one infusion's colours
 	# already (a mote, the mark it leaves): their looks are not woven.
 	for path: String in ["res://content/spells/forms/beam/beam.gdshader", "res://gameplay/feel/light_beam.gdshader", "res://gameplay/feel/mote.gdshader", "res://gameplay/feel/mark.gdshader"]:

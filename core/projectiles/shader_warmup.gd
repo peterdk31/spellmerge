@@ -29,7 +29,7 @@ const RECT: int = 2
 const BATCH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_head.gdshader"),
 	preload("res://core/projectiles/shot_flash.gdshader"),
-	preload("res://core/projectiles/shot_rune.gdshader"),
+	preload("res://core/projectiles/shot_still.gdshader"),
 	preload("res://core/projectiles/shot_orbit.gdshader"),
 	preload("res://core/projectiles/shot_status.gdshader"),
 	preload("res://core/projectiles/shot_arc.gdshader"),

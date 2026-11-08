@@ -62,7 +62,7 @@ func test_there_is_no_fixed_number_of_bodies() -> void:
 func test_a_still_shot_of_a_card_body_draws_in_its_batch() -> void:
 	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY_RUNE, "a still shot of no actor is a rune of the enemy ramp")
+	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY_STILL, "a still shot of no actor is a rune of the enemy ramp")
 	check(mgr.set_form(slot, &"wall", stone), "a card may name its body")
 	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(stone, true), "and it draws in that body's batch")
 	check_equal(mgr._kind_of(slot), ManagerScript.KIND_RUNE, "still a rune to the world")
@@ -84,7 +84,7 @@ func test_a_reused_slot_forgets_its_card() -> void:
 		mgr.step(DT)
 	var again: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	check_equal(again, slot, "the same slot is taken again")
-	check_equal(mgr._batch_of(again), ManagerScript.BATCH_ENEMY_RUNE, "a rune again, not the stone before")
+	check_equal(mgr._batch_of(again), ManagerScript.BATCH_ENEMY_STILL, "a rune again, not the stone before")
 	check_equal(mgr._form_of(again), &"rune", "told by its body again")
 
 

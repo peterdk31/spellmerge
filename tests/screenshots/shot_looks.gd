@@ -15,6 +15,8 @@ extends "res://tests/support/screenshot.gd"
 ##               the right half through a grey filter, to check the looks read without colour
 ## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
+## The rune card's own shot shader, which draws its still shots.
+const RUNE: Shader = preload("res://content/spells/forms/rune/rune.gdshader")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
@@ -57,6 +59,7 @@ func take() -> void:
 		var look: PackedInt32Array = PackedInt32Array() if e == 0 else PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))])
 		_bolt(0, Vector2(x, 30.0), BOLT_RADIUS, tint, look)
 		var rune: int = _shots.call("spawn", 0, Vector2(x, 80.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
+		_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
 		_dress(rune, tint, look)
 	for p in 4:
 		var anchor := Vector2(40.0 + p * 60.0, 140.0)
@@ -87,6 +90,7 @@ func take() -> void:
 	_bolt(2, Vector2(400.0, 140.0), BOLT_RADIUS, ELEMENTS[3].get("tint") as Color, everything)
 	_bolt(3, Vector2(470.0, 140.0), BOLT_RADIUS * float(BIGGER.get("radius_mult")), ELEMENTS[0].get("tint") as Color, everything)
 	var rune: int = _shots.call("spawn", 0, Vector2(565.0, 140.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
+	_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
 	_dress(rune, ELEMENTS[4].get("tint") as Color, everything)
 	# Four players, the same fire bolt, twice: in colour on the left, grey on the right.
 	for half in 2:

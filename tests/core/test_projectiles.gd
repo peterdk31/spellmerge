@@ -555,9 +555,9 @@ func _test_shot_core_colour_and_batches() -> void:
 	_mgr.update_draw()
 	_check(_mgr.drawn == 3, "the three shots are drawn (%d)" % _mgr.drawn)
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the bolt is in the bolt batch")
-	_check(_mgr._rune_node.multimesh.visible_instance_count == 1, "the rune is in the rune batch")
+	_check(_mgr._still_node.multimesh.visible_instance_count == 1, "the rune is in the rune batch")
 	_check(_mgr._orbit_node.multimesh.visible_instance_count == 1, "the orbit shot is in the orbit batch")
-	for node: MultiMeshInstance2D in [_mgr._draw_node, _mgr._rune_node, _mgr._orbit_node]:
+	for node: MultiMeshInstance2D in [_mgr._draw_node, _mgr._still_node, _mgr._orbit_node]:
 		var buffer: PackedFloat32Array = node.multimesh.buffer
 		_check(is_equal_approx(buffer[12], frost.r) and is_equal_approx(buffer[13], frost.g) and is_equal_approx(buffer[14], frost.b), "the core colour is in the custom data")
 	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
@@ -579,7 +579,7 @@ func _test_shot_core_colour_and_batches() -> void:
 	_check(again >= 0 and is_equal_approx(plain[12], 1.0) and is_equal_approx(plain[13], 1.0) and is_equal_approx(plain[14], 1.0), "a new shot has a white core, not the last one's")
 	var art := PlaceholderTexture2D.new()
 	_mgr.texture = art
-	_check(_mgr._rune_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art")
+	_check(_mgr._still_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art")
 	root.remove_child(_mgr)
 
 
@@ -602,12 +602,12 @@ func _test_enemy_shots_have_their_own_batch() -> void:
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(40.0, 0.0), Vector2.ZERO, 1.0, 8.0, ManagerScript.LAYER_PLAYER, 0, 0, ManagerScript.MOTION_STILL)
 	_mgr.update_draw()
 	_check(_mgr.drawn == 4 and _mgr.drawn_enemy == 3, "the rune is drawn and counted as an enemy shot")
-	_check(_mgr._enemy_node.multimesh.visible_instance_count == 2 and _mgr._enemy_rune_node.multimesh.visible_instance_count == 1, "in the enemy rune batch, not with the trails")
-	_check((_mgr._enemy_rune_node.material as ShaderMaterial).shader == ManagerScript.RUNE_SHADER, "drawn by the rune shader")
-	_check(_mgr._enemy_rune_node.z_index == _mgr._enemy_node.z_index, "on the enemy shots' layer")
+	_check(_mgr._enemy_node.multimesh.visible_instance_count == 2 and _mgr._enemy_still_node.multimesh.visible_instance_count == 1, "in the enemy rune batch, not with the trails")
+	_check((_mgr._enemy_still_node.material as ShaderMaterial).shader == ManagerScript.STILL_SHADER, "drawn by the rune shader")
+	_check(_mgr._enemy_still_node.z_index == _mgr._enemy_node.z_index, "on the enemy shots' layer")
 	_mgr.clear()
 	_mgr.update_draw()
-	_check(_mgr.drawn == 0 and _mgr._enemy_node.multimesh.visible_instance_count == 0 and _mgr._enemy_rune_node.multimesh.visible_instance_count == 0, "clear empties the enemy batches too")
+	_check(_mgr.drawn == 0 and _mgr._enemy_node.multimesh.visible_instance_count == 0 and _mgr._enemy_still_node.multimesh.visible_instance_count == 0, "clear empties the enemy batches too")
 	root.remove_child(_mgr)
 
 
@@ -688,7 +688,7 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 	_check(_mgr.drawn == bolts + runes + orbits + hostile, "every shot is drawn (%d)" % _mgr.drawn)
 	var wanted: Array = [
 		[_mgr._draw_node, bolts, 128],
-		[_mgr._rune_node, runes, ManagerScript.MIN_BATCH],
+		[_mgr._still_node, runes, ManagerScript.MIN_BATCH],
 		[_mgr._orbit_node, orbits, ManagerScript.MIN_BATCH],
 		[_mgr._enemy_node, hostile, ManagerScript.MIN_BATCH],
 	]
@@ -699,7 +699,7 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 		_check(multimesh.instance_count == row[2], "the batch has room for %d (%d)" % [row[2], multimesh.instance_count])
 		_check(multimesh.buffer.size() == multimesh.instance_count * stride, "its buffer is instance_count x stride")
 	var bolt_buffer: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
-	var rune_buffer: PackedFloat32Array = _mgr._rune_node.multimesh.buffer
+	var rune_buffer: PackedFloat32Array = _mgr._still_node.multimesh.buffer
 	var hostile_buffer: PackedFloat32Array = _mgr._enemy_node.multimesh.buffer
 	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
 	# A shot in flight holds its head where it is drawn; the shader puts the quad round its trail.

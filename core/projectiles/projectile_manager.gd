@@ -55,8 +55,9 @@ extends Node2D
 ## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
 ## batch of its own (the owner, 2026-10-29; core/README.md, "The shot shaders"): a flying shot
 ## (its core and the core's light; the tail is motes) by `shot_head.gdshader`, as small quads its
-## vertex stage places (`head_mesh`, so the fragment stage stays small), a rune by
-## `shot_rune.gdshader`.
+## vertex stage places (`head_mesh`, so the fragment stage stays small), a still shot by its card's
+## own shader (`register_body`: a rune's, a wall's stones, a pool's puddle) or, when its card names
+## none, the plain `shot_still.gdshader`.
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
@@ -338,17 +339,17 @@ const MIN_BATCH: int = 64
 ## BATCH_BODY_FIRST + 2 (n - 1), and + 1 for the enemy ramp. `batch_count()` says how many there
 ## are now; `batches_grown` tells when there are more.
 const BATCH_BOLT: int = 0
-const BATCH_RUNE: int = 1
+const BATCH_STILL: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_ENEMY: int = 3
-const BATCH_ENEMY_RUNE: int = 4
+const BATCH_ENEMY_STILL: int = 4
 const BATCH_BODY_FIRST: int = 5
 ## The most card bodies: a slot's body and its batch are a byte each, so 2 x MOST_BODIES + 5 batches
 ## at most. A shader past them is drawn as a rune (an error names it).
 const MOST_BODIES: int = 125
 ## The order the first batches' nodes are made in (their draw order at one z); a body's pair is made
 ## after them, when it is numbered.
-const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_RUNE, BATCH_ORBIT, BATCH_ENEMY, BATCH_ENEMY_RUNE]
+const BATCH_ORDER: Array[int] = [BATCH_BOLT, BATCH_STILL, BATCH_ORBIT, BATCH_ENEMY, BATCH_ENEMY_STILL]
 ## `_draw_out`: the totals of a drawing first (the particles asked for, 0 (was the trails' cost), the
 ## shots drawn, the enemy shots drawn, the tail births laid, the tail asked for), then each batch's
 ## instances written from DRAW_OUT_FIRST on, so the totals stay put as batches are added.
@@ -359,8 +360,8 @@ const DRAW_BIRTHS: int = 4
 const DRAW_TAIL: int = 5
 const DRAW_OUT_FIRST: int = 6
 ## The bodies a shot is drawn as (the shot shaders build them on a pixel grid; staffs B6a): a
-## bolt's head (`shot_head.gdshader`; its tail is motes), a rune (a diamond that pulses,
-## `shot_rune.gdshader`), an orbit shot drawn whole with its tail bent round its circle
+## bolt's head (`shot_head.gdshader`; its tail is motes), a still shot (its card's shader, or the
+## plain `shot_still.gdshader`), an orbit shot drawn whole with its tail bent round its circle
 ## (`shot_orbit.gdshader`, Entities' familiars; the manager's orbit shots are drawn as bolts are).
 ## Kind 0 is no body. A still shot is KIND_RUNE to the world (`impact_body`) whatever draws it: a
 ## card's own body is its batch's shader (`register_body`), not a kind.
@@ -551,7 +552,7 @@ const PARTICLES_PER_SHOT_MAX: int = 12
 const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
 ## Build the shots from their looks (see "Drawing" above): flying shots' heads, runes.
 const HEAD_SHADER: Shader = preload("res://core/projectiles/shot_head.gdshader")
-const RUNE_SHADER: Shader = preload("res://core/projectiles/shot_rune.gdshader")
+const STILL_SHADER: Shader = preload("res://core/projectiles/shot_still.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
@@ -604,7 +605,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_body_shaders", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_rune_node", &"_orbit_node", &"_enemy_node", &"_enemy_rune_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"texture", &"_body_shaders", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -913,10 +914,10 @@ var _mirrors: Array[MultiMesh] = []
 ## The first batches' nodes by name: the hat ramps' bolts, runes and orbits, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
-var _rune_node: MultiMeshInstance2D = null
+var _still_node: MultiMeshInstance2D = null
 var _orbit_node: MultiMeshInstance2D = null
 var _enemy_node: MultiMeshInstance2D = null
-var _enemy_rune_node: MultiMeshInstance2D = null
+var _enemy_still_node: MultiMeshInstance2D = null
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
 var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## The card bodies' shaders, body `n` at `n - 1` (`register_body`), and how many batches there are
@@ -1224,15 +1225,15 @@ func _ready() -> void:
 		events.tailless_motes_changed.connect(set_tailless_pool)
 	_nodes.resize(BATCH_BODY_FIRST)
 	for batch: int in BATCH_ORDER:
-		_nodes[batch] = _make_batch(_batch_z(batch), RUNE_SHADER if batch_mesh(batch) < 0 else HEAD_SHADER, null if batch_mesh(batch) < 0 else head_mesh())
+		_nodes[batch] = _make_batch(_batch_z(batch), STILL_SHADER if batch_mesh(batch) < 0 else HEAD_SHADER, null if batch_mesh(batch) < 0 else head_mesh())
 	# The card bodies numbered before it was in the tree.
 	for n in _body_shaders.size():
 		_make_body_batches(n + 1)
 	_draw_node = _nodes[BATCH_BOLT]
-	_rune_node = _nodes[BATCH_RUNE]
+	_still_node = _nodes[BATCH_STILL]
 	_orbit_node = _nodes[BATCH_ORBIT]
 	_enemy_node = _nodes[BATCH_ENEMY]
-	_enemy_rune_node = _nodes[BATCH_ENEMY_RUNE]
+	_enemy_still_node = _nodes[BATCH_ENEMY_STILL]
 	_apply_textures()
 	_fit_draw_bounds()
 
@@ -1283,12 +1284,12 @@ static func batch_mesh(batch: int) -> int:
 static func batch_on_enemy_layer(batch: int) -> bool:
 	if batch >= BATCH_BODY_FIRST:
 		return (batch - BATCH_BODY_FIRST) % 2 == 1
-	return batch == BATCH_ENEMY or batch == BATCH_ENEMY_RUNE
+	return batch == BATCH_ENEMY or batch == BATCH_ENEMY_STILL
 
 
 ## True for a batch given the shot art (`texture`): the hat ramps' bolts, runes and orbits.
 static func batch_textured(batch: int) -> bool:
-	return batch == BATCH_BOLT or batch == BATCH_RUNE or batch == BATCH_ORBIT
+	return batch == BATCH_BOLT or batch == BATCH_STILL or batch == BATCH_ORBIT
 
 
 ## The z its batch's node draws at.
@@ -5181,8 +5182,8 @@ func _set_shares(node: MultiMeshInstance2D) -> void:
 
 ## How many particles the pool is asked for by a shot with the packed `look`: 4 + 2 per
 ## emitting kind (every kind but the weave, which changes the body), at most 12; none for a
-## plain shot. The shot shaders (`shot_rune.gdshader`, `shot_orbit.gdshader`) hold the same rule;
-## keep them equal.
+## plain shot. The shot shaders that give particles off (`shot_still.gdshader`, `shot_orbit.gdshader`
+## and every card's own shot shader) hold the same rule; keep them equal.
 static func particles_of(look: int) -> int:
 	if look == 0:
 		return 0
@@ -5202,9 +5203,9 @@ func _batch_of(slot: int) -> int:
 	if _motion[slot] == MOTION_STILL and _body[slot] > 0:
 		return body_batch(_body[slot], not is_hat_ramp(_ramp[slot]))
 	if not is_hat_ramp(_ramp[slot]):
-		return BATCH_ENEMY_RUNE if _motion[slot] == MOTION_STILL else BATCH_ENEMY
+		return BATCH_ENEMY_STILL if _motion[slot] == MOTION_STILL else BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
-		return BATCH_RUNE
+		return BATCH_STILL
 	if _motion[slot] == MOTION_ORBIT:
 		return BATCH_ORBIT
 	return BATCH_BOLT

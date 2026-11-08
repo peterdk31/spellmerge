@@ -2,13 +2,12 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A rune (the projectile manager's rune batches; core/README.md, "The shot shaders"): a one-pixel
-// diamond about its hit size with bright corners, a dotted ring inside and a glyph of four dots
-// turning round a bright heart, swelling and settling while it waits, tracing itself onto the
-// floor while it is new (the code beside its kind), its card particles given off from its outline
-// and a soft glow. (A still shot whose card names a shader of its own, a wall's stone or a pool's
-// puddle, is drawn by that shader instead: `FormBase.shot_shader`.) Its quad is GRID x zoom
-// pixels square round its centre. Blending is premultiplied: its pixels are opaque, the glow added
+// A rune (content/spells/forms/rune/: its card's own shot shader, `FormBase.shot_shader`;
+// core/README.md, "The shot shaders"): a one-pixel diamond about its hit size with bright corners, a
+// dotted ring inside and a glyph of four dots turning round a bright heart, swelling and settling
+// while it waits, tracing itself onto the floor while it is new (the code beside its kind), its card
+// particles given off from its outline and a soft glow. Its quad is GRID x zoom pixels square round
+// its centre. Blending is premultiplied: its pixels are opaque, the glow added
 // light.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"

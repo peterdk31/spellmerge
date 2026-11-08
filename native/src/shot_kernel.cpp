@@ -105,10 +105,10 @@ constexpr double RUNE_TRACE = 0.25;
 constexpr double TRACE_FROM = 0.02;
 constexpr double TRACE_SPAN = 0.42;
 constexpr int BATCH_BOLT = 0;
-constexpr int BATCH_RUNE = 1;
+constexpr int BATCH_STILL = 1;
 constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
-constexpr int BATCH_ENEMY_RUNE = 4;
+constexpr int BATCH_ENEMY_STILL = 4;
 constexpr int BATCH_BODY_FIRST = 5;
 // `_draw_out`: its totals first (DRAW_*), then each batch's rows written from DRAW_OUT_FIRST on; how
 // many batches there are is the manager's `_batch_total`, which grows with the card bodies.
@@ -944,10 +944,10 @@ const Constant CONSTANTS[] = {
 	{ "TRACE_FROM", (double)TRACE_FROM },
 	{ "TRACE_SPAN", (double)TRACE_SPAN },
 	{ "BATCH_BOLT", (double)BATCH_BOLT },
-	{ "BATCH_RUNE", (double)BATCH_RUNE },
+	{ "BATCH_STILL", (double)BATCH_STILL },
 	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
-	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
+	{ "BATCH_ENEMY_STILL", (double)BATCH_ENEMY_STILL },
 	{ "BATCH_BODY_FIRST", (double)BATCH_BODY_FIRST },
 	{ "DRAW_ASKED", (double)DRAW_ASKED },
 	{ "DRAW_SHOTS", (double)DRAW_SHOTS },
@@ -1512,9 +1512,9 @@ void ShotKernel::count_draw(Object *m) {
 				if (mot == MOTION_STILL && body[slot] > 0) {
 					batch = BATCH_BODY_FIRST + 2 * ((int64_t)body[slot] - 1) + (is_hat_ramp(rmp) ? 0 : 1);
 				} else if (!is_hat_ramp(rmp)) {
-					batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
+					batch = mot == MOTION_STILL ? BATCH_ENEMY_STILL : BATCH_ENEMY;
 				} else if (mot == MOTION_STILL) {
-					batch = BATCH_RUNE;
+					batch = BATCH_STILL;
 				} else if (mot == MOTION_ORBIT) {
 					batch = BATCH_ORBIT;
 				}
@@ -1826,7 +1826,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		shots += used[b];
 	}
 	// The batches on the enemy ramp's layer (`batch_on_enemy_layer`): its shots, runes and bodies.
-	int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
+	int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_STILL];
 	for (int64_t b = BATCH_BODY_FIRST + 1; b < batches; b += 2) {
 		enemy_shots += used[b];
 	}

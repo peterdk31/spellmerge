@@ -77,6 +77,14 @@ const REVIVE_RING_RADIUS: float = 7.0
 const REVIVE_RING_HEIGHT: float = 24.0
 const REVIVE_RING_BACK: Color = Color("5a5a6e")
 const OUTLINE_COLOR: Color = Color("14121f")
+## The hammer a slam's staff turns into (its `hammer` pose channel, `Spells.poses().staff_hammer`):
+## drawn by its own node over the staff and under the face (HAMMER_SHADER), a square HAMMER_EXTENT
+## pixels each way round the grip; a spell of hit radius HAMMER_RADIUS (the slam's ring) draws it
+## at size 1, a bigger one bigger (a bigger card's), up to HAMMER_SIZE_MOST.
+const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
+const HAMMER_EXTENT: float = 48.0
+const HAMMER_RADIUS: float = 16.0
+const HAMMER_SIZE_MOST: float = 2.2
 ## How far toward white the ghosts go from the ramp's light shade.
 const GHOST_LIGHT: float = 0.4
 
@@ -90,6 +98,8 @@ var _face: Face = null
 var _downed: Downed = null
 ## The shadow, drawn under the sprite.
 var _shadow: Node2D = null
+## The hammer, drawn over the sprite (made at setup; shown while its pose channel is above 0).
+var _hammer: Node2D = null
 ## The staff whose head and personality show (-1 before the first step), and the time hovered.
 var _shown: int = -1
 var _time: float = 0.0
@@ -132,6 +142,17 @@ func setup(owner_actor: Actor) -> void:
 		_shadow.draw.connect(_draw_shadow)
 		actor.add_child(_shadow)
 		actor.move_child(_shadow, _sprite.get_index() if _sprite != null else 0)
+	if _hammer == null and _sprite != null:
+		_hammer = Node2D.new()
+		_hammer.name = "Hammer"
+		_hammer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var material := ShaderMaterial.new()
+		material.shader = HAMMER_SHADER
+		_hammer.material = material
+		_hammer.draw.connect(_draw_hammer)
+		_hammer.visible = false
+		actor.add_child(_hammer)
+		actor.move_child(_hammer, _sprite.get_index() + 1)
 	_shown = -1
 	_poof_age = -1.0
 	_target = actor.caster.current if actor.caster != null else 0
@@ -154,6 +175,7 @@ func step(delta: float) -> void:
 	apply_pose(_sprite, _face, moving or _dash_look)
 	if moving or _dash_look:
 		_apply_dash_look(moving)
+	_place_hammer()
 	_update_invulnerable_look(down)
 	var progress: float = _downed.revive_progress() if _downed != null else 0.0
 	if not actor.aim.is_equal_approx(_drawn_aim) or down != _drawn_down or progress != _drawn_progress:
@@ -161,12 +183,6 @@ func step(delta: float) -> void:
 		_drawn_down = down
 		_drawn_progress = progress
 		queue_redraw()
-
-
-## Where a slam's hammer grows on this staff's head sheet (`ActorLook.hammer_frame`): FRAME_SIZE
-## frames, the grip at GRIP, the tip `Actor.reach` from it.
-func hammer_frame() -> Vector4:
-	return Vector4(FRAME_SIZE, GRIP.x, GRIP.y, actor.reach())
 
 
 ## The staff (button) whose head shows, -1 before the first step.
@@ -301,6 +317,49 @@ func _landed(at: Vector2) -> Vector2:
 		return at
 	var onto: Vector2 = actor.hand_offset + poses.staff_land_point(actor.id) - _tip_from_grip(direction()) * pose_scale()
 	return at.lerp(onto, land).round()
+
+
+## The hammer on the staff while its animation turns its head into one: where the sprite is (as
+## stretched and leaned), pointing as the drawn column does, as far turned and as big as the
+## animation's spell says, in its glow's colour.
+func _place_hammer() -> void:
+	if _hammer == null:
+		return
+	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
+	var amount: float = poses.staff_hammer(actor.id) if poses != null and not pose_dir().is_zero_approx() else 0.0
+	_hammer.visible = amount > 0.0
+	if amount <= 0.0:
+		return
+	_hammer.position = _sprite.position
+	_hammer.scale = _sprite.scale
+	_hammer.rotation = _sprite.rotation
+	var tint: Color = poses.staff_glow_tint(actor.id)
+	var colour: Color = light_color() if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
+	var material := _hammer.material as ShaderMaterial
+	material.set_shader_parameter(&"hammer", amount)
+	material.set_shader_parameter(&"hammer_size", hammer_size())
+	material.set_shader_parameter(&"hammer_dir", Vector2.RIGHT.rotated(direction() * TAU / DIRECTIONS))
+	material.set_shader_parameter(&"hammer_reach", actor.reach())
+	material.set_shader_parameter(&"glow_color", colour)
+	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))
+
+
+## How big the hammer is drawn now: 1 for a spell of hit radius HAMMER_RADIUS (a slam's ring),
+## bigger for a bigger one, up to HAMMER_SIZE_MOST.
+func hammer_size() -> float:
+	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
+	var radius: float = poses.staff_radius(actor.id) if poses != null else 0.0
+	return clampf(radius / HAMMER_RADIUS, 1.0, HAMMER_SIZE_MOST)
+
+
+## The hammer's node, for tests (null without a sprite).
+func hammer_node() -> Node2D:
+	return _hammer
+
+
+## The square the hammer's shader draws in, round the grip.
+func _draw_hammer() -> void:
+	_hammer.draw_rect(Rect2(-Vector2.ONE * HAMMER_EXTENT, Vector2.ONE * HAMMER_EXTENT * 2.0), Color.WHITE)
 
 
 ## Show or hide the invulnerable look when the state changes; while it shows, the closing ring is

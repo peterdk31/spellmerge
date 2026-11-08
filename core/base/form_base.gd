@@ -85,7 +85,7 @@ const POSE_RANGES: Dictionary = {
 ## jitter) and `land` (0 to 1: how far the staff is moved so its drawn tip lies on the point its
 ## carrier strikes, a slam's impact; nothing for a carrier that names none), `hammer` (0 to 1: how far
 ## the staff's head has turned into a hammer's, which grows out of it and goes back into it; a
-## wizard's staff only, `StaffLook.hammer_frame`); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
+## wizard's staff only, `StaffLook`; as big as the spell's hit radius, so a bigger card grows it); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
 ## `mood` the face shows from then on (POSE_MOODS). Ranges in POSE_RANGES; the validator checks it.
 ## Example: [{"phase": "after", "at": 0.04, "push": -3, "ease": "out"}, {"phase": "after", "at": 0.2}].
 @export var staff_pose: Array[Dictionary] = []

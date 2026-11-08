@@ -16,9 +16,6 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## The shots' sprite shader (core/README.md, "The shot shaders"): the body's glow keeps the
 ## sprite's own colours (`core_override` alpha 0) and adds light round it.
 const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
-## The same with a hammer growing out of a staff's head (a slam's `hammer` channel,
-## `Spells.poses().staff_hammer`), for a look whose sprite is a staff's head sheet (`hammer_frame`).
-const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
 ## How bright the body's glow is at an animation's full glow (`Spells.poses().staff_glow` 1).
 const POSE_GLOW: float = 1.6
 ## How fast a shaking body jitters (radians a second on each axis, out of step).
@@ -37,8 +34,6 @@ var actor: Actor = null
 ## stretched by its animation (to put its scale back once when it ends).
 var _glow_material: ShaderMaterial = null
 var _pose_stretched: bool = false
-## The body's material while its animation turns its head into a hammer (made the first time).
-var _hammer_material: ShaderMaterial = null
 
 
 func setup(owner_actor: Actor) -> void:
@@ -92,56 +87,32 @@ func apply_pose(sprite: Sprite2D, face: Face, keep_scale: bool) -> void:
 			_pose_stretched = scale_now != Vector2.ONE
 			sprite.scale = scale_now
 	if sprite != null:
-		var hammer: float = actor.spells.poses().staff_hammer(actor.id) if posing and hammer_frame() != Vector4.ZERO else 0.0
-		_apply_glow(sprite, actor.spells.poses().staff_glow(actor.id) if posing else 0.0, hammer)
+		_apply_glow(sprite, actor.spells.poses().staff_glow(actor.id) if posing else 0.0)
 	if face != null and posing:
 		var mood: StringName = actor.spells.poses().staff_mood(actor.id)
 		if POSE_MOODS.has(mood):
 			face.show_mood(POSE_MOODS[mood] as Face.Mood, POSE_MOOD_SECONDS)
 
 
-## True while the body glows with its animation (or turns into a hammer with it).
+## True while the body glows with its animation.
 func is_glowing(sprite: Sprite2D) -> bool:
-	return sprite != null and sprite.material != null and (sprite.material == _glow_material or sprite.material == _hammer_material)
+	return sprite != null and _glow_material != null and sprite.material == _glow_material
 
 
-## True while the body's head is a hammer's, or turning into one.
-func is_hammer(sprite: Sprite2D) -> bool:
-	return sprite != null and _hammer_material != null and sprite.material == _hammer_material
-
-
-## For a look whose sprite is a staff's head sheet, where its hammer goes (`staff_hammer.gdshader`):
-## its frames' size, its grip (x, y) in a frame and its tip's distance from the grip. Zero for a
-## look whose sprite is not one: its animations turn nothing into a hammer.
-func hammer_frame() -> Vector4:
-	return Vector4.ZERO
-
-
-func _apply_glow(sprite: Sprite2D, glow: float, hammer: float = 0.0) -> void:
-	var ours: bool = sprite.material != null and (sprite.material == _glow_material or sprite.material == _hammer_material)
-	if glow <= 0.0 and hammer <= 0.0:
-		if ours:
+func _apply_glow(sprite: Sprite2D, glow: float) -> void:
+	if glow <= 0.0:
+		if _glow_material != null and sprite.material == _glow_material:
 			sprite.material = null
 		return
-	if sprite.material != null and not ours:
+	if sprite.material != null and sprite.material != _glow_material:
 		return
-	var material: ShaderMaterial = _glow_material
-	if hammer > 0.0:
-		if _hammer_material == null:
-			_hammer_material = ShaderMaterial.new()
-			_hammer_material.shader = HAMMER_SHADER
-			_hammer_material.set_shader_parameter(&"core_override", Color(0.0, 0.0, 0.0, 0.0))
-		material = _hammer_material
-		material.set_shader_parameter(&"hammer", hammer)
-		material.set_shader_parameter(&"hammer_frame", hammer_frame())
-	elif _glow_material == null:
+	if _glow_material == null:
 		_glow_material = ShaderMaterial.new()
 		_glow_material.shader = SPRITE_SHADER
 		_glow_material.set_shader_parameter(&"core_override", Color(0.0, 0.0, 0.0, 0.0))
-		material = _glow_material
 	# The infusion's colour when it has one, else the actor's ramp's.
 	var tint: Color = actor.spells.poses().staff_glow_tint(actor.id)
 	var colour: Color = ProjectilesScript.ramp_light(actor.ramp) if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
-	material.set_shader_parameter(&"glow_color", colour)
-	material.set_shader_parameter(&"sprite_glow", glow * POSE_GLOW)
-	sprite.material = material
+	_glow_material.set_shader_parameter(&"glow_color", colour)
+	_glow_material.set_shader_parameter(&"sprite_glow", glow * POSE_GLOW)
+	sprite.material = _glow_material

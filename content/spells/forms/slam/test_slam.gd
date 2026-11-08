@@ -174,6 +174,7 @@ func test_its_staff_turns_into_a_hammer_and_back() -> void:
 	check(growing > 0.0 and growing < 1.0, "growing in the wind-up: %f" % growing)
 	arena.run(0.16)
 	check(is_equal_approx(arena.spells.poses().staff_hammer(0), 1.0), "a hammer at the impact: %f" % arena.spells.poses().staff_hammer(0))
+	check(is_equal_approx(arena.spells.poses().staff_radius(0), _card().radius), "its look told how wide the slam's ring is")
 	arena.run(0.8)
 	check_equal(arena.spells.poses().staff_hammer(0), 0.0, "a staff again once it settles")
 	arena.free_all()

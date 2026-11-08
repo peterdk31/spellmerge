@@ -506,7 +506,11 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	var plain: int = manager.spawn(0, Vector2(120.0, 100.0), Vector2(60.0, 0.0), 2.0, 4.0)
 	var dim: int = manager.spawn(0, Vector2(120.0, 160.0), Vector2(60.0, 0.0), 2.0, 4.0)
 	var rune: int = manager.spawn(0, Vector2(300.0, 160.0), Vector2.ZERO, 2.0, 6.0, ProjectilesScript.LAYER_ENEMY, 0, 0, ProjectilesScript.MOTION_STILL)
-	manager.set_looks(PackedInt32Array([dim]), 1, Color.WHITE, 0, &"atom", 0, 0.5, 0.75)
+	var launch := LaunchLook.new()
+	launch.form = &"atom"
+	launch.light_intensity = 0.5
+	launch.light_reach = 0.75
+	manager.set_looks(PackedInt32Array([dim]), 1, launch)
 	check(manager.set_light(rune, 1.5, 2.0), "a rune's light set")
 	check(not manager.set_light(-1, 1.0, 1.0), "not an empty slot")
 	manager.step(1.0 / 60.0)
@@ -528,8 +532,12 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	manager.set_light(bounded, 9.0, 0.0)
 	check(is_equal_approx(manager._look_light_intensity[bounded], ProjectilesScript.LIGHT_MAX) and is_equal_approx(manager._look_light_reach[bounded], ProjectilesScript.LIGHT_REACH_MIN), "kept in bounds")
 	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
-	check(code.contains("RUNE_REACH * MODEL_MATRIX[2].x") and code.contains("rune_strength * MODEL_MATRIX[2].y"), "a rune's light: its reach and brightness times the row's")
-	check(code.contains("half_size = vec2(reach * MODEL_MATRIX[2].x)") and code.contains("shot_strength * MODEL_MATRIX[2].y"), "a head's light too")
+	# The shader names the row's floats once: MODEL_MATRIX[2].x is a row's float 2, .y its float 6.
+	check_equal(ProjectilesScript.LIGHT_REACH_FLOAT, 2, "the reach is the row's float 2")
+	check_equal(ProjectilesScript.LIGHT_INTENSITY_FLOAT, 6, "the intensity its float 6")
+	check(code.contains("#define LIGHT_REACH MODEL_MATRIX[2].x") and code.contains("#define LIGHT_INTENSITY MODEL_MATRIX[2].y"), "which the light shader reads as LIGHT_REACH and LIGHT_INTENSITY")
+	check(code.contains("RUNE_REACH * LIGHT_REACH") and code.contains("rune_strength * LIGHT_INTENSITY"), "a rune's light: its reach and brightness times the row's")
+	check(code.contains("half_size = vec2(reach * LIGHT_REACH)") and code.contains("shot_strength * LIGHT_INTENSITY"), "a head's light too")
 
 
 ## A beam card's light (card-looks phase 1b, 2): a beam's light is BEAM_STRENGTH times its card's

@@ -200,7 +200,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -618,6 +618,24 @@ func _remember_look(card: FormBase) -> int:
 		_looks[card.id] = CardLook.of(card.look_shader, card.look_light_intensity, card.look_light_reach)
 		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
 	return int(_look_drawers[card.id])
+
+
+## What one launch's shots are drawn as (`_launch_look_of`), filled for each launch and reused: a
+## launch allocates nothing (DERIVED scratch).
+var _launch_look: LaunchLook = LaunchLook.new()
+
+
+## `spell`'s launch look, in `_launch_look`: its core, look kinds, card, card body (numbered by the
+## projectile manager with the mesh its shots are written as) and light.
+func _launch_look_of(spell: CompiledSpell) -> LaunchLook:
+	var mesh: int = _shot_mesh(spell.look_drawer)
+	_launch_look.core = spell.tint
+	_launch_look.look = spell.look
+	_launch_look.form = spell.form_id
+	_launch_look.body = projectiles.register_body(spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
+	_launch_look.light_intensity = spell.look_light_intensity
+	_launch_look.light_reach = spell.look_light_reach
+	return _launch_look
 
 
 ## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.
@@ -1926,9 +1944,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 ## shot that cast it (no shot ends while a launch is set up), its trigger rows. Returns how many
 ## shots there were.
 func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
-	var look_mesh: int = _shot_mesh(spell.look_drawer)
-	var look_body: int = projectiles.register_body(spell.look_shader, look_mesh) if look_mesh != NO_SHOT_MESH else 0
-	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, look_body, spell.look_light_intensity, spell.look_light_reach)
+	projectiles.set_looks(slots, count, _launch_look_of(spell))
 	if _rec_seq.size() < projectiles.get_cap():
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null

@@ -13,6 +13,7 @@ const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 const FIRE: Color = Color("e0592f")
 
@@ -254,7 +255,7 @@ func test_a_swing_with_no_cards_gives_off_only_sparks_and_none_with_motes_off() 
 
 
 func test_the_shader_draws_only_the_line_and_its_light() -> void:
-	var code: String = SwingTrailsScript.SHADER.code
+	var code: String = ShaderSource.of(SwingTrailsScript.SHADER)
 	check(not code.contains("shot_particle") and not code.contains("Q_SPARK") and not code.contains("Q_PARTICLE"), "its sparks and card particles are motes (S6 item 10)")
 	check_equal(SwingTrailsScript.SWING_QUADS.size(), 2, "two quads: the light and the line")
 

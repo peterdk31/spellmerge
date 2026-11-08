@@ -236,13 +236,13 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 	_world.input.send_virtual_aim(0, Vector2.RIGHT)
 	_world.run(1, false)
 	check(not hammer.visible, "no hammer at rest")
-	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.6, 16.0]
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.6, 1.0]
 	_world.run(1, false)
 	check(hammer.visible, "shown while the pose turns the staff into it")
 	var material := hammer.material as ShaderMaterial
 	check(material.shader == StaffLook.HAMMER_SHADER, "by the hammer's shader")
 	check(is_equal_approx(material.get_shader_parameter(&"hammer") as float, 0.6), "as far as the pose says")
-	check(is_equal_approx(material.get_shader_parameter(&"hammer_size") as float, 1.0), "a slam's ring draws it at size 1")
+	check(is_equal_approx(material.get_shader_parameter(&"hammer_size") as float, 1.0), "a slam no card grew draws it at size 1")
 	check((material.get_shader_parameter(&"hammer_dir") as Vector2).is_equal_approx(Vector2.RIGHT), "pointing as the staff's column does")
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, body.reach()), "over its tip")
 	check_equal(hammer.position, sprite.position, "where the staff is")
@@ -253,17 +253,18 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 
 
 func test_a_bigger_spell_draws_a_bigger_hammer() -> void:
-	# A bigger card grows the slam's ring, and the hammer with it, up to HAMMER_SIZE_MOST.
+	# A bigger card grows the slam's spell (its radius_mult), and the hammer with it, up to
+	# HAMMER_SIZE_MOST; the look knows nothing of the slam's own numbers.
 	var body := _wizard()
 	var look: StaffLook = WizardFixture.look(body)
 	_world.input.send_virtual_aim(0, Vector2.RIGHT)
-	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, StaffLook.HAMMER_RADIUS * 1.6]
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.6]
 	_world.run(1, false)
-	check(is_equal_approx(look.hammer_size(), 1.6), "a ring 1.6 times as wide draws it 1.6 times as big: %f" % look.hammer_size())
-	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, StaffLook.HAMMER_RADIUS * 10.0]
+	check(is_equal_approx(look.hammer_size(), 1.6), "grown 1.6 times, it is drawn 1.6 times as big: %f" % look.hammer_size())
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 10.0]
 	_world.run(1, false)
 	check(is_equal_approx(look.hammer_size(), StaffLook.HAMMER_SIZE_MOST), "never past its biggest, so it stays in its square")
-	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 4.0]
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 0.25]
 	_world.run(1, false)
 	check(is_equal_approx(look.hammer_size(), 1.0), "never smaller than a slam's")
 

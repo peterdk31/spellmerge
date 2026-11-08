@@ -10,7 +10,7 @@ render_mode blend_premul_alpha;
 // its back in shadow, a dark socket where the staff goes through and its two ends bound in the
 // glow's colour, with that light round it. As `hammer` rises from 0 to 1 its pixels come in from
 // the middle out, white-hot at first; as it falls they go back. `hammer_size` scales it (1 a plain
-// slam's; a bigger slam's ring draws a bigger hammer). Blending is premultiplied: its pixels are
+// slam's; as many times as its cards grew the spell, a bigger card's 1.6). Blending is premultiplied: its pixels are
 // opaque, its light added. Warmed as a rect (RECT) before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
@@ -51,7 +51,8 @@ void fragment() {
 	float along = dot(d, dir);
 	float across = dot(d, across_dir);
 	vec2 box = vec2(abs(along) - ht, abs(across) - hl);
-	float near = falloff(length(max(box, vec2(0.0))), 6.0 * hammer_size) * hammer;
+	// Its light reaches the same few pixels at any size, so a big one stays inside its square.
+	float near = falloff(length(max(box, vec2(0.0))), 6.0) * hammer;
 	bool inside = box.x <= 0.5 && box.y <= 0.5 && !(box.x > -0.5 && box.y > -0.5);
 	// Its pixels come in from the middle out as it grows, and go back the same way.
 	float out_from = length(d) / (HALF_LONG * hammer_size + 1.0);

@@ -492,6 +492,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		wind_up_mult *= maxf(modifier.wind_up_mult, 0.0)
 		speed *= modifier.speed_mult
 		radius *= modifier.radius_mult
+		spell.radius_scale *= modifier.radius_mult
 		shots *= modifier.shot_mult
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult

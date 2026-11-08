@@ -188,12 +188,13 @@ func staff_hammer(actor: int) -> float:
 	return _pose_out[HAMMER] if _pose_now(actor) else 0.0
 
 
-## The hit radius of the card `actor`'s staff animation plays for (a slam's ring, grown by bigger),
-## for a look that draws it bigger as the spell is: 0 while it plays none.
-func staff_radius(actor: int) -> float:
+## How many times its cards grew the spell `actor`'s staff animation plays for
+## (`CompiledSpell.radius_scale`: 1.6 with a bigger card), for a look that draws it bigger as the
+## spell grows (a slam's hammer): 1 while it plays none.
+func staff_grown(actor: int) -> float:
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
-		return 0.0
-	return _pose_spell[actor].radius
+		return 1.0
+	return _pose_spell[actor].radius_scale
 
 
 ## How far (0 to 1) `actor`'s staff is moved so its tip lies on the point its carrier strikes, and

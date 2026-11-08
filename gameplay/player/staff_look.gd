@@ -29,6 +29,11 @@ extends ActorLook
 ## drawn by the shots' sprite shader (the glow look, 2026-10-27), turned to the ramp's light colour and
 ## falling apart pixel by pixel, the older the more (GHOST_DISSOLVE), never see-through.
 ##
+## A slam turns the staff's head into a hammer (its `hammer` pose channel): a Hammer node made at
+## setup, over the sprite and under the face, follows the sprite and is drawn by its own shader
+## (`core/projectiles/staff_hammer.gdshader`) while the channel is above 0, as big as the slam's
+## cards grew it.
+##
 ## Drawn by this node: the aim reticle (a chevron), the closing ring while the actor cannot be hurt
 ## (`Health.protect`, with the body and face 55% opaque) and, while it is down, only the revive
 ## ring (`Downed.revive_progress`: an arc sweeping clockwise from the top, a cross in the middle).
@@ -79,11 +84,11 @@ const REVIVE_RING_BACK: Color = Color("5a5a6e")
 const OUTLINE_COLOR: Color = Color("14121f")
 ## The hammer a slam's staff turns into (its `hammer` pose channel, `Spells.poses().staff_hammer`):
 ## drawn by its own node over the staff and under the face (HAMMER_SHADER), a square HAMMER_EXTENT
-## pixels each way round the grip; a spell of hit radius HAMMER_RADIUS (the slam's ring) draws it
-## at size 1, a bigger one bigger (a bigger card's), up to HAMMER_SIZE_MOST.
+## pixels each way round the grip; as many times its size as its cards grew the spell
+## (`Spells.poses().staff_grown`: a bigger card's 1.6), from 1 up to HAMMER_SIZE_MOST, which keeps it
+## inside its square.
 const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
 const HAMMER_EXTENT: float = 48.0
-const HAMMER_RADIUS: float = 16.0
 const HAMMER_SIZE_MOST: float = 2.2
 ## How far toward white the ghosts go from the ramp's light shade.
 const GHOST_LIGHT: float = 0.4
@@ -337,19 +342,21 @@ func _place_hammer() -> void:
 	var colour: Color = light_color() if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
 	var material := _hammer.material as ShaderMaterial
 	material.set_shader_parameter(&"hammer", amount)
-	material.set_shader_parameter(&"hammer_size", hammer_size())
+	material.set_shader_parameter(&"hammer_size", _hammer_size(poses))
 	material.set_shader_parameter(&"hammer_dir", Vector2.RIGHT.rotated(direction() * TAU / DIRECTIONS))
 	material.set_shader_parameter(&"hammer_reach", actor.reach())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))
 
 
-## How big the hammer is drawn now: 1 for a spell of hit radius HAMMER_RADIUS (a slam's ring),
-## bigger for a bigger one, up to HAMMER_SIZE_MOST.
+## How big the hammer is drawn now: as many times its size as its cards grew the spell, from 1 up
+## to HAMMER_SIZE_MOST.
 func hammer_size() -> float:
-	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
-	var radius: float = poses.staff_radius(actor.id) if poses != null else 0.0
-	return clampf(radius / HAMMER_RADIUS, 1.0, HAMMER_SIZE_MOST)
+	return _hammer_size(actor.spells.poses() if actor.spells != null else null)
+
+
+func _hammer_size(poses: StaffPoses) -> float:
+	return clampf(poses.staff_grown(actor.id) if poses != null else 1.0, 1.0, HAMMER_SIZE_MOST)
 
 
 ## The hammer's node, for tests (null without a sprite).

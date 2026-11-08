@@ -123,11 +123,11 @@ class SetPoses:
 	func staff_hammer(actor: int) -> float:
 		return _part(actor, 8, 0.0)
 
-	func staff_radius(actor: int) -> float:
-		return _part(actor, 9, 0.0)
+	func staff_grown(actor: int) -> float:
+		return _part(actor, 9, 1.0)
 
 	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint,
-	## land, land point, hammer, spell radius]), or `none`.
+	## land, land point, hammer, how much its cards grew its spell]), or `none`.
 	func _part(actor: int, n: int, none: Variant) -> Variant:
 		var set_poses: Dictionary = fake.get("staff_poses")
 		return set_poses[actor][n] if set_poses.has(actor) and set_poses[actor].size() > n else none

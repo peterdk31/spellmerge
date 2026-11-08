@@ -248,8 +248,8 @@ To give a carrier a fade, override `fade()`, and draw its look from `fade_left`.
    one), its cues (`cast_cue`, the flash on the staff, `cast` by default; `shown_cue`, where it
    shows itself; `impact_cue`, where its shots strike, `impact` by default; `end_cue`, where a
    carrier with no shot ends; `tests/content/spells/test_carrier_looks.gd` fails for a cue that is
-   not in `content/cues/`: one file per moment, flashes from `content/flashes/`), and a `shot_body` if
-   its still shots are not runes. A carrier with no shot to draw tells its moments for them:
+   not in `content/cues/`: one file per moment, flashes from `content/flashes/`), and a `shot_shader`
+   (a shader in its folder, `FormBase.shot_shader`) if its still shots are not runes. A carrier with no shot to draw tells its moments for them:
    `form_shown` with its card's id (`spell.form_id`) where it shows itself, which plays its
    `shown_cue`, and `carrier_ended` where it ends, which plays its `end_cue` (a carrier that moves its caster gets this from
    `CasterMoves.end`). Feel names no carrier: nothing there changes.

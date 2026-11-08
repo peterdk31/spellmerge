@@ -6,11 +6,8 @@ render_mode blend_premul_alpha;
 // diamond about its hit size with bright corners, a dotted ring inside and a glyph of four dots
 // turning round a bright heart, swelling and settling while it waits, tracing itself onto the
 // floor while it is new (the code beside its kind), its card particles given off from its outline
-// and a soft glow. A still shot whose card asks for a stone (KIND_STONE, a wall's) is a standing
-// ward stone instead: a slab lit from the top-left with a glyph cut down its face, light running up
-// it, a glowing line at its foot, rising out of the floor while it is new. One that asks for a pool
-// (KIND_POOL, a pool's) is a flat puddle on the floor: an oval rim, ripples running out over a
-// dithered middle the floor shows through, a few bubbles, spreading out while it is new. Its quad is GRID x zoom
+// and a soft glow. (A still shot whose card names a shader of its own, a wall's stone or a pool's
+// puddle, is drawn by that shader instead: `FormBase.shot_shader`.) Its quad is GRID x zoom
 // pixels square round its centre. Blending is premultiplied: its pixels are opaque, the glow added
 // light.
 
@@ -23,20 +20,12 @@ render_mode blend_premul_alpha;
 uniform float particle_share = 1.0;
 
 const float GRID = 24.0;
-// The stone's kind (KIND_STONE in projectile_manager.gd).
-const float K_STONE = 4.0;
-// The pool's kind (KIND_POOL in projectile_manager.gd).
-const float K_POOL = 5.0;
 
-// How much of a new rune is traced (a stone risen), 0 to 1 (1 once it is whole), and 1 for a stone.
+// How much of a new rune is traced, 0 to 1 (1 once it is whole).
 varying flat float age;
-varying flat float stone;
-varying flat float pool;
 
 void vertex() {
 	age = coded_age(coded_code(INSTANCE_CUSTOM.a));
-	stone = coded_kind(INSTANCE_CUSTOM.a) == K_STONE ? 1.0 : 0.0;
-	pool = coded_kind(INSTANCE_CUSTOM.a) == K_POOL ? 1.0 : 0.0;
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, true);
 	SET_LOOK(L);
 }
@@ -75,72 +64,6 @@ float rune(vec2 q, float reach, float swell) {
 	return 0.0;
 }
 
-// Stone: a slab `reach` x 1.25 either side of the middle (a wall's stones touch), from 3 reaches
-// above it to 0.8 below, its top corners cut round, rimmed dark against the floor, its cap lit;
-// lit down its left side, shadowed down its right; a glyph cut down
-// its middle with ticks off alternate sides, a light running up it; a glowing line at its foot.
-// While it is new it rises out of the floor. Returns the pixel's colour (alpha 0 for none).
-vec4 stone_pixel(vec2 q, float reach) {
-	float w = floor(reach * 1.25 + 0.5);
-	float top = -floor(reach * 3.0 + 0.5);
-	float foot = floor(reach * 0.8 + 0.5);
-	float x = floor(q.x);
-	float y = floor(q.y);
-	if (y == foot + 1.0 && abs(x) <= w + 1.0) {
-		return vec4(abs(x) <= w - 1.0 ? hi : mid, 1.0);
-	}
-	float risen = foot - (foot - top) * age;
-	if (abs(x) > w || y < top || y > foot || y < risen || abs(x) > w - 2.0 + (y - top)) {
-		return vec4(0.0);
-	}
-	if (x == 0.0 && y > top + 1.0 && y < foot - 1.0) {
-		return vec4(mod(y - floor(-sim_time * 10.0 + seed * 7.0), 7.0) < 1.0 ? hot : hi, 1.0);
-	}
-	if (abs(x) == 1.0 && y > top + 1.0 && y < foot - 1.0 && mod(y + (x > 0.0 ? 2.0 : 0.0), 4.0) == 0.0) {
-		return vec4(mid, 1.0);
-	}
-	// Its rim dark against the floor, its cap lit, its left face light and its right in shadow.
-	bool rim = abs(x) == w || y == top || y == foot || abs(x) == w - 2.0 + (y - top);
-	if (rim) {
-		return vec4(OUTLINE, 1.0);
-	}
-	if (y <= top + 1.0 || abs(x) >= w - 3.0 + (y - top)) {
-		return vec4(BONE_SHADOW, 1.0);
-	}
-	return vec4(x < -w * 0.4 ? STONE_LIGHT : (x > w * 0.4 ? STONE_SHADOW : STONE_BASE), 1.0);
-}
-
-// Pool: a flat oval `reach` x 1.3 wide and x 0.75 deep (seen from above at a slant), spreading
-// out from its middle while it is new: a one-pixel rim in its base shade, light at its top-left
-// edge; inside, a checker of its base shade the floor shows through, ripples of its light shade
-// running out from the middle, and now and then a white-hot bubble. Returns the pixel's colour
-// (alpha 0 for none).
-vec4 pool_pixel(vec2 q, float reach) {
-	vec2 e = q / vec2(reach * 1.3, reach * 0.75);
-	float r = length(e);
-	float spread = max(age, 0.15);
-	if (r > spread) {
-		return vec4(0.0);
-	}
-	float edge = (spread - r) * reach;
-	if (edge < 1.0) {
-		return vec4(q.x < 0.0 && q.y < 0.0 ? hi : mid, 1.0);
-	}
-	float ripple = fract(r * 2.5 - sim_time * 0.8 + seed);
-	if (ripple < 0.12) {
-		return vec4(hi, 1.0);
-	}
-	vec2 cell = floor(q * 0.25);
-	float blink = hash(cell.x * 7.0 + cell.y, floor(sim_time * 3.0 + seed), 11.0);
-	if (blink > 0.985 && mod(floor(q.x) + floor(q.y), 4.0) < 0.5) {
-		return vec4(hot, 1.0);
-	}
-	if (mod(floor(q.x) + floor(q.y), 2.0) < 0.5) {
-		return vec4(mid, 1.0);
-	}
-	return vec4(0.0);
-}
-
 vec4 rune_look(vec2 uv) {
 	// The screen pixel, the centre at 0, pixel centres on whole numbers.
 	vec2 size = vec2(GRID) * zoom;
@@ -171,30 +94,6 @@ vec4 rune_look(vec2 uv) {
 				colour = p;
 			}
 		}
-	}
-	if (pool > 0.5) {
-		vec4 p = pool_pixel(q, reach);
-		if (p.a > 0.0) {
-			return p;
-		}
-		if (colour.a > 0.0) {
-			return colour;
-		}
-		// Its glow: a soft light over the whole puddle.
-		float lit_pool = 0.3 * falloff(length(q / vec2(1.3, 0.75)), reach * 1.2) * age;
-		return vec4(glow * lit_pool * glow_strength, 0.0);
-	}
-	if (stone > 0.5) {
-		vec4 s = stone_pixel(q, reach);
-		if (s.a > 0.0) {
-			return s;
-		}
-		if (colour.a > 0.0) {
-			return colour;
-		}
-		// Its glow: light down its glyph and along its foot.
-		float lit_stone = 0.5 * falloff(length(q - vec2(0.0, -reach * 1.1)), reach * 2.2) * age;
-		return vec4(glow * lit_stone * glow_strength, 0.0);
 	}
 	float tier = rune(q, reach, swell);
 	if (tier > 0.5) {

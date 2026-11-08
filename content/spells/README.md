@@ -65,7 +65,7 @@ These steps are not new files only (the report of #243, the fifth element):
 
 ## Allowed files
 
-`.tres`, `.gd` (a script, and the card's own `test_<id>.gd`), the icon (`.png` or `.svg`), SFX (`.ogg`), `.json` (the combos in `combos/`, and `assets.json`), plus Godot's `.uid` and `.import` files and `.license` files. Limits: 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else. Typed GDScript only; no banned APIs (see AGENTS.md, hard rules).
+`.tres`, `.gd` (a script, and the card's own `test_<id>.gd`), the icon (`.png` or `.svg`), SFX (`.ogg`), a carrier's own shot shader (`.gdshader`, named by `shot_shader`: copy `forms/pool/pool.gdshader`; core/README.md, "The shot shaders", has the rules a shader keeps, small and branch-light), `.json` (the combos in `combos/`, and `assets.json`), plus Godot's `.uid` and `.import` files and `.license` files. Limits: 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else. Typed GDScript only; no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps
 

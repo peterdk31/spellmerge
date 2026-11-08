@@ -69,9 +69,10 @@ var tint: Color = Color.WHITE
 ## The shot's look, packed by `core/projectiles`' `pack_look`: the `look_layer` of every
 ## infusion and modifier on it, combined (0 none).
 var look: int = 0
-## The body its shots ask for (`FormBase.shot_body` as the projectile manager's KIND_*; 0 for their
-## motion's own), and its card's id goes with every shot (`Projectiles.set_form`), for its looks.
-var body: int = 0
+## The shader its still shots are drawn by (`FormBase.shot_shader`; null for their motion's own),
+## a body the projectile manager numbers (`register_body`); its card's id goes with every shot
+## (`Projectiles.set_looks`), for its looks.
+var shot_shader: Shader = null
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null

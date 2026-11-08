@@ -71,8 +71,8 @@ private:
 	Scratch *_scratch = nullptr;
 
 	void homing_pass(Object *manager, int64_t first, int64_t count, double delta);
-	// The draw batches' instance data (BATCH_* of the manager, BATCHES of them), handed to the MultiMeshes.
-	PackedFloat32Array _buffers[10];
+	// The draw batches' instance data (BATCH_* of the manager, BATCHES of them: the cpp static_asserts the size), handed to the MultiMeshes.
+	PackedFloat32Array _buffers[17];
 };
 
 } // namespace godot

@@ -1,14 +1,18 @@
 extends "res://tests/support/suite.gd"
 ## What a shot is drawn as and told as (`Projectiles.set_form`): every shot a card fired carries the
 ## card's id, so its impacts and its end are told as that card (`impact_form`, its card's impact
-## look), and the body (`impact_body`) goes with them; a still shot may ask for a still body of its
-## own (a wall's stone, KIND_STONE), and any other ask keeps its motion's body. The manager is
-## stepped by hand.
+## look), and the body (`impact_body`) goes with them. A still shot may ask for a card's own body
+## (a shader `register_body` numbered: a wall's stone), drawn by that shader's pair of batches; it
+## is still a rune to the world, and a flying shot keeps its own batch. The manager is stepped by
+## hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectile_bodies.gd
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const STONE: Shader = preload("res://content/spells/forms/wall/stone.gdshader")
+const POOL: Shader = preload("res://content/spells/forms/pool/pool.gdshader")
 
 const DT: float = 1.0 / 60.0
 
@@ -30,27 +34,44 @@ func before_each() -> void:
 		told.append([mgr.impact_form, mgr.impact_body]))
 
 
-func test_a_still_shot_can_be_a_stone() -> void:
+func test_a_card_shader_is_numbered_once_and_given_a_pair_of_batches() -> void:
+	check_equal(mgr.register_body(null), 0, "no shader is no body")
+	var stone: int = mgr.register_body(STONE)
+	check_equal(stone, 1, "the first shader is body 1")
+	check_equal(mgr.register_body(STONE), stone, "asked again, the same body")
+	check_equal(mgr.register_body(POOL), 2, "another is the next")
+	check(mgr.body_shader(stone) == STONE, "a body knows its shader")
+	check(WarmupScript._wanted.has(STONE) and WarmupScript._wanted.has(POOL), "both are warmed before the first room")
+	check(ManagerScript.BATCH_ENEMY_LAYER[ManagerScript.body_batch(stone, true)] and not ManagerScript.BATCH_ENEMY_LAYER[ManagerScript.body_batch(stone, false)], "its pair: the hat ramps', then the enemy ramp's a layer up")
+	check_equal(ManagerScript.BATCH_MESH[ManagerScript.body_batch(stone, false)], -1, "one quad a shot, as a rune")
+
+
+func test_a_still_shot_of_a_card_body_draws_in_its_batch() -> void:
+	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	check_equal(mgr._kind_of(slot), ManagerScript.KIND_RUNE, "a still shot is a rune by its motion")
-	check(mgr.set_form(slot, &"wall", ManagerScript.KIND_STONE), "a card may name it")
-	check_equal(mgr._kind_of(slot), ManagerScript.KIND_STONE, "and a still shot is then the stone it asks for")
+	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY_RUNE, "a still shot of no actor is a rune of the enemy ramp")
+	check(mgr.set_form(slot, &"wall", stone), "a card may name its body")
+	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(stone, true), "and it draws in that body's batch")
+	check_equal(mgr._kind_of(slot), ManagerScript.KIND_RUNE, "still a rune to the world")
 
 
-func test_a_flying_shot_keeps_its_own_body() -> void:
+func test_a_flying_shot_keeps_its_own_batch() -> void:
+	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2(50, 0), 1.0)
-	mgr.set_form(slot, &"swap", ManagerScript.KIND_STONE)
-	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "a stone is no body for a flying shot: a bolt's")
+	mgr.set_form(slot, &"swap", stone)
+	check_equal(mgr._batch_of(slot), ManagerScript.BATCH_ENEMY, "a card body draws only a still shot")
+	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "a bolt's body")
 
 
 func test_a_reused_slot_forgets_its_card() -> void:
+	var stone: int = mgr.register_body(STONE)
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 0.05, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.set_form(slot, &"wall", ManagerScript.KIND_STONE)
+	mgr.set_form(slot, &"wall", stone)
 	for _i in 10:
 		mgr.step(DT)
 	var again: int = mgr.spawn(0, Vector2(100, 100), Vector2.ZERO, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	check_equal(again, slot, "the same slot is taken again")
-	check_equal(mgr._kind_of(again), ManagerScript.KIND_RUNE, "a rune again, not the stone before")
+	check_equal(mgr._batch_of(again), ManagerScript.BATCH_ENEMY_RUNE, "a rune again, not the stone before")
 	check_equal(mgr._form_of(again), &"rune", "told by its body again")
 
 

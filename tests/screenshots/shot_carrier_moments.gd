@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ## `_2`, drawn twice as big): one row per moment, one column per age. Sheet 1: where a teleport
 ## leaves (`vanish`) and lands (`appear`), one end of a swap's trade (`trade`) and a rain falling
 ## (`rainfall`). Sheet 2: a decoy or familiar appearing (`conjure`) and going (`dismiss`), and a
-## wall's row of stones rising and standing (`KIND_STONE`; `carrier_moments_stones` close up). Each column is its own take, put
+## wall's row of stones rising and standing (the wall's own `stone.gdshader`; `carrier_moments_stones` close up). Each column is its own take, put
 ## together into one sheet.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -13,6 +13,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const AGES: Array[int] = [1, 4, 8, 14, 22]
 const COLUMN := 128
 const FIRE := Color("e0592f")
+const STONE: Shader = preload("res://content/spells/forms/wall/stone.gdshader")
 
 
 func take() -> void:
@@ -59,7 +60,7 @@ func _sheet(wizard: int, rows: Array[Array], walls: bool, shot_name: String) -> 
 			if row[0] == "wall":
 				var slot: int = projectiles.call("spawn", wizard, at, Vector2.ZERO, 5.0, 5.0, ProjectilesScript.LAYER_ENEMY, 0, tag, ProjectilesScript.MOTION_STILL)
 				projectiles.call("set_core", slot, FIRE)
-				projectiles.call("set_form", slot, &"wall", ProjectilesScript.KIND_STONE)
+				projectiles.call("set_form", slot, &"wall", projectiles.call("register_body", STONE))
 				projectiles.call("set_solid", slot, Vector2.RIGHT, 5, 9.0)
 			else:
 				events.call("emit_signal", row[0], wizard, row[1], at, Vector2.RIGHT, row[2], FIRE, 0)

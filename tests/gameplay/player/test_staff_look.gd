@@ -282,6 +282,27 @@ func test_the_hammer_heads_bottom_is_what_strikes() -> void:
 	check(is_equal_approx(below.x, floorf(StaffLook.HAMMER_HALF_THICK + 0.5) - StaffLook.HAMMER_BACK), "level with the head's middle (whole pixels), its two faces as low: %s" % below)
 
 
+func test_a_hammer_binds_every_infusion_of_its_spell() -> void:
+	# The owner, 2026-11-08: "I would like this for the hammer as well" (a beam shows each of its
+	# infusions). Its shader is handed every one, in slot order (`StaffPoses.staff_infusions`).
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	var fire := Color(0.878, 0.349, 0.184, 1.0 / 255.0)
+	var frost := Color(0.31, 0.839, 0.863, 2.0 / 255.0)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color(fire.r, fire.g, fire.b), 0.0, Vector2.INF, 1.0, 1.0, PackedColorArray([fire, frost])]
+	_world.run(1, false)
+	var material := look.hammer_node().material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"hammer_infusion_count"), 2, "both infusions")
+	var given: PackedColorArray = material.get_shader_parameter(&"hammer_infusions")
+	check(given.size() == 2 and given[0].is_equal_approx(fire) and given[1].is_equal_approx(frost), "in slot order: %s" % [given])
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	check_equal(material.get_shader_parameter(&"hammer_infusion_count"), 0, "a plain slam's: none, its bands in its ramp's colour")
+	var code: String = FileAccess.get_file_as_string("res://core/projectiles/staff_hammer.gdshader")
+	check(code.contains("uniform vec4 hammer_infusions[%d];" % StaffLook.HAMMER_INFUSIONS_MOST), "the shader holds as many as StaffLook hands it")
+
+
 func test_a_bigger_spell_draws_a_bigger_hammer() -> void:
 	# A bigger card grows the slam's spell (its radius_mult), and the hammer with it, up to
 	# HAMMER_SIZE_MOST; the look knows nothing of the slam's own numbers.

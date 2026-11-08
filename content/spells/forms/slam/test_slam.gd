@@ -220,6 +220,26 @@ func test_a_charged_slam_raises_its_hammer_slowly_and_still_smashes_it_down_fast
 	check(charged.x <= 8, "in a blink: %d frames" % charged.x)
 
 
+func test_its_hammer_is_told_every_infusion_on_it() -> void:
+	# The hammer binds each infusion in a band of its own (StaffLook): the animation hands its look
+	# the spell's infusions in slot order, and none once it is over.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["frost", "fire", "slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.1)
+	var infusions: PackedColorArray = arena.spells.poses().staff_infusions(0)
+	var frost: ElementBase = arena.spells.registry.call("get_resource", &"spells", &"frost")
+	var fire: ElementBase = arena.spells.registry.call("get_resource", &"spells", &"fire")
+	check_equal(infusions.size(), 2, "both")
+	if infusions.size() == 2:
+		check(Color(infusions[0].r, infusions[0].g, infusions[0].b).is_equal_approx(Color(frost.tint.r, frost.tint.g, frost.tint.b)), "frost first, as on the staff")
+		check(Color(infusions[1].r, infusions[1].g, infusions[1].b).is_equal_approx(Color(fire.tint.r, fire.tint.g, fire.tint.b)), "then fire")
+	arena.run(0.8)
+	check(arena.spells.poses().staff_infusions(0).is_empty(), "none once it is over")
+	arena.free_all()
+
+
 func test_its_staff_turns_into_a_hammer_and_back() -> void:
 	# The card's `hammer` channel (the owner, 2026-11-08): the staff's head grows into a hammer's as it
 	# winds up, is one when it strikes, and goes back as it settles (StaffLook draws it).

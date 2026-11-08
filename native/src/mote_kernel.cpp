@@ -57,7 +57,10 @@ constexpr double PI_D = 3.1415926535897932384626433833;
 	X(births, "births", INT) \
 	X(written, "written", INT) \
 	X(settles, "settles", INT) \
-	X(settles_skipped, "settles_skipped", INT)
+	X(settles_skipped, "settles_skipped", INT) \
+	X(infusion_rgb, "_infusion_rgb", PACKED_FLOAT32_ARRAY) \
+	X(infusion_mask, "_infusion_mask", INT) \
+	X(infusion_turn, "_infusion_turn", INT)
 
 struct MoteNames {
 #define MO_DECLARE(id, gd, type) StringName id;
@@ -129,7 +132,7 @@ bool MoteKernel::configure(const Dictionary &c) {
 			take_int(c, "LOOK_ENEMY_RAMP", _look_enemy_ramp) && take_int(c, "LOOK_EXACT", _look_exact) &&
 			take(c, "LIFE_MAX", _life_max) && take(c, "HEIGHT_MAX", _height_max) &&
 			take(c, "SOURCE_CODE", _source_code) && take(c, "KIND_CODE", _kind_code) &&
-			take(c, "TRAIL_SPEED", _trail_speed);
+			take(c, "TRAIL_SPEED", _trail_speed) && take_int(c, "LOOK_LAYERS", _look_layers);
 	return _ready;
 }
 
@@ -189,6 +192,7 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	Arr<PackedInt32Array> settle_marks, birth_pair, pair_from, pair_size, pair_kinds;
 	Arr<PackedVector2Array> k_speed, k_up, k_life;
 	Arr<PackedFloat64Array> k_spread, k_height, k_gravity, k_bounce, k_drag, k_wobble, k_wobble_rate, settle_out;
+	Arr<PackedFloat32Array> infusion_rgb;
 	dirty.load(m, k.dirty);
 	until.load(m, k.until);
 	settle_marks.load(m, k.settle_marks);
@@ -207,6 +211,7 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	k_wobble.load(m, k.k_wobble);
 	k_wobble_rate.load(m, k.k_wobble_rate);
 	settle_out.load(m, k.settle_out);
+	infusion_rgb.load(m, k.infusion_rgb);
 	Array buffers = m->get(k.buffers);
 	const int64_t kinds = k_speed.n;
 	ERR_FAIL_COND_V(k_up.n < kinds || k_life.n < kinds || k_spread.n < kinds || k_height.n < kinds ||
@@ -225,6 +230,8 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	int64_t written = m->get(k.written);
 	int64_t settles = m->get(k.settles);
 	int64_t settles_skipped = m->get(k.settles_skipped);
+	const int64_t infusion_mask = m->get(k.infusion_mask);
+	int64_t infusion_turn = m->get(k.infusion_turn);
 	ERR_FAIL_COND_V(cap <= 0 || dirty.n < buffers.size() || until.n < buffers.size(), 0);
 
 	// `give_off`'s first line.
@@ -277,7 +284,34 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 		const int64_t look = (int64_t)(double)g[b + _spark_look];
 		const int64_t who = ramp >= 0 && ramp < _enemy_source && (look & _look_enemy_ramp) == 0 ? ramp : _enemy_source;
 		const int64_t source = who + ((look & _look_exact) != 0 ? _exact_source : 0);
-		const float core_r = g[b + _spark_core], core_g = g[b + _spark_core + 1], core_b = g[b + _spark_core + 2];
+		float core_r = g[b + _spark_core], core_g = g[b + _spark_core + 1], core_b = g[b + _spark_core + 2];
+		// `infusions_of`: a birth of an infusion's layer is in its colours; any other of a spell of
+		// several (a tail, a splash) takes the next infusion (`_next_infusion`).
+		const int64_t present = look & infusion_mask;
+		if ((present & (present - 1)) != 0) {
+			const int64_t layer = (int64_t)(double)g[b + _spark_kind];
+			int64_t bits = layer >= 1 && layer <= _look_layers ? present & ((int64_t)1 << (layer - 1)) : 0;
+			if (bits == 0) {
+				int64_t count = 0;
+				for (int64_t left = present; left != 0; left &= left - 1) {
+					count++;
+				}
+				const int64_t pick = infusion_turn % count;
+				infusion_turn += 1;
+				bits = present;
+				for (int64_t i = 0; i < pick; i++) {
+					bits &= bits - 1;
+				}
+			}
+			int64_t lowest = 1;
+			while (((bits >> (lowest - 1)) & 1) == 0) {
+				lowest++;
+			}
+			ERR_BREAK(lowest * 3 + 2 >= infusion_rgb.n);
+			core_r = infusion_rgb[lowest * 3];
+			core_g = infusion_rgb[lowest * 3 + 1];
+			core_b = infusion_rgb[lowest * 3 + 2];
+		}
 		double height = k_height[kk];
 
 		int64_t one = 1;
@@ -406,6 +440,7 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	m->set(k.written, written);
 	m->set(k.settles, settles);
 	m->set(k.settles_skipped, settles_skipped);
+	m->set(k.infusion_turn, infusion_turn);
 	return handed;
 }
 

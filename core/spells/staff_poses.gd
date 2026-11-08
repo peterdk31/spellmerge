@@ -41,6 +41,8 @@ var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
 ## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
 const POSE_CHANNELS: int = 8
+## What `staff_infusions` answers with no spell (never written).
+const NO_INFUSIONS: PackedColorArray = []
 ## Where `land` and `hammer` are among them.
 const LAND: int = 6
 const HAMMER: int = 7
@@ -231,6 +233,16 @@ func staff_grown(actor: int) -> float:
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
 		return 1.0
 	return _pose_spell[actor].radius_scale
+
+
+## How each different infusion on the spell `actor`'s staff animation plays for looks, in slot
+## order (`CompiledSpell.infusion_looks`: rgb its tint, alpha its look kind / 255), for a look that
+## shows each (a slam's hammer binds one in each of its bands); empty while it plays none, or for a
+## spell of none. Shared: read it, never change it.
+func staff_infusions(actor: int) -> PackedColorArray:
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
+		return NO_INFUSIONS
+	return _pose_spell[actor].infusion_looks
 
 
 ## How far (0 to 1) `actor`'s staff is moved so its tip lies on the point its carrier strikes, and

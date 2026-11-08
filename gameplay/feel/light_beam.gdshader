@@ -11,6 +11,8 @@ render_mode blend_add, world_vertex_coords;
 // path's points is folded away.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+// A beam's light is its first infusion's, as the beam card's body (it shows the others as strands).
+#define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
 // shot_beam.gdshader's BEAM_POINTS.

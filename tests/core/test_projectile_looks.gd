@@ -243,7 +243,8 @@ func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
 	check(source.contains("box = vec4(q_lo, q_hi)") and source.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
 	for kind: Array in [["Q_LIGHT", ManagerScript.HEAD_Q_LIGHT], ["Q_CORE", ManagerScript.HEAD_Q_CORE]]:
 		check(source.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
-	check(not source.contains("trail_data") and not source.contains("texelFetch"), "nothing reads a path")
+	# The one texture read is the infusion table's, in the vertex stage (`look_of`, once a vertex).
+	check(not source.contains("trail_data") and source.replace("texelFetch(infusion_tints", "").find("texelFetch") < 0, "nothing reads a path")
 	var fragments: String = source.get_slice("// ---- Fragments ----", 1)
 	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
 	check(not fragments.contains("for (") and not fragments.contains("while ("), "no pixel loops")

@@ -69,6 +69,8 @@ var registry: RegistryScript = null:
 		registry = value
 		cards.registry = value
 		cards.clear()
+		if pool != null:
+			pool.set_infusions(InfusionTable.of_registry(value))
 ## The spell runtime, which a shot's tag gives its spell from (`profile`; null for none: every
 ## shot's motes by its look). Feel hands it down with the projectile manager (`attach`).
 var spells: Object = null:
@@ -500,6 +502,9 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 	var exact: bool = colour.a > 0.0
 	var spell: int = MotesScript.spell_source(cue.ramp, MotesScript.LOOK_EXACT if exact else cue.look)
 	var core: Color = colour if exact else cue.tint
+	# The cards whose infusions colour the part's spell-coloured motes (none in an exact colour, a
+	# body's own or the bare ramp).
+	var cards_look: int = 0 if exact or part.body or part.bare else cue.look
 	if part.body and not exact:
 		# The body's own colour (a death puff's sparks), in no one's ramp and without the cards.
 		spell = MotesScript.spell_source(0, 0)
@@ -534,10 +539,10 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		var each: int
 		if part.share >= 0.0:
 			each = maxi(roundi(float(part.kind_count) * part.share * cue.power), 1)
-			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true, line, life)
+			pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, 0.0, part.spread, part.up, false, true, line, life, 0 if alone else cards_look)
 			return
 		each = -1 if part.count < 0 and cue.power == 1.0 else maxi(roundi(float(part.kind_count if part.count < 0 else part.count) * cue.power), 1)
-		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often, line, life)
+		pool.throw_part(part.kind_at, at, way, surface if alone else spell, Color.WHITE if alone else core, each, reach, part.spread, part.up, part.ring, part.often, line, life, 0 if alone else cards_look)
 		return
 	var kinds: PackedInt32Array = cards.motes_of(cue.tag, cue.look) if named == &"spell" else _surface_kinds
 	var count: int = part.count
@@ -551,12 +556,12 @@ func _play_motes_part(part: MotesPart, cue: CueContextScript) -> void:
 		var walls: bool = of_surface or (pool.kinds()[k].surface and part.colours != &"spell" and not exact)
 		var source: int = surface if walls else spell
 		if shed:
-			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true, line, life)
+			pool.throw_part(k, at, way, source, Color.WHITE if walls else core, maxi(roundi(float(pool.kinds()[k].count) * share), 1), 0.0, part.spread, part.up, false, true, line, life, 0 if walls else cards_look)
 			continue
 		# How many of this kind: its share of the part's count (else its own count), times the power.
 		var each_share: float = float(pool.kinds()[k].count) if count < 0 else float(count) / float(kinds.size())
 		var each: int = -1 if count < 0 and cue.power == 1.0 else maxi(roundi(each_share * cue.power), 1)
-		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often, line, life)
+		pool.throw_part(k, at, way, source, Color.WHITE if walls else core, each, reach, part.spread, part.up, part.ring, part.often, line, life, 0 if walls else cards_look)
 
 
 ## A cue's `motes` part read into its typed fields once (`Feel.add_cue_part`'s `prepare`, S6 2: a
@@ -685,6 +690,8 @@ func use_motes(motes: MotesScript) -> void:
 		add_child(pool)
 		pool.step(_clock)
 		pool.settle_into(marks)
+		# A spell's motes in each of its infusions' colours (`Motes.set_infusions`).
+		pool.set_infusions(InfusionTable.of_registry(registry))
 	cards.use_motes(pool)
 	if pool != null:
 		pool.use_cards(cards if pool.has_card_kinds() else null)

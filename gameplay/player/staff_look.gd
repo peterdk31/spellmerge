@@ -90,6 +90,8 @@ const OUTLINE_COLOR: Color = Color("14121f")
 const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
 const HAMMER_EXTENT: float = 48.0
 const HAMMER_SIZE_MOST: float = 2.2
+## The most infusions the hammer's bands show (its shader's `hammer_infusions[4]`).
+const HAMMER_INFUSIONS_MOST: int = 4
 ## The hammer's head at size 1 (its shape is here, handed to its shader, so where it lands and what
 ## is drawn are one): half as thick along the staff and half as long across it, and how far back
 ## from the tip its back face is, in pixels.
@@ -415,6 +417,11 @@ func _place_hammer() -> void:
 	material.set_shader_parameter(&"hammer_reach", tip.length())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))
+	# Every infusion on its spell shows, one in each of its bands (the owner, 2026-11-08: as a beam's
+	# several infusions show).
+	var infusions: PackedColorArray = poses.staff_infusions(actor.id)
+	material.set_shader_parameter(&"hammer_infusions", infusions)
+	material.set_shader_parameter(&"hammer_infusion_count", mini(infusions.size(), HAMMER_INFUSIONS_MOST))
 
 
 ## How big the hammer is drawn now: as many times its size as its cards grew the spell, from 1 up

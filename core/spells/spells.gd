@@ -619,7 +619,11 @@ func _look_of(form: StringName) -> Array:
 	if form == &"" or source == null or not source.has_method(&"get_resource"):
 		return NO_LOOK
 	var card := source.call(&"get_resource", &"spells", form) as FormBase
-	var row: Array = NO_LOOK if card == null else _look_row(card)
+	if card == null:
+		# Not kept: an id that is no carrier card (a chain's jump) costs a lookup, and a card the
+		# registry has not scanned yet is read once it has.
+		return NO_LOOK
+	var row: Array = _look_row(card)
 	_looks[form] = row
 	return row
 

@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_test_four_players_keep_their_own()
 	_test_bad_requests_are_ignored()
 	_test_swap_moves_only_the_named_enemy()
+	_test_a_familiar_is_drawn_by_its_cards_look()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/ai entities (decoys, familiars, swap)")
@@ -388,3 +389,16 @@ func _test_swap_moves_only_the_named_enemy() -> void:
 	_check(other.position.is_equal_approx(Vector2(-50.0, 0.0)), "and no other")
 	_world.bus.target_move_requested.emit(0, moved, Vector2(INF, 0.0))
 	_check(moved.position.is_equal_approx(Vector2(300.0, 200.0)), "a move to nowhere is ignored")
+
+
+## The familiar card's own look (docs/milestones/card-looks.md, phase 3): every familiar's orb is
+## drawn by the shader Spells answers for the familiar card as an orb, set once on the familiars'
+## batch; with no Spells (or no shader of its own) the plain orbit shot's.
+func _test_a_familiar_is_drawn_by_its_cards_look() -> void:
+	_setup()
+	var material: ShaderMaterial = _entities._familiar_node.material as ShaderMaterial
+	_check(material.shader == preload("res://content/spells/forms/familiar/familiar.gdshader"), "familiar look: drawn by the familiar card's shader, got %s" % material.shader.resource_path)
+	_entities.spells = null
+	_entities.use_familiar_look()
+	_check(material.shader == EntitiesScript.ORBIT_SHADER, "familiar look: the plain orbit shot with no Spells")
+	_teardown()

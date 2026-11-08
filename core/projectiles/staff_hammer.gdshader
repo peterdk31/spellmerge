@@ -10,21 +10,33 @@ render_mode blend_premul_alpha;
 // its back in shadow, a dark socket where the staff goes through and its two ends bound in the
 // glow's colour, with that light round it. As `hammer` rises from 0 to 1 its pixels come in from
 // the middle out, white-hot at first; as it falls they go back. `hammer_size` scales it (1 a plain
-// slam's; as many times as its cards grew the spell, a bigger card's 1.6). Blending is premultiplied: its pixels are
+// slam's; as many times as its cards grew the spell, a bigger card's 1.6). As it lands its head
+// smushes (`hammer_squash`, 0 to 0.5: the staff's squash), as a hammer's head does when its end
+// strikes: it shortens along its length and bulges thicker along the staff, its lowest corner (on
+// the ground) kept where it struck, and a lip spreads at each end; then it springs back. Blending is premultiplied: its pixels are
 // opaque, its light added. Warmed as a rect (RECT) before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 
-// The hammer's head at size 1: half as thick along the staff and half as long across it, in pixels;
-// how far back from the tip its back face is.
-const float HALF_THICK = 5.5;
-const float HALF_LONG = 10.0;
-const float BACK = 6.0;
+// How the head smushes at a squash of 1: the share its length shortens by and its thickness grows
+// by, and the pixels the lip at each end spreads past its sides (at size 1).
+const float SQUASH_SHORT = 1.2;
+const float SQUASH_WIDE = 1.6;
+const float SQUASH_LIP = 8.0;
 
 // How far the head has turned into the hammer's (0 the staff, 1 the hammer), how big it is, the way
 // the drawn staff points (its head sheet's column) and its tip's distance from the grip.
 uniform float hammer = 0.0;
 uniform float hammer_size = 1.0;
+uniform float hammer_squash = 0.0;
+// The head at size 1 (StaffLook's HAMMER_*: its shape lives there, so where it lands and what is
+// drawn are one): half as thick along the staff, half as long across it, and how far back from the
+// tip its back face is, in pixels; and which corner is lowest on the screen (`StaffLook._hammer_down`:
+// x the end of its length, y the face along the staff), which its smush keeps where it struck.
+uniform float hammer_half_thick = 5.5;
+uniform float hammer_half_long = 10.0;
+uniform float hammer_back = 6.0;
+uniform vec2 hammer_down = vec2(1.0, 1.0);
 uniform vec2 hammer_dir = vec2(1.0, 0.0);
 uniform float hammer_reach = 16.0;
 // Its bands' and light's colour (the infusion's, else the player's) and how bright the light is.
@@ -44,18 +56,26 @@ void fragment() {
 	vec2 dir = hammer_dir;
 	vec2 across_dir = vec2(-dir.y, dir.x);
 	float grow = clamp(hammer * 1.3, 0.0, 1.0);
-	float ht = floor(HALF_THICK * hammer_size + 0.5) * max(grow, 0.3);
-	float hl = floor(HALF_LONG * hammer_size + 0.5) * grow;
-	vec2 h = dir * (hammer_reach - BACK + ht);
+	float squash = clamp(hammer_squash, 0.0, 0.5);
+	float ht_rest = floor(hammer_half_thick * hammer_size + 0.5) * max(grow, 0.3);
+	float hl_rest = floor(hammer_half_long * hammer_size + 0.5) * grow;
+	// Squashed, it is shorter along its length and thicker along the staff, its lowest corner (the
+	// one that hit the ground) kept where it is.
+	float ht = floor(ht_rest * (1.0 + SQUASH_WIDE * squash) + 0.5);
+	float hl = floor(hammer_half_long * hammer_size * max(1.0 - SQUASH_SHORT * squash, 0.4) + 0.5) * grow;
+	vec2 h = dir * (hammer_reach - hammer_back + ht_rest) + across_dir * hammer_down.x * (hl_rest - hl) + dir * hammer_down.y * (ht_rest - ht);
 	vec2 d = p - h;
 	float along = dot(d, dir);
 	float across = dot(d, across_dir);
+	// The lips at its ends, spread past its sides while it is squashed (its ends driven in).
+	float lip = floor(SQUASH_LIP * hammer_size * squash);
+	ht += abs(across) > hl - 1.5 - floor(lip * 0.5) ? lip : 0.0;
 	vec2 box = vec2(abs(along) - ht, abs(across) - hl);
 	// Its light reaches the same few pixels at any size, so a big one stays inside its square.
 	float near = falloff(length(max(box, vec2(0.0))), 6.0) * hammer;
 	bool inside = box.x <= 0.5 && box.y <= 0.5 && !(box.x > -0.5 && box.y > -0.5);
 	// Its pixels come in from the middle out as it grows, and go back the same way.
-	float out_from = length(d) / (HALF_LONG * hammer_size + 1.0);
+	float out_from = length(d) / (hammer_half_long * hammer_size + 1.0);
 	bool come = hash_seeded(floor(p.x), floor(p.y), 91.0, 0.0) < hammer * 1.8 - out_from * 0.8;
 	vec3 band = glow_color.rgb;
 	vec4 colour = vec4(0.0);

@@ -161,6 +161,33 @@ func test_its_staff_rises_glowing_drops_and_settles() -> void:
 	arena.free_all()
 
 
+func test_its_blow_hangs_at_the_top_then_whips_down() -> void:
+	# A hard hit (the owner, 2026-11-08: "start a bit slower and then accelerate"): the drop's key
+	# eases "slam", so halfway through the drop the staff has come only a little of the way down,
+	# and it covers the rest in the drop's last moments.
+	check(is_equal_approx(StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["slam"]), 0.0625), "slam eases as x to the fourth")
+	check(StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["slam"]) < StaffPoses.pose_ease(0.5, FormBase.POSE_EASES["in"]), "slower to start than \"in\"")
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	# The staff's turn every frame from the cast to past the impact.
+	var turns: Array[float] = []
+	for n in 24:
+		arena.run(1.0 / 60.0)
+		turns.append(arena.spells.poses().staff_pose(0).x)
+	var top: int = 0
+	for n in turns.size():
+		top = n if turns[n] < turns[top] else top
+	var hit: int = top
+	while hit < turns.size() - 1 and turns[hit] < 0.3:
+		hit += 1
+	var mid: int = top + (hit - top) / 2
+	check(hit - top >= 4, "its drop takes a few frames: %d" % (hit - top))
+	check(turns[mid] - turns[top] < 0.25 * (turns[hit] - turns[top]), "halfway through its drop it has come less than a quarter of the way down: %s" % [turns])
+	arena.free_all()
+
+
 func test_its_staff_turns_into_a_hammer_and_back() -> void:
 	# The card's `hammer` channel (the owner, 2026-11-08): the staff's head grows into a hammer's as it
 	# winds up, is one when it strikes, and goes back as it settles (StaffLook draws it).

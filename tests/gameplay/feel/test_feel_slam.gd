@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## floor: it distracted from the strike, owner 2026-10-30); at the impact (`slam`) the cue its card's impact look names, `slam`: a white-hot star (no expanding
 ## ring: the cracks show its reach) and the ground struck: its mark on the floor (a quake under the
 ## bodies that outlasts the flash), stone chips, the slammer held a moment, and a shake with a
-## punch down the screen, which the screen shake setting turns off.
+## punch down the screen, which the screen shake setting turns off. Its flashes are all drawn on
+## the floor, under the bodies (owner, 2026-11-08).
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -54,9 +55,11 @@ func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> vo
 	check_equal(feel.flashes_of(&"quake"), 1, "a quake where it struck")
 	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(16.0 * 1.5 / feel.flash_kind(&"quake").step), "sized by its radius")
 	feel.step(0.05)
-	check_equal(feel._floor_node.multimesh.visible_instance_count, 1, "drawn in the floor batch")
-	check_equal(feel._flash_node.multimesh.visible_instance_count, 1, "not with the flashes (the star; its chips are motes)")
-	check(feel._floor_node.z_index < 40, "under the enemies (entities.gd DRAW_Z)")
+	# The whole strike is on the floor, under the bodies (the owner, 2026-11-08: "the impact should be
+	# drawn on the floor", not over the training dummy): the cracks, and the burst and star (`floor`).
+	check_equal(feel._floor_node.multimesh.visible_instance_count, 3, "the cracks, burst and star in the floor batch")
+	check_equal(feel._flash_node.multimesh.visible_instance_count, 0, "nothing drawn over the bodies (its chips are motes)")
+	check(feel._floor_node.z_index < 0 and feel._floor_node.z_index > RoomBase.FLOOR_Z, "on the room's floor, under every body (the wizards and enemies draw at 0 and up): %d" % feel._floor_node.z_index)
 	feel.step(0.5)
 	check_equal(feel.flashes_of(&"burst"), 0, "the star is gone")
 	check_equal(feel.flashes_of(&"quake"), 1, "the cracks are still there, cooling")

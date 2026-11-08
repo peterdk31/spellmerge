@@ -2,7 +2,8 @@ extends "res://tests/support/suite.gd"
 ## Staff animations line up with their spell's look (2026-10-30, the slam's staff missed its floor
 ## crack): every carrier card whose `staff_pose` has a `land` key is cast by a real wizard (its
 ## StaffLook, the real runtime) along every one of the head sheet's 16 directions, and in between,
-## and short of a wall. While it lands fully, the drawn tip (`StaffLook.tip_position`) is on the
+## and short of a wall. While it lands fully, the drawn point that strikes (`StaffLook.contact_position`:
+## the tip, or the hammer head's lowest corner while the staff is a hammer) is on the
 ## point its carrier strikes (`Carrier.strike_point`, from the hand), and the carrier's look of its
 ## strike (`form_shown`) is drawn there too. A new card that lands is checked here without a line
 ## added; a new carrier that strikes a point says so in `traits()` (`STRIKES_POINT`).
@@ -65,8 +66,8 @@ func _check_cast(body: Actor, aim: Vector2, what: String) -> int:
 			continue
 		landed += 1
 		struck = hand + point
-		var tip: Vector2 = look.tip_position()
-		check(tip.distance_to(struck) <= SLACK, "%s aiming %s: the drawn tip %s is on the point struck %s" % [what, aim, tip, struck])
+		var tip: Vector2 = look.contact_position()
+		check(tip.distance_to(struck) <= SLACK, "%s aiming %s: the drawn point that strikes %s is on the point struck %s" % [what, aim, tip, struck])
 	check(landed > 0, "%s aiming %s: its staff lands" % [what, aim])
 	if struck.is_finite() and not _shown.is_empty():
 		var nearest: float = INF

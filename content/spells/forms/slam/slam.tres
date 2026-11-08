@@ -23,6 +23,6 @@ pierce = 0
 ray_length = 20.0
 wind_up = 0.25
 knockback = 240.0
-staff_pose = Array[Dictionary]([{"phase": "wind", "at": 0.8, "turn": -50, "lift": 6, "push": -4, "glow": 1.0, "shake": 0.6, "hammer": 1.0, "ease": "out", "mood": "angry"}, {"phase": "wind", "at": 1.0, "turn": 35, "push": 6, "land": 1.0, "glow": 0.3, "hammer": 1.0, "ease": "in"}, {"phase": "after", "at": 0.1, "turn": 35, "push": 6, "land": 1.0, "hammer": 1.0}, {"phase": "after", "at": 0.32}])
+staff_pose = Array[Dictionary]([{"phase": "wind", "at": 0.45, "turn": -55, "lift": 7, "push": -5, "glow": 0.7, "shake": 0.3, "hammer": 1.0, "ease": "out", "mood": "angry"}, {"phase": "wind", "at": 0.68, "turn": -62, "lift": 8, "push": -6, "glow": 1.0, "shake": 1.0, "stretch": -0.1, "hammer": 1.0, "ease": "inout", "mood": "furious"}, {"phase": "wind", "at": 1.0, "turn": 35, "push": 6, "land": 1.0, "glow": 0.3, "stretch": 0.3, "hammer": 1.0, "ease": "slam"}, {"phase": "after", "at": 0.05, "turn": 35, "push": 6, "land": 1.0, "stretch": -0.25, "hammer": 1.0, "ease": "out"}, {"phase": "after", "at": 0.14, "turn": 35, "push": 6, "land": 1.0, "hammer": 1.0}, {"phase": "after", "at": 0.34}])
 cast_cue = &"cast_bolt"
 end_cue = &"slam"

@@ -9,7 +9,7 @@ extends SpellComponent
 ## a key can show on the staff's face (its brows), the channels a key moves and the numbers each
 ## key is packed into for playing (`packed_pose`: phase, at, the CHANNELS, ease, mood).
 const POSE_PHASES: Dictionary = {"wind": 0, "strike": 1, "hold": 2, "after": 3}
-const POSE_EASES: Dictionary = {"inout": 0, "out": 1, "in": 2}
+const POSE_EASES: Dictionary = {"inout": 0, "out": 1, "in": 2, "slam": 3}
 const POSE_MOODS: Array[StringName] = [&"raised", &"angry", &"furious", &"worried"]
 const POSE_CHANNELS: Array[String] = ["turn", "lift", "push", "glow", "stretch", "shake", "land", "hammer"]
 ## Where each number is in a packed key, and how many a key has.
@@ -85,7 +85,9 @@ const POSE_RANGES: Dictionary = {
 ## jitter) and `land` (0 to 1: how far the staff is moved so its drawn tip lies on the point its
 ## carrier strikes, a slam's impact; nothing for a carrier that names none), `hammer` (0 to 1: how far
 ## the staff's head has turned into a hammer's, which grows out of it and goes back into it; a
-## wizard's staff only, `StaffLook`; as big as the spell's hit radius, so a bigger card grows it); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
+## wizard's staff only, `StaffLook`; as big as its cards grew the spell, so a bigger card grows it); the
+## `ease` into it ("inout", "out" slowing into it, "in" speeding up into it, "slam" barely moving at
+## first and then whipping into it: a heavy blow coming down) and a
 ## `mood` the face shows from then on (POSE_MOODS). Ranges in POSE_RANGES; the validator checks it.
 ## Example: [{"phase": "after", "at": 0.04, "push": -3, "ease": "out"}, {"phase": "after", "at": 0.2}].
 @export var staff_pose: Array[Dictionary] = []

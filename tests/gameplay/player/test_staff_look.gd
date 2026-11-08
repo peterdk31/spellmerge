@@ -245,11 +245,41 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_size") as float, 1.0), "a slam no card grew draws it at size 1")
 	check((material.get_shader_parameter(&"hammer_dir") as Vector2).is_equal_approx(Vector2.RIGHT), "pointing as the staff's column does")
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, body.reach()), "over its tip")
+	check_equal(hammer.scale, Vector2.ONE, "never scaled itself: its head smushes by its own rule")
 	check_equal(hammer.position, sprite.position, "where the staff is")
+	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "its head whole while the staff is not squashed")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.1, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "not by a crouch while it is raised (not landed)")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.25, &"", Color.WHITE, 1.0, Vector2(20.0, 0.0), 1.0, 1.0]
+	_world.run(1, false)
+	check(is_equal_approx(material.get_shader_parameter(&"hammer_squash") as float, 0.25), "and smushed as the staff is squashed, landing")
+	var drawn: Vector2 = sprite.global_transform * (Vector2.RIGHT * body.reach())
+	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, (drawn - sprite.global_position).length()), "still on the drawn tip of the squashed staff")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.3, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "not by a stretch (the smear of its fall)")
 	check((material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(look.light_color()), "bound in its ramp's colour")
 	_world.fake.staff_poses.erase(body.id)
 	_world.run(1, false)
 	check(not hammer.visible, "gone after")
+
+
+func test_the_hammer_heads_bottom_is_what_strikes() -> void:
+	# The owner, 2026-11-08: "the bottom of the hammer head should hit the ground". The point a
+	# landing puts on its strike is the tip, or while the staff is a hammer the head's lowest corner
+	# on the screen: below the tip, out along the head's length (StaffLook.HAMMER_*).
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.0, 1.0]
+	_world.run(1, false)
+	check(look.contact_position().is_equal_approx(look.tip_position()), "a staff strikes with its tip")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	var below: Vector2 = look.contact_position() - look.tip_position()
+	check(is_equal_approx(below.y, StaffLook.HAMMER_HALF_LONG), "a hammer with its head's bottom, half its length below the tip: %s" % below)
+	check(is_equal_approx(below.x, floorf(StaffLook.HAMMER_HALF_THICK + 0.5) - StaffLook.HAMMER_BACK), "level with the head's middle (whole pixels), its two faces as low: %s" % below)
 
 
 func test_a_bigger_spell_draws_a_bigger_hammer() -> void:

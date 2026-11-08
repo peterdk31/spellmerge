@@ -37,6 +37,8 @@ extends Resource
 ##                cards; plain white when the cue has no body colour
 ##   `way`        `aim` (the cue's direction, the default), `back` (against it), `right` or `up`
 ##   `particles`  true: left out while particles are off (the stress benchmark)
+##   `floor`      true: drawn on the floor, under the bodies, instead of over everything (a ground
+##                strike's flash: a slam's; an arc, an explosion's part or a status stays where it is)
 ##   `if_cards`   true: played only when the cue has cards (a look layer; an element's flare)
 ##   `if_layer`   a look layer (1 to MoteKind.LOOK_LAYERS; the LOOK_* kinds of core/projectiles):
 ##                played only when the cue's cards have it (lightning's arc: 5)
@@ -159,7 +161,7 @@ const REACTION_REPEAT: float = 0.3
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys of each kind of part: a flash (`flash`), motes and a floor mark.
-const PART_KEYS: Array[String] = ["part", "flash", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along"]
+const PART_KEYS: Array[String] = ["part", "flash", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "bare", "no_cards", "body", "way", "particles", "if_cards", "if_layer", "if_size_over", "if_size_upto", "along", "floor"]
 const MOTE_KEYS: Array[String] = ["part", "kind", "colours", "count", "reach", "radius", "spread", "up", "ring", "way", "below", "color", "bare", "often", "share", "body", "along", "line", "life"]
 const MARK_KEYS: Array[String] = ["part", "mark", "reach", "radius", "rot", "cards"]
 const LIGHT_KEYS: Array[String] = ["part", "strength", "reach", "radius", "seconds", "color", "plain", "bare", "along"]

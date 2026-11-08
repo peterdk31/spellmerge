@@ -188,7 +188,7 @@ func aim_seen(actor: int) -> bool:
 
 
 ## The angle from the aim of `actor` to the way its body walked at its last cast (0 standing): a
-## dash it casts itself is turned by it.
+## move it casts itself (MOVES_CASTER) is turned by it.
 func walk_turn(actor: int) -> float:
 	return _rt._walk_turn[actor]
 

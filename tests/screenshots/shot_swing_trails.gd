@@ -3,7 +3,8 @@ extends "res://tests/support/screenshot.gd"
 ## brief line at the reach that sheds pixel sparks outward, cooling through the ramp, with the
 ## swing's card particles. Rows are cards (plain in player 1's ramp, fire, frost, lightning, plain
 ## in player 2's, an enemy's); columns are moments of one swing (mid-sweep, its end, 0.1 s and
-## 0.25 s on), each cell its own caster so none chains on another. `swing_trails` is the whole
+## 0.25 s on, and the same caster's next swing, which turns the other way), each cell its own caster
+## so none chains on another. `swing_trails` is the whole
 ## screen and `swing_trails_4x` a crop of the fire row.
 
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -19,6 +20,10 @@ const ROWS: Array = [
 ]
 ## Frames from each column's cast to the shot (60 a second; a 0.12 s wind-up, a 0.06 s sweep).
 const PHASES: Array[int] = [9, 11, 17, 26]
+## The last column: the caster's next swing, which turns the other way (`swing_side`), at its end;
+## its first swing went this many frames before the shot.
+const NEXT_AT: int = 11
+const FIRST_AT: int = 60
 
 
 func take() -> void:
@@ -46,9 +51,14 @@ func take() -> void:
 			var actor: int = actors.open(team, row[1])
 			spells.call("install_staff", actor, 0, compiled)
 			cells.append([actor, Vector2(120.0 + 80.0 * c, 40.0 + 55.0 * r), PHASES[c]])
+		var again: int = actors.open(team, row[1])
+		spells.call("install_staff", again, 0, compiled)
+		cells.append([again, Vector2(120.0 + 80.0 * PHASES.size(), 40.0 + 55.0 * r), FIRST_AT])
+		cells.append([again, Vector2(120.0 + 80.0 * PHASES.size(), 40.0 + 55.0 * r), NEXT_AT])
 	for c in PHASES.size():
 		label("%.2f s" % (PHASES[c] / 60.0), Vector2(110.0 + 80.0 * c, 8.0))
-	var longest: int = PHASES.max()
+	label("next swing", Vector2(100.0 + 80.0 * PHASES.size(), 8.0))
+	var longest: int = maxi(PHASES.max(), FIRST_AT)
 	for frame in longest:
 		for cell: Array in cells:
 			if longest - frame == cell[2]:

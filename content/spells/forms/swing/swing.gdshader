@@ -6,7 +6,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // the owner, 2026-11-08: rework the carriers' looks). A copy of the plain trail
 // (`core/projectiles/shot_swing.gdshaderinc`, the fallback) drawing a crescent slash instead of a
 // line: white-hot along its line at the reach where the tip just passed, cooling inward through
-// its ramp and with age, thickest at the middle of its arc and to a point at each end, a pixel of
+// its ramp and with age, a stroke the way it swung (a hairline where it began, its head near where
+// it ended, pointed at the end; each swing turns the other way, so its stroke does too), a pixel of
 // light outside it while fresh and two broken smears inside it behind the tip. An infused slash is
 // in its infusion's ramp with its player's colour along its inner edge; a plain one in its
 // player's. Its vertices, quads and uniforms are the plain trail's (Feel's swing trails draw each
@@ -29,6 +30,10 @@ const float LIGHT_LIFE = 0.3;
 const float THICK = 4.0;
 const float SMEAR_A = 2.0;
 const float SMEAR_B = 4.0;
+// How sharply its head comes to a point at the end (it tapers over the last 1 / HEAD of its arc),
+// and the stroke's thickest share, so its head is THICK.
+const float HEAD = 6.0;
+const float HEAD_PEAK = 0.75;
 // The line runs this far inside the reach, and the square round the hand this far outside it.
 const float LINE_IN = 2.0;
 const float MARGIN = 10.0;
@@ -118,9 +123,11 @@ void fragment() {
 	bool on_arc = abs(a) <= swing_half;
 	float line_r = swing_reach - LINE_IN;
 	float u = age / LINE_LIFE;
-	// A crescent: thickest at the middle of its arc, to a point at each end, thinning as it ages.
-	float p = a / max(swing_half, 0.001);
-	float taper = max(1.0 - p * p, 0.0);
+	// A stroke the way it swung (`a` grows the way it turns, so the side it swung from is -half):
+	// a hairline where it began, swelling to its head near where it ended, to a point at the end;
+	// thinning as it ages. Each swing turns the other way, so its stroke does too.
+	float along = clamp((a / max(swing_half, 0.001) + 1.0) * 0.5, 0.0, 1.0);
+	float taper = clamp(pow(along, 1.6) * min((1.0 - along) * HEAD, 1.0) / HEAD_PEAK, 0.0, 1.0);
 	float thick = floor(THICK * taper * pow(max(1.0 - u, 0.0), 0.7) + 0.5);
 	// Pixels inside its line (0 on it), and from its inner edge.
 	float dr = floor(line_r - r + 0.5);

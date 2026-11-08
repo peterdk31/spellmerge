@@ -1,6 +1,6 @@
 # Card looks: every carrier's look in its own folder
 
-**Status: plan (2026-11-08), for the owner's review.** The owner, on the pool's look first being a branch of the rune shader: "if a card needs a shader, a new shader is added in its folder", then "ideally each shot should have its own", and "this should also make it easier to change the look of eg. Bolt in the future". PR #632 did it for still shots: the rune, the wall's stones and the pool's puddle are shaders in their card folders (`FormBase.shot_shader`), the projectile manager makes a pair of batches for each card's shader as it is numbered (no fixed number, in the native kernel too), and a plain fallback (`core/projectiles/shot_still.gdshader`) draws a still shot whose card names none. This plan takes the same idea to every other carrier with a look of its own.
+**Status: plan (2026-11-08), reviewed by the owner the same day: one field, `look_shader` (question 1: yes), and the bolt gets a look of its own in phase 1 (question 2: "let's try yes").** The owner, on the pool's look first being a branch of the rune shader: "if a card needs a shader, a new shader is added in its folder", then "ideally each shot should have its own", and "this should also make it easier to change the look of eg. Bolt in the future". PR #632 did it for still shots: the rune, the wall's stones and the pool's puddle are shaders in their card folders (`FormBase.shot_shader`), the projectile manager makes a pair of batches for each card's shader as it is numbered (no fixed number, in the native kernel too), and a plain fallback (`core/projectiles/shot_still.gdshader`) draws a still shot whose card names none. This plan takes the same idea to every other carrier with a look of its own.
 
 ## Where every carrier's look is now
 
@@ -30,7 +30,7 @@ What every card shader keeps, as today's shot shaders do (core/README.md, "The s
 - **Native kernel:** the same batch rule (`count_draw`), with the body no longer tied to `MOTION_STILL`. `draw_shots` already writes a head for a moving shot and a quad for a still one. `test_native_kernel` gives some flying shots a card body.
 - **Spell light:** a body batch of heads is lit as shots (`ROWS_SHOT`), one of quads as runes (`ROWS_RUNE`): `batch_mesh()` answers per batch, not per index.
 - **Contract for a flying card shader:** copy `shot_head.gdshader` (its vertex stage places the head's quads from the instance; tails stay Feel's motes and are not the shader's).
-- **Cards:** none is given a new look in this phase. The bolt, atom, nova and swap keep the shared head (no `look_shader`) until someone wants one of them to look different. A shader per card costs a draw call and a compile each, so sharing stays the default.
+- **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `forms/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom, nova and swap keep the shared head (no `look_shader`) until someone wants one of them to look different: a shader per card costs a draw call and a compile each, so sharing stays the default.
 
 ## Phase 2: beam and swing (Feel)
 
@@ -61,7 +61,7 @@ Entities draws a familiar's orb with `shot_orbit.gdshader`. The familiar card na
 
 One PR each, phase 1 first: it is the one the bolt question needs, and phases 2 and 3 copy its pattern into simpler drawers.
 
-## Questions for the owner
+## The owner's answers (2026-11-08)
 
-1. The rename `shot_shader` → `look_shader` (one field for "the shader that draws this carrier", whoever draws it), or keep a field per kind of drawer?
-2. Phase 1 gives no card a new look. Should the bolt get one now (a distinct `forms/bolt/bolt.gdshader`), or only when its art is reworked?
+1. **One field:** `shot_shader` is renamed `look_shader` in phase 1, "the shader that draws this carrier", whoever draws it.
+2. **The bolt gets its own look** in phase 1 (`forms/bolt/bolt.gdshader`), to try it.

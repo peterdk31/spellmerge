@@ -440,7 +440,7 @@ func swing_tint(at: int) -> Color:
 
 
 ## The id of the card live swing `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws
-## its trail by its card's look (`Spells.look_shader_of`).
+## its trail by its card's look (`Spells.look_of`).
 func swing_form(at: int) -> StringName:
 	return _sw_spell[at].form_id if _sw_spell[at] != null else &""
 

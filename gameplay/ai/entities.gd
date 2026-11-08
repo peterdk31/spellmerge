@@ -96,7 +96,7 @@ const FAMILIAR_SIZE: float = 3.0
 ## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
 ## style (`DecoyLook`), a familiar an orbit shot drawn whole with its tail bent round its circle.
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
-## The card whose look a familiar's orb is (`Spells.look_shader_of`, as an orb: its `look_shader`,
+## The card whose look a familiar's orb is (`Spells.look_of`, as an orb: its `look_shader`,
 ## or ORBIT_SHADER when it names none; docs/milestones/card-looks.md, phase 3). Every familiar is
 ## drawn in one batch, so by one card's shader: a second card that makes familiars with a look of
 ## its own would need a batch per shader.
@@ -226,12 +226,14 @@ func _ready() -> void:
 
 
 ## Draws the familiars' orbs by their card's own shader (`FAMILIAR_CARD`'s `look_shader`, asked of
-## Spells as an orb), or ORBIT_SHADER when it names none or there is no Spells. Once when it is
-## ready and at each run's start; nothing is asked per spawn.
+## Spells as an orb), or ORBIT_SHADER when it names none or there is no Spells, and warms it. Once
+## when it is ready and at each run's start; nothing is asked per spawn.
 func use_familiar_look() -> void:
-	var shader: Shader = spells.look_shader_of(FAMILIAR_CARD, Carrier.LOOK_ORB) if spells != null else null
+	var shader: Shader = spells.look_of(FAMILIAR_CARD, Carrier.LOOK_ORB).shader if spells != null else null
 	var material: ShaderMaterial = _familiar_node.material as ShaderMaterial
 	var wanted: Shader = shader if shader != null else ORBIT_SHADER
+	# Warmed before the first room as Entities draws it, one batch (Spells knows nothing of how).
+	ShaderWarmupScript.want(wanted, ShaderWarmupScript.BATCH)
 	if material.shader != wanted:
 		material.shader = wanted
 

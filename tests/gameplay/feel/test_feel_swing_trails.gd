@@ -84,21 +84,17 @@ class FakeSwings:
 		return 77
 
 	## The card each swing is (`swing_form`), and the looks Spells would answer for a card id
-	## drawn as a swing trail (`look_shader_of`): none by default, every trail plain.
+	## drawn as a swing trail (`look_of`): none by default, every trail plain.
 	var form: StringName = &"swing"
 	var trail_shaders: Dictionary = {}
 
 	func swing_form(_at: int) -> StringName:
 		return form
 
-	func look_shader_of(id: StringName, drawer: int) -> Shader:
-		return trail_shaders.get(id) as Shader if drawer == Carrier.LOOK_SWING else null
-
-	func look_light_intensity_of(_id: StringName, _drawer: int) -> float:
-		return 1.0
-
-	func look_light_reach_of(_id: StringName, _drawer: int) -> float:
-		return 1.0
+	func look_of(id: StringName, drawer: int) -> CardLook:
+		if drawer != Carrier.LOOK_SWING or not trail_shaders.has(id):
+			return CardLook.PLAIN
+		return CardLook.of(trail_shaders[id] as Shader, 1.0, 1.0)
 
 
 var bus: EventsScript
@@ -264,7 +260,7 @@ func test_the_shader_draws_only_the_line_and_its_light() -> void:
 
 
 ## A swing card's own look (docs/milestones/card-looks.md, phase 2): its trail is drawn by the shader
-## Spells answers for its card (`look_shader_of`, as a swing trail), on the trail's own material;
+## Spells answers for its card (`look_of`, as a swing trail), on the trail's own material;
 ## a card that names none, or that another area draws, trails with the plain shader.
 func test_a_swing_trails_with_its_cards_own_shader() -> void:
 	var own_look: Shader = preload("res://content/spells/forms/swing/swing.gdshader")

@@ -12,6 +12,8 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
+const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
 ## The plain shader each area draws a card with no look of its own by: what a card's shader copies.
 const PLAIN: Dictionary = {
@@ -90,15 +92,23 @@ func test_no_card_shader_reads_the_light_floats() -> void:
 
 
 func test_every_card_shader_is_warmed_before_the_first_room() -> void:
+	# Each area warms the card shaders it draws, as it draws them: the projectile manager its
+	# bodies (numbered when Spells starts), Feel its beams' and trails', Entities its orbs'.
 	var manager := own(ProjectilesScript.new()) as ProjectilesScript
 	var spells := own(SpellsScript.new()) as Node
 	spells.set(&"registry", registry)
 	spells.set(&"projectiles", manager)
 	spells.call(&"register_bodies")
+	var feel := own(FeelScript.new()) as FeelScript
+	feel.spells = spells
+	feel._warm_card_looks()
+	var entities := own(EntitiesScript.new()) as EntitiesScript
+	entities.spells = spells as SpellsScript
+	entities.use_familiar_look()
 	var warmed: Array[Shader] = WarmupScript.shaders()
 	for each: Array in _looked_cards():
 		var form: FormBase = each[0]
-		check(warmed.has(form.look_shader), "%s's shader is warmed when Spells starts" % form.id)
+		check(warmed.has(form.look_shader), "%s's shader is warmed before the first room" % form.id)
 	# A shot carrier's body was numbered then, with its mesh: asked again, it is one of those.
 	var numbered: int = manager.batch_count()
 	for each: Array in _looked_cards():

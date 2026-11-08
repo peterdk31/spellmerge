@@ -26,9 +26,10 @@
 // layer order. A look drawn by a node of its own (the beam card, the slam's hammer) is handed its
 // spell's infusions in slot order as a uniform array instead (`CompiledSpell.infusion_looks`: each
 // tint and look kind), and makes the same materials from the tints.
-// `look_of` uses the palette the default way, so a shader that does nothing shows every infusion:
-// its light and base stay the first's, it cools into the second's (its shadow, the end of `ramp`)
-// and glows in the last one's. A shader that draws the palette its own way (the beam card's
+// `look_of` uses the palette the default way, so a shader that does nothing shows every infusion of
+// its palette (PALETTE_MOST; a fifth shows in the motes only), a ramp slot each: its light and base
+// stay the first's, it cools into the second's (its shadow, the end of `ramp`), glows in the third's
+// (the second's with two) and its white-hot core is the fourth's light whitened. A shader that draws the palette its own way (the beam card's
 // strands) defines LOOK_OWN_INFUSIONS before including this, keeps the first's ramp in `look_of`,
 // and reads the palette itself.
 
@@ -166,13 +167,18 @@ Look look_of(vec3 c, float who, float z, vec3 b, float s, bool particles) {
 	L.glow = mix(L.mid, L.hi, 0.35);
 #ifndef LOOK_OWN_INFUSIONS
 	if (first >= 0) {
-		// The palette's default use: it cools into the second's base and glows in the last one's.
+		// The palette's default use, a slot an infusion so none is skipped: it cools into the
+		// second's base, glows in the third's (the second's with two) and its white-hot core is the
+		// fourth's light whitened (as the first's is with fewer).
 		ivec4 materials;
 		int count = palette_of(c, b, materials);
 		if (count > 1) {
-			int last = count > 3 ? materials.w : (count > 2 ? materials.z : materials.y);
+			int glows = count > 2 ? materials.z : materials.y;
 			L.lo = palette_shade(materials.y, 1);
-			L.glow = mix(palette_shade(last, 1), palette_shade(last, 2), 0.35);
+			L.glow = mix(palette_shade(glows, 1), palette_shade(glows, 2), 0.35);
+			if (count > 3) {
+				L.hot = mix(palette_shade(materials.w, 2), vec3(1.0), 0.5);
+			}
 		}
 	}
 #endif

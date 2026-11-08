@@ -3230,3 +3230,11 @@ The owner asked for the three ideas picked from a review of every card: a trigge
 - **Cost:** a draw call per body batch that has shots this frame (empty ones upload nothing). A card's shader must keep the shot shaders' rules (small and branch-light; core/README.md, "The shot shaders").
 - **The rune too (owner, same day):** its look is its card's own shader, `content/spells/forms/rune/rune.gdshader` (was `core/projectiles/shot_rune.gdshader`). A still shot whose card names no shader is drawn by a plain fallback, `core/projectiles/shot_still.gdshader` (a white-hot cross and its glow, its card particles round it), in the batches now named `BATCH_STILL` and `BATCH_ENEMY_STILL` (were `BATCH_RUNE`, `BATCH_ENEMY_RUNE`). The word "rune" stays for a still shot in the world (`KIND_RUNE`, `RUNE_TRACE`, a still shot no card named is told as `&"rune"`).
 
+
+
+## 2026-11-08: Every carrier's look in its own card (owner decision; docs/milestones/card-looks.md)
+
+- **Now (phase 1):** `FormBase.shot_shader` is `FormBase.look_shader`, the shader that draws a card's carrier whichever area draws it (a carrier says which, `Carrier.look_drawer`: the manager's head or quad batches, Feel's beams or swing trails, Entities' orbs, or nothing). A card body is a shader and a mesh (`register_body(shader, MESH_QUAD or MESH_HEAD)`), so a flying shot may have a look of its own too; a shot whose motion is not written as its body's mesh draws plain, in the GDScript and the native kernel alike. A body's batches keep the first batches' draw order (a head body's after the bolts', a quad body's after the runes'). The bolt has a look of its own, `content/spells/forms/bolt/bolt.gdshader` (its core a `x` where the shared head's is a `+`), for the owner to judge; the atom, nova and swap keep the shared head.
+- **The rename:** a card still writing `shot_shader` keeps its look (`FormBase._set` takes it as `look_shader`) and the validator names it.
+- **Why:** the owner: "ideally each shot should have its own", and "this should also make it easier to change the look of eg. Bolt in the future".
+- **Cost:** a body is up to four draw calls with Spell light on (its pair, and the light batch mirroring each) while it has shots; empty batches upload nothing. Sharing the plain shaders stays the default.

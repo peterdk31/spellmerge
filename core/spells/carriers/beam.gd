@@ -118,6 +118,11 @@ func id() -> StringName:
 	return &"beam"
 
 
+## What draws its look: Feel draws its beams.
+func look_drawer() -> int:
+	return LOOK_BEAM
+
+
 
 ## The beams of the runtime `spells` (its bound `beam` carrier, `Spells.carrier`), for what reads
 ## its own getters (the looks, `ai`, the actor's mover, the tests).

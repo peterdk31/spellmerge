@@ -19,7 +19,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 		return
 	check_equal(card.id, &"pool", "its id is its folder")
 	check_equal(card.carrier, &"pool", "it fires the pool carrier")
-	check(card.shot_shader == preload("res://content/spells/forms/pool/pool.gdshader"), "drawn as a puddle, by its folder's shader")
+	check(card.look_shader == preload("res://content/spells/forms/pool/pool.gdshader"), "drawn as a puddle, by its folder's shader")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check(card.look_problems().is_empty(), "its look is one the shaders draw: %s" % [card.look_problems()])
 	var pool: Carrier = Carriers.of(&"pool")

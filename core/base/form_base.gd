@@ -112,19 +112,35 @@ var _pose_packed: bool = false
 @export var impact_cue: StringName = &"impact"
 @export var end_cue: StringName = &""
 @export var wind_cue: StringName = &"wind"
-## What its still shots are drawn by: null for their motion's own body (a flying shot a bolt with
-## its tail, a still one a rune's diamond, an orbiting one an orbit shot), or a canvas-item shader of
-## the card's own, in its folder (a wall's `stone.gdshader`, a pool's `pool.gdshader`), that draws one
-## quad a still shot (each stone of a solid one) from the projectile manager's instance data, as the
-## rune shader does (core/README.md, "The shot shaders": copy `forms/pool/pool.gdshader`). The
-## manager gives it a pair of batches of its own (`ProjectileManager.register_body`; every card
-## may have its own) and the shader warm-up compiles it before the first room. A flying or
-## orbiting shot ignores it.
-@export var shot_shader: Shader = null
+## The shader that draws its carrier's look, whichever area draws it (`Carrier.look_drawer`;
+## docs/milestones/card-looks.md): null for that area's plain one in core (a flying shot a bolt's
+## head, a still one the plain still quad), or a canvas-item shader of the card's own, in its folder.
+## For a still carrier it draws one quad a shot (each stone of a solid one) from the projectile
+## manager's instance data (a wall's `stone.gdshader`, a pool's `pool.gdshader`: copy
+## `forms/pool/pool.gdshader`); for one that flies or orbits it places a shot's head from its
+## instance as `shot_head.gdshader` does (the bolt's `bolt.gdshader`: copy it). The manager gives it
+## a pair of batches of its own (`ProjectileManager.register_body`; every card may have its own) and
+## the shader warm-up compiles it before the first room (core/README.md, "The shot shaders").
+@export var look_shader: Shader = null
+## The old names of renamed look fields this card was loaded with (`_set`), each still taken (a
+## `shot_shader` is its `look_shader`), and named by `look_problems` so the card is fixed.
+var _renamed: PackedStringArray = PackedStringArray()
 
 
 func kind() -> StringName:
 	return &"form"
+
+
+## A field this card's `.tres` sets that no longer exists: `shot_shader`, renamed `look_shader`
+## (docs/milestones/card-looks.md), is taken as it and remembered for `look_problems`, so a card
+## written before the rename (or a branch) never loads clean and draws plain in silence.
+func _set(property: StringName, value: Variant) -> bool:
+	if property == &"shot_shader":
+		look_shader = value as Shader
+		if not _renamed.has("shot_shader"):
+			_renamed.append("shot_shader")
+		return true
+	return false
 
 
 ## Its cues and how big its impact cue plays, for looks (`gameplay/feel`, which reads no spell
@@ -133,13 +149,15 @@ func look_cues() -> Array:
 	return [cast_cue, shown_cue, impact_cue, end_cue, radius, wind_cue]
 
 
-## What is wrong with its looks, one line each (empty when nothing is): a shot shader that is not
+## What is wrong with its looks, one line each (empty when nothing is): a look shader that is not
 ## a canvas-item shader. Whether the cues it names exist is the registry's to say
 ## (tests/content/spells/test_carrier_looks.gd).
 func look_problems() -> PackedStringArray:
 	var found := PackedStringArray()
-	if shot_shader != null and shot_shader.get_mode() != Shader.MODE_CANVAS_ITEM:
-		found.append("%s: shot_shader '%s' is not a canvas_item shader" % [id, shot_shader.resource_path])
+	for name: String in _renamed:
+		found.append("%s: `%s` was renamed `look_shader`: rename it in the card's .tres" % [id, name])
+	if look_shader != null and look_shader.get_mode() != Shader.MODE_CANVAS_ITEM:
+		found.append("%s: look_shader '%s' is not a canvas_item shader" % [id, look_shader.resource_path])
 	return found
 
 

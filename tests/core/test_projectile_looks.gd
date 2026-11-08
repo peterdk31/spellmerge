@@ -235,7 +235,7 @@ func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
 	check_equal(floori(uvs[0].y), ManagerScript.HEAD_Q_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.HEAD_Q_CORE, "the core last, on top")
 	for batch in mgr.batch_count():
-		if ManagerScript.batch_mesh(batch) >= 0:
+		if mgr.batch_mesh(batch) == ManagerScript.MESH_HEAD:
 			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_head.gdshader")
 	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")

@@ -155,9 +155,12 @@ func _test_both_step_alike(threads: int) -> void:
 		root.add_child(mgr)
 		mgr.set_cap(1500)
 		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
-		# Every card body's pair of batches (`register_body`): the still shots below take them in turn.
-		for shader in _body_shaders():
-			mgr.register_body(shader)
+		# Every card body's pair of batches (`register_body`): quad bodies and head bodies in turn
+		# (card-looks phase 1). The shots below take them in turn, still and flying alike, so some
+		# draw in their body's pair and some, whose motion is not written as their body's mesh, plain.
+		var bodies: Array[Shader] = _body_shaders()
+		for n in bodies.size():
+			mgr.register_body(bodies[n], ManagerScript.MESH_QUAD if n % 2 == 0 else ManagerScript.MESH_HEAD)
 		# The births are handed out (as Feel's motes take them), from the same dice on both sides:
 		# with the tails off the drawing lays the tails as births (S5 step 4), compared to the bit.
 		mgr.spark_motes = true
@@ -339,8 +342,14 @@ func _drive(side: int, step: int) -> void:
 				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		elif kind == 1:
 			slot = m.spawn_orbit(caster if caster != _imp else 0, rng.randf_range(20.0, 60.0), rng.randf() * TAU, rng.randf_range(-4.0, 4.0), rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1)
+			if slot >= 0 and slot % 3 == 0:
+				# An orbit shot of a card body: a head body's pair, or plain for a quad body.
+				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		else:
 			slot = m.spawn(caster, from, velocity, rng.randf_range(0.3, 2.5), rng.randf_range(1.0, 9.0), ManagerScript.ACTOR_LAYERS, rng.randi() % 4, 1 if kind != 9 else 2)
+			if slot >= 0 and kind == 8:
+				# A flying shot of a card body (a bolt's own head): a head body's pair, or plain.
+				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		if slot < 0:
 			continue
 		# Any look bits, the enemy ramp's flag among them (`ramp_look`), so a new kind is covered too.

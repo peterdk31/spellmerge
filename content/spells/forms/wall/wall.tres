@@ -25,4 +25,4 @@ ray_length = 28.0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "push": 4, "stretch": -0.3, "ease": "out"}, {"phase": "after", "at": 0.3}])
 cast_cue = &"cast_wall"
 impact_cue = &"impact_ring"
-shot_shader = ExtResource("3_shader")
+look_shader = ExtResource("3_shader")

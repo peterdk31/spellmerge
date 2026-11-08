@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A still shot whose card names no shader of its own (`FormBase.shot_shader`; the projectile
+// A still shot whose card names no shader of its own (`FormBase.look_shader`; the projectile
 // manager's still and enemy still batches; core/README.md, "The shot shaders"): a plain mark, a
 // white-hot 3 px cross in its light shade's ring, its card particles given off round it and a soft
 // glow. Every card that stands still draws its own look (a rune's, a wall's stones, a pool's

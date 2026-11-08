@@ -203,7 +203,7 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 	for batch in light.batches.size():
 		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
 		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.batch_mesh(batch) < 0 else SpellLightScript.ROWS_SHOT
+		var rows: int = SpellLightScript.ROWS_RUNE if light._projectiles.batch_mesh(batch) == ProjectilesScript.MESH_QUAD else SpellLightScript.ROWS_SHOT
 		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "shots"])
 	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
 

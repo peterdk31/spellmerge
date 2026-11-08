@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="FormBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
 [ext_resource type="Texture2D" path="res://content/spells/forms/bolt/icon.svg" id="2_icon"]
+[ext_resource type="Shader" path="res://content/spells/forms/bolt/bolt.gdshader" id="3_shader"]
 
 [resource]
 script = ExtResource("1_base")
@@ -22,3 +23,4 @@ carrier = &"atom"
 pierce = 0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.03, "push": -3, "stretch": 0.25, "ease": "out"}, {"phase": "after", "at": 0.18}])
 cast_cue = &"cast_bolt"
+look_shader = ExtResource("3_shader")

@@ -44,6 +44,11 @@ func id() -> StringName:
 	return &"slam"
 
 
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE
+
+
 
 ## The slams of the runtime `spells` (its bound `slam` carrier, `Spells.carrier`), for what reads
 ## its own getters (the looks, `ai`, the actor's mover, the tests).

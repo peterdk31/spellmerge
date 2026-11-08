@@ -8,6 +8,11 @@ func id() -> StringName:
 	return &"wall"
 
 
+## What draws its look: its shots stand still, one quad each.
+func look_drawer() -> int:
+	return LOOK_STILL
+
+
 func traits() -> int:
 	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | MEETS_SHOTS | BLOCKS | CASTS_FROM_SHOT
 

@@ -546,17 +546,35 @@ func _ready() -> void:
 	register_bodies()
 
 
-## Hands every carrier card's own shot shader (`FormBase.shot_shader`) to the projectile manager
-## now (`register_body`), so each has its batches and is warmed before the first room, not first
-## drawn in the middle of one. A launch numbers any it did not know too.
+## Hands every shot carrier card's own shader (`FormBase.look_shader`, of a card whose carrier's
+## shots the projectile manager draws: LOOK_SHOT or LOOK_STILL) to the projectile manager now
+## (`register_body`, with the mesh its shots are written as), so each has its batches and is warmed
+## before the first room, not first drawn in the middle of one. A launch numbers any it did not
+## know too.
 func register_bodies() -> void:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
 	if projectiles == null or source == null or not source.has_method(&"get_all"):
 		return
 	for card: Resource in source.call(&"get_all", &"spells"):
 		var form := card as FormBase
-		if form != null and form.shot_shader != null:
-			projectiles.register_body(form.shot_shader)
+		if form != null and form.look_shader != null:
+			var mesh: int = _shot_mesh(Carriers.of(form.carrier).look_drawer())
+			if mesh != NO_SHOT_MESH:
+				projectiles.register_body(form.look_shader, mesh)
+
+
+## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.
+const NO_SHOT_MESH: int = 1
+
+
+## The projectile manager's mesh (`MESH_HEAD` or `MESH_QUAD`) the shots of a carrier drawn by
+## `drawer` (`Carrier.LOOK_*`) are written as, or NO_SHOT_MESH for one the manager does not draw.
+static func _shot_mesh(drawer: int) -> int:
+	if drawer == Carrier.LOOK_SHOT:
+		return ProjectilesScript.MESH_HEAD
+	if drawer == Carrier.LOOK_STILL:
+		return ProjectilesScript.MESH_QUAD
+	return NO_SHOT_MESH
 
 
 ## Connect to a projectile manager and an event bus (either may be null, then casting is
@@ -1851,7 +1869,9 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 ## shot that cast it (no shot ends while a launch is set up), its trigger rows. Returns how many
 ## shots there were.
 func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
-	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, projectiles.register_body(spell.shot_shader))
+	var look_mesh: int = _shot_mesh(spell.look_drawer)
+	var look_body: int = projectiles.register_body(spell.look_shader, look_mesh) if look_mesh != NO_SHOT_MESH else 0
+	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, look_body)
 	if _rec_seq.size() < projectiles.get_cap():
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null

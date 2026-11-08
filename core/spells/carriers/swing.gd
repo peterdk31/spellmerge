@@ -54,6 +54,11 @@ func id() -> StringName:
 	return &"swing"
 
 
+## What draws its look: Feel draws its swing trails.
+func look_drawer() -> int:
+	return LOOK_SWING
+
+
 
 ## The swings of the runtime `spells` (its bound `swing` carrier, `Spells.carrier`), for what reads
 ## its own getters (the looks, `ai`, the actor's mover, the tests).

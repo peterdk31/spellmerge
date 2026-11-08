@@ -32,7 +32,7 @@ extends ActorLook
 ## A slam turns the staff's head into a hammer (its `hammer` pose channel): a Hammer node made at
 ## setup, over the sprite and under the face, follows the sprite and is drawn by its own shader
 ## (`core/projectiles/staff_hammer.gdshader`) while the channel is above 0, as big as the slam's
-## cards grew it.
+## cards grew it, its head smushing while the staff is squashed (its landing).
 ##
 ## Drawn by this node: the aim reticle (a chevron), the closing ring while the actor cannot be hurt
 ## (`Health.protect`, with the body and face 55% opaque) and, while it is down, only the revive
@@ -343,6 +343,8 @@ func _place_hammer() -> void:
 	var material := _hammer.material as ShaderMaterial
 	material.set_shader_parameter(&"hammer", amount)
 	material.set_shader_parameter(&"hammer_size", _hammer_size(poses))
+	# Its head smushes while the staff is squashed (a negative stretch: a slam's landing).
+	material.set_shader_parameter(&"hammer_squash", maxf(-poses.staff_stretch(actor.id), 0.0))
 	material.set_shader_parameter(&"hammer_dir", Vector2.RIGHT.rotated(direction() * TAU / DIRECTIONS))
 	material.set_shader_parameter(&"hammer_reach", actor.reach())
 	material.set_shader_parameter(&"glow_color", colour)

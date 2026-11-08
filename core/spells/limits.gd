@@ -155,6 +155,11 @@ const SHOT_MOVES_START: int = 64
 ## Seconds a rune hits nothing after it is placed (owner, 2026-11-06: a trap arms): then it hits
 ## whatever is on it, the body whose hit cast it too (`CarrierRune`).
 const RUNE_ARM: float = 1.0
+## Seconds between a pool's strikes of what stands in it (`CarrierPool`): every tick it forgets the
+## bodies it touches, so each is hit again, its infusion's status put on again.
+const POOL_TICK: float = 0.5
+## How far ahead a pool spreads when its form has no `ray_length`, in pixels.
+const POOL_REACH: float = 64.0
 ## Pixels of slack on "a payload starts touching the body that fired it": a payload starts where
 ## the shot that hit was, whose centre may stand its own radius off the body, more than the
 ## payload's when that shot was bigger (a `bigger` bolt's 8 px against a nova shot's 5).

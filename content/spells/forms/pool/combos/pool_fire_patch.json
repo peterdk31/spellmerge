@@ -1,0 +1,10 @@
+{
+	"id": "pool_fire_patch",
+	"name": "Fire patch",
+	"does": "A fire pool spills under an imp ahead and strikes it every half second, so it burns on and on while the imp beside the pool is left alone.",
+	"needs": "pool",
+	"casts": [{"staff": 0, "cards": ["fire", "pool"]}],
+	"imps": [[56, 0], [56, 44]],
+	"seconds": 2.2,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 8}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

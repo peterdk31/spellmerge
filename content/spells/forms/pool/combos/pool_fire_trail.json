@@ -1,0 +1,10 @@
+{
+	"id": "pool_fire_trail",
+	"name": "Fire trail",
+	"does": "A slow bolt spills a fire pool ahead of it every half second, leaving a burning trail that catches an imp standing beside its path, which the bolt itself never touches.",
+	"needs": "pool",
+	"casts": [{"staff": 0, "cards": ["slow", "timer", "bolt", "fire", "pool"]}],
+	"imps": [[120, 22]],
+	"seconds": 3.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 4}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

@@ -8,7 +8,9 @@ render_mode blend_premul_alpha;
 // floor while it is new (the code beside its kind), its card particles given off from its outline
 // and a soft glow. A still shot whose card asks for a stone (KIND_STONE, a wall's) is a standing
 // ward stone instead: a slab lit from the top-left with a glyph cut down its face, light running up
-// it, a glowing line at its foot, rising out of the floor while it is new. Its quad is GRID x zoom
+// it, a glowing line at its foot, rising out of the floor while it is new. One that asks for a pool
+// (KIND_POOL, a pool's) is a flat puddle on the floor: an oval rim, ripples running out over a
+// dithered middle the floor shows through, a few bubbles, spreading out while it is new. Its quad is GRID x zoom
 // pixels square round its centre. Blending is premultiplied: its pixels are opaque, the glow added
 // light.
 
@@ -23,14 +25,18 @@ uniform float particle_share = 1.0;
 const float GRID = 24.0;
 // The stone's kind (KIND_STONE in projectile_manager.gd).
 const float K_STONE = 4.0;
+// The pool's kind (KIND_POOL in projectile_manager.gd).
+const float K_POOL = 5.0;
 
 // How much of a new rune is traced (a stone risen), 0 to 1 (1 once it is whole), and 1 for a stone.
 varying flat float age;
 varying flat float stone;
+varying flat float pool;
 
 void vertex() {
 	age = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	stone = coded_kind(INSTANCE_CUSTOM.a) == K_STONE ? 1.0 : 0.0;
+	pool = coded_kind(INSTANCE_CUSTOM.a) == K_POOL ? 1.0 : 0.0;
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, true);
 	SET_LOOK(L);
 }
@@ -104,6 +110,37 @@ vec4 stone_pixel(vec2 q, float reach) {
 	return vec4(x < -w * 0.4 ? STONE_LIGHT : (x > w * 0.4 ? STONE_SHADOW : STONE_BASE), 1.0);
 }
 
+// Pool: a flat oval `reach` x 1.3 wide and x 0.75 deep (seen from above at a slant), spreading
+// out from its middle while it is new: a one-pixel rim in its base shade, light at its top-left
+// edge; inside, a checker of its base shade the floor shows through, ripples of its light shade
+// running out from the middle, and now and then a white-hot bubble. Returns the pixel's colour
+// (alpha 0 for none).
+vec4 pool_pixel(vec2 q, float reach) {
+	vec2 e = q / vec2(reach * 1.3, reach * 0.75);
+	float r = length(e);
+	float spread = max(age, 0.15);
+	if (r > spread) {
+		return vec4(0.0);
+	}
+	float edge = (spread - r) * reach;
+	if (edge < 1.0) {
+		return vec4(q.x < 0.0 && q.y < 0.0 ? hi : mid, 1.0);
+	}
+	float ripple = fract(r * 2.5 - sim_time * 0.8 + seed);
+	if (ripple < 0.12) {
+		return vec4(hi, 1.0);
+	}
+	vec2 cell = floor(q * 0.25);
+	float blink = hash(cell.x * 7.0 + cell.y, floor(sim_time * 3.0 + seed), 11.0);
+	if (blink > 0.985 && mod(floor(q.x) + floor(q.y), 4.0) < 0.5) {
+		return vec4(hot, 1.0);
+	}
+	if (mod(floor(q.x) + floor(q.y), 2.0) < 0.5) {
+		return vec4(mid, 1.0);
+	}
+	return vec4(0.0);
+}
+
 vec4 rune_look(vec2 uv) {
 	// The screen pixel, the centre at 0, pixel centres on whole numbers.
 	vec2 size = vec2(GRID) * zoom;
@@ -134,6 +171,18 @@ vec4 rune_look(vec2 uv) {
 				colour = p;
 			}
 		}
+	}
+	if (pool > 0.5) {
+		vec4 p = pool_pixel(q, reach);
+		if (p.a > 0.0) {
+			return p;
+		}
+		if (colour.a > 0.0) {
+			return colour;
+		}
+		// Its glow: a soft light over the whole puddle.
+		float lit_pool = 0.3 * falloff(length(q / vec2(1.3, 0.75)), reach * 1.2) * age;
+		return vec4(glow * lit_pool * glow_strength, 0.0);
 	}
 	if (stone > 0.5) {
 		vec4 s = stone_pixel(q, reach);

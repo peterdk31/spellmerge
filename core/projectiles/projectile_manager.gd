@@ -353,6 +353,9 @@ const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
 ## A standing stone (a wall's, `shot_rune.gdshader`): a still body a card can ask for (`set_form`).
 const KIND_STONE: int = 4
+## A pool on the floor (a pool's, `shot_rune.gdshader`): a flat puddle in its card's colours,
+## rippling out, a still body a card can ask for (`set_form`).
+const KIND_POOL: int = 5
 ## The kind travels in the alpha of the custom data as 1 - (kind + bend) / KIND_STEPS, so it
 ## has room for kinds 0 to KIND_MAX, and the bend code (below 0.5) rounds away when it is read.
 const KIND_STEPS: float = 16.0
@@ -5913,6 +5916,16 @@ func _mark_memory(slot: int) -> int:
 			before = at
 		at = next
 	return _mark_stamp
+
+
+## The shot in `slot` forgets every target it touches, so it hits each again at its next test,
+## though they never left it (a pool's tick: what stands in it is struck again). False for an empty
+## slot. Not to be called while the manager steps.
+func forget_hits(slot: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_forget_all(slot)
+	return true
 
 
 ## The shot in `slot` hit target `t` this step: remember it until it leaves it.

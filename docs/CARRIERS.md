@@ -172,10 +172,10 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | Hook | Default | Overridden by |
 | --- | --- | --- |
 | `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), atom (adds the nova's ring) |
-| `shoot` | a shot flying along its heading | rune (still, placed ahead), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
+| `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
-| `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), portal (moves what went into its gates) |
+| `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `payload_cast_by` | from its traits (the fallback carriers above) | none: every carrier answers by its yes/no flags |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |

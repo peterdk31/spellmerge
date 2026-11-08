@@ -363,6 +363,9 @@ static func reach(form: FormBase) -> float:
 			return form.ray_length
 		&"rune":
 			return form.radius
+		&"pool":
+			# In the puddle: it spreads `ray_length` ahead.
+			return form.ray_length
 		&"orbit":
 			return form.orbit_radius
 		&"wall":

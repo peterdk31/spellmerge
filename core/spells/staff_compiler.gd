@@ -17,7 +17,7 @@ extends RefCounted
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The shot bodies a form card may ask for (`FormBase.SHOT_BODIES`), as the projectile manager's kinds.
-const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE}
+const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE, &"pool": ProjectilesScript.KIND_POOL}
 ## `CompiledCast.targets` value for a card that landed on the caster, on a payload's origin, and on
 ## the body or shot that fired a payload.
 const TARGET_CASTER: int = -1

@@ -5009,8 +5009,12 @@ func _draw_shots(fraction: float) -> void:
 			_draw_out[DRAW_OUT_FIRST + batch] = _write_stones(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue
 		var flags: int = HEAD_LIVE | (HEAD_ORBIT if motion == MOTION_ORBIT else 0)
-		_write_head(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
-		_write_light(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE, slot)
+		var row: int = _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE
+		var buffer: PackedFloat32Array = _buffers[batch]
+		_write_head(buffer, row, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
+		# Its light multipliers in the row's free floats (written inline: a call per shot costs).
+		buffer[row + LIGHT_REACH_FLOAT] = _look_light_reach[slot]
+		buffer[row + LIGHT_INTENSITY_FLOAT] = _look_light_intensity[slot]
 		_draw_out[DRAW_OUT_FIRST + batch] += 1
 		if tail_births_on:
 			_lay_tail(slot, at)
@@ -5244,19 +5248,17 @@ func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2
 		at -= _solid_half(slot, solid)
 	var code: float = trace_code(sim_time - _born[slot])
 	var kind: int = _kind_of(slot)
+	var light_reach: float = _look_light_reach[slot]
+	var light_intensity: float = _look_light_intensity[slot]
 	# A batch holds the cap at most: stones past it are not drawn.
 	for n in mini(stones, buffer.size() / DRAW_STRIDE - out):
-		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
-		_write_light(buffer, out * DRAW_STRIDE, slot)
+		var i: int = out * DRAW_STRIDE
+		_write_quad(buffer, i, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
+		# Its light multipliers in the row's free floats (written inline: a call per shot costs).
+		buffer[i + LIGHT_REACH_FLOAT] = light_reach
+		buffer[i + LIGHT_INTENSITY_FLOAT] = light_intensity
 		out += 1
 	return out
-
-
-## The shot in `slot`'s light multipliers into its row at float `i` (LIGHT_REACH_FLOAT,
-## LIGHT_INTENSITY_FLOAT), after `_write_quad` or `_write_head` left them 0.
-func _write_light(buffer: PackedFloat32Array, i: int, slot: int) -> void:
-	buffer[i + LIGHT_REACH_FLOAT] = _look_light_reach[slot]
-	buffer[i + LIGHT_INTENSITY_FLOAT] = _look_light_intensity[slot]
 
 
 ## Work out what `update_draw` keeps for the shot in `slot` (see `_drawn_seq`).

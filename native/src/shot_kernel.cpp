@@ -1820,7 +1820,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			} else {
 				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
 			}
-			// `_write_light`: its light multipliers in the row's free floats.
+			// Its light multipliers in the row's free floats (as the GDScript writes them after `_write_head` or `_write_quad`).
 			b[LIGHT_REACH_FLOAT] = light_reach[slot];
 			b[LIGHT_INTENSITY_FLOAT] = light_intensity[slot];
 		}

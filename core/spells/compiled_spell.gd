@@ -199,6 +199,15 @@ func fires_on(event: int) -> bool:
 	return false
 
 
+## True when it has a trigger its carrier fires while it lives (`TriggerBase.LIVE`): it is listed
+## as a live carrier (`CarrierKit.live_join`).
+func fires_live() -> bool:
+	for trigger in triggers:
+		if TriggerBase.LIVE.has(trigger.event):
+			return true
+	return false
+
+
 ## True when its carrier answers yes to `flag` (a `CarrierTraits` flag).
 func has_trait(flag: int) -> bool:
 	return traits & flag != 0

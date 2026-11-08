@@ -231,9 +231,8 @@ static func plain_staff(slots: int) -> StaffBase:
 func cast(player: int, staff: int, direction: Vector2 = Vector2.RIGHT) -> bool:
 	# An orbit has to find its anchor already set, as it is every physics step in the game.
 	projectiles.set_anchor(player, _casters[player])
-	# A cast is a new press: it sets off the staff's live `on recast` carriers first, as a wizard's.
-	spells.recast_staff(player, staff)
-	return spells.cast_staff(player, staff, _casters[player], direction, MANA) != SpellsScript.REFUSED
+	# A cast is a new press: it sets off the staff's live `on recast` carriers too, as a wizard's.
+	return spells.press_staff(player, staff, _casters[player], direction, MANA) != SpellsScript.REFUSED
 
 
 ## Moves time on by `seconds` in fixed steps.

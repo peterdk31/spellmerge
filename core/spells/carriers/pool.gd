@@ -43,10 +43,10 @@ func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directio
 	return made
 
 
-func spawn_row(spell: CompiledSpell, _tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, lifetime: float) -> int:
+func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, lifetime: float) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.POOL_REACH
 	var at: Vector2 = kit.projectiles.clip_to_walls(origin, origin + heading * reach)
-	return kit.projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, _tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
+	return kit.projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
 
 
 ## Every live pool's clock runs on by `delta`; one whose tick is due forgets the bodies it touches,

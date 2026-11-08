@@ -176,13 +176,9 @@ func step(delta: float) -> void:
 		# then only a new press casts, which switches it off.
 		var pressed: bool = intent.is_pressed(at)
 		var held: bool = intent.is_held(at) and not actor.spells.is_holding(number, at)
-		if pressed and not actor.is_down():
-			# A new press sets off the staff's live `on recast` carriers first, ready or not, so
-			# the carrier this press casts is not one of them.
-			actor.spells.recast_staff(number, at)
 		if pressed or held:
 			_show(at)
-			cast(at)
+			cast(at, pressed)
 
 
 ## The projectile manager's anchor at the body and Spells' aim from the staff tip.
@@ -226,15 +222,19 @@ func _origin() -> Vector2:
 
 
 ## Cast staff `at` now. Returns true if it cast (or switched its sustained cards off). Does
-## nothing while the actor is down or for a staff with no build.
-func cast(at: int) -> bool:
+## nothing while the actor is down or for a staff with no build. `pressed`: a new press, not a held
+## button's repeat, which also sets off the staff's live `on recast` carriers, busy or not
+## (`Spells.press_staff`).
+func cast(at: int, pressed: bool = true) -> bool:
 	if actor.is_down() or not has_staff(at):
 		return false
 	_push_place_again()
 	var origin: Vector2 = _origin()
 	var direction: Vector2 = actor.aim
 	# The way the body walks, for a dash it casts (staffs A6a).
-	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana(at), actor.intent.move)
+	var mana: float = free_mana(at)
+	var walk: Vector2 = actor.intent.move
+	var spent: float = actor.spells.press_staff(number, at, origin, direction, mana, walk) if pressed else actor.spells.cast_staff(number, at, origin, direction, mana, walk)
 	if spent == SpellsScript.REFUSED:
 		return false
 	_mana[at] = maxf(_mana[at] - spent, 0.0)

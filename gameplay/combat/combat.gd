@@ -1014,9 +1014,8 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	var discharged: bool = _discharged
 	if _same(row, node):
 		if strength > 0.0:
-			# A push replaces the knockback, so it replaces the slam too: only a heavy hit, or a
-			# gusted body's, arms it.
-			_slam[row] = profile.slam if profile.slam > 0 else (maxi(roundi(damage * GUST_SLAM_SHARE), 1) if gust > 0.0 else 0)
+			# A push replaces the knockback, so it replaces the slam too.
+			_slam[row] = _slam_of(profile, damage, gust)
 			_slam_by[row] = by
 	# What the reactions kill is not the spell's own kill: no `kill_landed`.
 	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the
@@ -1055,6 +1054,15 @@ func _heals(by: int, row: int) -> bool:
 		return false
 	var team: int = table.team_of(by)
 	return team != ActorsScript.NONE and team == _team(row)
+
+
+## The slam a spell hit of `profile` dealing `damage` arms on a body it shoves, `gust` per cent
+## harder: a heavy hit's own, else GUST_SLAM_SHARE of its damage (at least 1) while it is gusted,
+## else none.
+static func _slam_of(profile: HitProfile, damage: float, gust: float) -> int:
+	if profile.slam > 0:
+		return profile.slam
+	return maxi(roundi(damage * GUST_SLAM_SHARE), 1) if gust > 0.0 else 0
 
 
 ## How much harder a spell hit of `profile` shoves the row `row`, in per cent: its gust's power

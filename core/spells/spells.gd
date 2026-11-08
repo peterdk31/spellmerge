@@ -2275,28 +2275,22 @@ static func first_tick(interval: float, life: float) -> float:
 	return minf(interval, life * 0.5)
 
 
-## Lists a carrier of `tag` that lasts, once for each `timer`, `on hurt` or `on recast` trigger it has (see
+## Lists a carrier of `tag` that lasts, once for each trigger of `TriggerBase.LIVE` it has (see
 ## `_lc_tag`): `kind` and `ref` (with `seq`, the row's birth) say where it is, `tied` that it ends
 ## with that row, else it lives `life` seconds; `at` is where it starts and `way` its way.
 func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tied: bool, life: float, at: Vector2, way: Vector2) -> void:
 	for t in spell.triggers.size():
 		var trigger: CompiledSpell.Trigger = spell.triggers[t]
-		if SpellRuntime.lists_live(trigger.event):
+		if TriggerBase.LIVE.has(trigger.event):
 			_lc_join_one(t, trigger.interval, tag, kind, ref, seq, tied, life, at, way)
 
 
-## True for the events a carrier that lasts is listed for (`_lc_join`): it fires them while it
-## lives, from where it is then (`timer`, `on hurt`, `on recast`).
-static func lists_live(event: int) -> bool:
-	return event == TriggerBase.Event.TIMER or event == TriggerBase.Event.HURT or event == TriggerBase.Event.RECAST
-
-
-## How many entries `_lc_join` lists for one carrier of `spell`: its `timer`, `on hurt` and
-## `on recast` triggers.
+## How many entries `_lc_join` lists for one carrier of `spell`: its triggers of
+## `TriggerBase.LIVE`.
 static func _lc_rows(spell: CompiledSpell) -> int:
 	var rows: int = 0
 	for trigger in spell.triggers:
-		if SpellRuntime.lists_live(trigger.event):
+		if TriggerBase.LIVE.has(trigger.event):
 			rows += 1
 	return rows
 
@@ -2910,10 +2904,7 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		var body: int = _lc_ref[i] if _lc_kind[i] == LC_ACTOR else SpellTag.caster_of(tag)
 		if trigger == null or trigger.event != TriggerBase.Event.HURT or body != actor or _hurt_firing.has(tag):
 			continue
-		var at: Vector2 = _lc_where(i)
-		if at.is_finite():
-			_lc_at[i] = at
-		elif _lc_tied[i] == 1:
+		if not _lc_follow(i):
 			continue
 		_hurt_firing.append(tag)
 		# It starts on the hurt body, so it spares that body until it has left it (`_launch`).
@@ -2921,12 +2912,29 @@ func _on_hurt(actor: int, _amount: float, position: Vector2, _tag: int, _kind: S
 		_hurt_firing.resize(_hurt_firing.size() - 1)
 
 
-## `on recast`: a new press of staff `staff` of `actor` (not a held button's repeat; the caller
-## tells them apart, as for a `hold`'s switch-off). Every live carrier that staff cast with that
-## trigger fires its payload from where it is now, the way a timer's tick does, whether or not the
-## staff is ready to cast again: the press is the detonation. Call it before `cast_staff` for the
-## same press, so the carrier that press casts is not set off by it. It fires every time while the
-## carrier lives; a payload's own `on recast` waits for the next press. Returns how many fired.
+## Brings live carrier `i`'s place up to date (`_lc_at`) for an event it fires now (a hurt, a
+## recast); false when it follows a row that is gone (`tied`), so it fires nothing.
+func _lc_follow(i: int) -> bool:
+	var at: Vector2 = _lc_where(i)
+	if at.is_finite():
+		_lc_at[i] = at
+		return true
+	return _lc_tied[i] == 0
+
+
+## A new press of this actor's staff (not a held button's repeat: the caller tells them apart, as
+## for a `hold`'s switch-off): its live `on recast` carriers go off (`recast_staff`), then it casts
+## (`cast_staff`, whose return this is), so the carrier this press casts is not one of them.
+func press_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float, walk: Vector2 = Vector2.ZERO) -> float:
+	recast_staff(actor, staff)
+	return cast_staff(actor, staff, origin, direction, mana, walk)
+
+
+## `on recast`: staff `staff` of `actor` is pressed again (`press_staff`). Every live carrier that
+## staff cast with that trigger fires its payload from where it is now, the way a timer's tick does,
+## whether or not the staff is ready to cast again: the press is the detonation. It fires every
+## time while the carrier lives; a payload's own `on recast` waits for the next press. Returns how
+## many fired.
 func recast_staff(actor: int, staff: int) -> int:
 	if not _in_range(actor, staff):
 		return 0
@@ -2939,12 +2947,7 @@ func recast_staff(actor: int, staff: int) -> int:
 			continue
 		var spell: CompiledSpell = _profiles.get(tag)
 		var trigger: CompiledSpell.Trigger = _lc_trigger_of(i, spell)
-		if trigger == null or trigger.event != TriggerBase.Event.RECAST:
-			continue
-		var at: Vector2 = _lc_where(i)
-		if at.is_finite():
-			_lc_at[i] = at
-		elif _lc_tied[i] == 1:
+		if trigger == null or trigger.event != TriggerBase.Event.RECAST or not _lc_follow(i):
 			continue
 		_lc_fire(i, trigger.payload, _lc_at[i])
 		fired += 1

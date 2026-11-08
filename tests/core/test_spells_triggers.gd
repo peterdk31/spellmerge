@@ -333,8 +333,7 @@ func test_on_hurt_stops_when_the_carrier_is_gone() -> void:
 ## A new press of staff 0 of `caster`, as the caster's input sends it: its live `on recast`
 ## carriers first, then the cast (refused while the staff is busy).
 func _press(caster: int) -> void:
-	_spells.recast_staff(caster, 0)
-	_cast(caster)
+	_spells.press_staff(caster, 0, Vector2.ZERO, Vector2.RIGHT, 10.0)
 
 
 func test_on_recast_fires_from_each_live_carrier_when_its_staff_is_pressed_again() -> void:
@@ -381,8 +380,7 @@ func test_on_recast_hears_only_its_own_staff() -> void:
 	StaffKit.build(_spells, 1, 0, [&"bolt"] as Array[StringName])
 	_press(0)
 	_tick(3)
-	_spells.recast_staff(0, 1)
-	_spells.cast_staff(0, 1, Vector2.ZERO, Vector2.RIGHT, 10.0)
+	_spells.press_staff(0, 1, Vector2.ZERO, Vector2.RIGHT, 10.0)
 	_press(1)
 	check_equal(_slots(payload).size(), 0, "another staff of its caster, or another caster, sets nothing off")
 

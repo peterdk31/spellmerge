@@ -127,3 +127,19 @@ func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
 	form.look_shader = preload("res://content/spells/forms/pool/pool.gdshader")
 	var found: String = " ".join(form.look_problems())
 	check(found.contains("never drawn"), "a dash draws no look: %s" % found)
+
+
+func test_every_card_shader_takes_every_uniform_its_area_sets() -> void:
+	# A card that draws a look of its own (no longer its area's plain include: the beam, the swing,
+	# the familiar; the owner, 2026-11-08) is still handed its area's uniforms (Feel's beams and
+	# trails, Entities' orbs, the manager's batches), so it declares every one, or a setting falls
+	# on nothing and the look draws stale.
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		if not PLAIN.has(each[1]):
+			continue
+		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
+		var code: String = ShaderSource.of(form.look_shader)
+		for line: String in plain.split("\n"):
+			if line.begins_with("uniform "):
+				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])

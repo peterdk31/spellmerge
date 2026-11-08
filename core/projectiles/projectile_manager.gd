@@ -321,6 +321,17 @@ const RAY_PATH_START: int = 80
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
 ## (the colour of the shot's core, read by the shot shaders).
 const DRAW_STRIDE: int = 16
+## The floats of a shot's row (its transform's free ones, `MODEL_MATRIX[2].x` and `.y` to a shader)
+## that carry how far and how bright it lights the room (`_look_light_reach`,
+## `_look_light_intensity`; Feel's `light.gdshader`). No shot shader reads them.
+const LIGHT_REACH_FLOAT: int = 2
+const LIGHT_INTENSITY_FLOAT: int = 6
+## The bounds of a shot's light multipliers (`set_light`; a card's `look_light_intensity` and
+## `look_light_reach`, which the validator keeps in the same): 0 lights nothing, a reach never shrinks
+## below a quarter (so the light buffer's rows stay a few pixels), and neither passes 2.
+const LIGHT_INTENSITY_MIN: float = 0.0
+const LIGHT_REACH_MIN: float = 0.25
+const LIGHT_MAX: float = 2.0
 ## The smallest a batch's MultiMesh buffer gets, in shots. A batch holds as many shots
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
@@ -615,7 +626,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -700,6 +711,12 @@ var _motion: PackedByteArray = PackedByteArray()
 ## numbered, drawn when the shot is still; 0 for its motion's own), and the id of the card it is
 ## (`&""` for none), for its looks.
 var _body: PackedByteArray = PackedByteArray()
+## How bright and how far each shot lights the room, times the shot light's own (its card's
+## `look_light_intensity` and `look_light_reach`, `set_looks`, `set_light`; 1 for a plain shot):
+## written into its row's free floats (`MODEL_MATRIX[2].y` and `.x`, LIGHT_INTENSITY_FLOAT and
+## LIGHT_REACH_FLOAT), which Feel's spell light reads (`light.gdshader`). Drawn only (VIEW).
+var _look_light_intensity: PackedFloat32Array = PackedFloat32Array()
+var _look_light_reach: PackedFloat32Array = PackedFloat32Array()
 var _form_id: Array[StringName] = []
 ## Orbit shots: radius from the anchor, current angle and angular speed (rad/s).
 var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
@@ -1492,6 +1509,8 @@ func set_cap(value: int) -> void:
 	_tag.resize(_cap)
 	_motion.resize(_cap)
 	_body.resize(_cap)
+	_look_light_intensity.resize(_cap)
+	_look_light_reach.resize(_cap)
 	_form_id.resize(_cap)
 	_orbit_radius.resize(_cap)
 	_orbit_angle.resize(_cap)
@@ -2405,9 +2424,11 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
-## `set_core`, `set_look` and `set_form` for each of the first `count` shots in `slots` (-1 for
-## none), checked once: one launch's shots share them.
-func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int) -> void:
+## `set_core`, `set_look`, `set_form` and `set_light` for each of the first `count` shots in
+## `slots` (-1 for none), checked once: one launch's shots share them.
+func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int, light_intensity: float = 1.0, light_reach: float = 1.0) -> void:
+	var intensity: float = clean_light(light_intensity, LIGHT_INTENSITY_MIN)
+	var reach: float = clean_light(light_reach, LIGHT_REACH_MIN)
 	var core_ok: bool = is_finite(color.r) and is_finite(color.g) and is_finite(color.b)
 	var core: Color = Color(color.r, color.g, color.b, 1.0)
 	var look_ok: bool = look >= 0 and look < 1 << (LOOK_COUNT - 1)
@@ -2422,6 +2443,24 @@ func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, for
 			_look[slot] = look
 		_form_id[slot] = form
 		_set_body(slot, kind)
+		_look_light_intensity[slot] = intensity
+		_look_light_reach[slot] = reach
+
+
+## How bright (`intensity`) and how far (`reach`) the shot in `slot` lights the room, each times the
+## shot light's own (1 as a plain shot; its card's `look_light_intensity` and `look_light_reach`),
+## kept in LIGHT_INTENSITY_MIN to LIGHT_MAX and LIGHT_REACH_MIN to LIGHT_MAX. False for an empty slot.
+func set_light(slot: int, intensity: float, reach: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_look_light_intensity[slot] = clean_light(intensity, LIGHT_INTENSITY_MIN)
+	_look_light_reach[slot] = clean_light(reach, LIGHT_REACH_MIN)
+	return true
+
+
+## A light multiplier kept in `least` to LIGHT_MAX (1 for one that is not a number).
+static func clean_light(value: float, least: float) -> float:
+	return clampf(value, least, LIGHT_MAX) if is_finite(value) else 1.0
 
 
 ## Slot `slot`'s card body is `body` now: drawn again from its batch on (`_remember_drawn`), since
@@ -3099,6 +3138,8 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_vel[slot] = velocity if motion == MOTION_STRAIGHT else Vector2.ZERO
 	_motion[slot] = motion
 	_body[slot] = 0
+	_look_light_intensity[slot] = 1.0
+	_look_light_reach[slot] = 1.0
 	_form_id[slot] = &""
 	_turn[slot] = 0.0
 	_home_at[slot] = Vector2.INF
@@ -4969,6 +5010,7 @@ func _draw_shots(fraction: float) -> void:
 			continue
 		var flags: int = HEAD_LIVE | (HEAD_ORBIT if motion == MOTION_ORBIT else 0)
 		_write_head(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
+		_write_light(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE, slot)
 		_draw_out[DRAW_OUT_FIRST + batch] += 1
 		if tail_births_on:
 			_lay_tail(slot, at)
@@ -5205,8 +5247,16 @@ func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2
 	# A batch holds the cap at most: stones past it are not drawn.
 	for n in mini(stones, buffer.size() / DRAW_STRIDE - out):
 		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
+		_write_light(buffer, out * DRAW_STRIDE, slot)
 		out += 1
 	return out
+
+
+## The shot in `slot`'s light multipliers into its row at float `i` (LIGHT_REACH_FLOAT,
+## LIGHT_INTENSITY_FLOAT), after `_write_quad` or `_write_head` left them 0.
+func _write_light(buffer: PackedFloat32Array, i: int, slot: int) -> void:
+	buffer[i + LIGHT_REACH_FLOAT] = _look_light_reach[slot]
+	buffer[i + LIGHT_INTENSITY_FLOAT] = _look_light_intensity[slot]
 
 
 ## Work out what `update_draw` keeps for the shot in `slot` (see `_drawn_seq`).

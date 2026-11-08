@@ -6,7 +6,9 @@ extends "res://tests/support/screenshot.gd"
 ## `spell_light_ambient_07` (a dev look at a darker room, ambient 0.7); and each at 3x round the
 ## middle (`..._3x`). The shots: the four players' plain bolts, a fire, a frost, a storm and a
 ## lightning bolt, a bigger fire bolt, an enemy's bolt and a rune, some beside the walls and the
-## pillars; the arena's torches light too (P3b). The owner's picks of a room's ambient and of the
+## pillars; the arena's torches light too (P3b). In the middle, a plain bolt beside an atom, which
+## lights less and less far by its card's light (`look_light_intensity`, `look_light_reach`;
+## docs/milestones/card-looks.md, phase 1b). The owner's picks of a room's ambient and of the
 ## light's steps are drawn by shot_spell_light_rooms.gd.
 
 ## The rune card's own shot shader, which draws its still shots.
@@ -19,6 +21,8 @@ const FROST := preload("res://content/spells/elements/frost/frost.tres")
 const STORM := preload("res://content/spells/elements/storm/storm.tres")
 const LIGHTNING := preload("res://content/spells/elements/lightning/lightning.tres")
 const BIGGER := preload("res://content/spells/modifiers/bigger/bigger.tres")
+const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
+const ATOM := preload("res://content/spells/forms/atom/atom.tres")
 const BOLT_RADIUS: float = 5.0
 const MIDDLE := Vector2(320.0, 180.0)
 
@@ -48,6 +52,10 @@ func take() -> void:
 	_bolt(3, Vector2(490.0, 180.0), BOLT_RADIUS, LIGHTNING.get("tint") as Color, PackedInt32Array([int(LIGHTNING.get("look_layer"))]))
 	_bolt(0, Vector2(320.0, 300.0), BOLT_RADIUS * 2.0, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer")), int(BIGGER.get("look_layer"))]))
 	_bolt(enemy, Vector2(560.0, 300.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
+	# A bolt and an atom side by side, each with its card's light.
+	for card: Resource in [BOLT, ATOM]:
+		var slot: int = _shots.call("spawn", 1, Vector2(285.0 if card == BOLT else 355.0, 150.0), Vector2(0.01, 0.0), 600.0, float(card.get("radius"))) as int
+		_shots.call("set_light", slot, float(card.get("look_light_intensity")), float(card.get("look_light_reach")))
 	var rune: int = _shots.call("spawn", 0, Vector2(80.0, 300.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
 	_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
 	_dress(rune, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer"))]))

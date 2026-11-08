@@ -79,3 +79,31 @@ func test_a_card_with_the_old_shot_shader_name_keeps_its_look_and_is_reported() 
 	var found: PackedStringArray = form.look_problems()
 	check_equal(found.size(), 1, "one problem: %s" % [found])
 	check(" ".join(found).contains("renamed `look_shader`"), "it names the rename")
+
+
+## A card's light (card-looks phase 1b): the atom lights less, and less far, than the bolt, and its
+## compiled spell carries that to its shots (`Projectiles.set_looks`).
+func test_the_atom_lights_less_than_the_bolt() -> void:
+	var atom: FormBase = load("res://content/spells/forms/atom/atom.tres") as FormBase
+	var bolt: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
+	check(atom.look_light_intensity < bolt.look_light_intensity, "dimmer: %s against %s" % [atom.look_light_intensity, bolt.look_light_intensity])
+	check(atom.look_light_reach < bolt.look_light_reach, "and nearer: %s against %s" % [atom.look_light_reach, bolt.look_light_reach])
+	var registry := own(preload("res://core/registry/registry.gd").new()) as Node
+	registry.call("scan")
+	var spells := own(preload("res://core/spells/spells.gd").new()) as Node
+	spells.set(&"registry", registry)
+	var staff := StaffBase.new()
+	staff.id = &"test"
+	staff.slots = 4
+	var spell: CompiledSpell = (spells.call(&"compile_staff", [&"atom"] as Array[StringName], staff) as CompiledStaff).casts[0].group.spells[0]
+	check(is_equal_approx(spell.look_light_intensity, atom.look_light_intensity) and is_equal_approx(spell.look_light_reach, atom.look_light_reach), "its compiled spell carries its light")
+
+
+## Out of range, the light is a range problem the validator names.
+func test_a_light_out_of_range_is_reported() -> void:
+	var form := FormBase.new()
+	form.id = &"test_form"
+	form.look_light_intensity = 3.0
+	form.look_light_reach = 0.1
+	var found: String = " ".join(form.range_problems())
+	check(found.contains("look_light_intensity") and found.contains("look_light_reach"), "both named: %s" % found)

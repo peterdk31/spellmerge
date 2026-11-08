@@ -122,6 +122,13 @@ var _pose_packed: bool = false
 ## a pair of batches of its own (`ProjectileManager.register_body`; every card may have its own) and
 ## the shader warm-up compiles it before the first room (core/README.md, "The shot shaders").
 @export var look_shader: Shader = null
+## How bright its carrier lights the room (Feel's spell light), times what that area gives any
+## shot of its size (docs/milestones/card-looks.md, phase 1b): 1 as today, 0 lights nothing, at most
+## 2. A plain number, like the speed curve: the atom's is lower than the bolt's.
+@export var look_light_intensity: float = 1.0
+## How far its carrier's light reaches, times what its size gives (a shot's `SHOT_REACH` and zoom,
+## a still one's quad): 1 as today, from 0.25 to 2.
+@export var look_light_reach: float = 1.0
 ## The old names of renamed look fields this card was loaded with (`_set`), each still taken (a
 ## `shot_shader` is its `look_shader`), and named by `look_problems` so the card is fixed.
 var _renamed: PackedStringArray = PackedStringArray()
@@ -220,6 +227,8 @@ func ranges() -> Dictionary:
 		"arc": Vector2(0.0, 360.0),
 		"wind_up": Vector2(0.0, 2.0),
 		"knockback": Vector2(0.0, 2000.0),
+		"look_light_intensity": Vector2(0.0, 2.0),
+		"look_light_reach": Vector2(0.25, 2.0),
 	})
 	return limits
 

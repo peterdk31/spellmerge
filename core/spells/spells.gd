@@ -1871,7 +1871,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
 	var look_mesh: int = _shot_mesh(spell.look_drawer)
 	var look_body: int = projectiles.register_body(spell.look_shader, look_mesh) if look_mesh != NO_SHOT_MESH else 0
-	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, look_body)
+	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, look_body, spell.look_light_intensity, spell.look_light_reach)
 	if _rec_seq.size() < projectiles.get_cap():
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null

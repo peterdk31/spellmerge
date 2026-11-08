@@ -76,6 +76,10 @@ var look: int = 0
 ## whatever draws it): for shots, a body the projectile manager numbers (`register_body`, by
 ## `look_drawer`'s mesh); its card's id goes with every shot (`Projectiles.set_looks`), for its looks.
 var look_shader: Shader = null
+## How bright and how far its carrier lights the room, times the light's own
+## (`FormBase.look_light_intensity`, `look_light_reach`; 1 for a plain one).
+var look_light_intensity: float = 1.0
+var look_light_reach: float = 1.0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null

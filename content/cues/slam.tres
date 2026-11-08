@@ -5,7 +5,8 @@
 [resource]
 script = ExtResource("1_base")
 id = &"slam"
-parts = Array[Dictionary]([{"flash": &"burst", "zoom": 3}, {"flash": &"quake", "reach": 1.5, "way": &"right"}, {"part": &"motes", "kind": &"surface", "count": 50, "reach": 1.0, "spread": 360.0, "up": 1.8}, {"part": &"motes", "kind": &"spell", "count": 16, "reach": 0.6, "spread": 360.0}, {"part": &"mark", "mark": &"crack", "reach": 1.0}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 32.0, "spread": 160.0, "way": &"back"}])
-shake = 0.45
-kick = 3.0
-hold = 0.06
+parts = Array[Dictionary]([{"flash": &"burst", "zoom": 3, "floor": true}, {"flash": &"star", "zoom": 3, "seconds": 0.12, "floor": true}, {"flash": &"quake", "reach": 1.6, "way": &"right"}, {"part": &"motes", "kind": &"dust", "colours": &"surface", "count": 16, "reach": 1.4, "spread": 360.0, "ring": true, "up": 0.2}, {"part": &"motes", "kind": &"surface", "count": 50, "reach": 1.1, "spread": 360.0, "up": 2.4}, {"part": &"motes", "kind": &"spell", "count": 14, "reach": 0.7, "spread": 360.0}, {"part": &"mark", "mark": &"crack", "reach": 1.15}, {"part": &"motes", "kind": &"spark", "count": 12, "radius": 40.0, "spread": 200.0, "way": &"back"}, {"part": &"light", "reach": 1.8, "strength": 1.0, "seconds": 0.22}])
+shake = 0.75
+kick = 5.5
+hold = 0.1
+hold_target = 0.07

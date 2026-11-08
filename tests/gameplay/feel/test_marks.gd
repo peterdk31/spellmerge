@@ -460,7 +460,8 @@ func test_the_layer_lies_on_the_floor_under_every_body() -> void:
 	check_equal(z, FeelScript.MARK_Z, "at MARK_Z")
 	check(z > RoomBase.FLOOR_Z, "over the room's floor")
 	check(z < 0, "under the bodies (wizards and enemies at 0)")
-	check(z < FeelScript.MOTE_Z and z < FeelScript.FLOOR_Z, "under the motes and Feel's floor flashes")
+	check(z < FeelScript.MOTE_Z, "under the motes")
+	check_equal(FeelScript.FLOOR_Z, z, "with Feel's floor flashes (a slam's strike, a quake's cracks), on the floor under the bodies")
 	for room_id: StringName in registry.get_ids(&"rooms"):
 		var room: RoomBase = registry.get_resource(&"rooms", room_id) as RoomBase
 		var layout: Node = room.scene.instantiate()

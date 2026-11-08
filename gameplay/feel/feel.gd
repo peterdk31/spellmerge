@@ -110,13 +110,15 @@ const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 const ENEMY_FORMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
-## Marks on the floor (a quake) draw just under the beams and rings, under the enemies (40).
-const FLOOR_Z: int = FORM_Z - 1
 ## Where the spectacle draws (`spectacle.gd`): the motes under the beams and every flash and
 ## telegraph, the floor marks on the floor under every body, spell light just under the motes.
 const MOTE_Z: int = SpectacleScript.MOTE_Z
 const MARK_Z: int = SpectacleScript.MARK_Z
 const LIGHT_Z: int = SpectacleScript.LIGHT_Z
+## Flashes on the floor (a quake's cracks, a slam's burst and star: `FlashKind.on_floor`, a cue
+## part's `floor`) draw with the floor marks: over the room's floor (`RoomBase.FLOOR_Z`), under
+## every body (the wizards and enemies at 0 and up; it was FORM_Z - 1 and drew over them).
+const FLOOR_Z: int = MARK_Z
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
@@ -506,6 +508,9 @@ var _flash_offset: PackedVector2Array = PackedVector2Array()
 ## The actor whose staff tip each flash sits on, turning with its live aim (a wind-up's ring:
 ## `Spells.aim_origin_of`), or NONE; its `_flash_offset` is then from the tip, along the aim.
 var _flash_tip: PackedInt32Array = PackedInt32Array()
+## 1 for a flash drawn on the floor under the bodies by its cue part (`floor`; a slam's), as its
+## kind's `on_floor` draws the cracks.
+var _flash_floor: PackedByteArray = PackedByteArray()
 ## The actor whose staff tip the flashes of the cue playing now sit on (`_on_cast_winding`), or NONE.
 var _cue_tip: int = ActorsScript.NONE
 var _next_flash: int = 0
@@ -1596,6 +1601,9 @@ func _play_flash(flash: CuePlanScript.Flash, cue: CueContextScript) -> void:
 		_cue_flash = _show_flash(flash.kind, at, way, cue.color, 0, EXACT, zoom, seconds, length, follow)
 	else:
 		_cue_flash = _show_flash(flash.kind, at, way, cue.tint, cue.ramp, 0 if paint == CuePlanScript.PAINT_NO_CARDS else cue.look, zoom, seconds, length, follow)
+	# A ground strike's flash on the floor, under the bodies (its part's `floor`).
+	if flash.floor and _cue_flash >= 0:
+		_flash_floor[_cue_flash] = 1
 	# A followed cue's flash sits where it was played from its body (S6, item 9).
 	if follow != null and _cue_flash >= 0:
 		_flash_offset[_cue_flash] = at - follow.global_position
@@ -1905,6 +1913,8 @@ func _size_flashes(slots: int) -> void:
 	_flash_light.fill(0.0)
 	_flash_offset.resize(slots)
 	_flash_tip.resize(slots)
+	_flash_floor.resize(slots)
+	_flash_floor.fill(0)
 	_flash_tip.fill(ActorsScript.NONE)
 	_next_flash = 0
 	# The statuses shown lost their flashes; the next step shows them again.
@@ -2022,6 +2032,7 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_follow[slot] = follow
 	_flash_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
 	_flash_tip[slot] = _cue_tip
+	_flash_floor[slot] = 0
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
 	if kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
@@ -2101,7 +2112,7 @@ func _step_flashes(real_delta: float) -> void:
 			buffer = _blast_buffer
 			i = blasts * FLASH_STRIDE
 			blasts += 1
-		elif _table_floor[row] != 0:
+		elif _table_floor[row] != 0 or _flash_floor[slot] != 0:
 			buffer = _floor_buffer
 			i = floors * FLASH_STRIDE
 			floors += 1

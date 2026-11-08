@@ -159,7 +159,8 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 	var feel_items: Array[CanvasItem] = []
 	_items(feel, feel_items)
 	for item in feel_items:
-		if item != feel and item != light.apply:
+		# The floor flashes lie under the bodies, so under the light (checked below).
+		if item != feel and item != light.apply and item != feel._floor_node:
 			check(_drawn_z(item) > at, "Feel's %s (z %d) is over the light" % [feel.get_path_to(item), _drawn_z(item)])
 	var shot_items: Array[CanvasItem] = []
 	_items(manager, shot_items)
@@ -167,7 +168,10 @@ func test_the_light_is_applied_above_the_bodies_and_under_every_spell() -> void:
 		if item != manager:
 			check(_drawn_z(item) > at, "the shots' %s (z %d) are over the light" % [manager.get_path_to(item), _drawn_z(item)])
 	check(EntitiesScript.DRAW_Z > at, "the entities are over the light")
-	check(FeelScript.MOTE_Z > at and FeelScript.FLOOR_Z > at and FeelScript.FORM_Z > at and FeelScript.FLASH_Z > at, "motes, floor flashes, beams and flashes are over the light")
+	check(FeelScript.MOTE_Z > at and FeelScript.FORM_Z > at and FeelScript.FLASH_Z > at, "motes, beams and flashes are over the light")
+	# The floor flashes lie on the floor under the bodies (owner, 2026-11-08), so under the light
+	# with the floor marks: lit by it, as the slam's cue lights its own strike (its `light` part).
+	check(FeelScript.FLOOR_Z < at and FeelScript.FLOOR_Z == FeelScript.MARK_Z, "floor flashes lie with the floor marks, lit by the light")
 
 
 func test_the_buffer_follows_the_view_at_a_quarter_size() -> void:

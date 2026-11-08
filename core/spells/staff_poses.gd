@@ -323,11 +323,14 @@ static func up_side(aim: Vector2) -> int:
 
 
 ## `x` (0 to 1) of the way into a key, eased by `ease` (`FormBase.POSE_EASES`: 0 slow, fast, slow;
-## 1 slowing into the key; 2 speeding up into it).
+## 1 slowing into the key; 2 speeding up into it; 3 barely moving and then whipping into it).
 static func pose_ease(x: float, ease: int) -> float:
 	match ease:
 		1:
 			return 1.0 - (1.0 - x) * (1.0 - x)
 		2:
 			return x * x
+		3:
+			# "slam": barely moving at first, then whipping into the key (a heavy blow coming down).
+			return x * x * x * x
 	return CarrierSwing.swing_ease(x)

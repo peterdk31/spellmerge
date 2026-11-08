@@ -37,6 +37,8 @@ class Flash:
 	## Whether any of the gates on its cards or size is set (most flashes have none: skipped in one
 	## test).
 	var gated: bool = false
+	## Its `floor`: drawn on the floor, under the bodies.
+	var floor: bool = false
 
 ## A flash's colours: the cue's (its tint and cards, or its own colour when it has one), its own
 ## exact `color`, `plain`, `bare`, the cue's without the cards (`no_cards`), and the body's own
@@ -154,6 +156,7 @@ static func flash_of(part: Dictionary, flashes: Dictionary) -> Flash:
 		&"up":
 			flash.way = WAY_UP
 	flash.particles = bool(part.get("particles", false))
+	flash.floor = bool(part.get("floor", false))
 	flash.if_cards = bool(part.get("if_cards", false))
 	flash.if_layer = int(part.get("if_layer", 0))
 	flash.size_over = float(part.get("if_size_over", -INF))

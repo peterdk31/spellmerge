@@ -189,7 +189,21 @@ func test_the_slam_is_a_star_and_the_ground_struck() -> void:
 	check_equal(feel.flash_info(&"quake").get("zoom"), roundi(16.0 * 1.5 / feel.flash_kind(&"quake").step), "out past its reach")
 	var quake: CueBase = feel.cue_of(&"quake")
 	var slam: CueBase = feel.cue_of(&"slam")
-	check(slam.shake == quake.shake and slam.kick == quake.kick and slam.hold == quake.hold and slam.kick_way == quake.kick_way, "the quake's weight")
+	# A slam hits harder than the ground merely shaking (the owner, 2026-11-08: "it should really
+	# look like it hits hard"): at least the quake's weight, punched the same way.
+	check(slam.shake >= quake.shake and slam.kick >= quake.kick and slam.hold >= quake.hold and slam.kick_way == quake.kick_way, "at least the quake's weight")
+
+
+func test_a_flash_part_on_the_floor_is_drawn_under_the_bodies() -> void:
+	# A cue part's `floor` (a ground strike's flash): the floor batch, under the bodies, while the
+	# same kind with no `floor` (every other cue's burst) stays over everything.
+	var cue: CueBase = _made([{"flash": &"burst", "zoom": 2, "floor": true}, {"flash": &"burst", "zoom": 2}])
+	check(cue.problems().is_empty(), "`floor` is a flash part's key: %s" % [cue.problems()])
+	_cue(&"test_cue")
+	feel.step(0.01)
+	check_equal(feel._floor_node.multimesh.visible_instance_count, 1, "the one with `floor` on the floor")
+	check_equal(feel._flash_node.multimesh.visible_instance_count, 1, "the other over everything")
+	check(feel._floor_node.z_index < feel._flash_node.z_index, "the floor under the flashes")
 
 
 func test_particles_off_leaves_out_the_parts_that_say_so() -> void:

@@ -1,6 +1,6 @@
 # Card looks: every carrier's look in its own folder
 
-**Status: plan (2026-11-08), reviewed by the owner the same day: one field, `look_shader` (question 1: yes), and the bolt gets a look of its own in phase 1 (question 2: "let's try yes"). Revised the same day after a design review: a body is a shader and a mesh, and a shot whose motion draws another mesh falls back to its motion's batch (phase 1); one material per beam and trail, not per shader (phase 2); one way to ask for a card's look, `Spells.look_shader_of` (phases 2 and 3).** The owner, on the pool's look first being a branch of the rune shader: "if a card needs a shader, a new shader is added in its folder", then "ideally each shot should have its own", and "this should also make it easier to change the look of eg. Bolt in the future". PR #632 did it for still shots: the rune, the wall's stones and the pool's puddle are shaders in their card folders (`FormBase.shot_shader`), the projectile manager makes a pair of batches for each card's shader as it is numbered (no fixed number, in the native kernel too), and a plain fallback (`core/projectiles/shot_still.gdshader`) draws a still shot whose card names none. This plan takes the same idea to every other carrier with a look of its own.
+**Status: plan (2026-11-08), reviewed by the owner the same day: one field, `look_shader` (question 1: yes), and the bolt gets a look of its own in phase 1 (question 2: "let's try yes"). Revised the same day after a design review: a body is a shader and a mesh, and a shot whose motion draws another mesh falls back to its motion's batch (phase 1); one material per beam and trail, not per shader (phase 2); one way to ask for a card's look, `Spells.look_shader_of` (phases 2 and 3). Then, on the owner's ask ("the Atom should not emit as much light as the bolt"): a card's light, `FormBase.look_light` (phase 1b).** The owner, on the pool's look first being a branch of the rune shader: "if a card needs a shader, a new shader is added in its folder", then "ideally each shot should have its own", and "this should also make it easier to change the look of eg. Bolt in the future". PR #632 did it for still shots: the rune, the wall's stones and the pool's puddle are shaders in their card folders (`FormBase.shot_shader`), the projectile manager makes a pair of batches for each card's shader as it is numbered (no fixed number, in the native kernel too), and a plain fallback (`core/projectiles/shot_still.gdshader`) draws a still shot whose card names none. This plan takes the same idea to every other carrier with a look of its own.
 
 ## Where every carrier's look is now
 
@@ -39,13 +39,26 @@ What every card shader keeps, as today's shot shaders do (core/README.md, "The s
 - **Contract for a flying card shader:** copy `shot_head.gdshader` (its vertex stage places the head's quads from the instance; tails stay Feel's motes and are not the shader's). Warmed as a batch (`ShaderWarmup.want(shader, BATCH)`), as the head shader is.
 - **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `forms/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom, nova and swap keep the shared head (no `look_shader`) until someone wants one of them to look different: a shader per card costs a draw call and a compile each, so sharing stays the default.
 
+## Phase 1b: a card's light (the atom lit less than the bolt)
+
+The owner, 2026-11-08: "the Atom should not emit as much light as the bolt". Today every shot lights the room equally bright: one strength per light batch (`shot_strength` 0.9 for heads, `rune_strength` 0.55 for quads, uniforms of `gameplay/feel/light.gdshader`), its reach set only by its size (an atom's 1.5 radius is already a speck's smaller reach, as bright as a bolt's). How bright is a card's to say, beside its shader.
+
+- **One field:** `FormBase.look_light: float = 1.0`, how bright its carrier lights the room, times the area's light (0 lights nothing). A plain number in the card's `.tres`, like the speed curve. The validator keeps it in 0 to 2, so no card can blind the room. Compiled into `CompiledSpell.look_light` with the shader. Changing the atom's light is one line in `atom.tres`, with no engine change.
+- **Per shot, not per batch.** The atom shares its head batch with the bolt, nova and swap, so a light per batch would give it a body (a pair of batches) only to be dimmer. Instead the light goes with each shot: `set_looks` keeps it per slot (`_look_light`, listed in the manager's `VIEW`: drawn only, never hashed), and `_write_head`, `_write_quad` and `_write_stones` write it in the row's free float `MODEL_MATRIX[2].y` (buffer index 6, 0 today). That is the same float a flash row already gives its light in (`room_light`), so `light.gdshader` reads it the same way: `shot_strength` and `rune_strength` times it. No draw call is added, and a card that never sets it lights as today.
+- **Native kernel:** `draw_shots` writes the same float from the same array, byte for byte; `test_native_kernel` gives some shots a light other than 1.
+- **The shot shaders do not read it** (the head's, the plain still's, every card's): float 6 stays theirs to ignore, and the phase-4 test checks no card shader reads `MODEL_MATRIX[2]`.
+- **The atom:** `look_light = 0.5` to start, shown beside a bolt in the spell-light screenshot (`tests/screenshots/shot_spell_light.gd`) for the owner to judge.
+- **Beyond shots:** the beam's light (phase 2) honours it too: Feel hands `light_beam` the beam's strength, `BEAM_STRENGTH` times `Spells.look_light_of(form)` (the same lookup as the shader's, filled at the same time). A familiar's orb gives no light today, so nothing changes there.
+
+It does not need phase 1's bodies, so it can go before or after it; it comes right after, since both change the same row writers and kernel loop.
+
 ## Phase 2: beam and swing (Feel)
 
 - Feel asks for a carrier's shader by its form id, `spells.look_shader_of(form)`, once per form id and kept (as `_form_cues_of` keeps cues); it reads no card field.
 - **One material per node, not per shader.** Each live beam sets its own uniforms on its own material (`beam_path`, `beam_start`, `beam_end`, `beam_length`, ...: `Feel._on_form_shown`), and each swing trail its own (`swing_origin`, `sim_time`), so a material is never shared between nodes. A beam's node keeps its `ShaderMaterial`; when it is shown for a beam, its `material.shader` is set to the card's (or core's) only when it differs from the one it has, so nothing is allocated or recompiled per cast. A test shows two beams of different cards at once and checks each node keeps its own path and shader.
 - **Beam:** `shot_beam.gdshader` stays in core as the fallback for rays with no beam card (chain jumps, zaps, arcs: `RAY_FORM`), and the beam card names a copy of it: `forms/beam/beam.gdshader`.
 - **Swing:** the same in `swing_trails.gd`: `forms/swing/swing.gdshader`, with core's as the fallback; a trail's shader is set when it is shown for a swing.
-- **Light:** the beam light (`light_beam.gdshader`) reads the beam mesh, not its shader, so it needs nothing.
+- **Light:** the beam light (`light_beam.gdshader`) reads the beam mesh, not its shader, so a beam shader needs nothing for it; how bright it is comes from the card's `look_light` (phase 1b).
 - **Warm-up:** drawn as MESH (`ShaderWarmup.want(shader, MESH)`), handed over when Spells fills `look_shader_of`.
 
 ## Phase 3: the familiar's orb (Entities)
@@ -54,8 +67,8 @@ Entities draws every familiar in one MultiMesh with one material (`_familiar_nod
 
 ## Phase 4: docs and checks
 
-- core/README.md "The shot shaders" and content/spells/README.md: one paragraph on card looks (which area draws which carrier, what a card shader must keep, where to copy one from, `Spells.look_shader_of`).
-- One test over the registry: every card's `look_shader` is a canvas-item shader, keeps the particle rule **of the area that draws its carrier**, and is warmed before the first room (extending `test_carrier_looks` and `test_shader_warmup`). The rule is the area's: a manager batch shader (head, still, orbit) keeps `4 + 2 per kind` (`test_projectile_looks`); a beam or swing shader draws its particles as geometry (`shot_beam.gdshader`, "PARTICLES ARE GEOMETRY") and keeps that mesh's quad count instead. The test finds each card's drawer from its carrier (the manager, Feel's beam, Feel's swing, Entities) and checks the card against that drawer's rule.
+- core/README.md "The shot shaders" and content/spells/README.md: one paragraph on card looks (which area draws which carrier, what a card shader must keep, where to copy one from, `Spells.look_shader_of`; how bright a card lights, `look_light`).
+- One test over the registry: every card's `look_shader` is a canvas-item shader, keeps the particle rule **of the area that draws its carrier**, and is warmed before the first room (extending `test_carrier_looks` and `test_shader_warmup`); and no card shader reads `MODEL_MATRIX[2]`, the row float the light reads (phase 1b). The rule is the area's: a manager batch shader (head, still, orbit) keeps `4 + 2 per kind` (`test_projectile_looks`); a beam or swing shader draws its particles as geometry (`shot_beam.gdshader`, "PARTICLES ARE GEOMETRY") and keeps that mesh's quad count instead. The test finds each card's drawer from its carrier (the manager, Feel's beam, Feel's swing, Entities) and checks the card against that drawer's rule.
 - `test_spell_field_reads` keeps passing: the areas get a card's shader through `Spells.look_shader_of`, never by reading the card.
 
 ## Order, size, risk
@@ -63,11 +76,12 @@ Entities draws every familiar in one MultiMesh with one material (`_familiar_nod
 | Phase | Size | Native | Risk |
 | --- | --- | --- | --- |
 | 1 flying shots | medium | yes (`count_draw`) | the hot path: compared byte for byte by `test_native_kernel`; a body's mesh against its shots' motion (the fallback rule and its test); the drawn cache's key; light rows of a head body's batch; draw calls grow only when a card names its own shader (the bolt's own look is one more pair) |
+| 1b a card's light | small | yes (`draw_shots`) | the row writers and the kernel's, compared byte for byte; the spell-light screenshots (`shot_spell_light*`) and `test_light` show every card but the atom unchanged |
 | 2 beam, swing | small | no | Feel's beam and trail code, a material per node; the screenshots `shot_beam*`, `shot_swing*` show it unchanged |
 | 3 familiar | small | no | Entities' orb node |
 | 4 docs, checks | small | no | none |
 
-One PR each, phase 1 first: it is the one the bolt question needs, and phases 2 and 3 copy its pattern into simpler drawers.
+One PR each, phase 1 first: it is the one the bolt question needs, and phases 2 and 3 copy its pattern into simpler drawers. Phase 1b follows it (the same writers), and phase 2's beam light needs it.
 
 ## The owner's answers (2026-11-08)
 

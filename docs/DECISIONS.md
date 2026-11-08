@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-08: One hit look per body and staff a frame (shot scale H3, owner session)
+
+- **Asked:** the owner, on lowering `BodyLooks.PER_BODY` from 3 (2026-11-07, below): "Would It make sense to bundle Feel? ... lowered it from 3 to 1? Or even just 1 for each second frame?", then, shown the measurements and the storm side by side: "Go with 1 per body".
+- **Measured** (30,000 bolts, three variants interleaved, three runs each, the same hits and damage in all): Feel's hit listeners 17.2 / 9.8 / 7.7 us a hit in the storm and 19.6 / 12.8 / 10.0 us in the crowd for 3 per body, 1 per body, and 1 per body per two frames; crowd_all 48.6 / 44.0 / 42.4 ms of hand-backs and listeners a step. In the storm at 10,000 shots, three stacked sprays made a heavily hit body a blown-out white blob; one reads as one spray the way the shot came.
+- **Now:** a body shows one hit look per staff a frame. One per two frames was not taken: a few percent more, and its look was not seen in the game. Each staff still counts apart.
+
 ## 2026-11-07: A body shows a few hit looks a frame; shake never piles up (shot scale H3, owner session)
 
 - **Asked:** the owner, on Feel adding a look for every one of many hits on one body: "Would It make sense to bundle Feel? Maybe per target? Like if a target is hit 1000 times in a frame, will Feel add hit motes a 1000 times?", then: "Yes build it like that. Screen shake should not pile up for each hit. It becomes unwatchable in the storm as it is now. So maybe limit it aswell".

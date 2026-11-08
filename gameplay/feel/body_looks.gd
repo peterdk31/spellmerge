@@ -1,6 +1,7 @@
 extends RefCounted
 ## How many hit looks each body has shown this frame, per staff that hit it (shot scale H3; owner,
-## 2026-11-07): a body shows the look of at most PER_BODY hits of one staff in a frame (its spray,
+## 2026-11-07, one a frame since 2026-11-08): a body shows the look of at most PER_BODY hits of one
+## staff in a frame (its spray,
 ## impact, sparks, squash and sound), and the hits after that show nothing, so the frame's flashes
 ## and motes are spread over the bodies being hit instead of spent on the one in front of the
 ## casters. Each staff counts apart, so a lone cast hitting a body inside another staff's storm still
@@ -9,7 +10,9 @@ extends RefCounted
 ## A table of (body, staff group) keys reused every frame: a slot with an older frame's stamp is
 ## empty, so nothing is cleared, and it grows only when one frame fills half of it.
 
-const PER_BODY: int = 3
+## One: measured against three (2026-11-08), it took Feel's hit listeners about 7 us a hit lower,
+## and each hit read as one spray instead of a blown-out blob of stacked ones.
+const PER_BODY: int = 1
 const START_SIZE: int = 1024
 
 var _bodies: PackedInt64Array = PackedInt64Array()

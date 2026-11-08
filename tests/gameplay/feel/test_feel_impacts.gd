@@ -204,7 +204,9 @@ func test_wall_flashes_are_limited_and_end() -> void:
 func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
 	var target: Node2D = _enemy()
 	bus.projectile_impact.emit(0, target, Vector2.ZERO, Vector2.RIGHT)
-	feel._impact_frame -= 1  # the damage never came; a contact hit on a later frame
+	# The damage never came; a contact hit on a later frame (Feel steps: the body may show a look again).
+	feel._impact_frame -= 1
+	feel.step(STEP)
 	bus.damage_dealt.emit(0, target, 5, Vector2.ZERO)
 	check_equal(feel.flashes_of(&"spray"), 0, "a stale impact gives no spray")
 	check_equal(feel.flashes_of(&"puff"), 1, "but a puff")

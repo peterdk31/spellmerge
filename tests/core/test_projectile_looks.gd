@@ -234,8 +234,8 @@ func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.HEAD_Q_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.HEAD_Q_CORE, "the core last, on top")
-	for batch in ManagerScript.BATCHES:
-		if ManagerScript.BATCH_MESH[batch] >= 0:
+	for batch in mgr.batch_count():
+		if ManagerScript.batch_mesh(batch) >= 0:
 			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_head.gdshader")
 	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
@@ -410,7 +410,7 @@ func test_lightning_shots_are_drawn_with_the_others() -> void:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
 	var counts: Array[int] = []
-	for batch in ManagerScript.BATCHES:
+	for batch in mgr.batch_count():
 		counts.append(mgr._nodes[batch].multimesh.visible_instance_count)
 	check_equal(counts[ManagerScript.BATCH_BOLT], 2, "the plain and lightning's bolts in the bolts' batch")
 	check_equal(counts[ManagerScript.BATCH_ENEMY], 1, "an enemy's lightning in the enemy batch")

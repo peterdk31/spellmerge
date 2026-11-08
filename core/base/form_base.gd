@@ -117,8 +117,8 @@ var _pose_packed: bool = false
 ## the card's own, in its folder (a wall's `stone.gdshader`, a pool's `pool.gdshader`), that draws one
 ## quad a still shot (each stone of a solid one) from the projectile manager's instance data, as the
 ## rune shader does (core/README.md, "The shot shaders": copy `forms/pool/pool.gdshader`). The
-## manager gives it a pair of batches (`ProjectileManager.register_body`, at most BODY_KINDS
-## shaders in the game) and the shader warm-up compiles it before the first room. A flying or
+## manager gives it a pair of batches of its own (`ProjectileManager.register_body`; every card
+## may have its own) and the shader warm-up compiles it before the first room. A flying or
 ## orbiting shot ignores it.
 @export var shot_shader: Shader = null
 

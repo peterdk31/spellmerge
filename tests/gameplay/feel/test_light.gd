@@ -92,7 +92,7 @@ func test_the_setting_is_on_by_default_and_makes_the_light() -> void:
 	var light: SpellLightScript = feel.light()
 	check(light != null and feel.is_ancestor_of(light), "Feel makes the light (its spectacle)")
 	check(light.viewport != null and light.apply != null, "a light buffer and the rect that applies it")
-	check_equal(light.batches.size(), ProjectilesScript.BATCHES, "one light batch per projectile batch")
+	check_equal(light.batches.size(), feel.projectiles.batch_count(), "one light batch per projectile batch, the card bodies' too")
 
 
 func test_off_leaves_no_nodes_and_on_makes_them_again() -> void:
@@ -111,7 +111,7 @@ func test_off_leaves_no_nodes_and_on_makes_them_again() -> void:
 	check_equal(viewports, 0, "off: no light buffer under Feel")
 	for item in found:
 		check(item.material == null or (item.material as ShaderMaterial) == null or (item.material as ShaderMaterial).shader != SpellLightScript.APPLY_SHADER, "off: no apply rect")
-	for batch in ProjectilesScript.BATCHES:
+	for batch in manager.batch_count():
 		check(manager.batch_mirror(batch) == null, "off: batch %d mirrored by nothing" % batch)
 	bus.spell_light_changed.emit(true)
 	check(feel.light() != null and feel.spell_light, "on again: the light is back")
@@ -128,7 +128,7 @@ func test_the_light_batches_get_the_rows_the_batches_upload() -> void:
 	manager.step(1.0 / 60.0)
 	manager.update_draw(1.0)
 	var drawn: int = 0
-	for batch in ProjectilesScript.BATCHES:
+	for batch in manager.batch_count():
 		var source: MultiMesh = manager._nodes[batch].multimesh
 		var mirror: MultiMesh = manager.batch_mirror(batch)
 		check(mirror == light.batches[batch].multimesh, "batch %d is mirrored by its light batch" % batch)
@@ -200,10 +200,10 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 	check(shade.get_shader_parameter(&"light_buffer") is ViewportTexture, "the rect reads the light buffer")
 	var ambient: Variant = shade.get_shader_parameter(&"ambient")
 	check(ambient == null or is_equal_approx(float(ambient), 1.0), "the ambient is 1.0 with no room: the room as it is")
-	for batch in ProjectilesScript.BATCHES:
+	for batch in light.batches.size():
 		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
 		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.BATCH_MESH[batch] < 0 else SpellLightScript.ROWS_SHOT
+		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.batch_mesh(batch) < 0 else SpellLightScript.ROWS_SHOT
 		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "shots"])
 	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
 
@@ -342,7 +342,7 @@ func test_an_enemy_shot_lights_like_any() -> void:
 	manager.update_draw(1.0)
 	var at: Vector2 = manager.get_position_of(slot)
 	var found: bool = false
-	for batch in ProjectilesScript.BATCHES:
+	for batch in manager.batch_count():
 		var mirror: MultiMesh = manager.batch_mirror(batch)
 		var buffer: PackedFloat32Array = mirror.buffer
 		for n in mirror.visible_instance_count:
@@ -365,7 +365,7 @@ func test_a_shot_without_a_trail_row_lights() -> void:
 	check(not shader.contains("row >= 0.0 && flag_set(flags, HF_LIVE)"), "the light shader lights a head without a row")
 	var at: Vector2 = manager.get_position_of(slot)
 	var found: bool = false
-	for batch in ProjectilesScript.BATCHES:
+	for batch in manager.batch_count():
 		var mirror: MultiMesh = manager.batch_mirror(batch)
 		var buffer: PackedFloat32Array = mirror.buffer
 		for n in mirror.visible_instance_count:

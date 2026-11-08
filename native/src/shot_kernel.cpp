@@ -110,8 +110,14 @@ constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
 constexpr int BATCH_ENEMY_RUNE = 4;
 constexpr int BATCH_BODY_FIRST = 5;
-constexpr int BODY_KINDS = 6;
-constexpr int BATCHES = BATCH_BODY_FIRST + 2 * BODY_KINDS;
+// `_draw_out`: its totals first (DRAW_*), then each batch's rows written from DRAW_OUT_FIRST on; how
+// many batches there are is the manager's `_batch_total`, which grows with the card bodies.
+constexpr int DRAW_ASKED = 0;
+constexpr int DRAW_SHOTS = 2;
+constexpr int DRAW_ENEMY = 3;
+constexpr int DRAW_BIRTHS = 4;
+constexpr int DRAW_TAIL = 5;
+constexpr int DRAW_OUT_FIRST = 6;
 constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
@@ -195,6 +201,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(sim_time, "sim_time", FLOAT) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
 	X(body, "_body", PACKED_BYTE_ARRAY) \
+	X(batch_total, "_batch_total", INT) \
 	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
 	X(seq, "_seq", PACKED_INT64_ARRAY) \
 	X(drawn_seq, "_drawn_seq", PACKED_INT64_ARRAY) \
@@ -833,6 +840,10 @@ struct TailPlan {
 struct ShotKernel::Scratch {
 	// What each span of a drawing loop counted: its shots per batch, turned into where its rows start.
 	std::vector<int64_t> draw_counts;
+	// Each batch's buffer to write, its room and its rows written (`draw_shots`), sized to the batches.
+	std::vector<float *> out_buffer;
+	std::vector<int64_t> room;
+	std::vector<int64_t> used;
 	// Each slot's tail plan.
 	std::vector<TailPlan> tails;
 };
@@ -938,8 +949,12 @@ const Constant CONSTANTS[] = {
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
 	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
 	{ "BATCH_BODY_FIRST", (double)BATCH_BODY_FIRST },
-	{ "BODY_KINDS", (double)BODY_KINDS },
-	{ "BATCHES", (double)BATCHES },
+	{ "DRAW_ASKED", (double)DRAW_ASKED },
+	{ "DRAW_SHOTS", (double)DRAW_SHOTS },
+	{ "DRAW_ENEMY", (double)DRAW_ENEMY },
+	{ "DRAW_BIRTHS", (double)DRAW_BIRTHS },
+	{ "DRAW_TAIL", (double)DRAW_TAIL },
+	{ "DRAW_OUT_FIRST", (double)DRAW_OUT_FIRST },
 	{ "LOOK_GRID", (double)LOOK_GRID },
 	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
@@ -1473,12 +1488,13 @@ void ShotKernel::count_draw(Object *m) {
 	batch_counts.load(m, k.batch_counts);
 	drawn_color.load(m, k.drawn_color);
 	const int64_t high = m->get(k.high);
-	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || high > body.n || batch_counts.n < BATCHES);
+	const int64_t batches = m->get(k.batch_total);
+	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || high > body.n || batches < BATCH_BODY_FIRST || batch_counts.n < batches);
 	// Each span counts its own batches (`_scratch->draw_counts`), added up after in span order.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
-	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	_scratch->draw_counts.assign(spans * batches, 0);
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
 				continue;
@@ -1510,10 +1526,10 @@ void ShotKernel::count_draw(Object *m) {
 			counts[drawn_batch[slot]] += 1;
 		}
 	});
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		int64_t count = 0;
 		for (int64_t span = 0; span < spans; span++) {
-			count += _scratch->draw_counts[span * BATCHES + b];
+			count += _scratch->draw_counts[span * batches + b];
 		}
 		batch_counts[b] = (int32_t)count;
 	}
@@ -1567,7 +1583,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	core.load(m, k.core);
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || high > body.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
+	const int64_t batches = m->get(k.batch_total);
+	ERR_FAIL_COND(high > alive.n || high > body.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
 	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
 	// in `_by_group`, and its particles and tail asked for are added to its group's.
 	Arr<PackedInt32Array> group, group_end, by_group;
@@ -1683,10 +1700,16 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		tail_carry[slot] = (float)(carry - d);
 		tail_n[slot] = (int32_t)n;
 	};
-	float *out_buffer[BATCHES];
-	int64_t room[BATCHES];
-	int64_t used[BATCHES] = {};
-	for (int64_t b = 0; b < BATCHES; b++) {
+	if ((int64_t)_buffers.size() < batches) {
+		_buffers.resize(batches);
+	}
+	std::vector<float *> &out_buffer = _scratch->out_buffer;
+	std::vector<int64_t> &room = _scratch->room;
+	std::vector<int64_t> &used = _scratch->used;
+	out_buffer.resize(batches);
+	room.resize(batches);
+	used.assign(batches, 0);
+	for (int64_t b = 0; b < batches; b++) {
 		if (_buffers[b].size() != rooms[b] * DRAW_STRIDE) {
 			_buffers[b].resize(rooms[b] * DRAW_STRIDE);
 		}
@@ -1730,26 +1753,26 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	// it knows where its rows start (the shots before it, in slot order); rows past a batch's room
 	// are not written, as in the GDScript.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
-	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	_scratch->draw_counts.assign(spans * batches, 0);
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] != 0) {
 				counts[drawn_batch[slot]] += 1;
 			}
 		}
 	});
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		int64_t before = 0;
 		for (int64_t span = 0; span < spans; span++) {
-			const int64_t count = _scratch->draw_counts[span * BATCHES + b];
-			_scratch->draw_counts[span * BATCHES + b] = before;
+			const int64_t count = _scratch->draw_counts[span * batches + b];
+			_scratch->draw_counts[span * batches + b] = before;
 			before += count;
 		}
 		used[b] = MIN(before, room[b]);
 	}
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *row = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *row = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
 				continue;
@@ -1799,28 +1822,27 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		}
 	}
 	int64_t shots = 0;
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		shots += used[b];
 	}
-	// The batches on the enemy ramp's layer (`BATCH_ENEMY_LAYER`): its shots, runes and bodies.
+	// The batches on the enemy ramp's layer (`batch_on_enemy_layer`): its shots, runes and bodies.
 	int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
-	for (int64_t b = BATCH_BODY_FIRST + 1; b < BATCHES; b += 2) {
+	for (int64_t b = BATCH_BODY_FIRST + 1; b < batches; b += 2) {
 		enemy_shots += used[b];
 	}
-	for (int64_t b = 0; b < BATCHES; b++) {
-		draw_out[b] = (int32_t)used[b];
+	for (int64_t b = 0; b < batches; b++) {
+		draw_out[DRAW_OUT_FIRST + b] = (int32_t)used[b];
 	}
-	draw_out[BATCHES] = (int32_t)asked;
-	draw_out[BATCHES + 1] = 0;
-	draw_out[BATCHES + 2] = (int32_t)shots;
-	draw_out[BATCHES + 3] = (int32_t)enemy_shots;
-	draw_out[BATCHES + 4] = (int32_t)tail_count;
-	draw_out[BATCHES + 5] = (int32_t)(int64_t)tail_wanted;
+	draw_out[DRAW_ASKED] = (int32_t)asked;
+	draw_out[DRAW_ASKED + 1] = 0;
+	draw_out[DRAW_SHOTS] = (int32_t)shots;
+	draw_out[DRAW_ENEMY] = (int32_t)enemy_shots;
+	draw_out[DRAW_BIRTHS] = (int32_t)tail_count;
+	draw_out[DRAW_TAIL] = (int32_t)(int64_t)tail_wanted;
 }
 
 PackedFloat32Array ShotKernel::buffer(int64_t batch) const {
-	static_assert(sizeof(_buffers) / sizeof(_buffers[0]) == BATCHES, "ShotKernel::_buffers has one buffer per batch");
-	ERR_FAIL_INDEX_V(batch, BATCHES, PackedFloat32Array());
+	ERR_FAIL_INDEX_V(batch, (int64_t)_buffers.size(), PackedFloat32Array());
 	return _buffers[batch];
 }
 

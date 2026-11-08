@@ -21,6 +21,8 @@
 #include <godot_cpp/variant/rect2.hpp>
 #include <godot_cpp/variant/string_name.hpp>
 
+#include <vector>
+
 namespace godot {
 
 class ShotKernel : public RefCounted {
@@ -71,8 +73,9 @@ private:
 	Scratch *_scratch = nullptr;
 
 	void homing_pass(Object *manager, int64_t first, int64_t count, double delta);
-	// The draw batches' instance data (BATCH_* of the manager, BATCHES of them: the cpp static_asserts the size), handed to the MultiMeshes.
-	PackedFloat32Array _buffers[17];
+	// The draw batches' instance data (BATCH_* of the manager, `_batch_total` of them, growing with
+	// its card bodies), handed to the MultiMeshes.
+	std::vector<PackedFloat32Array> _buffers;
 };
 
 } // namespace godot

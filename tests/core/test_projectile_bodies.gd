@@ -42,8 +42,21 @@ func test_a_card_shader_is_numbered_once_and_given_a_pair_of_batches() -> void:
 	check_equal(mgr.register_body(POOL), 2, "another is the next")
 	check(mgr.body_shader(stone) == STONE, "a body knows its shader")
 	check(WarmupScript._wanted.has(STONE) and WarmupScript._wanted.has(POOL), "both are warmed before the first room")
-	check(ManagerScript.BATCH_ENEMY_LAYER[ManagerScript.body_batch(stone, true)] and not ManagerScript.BATCH_ENEMY_LAYER[ManagerScript.body_batch(stone, false)], "its pair: the hat ramps', then the enemy ramp's a layer up")
-	check_equal(ManagerScript.BATCH_MESH[ManagerScript.body_batch(stone, false)], -1, "one quad a shot, as a rune")
+	check(ManagerScript.batch_on_enemy_layer(ManagerScript.body_batch(stone, true)) and not ManagerScript.batch_on_enemy_layer(ManagerScript.body_batch(stone, false)), "its pair: the hat ramps', then the enemy ramp's a layer up")
+	check_equal(ManagerScript.batch_mesh(ManagerScript.body_batch(stone, false)), -1, "one quad a shot, as a rune")
+	check_equal(mgr.batch_count(), ManagerScript.BATCH_BODY_FIRST + 4, "two bodies: the first five batches and two pairs")
+
+
+func test_there_is_no_fixed_number_of_bodies() -> void:
+	var grown: Array[int] = []
+	mgr.batches_grown.connect(func(count: int) -> void: grown.append(count))
+	for n in 20:
+		var shader := Shader.new()
+		shader.code = "shader_type canvas_item;\n// body %d\n" % n
+		check_equal(mgr.register_body(shader), n + 1, "body %d is numbered" % (n + 1))
+	check_equal(mgr.batch_count(), ManagerScript.BATCH_BODY_FIRST + 40, "each with its own pair of batches")
+	check_equal(grown.size(), 20, "each told (batches_grown)")
+	check_equal(grown[19], mgr.batch_count(), "with the count in all")
 
 
 func test_a_still_shot_of_a_card_body_draws_in_its_batch() -> void:

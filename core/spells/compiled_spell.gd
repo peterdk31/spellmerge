@@ -62,6 +62,10 @@ var ray_length: float = 0.0
 ## (docs/milestones/cast-timing.md).
 var arc: float = 0.0
 var wind_up: float = 0.0
+## The wind-up its staff animation's keys are timed for: its form card's own, times the cards'
+## `wind_up_mult`, with no `wind_up_add` (a charge's 2 s). A longer wind-up is spent before the
+## animation's blow, which keeps this pace (`StaffPoses.start`).
+var pose_wind_up: float = 0.0
 ## The carrier's staff animation (`FormBase.packed_pose`, shared, never written).
 var staff_pose: PackedFloat32Array = PackedFloat32Array()
 ## The shots the cards asked for (the same as `shots`; kept for the description).

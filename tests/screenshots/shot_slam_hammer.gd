@@ -2,7 +2,7 @@ extends "res://tests/support/screenshot.gd"
 ## A slam's staff turning into a hammer (its `hammer` pose channel, core/projectiles/staff_hammer.gdshader;
 ## the owner, 2026-11-08): players 1 to 4 in a row each slam to the right, each in its own ramp:
 ## player 1 early in the wind-up as its hammer forms white-hot, then raised and whole a plain slam
-## (player 2), a bigger one (player 3) and a slam with two bigger cards (player 4), whose rings and
+## (player 2), a bigger one (player 3) and a slam with three bigger cards (player 4: no cap, its square grows with it), whose rings and
 ## hammers grow (SINCE, CARDS). `slam_hammer` is a 3x crop of the row; `slam_hammer_4x` the second
 ## wizard's whole hammer.
 
@@ -10,7 +10,7 @@ const STAFF := preload("res://content/wizard/staffs/curl/curl.tres")
 ## Frames from each wizard's cast to the shot (60 a second; a 0.25 s wind-up, then the impact), and
 ## each wizard's cards.
 const SINCE: Array[int] = [5, 12, 12, 12]
-const CARDS: Array = [[&"slam"], [&"slam"], [&"bigger", &"slam"], [&"bigger", &"bigger", &"slam"]]
+const CARDS: Array = [[&"slam"], [&"slam"], [&"bigger", &"slam"], [&"bigger", &"bigger", &"bigger", &"slam"]]
 
 
 func take() -> void:

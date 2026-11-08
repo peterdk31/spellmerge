@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## one writing the trails' births with `MoteKernel` and one without (`Motes.native`), each settling
 ## into a mark layer of its own, are given the same seeded births frame after frame: every look
 ## kind, the dash's streak, a kind with two motes to pick from, spells' kinds through a cards
-## lookup, the enemy ramp and the exact colour, a birth at no point, a frame that runs out of rows,
+## lookup, spells of several infusions (each birth in its infusion's colours, or the next in turn),
+## the enemy ramp and the exact colour, a birth at no point, a frame that runs out of rows,
 ## and every "Particle amount". After every frame each array of the two pools (every chunk's rows,
 ## the chunks' flags and lives), their counters and their random state, and the settles each mark
 ## layer was handed must be equal byte for byte.
@@ -20,7 +21,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const FRAMES: int = 24
 const BIRTHS: int = 400
 ## The counters and state compared after every frame.
-const SCALARS: Array[StringName] = [&"_next", &"_rows_left", &"_settles_left", &"_serial", &"written", &"cut", &"births", &"settles", &"settles_skipped"]
+const SCALARS: Array[StringName] = [&"_next", &"_rows_left", &"_settles_left", &"_serial", &"written", &"cut", &"births", &"settles", &"settles_skipped", &"_infusion_turn"]
 
 
 ## A spell lookup (as card_kinds.gd's `layer_motes`): odd tags get kinds of their own.
@@ -84,6 +85,14 @@ func _side(native: bool, cards: bool) -> Array:
 	marks.enter(Rect2(-200.0, -200.0, 1000.0, 800.0), null, 8.0)
 	marks.step(0.0)
 	motes.settle_into(marks)
+	# Three infusions, on look layers 1 to 3 (`InfusionTable`).
+	var table := PackedColorArray()
+	table.resize(InfusionTable.LAYERS)
+	table.fill(Color(0.0, 0.0, 0.0, 0.0))
+	table[1] = Color("e0592f")
+	table[2] = Color("4fd6dc")
+	table[3] = Color("f2c230")
+	motes.set_infusions(table)
 	if cards:
 		var lookup := Cards.new()
 		lookup.motes = motes
@@ -109,7 +118,9 @@ func _births(rng: RandomNumberGenerator) -> PackedFloat32Array:
 		given[b + ProjectilesScript.SPARK_BACK_Y] = back.y
 		given[b + ProjectilesScript.SPARK_KIND] = kinds[rng.randi_range(0, kinds.size() - 1)]
 		given[b + ProjectilesScript.SPARK_RAMP] = rng.randi_range(-1, 5)
-		given[b + ProjectilesScript.SPARK_LOOK] = (1 << rng.randi_range(0, 4)) | flags[rng.randi_range(0, flags.size() - 1)]
+		# Every other birth of a spell of several infusions (layers 1 to 3).
+		var infusions: int = rng.randi_range(0, 7) if n % 2 == 0 else 0
+		given[b + ProjectilesScript.SPARK_LOOK] = (1 << rng.randi_range(0, 4)) | infusions | flags[rng.randi_range(0, flags.size() - 1)]
 		for c in 3:
 			given[b + ProjectilesScript.SPARK_CORE + c] = rng.randf()
 		given[b + ProjectilesScript.SPARK_TAG] = rng.randi_range(0, 7)
@@ -181,6 +192,7 @@ func _run(cards: bool) -> void:
 	check(settled > 0, "motes settled: %d" % settled)
 	check(a.cut > 0, "a frame ran out of rows: %d cut" % a.cut)
 	check(a.births > 0 and a.written > a.births / 2, "births written: %d of %d" % [a.written, a.births])
+	check(int(a.get(&"_infusion_turn")) > 0, "births took their spells' infusions in turn: %d" % int(a.get(&"_infusion_turn")))
 
 
 func test_the_kernel_writes_the_births_as_the_gdscript_does() -> void:

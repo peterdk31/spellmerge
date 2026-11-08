@@ -84,12 +84,13 @@ const REVIVE_RING_BACK: Color = Color("5a5a6e")
 const OUTLINE_COLOR: Color = Color("14121f")
 ## The hammer a slam's staff turns into (its `hammer` pose channel, `Spells.poses().staff_hammer`):
 ## drawn by its own node over the staff and under the face (HAMMER_SHADER), a square HAMMER_EXTENT
-## pixels each way round the grip; as many times its size as its cards grew the spell
-## (`Spells.poses().staff_grown`: a bigger card's 1.6), from 1 up to HAMMER_SIZE_MOST, which keeps it
-## inside its square.
+## pixels each way round the grip at size 1; as many times its size as its cards grew the spell
+## (`Spells.poses().staff_grown`: a bigger card's 1.6), never less than 1 and with no most (the
+## owner, 2026-11-08: "remove the cap"): its square grows with it, so it is never cut off.
 const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
 const HAMMER_EXTENT: float = 48.0
-const HAMMER_SIZE_MOST: float = 2.2
+## The most infusions the hammer's bands show (its shader's `hammer_infusions[4]`).
+const HAMMER_INFUSIONS_MOST: int = 4
 ## The hammer's head at size 1 (its shape is here, handed to its shader, so where it lands and what
 ## is drawn are one): half as thick along the staff and half as long across it, and how far back
 ## from the tip its back face is, in pixels.
@@ -113,6 +114,8 @@ var _shadow: Node2D = null
 ## how far the staff was a hammer and how big when last drawn (x, y: what `contact_position` reads,
 ## as `tip_position` reads the sprite as last stepped).
 var _hammer: Node2D = null
+## The hammer size its square was last drawn for (`_draw_hammer`): drawn again when it changes.
+var _hammer_extent: float = 1.0
 var _drawn_hammer: Vector2 = Vector2(0.0, 1.0)
 ## The staff whose head and personality show (-1 before the first step), and the time hovered.
 var _shown: int = -1
@@ -395,6 +398,10 @@ func _place_hammer() -> void:
 	_hammer.visible = amount > 0.0
 	if amount <= 0.0:
 		return
+	# Its square as big as it is, so a hammer of many bigger cards is never cut off.
+	if _drawn_hammer.y != _hammer_extent:
+		_hammer_extent = _drawn_hammer.y
+		_hammer.queue_redraw()
 	# On the drawn tip as the staff is stretched, squashed and leaned, but never itself scaled: its
 	# head smushes by its own rule (`hammer_squash`), not the sprite's squash along a screen axis.
 	_hammer.position = _sprite.position
@@ -415,16 +422,20 @@ func _place_hammer() -> void:
 	material.set_shader_parameter(&"hammer_reach", tip.length())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))
+	# Every infusion on its spell shows, one in each of its bands (the owner, 2026-11-08: as a beam's
+	# several infusions show).
+	var infusions: PackedColorArray = poses.staff_infusions(actor.id)
+	material.set_shader_parameter(&"hammer_infusions", infusions)
+	material.set_shader_parameter(&"hammer_infusion_count", mini(infusions.size(), HAMMER_INFUSIONS_MOST))
 
 
-## How big the hammer is drawn now: as many times its size as its cards grew the spell, from 1 up
-## to HAMMER_SIZE_MOST.
+## How big the hammer is drawn now: as many times its size as its cards grew the spell, at least 1.
 func hammer_size() -> float:
 	return _hammer_size(actor.spells.poses() if actor.spells != null else null)
 
 
 func _hammer_size(poses: StaffPoses) -> float:
-	return clampf(poses.staff_grown(actor.id) if poses != null else 1.0, 1.0, HAMMER_SIZE_MOST)
+	return maxf(poses.staff_grown(actor.id) if poses != null else 1.0, 1.0)
 
 
 ## The hammer's node, for tests (null without a sprite).
@@ -432,9 +443,16 @@ func hammer_node() -> Node2D:
 	return _hammer
 
 
-## The square the hammer's shader draws in, round the grip.
+## The square the hammer's shader draws in, round the grip: HAMMER_EXTENT each way times its size.
 func _draw_hammer() -> void:
-	_hammer.draw_rect(Rect2(-Vector2.ONE * HAMMER_EXTENT, Vector2.ONE * HAMMER_EXTENT * 2.0), Color.WHITE)
+	var extent: float = HAMMER_EXTENT * _hammer_extent
+	_hammer.draw_rect(Rect2(-Vector2.ONE * extent, Vector2.ONE * extent * 2.0), Color.WHITE)
+
+
+## The size of the square the hammer is drawn in (its `_draw_hammer`; for tests): HAMMER_EXTENT each
+## way times this.
+func hammer_extent() -> float:
+	return _hammer_extent
 
 
 ## Show or hide the invulnerable look when the state changes; while it shows, the closing ring is

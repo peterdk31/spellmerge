@@ -546,7 +546,8 @@ func _ready() -> void:
 	register_bodies()
 
 
-## Reads every carrier card's look once (`_looks`, for `look_of` and `look_shaders`) and hands each
+## Publishes the infusion table (every infusion's colour by its look layer, `InfusionTable`) for the
+## shaders, reads every carrier card's look once (`_looks`, for `look_of` and `look_shaders`) and hands each
 ## shot carrier card's own shader (LOOK_SHOT, LOOK_STILL) to the projectile manager now
 ## (`register_body`, with the mesh its shots are written as), so it has its batches and is warmed
 ## before the first room, not first drawn in the middle of one. A launch numbers any it did not know
@@ -555,6 +556,8 @@ func register_bodies() -> void:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
 	if source == null or not source.has_method(&"get_all"):
 		return
+	# Every infusion's colour by its look layer, for the shaders that weave a look of several.
+	InfusionTable.publish(InfusionTable.of_registry(source))
 	for card: Resource in source.call(&"get_all", &"spells"):
 		var form := card as FormBase
 		if form == null:

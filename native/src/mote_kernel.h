@@ -54,6 +54,7 @@ private:
 	int64_t _spark_streak = 0, _pair_layers = 0;
 	int64_t _enemy_source = 0, _exact_source = 0, _look_enemy_ramp = 0, _look_exact = 0;
 	double _life_max = 0.0, _height_max = 0.0, _source_code = 0.0, _kind_code = 0.0, _trail_speed = 0.0;
+	int64_t _look_layers = 0;
 };
 
 } // namespace godot

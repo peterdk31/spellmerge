@@ -39,6 +39,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // `mote_flight` is `Motes.flight` line for line.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+// A mote is in one infusion's colours (`Motes.set_infusions` picks it): its look is never woven.
+#define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
 uniform sampler2D kind_table : filter_nearest;

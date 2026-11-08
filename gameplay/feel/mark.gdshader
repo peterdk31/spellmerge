@@ -37,6 +37,8 @@ render_mode blend_mix, world_vertex_coords;
 // The colour and custom data are between 0 and 1 and need no more than bytes.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+// A mark is in one infusion's colours, as the mote it is of: its look is never woven.
+#define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
 uniform vec4 kind_form[16];

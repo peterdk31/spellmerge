@@ -28,6 +28,12 @@ var _pose_from: PackedFloat32Array = PackedFloat32Array()
 var _pose_land: PackedVector2Array = PackedVector2Array()
 ## The card each animation plays for (its carrier's `strike_point` along the live aim).
 var _pose_spell: Array[CompiledSpell] = []
+## The blow of each animation: its last wind key, which keeps its card's own pace however long the
+## wind-up is (a charged slam still comes down fast), or -1 when none does (a single wind key, a
+## spell timed for no wind-up); and the seconds each wind key before it is at a fraction of 1,
+## so those keys share the rest (the wind-up itself when there is no blow).
+var _pose_blow: PackedInt32Array = PackedInt32Array()
+var _pose_lead: PackedFloat32Array = PackedFloat32Array()
 ## The pose worked out last (`_pose_now`), for whom and when: the channels and the mood.
 var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
@@ -35,6 +41,8 @@ var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
 ## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
 const POSE_CHANNELS: int = 8
+## What `staff_infusions` answers with no spell (never written).
+const NO_INFUSIONS: PackedColorArray = []
 ## Where `land` and `hammer` are among them.
 const LAND: int = 6
 const HAMMER: int = 7
@@ -56,6 +64,8 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_tint.resize(SpellRuntime.ACTORS)
 	_pose_land.resize(SpellRuntime.ACTORS)
 	_pose_spell.resize(SpellRuntime.ACTORS)
+	_pose_blow.resize(SpellRuntime.ACTORS)
+	_pose_lead.resize(SpellRuntime.ACTORS)
 	_pose_from.resize(SpellRuntime.ACTORS * POSE_CHANNELS)
 	_pose_out.resize(POSE_CHANNELS)
 	clear()
@@ -114,6 +124,34 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 	_pose_tint[actor] = spell.tint
 	_pose_spell[actor] = spell
 	_pose_land[actor] = _land_point(actor, spell, dir)
+	_time_wind(actor, spell, wind)
+
+
+## Times the wind keys of `actor`'s animation for `spell` over `wind` seconds: they are fractions
+## of the wind-up their card is timed for (`CompiledSpell.pose_wind_up`). A shorter wind-up (faster
+## casting) plays them all faster; a longer one (a charge, a staff's own wind-up) is spent on the
+## keys before the last, and the last, the blow into the release, keeps its card's pace: a slam
+## charged for 2 s more raises its hammer slowly and still smashes it down in a blink.
+func _time_wind(actor: int, spell: CompiledSpell, wind: float) -> void:
+	var keys: PackedFloat32Array = spell.staff_pose
+	var stride: int = FormBase.POSE_STRIDE
+	var last: int = -1
+	var before: int = -1
+	for k in keys.size() / stride:
+		if roundi(keys[k * stride + FormBase.PK_PHASE]) == FormBase.POSE_PHASES["wind"]:
+			before = last
+			last = k
+	_pose_blow[actor] = -1
+	_pose_lead[actor] = wind
+	if before < 0 or spell.pose_wind_up <= 0.0 or wind <= spell.pose_wind_up:
+		return
+	var at_last: float = keys[last * stride + FormBase.PK_AT]
+	var at_before: float = keys[before * stride + FormBase.PK_AT]
+	if at_before <= 0.0:
+		return
+	var blow: float = maxf(at_last - at_before, 0.0) * spell.pose_wind_up
+	_pose_blow[actor] = last
+	_pose_lead[actor] = maxf(at_last * wind - blow, 0.0) / at_before
 
 
 ## Where `spell`'s carrier strikes from `actor`'s hand along `dir` (`Carrier.strike_point`), stopped
@@ -195,6 +233,16 @@ func staff_grown(actor: int) -> float:
 	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
 		return 1.0
 	return _pose_spell[actor].radius_scale
+
+
+## How each different infusion on the spell `actor`'s staff animation plays for looks, in slot
+## order (`CompiledSpell.infusion_looks`: rgb its tint, alpha its look kind / 255), for a look that
+## shows each (a slam's hammer binds one in each of its bands); empty while it plays none, or for a
+## spell of none. Shared: read it, never change it.
+func staff_infusions(actor: int) -> PackedColorArray:
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
+		return NO_INFUSIONS
+	return _pose_spell[actor].infusion_looks
 
 
 ## How far (0 to 1) `actor`'s staff is moved so its tip lies on the point its carrier strikes, and
@@ -287,7 +335,8 @@ func _pose_now(actor: int) -> bool:
 				from_t = wind + strike
 			continue
 		var at: float = keys[k * stride + FormBase.PK_AT]
-		var t: float = at * wind if phase == 0 else (wind + at * strike if phase == 1 else wind + strike + at)
+		# A wind key before the blow is timed by the lead (`_time_wind`), the blow and the rest by the wind-up.
+		var t: float = at * (_pose_lead[actor] if k < _pose_blow[actor] else wind) if phase == 0 else (wind + at * strike if phase == 1 else wind + strike + at)
 		if s < t:
 			return _pose_between(keys, actor, from_key, k, clampf((s - from_t) / (t - from_t), 0.0, 1.0) if t > from_t else 1.0, mood)
 		from_key = k

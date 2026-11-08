@@ -7,8 +7,8 @@ render_mode blend_premul_alpha;
 // own Hammer node (gameplay/player/staff_look.gd), a square round the staff's grip above the staff
 // and under its face, moved and stretched as the staff is: a hammer's head grows out of the
 // staff's head, a block of stone across the staff over its tip, outlined, its striking face light,
-// its back in shadow, a dark socket where the staff goes through and its two ends bound in the
-// glow's colour, with that light round it. As `hammer` rises from 0 to 1 its pixels come in from
+// its back in shadow, a dark socket where the staff goes through and its two ends bound in its
+// infusions' colours (`hammer_infusions`; the player's with none), with that light round it. As `hammer` rises from 0 to 1 its pixels come in from
 // the middle out, white-hot at first; as it falls they go back. `hammer_size` scales it (1 a plain
 // slam's; as many times as its cards grew the spell, a bigger card's 1.6). As it lands its head
 // smushes (`hammer_squash`, 0 to 0.5: the staff's squash), as a hammer's head does when its end
@@ -39,8 +39,15 @@ uniform float hammer_back = 6.0;
 uniform vec2 hammer_down = vec2(1.0, 1.0);
 uniform vec2 hammer_dir = vec2(1.0, 0.0);
 uniform float hammer_reach = 16.0;
-// Its bands' and light's colour (the infusion's, else the player's) and how bright the light is.
+// Its bands' and light's colour with no infusion (the player's; the infusion's when it has one)
+// and how bright the light is.
 uniform vec4 glow_color = vec4(1.0);
+// Every different infusion on its spell, in slot order (`StaffPoses.staff_infusions`: rgb its tint),
+// and how many: each shows (the owner, 2026-11-08: "I would like this for the hammer as well", as a
+// beam's several infusions show). The first binds one end, the second the other (one infusion
+// binds both), the third rings its socket, the fourth too, in turn with the third along the head.
+uniform vec4 hammer_infusions[4];
+uniform int hammer_infusion_count = 0;
 uniform float hammer_glow = 0.0;
 uniform float glow_strength = 1.0;
 
@@ -77,7 +84,9 @@ void fragment() {
 	// Its pixels come in from the middle out as it grows, and go back the same way.
 	float out_from = length(d) / (hammer_half_long * hammer_size + 1.0);
 	bool come = hash_seeded(floor(p.x), floor(p.y), 91.0, 0.0) < hammer * 1.8 - out_from * 0.8;
-	vec3 band = glow_color.rgb;
+	// The band of the end it is nearer (and the light there): the first infusion's, the second's.
+	vec3 first = hammer_infusion_count > 0 ? hammer_infusions[0].rgb : glow_color.rgb;
+	vec3 band = hammer_infusion_count > 1 && across > 0.0 ? hammer_infusions[1].rgb : first;
 	vec4 colour = vec4(0.0);
 	if (inside && come && hl >= 0.5) {
 		bool edge = box.x > -0.5 || box.y > -0.5;
@@ -86,6 +95,11 @@ void fragment() {
 		vec3 stone = along > ht - 1.0 - bands ? STONE_LIGHT : (along < -ht + 1.0 + bands ? STONE_SHADOW : STONE_BASE);
 		stone = abs(across) < 1.0 && along < ht - 1.0 - bands ? STONE_SHADOW : stone;
 		vec3 rgb = edge ? OUTLINE : (abs(across) > hl - 0.5 - bands ? band : stone);
+		if (!edge && hammer_infusion_count > 2 && abs(across) >= 1.0 && abs(across) < 1.0 + bands) {
+			// The third (and fourth, every other pixel along) rings the socket.
+			int ring = hammer_infusion_count > 3 && mod(floor(along), 2.0) > 0.5 ? 3 : 2;
+			rgb = hammer_infusions[ring].rgb;
+		}
 		// White-hot as it forms.
 		rgb = mix(rgb, BONE_LIGHT, clamp(1.0 - hammer * 1.6, 0.0, 1.0));
 		colour = vec4(rgb, 1.0);

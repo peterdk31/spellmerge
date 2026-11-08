@@ -259,6 +259,18 @@ var _pair_from: PackedInt32Array = PackedInt32Array()
 var _pair_size: PackedInt32Array = PackedInt32Array()
 var _pair_kinds: PackedInt32Array = PackedInt32Array()
 var _settle_out: PackedFloat64Array = PackedFloat64Array()
+## A spell's motes in its infusions' colours (the owner, 2026-11-08: a beam of several infusions
+## gave off motes of its first only; "this should also be different motes based on infusions (as
+## a general rule)"; `set_infusions`). Of a spell with two infusions or more, a mote of an
+## infusion's own kind (fire's embers, frost's flecks: its `look_layers`) is in that infusion's
+## colours, and any other (a tail, a splash, a hit's spray, a modifier's kind) takes them in turn.
+## Each infusion's tint by its look layer (`InfusionTable`, rgb floats: the native kernel reads it
+## too), the look bits of the infusions, each kind's look layers as bits, and how many motes have
+## taken the infusions in turn.
+var _infusion_rgb: PackedFloat32Array = PackedFloat32Array()
+var _infusion_mask: int = 0
+var _kind_layers: PackedInt32Array = PackedInt32Array()
+var _infusion_turn: int = 0
 
 
 ## A pool of `cap` rows (above 0) of the kinds `kinds` (at most MAX_KINDS; a kind with problems
@@ -286,6 +298,7 @@ func _init(cap: int, z: int, kinds: Array[MoteKind], table: RampTableScript = nu
 	_pair_size.resize(ProjectilesScript.SPARK_BIRTHS_MAX)
 	_pair_kinds.resize(64)
 	_settle_out.resize(SETTLE_MOST * SETTLE_STRIDE)
+	set_infusions(PackedColorArray())
 	set_native(native)
 
 
@@ -309,7 +322,7 @@ func set_native(on: bool) -> void:
 		"SPARK_STREAK": ProjectilesScript.SPARK_STREAK, "PAIR_LAYERS": PAIR_LAYERS,
 		"ENEMY_SOURCE": ENEMY_SOURCE, "EXACT_SOURCE": EXACT_SOURCE, "LOOK_ENEMY_RAMP": LOOK_ENEMY_RAMP,
 		"LOOK_EXACT": LOOK_EXACT, "LIFE_MAX": LIFE_MAX, "HEIGHT_MAX": HEIGHT_MAX, "SOURCE_CODE": SOURCE_CODE,
-		"KIND_CODE": KIND_CODE, "TRAIL_SPEED": TRAIL_SPEED,
+		"KIND_CODE": KIND_CODE, "TRAIL_SPEED": TRAIL_SPEED, "LOOK_LAYERS": LOOK_LAYERS,
 	}
 	var wrong: PackedStringArray = _kernel.call(&"check_fields", self)
 	if not _kernel.call(&"configure", numbers):
@@ -317,6 +330,62 @@ func set_native(on: bool) -> void:
 	if not wrong.is_empty():
 		push_error("Motes: the native MoteKernel does not match this script (%s); running the GDScript" % ", ".join(wrong))
 		_kernel = null
+
+
+## The infusions' colours from now on (`InfusionTable.of_registry`: each one's tint by its look
+## layer; empty for none, and then every mote of a spell is in its core colour, as before).
+func set_infusions(table: PackedColorArray) -> void:
+	_infusion_rgb.resize(InfusionTable.LAYERS * 3)
+	_infusion_rgb.fill(0.0)
+	for layer in mini(table.size(), InfusionTable.LAYERS):
+		_infusion_rgb[layer * 3] = table[layer].r
+		_infusion_rgb[layer * 3 + 1] = table[layer].g
+		_infusion_rgb[layer * 3 + 2] = table[layer].b
+	_infusion_mask = InfusionTable.mask(table) & ((1 << LOOK_LAYERS) - 1)
+
+
+## The infusions the motes of a spell of the look `look` are coloured by: the look bits of its
+## infusions when it has two or more, else 0 (its motes are all in its core colour).
+func infusions_of(look: int) -> int:
+	var present: int = look & _infusion_mask
+	return present if present & (present - 1) != 0 else 0
+
+
+## The colour of the infusion of the lowest of the look bits `bits` (one infusion's at least).
+func _infusion_colour(bits: int) -> Color:
+	var layer: int = 1
+	while (bits >> (layer - 1)) & 1 == 0:
+		layer += 1
+	return Color(_infusion_rgb[layer * 3], _infusion_rgb[layer * 3 + 1], _infusion_rgb[layer * 3 + 2])
+
+
+## The colour of the next of the infusions `present` (two at least) in turn: a mote of a spell
+## that is none of its infusions' own takes the next.
+func _next_infusion(present: int) -> Color:
+	var count: int = 0
+	var bits: int = present
+	while bits != 0:
+		bits &= bits - 1
+		count += 1
+	var pick: int = _infusion_turn % count
+	_infusion_turn += 1
+	bits = present
+	for n in pick:
+		bits &= bits - 1
+	return _infusion_colour(bits)
+
+
+## The core colour of motes of the look layers `own_layers` (as bits: a kind's, a trail birth's)
+## of a spell with the infusions `present` (`infusions_of`) and the core colour `core`: their own
+## infusion's when they are of one of them, else `core`; and the infusions each of them takes in
+## turn instead (`burst`'s `turns`): `present` when they are of none of them, else 0.
+func _own_core(present: int, own_layers: int, core: Color) -> Color:
+	var own: int = present & own_layers
+	return _infusion_colour(own) if own != 0 else core
+
+
+func _turns_of(present: int, own_layers: int) -> int:
+	return present if present & own_layers == 0 else 0
 
 
 ## How many motes the ring holds.
@@ -448,10 +517,12 @@ func shed_kinds(found: PackedInt32Array, at: Vector2, dir: Vector2, core: Color,
 		return
 	var source: int = spell_source(ramp, look)
 	var share: float = scale / float(found.size())
+	var present: int = infusions_of(look)
 	_keep = _hit_keep
 	for k in found:
 		var kind: MoteKind = _kinds[k]
-		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source, core, kind.height)
+		burst(k, at, dir, maxi(roundi(float(kind.count) * share), 1), kind.speed, kind.spread, kind.up, kind.life, source,
+			_own_core(present, _kind_layers[k], core), kind.height, Vector2.ZERO, _turns_of(present, _kind_layers[k]))
 	_keep = 0
 
 
@@ -488,12 +559,18 @@ func give_off(given: PackedFloat32Array, count: int) -> void:
 		var k: int = found[0] if found.size() == 1 else found[_rng.randi_range(0, found.size() - 1)]
 		var kind: MoteKind = _kinds[k]
 		births += 1
+		var look: int = int(given[b + ProjectilesScript.SPARK_LOOK])
+		var core: Color = Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2])
+		# A birth of an infusion's layer is in its colours; any other of a spell of several (a tail, a
+		# splash) takes the next infusion (the native kernel does the same, in the same order).
+		var present: int = infusions_of(look)
+		if present != 0:
+			var own: int = present & (1 << (layer - 1)) if layer >= 1 and layer <= LOOK_LAYERS else 0
+			core = _infusion_colour(own) if own != 0 else _next_infusion(present)
 		burst(k, Vector2(given[b + ProjectilesScript.SPARK_X], given[b + ProjectilesScript.SPARK_Y]),
 			Vector2(given[b + ProjectilesScript.SPARK_BACK_X], given[b + ProjectilesScript.SPARK_BACK_Y]),
 			1, kind.speed * TRAIL_SPEED, kind.spread, kind.up * TRAIL_SPEED, kind.life,
-			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), int(given[b + ProjectilesScript.SPARK_LOOK])),
-			Color(given[b + ProjectilesScript.SPARK_CORE], given[b + ProjectilesScript.SPARK_CORE + 1], given[b + ProjectilesScript.SPARK_CORE + 2]),
-			kind.height)
+			spell_source(int(given[b + ProjectilesScript.SPARK_RAMP]), look), core, kind.height)
 
 
 ## `give_off` in the native kernel: it names each birth's (tag, kind) pair, the kinds of each pair
@@ -603,8 +680,9 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 ## its own speed up, all as fast as the fastest when `ring` (a ring going out). `often` for a source
 ## of many a frame (a hit's spray): it stops once only the frame's MOMENT_ROWS are left, as `shed`.
 ## With a `line`, each mote is thrown from a point of the line from `at` to `at + line` (a staff);
-## `life` times the kind's own life (a quicker moment).
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0) -> void:
+## `life` times the kind's own life (a quicker moment). `look`: the cards of the spell whose colours
+## they are in (0 for none): of a spell of several infusions, they take its infusions' colours.
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0, look: int = 0) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
@@ -620,7 +698,9 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	if ring:
 		speed.x = speed.y * 0.9
 	_keep = _hit_keep if often else 0
-	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source, core, kind.height, line)
+	var present: int = infusions_of(look)
+	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source,
+		_own_core(present, _kind_layers[k], core), kind.height, line, _turns_of(present, _kind_layers[k]))
 	_keep = 0
 
 
@@ -632,8 +712,10 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 ## (the native births never pass one, so `MoteKernel` mirrors this with none). Fewer when the
 ## frame's FRAME_ROWS run out. Every mote is written here: this is
 ## the one place a row is made. A kind that settles leaves its mark where each mote comes to rest
-## (as many as SETTLE_ROWS allows).
-func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0, line: Vector2 = Vector2.ZERO) -> void:
+## (as many as SETTLE_ROWS allows). With `turns` (a spell's infusions, `infusions_of`), each mote
+## is in the next of them in turn instead of `core` (`_next_infusion`; the native births never pass
+## any: their birth's colour is picked before, as `give_off` does).
+func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread: float, up: Vector2, life: Vector2, source: int, core: Color, height: float = 0.0, line: Vector2 = Vector2.ZERO, turns: int = 0) -> void:
 	if density != 1.0:
 		count = floori(float(count) * density + _rng.randf())
 	if count <= 0 or not at.is_finite() or k < 0 or k >= _kinds.size() or source < 0:
@@ -696,6 +778,8 @@ func burst(k: int, at: Vector2, dir: Vector2, count: int, speed: Vector2, spread
 		# The life in 1/255 steps of LIFE_MAX.
 		buffer[i + ROW_LIFE] = roundf(_rng.randf_range(shortest, longest) / LIFE_MAX * 255.0) / 255.0
 		buffer[i + ROW_HEIGHT] = coded_height
+		if turns != 0:
+			core = _next_infusion(turns)
 		buffer[i + ROW_CORE] = core.r
 		buffer[i + ROW_CORE + 1] = core.g
 		buffer[i + ROW_CORE + 2] = core.b
@@ -979,6 +1063,13 @@ func _take_kinds(kinds: Array[MoteKind]) -> void:
 		_k_drag.append(kind.drag)
 		_k_wobble.append(kind.wobble)
 		_k_wobble_rate.append(kind.wobble_rate)
+		# Its look layers as a look's bits (layer 0, any shot's, is none): an infusion's own kind
+		# takes that infusion's colours.
+		var layer_bits: int = 0
+		for layer in kind.look_layers:
+			if layer >= 1 and layer <= LOOK_LAYERS:
+				layer_bits |= 1 << (layer - 1)
+		_kind_layers.append(layer_bits)
 		var frames: int = kind.shape_frames().size()
 		_kind_image.set_pixel(0, k, Color(kind.gravity, kind.drag, kind.bounce, kind.glow))
 		_kind_image.set_pixel(1, k, Color(kind.wobble, kind.wobble_rate, float(kind.shade_from), float(reach_of(kind))))

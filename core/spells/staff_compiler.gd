@@ -454,6 +454,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.ray_length = form.ray_length
 		spell.arc = form.arc
 		spell.wind_up = maxf(form.wind_up, 0.0)
+		spell.pose_wind_up = spell.wind_up
 		spell.staff_pose = form.packed_pose()
 		spell.spread = form.spread
 		spell.look_shader = form.look_shader
@@ -525,6 +526,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.mana_cost = mana
 	spell.wind_down = maxf(wind_down, 0.0)
 	spell.wind_up *= wind_up_mult
+	spell.pose_wind_up *= wind_up_mult
 	spell.speed = speed
 	spell.radius = radius
 	spell.shots = shots

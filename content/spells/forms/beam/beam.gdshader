@@ -21,6 +21,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // beam's own material); warmed as a mesh before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
+// Every infusion shows as a strand of its own (below), so its look keeps the first's ramp unwoven.
+#define LOOK_OWN_INFUSIONS
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
 // The most points a path has (LIVE_BEAM_POINTS in gameplay/feel/feel.gd).

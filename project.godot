@@ -196,6 +196,13 @@ leave={
 
 common/max_physics_steps_per_frame=3
 
+[shader_globals]
+
+infusion_tints={
+"type": "sampler2D",
+"value": ""
+}
+
 [rendering]
 
 renderer/rendering_method="gl_compatibility"

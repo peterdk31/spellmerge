@@ -252,6 +252,39 @@ func test_a_dash_the_wizard_casts_standing_goes_along_the_aim() -> void:
 	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(0.0, 48.0)), "no walk: along the aim: %s" % [_moves])
 
 
+func test_a_teleport_the_wizard_casts_goes_the_way_it_walks() -> void:
+	# Owner, 2026-11-08: a teleport goes the way the body walks, as a dash does.
+	_build([&"teleport"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2(0.0, -3.0))
+	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].is_equal_approx(Vector2(0.0, -100.0)), "the walk's way, the card's distance: %s" % [_moves])
+
+
+func test_a_teleport_the_wizard_casts_standing_goes_along_the_aim() -> void:
+	_build([&"teleport"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0)
+	check(_moves.size() == 1 and _moves[0][2].is_equal_approx(Vector2(0.0, 100.0)), "no walk: along the aim: %s" % [_moves])
+
+
+## The rule is the trait's (owner, 2026-11-08): every carrier that MOVES_CASTER, a new one too,
+## goes the way the wizard walks when the wizard casts it.
+func test_every_carrier_that_moves_its_caster_goes_the_way_it_walks() -> void:
+	var seen: int = 0
+	for id: StringName in Carriers.ids():
+		if (Carriers.of(id).traits() & CarrierTraits.MOVES_CASTER) == 0:
+			continue
+		seen += 1
+		var form: FormBase = _form(StringName("walker_%s" % id), 240.0, 0.2)
+		form.carrier = id
+		form.ray_length = 50.0
+		_moves.clear()
+		_spells.clear()
+		_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+		_build([StringName("walker_%s" % id)])
+		_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0, Vector2.UP)
+		check(_moves.size() >= 1 and _moves[0][2].normalized().is_equal_approx(Vector2.UP), "%s goes the walk's way, not the aim: %s" % [id, _moves])
+	check(seen >= 2, "the dash and the teleport at least: %d" % seen)
+
+
 func test_a_mirrored_dash_of_the_wizard_goes_the_walk_way_and_back() -> void:
 	# Owner, R4 F1: mirror fires the carrier again with its way reversed, whatever that way is; a
 	# wizard's own dash takes the walk's way, so its mirror goes back against the walk. Both run.

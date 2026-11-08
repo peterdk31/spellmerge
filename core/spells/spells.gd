@@ -423,7 +423,7 @@ var _strike_marks: PackedVector2Array = PackedVector2Array()
 ## True while a `blast` strikes (`_blast`): its hits pull and swap nothing (rules R4 F2).
 var _blasting: bool = false
 ## caster -> the angle from its aim to the way its body walked at its last cast (0 standing;
-## `cast_staff`'s `walk`): a dash it casts itself is turned by it.
+## `cast_staff`'s `walk`): a move it casts itself is turned by it.
 var _walk_turn: PackedFloat32Array = PackedFloat32Array()
 ## While `entity_spawn_requested` is sent, the key of the entity it asks for (0 at other times):
 ## Entities keeps it and hands it back with `familiar_at`, and names it here again while it sends
@@ -1012,8 +1012,9 @@ func is_holding(actor: int, staff: int) -> bool:
 ## frees their reservation and returns 0.0. The caller decides which presses may do that (a
 ## held button should not switch on and off again and again).
 ##
-## `walk` is the way the caster's body walks (zero when it stands): a dash it casts itself takes
-## that way in place of `direction` (`CarrierMove`; staffs A6a, kept by the owner in R4 F1).
+## `walk` is the way the caster's body walks (zero when it stands): a move it casts itself (a dash,
+## a teleport: MOVES_CASTER) takes that way in place of `direction` (`CarrierMove`; staffs A6a, kept
+## by the owner in R4 F1, teleport too since 2026-11-08).
 func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, mana: float, walk: Vector2 = Vector2.ZERO) -> float:
 	if projectiles == null or not _in_range(actor, staff) or not origin.is_finite():
 		return REFUSED

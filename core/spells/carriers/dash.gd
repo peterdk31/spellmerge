@@ -80,10 +80,6 @@ func clear() -> void:
 	_passes.clear()
 
 
-func _walks() -> bool:
-	return true
-
-
 func _move_seconds(spell: CompiledSpell) -> float:
 	return CasterMoves.move_seconds(spell.ray_length, spell.speed, spell.lifetime)
 

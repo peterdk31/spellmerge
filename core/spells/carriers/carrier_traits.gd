@@ -52,6 +52,8 @@ const LINE: int = 1 << 19
 ## caster, whom its shield then guards)? Shield, deflect and `on block` need it.
 const MEETS_SHOTS: int = 1 << 20
 ## Does it move its caster (a dash, a teleport)? A mirror would cancel it, and nothing keeps it on.
+## The wizard's own cast of it goes the way its body walks, along the aim when it stands
+## (`CarrierMove.launch`, owner 2026-11-08).
 const MOVES_CASTER: int = 1 << 21
 ## Does it strike one point near its caster's hand (a slam's impact, `Carrier.strike_point`)? A
 ## staff animation's `land` keys put the staff's tip there; on any other carrier they are refused.

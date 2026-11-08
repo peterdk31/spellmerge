@@ -249,6 +249,18 @@ func test_the_walls_clip_the_marks() -> void:
 	check_equal(marks.shader_parameter(&"mask_cell"), ProjectilesScript.WALL_CELL, "and a cell's pixels")
 
 
+func test_a_new_floor_flash_draws_over_the_marks_left_before() -> void:
+	# The owner, 2026-11-08: the debris a slam leaves drew over the next slam's strike. The floor
+	# flashes and the mark layer share a z, so the later in the tree draws on top: the flashes.
+	var pair: Array = _feel()
+	var feel: FeelScript = pair[1]
+	check_equal(feel._floor_node.z_index, feel.marks().sprite().z_index, "one z")
+	check(feel._floor_node.is_greater_than(feel.marks().sprite()), "the floor flashes after the marks in the tree")
+	feel.set_floor_marks(false)
+	feel.set_floor_marks(true)
+	check(feel._floor_node.is_greater_than(feel.marks().sprite()), "and after a mark layer made again (the setting turned back on)")
+
+
 func test_a_cue_stamps_its_mark_as_big_as_its_reach() -> void:
 	var pair: Array = _feel()
 	var feel: FeelScript = pair[1]

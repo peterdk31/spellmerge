@@ -614,6 +614,10 @@ func _ready() -> void:
 	_spectacle.registry = registry
 	_spectacle.particles_enabled = particles_enabled
 	add_child(_spectacle)
+	# The floor flashes (a slam's burst and star) share the floor marks' z; at one z the later node
+	# draws on top, so they come after the spectacle, whose mark layer (made whenever the setting
+	# turns on) is inside it: a new strike shows over the marks earlier ones left.
+	move_child(_floor_node, _spectacle.get_index())
 	_lanes = LanesScript.new()
 	_lanes.name = "Lanes"
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).

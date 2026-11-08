@@ -188,6 +188,38 @@ func test_its_blow_hangs_at_the_top_then_whips_down() -> void:
 	arena.free_all()
 
 
+## The frames from the top of a slam's wind-up (its staff turned furthest back) to its blow
+## landing, cast with `cards` and watched for `seconds`; and the frame of the top.
+func _drop_frames(cards: Array, seconds: float) -> Vector2i:
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, cards)
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	var turns: Array[float] = []
+	for n in roundi(seconds * 60.0):
+		arena.run(1.0 / 60.0)
+		turns.append(arena.spells.poses().staff_pose(0).x)
+	arena.free_all()
+	var top: int = 0
+	for n in turns.size():
+		top = n if turns[n] < turns[top] - 0.0001 else top
+	var hit: int = top
+	while hit < turns.size() - 1 and turns[hit] < 0.3:
+		hit += 1
+	return Vector2i(hit - top, top)
+
+
+func test_a_charged_slam_raises_its_hammer_slowly_and_still_smashes_it_down_fast() -> void:
+	# The owner, 2026-11-08: with charge the slow wind-up is nice, but the hit "should be really
+	# fast, like winding up a hammer and smacking it down". The blow (the last wind key) keeps the
+	# card's own pace; charge's 2 s more go to the keys before it (`StaffPoses._time_wind`).
+	var plain: Vector2i = _drop_frames(["slam"], 0.5)
+	var charged: Vector2i = _drop_frames(["charge", "slam"], 2.6)
+	check(charged.y > 60, "the charged one takes its time to the top: frame %d" % charged.y)
+	check(absi(charged.x - plain.x) <= 1, "and comes down as fast as a plain slam: %d frames, plain %d" % [charged.x, plain.x])
+	check(charged.x <= 8, "in a blink: %d frames" % charged.x)
+
+
 func test_its_staff_turns_into_a_hammer_and_back() -> void:
 	# The card's `hammer` channel (the owner, 2026-11-08): the staff's head grows into a hammer's as it
 	# winds up, is one when it strikes, and goes back as it settles (StaffLook draws it).

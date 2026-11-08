@@ -87,21 +87,29 @@ func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
 			count += 1
 			check(own_look.contains(line), "the beam's look keeps `%s`" % line)
 	check(count > 10, "the plain beam's uniforms were read (%d)" % count)
-	check(own_look.contains("rift = lead == E_VOID ? 1.0 : 0.0;"), "a beam whose first infusion is void is a dark rift")
+	check(own_look.contains("uniform vec4 beam_infusions[8];") and own_look.contains("uniform int beam_infusion_count"), "it is handed every infusion on the beam")
+	check(own_look.contains("rift = kind == L_PULL ? 1.0 : 0.0;"), "a beam whose first infusion gives off a dark heart (void) is a dark rift")
 
 
-func test_its_look_knows_every_infusion_by_its_look_kind() -> void:
-	# The beam's look tells its infusions apart by look kind (infusion e is kind e + 1) and draws
-	# each in its ramp (`E_MATERIAL`, `STRAND_*`): a new infusion, or one that changes its kind,
-	# changes the beam's tables too.
-	var expected: Dictionary = {&"fire": 1, &"frost": 2, &"storm": 3, &"void": 4, &"lightning": 5, &"mend": 6}
-	var seen: Array[StringName] = []
-	for card: Resource in _registry.call("get_all", &"spells"):
-		var element := card as ElementBase
-		if element == null:
-			continue
-		seen.append(element.id)
-		check(expected.has(element.id), "%s is an infusion the beam's look knows (content/spells/forms/beam/beam.gdshader, E_*)" % element.id)
-		if expected.has(element.id):
-			check_equal(element.look_layer, expected[element.id], "%s's look kind is the one the beam's look reads" % element.id)
-	check_equal(seen.size(), expected.size(), "the beam's look knows every infusion")
+
+func test_it_hands_its_look_every_infusion_on_it_in_slot_order() -> void:
+	# The beam's look shows every infusion from what it is handed (a strand each but the first),
+	# so a new or changed infusion card needs nothing in the beam: its tint and its look kind go
+	# with the beam.
+	var frost: ElementBase = _registry.call("get_resource", &"spells", &"frost")
+	var fire: ElementBase = _registry.call("get_resource", &"spells", &"fire")
+	_cast_with(&"beam", [&"frost", &"fire", &"frost"], 0, Vector2.ZERO)
+	var beams: CarrierBeam = CarrierBeam.of(_spells)
+	var at: int = -1
+	for i in beams.beam_slots():
+		if beams.beam_on(i):
+			at = i
+	check(at >= 0, "the beam is on")
+	if at < 0:
+		return
+	var looks: PackedColorArray = beams.beam_infusions(at)
+	check_equal(looks.size(), 2, "each different infusion once")
+	check_equal(Color(looks[0].r, looks[0].g, looks[0].b), frost.tint, "the first first, in its tint")
+	check_equal(int(roundf(looks[0].a * 255.0)), frost.look_layer, "with its look kind")
+	check_equal(Color(looks[1].r, looks[1].g, looks[1].b), fire.tint, "then the next")
+	check_equal(int(roundf(looks[1].a * 255.0)), fire.look_layer, "with its look kind")

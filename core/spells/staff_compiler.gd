@@ -478,6 +478,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 			later_ids.append(element.status_id)
 			later_durations.append(element.status_duration)
 			later_strengths.append(element.status_strength)
+		if not spell.element_ids.has(element.id):
+			spell.infusion_looks.append(Color(element.tint.r, element.tint.g, element.tint.b, float(element.look_layer) / 255.0))
 		spell.element_ids.append(element.id)
 		damage *= element.damage_scale
 		heals = heals or element.heals

@@ -322,6 +322,7 @@ func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
 	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
 	check_equal(material.get_shader_parameter(&"beam_player"), 3, "in its caster's hat ramp")
 	check_equal(material.get_shader_parameter(&"beam_look"), 9, "with the cast's cards")
+	check_equal(material.get_shader_parameter(&"beam_infusion_count"), 0, "a shown beam hands no infusions: its look works them out from its tint and cards")
 	check(is_equal_approx(material.get_shader_parameter(&"beam_glow") as float, preset.beam_alpha), "glowing as the preset says")
 
 

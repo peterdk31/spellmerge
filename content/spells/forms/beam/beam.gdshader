@@ -36,24 +36,8 @@ const float BANDS = 4.0;
 // How fast its pulses run down it (px/s) and how many are on it at once.
 const float PULSE_SPEED = 320.0;
 const int PULSES = 4;
-// The infusions a beam can carry, by number: 0 fire, 1 frost, 2 storm, 3 void, 4 lightning,
-// 5 mend. Infusion `e` is look kind e + 1 (its card's `look_layer`, one no other card uses), so
-// the look tells which are on the beam; its tint tells which came first (`first_e`).
-const int INFUSIONS = 6;
-const float E_FIRE = 0.0;
-const float E_STORM = 2.0;
-const float E_VOID = 3.0;
-const float E_LIGHTNING = 4.0;
-const float E_MEND = 5.0;
-// Each infusion's ramp in the palette's materials (SHADES: Fire, Spark, Ice, Void, Arc); mend's
-// is the green ramp (its tint is the green light), worked out apart.
-const int E_MATERIAL[6] = int[](0, 2, 1, 3, 4, -1);
-// How each infusion's strand winds round the core (lightning's is jagged, worked out apart): its
-// turns a pixel, its speed, its reach as a share of the bands. Fire flickers, frost spirals
-// tight, storm sways wide, void threads, mend drifts.
-const float STRAND_TURN[6] = float[](0.21, 0.42, 0.085, 0.26, 0.0, 0.12);
-const float STRAND_SPEED[6] = float[](10.0, 5.0, 14.0, 7.0, 0.0, 3.0);
-const float STRAND_REACH[6] = float[](0.9, 0.8, 1.15, 0.75, 0.85, 0.7);
+// The most infusions it is handed (Feel's BEAM_INFUSIONS_MOST).
+const int INFUSIONS = 8;
 
 uniform vec4 core_override = vec4(1.0);
 // Feel's fade of the beam (kept with the beam; the beam's own fade is `beam_fade`).
@@ -73,6 +57,11 @@ uniform vec2 beam_start = vec2(-100000.0);
 uniform vec2 beam_end = vec2(-100000.0);
 // How far the beam's quads reach past each end, so the flares are whole.
 uniform float beam_lead = 0.0;
+// Every different infusion on it, in slot order (`CompiledSpell.infusion_looks`): rgb its tint,
+// alpha its look kind / 255, and how many (0: a beam shown with its tint and look only, whose
+// infusion is worked out from them). The first is its body; the others are its strands.
+uniform vec4 beam_infusions[8];
+uniform int beam_infusion_count = 0;
 
 // The pixel in the world.
 varying vec2 world;
@@ -85,19 +74,24 @@ varying flat vec4 cut_lo;
 varying flat vec4 cut_hi;
 // The whole beam's: how many pixels its bands reach each side now (its swell, kept inside its
 // quads), whether it is void's dark rift (1: void came first) or a white-hot core (0); its first
-// infusion (-1 none), the others as strands (a bit each, by number) and how many.
+// infusion's look kind (0 none: it sways, jags or wavers by it), how many infusions it shows.
 varying flat float bands;
 varying flat float rift;
-varying flat float first_e;
-varying flat float strand_bits;
-varying flat float strand_count;
+varying flat float first_kind;
+varying flat float infusion_count;
 
 // ---- Vertices ----
 
-// Infusion `e`'s shade `k` (0 shadow, 1 base, 2 light).
-vec3 infusion_shade(int e, int k) {
-	int m = E_MATERIAL[clamp(e, 0, INFUSIONS - 1)];
-	return m < 0 ? (k == 0 ? P_SHADOW[2] : (k == 1 ? P_BASE[2] : P_LIGHT[2])) : SHADES[m * 3 + clamp(k, 0, 2)];
+// Infusion `i`'s look kind (its card's `look_layer`).
+float infusion_kind(int i) {
+	return floor(beam_infusions[clamp(i, 0, INFUSIONS - 1)].a * 255.0 + 0.5);
+}
+
+// Infusion `i`'s shade `k` (0 shadow, 1 base, 2 light), from its tint (a palette colour) as a
+// reaction's exact colour is made (`look_of`, EXACT).
+vec3 infusion_shade(int i, int k) {
+	vec3 c = beam_infusions[clamp(i, 0, INFUSIONS - 1)].rgb;
+	return k == 0 ? c * 0.55 : (k == 1 ? c : mix(c, vec3(1.0), 0.35));
 }
 
 // Point `n` of the path (clamped to it).
@@ -146,36 +140,24 @@ void vertex() {
 	cut_hi = vec4(last ? B.xy + way * beam_lead : B.xy, hi_n);
 	// Two pixels inside its quad's edge: room for a pulse's bulge and a sparkle past it.
 	bands = clamp(floor(BANDS * beam_swell + 0.25), 1.0, max(half_width - 3.0, 1.0));
-	// Its first infusion: the one on it whose ramp holds its tint (none for a plain beam). The
-	// others it carries are strands.
-	float lead = -1.0;
-	float near = 0.08;
-	float bits_left = 0.0;
-	float count = 0.0;
-	for (int e = 0; e < INFUSIONS; e++) {
-		if (L.plain < 0.5 && bit_set(b, float(e + 1))) {
-			for (int k = 0; k < 3; k++) {
-				float d = distance(core_override.rgb, infusion_shade(e, k));
-				lead = d < near ? float(e) : lead;
-				near = min(near, d);
-			}
-		}
+	// Its first infusion's look kind, handed over, or for a beam shown with its look only the
+	// kind its tint's infusion gives off (a plain beam: none).
+	float shown_kind = L.plain > 0.5 ? 0.0 : (bit_set(b, L_PULL) ? L_PULL : (bit_set(b, L_SPARKS) ? L_SPARKS : (bit_set(b, L_GUSTS) ? L_GUSTS : (bit_set(b, L_EMBERS) ? L_EMBERS : 0.0))));
+	float kind = beam_infusion_count > 0 ? infusion_kind(0) : shown_kind;
+	first_kind = kind;
+	infusion_count = float(min(beam_infusion_count, INFUSIONS));
+	rift = kind == L_PULL ? 1.0 : 0.0;
+	// A tint no palette material holds (mend's green) takes a ramp made from the tint itself.
+	float near = 9.0;
+	for (int i = 0; i < MATERIALS * 3; i++) {
+		near = min(near, distance(core_override.rgb, SHADES[i]));
 	}
-	for (int e = 0; e < INFUSIONS; e++) {
-		bool strand = bit_set(b, float(e + 1)) && float(e) != lead;
-		bits_left += strand ? exp2(float(e)) : 0.0;
-		count += strand ? 1.0 : 0.0;
-	}
-	first_e = lead;
-	strand_bits = bits_left;
-	strand_count = count;
-	rift = lead == E_VOID ? 1.0 : 0.0;
-	// Mend's tint is no material's: its body takes the green ramp.
-	if (lead == E_MEND) {
-		lo = P_SHADOW[2];
-		mid = P_BASE[2];
-		hi = P_LIGHT[2];
-		hot = mix(hi, vec3(1.0), 0.5);
+	if (L.plain < 0.5 && near > 0.08) {
+		vec3 t = core_override.rgb;
+		lo = t * 0.55;
+		mid = t;
+		hi = mix(t, vec3(1.0), 0.35);
+		hot = mix(t, vec3(1.0), 0.7);
 		glow = mix(mid, hi, 0.35);
 	}
 }
@@ -189,15 +171,15 @@ void vertex() {
 float off_at(float along, float len) {
 	float jf = floor(sim_time * 30.0);
 	float off = 0.0;
-	if (first_e == E_LIGHTNING) {
+	if (first_kind == L_SPARKS) {
 		float seg = 6.0;
 		float k = floor(along / seg);
 		float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 41.0) - 0.5) * 6.0;
 		float o1 = (k + 1.0) * seg >= len ? 0.0 : (hash(k + 1.0, jf, 41.0) - 0.5) * 6.0;
 		off = mix(o0, o1, fract(along / seg));
-	} else if (first_e == E_STORM) {
+	} else if (first_kind == L_GUSTS) {
 		off = sin(along * 0.11 - sim_time * 18.0) * 1.6;
-	} else if (first_e == E_FIRE) {
+	} else if (first_kind == L_EMBERS) {
 		off = sin(along * 0.55 - sim_time * 36.0) * 0.7;
 	}
 	return off;
@@ -212,39 +194,49 @@ float pulse_at(float along, float len, float reach) {
 }
 
 // The infusion the pulse nearest `along` carries: the pulses take turns, the first infusion's own
-// (-1: the beam's ramp) and then each strand's, so every infusion runs down it in turn.
+// (-1: the beam's ramp) and then each other's, so every infusion runs down it in turn.
 float pulse_infusion(float along, float len) {
 	float gap = len / float(PULSES);
 	float k = floor((along - sim_time * PULSE_SPEED) / gap + 0.5);
-	float turn = mod(k, strand_count + 1.0);
-	float found = -1.0;
-	float n = 0.0;
-	for (int e = 0; e < INFUSIONS; e++) {
-		bool strand = mod(floor(strand_bits / exp2(float(e)) + 0.001), 2.0) > 0.5;
-		n += strand ? 1.0 : 0.0;
-		found = strand && n == turn ? float(e) : found;
-	}
-	return found;
+	float turn = mod(k, max(infusion_count, 1.0));
+	return turn < 0.5 ? -1.0 : turn;
 }
 
-// Strand `i` of infusion `e` at `along`: how far across it is (x), whether it is in front of the
-// core (y > 0) and how steep it runs (z, pixels across a pixel along), within `reach` pixels.
-vec3 strand_at(int e, float i, float along, float reach) {
-	float phase = 6.2832 * i / max(strand_count, 1.0);
-	if (float(e) == E_LIGHTNING) {
+// How a strand of look kind `kind` winds round the core: its turns a pixel, its speed, its reach
+// as a share of the bands. Embers (fire) flicker, flecks (frost) spiral tight, gusts (storm) sway
+// wide, a dark heart (void) threads, rising motes (mend) drift; sparks (lightning) jag, worked
+// out apart; any other kind winds its own way, picked from its number.
+vec3 strand_style(float kind) {
+	vec3 own = vec3(0.12 + 0.3 * hash_seeded(kind, 1.0, 57.0, 0.0), 3.0 + 9.0 * hash_seeded(kind, 2.0, 57.0, 0.0), 0.8);
+	own = kind == L_EMBERS ? vec3(0.21, 10.0, 0.9) : own;
+	own = kind == L_FLECKS ? vec3(0.42, 5.0, 0.8) : own;
+	own = kind == L_GUSTS ? vec3(0.085, 14.0, 1.15) : own;
+	own = kind == L_PULL ? vec3(0.26, 7.0, 0.75) : own;
+	own = kind == L_SPARKS ? vec3(0.0, 0.0, 0.85) : own;
+	own = kind == L_MOTES ? vec3(0.12, 3.0, 0.7) : own;
+	return own;
+}
+
+// Strand `i` (of `n`, look kind `kind`) at `along`: how far across it is (x), whether it is in
+// front of the core (y > 0) and how steep it runs (z, pixels across a pixel along), within
+// `reach` pixels.
+vec3 strand_at(float kind, float i, float n, float along, float reach) {
+	float phase = 6.2832 * i / max(n, 1.0);
+	vec3 style = strand_style(kind);
+	float r = reach * style.z;
+	if (kind == L_SPARKS) {
 		// Jagged: a fresh zigzag every few frames, in front or behind by turns.
 		float seg = 5.0;
 		float jf = floor(sim_time * 15.0);
 		float k = floor(along / seg);
-		float o0 = (hash(k, jf, 51.0 + i) * 2.0 - 1.0) * reach;
-		float o1 = (hash(k + 1.0, jf, 51.0 + i) * 2.0 - 1.0) * reach;
+		float o0 = (hash(k, jf, 51.0 + i) * 2.0 - 1.0) * r;
+		float o1 = (hash(k + 1.0, jf, 51.0 + i) * 2.0 - 1.0) * r;
 		return vec3(mix(o0, o1, fract(along / seg)), hash(k, jf, 53.0 + i) - 0.5, (o1 - o0) / seg);
 	}
-	float turn = STRAND_TURN[e];
-	float a = along * turn - sim_time * STRAND_SPEED[e] + phase;
-	// Fire's reach flickers.
-	float r = float(e) == E_FIRE ? reach * (0.75 + 0.25 * hash(floor(sim_time * 20.0), floor(along / 9.0), 55.0)) : reach;
-	return vec3(r * sin(a), cos(a), r * turn * cos(a));
+	float a = along * style.x - sim_time * style.y + phase;
+	// Embers' reach flickers.
+	r = kind == L_EMBERS ? r * (0.75 + 0.25 * hash(floor(sim_time * 20.0), floor(along / 9.0), 55.0)) : r;
+	return vec3(r * sin(a), cos(a), r * style.x * cos(a));
 }
 
 // The beam's pixel at `along` pixels from the staff and `across` from its middle, `cheb` the
@@ -278,17 +270,18 @@ vec4 beam_pixel(float along, float across, float cheb, vec2 P, float pulse_e) {
 	// front its base (light outside the white-hot), behind it hidden by the core and dark at the
 	// edges. Void's is a dark thread.
 	float reach = max(edge - 1.0, 1.0);
-	float n = 0.0;
-	for (int e = 0; e < INFUSIONS; e++) {
-		if (mod(floor(strand_bits / exp2(float(e)) + 0.001), 2.0) > 0.5) {
-			vec3 s = strand_at(e, n, along, reach * STRAND_REACH[e]);
-			bool hit = abs(xs - s.x) <= 0.5 + 0.5 * abs(s.z);
-			bool front = s.y > 0.0;
-			vec3 strand_shade = infusion_shade(e, front ? (band < 2.5 ? 2 : 1) : 0);
-			strand_shade = float(e) == E_VOID ? (front ? OUTLINE : VOID_BASE) : strand_shade;
-			inner = hit && x <= edge && (front || band < 2.5) ? strand_shade : inner;
-			n += 1.0;
+	float strands = max(infusion_count - 1.0, 0.0);
+	for (int i = 1; i < INFUSIONS; i++) {
+		if (float(i) >= infusion_count) {
+			break;
 		}
+		float kind = infusion_kind(i);
+		vec3 s = strand_at(kind, float(i - 1), strands, along, reach);
+		bool hit = abs(xs - s.x) <= 0.5 + 0.5 * abs(s.z);
+		bool front = s.y > 0.0;
+		vec3 strand_shade = infusion_shade(i, front ? (band < 2.5 ? 2 : 1) : 0);
+		strand_shade = kind == L_PULL ? (front ? OUTLINE : infusion_shade(i, 1)) : strand_shade;
+		inner = hit && x <= edge && (front || band < 2.5) ? strand_shade : inner;
 	}
 	vec4 colour = vec4(0.0);
 	// As it ends it falls apart into pixels, its edge first, its core last.
@@ -333,7 +326,7 @@ vec3 beam_light(float along, float across, vec2 P, float pulse_e) {
 // The light's strength after the beam's fade, glow, flicker and void's dimming.
 float light_scale() {
 	float k = beam_fade * beam_glow;
-	if (first_e == E_LIGHTNING) {
+	if (first_kind == L_SPARKS) {
 		k *= 0.55 + 0.9 * hash(floor(sim_time * 20.0), 0.0, 21.0);
 	}
 	if (rift > 0.5) {

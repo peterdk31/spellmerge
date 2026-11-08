@@ -235,6 +235,9 @@ class FakeBeams:
 	func beam_tint(_at: int) -> Color:
 		return FROST
 
+	func beam_infusions(_at: int) -> PackedColorArray:
+		return PackedColorArray([Color(FROST.r, FROST.g, FROST.b, 2.0 / 255.0), Color(0.88, 0.35, 0.18, 1.0 / 255.0)])
+
 	func beam_since_hit(_at: int) -> float:
 		return 1.0
 
@@ -276,6 +279,9 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
 	check(is_equal_approx(path[points - 1].z, material.get_shader_parameter(&"beam_length") as float), "each point says how far along it is, the last as far as the beam got")
 	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
+	check_equal((line.material as ShaderMaterial).get_shader_parameter(&"beam_infusion_count"), 2, "its look is handed every infusion on it")
+	var infusions: PackedColorArray = (line.material as ShaderMaterial).get_shader_parameter(&"beam_infusions")
+	check(infusions.size() == 2 and infusions[1].is_equal_approx(Color(0.88, 0.35, 0.18, 1.0 / 255.0)), "in slot order, with their look kinds")
 	var tint: Color = (line.material as ShaderMaterial).get_shader_parameter(&"body_tint")
 	check(is_equal_approx(tint.a, feel.preset.beam_alpha) and tint.a < 1.0, "a little see-through, so crossing beams all show: %f" % tint.a)
 	beams.reach = 50.0

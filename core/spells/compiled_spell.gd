@@ -137,6 +137,10 @@ var fallback: int = FALLBACK_NONE
 var strikes: bool = true
 ## Every infusion on the shot, in slot order; `element_id` is the first.
 var element_ids: Array[StringName] = []
+## How each different infusion on it looks, in slot order (a card twice is once): rgb its `tint`,
+## alpha its `look_layer` / 255. Drawn by a carrier's look that shows every infusion (the beam's
+## strands, `beam_infusions`); the first is `tint`'s.
+var infusion_looks: PackedColorArray = PackedColorArray()
 ## The stacked `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`
 ## (`StaffCompiler.stacked`: three shields give 3 at SHIELD, two heavy cards 16 at HEAVY).
 var behaviours: PackedFloat32Array = PackedFloat32Array()

@@ -225,6 +225,36 @@ func test_a_glowing_pose_lights_the_body_in_its_colour_then_lets_go() -> void:
 	check(not look.is_glowing(sprite) and sprite.material == null, "the sprite is given back after")
 
 
+func test_a_hammer_pose_grows_a_hammer_on_the_head_then_lets_go() -> void:
+	# A slam's `hammer` channel (the owner, 2026-11-08): the staff's body drawn by the hammer
+	# shader, told how far it has turned and where its head sheet's grip and tip are.
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.run(1, false)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.6]
+	_world.run(1, false)
+	check(look.is_hammer(sprite) and look.is_glowing(sprite), "drawn by the hammer shader while the pose turns it, even with no glow")
+	var material := sprite.material as ShaderMaterial
+	check(material.shader == ActorLook.HAMMER_SHADER, "the hammer's shader")
+	check(is_equal_approx(material.get_shader_parameter(&"hammer") as float, 0.6), "as far as the pose says")
+	check_equal(material.get_shader_parameter(&"hammer_frame"), Vector4(StaffLook.FRAME_SIZE, StaffLook.GRIP.x, StaffLook.GRIP.y, body.reach()), "where its head sheet's grip and tip are")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.5, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.0]
+	_world.run(1, false)
+	check(not look.is_hammer(sprite) and look.is_glowing(sprite), "back to the plain glow once the hammer is gone")
+	_world.fake.staff_poses.erase(body.id)
+	_world.run(1, false)
+	check(sprite.material == null, "and the sprite is given back after")
+
+
+func test_only_a_staff_head_sheet_has_a_hammer() -> void:
+	# A look whose sprite is not a staff's head sheet (a creature's) has nowhere to put one.
+	var plain := ActorLook.new()
+	check_equal(plain.hammer_frame(), Vector4.ZERO, "a plain look turns nothing into a hammer")
+	plain.free()
+
+
 func test_a_pose_stretches_the_body_and_shows_its_mood() -> void:
 	var body := _wizard()
 	var look: StaffLook = WizardFixture.look(body)

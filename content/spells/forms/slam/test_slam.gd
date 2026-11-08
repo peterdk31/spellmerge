@@ -161,6 +161,24 @@ func test_its_staff_rises_glowing_drops_and_settles() -> void:
 	arena.free_all()
 
 
+func test_its_staff_turns_into_a_hammer_and_back() -> void:
+	# The card's `hammer` channel (the owner, 2026-11-08): the staff's head grows into a hammer's as it
+	# winds up, is one when it strikes, and goes back as it settles (StaffLook draws it).
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	check_equal(arena.spells.poses().staff_hammer(0), 0.0, "a staff before it slams")
+	arena.cast(0, 0)
+	arena.run(0.1)
+	var growing: float = arena.spells.poses().staff_hammer(0)
+	check(growing > 0.0 and growing < 1.0, "growing in the wind-up: %f" % growing)
+	arena.run(0.16)
+	check(is_equal_approx(arena.spells.poses().staff_hammer(0), 1.0), "a hammer at the impact: %f" % arena.spells.poses().staff_hammer(0))
+	arena.run(0.8)
+	check_equal(arena.spells.poses().staff_hammer(0), 0.0, "a staff again once it settles")
+	arena.free_all()
+
+
 func test_its_staff_lands_its_tip_on_the_impact_short_of_a_wall() -> void:
 	# The card's strike keys `land` the staff (StaffLook puts the drawn tip on the point struck),
 	# and the slam strikes a point (`STRIKES_POINT`): `ray_length` along the locked aim, short of a wall.

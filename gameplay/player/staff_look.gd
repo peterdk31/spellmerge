@@ -163,6 +163,12 @@ func step(delta: float) -> void:
 		queue_redraw()
 
 
+## Where a slam's hammer grows on this staff's head sheet (`ActorLook.hammer_frame`): FRAME_SIZE
+## frames, the grip at GRIP, the tip `Actor.reach` from it.
+func hammer_frame() -> Vector4:
+	return Vector4(FRAME_SIZE, GRIP.x, GRIP.y, actor.reach())
+
+
 ## The staff (button) whose head shows, -1 before the first step.
 func shown_staff() -> int:
 	return _shown

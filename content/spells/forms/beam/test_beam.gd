@@ -3,6 +3,8 @@ extends "res://tests/support/card_rig.gd"
 ##
 ## godot --headless --path . --script res://content/spells/forms/beam/test_beam.gd
 
+const ShaderSource := preload("res://tests/support/shader_source.gd")
+
 
 func test_the_card_is_a_beam() -> void:
 	_check_card(&"beam", 2)
@@ -69,3 +71,20 @@ func test_the_beam_does_not_reach_past_its_length() -> void:
 	_target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
 	_cast_form(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 0, "a target beyond the reach is safe")
+
+
+func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
+	# The beam's look is its own (a white-hot core banded out through its ramp; void a dark rift;
+	# the owner, 2026-11-08), no longer the plain beam's include: Feel sets the plain beam's
+	# uniforms on it (`Feel._on_form_shown`), so it keeps declaring every one, or a setting falls
+	# on nothing and the beam draws stale.
+	var plain: String = ShaderSource.of(load("res://core/projectiles/shot_beam.gdshader") as Shader)
+	var own_look: String = ShaderSource.of(_form(&"beam").look_shader)
+	check(not _form(&"beam").look_shader.code.contains("#include \"res://core/projectiles/shot_beam.gdshaderinc\""), "the beam draws a look of its own")
+	var count: int = 0
+	for line: String in plain.split("\n"):
+		if line.begins_with("uniform "):
+			count += 1
+			check(own_look.contains(line), "the beam's look keeps `%s`" % line)
+	check(count > 10, "the plain beam's uniforms were read (%d)" % count)
+	check(own_look.contains("has_layer(L_PULL) ? 1.0 : 0.0"), "void's beam is a dark rift")

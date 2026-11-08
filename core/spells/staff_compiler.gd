@@ -26,7 +26,7 @@ const TARGET_BEARER: int = -3
 
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
-const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction"]
+const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction", "when its staff is pressed again"]
 
 ## Test only (tests/core/test_card_rules.gd): true keeps every card the waste table would drop on
 ## its carrier (a behaviour, numbers, an infusion, a trigger that "never fires"), so the runtime

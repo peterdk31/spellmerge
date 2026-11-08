@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/triggers/on_recast/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by hand)",
+			"prompt": "A 16x16 icon for the On Recast trigger: a Stone press button seen from the side, with a Fire spark bursting above it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

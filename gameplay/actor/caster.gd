@@ -176,6 +176,10 @@ func step(delta: float) -> void:
 		# then only a new press casts, which switches it off.
 		var pressed: bool = intent.is_pressed(at)
 		var held: bool = intent.is_held(at) and not actor.spells.is_holding(number, at)
+		if pressed and not actor.is_down():
+			# A new press sets off the staff's live `on recast` carriers first, ready or not, so
+			# the carrier this press casts is not one of them.
+			actor.spells.recast_staff(number, at)
 		if pressed or held:
 			_show(at)
 			cast(at)

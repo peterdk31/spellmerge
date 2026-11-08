@@ -180,7 +180,7 @@ func fires_with(event: int, has: Dictionary, infused: bool) -> bool:
 ## could use it. Worked out from its yes/no answers, the same for every carrier, as the runtime
 ## fires each event:
 ## - `on cast` leaves at once, cast by whoever cast the carrier (`by`).
-## - `timer` and `on hurt` fire from where the carrier is while it lasts: its own shot
+## - `timer`, `on hurt` and `on recast` fire from where the carrier is while it lasts: its own shot
 ##   (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`) or what it moves (`MOVES_CASTER`: the
 ##   shot that cast it, else the wizard's body); a line, a strike or a spot is a point.
 ## - `on expire` fires where it ended: a move's end is what it moved; a shot that pulls ends where
@@ -195,7 +195,7 @@ func payload_cast_by(event: int, spell: CompiledSpell, by: int) -> int:
 	match event:
 		TriggerBase.Event.CAST:
 			return by
-		TriggerBase.Event.TIMER, TriggerBase.Event.HURT:
+		TriggerBase.Event.TIMER, TriggerBase.Event.HURT, TriggerBase.Event.RECAST:
 			var bearer: int = _bearer(by)
 			return bearer if bearer != 0 else BY_POINT
 		TriggerBase.Event.EXPIRE:

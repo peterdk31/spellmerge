@@ -26,6 +26,10 @@ enum Event {
 	HURT,
 	## The carrier's hit sets off a reaction; the payload fires from the target (B2, B3).
 	REACTION,
+	## Its staff is pressed again while the carrier lives (a new press, not a held button; ready to
+	## cast or not: `Spells.recast_staff`); the payload fires from where the carrier is then. The
+	## one trigger the player sets off by hand: a detonation, when they choose.
+	RECAST,
 }
 
 ## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
@@ -38,6 +42,7 @@ const NEEDS: Dictionary = {
 	Event.HIT: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
 	Event.TIMER: {"any": CarrierTraits.LASTS},
 	Event.HURT: {"any": CarrierTraits.LASTS},
+	Event.RECAST: {"any": CarrierTraits.LASTS},
 	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
 	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
 	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},

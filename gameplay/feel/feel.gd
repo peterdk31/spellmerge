@@ -243,6 +243,9 @@ const STATUS_RISE: float = 8.0
 const BEAM_WIDTH: float = 16.0
 ## How far a beam's quad reaches past each end, so its flares are whole (the shader's beam_lead).
 const BEAM_LEAD: float = 8.0
+## The most infusions a live beam hands its look (the shader's `beam_infusions[8]`); more are left
+## out of its drawing only.
+const BEAM_INFUSIONS_MOST: int = 8
 const FLASH_Z: int = 50
 ## The flash quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const FLASH_GRID: float = 24.0
@@ -2404,6 +2407,8 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	material.set_shader_parameter(&"beam_end", end)
 	material.set_shader_parameter(&"beam_player", _beam_ramp(ramp))
 	material.set_shader_parameter(&"beam_look", look)
+	# A shown beam carries its tint and look only: its look works its infusion out from them.
+	material.set_shader_parameter(&"beam_infusion_count", 0)
 	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 	var body: Color = Color.WHITE
 	if projectiles != null:
@@ -2570,6 +2575,10 @@ func _draw_live_beams(real_delta: float) -> void:
 		material.set_shader_parameter(&"beam_width", BEAM_WIDTH * grown)
 		material.set_shader_parameter(&"beam_player", _beam_ramp(_ramp_of(caster)))
 		material.set_shader_parameter(&"beam_look", int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0)
+		# Every infusion on it, in slot order, for a look that shows each (the beam card's strands).
+		var infusions: PackedColorArray = beams.call("beam_infusions", i) if beams.has_method("beam_infusions") else PackedColorArray()
+		material.set_shader_parameter(&"beam_infusions", infusions)
+		material.set_shader_parameter(&"beam_infusion_count", mini(infusions.size(), BEAM_INFUSIONS_MOST))
 		material.set_shader_parameter(&"beam_fade", fade)
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)

@@ -3,6 +3,8 @@ extends "res://tests/support/card_rig.gd"
 ##
 ## godot --headless --path . --script res://content/spells/forms/beam/test_beam.gd
 
+const ShaderSource := preload("res://tests/support/shader_source.gd")
+
 
 func test_the_card_is_a_beam() -> void:
 	_check_card(&"beam", 2)
@@ -69,3 +71,45 @@ func test_the_beam_does_not_reach_past_its_length() -> void:
 	_target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
 	_cast_form(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 0, "a target beyond the reach is safe")
+
+
+func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
+	# The beam's look is its own (a white-hot core banded out through its ramp; void a dark rift;
+	# the owner, 2026-11-08), no longer the plain beam's include: Feel sets the plain beam's
+	# uniforms on it (`Feel._on_form_shown`), so it keeps declaring every one, or a setting falls
+	# on nothing and the beam draws stale.
+	var plain: String = ShaderSource.of(load("res://core/projectiles/shot_beam.gdshader") as Shader)
+	var own_look: String = ShaderSource.of(_form(&"beam").look_shader)
+	check(not _form(&"beam").look_shader.code.contains("#include \"res://core/projectiles/shot_beam.gdshaderinc\""), "the beam draws a look of its own")
+	var count: int = 0
+	for line: String in plain.split("\n"):
+		if line.begins_with("uniform "):
+			count += 1
+			check(own_look.contains(line), "the beam's look keeps `%s`" % line)
+	check(count > 10, "the plain beam's uniforms were read (%d)" % count)
+	check(own_look.contains("uniform vec4 beam_infusions[8];") and own_look.contains("uniform int beam_infusion_count"), "it is handed every infusion on the beam")
+	check(own_look.contains("rift = kind == L_PULL ? 1.0 : 0.0;"), "a beam whose first infusion gives off a dark heart (void) is a dark rift")
+
+
+
+func test_it_hands_its_look_every_infusion_on_it_in_slot_order() -> void:
+	# The beam's look shows every infusion from what it is handed (a strand each but the first),
+	# so a new or changed infusion card needs nothing in the beam: its tint and its look kind go
+	# with the beam.
+	var frost: ElementBase = _registry.call("get_resource", &"spells", &"frost")
+	var fire: ElementBase = _registry.call("get_resource", &"spells", &"fire")
+	_cast_with(&"beam", [&"frost", &"fire", &"frost"], 0, Vector2.ZERO)
+	var beams: CarrierBeam = CarrierBeam.of(_spells)
+	var at: int = -1
+	for i in beams.beam_slots():
+		if beams.beam_on(i):
+			at = i
+	check(at >= 0, "the beam is on")
+	if at < 0:
+		return
+	var looks: PackedColorArray = beams.beam_infusions(at)
+	check_equal(looks.size(), 2, "each different infusion once")
+	check_equal(Color(looks[0].r, looks[0].g, looks[0].b), frost.tint, "the first first, in its tint")
+	check_equal(int(roundf(looks[0].a * 255.0)), frost.look_layer, "with its look kind")
+	check_equal(Color(looks[1].r, looks[1].g, looks[1].b), fire.tint, "then the next")
+	check_equal(int(roundf(looks[1].a * 255.0)), fire.look_layer, "with its look kind")

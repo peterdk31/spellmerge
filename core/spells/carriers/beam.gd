@@ -1075,6 +1075,12 @@ func beam_tint(at: int) -> Color:
 	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
 
 
+## How each different infusion on live beam `at` looks, in slot order (`CompiledSpell.infusion_looks`:
+## rgb its tint, alpha its look kind / 255; empty for a plain beam), so its look shows every one.
+func beam_infusions(at: int) -> PackedColorArray:
+	return _bm_spell[at].infusion_looks if _bm_spell[at] != null else PackedColorArray()
+
+
 ## The id of the card live beam `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws it
 ## by its card's look (`Spells.look_of`).
 func beam_form(at: int) -> StringName:

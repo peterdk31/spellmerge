@@ -5094,11 +5094,12 @@ func _batch_of(slot: int) -> int:
 	return BATCH_BOLT
 
 
-## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE, KIND_ORBIT or KIND_STONE): its motion's,
-## or the still body its card asked for (`set_form`) when it is still.
+## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE, KIND_ORBIT, KIND_STONE or KIND_POOL): its
+## motion's, or the still body its card asked for (`set_form`) when it is still. The native kernel's
+## `draw_shots` writes the same for a still shot that is not solid (a pool or a rune).
 func _kind_of(slot: int) -> int:
 	if _motion[slot] == MOTION_STILL:
-		return KIND_STONE if _body[slot] == KIND_STONE else KIND_RUNE
+		return _body[slot] if _body[slot] == KIND_STONE or _body[slot] == KIND_POOL else KIND_RUNE
 	if _motion[slot] == MOTION_ORBIT:
 		return KIND_ORBIT
 	return KIND_BOLT

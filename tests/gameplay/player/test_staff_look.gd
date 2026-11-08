@@ -265,6 +265,23 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 	check(not hammer.visible, "gone after")
 
 
+func test_the_hammer_heads_bottom_is_what_strikes() -> void:
+	# The owner, 2026-11-08: "the bottom of the hammer head should hit the ground". The point a
+	# landing puts on its strike is the tip, or while the staff is a hammer the head's lowest corner
+	# on the screen: below the tip, out along the head's length (StaffLook.HAMMER_*).
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 0.0, 1.0]
+	_world.run(1, false)
+	check(look.contact_position().is_equal_approx(look.tip_position()), "a staff strikes with its tip")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	var below: Vector2 = look.contact_position() - look.tip_position()
+	check(is_equal_approx(below.y, StaffLook.HAMMER_HALF_LONG), "a hammer with its head's bottom, half its length below the tip: %s" % below)
+	check(is_equal_approx(below.x, floorf(StaffLook.HAMMER_HALF_THICK + 0.5) - StaffLook.HAMMER_BACK), "level with the head's middle (whole pixels), its two faces as low: %s" % below)
+
+
 func test_a_bigger_spell_draws_a_bigger_hammer() -> void:
 	# A bigger card grows the slam's spell (its radius_mult), and the hammer with it, up to
 	# HAMMER_SIZE_MOST; the look knows nothing of the slam's own numbers.

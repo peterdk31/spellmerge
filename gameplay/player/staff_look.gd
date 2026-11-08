@@ -90,6 +90,12 @@ const OUTLINE_COLOR: Color = Color("14121f")
 const HAMMER_SHADER: Shader = preload("res://core/projectiles/staff_hammer.gdshader")
 const HAMMER_EXTENT: float = 48.0
 const HAMMER_SIZE_MOST: float = 2.2
+## The hammer's head at size 1 (its shape is here, handed to its shader, so where it lands and what
+## is drawn are one): half as thick along the staff and half as long across it, and how far back
+## from the tip its back face is, in pixels.
+const HAMMER_HALF_THICK: float = 5.5
+const HAMMER_HALF_LONG: float = 10.0
+const HAMMER_BACK: float = 6.0
 ## How far toward white the ghosts go from the ramp's light shade.
 const GHOST_LIGHT: float = 0.4
 
@@ -103,8 +109,11 @@ var _face: Face = null
 var _downed: Downed = null
 ## The shadow, drawn under the sprite.
 var _shadow: Node2D = null
-## The hammer, drawn over the sprite (made at setup; shown while its pose channel is above 0).
+## The hammer, drawn over the sprite (made at setup; shown while its pose channel is above 0), and
+## how far the staff was a hammer and how big when last drawn (x, y: what `contact_position` reads,
+## as `tip_position` reads the sprite as last stepped).
 var _hammer: Node2D = null
+var _drawn_hammer: Vector2 = Vector2(0.0, 1.0)
 ## The staff whose head and personality show (-1 before the first step), and the time hovered.
 var _shown: int = -1
 var _time: float = 0.0
@@ -153,6 +162,9 @@ func setup(owner_actor: Actor) -> void:
 		_hammer.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		var material := ShaderMaterial.new()
 		material.shader = HAMMER_SHADER
+		material.set_shader_parameter(&"hammer_half_thick", HAMMER_HALF_THICK)
+		material.set_shader_parameter(&"hammer_half_long", HAMMER_HALF_LONG)
+		material.set_shader_parameter(&"hammer_back", HAMMER_BACK)
 		_hammer.material = material
 		_hammer.draw.connect(_draw_hammer)
 		_hammer.visible = false
@@ -311,17 +323,64 @@ func _tip_from_grip(column: int) -> Vector2:
 	return Vector2.RIGHT.rotated(column * TAU / DIRECTIONS) * actor.reach()
 
 
-## The body at `at`, moved its animation's `land` of the way to where the drawn tip (`_tip_from_grip`,
-## as stretched) lies on the point its carrier strikes (`Spells.poses().staff_land_point`, from the
-## hand): a slam's staff lands on its impact whichever way it faces. `at` as it is while its carrier
-## strikes no point.
+## The body at `at`, moved its animation's `land` of the way to where the drawn point that strikes
+## (`_contact_from_grip`: the tip, or the hammer head's lowest corner) lies on the point its carrier
+## strikes (`Spells.poses().staff_land_point`, from the hand): a slam's hammer comes down on its impact
+## whichever way it faces. `at` as it is while its carrier strikes no point.
 func _landed(at: Vector2) -> Vector2:
 	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
 	var land: float = poses.staff_land(actor.id) if poses != null else 0.0
 	if land <= 0.0:
 		return at
-	var onto: Vector2 = actor.hand_offset + poses.staff_land_point(actor.id) - _tip_from_grip(direction()) * pose_scale()
+	_drawn_hammer = Vector2(_hammer_amount(poses), _hammer_size(poses))
+	var onto: Vector2 = actor.hand_offset + poses.staff_land_point(actor.id) - _contact_from_grip(_tip_from_grip(direction()) * pose_scale(), _drawn_hammer)
 	return at.lerp(onto, land).round()
+
+
+## Where the drawn point that strikes is, in the world: the tip (`tip_position`), or while the
+## staff is a hammer the hammer head's lowest corner on the screen (its bottom, which hits the
+## ground). What an animation's `land` puts on the point its carrier strikes, and what the
+## alignment checks measure (tests/gameplay/player/test_staff_alignment.gd).
+func contact_position() -> Vector2:
+	if _sprite == null:
+		return tip_position()
+	var tip: Vector2 = _tip_from_grip(_sprite.frame_coords.x) * _sprite.scale
+	return tip_position() + (_contact_from_grip(tip, _drawn_hammer) - tip).rotated(_sprite.global_rotation)
+
+
+## The drawn point that strikes from the grip, for the drawn tip `tip` (from the grip, as stretched)
+## and the hammer `hammer` (x how far the staff is one, y its size): the tip, moved toward the
+## hammer head's lowest corner as far as the staff is a hammer.
+func _contact_from_grip(tip: Vector2, hammer: Vector2) -> Vector2:
+	if hammer.x <= 0.0:
+		return tip
+	return tip + _hammer_bottom(tip, hammer.y) * hammer.x
+
+
+## From the drawn tip `tip` (from the grip) to the lowest corner on the screen of a whole hammer head
+## of size `size` on it (its shape as its shader draws it, at rest).
+func _hammer_bottom(tip: Vector2, size: float) -> Vector2:
+	var dir: Vector2 = tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT
+	var across: Vector2 = Vector2(-dir.y, dir.x)
+	var thick: float = floorf(HAMMER_HALF_THICK * size + 0.5)
+	var long: float = floorf(HAMMER_HALF_LONG * size + 0.5)
+	var down: Vector2 = _hammer_down(dir)
+	return dir * (thick - HAMMER_BACK) + across * down.x * long + dir * down.y * thick
+
+
+## Which corner of the head is lowest on the screen, for a staff pointing along `dir`: x the end of
+## its length (1 along its `across`, -1 the other), y the face along the staff (1 the tip's, -1 the
+## back, 0 for a staff lying flat across the screen, whose two faces are as low).
+static func _hammer_down(dir: Vector2) -> Vector2:
+	var across: Vector2 = Vector2(-dir.y, dir.x)
+	var along: float = 0.0 if absf(dir.y) < 0.05 else signf(dir.y)
+	return Vector2(1.0 if across.y >= 0.0 else -1.0, along)
+
+
+## How far (0 to 1) the staff is a hammer now: its animation's `hammer` channel, none while it plays
+## none (or it is down).
+func _hammer_amount(poses: StaffPoses) -> float:
+	return poses.staff_hammer(actor.id) if poses != null and not pose_dir().is_zero_approx() else 0.0
 
 
 ## The hammer on the staff while its animation turns its head into one: on the drawn tip (the
@@ -331,7 +390,8 @@ func _place_hammer() -> void:
 	if _hammer == null:
 		return
 	var poses: StaffPoses = actor.spells.poses() if actor.spells != null else null
-	var amount: float = poses.staff_hammer(actor.id) if poses != null and not pose_dir().is_zero_approx() else 0.0
+	var amount: float = _hammer_amount(poses)
+	_drawn_hammer = Vector2(amount, _hammer_size(poses))
 	_hammer.visible = amount > 0.0
 	if amount <= 0.0:
 		return
@@ -348,7 +408,10 @@ func _place_hammer() -> void:
 	# Its head smushes while the staff is squashed as it lands (a negative stretch with `land`: a
 	# slam's landing), not by a crouch while it is raised.
 	material.set_shader_parameter(&"hammer_squash", maxf(-poses.staff_stretch(actor.id), 0.0) * poses.staff_land(actor.id))
-	material.set_shader_parameter(&"hammer_dir", tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT)
+	var dir: Vector2 = tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT
+	material.set_shader_parameter(&"hammer_dir", dir)
+	# Its smush keeps its lowest corner, the one that hit the ground, where it is.
+	material.set_shader_parameter(&"hammer_down", _hammer_down(dir))
 	material.set_shader_parameter(&"hammer_reach", tip.length())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))

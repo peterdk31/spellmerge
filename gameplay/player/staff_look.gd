@@ -324,9 +324,9 @@ func _landed(at: Vector2) -> Vector2:
 	return at.lerp(onto, land).round()
 
 
-## The hammer on the staff while its animation turns its head into one: where the sprite is (as
-## stretched and leaned), pointing as the drawn column does, as far turned and as big as the
-## animation's spell says, in its glow's colour.
+## The hammer on the staff while its animation turns its head into one: on the drawn tip (the
+## column's, as the sprite is stretched and leaned), as far turned and as big as the animation's
+## spell says, smushed while the staff is squashed, in its glow's colour.
 func _place_hammer() -> void:
 	if _hammer == null:
 		return
@@ -335,18 +335,21 @@ func _place_hammer() -> void:
 	_hammer.visible = amount > 0.0
 	if amount <= 0.0:
 		return
+	# On the drawn tip as the staff is stretched, squashed and leaned, but never itself scaled: its
+	# head smushes by its own rule (`hammer_squash`), not the sprite's squash along a screen axis.
 	_hammer.position = _sprite.position
-	_hammer.scale = _sprite.scale
 	_hammer.rotation = _sprite.rotation
+	var tip: Vector2 = _tip_from_grip(direction()) * _sprite.scale
 	var tint: Color = poses.staff_glow_tint(actor.id)
 	var colour: Color = light_color() if tint.is_equal_approx(Color.WHITE) else Color(tint.r, tint.g, tint.b, 1.0)
 	var material := _hammer.material as ShaderMaterial
 	material.set_shader_parameter(&"hammer", amount)
 	material.set_shader_parameter(&"hammer_size", _hammer_size(poses))
-	# Its head smushes while the staff is squashed (a negative stretch: a slam's landing).
-	material.set_shader_parameter(&"hammer_squash", maxf(-poses.staff_stretch(actor.id), 0.0))
-	material.set_shader_parameter(&"hammer_dir", Vector2.RIGHT.rotated(direction() * TAU / DIRECTIONS))
-	material.set_shader_parameter(&"hammer_reach", actor.reach())
+	# Its head smushes while the staff is squashed as it lands (a negative stretch with `land`: a
+	# slam's landing), not by a crouch while it is raised.
+	material.set_shader_parameter(&"hammer_squash", maxf(-poses.staff_stretch(actor.id), 0.0) * poses.staff_land(actor.id))
+	material.set_shader_parameter(&"hammer_dir", tip.normalized() if not tip.is_zero_approx() else Vector2.RIGHT)
+	material.set_shader_parameter(&"hammer_reach", tip.length())
 	material.set_shader_parameter(&"glow_color", colour)
 	material.set_shader_parameter(&"hammer_glow", poses.staff_glow(actor.id))
 

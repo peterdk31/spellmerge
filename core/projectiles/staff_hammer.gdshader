@@ -11,9 +11,9 @@ render_mode blend_premul_alpha;
 // glow's colour, with that light round it. As `hammer` rises from 0 to 1 its pixels come in from
 // the middle out, white-hot at first; as it falls they go back. `hammer_size` scales it (1 a plain
 // slam's; as many times as its cards grew the spell, a bigger card's 1.6). As it lands its head
-// smushes (`hammer_squash`, 0 to 0.5: the staff's squash): its striking face stays where it struck,
-// the head shortens back toward the staff and widens across, and a lip of the face spreads out past
-// its sides; then it springs back. Blending is premultiplied: its pixels are
+// smushes (`hammer_squash`, 0 to 0.5: the staff's squash), as a hammer's head does when its end
+// strikes: it shortens along its length (its ends driven in toward the staff) and bulges thicker
+// along the staff, and a lip spreads at each end; then it springs back. Blending is premultiplied: its pixels are
 // opaque, its light added. Warmed as a rect (RECT) before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
@@ -23,10 +23,10 @@ render_mode blend_premul_alpha;
 const float HALF_THICK = 5.5;
 const float HALF_LONG = 10.0;
 const float BACK = 6.0;
-// How the head smushes at a squash of 1: the share it shortens by and widens by, and the pixels its
-// face's lip spreads past each side (at size 1).
-const float SQUASH_SHORT = 1.6;
-const float SQUASH_WIDE = 1.2;
+// How the head smushes at a squash of 1: the share its length shortens by and its thickness grows
+// by, and the pixels the lip at each end spreads past its sides (at size 1).
+const float SQUASH_SHORT = 1.2;
+const float SQUASH_WIDE = 1.6;
 const float SQUASH_LIP = 8.0;
 
 // How far the head has turned into the hammer's (0 the staff, 1 the hammer), how big it is, the way
@@ -55,16 +55,16 @@ void fragment() {
 	float grow = clamp(hammer * 1.3, 0.0, 1.0);
 	float squash = clamp(hammer_squash, 0.0, 0.5);
 	float ht_rest = floor(HALF_THICK * hammer_size + 0.5) * max(grow, 0.3);
-	float ht = floor(ht_rest * max(1.0 - SQUASH_SHORT * squash, 0.4) + 0.5);
-	float hl = floor(HALF_LONG * hammer_size * (1.0 + SQUASH_WIDE * squash) + 0.5) * grow;
-	// Its striking face stays where it is at rest (on what it struck); a squash shortens it back.
-	vec2 h = dir * (hammer_reach - BACK + 2.0 * ht_rest - ht);
+	// Squashed, it is shorter along its length and thicker along the staff, round its middle.
+	float ht = floor(ht_rest * (1.0 + SQUASH_WIDE * squash) + 0.5);
+	float hl = floor(HALF_LONG * hammer_size * max(1.0 - SQUASH_SHORT * squash, 0.4) + 0.5) * grow;
+	vec2 h = dir * (hammer_reach - BACK + ht_rest);
 	vec2 d = p - h;
 	float along = dot(d, dir);
 	float across = dot(d, across_dir);
-	// The face's lip, spread past the sides while it is squashed.
+	// The lips at its ends, spread past its sides while it is squashed (its ends driven in).
 	float lip = floor(SQUASH_LIP * hammer_size * squash);
-	hl += along > ht - 1.5 - floor(lip * 0.5) ? lip : 0.0;
+	ht += abs(across) > hl - 1.5 - floor(lip * 0.5) ? lip : 0.0;
 	vec2 box = vec2(abs(along) - ht, abs(across) - hl);
 	// Its light reaches the same few pixels at any size, so a big one stays inside its square.
 	float near = falloff(length(max(box, vec2(0.0))), 6.0) * hammer;

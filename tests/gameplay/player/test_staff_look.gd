@@ -245,11 +245,17 @@ func test_a_hammer_pose_grows_a_hammer_on_the_staff_then_lets_go() -> void:
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_size") as float, 1.0), "a slam no card grew draws it at size 1")
 	check((material.get_shader_parameter(&"hammer_dir") as Vector2).is_equal_approx(Vector2.RIGHT), "pointing as the staff's column does")
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, body.reach()), "over its tip")
+	check_equal(hammer.scale, Vector2.ONE, "never scaled itself: its head smushes by its own rule")
 	check_equal(hammer.position, sprite.position, "where the staff is")
 	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "its head whole while the staff is not squashed")
-	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.25, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.1, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
+	_world.run(1, false)
+	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "not by a crouch while it is raised (not landed)")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, -0.25, &"", Color.WHITE, 1.0, Vector2(20.0, 0.0), 1.0, 1.0]
 	_world.run(1, false)
 	check(is_equal_approx(material.get_shader_parameter(&"hammer_squash") as float, 0.25), "and smushed as the staff is squashed, landing")
+	var drawn: Vector2 = sprite.global_transform * (Vector2.RIGHT * body.reach())
+	check(is_equal_approx(material.get_shader_parameter(&"hammer_reach") as float, (drawn - sprite.global_position).length()), "still on the drawn tip of the squashed staff")
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.3, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 1.0]
 	_world.run(1, false)
 	check_equal(material.get_shader_parameter(&"hammer_squash"), 0.0, "not by a stretch (the smear of its fall)")

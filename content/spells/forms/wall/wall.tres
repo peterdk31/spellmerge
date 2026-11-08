@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="FormBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
 [ext_resource type="Texture2D" path="res://content/spells/forms/wall/icon.svg" id="2_icon"]
+[ext_resource type="Shader" path="res://content/spells/forms/wall/stone.gdshader" id="3_shader"]
 
 [resource]
 script = ExtResource("1_base")
@@ -24,4 +25,4 @@ ray_length = 28.0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "push": 4, "stretch": -0.3, "ease": "out"}, {"phase": "after", "at": 0.3}])
 cast_cue = &"cast_wall"
 impact_cue = &"impact_ring"
-shot_body = &"stone"
+shot_shader = ExtResource("3_shader")

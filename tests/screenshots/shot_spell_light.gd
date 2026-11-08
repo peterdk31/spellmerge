@@ -9,6 +9,8 @@ extends "res://tests/support/screenshot.gd"
 ## pillars; the arena's torches light too (P3b). The owner's picks of a room's ambient and of the
 ## light's steps are drawn by shot_spell_light_rooms.gd.
 
+## The rune card's own shot shader, which draws its still shots.
+const RUNE: Shader = preload("res://content/spells/forms/rune/rune.gdshader")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ROOM := preload("res://content/rooms/crypt/arena_01.tscn")
@@ -47,6 +49,7 @@ func take() -> void:
 	_bolt(0, Vector2(320.0, 300.0), BOLT_RADIUS * 2.0, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer")), int(BIGGER.get("look_layer"))]))
 	_bolt(enemy, Vector2(560.0, 300.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
 	var rune: int = _shots.call("spawn", 0, Vector2(80.0, 300.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
+	_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
 	_dress(rune, FIRE.get("tint") as Color, PackedInt32Array([int(FIRE.get("look_layer"))]))
 	if int(_shots.get("drawn")) < 0:
 		fail("no shots")

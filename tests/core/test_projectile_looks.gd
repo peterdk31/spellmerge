@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt, rune, orbit)
 ## with its ramp (actors G3a: its caster's `Actors.ramp_of`), its look layers and its core colour in the instance data that
-## shot shaders read (`shot_head.gdshader`, `shot_rune.gdshader`), at a size that follows its hit radius in whole pixels; cards
+## shot shaders read (`shot_head.gdshader`, the still shots' shaders), at a size that follows its hit radius in whole pixels; cards
 ## give the layers (`look_layer`), the compiler combines every infusion's and modifier's look
 ## into one set, and the runtime hands it to the manager. Stepped and drawn by hand.
 
@@ -135,8 +135,8 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	mgr.set_anchor(2, Vector2(200.0, 200.0))
 	mgr.spawn_orbit(2, 20.0, 0.0, 1.0, 1.0)
 	mgr.update_draw(1.0)
-	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
-	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its ramp, its zoom (radius 14) and its layers")
+	check_equal(kind_at(mgr._still_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
+	check_equal(look_at(mgr._still_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its ramp, its zoom (radius 14) and its layers")
 	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight")
 	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.HEAD_LIVE | ManagerScript.HEAD_ORBIT, "flagged an orbit shot")
 	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "in its caster's ramp")
@@ -234,8 +234,8 @@ func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
 	check_equal(floori(uvs[0].y), ManagerScript.HEAD_Q_LIGHT, "the head's light first (void's dark heart)")
 	check_equal(floori(uvs[(quads - 1) * per].y), ManagerScript.HEAD_Q_CORE, "the core last, on top")
-	for batch in ManagerScript.BATCHES:
-		if ManagerScript.BATCH_MESH[batch] >= 0:
+	for batch in mgr.batch_count():
+		if ManagerScript.batch_mesh(batch) >= 0:
 			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_head.gdshader")
 	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
@@ -259,17 +259,17 @@ func code_at(node: MultiMeshInstance2D, i: int) -> float:
 func test_a_new_rune_traces_itself_onto_the_floor() -> void:
 	mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 5.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.update_draw(1.0)
-	check(absf(code_at(mgr._rune_node, 0) - ManagerScript.TRACE_FROM) < 0.001, "a rune just cast is not traced yet")
+	check(absf(code_at(mgr._still_node, 0) - ManagerScript.TRACE_FROM) < 0.001, "a rune just cast is not traced yet")
 	for i in 6:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
 	var half: float = ManagerScript.TRACE_FROM + ManagerScript.TRACE_SPAN * 0.1 / ManagerScript.RUNE_TRACE
-	check(absf(code_at(mgr._rune_node, 0) - half) < 0.001, "a tenth of a second later, part of it is")
-	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "still a rune")
+	check(absf(code_at(mgr._still_node, 0) - half) < 0.001, "a tenth of a second later, part of it is")
+	check_equal(kind_at(mgr._still_node, 0), ManagerScript.KIND_RUNE, "still a rune")
 	for i in 12:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
-	check_equal(code_at(mgr._rune_node, 0), 0.0, "past RUNE_TRACE it is whole")
+	check_equal(code_at(mgr._still_node, 0), 0.0, "past RUNE_TRACE it is whole")
 	check_equal(ManagerScript.trace_code(-1.0), 0.0, "a time out of order draws it whole")
 
 
@@ -369,7 +369,7 @@ func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
 
 
 func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
-	for path: String in ["res://core/projectiles/shot_rune.gdshader", "res://core/projectiles/shot_orbit.gdshader"]:
+	for path: String in ["res://core/projectiles/shot_still.gdshader", "res://core/projectiles/shot_orbit.gdshader", "res://content/spells/forms/rune/rune.gdshader", "res://content/spells/forms/wall/stone.gdshader", "res://content/spells/forms/pool/pool.gdshader"]:
 		var shader: Shader = load(path)
 		check(shader.code.contains("min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"), "%s asks 4 + 2 per kind" % path.get_file())
 	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
@@ -391,7 +391,7 @@ func test_at_the_cap_every_shot_thins_alike() -> void:
 	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
 	mgr.update_draw(1.0)
 	check(is_equal_approx(mgr.particle_share, 100.0 / 120.0), "the particles thin, every shot alike")
-	check(is_equal_approx(_shader_share(mgr._rune_node, &"particle_share"), mgr.particle_share), "for every batch")
+	check(is_equal_approx(_shader_share(mgr._still_node, &"particle_share"), mgr.particle_share), "for every batch")
 
 
 ## Lightning's shots are drawn with the others of their ramp and body (they had batches of their
@@ -410,7 +410,7 @@ func test_lightning_shots_are_drawn_with_the_others() -> void:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
 	var counts: Array[int] = []
-	for batch in ManagerScript.BATCHES:
+	for batch in mgr.batch_count():
 		counts.append(mgr._nodes[batch].multimesh.visible_instance_count)
 	check_equal(counts[ManagerScript.BATCH_BOLT], 2, "the plain and lightning's bolts in the bolts' batch")
 	check_equal(counts[ManagerScript.BATCH_ENEMY], 1, "an enemy's lightning in the enemy batch")

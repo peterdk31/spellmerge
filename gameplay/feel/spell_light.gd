@@ -126,12 +126,10 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	add_child(viewport)
 	_quad = QuadMesh.new()
 	_quad.size = Vector2.ONE
-	for batch in ProjectileManagerScript.BATCHES:
-		var rows: int = ROWS_RUNE if ProjectileManagerScript.BATCH_MESH[batch] < 0 else ROWS_SHOT
-		var node: MultiMeshInstance2D = _light_batch(rows)
-		batches.append(node)
-		if _projectiles != null:
-			_projectiles.mirror_batch(batch, node.multimesh)
+	_add_batches(_projectiles.batch_count() if _projectiles != null else ProjectileManagerScript.BATCH_BODY_FIRST)
+	if _projectiles != null:
+		# A card body numbered later (`register_body`) brings a pair of batches: they get lights too.
+		_projectiles.batches_grown.connect(_add_batches)
 	for kind in [FLASHES_FLARE, FLASHES_BLAST, FLASHES_ARC]:
 		var node: MultiMeshInstance2D = _light_batch(ROWS_FLASH)
 		var material: ShaderMaterial = node.material as ShaderMaterial
@@ -226,10 +224,22 @@ func _show_painted_node(node: Node, shown: bool) -> void:
 		item.visible = shown
 
 
+## A light batch mirroring each projectile batch up to `count` that has none yet.
+func _add_batches(count: int) -> void:
+	for batch in range(batches.size(), count):
+		var rows: int = ROWS_RUNE if ProjectileManagerScript.batch_mesh(batch) < 0 else ROWS_SHOT
+		var node: MultiMeshInstance2D = _light_batch(rows)
+		batches.append(node)
+		if _projectiles != null:
+			_projectiles.mirror_batch(batch, node.multimesh)
+
+
 ## Stop mirroring the batches (before this node is freed: the setting turned off).
 func release() -> void:
 	if _projectiles == null:
 		return
+	if _projectiles.batches_grown.is_connected(_add_batches):
+		_projectiles.batches_grown.disconnect(_add_batches)
 	for batch in batches.size():
 		if _projectiles.batch_mirror(batch) == batches[batch].multimesh:
 			_projectiles.mirror_batch(batch, null)

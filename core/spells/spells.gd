@@ -543,6 +543,20 @@ func _ready() -> void:
 	SimArea.join(self, &"Spells").steps(&"Spells", step).renewed_by(begin_run).takes_rules(take_rules)
 	if projectiles == null:
 		bind(get_node_or_null("/root/Projectiles") as ProjectilesScript, get_node_or_null("/root/Events") as EventsScript)
+	register_bodies()
+
+
+## Hands every carrier card's own shot shader (`FormBase.shot_shader`) to the projectile manager
+## now (`register_body`), so each has its batches and is warmed before the first room, not first
+## drawn in the middle of one. A launch numbers any it did not know too.
+func register_bodies() -> void:
+	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
+	if projectiles == null or source == null or not source.has_method(&"get_all"):
+		return
+	for card: Resource in source.call(&"get_all", &"spells"):
+		var form := card as FormBase
+		if form != null and form.shot_shader != null:
+			projectiles.register_body(form.shot_shader)
 
 
 ## Connect to a projectile manager and an event bus (either may be null, then casting is
@@ -1837,7 +1851,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 ## shot that cast it (no shot ends while a launch is set up), its trigger rows. Returns how many
 ## shots there were.
 func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
-	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, spell.body)
+	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, projectiles.register_body(spell.shot_shader))
 	if _rec_seq.size() < projectiles.get_cap():
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null

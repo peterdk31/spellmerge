@@ -12,7 +12,7 @@ render_mode blend_add, world_vertex_coords;
 //   ROWS_SHOT   the projectile manager's shot rows (shot_head.gdshader): MODEL_MATRIX[1].y the
 //               flags (HF_*), MODEL_MATRIX[3].xy the head. Only a live shot's head gives light, not
 //               a dash. Every shot, the enemies' too (one rule).
-//   ROWS_RUNE   its rune rows (shot_rune.gdshader): a real transform, a square quad of the
+//   ROWS_RUNE   its still shots' rows (one quad each: a card's shot shader, or shot_still.gdshader): a real transform, a square quad of the
 //               rune's size round its centre.
 //   ROWS_FLASH  Feel's flash rows (shot_flash, shot_blast, shot_arc): a real transform (its
 //               square, or an arc's length and width) round its centre, its second unused float

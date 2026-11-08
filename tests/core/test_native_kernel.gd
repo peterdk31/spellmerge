@@ -155,6 +155,9 @@ func _test_both_step_alike(threads: int) -> void:
 		root.add_child(mgr)
 		mgr.set_cap(1500)
 		mgr.set_bounds(Rect2(Vector2.ZERO, ROOM))
+		# Every card body's pair of batches (`register_body`): the still shots below take them in turn.
+		for shader in _body_shaders():
+			mgr.register_body(shader)
 		# The births are handed out (as Feel's motes take them), from the same dice on both sides:
 		# with the tails off the drawing lays the tails as births (S5 step 4), compared to the bit.
 		mgr.spark_motes = true
@@ -181,7 +184,7 @@ func _test_both_step_alike(threads: int) -> void:
 	_check(running == threads or running == 1, "the native kernel runs on %d threads (%d)" % [threads, running])
 	if running < threads:
 		print("NOTE: this build of the native module has no threads; %d asked, 1 runs" % threads)
-	_batch_seen.resize(ManagerScript.BATCHES)
+	_batch_seen.resize(_mgrs[1].batch_count())
 	_batch_seen.fill(0)
 	_tails_laid = 0
 	_tails_capped = false
@@ -219,11 +222,25 @@ func _test_both_step_alike(threads: int) -> void:
 		if _failures.size() > 8:
 			return
 	_check(_mgrs[1].get_count() > 400, "the scene keeps hundreds of shots (%d)" % _mgrs[1].get_count())
-	for batch in ManagerScript.BATCHES:
+	for batch in _mgrs[1].batch_count():
 		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 
+
+
+## The card bodies of the scene: plain canvas-item shaders, made once.
+const SCENE_BODIES: int = 6
+static var _bodies: Array[Shader] = []
+
+
+static func _body_shaders() -> Array[Shader]:
+	if _bodies.is_empty():
+		for n in SCENE_BODIES:
+			var shader := Shader.new()
+			shader.code = "shader_type canvas_item;\n// body %d\n" % n
+			_bodies.append(shader)
+	return _bodies
 
 
 ## A hit that grows targets mid-pass: the shots after it in the pass must see each target's cell as
@@ -317,6 +334,9 @@ func _drive(side: int, step: int) -> void:
 		var slot: int = -1
 		if kind == 0:
 			slot = m.spawn(caster, from + Vector2(rng.randf_range(-60, 60), rng.randf_range(-200, 0)), Vector2.ZERO, rng.randf_range(0.5, 2.0), rng.randf_range(4.0, 14.0), ManagerScript.ACTOR_LAYERS, 2, 1, ManagerScript.MOTION_STILL)
+			if slot >= 0:
+				# A rune, or one of the card bodies (their batches, the enemy ramp's too).
+				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		elif kind == 1:
 			slot = m.spawn_orbit(caster if caster != _imp else 0, rng.randf_range(20.0, 60.0), rng.randf() * TAU, rng.randf_range(-4.0, 4.0), rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1)
 		else:
@@ -423,7 +443,7 @@ func _compare_draw(step: int) -> void:
 	_check(a.drawn == b.drawn and a.drawn_enemy == b.drawn_enemy,
 			"step %d: the same drawn counts (%d %d / %d %d)" % [step, a.drawn, a.drawn_enemy, b.drawn, b.drawn_enemy])
 	_check(a.particle_demand == b.particle_demand, "step %d: the same demand" % step)
-	for batch in ManagerScript.BATCHES:
+	for batch in b.batch_count():
 		var count_a: int = a._nodes[batch].multimesh.visible_instance_count
 		var count_b: int = b._nodes[batch].multimesh.visible_instance_count
 		_check(count_a == count_b, "step %d batch %d: the same instances (%d / %d)" % [step, batch, count_a, count_b])

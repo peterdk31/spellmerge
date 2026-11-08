@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## Pools (`KIND_POOL`, the pool carrier's puddle; `shot_rune.gdshader`): one row per infusion
+## Pools (the pool card's own `pool.gdshader`, its puddle): one row per infusion
 ## colour (fire, frost, mend, void, plain), one column per age, from spreading out to standing
 ## (`pools`, drawn twice as big), and one standing fire pool close up (`pools_close`).
 
@@ -9,6 +9,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## The ages shown, in frames of 1/60 s.
 const AGES: Array[int] = [1, 6, 14, 30, 60]
 const COLUMN := 128
+const POOL: Shader = preload("res://content/spells/forms/pool/pool.gdshader")
 const TINTS: Array[Color] = [Color("e0592f"), Color("4fd6dc"), Color("8fd46a"), Color("e08ad8"), Color(0, 0, 0, 0)]
 
 
@@ -35,7 +36,7 @@ func take() -> void:
 			var slot: int = projectiles.call("spawn", wizard, at, Vector2.ZERO, 5.0, 16.0, ProjectilesScript.LAYER_ENEMY, 0, tag, ProjectilesScript.MOTION_STILL)
 			if TINTS[r].a > 0.0:
 				projectiles.call("set_core", slot, TINTS[r])
-			projectiles.call("set_form", slot, &"pool", ProjectilesScript.KIND_POOL)
+			projectiles.call("set_form", slot, &"pool", projectiles.call("register_body", POOL))
 		for i in AGES[column]:
 			await process_frame
 		var image: Image = await grab()

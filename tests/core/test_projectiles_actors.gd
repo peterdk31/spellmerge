@@ -297,11 +297,11 @@ func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
 	var node: MultiMeshInstance2D = mgr._enemy_node
 	check(node.material is ShaderMaterial, "drawn by the shot shaders")
 	check_equal(node.z_index, mgr._draw_node.z_index + 1, "one layer above the hat ramps' shots")
-	check_equal(mgr._enemy_rune_node.z_index, node.z_index, "the enemy runes too")
+	check_equal(mgr._enemy_still_node.z_index, node.z_index, "the enemy runes too")
 	var kinds: Array[int] = []
 	# A batch has one shader (the owner, 2026-10-29): the flying shots in one, the rune in another.
-	var rune_buffer: PackedFloat32Array = mgr._enemy_rune_node.multimesh.buffer
-	check_equal(mgr._enemy_rune_node.multimesh.visible_instance_count, 1, "the rune in the enemy rune batch")
+	var rune_buffer: PackedFloat32Array = mgr._enemy_still_node.multimesh.buffer
+	check_equal(mgr._enemy_still_node.multimesh.visible_instance_count, 1, "the rune in the enemy rune batch")
 	kinds.append(roundi((1.0 - rune_buffer[15]) * ManagerScript.KIND_STEPS))
 	var buffer: PackedFloat32Array = node.multimesh.buffer
 	check_equal(node.multimesh.visible_instance_count, 2, "the bolt and the orbit shot in the enemy shot batch")

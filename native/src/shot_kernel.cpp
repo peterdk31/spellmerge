@@ -100,17 +100,24 @@ constexpr int HEAD_ORBIT = 2;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
-constexpr int KIND_POOL = 5;
 constexpr double KIND_STEPS = 16.0;
 constexpr double RUNE_TRACE = 0.25;
 constexpr double TRACE_FROM = 0.02;
 constexpr double TRACE_SPAN = 0.42;
 constexpr int BATCH_BOLT = 0;
-constexpr int BATCH_RUNE = 1;
+constexpr int BATCH_STILL = 1;
 constexpr int BATCH_ORBIT = 2;
 constexpr int BATCH_ENEMY = 3;
-constexpr int BATCH_ENEMY_RUNE = 4;
-constexpr int BATCHES = 5;
+constexpr int BATCH_ENEMY_STILL = 4;
+constexpr int BATCH_BODY_FIRST = 5;
+// `_draw_out`: its totals first (DRAW_*), then each batch's rows written from DRAW_OUT_FIRST on; how
+// many batches there are is the manager's `_batch_total`, which grows with the card bodies.
+constexpr int DRAW_ASKED = 0;
+constexpr int DRAW_SHOTS = 2;
+constexpr int DRAW_ENEMY = 3;
+constexpr int DRAW_BIRTHS = 4;
+constexpr int DRAW_TAIL = 5;
+constexpr int DRAW_OUT_FIRST = 6;
 constexpr int LOOK_GRID = 24;
 constexpr double LOOK_CELL_PER_RADIUS = 0.25;
 constexpr int LOOK_ZOOM_MAX = 15;
@@ -194,6 +201,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(sim_time, "sim_time", FLOAT) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
 	X(body, "_body", PACKED_BYTE_ARRAY) \
+	X(batch_total, "_batch_total", INT) \
 	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
 	X(seq, "_seq", PACKED_INT64_ARRAY) \
 	X(drawn_seq, "_drawn_seq", PACKED_INT64_ARRAY) \
@@ -832,6 +840,10 @@ struct TailPlan {
 struct ShotKernel::Scratch {
 	// What each span of a drawing loop counted: its shots per batch, turned into where its rows start.
 	std::vector<int64_t> draw_counts;
+	// Each batch's buffer to write, its room and its rows written (`draw_shots`), sized to the batches.
+	std::vector<float *> out_buffer;
+	std::vector<int64_t> room;
+	std::vector<int64_t> used;
 	// Each slot's tail plan.
 	std::vector<TailPlan> tails;
 };
@@ -927,17 +939,22 @@ const Constant CONSTANTS[] = {
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
-	{ "KIND_POOL", (double)KIND_POOL },
 	{ "KIND_STEPS", (double)KIND_STEPS },
 	{ "RUNE_TRACE", (double)RUNE_TRACE },
 	{ "TRACE_FROM", (double)TRACE_FROM },
 	{ "TRACE_SPAN", (double)TRACE_SPAN },
 	{ "BATCH_BOLT", (double)BATCH_BOLT },
-	{ "BATCH_RUNE", (double)BATCH_RUNE },
+	{ "BATCH_STILL", (double)BATCH_STILL },
 	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
-	{ "BATCH_ENEMY_RUNE", (double)BATCH_ENEMY_RUNE },
-	{ "BATCHES", (double)BATCHES },
+	{ "BATCH_ENEMY_STILL", (double)BATCH_ENEMY_STILL },
+	{ "BATCH_BODY_FIRST", (double)BATCH_BODY_FIRST },
+	{ "DRAW_ASKED", (double)DRAW_ASKED },
+	{ "DRAW_SHOTS", (double)DRAW_SHOTS },
+	{ "DRAW_ENEMY", (double)DRAW_ENEMY },
+	{ "DRAW_BIRTHS", (double)DRAW_BIRTHS },
+	{ "DRAW_TAIL", (double)DRAW_TAIL },
+	{ "DRAW_OUT_FIRST", (double)DRAW_OUT_FIRST },
 	{ "LOOK_GRID", (double)LOOK_GRID },
 	{ "LOOK_CELL_PER_RADIUS", (double)LOOK_CELL_PER_RADIUS },
 	{ "LOOK_ZOOM_MAX", (double)LOOK_ZOOM_MAX },
@@ -1450,13 +1467,14 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 // `_count_batches` (no solid shots): `_batch_counts` and every live shot's drawn data.
 void ShotKernel::count_draw(Object *m) {
 	const Names &k = *names;
-	Arr<PackedByteArray> alive, motion, drawn_batch;
+	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedInt64Array> seq, drawn_seq;
 	Arr<PackedFloat32Array> radius, drawn_radius, drawn_size;
 	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts;
 	Arr<PackedColorArray> drawn_color;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
+	body.load(m, k.body);
 	drawn_batch.load(m, k.drawn_batch);
 	seq.load(m, k.seq);
 	drawn_seq.load(m, k.drawn_seq);
@@ -1470,12 +1488,13 @@ void ShotKernel::count_draw(Object *m) {
 	batch_counts.load(m, k.batch_counts);
 	drawn_color.load(m, k.drawn_color);
 	const int64_t high = m->get(k.high);
-	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || batch_counts.n < BATCHES);
+	const int64_t batches = m->get(k.batch_total);
+	ERR_FAIL_COND(high > alive.n || high > drawn_seq.n || high > body.n || batches < BATCH_BODY_FIRST || batch_counts.n < batches);
 	// Each span counts its own batches (`_scratch->draw_counts`), added up after in span order.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
-	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	_scratch->draw_counts.assign(spans * batches, 0);
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
 				continue;
@@ -1488,12 +1507,14 @@ void ShotKernel::count_draw(Object *m) {
 				drawn_seq[slot] = seq[slot];
 				drawn_radius[slot] = radius[slot];
 				drawn_look[slot] = look[slot];
-				// `_batch_of`.
+				// `_batch_of`: a still shot of a card body draws in its body's pair (`body_batch`).
 				int64_t batch = BATCH_BOLT;
-				if (!is_hat_ramp(rmp)) {
-					batch = mot == MOTION_STILL ? BATCH_ENEMY_RUNE : BATCH_ENEMY;
+				if (mot == MOTION_STILL && body[slot] > 0) {
+					batch = BATCH_BODY_FIRST + 2 * ((int64_t)body[slot] - 1) + (is_hat_ramp(rmp) ? 0 : 1);
+				} else if (!is_hat_ramp(rmp)) {
+					batch = mot == MOTION_STILL ? BATCH_ENEMY_STILL : BATCH_ENEMY;
 				} else if (mot == MOTION_STILL) {
-					batch = BATCH_RUNE;
+					batch = BATCH_STILL;
 				} else if (mot == MOTION_ORBIT) {
 					batch = BATCH_ORBIT;
 				}
@@ -1505,10 +1526,10 @@ void ShotKernel::count_draw(Object *m) {
 			counts[drawn_batch[slot]] += 1;
 		}
 	});
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		int64_t count = 0;
 		for (int64_t span = 0; span < spans; span++) {
-			count += _scratch->draw_counts[span * BATCHES + b];
+			count += _scratch->draw_counts[span * batches + b];
 		}
 		batch_counts[b] = (int32_t)count;
 	}
@@ -1562,7 +1583,8 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	core.load(m, k.core);
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || high > body.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
+	const int64_t batches = m->get(k.batch_total);
+	ERR_FAIL_COND(high > alive.n || high > body.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
 	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
 	// in `_by_group`, and its particles and tail asked for are added to its group's.
 	Arr<PackedInt32Array> group, group_end, by_group;
@@ -1678,10 +1700,16 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		tail_carry[slot] = (float)(carry - d);
 		tail_n[slot] = (int32_t)n;
 	};
-	float *out_buffer[BATCHES];
-	int64_t room[BATCHES];
-	int64_t used[BATCHES] = {};
-	for (int64_t b = 0; b < BATCHES; b++) {
+	if ((int64_t)_buffers.size() < batches) {
+		_buffers.resize(batches);
+	}
+	std::vector<float *> &out_buffer = _scratch->out_buffer;
+	std::vector<int64_t> &room = _scratch->room;
+	std::vector<int64_t> &used = _scratch->used;
+	out_buffer.resize(batches);
+	room.resize(batches);
+	used.assign(batches, 0);
+	for (int64_t b = 0; b < batches; b++) {
 		if (_buffers[b].size() != rooms[b] * DRAW_STRIDE) {
 			_buffers[b].resize(rooms[b] * DRAW_STRIDE);
 		}
@@ -1710,7 +1738,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	};
 	// A shot that lays a tail: a head, not a stone, and not a rune.
 	auto is_tail = [](int64_t mot, int64_t batch) {
-		return mot != MOTION_STILL && batch != BATCH_ENEMY_RUNE && batch != BATCH_RUNE;
+		return mot != MOTION_STILL;
 	};
 	std::vector<TailPlan> &tails = _scratch->tails;
 	if (tails_on && (int64_t)tails.size() < high) {
@@ -1725,26 +1753,26 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	// it knows where its rows start (the shots before it, in slot order); rows past a batch's room
 	// are not written, as in the GDScript.
 	const int64_t spans = jobs::spans_of(high, SLOT_SPAN);
-	_scratch->draw_counts.assign(spans * BATCHES, 0);
+	_scratch->draw_counts.assign(spans * batches, 0);
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *counts = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *counts = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] != 0) {
 				counts[drawn_batch[slot]] += 1;
 			}
 		}
 	});
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		int64_t before = 0;
 		for (int64_t span = 0; span < spans; span++) {
-			const int64_t count = _scratch->draw_counts[span * BATCHES + b];
-			_scratch->draw_counts[span * BATCHES + b] = before;
+			const int64_t count = _scratch->draw_counts[span * batches + b];
+			_scratch->draw_counts[span * batches + b] = before;
 			before += count;
 		}
 		used[b] = MIN(before, room[b]);
 	}
 	jobs::for_spans(high, SLOT_SPAN, _width, [&](int64_t span, int64_t begin, int64_t end) {
-		int64_t *row = _scratch->draw_counts.data() + span * BATCHES;
+		int64_t *row = _scratch->draw_counts.data() + span * batches;
 		for (int64_t slot = begin; slot < end; slot++) {
 			if (alive[slot] == 0) {
 				continue;
@@ -1763,15 +1791,14 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			float *b = out_buffer[batch] + index * DRAW_STRIDE;
 			const double size = drawn_size[slot];
 			const Color look_data = drawn_color[slot];
-			if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
-				// `_write_stones` for a shot that is not solid: one stone; `_kind_of`: a pool's puddle,
-				// else a rune (a stone is always solid, so the manager writes it).
+			if (mot == MOTION_STILL) {
+				// `_write_stones` for a shot that is not solid: one quad, a rune's or a card body's
+				// (its batch's shader draws it).
 				Vector2 dir = Vector2(1, 0);
-				if (mot == MOTION_STILL && vel[slot].length_squared() > 0.0f) {
+				if (vel[slot].length_squared() > 0.0f) {
 					dir = vel[slot].normalized();
 				}
-				const int kind = (mot == MOTION_STILL && body[slot] == KIND_POOL) ? KIND_POOL : KIND_RUNE;
-				write_quad(b, dir, size, at, look_data, core[slot], kind, trace_code(sim_time - (double)born[slot]));
+				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, trace_code(sim_time - (double)born[slot]));
 			} else {
 				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
 			}
@@ -1795,23 +1822,27 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		}
 	}
 	int64_t shots = 0;
-	for (int64_t b = 0; b < BATCHES; b++) {
+	for (int64_t b = 0; b < batches; b++) {
 		shots += used[b];
 	}
-	const int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_RUNE];
-	for (int64_t b = 0; b < BATCHES; b++) {
-		draw_out[b] = (int32_t)used[b];
+	// The batches on the enemy ramp's layer (`batch_on_enemy_layer`): its shots, runes and bodies.
+	int64_t enemy_shots = used[BATCH_ENEMY] + used[BATCH_ENEMY_STILL];
+	for (int64_t b = BATCH_BODY_FIRST + 1; b < batches; b += 2) {
+		enemy_shots += used[b];
 	}
-	draw_out[BATCHES] = (int32_t)asked;
-	draw_out[BATCHES + 1] = 0;
-	draw_out[BATCHES + 2] = (int32_t)shots;
-	draw_out[BATCHES + 3] = (int32_t)enemy_shots;
-	draw_out[BATCHES + 4] = (int32_t)tail_count;
-	draw_out[BATCHES + 5] = (int32_t)(int64_t)tail_wanted;
+	for (int64_t b = 0; b < batches; b++) {
+		draw_out[DRAW_OUT_FIRST + b] = (int32_t)used[b];
+	}
+	draw_out[DRAW_ASKED] = (int32_t)asked;
+	draw_out[DRAW_ASKED + 1] = 0;
+	draw_out[DRAW_SHOTS] = (int32_t)shots;
+	draw_out[DRAW_ENEMY] = (int32_t)enemy_shots;
+	draw_out[DRAW_BIRTHS] = (int32_t)tail_count;
+	draw_out[DRAW_TAIL] = (int32_t)(int64_t)tail_wanted;
 }
 
 PackedFloat32Array ShotKernel::buffer(int64_t batch) const {
-	ERR_FAIL_INDEX_V(batch, BATCHES, PackedFloat32Array());
+	ERR_FAIL_INDEX_V(batch, (int64_t)_buffers.size(), PackedFloat32Array());
 	return _buffers[batch];
 }
 

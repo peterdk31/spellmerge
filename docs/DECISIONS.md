@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-08: One hit look per body and staff a frame (shot scale H3, owner session)
+
+- **Asked:** the owner, on lowering `BodyLooks.PER_BODY` from 3 (2026-11-07, below): "Would It make sense to bundle Feel? ... lowered it from 3 to 1? Or even just 1 for each second frame?", then, shown the measurements and the storm side by side: "Go with 1 per body".
+- **Measured** (30,000 bolts, three variants interleaved, three runs each, the same hits and damage in all): Feel's hit listeners 17.2 / 9.8 / 7.7 us a hit in the storm and 19.6 / 12.8 / 10.0 us in the crowd for 3 per body, 1 per body, and 1 per body per two frames; crowd_all 48.6 / 44.0 / 42.4 ms of hand-backs and listeners a step. In the storm at 10,000 shots, three stacked sprays made a heavily hit body a blown-out white blob; one reads as one spray the way the shot came.
+- **Now:** a body shows one hit look per staff a frame. One per two frames was not taken: a few percent more, and its look was not seen in the game. Each staff still counts apart.
+
 ## 2026-11-08: A teleport goes the way the wizard walks, as every move of its caster does (owner session)
 
 - **Asked:** the owner: "Teleport should go in the direction an actor is moving, not in its aim direction. So just like dash. I'm wondering if this can be made a general rule for the future eg. If a card has a trait like 'movement'?"

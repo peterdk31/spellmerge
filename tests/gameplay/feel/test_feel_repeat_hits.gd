@@ -86,19 +86,21 @@ func test_a_repeat_hit_is_not_heard_again_and_a_body_sprays_a_few_a_frame() -> v
 	check_equal(feel.flashes_of(&"puff") + feel.flashes_of(&"spray"), before + 1, "the next frame the body sprays again")
 
 
-func test_another_attacker_kind_or_step_is_a_hit_of_its_own() -> void:
+## Another attacker, the next frame or another body is a hit of its own; the same attacker's next hit
+## on the body in the frame is not, whatever its kind (one look per body and staff a frame, `BodyLooks`).
+func test_another_attacker_step_or_body_is_a_hit_of_its_own() -> void:
 	var target: Actor = _wizard(1)
 	var by: int = FIRST_WIZARD_ID
 	_hit(by, target)
 	_hit(FIRST_WIZARD_ID + 2, target)
 	check_equal(registry.asked.size(), 2, "another attacker is heard")
 	_hit(by, target, &"burst")
-	check_equal(registry.asked.size(), 3, "another kind is heard")
+	check_equal(registry.asked.size(), 2, "the same attacker's hit of another kind on the body in the frame is not")
 	feel.step(STEP)
 	_hit(by, target, &"burst")
-	check_equal(registry.asked.size(), 4, "after Feel stepped the same hit is heard again")
+	check_equal(registry.asked.size(), 3, "after Feel stepped the attacker's hit is heard again")
 	_hit(by, _wizard(3))
-	check_equal(registry.asked.size(), 5, "another body is heard")
+	check_equal(registry.asked.size(), 4, "another body is heard")
 
 
 ## Feel keeps the `Actors` autoload once found (performance, 2026-11-02: every hit asks for it),

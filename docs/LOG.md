@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-08: Feel: one hit look per body and staff a frame (owner session)
+
+`BodyLooks.PER_BODY` is 1 (was 3): measured with 1 per body and 1 per two frames beside it, it took Feel's hit listeners about 7 us a hit lower (storm 17 to 10, crowd 20 to 13; crowd_all 49 to 44 ms a step at 30,000 bolts), the same hits and damage, and the storm's heavily hit bodies show one spray instead of a white blob of stacked ones. The owner picked 1 per body; DECISIONS has the numbers.
+
 ## 2026-11-07: Feel: a few hit looks per body a frame, and shake that does not pile up (owner session)
 
 The owner asked whether Feel should bundle per target. Measured: 77-93% of hits land on a body already hit that step. A body now shows the looks of at most three hits of one staff a frame (`gameplay/feel/body_looks.gd`; each staff apart, so a lone cast still shows in a storm), and screen shake raises to a moment's own instead of adding (`Feel._shake`), which the owner found unwatchable in the storm. Feel's hit listeners in the storm from about 36 to 14-16 us a hit, crowd_all 57 to 49 ms a step at 30,000 bolts, the same hits and damage. Tests: test_body_looks.gd, test_feel_repeat_hits.gd (its old "each still sprays" is now three a frame). DECISIONS has the rule.

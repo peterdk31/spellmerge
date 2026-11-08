@@ -19,7 +19,7 @@ func _shown(looks: BodyLooks, body: int, group: int, hits: int) -> int:
 func test_a_body_shows_a_few_hits_of_a_staff_a_frame() -> void:
 	var looks := BodyLooks.new()
 	check_equal(_shown(looks, 1001, 0, 1000), BodyLooks.PER_BODY, "of a thousand hits in a frame, %d show" % BodyLooks.PER_BODY)
-	check_equal(_shown(looks, 2002, 0, 2), 2, "another body counts its own")
+	check_equal(_shown(looks, 2002, 0, 2), mini(2, BodyLooks.PER_BODY), "another body counts its own")
 
 
 func test_each_staff_counts_apart() -> void:
@@ -39,10 +39,10 @@ func test_a_frame_of_many_bodies_keeps_each_count() -> void:
 	var looks := BodyLooks.new()
 	var bodies: int = BodyLooks.START_SIZE * 2
 	for body in bodies:
-		_shown(looks, 5000 + body * 977, body % 3, 2)
+		_shown(looks, 5000 + body * 977, body % 3, 1)
 	var wrong: int = 0
 	for body in bodies:
-		# Each has shown 2: one more shows, then none.
-		if _shown(looks, 5000 + body * 977, body % 3, 5) != BodyLooks.PER_BODY - 2:
+		# Each has shown one: the rest of its looks show, then none (a lost count would show one more).
+		if _shown(looks, 5000 + body * 977, body % 3, BodyLooks.PER_BODY + 3) != BodyLooks.PER_BODY - 1:
 			wrong += 1
 	check_equal(wrong, 0, "after the table grew, every one of %d bodies kept its count" % bodies)

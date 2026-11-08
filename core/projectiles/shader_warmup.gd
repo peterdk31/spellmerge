@@ -41,6 +41,7 @@ const MESH_SHADERS: Array[Shader] = [
 ]
 const RECT_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_sprite.gdshader"),
+	preload("res://core/projectiles/staff_hammer.gdshader"),
 ]
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 ## The world, as far as a draw needs to reach to never be culled.

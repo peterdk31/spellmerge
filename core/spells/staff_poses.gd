@@ -33,10 +33,11 @@ var _pose_out: PackedFloat32Array = PackedFloat32Array()
 var _pose_out_mood: int = 0
 var _pose_out_actor: int = -1
 var _pose_out_clock: float = -1.0
-## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land).
-const POSE_CHANNELS: int = 7
-## Where `land` is among them.
+## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake, land, hammer).
+const POSE_CHANNELS: int = 8
+## Where `land` and `hammer` are among them.
 const LAND: int = 6
+const HAMMER: int = 7
 
 ## The runtime this belongs to (`CarrierKit`): its clock and its actors' aims.
 var kit: CarrierKit = null
@@ -180,6 +181,20 @@ func staff_stretch(actor: int) -> float:
 
 func staff_shake(actor: int) -> float:
 	return _pose_out[5] if _pose_now(actor) else 0.0
+
+
+## How far (0 to 1) `actor`'s staff head has turned into a hammer's now (a slam's), for its look.
+func staff_hammer(actor: int) -> float:
+	return _pose_out[HAMMER] if _pose_now(actor) else 0.0
+
+
+## How many times its cards grew the spell `actor`'s staff animation plays for
+## (`CompiledSpell.radius_scale`: 1.6 with a bigger card), for a look that draws it bigger as the
+## spell grows (a slam's hammer): 1 while it plays none.
+func staff_grown(actor: int) -> float:
+	if actor < 0 or actor >= SpellRuntime.ACTORS or not _pose_now(actor) or _pose_spell[actor] == null:
+		return 1.0
+	return _pose_spell[actor].radius_scale
 
 
 ## How far (0 to 1) `actor`'s staff is moved so its tip lies on the point its carrier strikes, and

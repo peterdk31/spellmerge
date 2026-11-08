@@ -11,21 +11,21 @@ extends SpellComponent
 const POSE_PHASES: Dictionary = {"wind": 0, "strike": 1, "hold": 2, "after": 3}
 const POSE_EASES: Dictionary = {"inout": 0, "out": 1, "in": 2}
 const POSE_MOODS: Array[StringName] = [&"raised", &"angry", &"furious", &"worried"]
-const POSE_CHANNELS: Array[String] = ["turn", "lift", "push", "glow", "stretch", "shake", "land"]
+const POSE_CHANNELS: Array[String] = ["turn", "lift", "push", "glow", "stretch", "shake", "land", "hammer"]
 ## Where each number is in a packed key, and how many a key has.
 const PK_PHASE: int = 0
 const PK_AT: int = 1
 const PK_CHANNELS: int = 2
-const PK_EASE: int = 9
-const PK_MOOD: int = 10
-const POSE_STRIDE: int = 11
+const PK_EASE: int = 10
+const PK_MOOD: int = 11
+const POSE_STRIDE: int = 12
 ## The ranges of the channels a key may set (`turn` in degrees, `lift`, `push` and `shake` in
-## pixels, `glow` and `land` 0 to 1, `stretch` as a share: 0.3 is 30% longer along the aim and thinner
-## across).
+## pixels, `glow`, `land` and `hammer` 0 to 1, `stretch` as a share: 0.3 is 30% longer along the aim
+## and thinner across).
 const POSE_RANGES: Dictionary = {
 	"turn": Vector2(-720.0, 720.0), "lift": Vector2(-6.0, 16.0), "push": Vector2(-12.0, 12.0),
 	"glow": Vector2(0.0, 1.0), "stretch": Vector2(-0.5, 1.0), "shake": Vector2(0.0, 4.0),
-	"land": Vector2(0.0, 1.0),
+	"land": Vector2(0.0, 1.0), "hammer": Vector2(0.0, 1.0),
 }
 
 
@@ -83,7 +83,9 @@ const POSE_RANGES: Dictionary = {
 ## back), `glow` (0 to 1: light round the staff in its infusion's colour, else its player's),
 ## `stretch` (longer along the aim and thinner across, negative squashed), `shake` (pixels of
 ## jitter) and `land` (0 to 1: how far the staff is moved so its drawn tip lies on the point its
-## carrier strikes, a slam's impact; nothing for a carrier that names none); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
+## carrier strikes, a slam's impact; nothing for a carrier that names none), `hammer` (0 to 1: how far
+## the staff's head has turned into a hammer's, which grows out of it and goes back into it; a
+## wizard's staff only, `StaffLook`; as big as the spell's hit radius, so a bigger card grows it); the `ease` into it ("inout", "out" slowing into it, "in" speeding up into it) and a
 ## `mood` the face shows from then on (POSE_MOODS). Ranges in POSE_RANGES; the validator checks it.
 ## Example: [{"phase": "after", "at": 0.04, "push": -3, "ease": "out"}, {"phase": "after", "at": 0.2}].
 @export var staff_pose: Array[Dictionary] = []

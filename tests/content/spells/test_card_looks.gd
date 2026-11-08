@@ -14,6 +14,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 ## The plain shader each area draws a card with no look of its own by: what a card's shader copies.
 const PLAIN: Dictionary = {
@@ -67,8 +68,8 @@ func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
 		var form: FormBase = each[0]
 		if not PLAIN.has(each[1]):
 			continue
-		var plain: String = (load(PLAIN[each[1]]) as Shader).code
-		var code: String = form.look_shader.code
+		var plain: String = ShaderSource.of(load(PLAIN[each[1]]) as Shader)
+		var code: String = ShaderSource.of(form.look_shader)
 		for line: String in plain.split("\n"):
 			if line.begins_with("const float Q_") or line.begins_with("const float HF_"):
 				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])
@@ -78,17 +79,17 @@ func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
 func test_every_card_shader_keeps_its_areas_particle_rule() -> void:
 	for each: Array in _looked_cards():
 		var form: FormBase = each[0]
-		var code: String = form.look_shader.code
+		var code: String = ShaderSource.of(form.look_shader)
 		if DRAWS_PARTICLES.has(each[1]):
 			check(code.contains(PARTICLE_RULE), "%s asks 4 + 2 particles a kind" % form.id)
 		else:
-			check(not code.contains("emit_count()"), "%s draws no card particles: its area's are motes" % form.id)
+			check(not code.contains(PARTICLE_RULE), "%s draws no card particles: its area's are motes" % form.id)
 
 
 func test_no_card_shader_reads_the_light_floats() -> void:
 	for each: Array in _looked_cards():
 		var form: FormBase = each[0]
-		check(not form.look_shader.code.contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % form.id)
+		check(not ShaderSource.of(form.look_shader).contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % form.id)
 
 
 func test_every_card_shader_is_warmed_before_the_first_room() -> void:

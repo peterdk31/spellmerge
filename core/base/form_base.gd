@@ -118,7 +118,8 @@ var _pose_packed: bool = false
 ## For a still carrier it draws one quad a shot (each stone of a solid one) from the projectile
 ## manager's instance data (a wall's `stone.gdshader`, a pool's `pool.gdshader`: copy
 ## `forms/pool/pool.gdshader`); for one that flies or orbits it places a shot's head from its
-## instance as `shot_head.gdshader` does (the bolt's `bolt.gdshader`: copy it). The manager gives it
+## instance as `shot_head.gdshader` does (include `core/projectiles/shot_head.gdshaderinc`, as the
+## bolt's `bolt.gdshader` does, or copy it). The manager gives it
 ## a pair of batches of its own (`ProjectileManager.register_body`; every card may have its own) and
 ## the shader warm-up compiles it before the first room (core/README.md, "The shot shaders").
 @export var look_shader: Shader = null

@@ -10,6 +10,7 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const RegistryScript := preload("res://core/registry/registry.gd")
 const BirthsScript := preload("res://gameplay/feel/births.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 const FROST := Color(0.5, 0.75, 0.94)
 ## The look of a lightning card (its sparks).
@@ -377,7 +378,7 @@ func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
 	check_equal(mesh.surface_get_array_len(0), pieces * 2 * 4, "nothing else: its splash and card particles are motes (S6 item 10)")
 	check(mesh.custom_aabb.size.x >= 100000.0 and mesh.custom_aabb.size.y >= 100000.0, "its box is the world: the shader places it, so it is never culled")
 	var shader: Shader = FeelScript.BEAM_SHADER
-	check(shader.code.contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
+	check(ShaderSource.of(shader).contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
 	var drawn: int = 0
 	for node: MeshInstance2D in feel._forms + feel._live_beams:
 		if node.mesh == mesh:
@@ -439,5 +440,5 @@ func test_live_and_shown_beams_give_their_motes_to_the_pool() -> void:
 
 
 func test_the_beam_shader_draws_no_particles() -> void:
-	var code: String = FeelScript.BEAM_SHADER.code
+	var code: String = ShaderSource.of(FeelScript.BEAM_SHADER)
 	check(not code.contains("shot_particle") and not code.contains("Q_SPLASH") and not code.contains("Q_PARTICLE"), "its splash and card particles are motes (S6 item 10)")

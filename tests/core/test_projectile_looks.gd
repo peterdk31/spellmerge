@@ -23,6 +23,7 @@ const BIGGER := preload("res://content/spells/modifiers/bigger/bigger.tres")
 const PIERCE := preload("res://content/spells/modifiers/pierce/pierce.tres")
 const HOMING := preload("res://content/spells/modifiers/homing/homing.tres")
 const ECHO := preload("res://content/spells/modifiers/echo/echo.tres")
+const ShaderSource := preload("res://tests/support/shader_source.gd")
 
 var mgr: ManagerScript
 
@@ -174,7 +175,7 @@ func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 	var look_code: ShaderInclude = load("res://core/projectiles/shot_look.gdshaderinc")
 	check(look_code.code.contains("bit_set(b, ENEMY_RAMP) ? ENEMY_PLAYER"), "every shot shader's look takes it")
 	var beam: Shader = load("res://core/projectiles/shot_beam.gdshader")
-	check(beam.code.contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
+	check(ShaderSource.of(beam).contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
 	check(ManagerScript.ramp_color(ActorsScript.RAMP_ENEMY).is_equal_approx(Color("#a68a2a")), "the enemy ramp's colour is Blight ochre")
 	var enemy: int = ActorSeats.enemy(mgr.actors)
 	check(mgr.tint_of(enemy).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
@@ -238,11 +239,12 @@ func test_a_shot_head_is_geometry_and_the_fragment_stage_is_small() -> void:
 		if mgr.batch_mesh(batch) == ManagerScript.MESH_HEAD:
 			check(mgr._nodes[batch].multimesh.mesh == mesh, "shot batch %d draws the shots' mesh" % batch)
 	var shader: Shader = load("res://core/projectiles/shot_head.gdshader")
-	check(shader.code.contains("box = vec4(q_lo, q_hi)") and shader.code.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
+	var source: String = ShaderSource.of(shader)
+	check(source.contains("box = vec4(q_lo, q_hi)") and source.contains("COLOR = inside ? colour : vec4(0.0)"), "each triangle is cut to its quad's box")
 	for kind: Array in [["Q_LIGHT", ManagerScript.HEAD_Q_LIGHT], ["Q_CORE", ManagerScript.HEAD_Q_CORE]]:
-		check(shader.code.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
-	check(not shader.code.contains("trail_data") and not shader.code.contains("texelFetch"), "nothing reads a path")
-	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
+		check(source.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
+	check(not source.contains("trail_data") and not source.contains("texelFetch"), "nothing reads a path")
+	var fragments: String = source.get_slice("// ---- Fragments ----", 1)
 	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
 	check(not fragments.contains("for (") and not fragments.contains("while ("), "no pixel loops")
 	var kinds := RegEx.create_from_string("\\bL_[A-Z]+\\b|has_layer|bit_set|emitter")
@@ -371,7 +373,7 @@ func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
 func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
 	for path: String in ["res://core/projectiles/shot_still.gdshader", "res://core/projectiles/shot_orbit.gdshader", "res://content/spells/forms/rune/rune.gdshader", "res://content/spells/forms/wall/stone.gdshader", "res://content/spells/forms/pool/pool.gdshader"]:
 		var shader: Shader = load(path)
-		check(shader.code.contains("min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"), "%s asks 4 + 2 per kind" % path.get_file())
+		check(ShaderSource.of(shader).contains("min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"), "%s asks 4 + 2 per kind" % path.get_file())
 	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
 	check(palette.code.contains("const int MAX_PARTICLES = %d;" % ManagerScript.PARTICLES_PER_SHOT_MAX), "with the same cap")
 	check_equal(ManagerScript.EMITTING_MASK & (1 << (ManagerScript.LOOK_WEAVE - 1)), 0, "the weave does not emit")
@@ -534,7 +536,7 @@ func test_births_follow_the_kinds_rates_and_the_share() -> void:
 ## The rates are the manager's alone since S3 (the old trail shader's TIP table is gone): one a look
 ## kind, the weave none.
 func test_spark_rates_are_the_managers() -> void:
-	var code: String = (load("res://core/projectiles/shot_head.gdshader") as Shader).code
+	var code: String = ShaderSource.of(load("res://core/projectiles/shot_head.gdshader") as Shader)
 	check(not code.contains("TIP[ROWS]"), "the shader has no rates of its own")
 	check_equal(ManagerScript.SPARK_RATES.size(), ManagerScript.LOOK_COUNT, "a rate a look kind")
 	check_equal(ManagerScript.SPARK_RATES[ManagerScript.LOOK_WEAVE], 0.0, "the weave gives off nothing")

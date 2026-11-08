@@ -96,11 +96,6 @@ const FAMILIAR_SIZE: float = 3.0
 ## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
 ## style (`DecoyLook`), a familiar an orbit shot drawn whole with its tail bent round its circle.
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
-## The card whose look a familiar's orb is (`Spells.look_of`, as an orb: its `look_shader`,
-## or ORBIT_SHADER when it names none; docs/milestones/card-looks.md, phase 3). Every familiar is
-## drawn in one batch, so by one card's shader: a second card that makes familiars with a look of
-## its own would need a batch per shader.
-const FAMILIAR_CARD: StringName = &"familiar"
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const STRIDE: int = 16
@@ -225,13 +220,17 @@ func _ready() -> void:
 	events.run_ended.connect(_on_run_ended)
 
 
-## Draws the familiars' orbs by their card's own shader (`FAMILIAR_CARD`'s `look_shader`, asked of
-## Spells as an orb), or ORBIT_SHADER when it names none or there is no Spells, and warms it. Once
-## when it is ready and at each run's start; nothing is asked per spawn.
+## Draws the familiars' orbs by the shader of the card whose carrier makes orbs, if it names one
+## (`Spells.look_shaders(Carrier.LOOK_ORB)`; docs/milestones/card-looks.md, phase 3), or by
+## ORBIT_SHADER, and warms it. Every orb is drawn in one batch, so by one shader: more than one card
+## with an orb of its own would need a batch per shader, and is warned of (the first is used). Once
+## when it is ready and at each run's start; nothing is asked per spawn, and no card id is named here.
 func use_familiar_look() -> void:
-	var shader: Shader = spells.look_of(FAMILIAR_CARD, Carrier.LOOK_ORB).shader if spells != null else null
+	var shaders: Array[Shader] = spells.look_shaders(Carrier.LOOK_ORB) if spells != null else ([] as Array[Shader])
+	if shaders.size() > 1:
+		push_warning("Entities: %d cards draw their orbs by shaders of their own, but every orb is drawn in one batch: only %s is used" % [shaders.size(), shaders[0].resource_path])
 	var material: ShaderMaterial = _familiar_node.material as ShaderMaterial
-	var wanted: Shader = shader if shader != null else ORBIT_SHADER
+	var wanted: Shader = shaders[0] if not shaders.is_empty() else ORBIT_SHADER
 	# Warmed before the first room as Entities draws it, one batch (Spells knows nothing of how).
 	ShaderWarmupScript.want(wanted, ShaderWarmupScript.BATCH)
 	if material.shader != wanted:

@@ -2425,14 +2425,17 @@ func set_core(slot: int, color: Color) -> bool:
 
 
 ## `set_core`, `set_look`, `set_form` and `set_light` for each of the first `count` shots in
-## `slots` (-1 for none), checked once: one launch's shots share them.
-func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int, light_intensity: float = 1.0, light_reach: float = 1.0) -> void:
-	var intensity: float = clean_light(light_intensity, LIGHT_INTENSITY_MIN)
-	var reach: float = clean_light(light_reach, LIGHT_REACH_MIN)
+## `slots` (-1 for none), from what one launch's shots share (`launch`, a `LaunchLook`), checked once.
+func set_looks(slots: PackedInt32Array, count: int, launch: LaunchLook) -> void:
+	var intensity: float = clean_light(launch.light_intensity, LIGHT_INTENSITY_MIN)
+	var reach: float = clean_light(launch.light_reach, LIGHT_REACH_MIN)
+	var color: Color = launch.core
+	var look: int = launch.look
+	var form: StringName = launch.form
 	var core_ok: bool = is_finite(color.r) and is_finite(color.g) and is_finite(color.b)
 	var core: Color = Color(color.r, color.g, color.b, 1.0)
 	var look_ok: bool = look >= 0 and look < 1 << (LOOK_COUNT - 1)
-	var kind: int = clampi(body, 0, _body_shaders.size())
+	var kind: int = clampi(launch.body, 0, _body_shaders.size())
 	for n in count:
 		var slot: int = slots[n]
 		if slot < 0 or slot >= _cap or _alive[slot] == 0:

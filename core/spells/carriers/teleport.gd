@@ -1,6 +1,6 @@
 class_name CarrierTeleport
 extends CarrierMove
-## Blinks its caster `ray_length` along the aim, stopping before walls, and strikes the bodies where
+## Blinks its caster `ray_length` the way its body walks (along the aim standing, `CarrierMove`), stopping before walls, and strikes the bodies where
 ## it lands (`&"teleport"`). With homing it blinks to a target instead: one picked at random among
 ## those within its homing reach, any way round (`CarrierKit.pick_target`), landing at its edge, where
 ## its landing strike reaches it; with none in reach it does not blink (owner, 2026-11-06).

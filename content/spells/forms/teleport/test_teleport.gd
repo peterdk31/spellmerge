@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Teleport card (content/spells/forms/teleport/, staffs C): a carrier that blinks the caster a
-## fixed distance along the aim. The engine side is tested in `tests/core/test_spells_moves.gd`
+## fixed distance the way its body walks (along the aim standing). The engine side is tested in `tests/core/test_spells_moves.gd`
 ## and `tests/gameplay/player/test_player_caster.gd`; here the card's data and its combos.
 ##
 ## godot --headless --path . --script res://content/spells/forms/teleport/test_teleport.gd

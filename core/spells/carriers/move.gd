@@ -4,11 +4,12 @@ extends Carrier
 ## fixed, and its speed only says how long a dash takes (`CasterMoves.move_seconds`), so `faster`
 ## arrives sooner, not farther. What it moves is its caster (`CasterMoves.moved_by`): a body is
 ## asked through its owner (`caster_move_requested`: the wizard's for its own cast, whose player
-## picks a dash's way, the way it walks, and answers where it stops, staffs A6a; a decoy's for a
+## picks its way, the way it walks, and answers where it stops, staffs A6a; a decoy's for a
 ## payload its body fired, owner 2026-11-06); a shot that cast it is moved along `direction` itself,
-## and its end point comes when the move is over (`CasterMoves.track`). A dash the wizard casts
+## and its end point comes when the move is over (`CasterMoves.track`). A move the wizard casts
 ## itself takes the way its body walks in place of the aim (`Spells.cast_staff`'s `walk`), so a
-## mirrored one goes back the other way. A point cannot move, so a move cast by one moves the wizard
+## mirrored one goes back the other way: every carrier that MOVES_CASTER does (a dash, a teleport;
+## owner 2026-11-08), so a new one needs nothing of its own for it. A point cannot move, so a move cast by one moves the wizard
 ## to it (rules R4c, F1). Its `shield` guards what it moves (`CasterMoves.shield`). The subclasses
 ## say what is their own: the way and distance (`_aim_move`), how long it takes (`_move_seconds`)
 ## and what starts with it (`_move_body`, `_moved_shot`). A move's way and distance are its
@@ -22,7 +23,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var caster: int = kit.caster()
 	var moved: int = CasterMoves.moved_by(caster, actor)
 	var body: int = SpellRuntime.body_of(moved, actor)
-	if caster == SpellRuntime.CASTER_BODY and _walks():
+	if caster == SpellRuntime.CASTER_BODY and (traits() & MOVES_CASTER) != 0:
 		# Turned as far as the walk is off the aim (staffs A6a), so a mirrored one goes the other way.
 		way = DMath.rotated(way, kit.walk_turn(actor))
 	if moved != caster:
@@ -66,11 +67,6 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 ## cast by that body or shot (`Carrier.hit_caster`).
 func hit_caster(caster: int, actor: int) -> int:
 	return CasterMoves.moved_by(caster, actor)
-
-
-## True when the wizard's own cast of it goes the way its body walks (a dash).
-func _walks() -> bool:
-	return false
 
 
 ## The way (x, y) and distance (z) of the move about to start, cast from `origin`, of what is at

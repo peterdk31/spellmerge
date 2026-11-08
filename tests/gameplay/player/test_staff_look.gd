@@ -304,8 +304,8 @@ func test_a_hammer_binds_every_infusion_of_its_spell() -> void:
 
 
 func test_a_bigger_spell_draws_a_bigger_hammer() -> void:
-	# A bigger card grows the slam's spell (its radius_mult), and the hammer with it, up to
-	# HAMMER_SIZE_MOST; the look knows nothing of the slam's own numbers.
+	# A bigger card grows the slam's spell (its radius_mult), and the hammer with it, with
+	# no most; the look knows nothing of the slam's own numbers.
 	var body := _wizard()
 	var look: StaffLook = WizardFixture.look(body)
 	_world.input.send_virtual_aim(0, Vector2.RIGHT)
@@ -314,7 +314,8 @@ func test_a_bigger_spell_draws_a_bigger_hammer() -> void:
 	check(is_equal_approx(look.hammer_size(), 1.6), "grown 1.6 times, it is drawn 1.6 times as big: %f" % look.hammer_size())
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 10.0]
 	_world.run(1, false)
-	check(is_equal_approx(look.hammer_size(), StaffLook.HAMMER_SIZE_MOST), "never past its biggest, so it stays in its square")
+	check(is_equal_approx(look.hammer_size(), 10.0), "no most (the owner, 2026-11-08: \"remove the cap\"): %f" % look.hammer_size())
+	check(is_equal_approx(look.hammer_extent(), 10.0), "its square grown with it, so it is never cut off: %f" % look.hammer_extent())
 	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2.INF, 1.0, 0.25]
 	_world.run(1, false)
 	check(is_equal_approx(look.hammer_size(), 1.0), "never smaller than a slam's")

@@ -87,4 +87,21 @@ func test_its_own_look_takes_every_uniform_feel_gives_a_beam() -> void:
 			count += 1
 			check(own_look.contains(line), "the beam's look keeps `%s`" % line)
 	check(count > 10, "the plain beam's uniforms were read (%d)" % count)
-	check(own_look.contains("has_layer(L_PULL) ? 1.0 : 0.0"), "void's beam is a dark rift")
+	check(own_look.contains("rift = lead == E_VOID ? 1.0 : 0.0;"), "a beam whose first infusion is void is a dark rift")
+
+
+func test_its_look_knows_every_infusion_by_its_look_kind() -> void:
+	# The beam's look tells its infusions apart by look kind (infusion e is kind e + 1) and draws
+	# each in its ramp (`E_MATERIAL`, `STRAND_*`): a new infusion, or one that changes its kind,
+	# changes the beam's tables too.
+	var expected: Dictionary = {&"fire": 1, &"frost": 2, &"storm": 3, &"void": 4, &"lightning": 5, &"mend": 6}
+	var seen: Array[StringName] = []
+	for card: Resource in _registry.call("get_all", &"spells"):
+		var element := card as ElementBase
+		if element == null:
+			continue
+		seen.append(element.id)
+		check(expected.has(element.id), "%s is an infusion the beam's look knows (content/spells/forms/beam/beam.gdshader, E_*)" % element.id)
+		if expected.has(element.id):
+			check_equal(element.look_layer, expected[element.id], "%s's look kind is the one the beam's look reads" % element.id)
+	check_equal(seen.size(), expected.size(), "the beam's look knows every infusion")

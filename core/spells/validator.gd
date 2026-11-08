@@ -34,7 +34,7 @@ const FRAGMENT_ROOTS: Array[String] = ["res://content", "res://art", "res://audi
 ## The statuses an element may put on a target. `freeze` is not here: three stacks of chill
 ## make it, no element sets it. `tests/content/spells/test_validators.gd` checks this list
 ## against the ones `gameplay/combat` implements.
-const KNOWN_STATUSES: Array[StringName] = [&"burn", &"chill", &"shock", &"hex", &"static"]
+const KNOWN_STATUSES: Array[StringName] = [&"burn", &"chill", &"gust", &"hex", &"static"]
 
 ## Allowed numbers of a reaction row, {field: Vector2(min, max)}, both ends included.
 const REACTION_RANGES: Dictionary = {

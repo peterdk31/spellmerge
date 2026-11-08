@@ -1,0 +1,11 @@
+{
+	"id": "storm_wall_smash",
+	"name": "Wall smash",
+	"does": "A storm bolt shoves the imp back into the wall behind it, and the wall hits it too: more than the bolt alone.",
+	"needs": "storm",
+	"casts": [{"staff": 0, "cards": ["storm", "bolt"]}],
+	"imps": [[90, 0]],
+	"walls": [[102, -40, 8, 80]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 7}]
+}

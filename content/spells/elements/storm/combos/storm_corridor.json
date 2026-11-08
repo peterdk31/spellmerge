@@ -1,0 +1,11 @@
+{
+	"id": "storm_corridor",
+	"name": "Gale in a corridor",
+	"does": "A storm nova in a narrow corridor throws the imps on both sides into the walls, and the walls hurt them more than the ring does.",
+	"needs": "storm",
+	"casts": [{"staff": 0, "cards": ["storm", "nova"]}],
+	"imps": [[0, -30], [0, 30]],
+	"walls": [[-60, -50, 120, 8], [-60, 36, 120, 8]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0, 1], "min": 5}]
+}

@@ -1,11 +1,11 @@
 extends "res://tests/support/suite.gd"
-## Statuses in gameplay/combat (M2 part 7): the four elements' burn, chill and freeze, shock
+## Statuses in gameplay/combat (M2 part 7): the four elements' burn, chill and freeze, gust
 ## and hex, read from `Spells.hit_profile`, with several players at once. Hits arrive as
 ## `projectile_hit` on a test bus, with the tag of a real compiled spell built from the real
 ## element resources; time moves by `Combat.step` with a fixed binary-fraction delta.
 ## The players are actors 0-3 of the test's actor table, seated 0-3 (actors G3b: hits name actor
 ## ids). Enemies are plain bodies Combat opens an actor for (the enemies' team); `_foe` makes a
-## body of the wizards' team, for the rules that aim by team (shock jumps, static discharges).
+## body of the wizards' team, for the rules that aim by team (static discharges).
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_statuses.gd
 
@@ -126,7 +126,7 @@ func test_a_spell_hit_deals_the_profile_damage_and_its_status() -> void:
 
 
 func test_each_element_puts_its_own_status_on() -> void:
-	var wanted: Array[StringName] = [&"burn", &"chill", &"shock", &"hex", &"static"]
+	var wanted: Array[StringName] = [&"burn", &"chill", &"gust", &"hex", &"static"]
 	for i in ELEMENTS.size():
 		var player: int = i % 4
 		var enemy := _enemy()
@@ -215,53 +215,43 @@ func test_the_third_chill_freezes_then_thaws() -> void:
 	check_equal(_combat.pace(enemy), 1.0, "it thawed and walks at full speed")
 
 
-func test_shock_makes_the_next_hit_jump_to_the_nearest_neighbour() -> void:
+func test_a_gust_makes_spell_hits_shove_harder() -> void:
 	var enemy := _enemy(Vector2(0.0, 0.0))
-	var near := _enemy(Vector2(30.0, 0.0))
-	var far := _enemy(Vector2(50.0, 40.0))
-	_hit(0, enemy, _tag(0, &"storm"))
-	check_equal(_combat.health_of(near), 100, "the shocking hit itself does not jump")
 	_hit(0, enemy, _tag(0, &""))
-	check_equal(_combat.health_of(near), 100 - 3, "the next hit jumped to the nearest enemy")
-	check_equal(_combat.health_of(far), 100, "and only to one")
-	check(not _combat.has_status(enemy, &"shock"), "the shock is used up")
+	var plain: float = _combat.knockback_of(enemy).length()
+	check(plain > 0.0, "a plain hit shoves")
+	_combat.apply_status(0, enemy, &"gust", 4.0, 100.0)
 	_hit(0, enemy, _tag(0, &""))
-	check_equal(_combat.health_of(near), 100 - 3, "no second jump without a new shock")
+	check(is_equal_approx(_combat.knockback_of(enemy).length(), plain * 2.0), "a gusted body is shoved twice as hard (power 100)")
+	check(_combat.has_status(enemy, &"gust"), "the gust is not spent by a hit: it lasts its time")
 
 
-func test_a_shock_jumps_to_the_victims_own_team_only() -> void:
+func test_the_storm_hit_that_gusts_shoves_hard_itself() -> void:
+	var calm := _enemy(Vector2(0.0, 0.0))
+	var gusted := _enemy(Vector2(0.0, 200.0))
+	_hit(0, calm, _tag(0, &""))
+	_hit(0, gusted, _tag(0, &"storm"))
+	check(_combat.has_status(gusted, &"gust"), "storm gusts")
+	check(_combat.knockback_of(gusted).length() > _combat.knockback_of(calm).length() * 1.5, "and its own hit already shoves harder")
+
+
+func test_a_gusted_body_knocked_into_a_wall_takes_a_slam() -> void:
 	var enemy := _enemy(Vector2(0.0, 0.0))
-	var foe := _foe(Vector2(20.0, 0.0))
-	var kin := _enemy(Vector2(50.0, 0.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 75.0)
+	_projectiles.set_walls([Rect2(11.0, -40.0, 8.0, 80.0)])
+	_combat.apply_status(0, enemy, &"gust", 4.0, 100.0)
 	_hit(0, enemy, _tag(0, &""))
-	check_equal(_combat.health_of(foe), 100, "the nearer actor of another team is passed over")
-	check_equal(_combat.health_of(kin), 100 - 3, "the jump goes to the nearest of the enemy's own team")
+	var after_hit: float = _combat.health_of(enemy)
+	_run(STEP * 2.0)
+	check(_combat.health_of(enemy) < after_hit, "the wall slams it (%s after the hit's %s)" % [_combat.health_of(enemy), after_hit])
 
 
-func test_a_shock_jump_does_not_reach_past_its_range() -> void:
+func test_a_plain_body_knocked_into_a_wall_takes_no_slam() -> void:
 	var enemy := _enemy(Vector2(0.0, 0.0))
-	var distant := _enemy(Vector2(200.0, 0.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 75.0)
+	_projectiles.set_walls([Rect2(11.0, -40.0, 8.0, 80.0)])
 	_hit(0, enemy, _tag(0, &""))
-	check_equal(_combat.health_of(distant), 100, "out of range is left alone")
-
-
-func test_a_shock_jump_puts_no_status_on_the_neighbour() -> void:
-	var enemy := _enemy(Vector2(0.0, 0.0))
-	var near := _enemy(Vector2(30.0, 0.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 100.0)
-	_hit(0, enemy, _tag(0, &"fire"))
-	check(not _combat.has_status(near, &"burn") and not _combat.has_status(near, &"shock"), "the jump carries damage only")
-
-
-func test_a_shock_jump_still_happens_when_the_hit_kills() -> void:
-	var enemy := _enemy(Vector2(0.0, 0.0), 2)
-	var near := _enemy(Vector2(30.0, 0.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 100.0)
-	_hit(0, enemy, _tag(0, &""))
-	check_equal(_combat.actor_count(), 1, "the shocked enemy died")
-	check_equal(_combat.health_of(near), 96, "its neighbour still took the jump")
+	var after_hit: float = _combat.health_of(enemy)
+	_run(STEP * 2.0)
+	check_equal(_combat.health_of(enemy), after_hit, "only a heavy or a gusted body's push slams")
 
 
 func test_hex_adds_damage_taken() -> void:
@@ -580,7 +570,7 @@ func test_every_applied_status_goes_on_counts_down_and_comes_off() -> void:
 
 
 ## A status that ran out keeps no strength: put on again weaker, it has the new strength, not the
-## old one (it did for shock, hex and static until 2026-11-07).
+## old one (it did for the plain statuses until 2026-11-07).
 func test_a_status_put_on_again_after_it_ran_out_has_its_new_strength() -> void:
 	for st in CombatScript.STATUS_COUNT:
 		if not CombatScript.STATUS_APPLIED[st]:

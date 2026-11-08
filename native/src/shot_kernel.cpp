@@ -100,6 +100,7 @@ constexpr int HEAD_ORBIT = 2;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
+constexpr int KIND_POOL = 5;
 constexpr double KIND_STEPS = 16.0;
 constexpr double RUNE_TRACE = 0.25;
 constexpr double TRACE_FROM = 0.02;
@@ -192,6 +193,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(high, "_high", INT) \
 	X(sim_time, "sim_time", FLOAT) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
+	X(body, "_body", PACKED_BYTE_ARRAY) \
 	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
 	X(seq, "_seq", PACKED_INT64_ARRAY) \
 	X(drawn_seq, "_drawn_seq", PACKED_INT64_ARRAY) \
@@ -925,6 +927,7 @@ const Constant CONSTANTS[] = {
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
+	{ "KIND_POOL", (double)KIND_POOL },
 	{ "KIND_STEPS", (double)KIND_STEPS },
 	{ "RUNE_TRACE", (double)RUNE_TRACE },
 	{ "TRACE_FROM", (double)TRACE_FROM },
@@ -1537,7 +1540,7 @@ inline int64_t tail_code(int64_t seq) {
 
 void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
-	Arr<PackedByteArray> alive, motion, drawn_batch;
+	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
 	Arr<PackedFloat32Array> drawn_size, born;
 	Arr<PackedInt32Array> drawn_particles, draw_out, rooms;
@@ -1551,6 +1554,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	orbit_centre.load(m, k.orbit_centre);
 	drawn_size.load(m, k.drawn_size);
 	born.load(m, k.born);
+	body.load(m, k.body);
 	drawn_particles.load(m, k.drawn_particles);
 	draw_out.load(m, k.draw_out);
 	rooms.load(m, k.rooms);
@@ -1558,7 +1562,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	core.load(m, k.core);
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
-	ERR_FAIL_COND(high > alive.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
+	ERR_FAIL_COND(high > alive.n || high > body.n || draw_out.n < BATCHES + 6 || rooms.n < BATCHES);
 	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
 	// in `_by_group`, and its particles and tail asked for are added to its group's.
 	Arr<PackedInt32Array> group, group_end, by_group;
@@ -1760,12 +1764,14 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			const double size = drawn_size[slot];
 			const Color look_data = drawn_color[slot];
 			if (batch == BATCH_ENEMY_RUNE || batch == BATCH_RUNE) {
-				// `_write_stones` for a shot that is not solid: one stone.
+				// `_write_stones` for a shot that is not solid: one stone; `_kind_of`: a pool's puddle,
+				// else a rune (a stone is always solid, so the manager writes it).
 				Vector2 dir = Vector2(1, 0);
 				if (mot == MOTION_STILL && vel[slot].length_squared() > 0.0f) {
 					dir = vel[slot].normalized();
 				}
-				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, trace_code(sim_time - (double)born[slot]));
+				const int kind = (mot == MOTION_STILL && body[slot] == KIND_POOL) ? KIND_POOL : KIND_RUNE;
+				write_quad(b, dir, size, at, look_data, core[slot], kind, trace_code(sim_time - (double)born[slot]));
 			} else {
 				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
 			}

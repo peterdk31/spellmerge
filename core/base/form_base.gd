@@ -114,11 +114,12 @@ var _pose_packed: bool = false
 @export var wind_cue: StringName = &"wind"
 ## What its shots are drawn as: `&""` for their motion's own body (a flying shot a bolt with its
 ## tail, a still one a rune's diamond, an orbiting one an orbit shot), or a still body of its own for
-## a still shot: `&"stone"`, a standing ward stone (a wall's). One of SHOT_BODIES; a body its shots'
+## a still shot: `&"stone"`, a standing ward stone (a wall's), or `&"pool"`, a puddle on the floor
+## (a pool's). One of SHOT_BODIES; a body its shots'
 ## motion does not draw is left out. A new body is a kind in the shot shaders (core/README.md, "The
 ## shot shaders") and a name here.
 @export var shot_body: StringName = &""
-const SHOT_BODIES: Array[StringName] = [&"", &"stone"]
+const SHOT_BODIES: Array[StringName] = [&"", &"stone", &"pool"]
 
 
 func kind() -> StringName:

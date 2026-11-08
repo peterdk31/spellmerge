@@ -154,6 +154,20 @@ func test_every_staff_has_its_own_pool() -> void:
 	check(wizard.caster.cast(0), "while another staff's pool still pays")
 
 
+func test_a_new_press_sets_off_on_recast_and_a_held_repeat_does_not() -> void:
+	_world = Fixture.new(root)
+	var wizard: Actor = _seated(0, [[&"on_recast", &"slow", &"bolt", &"nova"]])
+	wizard.caster.set_mana(0, 300.0)
+	var payload: int = _world.spells.current_tag(wizard.caster_number(), 0, 1)
+	check(wizard.caster.cast(0), "the first press casts a slow bolt")
+	_world.run(5)
+	check_equal(_world.spells.live_shots(payload), 0, "one press sets nothing off")
+	check(not wizard.caster.cast(0, false), "a held repeat in the wind-down casts nothing")
+	check_equal(_world.spells.live_shots(payload), 0, "and sets nothing off")
+	wizard.caster.cast(0)
+	check(_world.spells.live_shots(payload) > 0, "a new press bursts the bolt into its nova, busy or not")
+
+
 func test_a_cast_that_winds_up_pays_its_mana_as_it_leaves() -> void:
 	# docs/milestones/cast-timing.md: mana is checked at the press and paid at the release, so a
 	# cast that never leaves costs nothing.

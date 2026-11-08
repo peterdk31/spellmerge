@@ -236,7 +236,7 @@ func test_the_elements_of_one_hit_chain_their_reactions() -> void:
 
 
 func test_every_element_of_a_hit_puts_its_status_on_the_wizard_it_hurt() -> void:
-	# Lightning then storm: static and shock have no reaction, so both go on. (Fire then frost
+	# Lightning then storm: static and gust have no reaction, so both go on. (Fire then frost
 	# thaws on a wizard as on an enemy since staffs F6: see test_combat_enemy_spells.gd.)
 	_wizard(0, Vector2.ZERO)
 	var profile := _profile(2)
@@ -245,26 +245,26 @@ func test_every_element_of_a_hit_puts_its_status_on_the_wizard_it_hurt() -> void
 	profile.status_id = &"static"
 	profile.status_duration = 2.0
 	profile.status_strength = 30.0
-	profile.later_status_ids = [&"shock"]
+	profile.later_status_ids = [&"gust"]
 	profile.later_status_durations = PackedFloat32Array([3.0])
 	profile.later_status_strengths = PackedFloat32Array([40.0])
 	_bus.projectile_hit.emit(0, _wizards[0], Vector2(-5.0, 0.0), _tag(profile), -1)
 	check(_combat.status_left(0, &"static") > 0.0, "charged")
-	check(_combat.status_left(0, &"shock") > 0.0, "and shocked by the second element")
+	check(_combat.status_left(0, &"gust") > 0.0, "and gusted by the second element")
 
 
-func test_a_burn_tick_spends_no_shock_and_no_static_and_adds_no_hex() -> void:
+func test_a_burn_tick_spends_no_gust_and_no_static_and_adds_no_hex() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	var near := _enemy(Vector2(30.0, 0.0))
 	_projectiles.step(STEP)
-	_combat.apply_status(0, 0, &"shock", 5.0, 100.0)
+	_combat.apply_status(0, 0, &"gust", 5.0, 100.0)
 	_combat.apply_status(0, 0, &"static", 5.0, 50.0)
 	_combat.apply_status(0, 0, &"burn", 1.0, 4.0)
 	_run(1.0)
-	check(_combat.status_left(0, &"shock") > 0.0, "the shock is still on after the ticks")
+	check(_combat.status_left(0, &"gust") > 0.0, "the gust is still on after the ticks")
 	check(_combat.status_left(0, &"static") > 0.0, "so is the static")
 	check_equal(_combat.health_of(near), 100, "no discharge from the wizard's own burn")
-	check_equal(wizard.health.health, wizard.health.max_health - 4, "the ticks took plain damage, no shock bonus")
+	check_equal(wizard.health.health, wizard.health.max_health - 4, "the ticks took plain damage, no bonus")
 
 
 func test_a_burn_tick_on_a_wizard_is_quiet_but_reaches_its_health_and_its_hud() -> void:
@@ -288,16 +288,6 @@ func test_a_burn_tick_that_downs_a_wizard_is_told_as_kind_status() -> void:
 	check(wizard.is_down(), "the burn downed the wizard")
 	check_equal(_landed.size(), 1, "only the tick that downed it was told")
 	check_equal(_landed[0][3], &"status", "as kind status")
-
-
-func test_a_shock_jump_kill_is_no_kill_for_a_card() -> void:
-	var struck := _enemy(Vector2.ZERO)
-	var weak := _enemy(Vector2(30.0, 0.0), 1)
-	_projectiles.step(STEP)
-	_combat.apply_status(0, struck, &"shock", 5.0, 100.0)
-	_bus.projectile_hit.emit(0, struck, Vector2(-5.0, 0.0), _tag(_profile(5)), -1)
-	check_equal(_combat.health_of(weak), -1, "the jump killed it")
-	check(_kills.is_empty(), "a jump is not the spell's own hit")
 
 
 func test_burn_on_a_wizard_hurts_over_time_as_kind_status() -> void:
@@ -341,19 +331,17 @@ func test_a_hexed_wizard_is_pulled_toward_a_spell_hit() -> void:
 	check_equal(_combat.knockback_of(0), Vector2(-100.0, 0.0), "pulled toward the hit at half the push (actors G5: the enemy's rule)")
 
 
-func test_a_shocked_wizards_next_spell_hit_jumps_to_its_nearest_teammate() -> void:
-	var wizard := _wizard(0, Vector2.ZERO)
-	var mate := _wizard(1, Vector2(40.0, 0.0))
-	var enemy := _enemy(Vector2(-20.0, 0.0))
-	_projectiles.step(STEP)
-	_combat.apply_status(0, 0, &"shock", 5.0, 100.0)
+func test_a_gusted_wizard_is_shoved_harder_by_a_spell_hit() -> void:
+	var wizard := _wizard(0, Vector2(100.0, 0.0))
+	var profile := _profile(2)
+	profile.knockback = 100.0
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0) + wizard.hurtbox.offset, _enemy_tag(profile), -1)
+	var plain: Vector2 = _combat.knockback_of(0)
+	_combat.apply_status(0, 0, &"gust", 5.0, 100.0)
 	check(_combat.hit(EventsScript.NO_PLAYER, wizard, 4), "a plain hit")
-	check_equal(wizard.health.health, wizard.health.max_health - 4, "adds nothing (actors G5: no shock bonus)")
-	check(_combat.has_status(wizard, &"shock"), "and leaves the shock for a spell")
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, -12.0), _enemy_tag(_profile(4)), -1)
-	check_equal(mate.health.health, mate.health.max_health - 4, "the spell hit jumped to the nearest actor of the wizard's team")
-	check_equal(_combat.health_of(enemy), 100, "not to the enemy, though it stands nearer")
-	check(not _combat.has_status(wizard, &"shock"), "the shock is spent")
+	check_equal(wizard.health.health, wizard.health.max_health - 6, "adds no damage (2 and 4)")
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0) + wizard.hurtbox.offset, _enemy_tag(profile), -1)
+	check(_combat.knockback_of(0).is_equal_approx(plain * 2.0), "a gusted wizard is shoved twice as hard, the enemy's rule too (%s, %s)" % [_combat.knockback_of(0), plain])
 
 
 func test_a_charged_wizard_discharges_into_enemies_near_on_the_next_hit() -> void:

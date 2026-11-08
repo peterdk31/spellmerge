@@ -1,0 +1,13 @@
+{
+	"id": "on_recast_slow_frost",
+	"name": "Frost on cue",
+	"does": "A slow bolt crawls out past an imp beside its path; casting again bursts it into a frost nova right there, chilling the imp it would have missed.",
+	"casts": [
+		{"staff": 0, "cards": ["on_recast", "slow", "bolt", "frost", "nova"]},
+		{"staff": 0, "cards": ["on_recast", "slow", "bolt", "frost", "nova"], "at": 1.5}
+	],
+	"imps": [[110, 40]],
+	"seconds": 2.5,
+	"needs": "on_recast",
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

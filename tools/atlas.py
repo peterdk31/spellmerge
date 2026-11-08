@@ -32,7 +32,7 @@ KIND_FOLDERS = {"form": "forms", "element": "elements", "modifier": "modifiers",
 KIND_ORDER = ("form", "element", "modifier", "trigger", "multicast", "combo", "reaction")
 # ReactionRow.Effect, in the order of the enum in core/base/reaction_row.gd.
 EFFECTS = ("burst", "consume", "extend", "spread")
-STATUS_WORDS = {"burn": "burning", "chill": "chilled", "shock": "shocked", "hex": "hexed"}
+STATUS_WORDS = {"burn": "burning", "chill": "chilled", "gust": "gusted", "hex": "hexed"}
 
 
 def _value(text: str, key: str, default: str = "") -> str:

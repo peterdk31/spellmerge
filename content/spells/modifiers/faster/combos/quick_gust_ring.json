@@ -1,0 +1,10 @@
+{
+	"id": "quick_gust_ring",
+	"name": "Quick gust ring",
+	"does": "A quick ring of gusts that flies half again as far: the imp 85 px out is only gusted with Faster.",
+	"needs": "faster",
+	"casts": [{"staff": 0, "cards": ["storm", "faster", "nova"]}],
+	"imps": [[40, 0], [0, 40], [-40, 0], [60, 60]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1, 2, 3], "status": "gust"}]
+}

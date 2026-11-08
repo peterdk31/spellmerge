@@ -55,8 +55,11 @@ func _forms() -> Array[FormBase]:
 
 ## How far a form gets: a beam, a dash, a teleport or a rain its length, a shot in flight its
 ## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
-## rises (it creeps as a rune does, rules R4 F6).
+## rises (it creeps as a rune does, rules R4 F6), a pool where it spreads and half as far again
+## as it creeps in its life.
 static func _reach(form: FormBase) -> float:
+	if form.carrier == &"pool":
+		return form.ray_length + SpellLimits.HOMING_DRIFT * form.lifetime * 0.5
 	if form.carrier == &"rune":
 		return SpellLimits.HOMING_DRIFT * form.lifetime
 	if form.carrier == &"wall":

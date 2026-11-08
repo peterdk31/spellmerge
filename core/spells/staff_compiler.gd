@@ -17,7 +17,7 @@ extends RefCounted
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The shot bodies a form card may ask for (`FormBase.SHOT_BODIES`), as the projectile manager's kinds.
-const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE}
+const BODIES: Dictionary = {&"stone": ProjectilesScript.KIND_STONE, &"pool": ProjectilesScript.KIND_POOL}
 ## `CompiledCast.targets` value for a card that landed on the caster, on a payload's origin, and on
 ## the body or shot that fired a payload.
 const TARGET_CASTER: int = -1
@@ -26,7 +26,7 @@ const TARGET_BEARER: int = -3
 
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
-const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction"]
+const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction", "when its staff is pressed again"]
 
 ## Test only (tests/core/test_card_rules.gd): true keeps every card the waste table would drop on
 ## its carrier (a behaviour, numbers, an infusion, a trigger that "never fires"), so the runtime

@@ -9,7 +9,7 @@ extends RefCounted
 ## never drawn) under the director's `Horde` node, registered with Combat as a plain body
 ## (`register_actor`: its kind's health, hurt circle and touch damage; Combat opens its actor id on
 ## the enemies' team). So every rule finds it as it finds any actor: shots and strikes hit its
-## hurt circle, statuses, reactions, shock jumps, static, hex, pulls and barriers are Combat's
+## hurt circle, statuses, reactions, gusts, static, hex, pulls and barriers are Combat's
 ## rows, its touch hurts the wizards, and its death is Combat's (`enemy_died`, then the node is
 ## freed). Nothing else exists per swarmer.
 ##

@@ -1,0 +1,13 @@
+{
+	"id": "on_recast_rune_nova",
+	"name": "Remote rune",
+	"does": "A rune is laid ahead; casting the staff again lays a second one and bursts the first into a ring of fire that burns an imp beyond it, out of reach of the caster.",
+	"casts": [
+		{"staff": 0, "cards": ["on_recast", "rune", "fire", "nova"]},
+		{"staff": 0, "cards": ["on_recast", "rune", "fire", "nova"], "at": 1.5}
+	],
+	"imps": [[100, 0]],
+	"seconds": 2.5,
+	"needs": "on_recast",
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

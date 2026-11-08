@@ -76,6 +76,7 @@ func before_each() -> void:
 	_trigger(&"on_wall", TriggerBase.Event.WALL)
 	_trigger(&"on_hurt", TriggerBase.Event.HURT)
 	_trigger(&"on_reaction", TriggerBase.Event.REACTION)
+	_trigger(&"on_recast", TriggerBase.Event.RECAST)
 
 
 func _put(component: SpellComponent, id: StringName) -> void:
@@ -327,6 +328,69 @@ func test_on_hurt_stops_when_the_carrier_is_gone() -> void:
 	_tick(20)
 	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	check_equal(_spells.live_shots(held), 0, "an expired carrier fires nothing")
+
+
+## A new press of staff 0 of `caster`, as the caster's input sends it: its live `on recast`
+## carriers first, then the cast (refused while the staff is busy).
+func _press(caster: int) -> void:
+	_spells.press_staff(caster, 0, Vector2.ZERO, Vector2.RIGHT, 10.0)
+
+
+func test_on_recast_fires_from_each_live_carrier_when_its_staff_is_pressed_again() -> void:
+	# A slow shot that lasts past three presses.
+	_form(&"long", 60.0, 3.0)
+	var payload: int = _build(0, [&"on_recast", &"long", &"rune"])
+	var carrier: int = _spells.current_tag(0, 0, 0)
+	_press(0)
+	_tick(32)
+	check_equal(_slots(payload).size(), 0, "one press fires nothing")
+	var first: int = _first(carrier)
+	var was: Vector2 = _mgr.get_position_of(first) if first >= 0 else Vector2.INF
+	_press(0)
+	var fired: Array[int] = _slots(payload)
+	check_equal(fired.size(), 1, "the second press fires the first shot's payload, not its own shot's")
+	check(fired.size() == 1 and _mgr.get_position_of(fired[0]).is_equal_approx(was), "from where the first shot was")
+	_tick(32)
+	_press(0)
+	check_equal(_slots(payload).size(), 3, "a third press fires both shots still in the air")
+
+
+func test_on_recast_fires_while_the_staff_is_still_busy() -> void:
+	var payload: int = _build(0, [&"on_recast", &"bolt", &"rune"])
+	var carrier: int = _spells.current_tag(0, 0, 0)
+	_press(0)
+	_tick(3)
+	_press(0)
+	check_equal(_slots(payload).size(), 1, "a press in the wind-down sets it off, though it casts nothing")
+	check_equal(_slots(carrier).size(), 1, "and no second bolt left")
+
+
+func test_a_cast_alone_is_no_recast() -> void:
+	_form(&"long", 60.0, 3.0)
+	var payload: int = _build(0, [&"on_recast", &"long", &"rune"])
+	_cast(0)
+	_tick(32)
+	_cast(0)
+	check_equal(_slots(payload).size(), 0, "a held button's repeat casts, it does not set anything off")
+
+
+func test_on_recast_hears_only_its_own_staff() -> void:
+	var payload: int = _build(0, [&"on_recast", &"bolt", &"rune"])
+	StaffKit.build(_spells, 0, 1, [&"bolt"] as Array[StringName])
+	StaffKit.build(_spells, 1, 0, [&"bolt"] as Array[StringName])
+	_press(0)
+	_tick(3)
+	_spells.press_staff(0, 1, Vector2.ZERO, Vector2.RIGHT, 10.0)
+	_press(1)
+	check_equal(_slots(payload).size(), 0, "another staff of its caster, or another caster, sets nothing off")
+
+
+func test_on_recast_fires_nothing_once_the_carrier_is_gone() -> void:
+	var payload: int = _build(0, [&"on_recast", &"short", &"rune"])
+	_press(0)
+	_tick(32)
+	_press(0)
+	check_equal(_slots(payload).size(), 0, "an expired carrier fires nothing")
 
 
 ## The caster `donor` casts `donor_cards` away from everything, then wizard 0 casts a bolt with

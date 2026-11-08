@@ -12,8 +12,9 @@ const E := TriggerBase.Event
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the carriers it can
 ## fire on. Every carrier not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
-const SHOTS: Array = [&"atom", &"rune", &"orbit", &"swap", &"wall"]
-## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
+const SHOTS: Array = [&"atom", &"rune", &"orbit", &"swap", &"wall", &"pool"]
+## What is over at once: no timer ticks, nothing hears a hurt on it (rules R4d) and nothing is left
+## for a recast.
 const AT_ONCE: Array = [&"slam", &"teleport"]
 
 var _items: Dictionary = {}
@@ -60,7 +61,7 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 func _expected(event: int, carrier: StringName) -> bool:
 	match event:
-		E.TIMER, E.HURT:
+		E.TIMER, E.HURT, E.RECAST:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
 			# Wherever a shield or deflect runs: not on a rain or familiar (a decoy has a barrier),

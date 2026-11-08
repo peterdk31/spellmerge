@@ -263,6 +263,11 @@ func _discover() -> void:
 const LINE: Dictionary = {"name": "target", "line": true}
 const OPEN: Dictionary = {"name": "open"}
 const CROWD_AGAIN: Dictionary = {"name": "a crowd, cast again", "line": true, "crowd": true, "repeat": true}
+## Nothing in the way, the staff pressed again now and then (`again`: at these steps; `on
+## recast`), busy or not. Without the card the carrier holds its payload under a trigger that stays
+## quiet here (`stand_in`: `on hurt`, and no one is hurt), so both staffs cast the same cycle and
+## only the recast differs.
+const OPEN_AGAIN: Dictionary = {"name": "open, pressed again", "again": [6, 9, 14, 22, 40, 70], "stand_in": TriggerBase.Event.HURT}
 const SIDE_TARGET: Dictionary = {"name": "target off the line", "side": true}
 ## The same, cast again while it lasts: a zap is a chance (50% a body a shot), so one shot may
 ## pass the target without zapping it; a stream of them does not.
@@ -330,6 +335,8 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 			return [HURT, SHOOTER]
 		TriggerBase.Event.REACTION:
 			return [REACTING]
+		TriggerBase.Event.RECAST:
+			return [OPEN_AGAIN]
 	return []
 
 
@@ -356,6 +363,9 @@ static func reach(form: FormBase) -> float:
 			return form.ray_length
 		&"rune":
 			return form.radius
+		&"pool":
+			# In the puddle: it spreads `ray_length` ahead.
+			return form.ray_length
 		&"orbit":
 			return form.orbit_radius
 		&"wall":
@@ -624,6 +634,11 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: boo
 		with.append_array(extra)
 		with.append_array(tail)
 		with.append(_payload.id)
+		if scene.has("stand_in"):
+			for trigger in _triggers:
+				if trigger.event == int(scene["stand_in"]):
+					without.append(trigger.id)
+					break
 		without.append_array(extra)
 		without.append_array(tail)
 		without.append(_payload.id)
@@ -798,6 +813,8 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 		world.at_step[2] = [world.press]
 	else:
 		world.press(scene.get("repeat", false))
+	for step: int in scene.get("again", []):
+		world.press_at(step)
 	world.run(seconds, 0.0 if not scene.get("repeat", false) else seconds)
 	var trace: PackedStringArray = world.trace
 	world.free_all()

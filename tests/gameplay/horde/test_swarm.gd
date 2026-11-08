@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Tests for the swarm (gameplay/horde/swarm.gd, docs/milestones/horde-swarm.md part S1): kinds
 ## read from the enemy, a swarmer as a bare node and a plain Combat body, the rows through many
 ## deaths, chase and retargeting, pace (chill, freeze), knockback, pull, swap, spacing, the floor
-## and wall bodies, touch, every element's status and the shock jump between swarmers, the hurt
+## and wall bodies, touch, every element's status and a gust's harder shove, the hurt
 ## pose, grudges, death by bolts with its gem through the director, the director's routing and its
 ## break, and no growth of memory over many steps. On a fixture of its own (swarm_fixture.gd: the
 ## real Combat, projectile manager and Spells); time moves by fixed steps.
@@ -341,7 +341,7 @@ func test_touch_hurts_a_wizard() -> void:
 func test_every_element_puts_its_status_on_a_swarmer() -> void:
 	var run: Fixture = _make()
 	var wizard: Actor = run.wizard(Vector2(400.0, 0.0))
-	var wanted: Dictionary = {&"fire": &"burn", &"frost": &"chill", &"storm": &"shock", &"void": &"hex", &"lightning": &"static"}
+	var wanted: Dictionary = {&"fire": &"burn", &"frost": &"chill", &"storm": &"gust", &"void": &"hex", &"lightning": &"static"}
 	var y: float = -200.0
 	for element: StringName in wanted:
 		var node: Node2D = run.swarmer(Vector2(0.0, y), Fixture.HuskData)
@@ -378,16 +378,15 @@ func test_frost_freezes_a_swarmer_where_it_stands() -> void:
 	check(node.position.distance_to(at) < 1.0, "frozen, it does not walk (moved %.1f px)" % node.position.distance_to(at))
 
 
-func test_a_shock_jumps_between_swarmers() -> void:
+func test_a_gust_shoves_a_swarmer_harder() -> void:
 	var run: Fixture = _make()
 	var wizard: Actor = run.wizard(Vector2(900.0, 900.0))
-	var struck: Node2D = run.swarmer(Vector2.ZERO, Fixture.HuskData)
-	var near: Node2D = run.swarmer(Vector2(30.0, 0.0), Fixture.HuskData)
-	run.hit(wizard.id, struck, run.tag(wizard.id, &"storm"))
-	check(run.combat.has_status(struck, CombatScript.SHOCK), "the storm hit shocked it")
-	var before: int = run.combat.health_of(near)
-	run.hit(wizard.id, struck, run.tag(wizard.id))
-	check(run.combat.health_of(near) < before, "the next hit jumped to the swarmer beside it")
+	var calm: Node2D = run.swarmer(Vector2.ZERO, Fixture.HuskData)
+	var gusted: Node2D = run.swarmer(Vector2(0.0, 200.0), Fixture.HuskData)
+	run.hit(wizard.id, calm, run.tag(wizard.id))
+	run.hit(wizard.id, gusted, run.tag(wizard.id, &"storm"))
+	check(run.combat.has_status(gusted, CombatScript.GUST), "the storm hit gusted it")
+	check(run.combat.knockback_of(gusted).length() > run.combat.knockback_of(calm).length() * 1.5, "and shoved it harder than a plain hit")
 
 
 func test_a_hit_shows_the_hurt_pose() -> void:

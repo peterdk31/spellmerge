@@ -1,0 +1,10 @@
+{
+	"id": "pool_frost_slick",
+	"name": "Frost slick",
+	"does": "A frost pool chills the imp standing in it at every tick, and the third chill in a row freezes it solid: one cast, no second bolt needed.",
+	"needs": "pool",
+	"casts": [{"staff": 0, "cards": ["frost", "pool"]}],
+	"imps": [[56, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "freeze"}]
+}

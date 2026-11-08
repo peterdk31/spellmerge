@@ -149,7 +149,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		if exit >= 0:
 			_pt_gates[at * _pt_stride + used] = exit
 			used += 1
-			if spell.fires_on(TriggerBase.Event.TIMER) or spell.fires_on(TriggerBase.Event.HURT):
+			if spell.fires_live():
 				kit.live_join(spell, tag, SpellRuntime.LC_POINT, -1, born, false, lifetime, exit_at, face)
 	_pt_gates_used[at] = used
 	kit.shot_started(tag)

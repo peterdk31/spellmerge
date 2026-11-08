@@ -53,7 +53,7 @@ extends Resource
 ## full depth: its glow `status_deep_white` of the way to white and `status_deep_motes` times the
 ## motes, so a frozen character reads apart from a chilled one.
 ## When a character has several, the first in `status_order` is the one shown.
-@export var status_order: Array[StringName] = [&"freeze", &"static", &"shock", &"burn", &"hex", &"chill"]
+@export var status_order: Array[StringName] = [&"freeze", &"static", &"gust", &"burn", &"hex", &"chill"]
 @export var deep_statuses: Dictionary = {&"freeze": &"chill"}
 @export_range(0.0, 60.0, 0.5) var status_mote_rate: float = 8.0
 @export_range(1.0, 8.0, 0.5) var status_deep_motes: float = 2.0

@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Reactions and statuses in gameplay/feel (#244, part 3): a reaction is a burst bigger than a
 ## plain hit (a ring, a bigger spray, a longer hit-stop, more shake and its sound together), and
-## an enemy with burning, chill, freeze, shock or hex shows it on its sprite, without text: a glow
+## an enemy with burning, chill, freeze, gust or hex shows it on its sprite, without text: a glow
 ## in its element card's colour and the card's motes round it (spell spectacle 2, S6 item 11).
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -135,7 +135,7 @@ func test_four_players_reacting_at_once_stay_inside_the_effect_slots() -> void:
 
 func test_each_status_shows_a_different_colour() -> void:
 	var seen: Array[Color] = []
-	for id: StringName in [&"burn", &"chill", &"freeze", &"shock", &"hex"]:
+	for id: StringName in [&"burn", &"chill", &"freeze", &"gust", &"hex"]:
 		var enemy: Enemy = _enemy()
 		_status_on(enemy, id)
 		check_equal(_feel.status_shown(enemy), id, "%s shows" % id)
@@ -201,7 +201,7 @@ func test_a_sprite_with_its_own_material_still_shows_a_status() -> void:
 
 func test_a_freed_enemy_loses_its_overlay() -> void:
 	var enemy: Enemy = _enemy()
-	_status_on(enemy, &"shock")
+	_status_on(enemy, &"gust")
 	enemy.free()
 	_feel.step(STEP)
 	check_equal(_feel.live_statuses(), 0, "no overlay for a freed enemy")
@@ -221,7 +221,7 @@ func test_without_combat_there_are_no_overlays() -> void:
 
 
 func test_a_status_is_shown_as_its_element_card() -> void:
-	for id: StringName in [&"burn", &"chill", &"shock", &"hex", &"static"]:
+	for id: StringName in [&"burn", &"chill", &"gust", &"hex", &"static"]:
 		var card: Array = _feel._status_card(id)
 		check(not card.is_empty() and card[ElementBase.STATUS_LOOK_STATUS] == id, "%s is the status of a card" % id)
 		var tint: Color = card[ElementBase.STATUS_LOOK_TINT] as Color

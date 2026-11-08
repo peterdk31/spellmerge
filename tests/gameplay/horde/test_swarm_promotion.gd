@@ -66,13 +66,13 @@ func test_a_possession_promotes_the_swarmer_with_everything_it_had() -> void:
 	node.name = "Picked"
 	var id: int = run.combat.actor_of(node)
 	var at: Vector2 = node.position
-	# Hurt, burnt, chilled twice, hexed, shocked, charged, pushed, then a barrier.
+	# Hurt, burnt, chilled twice, hexed, gusted, charged, pushed, then a barrier.
 	run.combat.hit(wizard.id, node, 3.0, Vector2.RIGHT, 120.0)
 	run.combat.apply_status(wizard.id, node, CombatScript.BURN, 2.0, 1.5)
 	run.combat.apply_status(wizard.id, node, CombatScript.CHILL, 2.5, 30.0)
 	run.combat.apply_status(wizard.id, node, CombatScript.CHILL, 2.5, 30.0)
 	run.combat.apply_status(wizard.id, node, CombatScript.HEX, 3.0, 25.0)
-	run.combat.apply_status(wizard.id, node, CombatScript.SHOCK, 1.5, 40.0)
+	run.combat.apply_status(wizard.id, node, CombatScript.GUST, 1.5, 40.0)
 	run.combat.apply_status(wizard.id, node, CombatScript.STATIC, 1.5, 50.0)
 	run.combat.give_shield(node, 2, 4.0, 7)
 	var before: Dictionary = run.combat.row_state(node)

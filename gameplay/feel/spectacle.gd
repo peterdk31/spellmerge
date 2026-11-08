@@ -792,10 +792,11 @@ func light_beams_begin() -> void:
 		light.light_beams_begin()
 
 
-## Live beam `i`'s light along the path Feel just gave its shader (`SpellLight.light_beam`).
-func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float) -> void:
+## Live beam `i`'s light along the path Feel just gave its shader (`SpellLight.light_beam`), as
+## bright and as far as its card says (`intensity`, `reach`: its `look_light_*`, 1 as any beam).
+func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float, intensity: float = 1.0, reach: float = 1.0) -> void:
 	if light != null:
-		light.light_beam(i, path, points, player, look, core, fade)
+		light.light_beam(i, path, points, player, look, core, fade, intensity, reach)
 
 
 # --- The room ------------------------------------------------------------------------------------

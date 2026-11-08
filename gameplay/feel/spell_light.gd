@@ -370,8 +370,9 @@ func light_beams_begin() -> void:
 
 ## Live beam `i`'s light along the path Feel just gave its shader: `points` of `path` (x, y, how
 ## far along), in the ramp `player` (shot_beam's `beam_player`), its look and core colour, faded
-## by `fade`.
-func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float) -> void:
+## by `fade`; BEAM_STRENGTH times `intensity` bright and BEAM_REACH times `reach` wide (its card's
+## `look_light_intensity` and `look_light_reach`; docs/milestones/card-looks.md, phase 1b).
+func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float, intensity: float = 1.0, reach: float = 1.0) -> void:
 	while beams.size() <= i:
 		var node := MeshInstance2D.new()
 		node.mesh = beam_light_mesh()
@@ -391,6 +392,8 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 	shade.set_shader_parameter(&"beam_look", look)
 	shade.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
 	shade.set_shader_parameter(&"beam_fade", fade)
+	shade.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
+	shade.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
 	beam.visible = true
 
 

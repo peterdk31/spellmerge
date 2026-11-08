@@ -26,6 +26,8 @@ class CardsRegistry:
 
 
 const FORMS: Array[StringName] = [&"bolt", &"beam", &"nova", &"rune", &"orbit"]
+## The beam card's own look (`FormBase.look_shader`; docs/milestones/card-looks.md, phase 2).
+const BEAM_CARD_SHADER: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
 
 var bus: EventsScript
 var feel: FeelScript
@@ -315,7 +317,7 @@ func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
 	bus.form_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
 	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
-	check(material.shader == FeelScript.BEAM_SHADER, "a beam")
+	check(material.shader == BEAM_CARD_SHADER, "a beam, by its card's own shader (card-looks phase 2)")
 	check_equal(material.get_shader_parameter(&"beam_points"), 2, "along a path of two points")
 	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
 	check_equal(material.get_shader_parameter(&"beam_player"), 3, "in its caster's hat ramp")
@@ -380,3 +382,31 @@ func test_an_impact_cue_is_of_the_shots_spell() -> void:
 	_impact(0, &"rune")
 	projectiles.impact_tag = 0
 	check_equal(tags, [77] as Array[int], "a rune's burst leaves its scar by the cards of the shot's spell (`impact_tag`)")
+
+
+## Two beams on screen at once keep their own materials: each sets its own path and length, so a
+## card's shader is set on each beam's own material, never shared (card-looks phase 2).
+func test_two_beams_keep_their_own_materials() -> void:
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	bus.form_shown.emit(1, &"beam", Vector2(0, 50), Vector2.RIGHT, 60.0, Color.BLUE, 0)
+	var shown: Array[MeshInstance2D] = []
+	for node in feel._forms:
+		if node.visible:
+			shown.append(node)
+	check_equal(shown.size(), 2, "two beams")
+	if shown.size() != 2:
+		return
+	check(shown[0].material != shown[1].material, "each its own material")
+	var lengths: Array = [(shown[0].material as ShaderMaterial).get_shader_parameter(&"beam_length"), (shown[1].material as ShaderMaterial).get_shader_parameter(&"beam_length")]
+	lengths.sort()
+	check_equal(lengths, [60.0, 100.0], "each its own length")
+	for node in shown:
+		check((node.material as ShaderMaterial).shader == BEAM_CARD_SHADER, "each by the beam card's shader")
+
+
+## Only a card its own area draws lends a beam its shader: a ray of another card (a zap of a bolt
+## is drawn as a beam, but the bolt's shader draws heads) and an id that is no card draw plain.
+func test_a_beam_of_another_card_is_drawn_plain() -> void:
+	check(feel._form_shader_of(&"beam", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == BEAM_CARD_SHADER, "the beam card's own")
+	check(feel._form_shader_of(&"bolt", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "a bolt's ray: plain")
+	check(feel._form_shader_of(&"no_such_card", Carrier.LOOK_BEAM, FeelScript.BEAM_SHADER) == FeelScript.BEAM_SHADER, "no card: plain")

@@ -107,3 +107,22 @@ func test_a_light_out_of_range_is_reported() -> void:
 	form.look_light_reach = 0.1
 	var found: String = " ".join(form.range_problems())
 	check(found.contains("look_light_intensity") and found.contains("look_light_reach"), "both named: %s" % found)
+
+
+## Spells answers a card's look for the area that draws its carrier (card-looks phases 2 and 3):
+## the beam card's shader to Feel's beams, nothing to another area, and nothing for an id that is
+## no carrier card; its light likewise (1 elsewhere).
+func test_spells_answers_a_cards_look_for_its_own_area() -> void:
+	var registry := own(preload("res://core/registry/registry.gd").new()) as Node
+	registry.call("scan")
+	var spells := own(preload("res://core/spells/spells.gd").new()) as Node
+	spells.set(&"registry", registry)
+	var beam: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
+	check(spells.call(&"look_shader_of", &"beam", Carrier.LOOK_BEAM) == beam, "the beam card's shader, to the beams")
+	check(spells.call(&"look_shader_of", &"beam", Carrier.LOOK_SWING) == null, "not to the swing trails")
+	check(spells.call(&"look_shader_of", &"bolt", Carrier.LOOK_BEAM) == null, "a bolt's ray is no beam card's: plain")
+	check(spells.call(&"look_shader_of", &"no_such_card", Carrier.LOOK_BEAM) == null, "no card: plain")
+	check(spells.call(&"look_shader_of", &"swing", Carrier.LOOK_SWING) == preload("res://content/spells/forms/swing/swing.gdshader"), "the swing card's, to the trails")
+	check(is_equal_approx(float(spells.call(&"look_light_intensity_of", &"atom", Carrier.LOOK_SHOT)), 0.5), "the atom's light, for shots")
+	check(is_equal_approx(float(spells.call(&"look_light_intensity_of", &"atom", Carrier.LOOK_BEAM)), 1.0), "and 1 to another area")
+	check(is_equal_approx(float(spells.call(&"look_light_reach_of", &"no_such_card", Carrier.LOOK_BEAM)), 1.0), "1 for no card")

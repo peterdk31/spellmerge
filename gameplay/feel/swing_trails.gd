@@ -71,8 +71,9 @@ func _init(mesh: ArrayMesh) -> void:
 ## clock `now`: a new one takes a free trail, a live one moves its trail to its hand and gives off
 ## the motes of the stretch its tip passed into `births` (none when null: motes off), and a trail
 ## past its time is hidden. `ramp_of` gives the shader's player for an actor (0-3 a hat ramp, -1
-## the enemy ramp); `glow` is how strongly it glows.
-func step(swings: Object, now: float, ramp_of: Callable, glow: float, births: BirthsScript = null) -> void:
+## the enemy ramp); `glow` is how strongly it glows; `shader_of` the shader a swing of a card id
+## trails with (its card's `look_shader`, or SHADER; none: SHADER for every swing).
+func step(swings: Object, now: float, ramp_of: Callable, glow: float, births: BirthsScript = null, shader_of: Callable = Callable()) -> void:
 	var count: int = 0
 	if swings != null:
 		count = int(swings.call("swing_slots"))
@@ -85,6 +86,14 @@ func step(swings: Object, now: float, ramp_of: Callable, glow: float, births: Bi
 		if fresh:
 			slot = _free_trail(now)
 			_born[slot] = born
+			# Drawn by its card's own shader (docs/milestones/card-looks.md, phase 2): set on the
+			# trail's own material (each trail sets its own uniforms), only when it differs.
+			var shader: Shader = SHADER
+			if shader_of.is_valid() and swings.has_method("swing_form"):
+				shader = shader_of.call(swings.call("swing_form", at) as StringName) as Shader
+			var material: ShaderMaterial = _nodes[slot].material as ShaderMaterial
+			if material.shader != shader:
+				material.shader = shader
 		_show(slot, swings, at, now, fresh, ramp_of, glow)
 		var turned: float = float(swings.call("swing_turned", at))
 		if births != null and not fresh:

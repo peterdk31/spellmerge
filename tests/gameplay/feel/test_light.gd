@@ -530,3 +530,23 @@ func test_a_shots_row_carries_its_cards_light() -> void:
 	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
 	check(code.contains("RUNE_REACH * MODEL_MATRIX[2].x") and code.contains("rune_strength * MODEL_MATRIX[2].y"), "a rune's light: its reach and brightness times the row's")
 	check(code.contains("half_size = vec2(reach * MODEL_MATRIX[2].x)") and code.contains("shot_strength * MODEL_MATRIX[2].y"), "a head's light too")
+
+
+## A beam card's light (card-looks phase 1b, 2): a beam's light is BEAM_STRENGTH times its card's
+## `look_light_intensity` bright and BEAM_REACH times its `look_light_reach` wide, 1 as any beam.
+func test_a_beams_light_follows_its_cards_light() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	var path := PackedVector3Array()
+	path.resize(SpellLightScript.BEAM_POINTS)
+	path[0] = Vector3(10.0, 20.0, 0.0)
+	path[1] = Vector3(110.0, 20.0, 100.0)
+	light.light_beams_begin()
+	light.light_beam(0, path, 2, 0, 0, Color.WHITE, 1.0)
+	light.light_beam(1, path, 2, 0, 0, Color.WHITE, 1.0, 0.5, 2.0)
+	var plain: ShaderMaterial = light.beams[0].material as ShaderMaterial
+	var card: ShaderMaterial = light.beams[1].material as ShaderMaterial
+	check(is_equal_approx(float(plain.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH) and is_equal_approx(float(plain.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH), "a plain beam lights as before")
+	check(is_equal_approx(float(card.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH * 0.5), "half as bright")
+	check(is_equal_approx(float(card.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH * 2.0), "twice as wide")

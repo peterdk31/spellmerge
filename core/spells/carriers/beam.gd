@@ -1075,6 +1075,12 @@ func beam_tint(at: int) -> Color:
 	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
 
 
+## The id of the card live beam `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws it
+## by its card's look (`Spells.look_shader_of`).
+func beam_form(at: int) -> StringName:
+	return _bm_spell[at].form_id if _bm_spell[at] != null else &""
+
+
 ## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.
 func beam_look(at: int) -> int:
 	return _bm_spell[at].look if _bm_spell[at] != null else 0

@@ -83,6 +83,23 @@ class FakeSwings:
 	func swing_tag(_at: int) -> int:
 		return 77
 
+	## The card each swing is (`swing_form`), and the looks Spells would answer for a card id
+	## drawn as a swing trail (`look_shader_of`): none by default, every trail plain.
+	var form: StringName = &"swing"
+	var trail_shaders: Dictionary = {}
+
+	func swing_form(_at: int) -> StringName:
+		return form
+
+	func look_shader_of(id: StringName, drawer: int) -> Shader:
+		return trail_shaders.get(id) as Shader if drawer == Carrier.LOOK_SWING else null
+
+	func look_light_intensity_of(_id: StringName, _drawer: int) -> float:
+		return 1.0
+
+	func look_light_reach_of(_id: StringName, _drawer: int) -> float:
+		return 1.0
+
 
 var bus: EventsScript
 var feel: FeelScript
@@ -244,3 +261,27 @@ func test_the_shader_draws_only_the_line_and_its_light() -> void:
 	var code: String = SwingTrailsScript.SHADER.code
 	check(not code.contains("shot_particle") and not code.contains("Q_SPARK") and not code.contains("Q_PARTICLE"), "its sparks and card particles are motes (S6 item 10)")
 	check_equal(SwingTrailsScript.SWING_QUADS.size(), 2, "two quads: the light and the line")
+
+
+## A swing card's own look (docs/milestones/card-looks.md, phase 2): its trail is drawn by the shader
+## Spells answers for its card (`look_shader_of`, as a swing trail), on the trail's own material;
+## a card that names none, or that another area draws, trails with the plain shader.
+func test_a_swing_trails_with_its_cards_own_shader() -> void:
+	var own_look: Shader = preload("res://content/spells/forms/swing/swing.gdshader")
+	swings.trail_shaders[&"swing"] = own_look
+	feel.step(0.016)
+	var trail: MeshInstance2D = null
+	for node: MeshInstance2D in _trails()._nodes:
+		if node.visible:
+			trail = node
+	check(trail != null and (trail.material as ShaderMaterial).shader == own_look, "drawn by its card's shader")
+	check_equal(_trails().parameter_of(1, &"swing_reach"), 24.0, "with its own uniforms, as before")
+	# A new swing of a card with no look of its own takes a trail drawn plain.
+	swings.form = &"bolt"
+	swings.generation = 1
+	feel.step(0.016)
+	var plain: int = 0
+	for node: MeshInstance2D in _trails()._nodes:
+		if node.visible and (node.material as ShaderMaterial).shader == SwingTrailsScript.SHADER:
+			plain += 1
+	check_equal(plain, 1, "the other swing's trail is plain")

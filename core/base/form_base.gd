@@ -157,7 +157,7 @@ func look_cues() -> Array:
 
 
 ## What is wrong with its looks, one line each (empty when nothing is): a look shader that is not
-## a canvas-item shader. Whether the cues it names exist is the registry's to say
+## a canvas-item shader, one its carrier never draws, an old field name. Whether the cues it names exist is the registry's to say
 ## (tests/content/spells/test_carrier_looks.gd).
 func look_problems() -> PackedStringArray:
 	var found := PackedStringArray()
@@ -165,6 +165,8 @@ func look_problems() -> PackedStringArray:
 		found.append("%s: `%s` was renamed `look_shader`: rename it in the card's .tres" % [id, name])
 	if look_shader != null and look_shader.get_mode() != Shader.MODE_CANVAS_ITEM:
 		found.append("%s: look_shader '%s' is not a canvas_item shader" % [id, look_shader.resource_path])
+	if look_shader != null and Carriers.exists(carrier) and Carriers.of(carrier).look_drawer() == Carrier.LOOK_NONE:
+		found.append("%s: look_shader '%s' is never drawn: its carrier `%s` has no look of its own (Carrier.look_drawer)" % [id, look_shader.resource_path, carrier])
 	return found
 
 

@@ -1,0 +1,118 @@
+extends "res://tests/support/suite.gd"
+## Every card's own look, over the whole registry (docs/milestones/card-looks.md, phase 4). A card
+## that names a `look_shader` is drawn by the area its carrier says (`Carrier.look_drawer`), so its
+## shader must keep that area's contract: a canvas-item shader its carrier draws, the instance and
+## mesh its area hands it (the quad kinds and flags of the area's plain shader, which it copies),
+## the particle rule of that area, nothing read from the row floats the spell light reads, and a
+## warm-up before the first room.
+##
+## godot --headless --path . --script res://tests/content/spells/test_card_looks.gd
+
+const RegistryScript := preload("res://core/registry/registry.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+
+## The plain shader each area draws a card with no look of its own by: what a card's shader copies.
+const PLAIN: Dictionary = {
+	Carrier.LOOK_SHOT: "res://core/projectiles/shot_head.gdshader",
+	Carrier.LOOK_STILL: "res://core/projectiles/shot_still.gdshader",
+	Carrier.LOOK_BEAM: "res://core/projectiles/shot_beam.gdshader",
+	Carrier.LOOK_SWING: "res://core/projectiles/shot_swing.gdshader",
+	Carrier.LOOK_ORB: "res://core/projectiles/shot_orbit.gdshader",
+}
+## The particle rule of a shader that draws its card particles (a still shot's quad, an orb):
+## 4 + 2 a kind, at most MAX_PARTICLES. The others' particles are Feel's motes.
+const PARTICLE_RULE: String = "min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"
+const DRAWS_PARTICLES: Array[int] = [Carrier.LOOK_STILL, Carrier.LOOK_ORB]
+
+var registry: Node
+
+
+func before_each() -> void:
+	registry = own(RegistryScript.new()) as Node
+	registry.call("scan")
+
+
+## The carrier cards that name a look of their own, as [card, the area that draws it].
+func _looked_cards() -> Array:
+	var found: Array = []
+	for card: Resource in registry.call("get_all", &"spells"):
+		var form := card as FormBase
+		if form != null and form.look_shader != null:
+			found.append([form, Carriers.of(form.carrier).look_drawer()])
+	return found
+
+
+func test_some_cards_have_a_look_of_their_own() -> void:
+	var ids: Array[StringName] = []
+	for each: Array in _looked_cards():
+		ids.append((each[0] as FormBase).id)
+	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"beam", &"swing", &"familiar"]:
+		check(ids.has(id), "%s draws with its folder's shader" % id)
+
+
+func test_every_card_shader_is_one_its_carrier_draws() -> void:
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
+		check(PLAIN.has(each[1]), "%s's carrier %s draws a look (got %d)" % [form.id, form.carrier, each[1]])
+		check(form.look_shader.resource_path.begins_with("res://content/spells/forms/%s/" % form.id), "%s's shader is in its own folder" % form.id)
+
+
+func test_every_card_shader_keeps_its_areas_instance_and_mesh() -> void:
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		if not PLAIN.has(each[1]):
+			continue
+		var plain: String = (load(PLAIN[each[1]]) as Shader).code
+		var code: String = form.look_shader.code
+		for line: String in plain.split("\n"):
+			if line.begins_with("const float Q_") or line.begins_with("const float HF_"):
+				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])
+		check(code.contains("render_mode blend_premul_alpha"), "%s blends as the shot shaders do" % form.id)
+
+
+func test_every_card_shader_keeps_its_areas_particle_rule() -> void:
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		var code: String = form.look_shader.code
+		if DRAWS_PARTICLES.has(each[1]):
+			check(code.contains(PARTICLE_RULE), "%s asks 4 + 2 particles a kind" % form.id)
+		else:
+			check(not code.contains("emit_count()"), "%s draws no card particles: its area's are motes" % form.id)
+
+
+func test_no_card_shader_reads_the_light_floats() -> void:
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		check(not form.look_shader.code.contains("MODEL_MATRIX[2]"), "%s leaves the row floats the spell light reads alone (LIGHT_*_FLOAT)" % form.id)
+
+
+func test_every_card_shader_is_warmed_before_the_first_room() -> void:
+	var manager := own(ProjectilesScript.new()) as ProjectilesScript
+	var spells := own(SpellsScript.new()) as Node
+	spells.set(&"registry", registry)
+	spells.set(&"projectiles", manager)
+	spells.call(&"register_bodies")
+	var warmed: Array[Shader] = WarmupScript.shaders()
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		check(warmed.has(form.look_shader), "%s's shader is warmed when Spells starts" % form.id)
+	# A shot carrier's body was numbered then, with its mesh: asked again, it is one of those.
+	var numbered: int = manager.batch_count()
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		if each[1] == Carrier.LOOK_SHOT or each[1] == Carrier.LOOK_STILL:
+			var mesh: int = ProjectilesScript.MESH_HEAD if each[1] == Carrier.LOOK_SHOT else ProjectilesScript.MESH_QUAD
+			check(manager.register_body(form.look_shader, mesh) > 0, "%s has a body" % form.id)
+	check_equal(manager.batch_count(), numbered, "every shot carrier card's body was numbered when Spells started")
+
+
+func test_a_look_shader_on_a_carrier_with_no_look_is_reported() -> void:
+	var form := FormBase.new()
+	form.id = &"test_form"
+	form.carrier = &"dash"
+	form.look_shader = preload("res://content/spells/forms/pool/pool.gdshader")
+	var found: String = " ".join(form.look_problems())
+	check(found.contains("never drawn"), "a dash draws no look: %s" % found)

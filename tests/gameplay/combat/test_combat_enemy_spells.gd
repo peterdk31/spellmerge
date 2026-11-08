@@ -153,7 +153,7 @@ func test_a_frozen_wizard_shatters_for_double() -> void:
 	for i in 3:
 		_combat.apply_status(EventsScript.NO_PLAYER, 0, &"chill", 3.0, 30.0)
 	check(_combat.status_left(0, &"freeze") > 0.0, "three chills freeze")
-	_hit(wizard, _element(1, &"storm", &"shock"))
+	_hit(wizard, _element(1, &"storm", &"gust"))
 	check_equal(_triggered, [&"shatter"] as Array[StringName], "storm on a frozen wizard shatters")
 	check_equal(wizard.health.health, wizard.health.max_health - 1 - 12, "the hit, then twice the shatter")
 	check_equal(_combat.status_left(0, &"freeze"), 0.0, "the freeze is gone")
@@ -176,14 +176,14 @@ func test_a_chilled_wizard_is_stilled_and_a_burn_kindles_the_wizards_near() -> v
 func test_a_wizard_waits_before_reacting_again() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
-	_hit(wizard, _element(1, &"storm", &"shock"))
+	_hit(wizard, _element(1, &"storm", &"gust"))
 	check_equal(_triggered, [&"flare"] as Array[StringName], "the first hit reacts")
 	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
-	_hit(wizard, _element(1, &"storm", &"shock"))
+	_hit(wizard, _element(1, &"storm", &"gust"))
 	check_equal(_triggered.size(), 1, "one right after does not")
 	_run(0.75)
 	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
-	_hit(wizard, _element(1, &"storm", &"shock"))
+	_hit(wizard, _element(1, &"storm", &"gust"))
 	check_equal(_triggered.size(), 2, "after the wait it reacts again")
 
 

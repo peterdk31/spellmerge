@@ -1,12 +1,12 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of enemy statuses: one ember imp each with burning, chill, freeze, shock, hex and
+## Screenshots of enemy statuses: one ember imp each with burning, chill, freeze, gust, hex and
 ## static, in a row in the live game (`statuses_1x`, as a player sees them, and `statuses_4x`),
 ## then a reaction bursting over the row (`status_reaction_1x`). A status's particles are its card's
 ## motes given off a few a second (spell spectacle 2, S6 item 11), so the row is shown after
 ## SHOWN_FRAMES, once they have built up as they do in a fight.
 
 const IMP_SCENE := preload("res://content/enemies/ember_imp/ember_imp.tscn")
-const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"shock", &"hex", &"static"]
+const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"gust", &"hex", &"static"]
 ## Pixels between neighbours in the row.
 const GAP: float = 40.0
 ## Status seconds, long enough to outlast the shots.

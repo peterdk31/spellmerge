@@ -44,7 +44,7 @@ const REACTION_TIME: float = 2.0
 const REACTION_REACH: float = 2.0
 ## The statuses the status line names, in this order.
 const STATUSES: Array[StringName] = [
-	CombatScript.BURN, CombatScript.CHILL, CombatScript.FREEZE, CombatScript.SHOCK,
+	CombatScript.BURN, CombatScript.CHILL, CombatScript.FREEZE, CombatScript.GUST,
 	CombatScript.HEX, CombatScript.STATIC,
 ]
 

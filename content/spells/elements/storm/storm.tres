@@ -7,12 +7,12 @@
 script = ExtResource("1_base")
 id = &"storm"
 display_name = "Storm"
-description = "Shocks; the next hit jumps to a nearby foe. Quick."
+description = "Gusts: hits shove it twice as hard. Walls hurt. Breezy."
 complexity = 1
 icon = ExtResource("2_icon")
-status_id = &"shock"
+status_id = &"gust"
 status_duration = 4.0
-status_strength = 75.0
+status_strength = 100.0
 damage_scale = 1.0
 tint = Color(0.9490, 0.7608, 0.1882, 1)
 look_layer = 3

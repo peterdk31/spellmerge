@@ -64,7 +64,7 @@ func test_reaction_table_finds_a_pair_in_order() -> void:
 	row.element_id = &"storm"
 	table.rows.append(row)
 	check(table.find(&"chill", &"storm") == row, "chill hit by storm finds shatter")
-	check(table.find(&"shock", &"frost") == null, "the reverse pair is a different reaction")
+	check(table.find(&"gust", &"frost") == null, "the reverse pair is a different reaction")
 	check(table.find(&"burn", &"void") == null, "a pair with no row gives null")
 
 
@@ -102,7 +102,7 @@ func test_reaction_table_index_follows_its_rows() -> void:
 ## with the statuses it is given, and follows the rows as the index does.
 func test_reaction_table_in_order_follows_its_rows() -> void:
 	var table := ReactionTable.new()
-	var order: Array[StringName] = [&"burn", &"chill", &"shock"]
+	var order: Array[StringName] = [&"burn", &"chill", &"gust"]
 	check(table.in_order(&"storm", order).is_empty(), "an empty table: none")
 	var chill := ReactionRow.new()
 	chill.status_id = &"chill"

@@ -124,7 +124,7 @@ func test_every_pair_of_the_four_first_elements_reacts_both_ways_under_one_of_si
 				continue
 			var found: bool = false
 			for row in table.rows:
-				var status_element: StringName = {&"burn": &"fire", &"chill": &"frost", &"shock": &"storm", &"hex": &"void"}.get(row.status_id, &"")
+				var status_element: StringName = {&"burn": &"fire", &"chill": &"frost", &"gust": &"storm", &"hex": &"void"}.get(row.status_id, &"")
 				if status_element == a and row.element_id == b:
 					found = true
 					names[row.reaction_id] = true
@@ -142,7 +142,7 @@ func test_shatter_eats_chill_for_bonus_damage() -> void:
 	check_equal(_ids(), [&"shatter"], "shatter fired")
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 6, "the hit plus the bonus")
 	check(not _combat.has_status(enemy, &"chill"), "the chill is gone")
-	check(not _combat.has_status(enemy, &"shock"), "storm put no shock on: the reaction ran instead")
+	check(not _combat.has_status(enemy, &"gust"), "storm put no gust on: the reaction ran instead")
 
 
 func test_shatter_doubles_on_a_frozen_enemy_and_ends_the_freeze() -> void:
@@ -156,13 +156,13 @@ func test_shatter_doubles_on_a_frozen_enemy_and_ends_the_freeze() -> void:
 	check_equal(_combat.pace(enemy), 1.0, "the enemy moves again")
 
 
-func test_shatter_works_the_other_way_round_on_shock() -> void:
+func test_shatter_works_the_other_way_round_on_gust() -> void:
 	var enemy := _enemy()
-	_combat.apply_status(0, enemy, &"shock", 4.0, 0.0001)
+	_combat.apply_status(0, enemy, &"gust", 4.0, 0.0001)
 	_hit(0, enemy, &"frost")
-	check_equal(_ids(), [&"shatter"], "frost on a shocked enemy shatters")
+	check_equal(_ids(), [&"shatter"], "frost on a gusted enemy shatters")
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 6, "the hit plus the bonus")
-	check(not _combat.has_status(enemy, &"shock"), "the shock is gone")
+	check(not _combat.has_status(enemy, &"gust"), "the gust is gone")
 	check(not _combat.has_status(enemy, &"chill"), "and frost put no chill on")
 
 
@@ -218,15 +218,13 @@ func test_flare_is_wider_and_weaker_than_thaw() -> void:
 	check(_combat.has_status(enemy, &"burn"), "flare leaves the burn alone")
 
 
-func test_flare_on_a_shocked_enemy_hit_by_fire() -> void:
+func test_flare_on_a_gusted_enemy_hit_by_fire() -> void:
 	var enemy := _enemy()
 	var wide := _enemy(Vector2(0.0, 50.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 0.0001)
+	_combat.apply_status(0, enemy, &"gust", 4.0, 0.0001)
 	_hit(0, enemy, &"fire")
-	check(_ids().has(&"flare"), "fire on shock flares")
-	# Health is decimal (2026-10-30): the jump is its share of the hit, here a hair, no longer at
-	# least a point.
-	check(absf(_combat.health_of(wide) - 98.0) < 0.001, "the burst plus the shock's tiny jump (%s)" % _combat.health_of(wide))
+	check(_ids().has(&"flare"), "fire on gust flares")
+	check_equal(_combat.health_of(wide), 98, "the burst reaches 50 px")
 
 
 # --- Kindle: fire and void, spread ---
@@ -310,12 +308,10 @@ func test_rift_bursts_and_pulls_toward_the_centre() -> void:
 	var enemy := _enemy()
 	var near := _enemy(Vector2(30.0, 0.0))
 	var outside := _enemy(Vector2(100.0, 0.0))
-	_combat.apply_status(0, enemy, &"shock", 4.0, 0.0001)
+	_combat.apply_status(0, enemy, &"gust", 4.0, 0.0001)
 	_hit(0, enemy, &"void")
 	check_equal(_ids(), [&"rift"], "rift fired")
-	# The burst's 2, and the shock's own jump of at least 1 to the nearest enemy (the hit
-	# spends the shock before the reaction runs, so rift only adds the burst).
-	check(absf(_combat.health_of(near) - 98.0) < 0.001, "the neighbour takes the burst and the jump, its tiny share (%s)" % _combat.health_of(near))
+	check_equal(_combat.health_of(near), 98, "the neighbour takes the burst's 2")
 	check(_combat.knockback_of(near).x < 0.0, "and is pulled toward the centre")
 	check_equal(_combat.health_of(outside), 100, "out of reach is untouched")
 
@@ -327,14 +323,14 @@ func test_rift_on_a_hexed_enemy_hit_by_storm() -> void:
 	_hit(0, enemy, &"storm")
 	check_equal(_ids(), [&"rift"], "storm on hex")
 	check(_combat.knockback_of(near).y > 0.0, "the neighbour is pulled in")
-	check(not _combat.has_status(enemy, &"shock"), "no shock went on")
+	check(not _combat.has_status(enemy, &"gust"), "no gust went on")
 
 
 # --- the rest of the contract ---
 
 
 func test_the_same_element_does_not_react() -> void:
-	var own_status: Dictionary = {&"fire": &"burn", &"frost": &"chill", &"storm": &"shock", &"void": &"hex"}
+	var own_status: Dictionary = {&"fire": &"burn", &"frost": &"chill", &"storm": &"gust", &"void": &"hex"}
 	for element in ELEMENTS:
 		var enemy := _enemy(Vector2(200.0 * ELEMENTS.find(element), 0.0))
 		_combat.apply_status(0, enemy, own_status[element], 3.0, 10.0)
@@ -378,7 +374,7 @@ func test_a_reaction_can_kill_and_credits_the_player() -> void:
 
 func test_four_players_react_on_four_enemies_at_once() -> void:
 	var enemies: Array[Node2D] = []
-	var statuses: Array[StringName] = [&"burn", &"chill", &"shock", &"hex"]
+	var statuses: Array[StringName] = [&"burn", &"chill", &"gust", &"hex"]
 	for player in 4:
 		var enemy := _enemy(Vector2(200.0 * player, 0.0))
 		enemies.append(enemy)
@@ -421,13 +417,13 @@ func test_a_busy_reaction_leaves_nothing_behind() -> void:
 
 func test_an_enemy_reacts_once_per_wait_and_the_next_hit_does_its_own_status() -> void:
 	var enemy := _enemy()
-	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_combat.apply_status(0, enemy, &"gust", 5.0, 50.0)
 	_hit(0, enemy, &"fire")
 	_hit(0, enemy, &"fire")
 	check_equal(_ids(), [&"flare"], "the second hit inside the wait did not react")
 	check(_combat.has_status(enemy, &"burn"), "it burned the enemy instead")
 	_run(CombatScript.REACTION_WAIT + STEP)
-	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_combat.apply_status(0, enemy, &"gust", 5.0, 50.0)
 	_hit(0, enemy, &"fire")
 	check_equal(_ids(), [&"flare", &"flare"], "after the wait it reacts again")
 
@@ -454,13 +450,13 @@ func test_twenty_stillness_hits_on_hex_stay_under_the_caps() -> void:
 	check(before - _combat.health_of(enemy) <= 100 + 100, "hex adds at most 100 per cent")
 
 
-func test_shatter_doubles_for_a_frozen_and_shocked_enemy() -> void:
+func test_shatter_doubles_for_a_frozen_and_gusted_enemy() -> void:
 	var enemy := _enemy()
 	for i in 3:
 		_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
-	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_combat.apply_status(0, enemy, &"gust", 5.0, 50.0)
 	_hit(0, enemy, &"frost")
-	check_equal(_ids(), [&"shatter"], "frost on shock shatters")
+	check_equal(_ids(), [&"shatter"], "frost on gust shatters")
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 12, "twice the bonus, as for a frozen chill")
 	check(not _combat.has_status(enemy, &"freeze"), "the freeze is broken")
 

@@ -27,7 +27,7 @@ extends Node
 ##
 ## A spell's hit (`projectile_hit`; a blast's too, rules R4 F2) is looked up in Spells' hit profiles
 ## (`Spells.hit_profile(tag, shot)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
-## else damage and a push (a pull while hexed), the shock jump, the static discharge, then
+## else damage and a push (a pull while hexed; harder while gusted), the static discharge, then
 ## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
 ## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
 ## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
@@ -36,7 +36,8 @@ extends Node
 ## counts; flow counts the wave by it), and the body is freed.
 ##
 ## The one rules (owner, 2026-10-28), the same on every actor:
-##  - **shock:** the next spell hit also jumps to the nearest other actor of the victim's team;
+##  - **gust:** a spell hit shoves it harder (its power in per cent more), and a gusted body
+##    knocked into a wall takes a slam, as a heavy hit's; the storm hit that gusts it shoves so too;
 ##  - **static:** any hit (not a burn tick) sets it off: the victim's actors of other teams
 ##    within STATIC_RANGE take its share, and the charge is always spent;
 ##  - **hex:** extra damage, and a spell hit pulls the victim toward it instead of pushing;
@@ -67,28 +68,28 @@ const REACTIONS: ReactionTable = preload("res://content/spells/reactions.tres")
 const BURN: StringName = &"burn"
 const CHILL: StringName = &"chill"
 const FREEZE: StringName = &"freeze"
-const SHOCK: StringName = &"shock"
+const GUST: StringName = &"gust"
 const HEX: StringName = &"hex"
 const STATIC: StringName = &"static"
 ## Every status by its index (`ST_*`): a row keeps each one's seconds left and power in
-## `_status_left` and `_status_power`, at `row * STATUS_COUNT + ST_*`. A plain status (shock, hex,
+## `_status_left` and `_status_power`, at `row * STATUS_COUNT + ST_*`. A plain status (gust, hex,
 ## static) is only its name, its index and its row in each table below; burn and chill have rules of
 ## their own, in the few places that name them (`_apply_status_row`, `_extend`, `_remove_status`,
 ## `_tick`). What a status does to a hit is where the hit is dealt (`_hit`, `_apply_spell`, `_pace`).
-const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, SHOCK, HEX, STATIC]
+const STATUSES: Array[StringName] = [BURN, CHILL, FREEZE, GUST, HEX, STATIC]
 const ST_BURN: int = 0
 const ST_CHILL: int = 1
 const ST_FREEZE: int = 2
-const ST_SHOCK: int = 3
+const ST_GUST: int = 3
 const ST_HEX: int = 4
 const ST_STATIC: int = 5
 const STATUS_COUNT: int = 6
 ## A status's index by its name.
-const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, SHOCK: ST_SHOCK, HEX: ST_HEX, STATIC: ST_STATIC}
+const STATUS_AT: Dictionary[StringName, int] = {BURN: ST_BURN, CHILL: ST_CHILL, FREEZE: ST_FREEZE, GUST: ST_GUST, HEX: ST_HEX, STATIC: ST_STATIC}
 ## By ST_*: whether `apply_status` puts it on (freeze only comes from chill).
 const STATUS_APPLIED: Array[bool] = [true, true, false, true, true, true]
 ## By ST_*: what `apply_status`'s strength is in its power (its power is the strength over this):
-## burn's damage a second, chill's share of speed (its strength a percent), shock's, hex's and
+## burn's damage a second, chill's share of speed (its strength a percent), gust's, hex's and
 ## static's percent; freeze has none.
 const STATUS_STRENGTH_PER_POWER: Array[float] = [1.0, 100.0, 0.0, 1.0, 1.0, 1.0]
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
@@ -144,9 +145,9 @@ const KNOCKBACK_DECAY: float = 1200.0
 const CHILL_STACKS_TO_FREEZE: int = 3
 const FREEZE_TIME: float = 1.0
 const CHILL_SLOW_MAX: float = 0.9
-## A shocked actor's next spell hit also jumps to the nearest other actor of its team within
-## this many pixels.
-const SHOCK_JUMP_RANGE: float = 64.0
+## A gusted actor's spell hit arms a slam of this share of the hit's damage (at least 1), unless
+## the hit is heavy and arms its own: knocked into a wall, it takes it (`_check_slam`).
+const GUST_SLAM_SHARE: float = 0.5
 ## A spell hit on a hexed actor pulls it toward the hit point with this share of the push it
 ## would have had away from it.
 const HEX_PULL_SHARE: float = 0.5
@@ -156,7 +157,7 @@ const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at: a hit reacts with the
 ## first the target has that has a row for the hit's element (a frozen target counts as chilled).
 ## The one list of that order (`_status_bits`).
-const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX, STATIC]
+const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, GUST, HEX, STATIC]
 ## `_hit`'s `team` when its caller has not read the row's team (it reads it then).
 const TEAM_UNREAD: int = -2
 ## A consume reaction does this many times its damage to a frozen actor.
@@ -165,7 +166,7 @@ const FROZEN_BONUS: int = 2
 ## status instead. Keeps fast spells from setting the same reaction off on every hit.
 const REACTION_WAIT: float = 0.5
 ## Limits for the reaction EXTEND effect: the longest freeze, the longest any other extended
-## status, the largest extra damage share of hex or shock in per cent, and the fastest burn.
+## status, the largest share of hex or gust in per cent, and the fastest burn.
 const MAX_FREEZE: float = 4.0
 const MAX_EXTENDED_TIME: float = 8.0
 const MAX_EXTENDED_PERCENT: float = 100.0
@@ -239,7 +240,7 @@ var _steps: int = 0
 var _contact_left: PackedFloat32Array = PackedFloat32Array()
 
 # Statuses, STATUS_COUNT a row (`row * STATUS_COUNT + ST_*`): seconds left (0: off) and power
-# (burn's damage a second, chill's share of speed taken, the percent a shock jumps with, a hex
+# (burn's damage a second, chill's share of speed taken, the percent more a gust shoves, a hex
 # adds, a static charge discharges; freeze has none).
 var _status_left: PackedFloat32Array = PackedFloat32Array()
 var _status_power: PackedFloat32Array = PackedFloat32Array()
@@ -644,9 +645,9 @@ func _consume_knockback(row: int, delta: float) -> Vector2:
 
 # --- Statuses ----------------------------------------------------------------
 
-## Put `status_id` (burn, chill, shock, hex or static) on `actor` (an id or its node) for
+## Put `status_id` (burn, chill, gust, hex or static) on `actor` (an id or its node) for
 ## `duration` seconds. `strength` is burn damage per second, the percent of speed chill takes,
-## the percent of the hit that a shock jumps with, the percent of extra damage a hex adds, or the
+## the percent more a gust shoves, the percent of extra damage a hex adds, or the
 ## percent of a hit a static charge discharges. `caster` is credited with burn damage. A second
 ## application refreshes the time and keeps the stronger number (a status that ran out keeps none:
 ## put on again it has its new one); the third chill in a row
@@ -703,7 +704,7 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 	return true
 
 
-## Seconds left of `status_id` (burn, chill, freeze, shock, hex or static) on `actor`; 0 when
+## Seconds left of `status_id` (burn, chill, freeze, gust, hex or static) on `actor`; 0 when
 ## it is off or the actor is not registered.
 func status_left(actor: Variant, status_id: StringName) -> float:
 	var row: int = _row_of(actor)
@@ -979,7 +980,7 @@ func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals an actor of the caster's
 ## team (teams aim: a mend is for friends); otherwise damage and a push away from the hit (a pull
-## toward it while hexed), the shock jump, the static discharge (in `_hit`), then every element in
+## toward it while hexed; harder while gusted, `_gust_power`), the static discharge (in `_hit`), then every element in
 ## order: each reacts with what the ones before it left, or puts its own status on, later
 ## statuses too (`fire · frost · bolt` thaws on its own hit).
 func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kind: StringName) -> void:
@@ -999,8 +1000,9 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	if _status_left[at + ST_HEX] > 0.0:
 		direction = -direction
 		strength *= HEX_PULL_SHARE
-	var jump_share: float = _status_power[at + ST_SHOCK] if _status_left[at + ST_SHOCK] > 0.0 else 0.0
-	var jump_from: Vector2 = feet + _hurt_offset[row]
+	var gust: float = _gust_power(row, profile)
+	if gust > 0.0:
+		strength *= 1.0 + gust / 100.0
 	# (Read now: a body the hit kills has no row, and so no team, after it.)
 	var team: int = _team(row)
 	# The reaction is chosen from the statuses the target had when the hit arrived.
@@ -1012,17 +1014,11 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	var discharged: bool = _discharged
 	if _same(row, node):
 		if strength > 0.0:
-			# A push replaces the knockback, so it replaces the slam too: only a heavy hit arms it.
-			_slam[row] = profile.slam if profile.slam > 0 else 0
+			# A push replaces the knockback, so it replaces the slam too: only a heavy hit, or a
+			# gusted body's, arms it.
+			_slam[row] = profile.slam if profile.slam > 0 else (maxi(roundi(damage * GUST_SLAM_SHARE), 1) if gust > 0.0 else 0)
 			_slam_by[row] = by
-		if jump_share > 0.0:
-			_remove_status(row, SHOCK)
-	# What the jump and the reactions kill is not the spell's own kill: no `kill_landed`.
-	if jump_share > 0.0:
-		var spell_tag: int = _tag
-		_tag = 0
-		_shock_jump(by, team, node, jump_from, damage * jump_share / 100.0)
-		_tag = spell_tag
+	# What the reactions kill is not the spell's own kill: no `kill_landed`.
 	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the
 	# next element read what is left.)
 	var reacted: bool = false
@@ -1061,28 +1057,18 @@ func _heals(by: int, row: int) -> bool:
 	return team != ActorsScript.NONE and team == _team(row)
 
 
-## The spell hit on `node` (of `team`) jumps from `from` to the nearest other actor of that team
-## in reach, for `amount`. The jump pushes nothing and puts on no status.
-func _shock_jump(by: int, team: int, node: Node2D, from: Vector2, amount: float) -> void:
-	if projectiles == null:
-		return
-	var near: Array[Node2D] = _take_scratch()
-	var count: int = projectiles.targets_in(from, SHOCK_JUMP_RANGE, ProjectileManagerScript.ACTOR_LAYERS, near)
-	var best: int = ActorsScript.NONE
-	var best_sq: float = INF
-	for i in count:
-		if near[i] == node:
-			continue
-		var other: int = _row_of_node(near[i])
-		if other == ActorsScript.NONE or _team(other) != team:
-			continue
-		var d: float = (_position_of(_nodes[other]) + _hurt_offset[other]).distance_squared_to(from)
-		if d < best_sq:
-			best_sq = d
-			best = other
-	_give_scratch()
-	if best != ActorsScript.NONE:
-		_hit(by, best, amount, Vector2.ZERO, 0.0, KIND_SHOT, null, false)
+## How much harder a spell hit of `profile` shoves the row `row`, in per cent: its gust's power
+## while it is gusted, or the gust the hit itself puts on (a storm hit shoves at once); the larger.
+## 0 when neither.
+func _gust_power(row: int, profile: HitProfile) -> float:
+	var at: int = row * STATUS_COUNT + ST_GUST
+	var power: float = _status_power[at] if _status_left[at] > 0.0 else 0.0
+	if profile.status_id == GUST:
+		power = maxf(power, profile.status_strength)
+	for i in profile.later_status_ids.size():
+		if profile.later_status_ids[i] == GUST and i < profile.later_status_strengths.size():
+			power = maxf(power, profile.later_status_strengths[i])
+	return power
 
 
 ## A charged actor (`actor`, of `team`, the body `victim`) was hit: every actor of another team

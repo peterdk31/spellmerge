@@ -1,0 +1,12 @@
+{
+	"id": "faster_casting_gust_ring",
+	"name": "Faster casting gust ring",
+	"does": "A ring of gusts that is ready again in half the time, so the second ring at 0.5 s goes out too.",
+	"casts": [
+		{"staff": 0, "cards": ["storm", "faster_casting", "nova"]},
+		{"staff": 0, "cards": ["storm", "faster_casting", "nova"], "at": 0.5}
+	],
+	"imps": [[40, 0], [0, 40], [-40, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "gust"}]
+}

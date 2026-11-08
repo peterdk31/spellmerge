@@ -23,3 +23,5 @@ pierce = 0
 knockback = 10.0
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.02, "push": -1, "ease": "out"}, {"phase": "after", "at": 0.05}])
 cast_cue = &"cast_atom"
+look_light_intensity = 0.5
+look_light_reach = 0.75

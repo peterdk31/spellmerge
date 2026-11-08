@@ -8,6 +8,11 @@ func id() -> StringName:
 	return &"rune"
 
 
+## What draws its look: its shots stand still, one quad each.
+func look_drawer() -> int:
+	return LOOK_STILL
+
+
 func traits() -> int:
 	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD | MEETS_SHOTS | CASTS_FROM_SHOT
 

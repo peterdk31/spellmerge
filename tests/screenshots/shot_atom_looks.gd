@@ -1,11 +1,13 @@
 extends "res://tests/support/screenshot.gd"
 ## The atom beside the bolt in flight: a speck (hit radius below `SPECK_RADIUS`) drawn as a
 ## one-pixel core (`shot_head.gdshader`), and a fast shot's tail of motes, laid along all the
-## way it went. It fails when fewer than 12 shots
+## way it went. It fails when fewer than 18 shots
 ## are drawn.
 ##
-## `atom_looks` (1x): a pair of lanes per infusion (plain, fire, frost, storm, void, lightning),
-## a bolt above an atom, both flying right. `atom_looks_4x`: the plain pair's heads at 4x.
+## `atom_looks` (1x): three lanes per infusion (plain, fire, frost, storm, void, lightning), all
+## flying right: a bolt drawn by its card's own shader (`forms/bolt/bolt.gdshader`, its core a `x`;
+## docs/milestones/card-looks.md), an atom, and a bolt drawn by the plain head (`+`) for the owner
+## to judge them side by side. `atom_looks_4x`: the plain infusion's three heads at 4x.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
@@ -42,20 +44,23 @@ func take() -> void:
 		var look: PackedInt32Array = PackedInt32Array() if e == 0 else PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))])
 		var player: int = wizards[e % 4]
 		var y: float = 30.0 + e * 56.0
-		for lane in 2:
-			var form: Resource = BOLT if lane == 0 else ATOM
+		for lane in 3:
+			var form: Resource = ATOM if lane == 1 else BOLT
 			var speed: float = float(form.get("speed"))
 			# Both end their flight at the same x, so the tails line up behind them.
-			var start: Vector2 = Vector2(420.0 - speed * float(FLIGHT) / 60.0, y + lane * 22.0)
+			var start: Vector2 = Vector2(420.0 - speed * float(FLIGHT) / 60.0, y + lane * 17.0)
 			var slot: int = _shots.call("spawn", player, start, Vector2(speed, 0.0), 600.0, float(form.get("radius"))) as int
+			if lane == 0:
+				# The bolt's own look: its card's shader, a pair of head batches of its own.
+				_shots.call("set_form", slot, &"bolt", _shots.call("register_body", form.get("look_shader"), ManagerScript.MESH_HEAD))
 			_shots.call("set_core", slot, tint)
 			_shots.call("set_look", slot, ManagerScript.pack_look(look))
 		if e == 0:
-			atom_at = Vector2(420.0, y + 11.0)
+			atom_at = Vector2(420.0, y + 17.0)
 	await settle(FLIGHT)
 	var image: Image = await grab()
-	if int(_shots.get("drawn")) < 12:
+	if int(_shots.get("drawn")) < 18:
 		fail("only %d shots were drawn" % int(_shots.get("drawn")))
 		return
 	save(image, "atom_looks")
-	save_crop(image, atom_at, "atom_looks_4x", Vector2i(80, 24))
+	save_crop(image, atom_at, "atom_looks_4x", Vector2i(80, 44))

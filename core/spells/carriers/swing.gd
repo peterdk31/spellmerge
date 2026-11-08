@@ -54,6 +54,11 @@ func id() -> StringName:
 	return &"swing"
 
 
+## What draws its look: Feel draws its swing trails.
+func look_drawer() -> int:
+	return LOOK_SWING
+
+
 
 ## The swings of the runtime `spells` (its bound `swing` carrier, `Spells.carrier`), for what reads
 ## its own getters (the looks, `ai`, the actor's mover, the tests).
@@ -432,6 +437,12 @@ func swing_sweep(at: int) -> float:
 ## The tint and packed look kinds of swing `at` (`CompiledSpell.tint`, `look`), so it shows its cards.
 func swing_tint(at: int) -> Color:
 	return _sw_spell[at].tint if _sw_spell[at] != null else Color.WHITE
+
+
+## The id of the card live swing `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws
+## its trail by its card's look (`Spells.look_of`).
+func swing_form(at: int) -> StringName:
+	return _sw_spell[at].form_id if _sw_spell[at] != null else &""
 
 
 func swing_look(at: int) -> int:

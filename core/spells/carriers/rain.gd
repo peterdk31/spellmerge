@@ -8,6 +8,11 @@ func id() -> StringName:
 	return &"rain"
 
 
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE
+
+
 func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD | CARRIES_PAYLOAD | HOLDS_STAFF
 

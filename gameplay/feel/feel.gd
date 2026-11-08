@@ -377,6 +377,11 @@ var _hit_flash_material: ShaderMaterial = null
 ## The live beams (`Spells.carrier(&"beam")`), one beam mesh each (`beam_mesh`), made once, and each one's
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
+## Each carrier card's own look as an area of Feel draws it, asked of Spells once and kept
+## (`_form_look_of`; docs/milestones/card-looks.md): {Carrier.LOOK_BEAM or LOOK_SWING: {card id:
+## CardLook}}. Beams' and swing trails' materials take its shader; a beam's light its light. Feel
+## reads no card field.
+var _form_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
 ## The open portals' gates (`PortalRingsScript`), drawn every frame.
@@ -673,6 +678,7 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells")
+	_warm_card_looks()
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
 	_spectacle.attach(projectiles, spells)
@@ -711,7 +717,7 @@ func step(real_delta: float) -> void:
 	_hit_sounds = 0
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
-		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null)
+		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
 	if _portal_rings != null:
 		_portal_rings.step(spells.call("carrier", &"portal") if spells != null and spells.has_method("carrier") else null, projectiles, _clock)
 	_status_motes(real_delta)
@@ -1653,6 +1659,47 @@ func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Ve
 		play_cue(cue, caster, at, direction, size, tint, look, ActorsScript.NONE, -1, -1, tag)
 
 
+## The carrier card `form`'s look as the area `drawer` (Carrier.LOOK_BEAM, LOOK_SWING) draws it
+## (`Spells.look_of`; `CardLook.PLAIN` with no Spells, no card, or a card another area draws), asked
+## once per id and kept: a cast allocates nothing.
+func _form_look_of(form: StringName, drawer: int) -> CardLook:
+	var cache: Dictionary = _form_looks.get(drawer, {})
+	var known: CardLook = cache.get(form) as CardLook
+	if known != null:
+		return known
+	if spells == null or form == &"" or not spells.has_method(&"look_of"):
+		return CardLook.PLAIN
+	var look: CardLook = spells.call(&"look_of", form, drawer) as CardLook
+	cache[form] = look
+	_form_looks[drawer] = cache
+	return look
+
+
+## The shader that draws the carrier card `form`'s look in the area `drawer`, or `plain` when its
+## card names none (or is drawn by another area).
+func _form_shader_of(form: StringName, drawer: int, plain: Shader) -> Shader:
+	var shader: Shader = _form_look_of(form, drawer).shader
+	return shader if shader != null else plain
+
+
+## Warms the carrier cards' own shaders Feel draws (beams' and swing trails', one mesh each:
+## `Spells.look_shaders`) before the first room, as it warms its own; Spells knows nothing of how.
+func _warm_card_looks() -> void:
+	if spells == null or not spells.has_method(&"look_shaders"):
+		return
+	for drawer: int in [Carrier.LOOK_BEAM, Carrier.LOOK_SWING]:
+		for shader: Shader in spells.call(&"look_shaders", drawer):
+			ShaderWarmupScript.want(shader, ShaderWarmupScript.MESH)
+
+
+## Gives `node`'s own material `shader` (a beam's or a trail's: each node keeps its own material,
+## since each sets its own uniforms), only when it has another, so nothing is recompiled per cast.
+static func _use_shader(node: CanvasItem, shader: Shader) -> void:
+	var material: ShaderMaterial = node.material as ShaderMaterial
+	if material.shader != shader:
+		material.shader = shader
+
+
 ## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.
 func _make_beam() -> MeshInstance2D:
 	var node := MeshInstance2D.new()
@@ -1694,6 +1741,11 @@ static func swing_mesh() -> ArrayMesh:
 
 
 ## The swing trails (for tests).
+## The shader a swing of the carrier card `form` trails with (its `look_shader`, or the plain trail's).
+func _swing_shader_of(form: StringName) -> Shader:
+	return _form_shader_of(form, Carrier.LOOK_SWING, SwingTrailsScript.SHADER)
+
+
 func swing_trails() -> SwingTrailsScript:
 	return _swing_trails
 
@@ -2338,6 +2390,8 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	var path: PackedVector3Array = _form_paths[slot]
 	path[0] = Vector3(origin.x, origin.y, 0.0)
 	path[1] = Vector3(end.x, end.y, length)
+	# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's.
+	_use_shader(node, _form_shader_of(form, Carrier.LOOK_BEAM, BEAM_SHADER))
 	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 	# A path of two points, BEAM_LEAD past each end, so the flares are whole.
@@ -2497,6 +2551,10 @@ func _draw_live_beams(real_delta: float) -> void:
 		if projectiles != null:
 			body = projectiles.tint_of(caster)
 		var tint: Color = beams.call("beam_tint", i)
+		# Drawn by its card's own shader (`FormBase.look_shader`), or the plain beam's, and lit as
+		# its card says (`look_light_intensity`, `look_light_reach`).
+		var look: CardLook = _form_look_of(beams.call("beam_form", i) as StringName if beams.has_method("beam_form") else &"", Carrier.LOOK_BEAM)
+		_use_shader(node, look.shader if look.shader != null else BEAM_SHADER)
 		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
@@ -2519,7 +2577,7 @@ func _draw_live_beams(real_delta: float) -> void:
 		_beam_motes(path, used, walked, end_at, end_dir, fade, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, int(beams.call("beam_tag", i)) if beams.has_method("beam_tag") else 0, real_delta)
 		# Spell light along the same path (P3b; through the spectacle, `SpellLight.light_beam`).
 		if _spectacle != null:
-			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade)
+			_spectacle.light_beam(i, path, used, _beam_ramp(_ramp_of(caster)), int(beams.call("beam_look", i)) if beams.has_method("beam_look") else 0, tint, fade, look.light_intensity, look.light_reach)
 
 
 ## The motes a beam gives off over `seconds` (see BEAM_SPLASH_RATE), into the spectacle's births

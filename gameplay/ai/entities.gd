@@ -96,6 +96,11 @@ const FAMILIAR_SIZE: float = 3.0
 ## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
 ## style (`DecoyLook`), a familiar an orbit shot drawn whole with its tail bent round its circle.
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
+## The card whose look a familiar's orb is (`Spells.look_of`, as an orb: its `look_shader`,
+## or ORBIT_SHADER when it names none; docs/milestones/card-looks.md, phase 3). Every familiar is
+## drawn in one batch, so by one card's shader: a second card that makes familiars with a look of
+## its own would need a batch per shader.
+const FAMILIAR_CARD: StringName = &"familiar"
 const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const STRIDE: int = 16
@@ -209,6 +214,7 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	use_familiar_look()
 	if events == null:
 		push_warning("Entities: the Events autoload is missing, so no decoy or familiar is ever made.")
 		return
@@ -217,6 +223,19 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.ai_view_changed.connect(_on_ai_view_changed)
 	events.run_ended.connect(_on_run_ended)
+
+
+## Draws the familiars' orbs by their card's own shader (`FAMILIAR_CARD`'s `look_shader`, asked of
+## Spells as an orb), or ORBIT_SHADER when it names none or there is no Spells, and warms it. Once
+## when it is ready and at each run's start; nothing is asked per spawn.
+func use_familiar_look() -> void:
+	var shader: Shader = spells.look_of(FAMILIAR_CARD, Carrier.LOOK_ORB).shader if spells != null else null
+	var material: ShaderMaterial = _familiar_node.material as ShaderMaterial
+	var wanted: Shader = shader if shader != null else ORBIT_SHADER
+	# Warmed before the first room as Entities draws it, one batch (Spells knows nothing of how).
+	ShaderWarmupScript.want(wanted, ShaderWarmupScript.BATCH)
+	if material.shader != wanted:
+		material.shader = wanted
 
 
 ## Move time on: lifetimes and familiar orbits.
@@ -311,6 +330,7 @@ func enemy_gone(caster: int) -> void:
 ## time it holds a decoy.
 func begin_run() -> void:
 	clear()
+	use_familiar_look()
 	for row in _decoys.size():
 		var decoy: Actor = _decoys[row]
 		if decoy != null:

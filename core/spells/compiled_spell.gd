@@ -40,14 +40,17 @@ var shots: int = 1
 var spread: float = 0.0
 ## The id of its carrier (`FormBase.carrier`, `Carriers.of`); a fallback's is a fallback carrier's
 ## (`Carriers.ON_CASTER`, `ON_BEARER`, `AT_POINT`), which no form card fires.
-## Setting it reads the carrier's `traits` once.
+## Setting it reads the carrier's `traits` and `look_drawer` once.
 var carrier: StringName = &"":
 	set(value):
 		carrier = value
 		traits = Carriers.of(value).traits()
+		look_drawer = Carriers.of(value).look_drawer()
 ## Its carrier's yes/no answers (`Carrier.traits`, `CarrierTraits`), kept here so the runtime asks
 ## them per shot with no lookup (`has_trait`).
 var traits: int = 0
+## What draws its carrier's look (`Carrier.look_drawer`, LOOK_*), kept with the traits.
+var look_drawer: int = Carrier.LOOK_NONE
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
@@ -69,10 +72,14 @@ var tint: Color = Color.WHITE
 ## The shot's look, packed by `core/projectiles`' `pack_look`: the `look_layer` of every
 ## infusion and modifier on it, combined (0 none).
 var look: int = 0
-## The shader its still shots are drawn by (`FormBase.shot_shader`; null for their motion's own),
-## a body the projectile manager numbers (`register_body`); its card's id goes with every shot
-## (`Projectiles.set_looks`), for its looks.
-var shot_shader: Shader = null
+## The shader its carrier's look is drawn by (`FormBase.look_shader`; null for the plain one of
+## whatever draws it): for shots, a body the projectile manager numbers (`register_body`, by
+## `look_drawer`'s mesh); its card's id goes with every shot (`Projectiles.set_looks`), for its looks.
+var look_shader: Shader = null
+## How bright and how far its carrier lights the room, times the light's own
+## (`FormBase.look_light_intensity`, `look_light_reach`; 1 for a plain one).
+var look_light_intensity: float = 1.0
+var look_light_reach: float = 1.0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null

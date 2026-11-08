@@ -200,7 +200,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -546,17 +546,92 @@ func _ready() -> void:
 	register_bodies()
 
 
-## Hands every carrier card's own shot shader (`FormBase.shot_shader`) to the projectile manager
-## now (`register_body`), so each has its batches and is warmed before the first room, not first
-## drawn in the middle of one. A launch numbers any it did not know too.
+## Reads every carrier card's look once (`_looks`, for `look_of` and `look_shaders`) and hands each
+## shot carrier card's own shader (LOOK_SHOT, LOOK_STILL) to the projectile manager now
+## (`register_body`, with the mesh its shots are written as), so it has its batches and is warmed
+## before the first room, not first drawn in the middle of one. A launch numbers any it did not know
+## too. The other areas warm the shaders they draw themselves (`look_shaders`).
 func register_bodies() -> void:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
-	if projectiles == null or source == null or not source.has_method(&"get_all"):
+	if source == null or not source.has_method(&"get_all"):
 		return
 	for card: Resource in source.call(&"get_all", &"spells"):
 		var form := card as FormBase
-		if form != null and form.shot_shader != null:
-			projectiles.register_body(form.shot_shader)
+		if form == null:
+			continue
+		var drawer: int = _remember_look(form)
+		var mesh: int = _shot_mesh(drawer)
+		if form.look_shader != null and mesh != NO_SHOT_MESH and projectiles != null:
+			projectiles.register_body(form.look_shader, mesh)
+
+
+## Each carrier card's look by its id, read from the card once (at start, `register_bodies`, or the
+## first time one is asked for): {id: CardLook}, and the area that draws its carrier ({id:
+## Carrier.LOOK_*}). Caches (DERIVED).
+var _looks: Dictionary = {}
+var _look_drawers: Dictionary = {}
+
+
+## The carrier card `form`'s look as the area `drawer` (Carrier.LOOK_*: Feel's beams or swing
+## trails, Entities' orbs) draws it: its own shader and light (`FormBase.look_shader`,
+## `look_light_intensity`, `look_light_reach`), or `CardLook.PLAIN` when its carrier is drawn by
+## another area (a bolt's zap is a beam, but a bolt's shader draws heads) and for an id that is no
+## carrier card (a chain's jump). So no area reads the card (docs/milestones/card-looks.md). Shared
+## and read only; allocates nothing once the card was read.
+func look_of(form: StringName, drawer: int) -> CardLook:
+	if not _looks.has(form) and not _read_look(form):
+		return CardLook.PLAIN
+	return _looks[form] as CardLook if int(_look_drawers[form]) == drawer else CardLook.PLAIN
+
+
+## Every carrier card's own shader the area `drawer` draws (Carrier.LOOK_*), so that area warms them
+## before the first room (`ShaderWarmup.want`, as it draws them). A new array each call: once, at
+## start.
+func look_shaders(drawer: int) -> Array[Shader]:
+	var found: Array[Shader] = []
+	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
+	if source == null or not source.has_method(&"get_all"):
+		return found
+	for card: Resource in source.call(&"get_all", &"spells"):
+		var form := card as FormBase
+		if form != null and form.look_shader != null and _remember_look(form) == drawer and not found.has(form.look_shader):
+			found.append(form.look_shader)
+	return found
+
+
+## Reads the card `form` into `_looks`: false when there is no such carrier card (not kept, so a
+## card the registry has not scanned yet is read once it has).
+func _read_look(form: StringName) -> bool:
+	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
+	if form == &"" or source == null or not source.has_method(&"get_resource"):
+		return false
+	var card := source.call(&"get_resource", &"spells", form) as FormBase
+	if card == null:
+		return false
+	_remember_look(card)
+	return true
+
+
+## Keeps `card`'s look in `_looks` (once) and returns the area that draws its carrier.
+func _remember_look(card: FormBase) -> int:
+	if not _looks.has(card.id):
+		_looks[card.id] = CardLook.of(card.look_shader, card.look_light_intensity, card.look_light_reach)
+		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
+	return int(_look_drawers[card.id])
+
+
+## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.
+const NO_SHOT_MESH: int = 1
+
+
+## The projectile manager's mesh (`MESH_HEAD` or `MESH_QUAD`) the shots of a carrier drawn by
+## `drawer` (`Carrier.LOOK_*`) are written as, or NO_SHOT_MESH for one the manager does not draw.
+static func _shot_mesh(drawer: int) -> int:
+	if drawer == Carrier.LOOK_SHOT:
+		return ProjectilesScript.MESH_HEAD
+	if drawer == Carrier.LOOK_STILL:
+		return ProjectilesScript.MESH_QUAD
+	return NO_SHOT_MESH
 
 
 ## Connect to a projectile manager and an event bus (either may be null, then casting is
@@ -1851,7 +1926,9 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 ## shot that cast it (no shot ends while a launch is set up), its trigger rows. Returns how many
 ## shots there were.
 func _register_shots(slots: PackedInt32Array, count: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> int:
-	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, projectiles.register_body(spell.shot_shader))
+	var look_mesh: int = _shot_mesh(spell.look_drawer)
+	var look_body: int = projectiles.register_body(spell.look_shader, look_mesh) if look_mesh != NO_SHOT_MESH else 0
+	projectiles.set_looks(slots, count, spell.tint, spell.look, spell.form_id, look_body, spell.look_light_intensity, spell.look_light_reach)
 	if _rec_seq.size() < projectiles.get_cap():
 		_grow_records(projectiles.get_cap())
 	var relay: HitProfile = spell.echo_hit if spell == _echo_spell else null

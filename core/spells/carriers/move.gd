@@ -90,3 +90,8 @@ func _move_body(_spell: CompiledSpell, _tag: int, _actor: int, _body: int, _orig
 ## What starts with a move of the shot `shot` that cast it.
 func _moved_shot(_spell: CompiledSpell, _tag: int, _actor: int, _shot: int, _seconds: float, _chain: int, _prev: int) -> void:
 	pass
+
+
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE

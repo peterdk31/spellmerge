@@ -118,6 +118,11 @@ func id() -> StringName:
 	return &"beam"
 
 
+## What draws its look: Feel draws its beams.
+func look_drawer() -> int:
+	return LOOK_BEAM
+
+
 
 ## The beams of the runtime `spells` (its bound `beam` carrier, `Spells.carrier`), for what reads
 ## its own getters (the looks, `ai`, the actor's mover, the tests).
@@ -1068,6 +1073,12 @@ func beam_growth(at: int) -> float:
 
 func beam_tint(at: int) -> Color:
 	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
+
+
+## The id of the card live beam `at` is (`CompiledSpell.form_id`; &"" for none), so Feel draws it
+## by its card's look (`Spells.look_of`).
+func beam_form(at: int) -> StringName:
+	return _bm_spell[at].form_id if _bm_spell[at] != null else &""
 
 
 ## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.

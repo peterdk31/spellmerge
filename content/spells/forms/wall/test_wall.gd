@@ -88,7 +88,7 @@ func test_four_players_raise_walls_at_once() -> void:
 	arena.free_all()
 
 
-## A card's `shot_shader` goes into its compiled spell: a wall is built of stones its own shader draws.
+## A card's `look_shader` goes into its compiled spell: a wall is built of stones its own shader draws.
 func test_a_wall_is_built_of_stones() -> void:
 	var registry := own(preload("res://core/registry/registry.gd").new()) as Node
 	registry.call("scan")
@@ -98,6 +98,6 @@ func test_a_wall_is_built_of_stones() -> void:
 	staff.id = &"test"
 	staff.slots = 4
 	var wall: CompiledSpell = (spells.call(&"compile_staff", [&"wall"] as Array[StringName], staff) as CompiledStaff).casts[0].group.spells[0]
-	var bolt: CompiledSpell = (spells.call(&"compile_staff", [&"bolt"] as Array[StringName], staff) as CompiledStaff).casts[0].group.spells[0]
-	check(wall.shot_shader == preload("res://content/spells/forms/wall/stone.gdshader"), "a wall's shots are its folder's stones")
-	check(bolt.shot_shader == null, "a bolt's are the body of their motion")
+	var atom: CompiledSpell = (spells.call(&"compile_staff", [&"atom"] as Array[StringName], staff) as CompiledStaff).casts[0].group.spells[0]
+	check(wall.look_shader == preload("res://content/spells/forms/wall/stone.gdshader"), "a wall's shots are its folder's stones")
+	check(atom.look_shader == null, "an atom's are the body of their motion")

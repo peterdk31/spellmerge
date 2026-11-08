@@ -14,6 +14,10 @@ render_mode blend_add, world_vertex_coords;
 //               a dash. Every shot, the enemies' too (one rule).
 //   ROWS_RUNE   its still shots' rows (one quad each: a card's shot shader, or shot_still.gdshader): a real transform, a square quad of the
 //               rune's size round its centre.
+//               Both kinds of shot row carry its card's light (`look_light_reach` and
+//               `look_light_intensity`, 1 for a plain shot) in MODEL_MATRIX[2].x and .y (the
+//               manager's LIGHT_REACH_FLOAT and LIGHT_INTENSITY_FLOAT): its reach and brightness
+//               are multiplied by them.
 //   ROWS_FLASH  Feel's flash rows (shot_flash, shot_blast, shot_arc): a real transform (its
 //               square, or an arc's length and width) round its centre, its second unused float
 //               (MODEL_MATRIX[2].y) how much it lights at its start (its kind's `room_light`, 0
@@ -73,9 +77,11 @@ void vertex() {
 	vec2 way = vec2(1.0, 0.0);
 	vec3 colour = vec3(0.0);
 	if (rows == ROWS_RUNE) {
-		float reach = length(MODEL_MATRIX[0].xy) * 0.5 * RUNE_REACH;
+		// Its card's light reach and intensity (`look_light_reach`, `look_light_intensity`) in the
+		// row's free floats, MODEL_MATRIX[2].x and .y (the manager's LIGHT_*_FLOAT; 1 for a plain shot).
+		float reach = length(MODEL_MATRIX[0].xy) * 0.5 * RUNE_REACH * MODEL_MATRIX[2].x;
 		half_size = vec2(reach);
-		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * rune_strength;
+		colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * rune_strength * MODEL_MATRIX[2].y;
 	} else if (rows == ROWS_FLASH) {
 		float through = clamp((coded_code(INSTANCE_CUSTOM.a) - FLASH_FROM) / FLASH_SPAN, 0.0, 1.0);
 		float strength = MODEL_MATRIX[2].y * (1.0 - through);
@@ -101,8 +107,9 @@ void vertex() {
 		if (flag_set(flags, HF_LIVE)) {
 			float red = floor(COLOR.r * 255.0 + 0.5);
 			float reach = red < 4.0 ? SPECK_REACH : SHOT_REACH + SHOT_REACH_ZOOM * max(floor(red / 4.0), 1.0);
-			half_size = vec2(reach);
-			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * shot_strength;
+			// Times its card's light reach and intensity, as a rune's (MODEL_MATRIX[2].x and .y).
+			half_size = vec2(reach * MODEL_MATRIX[2].x);
+			colour = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, 0.0, false).glow * shot_strength * MODEL_MATRIX[2].y;
 		}
 	}
 	if (half_size.x <= 0.0 || dot(colour, colour) <= 0.0) {

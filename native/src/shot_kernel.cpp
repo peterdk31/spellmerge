@@ -39,6 +39,12 @@ constexpr double PI_D = 3.1415926535897932384626433833;
 constexpr double TAU_D = 6.2831853071795864769252867666;
 constexpr int MOTION_STRAIGHT = 0;
 constexpr int MOTION_STILL = 1;
+// The manager's MESH_*: what a batch draws (`batch_mesh`).
+constexpr int MESH_HEAD = 0;
+constexpr int MESH_QUAD = -1;
+// The manager's LIGHT_*_FLOAT: a row's floats that carry its light's reach and intensity.
+constexpr int LIGHT_REACH_FLOAT = 2;
+constexpr int LIGHT_INTENSITY_FLOAT = 6;
 constexpr int MOTION_ORBIT = 2;
 constexpr int F_GHOST = 8;
 constexpr int S_IDLE = 0;
@@ -201,6 +207,9 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(sim_time, "sim_time", FLOAT) \
 	X(born, "_born", PACKED_FLOAT32_ARRAY) \
 	X(body, "_body", PACKED_BYTE_ARRAY) \
+	X(body_meshes, "_body_meshes", PACKED_INT32_ARRAY) \
+	X(look_light_intensity, "_look_light_intensity", PACKED_FLOAT32_ARRAY) \
+	X(look_light_reach, "_look_light_reach", PACKED_FLOAT32_ARRAY) \
 	X(batch_total, "_batch_total", INT) \
 	X(orbit_centre, "_orbit_centre", PACKED_VECTOR2_ARRAY) \
 	X(seq, "_seq", PACKED_INT64_ARRAY) \
@@ -884,6 +893,10 @@ const Constant CONSTANTS[] = {
 	{ "MOTION_STRAIGHT", (double)MOTION_STRAIGHT },
 	{ "MOTION_STILL", (double)MOTION_STILL },
 	{ "MOTION_ORBIT", (double)MOTION_ORBIT },
+	{ "MESH_HEAD", (double)MESH_HEAD },
+	{ "MESH_QUAD", (double)MESH_QUAD },
+	{ "LIGHT_REACH_FLOAT", (double)LIGHT_REACH_FLOAT },
+	{ "LIGHT_INTENSITY_FLOAT", (double)LIGHT_INTENSITY_FLOAT },
 	{ "F_GHOST", (double)F_GHOST },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },
@@ -1470,11 +1483,12 @@ void ShotKernel::count_draw(Object *m) {
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedInt64Array> seq, drawn_seq;
 	Arr<PackedFloat32Array> radius, drawn_radius, drawn_size;
-	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts;
+	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, body_meshes;
 	Arr<PackedColorArray> drawn_color;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
 	body.load(m, k.body);
+	body_meshes.load(m, k.body_meshes);
 	drawn_batch.load(m, k.drawn_batch);
 	seq.load(m, k.seq);
 	drawn_seq.load(m, k.drawn_seq);
@@ -1507,9 +1521,11 @@ void ShotKernel::count_draw(Object *m) {
 				drawn_seq[slot] = seq[slot];
 				drawn_radius[slot] = radius[slot];
 				drawn_look[slot] = look[slot];
-				// `_batch_of`: a still shot of a card body draws in its body's pair (`body_batch`).
+				// `_batch_of`: a shot of a card body draws in its body's pair (`body_batch`) while its
+				// motion is written as the body's mesh (`mesh_of_motion`: a quad still, else a head).
 				int64_t batch = BATCH_BOLT;
-				if (mot == MOTION_STILL && body[slot] > 0) {
+				const int64_t b = (int64_t)body[slot];
+				if (b > 0 && b <= body_meshes.n && body_meshes[b - 1] == (mot == MOTION_STILL ? MESH_QUAD : MESH_HEAD)) {
 					batch = BATCH_BODY_FIRST + 2 * ((int64_t)body[slot] - 1) + (is_hat_ramp(rmp) ? 0 : 1);
 				} else if (!is_hat_ramp(rmp)) {
 					batch = mot == MOTION_STILL ? BATCH_ENEMY_STILL : BATCH_ENEMY;
@@ -1563,9 +1579,11 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
-	Arr<PackedFloat32Array> drawn_size, born;
+	Arr<PackedFloat32Array> drawn_size, born, light_intensity, light_reach;
 	Arr<PackedInt32Array> drawn_particles, draw_out, rooms;
 	Arr<PackedColorArray> drawn_color, core;
+	light_intensity.load(m, k.look_light_intensity);
+	light_reach.load(m, k.look_light_reach);
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
 	drawn_batch.load(m, k.drawn_batch);
@@ -1584,7 +1602,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
 	const int64_t batches = m->get(k.batch_total);
-	ERR_FAIL_COND(high > alive.n || high > body.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
+	ERR_FAIL_COND(high > alive.n || high > body.n || high > light_intensity.n || high > light_reach.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
 	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
 	// in `_by_group`, and its particles and tail asked for are added to its group's.
 	Arr<PackedInt32Array> group, group_end, by_group;
@@ -1802,6 +1820,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			} else {
 				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
 			}
+			// Its light multipliers in the row's free floats (as the GDScript writes them after `_write_head` or `_write_quad`).
+			b[LIGHT_REACH_FLOAT] = light_reach[slot];
+			b[LIGHT_INTENSITY_FLOAT] = light_intensity[slot];
 		}
 	});
 	// In slot order, on this thread: what adds up (the particles asked for, each group's shots and

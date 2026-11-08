@@ -128,7 +128,8 @@ func _init(projectiles: ProjectileManagerScript, z: int) -> void:
 	_quad.size = Vector2.ONE
 	_add_batches(_projectiles.batch_count() if _projectiles != null else ProjectileManagerScript.BATCH_BODY_FIRST)
 	if _projectiles != null:
-		# A card body numbered later (`register_body`) brings a pair of batches: they get lights too.
+		# A card body numbered later (`register_body`) brings a pair of batches: they get lights too,
+		# read as its mesh is (a head body's as shots, a quad body's as runes).
 		_projectiles.batches_grown.connect(_add_batches)
 	for kind in [FLASHES_FLARE, FLASHES_BLAST, FLASHES_ARC]:
 		var node: MultiMeshInstance2D = _light_batch(ROWS_FLASH)
@@ -227,7 +228,8 @@ func _show_painted_node(node: Node, shown: bool) -> void:
 ## A light batch mirroring each projectile batch up to `count` that has none yet.
 func _add_batches(count: int) -> void:
 	for batch in range(batches.size(), count):
-		var rows: int = ROWS_RUNE if ProjectileManagerScript.batch_mesh(batch) < 0 else ROWS_SHOT
+		var mesh: int = _projectiles.batch_mesh(batch) if _projectiles != null else ProjectileManagerScript.first_batch_mesh(batch)
+		var rows: int = ROWS_RUNE if mesh == ProjectileManagerScript.MESH_QUAD else ROWS_SHOT
 		var node: MultiMeshInstance2D = _light_batch(rows)
 		batches.append(node)
 		if _projectiles != null:
@@ -368,8 +370,9 @@ func light_beams_begin() -> void:
 
 ## Live beam `i`'s light along the path Feel just gave its shader: `points` of `path` (x, y, how
 ## far along), in the ramp `player` (shot_beam's `beam_player`), its look and core colour, faded
-## by `fade`.
-func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float) -> void:
+## by `fade`; BEAM_STRENGTH times `intensity` bright and BEAM_REACH times `reach` wide (its card's
+## `look_light_intensity` and `look_light_reach`; docs/milestones/card-looks.md, phase 1b).
+func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look: int, core: Color, fade: float, intensity: float = 1.0, reach: float = 1.0) -> void:
 	while beams.size() <= i:
 		var node := MeshInstance2D.new()
 		node.mesh = beam_light_mesh()
@@ -389,6 +392,8 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 	shade.set_shader_parameter(&"beam_look", look)
 	shade.set_shader_parameter(&"core_override", Color(core.r, core.g, core.b, 1.0))
 	shade.set_shader_parameter(&"beam_fade", fade)
+	shade.set_shader_parameter(&"beam_strength", BEAM_STRENGTH * intensity)
+	shade.set_shader_parameter(&"beam_reach", BEAM_REACH * reach)
 	beam.visible = true
 
 

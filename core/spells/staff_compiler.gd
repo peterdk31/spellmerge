@@ -456,7 +456,9 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.wind_up = maxf(form.wind_up, 0.0)
 		spell.staff_pose = form.packed_pose()
 		spell.spread = form.spread
-		spell.shot_shader = form.shot_shader
+		spell.look_shader = form.look_shader
+		spell.look_light_intensity = form.look_light_intensity
+		spell.look_light_reach = form.look_light_reach
 		damage = form.base_damage
 		mana = form.mana_cost
 		wind_down = form.wind_down

@@ -321,6 +321,17 @@ const RAY_PATH_START: int = 80
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
 ## (the colour of the shot's core, read by the shot shaders).
 const DRAW_STRIDE: int = 16
+## The floats of a shot's row (its transform's free ones, `MODEL_MATRIX[2].x` and `.y` to a shader)
+## that carry how far and how bright it lights the room (`_look_light_reach`,
+## `_look_light_intensity`; Feel's `light.gdshader`). No shot shader reads them.
+const LIGHT_REACH_FLOAT: int = 2
+const LIGHT_INTENSITY_FLOAT: int = 6
+## The bounds of a shot's light multipliers (`set_light`; a card's `look_light_intensity` and
+## `look_light_reach`, which the validator keeps in the same): 0 lights nothing, a reach never shrinks
+## below a quarter (so the light buffer's rows stay a few pixels), and neither passes 2.
+const LIGHT_INTENSITY_MIN: float = 0.0
+const LIGHT_REACH_MIN: float = 0.25
+const LIGHT_MAX: float = 2.0
 ## The smallest a batch's MultiMesh buffer gets, in shots. A batch holds as many shots
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
@@ -333,19 +344,29 @@ const MIN_BATCH: int = 64
 ## BATCH_ORDER, so at one z the bolts draw before the runes and the orbits.
 ##
 ## After them come the card bodies' batches, as many as the cards ask for (`register_body`): a
-## still shot whose card names a shader of its own (`FormBase.shot_shader`, in the card's folder: a
-## wall's stones, a pool's puddle) is drawn by it, one quad a shot as a rune is, in a pair of batches
-## made with that shader (the hat ramps', then the enemy ramp's one layer up): body `n` draws in
-## BATCH_BODY_FIRST + 2 (n - 1), and + 1 for the enemy ramp. `batch_count()` says how many there
-## are now; `batches_grown` tells when there are more.
+## shot whose card names a shader of its own (`FormBase.look_shader`, in the card's folder: a
+## wall's stones, a pool's puddle, a bolt's head) is drawn by it, in a pair of batches made with that
+## shader and the mesh its shots are written as (MESH_QUAD, one quad a shot as a rune is, for a still
+## carrier; MESH_HEAD, the shots' `head_mesh`, for one that flies or orbits): the hat ramps', then
+## the enemy ramp's one layer up. Body `n` draws in BATCH_BODY_FIRST + 2 (n - 1), and + 1 for the
+## enemy ramp. A body is a shader and a mesh: the same shader under both meshes is two bodies. A
+## shot is drawn in its body's pair only while its motion is written as the body's mesh
+## (`mesh_of_motion`); otherwise in its motion's own batch, plainly (`_batch_of`). A body's nodes
+## keep the first batches' draw order (`_place_body_node`): a head body's after the bolts', a quad
+## body's after the runes'. `batch_count()` says how many there are now; `batches_grown` tells when
+## there are more.
 const BATCH_BOLT: int = 0
 const BATCH_STILL: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_ENEMY: int = 3
 const BATCH_ENEMY_STILL: int = 4
 const BATCH_BODY_FIRST: int = 5
+## The meshes a batch draws (`batch_mesh`): the shots' head (`head_mesh`, placed by the shader's
+## vertex stage), or one quad a shot (a rune's, a stone's, a card's still body).
+const MESH_HEAD: int = 0
+const MESH_QUAD: int = -1
 ## The most card bodies: a slot's body and its batch are a byte each, so 2 x MOST_BODIES + 5 batches
-## at most. A shader past them is drawn as a rune (an error names it).
+## at most. A shader past them is drawn by its shots' motion's plain batch (an error names it).
 const MOST_BODIES: int = 125
 ## The order the first batches' nodes are made in (their draw order at one z); a body's pair is made
 ## after them, when it is numbered.
@@ -364,7 +385,7 @@ const DRAW_OUT_FIRST: int = 6
 ## plain `shot_still.gdshader`), an orbit shot drawn whole with its tail bent round its circle
 ## (`shot_orbit.gdshader`, Entities' familiars; the manager's orbit shots are drawn as bolts are).
 ## Kind 0 is no body. A still shot is KIND_RUNE to the world (`impact_body`) whatever draws it: a
-## card's own body is its batch's shader (`register_body`), not a kind.
+## card's own body is its batch's shader and mesh (`register_body`), not a kind.
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
@@ -605,7 +626,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_body_shaders", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -690,6 +711,12 @@ var _motion: PackedByteArray = PackedByteArray()
 ## numbered, drawn when the shot is still; 0 for its motion's own), and the id of the card it is
 ## (`&""` for none), for its looks.
 var _body: PackedByteArray = PackedByteArray()
+## How bright and how far each shot lights the room, times the shot light's own (its card's
+## `look_light_intensity` and `look_light_reach`, `set_looks`, `set_light`; 1 for a plain shot):
+## written into its row's free floats (`MODEL_MATRIX[2].y` and `.x`, LIGHT_INTENSITY_FLOAT and
+## LIGHT_REACH_FLOAT), which Feel's spell light reads (`light.gdshader`). Drawn only (VIEW).
+var _look_light_intensity: PackedFloat32Array = PackedFloat32Array()
+var _look_light_reach: PackedFloat32Array = PackedFloat32Array()
 var _form_id: Array[StringName] = []
 ## Orbit shots: radius from the anchor, current angle and angular speed (rad/s).
 var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
@@ -923,6 +950,8 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## The card bodies' shaders, body `n` at `n - 1` (`register_body`), and how many batches there are
 ## with theirs (`batch_count`; the native kernel reads it).
 var _body_shaders: Array[Shader] = []
+## Each card body's mesh (MESH_HEAD or MESH_QUAD), body `n` at `n - 1` (`register_body`).
+var _body_meshes: PackedInt32Array = PackedInt32Array()
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1225,7 +1254,7 @@ func _ready() -> void:
 		events.tailless_motes_changed.connect(set_tailless_pool)
 	_nodes.resize(BATCH_BODY_FIRST)
 	for batch: int in BATCH_ORDER:
-		_nodes[batch] = _make_batch(_batch_z(batch), STILL_SHADER if batch_mesh(batch) < 0 else HEAD_SHADER, null if batch_mesh(batch) < 0 else head_mesh())
+		_nodes[batch] = _make_batch(_batch_z(batch), STILL_SHADER if first_batch_mesh(batch) == MESH_QUAD else HEAD_SHADER, null if first_batch_mesh(batch) == MESH_QUAD else head_mesh())
 	# The card bodies numbered before it was in the tree.
 	for n in _body_shaders.size():
 		_make_body_batches(n + 1)
@@ -1238,22 +1267,26 @@ func _ready() -> void:
 	_fit_draw_bounds()
 
 
-## The body number (from 1) of a card's own shot shader, numbered the first time it is asked for:
-## a pair of batches is made with it (`batches_grown`), and it is handed to the shader
-## warm-up (`ShaderWarmup.want`, drawn as a batch), so it is compiled before the first room when it
-## is asked for before then (Spells numbers every carrier card's when it starts). 0 for none, and
-## for one past MOST_BODIES (an error names it; its shots are drawn as runes).
-func register_body(shader: Shader) -> int:
+## The body number (from 1) of a card's own shader drawing `mesh` (MESH_QUAD for still shots,
+## MESH_HEAD for flying or orbiting ones), numbered the first time the pair is asked for: a pair of
+## batches is made with them (`batches_grown`), and the shader is handed to the shader warm-up
+## (`ShaderWarmup.want`, drawn as a batch), so it is compiled before the first room when it is
+## asked for before then (Spells numbers every carrier card's when it starts). The same shader under
+## the other mesh is another body. 0 for none, and for one past MOST_BODIES (an error names it; its
+## shots are drawn by their motion's plain batch).
+func register_body(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	if shader == null:
 		return 0
-	var at: int = _body_shaders.find(shader)
-	if at >= 0:
-		return at + 1
+	for at in _body_shaders.size():
+		if _body_shaders[at] == shader and _body_meshes[at] == mesh:
+			return at + 1
 	if _body_shaders.size() >= MOST_BODIES:
-		push_error("Projectiles: no batch left for the shot shader %s (MOST_BODIES is %d); its shots are drawn as runes" % [shader.resource_path, MOST_BODIES])
+		push_error("Projectiles: no batch left for the shot shader %s (MOST_BODIES is %d); its shots are drawn plain" % [shader.resource_path, MOST_BODIES])
 		return 0
+	if not _body_shaders.has(shader):
+		ShaderWarmupScript.want(shader, ShaderWarmupScript.BATCH)
 	_body_shaders.append(shader)
-	ShaderWarmupScript.want(shader, ShaderWarmupScript.BATCH)
+	_body_meshes.append(MESH_HEAD if mesh == MESH_HEAD else MESH_QUAD)
 	var body: int = _body_shaders.size()
 	_batch_total = BATCH_BODY_FIRST + 2 * body
 	_rooms.resize(_batch_total)
@@ -1269,14 +1302,29 @@ func register_body(shader: Shader) -> int:
 	return body
 
 
+## The mesh a shot of `motion` is written as (`_write_stones` or `_write_head`): MESH_QUAD for a
+## still shot, MESH_HEAD for any other. A card body draws a shot only while this is its mesh.
+static func mesh_of_motion(motion: int) -> int:
+	return MESH_QUAD if motion == MOTION_STILL else MESH_HEAD
+
+
 ## How many draw batches there are now: the first five and a pair for each card body.
 func batch_count() -> int:
 	return _batch_total
 
 
-## Batch `batch`'s mesh: 0 the shots' (`head_mesh`), -1 one quad a shot (runes, card bodies).
-static func batch_mesh(batch: int) -> int:
-	return 0 if batch == BATCH_BOLT or batch == BATCH_ORBIT or batch == BATCH_ENEMY else -1
+## Batch `batch`'s mesh: MESH_HEAD the shots' (`head_mesh`), MESH_QUAD one quad a shot (runes, a
+## still card's body); a card body's batch draws its body's mesh.
+func batch_mesh(batch: int) -> int:
+	if batch >= BATCH_BODY_FIRST:
+		var body: int = (batch - BATCH_BODY_FIRST) / 2 + 1
+		return _body_meshes[body - 1] if body <= _body_meshes.size() else MESH_QUAD
+	return first_batch_mesh(batch)
+
+
+## The mesh of one of the first batches (BATCH_BOLT to BATCH_ENEMY_STILL), which every manager has.
+static func first_batch_mesh(batch: int) -> int:
+	return MESH_HEAD if batch == BATCH_BOLT or batch == BATCH_ORBIT or batch == BATCH_ENEMY else MESH_QUAD
 
 
 ## True for a batch on the enemy ramp's layer, one above the others: its flying shots, its runes,
@@ -1302,22 +1350,52 @@ func body_shader(body: int) -> Shader:
 	return _body_shaders[body - 1] if body >= 1 and body <= _body_shaders.size() else null
 
 
-## The batch a still shot of card body `body` draws in: its hat ramps' or, with
+## The mesh of card body `body` (from 1; MESH_HEAD or MESH_QUAD), MESH_QUAD for none.
+func body_mesh(body: int) -> int:
+	return _body_meshes[body - 1] if body >= 1 and body <= _body_meshes.size() else MESH_QUAD
+
+
+## The batch a shot of card body `body` draws in: its hat ramps' or, with
 ## `enemy`, its enemy ramp's.
 static func body_batch(body: int, enemy: bool) -> int:
 	return BATCH_BODY_FIRST + 2 * (body - 1) + (1 if enemy else 0)
 
 
-## Makes card body `body`'s pair of batches with its shader (the nodes before it are made), fitted
-## to the room as the others are.
+## Makes card body `body`'s pair of batches with its shader and mesh (the nodes before it are made),
+## fitted to the room as the others are, each placed in the draw order (`_place_body_node`).
 func _make_body_batches(body: int) -> void:
+	var mesh: int = _body_meshes[body - 1]
 	for enemy: bool in [false, true]:
 		var batch: int = body_batch(body, enemy)
 		if _nodes.size() <= batch:
 			_nodes.resize(batch + 1)
 		if _nodes[batch] == null:
-			_nodes[batch] = _make_batch(_batch_z(batch), _body_shaders[body - 1], null)
+			_nodes[batch] = _make_batch(_batch_z(batch), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
 			_nodes[batch].multimesh.custom_aabb = _nodes[BATCH_BOLT].multimesh.custom_aabb
+			_place_body_node(body, enemy)
+
+
+## Moves card body `body`'s node (the hat ramps' or, with `enemy`, the enemy ramp's) into the first
+## batches' draw order at its z (BATCH_ORDER: bolts, runes, orbits; a node later among its siblings
+## draws above the ones before it): right after the batch of plain shots its mesh draws
+## (BATCH_BOLT or BATCH_ENEMY for a head body, BATCH_STILL or BATCH_ENEMY_STILL for a quad one) and
+## the bodies of its mesh and layer numbered before it. So a bolt with a look of its own still draws
+## under the runes and the orbit shots, as a plain bolt does.
+func _place_body_node(body: int, enemy: bool) -> void:
+	var mesh: int = _body_meshes[body - 1]
+	var plain: int
+	if mesh == MESH_HEAD:
+		plain = BATCH_ENEMY if enemy else BATCH_BOLT
+	else:
+		plain = BATCH_ENEMY_STILL if enemy else BATCH_STILL
+	var after: Node = _nodes[plain]
+	for earlier in range(1, body):
+		if _body_meshes[earlier - 1] == mesh:
+			var node: Node = _nodes[body_batch(earlier, enemy)]
+			if node != null and node.get_index() > after.get_index():
+				after = node
+	var mine: Node = _nodes[body_batch(body, enemy)]
+	move_child(mine, after.get_index() + 1 if mine.get_index() > after.get_index() else after.get_index())
 
 
 ## Draw batch `batch`'s rows (BATCH_*) again in `multimesh` too, or stop with null (Feel's spell
@@ -1431,6 +1509,8 @@ func set_cap(value: int) -> void:
 	_tag.resize(_cap)
 	_motion.resize(_cap)
 	_body.resize(_cap)
+	_look_light_intensity.resize(_cap)
+	_look_light_reach.resize(_cap)
 	_form_id.resize(_cap)
 	_orbit_radius.resize(_cap)
 	_orbit_angle.resize(_cap)
@@ -2344,9 +2424,11 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
-## `set_core`, `set_look` and `set_form` for each of the first `count` shots in `slots` (-1 for
-## none), checked once: one launch's shots share them.
-func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int) -> void:
+## `set_core`, `set_look`, `set_form` and `set_light` for each of the first `count` shots in
+## `slots` (-1 for none), checked once: one launch's shots share them.
+func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, form: StringName, body: int, light_intensity: float = 1.0, light_reach: float = 1.0) -> void:
+	var intensity: float = clean_light(light_intensity, LIGHT_INTENSITY_MIN)
+	var reach: float = clean_light(light_reach, LIGHT_REACH_MIN)
 	var core_ok: bool = is_finite(color.r) and is_finite(color.g) and is_finite(color.b)
 	var core: Color = Color(color.r, color.g, color.b, 1.0)
 	var look_ok: bool = look >= 0 and look < 1 << (LOOK_COUNT - 1)
@@ -2361,6 +2443,24 @@ func set_looks(slots: PackedInt32Array, count: int, color: Color, look: int, for
 			_look[slot] = look
 		_form_id[slot] = form
 		_set_body(slot, kind)
+		_look_light_intensity[slot] = intensity
+		_look_light_reach[slot] = reach
+
+
+## How bright (`intensity`) and how far (`reach`) the shot in `slot` lights the room, each times the
+## shot light's own (1 as a plain shot; its card's `look_light_intensity` and `look_light_reach`),
+## kept in LIGHT_INTENSITY_MIN to LIGHT_MAX and LIGHT_REACH_MIN to LIGHT_MAX. False for an empty slot.
+func set_light(slot: int, intensity: float, reach: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_look_light_intensity[slot] = clean_light(intensity, LIGHT_INTENSITY_MIN)
+	_look_light_reach[slot] = clean_light(reach, LIGHT_REACH_MIN)
+	return true
+
+
+## A light multiplier kept in `least` to LIGHT_MAX (1 for one that is not a number).
+static func clean_light(value: float, least: float) -> float:
+	return clampf(value, least, LIGHT_MAX) if is_finite(value) else 1.0
 
 
 ## Slot `slot`'s card body is `body` now: drawn again from its batch on (`_remember_drawn`), since
@@ -2382,8 +2482,8 @@ func set_look(slot: int, look: int) -> bool:
 
 
 ## Name the card the shot in `slot` is (`form`: its impacts are told as it, `impact_form`) and the
-## body it asks for (`body`: a card body `register_body` numbered, 0 for its motion's own; only
-## a still shot draws one). False for an empty slot.
+## body it asks for (`body`: a card body `register_body` numbered, 0 for its motion's own; a shot
+## draws it only while its motion is written as the body's mesh). False for an empty slot.
 func set_form(slot: int, form: StringName, body: int = 0) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
@@ -3038,6 +3138,8 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_vel[slot] = velocity if motion == MOTION_STRAIGHT else Vector2.ZERO
 	_motion[slot] = motion
 	_body[slot] = 0
+	_look_light_intensity[slot] = 1.0
+	_look_light_reach[slot] = 1.0
 	_form_id[slot] = &""
 	_turn[slot] = 0.0
 	_home_at[slot] = Vector2.INF
@@ -4907,7 +5009,12 @@ func _draw_shots(fraction: float) -> void:
 			_draw_out[DRAW_OUT_FIRST + batch] = _write_stones(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch], slot, dir, _drawn_size[slot], at, look_data)
 			continue
 		var flags: int = HEAD_LIVE | (HEAD_ORBIT if motion == MOTION_ORBIT else 0)
-		_write_head(_buffers[batch], _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
+		var row: int = _draw_out[DRAW_OUT_FIRST + batch] * DRAW_STRIDE
+		var buffer: PackedFloat32Array = _buffers[batch]
+		_write_head(buffer, row, at, flags, look_data, _core[slot], _pos[slot] - _prev[slot])
+		# Its light multipliers in the row's free floats (written inline: a call per shot costs).
+		buffer[row + LIGHT_REACH_FLOAT] = _look_light_reach[slot]
+		buffer[row + LIGHT_INTENSITY_FLOAT] = _look_light_intensity[slot]
 		_draw_out[DRAW_OUT_FIRST + batch] += 1
 		if tail_births_on:
 			_lay_tail(slot, at)
@@ -5141,9 +5248,15 @@ func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2
 		at -= _solid_half(slot, solid)
 	var code: float = trace_code(sim_time - _born[slot])
 	var kind: int = _kind_of(slot)
+	var light_reach: float = _look_light_reach[slot]
+	var light_intensity: float = _look_light_intensity[slot]
 	# A batch holds the cap at most: stones past it are not drawn.
 	for n in mini(stones, buffer.size() / DRAW_STRIDE - out):
-		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
+		var i: int = out * DRAW_STRIDE
+		_write_quad(buffer, i, dir, size, at + step * n, look_data, _core[slot], kind, 0.0, code)
+		# Its light multipliers in the row's free floats (written inline: a call per shot costs).
+		buffer[i + LIGHT_REACH_FLOAT] = light_reach
+		buffer[i + LIGHT_INTENSITY_FLOAT] = light_intensity
 		out += 1
 	return out
 
@@ -5200,8 +5313,11 @@ static func particles_of(look: int) -> int:
 ## Which draw batch a live slot belongs to (BATCH_*), by its ramp and body. The one rule both the counting and the writing use, so a batch
 ## always has the room its writes need.
 func _batch_of(slot: int) -> int:
-	if _motion[slot] == MOTION_STILL and _body[slot] > 0:
-		return body_batch(_body[slot], not is_hat_ramp(_ramp[slot]))
+	# A card body draws its shot only while the shot's motion is written as the body's mesh; a shot
+	# whose motion changed past it (or a card's shader numbered for the other mesh) draws plain.
+	var body: int = _body[slot]
+	if body > 0 and _body_meshes[body - 1] == mesh_of_motion(_motion[slot]):
+		return body_batch(body, not is_hat_ramp(_ramp[slot]))
 	if not is_hat_ramp(_ramp[slot]):
 		return BATCH_ENEMY_STILL if _motion[slot] == MOTION_STILL else BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:

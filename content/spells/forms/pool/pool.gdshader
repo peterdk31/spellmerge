@@ -8,7 +8,7 @@ render_mode blend_premul_alpha;
 // Its quad is GRID x zoom pixels square round its centre, from the projectile manager's instance
 // data as a rune's (`ProjectileManager._write_quad`: the look in COLOR and the custom data, the
 // trace code beside the kind in the custom data's alpha). Blending is premultiplied: its pixels are
-// opaque, the glow added light. Drawn by its card's pair of batches (`FormBase.shot_shader`,
+// opaque, the glow added light. Drawn by its card's pair of batches (`FormBase.look_shader`,
 // `ProjectileManager.register_body`), warmed before the first room.
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"

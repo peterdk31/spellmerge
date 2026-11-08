@@ -203,7 +203,7 @@ func test_both_shaders_are_warmed_and_the_rect_reads_the_buffer() -> void:
 	for batch in light.batches.size():
 		var material: ShaderMaterial = light.batches[batch].material as ShaderMaterial
 		check(material.shader == SpellLightScript.LIGHT_SHADER, "batch %d draws its light" % batch)
-		var rows: int = SpellLightScript.ROWS_RUNE if ProjectilesScript.batch_mesh(batch) < 0 else SpellLightScript.ROWS_SHOT
+		var rows: int = SpellLightScript.ROWS_RUNE if light._projectiles.batch_mesh(batch) == ProjectilesScript.MESH_QUAD else SpellLightScript.ROWS_SHOT
 		check_equal(int(material.get_shader_parameter(&"rows")), rows, "batch %d reads its rows as %s" % [batch, "runes" if rows == SpellLightScript.ROWS_RUNE else "shots"])
 	check(warmed.has(SpellLightScript.BEAM_SHADER), "the beam light shader is warmed")
 
@@ -495,3 +495,58 @@ func test_the_steps_are_a_switch() -> void:
 	check_equal(int(shade.get_shader_parameter(&"bands")), 0, "smooth")
 	light.set_bands(1)
 	check_equal(light.bands, 2, "at least one step past dim")
+
+
+## A card's light (docs/milestones/card-looks.md, phase 1b): each shot's row carries its card's
+## light reach and intensity (`set_looks`, `set_light`; 1 for a plain shot) in its free floats, a
+## head's and a rune's alike, and the light shader multiplies its reach and brightness by them.
+func test_a_shots_row_carries_its_cards_light() -> void:
+	var made: Array = _feel()
+	var manager: ProjectilesScript = made[2]
+	var plain: int = manager.spawn(0, Vector2(120.0, 100.0), Vector2(60.0, 0.0), 2.0, 4.0)
+	var dim: int = manager.spawn(0, Vector2(120.0, 160.0), Vector2(60.0, 0.0), 2.0, 4.0)
+	var rune: int = manager.spawn(0, Vector2(300.0, 160.0), Vector2.ZERO, 2.0, 6.0, ProjectilesScript.LAYER_ENEMY, 0, 0, ProjectilesScript.MOTION_STILL)
+	manager.set_looks(PackedInt32Array([dim]), 1, Color.WHITE, 0, &"atom", 0, 0.5, 0.75)
+	check(manager.set_light(rune, 1.5, 2.0), "a rune's light set")
+	check(not manager.set_light(-1, 1.0, 1.0), "not an empty slot")
+	manager.step(1.0 / 60.0)
+	manager.update_draw(1.0)
+	var rows: Dictionary = {}
+	for batch in manager.batch_count():
+		var mirror: MultiMesh = manager.batch_mirror(batch)
+		var buffer: PackedFloat32Array = mirror.buffer
+		for n in mirror.visible_instance_count:
+			var i: int = n * SpellLightScript.STRIDE
+			for slot: int in [plain, dim, rune]:
+				var at: Vector2 = manager.get_position_of(slot)
+				if Vector2(buffer[i + 3], buffer[i + 7]).distance_to(at) < 4.0:
+					rows[slot] = Vector2(buffer[i + ProjectilesScript.LIGHT_REACH_FLOAT], buffer[i + ProjectilesScript.LIGHT_INTENSITY_FLOAT])
+	check_equal(rows.get(plain), Vector2(1.0, 1.0), "a plain shot lights as before")
+	check_equal(rows.get(dim), Vector2(0.75, 0.5), "a dimmer card's head: its reach and intensity")
+	check_equal(rows.get(rune), Vector2(2.0, 1.5), "a rune's quad carries them too")
+	var bounded: int = manager.spawn(0, Vector2(400.0, 100.0), Vector2(60.0, 0.0), 2.0, 4.0)
+	manager.set_light(bounded, 9.0, 0.0)
+	check(is_equal_approx(manager._look_light_intensity[bounded], ProjectilesScript.LIGHT_MAX) and is_equal_approx(manager._look_light_reach[bounded], ProjectilesScript.LIGHT_REACH_MIN), "kept in bounds")
+	var code: String = (load("res://gameplay/feel/light.gdshader") as Shader).code
+	check(code.contains("RUNE_REACH * MODEL_MATRIX[2].x") and code.contains("rune_strength * MODEL_MATRIX[2].y"), "a rune's light: its reach and brightness times the row's")
+	check(code.contains("half_size = vec2(reach * MODEL_MATRIX[2].x)") and code.contains("shot_strength * MODEL_MATRIX[2].y"), "a head's light too")
+
+
+## A beam card's light (card-looks phase 1b, 2): a beam's light is BEAM_STRENGTH times its card's
+## `look_light_intensity` bright and BEAM_REACH times its `look_light_reach` wide, 1 as any beam.
+func test_a_beams_light_follows_its_cards_light() -> void:
+	var made: Array = _feel()
+	var feel: FeelScript = made[1]
+	var light: SpellLightScript = feel.light()
+	var path := PackedVector3Array()
+	path.resize(SpellLightScript.BEAM_POINTS)
+	path[0] = Vector3(10.0, 20.0, 0.0)
+	path[1] = Vector3(110.0, 20.0, 100.0)
+	light.light_beams_begin()
+	light.light_beam(0, path, 2, 0, 0, Color.WHITE, 1.0)
+	light.light_beam(1, path, 2, 0, 0, Color.WHITE, 1.0, 0.5, 2.0)
+	var plain: ShaderMaterial = light.beams[0].material as ShaderMaterial
+	var card: ShaderMaterial = light.beams[1].material as ShaderMaterial
+	check(is_equal_approx(float(plain.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH) and is_equal_approx(float(plain.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH), "a plain beam lights as before")
+	check(is_equal_approx(float(card.get_shader_parameter(&"beam_strength")), SpellLightScript.BEAM_STRENGTH * 0.5), "half as bright")
+	check(is_equal_approx(float(card.get_shader_parameter(&"beam_reach")), SpellLightScript.BEAM_REACH * 2.0), "twice as wide")

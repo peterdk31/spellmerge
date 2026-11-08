@@ -104,3 +104,8 @@ func end_of(tag: int) -> void:
 	kit.live_leave(tag, true)
 	if _entities.erase(tag) and kit.events != null:
 		kit.events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
+
+
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE

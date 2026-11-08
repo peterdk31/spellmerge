@@ -213,7 +213,7 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 	var file: String = form.resource_path
 	problems.append_array(_check_pose(form, file))
 	for line: String in form.look_problems():
-		problems.append(_problem("look", file, "shot_shader", line))
+		problems.append(_problem("look", file, "look_shader", line))
 	var carrier: Carrier = Carriers.of(form.carrier)
 	if not Carriers.exists(form.carrier):
 		problems.append(_problem("unknown-carrier", file, "carrier", "`%s` is no carrier: use one of %s (core/spells/carriers/)." % [form.carrier, ", ".join(Carriers.ids())]))

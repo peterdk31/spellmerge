@@ -60,6 +60,11 @@ func id() -> StringName:
 	return &"portal"
 
 
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE
+
+
 ## The portals of the runtime `spells` (its bound `portal` carrier), for what reads its own
 ## getters (the looks, the tests).
 static func of(spells: SpellRuntime) -> CarrierPortal:

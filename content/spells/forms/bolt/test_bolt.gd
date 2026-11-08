@@ -36,3 +36,26 @@ func test_the_bolt_ends_after_its_lifetime() -> void:
 func test_its_moments_have_their_cues() -> void:
 	var card: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
 	check_equal(card.impact_cue, &"impact", "its impact plays impact")
+
+
+## Its own look (docs/milestones/card-looks.md, phase 1): a bolt's head is drawn by its folder's
+## shader, in a pair of head batches of its own, so the atom, nova and swap keep the plain head.
+func test_it_is_drawn_by_its_own_head_shader() -> void:
+	var card: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
+	check(card.look_shader == preload("res://content/spells/forms/bolt/bolt.gdshader"), "drawn by its folder's shader")
+	check(card.look_problems().is_empty(), "a canvas-item shader")
+	var tag: int = _cast_form(&"bolt", 0, Vector2.ZERO)
+	check(tag > 0, "cast")
+	var slot: int = -1
+	for s in _mgr.get_cap():
+		if _mgr.is_alive(s):
+			slot = s
+	check(slot >= 0, "its shot flies")
+	if slot < 0:
+		return
+	var body: int = _mgr._body[slot]
+	check(body > 0 and _mgr.body_shader(body) == card.look_shader, "its shot carries its card's body")
+	check_equal(_mgr.body_mesh(body), _mgr.MESH_HEAD, "a head body: its shots fly")
+	check_equal(_mgr._batch_of(slot), _mgr.body_batch(body, not _mgr.is_hat_ramp(_mgr._ramp[slot])), "drawn in its body's batch")
+	var atom: FormBase = load("res://content/spells/forms/atom/atom.tres") as FormBase
+	check(atom.look_shader == null, "the atom keeps the plain head")

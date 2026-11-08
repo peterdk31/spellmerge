@@ -71,3 +71,8 @@ func _before_strike(_spell: CompiledSpell, _tag: int, _actor: int, _at: Vector2,
 ## What it does after its strike (a shield, which the strike would otherwise spend).
 func _after_strike(_spell: CompiledSpell, _tag: int, _actor: int, _at: Vector2) -> void:
 	pass
+
+
+## What draws its look: no look of its own (cues, or a body that is not the card's).
+func look_drawer() -> int:
+	return LOOK_NONE

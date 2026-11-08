@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// A rune (content/spells/forms/rune/: its card's own shot shader, `FormBase.shot_shader`;
+// A rune (content/spells/forms/rune/: its card's own shot shader, `FormBase.look_shader`;
 // core/README.md, "The shot shaders"): a one-pixel diamond about its hit size with bright corners, a
 // dotted ring inside and a glyph of four dots turning round a bright heart, swelling and settling
 // while it waits, tracing itself onto the floor while it is new (the code beside its kind), its card

@@ -26,7 +26,7 @@ const GLOWS: Array[Color] = [
 	Color(0.878, 0.541, 0.847, 1),
 ]
 ## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"rain", &"void", &"blast"]]
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"]]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -103,7 +103,7 @@ func test_each_stray_casts_the_cards_it_was_planned_with() -> void:
 
 
 ## Four players in the room: the Rime Crook and the Bone Scepter wind up, cast their spells (frost
-## · hook, void · rain) at the nearest of them and nobody waits (they are actors on the enemy team).
+## · hook, a bolt and a void bolt falling where it hit) at the nearest of them and nobody waits (they are actors on the enemy team).
 func test_the_new_strays_attack_four_players() -> void:
 	for data in [STRAYS[3], STRAYS[4]]:
 		var world := AiFixture.new(root, 4)
@@ -156,11 +156,16 @@ func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:
 
 
 func test_a_stray_plays_its_carriers_staff_animation() -> void:
-	# The Bone Scepter casts rain · void · blast: its rain's animation raises the staff, glowing,
-	# until the rain falls, as a wizard's does (ActorLook's pose, shared by every look).
+	# A Bone Scepter with a slam: the slam's animation raises the staff, glowing, before it strikes,
+	# as a wizard's does (ActorLook's pose, shared by every look).
+	var slammer := StaffCards.new()
+	slammer.staff = STRAYS[4].staffs[0].staff
+	slammer.cards = [&"slam"]
+	var data := STRAYS[4].duplicate() as EnemyBase
+	data.staffs = [slammer]
 	var world := AiFixture.new(root, 1)
-	world.players[0].position = Vector2(70.0, 0.0)
-	var body: Actor = world.enemy(STRAYS[4].scene, STRAYS[4], Vector2.ZERO)
+	world.players[0].position = Vector2(20.0, 0.0)
+	var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
 	var look := body.get_node(^"CreatureLook") as CreatureLook
 	var sprite := body.get_node(^"Sprite") as Sprite2D
 	var glowed: bool = false

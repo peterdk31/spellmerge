@@ -70,11 +70,7 @@ const SPLIT_SPREAD: float = 30.0
 const GENERATIONS: int = 8
 ## Staffs per caster, one per button for a seat: A, X, Y and B.
 const STAFFS: int = 4
-## Pixels ahead of the caster that a rain falls when the form gives no `ray_length`, and that
-## the middle of a wall is placed.
-const RAIN_REACH: float = 120.0
-## Pixels round its aim point that a rain strikes as it lands (with its own hit and cards).
-const RAIN_SPLASH: float = 16.0
+## Pixels ahead of the caster that the middle of a wall stands.
 const WALL_REACH: float = 28.0
 ## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
 const HOLD_LIFETIME: float = 100000.0

@@ -25,7 +25,7 @@ func test_every_carrier_is_found_by_its_name() -> void:
 	check(not Carriers.of(&"fissure").works(BEHAVIOURS.NONE), "and no card works on it")
 	check(not Carriers.exists(&"fissure") and not Carriers.exists(&""), "and neither is a carrier")
 	check(Carriers.exists(&"atom"), "an atom is")
-	check_equal(Carriers.ids().size(), 15, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
+	check_equal(Carriers.ids().size(), 14, "every carrier script in the folder is found, and none of the bases: %s" % [Carriers.ids()])
 	var ids: Array[StringName] = Carriers.ids()
 	check(ids.find(&"dash") < ids.find(&"beam") and ids.find(&"beam") < ids.find(&"decoy") and ids.find(&"decoy") < ids.find(&"swing") and ids.find(&"swing") < ids.find(&"slam"), "the runtime steps a dash's strikes, then beams, entities, swings and slams: %s" % [ids])
 
@@ -95,7 +95,7 @@ func test_what_a_trigger_needs_from_its_cards_is_in_its_need() -> void:
 	check(bolt.fires_with(EVENTS.REACTION, {}, true) and bolt.fires_with(EVENTS.REACTION, {BEHAVIOURS.RELAY: true}, false), "or relay")
 	check(not decoy.fires_with(EVENTS.REACTION, {}, true) and decoy.fires_with(EVENTS.REACTION, blast, true), "and a blast where it hits nothing")
 	check(bolt.fires_with(EVENTS.WALL, {}, false) and not bolt.fires_with(EVENTS.WALL, {BEHAVIOURS.GHOST: true}, false), "a ghost never meets a wall")
-	check(not Carriers.of(&"rain").fires_with(EVENTS.BLOCK, shield, false), "a shield on a carrier that meets no shots blocks nothing")
+	check(not Carriers.of(&"familiar").fires_with(EVENTS.BLOCK, shield, false), "a shield on a carrier that meets no shots blocks nothing")
 
 
 func test_asking_about_one_card_says_what_a_compile_says() -> void:
@@ -111,9 +111,7 @@ func test_asking_about_one_card_says_what_a_compile_says() -> void:
 		var component := card as SpellComponent
 		for carrier: StringName in Carriers.ids():
 			var ids: Array[StringName] = [component.id, carrier]
-			if card is TriggerBase or carrier == &"rain":
-				ids.append(&"bolt")
-			if card is TriggerBase and carrier == &"rain":
+			if card is TriggerBase:
 				ids.append(&"bolt")
 			var built: CompiledStaff = arena.spells.compile_staff(ids, ArenaScript.plain_staff(ids.size()))
 			check_equal(not built.wasted.has(0), arena.spells.card_works(component.id, carrier), "%s on a %s" % [component.id, carrier])

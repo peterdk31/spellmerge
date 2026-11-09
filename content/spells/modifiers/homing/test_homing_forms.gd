@@ -53,7 +53,7 @@ func _forms() -> Array[FormBase]:
 	return forms
 
 
-## How far a form gets: a beam, a dash, a teleport or a rain its length, a shot in flight its
+## How far a form gets: a beam, a dash or a teleport its length, a shot in flight its
 ## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
 ## rises (it creeps as a rune does, rules R4 F6), a pool where it spreads and half as far again
 ## as it creeps in its life.
@@ -110,9 +110,6 @@ func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach(
 		if _moves_caster(form):
 			_check_move(form, at)
 			continue
-		if form.carrier == &"rain":
-			_check_rain(form, at)
-			continue
 		if not Carriers.of(form.carrier).hits():
 			# A decoy hits nothing: homing makes it creep toward its target (test_decoy.gd).
 			continue
@@ -138,23 +135,6 @@ func _check_move(form: FormBase, at: Vector2) -> void:
 	else:
 		var homing: Homing = CarrierDash.of(_spells).move_homing(1)
 		check(homing.homes() and homing.reach >= at.length(), "a homing %s turns the wizard toward a target %s px off (reach %s)" % [form.id, roundi(at.length()), homing.reach])
-
-
-## A rain hits nothing itself: a homing one falls on the target, a plain one where it was aimed.
-func _check_rain(form: FormBase, at: Vector2) -> void:
-	var falls: Array[Vector2] = []
-	var seen: Callable = func(_actor: int, kind: StringName, point: Vector2, _dir: Vector2, _seconds: float, _tint: Color, _look: int) -> void:
-		if kind == &"rain":
-			falls.append(point)
-	_bus.form_shown.connect(seen)
-	var casts: Array = [[form.id] as Array[StringName], [&"homing", form.id] as Array[StringName]]
-	for player in casts.size():
-		StaffKit.build(_spells, player, 0, casts[player])
-		check(_spells.cast_staff(player, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "%s is cast" % [casts[player]])
-	_bus.form_shown.disconnect(seen)
-	check_equal(falls.size(), 2, "a plain and a homing %s each fall once" % form.id)
-	if falls.size() == 2:
-		check(not falls[0].is_equal_approx(at) and falls[1].is_equal_approx(at), "a homing %s falls on a target %s px off at %s degrees, a plain one where it was aimed: %s" % [form.id, roundi(at.length()), OFF_AIM, falls])
 
 
 ## Homing places a wall on a target near where it stands (rules R4i); its shots then keep still

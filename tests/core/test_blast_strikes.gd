@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Card rules R4 F2 (docs/milestones/M2-rules.md, owner 2026-10-30): one strike for every area. A
-## blast strikes every body round its end point through the one strike a swing, a slam, a dash, a
-## teleport and a rain use (`Spells._strike`), so each body it catches is a hit of its carrier:
+## blast strikes every body round its end point through the one strike a swing, a slam, a dash and a
+## teleport use (`Spells._strike`), so each body it catches is a hit of its carrier:
 ## `on hit`, chain, siphon and the rest work on it, its caster's own body is caught too, and a hit
 ## of a blast does not blast again. A strike keeps what relay took on and what an echo hits with.
 ## It runs a real projectile manager and event bus, stepped by hand, with cards built in code.

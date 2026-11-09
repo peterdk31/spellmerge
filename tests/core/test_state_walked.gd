@@ -36,7 +36,7 @@ func test_a_horde_wave_walks_without_problems() -> void:
 	_check_scene(&"horde")
 
 
-## Every card of content/spells, cast alone (a carrier, with a payload when it carries one) or on
+## Every card of content/spells, cast alone (a carrier) or on
 ## the payload carrier (any other card; a trigger with a payload to fire), in the card rules' world
 ## with a teammate and two enemies, walked at CARD_WALKS.
 func test_every_card_walks_without_problems() -> void:
@@ -64,10 +64,7 @@ func test_every_card_walks_without_problems() -> void:
 		return
 	var casts: Array[Array] = []
 	for form in forms:
-		var cards: Array[StringName] = [form.id]
-		if form.carries_payload():
-			cards.append(payload.id)
-		casts.append(cards)
+		casts.append([form.id] as Array[StringName])
 	for card in others:
 		var cards: Array[StringName] = [card.id, payload.id]
 		if card is TriggerBase:

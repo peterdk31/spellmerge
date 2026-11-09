@@ -64,9 +64,9 @@ func _expected(event: int, carrier: StringName) -> bool:
 		E.TIMER, E.HURT, E.RECAST:
 			return not AT_ONCE.has(carrier)
 		E.BLOCK:
-			# Wherever a shield or deflect runs: not on a rain or familiar (a decoy has a barrier),
-			# nor a portal, which passes every shot on (owner, 2026-11-05).
-			return carrier != &"rain" and carrier != &"familiar" and carrier != &"portal"
+			# Wherever a shield or deflect runs: not on a familiar (a decoy has a barrier), nor a
+			# portal, which passes every shot on (owner, 2026-11-05).
+			return carrier != &"familiar" and carrier != &"portal"
 		E.WALL:
 			return [&"atom", &"swap", &"beam"].has(carrier)
 	return true
@@ -106,7 +106,6 @@ func test_the_same_cards_read_alike_whether_the_trigger_fires_or_not() -> void:
 func test_triggers_that_never_fire_are_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy"],
-		[&"on_wall", &"rain"],
 		[&"on_wall", &"dash"],
 		[&"on_wall", &"orbit"],
 		[&"on_wall", &"rune"],
@@ -115,15 +114,12 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 		[&"on_hurt", &"teleport"],
 		[&"on_timer", &"slam"],
 		[&"on_timer", &"teleport"],
-		[&"on_block", &"rain"],
+		[&"on_block", &"familiar"],
 		[&"on_kill", &"decoy"],
 		[&"on_reaction", &"familiar"],
 	]
 	for cell: Array in cells:
 		var cards: Array[StringName] = [cell[0], cell[1], &"atom"]
-		if cell[1] == &"rain":
-			# A rain reads a payload of its own first.
-			cards.append(&"atom")
 		var built: CompiledStaff = _compile(cards)
 		check(built.wasted.has(0), "%s on %s is wasted: %s" % [cell[0], cell[1], built.wasted])
 
@@ -132,14 +128,12 @@ func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"atom"], [&"on_timer", &"atom"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
 		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"],
-		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
-		[&"on_timer", &"beam"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
-		[&"on_hurt", &"beam"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
+		[&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
+		[&"on_timer", &"beam"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
+		[&"on_hurt", &"beam"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"],
 	]
 	for cell: Array in cells:
 		var cards: Array[StringName] = [cell[0], cell[1], &"atom"]
-		if cell[1] == &"rain":
-			cards.append(&"atom")
 		var built: CompiledStaff = _compile(cards)
 		check(built.wasted.is_empty(), "%s on %s fires: %s" % [cell[0], cell[1], built.wasted])
 		var spell: CompiledSpell = built.casts[0].group.spells[0]
@@ -155,7 +149,6 @@ func test_the_cards_an_event_needs() -> void:
 	# A hit, kill or reaction of a carrier that hits nothing itself comes from its blast (rules R4 F2).
 	check(_compile([&"on_hit", &"blast", &"decoy", &"atom"]).wasted.is_empty(), "a decoy with a blast hits")
 	check(_compile([&"on_hit", &"decoy", &"atom", &"atom"]).wasted.has(0), "without one it does not")
-	check(_compile([&"on_kill", &"rain", &"atom", &"atom"]).wasted.is_empty(), "a rain kills by its own strike")
 	check(_compile([&"on_kill", &"blast", &"decoy", &"atom"]).wasted.is_empty(), "a decoy with a blast can kill")
 	check(_compile([&"on_kill", &"blast", &"dash", &"atom"]).wasted.is_empty(), "so can a dash with a blast")
 	# A reaction needs an element on the hit.

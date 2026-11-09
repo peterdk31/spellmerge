@@ -35,7 +35,6 @@ func before_each() -> void:
 	var halo: FormBase = _form(&"halo", 4, 8)
 	halo.spread = 360.0
 	halo.wind_down = 0.4
-	_form(&"rain", 3, 1).carrier = &"rain"
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
 	_modifier(&"split").shot_mult = 3
@@ -390,13 +389,6 @@ func test_scatter_and_burst_mark_the_group() -> void:
 	check_equal(burst.spells.size(), 1, "the same one carrier")
 
 
-func test_rain_carries_its_own_payload() -> void:
-	var rain: CompiledSpell = _compile("rain frost halo").casts[0].group.spells[0]
-	check(rain.own_payload != null, "rain reads a payload")
-	if rain.own_payload != null:
-		check_equal(rain.own_payload.spells[0].element_id, &"frost", "a frost halo falls")
-
-
 func test_the_numbers_of_a_cast() -> void:
 	var cast: CompiledCast = _compile("fire bolt").casts[0]
 	check_equal(cast.mana, 2.0, "the bolt's mana")
@@ -420,8 +412,6 @@ func test_a_payload_adds_no_wind_down() -> void:
 	var cast: CompiledCast = _compile("on_hit bolt halo").casts[0]
 	check(is_equal_approx(cast.wind_down, 0.2), "the bolt's wind-down alone, got %s" % cast.wind_down)
 	check(not cast.wasted.has(2), "the halo still fires on hit")
-	var rain: CompiledCast = _compile("rain halo").casts[0]
-	check(is_equal_approx(rain.wind_down, _fake.items[&"rain"].wind_down), "a rain's own payload adds none either, got %s" % rain.wind_down)
 
 
 func test_a_payload_multicast_adds_no_wind_down() -> void:

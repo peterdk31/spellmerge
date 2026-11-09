@@ -1,8 +1,8 @@
 extends "res://tests/support/screenshot.gd"
 ## The carriers' moments that are cues their cards name, over their lives (`carrier_moments_1` and
 ## `_2`, drawn twice as big): one row per moment, one column per age. Sheet 1: where a teleport
-## leaves (`vanish`) and lands (`appear`), one end of a swap's trade (`trade`) and a rain falling
-## (`rainfall`). Sheet 2: a decoy or familiar appearing (`conjure`) and going (`dismiss`), and a
+## leaves (`vanish`) and lands (`appear`), one end of a swap's trade (`trade`).
+## Sheet 2: a decoy or familiar appearing (`conjure`) and going (`dismiss`), and a
 ## wall's row of stones rising and standing (the wall's own `stone.gdshader`; `carrier_moments_stones` close up). Each column is its own take, put
 ## together into one sheet.
 
@@ -32,7 +32,6 @@ func take() -> void:
 		["form_shown", &"teleport", 0.0],
 		["carrier_ended", &"teleport", 6.0],
 		["form_shown", &"swap", 80.0],
-		["carrier_ended", &"rain", 16.0],
 	]
 	await _sheet(wizard, first, false, "carrier_moments_1")
 	var second: Array[Array] = [

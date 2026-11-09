@@ -1661,7 +1661,7 @@ func _cue_tag() -> int:
 	return tag if tag is int else 0
 
 
-## A carrier with no shot ended (a teleport or dash landing, a rain falling, a slam striking, a
+## A carrier with no shot ended (a teleport or dash landing, a slam striking, a
 ## decoy or familiar going): the streams its cues started end (a dash's streaks), and its card's
 ## `end_cue` plays, `size` big.
 func _on_carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int) -> void:
@@ -2380,8 +2380,7 @@ func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way
 	_spectacle.barrier_changed(actor, charges, seconds, tag, way, radius, _ramp_of(actor))
 
 
-## A carrier showed itself: its card's `shown_cue` (a rain's telegraph
-## with `length` its seconds, where a teleport leaves, each end of a swap, a decoy or familiar
+## A carrier showed itself: its card's `shown_cue` (where a teleport leaves, each end of a swap, a decoy or familiar
 ## appearing, a dash's dust and lightning arc, S5), then a beam (drawn by `shot_beam.gdshader` in
 ## the element's ramp) with the cast's cards, in the caster's ramp: an enemy's look the same, in the
 ## enemy ramp (staffs F7). The beam keeps state of its own (its slot while it fades), so it stays

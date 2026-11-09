@@ -103,7 +103,7 @@ func cast_done() -> void:
 	_rt._cast_done()
 
 
-## A one-off homing pick (a teleport's target, a rain's spot): a random target of another team
+## A one-off homing pick (a teleport's target): a random target of another team
 ## within `within` of `at`, any way round, rolled afresh each time (`Spells.pick_target`). Its centre,
 ## or INF; `projectiles.homing_target_radius` is its hit radius.
 func pick_target(actor: int, at: Vector2, within: float) -> Vector2:

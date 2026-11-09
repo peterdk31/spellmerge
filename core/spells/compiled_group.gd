@@ -2,7 +2,7 @@ class_name CompiledGroup
 extends RefCounted
 ## One group read from a staff (docs/milestones/M2-staffs.md, "Reading a staff"): the
 ## carriers that leave together, as compiled spells, and how they leave. A cast is one group;
-## a trigger's payload, and the payload of `rain` and `familiar`, is another. Read-only data
+## a trigger's payload is another. Read-only data
 ## made by `StaffCompiler`; nothing outside `core/spells/` and the builder view reads it.
 
 ## Made whole by the staff compiler and never changed after: the state walk hashes it once

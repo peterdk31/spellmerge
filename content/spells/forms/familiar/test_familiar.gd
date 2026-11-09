@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Familiar card (content/spells/forms/familiar/, staffs C): a small helper that circles the
 ## caster and casts its payload at the nearest enemy. The engine side is tested in
-## `tests/core/test_spells_payload_carriers.gd` and `tests/gameplay/ai/test_entities.gd`; here the
+## `tests/core/test_spells_entity_carriers.gd` and `tests/gameplay/ai/test_entities.gd`; here the
 ## card's data and the entity it asks for. The combo arena has no `ai`, so its combos only check
 ## the cast asks for a familiar and what the wizard's other staffs do beside it.
 ##
@@ -46,7 +46,6 @@ func test_the_card_is_a_valid_carrier() -> void:
 	check_equal(card.id, &"familiar", "its id is its folder")
 	check_equal(card.kind(), &"form", "a carrier card")
 	check_equal(card.carrier, &"familiar", "it is a familiar")
-	check(not card.carries_payload(), "it has no payload of its own: it casts what its triggers give it (rules R4 F3)")
 	check(card.lifetime > 0.0, "it lasts a while")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 

@@ -29,7 +29,6 @@ const OUTWARD: int = CarrierTraits.OUTWARD
 const REPEATS_HELD: int = CarrierTraits.REPEATS_HELD
 const OWN_POSE: int = CarrierTraits.OWN_POSE
 const INSTANT_HOMING: int = CarrierTraits.INSTANT_HOMING
-const CARRIES_PAYLOAD: int = CarrierTraits.CARRIES_PAYLOAD
 const HOLDS_STAFF: int = CarrierTraits.HOLDS_STAFF
 const MOVES: int = CarrierTraits.MOVES
 const LINE: int = CarrierTraits.LINE
@@ -480,12 +479,6 @@ func switch_off(_tag: int) -> void:
 ## How many times one cast that lives `lifetime` seconds hits one target (a beam ticks): once.
 func hits_per_target(_lifetime: float) -> int:
 	return 1
-
-
-## A carrier that reads a payload of its own (`CARRIES_PAYLOAD`, a rain) lands it when its waiting
-## launch is due (`Spells._run_pending`): `group` falls at `point`.
-func land(_spell: CompiledSpell, _group: CompiledGroup, _actor: int, _staff: int, _generation: int, _point: Vector2, _heading: Vector2, _echoed: bool = false) -> void:
-	pass
 
 
 ## How far a cast of `spell` reaches along its aim, for an enemy's telegraph (`Spells.next_cast_reach`);

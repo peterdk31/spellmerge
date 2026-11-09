@@ -156,9 +156,6 @@ func _read_group(want: int, payload: bool, by: int, wind_up: float = 0.0) -> Com
 			_useful[slot] = true
 			_land(spell, kept, kept_modifiers, kept_elements, slot)
 			spell.card_slots.append(slot)
-			if form.carries_payload():
-				# A payload a carrier drops itself (a rain's) falls at a point.
-				spell.own_payload = _read_group(1, true, Carrier.BY_POINT)
 			for t in triggers.size():
 				_read_trigger(spell, triggers[t], trigger_slots[t], form, kept_elements, kept_modifiers, on.payload_cast_by(triggers[t].event, spell, by))
 			group.spells.append(spell)
@@ -545,7 +542,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
-	# A swing's sweep, a slam's shockwave (`burst`), a beam's or a rain's ray.
+	# A swing's sweep, a slam's shockwave (`burst`), a beam's ray.
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
 	if spell.homing_curve > 0.0:
@@ -702,8 +699,6 @@ func _spell_text(spell: CompiledSpell) -> String:
 			var modifiers: PackedStringArray = _modifier_names(spell)
 			if not modifiers.is_empty():
 				text += " (%s)" % ", ".join(modifiers)
-	if spell.own_payload != null and not spell.own_payload.is_empty():
-		text += " carrying %s" % _group_text(spell.own_payload)
 	for trigger in spell.triggers:
 		var when: String = WHEN[trigger.event] if trigger.event < WHEN.size() else "then"
 		if trigger.event == TriggerBase.Event.TIMER:

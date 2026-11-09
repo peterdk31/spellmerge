@@ -1,11 +1,10 @@
 extends "res://tests/support/suite.gd"
-## Tests for the payload and line carriers of the staffs (B2c): rain drops its payload on the aim
-## point after a delay, familiar and decoy ask for entities a step ahead and end through the events
-## (a familiar casts what its triggers give it, rules R4 F3),
-## wall is one solid still shot (a short-lived wall across the aim, rules R4 F6). It runs a real
-## projectile manager and event bus, stepped by hand, with cards built in code.
+## Tests for the entity and line carriers of the staffs (B2c): familiar and decoy ask for entities
+## a step ahead and end through the events (a familiar casts what its triggers give it, rules R4
+## F3); wall is one solid still shot (a short-lived wall across the aim, rules R4 F6). It runs a
+## real projectile manager and event bus, stepped by hand, with cards built in code.
 ##
-## godot --headless --path . --script res://tests/core/test_spells_payload_carriers.gd
+## godot --headless --path . --script res://tests/core/test_spells_entity_carriers.gd
 
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -69,8 +68,6 @@ func before_each() -> void:
 		_shown.append([player, form, at, direction, length]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
-	var rain: FormBase = _form(&"rain", 0.0, 0.5)
-	rain.carrier = &"rain"
 	var familiar: FormBase = _form(&"familiar", 0.0, 6.0)
 	familiar.carrier = &"familiar"
 	familiar.radius = 5.0
@@ -168,108 +165,6 @@ func _positions() -> Array[Vector2]:
 	return found
 
 
-func test_rain_drops_its_payload_on_the_aim_point_after_its_delay() -> void:
-	_build(0, [&"rain", &"bolt"])
-	check_equal(_cast(), 4.0, "rain and its payload cost both carriers")
-	check_equal(_mgr.get_count(), 0, "nothing flies at the cast")
-	_tick(20)
-	check_equal(_mgr.get_count(), 0, "nothing falls before the delay is over")
-	_tick(12)
-	var found: Array[Vector2] = _positions()
-	check_equal(found.size(), 1, "the payload fell")
-	check(found.size() == 1 and found[0].x > SpellLimits.RAIN_REACH - 20.0 and absf(found[0].y) < 1.0, "on the aim point: %s" % [found])
-
-
-func test_rain_shows_where_and_when() -> void:
-	_build(0, [&"rain", &"bolt"])
-	_cast()
-	check_equal(_shown.size(), 1, "one cue")
-	check(_shown.size() == 1 and _shown[0][1] == &"rain" and is_equal_approx(_shown[0][4], 0.5), "a rain cue that says how long it takes")
-	check(_shown.size() == 1 and is_equal_approx(_shown[0][2].x, SpellLimits.RAIN_REACH), "at the aim point")
-
-
-func test_rain_stops_at_a_wall() -> void:
-	_mgr.set_walls([Rect2(60.0, -50.0, 20.0, 100.0)])
-	_build(0, [&"rain", &"bolt"])
-	_cast()
-	check(_shown.size() == 1 and _shown[0][2].x < 60.0, "the aim point is in front of the wall")
-
-
-func test_rain_is_dropped_when_the_staff_is_rebuilt() -> void:
-	_build(0, [&"rain", &"bolt"])
-	_cast()
-	_build(0, [&"bolt"])
-	_tick(60)
-	check_equal(_mgr.get_count(), 0, "the old build's rain never fell")
-
-
-func test_a_dropped_rains_timer_ends_with_its_landing() -> void:
-	# Rules R4 F3 (from #478): the rebuild drops the landing, and the rain's clock with it.
-	(_fake.items[&"rain"] as FormBase).lifetime = 2.0
-	_build(0, [&"timer", &"rain", &"bolt", &"bolt"])
-	_cast()
-	_tick(40)
-	check_equal(_mgr.get_count(), 1, "its timer ticks while it falls")
-	# Its bolt in the air keeps the old build known, as any shot of it does.
-	_build(0, [&"bolt"])
-	_tick(90)
-	check_equal(_mgr.get_count(), 0, "after the rebuild its timer casts no more (its last bolt is gone)")
-
-
-func test_rain_fires_its_own_on_expire_trigger_as_it_lands() -> void:
-	_build(0, [&"on_expire", &"rain", &"bolt", &"bolt"])
-	_cast()
-	_tick(40)
-	check_equal(_mgr.get_count(), 2, "its payload and the trigger's payload both fell")
-
-
-func test_a_rain_with_nothing_after_it_does_nothing() -> void:
-	_build(0, [&"rain"])
-	_cast()
-	_tick(60)
-	check_equal(_mgr.get_count(), 0, "no payload, no shots")
-
-
-func test_a_rain_strikes_what_is_under_it_as_it_lands() -> void:
-	# Rules R4g: the rain hits with its own hit and cards where it lands, then drops its payload.
-	var under: Node2D = _target(Vector2(SpellLimits.RAIN_REACH, 0.0))
-	_target(Vector2(SpellLimits.RAIN_REACH + 40.0, 0.0))
-	var tag: int = _build(0, [&"rain"])
-	_cast()
-	_tick(20)
-	check(_hits.is_empty(), "nothing before it lands")
-	_tick(20)
-	check_equal(_hits.size(), 1, "one body under it is struck")
-	check(_hits.size() == 1 and _hits[0][1] == under and _hits[0][3] == tag, "the one on the aim point, by the rain itself")
-
-
-func test_a_landing_rain_fires_its_on_hit() -> void:
-	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
-	_build(0, [&"on_hit", &"rain", &"bolt"])
-	_cast()
-	_tick(31)
-	check_equal(_mgr.get_count(), 1, "its on-hit payload left from the target")
-
-
-func test_an_echoed_rain_strikes_at_half() -> void:
-	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
-	var damage: Array[int] = []
-	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int, shot: int) -> void:
-		damage.append(_spells.hit_profile(tag, shot).damage))
-	_build(0, [&"echo", &"rain"])
-	_cast()
-	_tick(90)
-	check_equal(damage.size(), 2, "the rain and its echo strike")
-	check(damage.size() == 2 and damage[1] < damage[0], "the echo at half: %s" % [damage])
-
-
-func test_a_mirrored_rain_lands_through_the_caster() -> void:
-	_build(0, [&"mirror", &"rain", &"bolt"])
-	_cast()
-	check_equal(_shown.size(), 2, "two cues")
-	check(_shown.size() == 2 and is_equal_approx(_shown[1][2].x, -SpellLimits.RAIN_REACH), "the second behind the caster: %s" % [_shown])
-
-
 func test_a_mirrored_wall_stands_behind() -> void:
 	_build(0, [&"mirror", &"wall"])
 	_cast()
@@ -316,44 +211,6 @@ func test_a_mirrored_rune_is_placed_behind() -> void:
 	check(found.size() == 2 and found[0].distance_to(-found[1]) < 0.01 and absf(absf(found[0].x) - 14.0) < 0.01, "one ahead, one behind: %s" % [found])
 
 
-func test_rain_payload_counts_as_live_until_it_ends() -> void:
-	var tag: int = _build(0, [&"rain", &"bolt"])
-	_cast()
-	_tick(40)
-	check_equal(_spells.live_shots(tag + (1 << SpellTag.NODE_SHIFT)), 1, "the payload's shot is counted under its own node")
-
-
-func _rain_cues() -> int:
-	var count: int = 0
-	for shown: Array in _shown:
-		if shown[1] == &"rain":
-			count += 1
-	return count
-
-
-func test_a_held_rain_keeps_falling_until_switched_off() -> void:
-	# Rules R4e (owner, 2026-10-29): a held rain used to fall once.
-	_form(&"stone", 0.0, 10.0)
-	_build(0, [&"hold", &"rain", &"stone"])
-	var mana: float = _cast()
-	check(_spells.is_holding(0, 0), "a held rain is on")
-	check_equal(_spells.reserved_mana(0, 0), mana, "and reserves its cast")
-	check_equal(_rain_cues(), 1, "one rain at the cast")
-	_tick(32)
-	check_equal(_mgr.get_count(), 1, "the first fell after its own delay")
-	check_equal(_rain_cues(), 2, "and the next began as it fell")
-	_tick(30)
-	check_equal(_mgr.get_count(), 2, "the second fell a lifetime later")
-	check_equal(_rain_cues(), 3, "a third is on its way")
-	check(_spells.is_holding(0, 0), "still on between two falls")
-	check_equal(_cast(), 0.0, "the next press switches it off")
-	check(not _spells.is_holding(0, 0), "off")
-	check_equal(_spells.reserved_mana(0, 0), 0.0, "its mana is free")
-	_tick(60)
-	check_equal(_rain_cues(), 3, "no new rain")
-	check_equal(_mgr.get_count(), 2, "and the third never fell")
-
-
 func test_familiar_asks_for_an_entity() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()
@@ -394,19 +251,6 @@ func test_a_familiar_shows_where_it_appears_and_ends_where_it_goes() -> void:
 	check(_shown.size() == 1 and _shown[0][1] == &"familiar" and _shown[0][2].is_equal_approx(_spawns[0][2]), "it shows where it is made: %s" % [_shown])
 	_bus.entity_ended.emit(0, &"familiar", Vector2(30, 40), tag)
 	check(ended.size() == 1 and ended[0][1] == &"familiar" and ended[0][2].is_equal_approx(Vector2(30, 40)), "and ends where it went: %s" % [ended])
-
-
-func test_a_rain_ends_where_it_falls() -> void:
-	_build(0, [&"rain", &"bolt"])
-	var ended: Array = []
-	_bus.carrier_ended.connect(func(player: int, form: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
-		ended.append([player, form, at, size]))
-	_cast()
-	_tick(20)
-	check_equal(ended.size(), 0, "nothing before it falls")
-	_tick(12)
-	check(ended.size() == 1 and ended[0][1] == &"rain" and is_equal_approx(ended[0][2].x, SpellLimits.RAIN_REACH), "it ends on its aim point: %s" % [ended])
-	check(ended.size() == 1 and ended[0][3] >= SpellLimits.RAIN_SPLASH, "as big as its splash")
 
 
 func test_entity_events_for_another_player_are_ignored() -> void:

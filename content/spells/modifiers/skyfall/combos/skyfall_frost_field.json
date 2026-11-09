@@ -1,0 +1,10 @@
+{
+	"id": "skyfall_frost_field",
+	"name": "Frost field",
+	"does": "A bolt hits an imp, and a frost pool falls from a hole over the spot it hit: it lands on the floor there and chills the imp and the one beside it.",
+	"needs": "skyfall",
+	"casts": [{"staff": 0, "cards": ["on_hit", "bolt", "skyfall", "frost", "pool"]}],
+	"imps": [[100, 0], [100, 14]],
+	"seconds": 2.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

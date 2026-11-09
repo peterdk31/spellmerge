@@ -10,7 +10,7 @@
 script = ExtResource("3_staff")
 id = &"bone_scepter"
 display_name = "Bone Scepter's staff"
-slots = 3
+slots = 5
 draw = 1
 wind_up = 1.0
 cooldown = 0.0
@@ -21,7 +21,7 @@ mana_regen = 5.5
 [sub_resource type="Resource" id="Resource_entry"]
 script = ExtResource("4_entry")
 staff = SubResource("Resource_staff")
-cards = Array[StringName]([&"rain", &"void", &"blast"])
+cards = Array[StringName]([&"on_hit", &"bolt", &"skyfall", &"void", &"bolt"])
 
 [resource]
 script = ExtResource("1_base")

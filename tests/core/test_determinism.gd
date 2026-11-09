@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Determinism on one machine (online-ready N1, docs/milestones/online-ready.md): each scripted scene
-## (tests/core/sim_scenes.gd: a staffed fight, a spell storm, a horde wave) played twice from the
+## (tests/core/sim_scenes.gd: a staffed fight, a spell storm) played twice from the
 ## same start gives the same state hash in every area at every tick. When two runs part, the desync
 ## report names the first tick, the areas and each differing member with both values: a cache filled
 ## in another order or a timing stat goes into DERIVED, anything else is a bug to fix.
@@ -20,10 +20,6 @@ func test_a_staffed_fight_plays_the_same_twice() -> void:
 
 func test_a_spell_storm_plays_the_same_twice() -> void:
 	_check_twice(&"storm")
-
-
-func test_a_horde_wave_plays_the_same_twice() -> void:
-	_check_twice(&"horde")
 
 
 ## The view stepped thrice (online-ready N9): a simulation script's drawing (the functions it lists

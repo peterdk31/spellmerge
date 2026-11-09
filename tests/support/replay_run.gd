@@ -9,7 +9,7 @@ extends RefCounted
 ##   person's input) walks, dashes, aims and casts the sandbox's staffs (the storm on LB, the fire
 ##   bolt) at the dummies while the "HUD" rebuilds a staff mid-run (a command): its replay plays
 ##   with nobody watching, and its frames are the same on every platform.
-## - **Fighter bots** (tests/bots/bot.gd) play a wave and a horde run. A bot reads the game through
+## - **Fighter bots** (tests/bots/bot.gd) play a wave. A bot reads the game through
 ##   queries that fill the services' caches, and those count as state (the projectile manager's
 ##   threat grid and target table), so its run replays exactly with the bots watching again
 ##   (their frames dropped; core/sim/frames.gd).
@@ -44,18 +44,17 @@ const RESUME_AT: int = 170
 
 ## Ticks recorded and played (four seconds of game by default).
 var ticks: int = 240
-## False runs the projectile manager's and the swarm's GDScript instead of the native kernels.
+## False runs the projectile manager's GDScript (and the maths' and moves' twins) instead of the
+## native kernels.
 var native: bool = true
 ## This machine's settings a run records with (online-ready N11: `SessionRules.machine()`; a replay
 ## plays by the rules in its header whatever these say): the projectile cap (0 leaves the
-## platform's) and the horde's web cap (-1 leaves the platform's, 0 desktop, 1 web). The platform
-## runner sets both, so every platform records the same game.
+## platform's). The platform runner sets it, so every platform records the same game.
 var cap: int = 0
-var horde_web: int = -1
 ## A seat moves "Max shots" in the recorded run: at tick `x` (-1: never) it asks for the cap `y`, as
 ## the pause menu does (`shot_cap_requested`, a command recorded with its tick; N11).
 var cap_request: Vector2i = Vector2i(-1, 0)
-## The run's seed (the horde's spawns and offers, the swarm's rows), or 0 for a random one. The
+## The run's seed (every roll of the run: `sim.chance`), or 0 for a random one. The
 ## platform runner fixes it, so every platform deals the same seeds.
 var run_seed: int = 0
 ## What went wrong on the way, in words (empty when all went as asked).
@@ -134,7 +133,7 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0:
 			_check_stopped(start + " recorded", i)
 	replay = _frames.call("stop_recording")
-	# The sandbox's staffs take any card; Play's and the horde's only their bag's.
+	# The sandbox's staffs take any card; Play's only its bag's.
 	if scripted > 0 and ticks > REBUILD_AT + 1 and start == &"sandbox_requested":
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:
@@ -262,10 +261,6 @@ func _find() -> void:
 	_flow.set(&"intro_enabled", false)
 	var machine: SessionRules = SessionRules.machine()
 	machine.shot_cap = cap if cap > 0 else SessionRules.defaults().shot_cap
-	if horde_web >= 0:
-		machine.horde_alive = SessionRules.HORDE_ALIVE_WEB if horde_web == 1 else SessionRules.HORDE_ALIVE_DESKTOP
-	else:
-		machine.horde_alive = SessionRules.defaults().horde_alive
 	if not native:
 		_kernels_off()
 
@@ -278,13 +273,9 @@ func _check_settings(start: StringName) -> void:
 		problems.append("%s: the shot cap is %d, not the run's %d" % [start, now, game.rules.shot_cap])
 
 
-## Every native kernel off: the projectile manager and the swarm on their GDScript (`native`
-## false), the maths and the bodies' moves on their twins (`DMath`, `WallSlide`).
+## Every native kernel off: the projectile manager on its GDScript (`native` false), the maths and the bodies' moves on their twins (`DMath`, `WallSlide`).
 func _kernels_off() -> void:
 	DMath.use_native(false)
 	WallSlide.use_native(false)
 	_root.get_node("Projectiles").set(&"native", false)
-	var swarm: Object = _root.get_node("Horde").get(&"swarm")
-	if swarm != null:
-		swarm.set(&"native", false)
 

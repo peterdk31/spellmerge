@@ -688,7 +688,7 @@ func test_a_flashs_sparks_are_its_cues_motes() -> void:
 	var motes: MotesScript = feel.motes()
 	var want: Dictionary = {
 		&"impact": &"spark", &"expire": &"spark", &"deflect": &"spark", &"parry": &"spark", &"slam": &"spark",
-		&"shield_block": &"spark", &"gem_pickup": &"spark", &"rune_burst": &"spark", &"cast": &"spark",
+		&"shield_block": &"spark", &"rune_burst": &"spark", &"cast": &"spark",
 		&"cast_rune": &"spark", &"cast_wall": &"spark", &"appear": &"spark",
 		&"conjure": &"spark", &"trade": &"spark", &"vanish": &"glimmer",
 		&"dismiss": &"glimmer", &"revive": &"glimmer",

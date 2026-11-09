@@ -1,8 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Combat's step with a crowd of bodies (Horde swarm S5, "Cheaper targets",
-## docs/milestones/horde-swarm.md): the step made cheaper (every team read once a step, each
+## Combat's step with a crowd of bodies (the cheaper step, 2026-10-31): the step made cheaper (every team read once a step, each
 ## victim's place once, a crowd passed by the box round the victims, only running counts written)
-## must touch exactly as before. A scripted crowd of plain bodies (the swarm's) round a few
+## must touch exactly as before. A scripted crowd of plain bodies round a few
 ## wizards, and round many (the grid path), sends the very hits it sent before the change: the
 ## fingerprints below were recorded on Combat before S5. And the edges: a touch at exactly the
 ## reach still lands, and a team changed by a death earlier in the step counts for that step's
@@ -61,7 +60,7 @@ func _on_hit(by: int, target: Node, amount: int, where: Vector2, kind: StringNam
 	_hash = hash([_hash, _step_no, by, _index_of.get(target.get_instance_id(), -99), amount, where, kind])
 
 
-## A plain body at `at` (a swarmer: `contact` > 0; a wizard: on the wizards' team).
+## A plain body at `at` (a toucher: `contact` > 0; a wizard: on the wizards' team).
 func _body(at: Vector2, health: int, radius: float, contact: int, wizard: bool) -> Node2D:
 	var body := Node2D.new()
 	body.position = at
@@ -74,7 +73,7 @@ func _body(at: Vector2, health: int, radius: float, contact: int, wizard: bool) 
 	return body
 
 
-## `wizards` wizards in a ring in the middle and 300 swarmers walking through them back and forth
+## `wizards` wizards in a ring in the middle and 300 touchers walking through them back and forth
 ## (no trigonometry), some burning so a few die on the way; returns [hits, hash].
 func _crowd(wizards: int) -> Array[int]:
 	for w in wizards:
@@ -114,7 +113,7 @@ func test_a_crowd_round_many_wizards_touches_as_before() -> void:
 	check_equal(got, RECORDED_MANY, "the same touches and burns, in the same order, as before")
 
 
-## `own_paces_and_pushes` (the swarm's step, Horde swarm S4) answers and spends as `own_pace` and
+## `own_paces_and_pushes` (a crowd's step in one call) answers and spends as `own_pace` and
 ## `own_knockback` body by body: a second Combat with the same bodies, statuses and pushes is asked
 ## one at a time. Covered: free, chilled, frozen and pushed bodies, a body under a wrong id (looked
 ## up by node), one Combat never heard of, and a row with no seconds (left alone).

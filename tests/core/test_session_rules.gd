@@ -5,7 +5,6 @@ extends "res://tests/support/suite.gd"
 ## machine's).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const HordeScript := preload("res://gameplay/horde/horde.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 
 
@@ -13,7 +12,6 @@ func test_the_defaults_are_the_platforms() -> void:
 	var made: SessionRules = SessionRules.defaults()
 	var web: bool = OS.has_feature("web")
 	check_equal(made.shot_cap, ManagerScript.DEFAULT_CAP_WEB if web else ManagerScript.DEFAULT_CAP_DESKTOP, "the shot cap")
-	check_equal(made.horde_alive, HordeScript.MAX_ALIVE_WEB if web else HordeScript.MAX_ALIVE_DESKTOP, "the horde's cap")
 	check_equal(made.hit_work, ManagerScript.WORK_PER_STEP, "the hit work")
 	check_equal(made.fire_shots, SpellLimits.FIRE_SHOTS_PER_STEP, "the fire pacing")
 	check(SessionRules.machine().equals(made), "this machine's start as them")
@@ -30,7 +28,6 @@ func test_a_copy_stands_apart() -> void:
 func test_the_bytes_come_back_and_bad_ones_are_refused() -> void:
 	var rules := SessionRules.new()
 	rules.shot_cap = 50000
-	rules.horde_alive = 150
 	rules.hit_work = 0x7fff_ffff
 	rules.fire_shots = 0
 	var bytes := PackedByteArray([7])

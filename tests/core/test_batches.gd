@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The batches' maker (core/projectiles/batches.gd): every 2D MultiMesh in the game is made by it,
 ## so its box is the world and no batch is ever culled. Godot culls a MultiMeshInstance2D by the
-## box it read at the node's last redraw; the horde's swarmers and gems, made without it, vanished
-## a whole kind at once when the camera moved off where they first were (2026-11-02).
+## box it read at the node's last redraw; batches made without it vanished a whole kind at once
+## when the camera moved off where they first were (2026-11-02).
 
 const BatchesScript := preload("res://core/projectiles/batches.gd")
 const MAKER: String = "res://core/projectiles/batches.gd"

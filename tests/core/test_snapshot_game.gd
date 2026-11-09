@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Snapshots on the real game (online-ready N10, core/sim/snapshot.gd): a run on the real autoloads
 ## (Flow, Coop, the wizards' PlayerControllers, the spell runtime, the projectile manager, Combat,
-## the AI, the horde) is recorded with a snapshot after one of its ticks; a fresh game then starts
+## the AI) is recorded with a snapshot after one of its ticks; a fresh game then starts
 ## the replay's run, restores the snapshot and plays the replay's frames on from the next tick, as a
 ## player joining the run online would. Every tick from there agrees with the recorded run's in every
 ## area. When they part, the desync report names the first tick, the areas and each member.
@@ -36,16 +36,12 @@ func test_a_sandbox_run_restored_plays_on_the_same() -> void:
 	await _check_resumed(&"sandbox_requested", 0, 1)
 
 
-## The wave and the horde with a scripted player, not bots: a bot reads the game through queries
+## The wave with a scripted player, not bots: a bot reads the game through queries
 ## that fill the services' caches, which count as state (core/sim/README.md, "Input"), so a run of
 ## bots goes on the same only with the same bots watching from the same state. A player joining a
 ## run never runs the host's bots; its frames come from the host.
 func test_a_wave_restored_plays_on_the_same() -> void:
 	await _check_resumed(&"play_requested", 0, 1)
-
-
-func test_a_horde_run_restored_plays_on_the_same() -> void:
-	await _check_resumed(&"horde_requested", 0, 1)
 
 
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a

@@ -35,7 +35,7 @@ extends Node
 ## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3; owner 2026-11-01: one
 ## staff file per setup, used as it is): every wizard gets the four staffs of its run's mode
 ## (`staffs_for_mode`), straight from the registry under `wizard`, never copied or changed: in
-## Play and the horde the four basic staffs STARTER_HEADS (`content/wizard/staffs/`, one per
+## Play the four basic staffs STARTER_HEADS (`content/wizard/staffs/`, one per
 ## button, each its own head), in the sandbox four times the `dev` staff (DEV_STAFF: 20 slots,
 ## no delay, practically infinite mana). The build channel plays no part. With them the mode's
 ## cards (`start_cards_for_mode`; Play's `start_cards`: A `dash`, X `bolt`, Y and B empty),
@@ -43,8 +43,7 @@ extends Node
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
 ## bag (the cards it may build with, `bag_for_mode`, handed over with `seat_wizard`): Play `dash`
-## and `bolt` (PLAY_BAG, `play_bag`); the horde `dash` and `swing` (HORDE_BAG, which the horde
-## director's START_BAG matches, and its level-up picks add to); the sandbox every card.
+## and `bolt` (PLAY_BAG, `play_bag`); the sandbox every card.
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -52,7 +51,7 @@ extends Node
 ## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
 ## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
-## Loading (owner, 2026-10-29): Play, Sandbox and Horde first do the work that must be ready before a
+## Loading (owner, 2026-10-29): Play and Sandbox first do the work that must be ready before a
 ## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
 ## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
 ## then the intro or the run starts. Today that work is the shader warm-up
@@ -74,17 +73,7 @@ extends Node
 ## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
 ## builds on Y (the most shots) and B (a decoy turret).
 ##
-## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX (above) or MODE_HORDE.
-##
-## Horde (docs/milestones/horde.md, H2): `horde_requested` (the main menu's Horde button, in every
-## build) loads like Play (no intro) and starts a run in the room `horde` (HORDE_ROOM_ID): a wizard
-## per joined player, no waves and no dummies; every wizard holds the four basic staffs, as in
-## Play, with
-## HORDE_START_CARDS (a dash staff and a swing staff). `room_entered(&"horde")` is followed by `horde_started(world)`. Flow spawns no
-## enemy here: the director (`gameplay/horde`) does, under its own node. When every wizard is down,
-## after HORDE_RESTART_DELAY (once started, a join does not call it off) a fresh world stands and
-## `horde_started` is sent again. `horde_ended` is sent when a horde run stops (`stop_run`) or
-## a run of another mode replaces it.
+## Modes: `mode` says which run this is: MODE_WAVES (Play) or MODE_SANDBOX (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -115,11 +104,6 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"bolt"], [], []]
 ## Play's bag: the cards a Play wizard may build with (owner, 2026-11-05).
 const PLAY_BAG: Array[StringName] = [&"dash", &"bolt"]
-## The cards a horde run starts with instead (owner, 2026-10-31): RB a dash staff, RT a swing staff.
-const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
-## The horde's bag at the start (owner, 2026-11-05: dash and swing; the horde director's
-## START_BAG is the same list, and its level-up picks add to it).
-const HORDE_BAG: Array[StringName] = [&"dash", &"swing"]
 ## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
 ## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
 ## Y, the most shots: a fire nova of bolts split three times (216 shots) whose every shot, when it
@@ -140,19 +124,16 @@ const SANDBOX_START_CARDS: Array = [
 ## spawn after these stands another of the first, `dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
 const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
-## The horde's room.
-const HORDE_ROOM_ID: StringName = &"horde"
-## The run modes (`mode`): Play's waves, the sandbox, the horde.
+## The run modes (`mode`): Play's waves, the sandbox.
 const MODE_WAVES: StringName = &"waves"
 const MODE_SANDBOX: StringName = &"sandbox"
-const MODE_HORDE: StringName = &"horde"
 ## The cue played on every standing wizard as a wave starts (`_show_wave_start`).
 const WAVE_START_CUE: StringName = &"wave_start"
 ## The actions of `sandbox_action_requested`.
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 ## The enemy arena (enemy AI AI8): every enemy the sandbox spawned goes.
 const ACTION_CLEAR_ENEMIES: StringName = &"clear_enemies"
-## The sandbox's staff, on every button, and the four basic staffs of Play and the horde by
+## The sandbox's staff, on every button, and the four basic staffs of Play by
 ## button (RB, RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
 const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
@@ -172,8 +153,6 @@ const WAVE_MAX: int = 24
 const BUILD_BREAK: float = 12.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
-## Seconds from the last wizard going down until a horde run starts over (time to read the summary).
-const HORDE_RESTART_DELAY: float = 5.0
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -235,7 +214,7 @@ var state: State = State.IDLE
 var world: Node2D = null
 ## The id of the room of the run in progress.
 var room_id: StringName = &""
-## The wave in progress (1 for the first of a run; 0 before a run, in the sandbox and the horde).
+## The wave in progress (1 for the first of a run; 0 before a run and in the sandbox).
 var wave: int = 0
 ## The mode of the run in progress, or of the next one (MODE_WAVES when idle).
 var mode: StringName = MODE_WAVES
@@ -250,8 +229,6 @@ var _starter: int = 0
 var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
-## True from a horde run's start until `horde_ended` is sent.
-var _horde_on: bool = false
 var _enemies: Array[Node] = []
 ## The sandbox's dummies still standing.
 var _dummies: Array[Node] = []
@@ -292,7 +269,6 @@ func _ready() -> void:
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
-	events.horde_requested.connect(_on_horde_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -385,9 +361,7 @@ func _seat_of(wizard: Node) -> int:
 func start_run(requester: int) -> bool:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
-	# The horde's enemies are the director's: it needs no enemy of its own.
-	var needs_enemy: bool = mode != MODE_HORDE
-	if room == null or room.scene == null or (needs_enemy and (enemy_data == null or enemy_data.scene == null)):
+	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
 		push_warning("Flow: the room or the enemy is missing from the registry, so no run starts.")
 		return false
 	if spells == null:
@@ -431,8 +405,6 @@ func start_run(requester: int) -> bool:
 		MODE_SANDBOX:
 			wave = 0
 			_spawn_dummies(new_world, room)
-		MODE_HORDE:
-			wave = 0
 		_:
 			wave = 1
 			_spawn_wave(new_world, room, enemy_data, wave)
@@ -441,30 +413,20 @@ func start_run(requester: int) -> bool:
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
-	var horde_before: bool = _horde_on
-	_horde_on = mode == MODE_HORDE
 	if events != null:
-		if horde_before and not _horde_on:
-			events.horde_ended.emit()
 		events.room_laid_out.emit(Rect2(Vector2.ZERO, size))
 		events.room_entered.emit(room.id)
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
-		match mode:
-			MODE_HORDE:
-				events.horde_started.emit(new_world)
-			MODE_WAVES:
-				events.wave_started.emit(wave)
-				_show_wave_start()
+		if mode == MODE_WAVES:
+			events.wave_started.emit(wave)
+			_show_wave_start()
 	return true
 
 
-## The room the next run of `mode` is in: the sandbox's, the horde's, or `room_id_to_play`.
+## The room the next run of `mode` is in: the sandbox's, or `room_id_to_play`.
 func room_id_for_mode() -> StringName:
-	match mode:
-		MODE_SANDBOX:
-			return SANDBOX_ROOM_ID
-		MODE_HORDE:
-			return HORDE_ROOM_ID
+	if mode == MODE_SANDBOX:
+		return SANDBOX_ROOM_ID
 	return room_id_to_play
 
 
@@ -487,10 +449,6 @@ func stop_run() -> void:
 	mode = MODE_WAVES
 	if was == MODE_SANDBOX and events != null:
 		events.sandbox_changed.emit(false)
-	if _horde_on:
-		_horde_on = false
-		if events != null:
-			events.horde_ended.emit()
 
 
 func _on_play_requested(player: int) -> void:
@@ -588,20 +546,6 @@ func _start_sandbox(player: int) -> void:
 		mode = MODE_WAVES
 
 
-func _on_horde_requested(player: int) -> void:
-	if state != State.IDLE:
-		return
-	if not _load_then(_start_horde.bind(player)):
-		_start_horde(player)
-
-
-## The horde run, once loaded: never the intro.
-func _start_horde(player: int) -> void:
-	mode = MODE_HORDE
-	if not start_run(player):
-		mode = MODE_WAVES
-
-
 ## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
 ## player's staffs or menus.
 func _on_sandbox_action_requested(player: int, action: StringName) -> void:
@@ -664,7 +608,7 @@ func _on_player_joined(player: int) -> void:
 	if joiner != null:
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
-	if _restart_left >= 0.0 and not _all_down() and mode != MODE_HORDE:
+	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 
 
@@ -747,14 +691,14 @@ func _on_player_downed(player: int) -> void:
 
 ## Seconds from everyone down until the restart (or, in the sandbox, until everyone stands up).
 func restart_delay() -> float:
-	return HORDE_RESTART_DELAY if mode == MODE_HORDE else RESTART_DELAY
+	return RESTART_DELAY
 
 
 func _on_player_revived(player: int, _reviver: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS:
 		return
 	_downed[player] = false
-	if _restart_left >= 0.0 and not _all_down() and mode != MODE_HORDE:
+	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
 
 
@@ -842,7 +786,7 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 
 ## The four staffs a wizard of this run's `mode` holds, by button, as the registry has them:
-## the sandbox's the `dev` staff on every button, Play's and the horde's the four basic staffs
+## the sandbox's the `dev` staff on every button, Play's the four basic staffs
 ## (STARTER_HEADS). Empty when one is missing.
 func staffs_for_mode() -> Array[StaffBase]:
 	var ids: Array[StringName] = STARTER_HEADS
@@ -860,24 +804,19 @@ func staffs_for_mode() -> Array[StaffBase]:
 	return out
 
 
-## The cards each staff of a new wizard starts with in this run's `mode`: HORDE_START_CARDS in
-## the horde, `sandbox_cards` in the sandbox, `start_cards` in Play.
+## The cards each staff of a new wizard starts with in this run's `mode`: `sandbox_cards` in the
+## sandbox, `start_cards` in Play.
 func start_cards_for_mode() -> Array:
-	match mode:
-		MODE_HORDE:
-			return HORDE_START_CARDS
-		MODE_SANDBOX:
-			return sandbox_cards
+	if mode == MODE_SANDBOX:
+		return sandbox_cards
 	return start_cards
 
 
-## The bag a new wizard gets in this run's `mode`: HORDE_BAG in the horde, every spell card of
-## the registry in the sandbox, `play_bag` in Play.
+## The bag a new wizard gets in this run's `mode`: every spell card of the registry in the
+## sandbox, `play_bag` in Play.
 func bag_for_mode() -> Array[StringName]:
 	var out: Array[StringName] = []
 	match mode:
-		MODE_HORDE:
-			out.assign(HORDE_BAG)
 		MODE_SANDBOX:
 			if registry != null:
 				for id: StringName in registry.get_ids(&"spells"):

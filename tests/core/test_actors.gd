@@ -60,10 +60,10 @@ func test_a_full_table_opens_none_until_one_closes() -> void:
 	check_equal(_actors.open(ActorsScript.TEAM_WIZARDS, 0), 300, "a closed id is free again")
 
 
-## Horde H1 (docs/milestones/horde.md, "Scale"): the table holds four seats and a horde of 1,000,
-## and an id past the old 512 works like any other.
-func test_the_table_holds_a_horde_and_high_ids_work() -> void:
-	check(ActorsScript.ACTORS >= 1024, "room for four seats and a horde of 1,000")
+## The table holds four seats and a crowd of 1,000 (ACTORS 1024, owner 2026-11-09), and an id past
+## the old 512 works like any other.
+func test_the_table_holds_a_crowd_and_high_ids_work() -> void:
+	check(ActorsScript.ACTORS >= 1024, "room for four seats and a crowd of 1,000")
 	_open_enemies(700)
 	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 1, 1)
 	check_equal(wizard, 700, "the next id is past 511")
@@ -258,7 +258,7 @@ func test_spend_hold_over_a_partial_an_exact_and_a_long_step() -> void:
 	check_equal(_actors.spend_hold(99999, 0.25), 0.25, "a bad id is never held")
 
 
-## `spend_holds` (a crowd's step, Horde swarm S4) answers and spends as `spend_hold` one by one: a
+## `spend_holds` (a crowd's step in one call) answers and spends as `spend_hold` one by one: a
 ## second table, given the same holds, is asked row by row.
 func test_spend_holds_does_what_spend_hold_does_for_each() -> void:
 	var twin := own(ActorsScript.new()) as ActorsScript

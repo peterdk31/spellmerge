@@ -19,11 +19,10 @@ func _made() -> Replay:
 	replay.build = "dev 0123abcd"
 	replay.content = -42
 	replay.run_seed = 0x1234_5678_9abc
-	replay.start = &"horde_requested"
+	replay.start = &"sandbox_requested"
 	replay.starter = 2
 	replay.seats = 0b0101
 	replay.rules.shot_cap = 750
-	replay.rules.horde_alive = 150
 	replay.rules.hit_work = 4000
 	replay.rules.fire_shots = 0
 	var frames: Array[InputFrame] = _frames()
@@ -33,7 +32,7 @@ func _made() -> Replay:
 		frames[2].clear()
 		frames[2].set_aim(Vector2.UP)
 		if tick == 1:
-			frames[2].add_command(&"horde_pick_requested", [1])
+			frames[2].add_command(&"reward_pick_requested", [1])
 		replay.add_tick(frames, 0b0101)
 		frames[0].pressed_bits = 0
 	return replay
@@ -48,7 +47,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check_equal(back.build, "dev 0123abcd", "the build")
 	check_equal(back.content, -42, "the content")
 	check_equal(back.run_seed, 0x1234_5678_9abc, "the seed")
-	check_equal(back.start, &"horde_requested", "how it started")
+	check_equal(back.start, &"sandbox_requested", "how it started")
 	check_equal(back.starter, 2, "who started it")
 	check_equal(back.seats, 0b0101, "the seats")
 	check_equal(str(back.rules), str(replay.rules), "the run's rules")
@@ -61,7 +60,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 		for seat in 4:
 			check_equal(b[seat].to_bytes(), a[seat].to_bytes(), "tick %d seat %d: the same frame" % [tick, seat])
 	back.read_tick(1, b)
-	check_equal(b[2].commands, [[&"horde_pick_requested", 1]], "a command at its tick")
+	check_equal(b[2].commands, [[&"reward_pick_requested", 1]], "a command at its tick")
 	check(b[1].move == Vector2i.ZERO and b[1].commands.is_empty(), "a seat with no frame reads cleared")
 	check_equal(back.read_tick(3, b), -1, "no tick past the end")
 	check_equal(back.to_bytes(), replay.to_bytes(), "the same bytes again")
@@ -91,7 +90,7 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var starter: PackedByteArray = good.duplicate()
 	starter[build_end + 17] = 4
 	cases["starter 4"] = starter
-	# The rules: shot cap, horde cap, hit work, fire shots (four 32-bit numbers).
+	# The rules: shot cap, hit work, fire shots (three 32-bit numbers).
 	var rules_at: int = build_end + 19
 	var no_cap: PackedByteArray = good.duplicate()
 	no_cap.encode_u32(rules_at, 0)
@@ -99,14 +98,11 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var huge_cap: PackedByteArray = good.duplicate()
 	huge_cap.encode_u32(rules_at, SessionRules.MAX_SHOT_CAP + 1)
 	cases["a shot cap past the most"] = huge_cap
-	var no_horde: PackedByteArray = good.duplicate()
-	no_horde.encode_u32(rules_at + 4, 0)
-	cases["a horde cap of 0"] = no_horde
 	var no_work: PackedByteArray = good.duplicate()
-	no_work.encode_u32(rules_at + 8, 0)
+	no_work.encode_u32(rules_at + 4, 0)
 	cases["no hit work"] = no_work
 	var fires: PackedByteArray = good.duplicate()
-	fires.encode_u32(rules_at + 12, 0x8000_0000)
+	fires.encode_u32(rules_at + 8, 0x8000_0000)
 	cases["fire shots past the most"] = fires
 	var ticks: PackedByteArray = good.duplicate()
 	ticks.encode_u32(rules_at + SessionRules.BYTES, 4)

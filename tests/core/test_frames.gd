@@ -104,8 +104,8 @@ func test_commands_keep_their_order_and_types() -> void:
 func test_without_a_sink_a_command_applies_as_sent() -> void:
 	var bus := own(EventsScript.new()) as EventsScript
 	var heard: Array = []
-	bus.listen(&"horde_pick_requested", func(seat: int, choice: int) -> void: heard.append([seat, choice]))
-	bus.horde_pick_requested.emit(3, 1)
+	bus.listen(&"reward_pick_requested", func(seat: int, choice: int) -> void: heard.append([seat, choice]))
+	bus.reward_pick_requested.emit(3, 1)
 	check_equal(heard, [[3, 1]], "a test's own bus applies at once")
 
 

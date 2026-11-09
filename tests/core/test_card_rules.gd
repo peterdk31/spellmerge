@@ -511,7 +511,7 @@ func _modifier_part(part: int) -> void:
 	_play_modifiers("Modifiers (part %d of %d)" % [part + 1, MODIFIER_PARTS], cards)
 
 
-## Plays one part of the modifiers: the works-or-wasted matrix (the swarm test plays its parity).
+## Plays one part of the modifiers: the works-or-wasted matrix.
 func _play_modifiers(title: String, cards: Array[SpellComponent]) -> void:
 	_matrix(title, cards)
 
@@ -844,7 +844,7 @@ static func _cast_by_a_hit(form: FormBase) -> bool:
 	return form.id != BODY_COLUMN and (form.carrier == Carriers.AT_POINT or form.carrier == Carriers.ON_BEARER)
 
 
-## The world a cast runs in (tests/core/test_card_rules_swarm.gd makes its enemies swarmers).
+## The world a cast runs in.
 func _make_world() -> World:
 	return World.new(root, _shelf, _staff)
 

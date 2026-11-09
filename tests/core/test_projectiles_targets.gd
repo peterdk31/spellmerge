@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## The projectile manager's target grid with many targets (Horde swarm S5, "Cheaper targets",
-## docs/milestones/horde-swarm.md): the filling made cheaper must leave exactly what the old one
+## The projectile manager's target grid with many targets (the cheaper filling, 2026-10-31): the
+## filling made cheaper must leave exactly what the old one
 ## did. Each step is checked against a fresh count made the slow way: which targets are kept and
 ## at which index (a freed or removed one dropped, the last taking its place), each one's centre
 ## and team (its owner's, read when the grid is filled, a possession included), every cell's chain

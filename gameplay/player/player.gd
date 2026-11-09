@@ -38,8 +38,7 @@ extends ActorController
 ##   possession. A change is refused only when the slot does not exist or the card is not in the
 ##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given); `card_move_requested`'s staff
 ##   BAG (-1) is the bag.
-## - **A set bag** (each run mode's, from flow through `seat_wizard`; the horde's picks,
-##   docs/milestones/horde.md): `bag_set_requested` for this seat (or `set_bag`) makes the bag
+## - **A set bag** (each run mode's, from flow through `seat_wizard`): `set_bag` makes the bag
 ##   exactly that list and sends `bag_changed`. A set bag is never
 ##   overwritten by the first fill, also when it was set before the wizard first drove.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
@@ -202,7 +201,6 @@ func _bind_home(actor: Actor) -> void:
 		bus.listen(&"staff_change_requested", _on_staff_change_requested)
 		bus.listen(&"card_move_requested", _on_card_move_requested)
 		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
-		bus.bag_set_requested.connect(_on_bag_set_requested)
 		if not _bag_filled:
 			_fill_bag()
 		else:
@@ -374,11 +372,6 @@ func set_bag(cards: Array[StringName]) -> void:
 	_bag_filled = true
 	bag.assign(cards)
 	_announce_bag()
-
-
-func _on_bag_set_requested(player: int, cards: Array[StringName]) -> void:
-	if player == seat:
-		set_bag(cards)
 
 
 ## `bag_changed` for this seat, once it has a home body (before that, binding it announces).

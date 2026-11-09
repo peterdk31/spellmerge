@@ -61,7 +61,7 @@ func test_a_ray_after_a_runs_start_goes_as_before() -> void:
 
 ## So does a sweep's results (`sweep_nodes`, `sweep_points`, `sweep_heads`), which grow together:
 ## before N3c a run's start shrank two of them, and a sweep finding more bodies than they held
-## wrote past them (found by the horde stress run).
+## wrote past them (found by a stress run of 500 enemies).
 func test_a_sweep_after_a_runs_start_finds_as_many_as_before() -> void:
 	var count: int = ManagerScript.SWEEP_START + 8
 	var bodies: Array[Node2D] = []

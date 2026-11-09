@@ -37,8 +37,8 @@ var rules: SessionRules = SessionRules.defaults()
 ## Ticks the whole simulation still stands still (online-ready N4: the game-wide stop of a downed
 ## wizard or a boss's death, `hold`). Nothing steps then but the input frames; the drawing runs on.
 var hold_left: int = 0
-## Why the game stands stopped, one reason each (`stop`): the horde's build break, the pause
-## menu. Stopped while any is here; the drawing stops too (the Tick pauses the tree).
+## Why the game stands stopped, one reason each (`stop`): the pause menu, and any
+## other stop an area makes. Stopped while any is here; the drawing stops too (the Tick pauses the tree).
 var stops: Array[StringName] = []
 
 const TickScript := preload("res://core/sim/tick.gd")

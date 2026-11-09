@@ -68,8 +68,8 @@ extends PanelContainer
 ## buttons of the other pages are hidden, so UIFocus skips them. The focused button is marked
 ## with "> ", never by colour alone. Opening it stops the game and closing it (or its player's
 ## device leaving) lets it go: the command `pause_requested` (online-ready N4: a stop is the game's
-## state, `Sim.stop`, one reason of its own, so the horde's build break stands apart and the game
-## goes on only when neither stops it). The Tick pauses the tree for the picture. While a replay
+## state, `Sim.stop`, one reason of its own, so another stop stands apart and the game goes on
+## only when none stops it). The Tick pauses the tree for the picture. While a replay
 ## plays (its commands are the recording's) the menu pauses the tree itself, and the replay waits.
 
 const EventsScript := preload("res://core/events/events.gd")

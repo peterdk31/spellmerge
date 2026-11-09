@@ -7,7 +7,6 @@ extends RefCounted
 ## - `storm`: a frost nova split, a fire chain and a homing lightning bolt (aimed away, so it picks a
 ##   target and keeps it: by key since N5) cast on three imps, on the clip stage
 ##   (tests/clips/stage.gd): the spell runtime, the projectile manager, Combat and Feel.
-## - `horde`: a horde wave of made-up swarmers round one wizard (tests/gameplay/horde/horde_fixture.gd).
 ## - `possessed`: the fight with the first enemy's controller possessing both wizards (actors G9):
 ##   it drives the first and a puppet added in play drives the second; every body steps.
 ##
@@ -19,9 +18,8 @@ extends RefCounted
 
 const AIFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const StageScript := preload("res://tests/clips/stage.gd")
-const HordeFixture := preload("res://tests/gameplay/horde/horde_fixture.gd")
 
-const NAMES: Array[StringName] = [&"fight", &"storm", &"horde", &"possessed"]
+const NAMES: Array[StringName] = [&"fight", &"storm", &"possessed"]
 ## The fight's staffs (card ids by slot, one row a staff).
 const FIGHT_STAFFS: Array = [["fire", "bolt"], ["frost", "nova", "bolt"]]
 ## How long the possessed scene's possessions last (past its ticks).
@@ -40,7 +38,6 @@ var name: StringName
 var _root: Node
 var _fight: AIFixture = null
 var _stage: StageScript = null
-var _horde: HordeFixture = null
 
 
 func _init(root: Node, scene: StringName) -> void:
@@ -59,10 +56,6 @@ func _init(root: Node, scene: StringName) -> void:
 			_stage = StageScript.new(root, root.get_node_or_null("Registry"))
 			if not _stage.start(STORM):
 				push_error("SimScenes: the storm's staffs cast nothing")
-		&"horde":
-			_horde = HordeFixture.new(root, [0] as Array[int])
-			root.add_child(_horde.world)
-			_horde.start()
 		_:
 			push_error("SimScenes: no scene %s" % scene)
 
@@ -80,8 +73,6 @@ func step() -> void:
 		_fight.run_all(1)
 	elif _stage != null:
 		_stage.tick()
-	elif _horde != null:
-		_horde.director.step(1.0 / 60.0)
 
 
 ## The scene's areas, by name: its services and every actor's body by actor id (from the actor
@@ -94,8 +85,6 @@ func areas() -> Dictionary:
 		return out
 	if _stage != null:
 		return {"actors": _stage.actors, "projectiles": _stage.projectiles, "spells": _stage.spells, "combat": _stage.combat}
-	if _horde != null:
-		return {"actors": _horde.actors, "horde": _horde.director, "gems": _horde.director.gems()}
 	return {}
 
 
@@ -119,8 +108,6 @@ func restore(snapshot: Snapshot, input_from: Object = null) -> PackedStringArray
 				_fight.players.append(body)
 		return problems
 	if _stage != null:
-		return snapshot.restore(areas(), world())
-	if _horde != null:
 		return snapshot.restore(areas(), world())
 	return PackedStringArray()
 
@@ -157,8 +144,6 @@ func disturb() -> void:
 func world() -> Node:
 	if _stage != null:
 		return _stage.world
-	if _horde != null:
-		return _horde.world
 	return _root
 
 
@@ -180,8 +165,5 @@ func free_all() -> void:
 		_fight.free_all()
 	if _stage != null:
 		_stage.free_all()
-	if _horde != null:
-		_horde.free_all()
 	_fight = null
 	_stage = null
-	_horde = null

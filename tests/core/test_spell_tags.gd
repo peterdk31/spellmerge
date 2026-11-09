@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the tags and generations of the spell runtime (staffs A5/A6c; M2 part 5 before):
-## the tag layout (staff, generation, node and caster, every actor id 0-1023 since Horde H1), every compiled spell of a staff registered
+## the tag layout (staff, generation, node and caster, every actor id 0-1023 since 2026-10-30), every compiled spell of a staff registered
 ## under its node, four players building at once, a rebuild mid-flight, the generation ring
 ## wrapping and revoking. It uses cards built in code and a stand-in registry, so no content is
 ## needed. The compiler's own rules are in test_staff_compiler.gd.
@@ -148,7 +148,7 @@ func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
 	check_equal(shields[0], largest, "an int32 array keeps the largest tag")
 	check(SpellTag.make(0, 0, 0, 0) > 101000, "the smallest tag is above the AI's attack tags")
 	check(not SpellTag.is_spell_tag(SpellTag.LIMIT), "nothing at the limit is a spell tag")
-	check_equal(SpellTag.CASTER_MASK, 1023, "the caster has 10 bits (Horde H1)")
+	check_equal(SpellTag.CASTER_MASK, 1023, "the caster has 10 bits (ACTORS 1024)")
 	check_equal(SpellTag.FLAG, 1 << 24, "the flag sits above them, at bit 24")
 	check(SpellTag.FLAG > SpellTag.CASTER_MASK << SpellTag.CASTER_SHIFT, "no caster reaches the flag")
 	check_equal(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)), SpellTag.make(7, 0, 0, 2), "a generation key keeps its caster")

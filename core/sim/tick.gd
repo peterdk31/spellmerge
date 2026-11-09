@@ -22,7 +22,7 @@ extends Node
 ## Entities steps, is off). `set_ticking` turns an area off, so a test steps it by hand.
 ##
 ## **Stops are the game's state** (online-ready N4; `sim.gd`): while the sim is stopped
-## (`stop(reason)`: the horde's build break, the pause menu) a tick runs the input frames and only
+## (`stop(reason)`: the pause menu) a tick runs the input frames and only
 ## the steps that run through every reason it is stopped for (`SimArea.Step.own_stops`); while it
 ## is held (`hold`: a downed wizard, a boss's death, a number of ticks), the frames alone. Presses
 ## made meanwhile carry to the first tick that steps (`Frames.stood`). The tree's pause is only the
@@ -54,16 +54,16 @@ const DT: float = 1.0 / 60.0
 const PRIORITY: int = -1000
 ## The step of the actors' bodies, the Tick's own.
 const BODIES: StringName = &"bodies"
-## The written order of the steps (`SimArea.steps`' keys): the services, the horde's swarm, the
-## bodies, then the run's rules and timers (Flow's: the intro, the next wave, the restart; Coop's:
-## the view the camera is fitted to, the revives; the horde director's: its spawns, offers, breaks).
-const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", &"Swarm", BODIES, &"Flow", &"Coop", &"Horde"]
+## The written order of the steps (`SimArea.steps`' keys): the services, the bodies, then the
+## run's rules and timers (Flow's: the intro, the next wave, the restart; Coop's: the view the
+## camera is fitted to, the revives).
+const STEPS: Array[StringName] = [&"Projectiles", &"Spells", &"Combat", &"Entities", BODIES, &"Flow", &"Coop"]
 ## The order areas are renewed in at a run's start (`SimArea.renewed_by`): Entities first, whose
 ## `begin_run` frees the last run's decoys (bodies outside Flow's world, still registered in the
 ## manager and Combat), so no area is renewed under a body that leaves after; then the services in
-## the tick's order, then the horde director. The actor table goes last, once every area has let
-## its bodies go: its births count from 0 again (the keys, N5).
-const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat", &"Horde"]
+## the tick's order. The actor table goes last, once every area has let its bodies go: its births
+## count from 0 again (the keys, N5).
+const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"Combat"]
 ## The name the actor table is part of the state under.
 const ACTORS: StringName = &"Actors"
 
@@ -152,7 +152,7 @@ func _physics_process(_delta: float) -> void:
 
 ## One tick of `delta` seconds (the game's is always DT), in the written order (see the class doc).
 func run(delta: float) -> void:
-	# The frames run in every tick, stopped and held too (the horde's break takes its picks then).
+	# The frames run in every tick, stopped and held too (a command still arrives then).
 	var ticks_frames: bool = frames != null and frames.auto_tick
 	if ticks_frames:
 		frames.tick(delta)
@@ -290,7 +290,7 @@ func state_areas() -> Dictionary:
 		out[String(ACTORS)] = actors
 		var n: int = actors.open_ids(_ids)
 		for i in n:
-			# Actor bodies only: a swarm row's target node holds an id too, and is the swarm's.
+			# Actor bodies only: a plain Combat body (a stand-in) holds an id too, and is its maker's.
 			var body: Actor = actors.node_of(_ids[i]) as Actor
 			if body != null:
 				out[SimHash.BODY_PREFIX + str(_ids[i])] = body

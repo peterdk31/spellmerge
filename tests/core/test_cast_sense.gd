@@ -67,7 +67,7 @@ func test_moves_blocks_spawns_heals() -> void:
 
 func test_held_and_sustained() -> void:
 	check(_sense(["beam"]).repeats_held, "a beam goes on while held")
-	check(_sense(["rain"]).repeats_held, "a rain falls again while held")
+	check(_sense(["swing"]).repeats_held, "a swing sweeps again while held")
 	var hold: CastSense = _sense(["hold", "orbit"])
 	check(hold.sustained, "a held orbit stays until pressed again")
 	check(not _sense(["bolt"]).sustained, "a bolt does not")
@@ -79,10 +79,10 @@ func test_a_blast_is_known() -> void:
 	check(sense.harms(), "and harms")
 
 
-func test_a_rain_hurts_with_what_it_drops() -> void:
-	var sense: CastSense = _sense(["rain", "nova", "bolt"])
-	check(sense.area, "a rain falls on a point")
-	check(sense.damage > 0.0, "and hurts with its payload")
+func test_a_fall_from_the_sky_is_an_area_that_hurts() -> void:
+	var sense: CastSense = _sense(["skyfall", "bolt"])
+	check(sense.area, "a bolt from the sky falls on a spot")
+	check(sense.damage > 0.0, "and hurts with its own hit")
 
 
 func test_multicast_adds_up() -> void:

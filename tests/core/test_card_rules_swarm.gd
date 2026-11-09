@@ -57,8 +57,6 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 	# On swarmers too: two alike casts in the busiest scene with swarmers write the same trace.
 	for form in _forms:
 		var cards: Array[StringName] = [form.id]
-		if form.carries_payload():
-			cards.append(_payload.id)
 		var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
 		_as_swarm = true
 		var first: PackedStringArray = _run(cards, form, CROWD_AGAIN, seconds)

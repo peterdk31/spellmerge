@@ -237,7 +237,7 @@ static func stacks(behaviour: int) -> Stack:
 # --- Range (reach) ----------------------------------------------------------------------
 
 ## Factor on how far the carrier goes: a flying shot's `lifetime` (its range is speed x life),
-## every other carrier's `ray_length` (a beam's, a dash's, a rain's aim point...). Several
+## every other carrier's `ray_length` (a beam's, a dash's...). Several
 ## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 

@@ -38,7 +38,7 @@ func before_each() -> void:
 	feel.projectiles = projectiles
 	feel.drive_engine = false
 	feel.preset = preset
-	# The nova's ring and the rain's marker are cues (`content/cues`).
+	# The carriers' looks are cues (`content/cues`).
 	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
 	registry.scan()
 	feel.registry = registry
@@ -165,17 +165,6 @@ func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER + 1, "and never take a player's slot")
 	var enemy_beam: MeshInstance2D = feel._forms[FeelScript.ENEMY_FORMS * FeelScript.FORMS_PER_PLAYER]
 	check_equal(_param(enemy_beam, &"beam_player"), -1, "drawn in the enemy ramp")
-
-
-func test_a_rain_shows_its_marker_until_it_falls() -> void:
-	bus.form_shown.emit(1, &"rain", Vector2(40, 40), Vector2.RIGHT, 0.6, FROST, 3)
-	bus.form_shown.emit(ActorSeats.enemy(actors), &"rain", Vector2(80, 40), Vector2.RIGHT, 0.6, FROST, 3)
-	check_equal(feel.flashes_of(&"ring_in"), 2, "a ring closes on each rain's point, a wizard's and an enemy's")
-	check(is_equal_approx(feel.flash_info(&"ring_in")["seconds"], 0.6), "for as long as it takes to fall")
-	feel.step(0.5)
-	check_equal(feel.flashes_of(&"ring_in"), 2, "still there just before")
-	feel.step(0.2)
-	check_equal(feel.flashes_of(&"ring_in"), 0, "gone when it lands")
 
 
 func test_the_shipped_preset_has_the_form_art() -> void:

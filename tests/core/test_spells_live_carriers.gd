@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the live-carrier clock (rules R4d, owner 2026-10-29): every carrier that lasts keeps
 ## a timer and hears `on hurt` while it lives, and fires from where it is now (a shot, a beam's
-## tip, a rain's spot, a decoy, the caster's body during a dash; from a body, along its aim now); the first timer tick and the
+## tip, a decoy, the caster's body during a dash; from a body, along its aim now); the first timer tick and the
 ## first arc zap come after the interval or half the carrier's life, whichever is shorter. It
 ## runs a real projectile manager and event bus, stepped by hand, with cards built in code.
 ##
@@ -54,9 +54,6 @@ func before_each() -> void:
 	var beam: FormBase = _form(&"beam", 0.0, 0.4)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var rain: FormBase = _form(&"rain", 0.0, 0.8)
-	rain.carrier = &"rain"
-	rain.ray_length = 120.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	var dash: FormBase = _form(&"dash", 100.0, 0.4)
@@ -174,15 +171,6 @@ func test_on_hurt_on_a_beam_fires_while_it_is_on() -> void:
 	_tick(30)
 	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	check_equal(_runes().size(), 1, "an ended beam hears nothing")
-
-
-func test_a_timer_on_a_rain_fires_from_its_spot_while_it_falls() -> void:
-	_build([&"on_timer", &"rain", &"rune", &"rune"])
-	_cast()
-	_tick(25)
-	var runes: Array[Vector2] = _runes()
-	check_equal(runes.size(), 1, "a 0.8 s rain ticks at 0.4 s, before it lands")
-	check(runes.size() == 1 and runes[0].distance_to(Vector2(120, 0)) < 2.0, "at its spot (%s)" % [runes])
 
 
 func test_a_timer_on_a_decoy_fires_from_it_until_it_ends() -> void:

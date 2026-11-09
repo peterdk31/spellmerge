@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Decoy card (content/spells/forms/decoy/, staffs C): a copy of the wizard, an actor that aims
-## itself (enemies chase it when it is nearest). The engine side is tested in `tests/core/test_spells_payload_carriers.gd` and
+## itself (enemies chase it when it is nearest). The engine side is tested in `tests/core/test_spells_entity_carriers.gd` and
 ## `tests/gameplay/ai/test_entities.gd`; here the card's data, the entity it asks for and its body:
 ## a regular actor (owner, 2026-11-06) with a barrier for its shield, a deflect as it appears, and
 ## a payload's left-over cards landing on it.

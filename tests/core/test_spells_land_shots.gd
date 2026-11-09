@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ## payload fired by a shot, with cards that give the shots each behaviour, timers (lifecycle
 ## rows), a staff spread (its random draws), at the desktop cap and at a small one (where a launch
 ## with no room goes one at a time). The carriers that are not rows only (beam, swing, slam, wall,
-## rain, the moves and bodies) are cast too: they must be untouched by the switch.
+## the moves and bodies) are cast too, and a fall from the sky: they must be untouched by the switch.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_land_shots.gd
 
@@ -38,7 +38,7 @@ const SETS: Array = [
 		[&"split", &"swing"],
 		[&"split", &"slam"],
 		[&"split", &"wall"],
-		[&"split", &"rain"],
+		[&"skyfall", &"split", &"bolt"],
 		[&"on_expire", &"triple", &"bolt", &"split", &"decoy"],
 		[&"split", &"familiar"],
 		[&"on_hit", &"split", &"bolt", &"split", &"swap"],
@@ -48,7 +48,7 @@ const SETS: Array = [
 		[&"on_expire", &"split", &"bolt", &"split", &"swing"],
 		[&"on_expire", &"split", &"bolt", &"slam"],
 		[&"on_expire", &"split", &"bolt", &"wall"],
-		[&"on_expire", &"split", &"bolt", &"rain"],
+		[&"on_expire", &"split", &"bolt", &"skyfall", &"bolt"],
 		[&"on_expire", &"split", &"bolt", &"familiar"],
 		[&"on_expire", &"split", &"bolt", &"split", &"atom"],
 		[&"timer", &"split", &"rune", &"split", &"nova", &"bolt"],

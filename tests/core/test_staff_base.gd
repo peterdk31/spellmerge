@@ -58,16 +58,6 @@ func test_a_multicast_card_is_its_own_kind() -> void:
 	check(not double.range_problems().is_empty(), "nine extra draws is out of range")
 
 
-func test_only_rain_carries_a_payload() -> void:
-	var form := FormBase.new()
-	var carrying: Array[StringName] = []
-	for carrier: StringName in Carriers.ids():
-		form.carrier = carrier
-		if form.carries_payload():
-			carrying.append(carrier)
-	check_equal(carrying, [&"rain"] as Array[StringName], "rain only: a familiar casts what its triggers give it (rules R4 F3)")
-
-
 func test_every_new_enum_value_is_inside_the_validator_range() -> void:
 	var modifier := ModifierBase.new()
 	modifier.behaviour = ModifierBase.Behaviour.RELAY

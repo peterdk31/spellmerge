@@ -262,6 +262,6 @@ func test_wasted_where_nothing_leaves_from_a_point() -> void:
 	for carrier: String in ["dash", "teleport", "swing", "slam"]:
 		var built: CompiledStaff = _arena.install_cards(0, 0, ["penta", carrier])
 		check(built.wasted.has(0), "penta does nothing on a %s" % carrier)
-	for carrier: String in ["bolt", "beam", "rune", "wall", "rain", "orbit", "decoy", "familiar", "swap", "portal"]:
+	for carrier: String in ["bolt", "beam", "rune", "wall", "orbit", "decoy", "familiar", "swap", "portal"]:
 		var built: CompiledStaff = _arena.install_cards(0, 0, ["penta", carrier])
 		check(not built.wasted.has(0), "penta works on a %s" % carrier)

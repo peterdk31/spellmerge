@@ -164,8 +164,6 @@ var triggers: Array[Trigger] = []
 var payload: CompiledGroup:
 	get:
 		return triggers[0].payload if not triggers.is_empty() else null
-## The group a rain carries (its payload), or null.
-var own_payload: CompiledGroup = null
 ## Index in `CompiledStaff.nodes`; the tag of this spell's shots carries it.
 var node: int = -1
 ## The carrier's slot in the staff, -1 for a fallback.

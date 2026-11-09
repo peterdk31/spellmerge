@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
-
-[resource]
-script = ExtResource("1_base")
-id = &"rainfall"
-parts = Array[Dictionary]([{"flash": &"fall", "zoom": 2, "way": &"right"}, {"flash": &"spray", "zoom": 1, "way": &"up", "particles": true}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 15.0, "spread": 92.0, "way": &"up"}, {"part": &"motes", "kind": &"spark", "count": 10, "radius": 20.0, "spread": 360.0, "up": 0.3}, {"part": &"motes", "kind": &"spell", "count": 6, "radius": 12.0, "spread": 360.0}])
-shake = 0.06

@@ -10,7 +10,7 @@ extends RefCounted
 ## All of the modifier is here. The runtime calls it at the places marked "Skyfall": `_cast_once`
 ## and `_penta` (a cast that falls opens its hole instead of leaving), `_run_pending` (the hole has
 ## opened: it falls), `_land_shots` (every shot a carrier makes) and `_placed_at` with the kit's
-## `on_floor` (every carrier that is placed). Taking it out again is this file, the card folder, those
+## `on_floor` (every carrier that is placed); `_drop_pending` lets go of a fall that never falls. Taking it out again is this file, the card folder, those
 ## calls, and `set_floor` in the projectile manager.
 
 ## Not state: the runtime's kit, set up again (core/sim/README.md).
@@ -45,7 +45,10 @@ func spot_of(actor: int, origin: Vector2) -> Vector2:
 
 ## Opens the hole over `spot` (its look, the card's `shown_cue`) and queues the fall, cast by the hole
 ## (a point) after SpellLimits.SKYFALL_SECONDS. A point spares no body: whoever stands under it when
-## it lands is hit, its caster too (owner: "This is just following the general rule"). Returns 1:
+## it lands is hit, its caster too (owner: "This is just following the general rule"). While it
+## waits it counts as a live shot of `tag`, as an entity asked for does, so it is a carrier like any
+## other: a `hold` on it starts at the cast (its mana kept, the next press calls it off), and when
+## it falls what it makes carries the hold on by its own rule (`Spells._run_pending`). Returns 1:
 ## the cast has gone.
 func open(spell: CompiledSpell, tag: int, actor: int, spot: Vector2) -> int:
 	var hole: Vector2 = spot + Vector2.UP * SpellLimits.SKYFALL_HEIGHT
@@ -59,6 +62,7 @@ func open(spell: CompiledSpell, tag: int, actor: int, spot: Vector2) -> int:
 	_kit.cast_done()
 	launch.echoed = _kit.is_echo(spell)
 	launch.fall_floor = spot.y
+	_kit.shot_started(tag)
 	return 1
 
 

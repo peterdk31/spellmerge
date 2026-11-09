@@ -152,7 +152,6 @@ func test_a_payloads_cards_land_on_what_fired_it() -> void:
 	check_equal(_lands_on(arena, ["on_expire", "teleport", "shield"]), Carriers.ON_BEARER, "a teleport's end: on the body it moved")
 	check_equal(_lands_on(arena, ["on_cast", "bolt", "shield"]), Carriers.ON_BEARER, "on cast: on whoever cast the bolt")
 	check_equal(_lands_on(arena, ["timer", "beam", "shield"]), &"", "a beam's tip: a point")
-	check_equal(_lands_on(arena, ["timer", "rain", "bolt", "shield"]), &"", "a rain's spot: a point")
 	check_equal(_lands_on(arena, ["timer", "familiar", "shield"]), &"", "a familiar's orb: a point")
 	check_equal(_lands_on(arena, ["on_hit", "bolt", "recoil"]), &"", "recoil on a point: nothing to push")
 	check_equal(_lands_on(arena, ["timer", "bolt", "recoil"]), Carriers.ON_BEARER, "recoil on the bolt pushes it")

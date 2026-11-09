@@ -33,7 +33,7 @@ const float GRID = 24.0;
 // given off along its seam leave from the seam it draws and come and go with it: `look_shape` is a
 // piece's half span of its row and its seam's depth below its middle, in its hit size as drawn
 // (STILL_HIT); `look_clock` the seconds its seam takes to open and the seconds of its end it fades
-// over.
+// over. The defaults only draw a body no card has shaped yet.
 uniform vec2 look_shape = vec2(1.0, 1.0);
 uniform vec2 look_clock = vec2(0.3, 0.8);
 // World pixels a band of the seam is long (one infusion's).

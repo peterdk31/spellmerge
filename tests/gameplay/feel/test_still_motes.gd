@@ -82,11 +82,22 @@ func test_the_wall_and_the_pool_name_their_motes() -> void:
 		check_equal(form.look_motes, &"rising", "%s gives off rising motes" % form.id)
 		check(form.look_mote_rate > 0.0, "%s gives some off every second" % form.id)
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-		check(form.look_open <= ManagerScript.STILL_START and form.look_fade <= ManagerScript.STILL_END, "%s comes and goes within what its still clock tells" % form.id)
 	check_equal(WALL.look_motes_from, FormBase.LOOK_MOTES_ROW, "a wall's leave along its row")
 	check_equal(POOL.look_motes_from, FormBase.LOOK_MOTES_AREA, "a pool's over its oval")
 	var cards: Array[StringName] = spells.still_mote_cards()
 	check(cards.has(&"wall") and cards.has(&"pool") and not cards.has(&"rune"), "Spells names the still cards that give off motes (%s)" % [cards])
+
+
+func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
+	var later := own(ManagerScript.new()) as ManagerScript
+	root.add_child(later)
+	spells.projectiles = later
+	var body: int = spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD)
+	check(body > 0, "a launch numbers a body the start did not")
+	var material := later._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"look_shape"), POOL.look_shape, "and shapes it by its card, as the start does")
+	check_equal(spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD), body, "asked again, the same body")
+	spells.projectiles = mgr
 
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:

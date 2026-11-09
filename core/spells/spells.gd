@@ -554,9 +554,8 @@ func _ready() -> void:
 ## shaders, reads every carrier card's look once (`_looks`, for `look_of` and `look_shaders`) and hands each
 ## shot carrier card's own shader (LOOK_SHOT, LOOK_STILL) to the projectile manager now
 ## (`register_body`, with the mesh its shots are written as; a still one's look shape and clock with
-## it, `set_body_shape`), so it has its batches and is warmed before the first room, not first drawn
-## in the middle of one. A launch numbers any it did not know
-## too. The other areas warm the shaders they draw themselves (`look_shaders`).
+## it, `_shape_body`), so it has its batches and is warmed before the first room, not first drawn
+## in the middle of one. A launch numbers and shapes any it did not know too (`_body_of`). The other areas warm the shaders they draw themselves (`look_shaders`).
 func register_bodies() -> void:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
 	if source == null or not source.has_method(&"get_all"):
@@ -567,12 +566,9 @@ func register_bodies() -> void:
 		var form := card as FormBase
 		if form == null:
 			continue
-		var drawer: int = _remember_look(form)
-		var mesh: int = _shot_mesh(drawer)
+		var mesh: int = _shot_mesh(_remember_look(form))
 		if form.look_shader != null and mesh != NO_SHOT_MESH and projectiles != null:
-			var body: int = projectiles.register_body(form.look_shader, mesh)
-			if drawer == Carrier.LOOK_STILL:
-				projectiles.set_body_shape(body, form.look_shape, Vector2(form.look_open, form.look_fade))
+			_shape_body(projectiles.register_body(form.look_shader, mesh), form.id, mesh)
 
 
 ## Each carrier card's look by its id, read from the card once (at start, `register_bodies`, or the
@@ -657,10 +653,32 @@ func _launch_look_of(spell: CompiledSpell) -> LaunchLook:
 	_launch_look.core = spell.tint
 	_launch_look.look = spell.look
 	_launch_look.form = spell.form_id
-	_launch_look.body = projectiles.register_body(spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
+	_launch_look.body = _body_of(spell.form_id, spell.look_shader, mesh) if mesh != NO_SHOT_MESH else 0
 	_launch_look.light_intensity = spell.look_light_intensity
 	_launch_look.light_reach = spell.look_light_reach
 	return _launch_look
+
+
+## The card body the carrier card `form`'s shots are drawn by (its `shader` under `mesh`), numbered
+## the first time (`register_body`) and shaped as it is (`_shape_body`): a launch may be the first to
+## ask for a card the start did not know. Only a look up once numbered, so a launch costs no more.
+func _body_of(form: StringName, shader: Shader, mesh: int) -> int:
+	var body: int = projectiles.body_of(shader, mesh)
+	if body == 0 and shader != null:
+		body = projectiles.register_body(shader, mesh)
+		_shape_body(body, form, mesh)
+	return body
+
+
+## Hands a still card's look shape and clock (its `CardLook`: `look_shape`, `look_open`,
+## `look_fade`) to the manager for its body `body` (`set_body_shape`), so its shader draws by the
+## numbers its motes leave by (`gameplay/feel/still_motes.gd` reads the same `CardLook`). Every place
+## a body is numbered shapes it here. A head body (`mesh` MESH_HEAD) has no still look.
+func _shape_body(body: int, form: StringName, mesh: int) -> void:
+	if body <= 0 or mesh != ProjectilesScript.MESH_QUAD or not _looks.has(form):
+		return
+	var look: CardLook = _looks[form]
+	projectiles.set_body_shape(body, look.shape, Vector2(look.open, look.fade))
 
 
 ## `_shot_mesh`'s answer for a carrier whose look is not the projectile manager's shots.

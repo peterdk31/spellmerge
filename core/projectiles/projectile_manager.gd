@@ -645,7 +645,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_body_clocks", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -977,11 +977,10 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 var _body_shaders: Array[Shader] = []
 ## Each card body's mesh (MESH_HEAD or MESH_QUAD), body `n` at `n - 1` (`register_body`).
 var _body_meshes: PackedInt32Array = PackedInt32Array()
-## Each card body's look shape and clock, body `n` at `n - 1` (`set_body_shape`: its card's
-## `look_shape`, and `look_open` and `look_fade`), handed to its batches' shader as `look_shape` and
-## `look_clock`.
-var _body_shapes: PackedVector2Array = PackedVector2Array()
-var _body_clocks: PackedVector2Array = PackedVector2Array()
+## The card bodies shaped by their card (`set_body_shape`: its `look_shape`, and its `look_open` and
+## `look_fade`), handed to their batches' shader as `look_shape` and `look_clock`: {body: [shape,
+## clock]}. A body never shaped leaves its shader's own defaults alone.
+var _body_shapes: Dictionary = {}
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1319,8 +1318,6 @@ func register_body(shader: Shader, mesh: int = MESH_QUAD) -> int:
 		ShaderWarmupScript.want(shader, ShaderWarmupScript.BATCH)
 	_body_shaders.append(shader)
 	_body_meshes.append(MESH_HEAD if mesh == MESH_HEAD else MESH_QUAD)
-	_body_shapes.append(BODY_SHAPE)
-	_body_clocks.append(BODY_CLOCK)
 	var body: int = _body_shaders.size()
 	_batch_total = BATCH_BODY_FIRST + 2 * body
 	_rooms.resize(_batch_total)
@@ -1347,34 +1344,30 @@ func body_of(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	return 0
 
 
-## A card body's look shape and clock before its card says (`set_body_shape`): a round, its hit
-## size across, opening over 0.3 s and fading over the last 0.8 s.
-const BODY_SHAPE: Vector2 = Vector2(1.0, 1.0)
-const BODY_CLOCK: Vector2 = Vector2(0.3, 0.8)
-
-
 ## Card body `body`'s look shape (`FormBase.look_shape`, in its drawn hit size's units, STILL_HIT)
 ## and its clock (`Vector2(look_open, look_fade)`, seconds), handed to its batches' shader as the
 ## uniforms `look_shape` and `look_clock`, so the shader draws its look by the card's numbers and
 ## whoever gives off its motes (`still_motes.gd`, from the card's `CardLook`) reads the same ones.
-## Spells sets them when it numbers the card's body (`register_bodies`). The cards sharing a shader
-## share them: the last set holds.
+## Spells sets them as it numbers the card's body. A body is its shader, so the cards sharing one
+## must share these (test_card_looks checks the cards do).
 func set_body_shape(body: int, shape: Vector2, clock: Vector2) -> void:
 	if body < 1 or body > _body_shaders.size():
 		return
-	_body_shapes[body - 1] = shape
-	_body_clocks[body - 1] = clock
+	_body_shapes[body] = [shape, clock]
 	for enemy: bool in [false, true]:
 		var batch: int = body_batch(body, enemy)
 		if batch < _nodes.size() and _nodes[batch] != null:
 			_apply_body_shape(_nodes[batch], body)
 
 
-## Hands card body `body`'s look shape and clock to its batch `node`'s shader.
+## Hands card body `body`'s look shape and clock to its batch `node`'s shader, once it has them.
 func _apply_body_shape(node: MultiMeshInstance2D, body: int) -> void:
+	var shaped: Variant = _body_shapes.get(body)
+	if shaped == null:
+		return
 	var material := node.material as ShaderMaterial
-	material.set_shader_parameter(&"look_shape", _body_shapes[body - 1])
-	material.set_shader_parameter(&"look_clock", _body_clocks[body - 1])
+	material.set_shader_parameter(&"look_shape", shaped[0])
+	material.set_shader_parameter(&"look_clock", shaped[1])
 
 
 ## The mesh the shot in `slot` is written as (`_write_stones` or `_write_head`): MESH_QUAD for a

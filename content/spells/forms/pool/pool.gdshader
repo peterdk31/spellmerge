@@ -33,7 +33,8 @@ uniform float particle_share = 1.0;
 const float GRID = 24.0;
 // Its oval's half width and half depth in its hit size as drawn (STILL_HIT), its card's `look_shape`
 // (set by the projectile manager, `set_body_shape`), so its motes leave from the oval it draws. Its
-// come and go are its own (the splash, the drying), not the card's `look_clock`.
+// come and go are its own (the splash, the drying), not the card's `look_clock`. The default only
+// draws a body no card has shaped yet.
 uniform vec2 look_shape = vec2(1.0, 1.0);
 
 // Seconds it splashes in for (the drops a little longer).

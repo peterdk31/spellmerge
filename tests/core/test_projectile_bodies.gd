@@ -268,7 +268,7 @@ func test_a_bodys_shape_reaches_its_shader() -> void:
 	var pool: int = mgr.register_body(POOL)
 	for enemy: bool in [false, true]:
 		var material := mgr._nodes[ManagerScript.body_batch(pool, enemy)].material as ShaderMaterial
-		check_equal(material.get_shader_parameter(&"look_shape"), ManagerScript.BODY_SHAPE, "before its card says, the plain shape")
+		check_equal(material.get_shader_parameter(&"look_shape"), null, "before its card says, the shader keeps its own")
 	mgr.set_body_shape(pool, Vector2(1.3, 0.75), Vector2(0.2, 0.5))
 	for enemy: bool in [false, true]:
 		var material := mgr._nodes[ManagerScript.body_batch(pool, enemy)].material as ShaderMaterial

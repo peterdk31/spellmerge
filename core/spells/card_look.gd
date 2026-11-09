@@ -22,10 +22,11 @@ var mote_rate: float = 0.0
 var motes_from: int = FormBase.LOOK_MOTES_AREA
 ## The shape of its still look, in its hit size as drawn (`FormBase.look_shape`), and the seconds
 ## it takes to open and the seconds of its end it fades over (`look_open`, `look_fade`): what its
-## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by.
-var shape: Vector2 = Vector2(1.0, 1.0)
-var open: float = 0.3
-var fade: float = 0.8
+## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by. Its card's, from
+## `from_card` (the card holds the defaults); nothing for a look of no card, which has no motes.
+var shape: Vector2 = Vector2.ZERO
+var open: float = 0.0
+var fade: float = 0.0
 
 ## The look of a card with none of its own, or of an id that is no carrier card: drawn plain, lit
 ## as any. Shared.

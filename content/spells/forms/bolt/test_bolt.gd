@@ -39,7 +39,7 @@ func test_its_moments_have_their_cues() -> void:
 
 
 ## Its own look (docs/milestones/card-looks.md, phase 1): a bolt's head is drawn by its folder's
-## shader, in a pair of head batches of its own, so the atom, nova and swap keep the plain head.
+## shader, in a pair of head batches of its own, so the atom and nova keep the plain head.
 func test_it_is_drawn_by_its_own_head_shader() -> void:
 	var card: FormBase = load("res://content/spells/forms/bolt/bolt.tres") as FormBase
 	check(card.look_shader == preload("res://content/spells/forms/bolt/bolt.gdshader"), "drawn by its folder's shader")

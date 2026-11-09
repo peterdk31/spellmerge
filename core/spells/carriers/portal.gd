@@ -544,6 +544,21 @@ func portal_left(at: int) -> float:
 	return clampf(_pt_life[at] / _pt_span[at], 0.0, 1.0)
 
 
+## Seconds portal `at` has been open, and seconds it has left (INF for a held one): how its look
+## opens and closes.
+func portal_seconds(at: int) -> Vector2:
+	if not portal_on(at):
+		return Vector2.ZERO
+	var held: bool = _pt_span[at] <= 0.0 or _pt_span[at] >= SpellLimits.HOLD_LIFETIME
+	return Vector2(maxf(_pt_span[at] - _pt_life[at], 0.0), INF if held else maxf(_pt_life[at], 0.0))
+
+
+## How each different infusion on portal `at` looks, in slot order (`CompiledSpell.infusion_looks`:
+## rgb its tint); empty for none. Read only.
+func portal_infusions(at: int) -> PackedColorArray:
+	return _pt_spell[at].infusion_looks if portal_on(at) and _pt_spell[at] != null else PackedColorArray()
+
+
 ## Open portals now (tests).
 func portal_count() -> int:
 	return _pt_on.count(1)

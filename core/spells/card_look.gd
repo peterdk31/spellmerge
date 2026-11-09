@@ -14,6 +14,12 @@ var shader: Shader = null
 ## How bright and how far it lights the room (spell light), times the light's own: 1 as any shot.
 var light_intensity: float = 1.0
 var light_reach: float = 1.0
+## The motes its still shots give off while they stand (`FormBase.look_motes`: a MoteKind id, empty
+## for none), how many a second each shot gives off, and from where (`look_motes_from`: 0 the oval of
+## its hit size, 1 along its piece of a row).
+var motes: StringName = &""
+var mote_rate: float = 0.0
+var motes_from: int = 0
 
 ## The look of a card with none of its own, or of an id that is no carrier card: drawn plain, lit
 ## as any. Shared.

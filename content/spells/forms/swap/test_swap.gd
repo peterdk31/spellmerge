@@ -115,3 +115,14 @@ func test_four_players_trade_each() -> void:
 func test_its_moments_have_their_cues() -> void:
 	var card: FormBase = load("res://content/spells/forms/swap/swap.tres") as FormBase
 	check_equal(card.shown_cue, &"trade", "its shown plays trade")
+
+
+## Its look (the owner's pick, 2026-11-09: the chasing pair): its charm is drawn by its folder's own
+## head shader, a copy of the plain head's with the pair for its core, in a head body of its own.
+func test_its_charm_is_drawn_by_its_own_head_shader() -> void:
+	var card: FormBase = _card()
+	check(card.look_shader == preload("res://content/spells/forms/swap/swap.gdshader"), "drawn by its folder's shader")
+	check(card.look_problems().is_empty(), "a canvas-item shader its carrier draws: %s" % [card.look_problems()])
+	check_equal(Carriers.of(card.carrier).look_drawer(), Carrier.LOOK_SHOT, "a shot in flight: a head")
+	var code: String = card.look_shader.code
+	check(code.contains("twinkle_px(") and code.contains("palette_count(inf)"), "its sparks are twinkling motes, one an infusion")

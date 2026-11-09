@@ -602,6 +602,21 @@ func look_shaders(drawer: int) -> Array[Shader]:
 	return found
 
 
+## Every still carrier card whose shots give off motes while they stand (`FormBase.look_motes`,
+## drawn by a shader of its own), by id, for Feel to give them off (`gameplay/feel/still_motes.gd`,
+## which asks `look_of(form, Carrier.LOOK_STILL)` for them). A new array each call: once, at start.
+func still_mote_cards() -> Array[StringName]:
+	var found: Array[StringName] = []
+	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
+	if source == null or not source.has_method(&"get_all"):
+		return found
+	for card: Resource in source.call(&"get_all", &"spells"):
+		var form := card as FormBase
+		if form != null and form.look_shader != null and form.look_motes != &"" and _remember_look(form) == Carrier.LOOK_STILL:
+			found.append(form.id)
+	return found
+
+
 ## Reads the card `form` into `_looks`: false when there is no such carrier card (not kept, so a
 ## card the registry has not scanned yet is read once it has).
 func _read_look(form: StringName) -> bool:
@@ -618,7 +633,11 @@ func _read_look(form: StringName) -> bool:
 ## Keeps `card`'s look in `_looks` (once) and returns the area that draws its carrier.
 func _remember_look(card: FormBase) -> int:
 	if not _looks.has(card.id):
-		_looks[card.id] = CardLook.of(card.look_shader, card.look_light_intensity, card.look_light_reach)
+		var look: CardLook = CardLook.of(card.look_shader, card.look_light_intensity, card.look_light_reach)
+		look.motes = card.look_motes
+		look.mote_rate = card.look_mote_rate
+		look.motes_from = card.look_motes_from
+		_looks[card.id] = look
 		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
 	return int(_look_drawers[card.id])
 

@@ -235,6 +235,37 @@ float emitter(int i) {
 	return mod(floor(word / exp2(float(i % 4) * 5.0) + 0.001), 32.0);
 }
 
+// A look's palette (see THE PALETTE above) for a shader that hands it to its fragments to draw its
+// own way (a part of the look an infusion: the rune's facets, the mire's veins, the swap's sparks):
+// its materials as floats, -1 past its count, from `palette_of` (in vertex()).
+vec4 palette_floats(vec3 c, vec3 b) {
+	ivec4 m;
+	palette_of(c, b, m);
+	return vec4(m);
+}
+
+// How many infusions a palette from `palette_floats` holds (0 for a plain or exact look).
+float palette_count(vec4 pal) {
+	return dot(step(vec4(-0.5), pal), vec4(1.0));
+}
+
+// Shade `shade` (0 shadow, 1 base, 2 light) of the `slot`th infusion of the palette `pal` in turn
+// (from `palette_floats`), or `fallback` (the look's own shade) for a look of fewer than two.
+vec3 palette_turn(vec4 pal, int slot, int shade, vec3 fallback) {
+	float n = palette_count(pal);
+	if (n < 1.5) {
+		return fallback;
+	}
+	int k = int(mod(float(slot), n));
+	float m = k == 0 ? pal.x : (k == 1 ? pal.y : (k == 2 ? pal.z : pal.w));
+	return palette_shade(int(m), shade);
+}
+
+// The ramp's shade `s` (0 shadow, 1 base, 2 light, 3 white-hot: a mote's, `twinkle_px`).
+vec3 shade_rgb(float s) {
+	return s > 2.5 ? hot : (s > 1.5 ? hi : (s > 0.5 ? mid : lo));
+}
+
 // The ramp at `u` (0 white-hot, 1 shadow): what cools as it ages.
 vec3 ramp(float u) {
 	return u < 0.15 ? hot : (u < 0.4 ? hi : (u < 0.7 ? mid : lo));

@@ -82,10 +82,13 @@ const float K_SPRAY = 11.0;
 const float K_PUFF = 12.0;
 const float K_ARC = 14.0;
 const float K_STATUS = 15.0;
-// A flash's age (or a rune's trace) travels as TRACE_FROM + TRACE_SPAN x the fraction
-// (RUNE_TRACE in projectile_manager.gd); code 0 is a whole rune.
+// A flash's age travels as TRACE_FROM + TRACE_SPAN x the fraction; so does a still shot's clock
+// (`still_code` in projectile_manager.gd): its first STILL_START seconds as that, its last
+// STILL_END seconds of life as that negated, 0 between (`still_since`, `still_left`).
 const float TRACE_FROM = 0.02;
 const float TRACE_SPAN = 0.42;
+const float STILL_START = 1.25;
+const float STILL_END = 1.0;
 
 bool bit_set(vec3 b, float look) {
 	float bit = look - 1.0;
@@ -117,6 +120,25 @@ float falloff(float x, float reach) {
 	return k * k;
 }
 
+// A twinkling mote as a card shader draws one (the ward's look, gameplay/feel/barriers.gd; the
+// owner, 2026-11-09: "use motes for everything you can", the world's magic building blocks): a
+// pixel at `at` in its shade `shade` (0 shadow to 3 white-hot: `cooling`), white-hot at the start
+// of its twinkle `tw` (0-1, a cycle of its own) and at its brightest a little plus round it in the
+// light shade. The shade (0-3) of the pixel `p`, or -1 off it.
+float twinkle_px(vec2 p, vec2 at, float shade, float tw) {
+	vec2 d = abs(floor(p) - floor(at));
+	float far = d.x + d.y;
+	if (far < 0.5) {
+		return tw < 0.12 ? 3.0 : shade;
+	}
+	return far < 1.5 && tw < 0.07 && shade > 0.5 ? 2.0 : -1.0;
+}
+
+// A mote's shade `a` (0-1) through its life, cooling: white-hot, light, base, then shadow.
+float cooling(float a) {
+	return a < 0.15 ? 3.0 : (a < 0.5 ? 2.0 : (a < 0.85 ? 1.0 : 0.0));
+}
+
 // The colour `u` (0-1) of the way through a ramp of three or four shades.
 vec3 shade3(vec3 a, vec3 b, vec3 c, float u) {
 	return u < 0.334 ? a : (u < 0.667 ? b : c);
@@ -137,8 +159,18 @@ float coded_code(float custom_a) {
 	return coded - floor(coded + 0.5);
 }
 
-// How far through its life a flash (or a rune's trace) is, from its code (either side of its kind).
+// How far through its life a flash is, from its code (either side of its kind).
 float coded_age(float code) {
 	float a = abs(code);
 	return a > 0.01 ? clamp((a - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) : 1.0;
+}
+
+// A still shot's seconds since it was placed, from its code (STILL_START once past them).
+float still_since(float code) {
+	return code > 0.01 ? clamp((code - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) * STILL_START : STILL_START;
+}
+
+// A still shot's seconds of life left, from its code (STILL_END while it has more).
+float still_left(float code) {
+	return code < -0.01 ? (1.0 - clamp((-code - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0)) * STILL_END : STILL_END;
 }

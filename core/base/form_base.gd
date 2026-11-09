@@ -134,6 +134,16 @@ var _pose_packed: bool = false
 ## How far its carrier's light reaches, times what its size gives (a shot's `SHOT_REACH` and zoom,
 ## a still one's quad): 1 as today, from 0.25 to 2.
 @export var look_light_reach: float = 1.0
+## Motes its carrier's still shots give off all the time while they stand (the owner, 2026-11-09:
+## "use motes for everything you can", the world's magic building blocks): a `MoteKind` id
+## (content/motes; empty for none), how many a second each shot gives off (each piece of a solid
+## one, a wall's), and from where (LOOK_MOTES_*): anywhere on the oval of its hit size seen at a
+## slant (a pool's surface), or along its piece of the row on the floor (a wall's seam). Fewer while
+## it comes and as it goes (its still clock). Feel gives them off (`gameplay/feel/still_motes.gd`)
+## in the shot's colours, its infusions in turn, a share of them its infusions' own kinds.
+@export var look_motes: StringName = &""
+@export var look_mote_rate: float = 0.0
+@export_enum("area", "row") var look_motes_from: int = 0
 ## The old names of renamed look fields this card was loaded with (`_set`), each still taken (a
 ## `shot_shader` is its `look_shader`), and named by `look_problems` so the card is fixed.
 var _renamed: PackedStringArray = PackedStringArray()
@@ -162,7 +172,7 @@ func look_cues() -> Array:
 
 
 ## What is wrong with its looks, one line each (empty when nothing is): a look shader that is not
-## a canvas-item shader, one its carrier never draws, an old field name. Whether the cues it names exist is the registry's to say
+## a canvas-item shader, one its carrier never draws, an old field name, motes never given off. Whether the cues it names exist is the registry's to say
 ## (tests/content/spells/test_carrier_looks.gd).
 func look_problems() -> PackedStringArray:
 	var found := PackedStringArray()
@@ -172,6 +182,10 @@ func look_problems() -> PackedStringArray:
 		found.append("%s: look_shader '%s' is not a canvas_item shader" % [id, look_shader.resource_path])
 	if look_shader != null and Carriers.exists(carrier) and Carriers.of(carrier).look_drawer() == Carrier.LOOK_NONE:
 		found.append("%s: look_shader '%s' is never drawn: its carrier `%s` has no look of its own (Carrier.look_drawer)" % [id, look_shader.resource_path, carrier])
+	if look_motes != &"" and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
+		found.append("%s: look_motes '%s' are never given off: only a still carrier's shots drawn by a look_shader of the card's own give them off" % [id, look_motes])
+	if look_motes != &"" and look_mote_rate <= 0.0:
+		found.append("%s: look_motes '%s' at a rate of %s a second are never given off" % [id, look_motes, look_mote_rate])
 	return found
 
 
@@ -236,6 +250,7 @@ func ranges() -> Dictionary:
 		"knockback": Vector2(0.0, 2000.0),
 		"look_light_intensity": Vector2(0.0, 2.0),
 		"look_light_reach": Vector2(0.25, 2.0),
+		"look_mote_rate": Vector2(0.0, 120.0),
 	})
 	return limits
 

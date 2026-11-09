@@ -1,0 +1,38 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"rising"
+gravity = -4.0
+drag = 3.0
+bounce = 0.0
+wobble = 0.5
+wobble_rate = 6.0
+glow = 0.7
+shade_from = 0
+shape = "
+#
+
+#
+
+o
+
+#
+
+#
+
+.#.
+#o#
+.#.
+"
+shape_play = "loop"
+shape_rate = 6.0
+shape_turns = false
+count = 1
+speed = Vector2(0.0, 6.0)
+spread = 360.0
+up = Vector2(15.0, 21.0)
+life = Vector2(0.7, 1.1)
+height = 0.0

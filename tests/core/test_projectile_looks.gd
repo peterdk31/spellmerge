@@ -259,21 +259,42 @@ func code_at(node: MultiMeshInstance2D, i: int) -> float:
 	return coded - floorf(coded + 0.5)
 
 
-func test_a_new_rune_traces_itself_onto_the_floor() -> void:
+func test_a_still_shot_tells_its_shader_its_start_and_its_end() -> void:
 	mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 5.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.update_draw(1.0)
-	check(absf(code_at(mgr._still_node, 0) - ManagerScript.TRACE_FROM) < 0.001, "a rune just cast is not traced yet")
+	check(absf(code_at(mgr._still_node, 0) - ManagerScript.TRACE_FROM) < 0.001, "a rune just cast is at its start")
 	for i in 6:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
-	var half: float = ManagerScript.TRACE_FROM + ManagerScript.TRACE_SPAN * 0.1 / ManagerScript.RUNE_TRACE
-	check(absf(code_at(mgr._still_node, 0) - half) < 0.001, "a tenth of a second later, part of it is")
+	var tenth: float = ManagerScript.TRACE_FROM + ManagerScript.TRACE_SPAN * 0.1 / ManagerScript.STILL_START
+	check(absf(code_at(mgr._still_node, 0) - tenth) < 0.001, "a tenth of a second later, a little through it")
 	check_equal(kind_at(mgr._still_node, 0), ManagerScript.KIND_RUNE, "still a rune")
-	for i in 12:
+	for i in 72:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
-	check_equal(code_at(mgr._still_node, 0), 0.0, "past RUNE_TRACE it is whole")
-	check_equal(ManagerScript.trace_code(-1.0), 0.0, "a time out of order draws it whole")
+	check_equal(code_at(mgr._still_node, 0), 0.0, "past STILL_START and far from its end it is 0")
+	# 1.3 s lived of 5: 3.2 s more leaves 0.5 s, halfway through its end.
+	for i in 192:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	var end_half: float = -(ManagerScript.TRACE_FROM + ManagerScript.TRACE_SPAN * 0.5)
+	check(absf(code_at(mgr._still_node, 0) - end_half) < 0.01, "half a second from its end, it is halfway through its end (%f)" % code_at(mgr._still_node, 0))
+	check_equal(kind_at(mgr._still_node, 0), ManagerScript.KIND_RUNE, "its end leaves its kind alone")
+	check_equal(ManagerScript.still_code(-1.0, 3.0), 0.0, "a time out of order is 0")
+	check(ManagerScript.still_code(0.4, 0.3) < 0.0, "a short life tells its end once less is left than lived")
+	check(ManagerScript.still_code(0.2, 0.3) > 0.0, "and its start before")
+
+
+func test_a_walls_stones_turn_along_its_row() -> void:
+	var slot: int = mgr.spawn(0, Vector2(80.0, 80.0), Vector2.ZERO, 5.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	check(mgr.set_solid(slot, Vector2(0.0, 2.0), 3, 9.0), "it is made a row of three stones")
+	mgr.update_draw(1.0)
+	var buffer: PackedFloat32Array = mgr._still_node.multimesh.buffer
+	for stone in 3:
+		var i: int = stone * ManagerScript.DRAW_STRIDE
+		var x_axis: Vector2 = Vector2(buffer[i], buffer[i + 4])
+		check(x_axis.normalized().is_equal_approx(Vector2(0.0, 1.0)), "stone %d's quad runs along the row (%s), so its shader knows the wall's way" % [stone, x_axis])
+		check_equal(Vector2(buffer[i + 3], buffer[i + 7]).distance_to(Vector2(80.0, 80.0 + 9.0 * (stone - 1))) < 0.01, true, "stone %d stands in its place" % stone)
 
 
 var _seen_impacts: Array = []

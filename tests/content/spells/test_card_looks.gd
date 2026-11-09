@@ -51,7 +51,7 @@ func test_some_cards_have_a_look_of_their_own() -> void:
 	var ids: Array[StringName] = []
 	for each: Array in _looked_cards():
 		ids.append((each[0] as FormBase).id)
-	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"beam", &"swing", &"familiar"]:
+	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"swap", &"beam", &"swing", &"familiar"]:
 		check(ids.has(id), "%s draws with its folder's shader" % id)
 
 

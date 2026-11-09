@@ -26,3 +26,6 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "push": 4, "stret
 cast_cue = &"cast_wall"
 impact_cue = &"impact_ring"
 look_shader = ExtResource("3_shader")
+look_motes = &"rising"
+look_mote_rate = 16.0
+look_motes_from = 1

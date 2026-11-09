@@ -1,6 +1,6 @@
 # Carrier modifiers: Nova and Skyfall
 
-**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it; Parts 4-5 planned. The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
+**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it, and built (docs/DECISIONS.md, 2026-11-09); Parts 4-5 planned. The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
 
 The same day, on the orbit's look: "Hmm maybe orbit should also just be a modifier instead of a carrier" (Part 5).
 
@@ -22,7 +22,7 @@ Both are modifier behaviours. Each is a row of `ModifierBase.RULES`, a few lines
 
 Penta already takes over a cast in `_cast_once` (spells.gd:1639). Nova and Skyfall join it as stages, in a fixed order. Each stage hands the next one a place, a way and who casts it:
 
-firing (`_fire_spell`: mirror, echo, recoil, `on cast`) → **nova** (N ways round) → **skyfall** (to a spot ahead; after the fall, cast by that spot) → **penta** (a ring round whoever casts it now) → the carrier's `launch`.
+firing (`_fire_spell`: mirror, echo, recoil, `on cast`) → **nova** (N ways round) → **penta** (a ring round whoever casts it now) → **skyfall** (a hole over where it is cast, or over each Penta point; after the fall, cast by the hole) → the carrier's `launch`.
 
 So `nova · skyfall · bolt` drops 8 bolts on a ring of spots round you. `skyfall · penta · beam` falls on a spot and rings it with five beams aimed in. `mirror · skyfall · rune` drops a rune ahead and one behind. Every stage works the same way for every carrier.
 
@@ -101,7 +101,7 @@ The owner's picture: "A hole opens up and whatever carrier it modifies will shoo
 
 ### The rule
 
-1. **The spot** is `behaviour_reach` ahead along the copy's way (120 px on the card, the old rain's), stopped short of the first wall. Reach multiplies it; Homing moves it onto a target near it (the rain's `_homed_place`, moved into the runtime).
+1. **The spot** is where the cast comes from (owner, after the first build: "It should just open up on the spot it is cast from, like over the player, or above a projectile with on_hit skyfall"): over its caster, over the point or shot a trigger fired from. No card moves it: homing steers the falling carrier and Reach lengthens it, as on any carrier; the floor ends it first.
 2. **The hole** opens `SKYFALL_HEIGHT` (56 px) straight up the screen from the spot, at a fixed height: nothing changes it (owner: "it doesnt really matter gameplay wise if it is further away"). It stays open `SKYFALL_SECONDS` (0.6 s), the warning; the sim only waits (the runtime's queue, `PendingLaunch`, as the rain's landing waits now).
 3. **The cast:** when the hole has opened, the carrier is cast from the hole by that point (`CASTER_POINT`, as a Penta copy is), aimed straight down the screen, with the spot's **floor line**: the horizontal line through the spot. Everything it makes knows that line.
 4. **In the air:** a shot (or a beam's length) more than `SKYFALL_BAND` (12 px) above its floor line hits nothing, zaps nothing, pulls nothing and passes over room walls. It still moves by its own cards: homing steers it (onto an enemy near the spot), spiral waves it, a speed card makes it fall faster or slower (owner, question a).
@@ -109,13 +109,14 @@ The owner's picture: "A hole opens up and whatever carrier it modifies will shoo
 6. **At the floor line it ends**, as at the end of its life: `on expire` fires and a blast goes off there. The floor is not a wall (owner): `on wall`, bounce and ghost do nothing at it. A split fan from the hole spreads sideways as it falls and lands along the line, a little apart; a shot that homed or waved sideways lands at the line's height, beside the spot (owner, question c).
 7. **Placed carriers land on the floor line** (owner, question 4): a rune, pool, wall, decoy, familiar, portal or orbit is placed at the spot (it circles the spot, for an orbit). While a cast falls, the runtime's placement helper (`_placed_at`) answers the spot; the wall and the pool ask that helper instead of working out their own `ray_length` ahead (wall.gd, pool.gd). A fast streak, like an atom's, flies from the hole down to the spot first: a look only, it hits nothing.
 8. **What an airborne shot casts is airborne too** (owner, question b): a `timer` or `on hit` payload fired while a shot falls is cast where the shot is, in the air, with the same floor line, so it rains down after it.
-9. **Where it does nothing:** carriers held by or carried with the body (MELEE: swing, slam, dash, teleport). Its needs row is `B.SKYFALL: {"needs": {"not": MELEE}}`. A leap is a plan of its own.
+9. **It hits its caster** if it still stands under the hole when the fall lands: the hole is a point and spares no body (owner: "This is just following the general rule"); an `on hit` fall strikes what was hit too. Nova's eight copies stack on the same spot (owner: fine).
+10. **Where it does nothing:** carriers held by or carried with the body (MELEE: swing, slam, dash, teleport). Its needs row is `B.SKYFALL: {"needs": {"not": MELEE}}`. A leap is a plan of its own.
 
-So `skyfall · bolt` is a bolt that drops onto the spot and strikes what stands there; `skyfall · beam` is a beam from the hole to the floor, a pillar, that strikes only at its foot; `skyfall · split · bolt` drops three bolts landing side by side; `nova · skyfall · bolt` opens eight holes round you; `skyfall · rune` places a rune at the spot after a streak from the sky.
+So `skyfall · bolt` is a bolt that drops where you stand and strikes what stands there, you too; `on hit · bolt · skyfall · bolt` strikes what the first bolt hit again from above; `skyfall · beam` is a beam from the hole to the floor, a pillar, that strikes only at its foot; `skyfall · split · bolt` drops three bolts landing side by side; `nova · skyfall · bolt` stacks eight falls on your spot; `skyfall · rune` places a rune at the spot after a streak from the sky.
 
 ### The other cards
 
-- Echo falls once more; Mirror also falls behind; Nova makes a ring of spots, one hole each.
+- Echo falls once more; Mirror and Nova cast their copies from the same place, so their holes stack on the same spot.
 - **Penta with Skyfall (owner: "The penta reading is ok!"):** Penta's ring points become the spots: `skyfall · penta · bolt` opens five holes on the ring round its caster and drops a copy onto each, all falling straight down.
 - `on cast` fires at the cast, from the hand. Held: a held falling bolt falls again and again (as the held rain did); a held beam stays a pillar while held.
 - A rebuild drops a fall the wizard cast, as the rain's landing was dropped; a payload's fall keeps its build. No dice: every machine drops on the same spots.
@@ -133,7 +134,7 @@ All of it in motes first (owner: motes are the world's magic building blocks):
 
 | Where | What | Size |
 | --- | --- | --- |
-| `ModifierBase`, card folder | behaviour SKYFALL, its needs row, the card (`behaviour_reach` 120), icon, combos, test | small |
+| `ModifierBase`, card folder | behaviour SKYFALL, its needs row, the card, icon, combos, test | small |
 | `core/spells/spells.gd` | the Skyfall stage (spot, hole, the wait in the queue, the cast from the hole aimed down); a "falling" context while it casts, read by `_land_shots` (every shot a carrier makes) and `_placed_at` (every placed carrier); a payload cast by an airborne shot takes its floor | medium |
 | `core/projectiles/projectile_manager.gd` + `native/src/shot_kernel.cpp` | one number per shot, its floor line (none for every other shot). The move pass ends a shot at its line (as its expiry); the wall walk and the hit pass look only at the part of its step inside the band. The same lines in the GDScript and the kernel, compared byte for byte by test_native_kernel | medium (the one native change) |
 | `beam.gd` + the manager's ray walk | a falling beam row keeps its floor line; its length is the drop, and its ray hits and meets walls only in the band (a one-shot setting before the ray, as `ray_gates` is) | small |
@@ -164,7 +165,7 @@ Gone as a phase: with the owner's hole, a falling beam is cast down from the hol
   - `CompiledSpell.own_payload` (compiled_spell.gd:167-168);
   - the compiler (staff_compiler.gd:159-161, 705-706), the tree (spells.gd:774-775), CastSense (cast_sense.gd:132, 151-158) and `_group_has` (spells.gd:3519);
   - `PendingLaunch.landing` (spells.gd:191-193, 1766, 1818-1826, 1858, 1872-1873, 1887). Skyfall's own field replaces it.
-- **Limits:** `RAIN_REACH` becomes `SKYFALL_REACH`'s card number (`behaviour_reach` 120); `RAIN_SPLASH` goes (a falling shot strikes with its own size in the band).
+- **Limits:** `RAIN_REACH` and `RAIN_SPLASH` go (Skyfall falls where it is cast, and a falling shot strikes with its own size in the band).
 - **Cues:** `rainfall` becomes `skyfall_land`. `telegraph` stays, for Skyfall.
 - **The AI:** nothing special-cases rain. The hits in team_board, evade, open, close_in, fight, heal_ally, behaviour, brain, entities, decoy_controller, dummy_look and creature_look are the words `brain` and `AIBrain`; swarm.gd's is `AIBrain` and coop.gd's is `DRAIN`. The only real mention is a comment in gameplay/ai/README.md:21. The AI reads CastSense (`area`, `repeats_held`), which reads answers, so it sees a falling bolt the way it saw a rain.
 - **The Bone Scepter** (bone_scepter.tres:24): `rain · void · blast` (since #648) becomes `void · skyfall · bolt` (owner, answer 3). Also test_strays.gd:29 and 159-160, and the reasoning in DECISIONS.md:918.

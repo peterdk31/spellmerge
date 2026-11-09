@@ -180,6 +180,11 @@ const EXPIRE_BACKOFF: float = 2.0
 ## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05
 
+## Skyfall (`core/spells/skyfall.gd`): how far up the screen from its spot the hole opens (fixed:
+## owner, 2026-11-09, no card changes it), and how long it is open before the carrier falls.
+const SKYFALL_HEIGHT: float = 56.0
+const SKYFALL_SECONDS: float = 0.6
+
 ## The portal (docs/milestones/portal.md). Seconds a body that came through a portal waits before another takes it (P6).
 const PORTAL_REST: float = 0.4
 ## Exits a portal row has room for at first; it widens for a portal with more (no cap: owner,

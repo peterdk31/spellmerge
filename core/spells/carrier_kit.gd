@@ -212,6 +212,18 @@ func placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vecto
 	return _rt._placed_at(spell, origin, heading)
 
 
+## The floor line of what falls now (Skyfall: the fall being cast, or the falling shot casting),
+## INF for none.
+func floor_now() -> float:
+	return _rt._skyfall.floor_now()
+
+
+## Where a carrier placed at `point` goes: there, or on the floor line below it while it falls
+## (Skyfall, `core/spells/skyfall.gd`). Every carrier that places itself asks this.
+func on_floor(spell: CompiledSpell, point: Vector2) -> Vector2:
+	return _rt._skyfall.on_floor(spell, point)
+
+
 ## A shot spawned in `slot` (-1 when the manager refused it) takes its cards and its record and does
 ## not hit `source` for a while: 1 when it was made. What a carrier calls after `projectiles.spawn`.
 func land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:

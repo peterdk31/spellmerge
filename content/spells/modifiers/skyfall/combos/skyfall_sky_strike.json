@@ -1,0 +1,10 @@
+{
+	"id": "skyfall_sky_strike",
+	"name": "Sky strike",
+	"does": "A bolt hits an imp, and a moment later a fire bolt falls from a hole over the spot it hit and burns it.",
+	"needs": "skyfall",
+	"casts": [{"staff": 0, "cards": ["on_hit", "bolt", "skyfall", "fire", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

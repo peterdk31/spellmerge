@@ -108,7 +108,11 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	var spell_reach: float = carrier.reach_of(spell)
 	# A nova casts it every way at once: not aimed, an area as far out as each copy goes.
 	var ways: int = spell.nova_ways()
-	var carried: float = spell_reach
+	# Skyfall: it falls where it is cast, an area round there, not aimed.
+	var falls: bool = Skyfall.falls_on(spell, carrier)
+	if falls:
+		spell_reach = 0.0
+	var carried: float = spell.radius if falls else spell_reach
 	if ways > 1:
 		spell_reach = 0.0
 	if first:
@@ -133,7 +137,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = falls or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring or spell.has_trait(CarrierTraits.CARRIES_PAYLOAD):
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.

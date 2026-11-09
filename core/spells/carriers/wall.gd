@@ -23,7 +23,7 @@ func traits() -> int:
 ## and that its hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
 func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.WALL_REACH
-	var centre: Vector2 = kit.projectiles.clip_to_walls(origin, origin + direction * reach)
+	var centre: Vector2 = kit.on_floor(spell, kit.projectiles.clip_to_walls(origin, origin + direction * reach))
 	var slot: int = kit.projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
 	if slot < 0:
 		return 0

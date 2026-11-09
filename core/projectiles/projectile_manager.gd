@@ -2175,25 +2175,6 @@ func remove_target(node: Node2D) -> void:
 		_grid_stale = true
 
 
-## The body `old` is replaced by `new` for the same actor (the swarm's promotion, the event
-## `body_replaced`; Spells passes it on): `old`'s target entry becomes `new`'s in place (its
-## order among the targets kept, and its key: the same actor's), so every shot that keeps it (its
-## homing target, its memory of what it hit, the body its payload skips: keys, N5) keeps `new`;
-## a shot stuck to `old` sticks to `new`. Call it before `new` registers (its `add_target` then
-## updates the entry).
-func replace_body(old: Node, new: Node) -> void:
-	if old == null or new == null or old == new or not new is Node2D:
-		return
-	var at: int = _target_row(old)
-	if at >= 0 and _target_row(new) < 0:
-		_targets[at] = new
-		_target_id[at] = new.get_instance_id()
-	for slot in _cap:
-		var stuck: Variant = _stuck_to[slot]
-		if is_instance_valid(stuck) and stuck == old:
-			_stuck_to[slot] = new
-
-
 func get_target_count() -> int:
 	return _targets.size()
 
@@ -5949,7 +5930,7 @@ func _refresh_targets() -> void:
 	var team_rows: int = teams.size()
 	# One pass: a freed or removed target is dropped where it is found (the last one takes its
 	# index and is read next), so the indices and the chains come out as a drop pass and then a
-	# fill pass would leave them. Written out: every target, every step (Horde swarm S5).
+	# fill pass would leave them. Written out: every target, every step (2026-10-31).
 	var i: int = 0
 	while i < _targets.size():
 		var held: Variant = _targets[i]
@@ -6130,7 +6111,7 @@ func _hit_test(slot: int) -> bool:
 	var near_low: Vector2 = lowest - margin
 	var near_high: Vector2 = highest + margin
 	# The rest is read only once a cell's box lets the path in: most tests in a crowd end at the
-	# boxes (Horde swarm S5). A test that looks at no target leaves the shot's memory unmarked, and
+	# boxes (2026-10-31). A test that looks at no target leaves the shot's memory unmarked, and
 	# `_forget_left` then forgets every entry, as it would after marking them and seeing none.
 	var looking: bool = false
 	var path: Vector2 = Vector2.ZERO

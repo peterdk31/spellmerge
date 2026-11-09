@@ -224,7 +224,7 @@ static func _most_common(counts: Dictionary) -> int:
 
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and
 ## the layout's `Floor` sprite (the whole room, under the walls) when `layout` is given. The room
-## Flow makes is this size (its camera's limits), and the horde's floor without walls is too.
+## Flow makes is this size (its camera's limits).
 func size_in(layout: Node = null) -> Vector2:
 	var size := Vector2(640.0, 360.0)
 	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null

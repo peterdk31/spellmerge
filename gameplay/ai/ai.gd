@@ -24,7 +24,7 @@ const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 ## The executor's steps (`AIBrain.State`).
 const State := AIBrain.State
 
-## The brain's timings, named here for the other code that matches them (the horde swarm).
+## The brain's timings, named here for the code that matches them (the tests).
 const RETARGET_TIME: float = AIBrain.RETARGET_TIME
 const GRUDGE_TIME: float = AIBrain.GRUDGE_TIME
 const SIGHT: float = AIBrain.SIGHT
@@ -159,12 +159,6 @@ func phase_started(_actor: Actor, phase: EnemyPhase) -> void:
 ## Seconds the grudge still lasts (0 for none).
 func grudge_left() -> float:
 	return brain.grudge_left()
-
-
-## A grudge carried over from the body this actor replaces (the horde swarm's promotion, which
-## keeps a swarmer's grudge): it chases `attacker` for `seconds` more, as if hurt by it just now.
-func carry_grudge(attacker: Node2D, seconds: float) -> void:
-	brain.carry_grudge(attacker, seconds)
 
 
 ## `profile`, else the home actor's data's, else the shared default.

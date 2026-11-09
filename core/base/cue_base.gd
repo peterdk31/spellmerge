@@ -144,7 +144,7 @@ extends Resource
 ##
 ## How often (S6, item 13): `every` seconds is the least time between two plays of the cue for the
 ## same actor (the one it is of; none counts as one more), so a moment that comes by the hundred (a
-## gem picked up in a horde) shows a few times a second; a play sooner is left out whole, parts and
+## body caught by a pull, every step) shows a few times a second; a play sooner is left out whole, parts and
 ## weight. 0 (the default) plays every time.
 
 ## The cues of moments both the game's hit-stop (gameplay/combat/hit_stop.gd) and Feel play: one

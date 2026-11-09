@@ -174,11 +174,6 @@ const BODY_PLAIN: int = 3
 ## Where a body without the kit keeps its actor id, looked at in this order.
 const OWN_ID_PROPERTIES: Array[StringName] = [&"actor_id", &"caster"]
 
-## Sent at the start of every `step`, before freed bodies are dropped, statuses tick and touches are
-## checked: the moment no hit is being dealt. The horde swarm promotes the swarmers a rule asked
-## for here (docs/milestones/horde-swarm.md, S3), so the full actor stands before anything touches.
-signal stepping()
-
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `_node_id` and
 ## `_row_by_node`, a lookup from a body's node to its row (by instance id, equality only: a row is
 ## its actor id, and the row's identity is its actor's key, N5).
@@ -478,66 +473,6 @@ func knockback_of(actor: Variant) -> Vector2:
 	return _knock[row] if row != ActorsScript.NONE else Vector2.ZERO
 
 
-## Everything Combat keeps on `actor` (an id or its node) but its body, hurt circle and touch: its
-## health, every status (time left, strength, stacks, who set a burn), its barrier, its push, its
-## armed slam, its contact wait, its reaction wait and who hurt it last. Empty when it is not
-## registered. The swarm's promotion (docs/milestones/horde-swarm.md) carries a swarmer's row to
-## the full actor that replaces it with `carry_row_state`. Allocates (one Dictionary): not per step.
-func row_state(actor: Variant) -> Dictionary:
-	var row: int = _row_of(actor)
-	if row == ActorsScript.NONE:
-		return {}
-	return {
-		"health": health_of(row), "knock": _knock[row], "contact_left": _contact_left[row],
-		"status_left": _status_left.slice(row * STATUS_COUNT, (row + 1) * STATUS_COUNT),
-		"status_power": _status_power.slice(row * STATUS_COUNT, (row + 1) * STATUS_COUNT),
-		"burn": [_burn_carry[row], _burn_by[row]], "chill_stacks": _chill_stacks[row], "react_wait": _react_wait[row],
-		"shield": [_shield[row], _shield_left[row], _shield_tag[row]], "slam": [_slam[row], _slam_by[row]],
-		"last": [_last_by[row], _last_kind[row], _last_name[row]],
-	}
-
-
-## Puts `state` (a `row_state`) on `actor` (an id or its node, registered): its health (a kit
-## Actor's Health is set to it, at most its most), statuses, barrier, push and the rest, as they
-## were. Sends nothing (nothing new happened to it). Returns false when `actor` is not registered.
-func carry_row_state(actor: Variant, state: Dictionary) -> bool:
-	var row: int = _row_of(actor)
-	if row == ActorsScript.NONE or state.is_empty():
-		return false
-	var health: float = state["health"] as float
-	if health >= 0.0:
-		if _body[row] == BODY_ACTOR:
-			var kit: Actor = _nodes[row] as Actor
-			if kit.health != null and kit.health.health != health:
-				kit.health.reset(health)
-		else:
-			_health[row] = minf(health, _max_health[row])
-	_knock[row] = state["knock"] as Vector2
-	_contact_left[row] = state["contact_left"] as float
-	var lefts: PackedFloat32Array = state["status_left"]
-	var powers: PackedFloat32Array = state["status_power"]
-	for st in STATUS_COUNT:
-		_status_left[row * STATUS_COUNT + st] = lefts[st]
-		_status_power[row * STATUS_COUNT + st] = powers[st]
-	var burn: Array = state["burn"]
-	_burn_carry[row] = burn[0]
-	_burn_by[row] = burn[1]
-	_chill_stacks[row] = state["chill_stacks"] as int
-	_react_wait[row] = state["react_wait"] as float
-	var barrier: Array = state["shield"]
-	_shield[row] = barrier[0]
-	_shield_left[row] = barrier[1]
-	_shield_tag[row] = barrier[2]
-	var slam: Array = state["slam"]
-	_slam[row] = slam[0]
-	_slam_by[row] = slam[1]
-	var last: Array = state["last"]
-	_last_by[row] = last[0]
-	_last_kind[row] = last[1]
-	_last_name[row] = last[2]
-	return true
-
-
 ## For whoever moves the body `actor` (its node: the one call a body makes about itself every
 ## step, with `pace`): the push (pixels per second) to add to its movement this step. Call it
 ## once per physics step; it then fades the stored push by `KNOCKBACK_DECAY * delta`. Zero when
@@ -585,7 +520,7 @@ func own_knockback(actor: Node2D, id: int, delta: float) -> Vector2:
 
 
 ## `own_pace` and `own_knockback` for the first `count` bodies of `nodes` (their actor ids in `ids`)
-## at once (a crowd's step: one call instead of two per body, Horde swarm S4): for each `i` whose
+## at once (a crowd's step: one call instead of two per body): for each `i` whose
 ## `seconds[i]` is above 0, `paces[i]` becomes `own_pace(nodes[i], ids[i])` and `pushes[i]`
 ## `own_knockback(nodes[i], ids[i], seconds[i])`, the push spent as that spends it; the others are
 ## left as they were (a body held still spends no push). The arrays must hold `count` entries.
@@ -1310,7 +1245,6 @@ func step(delta: float) -> void:
 	_steps += 1
 	_bind_hit_stop()
 	hit_stop.step()
-	stepping.emit()
 	# Drop bodies freed from outside (backwards: a freed row takes the last one's place).
 	var n: int = _live.size() - 1
 	while n >= 0:
@@ -1319,7 +1253,7 @@ func step(delta: float) -> void:
 		n -= 1
 	_toucher_teams = 0
 	# Every actor's team at once (`_team` for each row, written out: this runs for every body, every
-	# step; Horde swarm S5): the table's own array, so it is always current; read only.
+	# step): the table's own array, so it is always current; read only.
 	var table: ActorsScript = _table()
 	_teams = table.teams() if table != null else PackedInt32Array()
 	for i in _live.size():
@@ -1448,7 +1382,7 @@ func _touch() -> void:
 	if _victims.size() <= CONTACT_DIRECT or projectiles == null:
 		# The victims' hurt circles once (nothing moves while contact is counted), and the box round
 		# them all, a pixel wider: a toucher whose circle stays out of it touches none of them, so
-		# most of a crowd is passed after one look at where it is (Horde swarm S5).
+		# most of a crowd is passed after one look at where it is.
 		var victims: int = _victims.size()
 		_victim_at.resize(victims)
 		var low: Vector2 = Vector2.INF

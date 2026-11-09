@@ -31,8 +31,8 @@ extends Node
 ## the changes do nothing. The bodies open their own ids (wizards, enemies that cast, the actor
 ## kit's actors); every system keys its arrays by them (actors G3).
 
-## How many actors there can be at once: four seats and a horde of 500+ enemies with room to
-## spare (Horde H1, docs/milestones/horde.md, "Scale"). It is also the caster field of a spell
+## How many actors there can be at once: four seats and a crowd of 500+ enemies with room to
+## spare (2026-10-30; kept by the owner, 2026-11-09). It is also the caster field of a spell
 ## tag (`SpellTag.CASTER_MASK` + 1, 10 bits). Every system sizes per-actor arrays by it; the
 ## largest is the spell runtime's per staff (ACTORS x 4 rows of a few arrays), a few hundred KB
 ## in all, allocated once at start.
@@ -176,7 +176,7 @@ func team_of(id: int) -> int:
 
 ## Every actor's team by id (ACTORS of them), NONE for an id not open: `team_of` of every id at
 ## once, for a system that reads the teams of hundreds of actors each step (the projectile target
-## grid and Combat's step, Horde swarm S5: a call per actor cost more than the rest of their work).
+## grid and Combat's step, 2026-10-31: a call per actor cost more than the rest of their work).
 ## It is the table's own array, not a copy (packed arrays are passed by reference): it always shows
 ## the teams as they are, and it is read only: never write to it.
 func teams() -> PackedInt32Array:
@@ -329,7 +329,7 @@ func spend_hold(id: int, delta: float) -> float:
 
 
 ## `spend_hold` for the first `count` actors of `ids` at once (a crowd's step: one call instead of
-## one per body, Horde swarm S4): `seconds[i]` becomes what `maxf(spend_hold(ids[i], delta), 0.0)`
+## one per body): `seconds[i]` becomes what `maxf(spend_hold(ids[i], delta), 0.0)`
 ## returns, and each stop is spent as that spends it. `seconds` must hold `count` entries.
 func spend_holds(ids: PackedInt32Array, count: int, delta: float, seconds: PackedFloat64Array) -> void:
 	for i in count:

@@ -13,15 +13,15 @@ extends Node
 ##   revived, joined and left, and the casts the wizard announces for the HUD and Feel.
 
 ## Commands (online-ready N2, docs/milestones/online-ready.md): the HUD's `*_requested` events the
-## simulation hears (`InputFrame.COMMAND_NAMES`: the builder's, the horde's picks, the sandbox
-## page's, rewards and doors) apply at the start of the next tick, never in the middle of one. The
+## simulation hears (`InputFrame.COMMAND_NAMES`: the builder's, the sandbox page's,
+## rewards and doors) apply at the start of the next tick, never in the middle of one. The
 ## HUD sends them as before; the bus hands each to `command_sink` (the frames service,
 ## core/sim/frames.gd, the autoload "Frames"), which puts it into its seat's next input frame and
 ## applies it with `apply_command` when that tick starts, so a replay (and later the network) gives
 ## the same command at the same tick. With no sink (a test's own bus) a command applies as it is
 ## sent. The simulation hears a command through `listen`, never by connecting to its signal (that
 ## would hear it as it is sent); the HUD and tests may still connect to see it sent. The requests
-## that start a run (`play_requested`, `sandbox_requested`, `horde_requested`) are not commands: a
+## that start a run (`play_requested`, `sandbox_requested`) are not commands: a
 ## replay's header says how its run started.
 ##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
@@ -68,17 +68,10 @@ signal sandbox_action_requested(player: int, action: StringName)
 signal sandbox_spawn_requested(player: int, enemy_id: StringName, count: int)
 ## Sender: hud. The sandbox page's "AI view" switch flipped: each enemy shows what its AI is doing. Heard by ai (enemy AI AI8).
 signal ai_view_changed(on: bool)
-## The Horde button was pressed (docs/milestones/horde.md). Heard by flow, which starts a horde run.
-signal horde_requested(player: int)
-## `player` picked offer number `choice` (0-2) of their open level-up pick. Heard by horde.
-signal horde_pick_requested(player: int, choice: int)
 ## `player` opened (`on` 1) or closed (`on` 0) the pause menu: offline the game stops while it is
 ## open (online-ready N4). A command: heard by the Tick (core/sim/tick.gd, `Sim.stop`), which pauses
 ## the tree for the picture once the game stands stopped.
 signal pause_requested(player: int, on: int)
-## `player` is done picking and building in the horde's level-up break (its picks all taken). Heard by
-## horde, which ends the break once every joined seat is ready.
-signal horde_ready_requested(player: int)
 
 # --- Devices (sender: core/input) -------------------------------------------
 
@@ -107,7 +100,7 @@ signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)
 signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
 ## Sender: core/spells. A carrier of the actor `caster` with no shot to end it ended at `at`, for looks only: a teleport or dash where its body landed (the carrier's end point), a slam where it struck. `form` names its form card (Feel plays the card's `end_cue` there), `direction` the way it went, `size` how big in pixels (a slam's ring, its card's radius), `tint` and `look` as `form_shown`'s.
 signal carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
-## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; S6 item 13: flow `wave_start`, horde `level_up` and `gem_pickup`, player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
+## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; S6 item 13: flow `wave_start`, player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
 signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
@@ -177,8 +170,6 @@ signal possess_requested(caster: int, target: int, seconds: float, tag: int)
 signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
-## Sender: horde (the swarm's promotion, docs/milestones/horde-swarm.md). The body `old` of the actor `actor` is replaced by `new` (the actor id, its Combat row and its place stay): sent just before `new` is added to the tree and `old` is freed, so whatever keeps a body by its node or instance id (a homing shot's target, a shot's or a sweep's memory of what it hit, a chain's last body, a status look) keeps `new` instead. Heard by core/spells (and through it core/projectiles) and feel.
-signal body_replaced(actor: int, old: Node, new: Node)
 ## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal hit_landed(caster: int, target: Node, amount: float, position: Vector2, kind: StringName, shot: int)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
@@ -215,7 +206,7 @@ signal room_laid_out(bounds: Rect2)
 signal room_entered(room_id: StringName)
 ## Sender: coop. The part of the world (world pixels) the party's shared view holds, worked out on
 ## the tick from where the wizards stand, and `party`, the box round them inside it; sent when
-## either changes. Heard by horde (enemies appear just outside the view) and by feel, whose party
+## either changes. Heard by feel, whose party
 ## camera eases towards the view as it is drawn, keeping `party` in the picture, so the simulation
 ## never reads the camera (online-ready N3, N9).
 signal view_fitted(view: Rect2, party: Rect2)
@@ -230,13 +221,6 @@ signal loading_finished()
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
-## Sender: flow. A horde run's world `world` stands, its wizards in it (docs/milestones/horde.md): sent
-## after `room_entered` at the start of a horde run and after each of its restarts. Heard by horde, which
-## starts its director on that world, and hud.
-signal horde_started(world: Node2D)
-## Sender: flow. The horde run ended (stopped, or another run started). Heard by horde, which stops and
-## forgets its world, and hud.
-signal horde_ended()
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.
@@ -247,27 +231,6 @@ signal door_voted(player: int, door: int)
 signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------
-
-## Sender: horde. The horde run's numbers, a few times a second: seconds survived, kills, horde
-## enemies alive, the party's level and its experience towards the next level. Heard by hud.
-signal horde_status(seconds: float, kills: int, alive: int, level: int, xp: int, xp_next: int)
-## Sender: horde. `player` may pick one of `card_ids` (up to three) for their bag. Heard by hud.
-signal horde_picks_offered(player: int, card_ids: Array[StringName])
-## Sender: horde. The result of a pick: `card_id` went into `player`'s bag (`&""`: the offer was dropped). Heard by hud.
-signal horde_pick_taken(player: int, card_id: StringName)
-## Sender: horde. A level-up build break began (`on` true: the game is paused for everyone) or ended
-## (`on` false: every joined seat was ready, or the run ended). Heard by hud.
-signal horde_break_changed(on: bool)
-## Sender: horde. `player`'s readiness in the build break: false at its start (and for a seat a level-up
-## in the break offers more cards), true once the seat sent `horde_ready_requested` with its picks taken.
-## Heard by hud.
-signal horde_ready_changed(player: int, ready: bool)
-## Sender: horde. Every wizard of the horde run is down: it lasted `seconds`, with `kills` kills, at party
-## level `level`. The director stops; flow restarts the run a few seconds later. Heard by hud (the summary).
-signal horde_over(seconds: float, kills: int, level: int)
-## Sender: horde. Set the bag of `player` (the card ids it may build with) to `bag`, instead of every
-## card. Heard by player, which keeps it until its wizard leaves and sends `bag_changed`.
-signal bag_set_requested(player: int, bag: Array[StringName])
 
 ## Sender: rewards. These rewards were offered to the players.
 signal reward_rolled(reward_ids: Array[StringName])

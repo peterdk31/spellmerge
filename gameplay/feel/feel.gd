@@ -181,10 +181,6 @@ const REACTION_LABEL_NEAR: float = 40.0
 const SPRAY_REF_DAMAGE: int = 5
 const SPRAY_MIN_SIZE: float = 0.7
 const SPRAY_MAX_SIZE: float = 1.6
-## A body without a `Sprite` child (a swarmer's bare node, docs/milestones/horde-swarm.md) names
-## under this metadata the object that draws it; that object's `sprite_of(body)` answers a Sprite2D
-## showing the body as it is drawn now (or null), which a death breaks into motes instead.
-const SPRITE_GIVER: StringName = &"sprite_giver"
 ## The flash kinds' folder in the registry (content/flashes; `FlashKind`).
 const FLASH_FOLDER: StringName = &"flashes"
 ## Feel's codes for its flashes (`_flash_kind` of a slot): a kind the flash shader draws from the
@@ -684,7 +680,6 @@ func _ready() -> void:
 	events.projectile_expired.connect(_on_projectile_expired)
 	events.shot_deflected.connect(_on_shot_deflected)
 	events.shot_blocked.connect(_on_shot_blocked)
-	events.body_replaced.connect(_on_body_replaced)
 	events.room_entered.connect(_on_room_entered)
 	events.view_fitted.connect(_on_view_fitted)
 	if combat == null:
@@ -778,17 +773,11 @@ func _rest_transform(sprite: Sprite2D, dead: Node) -> Transform2D:
 	return Transform2D(sprite.global_rotation, rest, 0.0, sprite.global_position)
 
 
-## The Sprite2D a body shows as: its `Sprite` child, or for a body drawn by another node (a
-## swarmer) that node's Sprite2D for it as it shows now; null for none.
+## The Sprite2D a body shows as: its `Sprite` child; null for none.
 func _body_sprite(body: Node) -> Sprite2D:
 	if body == null or not is_instance_valid(body):
 		return null
-	var source := body.get_node_or_null("Sprite") as Sprite2D
-	if source == null and body.has_meta(SPRITE_GIVER):
-		var giver: Variant = body.get_meta(SPRITE_GIVER)
-		if is_instance_valid(giver) and (giver as Object).has_method(&"sprite_of"):
-			source = (giver as Object).call(&"sprite_of", body) as Sprite2D
-	return source
+	return body.get_node_or_null("Sprite") as Sprite2D
 
 
 ## Start the white flash and the squash (wide and low) of the hit node's `Sprite` child, if it
@@ -890,21 +879,6 @@ func _on_view_fitted(view: Rect2, party: Rect2) -> void:
 ## The camera followed now, or null when it is gone (a freed world's).
 func _live_camera() -> Camera2D:
 	return _camera if _camera != null and is_instance_valid(_camera) else null
-
-
-## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's
-## promotion): a status shown on `old` and every flash following it follow `new`.
-func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
-	if old == null or new == null or not new is Node2D:
-		return
-	var from: int = old.get_instance_id()
-	var at: int = _status_enemies.find(from)
-	if at >= 0 and _status_enemies.find(new.get_instance_id()) < 0:
-		_status_enemies[at] = new.get_instance_id()
-	for slot in _flash_follow.size():
-		var follow: Variant = _flash_follow[slot]
-		if is_instance_valid(follow) and follow == old:
-			_flash_follow[slot] = new as Node2D
 
 
 ## Sprites flashing right now (for tests).
@@ -2786,7 +2760,7 @@ func _play(id: StringName) -> int:
 
 ## True for the death of a boss: an enemy whose data says `boss`.
 ## The own colour of a body that is no wizard: its enemy data's `hit_color`, or the default for a
-## body with none (a swarmer, a stand-in).
+## body with none (a stand-in).
 static func _hit_color_of(body: Node) -> Color:
 	if body is Actor and (body as Actor).data != null:
 		return (body as Actor).data.hit_color

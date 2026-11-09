@@ -440,13 +440,6 @@ func clear() -> void:
 	_rest_until.clear()
 
 
-## The swarm promoted a body (`Carrier.replace_body`): a resting body stays resting as its new one.
-func replace_body(old: Node, new: Node) -> void:
-	for i in _rest_body.size():
-		if _rest_body[i] == old:
-			_rest_body[i] = new as Node2D
-
-
 ## Widens every row's gates to room for `need` (the mouth and its exits), keeping each row's gates.
 func _fit_stride(need: int) -> void:
 	if need <= _pt_stride:

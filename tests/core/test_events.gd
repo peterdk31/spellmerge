@@ -31,9 +31,6 @@ const EVENTS: Dictionary = {
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	&"sandbox_spawn_requested": [["player", TYPE_INT], ["enemy_id", TYPE_STRING_NAME], ["count", TYPE_INT]],
 	&"ai_view_changed": [["on", TYPE_BOOL]],
-	&"horde_requested": [["player", TYPE_INT]],
-	&"horde_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
-	&"horde_ready_requested": [["player", TYPE_INT]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
@@ -81,7 +78,6 @@ const EVENTS: Dictionary = {
 	&"possess_requested": [["caster", TYPE_INT], ["target", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"possess_started": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"possess_ended": [["caster", TYPE_INT], ["actor", TYPE_INT]],
-	&"body_replaced": [["actor", TYPE_INT], ["old", TYPE_OBJECT], ["new", TYPE_OBJECT]],
 	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT]],
 	&"heal_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
 	# Players.
@@ -104,15 +100,6 @@ const EVENTS: Dictionary = {
 	&"loading_finished": [],
 	&"wave_started": [["wave", TYPE_INT]],
 	&"sandbox_changed": [["on", TYPE_BOOL]],
-	&"horde_started": [["world", TYPE_OBJECT]],
-	&"horde_ended": [],
-	&"horde_status": [["seconds", TYPE_FLOAT], ["kills", TYPE_INT], ["alive", TYPE_INT], ["level", TYPE_INT], ["xp", TYPE_INT], ["xp_next", TYPE_INT]],
-	&"horde_break_changed": [["on", TYPE_BOOL]],
-	&"horde_ready_changed": [["player", TYPE_INT], ["ready", TYPE_BOOL]],
-	&"horde_over": [["seconds", TYPE_FLOAT], ["kills", TYPE_INT], ["level", TYPE_INT]],
-	&"horde_picks_offered": [["player", TYPE_INT], ["card_ids", TYPE_ARRAY]],
-	&"horde_pick_taken": [["player", TYPE_INT], ["card_id", TYPE_STRING_NAME]],
-	&"bag_set_requested": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
 	&"build_break_started": [["seconds", TYPE_FLOAT]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
@@ -127,7 +114,6 @@ const EVENTS: Dictionary = {
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_laid_out", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"horde_started", &"horde_ended", &"horde_status", &"horde_break_changed", &"horde_over",
 	&"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 

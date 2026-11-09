@@ -7,15 +7,16 @@ render_mode blend_premul_alpha;
 // crystal drops in and hovers over a ring on the floor at its hit size, bobbing, its shadow under it.
 // While it arms (`SpellLimits.RUNE_ARM`, ARM here) the ring closes from an open arc, its tip lit, and
 // the crystal fills with light from the bottom; armed, the ring is whole, a white-hot speck chases
-// round it, the crystal spins (its facet's divide moving across it), light drips from it to the floor
-// and motes rise off the ring. The drips, the chasing speck and the rising motes are twinkling motes
-// (`twinkle_px`, the ward's look; the owner, 2026-11-09: "use motes for everything you can"). Its
-// going off is its card's impact cue (`rune_burst`). Its card particles are given off from the ring,
+// round it (a twinkling mote, `twinkle_px`) and the crystal spins (its facet's divide moving across
+// it). The light dripping from it to the floor and the motes rising off the ring once armed are real
+// motes (the owner, 2026-11-09: "use motes for everything you can"): its card's `look_motes` (`drip`
+// from its middle at the crystal's foot, `rising` off the rim of its `look_shape`, both from its
+// arming), given off by Feel (gameplay/feel/still_motes.gd). Its going off, the crystal slamming
+// down, is its card's impact cue (`rune_burst`). Its card particles are given off from the ring,
 // void's crystal has a dark heart and lightning's glow flickers. It is drawn upright on the screen
 // even when its quad turns with a creeping (homing) rune.
 // Every infusion shows (its palette, `palette_turn`): the crystal's lit facet in the first, its other
-// facet in the second, the ring in the third (the first's with two), and each mote (the drips, the
-// rising motes) in its infusions in turn.
+// facet in the second, the ring in the third (the first's with two).
 // It knows its time since it was placed from its still clock (`still_since`, the code beside its
 // kind: `ProjectileManager.still_code`). Its quad is GRID x zoom pixels square round its centre, from
 // the projectile manager's instance data (`_write_quad`). Blending is premultiplied: its pixels are
@@ -34,9 +35,10 @@ const float GRID = 24.0;
 // (`SpellLimits.RUNE_ARM`), filling with light between.
 const float DROP = 0.3;
 const float ARM = 1.0;
-// Armed, the drips falling at once and the motes rising off the ring.
-const int DRIPS = 3;
-const int RISERS = 5;
+// Its ring's half width and half depth in its hit size as drawn (STILL_HIT), its card's
+// `look_shape` (set by the projectile manager, `set_body_shape`), so the motes rising off the ring
+// leave from the ring it draws. The default only draws a body no card has shaped yet.
+uniform vec2 look_shape = vec2(1.0, 0.625);
 
 // Worked out once a rune (vertex): the crystal's height over the ring and its scale; how much of
 // the ring is drawn, where the chasing speck is and how far it has armed; the facet's divide,
@@ -103,7 +105,7 @@ vec4 rune_look(vec2 uv) {
 	vec2 local = uv * size - size * 0.5;
 	vec2 p = floor(vec2(axis.x * local.x - axis.y * local.y, axis.y * local.x + axis.x * local.y));
 	// The ring at its hit size, seen from above at a slant.
-	vec2 r = vec2(size.x * STILL_HIT, size.x * STILL_HIT * 0.625);
+	vec2 r = size.x * STILL_HIT * look_shape;
 	vec4 colour = vec4(0.0);
 	// What the cards give off: particles born at random points of the ring.
 	if (emit_count() > 0.5) {
@@ -147,31 +149,8 @@ vec4 rune_look(vec2 uv) {
 		// Armed: a white-hot mote chasing round the ring, twinkling.
 		float a = seal.z * TAU - 1.5708;
 		float m = twinkle_px(p, floor(vec2(cos(a), sin(a)) * r + 0.5), 3.0, fract(sim_time * 1.7 + seed));
-		// Which mote the pixel is of (its infusion in turn).
-		int slot = 0;
-		// Light dripping from the crystal to the floor, motes falling faster as they go, cooling.
-		float top = -seal.x + 6.0 * scale;
-		for (int k = 0; k < DRIPS; k++) {
-			float i = float(k);
-			float fall = fract(sim_time * 1.6 + i / float(DRIPS));
-			vec2 at = vec2(0.0, floor(mix(top, -0.5, fall * fall)));
-			float d = twinkle_px(p, at, fall < 0.4 ? 2.0 : 1.0, fract(sim_time * (1.3 + hash(i, 1.0, 40.0)) + hash(i, 2.0, 40.0)));
-			slot = d > m ? k : slot;
-			m = max(m, d);
-		}
-		// Motes rising off the ring, cooling as they rise.
-		for (int k = 0; k < RISERS; k++) {
-			float i = float(k);
-			float v = sim_time * 0.6 + hash(i, 0.0, 41.0);
-			float rise = fract(v);
-			float ang = hash(i, floor(v), 42.0) * TAU;
-			vec2 at = vec2(cos(ang), sin(ang)) * r + vec2(sin(rise * 5.0 + i) * 0.7, -rise * 9.0 * scale);
-			float d = twinkle_px(p, at, cooling(rise), fract(sim_time * (1.3 + hash(i, 1.0, 43.0)) + hash(i, 2.0, 43.0)));
-			slot = d > m ? k + 1 : slot;
-			m = max(m, d);
-		}
 		if (m >= 0.0) {
-			colour = vec4(m > 2.5 ? hot : palette_turn(pal, slot, int(m), shade_rgb(m)), 1.0);
+			colour = vec4(m > 2.5 ? hot : palette_turn(pal, 0, int(m), shade_rgb(m)), 1.0);
 		}
 	}
 	vec4 gem = crystal(p + vec2(0.0, seal.x));

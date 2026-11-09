@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"seam"
+gravity = -4.0
+drag = 3.0
+bounce = 0.0
+wobble = 0.0
+wobble_rate = 0.0
+glow = 0.35
+shade_from = 0
+shape = "
+#
+
+#
+
+o
+"
+shape_play = "pick"
+shape_rate = 8.0
+shape_turns = false
+count = 1
+speed = Vector2(0.0, 2.0)
+spread = 360.0
+up = Vector2(15.0, 19.0)
+life = Vector2(0.8, 1.0)
+height = 0.0

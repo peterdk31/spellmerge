@@ -687,7 +687,8 @@ func throw(k: int, at: Vector2, dir: Vector2, source: int, core: Color, scale: f
 ## With a `line`, each mote is thrown from a point of the line from `at` to `at + line` (a staff);
 ## `life` times the kind's own life (a quicker moment). `look`: the cards of the spell whose colours
 ## they are in (0 for none): of a spell of several infusions, they take its infusions' colours.
-func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0, look: int = 0) -> void:
+## `height`: how high over its ground point each shows at birth (px), or below 0 its kind's own.
+func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, count: int, reach: float, spread: float, up: float, ring: bool, often: bool = false, line: Vector2 = Vector2.ZERO, life: float = 1.0, look: int = 0, height: float = -1.0) -> void:
 	if k < 0 or k >= _kinds.size() or source < 0:
 		return
 	# One of many a frame (a hit's spray, S3): like `shed`, it leaves the moments' rows alone.
@@ -705,7 +706,7 @@ func throw_part(k: int, at: Vector2, dir: Vector2, source: int, core: Color, cou
 	_keep = _hit_keep if often else 0
 	var present: int = infusions_of(look)
 	burst(k, at, dir, kind.count if count < 0 else count, speed, kind.spread if spread < 0.0 else spread, kind.up * up, kind.life * life, source,
-		_own_core(present, _kind_layers[k], core), kind.height, line, _turns_of(present, _kind_layers[k]))
+		_own_core(present, _kind_layers[k], core), kind.height if height < 0.0 else height, line, _turns_of(present, _kind_layers[k]))
 	_keep = 0
 
 

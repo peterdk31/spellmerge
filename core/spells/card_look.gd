@@ -14,12 +14,9 @@ var shader: Shader = null
 ## How bright and how far it lights the room (spell light), times the light's own: 1 as any shot.
 var light_intensity: float = 1.0
 var light_reach: float = 1.0
-## The motes its still shots give off while they stand (`FormBase.look_motes`: a MoteKind id, empty
-## for none), how many a second each shot gives off, and from where (`FormBase.LOOK_MOTES_AREA` or
-## `LOOK_MOTES_ROW`, in its `shape`).
-var motes: StringName = &""
-var mote_rate: float = 0.0
-var motes_from: int = FormBase.LOOK_MOTES_AREA
+## The streams of motes its still shots give off while they stand (`FormBase.look_motes`, one
+## `StillMoteSource` each; empty for none), in its `shape`. Shared with the card: never change them.
+var motes: Array[StillMoteSource] = []
 ## The shape of its still look, in its hit size as drawn (`FormBase.look_shape`), and the seconds
 ## it takes to open and the seconds of its end it fades over (`look_open`, `look_fade`): what its
 ## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by. Its card's, from
@@ -38,8 +35,6 @@ static var PLAIN: CardLook = CardLook.new()
 static func from_card(card: FormBase) -> CardLook:
 	var look := of(card.look_shader, card.look_light_intensity, card.look_light_reach)
 	look.motes = card.look_motes
-	look.mote_rate = card.look_mote_rate
-	look.motes_from = card.look_motes_from
 	look.shape = card.look_shape
 	look.open = card.look_open
 	look.fade = card.look_fade

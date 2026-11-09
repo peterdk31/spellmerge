@@ -13,4 +13,4 @@ icon = ExtResource("2_icon")
 behaviour_id = &"blast"
 behaviour_strength = 40.0
 look_layer = 9
-cue = &"blast"
+cue = &"fireball"

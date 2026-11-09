@@ -512,9 +512,10 @@ func test_a_blast_plays_the_cue_its_card_names_the_first_in_slot_order() -> void
 	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "fallen back on the caster, the first's too: %s" % [_explosions])
 
 
-func test_the_shipped_blast_card_names_the_blast_cue() -> void:
+## The rising fireball since the owner's pick of 2026-11-09 (on trial; the ragged shell before).
+func test_the_shipped_blast_card_names_the_fireball_cue() -> void:
 	var card: ModifierBase = load("res://content/spells/modifiers/blast/blast.tres") as ModifierBase
-	check_equal(card.cue, &"blast", "blast.tres says which cue it plays")
+	check_equal(card.cue, &"fireball", "blast.tres says which cue it plays")
 
 
 func test_a_lone_blast_explodes_on_its_caster_and_a_decoy_without_one_does_not() -> void:

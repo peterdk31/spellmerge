@@ -1565,6 +1565,19 @@ func _register(node: Node2D, body: int, health: float, radius: float, contact: i
 	return row
 
 
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): the lookups from a body's node to
+## its row (`_node_id`, `_row_by_node`) are set again from the rows' bodies, which may be other
+## nodes now (a body made again).
+func rebuild_derived() -> void:
+	_row_by_node.clear()
+	_node_id.fill(0)
+	for row: int in _live:
+		var node: Node2D = _nodes[row]
+		if node != null and is_instance_valid(node):
+			_node_id[row] = node.get_instance_id()
+			_row_by_node[_node_id[row]] = row
+
+
 ## The row's body as a projectile target, unless it is down: a wizard on LAYER_PLAYER, the rest
 ## by team (the layers merge later), owned by the actor it casts as (or the actor it belongs to:
 ## `Actor.belongs_to`, a decoy's caster), so those shots skip it.

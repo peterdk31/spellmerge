@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; N2 the one input path (input frames, the frames service, replays); N3a the one clock (the Tick); N3b a run's start from a fresh game's state; N3c the `sim` service (time and chance by hash); snapshots come in a later part (N10).
+The simulation's own tools (online-ready, phase N, [docs/milestones/online-ready.md](../../docs/milestones/online-ready.md)): the same inputs must give the same game, to the bit, on every machine, so online co-op can send inputs only. N1 brings the state walker, the state hash, the desync report and the one source of a seed nobody chose; N2 the one input path (input frames, the frames service, replays); N3a the one clock (the Tick); N3b a run's start from a fresh game's state; N3c the `sim` service (time and chance by hash); N10 snapshots (the whole game saved and made again: a player joining a run, a replay sought, rollback later).
 
 ## The simulation folders
 
@@ -52,6 +52,7 @@ Simulation code runs on the tick, the same on every machine. `tests/core/test_si
 - **One driver.** The autoload `Tick` (`tick.gd`) runs every tick: the input frames (`Frames.tick`), then the areas' steps in its written order, `Tick.STEPS`: the services (the projectile manager, Spells, Combat, Entities), the horde's swarm, every actor's body by actor id (`Tick.BODIES`, the Tick's own: `Actor.tick_step`, its step, then its move), then the run's rules and timers (Flow's, Coop's, the horde director's). It is the order the scene tree gave them before, so the game plays as it did; only the bodies go by id now, not by when they joined the tree.
 - **Areas join the tick; the tick knows none.** An area joins in its `_ready` (`SimArea.join(self, &"Horde")`, `sim_area.gd`) and names its steps (each under a key of `Tick.STEPS`, a Callable taking `delta`), its run's start (`renewed_by(begin_run)`, or `fresh_because(reason)`) and the rules it takes (`takes_rules(take_rules)`). The Tick calls those Callables in its written order; the keys are only names, nothing is called by name and no area's method is the Tick's business. Only the game's autoload (`/root/<name>`) joins the game's Tick, so an area a test makes is stepped by the test alone. No area and no body has a `_physics_process` or a `_process` for the game; drawing stays in `_process` (view: the projectile manager's `update_draw`, in its `VIEW`; Feel's party camera; the looks). A new area that steps adds its key to `Tick.STEPS` (and `RUN_ORDER` if it is renewed) and joins.
 - **What the tick steps:** an area while it is `ticking` (`Tick.set_ticking(node, on)`: a test or a benchmark that steps it by hand turns it off) and its node can process (its process mode: the tree is never paused while the tick steps, below); a body while its `Actor.ticking` is on (a decoy, which Entities steps, is off; so is a body a test steps by hand). The engine's processing flags mean nothing to the tick.
+- **The clock is `sim.tick`:** the ticks run since the run began, so during a tick it is that tick's number; the Tick counts it after each tick (`Tick.count` reads it). It is state, so a snapshot restores it with the rest (N10).
 - **Time:** every step gets `Tick.DT` (1/60 s; `tests/core/test_tick.gd`), always: the game never scales the engine's time (N4). A slow frame runs up to `max_physics_steps_per_frame` ticks, each of `DT`. The bodies' `move_and_slide` still takes the engine's physics step until N6, so the engine's tick rate and time scale stay the project's (a faster test runs at `--fixed-fps`, unthrottled).
 
 ## Stops and holds (N4)
@@ -98,6 +99,20 @@ What the simulation goes through, it goes through in an order of its own, never 
 - **What it cannot see:** a cache in DERIVED that follows the state must be emptied by the area's `clear`; an object in an array that something outside the area holds on to is replaced, so keep such an object in a member or a dictionary. A cache that would carry a run's answer into the next (a compiled staff outlives a run) is DERIVED.
 - **Feel**, which is view, plays the moments' looks; their holds are Combat's (`HitStop`, N4). The cue names and the reaction repeat both use are `CueBase`'s (`REACTION_CUE`, `REACTION_REPEAT`, `reaction_cue`), so the two always agree.
 
+## Snapshots (N10)
+
+- **The whole game, by the walker's plan.** `Snapshot.take(areas, world)` (`snapshot.gd`) keeps every state member `StateWalk` walks, by the same plan (`StateWalk.plan`), so a member added later is saved and loaded with no code of its own; `snapshot.restore(areas, world)` makes a world of the same kind (the same one, or a fresh one: a player joining) as it says. `areas` is `Tick.state_areas()` in the game, a test world's otherwise; `world` is the node the bodies' parents are named under (the tree's root). A snapshot holds data only (values, arrays and dictionaries with their types, objects member by member) and content and FROZEN objects as themselves, so it restores into any world, any number of times.
+- **What it is checked by:** `tests/core/test_snapshot.gd` (the scripted scenes: a fight, a storm, a horde wave and a possession, each snapshotted and restored into a fresh world, the fight, the storm and the horde rolled back twice from one snapshot, and plain objects piece by piece) and `tests/core/test_snapshot_game.gd` (a sandbox run, a wave and a horde run on the real autoloads, recorded with a snapshot; a fresh game starts the replay's run, restores it and plays the replay on from the next tick, `Frames.seek`, as a joining player would). Every tick from the snapshot on agrees in every area, and the desync report names a member that parts: one wrongly in DERIVED, or a DERIVED one that follows the state and is not rebuilt.
+- **References** (REFS, and a node another holds) are kept as the actor id the actor table keeps the node under, and the path under it (a controller in a body); an object of a script by its number where the snapshot holds it. A reference to a node no actor id names is a problem.
+- **Bodies** (`StateWalk.is_body`: a node with an actor id) are made again from their scene (`scene_file_path`), or their script for one built in code, under the same parent path, with the simulation nodes added to them in play (`StateWalk.added_in_play`: a possession's puppet, a boss's phases), which the walker walks with the body. A body is given its state before it enters the tree, so its own `_ready` wires it (its components, its id, its controller) as when it was first made; then everything is written again.
+- **What an area does for it, by method name (none writes save code):**
+  - `func rebuild_derived() -> void`: its DERIVED members that follow the state, set up again after a restore (Combat's and the projectile manager's lookups from a node to its row, a controller's signals, which follow the body it drives: `ActorController.bind`/`unbind`). Called on every object restored that has it, the innermost first. A DERIVED member nobody rebuilds keeps the restored world's own: right for a service or scratch, wrong for anything that follows the state, which the snapshot tests find.
+  - `func restore_nodes() -> void`: the nodes it makes from its state that are no bodies (the swarm's bare rows, `Swarm.restore_nodes`), set in the actor table; the outermost first (the horde sets up a swarm the world has not, then the swarm makes its rows).
+- **Shared by identity:** an object one copy of which serves many (an AI behaviour, which a brain knows by which copy it is) is FROZEN, so a snapshot keeps it as itself (`AIBehaviour`; the rolls of a brain whose running behaviour was a copy parted the wave).
+- **Dictionaries keep their order** (the order they were filled in, which a loop follows: Spells steps its carriers so), though the hash walks their keys sorted. **Content** is a resource from a file; a resource made in code is state like any object.
+- **What it does not hold:** the input (the frames service's tape, a test stage's casts, presses carried through ticks that stood still): a join takes the frames after the snapshot (`Frames.seek`). A bot's queries fill the services' caches, which are state, so a run of bots goes on the same only with the same bots watching from the same state; a joining machine never runs the host's bots.
+- **Not yet (N10b, with N12):** content that builds its bodies in code (Entities' decoys are pooled and configured by Entities) and whatever N12's per-content replays through a snapshot find. The bytes a join sends (a strict decoder; scripts and content named by path and checked) are the netcode's.
+
 ## Input (N2)
 
 - **One input path.** The simulation takes input from `InputFrame`s only (`input_frame.gd`): one seat's input for one tick, its move (a signed byte per axis), its aim (a 16-bit angle, or keep), the staff buttons held and pressed, captured (an overlay of the seat is open), and the tick's commands. A seat's `PlayerController` builds its actor's intent from its frame; nothing in the simulation reads a device, the mouse or the camera. Devices (`LocalInput`, core/input), bots (`FrameSource`, `frame_source.gd`), replays and later the network all produce frames.
@@ -126,11 +141,14 @@ A new member of a simulation script, by what it holds:
 | a setting of the session a new run keeps (in an area with `begin_run`) | `RUN_KEEPS` (it stays state) | `ProjectileManager._cap`, `Horde.curve` |
 | a setting that changes the game | a field of `SessionRules`, set by `take_rules`, and `RUN_KEEPS` | `shot_cap` (`ProjectileManager._cap`), `horde_alive` (`Horde.alive_cap`) |
 | a setting of this machine that only changes the look | `VIEW` | `ProjectileManager.tailless_particle_cap` |
+| a lookup or a connection that follows the state (a node's row, the body a controller hears) | `DERIVED`, and set up again in `rebuild_derived()` ("Snapshots") | `Combat._row_by_node`, `ActorController._bound` |
+| a node made from the state that is no body (a swarm row) | made again in `restore_nodes()` ("Snapshots") | `Swarm.nodes` |
 
 And around it:
 - A `static var`: `DERIVED` (a cache, a test switch); it never holds state.
 - A look or another script that only draws: `const VIEW_ONLY: bool = true`. A function of a simulation script that only draws: its name in `VIEW` ("The line").
-- A script whose objects are made whole and never changed after: `const FROZEN: bool = true`. A per-row record that waits most of the time: `func idle() -> bool`.
+- A script whose objects are made whole and never changed after, or one copy of which serves many (known by which copy it is): `const FROZEN: bool = true`. A per-row record that waits most of the time: `func idle() -> bool`.
+- A computed property (a getter over another member): `DERIVED`, or a restore writes it (`Flow.sandbox`).
 - Chance: `sim.chance(purpose, key, counter)` with a counter of its rolls as state (above, "Chance"); a `sim` member in DERIVED. Time: `delta` and `sim_time`, never a clock.
 - Angles, curves and turns: `DMath` (above, "Maths"), never the engine's `sin`, `pow` or `Vector2.rotated`.
 - A list sits above the script's first member, with its one-line comment (`## Not state: ...`, `## State as who they point at: ...`); a subclass of a script with a list names its own (`DERIVED_BEAM`).
@@ -147,7 +165,7 @@ The tests say what is missed: `tests/core/test_state_declared.gd` from the types
 tools/check.sh
 ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test_state_walked, test_determinism,
                                     # test_input_frame, test_frames, test_replay, test_replay_game,
-                                    # test_tick, test_sim_fresh, test_sim
+                                    # test_tick, test_sim_fresh, test_sim, test_snapshot, test_snapshot_game
 ```
 
 ## Review questions
@@ -156,4 +174,5 @@ ci/build/build.sh --quick --tests   # test_state_walk, test_state_declared, test
 - Does a new scene in `tests/core/sim_scenes.gd` play the same twice?
 - Does any simulation code read a device, the mouse or the camera, or connect to a command's signal instead of `Events.listen`?
 - Does new simulation maths go through `DMath`, and a kernel's through `dmath.h`, the two the same to the bit?
+- Does a new DERIVED member follow the state (a lookup by node, a connection to the body driven)? Then the script's `rebuild_derived()` sets it up again, and the snapshot tests cover it.
 - Is a new area that keeps state between runs made fresh at a run's start (`renewed_by(begin_run)`, a `begin_run` calling `SimFresh.renew`, in `Tick.RUN_ORDER`), and is each name in its `RUN_KEEPS` a setting, not the run's state?

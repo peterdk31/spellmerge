@@ -100,22 +100,33 @@ func started(actor: Actor) -> void:
 		brain.board = board
 	else:
 		brain.board = brain.entities.board if brain.entities != null else null
-	if not actor.damaged.is_connected(_on_damaged):
-		actor.damaged.connect(_on_damaged)
-	if actor.caster != null and not actor.caster.staff_built.is_connected(_on_staff_built):
-		actor.caster.staff_built.connect(_on_staff_built)
+	bind(actor)
 	if actor == get_parent():
 		_name_to_entities()
 
 
 ## It stops driving `actor` (a guest took over): it forgets its target and its windup.
 func stopped(actor: Actor) -> void:
+	unbind(actor)
+	brain.reset()
+	_actor = null
+
+
+## It hears when the body it drives is hurt and when its staffs are built.
+func bind(actor: Actor) -> void:
+	super(actor)
+	if not actor.damaged.is_connected(_on_damaged):
+		actor.damaged.connect(_on_damaged)
+	if actor.caster != null and not actor.caster.staff_built.is_connected(_on_staff_built):
+		actor.caster.staff_built.connect(_on_staff_built)
+
+
+func unbind(actor: Actor) -> void:
 	if actor.damaged.is_connected(_on_damaged):
 		actor.damaged.disconnect(_on_damaged)
 	if actor.caster != null and actor.caster.staff_built.is_connected(_on_staff_built):
 		actor.caster.staff_built.disconnect(_on_staff_built)
-	brain.reset()
-	_actor = null
+	super(actor)
 
 
 ## Write the actor's intent for this step (`delta` seconds).

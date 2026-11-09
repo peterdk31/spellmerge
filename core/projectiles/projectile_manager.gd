@@ -2063,6 +2063,25 @@ func actor_table() -> ActorsScript:
 	return _auto_actors
 
 
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): each target's node is found again
+## by its key (an actor's, `Actors.id_of_key`, as Combat registers it), with its instance id; the
+## hit test's scratch is sized to the table again (the grid is state, filled as the snapshot's).
+## A target of a minted key (a test's plain node) names no node, so it is dropped at its next filling.
+func rebuild_derived() -> void:
+	var table: ActorsScript = actor_table()
+	var rows: int = _target_key.size()
+	_targets.resize(rows)
+	_target_id.resize(rows)
+	for i in rows:
+		var node: Node = table.node_of(table.id_of_key(_target_key[i])) if table != null else null
+		_targets[i] = node
+		_target_id[i] = node.get_instance_id() if node != null else 0
+	_target_mark.resize(rows)
+	_target_entry.resize(rows)
+	# No mark of another timeline may match a stamp to come (`_mark_stamp` is state; stamps start at 1).
+	_target_mark.fill(0)
+
+
 ## The team `caster` aims for (NONE for no actor).
 func _team_of(caster: int) -> int:
 	var table: ActorsScript = actor_table()

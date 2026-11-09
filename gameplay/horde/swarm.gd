@@ -119,8 +119,9 @@ const WALL_LAYER: int = 1
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the rows' nodes by
 ## instance id, a lookup from a node to its row (equality only: a row is held by its node, `nodes`,
 ## walked as its actor; N5); the native switch,
-## which gives the same game either way (native/README.md; found by N2b's platform runs).
-const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"sim", &"_parent", &"_cand_nodes", &"_kernel", &"native", &"_node_ids", &"_row_by_node"]
+## which gives the same game either way (native/README.md; found by N2b's platform runs); whether
+## it listens, which its signals' connections are (set up again: `resume`).
+const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"actors", &"entities", &"spells", &"sim", &"_parent", &"_cand_nodes", &"_kernel", &"native", &"_node_ids", &"_row_by_node", &"_listening"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"nodes", &"_slot_nodes"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -278,6 +279,27 @@ func start(parent: Node2D, arena: Rect2) -> void:
 	_fit_grid()
 	_read_walls(parent.get_parent() if parent != null else null)
 	_listen(true)
+
+
+## Goes on under `parent` in a world restored from a snapshot (online-ready N10,
+## core/sim/snapshot.gd), its rows as they were: its services found and its events heard again.
+## `restore_nodes` then makes the rows' nodes.
+func resume(parent: Node2D) -> void:
+	_find_services()
+	_parent = parent
+	_listen(true)
+
+
+## A swarm a restored snapshot no longer holds (online-ready N10): it stops listening and its bare
+## nodes go, so nothing of it acts in the world it was dropped from.
+func discard() -> void:
+	var gone: Array[Node2D] = []
+	for row in count:
+		if is_instance_valid(nodes[row]):
+			gone.append(nodes[row])
+	stop()
+	for node in gone:
+		node.free()
 
 
 ## Forgets every row and stops listening. The nodes are left to whoever frees the parent.
@@ -946,6 +968,35 @@ func _drop(row: int) -> void:
 	count = last
 	if look != null and is_instance_valid(look):
 		look.call(&"on_row_removed", row)
+
+
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): each row's bare node is the one the
+## actor table keeps for its actor id, or made again where there is none (a player joining the run),
+## and the lookups by node are set again. A bare node an earlier row held that no row holds now (the
+## same world gone back to an earlier tick) is freed.
+func restore_nodes() -> void:
+	if _parent == null or not is_instance_valid(_parent):
+		return
+	var before: Array[int] = _row_by_node.keys()
+	_row_by_node.clear()
+	for row in count:
+		var id: int = actor_ids[row]
+		var node: Node2D = actors.node_of(id) as Node2D if actors != null else null
+		if node == null or node.get_script() != null:
+			node = Node2D.new()
+			_parent.add_child(node)
+			if actors != null:
+				actors.set_node(id, node)
+		# A node kept from another timeline stands where its row stands now (the targets read it
+		# before the swarm steps).
+		node.position = positions[row]
+		nodes[row] = node
+		_node_ids[row] = node.get_instance_id()
+		_row_by_node[_node_ids[row]] = row
+	for instance: int in before:
+		var old: Node = instance_from_id(instance) as Node
+		if old != null and not _row_by_node.has(instance) and old.get_script() == null:
+			old.free()
 
 
 ## Room for `size` rows in every array.

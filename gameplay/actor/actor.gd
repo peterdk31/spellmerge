@@ -526,8 +526,10 @@ func _find_components() -> void:
 
 
 ## `found` if there is one already (a second of a kind is left alone, with a warning), else `child`.
+## `found` may be `child` itself: a body made again from a snapshot is given its members before its
+## `_ready` (core/sim/snapshot.gd).
 func _first(found: ActorComponent, child: Node) -> ActorComponent:
-	if found != null:
+	if found != null and found != child:
 		push_warning("Actor %s: a second %s is ignored." % [name, child.name])
 		return found
 	return child as ActorComponent

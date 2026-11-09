@@ -28,7 +28,8 @@ const SPAN: float = 4294967296.0
 ## The run's seed: 0 until a run starts (`Tick.begin_run` deals one, `SimSeed.fresh`), so a test
 ## that starts none rolls the same every time.
 var run_seed: int = 0
-## Ticks since the run began (the Tick keeps it equal to `Tick.count`).
+## Ticks since the run began: the game's clock, counted by the Tick after each tick (`Tick.count`
+## reads it), so during a tick it is the number of that tick.
 var tick: int = 0
 ## What the run plays by (core/sim/session_rules.gd, online-ready N11): set at the run's start
 ## (`Tick.begin_run`), from a replay's header while one plays, else from this machine's settings.

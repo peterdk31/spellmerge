@@ -60,6 +60,9 @@ var cap_request: Vector2i = Vector2i(-1, 0)
 var run_seed: int = 0
 ## What went wrong on the way, in words (empty when all went as asked).
 var problems: PackedStringArray = PackedStringArray()
+## A tick to snapshot the recorded run after (online-ready N10; -1 for none), and the snapshot.
+var snapshot_at: int = -1
+var snapshot: Snapshot = null
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -117,6 +120,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 	for i in ticks:
 		await _tree.physics_frame
 		_capture(into)
+		if i == snapshot_at:
+			snapshot = Snapshot.take(areas(), _root)
 		if scripted > 0 and i == REBUILD_AT:
 			# As the radial builder sends it: applied at the next tick's start, and recorded there.
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
@@ -129,7 +134,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0:
 			_check_stopped(start + " recorded", i)
 	replay = _frames.call("stop_recording")
-	if scripted > 0 and ticks > REBUILD_AT + 1:
+	# The sandbox's staffs take any card; Play's and the horde's only their bag's.
+	if scripted > 0 and ticks > REBUILD_AT + 1 and start == &"sandbox_requested":
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:
 			problems.append("%s: the rebuild did not apply in the recorded run" % start)
@@ -153,6 +159,27 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 		_capture(into)
 		if paused_run:
 			_check_stopped(replay.start + " played", i)
+	if bool(_frames.call("is_playing")):
+		problems.append("%s: the replay did not run out after its last tick" % replay.start)
+	_check_settings(replay.start)
+
+
+## `replay`'s run started in a fresh game and made as `from` says (a snapshot taken after its tick
+## `tick`: a player joining it, online-ready N10), then played on from the next tick, `bots` bots
+## watching; each tick's hashes from there to `into`. The snapshot's problems go to `problems`.
+func resume(replay: Replay, from: Snapshot, tick: int, bots: int, into: Desync) -> void:
+	await fresh()
+	_join_bots(bots)
+	await _tree.physics_frame
+	if not bool(_frames.call("play", replay)):
+		problems.append("%s: the replay did not play" % replay.start)
+	for problem in from.restore(areas(), _root):
+		problems.append("%s restored: %s" % [replay.start, problem])
+	if not bool(_frames.call("seek", tick + 1)):
+		problems.append("%s: the replay cannot go on from tick %d" % [replay.start, tick + 1])
+	for i in range(tick + 1, replay.tick_count()):
+		await _tree.physics_frame
+		_capture(into)
 	if bool(_frames.call("is_playing")):
 		problems.append("%s: the replay did not run out after its last tick" % replay.start)
 	_check_settings(replay.start)

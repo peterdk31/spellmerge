@@ -184,8 +184,9 @@ const INTRO_SEEN: StringName = &"intro_seen"
 
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
+## out from `mode` (read only).
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the

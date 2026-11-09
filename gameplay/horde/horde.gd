@@ -103,8 +103,9 @@ const CARD_FOLDER: StringName = &"spells"
 ## The node the horde's enemies stand under.
 const HORDE_NODE_NAME: String = "Horde"
 
-## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_gems"]
+## Not state: services, caches and scratch, set up again (core/sim/README.md); the swarm this world
+## set up (its listening, its look), which a restored snapshot may have replaced (`restore_nodes`).
+const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_gems", &"_wired"]
 ## What a new run keeps (`begin_run`): the curve (content: tests and the stress runs set it), the
 ## run's enemy cap (set from its rules just before, `take_rules`), the warnings already given.
 const RUN_KEEPS: Array[StringName] = [&"curve", &"alive_cap", &"missing_warnings"]
@@ -124,6 +125,8 @@ var alive_cap: int = SessionRules.defaults().horde_alive
 ## there instead of as a full actor; it moves in physics steps (`physics_step`), not in a break.
 ## Made at the first such spawn with the director's services; tests may set one before `start`.
 var swarm: SwarmScript = null
+## The swarm set up in this world (started or resumed, with its look), or null.
+var _wired: SwarmScript = null
 
 ## The world of the run, or null while no horde runs.
 var world: Node2D = null
@@ -370,6 +373,7 @@ func stop() -> void:
 		_bag_due[seat] = false
 	if swarm != null:
 		swarm.stop()
+	_wired = null
 	if _break_on:
 		_end_break()
 	for node: Node in [_horde, _gems]:
@@ -461,6 +465,43 @@ func _pick_kind() -> EnemyBase:
 ## went with the old node.
 func _start_swarm() -> void:
 	swarm.start(_horde, _arena)
+	_add_swarm_look()
+	_wired = swarm
+
+
+## The swarm made at the run's first swarmer, with the director's services.
+func _make_swarm() -> void:
+	swarm = SwarmScript.new()
+	_hand_services(swarm)
+	_start_swarm()
+
+
+func _hand_services(to: SwarmScript) -> void:
+	to.events = events
+	to.actors = actors
+	to.sim = sim
+
+
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): a swarm this world set up that the
+## run no longer holds (a world gone back to before its first swarmer) is discarded; a swarm this
+## world has not set up (a player joining after the run's first swarmer) goes on under this run's
+## node, with its look. Its rows' nodes are the swarm's own `restore_nodes`, after this.
+func restore_nodes() -> void:
+	if _wired != null and _wired != swarm:
+		if _wired.look != null and is_instance_valid(_wired.look):
+			_wired.look.free()
+		_wired.discard()
+		_wired = null
+	if swarm == null or swarm == _wired or _horde == null or not is_instance_valid(_horde):
+		return
+	_hand_services(swarm)
+	swarm.resume(_horde)
+	_add_swarm_look()
+	_wired = swarm
+
+
+## The swarm's look, a child of this run's `Horde` node at no offset.
+func _add_swarm_look() -> void:
 	var look := SwarmLookScript.new()
 	look.name = "SwarmLook"
 	look.setup(swarm)
@@ -472,11 +513,7 @@ func _add_enemy(data: EnemyBase, at: Vector2) -> bool:
 	var kind: SwarmKind = SwarmScript.kind_for(data)
 	if kind != null:
 		if swarm == null:
-			swarm = SwarmScript.new()
-			swarm.events = events
-			swarm.actors = actors
-			swarm.sim = sim
-			_start_swarm()
+			_make_swarm()
 		if swarm.spawn(kind, at) < 0:
 			return false
 		alive += 1

@@ -291,6 +291,13 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - Runs on the daily build. The workflow is under `ci/`/`.github/` (protected): the owner's change, drafted in the PR.
 - Proves done-when 3.
 
+**Done (2026-11-09), by an owner session.** `.github/workflows/platforms.yml`, called by the daily run after the build: the full build also exports Windows Test (`build.sh`, its native library checked) and keeps the three test exports as the `test-exports` artifact (`build.yml`'s `test-exports` input, which only the daily run sets). One job per platform plays the sandbox fight, the horde run and the waves, 600 ticks each (`tools/platform_hashes.py play NAME --build DIR`): Linux with the module and on its GDScript twins, Windows on a Windows runner (the first time the MinGW-built DLL is compared), the web in headless Chrome. Then one job compares each log with Linux (`compare`) and writes the report in the job summary: the first tick that parts and each differing area's two hashes. What was decided and found:
+
+- **A platform that parts holds the release back** (the owner: "It should stop the release"), as a broken build does: the daily release needs both jobs. The Daily log says why ("No release today: the platforms do not play the same game") and mentions the owner. The cost: a parting a player would not meet offline, or a flaky Windows runner, holds a day's release; publishing by hand (`publish.yml`) does not run the job, so the owner can still release.
+- **No leaves in CI.** Naming the members needs a second run of both platforms up to the parting tick; the report says to run `tools/platform_hashes.py run` on a checkout, which does that.
+- **A run that parts from its own recording** (`REPLAY SELF`), a run that did not finish and a platform whose job wrote no log are each named; the rest are still compared.
+- **Locally (the tool's `run`, after N6):** Linux with and without the module, Windows (its export without the module, through WSL) and the web agree at every tick of all three scenes, the waves included; about a minute and a half a run.
+
 ### N9: the simulation/view line, checked
 
 - Every script is either simulation or view, by folder (simulation: `core/sim`, `core/spells`, `core/projectiles`, `core/actors`, `gameplay/actor` except the looks, `gameplay/ai` except the looks, `gameplay/combat`, `gameplay/coop` rules, `gameplay/flow`, `gameplay/horde` except `swarm_look.gd`, `gameplay/player` controllers, `gameplay/progression`, `gameplay/rewards`, `gameplay/run`, `gameplay/difficulty`; view: `gameplay/feel`, every look, `hud/`, the camera). The list lives in `core/sim/README.md`.

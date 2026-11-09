@@ -1,0 +1,112 @@
+# The same game on every platform (online-ready N8, docs/milestones/online-ready.md), called by
+# daily.yml after the build.
+#
+# Plays the same recorded runs (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight,
+# a horde run of a bot and two bots in the waves) in the build's test exports (build.yml's
+# test-exports artifact): on Linux with the native module and on its GDScript twins, on a Windows
+# runner and in headless Chrome (the web build, its native module built by Emscripten). Then
+# compares every tick's state hash with Linux (tools/platform_hashes.py). A platform that parts is
+# reported in the job summary with its first tick and each differing area's hashes;
+# `tools/platform_hashes.py run` on a checkout then names the members.
+#
+# A platform that parts holds the daily release back, as a broken build does (owner, 2026-11-09);
+# the Daily log says so. The owner's publish.yml by hand does not run it. No secrets.
+name: platforms
+
+on:
+  workflow_call:
+    inputs:
+      commit:
+        description: the commit the build built (its tools play and compare the exports)
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ci
+  SCENES: sandbox,horde,wave
+  TICKS: "600" # ten seconds of game in each scene
+
+jobs:
+  play:
+    name: play the replays (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: linux, os: ubuntu-latest, build: linux-test, python: python3 }
+          - { name: linux-gdscript, os: ubuntu-latest, build: linux-test, python: python3 }
+          - { name: windows, os: windows-latest, build: windows-test, python: python }
+          - { name: web, os: ubuntu-latest, build: web-test, python: python3 }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+          sparse-checkout: |
+            tools
+            ci/smbot
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: test-exports
+          path: build
+      - name: Play the replays and print every tick's hashes
+        shell: bash
+        env:
+          NAME: ${{ matrix.name }}
+          BUILD: build/${{ matrix.build }}
+          PYTHON: ${{ matrix.python }}
+        run: >-
+          "$PYTHON" tools/platform_hashes.py play "$NAME" --build "$BUILD" --log "logs/$NAME.log"
+          --ticks "$TICKS" --scenes "$SCENES" --timeout 2400
+      - name: Keep the log for the compare
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: platform-log-${{ matrix.name }}
+          path: logs/${{ matrix.name }}.log
+          retention-days: 7
+          if-no-files-found: ignore
+
+  compare:
+    name: compare every platform with Linux
+    needs: play
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit }}
+          persist-credentials: false
+          sparse-checkout: tools
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: platform-log-*
+          merge-multiple: true
+          path: logs
+      - name: Compare (the first tick and areas where a platform parts, in the job summary)
+        run: |
+          status=0
+          python3 tools/platform_hashes.py compare logs/linux.log logs/linux-gdscript.log logs/windows.log logs/web.log \
+            > report.txt || status=$?
+          cat report.txt
+          {
+            echo "### The same game on every platform"
+            echo
+            case $status in
+              0) echo "Every platform agrees with Linux at every tick of $SCENES." ;;
+              1) echo "**A platform parts from Linux.** Run \`tools/platform_hashes.py run\` on a checkout to name the members." ;;
+              *) echo "**A platform's run did not finish** (its log is the platform-log artifact)." ;;
+            esac
+            echo
+            echo '```'
+            cat report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          ((status == 0)) || echo "::error::the platforms do not play the same game (see the job summary)"
+          exit "$status"

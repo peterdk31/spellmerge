@@ -28,6 +28,15 @@ class SummaryTest(unittest.TestCase):
             "Parked until 2026-10-23 11:08 UTC: Bots build spells (M2 part 20) (#156: `/retry` there brings it back). "
             "Why: the final review didn't approve it 2 times in a row"])
 
+    def test_a_platform_parting_holds_the_release_and_says_so(self) -> None:
+        lines = summary.lines_for({"RESULT_BUILD": "success", "RESULT_PLATFORMS": "failure",
+                                   "RESULT_RELEASE": "skipped"}, "o/r")
+        self.assertIn("No release today: the platforms do not play the same game", lines[0])
+        self.assertIn("❌ The same game on Linux, Windows and the web: failure", lines)
+        ok = summary.lines_for({"RESULT_BUILD": "success", "RESULT_PLATFORMS": "success", "RESULT_RELEASE": "success",
+                                "VERSION": "v0.1", "CHANNEL": "nightly"}, "o/r")
+        self.assertTrue(ok[0].startswith("Released [v0.1]"))
+
     def test_the_bench_logs_are_the_game_runs_that_print_bench_lines(self) -> None:
         self.assertEqual(summary.bench_logs(RUNS), {
             "stress-linux": "Linux Test, stress", "timing-linux": "Linux Test, projectile timing",

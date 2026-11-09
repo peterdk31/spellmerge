@@ -89,6 +89,8 @@ const SPARK_LIGHT: Color = Color("fff3a6")
 ## View as a whole: the state walk never enters it (core/sim/README.md).
 const VIEW_ONLY: bool = true
 
+## The input manager its skip buttons are read from (`setup`'s, else the "PlayerInput" autoload once
+## it is in the tree; none: nobody can skip).
 var input: Node = null
 
 var time: float = 0.0
@@ -112,8 +114,8 @@ var _shake: Vector2 = Vector2.ZERO
 
 
 ## Get ready for `seats` (the joined players, one dropped staff each, 1-4) and the input manager
-## `input_manager` (null: nobody can skip).
-func setup(seats: Array[int], input_manager: Node) -> void:
+## `input_manager` (null: the autoload's once it is in the tree).
+func setup(seats: Array[int], input_manager: Node = null) -> void:
 	input = input_manager
 	_seats = seats.duplicate()
 	if _seats.is_empty():
@@ -125,14 +127,25 @@ func setup(seats: Array[int], input_manager: Node) -> void:
 		if i > 0:
 			at += DROP_GAPS[i - 1]
 		_drops[i] = at
+	_count_presses()
+	_build()
+	_pose()
+
+
+func _ready() -> void:
+	if input == null:
+		input = get_node_or_null("/root/PlayerInput")
+		_count_presses()
+
+
+## The skip buttons' press counts now: only a press after them skips.
+func _count_presses() -> void:
 	_presses.clear()
 	for seat in SEATS:
 		var counts := PackedInt32Array()
 		for action in SKIP_ACTIONS:
 			counts.append(_press_count(seat, action))
 		_presses.append(counts)
-	_build()
-	_pose()
 
 
 ## How many staffs it drops (one per player).

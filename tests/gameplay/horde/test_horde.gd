@@ -656,8 +656,12 @@ func test_the_floor_is_the_walls_box_a_body_in() -> void:
 	check(run.director.arena().grow(HordeScript.WALL_MARGIN).is_equal_approx(Rect2(Vector2.ZERO, Fixture.ROOM)), "the walls' box, WALL_MARGIN in")
 
 
-func test_without_walls_the_camera_limits_are_the_room() -> void:
+## Without walls the floor is the room Flow laid out (`room_laid_out`), never the camera's limits
+## (the simulation reads no camera, online-ready N9: the limits here say otherwise, unread).
+func test_without_walls_the_room_is_the_floor() -> void:
 	var run: Fixture = _make()
 	run.world.get_child(0).free()
+	run.bus.room_laid_out.emit(Rect2(Vector2.ZERO, Fixture.ROOM))
+	run.camera.limit_right = 99999
 	run.start()
-	check(run.director.arena().grow(HordeScript.WALL_MARGIN).is_equal_approx(Rect2(Vector2.ZERO, Fixture.ROOM)), "the camera's limits, WALL_MARGIN in")
+	check(run.director.arena().grow(HordeScript.WALL_MARGIN).is_equal_approx(Rect2(Vector2.ZERO, Fixture.ROOM)), "the room's size, WALL_MARGIN in")

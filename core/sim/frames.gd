@@ -53,6 +53,8 @@ var registry: RegistryScript = null
 var auto_tick: bool = true
 ## Ticks started since the game began.
 var ticks: int = 0
+## Only tests set this: the mouse's point in the world, instead of the viewport's (INF: the viewport's).
+var mouse_world_override: Vector2 = Vector2.INF
 
 ## The frames of the tick in progress, by seat (four, reused).
 var _frames: Array[InputFrame] = []
@@ -277,6 +279,8 @@ func _pivot(seat: int) -> Vector2:
 
 ## The mouse in the world: the viewport's mouse through its canvas transform (the world's camera).
 func _mouse_world() -> Vector2:
+	if mouse_world_override != Vector2.INF:
+		return mouse_world_override
 	if not is_inside_tree():
 		return Vector2.INF
 	var viewport: Viewport = get_viewport()
@@ -331,6 +335,17 @@ func _apply() -> void:
 			var args: Array = [seat]
 			args.append_array(command.slice(1))
 			events.apply_command(command_name, args)
+
+
+## The seats joined now, in order: who plays a run that starts (Flow reads them here, never the
+## devices).
+func joined_seats() -> Array[int]:
+	var out: Array[int] = []
+	var mask: int = _joined_seats()
+	for seat in SEATS:
+		if mask & (1 << seat) != 0:
+			out.append(seat)
+	return out
 
 
 ## A bit per seat joined now.

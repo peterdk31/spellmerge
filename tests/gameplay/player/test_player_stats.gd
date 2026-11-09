@@ -106,10 +106,10 @@ func _test_mana_spent_and_regenerated() -> void:
 	# 0.0625 s * 10 mana/s = 0.625: two steps cross one whole number, not two events per step.
 	# The seat looks at the mana when it thinks, before the Caster regenerates, so the crossing
 	# is announced the step after it (actors G7: one step later than the old wizard).
-	_players[0].step(STEP)
-	_players[0].step(STEP)
+	_world.step_one(_players[0])
+	_world.step_one(_players[0])
 	_check(_stats.is_empty(), "the crossing is not announced in the step it happens, got %s" % [_stats])
-	_players[0].step(STEP)
+	_world.step_one(_players[0])
 	_check(_stats.size() == 1, "regenerating 1.25 mana crosses one whole number once, got %d events" % _stats.size())
 	_check(_stats.size() == 1 and _stats[0][3] == 76.0, "regenerated mana is whole numbers, got %s" % [_stats])
 

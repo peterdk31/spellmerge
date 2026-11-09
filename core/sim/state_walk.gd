@@ -59,19 +59,19 @@ extends RefCounted
 ##     walk.walk("combat", combat, func(path: String, value: Variant) -> void: print(path, " = ", value))
 ##     assert(walk.problems.is_empty())
 
-## The simulation folders (core/sim/README.md lists the same, with why). `core/sim/` is not one:
-## these tools read the simulation, they are not part of it.
+## The simulation folders (core/sim/README.md lists the same, with why): every script under one is
+## a simulation script, but those under VIEW_FOLDERS (online-ready N9: simulation by default, so a
+## new gameplay folder is covered the day it gets its first script). `core/sim/` is not one: these
+## tools read the simulation, they are not part of it.
 const FOLDERS: Array[String] = [
 	"res://core/actors/",
 	"res://core/projectiles/",
 	"res://core/spells/",
-	"res://gameplay/actor/",
-	"res://gameplay/ai/",
-	"res://gameplay/combat/",
-	"res://gameplay/coop/",
-	"res://gameplay/flow/",
-	"res://gameplay/horde/",
-	"res://gameplay/player/",
+	"res://gameplay/",
+]
+## Folders inside FOLDERS that are view as a whole: they draw the game and only read it.
+const VIEW_FOLDERS: Array[String] = [
+	"res://gameplay/feel/",
 ]
 ## The kinds of list a simulation script may declare (see the class doc; RUN_KEEPS, the settings a
 ## new run keeps, is `SimFresh`'s).
@@ -154,12 +154,15 @@ func values(area: String, object: Object, into: Array) -> void:
 	_collecting = false
 
 
-## Whether `script` is a simulation script (in FOLDERS). An inner class has no path of its own and is
+## Whether `script` is a simulation script (in FOLDERS, not in VIEW_FOLDERS). An inner class has no path of its own and is
 ## told by the file that holds it, which the static checks know and the walk does not need.
 static func is_simulation(script: Script) -> bool:
 	if script == null:
 		return false
 	var path: String = script.resource_path
+	for folder in VIEW_FOLDERS:
+		if path.begins_with(folder):
+			return false
 	for folder in FOLDERS:
 		if path.begins_with(folder):
 			return true

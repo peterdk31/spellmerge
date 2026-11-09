@@ -64,6 +64,7 @@ func before_each() -> void:
 	_spells = own(_world.spells) as SpellsScript
 	own(_world.combat)
 	own(_world.table)
+	own(_world.frames)
 	_players.clear()
 	_requests.clear()
 	_refused.clear()
@@ -108,7 +109,7 @@ func _frame() -> void:
 	_hud.poll()
 	_focus.poll()
 	for player in _players:
-		player.step(STEP)
+		_world.step_one(player)
 
 
 func _builder(player: int) -> BuilderScript:

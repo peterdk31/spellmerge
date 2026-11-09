@@ -154,7 +154,7 @@ func test_the_camera_and_the_shots_cover_the_whole_arena() -> void:
 	if camera != null:
 		check_equal(Vector2(camera.limit_right, camera.limit_bottom), Vector2(1280, 720), "the camera's limits are the arena")
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.HORDE_ROOM_ID) as RoomBase
-	check_equal(FlowScript.room_size(room, own(room.scene.instantiate()) as Node), Vector2(1280.0, 720.0), "the room size comes from the floor")
+	check_equal(room.size_in(own(room.scene.instantiate()) as Node), Vector2(1280.0, 720.0), "the room size comes from the floor")
 
 
 func test_the_m1_rooms_keep_their_size() -> void:
@@ -162,7 +162,7 @@ func test_the_m1_rooms_keep_their_size() -> void:
 	for id: StringName in [&"arena_01", &"sandbox"]:
 		var room: RoomBase = registry.call("get_resource", &"rooms", id) as RoomBase
 		var layout: Node = own(room.scene.instantiate()) as Node
-		check_equal(FlowScript.room_size(room, layout), FlowScript.room_size(room), "%s: the floor does not change its size" % id)
+		check_equal(room.size_in(layout), room.size_in(), "%s: the floor does not change its size" % id)
 
 
 func test_everyone_down_starts_it_over_after_the_horde_delay() -> void:

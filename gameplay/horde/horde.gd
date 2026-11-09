@@ -100,15 +100,11 @@ const STATUS_INTERVAL: float = 0.25
 ## The registry folders it reads.
 const ENEMY_FOLDER: StringName = &"enemies"
 const CARD_FOLDER: StringName = &"spells"
-const ROOM_FOLDER: StringName = &"rooms"
-const ROOM_ID: StringName = &"horde"
 ## The node the horde's enemies stand under.
 const HORDE_NODE_NAME: String = "Horde"
-## A camera limit this wide or more counts as none (Godot's default is 10,000,000).
-const NO_LIMIT: int = 1000000
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_camera", &"_gems"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"actors", &"sim", &"world", &"_horde", &"_gems"]
 ## What a new run keeps (`begin_run`): the curve (content: tests and the stress runs set it), the
 ## run's enemy cap (set from its rules just before, `take_rules`), the warnings already given.
 const RUN_KEEPS: Array[StringName] = [&"curve", &"alive_cap", &"missing_warnings"]
@@ -146,9 +142,10 @@ var missing_warnings: int = 0
 
 var _horde: Node2D = null
 var _gems: GemsScript = null
-var _camera: Camera2D = null
 ## The party's view (`view_fitted`), or Rect2() before one is heard: then the arena.
 var _view: Rect2 = Rect2()
+## The room the run is in (`room_laid_out`, world pixels), or Rect2() before one is heard.
+var _room: Rect2 = Rect2()
 ## The floor enemies may appear on, in world pixels.
 var _arena: Rect2 = FALLBACK_ARENA
 ## The curve's enemies, by `curve.ids` index (null for an id the registry lacks).
@@ -214,6 +211,7 @@ func _ready() -> void:
 	events.horde_started.connect(_on_horde_started)
 	events.horde_ended.connect(stop)
 	events.view_fitted.connect(_on_view_fitted)
+	events.room_laid_out.connect(_on_room_laid_out)
 	events.enemy_died.connect(_on_enemy_died)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"horde_pick_requested", _on_pick_requested)
@@ -335,7 +333,6 @@ func start(new_world: Node2D) -> void:
 	world.add_child(_gems)
 	# On the floor: drawn after the room, before the wizards and the horde.
 	world.move_child(_gems, mini(1, world.get_child_count() - 1))
-	_camera = _find_camera()
 	_arena = _find_arena()
 	_view = Rect2()
 	if swarm != null:
@@ -383,7 +380,6 @@ func stop() -> void:
 			node.queue_free()
 	_horde = null
 	_gems = null
-	_camera = null
 	world = null
 	alive = 0
 
@@ -527,8 +523,14 @@ func view_rect() -> Rect2:
 	return _view if _view.has_area() else _arena
 
 
-func _on_view_fitted(view: Rect2) -> void:
+func _on_view_fitted(view: Rect2, _party: Rect2) -> void:
 	_view = view
+
+
+## The room a run is starting in (just before `room_entered` and `horde_started`): the floor when
+## it has no walls.
+func _on_room_laid_out(bounds: Rect2) -> void:
+	_room = bounds
 
 
 ## How far from `from` along `direction` the ray leaves `rect` (0 when it never does, from
@@ -840,25 +842,14 @@ func _read_wizards() -> void:
 			_wizard_at[seat] = _to_world(wizard).origin
 
 
-## The world's camera: the viewport's current one when it is in the world, else the first in it.
-func _find_camera() -> Camera2D:
-	if world.is_inside_tree():
-		var current: Camera2D = world.get_viewport().get_camera_2d()
-		if current != null and _in_world(current):
-			return current
-	var found: Array[Node] = world.find_children("*", "Camera2D", true, false)
-	return found[0] as Camera2D if not found.is_empty() else null
-
-
 ## The floor enemies may appear on: the box round the room's walls (every wall-layer body's
-## shapes in the world), else the camera's limits, else the registry room's spawns, else
-## FALLBACK_ARENA; then WALL_MARGIN in.
+## shapes in the world), else the room Flow laid out (`room_laid_out`; never the camera's limits:
+## nothing in the simulation reads the camera, online-ready N9), else FALLBACK_ARENA; then
+## WALL_MARGIN in.
 func _find_arena() -> Rect2:
 	var outer: Rect2 = _walls_box()
-	if outer.size == Vector2.ZERO and _camera != null and _camera.limit_right - _camera.limit_left < NO_LIMIT and _camera.limit_bottom - _camera.limit_top < NO_LIMIT:
-		outer = Rect2(Vector2(_camera.limit_left, _camera.limit_top), Vector2(_camera.limit_right - _camera.limit_left, _camera.limit_bottom - _camera.limit_top))
 	if outer.size == Vector2.ZERO:
-		outer = _room_spawns_box()
+		outer = _room
 	if outer.size == Vector2.ZERO:
 		outer = FALLBACK_ARENA
 	var floor_rect: Rect2 = outer.grow(-WALL_MARGIN)
@@ -911,18 +902,6 @@ func _to_world(node: Node2D) -> Transform2D:
 			out = step_node.transform * out
 		at = at.get_parent()
 	return out
-
-
-## The registry's horde room, measured by its spawns as Flow does (a tile past the furthest).
-func _room_spawns_box() -> Rect2:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, ROOM_ID) as RoomBase if registry != null else null
-	if room == null:
-		return Rect2()
-	var size := Vector2.ZERO
-	for points: PackedVector2Array in [room.player_spawns, room.enemy_spawns, room.doors]:
-		for point: Vector2 in points:
-			size = size.max(point + Vector2(32.0, 32.0))
-	return Rect2(Vector2.ZERO, size) if size.x > 0.0 and size.y > 0.0 else Rect2()
 
 
 ## The curve's enemies from the registry; the missing ones are skipped, with one warning ever.

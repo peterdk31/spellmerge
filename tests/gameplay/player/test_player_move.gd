@@ -284,7 +284,7 @@ func _test_four_players_at_once() -> void:
 func _test_no_input() -> void:
 	_setup(1)
 	var player: Actor = _players[0]
-	WizardFixture.controller(player).input = null
+	WizardFixture.controller(player).frames = null
 	_hold(0, &"move_right")
 	_run(1)
 	_check(player.velocity == Vector2.ZERO, "a wizard whose controller has no input stands still")

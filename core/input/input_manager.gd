@@ -178,6 +178,21 @@ func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	if events != null:
+		# Heard before Flow (the autoloads' order), so the run starts with the keyboard in.
+		events.play_requested.connect(_on_run_requested)
+		events.sandbox_requested.connect(_on_run_requested)
+		events.horde_requested.connect(_on_run_requested)
+
+
+## A run was asked for (Play, the sandbox, the horde) by seat `requester`. The menu's buttons may
+## be pressed with the mouse by nobody who has joined: the keyboard then takes slot 0,
+## provisionally (a gamepad that joins before the keyboard is used takes P1 over). Anyone already
+## joined (a gamepad, in any slot) plays as they are and the keyboard stays out. The device layer's
+## decision, not the game's: the run reads the joined seats from the frames service (core/sim).
+func _on_run_requested(requester: int) -> void:
+	if requester == 0 and joined_count() == 0:
+		join(KEYBOARD, true)
 
 
 func _input(event: InputEvent) -> void:

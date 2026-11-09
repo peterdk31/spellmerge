@@ -220,3 +220,21 @@ static func _most_common(counts: Dictionary) -> int:
 			most = int(counts[rgba])
 			best = rgba
 	return best
+
+
+## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and
+## the layout's `Floor` sprite (the whole room, under the walls) when `layout` is given. The room
+## Flow makes is this size (its camera's limits), and the horde's floor without walls is too.
+func size_in(layout: Node = null) -> Vector2:
+	var size := Vector2(640.0, 360.0)
+	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null
+	if floor_sprite != null and floor_sprite.texture != null:
+		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
+		size = size.max(floor_sprite.position + extent)
+	for point: Vector2 in player_spawns:
+		size = size.max(point + Vector2(32.0, 32.0))
+	for point: Vector2 in enemy_spawns:
+		size = size.max(point + Vector2(32.0, 32.0))
+	for point: Vector2 in doors:
+		size = size.max(point + Vector2(32.0, 32.0))
+	return size

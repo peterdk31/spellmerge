@@ -634,8 +634,10 @@ signal rows_drawn(batch: int, rows: PackedFloat32Array, count: int)
 const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
-## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
+## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
+## own generator).
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -2100,8 +2102,7 @@ func _team_of_target(owner: int, layer: int) -> int:
 func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO, key: int = 0) -> void:
 	if node == null or layer == 0:
 		return
-	var id: int = node.get_instance_id()
-	var at: int = _target_id.find(id)
+	var at: int = _target_row(node)
 	if at >= 0:
 		if key != 0:
 			_target_key[at] = key
@@ -2116,7 +2117,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 		_minted_keys -= 1
 		key = _minted_keys
 	_targets.append(node)
-	_target_id.append(id)
+	_target_id.append(node.get_instance_id())
 	_target_key.append(key)
 	_target_radius.append(radius)
 	_target_layer.append(layer)
@@ -2134,7 +2135,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 func set_target_owner(node: Node2D, owner: int) -> bool:
 	if node == null or not is_caster(owner):
 		return false
-	var at: int = _target_id.find(node.get_instance_id())
+	var at: int = _target_row(node)
 	if at < 0:
 		return false
 	_target_owner[at] = owner
@@ -2145,7 +2146,7 @@ func set_target_owner(node: Node2D, owner: int) -> bool:
 func remove_target(node: Node2D) -> void:
 	if node == null:
 		return
-	var at: int = _target_id.find(node.get_instance_id())
+	var at: int = _target_row(node)
 	if at < 0:
 		return
 	if _stepping:
@@ -2164,11 +2165,10 @@ func remove_target(node: Node2D) -> void:
 func replace_body(old: Node, new: Node) -> void:
 	if old == null or new == null or old == new or not new is Node2D:
 		return
-	var at: int = _target_id.find(old.get_instance_id())
-	var to: int = new.get_instance_id()
-	if at >= 0 and _target_id.find(to) < 0:
+	var at: int = _target_row(old)
+	if at >= 0 and _target_row(new) < 0:
 		_targets[at] = new
-		_target_id[at] = to
+		_target_id[at] = new.get_instance_id()
 	for slot in _cap:
 		var stuck: Variant = _stuck_to[slot]
 		if is_instance_valid(stuck) and stuck == old:
@@ -4509,7 +4509,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 	var base: float = DMath.angle(direction)
 	var turn: float = 1.0 if side >= 0 else -1.0
 	var whole: bool = to_angle - from_angle >= TAU
-	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	var skip: int = _target_row(exclude)
 	var pad: Vector2 = Vector2.ONE * (reach + _max_target_radius)
 	var x0: int = clampi(floori((origin.x - pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
 	var x1: int = clampi(floori((origin.x + pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
@@ -4520,7 +4520,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (_target_layer[t] & layers) != 0 and _target_id[t] != skip and is_instance_valid(_targets[t]):
+				if (_target_layer[t] & layers) != 0 and t != skip and is_instance_valid(_targets[t]):
 					var to: Vector2 = _target_pos[t] - origin
 					var radius: float = _target_radius[t]
 					var distance: float = to.length()
@@ -4692,7 +4692,6 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	var heads: Array = _ray_heads[level]
 	var wanted: int = maxi(pierce, 0) + 1
 	var found: int = 0
-	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	if not _targets.is_empty() and reach > 0.0:
 		_query_ready()
 		layers |= ACTOR_LAYERS
@@ -4702,14 +4701,13 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		# `exclude`, the body it is cast from (the caller found it starts on it), is spared until a
 		# later piece of the path starts off it (as a shot's step does, `exclude`): a beam that
 		# bounces or bends back into it hits it.
-		var skip_at: int = _target_id.find(skip) if skip != 0 else -1
+		var skip_at: int = _target_row(exclude)
 		for i in used:
 			var a: Vector2 = _path[i]
 			var b: Vector2 = _path[i + 1]
 			if skip_at >= 0 and i > 0:
 				var on: float = wide + _target_radius[skip_at]
 				if a.distance_squared_to(_target_pos[skip_at]) > on * on:
-					skip = 0
 					skip_at = -1
 			var piece: float = a.distance_to(b)
 			if piece <= 0.0:
@@ -4725,7 +4723,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 				for x in range(x0, x1 + 1):
 					var t: int = _cell_head[y * _grid_w + x]
 					while t >= 0:
-						if (_target_layer[t] & layers) != 0 and _target_id[t] != skip and is_instance_valid(_targets[t]):
+						if (_target_layer[t] & layers) != 0 and t != skip_at and is_instance_valid(_targets[t]):
 							var along: float = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
 							var closest: Vector2 = a + heading * along
 							var touch: float = wide + _target_radius[t]
@@ -5721,7 +5719,7 @@ func freeze_left_of(slot: int) -> float:
 func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 	if node == null or not is_instance_valid(node):
 		return false
-	var at: int = _target_id.find(node.get_instance_id())
+	var at: int = _target_row(node)
 	if at < 0:
 		return false
 	var body: Node2D = _targets[at] as Node2D
@@ -5741,7 +5739,7 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 func exclude(slot: int, node: Node) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
 		# Kept by its key (N5); a node that is no target (none registered) is never hit anyway.
-		var at: int = _target_id.find(node.get_instance_id())
+		var at: int = _target_row(node)
 		_skip_id[slot] = _target_key[at] if at >= 0 else 0
 		_skip_on[slot] = 1.0
 		_skip_near[slot] = 0.0
@@ -5800,7 +5798,7 @@ func get_anchor(caster: int) -> Vector2:
 func target_owner_of(node: Node) -> int:
 	if node == null or not is_instance_valid(node):
 		return EventsScript.NO_PLAYER
-	var at: int = _target_id.find(node.get_instance_id())
+	var at: int = _target_row(node)
 	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
 
 
@@ -5810,7 +5808,7 @@ func target_owner_of(node: Node) -> int:
 func key_of(node: Node) -> int:
 	if node == null or not is_instance_valid(node):
 		return 0
-	var at: int = _target_id.find(node.get_instance_id())
+	var at: int = _target_row(node)
 	return _target_key[at] if at >= 0 else 0
 
 
@@ -5926,15 +5924,15 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		return null
 	var best: int = -1
 	var best_sq: float = INF
-	var skip: int = exclude.get_instance_id() if exclude != null else 0
-	var skip_also: int = exclude_also.get_instance_id() if exclude_also != null else 0
 	_query_ready()
+	var skip: int = _target_row(exclude)
+	var skip_also: int = _target_row(exclude_also)
 	var cells: Vector4i = _query_cells(point, radius)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, skip) and (skip_also == 0 or _target_id[t] != skip_also) and (team == ActorsScript.NONE or _target_team[t] != team):
+				if _query_match(t, point, radius, layers, skip) and t != skip_also and (team == ActorsScript.NONE or _target_team[t] != team):
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d < best_sq:
 						best_sq = d
@@ -5965,7 +5963,7 @@ func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Ar
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
 				var at: Vector2 = point if end == point else Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
-				if _query_match(t, at, radius, layers, 0) and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
+				if _query_match(t, at, radius, layers, -1) and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
 						radii.resize(centres.size())
@@ -5991,7 +5989,7 @@ func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D], 
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end), radius, layers, 0):
+				if _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end), radius, layers, -1):
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()
@@ -6002,6 +6000,13 @@ func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D], 
 func _query_ready() -> void:
 	if _grid_stale and not _stepping:
 		_refresh_targets()
+
+
+## The row of `node` in the target table, or -1 (none, or not registered): found by its instance
+## id, a lookup only (`_target_id` is DERIVED; online-ready N9). Rows are renumbered when the table
+## is refreshed (`_query_ready`), so a query takes its rows after that.
+func _target_row(node: Object) -> int:
+	return _target_id.find(node.get_instance_id()) if node != null else -1
 
 
 ## The grid cells (x0, y0, x1, y1) a query circle can reach.
@@ -6017,8 +6022,8 @@ func _query_cells(point: Vector2, radius: float) -> Vector4i:
 
 
 func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int) -> bool:
-	# A target freed since the grid was filled is skipped, never returned.
-	if (_target_layer[t] & layers) == 0 or _target_id[t] == skip or not is_instance_valid(_targets[t]):
+	# A target freed since the grid was filled is skipped, never returned; `skip` is a row (-1: none).
+	if (_target_layer[t] & layers) == 0 or t == skip or not is_instance_valid(_targets[t]):
 		return false
 	var reach: float = maxf(radius, 0.0) + _target_radius[t]
 	return _target_pos[t].distance_squared_to(point) <= reach * reach

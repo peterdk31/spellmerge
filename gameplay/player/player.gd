@@ -55,7 +55,6 @@ extends ActorController
 ##
 ## Flow puts a wizard together with `seat_wizard` before adding it to the tree.
 
-const InputManagerScript := preload("res://core/input/input_manager.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
@@ -64,18 +63,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const INPUT_BUFFER: float = 0.15
 ## The four staff buttons (0 RB, 1 RT, 2 LB, 3 LT; owner, 2026-10-26).
 const STAFF_COUNT: int = 4
-const CAST_ACTIONS: Array[StringName] = LocalInput.CAST_ACTIONS
-## Seconds the aim holds after the right stick is let go (the local input layer's).
-const AIM_HOLD_TIME: float = LocalInput.AIM_HOLD_TIME
-## A point closer than this (pixels) to the hand gives no direction (`aim_at`).
-const MOUSE_MIN_DISTANCE: float = LocalInput.MOUSE_MIN_DISTANCE
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 ## `card_move_requested`'s staff for the bag.
 const BAG: int = -1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"input", &"registry", &"frames", &"mouse_world_override", &"_local", &"_own_frame"]
+const DERIVED: Array[StringName] = [&"registry", &"frames"]
 ## State as who they point at: the actor it drives and its home body, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_actor", &"_home"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -83,24 +77,15 @@ const VIEW: Array[StringName] = [&"_sound_player"]
 
 ## The frames service (core/sim/frames.gd: this seat's input frame each tick) and the registry (the
 ## bag, the cast sound). Only tests set these, before adding the node; otherwise the "Frames" and
-## "Registry" autoloads are used.
+## "Registry" autoloads are used. The frames service is the seat's only input (online-ready N9): a
+## test feeds a seat through one of its own (tests/gameplay/player/wizard_fixture.gd), and one set
+## to null later gives no input at all.
 var frames: FramesScript = null
 var registry: RegistryScript = null
-## Only tests set this, before adding the node: an input manager of their own, which this seat
-## reads through a local input layer of its own (the same `LocalInput` the frames service keeps)
-## into a frame of its own, instead of the frames service's. Set to null later: no input at all.
-var input: InputManagerScript = null
 
 ## The card ids this seat may build with. Filled from the registry when it first drives, unless
 ## it was set (`set_bag`) before.
 var bag: Array[StringName] = []
-
-## Only tests set this (with `input`): the mouse position in the world, instead of the real one.
-## Vector2.INF means "ask the viewport".
-var mouse_world_override: Vector2 = Vector2.INF
-## With a test's `input`: its local input layer and the frame it fills each step.
-var _local: LocalInput = null
-var _own_frame: InputFrame = null
 
 ## The actor driven now (set by `started`, cleared by `stopped`), or null.
 var _actor: Actor = null
@@ -126,7 +111,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
-	if input == null and frames == null:
+	if frames == null:
 		frames = get_node_or_null("/root/Frames") as FramesScript
 		if frames == null:
 			push_warning("PlayerController %d: the Frames autoload is missing, so this seat cannot move." % seat)
@@ -261,7 +246,7 @@ func think(actor: Actor, delta: float) -> void:
 	announce_stats()
 	for at in STAFF_COUNT:
 		_buffer_left[at] = maxf(_buffer_left[at] - delta, 0.0)
-	var frame: InputFrame = _frame(actor, delta)
+	var frame: InputFrame = _frame()
 	if frame == null or actor.is_down():
 		# No input (only in tests), or down: stand, cast nothing, and presses made meanwhile are
 		# not held against the player after a revive.
@@ -287,48 +272,15 @@ func think(actor: Actor, delta: float) -> void:
 			intent.press(at)
 
 
-## This tick's frame of the seat: the frames service's, or with a test's own `input` one filled
-## here by the same local input layer; null for no input at all.
-func _frame(actor: Actor, delta: float) -> InputFrame:
-	if input != null:
-		_ensure_local()
-		_own_frame.seat = seat
-		_own_frame.clear()
-		var mouse: Vector2 = _mouse_world(actor) if input.is_mouse_aiming(seat) else Vector2.INF
-		_local.fill(_own_frame, input, seat, delta, actor.aim_pivot(), mouse)
-		return _own_frame
-	if frames != null:
-		return frames.frame_of(seat)
-	return null
+## This tick's frame of the seat: the frames service's; null for no input at all (a test's).
+func _frame() -> InputFrame:
+	return frames.frame_of(seat) if frames != null else null
 
 
-## The aim (unit length) for a shot of `actor` that flies through `point` (world position):
-## measured from the hand (`Actor.aim_pivot`), so the shot from the staff tip passes `point`.
-## Vector2.ZERO when `point` is within MOUSE_MIN_DISTANCE of the hand (`LocalInput.aim_at`).
-func aim_at(actor: Actor, point: Vector2) -> Vector2:
-	return LocalInput.aim_at(actor.aim_pivot(), point)
-
-
-func _mouse_world(actor: Actor) -> Vector2:
-	if mouse_world_override != Vector2.INF:
-		return mouse_world_override
-	return actor.get_global_mouse_position() if actor.is_inside_tree() else actor.global_position
-
-
-## Forget remembered presses, so no press made before counts later (a test's own local layer
-## takes its press counts as they are now).
+## Forget remembered presses, so no press made before counts later.
 func forget_presses() -> void:
 	for at in STAFF_COUNT:
 		_buffer_left[at] = 0.0
-	if input != null:
-		_ensure_local()
-		_local.forget_presses(input, seat)
-
-
-func _ensure_local() -> void:
-	if _local == null:
-		_local = LocalInput.new()
-		_own_frame = InputFrame.new()
 
 
 ## Send `staff_mana_changed` for each staff of the home body whose whole mana or pool size

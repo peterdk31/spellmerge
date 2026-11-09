@@ -120,7 +120,7 @@ func _test_stick_aim_holds_then_follows_the_move() -> void:
 	_input.send_virtual_aim(0, Vector2.RIGHT)
 	_run(1)
 	_input.send_virtual_aim(0, Vector2.ZERO)
-	_run(int(PlayerController.AIM_HOLD_TIME / STEP) - 2)
+	_run(int(LocalInput.AIM_HOLD_TIME / STEP) - 2)
 	_check(_near(_players[0].aim, Vector2.RIGHT), "the aim holds after the stick is let go")
 	_run(4)
 	_check(_near(_players[0].aim, Vector2.LEFT), "after the hold the aim follows the walk again")
@@ -132,14 +132,14 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 	var controller: PlayerController = _controller(wizard)
 	var hand_height: float = -wizard.hand_offset.y
 	wizard.global_position = Vector2(100, 100)
-	controller.mouse_world_override = Vector2(100, 40)
+	_world.frames.mouse_world_override = Vector2(100, 40)
 	_run(1)
 	_check(_near(wizard.aim, Vector2.DOWN), "the mouse is not used before it moves")
 	_input.handle_event(_mouse_move(20.0))
 	_run(1)
 	_check(_near(wizard.aim, Vector2.UP), "the keyboard player aims at the mouse")
 	# The aim is measured from the hand, the hand height above the feet.
-	controller.mouse_world_override = Vector2(160, 100 - hand_height)
+	_world.frames.mouse_world_override = Vector2(160, 100 - hand_height)
 	var walk := InputEventKey.new()
 	walk.physical_keycode = KEY_S
 	walk.pressed = true
@@ -148,7 +148,7 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 	# There is no `facing` any more; the walk shows in the velocity.
 	_check(wizard.velocity.y > 0.0 and is_zero_approx(wizard.velocity.x), "the keyboard player walks down")
 	_check(_near(wizard.aim, Vector2.RIGHT), "the mouse aim does not follow the walk")
-	controller.mouse_world_override = Vector2(101, 100 - hand_height)
+	_world.frames.mouse_world_override = Vector2(101, 100 - hand_height)
 	_run(1)
 	_check(_near(wizard.aim, Vector2.RIGHT), "a mouse on top of the wizard keeps the last aim")
 	var key := InputEventKey.new()
@@ -160,7 +160,7 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 
 func _test_mouse_aim_ignored_for_other_devices() -> void:
 	_setup(2, true)
-	_controller(_players[1]).mouse_world_override = Vector2(500, 500)
+	_world.frames.mouse_world_override = Vector2(500, 500)
 	_input.handle_event(InputEventMouseMotion.new())
 	_run(1)
 	_check(_near(_players[1].aim, Vector2.DOWN), "a bot ignores the mouse")
@@ -285,7 +285,7 @@ func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
 	wizard.global_position = Vector2(100, 100)
 	_input.handle_event(_mouse_move(20.0))
 	for mouse: Vector2 in [Vector2(220, 60), Vector2(40, 150), Vector2(130, 20), Vector2(160, 104)]:
-		_controller(wizard).mouse_world_override = mouse
+		_world.frames.mouse_world_override = mouse
 		_run(1)
 		_fake.origins.clear()
 		_fake.directions.clear()
@@ -309,11 +309,11 @@ func _test_aim_at_a_point() -> void:
 	var controller: PlayerController = _controller(wizard)
 	wizard.global_position = Vector2(100, 100)
 	for point: Vector2 in [Vector2(300, 100), Vector2(100, 300), Vector2(20, 40), Vector2(108, 70)]:
-		wizard.aim = controller.aim_at(wizard, point)
+		wizard.aim = LocalInput.aim_at(wizard.aim_pivot(), point)
 		var to_point: Vector2 = point - wizard.muzzle_position()
 		_check(_near(wizard.aim, wizard.aim.normalized()) and absf(wizard.aim.cross(to_point)) < 0.01 and wizard.aim.dot(to_point) > 0.0,
 				"the shot along aim_at(%s) passes the point" % point)
-	_check(controller.aim_at(wizard, wizard.aim_pivot() + Vector2(1, 1)) == Vector2.ZERO, "a point on the hand gives no direction")
+	_check(LocalInput.aim_at(wizard.aim_pivot(), wizard.aim_pivot() + Vector2(1, 1)) == Vector2.ZERO, "a point on the hand gives no direction")
 
 
 ## The reticle, gem and rings are drawn in the ramp's base colour lightened toward white (actors

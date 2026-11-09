@@ -268,7 +268,6 @@ func test_a_wizard_takes_its_intent_from_its_seats_frame() -> void:
 	var world := WizardFixture.new(root, true)
 	var body: Actor = world.wizard(1, Vector2.ZERO, [[&"bolt"], [], [], []], null, false)
 	var controller: PlayerController = WizardFixture.controller(body)
-	controller.input = null
 	controller.frames = _frames
 	world.add(body)
 	world.input.add_virtual_device(1)

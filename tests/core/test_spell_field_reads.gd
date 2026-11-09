@@ -21,8 +21,9 @@ const SPELL_CLASSES: String = "(SpellComponent|FormBase|ElementBase|ModifierBase
 ## Folders that are not game scripts, and the three that may read spell fields.
 const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "build", "ci", "docs", "content/spells", "core/base", "core/spells"]
 ## Fixtures that build or check cards, so they read and set card fields as the test_*.gd files may
-## (the card rig is what each card's own test extends).
-const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd", "tests/support/card_rig.gd"]
+## (the card rig is what each card's own test extends; the content fight builds a staff round every
+## card, online-ready N12).
+const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd", "tests/support/card_rig.gd", "tests/core/content_fight.gd"]
 
 
 func test_the_scanner_catches_field_reads() -> void:

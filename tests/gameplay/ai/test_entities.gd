@@ -225,7 +225,9 @@ func _test_decoy_copies_its_wizard() -> void:
 		_check(decoy.position.is_equal_approx(Vector2(10.0, 10.0)), "it stands where the card put it")
 
 
-## A row keeps its decoy actor: an ended decoy is placed again, full, under a fresh id.
+## A row's decoy is made new each time (online-ready N10b: nothing of an earlier decoy carries over,
+## which no snapshot holds): the ended one is freed as its row holds the next, which is full, under a
+## fresh id.
 func _test_a_decoy_is_placed_again() -> void:
 	_setup(1)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 1.0)
@@ -238,7 +240,10 @@ func _test_a_decoy_is_placed_again() -> void:
 	_check(_entities.count() == 0, "it ran out")
 	_spawn(0, EntitiesScript.DECOY, Vector2(50.0, 0.0))
 	var again: Actor = _entities.decoy_of(0)
-	_check(again == first, "the row's actor is placed again, not made anew")
+	_check(again != null and again != first, "a new actor")
+	_check(not is_instance_valid(first), "the ended one is freed")
+	if again == null:
+		return
 	_check(again.is_inside_tree() and again.id >= 0 and is_equal_approx(again.health.health, EntitiesScript.DECOY_HEALTH), "in the world with an id and full health")
 	_check(_world.combat.is_registered(again), "and hurtable again")
 
@@ -262,7 +267,10 @@ func _test_a_decoy_placed_again_aims_the_way_it_was_placed() -> void:
 	_world.players[0].position = Vector2(400.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO)
 	_run(2)
-	_check(_entities.decoy_of(0) == decoy, "the row's actor again")
+	decoy = _entities.decoy_of(0)
+	_check(decoy != null, "the row's next decoy")
+	if decoy == null:
+		return
 	_check(decoy.aim.dot(Vector2.LEFT) > 0.99, "with no foe it aims the way it was placed, away from its wizard (%s)" % decoy.aim)
 
 

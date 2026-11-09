@@ -2443,6 +2443,24 @@ func _run_waiting_fires() -> void:
 			_generation_gone(SpellTag.make(actor, staff, 0, generation))
 
 
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): every live shot this runtime knows
+## draws as its card's body and light again. The projectile manager keeps them as VIEW, numbered by
+## this machine as it first meets each card's shader (`register_body`), so a restored world numbers
+## them here, by the shot's spell (N12 found the numbers parting a restored world).
+func rebuild_derived() -> void:
+	if projectiles == null:
+		return
+	for slot in mini(_rec_seq.size(), projectiles.get_cap()):
+		if not _knows(slot):
+			continue
+		var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
+		if spell == null:
+			continue
+		var launch: LaunchLook = _launch_look_of(spell)
+		projectiles.set_body(slot, launch.body)
+		projectiles.set_light(slot, launch.light_intensity, launch.light_reach)
+
+
 ## True when the record of `slot` was made for the shot the manager last had there (it may
 ## have ended just now).
 func _same(slot: int) -> bool:

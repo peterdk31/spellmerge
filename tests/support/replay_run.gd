@@ -62,6 +62,9 @@ var problems: PackedStringArray = PackedStringArray()
 ## A tick to snapshot the recorded run after (online-ready N10; -1 for none), and the snapshot.
 var snapshot_at: int = -1
 var snapshot: Snapshot = null
+## The room a run of Play is in (`Flow.room_id_to_play`, set again in every fresh game), or empty for
+## Flow's own. The snapshot test plays every room by it (online-ready N12).
+var room: StringName = &""
 ## True: each run starts from a fresh game (every autoload made again). False: in the same game,
 ## after whatever ran before, as a player starts one run after another (N3b: the run starts from
 ## a fresh game's state all the same).
@@ -138,6 +141,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		var wizard: Actor = _flow.call("get_wizard", bots) as Actor
 		if wizard == null or wizard.caster.cards_of(0).slice(0, REBUILT.size()) != REBUILT:
 			problems.append("%s: the rebuild did not apply in the recorded run" % start)
+	if room != &"" and start == &"play_requested" and StringName(_flow.get(&"room_id")) != room:
+		problems.append("%s: the run is in %s, not %s" % [start, _flow.get(&"room_id"), room])
 	_check_settings(start)
 	for bot in players:
 		bot.leave()
@@ -259,6 +264,8 @@ func _find() -> void:
 	# under a test script.
 	_flow.set(&"loading_enabled", false)
 	_flow.set(&"intro_enabled", false)
+	if room != &"":
+		_flow.set(&"room_id_to_play", room)
 	var machine: SessionRules = SessionRules.machine()
 	machine.shot_cap = cap if cap > 0 else SessionRules.defaults().shot_cap
 	if not native:

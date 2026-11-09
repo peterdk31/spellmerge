@@ -29,10 +29,12 @@ extends RefCounted
 ##   by script and path, with their state as the walker walks it, `StateWalk.added_in_play`).
 ##
 ## **Restoring** into a world (the same, or a fresh one of the same kind) goes in this order:
-## 1. **Bodies:** the world's bodies are matched by area name and scene; one the snapshot lacks (or
+## 1. **Bodies:** the world's bodies are matched by area name and scene (and by name, for one built
+##    in code: actor ids are handed out again); one the snapshot lacks (or
 ##    one on its way out, queued for deletion) is freed, one missing is made (its scene or script,
 ##    its nodes added in play, its state, then `prepare(body)` and into its parent), so each body's
-##    own `_ready` wires it as when it was first made.
+##    own `_ready` wires it as when it was first made. A body built in code by the node it lives
+##    under (a pool: Entities' decoys) is made by that node, `remake_body(name)`, out of the tree.
 ## 2. **State:** every area's and body's members are written back. An object of the same script
 ##    already there is written in place (what outside holds on to it still does), else one is made
 ##    (`new()`, no arguments).
@@ -487,7 +489,10 @@ class Restorer:
 			var body: Body = wanted.get(String(name)) as Body
 			# A body on its way out (it died this frame: `queue_free`) is gone already.
 			var going: bool = (node as Node).is_queued_for_deletion()
-			if body != null and not going and (node as Node).scene_file_path == body.scene and (node as Node).get_script() == body.of:
+			# A body built in code is known by its name too (a pool's row: Entities' decoys), since
+			# actor ids are handed out again: another row's body may hold the id now.
+			var same_name: bool = body != null and (body.scene != "" or (node as Node).name == body.name)
+			if body != null and not going and same_name and (node as Node).scene_file_path == body.scene and (node as Node).get_script() == body.of:
 				_bodies[String(name)] = node as Node
 				_sync_added(node as Node, body)
 			else:
@@ -501,25 +506,27 @@ class Restorer:
 	## A body made again: its scene (or script), its nodes added in play, its state, `prepare`, and
 	## into its parent.
 	func _make_body(body: Body) -> Node:
+		var parent: Node = _world.get_node_or_null(body.parent) if _world != null else null
+		if parent == null:
+			Snapshot._problem(problems, body.area, "has no parent at %s in this world" % body.parent, "make the world of the same kind before restoring")
+			return null
 		var node: Node = null
-		if body.scene != "":
+		if body.scene == "" and parent.has_method(&"remake_body"):
+			# A body its parent builds in code and pools (Entities' decoys): its parent makes it.
+			node = parent.call(&"remake_body", body.name) as Node
+		elif body.scene != "":
 			if not body.scene.begins_with("res://") or not (body.scene.ends_with(".tscn") or body.scene.ends_with(".scn")):
 				Snapshot._problem(problems, body.area, "names a scene that is no scene file (%s)" % body.scene, "make bodies from scenes under res://")
 				return null
 			var scene: PackedScene = ResourceLoader.load(body.scene, "PackedScene") as PackedScene
 			node = scene.instantiate() if scene != null else null
-		elif body.of != null and body.of.can_instantiate():
+		if node == null and body.scene == "" and body.of != null and body.of.can_instantiate():
 			node = body.of.new() as Node
 		if node == null:
 			Snapshot._problem(problems, body.area, "cannot be made again (%s)" % body.scene, "make bodies from a scene, or from a script that takes no arguments")
 			return null
 		node.name = body.name
 		_sync_added(node, body)
-		var parent: Node = _world.get_node_or_null(body.parent) if _world != null else null
-		if parent == null:
-			Snapshot._problem(problems, body.area, "has no parent at %s in this world" % body.parent, "make the world of the same kind before restoring")
-			node.free()
-			return null
 		# Its state before it enters the tree, so its `_ready` sets it up as it was (its data, its id).
 		var ready := Restorer.new(_snapshot, _into, _world, Callable())
 		ready._full = false

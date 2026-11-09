@@ -6,11 +6,16 @@ extends "res://tests/support/suite.gd"
 ## player joining the run online would. Every tick from there agrees with the recorded run's in every
 ## area. When they part, the desync report names the first tick, the areas and each member.
 ##
+## Every room the registry finds plays a wave so (online-ready N12): a new room is covered the day
+## its folder lands, with no test written for it. Cards and enemies are covered the same way, in a
+## scripted fight each (tests/core/test_content_determinism.gd).
+##
 ## The runs are the replay test's (tests/support/replay_run.gd). Each takes seconds: the runner plays
 ## them in processes of their own (tests/support/suite.gd):
 # unit-test-shards: 3
 
 const ReplayRun := preload("res://tests/support/replay_run.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## Ticks recorded, and the tick the snapshot is taken after (past the scripted player's rebuild and
 ## pause in the sandbox, so the frames after it hold neither).
@@ -36,17 +41,24 @@ func test_a_sandbox_run_restored_plays_on_the_same() -> void:
 	await _check_resumed(&"sandbox_requested", 0, 1)
 
 
-## The wave with a scripted player, not bots: a bot reads the game through queries
-## that fill the services' caches, which count as state (core/sim/README.md, "Input"), so a run of
-## bots goes on the same only with the same bots watching from the same state. A player joining a
-## run never runs the host's bots; its frames come from the host.
-func test_a_wave_restored_plays_on_the_same() -> void:
-	await _check_resumed(&"play_requested", 0, 1)
+## A wave in every room the registry finds, with a scripted player, not bots: a bot reads the game
+## through queries that fill the services' caches, which count as state (core/sim/README.md,
+## "Input"), so a run of bots goes on the same only with the same bots watching from the same state.
+## A player joining a run never runs the host's bots; its frames come from the host.
+func test_a_wave_in_every_room_restored_plays_on_the_same() -> void:
+	var registry := own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	var rooms: Array[StringName] = registry.get_ids(&"rooms")
+	check(rooms.size() >= 2, "it finds the rooms (%d)" % rooms.size())
+	for room in rooms:
+		_run.room = room
+		await _check_resumed(&"play_requested", 0, 1)
 
 
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a
 ## snapshot after SNAPSHOT_AT, then resumed from it in a fresh game: the two agree from there on.
 func _check_resumed(start: StringName, bots: int, scripted: int) -> void:
+	var label: String = start if _run.room == &"" else "%s in %s" % [start, _run.room]
 	var recorded := Desync.new()
 	var resumed := Desync.new()
 	var replay: Replay = await _record(start, bots, scripted, recorded)
@@ -54,12 +66,12 @@ func _check_resumed(start: StringName, bots: int, scripted: int) -> void:
 		return
 	var snapshot: Snapshot = _run.snapshot
 	for problem in snapshot.problems:
-		check(false, "%s: %s" % [start, problem])
+		check(false, "%s: %s" % [label, problem])
 	await _run.resume(replay, snapshot, SNAPSHOT_AT, bots, resumed)
 	for problem in _run.problems:
 		check(false, problem)
 	_run.problems.clear()
-	check_equal(resumed.hashes.size(), TICKS - SNAPSHOT_AT - 1, "%s: the resumed run played every tick after the snapshot" % start)
+	check_equal(resumed.hashes.size(), TICKS - SNAPSHOT_AT - 1, "%s: the resumed run played every tick after the snapshot" % label)
 	var tick: int = Desync.first_parting(recorded, resumed)
 	if tick < 0:
 		return
@@ -68,7 +80,7 @@ func _check_resumed(start: StringName, bots: int, scripted: int) -> void:
 	var resumed2 := Desync.new(tick)
 	replay = await _record(start, bots, scripted, recorded2)
 	await _run.resume(replay, _run.snapshot, SNAPSHOT_AT, bots, resumed2)
-	check(false, "%s: the run resumed from its snapshot parts from it %d ticks after: %s" % [start, tick + 1, Desync.compare(recorded2, resumed2)])
+	check(false, "%s: the run resumed from its snapshot parts from it %d ticks after: %s" % [label, tick + 1, Desync.compare(recorded2, resumed2)])
 
 
 ## The run recorded with its snapshot; `into` keeps the ticks after the snapshot only, as the

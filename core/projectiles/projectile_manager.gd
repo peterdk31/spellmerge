@@ -640,7 +640,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -723,7 +723,9 @@ var _tag: PackedInt64Array = PackedInt64Array()
 var _motion: PackedByteArray = PackedByteArray()
 ## The body a card asked for per slot (`set_form`: a shader `register_body`
 ## numbered, drawn when the shot is still; 0 for its motion's own), and the id of the card it is
-## (`&""` for none), for its looks.
+## (`&""` for none), for its looks. VIEW: only the drawing reads it, and the numbers are this
+## machine's (in the order it first met each card's shader, Feel's among them), so a world restored
+## from a snapshot numbers them again (`set_body`, from Spells' `rebuild_derived`; online-ready N12).
 var _body: PackedByteArray = PackedByteArray()
 ## How bright and how far each shot lights the room, times the shot light's own (its card's
 ## `look_light_intensity` and `look_light_reach`, `set_looks`, `set_light`; 1 for a plain shot):
@@ -2513,6 +2515,24 @@ func set_light(slot: int, intensity: float, reach: float) -> bool:
 ## A light multiplier kept in `least` to LIGHT_MAX (1 for one that is not a number).
 static func clean_light(value: float, least: float) -> float:
 	return clampf(value, least, LIGHT_MAX) if is_finite(value) else 1.0
+
+
+## The shot in `slot` draws as the card body `body` (`register_body`'s number on this machine, 0 for
+## its motion's own): a snapshot restored gives its live shots theirs again (VIEW, see `_body`).
+## False for an empty slot.
+func set_body(slot: int, body: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	_set_body(slot, clampi(body, 0, _body_shaders.size()))
+	return true
+
+
+## The card shader the shot in `slot` draws as (its card body's, `register_body`), or null for a shot
+## drawn by its motion's own, and for an empty slot. Drawing only (the looks, tests).
+func get_body_shader_of(slot: int) -> Shader:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _body[slot] == 0:
+		return null
+	return _body_shaders[_body[slot] - 1]
 
 
 ## Slot `slot`'s card body is `body` now: drawn again from its batch on (`_remember_drawn`), since

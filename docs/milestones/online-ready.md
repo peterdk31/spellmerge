@@ -319,6 +319,16 @@ C++ from the start, whatever N2b finds (the owner, 2026-11-04).
 - AGENTS.md's "One clock" rule names the test.
 - Proves done-when 6.
 
+**Done (2026-11-09), by an owner session.** `tests/core/test_sim_rules.gd` (one table, `RULES`), `tests/support/sim_source.gd` (the scripts, their code lines without the view ones), `StateWalk.VIEW_FOLDERS`, and "The line" in core/sim/README.md. The test found 36 lines in five scripts, all fixed:
+
+- **Coop** keeps the rules (joins, revives, the party's view); the view is `Coop.VIEW_SIZE` inside the room Flow lays out (`room_laid_out(bounds)`, a new event), never the window or a camera. `view_fitted(view, party)` now carries the box round the party too, so the camera needs nothing else. The camera's easing moved to `gameplay/feel/party_camera.gd`, which Feel owns: it knows the event and its camera, nothing of Coop. Flow's room camera is a VIEW function (`_add_camera`) and takes over as the current camera when the room appears.
+- **The horde** takes the room from `room_laid_out` too (its own copy of the horde room's id and the registry lookup are gone); the room's size is `RoomBase.size_in` (moved from Flow: a helper of the data).
+- **The projectile manager** looks a body up by its row (`_target_row`): no instance id is carried past the DERIVED table; its drawing (`_process`, `update_draw`, the sparks) is in `VIEW`.
+- **The controller's own input path** is gone: the test fixture feeds its seats through a frames service of its own (`WizardFixture.frames`, `step_one`), and the frames service took the test mouse (`mouse_world_override`).
+- **Flow** reads the joined seats from the frames service (`Frames.joined_seats`); joining the keyboard when a run is asked for by nobody joined is the input layer's (`InputManager._on_run_requested`); the intro finds its skip buttons' input layer itself.
+- **The view stepped thrice** (`test_determinism.gd`): the fight and the storm agree with their drawing run three times between ticks.
+- **Reviewed for coupling before it was called done:** the first cut had the party camera preload Coop for its constants (Feel's first dependency on another gameplay area), the horde looking the room up itself beside Coop hearing it, and the inner-class walk written twice in the test helpers; each was fixed as above. 305 unit test runs pass; `tools/platform_hashes.py run`: Linux (native and GDScript), Windows and the web agree at every tick of the sandbox, horde and wave scenes.
+
 ### N10: snapshots
 
 - `core/sim/snapshot.gd` saves and loads the whole game through `StateWalk` (N1): no area writes its own save code. What a walker cannot do alone (making the actors' nodes again from their scene and id before their state is loaded, refilling a pool) is one `restore_nodes()` hook per area, as small as it can be; after loading, each area rebuilds its `DERIVED` members (`rebuild()`).

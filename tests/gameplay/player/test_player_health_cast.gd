@@ -140,7 +140,7 @@ func _test_damage_event_hurts_only_the_target() -> void:
 func _test_invulnerable_ignores_damage() -> void:
 	_setup(1)
 	Fixture.downed(_players[0]).protect(1.0)
-	_players[0].step(STEP)
+	_world.step_one(_players[0])
 	_check(_players[0].health.is_protected(), "protect makes the wizard invulnerable")
 	_hit(_players[0], 40)
 	_check(_players[0].health.health == _players[0].health.max_health, "no damage while invulnerable")
@@ -216,7 +216,7 @@ func _test_cast_spends_mana_and_sends_event() -> void:
 	_setup(2)
 	_arm(_players[1], 10.0, 0.0)
 	_world.hold(1, &"staff_1")
-	_players[1].step(STEP)
+	_world.step_one(_players[1])
 	_check(_fake.fired_players == [_players[1].id], "holding cast calls the runtime for this wizard's caster number")
 	_check(_fake.fired_slots == [0], "and for the active slot")
 	_check(_casts == [1] and _cast_ids == [&"bolt"], "spell_cast is sent with the player and the form id")

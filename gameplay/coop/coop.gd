@@ -1,5 +1,5 @@
 extends Node
-## Co-op (autoload `Coop`): joining and leaving mid-run and the shared camera. Up to four players; nobody ever waits for another player.
+## Co-op (autoload `Coop`): joining and leaving mid-run, the party's shared view and revives. Up to four players; nobody ever waits for another player.
 ##
 ## Joining and leaving: `core/input` turns a button press (or an unplugged
 ## gamepad, or a bot's virtual device) into `device_joined` / `device_left`. Coop
@@ -13,18 +13,16 @@ extends Node
 ## players, and the shooter too once a shot has left them (owner, 2026-11-06; `Spells._launch`),
 ## and `combat` turns the hits into damage as for any wizard.
 ##
-## The shared camera: after `room_entered` Coop takes the current `Camera2D` and,
-## every frame, moves it to the middle of all wizards (downed ones too, so a
-## body can still be found) and zooms out until everyone is inside the view with
-## CAMERA_MARGIN pixels to spare. Zoom stays between MIN_ZOOM and MAX_ZOOM, and
-## the camera eases towards its target (FOLLOW_SPEED), so a join or a dodge never
-## jerks the picture, and nobody leaves the view while it eases. A wizard whose seat drives
-## another actor (possess, actors G9) counts twice: its own standing body and the actor its seat
-## drives (`ActorController.driving` of its home controller), so both stay in view. The room's camera
-## limits keep the view inside the room, so the zoom-out stops where the view
-## would be bigger than the room (in a room not much bigger than the view, that
-## is no zoom-out at all) and the camera is pushed in from the edge instead.
-## Shake (`feel`) moves only the camera's `offset`, so the two do not clash.
+## The party's shared view, on the tick (`step_rules`): the part of the room that holds every
+## wizard (downed ones too, so a body can still be found) with CAMERA_MARGIN pixels to spare, zoomed
+## out no further than MIN_ZOOM and never past the room (`room_laid_out`: the view stops zooming out
+## where it would be bigger than the room, and is pushed in from the edge instead). A wizard whose
+## seat drives another actor (possess, actors G9) counts twice: its own standing body and the actor
+## its seat drives (`ActorController.driving` of its home controller), so both stay in view. It is
+## sent as `view_fitted` when it changes; the horde spawns just outside it. The view is VIEW_SIZE,
+## the game's own, never the window's, so it is the same on every machine (online-ready N9). The
+## camera that shows it is drawing only: Feel's party camera (gameplay/feel/party_camera.gd) eases
+## towards it on real time; nothing here reads a camera.
 ##
 ## Revive: a standing wizard within REVIVE_RANGE of a downed one holds the revive.
 ## After REVIVE_HOLD_TIME the downed wizard comes back (`Downed.revive(reviver)`,
@@ -36,8 +34,8 @@ extends Node
 ## nobody waits for another. `revive_progress(player, progress)` is sent when the
 ## progress changes, for the ring the downed wizard draws. Reasoning: DECISIONS.md.
 ##
-## Nothing here allocates per frame. Timing runs in step(delta), so tests drive it
-## with fixed deltas.
+## Nothing here allocates per tick. Timing runs in `step_rules(delta)`, so tests drive it with
+## fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
 const DownedScript := preload("res://gameplay/player/downed.gd")
@@ -45,15 +43,15 @@ const DownedScript := preload("res://gameplay/player/downed.gd")
 const PLAYER_SLOTS: int = 4
 ## The group every wizard actor is in (its scene puts it there).
 const WIZARDS_GROUP: StringName = &"wizards"
+## The game's view in pixels at zoom 1: the project's viewport (display/window/size), which the
+## window only scales (stretch mode "viewport"), so it is the same on every machine. A test checks
+## the two agree.
+const VIEW_SIZE: Vector2 = Vector2(640.0, 360.0)
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0
-## The camera never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more).
+## The view never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more).
 const MAX_ZOOM: float = 1.0
 const MIN_ZOOM: float = 0.5
-## How fast the camera eases to its target, per second (higher is snappier).
-const FOLLOW_SPEED: float = 6.0
-## A camera limit this wide or more counts as "no limit" (Godot's default is 10,000,000).
-const LIMIT_UNSET: float = 1000000.0
 
 ## Seconds a standing wizard must stay near a downed one to revive it.
 const REVIVE_HOLD_TIME: float = 2.0
@@ -66,15 +64,12 @@ const REVIVE_DRAIN_FACTOR: float = 2.0
 const REVIVE_PROTECTION: float = 1.5
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"camera", &"view_size"]
-## Not state: what only the drawing reads and writes (core/sim/README.md): the shared camera's
-## target, eased every drawn frame.
-const VIEW: Array[StringName] = [&"target_position", &"target_zoom"]
+const DERIVED: Array[StringName] = [&"events"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_wizards", &"_downs"]
 
 ## Why Coop needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
-const FRESH_BECAUSE: String = "the seats' joins are the session's; room_entered sets the run's view, wizards and revives"
+const FRESH_BECAUSE: String = "the seats' joins are the session's; room_laid_out and room_entered set the run's room, view, wizards and revives"
 ## The reason the pause menu stops the game (`Sim.stop`): offline, any seat's open menu stops it
 ## for everyone (one menu is open at a time).
 const MENU: StringName = &"menu"
@@ -82,18 +77,15 @@ const MENU: StringName = &"menu"
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
-## The size of the view in pixels. Only tests set this; otherwise the viewport's.
-var view_size: Vector2 = Vector2.ZERO
 
-## The part of the world the camera is fitted to show, worked out on the tick (`step_rules`) and
+## The room the view stays inside, in world pixels (`room_laid_out`); Rect2() for no bounds.
+var room: Rect2 = Rect2()
+
+## The party's view, the part of the world that holds every wizard, worked out on the tick (`step_rules`) and
 ## sent as `view_fitted` when it changes; Rect2() before the first fit of a room.
 var fitted_view: Rect2 = Rect2()
-
-## The camera being driven (null before the first `room_entered`).
-var camera: Camera2D = null
-## Where the camera is heading, and how far it zooms out (1 = no zoom).
-var target_position: Vector2 = Vector2.ZERO
-var target_zoom: float = MAX_ZOOM
+## The box round the party inside it (every wizard and the bodies they drive), sent with it.
+var fitted_party: Rect2 = Rect2()
 
 var _joined: Array[bool] = [false, false, false, false]
 var _joined_count: int = 0
@@ -115,6 +107,7 @@ func _ready() -> void:
 		return
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
+	events.room_laid_out.connect(_on_room_laid_out)
 	events.room_entered.connect(_on_room_entered)
 	# A command, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"pause_requested", _on_pause_requested)
@@ -131,24 +124,21 @@ func _on_pause_requested(_player: int, on: int) -> void:
 		game.go(MENU)
 
 
-## The camera (view). The rules are the tick's (`step_rules`, core/sim/tick.gd).
-func _process(delta: float) -> void:
-	step(delta)
-
-
-## Coop's rules, once a tick (core/sim/tick.gd): the view the camera is fitted to (`view_fitted`),
-## then the revives.
+## Coop's rules, once a tick (core/sim/tick.gd): the party's view (`view_fitted`), then the
+## revives.
 func step_rules(delta: float) -> void:
 	if not _all_valid():
 		refresh_wizards()
-	var fit: Vector3 = _fit()
-	if fit.z > 0.0:
-		var size: Vector2 = _view_size() / fit.z
+	var party: Rect2 = _party_box()
+	if party.size.x >= 0.0:
+		var fit: Vector3 = _fit(party)
+		var size: Vector2 = VIEW_SIZE / fit.z
 		var view := Rect2(Vector2(fit.x, fit.y) - size * 0.5, size)
-		if view != fitted_view:
+		if view != fitted_view or party != fitted_party:
 			fitted_view = view
+			fitted_party = party
 			if events != null:
-				events.view_fitted.emit(view)
+				events.view_fitted.emit(view, party)
 	step_revive(delta)
 
 
@@ -159,13 +149,6 @@ func joined_count() -> int:
 
 func is_joined(player: int) -> bool:
 	return player >= 0 and player < PLAYER_SLOTS and _joined[player]
-
-
-## Use `node` as the shared camera (normally found by itself after `room_entered`).
-## Tests use this; it also remembers the wizards that exist now.
-func set_camera(node: Camera2D) -> void:
-	camera = node
-	refresh_wizards()
 
 
 ## Read the wizards in the `wizards` group again. Done by itself after a join, a
@@ -192,21 +175,19 @@ static func _id_of(body: Node) -> int:
 	return id if id is int else -1
 
 
-## Work out where the camera should be and how far out, from the wizards now.
-## Does nothing with no wizards. Returns false in that case.
-func fit_camera() -> bool:
-	var fit: Vector3 = _fit()
-	if fit.z <= 0.0:
-		return false
-	target_zoom = fit.z
-	target_position = Vector2(fit.x, fit.y)
-	return true
+## Where a view holding `party` with CAMERA_MARGIN to spare would be, and its zoom: (centre x,
+## centre y, zoom).
+func _fit(party: Rect2) -> Vector3:
+	var view: Vector2 = VIEW_SIZE
+	var need: Vector2 = party.size + Vector2.ONE * (CAMERA_MARGIN * 2.0)
+	var floor_zoom: float = _min_zoom()
+	var zoom: float = clampf(minf(view.x / need.x, view.y / need.y), floor_zoom, maxf(MAX_ZOOM, floor_zoom))
+	var centre: Vector2 = _clamp_centre(party.get_center(), zoom)
+	return Vector3(centre.x, centre.y, zoom)
 
 
-## Where a camera holding every wizard (and the bodies they drive) would be and its zoom, from the
-## wizards now: (centre x, centre y, zoom), or a zoom of 0 with no wizards. Reads no camera but its
-## limits (the room's).
-func _fit() -> Vector3:
+## The box round every wizard and the bodies their seats drive now; a negative size with none.
+func _party_box() -> Rect2:
 	var low := Vector2.INF
 	var high := -Vector2.INF
 	var seen: int = 0
@@ -227,85 +208,33 @@ func _fit() -> Vector3:
 			low = low.min(driven.global_position)
 			high = high.max(driven.global_position)
 	if seen == 0:
-		return Vector3.ZERO
-	var view: Vector2 = _view_size()
-	var need: Vector2 = high - low + Vector2.ONE * (CAMERA_MARGIN * 2.0)
-	var floor_zoom: float = _min_zoom()
-	var zoom: float = clampf(minf(view.x / need.x, view.y / need.y), floor_zoom, maxf(MAX_ZOOM, floor_zoom))
-	var centre: Vector2 = _clamp_centre((low + high) * 0.5, zoom)
-	return Vector3(centre.x, centre.y, zoom)
+		return Rect2(Vector2.ZERO, -Vector2.ONE)
+	return Rect2(low, high - low)
 
 
-## The smallest zoom allowed: MIN_ZOOM, but never so far out that the view is
-## bigger than the camera's limits (the room), which would show empty space.
+## The smallest zoom allowed: MIN_ZOOM, but never so far out that the view is bigger than the
+## room, which would show empty space.
 func _min_zoom() -> float:
-	if camera == null or not is_instance_valid(camera):
+	if room.size.x <= 0.0 or room.size.y <= 0.0:
 		return MIN_ZOOM
-	var width: float = float(camera.limit_right - camera.limit_left)
-	var height: float = float(camera.limit_bottom - camera.limit_top)
-	if width <= 0.0 or height <= 0.0 or width >= LIMIT_UNSET or height >= LIMIT_UNSET:
-		return MIN_ZOOM
-	var view: Vector2 = _view_size()
-	return maxf(MIN_ZOOM, maxf(view.x / width, view.y / height))
+	return maxf(MIN_ZOOM, maxf(VIEW_SIZE.x / room.size.x, VIEW_SIZE.y / room.size.y))
 
 
-## Move a camera centre so a view at `zoom` stays inside the camera's limits, as
-## Godot does when drawing (so the position we keep is the one on screen).
+## Move a view's centre so the view at `zoom` stays inside the room (centred on an axis the room is
+## smaller than the view on).
 func _clamp_centre(centre: Vector2, zoom: float) -> Vector2:
-	if camera == null or not is_instance_valid(camera):
+	if room.size.x <= 0.0 or room.size.y <= 0.0:
 		return centre
-	var half: Vector2 = _view_size() * (0.5 / zoom)
-	var low := Vector2(camera.limit_left + half.x, camera.limit_top + half.y)
-	var high := Vector2(camera.limit_right - half.x, camera.limit_bottom - half.y)
-	var mid := Vector2((camera.limit_left + camera.limit_right) * 0.5, (camera.limit_top + camera.limit_bottom) * 0.5)
+	var half: Vector2 = VIEW_SIZE * (0.5 / zoom)
+	var low: Vector2 = room.position + half
+	var high: Vector2 = room.end - half
+	var mid: Vector2 = room.get_center()
 	var x: float = clampf(centre.x, low.x, high.x) if low.x <= high.x else mid.x
 	var y: float = clampf(centre.y, low.y, high.y) if low.y <= high.y else mid.y
 	return Vector2(x, y)
 
 
-## The part of the world the camera shows now (limits applied).
-func visible_rect() -> Rect2:
-	if camera == null or not is_instance_valid(camera):
-		return Rect2()
-	var size: Vector2 = _view_size() / camera.zoom.x
-	var centre: Vector2 = _clamp_centre(camera.position, camera.zoom.x)
-	return Rect2(centre - size * 0.5, size)
-
-
-## Ease the camera towards its target by `delta` seconds. Call `snap()` to jump.
-func step(delta: float) -> void:
-	if camera == null or not is_instance_valid(camera):
-		return
-	if not _all_valid():
-		refresh_wizards()
-	if not fit_camera():
-		return
-	var weight: float = 1.0 - DMath.exp(-FOLLOW_SPEED * maxf(delta, 0.0))
-	var at: Vector2 = camera.position.lerp(target_position, weight)
-	var zoom: float = lerpf(camera.zoom.x, target_zoom, weight)
-	# The target was fitted for where the camera is heading; fit against where it
-	# is, so nobody is outside the view while it eases.
-	zoom = _zoom_to_hold_everyone(at, zoom)
-	camera.zoom = Vector2(zoom, zoom)
-	camera.position = _clamp_centre(at, zoom)
-
-
-## `zoom`, lowered if needed so every wizard is inside a view centred on `at`.
-func _zoom_to_hold_everyone(at: Vector2, zoom: float) -> float:
-	var half: Vector2 = _view_size() * 0.5
-	var fit: float = zoom
-	for wizard: Node2D in _wizards:
-		if not is_instance_valid(wizard) or not wizard.is_inside_tree():
-			continue
-		var gap: Vector2 = (wizard.global_position - at).abs()
-		if gap.x > 0.0:
-			fit = minf(fit, half.x / gap.x * 0.999)
-		if gap.y > 0.0:
-			fit = minf(fit, half.y / gap.y * 0.999)
-	return maxf(fit, _min_zoom())
-
-
-## Advance every revive by `delta` seconds (what `_process` calls). A downed wizard
+## Advance every revive by `delta` seconds (`step_rules` calls it). A downed wizard
 ## fills while any standing wizard is within REVIVE_RANGE and drains otherwise.
 func step_revive(delta: float) -> void:
 	if delta <= 0.0:
@@ -369,23 +298,6 @@ func revive_progress_of(player: int) -> float:
 	return _revive[player] if player >= 0 and player < PLAYER_SLOTS else 0.0
 
 
-## Put the camera on its target at once.
-func snap() -> void:
-	if camera == null or not is_instance_valid(camera) or not fit_camera():
-		return
-	camera.zoom = Vector2(target_zoom, target_zoom)
-	camera.position = target_position
-
-
-func _view_size() -> Vector2:
-	if view_size != Vector2.ZERO:
-		return view_size
-	var viewport: Viewport = get_viewport()
-	if viewport == null:
-		return Vector2(640.0, 360.0)
-	return viewport.get_visible_rect().size
-
-
 func _all_valid() -> bool:
 	for wizard: Node2D in _wizards:
 		if not is_instance_valid(wizard):
@@ -421,29 +333,14 @@ func _clear_revives() -> void:
 		_set_revive(player, 0.0)
 
 
-## The camera of the world `flow` built; the current scene's and then the
-## viewport's only if there is none.
-func _find_camera() -> Camera2D:
-	var flow: Node = get_node_or_null("/root/Flow")
-	var world: Variant = flow.get("world") if flow != null else null
-	var tree: SceneTree = get_tree()
-	var roots: Array[Node] = []
-	if world is Node and is_instance_valid(world as Node):
-		roots.append(world as Node)
-	if tree != null and tree.current_scene != null:
-		roots.append(tree.current_scene)
-	for root: Node in roots:
-		var found: Array[Node] = root.find_children("*", "Camera2D", true, false)
-		if not found.is_empty():
-			return found[0] as Camera2D
-	var viewport: Viewport = get_viewport()
-	return viewport.get_camera_2d() if viewport != null else null
+## A room is laid out (`room_laid_out`, just before `room_entered`): the view stays inside it.
+func _on_room_laid_out(bounds: Rect2) -> void:
+	room = bounds
 
 
-## A new world is up: find its camera and put it on the players.
+## A new world is up: a new view is fitted at the next tick, and its wizards and revives are new.
 func _on_room_entered(_room_id: StringName) -> void:
 	fitted_view = Rect2()
-	camera = _find_camera()
+	fitted_party = Rect2()
 	refresh_wizards()
 	_clear_revives()
-	snap()

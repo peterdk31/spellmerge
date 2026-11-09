@@ -91,7 +91,7 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const InputManagerScript := preload("res://core/input/input_manager.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
@@ -185,9 +185,12 @@ const INTRO_SEEN: StringName = &"intro_seen"
 enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"input", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
+## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
+## room's camera.
+const VIEW: Array[StringName] = [&"_add_camera"]
 
 ## Why Flow needs no renewing at a run's start (core/sim/sim_area.gd, `fresh_because`).
 const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's members itself"
@@ -196,7 +199,7 @@ const FRESH_BECAUSE: String = "it starts the run: start_run sets the run's membe
 ## autoloads are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
-var input: InputManagerScript = null
+var frames: FramesScript = null
 var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
 var spells: SpellsScript = null
@@ -272,8 +275,8 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
-	if input == null:
-		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
+	if frames == null:
+		frames = get_node_or_null("/root/Frames") as FramesScript
 	if combat == null:
 		combat = get_node_or_null("/root/Combat") as CombatScript
 	if projectiles == null:
@@ -395,7 +398,6 @@ func start_run(requester: int) -> bool:
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
 		return false
-	_ensure_joined(requester)
 	var players: Array[int] = _joined_players()
 	if players.is_empty():
 		push_warning("Flow: no player has joined a device, so no run starts.")
@@ -415,7 +417,7 @@ func start_run(requester: int) -> bool:
 	else:
 		tick.begin_run()
 	var layout: Node = room.scene.instantiate()
-	var size: Vector2 = room_size(room, layout)
+	var size: Vector2 = room.size_in(layout)
 	if projectiles != null:
 		var bounds := Rect2(Vector2.ZERO, size).grow(PROJECTILE_MARGIN)
 		projectiles.set_bounds(bounds)
@@ -443,6 +445,7 @@ func start_run(requester: int) -> bool:
 	if events != null:
 		if horde_before and not _horde_on:
 			events.horde_ended.emit()
+		events.room_laid_out.emit(Rect2(Vector2.ZERO, size))
 		events.room_entered.emit(room.id)
 		events.sandbox_changed.emit(mode == MODE_SANDBOX)
 		match mode:
@@ -510,14 +513,13 @@ func wants_intro() -> bool:
 	return intro_enabled and save != null and not save.has_flag(INTRO_SEEN)
 
 
-## Show the intro for the joined players (`requester` joins first, as for a run); the run starts
+## Show the intro for the joined players (as a run reads them); the run starts
 ## when it ends or is skipped.
 func play_intro(requester: int) -> void:
-	_ensure_joined(requester)
 	_intro_requester = requester
 	intro = IntroScript.new()
 	intro.name = INTRO_NAME
-	intro.setup(_joined_players(), input)
+	intro.setup(_joined_players())
 	intro.finished.connect(_on_intro_finished)
 	state = State.INTRO
 	_show_world(intro)
@@ -765,24 +767,11 @@ func _all_down() -> bool:
 	return true
 
 
-## The Play button may be pressed with the mouse by nobody who has joined: the
-## keyboard then takes slot 0, provisionally (a gamepad that joins before the keyboard is used
-## takes P1 over; core/input). Anyone already joined (a gamepad, in any slot) plays as they are
-## and the keyboard stays out.
-func _ensure_joined(requester: int) -> void:
-	if input == null or requester != 0 or input.joined_count() > 0:
-		return
-	input.join(InputManagerScript.KEYBOARD, true)
-
-
+## The seats joined now (the frames service's: the devices', or a replay's), who play a run that
+## starts. Nobody has joined when a run is asked for with the mouse: the input layer joins the
+## keyboard first (core/input, `_on_run_requested`).
 func _joined_players() -> Array[int]:
-	var players: Array[int] = []
-	if input == null:
-		return players
-	for index in PLAYER_SLOTS:
-		if input.is_joined(index):
-			players.append(index)
-	return players
+	return frames.joined_seats() if frames != null else [] as Array[int]
 
 
 ## Tell the projectile manager where the walls are: every static body on the wall
@@ -797,31 +786,17 @@ func _set_walls(new_world: Node2D) -> void:
 			projectiles.add_wall_body(body)
 
 
-## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and
-## the layout's `Floor` sprite (the whole room, under the walls) when `layout` is given.
-static func room_size(room: RoomBase, layout: Node = null) -> Vector2:
-	var size := Vector2(640.0, 360.0)
-	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null
-	if floor_sprite != null and floor_sprite.texture != null:
-		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
-		size = size.max(floor_sprite.position + extent)
-	for point: Vector2 in room.player_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in room.enemy_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in room.doors:
-		size = size.max(point + Vector2(32.0, 32.0))
-	return size
-
-
 func _add_camera(parent: Node2D, size: Vector2) -> void:
 	var camera := Camera2D.new()
 	camera.position = size * 0.5
-	# `coop` moves and zooms this camera to fit everyone; the limits keep it inside the room.
+	# Feel's party camera moves and zooms it to the party's view (Coop's `view_fitted`); the
+	# limits keep it inside the room, as Coop keeps the view (`room_laid_out`).
 	camera.limit_left = 0
 	camera.limit_top = 0
 	camera.limit_right = ceili(size.x)
 	camera.limit_bottom = ceili(size.y)
+	# The picture shows this room from the moment it is in the tree, whatever camera was current.
+	camera.ready.connect(camera.make_current, CONNECT_ONE_SHOT)
 	parent.add_child(camera)
 
 

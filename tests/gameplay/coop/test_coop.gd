@@ -1,8 +1,8 @@
 extends SceneTree
 ## Tests for gameplay/coop, on the real autoloads: every join order of 1-4 players
 ## (the first is in when Play is pressed, the rest join mid-run), every leave
-## order, no duplicate events, the camera keeps everyone in view (zooms out as the
-## players spread, never past its limits, eases instead of jumping), and a
+## order, no duplicate events, the party's view keeps everyone in it and Feel's party camera
+## shows it (zooms out as the players spread, never past the room, eases instead of jumping), and a
 ## wizard's bolt hits a teammate (friendly fire is always on), not the shooter it leaves.
 ##
 ## godot --headless --path . --script res://tests/gameplay/coop/test_coop.gd
@@ -11,6 +11,7 @@ const CoopScript := preload("res://gameplay/coop/coop.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 
 const VIEW: Vector2 = Vector2(640.0, 360.0)
 const BOLT_TAG: int = 1
@@ -23,6 +24,7 @@ var _flow: FlowScript
 var _input: InputManagerScript
 var _combat: Node
 var _projectiles: ProjectileManagerScript
+var _party: PartyCameraScript
 var _joined_events: Array = []
 var _left_events: Array = []
 
@@ -40,10 +42,16 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the Events, PlayerInput, Projectiles, Combat, Flow and Coop autoloads must exist")
 		quit(1)
 		return
+	var feel: Node = root.get_node_or_null("Feel")
+	_party = feel.get("party_camera") as PartyCameraScript if feel != null else null
+	if _party == null:
+		printerr("TEST FAILED: the Feel autoload must have its party camera")
+		quit(1)
+		return
 	_events.connect("player_joined", func(player: int) -> void: _joined_events.append(player))
 	_events.connect("player_left", func(player: int) -> void: _left_events.append(player))
-	_coop.view_size = VIEW
 	_test_defaults()
+	_test_the_view_is_the_projects()
 	_test_every_join_order()
 	_test_every_leave_order()
 	_test_join_before_play()
@@ -140,19 +148,34 @@ func _extend(prefix: Array, out: Array[Array]) -> void:
 
 
 ## Start a run with `first` already in; the keyboard stays out.
+## `first` joins and asks for a run; its first tick's view puts the party camera on the new room's.
 func _start_with(first: int) -> void:
 	_input.add_virtual_device(first)
 	_events.emit_signal("play_requested", first)
+	_fit_and_snap()
 
 
 ## True if the wizard is inside what the camera really shows: its position and
 ## zoom with the camera limits applied (`visible_rect`).
 func _in_view(wizard: Node2D, _camera: Camera2D) -> bool:
-	return _coop.visible_rect().grow(0.01).has_point(wizard.global_position)
+	return _party.visible_rect().grow(0.01).has_point(wizard.global_position)
 
 
-## Take the room's limits off the camera, to test the zoom alone.
+## The party's view on the tick (Coop), then the camera put on it at once.
+func _fit_and_snap() -> void:
+	_coop.step_rules(0.0)
+	_party.snap()
+
+
+## One drawn frame of `delta` seconds after a tick: the view fitted again, the camera eased.
+func _frame(delta: float) -> void:
+	_coop.step_rules(0.0)
+	_party.step(delta)
+
+
+## Take the room's bounds off the view and the camera, to test the zoom alone.
 func _open_limits(camera: Camera2D) -> void:
+	_coop.room = Rect2()
 	camera.limit_left = -10000000
 	camera.limit_top = -10000000
 	camera.limit_right = 10000000
@@ -160,7 +183,7 @@ func _open_limits(camera: Camera2D) -> void:
 
 
 func _everyone_in_view() -> bool:
-	var camera: Camera2D = _coop.camera
+	var camera: Camera2D = _party.camera
 	if camera == null:
 		return false
 	for index in InputManagerScript.MAX_PLAYERS:
@@ -172,6 +195,14 @@ func _everyone_in_view() -> bool:
 
 func _test_defaults() -> void:
 	_check(_coop.joined_count() == 0, "nobody is joined at the start")
+
+
+## The party's view is the game's own size, the project's viewport, never the window's (online-ready
+## N9): the same on every machine.
+func _test_the_view_is_the_projects() -> void:
+	var size := Vector2(ProjectSettings.get_setting("display/window/size/viewport_width"), ProjectSettings.get_setting("display/window/size/viewport_height"))
+	_check(CoopScript.VIEW_SIZE == size, "Coop.VIEW_SIZE is the project's viewport (%s vs %s)" % [CoopScript.VIEW_SIZE, size])
+	_check(String(ProjectSettings.get_setting("display/window/stretch/mode")) == "viewport", "the window only scales the view (stretch mode viewport)")
 
 
 func _test_every_join_order() -> void:
@@ -197,7 +228,7 @@ func _test_every_join_order() -> void:
 			_check(_coop.joined_count() == position + 1, label + ": %d players joined" % (position + 1))
 			_check(_wizard_count() == position + 1, label + ": %d wizards" % (position + 1))
 			_check(_flow.state == FlowScript.State.RUNNING and not _flow.is_restarting(), label + ": the run went on while someone joined")
-			_coop.snap()
+			_fit_and_snap()
 			_check(_everyone_in_view(), label + ": everyone is in view after slot %d joined" % slot)
 		for slot: int in sequence:
 			_check(_wizard(slot) != null and _seat(_wizard(slot)) == slot and _wizard(slot).ramp == slot, label + ": wizard %d has its own seat and colour" % slot)
@@ -223,7 +254,7 @@ func _test_every_leave_order() -> void:
 			_check(_coop.joined_count() == 4 - left.size(), label + ": %d players remain" % (4 - left.size()))
 			for other in InputManagerScript.MAX_PLAYERS:
 				_check(left.has(other) or _wizard(other) != null, label + ": slot %d kept its wizard" % other)
-			_coop.step(0.1)
+			_frame(0.1)
 			_check(_everyone_in_view() or _wizard_count() == 0, label + ": the rest are in view")
 		# The order may name only some slots: the rest are still playing. When everyone is
 		# gone, the run waits quietly (nobody is down, so nothing restarts).
@@ -311,14 +342,14 @@ func _test_last_standing_leaves_restarts_the_room() -> void:
 func _test_camera_zooms_out_to_fit() -> void:
 	_stop()
 	_start_with(0)
-	_coop.snap()
-	var camera: Camera2D = _coop.camera
+	_fit_and_snap()
+	var camera: Camera2D = _party.camera
 	_check(camera != null, "the camera was found after room_entered")
 	if camera == null:
 		return
 	_open_limits(camera)
 	# The limits changed, so the target moved: snap again to see the zoom alone.
-	_coop.snap()
+	_fit_and_snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "one player: no zoom out, got %f" % camera.zoom.x)
 	_check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player: %s vs %s" % [camera.position, _wizard(0).global_position])
 	for slot in range(1, 4):
@@ -328,7 +359,7 @@ func _test_camera_zooms_out_to_fit() -> void:
 	for slot in 4:
 		_wizard(slot).global_position = corners[slot]
 	_coop.refresh_wizards()
-	_coop.snap()
+	_fit_and_snap()
 	_check(camera.zoom.x < CoopScript.MAX_ZOOM, "four spread players: the camera zoomed out, got %f" % camera.zoom.x)
 	_check(camera.zoom.x >= CoopScript.MIN_ZOOM, "the zoom stays above the minimum")
 	_check(_everyone_in_view(), "four spread players: everyone is in view")
@@ -338,18 +369,18 @@ func _test_camera_zooms_out_to_fit() -> void:
 	# Pushed apart beyond what fits: the zoom stops at the minimum.
 	_wizard(0).global_position = Vector2(-1000.0, 0.0)
 	_wizard(1).global_position = Vector2(2000.0, 0.0)
-	_coop.snap()
+	_fit_and_snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MIN_ZOOM), "far apart: the zoom stops at the minimum")
 	# Back together: it zooms in again.
 	for slot in 4:
 		_wizard(slot).global_position = Vector2(300.0 + 4.0 * slot, 200.0)
-	_coop.snap()
+	_fit_and_snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "together again: the zoom is back to 1, got %f" % camera.zoom.x)
 	# The downed are still in view.
 	_down(3)
 	_wizard(3).global_position = Vector2(600.0, 340.0)
 	_wizard(0).global_position = Vector2(40.0, 40.0)
-	_coop.snap()
+	_fit_and_snap()
 	_check(_in_view(_wizard(3), camera) and _in_view(_wizard(0), camera), "a downed wizard stays in the shared view")
 	_stop()
 
@@ -358,28 +389,28 @@ func _test_camera_eases() -> void:
 	_stop()
 	_start_with(0)
 	_input.add_virtual_device(1)
-	var camera: Camera2D = _coop.camera
+	var camera: Camera2D = _party.camera
 	if camera == null:
 		_check(false, "the camera exists for the easing test")
 		return
 	_open_limits(camera)
 	_wizard(0).global_position = Vector2(100.0, 100.0)
 	_wizard(1).global_position = Vector2(500.0, 300.0)
-	_coop.snap()
+	_fit_and_snap()
 	_wizard(1).global_position = Vector2(200.0, 100.0)
 	var before: Vector2 = camera.position
-	_coop.step(0.016)
+	_frame(0.016)
 	var moved: float = camera.position.distance_to(before)
-	var total: float = before.distance_to(_coop.target_position)
+	var total: float = before.distance_to(_party.target_position)
 	_check(moved > 0.0 and moved < total, "one frame moves the camera part of the way (%f of %f)" % [moved, total])
 	for i in 200:
-		_coop.step(0.1)
-	_check(camera.position.distance_to(_coop.target_position) < 0.01, "the camera arrives at its target")
-	_check(absf(camera.zoom.x - _coop.target_zoom) < 0.001, "the zoom arrives at its target")
+		_frame(0.1)
+	_check(camera.position.distance_to(_party.target_position) < 0.01, "the camera arrives at its target")
+	_check(absf(camera.zoom.x - _party.target_zoom) < 0.001, "the zoom arrives at its target")
 	# A zero or negative step moves nothing.
 	var at: Vector2 = camera.position
-	_coop.step(0.0)
-	_coop.step(-1.0)
+	_frame(0.0)
+	_frame(-1.0)
 	_check(camera.position == at, "a zero or negative step does not move the camera")
 	_stop()
 
@@ -391,7 +422,7 @@ func _test_camera_respects_room_limits() -> void:
 	_start_with(0)
 	for slot in range(1, 4):
 		_input.add_virtual_device(slot)
-	var camera: Camera2D = _coop.camera
+	var camera: Camera2D = _party.camera
 	if camera == null:
 		_check(false, "the camera exists for the limits test")
 		return
@@ -400,16 +431,16 @@ func _test_camera_respects_room_limits() -> void:
 	for slot in 4:
 		_wizard(slot).global_position = corners[slot]
 	_coop.refresh_wizards()
-	_coop.snap()
-	_check(room.grow(0.01).encloses(_coop.visible_rect()), "snapped: the view stays inside the room, got %s" % _coop.visible_rect())
+	_fit_and_snap()
+	_check(room.grow(0.01).encloses(_party.visible_rect()), "snapped: the view stays inside the room, got %s" % _party.visible_rect())
 	for slot in 4:
 		_check(_in_view(_wizard(slot), camera), "snapped: the wizard in corner %d is in the view" % slot)
 	# Start from the middle and ease out to the corners: nobody is ever outside.
 	camera.position = room.get_center()
 	camera.zoom = Vector2.ONE
 	for i in 60:
-		_coop.step(0.016)
-		_check(room.grow(0.01).encloses(_coop.visible_rect()), "easing %d: the view stays inside the room" % i)
+		_frame(0.016)
+		_check(room.grow(0.01).encloses(_party.visible_rect()), "easing %d: the view stays inside the room" % i)
 		_check(_everyone_in_view(), "easing %d: everyone is in view" % i)
 	_stop()
 
@@ -420,13 +451,13 @@ func _test_the_fitted_view_follows_the_wizards_not_the_camera() -> void:
 	_stop()
 	_start_with(0)
 	_input.add_virtual_device(1)
-	var camera: Camera2D = _coop.camera
+	var camera: Camera2D = _party.camera
 	if camera == null:
 		_check(false, "the camera exists for the fitted view test")
 		return
 	_open_limits(camera)
 	var sent: Array[Rect2] = []
-	var hear := func(view: Rect2) -> void: sent.append(view)
+	var hear := func(view: Rect2, _party: Rect2) -> void: sent.append(view)
 	_events.connect("view_fitted", hear)
 	_wizard(0).global_position = Vector2(100.0, 100.0)
 	_wizard(1).global_position = Vector2(300.0, 160.0)
@@ -448,17 +479,17 @@ func _test_nobody_leaves_the_view_while_easing() -> void:
 	_stop()
 	_start_with(0)
 	_input.add_virtual_device(1)
-	var camera: Camera2D = _coop.camera
+	var camera: Camera2D = _party.camera
 	if camera == null:
 		_check(false, "the camera exists for the ease-out test")
 		return
 	_open_limits(camera)
 	_wizard(0).global_position = Vector2(60.0, 200.0)
 	_wizard(1).global_position = Vector2(70.0, 200.0)
-	_coop.snap()
+	_fit_and_snap()
 	_wizard(1).global_position = Vector2(560.0, 200.0)
 	for i in 120:
-		_coop.step(0.016)
+		_frame(0.016)
 		_check(_everyone_in_view(), "ease-out frame %d: everyone is in view" % i)
 	_stop()
 
@@ -620,16 +651,18 @@ func _test_revive_edges() -> void:
 func _test_camera_survives_a_restart() -> void:
 	_stop()
 	_start_with(0)
-	var old_camera: Camera2D = _coop.camera
+	_fit_and_snap()
+	var old_camera: Camera2D = _party.camera
 	_down(0)
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.state == FlowScript.State.RUNNING, "the room restarted")
-	_check(_coop.camera != null and _coop.camera != old_camera and _coop.camera.is_inside_tree(), "Coop picked up the new world's camera")
+	_fit_and_snap()
+	_check(_party.camera != null and _party.camera != old_camera and _party.camera.is_inside_tree(), "the party camera picked up the new world's camera")
 	_check(_everyone_in_view(), "the player is in view after the restart")
 	# A step with the old camera gone must not fail.
-	_coop.step(0.1)
+	_frame(0.1)
 	_stop()
-	_coop.step(0.1)
+	_frame(0.1)
 	_check(true, "stepping with no wizards is safe")
 
 

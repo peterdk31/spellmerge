@@ -19,6 +19,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 const FakeSpells := preload("res://tests/gameplay/player/fixtures/fake_spells.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 
@@ -34,6 +35,9 @@ var registry: RegistryScript
 var spells: SpellsScript
 var combat: CombatScript
 var table: ActorsScript
+## The seats' frames service, built from `input` at each step's start (`run`), as the game's Tick
+## does: the wizards' only input (online-ready N9). `frames.mouse_world_override` is the mouse.
+var frames: FramesScript
 ## The stand-in runtime when made with `fake` (else null).
 var fake: FakeSpells = null
 var wizards: Array[Actor] = []
@@ -46,6 +50,10 @@ func _init(root: Node, use_fake: bool = false) -> void:
 	bus = EventsScript.new()
 	input = InputManagerScript.new()
 	input.events = bus
+	frames = FramesScript.new()
+	frames.events = bus
+	frames.input = input
+	frames.auto_tick = false
 	projectiles = ProjectilesScript.new()
 	projectiles.events = bus
 	projectiles.set_bounds(Rect2(-400.0, -400.0, 1040.0, 800.0))
@@ -79,7 +87,7 @@ func wizard(seat: int, at: Vector2 = Vector2.ZERO, cards: Array = NO_CARDS, staf
 	body.name = "Wizard%d" % seat
 	PlayerController.seat_wizard(body, seat, staff, cards.duplicate(true), staffs)
 	var seat_controller: PlayerController = PlayerController.of(body)
-	seat_controller.input = input
+	seat_controller.frames = frames
 	seat_controller.registry = registry
 	_wire(body)
 	body.position = at
@@ -136,6 +144,7 @@ func release(seat: int, action: StringName) -> void:
 ## systems.
 func run(count: int, move: bool = true) -> void:
 	for i in count:
+		frames.tick(STEP)
 		if fake != null:
 			fake.step(STEP)
 		for body in wizards:
@@ -149,6 +158,12 @@ func run(count: int, move: bool = true) -> void:
 		combat.step(STEP)
 
 
+## One step of `body` alone, its seat's frame built first (as `run` builds every seat's).
+func step_one(body: Actor, delta: float = STEP) -> void:
+	frames.tick(delta)
+	body.step(delta)
+
+
 ## A hit of `amount` on `body` through Combat, which takes it from its Health (actors G5).
 func hurt(body: Actor, amount: int, by: int = 0) -> void:
 	combat.hit(by, body, amount)
@@ -159,6 +174,6 @@ func free_all() -> void:
 		if is_instance_valid(body):
 			body.free()
 	wizards.clear()
-	for node: Node in [combat, spells, registry, projectiles, input, table, bus]:
+	for node: Node in [combat, spells, registry, projectiles, frames, input, table, bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

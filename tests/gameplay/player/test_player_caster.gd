@@ -138,7 +138,7 @@ func test_recoils_of_different_times_move_the_sum_of_their_distances() -> void:
 
 func test_recoil_works_without_input() -> void:
 	var player: Actor = _wizard(0)
-	Fixture.controller(player).input = null
+	Fixture.controller(player).frames = null
 	_ask(player, &"recoil", Vector2(-30.0, 0.0), 0.125)
 	_run(4)
 	check(player.global_position.distance_to(START + Vector2(-30.0, 0.0)) < 0.01, "pushed without an input manager, got %s" % player.global_position)

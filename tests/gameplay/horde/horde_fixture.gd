@@ -164,7 +164,7 @@ func add_wizard(parent: Node2D, seat: int, at: Vector2) -> Node2D:
 ## The run starts, and the party's view is the camera's (as Coop sends it on the tick).
 func start() -> void:
 	bus.horde_started.emit(world)
-	bus.view_fitted.emit(Rect2(camera.position - VIEW * 0.5, VIEW))
+	bus.view_fitted.emit(Rect2(camera.position - VIEW * 0.5, VIEW), Rect2(camera.position, Vector2.ZERO))
 
 
 ## `seconds` of steps of 1/60 s.

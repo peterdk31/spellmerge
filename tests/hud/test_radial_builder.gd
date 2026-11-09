@@ -61,6 +61,7 @@ func before_each() -> void:
 	_spells = own(_world.spells) as SpellsScript
 	own(_world.combat)
 	own(_world.table)
+	own(_world.frames)
 	_players.clear()
 	_rumbles.clear()
 	_whole.clear()
@@ -100,7 +101,7 @@ func _frame() -> void:
 	for player in 4:
 		_radial(player).step(STEP)
 	for player in _players:
-		player.step(STEP)
+		_world.step_one(player)
 
 
 func _radial(player: int) -> RadialScript:

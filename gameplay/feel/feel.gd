@@ -100,6 +100,7 @@ const CueContextScript := preload("res://gameplay/feel/cue_context.gd")
 const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
+const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
@@ -392,6 +393,8 @@ var _swing_trails: SwingTrailsScript = null
 var _portal_rings: PortalRingsScript = null
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
+## The party's shared camera, eased towards Coop's view (`view_fitted`) as it is drawn.
+var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
@@ -683,6 +686,7 @@ func _ready() -> void:
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.body_replaced.connect(_on_body_replaced)
 	events.room_entered.connect(_on_room_entered)
+	events.view_fitted.connect(_on_view_fitted)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -721,6 +725,8 @@ func step(real_delta: float) -> void:
 		_kick = _kick.move_toward(Vector2.ZERO, preset.cast_kick_decay * real_delta)
 		shake_offset += _kick
 		_apply_camera()
+	party_camera.follow(_live_camera())
+	party_camera.step(real_delta)
 	_step_reactions(real_delta)
 	_step_forms(real_delta)
 	_step_flashes(real_delta)
@@ -863,12 +869,27 @@ func _grow_reactions(size: int) -> void:
 ## A run starts (`room_entered`): no reaction was heard and no hit was juiced, so the first ones
 ## shake and sound (view only since N4: the holds are the game's, `HitStop`).
 func _on_room_entered(_room_id: StringName) -> void:
+	party_camera.room_entered()
 	_reaction_heard.clear()
 	_juiced_frame.fill(0)
 	_juiced_step.fill(0)
 	_juiced_body.fill(0)
 	_juiced_by.fill(0)
 	_juiced_kind.fill(&"")
+
+
+## The party's view (`view_fitted`, Coop's, on the tick): the party camera heads for it, on the
+## world's camera now (a new room's, at its first view).
+func _on_view_fitted(view: Rect2, party: Rect2) -> void:
+	_camera_step = -1
+	_refresh_camera()
+	party_camera.follow(_live_camera())
+	party_camera.fitted(view, party)
+
+
+## The camera followed now, or null when it is gone (a freed world's).
+func _live_camera() -> Camera2D:
+	return _camera if _camera != null and is_instance_valid(_camera) else null
 
 
 ## The body `old` was replaced by `new` for the same actor (`body_replaced`, the swarm's

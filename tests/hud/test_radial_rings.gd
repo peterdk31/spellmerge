@@ -51,6 +51,7 @@ func before_each() -> void:
 	_spells = own(_world.spells) as SpellsScript
 	own(_world.combat)
 	own(_world.table)
+	own(_world.frames)
 	_players.clear()
 	_rumbles.clear()
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
@@ -83,7 +84,7 @@ func _frame() -> void:
 	_focus.poll()
 	_hud.get_radial(0).step(STEP)
 	for player in _players:
-		player.step(STEP)
+		_world.step_one(player)
 
 
 func _frames(count: int) -> void:

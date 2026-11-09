@@ -10,42 +10,33 @@ extends "res://tests/support/suite.gd"
 ##   node of the engine or of a script outside the simulation (a service, a sprite), a view-only
 ##   node, a Callable, a Signal or an RID.
 ## - What the walker cannot see, from the source: a static member belongs to no object, so it is
-##   listed in DERIVED or VIEW (a cache, a test switch) and never holds state; and simulation code
-##   reads no clock (`Time`, `OS.get_ticks_*`) and rolls no global dice (`randomize()`, `randf()`,
-##   `randi()`, `seed()`) and keeps no generator of its own: chance comes from `sim`
-##   (core/sim/sim.gd, N3c), and a seed nobody chose from `SimSeed.fresh()`. View-only scripts
-##   (`VIEW_ONLY`) and VIEW members may do all three.
-## - Simulation code calls no engine trig (`sin`, `atan2`, `pow`, `Vector2.rotated`, ...: the C
-##   library's, which differs between platforms in the last digit) but `DMath`'s (core/sim/dmath.gd,
-##   online-ready N7). View-only scripts may, and so may a line that only draws, marked `# view:`
-##   with why.
+##   listed in DERIVED or VIEW (a cache, a test switch) and never holds state; and no state member
+##   keeps a generator: chance comes from `sim` (core/sim/sim.gd, N3c). What simulation code may
+##   not call (a clock, the dice, the engine's maths, input, the camera) is
+##   tests/core/test_sim_rules.gd's (N9).
+## - A name in VIEW is a member, or a function that only draws (N9).
 ## - The simulation folders in core/sim/README.md's table are StateWalk.FOLDERS.
 ##
 ## Each failure names the file, the member and the fix ("add it to DERIVED, it is set up again, not
 ## saved").
 
-## Code a simulation script may not hold outside a comment (see the class doc), and why.
-const FORBIDDEN: Dictionary = {
-	"(^|[^\\w])randomize\\(": "seeds a generator by the clock; take `SimSeed.fresh()` (core/sim)",
-	"(^|[^.\\w])(randf|randi|randf_range|randi_range|randfn|seed)\\(": "rolls the engine's global dice; take chance from `sim` (core/sim/sim.gd): `sim.chance(purpose, key, counter)`",
-	"(^|[^\\w])Time\\.": "reads the clock; the simulation runs on its own time (`delta`, `sim_time`)",
-	"(^|[^\\w])OS\\.get_(ticks|unix)": "reads the clock; the simulation runs on its own time (`delta`, `sim_time`)",
-}
-
+const SimSource := preload("res://tests/support/sim_source.gd")
 
 func test_every_listed_name_is_a_member() -> void:
-	for entry in _simulation_scripts():
+	for entry in SimSource.scripts():
 		var script: Script = entry["script"]
-		var members: PackedStringArray = StateWalk.declared(script) + _statics_of(script)
+		var members: PackedStringArray = StateWalk.declared(script) + SimSource.statics_of(script)
+		var view_functions: PackedStringArray = SimSource.view_functions(script)
 		for list: String in StateWalk.LISTS:
 			for name in StateWalk.listed(script, list):
-				check(members.has(name), "%s: %s lists %s, which is no member (renamed?); take it out" % [entry["name"], list, name])
+				var known: bool = members.has(name) or (list == "VIEW" and view_functions.has(name))
+				check(known, "%s: %s lists %s, which is no member%s (renamed?); take it out" % [entry["name"], list, name, " or function" if list == "VIEW" else ""])
 
 
 ## A setting a new run keeps (RUN_KEEPS, core/sim/sim_fresh.gd) is a state member: one in DERIVED or
 ## VIEW is never reset anyway, so listing it there too says the wrong thing.
 func test_every_run_keep_is_state() -> void:
-	for entry in _simulation_scripts():
+	for entry in SimSource.scripts():
 		var script: Script = entry["script"]
 		var not_state: PackedStringArray = StateWalk.listed(script, "DERIVED") + StateWalk.listed(script, "VIEW")
 		for name in StateWalk.listed(script, "RUN_KEEPS"):
@@ -56,7 +47,7 @@ func test_no_state_member_is_typed_as_something_it_cannot_save() -> void:
 	var classes: Dictionary[String, String] = {}
 	for entry: Dictionary in ProjectSettings.get_global_class_list():
 		classes[String(entry["class"])] = String(entry["path"])
-	for entry in _simulation_scripts():
+	for entry in SimSource.scripts():
 		var script: Script = entry["script"]
 		if StateWalk.is_view_only(script):
 			continue
@@ -71,17 +62,17 @@ func test_no_state_member_is_typed_as_something_it_cannot_save() -> void:
 
 
 func test_no_static_member_holds_state() -> void:
-	for entry in _simulation_scripts():
+	for entry in SimSource.scripts():
 		var script: Script = entry["script"]
 		if StateWalk.is_view_only(script):
 			continue
 		var listed: PackedStringArray = StateWalk.listed(script, "DERIVED") + StateWalk.listed(script, "VIEW")
-		for name in _statics_of(script):
+		for name in SimSource.statics_of(script):
 			check(listed.has(name), "%s: the static member %s belongs to no object, so no walk sees it; a cache or a switch goes in DERIVED, state goes in an object's member (core/sim/README.md, \"Steps\")" % [entry["name"], name])
 
 
 func test_no_state_member_keeps_a_generator() -> void:
-	for entry in _simulation_scripts():
+	for entry in SimSource.scripts():
 		var script: Script = entry["script"]
 		if StateWalk.is_view_only(script):
 			continue
@@ -91,53 +82,6 @@ func test_no_state_member_keeps_a_generator() -> void:
 			if int(info["usage"]) & PROPERTY_USAGE_SCRIPT_VARIABLE == 0 or skip.has(name):
 				continue
 			check(String(info["class_name"]) != "RandomNumberGenerator", "%s: %s keeps a generator; the simulation takes chance from its `sim` (core/sim/sim.gd): `sim.chance(purpose, key, counter)`, with a counter of its rolls as state (core/sim/README.md, \"Chance\")" % [entry["name"], name])
-
-
-## Engine maths a simulation script may not call outside a comment (online-ready N7): the C library's,
-## which differs between Linux, Windows and the web in the last digit now and then.
-const ENGINE_TRIG: Array[String] = [
-	"(^|[^.\\w])(sin|cos|tan|atan|atan2|asin|acos|sinh|cosh|tanh|exp|log|pow|ease|lerp_angle)\\(",
-	"(?<!DMath)\\.(angle|angle_to|angle_to_point|rotated|from_angle|slerp)\\(",
-]
-
-
-func test_simulation_code_calls_no_engine_trig() -> void:
-	var patterns: Array[RegEx] = []
-	for pattern: String in ENGINE_TRIG:
-		patterns.append(RegEx.create_from_string(pattern))
-	var scanned: int = 0
-	for entry in _simulation_scripts():
-		var script: Script = entry["script"]
-		var source: String = _source_of(script)
-		if source.is_empty() or StateWalk.is_view_only(script):
-			continue
-		scanned += 1
-		var lines: PackedStringArray = source.split("\n")
-		for i in lines.size():
-			if lines[i].contains("# view:"):
-				continue
-			var code: String = _code_of(lines[i])
-			for pattern in patterns:
-				if pattern.search(code) != null:
-					check(false, "%s:%d calls the engine's maths, which differs between platforms: call DMath's (core/sim/dmath.gd), or mark a line that only draws `# view: why`: %s" % [entry["name"], i + 1, lines[i].strip_edges()])
-	check(scanned > 50, "the simulation scripts were read (%d)" % scanned)
-
-
-func test_simulation_code_reads_no_clock_and_rolls_no_global_dice() -> void:
-	var patterns: Array[RegEx] = []
-	for pattern: String in FORBIDDEN:
-		patterns.append(RegEx.create_from_string(pattern))
-	for entry in _simulation_scripts():
-		var script: Script = entry["script"]
-		var source: String = _source_of(script)
-		if source.is_empty() or StateWalk.is_view_only(script):
-			continue
-		var lines: PackedStringArray = source.split("\n")
-		for i in lines.size():
-			var code: String = _code_of(lines[i])
-			for p in patterns.size():
-				if patterns[p].search(code) != null:
-					check(false, "%s:%d %s: %s" % [entry["name"], i + 1, FORBIDDEN.values()[p], lines[i].strip_edges()])
 
 
 func test_the_readme_lists_the_simulation_folders() -> void:
@@ -190,80 +134,3 @@ static func _cannot_be(name: String, classes: Dictionary[String, String]) -> Str
 
 static func _is_node(native: StringName) -> bool:
 	return ClassDB.class_exists(native) and (native == &"Node" or ClassDB.is_parent_class(native, &"Node"))
-
-
-## Every simulation script, sorted, then its inner classes (an inner class has no path of its own:
-## it is found among its file's constants), as {"name": "res://...gd" or "res://...gd::Inner",
-## "script": the script}.
-static func _simulation_scripts() -> Array[Dictionary]:
-	var paths := PackedStringArray()
-	for folder in StateWalk.FOLDERS:
-		_collect(folder.trim_suffix("/"), paths)
-	paths.sort()
-	var out: Array[Dictionary] = []
-	for path in paths:
-		_add_with_inner(path, load(path) as Script, out)
-	return out
-
-
-static func _add_with_inner(name: String, script: Script, out: Array[Dictionary]) -> void:
-	out.append({"name": name, "script": script})
-	var constants: Dictionary = script.get_script_constant_map()
-	for constant: String in constants:
-		var value: Variant = constants[constant]
-		if value is Script and (value as Script).resource_path.is_empty():
-			_add_with_inner("%s::%s" % [name, constant], value as Script, out)
-
-
-static func _collect(dir_path: String, out: PackedStringArray) -> void:
-	for file in DirAccess.get_files_at(dir_path):
-		if file.ends_with(".gd"):
-			out.append(dir_path + "/" + file)
-	for sub in DirAccess.get_directories_at(dir_path):
-		_collect(dir_path + "/" + sub, out)
-
-
-## A script's source ("" for an inner class: its lines are its file's, scanned with the file).
-static func _source_of(script: Script) -> String:
-	if script.resource_path.is_empty() or not script.resource_path.ends_with(".gd"):
-		return ""
-	return FileAccess.get_file_as_string(script.resource_path)
-
-
-## The static members `script` and the scripts it extends declare (from their source; an inner
-## class's are its file's).
-static func _statics_of(script: Script) -> PackedStringArray:
-	var out := PackedStringArray()
-	var pattern := RegEx.create_from_string("^static var (\\w+)")
-	var at: Script = script
-	while at != null:
-		for line in _source_of(at).split("\n"):
-			var found: RegExMatch = pattern.search(line)
-			if found != null:
-				out.append(found.get_string(1))
-		at = at.get_base_script()
-	return out
-
-
-## A line of GDScript without its comment (a `#` outside a string), and without its strings' text, so
-## a doc line or a message that names `randf()` is not code that calls it.
-static func _code_of(line: String) -> String:
-	var out: String = ""
-	var quote: String = ""
-	var i: int = 0
-	while i < line.length():
-		var c: String = line[i]
-		if quote.is_empty():
-			if c == "#":
-				break
-			if c == "\"" or c == "'":
-				quote = c
-			out += c
-		else:
-			if c == "\\":
-				i += 1
-			elif c == quote:
-				quote = ""
-				out += c
-		i += 1
-	return out

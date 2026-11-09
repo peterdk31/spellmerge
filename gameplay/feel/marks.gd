@@ -51,8 +51,6 @@ const MAX_KINDS: int = 16
 ## What a row's colour channels are divided by (the shader's KIND_CODE and SOURCE_CODE).
 const KIND_CODE: float = 16.0
 const SOURCE_CODE: float = 128.0
-## The biggest radius a stamp has (px); a bigger one is drawn this big.
-const MAX_RADIUS: float = 160.0
 ## Settled motes stamped in one frame at most; the rest fade with their motes.
 const SETTLED_PER_FRAME: int = 512
 ## The settle wheel: its slots' length (s), how many (past Motes.LIFE_MAX), the most a slot holds
@@ -229,7 +227,8 @@ func stamp(k: int, at: Vector2, radius: float, turn: float, source: int, core: C
 	var i: int = ((_pending_head + _pending_count) % PENDING_MAX) * DRAW_STRIDE
 	_pending_count += 1
 	var middle: Vector2 = (at - _origin).round()
-	_pending[i] = minf(roundf(radius), MAX_RADIUS)
+	# As big as it is asked to be (the owner, 2026-11-09: no cue is capped in size).
+	_pending[i] = roundf(radius)
 	_pending[i + 1] = _rng.randf()
 	_pending[i + 3] = middle.x
 	_pending[i + 4] = turn

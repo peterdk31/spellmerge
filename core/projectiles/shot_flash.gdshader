@@ -140,6 +140,9 @@ void vertex() {
 	float draw = kind_head.x;
 	float a = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, true);
+	// The zoom from the square's side (Feel's FLASH_GRID x zoom), uncapped: the look's red byte
+	// holds 63 at most.
+	L.zoom = max(floor(length(MODEL_MATRIX[1].xy) / GRID + 0.5), 1.0);
 	float z = L.zoom;
 	float s = L.seed;
 	bool poof = draw == D_CLOUDS;

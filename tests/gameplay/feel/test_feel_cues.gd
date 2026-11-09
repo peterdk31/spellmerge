@@ -243,6 +243,38 @@ func test_a_big_cue_draws_bigger_and_a_small_one_smaller() -> void:
 	check_equal(feel.flash_info(&"shell").get("zoom"), 1, "the smallest is zoom 1")
 
 
+## No cue is capped in size (the owner, 2026-11-09): a flash is drawn as big as its cue asks, past
+## the 63 the look's red byte holds (an explosion was capped at 126 px round, a table flash at zoom
+## 15, an arc at 252 px), and the shaders read its size from its row's transform, which says so.
+func test_a_huge_cue_is_drawn_whole() -> void:
+	_cue(&"blast", Vector2.ZERO, 400.0)
+	check_equal(feel.flash_info(&"shell").get("zoom"), 200, "a 400 px blast: zoom 200")
+	feel.step(0.001)
+	var blast: PackedFloat32Array = feel._blast_node.multimesh.buffer
+	var side: float = Vector2(blast[1], blast[5]).length()
+	check_equal(roundi(side / (4.0 * FeelScript.BLAST_SPAN)), 200, "its square tells the shader zoom 200: %s px" % side)
+	feel.step(feel.flash_kind(&"shell").seconds + 0.1)
+
+	var ring: FlashKind = feel.flash_kind(&"ring_out")
+	_made([{"flash": &"ring_out", "reach": 1.0}])
+	_cue(&"test_cue", Vector2.ZERO, 1000.0)
+	var zoom: int = roundi(1000.0 / ring.step)
+	check(zoom > 15, "a zoom past the old 15: %d" % zoom)
+	check_equal(feel.flash_info(&"ring_out").get("zoom"), zoom, "a 1000 px ring at its zoom")
+	feel.step(0.001)
+	var flash: PackedFloat32Array = feel._flash_node.multimesh.buffer
+	side = Vector2(flash[1], flash[5]).length()
+	check_equal(roundi(side / FeelScript.FLASH_GRID), zoom, "its square tells the shader so: %s px" % side)
+	feel.step(ring.seconds + 0.1)
+
+	feel.show_flash(&"arc", Vector2.ZERO, Vector2.RIGHT, Color.WHITE, 0, 0, 1, 0.5, 600.0)
+	check_equal(feel.flash_info(&"arc").get("zoom"), 150, "a 600 px arc: 150 steps of 4")
+	feel.step(0.001)
+	var arc: PackedFloat32Array = feel._arc_node.multimesh.buffer
+	var along: float = Vector2(arc[0], arc[4]).length() - 2.0 * FeelScript.ARC_MARGIN
+	check(is_equal_approx(along, 600.0), "its quad is 600 px long past its margins: %s" % along)
+
+
 ## Every flash kind of the content is one Feel draws: a code and a row for a cue's part each.
 func test_every_flash_kind_is_drawn() -> void:
 	var rows: Dictionary = feel.get("_flash_rows") as Dictionary

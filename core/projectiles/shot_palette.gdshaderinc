@@ -89,6 +89,9 @@ const float TRACE_FROM = 0.02;
 const float TRACE_SPAN = 0.42;
 const float STILL_START = 1.25;
 const float STILL_END = 1.0;
+// A still shot's hit size as drawn, as a share of its quad: the unit a still card's look is shaped
+// in (its `look_shape`; `STILL_HIT` in projectile_manager.gd, compared by test_projectile_looks).
+const float STILL_HIT = 0.15;
 
 bool bit_set(vec3 b, float look) {
 	float bit = look - 1.0;

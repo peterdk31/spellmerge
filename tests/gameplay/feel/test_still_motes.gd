@@ -1,9 +1,10 @@
 extends "res://tests/support/suite.gd"
 ## Still motes (gameplay/feel/still_motes.gd; the owner, 2026-11-09: "use motes for everything you
 ## can"): a still carrier card that names `look_motes` has its shots give off that kind all the time
-## while they stand, from the rows the projectile manager draws them by (`watch_rows`, `rows_drawn`):
-## along each piece of a wall's row, over a pool's oval, thinning while it comes and as it goes (its
-## still clock), in the shot's colours and now and then its infusions' own kinds.
+## while they stand, from a view of where the projectile manager draws them (`watch_body`,
+## `still_shots_drawn`, `StillShotView`): along each piece of a wall's row, over a pool's oval (the
+## card's `look_shape`, which its shader draws by too), thinning while it comes and as it goes
+## (`look_open`, `look_fade`), in the shot's colours and now and then its infusions' own kinds.
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_still_motes.gd
 
@@ -22,7 +23,7 @@ const FIRE_LOOK: int = 1 << 0
 var mgr: ManagerScript
 var motes: MotesScript
 var still: StillMotesScript
-var spells: Node
+var spells: SpellRuntime
 
 
 func before_each() -> void:
@@ -34,10 +35,10 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	mgr.set_cap(200)
 	root.add_child(mgr)
-	spells = own(SpellsScript.new()) as Node
-	spells.set(&"registry", registry)
-	spells.set(&"projectiles", mgr)
-	spells.call(&"register_bodies")
+	spells = own(SpellsScript.new()) as SpellRuntime
+	spells.registry = registry
+	spells.projectiles = mgr
+	spells.register_bodies()
 	var kinds: Array[MoteKind] = []
 	for kind: Resource in registry.get_all(&"motes"):
 		kinds.append(kind as MoteKind)
@@ -46,8 +47,7 @@ func before_each() -> void:
 	root.add_child(motes)
 	still = StillMotesScript.new()
 	still.attach(mgr, spells)
-	mgr.rows_drawn.connect(func(batch: int, rows: PackedFloat32Array, count: int) -> void:
-		still.give_off(batch, rows, count, mgr.sim_time, motes))
+	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void: still.give_off(view, motes))
 
 
 ## A still shot of `form`'s body at `at` living `life` seconds; a wall's a row of five across x.
@@ -82,10 +82,22 @@ func test_the_wall_and_the_pool_name_their_motes() -> void:
 		check_equal(form.look_motes, &"rising", "%s gives off rising motes" % form.id)
 		check(form.look_mote_rate > 0.0, "%s gives some off every second" % form.id)
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-	check_equal(WALL.look_motes_from, StillMotesScript.FROM_ROW, "a wall's leave along its row")
-	check_equal(POOL.look_motes_from, StillMotesScript.FROM_AREA, "a pool's over its oval")
-	var cards: Array[StringName] = spells.call(&"still_mote_cards")
+	check_equal(WALL.look_motes_from, FormBase.LOOK_MOTES_ROW, "a wall's leave along its row")
+	check_equal(POOL.look_motes_from, FormBase.LOOK_MOTES_AREA, "a pool's over its oval")
+	var cards: Array[StringName] = spells.still_mote_cards()
 	check(cards.has(&"wall") and cards.has(&"pool") and not cards.has(&"rune"), "Spells names the still cards that give off motes (%s)" % [cards])
+
+
+func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
+	var later := own(ManagerScript.new()) as ManagerScript
+	root.add_child(later)
+	spells.projectiles = later
+	var body: int = spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD)
+	check(body > 0, "a launch numbers a body the start did not")
+	var material := later._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"look_shape"), POOL.look_shape, "and shapes it by its card, as the start does")
+	check_equal(spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD), body, "asked again, the same body")
+	spells.projectiles = mgr
 
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
@@ -113,11 +125,27 @@ func test_a_wall_streams_motes_along_its_row() -> void:
 
 
 func test_none_while_it_comes_in_and_fewer_as_it_goes() -> void:
-	check_equal(StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(0.0, 3.0)) / ManagerScript.KIND_STEPS), 0.0, "none the moment it is placed")
-	check(is_equal_approx(StillMotesScript.strength(1.0 - ManagerScript.KIND_RUNE / ManagerScript.KIND_STEPS), 1.0), "all once it stands")
-	var ending: float = StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(3.0, 0.4)) / ManagerScript.KIND_STEPS)
+	var end: float = ManagerScript.STILL_END
+	check_equal(StillMotesScript.strength(0.0, end, 0.3, 0.8), 0.0, "none the moment it is placed")
+	check(is_equal_approx(StillMotesScript.strength(0.15, end, 0.3, 0.8), 0.5), "half way through opening, half")
+	check(is_equal_approx(StillMotesScript.strength(ManagerScript.STILL_START, end, 0.3, 0.8), 1.0), "all once it stands")
+	var ending: float = StillMotesScript.strength(ManagerScript.STILL_START, 0.4, 0.3, 0.8)
 	check(ending > 0.0 and ending < 0.5, "fewer near its end (%f)" % ending)
-	check_equal(StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(3.0, 0.0)) / ManagerScript.KIND_STEPS), 0.0, "none at its end")
+	check_equal(StillMotesScript.strength(ManagerScript.STILL_START, 0.0, 0.3, 0.8), 0.0, "none at its end")
+	check(is_equal_approx(StillMotesScript.strength(0.0, end, 0.0, 0.0), 1.0), "a card that opens and fades at once gives off all from the start")
+
+
+func test_the_card_shapes_its_shader_and_its_motes_alike() -> void:
+	for form: FormBase in [WALL, POOL]:
+		var body: int = mgr.body_of(form.look_shader, ManagerScript.MESH_QUAD)
+		check(body > 0 and still.watches(body), "%s's body is watched" % form.id)
+		var material := mgr._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
+		check_equal(material.get_shader_parameter(&"look_shape"), form.look_shape, "%s's shader draws by its card's shape" % form.id)
+		check_equal(material.get_shader_parameter(&"look_clock"), Vector2(form.look_open, form.look_fade), "and comes and goes by its card's clock")
+		var look: CardLook = spells.look_of(form.id, Carrier.LOOK_STILL)
+		check(look.shape == form.look_shape and look.open == form.look_open and look.fade == form.look_fade, "%s's motes read the same numbers (its CardLook)" % form.id)
+		var own: String = form.look_shader.code
+		check(own.contains("STILL_HIT") and not own.contains("0.15"), "%s's shader takes its hit size from STILL_HIT, not a copy" % form.id)
 
 
 func test_a_fire_pool_gives_off_embers_too() -> void:
@@ -143,4 +171,4 @@ func test_a_card_with_no_still_motes_gives_none() -> void:
 	_place(rune, Vector2(100.0, 100.0))
 	_run(60)
 	check_equal(_written(before).size(), 0, "a rune's motes are its shader's")
-	check(not still.watches(ManagerScript.BATCH_STILL), "the plain still batch is not watched")
+	check(not still.watches(mgr.body_of(rune.look_shader, ManagerScript.MESH_QUAD)), "a card that names no motes is not watched")

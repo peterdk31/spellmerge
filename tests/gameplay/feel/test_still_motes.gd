@@ -153,7 +153,7 @@ func test_a_strike_parts_the_wall_s_stream_for_a_moment() -> void:
 	_run(60)
 	var foot: Vector2 = Vector2(200.0, 150.0 + floorf(ManagerScript.look_size(WALL.radius) * ManagerScript.STILL_HIT * WALL.look_shape.y + 0.5))
 	var before: int = motes.next_row()
-	still.struck(Vector2(200.0, 150.0), motes)
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
 	var knocked: Array = _written(before)
 	check_equal(knocked.size(), StillMotesScript.KNOCKED, "a few motes knocked out where it struck")
 	var parted: int = still.parted
@@ -167,8 +167,21 @@ func test_a_strike_parts_the_wall_s_stream_for_a_moment() -> void:
 	_run(30)
 	check_equal(still.parted, parted, "after half a second the stream closes again")
 	before = motes.next_row()
-	still.struck(Vector2(500.0, 300.0), motes)
+	still.struck(Vector2(500.0, 300.0), mgr.sim_time, motes)
 	check_equal(motes.next_row(), before, "a strike far from any still shot does nothing")
+
+
+func test_a_strike_where_a_wall_was_does_nothing() -> void:
+	_run(30)
+	_place(WALL, Vector2(200.0, 150.0), 0.5)
+	_run(60)
+	var before: int = motes.next_row()
+	var parted: int = still.parted
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
+	check_equal(motes.next_row(), before, "the wall ended: no motes knocked out of thin air")
+	_place(WALL, Vector2(200.0, 150.0))
+	_run(30)
+	check_equal(still.parted, parted, "and a new wall there is not parted by it")
 
 
 func test_none_while_it_comes_in_and_fewer_as_it_goes() -> void:

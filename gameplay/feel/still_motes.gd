@@ -46,8 +46,9 @@ var _own_kinds: Dictionary = {}
 var _strike_at: PackedVector2Array = PackedVector2Array()
 var _strike_when: PackedFloat32Array = PackedFloat32Array()
 var _strike_next: int = 0
-## Strikes looked for since the last frame's shots were handed out.
+## Strikes looked for this frame, and the manager's clock it was counted at.
 var _strikes_looked: int = 0
+var _strikes_at: float = -1.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The manager's clock when shots were last handed out, and the seconds since the one before.
 var _seen: float = -1.0
@@ -94,7 +95,6 @@ func watches(body: int) -> bool:
 func give_off(view: StillShotView, pool: MotesScript) -> void:
 	_views[view.body * 2 + (1 if view.enemy else 0)] = view
 	if view.time != _seen:
-		_strikes_looked = 0
 		_frame = clampf(view.time - _seen, 0.0, LONGEST_FRAME) if _seen >= 0.0 else 0.0
 		_seen = view.time
 	var look: CardLook = _looks.get(view.body) as CardLook
@@ -111,7 +111,7 @@ func _give_off_source(view: StillShotView, look: CardLook, source: StillMoteSour
 	for n in view.count:
 		if source.stop > 0.0 and view.since[n] >= source.stop:
 			continue
-		var many: int = floori(source.rate * _frame * strength(view.since[n] - source.start, view.left[n], look.open if source.stop <= 0.0 else 0.0, look.fade) + _rng.randf())
+		var many: int = floori(source.rate * _frame * strength(view.since[n] - source.start, view.left[n], look.open, look.fade) + _rng.randf())
 		if many <= 0:
 			continue
 		var bits: int = view.look[n]
@@ -131,18 +131,22 @@ func _give_off_source(view: StillShotView, look: CardLook, source: StillMoteSour
 			given += 1
 
 
-## A shot or a beam struck a wall at `at`: if it is one of the still shots drawn last frame (a wall
-## made by a card), its streams part there for PART_SECONDS (on the clock its shots were drawn by)
-## and KNOCKED motes of the shot's first stream are knocked out into `pool` (null: none), in its
-## colours.
-func struck(at: Vector2, pool: MotesScript) -> void:
+## A shot or a beam struck a wall at `at`, at the projectile manager's clock `now`: if it is one of
+## the still shots drawn in the last frame (a wall made by a card), its streams part there for
+## PART_SECONDS and KNOCKED motes of the shot's first stream are knocked out into `pool` (null:
+## none), in its colours. A batch drawn longer ago than LONGEST_FRAME is not where its shots are any
+## more (the manager hands out no view of a batch that draws none: a wall that ended).
+func struck(at: Vector2, now: float, pool: MotesScript) -> void:
+	if now != _strikes_at:
+		_strikes_at = now
+		_strikes_looked = 0
 	if _views.is_empty() or _strikes_looked >= MOST_STRIKES:
 		return
 	_strikes_looked += 1
 	for key: int in _views:
 		var view: StillShotView = _views[key]
 		var look: CardLook = _looks.get(view.body) as CardLook
-		if look == null:
+		if look == null or now - view.time > LONGEST_FRAME:
 			continue
 		for n in view.count:
 			var reach: float = view.reach[n]
@@ -150,7 +154,7 @@ func struck(at: Vector2, pool: MotesScript) -> void:
 			if view.at[n].distance_squared_to(at) > span * span:
 				continue
 			_strike_at[_strike_next] = at
-			_strike_when[_strike_next] = view.time
+			_strike_when[_strike_next] = now
 			_strike_next = (_strike_next + 1) % MOST_STRIKES
 			var first: StillMoteSource = look.motes[0]
 			var kind: int = pool.kind_index(first.kind) if pool != null else -1

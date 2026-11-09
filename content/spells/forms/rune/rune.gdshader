@@ -35,6 +35,13 @@ const float GRID = 24.0;
 // (`SpellLimits.RUNE_ARM`), filling with light between.
 const float DROP = 0.3;
 const float ARM = 1.0;
+// The crystal's hover over its middle once it has dropped in, and how far below its centre light
+// drips from (its foot), in pixels at scale 1; its scale is SCALE_PER_ZOOM a zoom. Its card's `drip`
+// source shows at that foot (its `height`, in hit size as drawn: (HOVER - DRIP_FROM) x
+// SCALE_PER_ZOOM / (GRID x STILL_HIT); test_rune checks the two agree).
+const float HOVER = 10.0;
+const float DRIP_FROM = 6.0;
+const float SCALE_PER_ZOOM = 0.25;
 // Its ring's half width and half depth in its hit size as drawn (STILL_HIT), its card's
 // `look_shape` (set by the projectile manager, `set_body_shape`), so the motes rising off the ring
 // leave from the ring it draws. The default only draws a body no card has shaped yet.
@@ -55,11 +62,11 @@ void vertex() {
 	float since = still_since(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, true);
 	SET_LOOK(L);
-	float c = clamp(L.zoom * 0.25, 0.5, 2.0);
+	float c = clamp(L.zoom * SCALE_PER_ZOOM, 0.5, 2.0);
 	float drop = clamp(since / DROP, 0.0, 1.0);
 	float fall = 1.0 - (1.0 - drop) * (1.0 - drop);
 	float bob = sin(sim_time * 3.0 + L.seed) * 1.2 * clamp((since - DROP) / 0.2, 0.0, 1.0);
-	float hover = (mix(24.0, 10.0, fall) + bob) * c;
+	float hover = (mix(24.0, HOVER, fall) + bob) * c;
 	float arm = clamp((since - DROP) / (ARM - DROP), 0.0, 1.0);
 	float armed = since >= ARM ? 1.0 : 0.0;
 	float ring_to = since < DROP ? 0.0 : 0.12 + arm * 0.88;

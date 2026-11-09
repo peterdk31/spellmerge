@@ -14,7 +14,7 @@ from = 0
 [sub_resource type="Resource" id="Mote_2"]
 script = ExtResource("9_source")
 kind = &"spark"
-rate = 30.0
+rate = 60.0
 from = 2
 stop = 0.3
 

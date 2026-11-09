@@ -89,3 +89,22 @@ func test_its_look_arms_when_it_does() -> void:
 	check(code.contains("const float ARM = %s;" % String.num(SpellLimits.RUNE_ARM, 1)), "the shader arms at SpellLimits.RUNE_ARM")
 	check(code.contains("still_since("), "it reads its time since it was placed")
 	check(ManagerScript.STILL_START > SpellLimits.RUNE_ARM, "the still clock runs past its arming")
+
+
+## The value of `const float <name> = <value>;` in shader text `code`, or NAN.
+func _shader_const(code: String, name: String) -> float:
+	var found := RegEx.create_from_string("const\\s+float\\s+%s\\s*=\\s*([-0-9.]+)\\s*;" % name).search(code)
+	return found.get_string(1).to_float() if found != null else NAN
+
+
+func test_its_drips_show_at_the_crystal_s_foot() -> void:
+	# The `drip` source's height is the shader's crystal foot in hit size as drawn, worked out from
+	# the shader's own numbers: change the crystal and this says so.
+	var card := load("res://content/spells/forms/rune/rune.tres") as FormBase
+	var code: String = card.look_shader.code
+	var foot: float = (_shader_const(code, "HOVER") - _shader_const(code, "DRIP_FROM")) * _shader_const(code, "SCALE_PER_ZOOM") / (_shader_const(code, "GRID") * ManagerScript.STILL_HIT)
+	var drips: Array = card.look_motes.filter(func(s: StillMoteSource) -> bool: return s.kind == &"drip")
+	check_equal(drips.size(), 1, "one stream of drips")
+	if drips.size() == 1:
+		check(absf((drips[0] as StillMoteSource).height - foot) < 0.01, "its height is the crystal's foot (%f, the shader's %f)" % [(drips[0] as StillMoteSource).height, foot])
+		check(is_equal_approx((drips[0] as StillMoteSource).start, SpellLimits.RUNE_ARM), "from its arming")

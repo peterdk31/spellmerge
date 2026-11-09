@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"fleck"
-look_layers = PackedInt32Array(2)
+look_ids = Array[StringName]([&"flecks"])
 settles = &"speck"
 gravity = 300.0
 drag = 2.5

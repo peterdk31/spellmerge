@@ -12,5 +12,5 @@ complexity = 2
 icon = ExtResource("2_icon")
 behaviour_id = &"blast"
 behaviour_strength = 40.0
-look_layer = 9
+look_id = &"burst"
 cue = &"fireball"

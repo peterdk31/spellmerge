@@ -353,10 +353,10 @@ func test_the_elements_have_looks_of_their_own() -> void:
 		check(not seen.has(element.look_layer), "%s has a look of its own" % element.id)
 		seen.append(element.look_layer)
 		check(element.range_problems().is_empty(), "%s is in range" % element.id)
-	check_equal(int((FIRE.ranges()["look_layer"] as Vector2).y), ManagerScript.LOOK_COUNT - 1, "an infusion's top look is the manager's last")
-	check_equal(int((BIGGER.ranges()["look_layer"] as Vector2).y), ManagerScript.LOOK_COUNT - 1, "so is a modifier's")
+	# A card names its look (`LookNames`); every name is one of the manager's kinds
+	# (tests/core/test_look_names.gd), and a name that is none is a validator problem.
 	var bad: ElementBase = FIRE.duplicate() as ElementBase
-	bad.look_layer = ManagerScript.LOOK_COUNT
+	bad.look_id = &"no_such_look"
 	check(not bad.range_problems().is_empty(), "a look the shader does not know is a validator problem")
 
 

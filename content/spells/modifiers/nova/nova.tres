@@ -15,5 +15,5 @@ wind_down_mult = 3.0
 mana_mult = 2.0
 behaviour_id = &"nova"
 behaviour_strength = 8.0
-look_layer = 9
+look_id = &"burst"
 cue = &"nova"

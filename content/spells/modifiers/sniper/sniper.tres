@@ -11,4 +11,4 @@ description = "The next carrier keeps a quarter of its staff's spread."
 complexity = 1
 icon = ExtResource("2_icon")
 spread_mult = 0.25
-look_layer = 12
+look_id = &"glitter"

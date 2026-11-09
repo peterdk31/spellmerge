@@ -13,4 +13,4 @@ icon = ExtResource("2_icon")
 damage_scale = 1.0
 tint = Color(0.5608, 0.8314, 0.4157, 1)
 heals = true
-look_layer = 6
+look_id = &"motes"

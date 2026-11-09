@@ -6,7 +6,7 @@ extends Resource
 ##
 ## A kind belongs to cards (docs/milestones/spell-spectacle-2.md, S2): it is the motes of every
 ## card it names by id (`cards`: a form, an element or a modifier), and of every card whose
-## `look_layer` it names (`look_layers`) that no kind names by id. So a card gets motes of its
+## look it names (`look_ids`) that no kind names by id. So a card gets motes of its
 ## own with one new file naming it (the card's file is not touched), a card that no kind names
 ## sheds its look layer's, and a shot whose cards have none sheds the kinds of layer 0. A spell
 ## sheds every kind of its cards, its burst split between them. A `surface` kind belongs to no
@@ -29,10 +29,15 @@ const LOOK_LAYERS: int = preload("res://core/projectiles/projectile_manager.gd")
 ## The cards (forms, elements, modifiers: their ids) this kind is the motes of, whatever their look
 ## layer.
 @export var cards: Array[StringName] = []
-## The cards' look layers (`look_layer` of an element or modifier; the LOOK_* kinds of
-## core/projectiles) this kind is the motes of, for the cards no kind names by id; 0 for a shot
-## with no layer that has a kind.
-@export var look_layers: PackedInt32Array = PackedInt32Array()
+## The cards' looks (`look_id` of an element or modifier, `LookNames`) this kind is the motes of,
+## for the cards no kind names by id; `plain` for a shot with no look that has a kind.
+@export var look_ids: Array[StringName] = []
+## `look_ids` as their numbers, the LOOK_* kinds of core/projectiles (`plain` 0): what Feel reads.
+var look_layers: PackedInt32Array:
+	get:
+		return LookNames.layers_of(look_ids)
+	set(value):
+		look_ids = LookNames.names_of(value)
 ## Thrown off a struck surface in the room's colours, not by a spell's cards.
 @export var surface: bool = false
 ## Given off along every dash's path (its speed streaks; docs/milestones/spell-spectacle-2.md,
@@ -166,18 +171,18 @@ func problems() -> PackedStringArray:
 	var found := PackedStringArray()
 	if id == &"":
 		found.append("a mote kind needs an id")
-	if surface and (not look_layers.is_empty() or not cards.is_empty()):
-		found.append("%s: a surface kind belongs to no card, so it names no cards and no look layers" % id)
-	if dash_path and (surface or not look_layers.is_empty() or not cards.is_empty()):
+	if surface and (not look_ids.is_empty() or not cards.is_empty()):
+		found.append("%s: a surface kind belongs to no card, so it names no cards and no looks" % id)
+	if dash_path and (surface or not look_ids.is_empty() or not cards.is_empty()):
 		found.append("%s: a dash's path kind belongs to no card and no surface" % id)
-	if tail and (surface or dash_path or not look_layers.is_empty() or not cards.is_empty()):
+	if tail and (surface or dash_path or not look_ids.is_empty() or not cards.is_empty()):
 		found.append("%s: a tail kind belongs to no card, no surface and no dash" % id)
 	for card in cards:
 		if card == &"":
 			found.append("%s: a card it names has no id" % id)
-	for layer in look_layers:
-		if layer < 0 or layer > LOOK_LAYERS:
-			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, LOOK_LAYERS])
+	for look in look_ids:
+		if not LookNames.known(look):
+			found.append("%s: %s is not a look (%s)" % [id, look, ", ".join(LookNames.NAMES)])
 	if settles != &"" and gravity <= 0.0:
 		found.append("%s: only a kind that falls comes to rest, so one that rises leaves no mark" % id)
 	if speed.x > speed.y or up.x > up.y or life.x > life.y:

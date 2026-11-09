@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"spark"
-look_layers = PackedInt32Array(0, 5)
+look_ids = Array[StringName]([&"plain", &"sparks"])
 gravity = 220.0
 drag = 3.5
 bounce = 0.35

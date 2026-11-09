@@ -12,4 +12,4 @@ complexity = 2
 icon = ExtResource("2_icon")
 behaviour_id = &"magnet"
 behaviour_strength = 70.0
-look_layer = 20
+look_id = &"converge"

@@ -12,4 +12,4 @@ complexity = 1
 icon = ExtResource("2_icon")
 behaviour_id = &"recoil"
 behaviour_strength = 24.0
-look_layer = 17
+look_id = &"curl"

@@ -6,7 +6,7 @@ extends Resource
 ## mark is a new file and no list is edited. A cue names it in a part
 ## (`{"part": "mark", "mark": "scorch", ...}`, core/base/cue_base.gd).
 ##
-## A kind may belong to cards (`cards` by id, `look_layers` by look, like a `MoteKind`; a card a kind
+## A kind may belong to cards (`cards` by id, `look_ids` by look, like a `MoteKind`; a card a kind
 ## names by id takes no kind by its layer; spell-spectacle-2.md, S2): a cue's mark part with
 ## `"cards": true` stamps the marks of the cards it was played with instead of its own when they
 ## have one, so a frost blast leaves frost where a plain blast leaves a scorch.
@@ -38,10 +38,16 @@ extends Resource
 ## The cards (their ids) this kind is the mark of, for a part with `"cards": true`, whatever their
 ## look layer.
 @export var cards: Array[StringName] = []
-## The cards' look layers (`look_layer` of an element or modifier; the LOOK_* kinds of
-## core/projectiles) this kind is the mark of, for a part with `"cards": true` and the cards no
-## kind names by id; empty for a mark that belongs to no card (a scorch, a crack).
-@export var look_layers: PackedInt32Array = PackedInt32Array()
+## The cards' looks (`look_id` of an element or modifier, `LookNames`) this kind is the mark of,
+## for a part with `"cards": true` and the cards no kind names by id; empty for a mark that belongs
+## to no card (a scorch, a crack).
+@export var look_ids: Array[StringName] = []
+## `look_ids` as their numbers, the LOOK_* kinds of core/projectiles: what Feel reads.
+var look_layers: PackedInt32Array:
+	get:
+		return LookNames.layers_of(look_ids)
+	set(value):
+		look_ids = LookNames.names_of(value)
 ## How the shader draws it (see above).
 @export_enum("blot", "crack", "rime", "ring", "rune", "speck") var form: String = "blot"
 ## How ragged its rim is (or how jagged its lines), 0 a clean circle.
@@ -82,9 +88,9 @@ func problems() -> PackedStringArray:
 	for shade: String in [body_shade, edge_shade]:
 		if not SHADES.has(shade):
 			found.append("%s: a mark's shade is one of %s (STYLE.md), not '%s'" % [id, SHADES, shade])
-	for layer in look_layers:
-		if layer < 0 or layer > MoteKind.LOOK_LAYERS:
-			found.append("%s: look layer %d is not a LOOK_* kind (0-%d)" % [id, layer, MoteKind.LOOK_LAYERS])
+	for look in look_ids:
+		if not LookNames.known(look):
+			found.append("%s: %s is not a look (%s)" % [id, look, ", ".join(LookNames.NAMES)])
 	for card in cards:
 		if card == &"":
 			found.append("%s: a card it names has no id" % id)

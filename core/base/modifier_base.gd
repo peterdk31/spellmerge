@@ -225,11 +225,16 @@ static func stacks(behaviour: int) -> Stack:
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 
-## The particles this card makes its shots give off: a LOOK_* kind of `core/projectiles` (0
-## none, 1 embers, 2 frost flecks ... see the LOOK_* constants in
-## `core/projectiles/projectile_manager.gd`). A shot gives off the kinds of all its infusions
-## and modifiers, mixed at random from its tail; two cards with the same kind add nothing more.
-@export var look_layer: int = 0
+## The particles this card makes its shots give off, by name (`LookNames`: `embers`, `flecks`,
+## `curl` ...; empty for none). A shot gives off the looks of all its infusions and modifiers,
+## mixed at random from its tail; two cards with the same look add nothing more.
+@export var look_id: StringName = &""
+## `look_id` as its number, the LOOK_* kind of `core/projectiles` the engine reads (0 for none).
+var look_layer: int:
+	get:
+		return LookNames.layer_of(look_id)
+	set(value):
+		look_id = LookNames.name_of(value)
 ## The cue (`content/cues`) Feel plays when this card's behaviour goes off: `blast`'s explosion,
 ## as big as its radius, or `zap`'s arc wherever a zap shows itself (`form_shown` names the card;
 ## as long as the zap). When several cards of one behaviour name a cue, the first in slot order
@@ -286,7 +291,6 @@ func ranges() -> Dictionary:
 		"wind_up_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
 		"shot_mult": Vector2(1, 8),
-		"look_layer": Vector2(0.0, 21.0),
 		"extra_pierce": Vector2(0, 8),
 		"behaviour_strength": Vector2(0.0, 256.0),
 		"behaviour_reach": Vector2(0.0, 360.0),
@@ -306,4 +310,6 @@ func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
 	if behaviour_id != &"" and behaviour_of(behaviour_id) == Behaviour.NONE:
 		problems.append("behaviour_id: %s is not a behaviour (%s)" % [behaviour_id, ", ".join(Behaviour.keys().slice(1)).to_lower()])
+	if look_id != &"" and LookNames.layer_of(look_id) == 0:
+		problems.append("look_id: %s is not a look (%s)" % [look_id, ", ".join(LookNames.NAMES.slice(1))])
 	return problems

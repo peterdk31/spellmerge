@@ -8,10 +8,17 @@ extends "res://tests/support/suite.gd"
 # unit-test-shards: 2
 
 const SimScenes := preload("res://tests/core/sim_scenes.gd")
+const ContentFight := preload("res://tests/core/content_fight.gd")
+const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const DecoyCard := preload("res://content/spells/forms/decoy/decoy.tres")
+const PoolCard := preload("res://content/spells/forms/pool/pool.tres")
+const BoltCard := preload("res://content/spells/forms/bolt/bolt.tres")
 
 ## Ticks played before the snapshot, and after it.
 const BEFORE: int = 70
 const AFTER: int = 80
+## Ticks a decoy fight plays after its snapshot: past several decoys' ends and new ones.
+const DECOY_AFTER: int = 240
 ## Between the storm's casts (at 0, 0.2 and 0.5 s).
 const STORM_EARLY: int = 20
 
@@ -255,3 +262,127 @@ func _parting(scene: StringName, before: int, keep: int, fresh_as: StringName = 
 func _check_problems(scene: StringName, problems: PackedStringArray) -> void:
 	for problem in problems:
 		check(false, "%s: %s" % [scene, problem])
+
+
+## A decoy restored is a whole decoy (online-ready N10b): Entities builds its decoys in code and
+## pools them, so the snapshot asks it to make one again (`remake_body`): its components and mind,
+## off the Tick (Entities steps it), its row's again, and its owner's look copied onto it.
+func test_a_decoy_restored_is_made_again_by_entities() -> void:
+	var played := ContentFight.new(root, ContentFight.CARD, DecoyCard)
+	var at: int = -1
+	for i in 240:
+		played.step()
+		if played.entities.count(EntitiesScript.DECOY) > 0:
+			at = i
+			break
+	check(at >= 0, "the decoy card made a decoy")
+	var snapshot := Snapshot.take(played.areas(), played.world)
+	_check_problems(&"decoy", snapshot.problems)
+	played.free_all()
+	var restored := ContentFight.new(root, ContentFight.CARD, DecoyCard)
+	_check_problems(&"decoy", restored.restore(snapshot, at))
+	var decoy: Actor = null
+	for child: Node in restored.entities.get_children():
+		if child is Actor:
+			decoy = child as Actor
+	check(decoy != null, "the decoy is made again under Entities")
+	if decoy == null:
+		restored.free_all()
+		return
+	check(restored.entities.decoy_of(decoy.belongs_to) == decoy, "its row holds it again")
+	check(decoy.health != null and decoy.get_node_or_null(^"Hurtbox") is Hurtbox and decoy.get_node_or_null(^"Mover") is Mover and decoy.get_node_or_null(^"Caster") is Caster, "it has its components")
+	check(decoy.get_node_or_null(^"Mind") is DecoyController and decoy.controller == decoy.get_node(^"Mind"), "its mind drives it")
+	check(not decoy.ticking, "Entities steps it, not the Tick")
+	var look: DecoyLook = decoy.get_node_or_null(^"Look") as DecoyLook
+	check(look != null and look.sprite.texture != null, "it looks like its owner again")
+	restored.free_all()
+
+
+## A decoy fight rolled back into the same world plays on as it did, twice from one snapshot
+## (online-ready N10b): after the snapshot decoys end and rows hold new ones, which may take the actor
+## ids of the snapshot's decoys (ids are handed out again), so a body built in code is matched by its
+## name (its row) as well as its id, and each decoy is made new, with nothing of an earlier one.
+func test_a_decoy_fight_rolled_back_plays_on_the_same() -> void:
+	var fight := ContentFight.new(root, ContentFight.CARD, DecoyCard)
+	var at: int = -1
+	for i in 240:
+		fight.step()
+		if fight.entities.count(EntitiesScript.DECOY) > 0:
+			at = i
+			break
+	check(at >= 0, "the decoy card made a decoy")
+	var snapshot := Snapshot.take(fight.areas(), fight.world)
+	_check_problems(&"decoy", snapshot.problems)
+	var first := Desync.new()
+	for i in DECOY_AFTER:
+		fight.step()
+		first.capture(fight.areas())
+	for again in 2:
+		_check_problems(&"decoy", fight.restore(snapshot, at))
+		var later := Desync.new()
+		for i in DECOY_AFTER:
+			fight.step()
+			later.capture(fight.areas())
+		check_equal(Desync.first_parting(first, later), -1, "the decoy fight rolled back (%d) plays on as it did" % again)
+	fight.free_all()
+
+
+## A decoy whose actor id another row's decoy took after the snapshot (ids are handed out again)
+## comes back as its own row's when the world is rolled back (online-ready N10b): a body built in
+## code is matched by its name as well as its id, so the other row's is freed and this one made again.
+func test_a_rolled_back_decoy_is_its_rows_though_its_id_was_taken() -> void:
+	var fight := ContentFight.new(root, ContentFight.CARD, BoltCard)
+	var wizard: Actor = fight.fight.players[0]
+	var enemy: Actor = fight.fight.enemies[0]
+	var bus: Node = fight.fight.bus
+	bus.emit_signal(&"entity_spawn_requested", wizard.id, EntitiesScript.DECOY, Vector2(20.0, 0.0), 6.0, 1, EntitiesScript.CASTER_BODY)
+	var own: Actor = fight.entities.decoy_of(wizard.id)
+	check(own != null, "the wizard's decoy is made")
+	if own == null:
+		fight.free_all()
+		return
+	var own_name: StringName = own.name
+	var own_id: int = own.id
+	var snapshot := Snapshot.take(fight.areas(), fight.world)
+	bus.emit_signal(&"entity_end_requested", wizard.id, 1)
+	bus.emit_signal(&"entity_spawn_requested", enemy.id, EntitiesScript.DECOY, Vector2(150.0, 40.0), 6.0, 2, EntitiesScript.CASTER_BODY)
+	var other: Actor = fight.entities.decoy_of(enemy.id)
+	check(other != null and other.id == own_id and other.name != own_name, "the enemy's decoy takes the ended decoy's id in another row")
+	_check_problems(&"decoy", fight.restore(snapshot, 0))
+	var back: Actor = fight.entities.decoy_of(wizard.id)
+	check(back != null and back.is_inside_tree() and back.name == own_name and back.id == own_id, "the wizard's decoy is back in its own row")
+	check(fight.entities.decoy_of(enemy.id) == null, "the enemy's decoy is gone")
+	check_equal(fight.entities.count(EntitiesScript.DECOY), 1, "one decoy")
+	fight.free_all()
+
+
+## A shot restored draws as its card's body again (online-ready N12): which batch draws a card's
+## shader is this machine's number (`register_body`, in the order it first met each), so the
+## projectile manager keeps it as VIEW and Spells gives the live shots theirs after a restore.
+func test_a_shot_restored_draws_as_its_card() -> void:
+	var played := ContentFight.new(root, ContentFight.CARD, PoolCard)
+	var at: int = -1
+	var slots: Array[int] = []
+	for i in 240:
+		played.step()
+		slots = _card_body_shots(played)
+		if not slots.is_empty():
+			at = i
+			break
+	check(at >= 0, "a pool shot draws as its card's shader")
+	var snapshot := Snapshot.take(played.areas(), played.world)
+	played.free_all()
+	var restored := ContentFight.new(root, ContentFight.CARD, PoolCard)
+	_check_problems(&"pool", restored.restore(snapshot, at))
+	check_equal(_card_body_shots(restored), slots, "the restored shots draw as their card's shader")
+	restored.free_all()
+
+
+## The live shots of `fight` that draw as the pool card's own shader.
+static func _card_body_shots(fight: ContentFight) -> Array[int]:
+	var out: Array[int] = []
+	var shots: Node = fight.fight.projectiles
+	for slot: int in shots.call(&"get_cap"):
+		if shots.call(&"get_body_shader_of", slot) == PoolCard.look_shader:
+			out.append(slot)
+	return out

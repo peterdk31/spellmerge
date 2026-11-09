@@ -15,6 +15,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const FramesScript := preload("res://core/sim/frames.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 ## Time moves by this fixed binary fraction.
@@ -111,10 +112,15 @@ func _init(root: Node, player_count: int = 1) -> void:
 
 
 ## A wizard actor of seat `index` from the real scene (actors G7), wired to this world and in the
-## tree (its hurtbox registers it in Combat as it enters), stepped by nobody.
-func wizard(index: int, at: Vector2) -> Actor:
+## tree (its hurtbox registers it in Combat as it enters), stepped by nobody. With `frames` (a
+## frames service of the test's own, online-ready N12) its seat reads its input there, and it holds
+## `cards` (four lists of card ids) on `staff` for every button.
+func wizard(index: int, at: Vector2, frames: FramesScript = null, staff: StaffBase = null, cards: Array = [[], [], [], []]) -> Actor:
 	var body := WizardScene.instantiate() as Actor
-	PlayerController.seat_wizard(body, index, null, [[], [], [], []])
+	var seat: PlayerController = PlayerController.seat_wizard(body, index, staff, cards.duplicate(true))
+	if frames != null:
+		seat.frames = frames
+		seat.registry = registry
 	body.events = bus
 	body.combat = combat
 	body.projectiles = projectiles
@@ -178,6 +184,41 @@ func wire(body: Actor) -> void:
 func imp_facing_player(distance: float = 80.0) -> Actor:
 	players[0].position = Vector2(distance, 0.0)
 	return imp()
+
+
+## Every open actor's body in this world's actor table, by id.
+func bodies() -> Array[Actor]:
+	var out: Array[Actor] = []
+	var ids := PackedInt32Array()
+	ids.resize(ActorsScript.ACTORS)
+	var n: int = actors.open_ids(ids)
+	for i in n:
+		var body: Actor = actors.node_of(ids[i]) as Actor
+		if body != null:
+			out.append(body)
+	return out
+
+
+## The world's areas by name, as the Tick's `state_areas` names them (online-ready N1): its services,
+## then `more` (a scene's own services), then every actor's body by actor id, in that order.
+func areas(more: Dictionary = {}) -> Dictionary:
+	var out: Dictionary = {"actors": actors, "projectiles": projectiles, "spells": spells, "combat": combat}
+	out.merge(more)
+	for body in bodies():
+		out[SimHash.BODY_PREFIX + str(body.id)] = body
+	return out
+
+
+## `enemies` and `players` found again from the actor table (a snapshot restored made some bodies
+## again): a body driven by a brain is an enemy, one by a seat a player, by actor id.
+func regather() -> void:
+	enemies.clear()
+	players.clear()
+	for body in bodies():
+		if body.home_controller is AIController:
+			enemies.append(body)
+		elif body.home_controller is PlayerController:
+			players.append(body)
 
 
 ## The AI in `body`'s scene (its home controller), or null.

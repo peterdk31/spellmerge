@@ -112,8 +112,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Online-ready: the same game on every platform (N8).** (`tests/`; the workflow under `ci/`/`.github/` is the owner's, drafted in the PR) N8. After N4, N5, N6 and N7b. Done (#651).
 - [x] **Online-ready: the simulation/view line, checked (N9).** (`tests/core/`, `core/sim/README.md`, `AGENTS.md`) N9. After N8 and N11. Done (#653).
 - [x] **Online-ready: snapshots, the machinery and the game's runs (N10a).** (`core/sim/snapshot.gd`, `rebuild()`/`restore_nodes()` hooks) N10a: built 2026-11-09 (milestones/online-ready.md, N10).
-- [ ] **Online-ready: snapshots of all content (N10b), with N12.** (`gameplay/ai/entities.gd` decoys, whatever N12's replays through a snapshot find) N10b; built beside N12, which finds the gaps. After N10a.
-- [ ] **Online-ready: new content covered by itself (N12).** (`tests/core/`) N12. After N10a.
+- [x] **Online-ready: snapshots of all content (N10b), with N12.** (`gameplay/ai/entities.gd` decoys, whatever N12's replays through a snapshot find) N10b: built 2026-11-09 (milestones/online-ready.md, N10).
+- [x] **Online-ready: new content covered by itself (N12).** (`tests/core/`) N12: built 2026-11-09 (milestones/online-ready.md, N12).
 
 ## Blocked
 

@@ -79,10 +79,7 @@ func step() -> void:
 ## table, as `Tick.state_areas` finds them).
 func areas() -> Dictionary:
 	if _fight != null:
-		var out: Dictionary = {"actors": _fight.actors, "projectiles": _fight.projectiles, "spells": _fight.spells, "combat": _fight.combat, "board": _fight.board}
-		for body in _bodies(_fight.actors):
-			out["actor %d" % body.id] = body
-		return out
+		return _fight.areas({"board": _fight.board})
 	if _stage != null:
 		return {"actors": _stage.actors, "projectiles": _stage.projectiles, "spells": _stage.spells, "combat": _stage.combat}
 	return {}
@@ -99,13 +96,7 @@ func restore(snapshot: Snapshot, input_from: Object = null) -> PackedStringArray
 		_stage.set(&"_pending", (played.get(&"_pending") as Array).duplicate(true))
 	if _fight != null:
 		var problems: PackedStringArray = snapshot.restore(areas(), _root, func(body: Node) -> void: _fight.wire(body as Actor))
-		_fight.enemies.clear()
-		_fight.players.clear()
-		for body in _bodies(_fight.actors):
-			if body.home_controller is AIController:
-				_fight.enemies.append(body)
-			else:
-				_fight.players.append(body)
+		_fight.regather()
 		return problems
 	if _stage != null:
 		return snapshot.restore(areas(), world())
@@ -145,19 +136,6 @@ func world() -> Node:
 	if _stage != null:
 		return _stage.world
 	return _root
-
-
-## Every open actor's body in `table`, by id.
-static func _bodies(table: Node) -> Array[Actor]:
-	var out: Array[Actor] = []
-	var ids := PackedInt32Array()
-	ids.resize(1024)
-	var n: int = table.call(&"open_ids", ids)
-	for i in n:
-		var body: Actor = table.call(&"node_of", ids[i]) as Actor
-		if body != null:
-			out.append(body)
-	return out
 
 
 func free_all() -> void:

@@ -1,6 +1,7 @@
 extends Node2D
 ## Entities (staffs B5): the decoys and familiars that cards make. One autoload ("Entities")
-## keeps them in a fixed pool, so a card spawning one allocates nothing.
+## keeps them in a fixed pool of rows, so a card spawning a familiar allocates nothing; a decoy is an
+## actor made new for its row each time (below).
 ##
 ##     Events.entity_spawn_requested.emit(caster, &"decoy", at, 6.0, tag, -1)     # core/spells sends it
 ##
@@ -20,8 +21,10 @@ extends Node2D
 ## nearest). Homing on its card makes it creep toward its target within its homing reach, at
 ## SpellLimits.HOMING_DRIFT (as a homing rune creeps). It ends when its Health is used up (it is
 ## `downable`: Entities ends it instead of letting it die) or its time runs out; where it ended is
-## its end point. Each row makes its decoy actor the first time it holds one and keeps it: an ended
-## decoy leaves the tree and is placed again later. Entities steps its decoys itself, in `step`. A
+## its end point. A row makes a new decoy actor each time it holds one, so nothing of an earlier
+## decoy carries over (a snapshot holds only the live ones; online-ready N10b): an ended decoy leaves
+## the tree and is freed when its row next holds one, or with Entities. Entities steps its decoys
+## itself, in `step`. A
 ## decoy is a regular actor (owner, 2026-11-06): a shield on its card is a barrier Combat keeps on
 ## it, and a deflect turns the shots round it as it appears, both given by core/spells
 ## (`CarrierDecoy`) once the decoy is in the world; nothing here guards it.
@@ -105,7 +108,9 @@ const STRIDE: int = 16
 const DRAW_Z: int = 40
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"spells"]
+## The decoy actors are a pool of nodes: each live one is a body of its own, which a snapshot keeps
+## and Entities makes again (`remake_body`, `rebuild_derived`).
+const DERIVED: Array[StringName] = [&"events", &"projectiles", &"actors", &"combat", &"spells", &"_decoys"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_caster", &"_enemies"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -148,8 +153,9 @@ var _enemies: Array[Node2D] = []
 var _centre_at: PackedVector2Array = PackedVector2Array()
 var _centre_slot: PackedInt32Array = PackedInt32Array()
 var _centre_seq: PackedInt64Array = PackedInt64Array()
-## The decoy actor of each row, made the first time the row holds a decoy (null before), in the
-## tree while the row is a decoy.
+## The decoy actor of each row (null before its first), in the tree while the row is a decoy; out of
+## it once the decoy ended, until the row's next decoy replaces it. DERIVED: a live decoy is a body
+## (the actor table's), which a snapshot keeps and Entities makes again (`remake_body`).
 var _decoys: Array[Actor] = []
 var _spawned: int = 0
 var _live: int = 0
@@ -327,7 +333,7 @@ func begin_run() -> void:
 	use_familiar_look()
 	for row in _decoys.size():
 		var decoy: Actor = _decoys[row]
-		if decoy != null:
+		if decoy != null and is_instance_valid(decoy):
 			decoy.free()
 		_decoys[row] = null
 	SimFresh.renew(self)
@@ -402,9 +408,7 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 ## creeping toward its target when the card with `tag` homes. Spells hears its actor id
 ## (`Spells.entity_body`), so its triggers cast from it along its aim.
 func _place_decoy(row: int, owner: int, tag: int, at: Vector2, body: Node2D) -> void:
-	var decoy: Actor = _decoys[row]
-	if decoy == null:
-		decoy = _make_decoy(row)
+	var decoy: Actor = _new_decoy(row)
 	var mind: DecoyController = decoy.get_node(^"Mind") as DecoyController
 	mind.team = _team_of(owner)
 	mind.reach = CarrierDecoy.of(spells).homing_reach(tag) if spells != null else 0.0
@@ -428,7 +432,17 @@ func _place_decoy(row: int, owner: int, tag: int, at: Vector2, body: Node2D) -> 
 		spells.entity_body = decoy.id
 
 
-## The decoy actor of row `row`, made once: its components and its controller.
+## Row `row`'s decoy actor made new, out of the tree (its ended one, if any, freed): every decoy
+## starts as a fresh one, in every world alike.
+func _new_decoy(row: int) -> Actor:
+	var old: Actor = _decoys[row]
+	if old != null and is_instance_valid(old):
+		old.free()
+	_decoys[row] = null
+	return _make_decoy(row)
+
+
+## The decoy actor of row `row`: its components and its controller.
 func _make_decoy(row: int) -> Actor:
 	var decoy := Actor.new()
 	decoy.name = "Decoy%d" % row
@@ -444,14 +458,19 @@ func _make_decoy(row: int) -> Actor:
 	health.max_health = DECOY_HEALTH
 	decoy.add_child(health)
 	var hurtbox := Hurtbox.new()
+	# Named, as a snapshot finds a body's nodes by name (a body built in code: all of them).
+	hurtbox.name = "Hurtbox"
 	hurtbox.radius = DECOY_RADIUS
 	hurtbox.offset = DECOY_OFFSET
 	decoy.add_child(hurtbox)
 	var mover := Mover.new()
+	mover.name = "Mover"
 	mover.speed = SpellLimits.HOMING_DRIFT
 	mover.body_radius = DECOY_RADIUS
 	decoy.add_child(mover)
-	decoy.add_child(Caster.new())
+	var caster := Caster.new()
+	caster.name = "Caster"
+	decoy.add_child(caster)
 	var look := DecoyLook.new()
 	look.name = "Look"
 	decoy.add_child(look)
@@ -462,11 +481,39 @@ func _make_decoy(row: int) -> Actor:
 	return decoy
 
 
+## A snapshot makes the decoy named `body_name` again (core/sim/snapshot.gd, "Bodies"; online-ready
+## N10b): its row's actor made new, with its components and its mind, out of the tree, for the
+## snapshot to write its state into and add here. Null for a name that is no row's.
+func remake_body(body_name: StringName) -> Node:
+	for row in POOL_SIZE:
+		if body_name == StringName("Decoy%d" % row):
+			return _new_decoy(row)
+	return null
+
+
+## A snapshot restored (online-ready N10b): each row's decoy found again among the children (a live
+## one is a body the snapshot kept or made), and each live decoy's look copied again from its owner's
+## body (the look is drawing, outside the state).
+func rebuild_derived() -> void:
+	for row in POOL_SIZE:
+		var there: Actor = get_node_or_null(NodePath("Decoy%d" % row)) as Actor
+		if there != null:
+			_decoys[row] = there
+		elif _decoys[row] != null and (not is_instance_valid(_decoys[row]) or _decoys[row].is_inside_tree()):
+			_decoys[row] = null
+		if _kind[row] != DECOY or _decoys[row] == null:
+			continue
+		var look: DecoyLook = _decoys[row].get_node_or_null(^"Look") as DecoyLook
+		if look != null:
+			look.copy_look(_body_of(_owner[row]))
+			look.tint(ProjectileManagerScript.ramp_color(_ramp[row]).lerp(Color.WHITE, 0.4))
+
+
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
 		# The decoys out of the tree are no children: they go with Entities.
 		for decoy in _decoys:
-			if decoy != null and decoy.get_parent() == null:
+			if decoy != null and is_instance_valid(decoy) and decoy.get_parent() == null:
 				decoy.free()
 
 
@@ -492,12 +539,7 @@ func _on_run_ended(_victory: bool) -> void:
 
 func _step_familiar(row: int, delta: float) -> void:
 	_angle[row] = wrapf(_angle[row] + FAMILIAR_TURN * delta, -PI, PI)
-	var body: Node2D = _caster[row]
-	if not is_instance_valid(body):
-		_caster[row] = null
-	elif body is Actor and (body as Actor).belongs_to == _owner[row] and not body.is_inside_tree():
-		# A body of its owner's that it circles (a decoy) has ended: it stays where that was.
-		_centre_at[row] = _centre_of(body)
+	if not is_instance_valid(_caster[row]):
 		_caster[row] = null
 	_position[row] = _orbit_point(row)
 
@@ -538,6 +580,11 @@ func _end(row: int, announce: bool) -> void:
 		_position[row] = decoy.global_position
 		# Out of the tree: its id, hurt circle and caster close, and nothing aims at it any more.
 		remove_child(decoy)
+		# A familiar circling it stays where it ended.
+		for other in POOL_SIZE:
+			if _kind[other] == FAMILIAR and _caster[other] == decoy:
+				_centre_at[other] = _centre_of(decoy)
+				_caster[other] = null
 	if announce and events != null:
 		# Spells hears which of its tag's entities this is (its key), so this one's timer leaves. An
 		# end inside a spawn (the cap) puts back the key the spawn is asking under.

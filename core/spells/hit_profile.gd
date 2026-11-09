@@ -3,6 +3,14 @@ extends RefCounted
 ## What one hit of a spell's shot does, as `Spells.hit_profile(tag)` gives it to
 ## `gameplay/combat`: the numbers it needs and nothing else, so combat reads no spell
 ## field. One object per compiled spell, shared and read-only: no hit allocates.
+##
+## FROZEN (core/sim/README.md, "Contract", "Made once"): set whole where it is made (the compiler, `copy` and
+## `scaled`, a relay's merge before it is kept) and never written after, so the state walk hashes
+## it by what it holds, not by which object it is, and a snapshot keeps it as itself (online-ready
+## N10). Before, a snapshot copied a profile a relay shot held (its compiled spell's own, until an
+## infusion changes it) as state, so the restored shot held an equal copy and the hash, which tells
+## an object met twice from two equal ones, parted (N12 found it on echo).
+const FROZEN: bool = true
 
 ## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
 var damage: float = 1.0

@@ -6,6 +6,7 @@
 #   dist         the zips and SHA256SUMS (publish.yml releases them)
 #   screenshots  for the Pages gallery
 #   build-logs   stress and timing results for the Daily log
+#   test-exports with test-exports: the exports with tests that platforms.yml plays
 # No secrets.
 name: build
 
@@ -16,6 +17,10 @@ on:
         description: "auto (the quality gate), stable or nightly"
         type: string
         default: auto
+      test-exports:
+        description: also keep the test exports (Linux, Windows and Web Test) for platforms.yml
+        type: boolean
+        default: false
     outputs:
       version:
         value: ${{ jobs.build.outputs.version }}
@@ -80,6 +85,17 @@ jobs:
           name: build-logs
           path: build/logs
           retention-days: 1
+      - name: Keep the test exports (platforms.yml plays the same replays in each)
+        if: inputs.test-exports
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-exports
+          path: |
+            build/linux-test
+            build/windows-test
+            build/web-test
+          retention-days: 1
+          if-no-files-found: error
       - name: Keep the screenshots (for the Pages gallery)
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

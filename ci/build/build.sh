@@ -322,12 +322,12 @@ clips() {
 }
 
 export_preset() { # export_preset <preset>: a release export to the preset's export_path
-  local preset="$1" out
+  local preset="$1" out name="${1,,}"
   step "Exporting $preset"
   out=$(sed -n "/^name=\"$preset\"\$/,/^export_path=/s/^export_path=\"\(.*\)\"\$/\1/p" export_presets.cfg)
   rm -rf "$(dirname "$out")"
   mkdir -p "$(dirname "$out")"
-  godot_checked "export-${preset,,}" "$GODOT" --headless --path . --export-release "$preset" "$out"
+  godot_checked "export-${name// /-}" "$GODOT" --headless --path . --export-release "$preset" "$out"
   [[ -s "$out" ]] || { echo "::error::$preset export produced no $out"; exit 1; }
   case "$preset" in
     Web*) check_native_export web "$(dirname "$out")" ;;
@@ -375,6 +375,10 @@ export_all() {
         || { echo "::error::$label did not print '$linux_ok' in the Linux Test export"; exit 1; }
     done <<<"$runs"
     check_native_loaded linux
+    # The Windows preset with tests: not run here, but kept with the other two for the daily run's
+    # platforms job, which plays the same replays in all three, Windows on a Windows runner
+    # (.github/workflows/platforms.yml, online-ready N8).
+    export_preset "Windows Test"
   fi
 
   step "Boot smoke test (web build in headless Chrome)"

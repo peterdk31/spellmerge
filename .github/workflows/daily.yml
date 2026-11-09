@@ -6,7 +6,9 @@
 #                  files checked with no secrets, carried out by a script
 #                  (labels, replies, the work queue, CLA signatures)
 #  3. build        build and smoke tests (build.yml); a broken build is not released
-#                  and the Daily log says so (nothing is reverted automatically)
+#                  and the Daily log says so (nothing is reverted automatically);
+#                  then the same replays on Linux, Windows and the web (platforms.yml);
+#                  a platform that parts holds the release back too
 #  4. release      attested immutable release, GitHub Pages, itch.io (publish.yml,
 #                  which the owner can also run by hand)
 #  5. log          alarms and the Daily log summary
@@ -232,11 +234,22 @@ jobs:
     permissions:
       contents: read
       issues: read # quality gate: open crash and blocker issues
+    with:
+      test-exports: true # for the platforms job
+
+  platforms:
+    name: the same game on every platform
+    needs: build
+    if: always() && needs.build.result == 'success'
+    uses: ./.github/workflows/platforms.yml
+    with:
+      commit: ${{ needs.build.outputs.commit }}
 
   release:
     name: release
-    needs: build
-    if: always() && needs.build.result == 'success'
+    needs: [build, platforms]
+    # Only when every platform plays the same game too (platforms.yml; owner, 2026-11-09).
+    if: always() && needs.build.result == 'success' && needs.platforms.result == 'success'
     uses: ./.github/workflows/publish.yml
     # A called workflow's jobs may only ask for what the caller grants, every job of it
     # (not just the ones that run), so each call grants what publish.yml asks for in all.
@@ -387,7 +400,7 @@ jobs:
 
   summary:
     name: post to the Daily log
-    needs: [control, intake-gather, intake-decide, intake-apply, build, release, pages, itch, alarms]
+    needs: [control, intake-gather, intake-decide, intake-apply, build, platforms, release, pages, itch, alarms]
     if: always() && needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -418,6 +431,7 @@ jobs:
           INTAKE_STATUS: ${{ needs.intake-decide.outputs.status }}
           RESULT_INTAKE: ${{ needs.intake-apply.result }}
           RESULT_BUILD: ${{ needs.build.result }}
+          RESULT_PLATFORMS: ${{ needs.platforms.result }}
           RESULT_RELEASE: ${{ needs.release.result }}
           RESULT_PAGES: ${{ needs.pages.result }}
           RESULT_ITCH: ${{ needs.itch.result }}

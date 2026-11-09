@@ -4,8 +4,12 @@
 
 from __future__ import annotations
 
+import io
+import os
 import sys
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -15,14 +19,14 @@ import platform_hashes as ph  # noqa: E402
 
 def log(*ticks: tuple[str, dict[str, str]], scene: str = "sandbox", inputs: str = "abc",
         leaves: list[tuple[str, str, str, str]] | None = None, result: str = "REPLAY HASHES OK",
-        prefix: str = "") -> str:
+        prefix: str = "", self_check: str = "agree") -> str:
     lines = [f"{prefix}REPLAY START\t{scene}\tLinux\tticks={len(ticks)}\tnative=on\tcap=1000",
              f"{prefix}REPLAY INPUT\t{scene}\t{inputs}"]
     for tick, (whole, areas) in enumerate(ticks):
         lines.append(f"{prefix}REPLAY TICK\t{scene}\t{tick}\t{whole}\t" + "\t".join(f"{a}={h}" for a, h in areas.items()))
     for area, digest, path, shown in leaves or []:
         lines.append(f"{prefix}REPLAY LEAF\t{scene}\t{area}\t{digest}\t{path}\t{shown}")
-    lines.append(f"{prefix}REPLAY SELF\t{scene}\tagree")
+    lines.append(f"{prefix}REPLAY SELF\t{scene}\t{self_check}")
     lines.append(prefix + result)
     return "\n".join(lines)
 
@@ -64,7 +68,7 @@ class CompareTest(unittest.TestCase):
         self.assertEqual((parting.tick, parting.areas), (1, ["B"]))
         text, agree = ph.report(a, b)
         self.assertFalse(agree)
-        self.assertIn("sandbox: parts at tick 1, in B", text)
+        self.assertIn("sandbox: parts at tick 1, in B (2 vs 9)", text)
 
     def test_names_the_members_from_kept_leaves(self) -> None:
         leaves_a = [("B", "d1", "B.x", "1.0"), ("B", "d2", "B.y", "2.0")]
@@ -90,6 +94,78 @@ class CompareTest(unittest.TestCase):
         text, agree = ph.report(a, b)
         self.assertFalse(agree)
         self.assertIn("not played: horde", text)
+
+
+class RunProblemsTest(unittest.TestCase):
+    def test_a_finished_run_that_agrees_with_itself(self) -> None:
+        self.assertEqual(ph.run_problems(ph.parse("linux", log(("w0", {"A": "1"})))), ([], 0))
+
+    def test_a_run_that_did_not_finish(self) -> None:
+        lines, status = ph.run_problems(ph.parse("web", log(("w0", {"A": "1"}), result="REPLAY HASHES FAILED: boom")))
+        self.assertEqual(status, 2)
+        self.assertIn("did not finish (REPLAY HASHES FAILED: boom)", lines[0])
+        self.assertEqual(ph.run_problems(ph.parse("web", "nothing"))[1], 2)
+
+    def test_a_replay_parting_from_its_own_recording(self) -> None:
+        lines, status = ph.run_problems(ph.parse("windows", log(("w0", {"A": "1"}), self_check="parts at tick 7")))
+        self.assertEqual(status, 1)
+        self.assertEqual(lines, ["windows: sandbox: its replay parts at tick 7 against its recording"])
+
+
+class CommandsTest(unittest.TestCase):
+    """`compare` on saved logs and `play` on an export, as the daily build's platforms job runs them."""
+
+    def setUp(self) -> None:
+        self.dir = Path(tempfile.mkdtemp())
+
+    def write(self, name: str, text: str) -> Path:
+        path = self.dir / name
+        path.write_text(text)
+        return path
+
+    def main(self, *argv: str) -> tuple[int, str]:
+        out = io.StringIO()
+        with redirect_stdout(out):
+            status = ph.main(list(argv))
+        return status, out.getvalue()
+
+    def test_compare_agrees_parts_and_does_not_finish(self) -> None:
+        linux = self.write("linux.log", log(("w0", {"A": "1"}), ("w1", {"A": "2"})))
+        same = self.write("web.log", log(("w0", {"A": "1"}), ("w1", {"A": "2"}), prefix="console.log: "))
+        other = self.write("windows.log", log(("w0", {"A": "1"}), ("x1", {"A": "5"})))
+        broken = self.write("broken.log", "REPLAY HASHES FAILED: no wizard")
+        self.assertEqual(self.main("compare", str(linux), str(same))[0], 0)
+        status, text = self.main("compare", str(linux), str(same), str(other))
+        self.assertEqual(status, 1)
+        self.assertIn("windows against linux:\n  sandbox: parts at tick 1, in A (2 vs 5)", text)
+        status, text = self.main("compare", str(linux), str(other), str(broken))
+        self.assertEqual(status, 2)
+        self.assertIn("broken: the run did not finish (REPLAY HASHES FAILED: no wizard)", text)
+        # A platform whose job wrote no log: the rest are still compared.
+        status, text = self.main("compare", str(linux), str(self.dir / "windows-gone.log"), str(other))
+        self.assertEqual(status, 2)
+        self.assertIn("windows-gone: no log", text)
+        self.assertIn("parts at tick 1", text)
+        self.assertEqual(self.main("compare", str(self.dir / "gone.log"), str(linux))[0], 2)
+
+    @unittest.skipIf(os.name != "posix", "the fake export is a shell script")
+    def test_play_runs_an_export_and_writes_its_log(self) -> None:
+        build = self.dir / "linux-test"
+        build.mkdir()
+        # A stand-in export: prints a finished run and the arguments it was given. Not executable,
+        # as a downloaded CI artifact comes.
+        lines = log(("w0", {"A": "1"})).replace("\t", "\\t").splitlines()
+        program = "#!/bin/sh\n" + "".join(f"printf '{line}\\n'\n" for line in lines) + 'echo "ARGS $*"\n'
+        self.write("linux-test/Game.x86_64", program)
+        out = self.dir / "logs" / "linux-gdscript.log"
+        status, _ = self.main("play", "linux-gdscript", "--build", str(build), "--log", str(out),
+                              "--ticks=9", "--scenes=wave")
+        self.assertEqual(status, 0)
+        text = out.read_text()
+        self.assertIn("ARGS --headless -- --replay-hashes --ticks=9 --scenes=wave --no-native", text)
+        self.assertEqual(ph.parse("linux-gdscript", text).result, "REPLAY HASHES OK")
+        self.write("linux-test/Game.x86_64", "#!/bin/sh\necho crashed\n")
+        self.assertEqual(self.main("play", "linux", "--build", str(build), "--log", str(out))[0], 2)
 
 
 if __name__ == "__main__":

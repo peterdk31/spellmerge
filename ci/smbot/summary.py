@@ -23,6 +23,7 @@ from . import dailylog, gh, inbox, pacing, state
 JOBS = {  # job id -> what it does, for the summary
     "intake": "Community intake",
     "build": "Build and smoke tests",
+    "platforms": "The same game on Linux, Windows and the web",
     "release": "Release",
     "pages": "Web build on GitHub Pages",
     "itch": "itch.io",
@@ -38,6 +39,9 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
         out.append(f"Released [{version}](https://github.com/{repo}/releases/tag/{version}) as **{channel}**.")
     elif env.get("RESULT_BUILD") == "failure":
         out.append("**No release today: the build or a smoke test failed.** See the run's build-logs artifact.")
+    elif env.get("RESULT_PLATFORMS") == "failure":
+        out.append("**No release today: the platforms do not play the same game** (the same replays part between "
+                   "Linux, Windows and the web). See the platforms job's summary in the run.")
     for job, label in JOBS.items():
         result = env.get(f"RESULT_{job.upper()}", "skipped")
         if job == "itch" and result == "skipped":

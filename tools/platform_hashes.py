@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 # SPDX-FileCopyrightText: 2026 peterdk31 and Spellmerge contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""The same game on every platform, a first look (online-ready N2b, docs/milestones/online-ready.md).
+"""The same game on every platform (online-ready N2b and N8, docs/milestones/online-ready.md).
 
-Runs the replay hashes (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight and a
-horde run of a bot, recorded and played back, every tick's state hash per area printed) in the test
-exports on Linux, Windows and the web, and names the first tick and area where a platform parts from
-Linux. When one parts, it runs that scene again on both, keeping the parting tick's leaves, and names
-the members that differ.
+Runs the replay hashes (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight, a horde
+run of a bot and two bots in the waves, recorded and played back, every tick's state hash per area
+printed) in the test exports on Linux, Windows and the web, and names the first tick and area where a
+platform parts from Linux, with both hashes of each area. When one parts, `run` plays that scene
+again on both, keeping the parting tick's leaves, and names the members that differ.
 
   tools/platform_hashes.py run [--platforms linux,windows,web] [--ticks 600] [--scenes sandbox,horde]
+  tools/platform_hashes.py play NAME --build DIR [--ticks 600] [--scenes sandbox,horde] [--log FILE]
   tools/platform_hashes.py compare build/platforms/linux.log build/platforms/web.log ...
 
 `run` needs one `ci/build/build.sh --quick` in the checkout (the pinned Godot and the Linux native
@@ -21,8 +22,12 @@ platform's run, Linux runs once more with `--no-native` (the GDScript twins of t
   the Linux GDScript run as well.
 - **The web** runs in headless Chromium (smbot.websmoke, SwiftShader), the native module built by
   Emscripten.
-No CI job runs it yet (N8 adds one). Exit status: 0 when every platform agrees with Linux, 1 when one
-parts, 2 when a run did not finish.
+
+`play` runs one export that is already built (NAME: linux, linux-gdscript, windows or web) and
+writes its log; `compare` then compares saved logs with the first. The daily build's `platforms`
+job does that (.github/workflows/platforms.yml, N8): each platform on its own runner, Windows on a
+Windows runner, then one compare. Exit status: 0 when every platform agrees with Linux, 1 when one
+parts (or a run's own replay parts from its recording), 2 when a run did not finish.
 """
 
 from __future__ import annotations
@@ -157,7 +162,13 @@ def report(ref: Run, other: Run) -> tuple[str, bool]:
             lines.append(f"  {parting.scene}: agrees at all {len(ref.scenes[parting.scene].ticks)} ticks")
             continue
         agree = False
-        where = ", ".join(parting.areas) if parting.areas else parting.note
+        where = parting.note
+        if parting.areas:
+            # Each area with both its hashes: CI keeps no leaves, so this is what its report shows.
+            ref_areas = ref.scenes[parting.scene].ticks[parting.tick][1]
+            areas = other.scenes[parting.scene].ticks[parting.tick][1]
+            where = ", ".join(f"{a} ({ref_areas.get(a, 'missing')} vs {areas.get(a, 'missing')})"
+                              for a in parting.areas)
         lines.append(f"  {parting.scene}: parts at tick {parting.tick}, in {where}")
         for member in members_parting(ref.scenes[parting.scene], other.scenes[parting.scene], parting.areas):
             lines.append(f"    {member}")
@@ -166,6 +177,24 @@ def report(ref: Run, other: Run) -> tuple[str, bool]:
         agree = False
         lines.append(f"  not played: {', '.join(missing)}")
     return "\n".join(lines), agree
+
+
+def run_problems(run: Run) -> tuple[list[str], int]:
+    """What is wrong with one run on its own, and the exit status it calls for: 2 when it did not
+    finish, 1 when a scene's replay parted from its own recording (REPLAY SELF), else 0."""
+    if run.result != "REPLAY HASHES OK":
+        return [f"{run.name}: the run did not finish ({run.result or 'no result line'})"], 2
+    lines = [f"{run.name}: {name}: its replay {scene.self_check or 'printed no self check'} against its recording"
+             for name, scene in run.scenes.items() if scene.self_check != "agree"]
+    return lines, 1 if lines else 0
+
+
+def print_problems(run: Run, where: Path | None = None) -> int:
+    """Prints `run_problems` (with the log they came from) and returns its exit status."""
+    lines, status = run_problems(run)
+    for line in lines:
+        print(f"{line} ({where})" if where else line)
+    return status
 
 
 # --- Running the exports -------------------------------------------------------------------------
@@ -201,20 +230,34 @@ def windows_temp() -> Path:
     return Path(subprocess.run(["wslpath", "-u", text], capture_output=True, text=True).stdout.strip())
 
 
-def run_linux(name: str, args: list[str], timeout: float, tag: str = "") -> Path:
-    log = OUT / f"{name}{tag}.log"
-    sh(ROOT / "build/linux-test/Spellmerge.x86_64", "--headless", "--", ARGUMENT, *args, log=log, timeout=timeout,
-       env={**os.environ, "XDG_DATA_HOME": str(OUT / f"data-{name}")})
-    return log
+# The exports' folders that `run` makes, by player.
+BUILDS = {"linux": "build/linux-test", "linux-gdscript": "build/linux-test", "windows": "build/windows-test",
+          "web": "build/web-test"}
 
 
-def run_windows(args: list[str], timeout: float, tag: str = "") -> Path:
-    folder = windows_temp() / WINDOWS_TEMP_NAME
-    shutil.rmtree(folder, ignore_errors=True)
-    shutil.copytree(ROOT / "build/windows-test", folder)
-    log = OUT / f"windows{tag}.log"
-    exe = folder / "Spellmerge.exe"
-    # Run from a Windows folder (cwd), so the game does not start in a \\wsl$ path.
+def program(build: Path, pattern: str) -> Path:
+    """The export's program in `build`, found by its extension (its name is the game's, ci/config.json)."""
+    found = sorted(p for p in build.glob(pattern) if not p.name.endswith(".console.exe"))
+    if not found:
+        sys.exit(f"platform_hashes: no {pattern} in {build}")
+    return found[0]
+
+
+def play_linux(build: Path, args: list[str], timeout: float, log: Path) -> None:
+    exe = program(build, "*.x86_64")
+    exe.chmod(exe.stat().st_mode | 0o111)  # a downloaded CI artifact loses the mode
+    sh(exe, "--headless", "--", ARGUMENT, *args, log=log, timeout=timeout,
+       env={**os.environ, "XDG_DATA_HOME": str(log.parent / f"data-{log.stem}")})
+
+
+def play_windows(build: Path, args: list[str], timeout: float, log: Path) -> None:
+    folder = build
+    if sys.platform != "win32":
+        # Through WSL's interop, from a copy under %TEMP%, so the game does not start in a \\wsl$ path.
+        folder = windows_temp() / WINDOWS_TEMP_NAME
+        shutil.rmtree(folder, ignore_errors=True)
+        shutil.copytree(build, folder)
+    exe = program(folder, "*.exe")
     print(f"$ {exe} --headless -- {ARGUMENT} {' '.join(args)}", flush=True)
     with open(log, "w") as out:
         try:
@@ -222,14 +265,24 @@ def run_windows(args: list[str], timeout: float, tag: str = "") -> Path:
                            stderr=subprocess.STDOUT, timeout=timeout)
         except subprocess.TimeoutExpired:
             out.write("\nplatform_hashes: timed out\n")
-    return log
 
 
-def run_web(args: list[str], timeout: float, tag: str = "") -> Path:
-    log = OUT / f"web{tag}.log"
+def play_web(build: Path, args: list[str], timeout: float, log: Path) -> None:
     page_args = [f"--page-args={a}" for a in [ARGUMENT, *args]]
-    sh(sys.executable, "-m", "smbot.websmoke", "build/web-test", *page_args, "--expect", DONE,
+    sh(sys.executable, "-m", "smbot.websmoke", build, *page_args, "--expect", DONE,
        "--timeout", str(timeout), log=log, env={**os.environ, "PYTHONPATH": str(ROOT / "ci")})
+
+
+PLAYERS = {"linux": play_linux, "linux-gdscript": lambda b, a, t, l: play_linux(b, a + ["--no-native"], t, l),
+           "windows": play_windows, "web": play_web}
+
+
+def play(name: str, build: Path, args: list[str], timeout: float, log: Path) -> Path:
+    """Plays the replay hashes in one export, the log written to `log`."""
+    # Whole paths: the programs run in another folder (ROOT, or the Windows export's own).
+    build, log = build.resolve(), log.resolve()
+    log.parent.mkdir(parents=True, exist_ok=True)
+    PLAYERS[name](build, args, timeout, log)
     return log
 
 
@@ -250,17 +303,15 @@ def main_run(opts: argparse.Namespace) -> int:
             export("Web Test", "build/web-test/index.html")
     # A run's log is build/platforms/<name>.log; a run again keeping a tick's leaves writes
     # <name>-keep-<other>.log beside it.
-    runners = {"linux": lambda a, tag="": run_linux("linux", a, opts.timeout, tag),
-               "linux-gdscript": lambda a, tag="": run_linux("linux-gdscript", a + ["--no-native"], opts.timeout, tag),
-               "windows": lambda a, tag="": run_windows(a, opts.timeout, tag),
-               "web": lambda a, tag="": run_web(a, opts.timeout, tag)}
+    def runner(name: str, a: list[str], tag: str = "") -> Path:
+        return play(name, ROOT / BUILDS[name], a, opts.timeout, OUT / f"{name}{tag}.log")
+
     names = ["linux", "linux-gdscript"] + [p for p in platforms if p not in ("linux", "linux-gdscript")]
-    logs = {name: runners[name](args) for name in names}
+    logs = {name: runner(name, args) for name in names}
     runs = {name: parse(name, logs[name].read_text(errors="replace")) for name in names}
-    unfinished = [n for n, r in runs.items() if r.result != "REPLAY HASHES OK"]
-    for name in unfinished:
-        print(f"{name}: the run did not finish ({runs[name].result or 'no result line'}; {logs[name]})")
-    status = 2 if unfinished else 0
+    status = 0
+    for name in names:
+        status = max(status, print_problems(runs[name], logs[name]))
     ref = runs["linux"]
     for name in names[1:]:
         refs = [ref] + ([runs["linux-gdscript"]] if name == "windows" else [])
@@ -270,12 +321,12 @@ def main_run(opts: argparse.Namespace) -> int:
                 # Again, keeping the parting tick's leaves on both, so the report names the members.
                 partings = [p for p in compare(against, runs[name]) if p.tick >= 0]
                 keeps = [f"--keep={p.scene}:{p.tick}" for p in partings]
-                # Only the scenes that part, each up to its parting tick.
-                again_args = [f"--ticks={max(p.tick for p in partings) + 1}",
-                              f"--scenes={','.join(p.scene for p in partings)}"] + keeps
-                if keeps:
+                if keeps:  # none when only a scene was not played
+                    # Only the scenes that part, each up to its parting tick.
+                    again_args = [f"--ticks={max(p.tick for p in partings) + 1}",
+                                  f"--scenes={','.join(p.scene for p in partings)}"] + keeps
                     pair = (against.name, name)
-                    again = {n: parse(n, runners[n](again_args, f"-keep-{pair[1 - pair.index(n)]}").read_text(errors="replace"))
+                    again = {n: parse(n, runner(n, again_args, f"-keep-{pair[1 - pair.index(n)]}").read_text(errors="replace"))
                              for n in pair}
                     text, agree = report(again[against.name], again[name])
                 status = max(status, 1)
@@ -283,27 +334,55 @@ def main_run(opts: argparse.Namespace) -> int:
     return status
 
 
+def main_compare(logs: list[Path]) -> int:
+    """Compares saved logs with the first; prints each run's own problems and each parting."""
+    status = 0
+    runs: list[Run] = []
+    for path in logs:
+        if path.exists():
+            runs.append(parse(path.stem, path.read_text(errors="replace")))
+        else:  # its job failed before writing one
+            print(f"{path.stem}: no log ({path})")
+            status = 2
+    if logs and not logs[0].exists():
+        return status  # nothing to compare with
+    for run in runs:
+        status = max(status, print_problems(run))
+    for other in runs[1:]:
+        text, agree = report(runs[0], other)
+        print(text)
+        status = max(status, 0 if agree else 1)
+    return status
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="command", required=True)
+
+    def run_options(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--ticks", type=int, default=600)
+        p.add_argument("--scenes", default="sandbox,horde")
+        p.add_argument("--timeout", type=float, default=1800.0, help="seconds per run")
+
     r = sub.add_parser("run", help="export, run on each platform and compare")
     r.add_argument("--platforms", default="linux,windows,web")
-    r.add_argument("--ticks", type=int, default=600)
-    r.add_argument("--scenes", default="sandbox,horde")
-    r.add_argument("--timeout", type=float, default=1800.0, help="seconds per run")
+    run_options(r)
     r.add_argument("--no-export", action="store_true", help="run the exports already in build/")
+    p = sub.add_parser("play", help="run one export already built and write its log")
+    p.add_argument("name", choices=sorted(PLAYERS))
+    p.add_argument("--build", type=Path, help="the export's folder (default: where `run` exports it)")
+    p.add_argument("--log", type=Path, help="the log to write (default: build/platforms/NAME.log)")
+    run_options(p)
     c = sub.add_parser("compare", help="compare logs, the first one the reference")
     c.add_argument("logs", nargs="+", type=Path)
     opts = ap.parse_args(argv)
     if opts.command == "run":
         return main_run(opts)
-    runs = [parse(p.stem, p.read_text(errors="replace")) for p in opts.logs]
-    status = 0
-    for other in runs[1:]:
-        text, agree = report(runs[0], other)
-        print(text)
-        status = status if agree else 1
-    return status
+    if opts.command == "play":
+        log = play(opts.name, opts.build or ROOT / BUILDS[opts.name],
+                   [f"--ticks={opts.ticks}", f"--scenes={opts.scenes}"], opts.timeout, opts.log or OUT / f"{opts.name}.log")
+        return print_problems(parse(opts.name, log.read_text(errors="replace")), log)
+    return main_compare(opts.logs)
 
 
 if __name__ == "__main__":

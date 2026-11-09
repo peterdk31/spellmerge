@@ -91,6 +91,9 @@ void vertex() {
 	float a = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, false);
 	float s = L.seed;
+	// The zoom from the square's side (Feel's zoom x 4 x BLAST_SPAN), uncapped: the look's red
+	// byte holds 63 at most.
+	L.zoom = max(floor(length(MODEL_MATRIX[1].xy) / (4.0 * BLAST_SPAN) + 0.5), 1.0);
 	float r = L.zoom * 2.0;
 	float life = kind == B_SHELL ? SHELL_SECONDS : FIREBALL_SECONDS;
 	float t = a * life;

@@ -25,6 +25,9 @@ varying flat float age;
 void vertex() {
 	age = coded_age(coded_code(INSTANCE_CUSTOM.a));
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, float(INSTANCE_ID % 61) * 1.618, false);
+	// Its length in steps of 4 px from the quad (Feel's length + 2 x ARC_MARGIN along), uncapped:
+	// the look's red byte holds 63 steps at most.
+	L.zoom = max(floor((length(MODEL_MATRIX[0].xy) - 2.0 * ARC_MARGIN) / 4.0 + 0.5), 1.0);
 	SET_LOOK(L);
 }
 

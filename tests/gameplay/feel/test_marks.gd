@@ -194,6 +194,14 @@ func test_a_stamp_waits_for_the_frame_and_draws_once() -> void:
 	check_equal(marks.viewport().render_target_update_mode, SubViewport.UPDATE_DISABLED, "its viewport reads UPDATE_DISABLED")
 
 
+## No mark is capped in size (the owner, 2026-11-09: no cue is): a stamp is as big as asked
+## (it was 160 px round at most).
+func test_a_huge_stamp_is_whole() -> void:
+	var marks: MarksScript = _layer()
+	marks.stamp(0, Vector2(300.0, 200.0), 420.0, 0.0, 0, Color.WHITE)
+	check_equal(marks.pending_row(0)[0], 420.0, "its radius as asked")
+
+
 func test_a_flood_waits_for_later_frames() -> void:
 	var marks: MarksScript = _layer()
 	for i in MarksScript.STAMPS_PER_FRAME + 10:

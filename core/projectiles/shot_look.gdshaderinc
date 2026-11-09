@@ -8,7 +8,9 @@
 //   custom data rgb  the core colour (the first infusion's tint; white for none)
 //   custom data a    the kind and a code as 1 - (kind + code) / 16 (`coded_kind`, `coded_code`)
 //   colour r         player + zoom x 4, as n / 255: the shapes grow with the zoom while every
-//                    line stays one pixel, so a bigger shot is bigger, never chunkier
+//                    line stays one pixel, so a bigger shot is bigger, never chunkier (63 at
+//                    most: Feel's flash shaders read their zoom from the row's transform
+//                    instead, so no cue is capped in size)
 //   colour g, b, a   the look: one bit per layer kind (kind 1 is bit 0 of green, kind 9 bit 0
 //                    of blue, kind 17 bit 0 of alpha), every kind the shot's cards bring, and
 //                    the flags (ENEMY_RAMP, EXACT)

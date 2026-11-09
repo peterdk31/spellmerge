@@ -229,9 +229,8 @@ const NO_BODY := Color(0.0, 0.0, 0.0, 0.0)
 const CASTER_RAMP: int = -100
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
-## A discharge arc is drawn along its length (at most ARC_LONGEST: the length travels in the
-## zoom's place, 4 px a step), ARC_MARGIN past each end, ARC_ACROSS across (the shader's).
-const ARC_LONGEST: float = 252.0
+## A discharge arc is drawn along its length (in steps of 4 px, as long as it is: `shot_arc.gdshader`
+## reads it from its quad), ARC_MARGIN past each end, ARC_ACROSS across (the shader's).
 const ARC_MARGIN: float = 12.0
 const ARC_ACROSS: float = 56.0
 ## The cue of a discharge's arc (`discharge_arc`; content/cues).
@@ -2027,8 +2026,10 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	_flash_core[slot] = core
 	_flash_ramp[slot] = ramp
-	# An explosion's part takes its radius / 2 as its zoom, up to the most the look holds.
-	_flash_zoom[slot] = clampi(zoom, 1, 63 if kind == KIND_SHELL or kind == KIND_FIREBALL else 15)
+	# As big as it is asked to be (the owner, 2026-11-09: no cue is capped in size): an explosion's
+	# part takes its radius / 2 as its zoom. The shaders read the size from the row's transform, not
+	# the look's red byte (which holds 63 at most).
+	_flash_zoom[slot] = maxi(zoom, 1)
 	_flash_look[slot] = look
 	_flash_age[slot] = 0.0
 	_flash_seconds[slot] = maxf(seconds, 0.01)
@@ -2039,7 +2040,7 @@ func _show_flash(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_flash_floor[slot] = 0
 	_flash_light[slot] = 0.0 if _cue_unlit else float(_code_light.get(kind, 0.0))
 	if kind == KIND_ARC:
-		var steps: int = clampi(roundi(length / 4.0), 1, roundi(ARC_LONGEST / 4.0))
+		var steps: int = maxi(roundi(length / 4.0), 1)
 		_flash_zoom[slot] = steps
 		_flash_length[slot] = steps * 4.0
 	return slot

@@ -28,7 +28,8 @@ extends SceneTree
 ## orbits that was born in the bottom wall is refused (every slot after it one lower), the ones
 ## whose circle crosses that wall end there, and half the wizards' orbits are bolts with a speed
 ## (and speed curves) where all had a fixed angular speed; the drift-only orbits move as before,
-## to the bit).
+## to the bit; and again for 5B, 2026-11-09, when a still shot's body became a flag of its own,
+## `F_QUAD`, in its flags: only the runes' flags differ, every line else to the bit).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

@@ -68,6 +68,8 @@ var _tails_capped: bool = false
 ## Whether a circling shot went round backwards after a bounce (its `_orbit_way`), so the kernel's
 ## orbit pass is compared on one.
 var _turned_back: bool = false
+## Whether a still body circled (5B), so the kernel drew a moving quad.
+var _circled_quad: bool = false
 
 
 func _initialize() -> void:
@@ -195,6 +197,7 @@ func _test_both_step_alike(threads: int) -> void:
 	_tails_laid = 0
 	_tails_capped = false
 	_turned_back = false
+	_circled_quad = false
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -213,6 +216,11 @@ func _test_both_step_alike(threads: int) -> void:
 		_tails_laid += _mgrs[1].tail_births
 		_tails_capped = _tails_capped or (_mgrs[1].tail_births == _mgrs[1].tail_births_cap and _mgrs[1].tail_spacing > ManagerScript.TAIL_SPACING)
 		_turned_back = _turned_back or _mgrs[1]._orbit_way.has(-1.0)
+		if not _circled_quad:
+			for slot in _mgrs[1]._high:
+				if _mgrs[1]._alive[slot] != 0 and _mgrs[1]._motion[slot] == ManagerScript.MOTION_ORBIT and (_mgrs[1]._flags[slot] & ManagerScript.F_QUAD) != 0:
+					_circled_quad = true
+					break
 		# Threat asks: enough in a step for the grid (from the third), and some in a step without it.
 		var asks: int = 6 if step % 3 != 2 else 1
 		for n in asks:
@@ -235,6 +243,7 @@ func _test_both_step_alike(threads: int) -> void:
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 	_check(_turned_back, "a circling shot bounced and went round backwards")
+	_check(_circled_quad, "a still body circled, drawn as its quad")
 
 
 
@@ -355,7 +364,10 @@ func _drive(side: int, step: int) -> void:
 			var angle: float = rng.randf() * TAU
 			var drift: float = rng.randf_range(-4.0, 4.0)
 			var own_speed: Vector2 = velocity if rng.randf() < 0.75 else Vector2.ZERO
-			slot = m.spawn(who, m.get_anchor(who), own_speed, rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1)
+			# Half of those with no speed are still bodies set circling (5B: a rune, a pool, a stone):
+			# they keep their quad (`F_QUAD`) while they move.
+			var still: bool = own_speed == Vector2.ZERO and step % 2 == 0
+			slot = m.spawn(who, m.get_anchor(who), own_speed, rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1, ManagerScript.MOTION_STILL if still else ManagerScript.MOTION_STRAIGHT)
 			if slot >= 0 and not m.set_orbit(slot, round_radius, angle, drift):
 				_failures.append("step %d: set_orbit refused a live straight shot" % step)
 			if slot >= 0 and slot % 2 == 0:

@@ -218,7 +218,7 @@ It does nothing on dash and teleport (they move the caster), swing and slam (the
 - **The beam sweeps.** `beam.gd`'s step turns its aim round its caster by the turn (drift only, since a beam's speed is 0) each step, for its 3 s. A held beam sweeps for as long as it is held. The beam keeps its own length. Homing does nothing on a sweeping beam, as on a circling shot.
 - **The cue:** the card's `cue = &"orbit"`, shown when cast: a ring of motes traced at the radius in the spell's infusion colours (the owner's rule: motes for everything; question 9 yes). It is today's `cast_orbit` remade in motes and renamed. What circles keeps its own look and cues.
 
-### Part 5A: the modifier on flying carriers and the beam; the carrier goes
+### Part 5A: the modifier on flying carriers and the beam; the carrier goes (done, #654)
 
 1. `Behaviour.ORBIT` with its `RULES` row (5A needs), and `lifetime_base` in ModifierBase and the compiler, with tests.
 2. `core/spells/orbit.gd`, the `_land_shots` hook, and `set_orbit` plus the speed-driven turn in the manager and `ShotKernel`.
@@ -231,7 +231,7 @@ It does nothing on dash and teleport (they move the caster), swing and slam (the
 9. **Tests that name orbit** move to the modifier: test_hold, test_return, test_zap, test_penta, test_decoy, test_on_hurt, test_shield, test_card_rules, test_behaviour_table, test_spells_cast, test_spells_multicast, test_spells_land_shots, test_spells_moves, test_spells_actors, test_spells_deflect, test_projectile_bodies, test_staff_compiler, test_staff_runtime, test_cast_sense, test_trigger_table, test_validators, test_cast_timing, the player bag and build tests, test_radial_builder, test_feel_form_looks, the benchmarks and the screenshot scripts. New tests: start angle from the start point; turn from speed (an atom outturns a bolt, Slow slows it, speed 0 drifts one turn in 3 s); a circling shot ends on a room wall and Ghost passes it; the AI sees a circling shot; `lifetime_base` with factors in any order; a sweeping beam; the native kernel's orbit step.
 10. **Docs:** CARRIERS.md, content/spells/README.md, core/README.md, DESIGN.md (the card list), card-looks.md (the orbit look note), BACKLOG.md, and a DECISIONS.md entry: "Orbit is a modifier: motion only, no special cases".
 
-### Part 5B: runes, pools and walls circle
+### Part 5B: runes, pools and walls circle (done)
 
 1. The `RULES` row widens to the 5B needs.
 2. A still carrier's row becomes a circler through the same `set_orbit`. The manager keeps its body (quad, its card shader, its still-shot age codes `still_since`/`still_left` for the rune) while its motion is orbit. This is the native change: the body is chosen per slot by what was spawned, not by `motion == MOTION_STILL` (projectile_manager.gd:1319, 1338, 2903, 2964, 3028 and the kernel's mirror). `_moves` already counts an orbit as moving, so Linger, Sticky and Spiral read circling runes as moving; the card-rules test is updated to say so.
@@ -246,8 +246,8 @@ It does nothing on dash and teleport (they move the caster), swing and slam (the
 | 1 Nova modifier, nova form gone (done, #648) | medium (most of it mechanical: about 100 files go from `nova` to `nova, bolt`) | no | the pacing count (`copies`); 8 swings or slams start the staff animation once; tests that measured the old nova's single batch (test_spells_land_shots) now see 8 launches |
 | 2 Skyfall (the hole, the beam's pillar with it) | medium to large: one PR | yes (each shot's floor line in the move and hit passes, mirrored in the kernel) | a step that jumps past the band must still hit what stands in it, alike in the GDScript and the kernel; the falling context reaching every shot and placement (`_land_shots`, `_placed_at`) and payloads of airborne shots; the waiting queue on rebuilds |
 | 4 rain gone (done) | medium | no | the Bone Scepter's staff; the payload-carrier code removed |
-| 5A orbit modifier on flyers and the beam, carrier gone | large (many tests name orbit) | yes (turn from speed, body look not by motion) | rows turned into circlers after they spawn; walls and the AI now meet circling shots; the beam's sweep; the kernel compared byte for byte |
-| 5B runes, pools and walls circle | medium | yes (a quad body under orbit motion) | still-shot looks, age codes and motes on a moving row; card rules that read MOVES |
+| 5A orbit modifier on flyers and the beam, carrier gone (done, #654) | large (many tests name orbit) | yes (turn from speed, body look not by motion) | rows turned into circlers after they spawn; walls and the AI now meet circling shots; the beam's sweep; the kernel compared byte for byte |
+| 5B runes, pools and walls circle (done) | medium | yes (a quad body under orbit motion) | still-shot looks, age codes and motes on a moving row; card rules that read MOVES |
 
 One PR each. Phase 4 needs phase 2, so the Bone Scepter and the combos have something to move to; phase 3 is part of phase 2.
 

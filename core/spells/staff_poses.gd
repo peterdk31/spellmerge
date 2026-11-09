@@ -26,6 +26,9 @@ var _pose_from: PackedFloat32Array = PackedFloat32Array()
 ## of a wall; INF for nowhere): where its `land` channel puts the drawn tip. For an animation that
 ## turns with the live aim (a cast winding up) it is worked out again along that aim when read.
 var _pose_land: PackedVector2Array = PackedVector2Array()
+## How far (radians) the carrier `actor` holds has turned its staff round the hand on top of its
+## animation (`turn_staff`: a beam sweeping round its caster, Orbit), until the next animation.
+var _pose_turned: PackedFloat32Array = PackedFloat32Array()
 ## The card each animation plays for (its carrier's `strike_point` along the live aim).
 var _pose_spell: Array[CompiledSpell] = []
 ## The blow of each animation: its last wind key, which keeps its card's own pace however long the
@@ -58,6 +61,7 @@ func _init(runtime_kit: CarrierKit) -> void:
 	_pose_strike.resize(SpellRuntime.ACTORS)
 	_pose_dir.resize(SpellRuntime.ACTORS)
 	_pose_side.resize(SpellRuntime.ACTORS)
+	_pose_turned.resize(SpellRuntime.ACTORS)
 	_pose_keys.resize(SpellRuntime.ACTORS)
 	_pose_tag.resize(SpellRuntime.ACTORS)
 	_pose_lock.resize(SpellRuntime.ACTORS)
@@ -75,11 +79,13 @@ func _init(runtime_kit: CarrierKit) -> void:
 func clear() -> void:
 	_pose_start.fill(INF)
 	_pose_spell.fill(null)
+	_pose_turned.fill(0.0)
 
 
 ## `actor`'s staff does not move (a caster opened or closed under its id).
 func reset_actor(actor: int) -> void:
 	_pose_start[actor] = INF
+	_pose_turned[actor] = 0.0
 
 
 ## When `actor`'s last staff animation began (INF for none): one cast's carriers start one.
@@ -105,11 +111,12 @@ func start(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: floa
 			_pose_from[at + c] = 0.0
 	else:
 		_pose_now(actor)
-		var heading: float = DMath.angle(was) + deg_to_rad(_pose_out[0]) * _pose_side[actor]
+		var heading: float = DMath.angle(was) + deg_to_rad(_pose_out[0]) * _pose_side[actor] + _pose_turned[actor]
 		for c in POSE_CHANNELS:
 			_pose_from[at + c] = _pose_out[c]
 		_pose_from[at] = rad_to_deg(angle_difference(DMath.angle(dir), heading)) * side
 	_pose_out_actor = -1
+	_pose_turned[actor] = 0.0
 	if spell.staff_pose.is_empty():
 		_pose_start[actor] = INF
 		return
@@ -192,13 +199,22 @@ func end_strike(tag: int) -> void:
 
 
 ## Where `actor`'s staff is in its animation now (its carrier's `staff_pose`), for its look: x the
-## turn off the aim locked at the cast (radians, a backhand's the other way), y the lift and z the
+## turn off the aim locked at the cast (radians, a backhand's the other way; with what its carrier turned it,
+## `turn_staff`), y the lift and z the
 ## push along that aim (pixels). Zero when it plays none: then `staff_pose_dir` is zero too and the
 ## look follows the aim. A new animation starts from where the last one had the staff.
 func staff_pose(actor: int) -> Vector3:
 	if not _pose_now(actor):
 		return Vector3.ZERO
-	return Vector3(deg_to_rad(_pose_out[0]) * _pose_side[actor], _pose_out[1], _pose_out[2])
+	return Vector3(deg_to_rad(_pose_out[0]) * _pose_side[actor] + _pose_turned[actor], _pose_out[1], _pose_out[2])
+
+
+## The carrier `actor` holds turns its staff `radians` round the hand, on top of its animation, from
+## now until the next animation starts (a beam sweeping round its caster, Orbit: the staff turns with
+## it, its tip where the beam starts). Only while an animation plays (`staff_pose`).
+func turn_staff(actor: int, radians: float) -> void:
+	if actor >= 0 and actor < SpellRuntime.ACTORS and is_finite(radians):
+		_pose_turned[actor] = radians
 
 
 ## How strongly `actor`'s staff glows now (0 to 1), and in what colour: its carrier's infusion's,

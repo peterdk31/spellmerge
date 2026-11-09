@@ -23,7 +23,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `HITS` | Does it hit things itself (not a decoy or a familiar)? |
 | `LASTS` | Does it last a while (not a slam or a teleport, which are over at once)? |
 | `STEERS` | Can homing steer it (turn it, bend it, place it on a target, or creep it toward one: a rune, a wall, a decoy)? |
-| `MEETS_SHOTS` | Can it stop or turn other shots (not a rain or a familiar)? |
+| `MEETS_SHOTS` | Can it stop or turn other shots (not a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
 | `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |
 | `BLOCKS` | Does it stand in the world and stop other actors' shots (a wall)? Read only by the AI's summary (`CastSense`). |
@@ -85,8 +85,8 @@ three (`caster.gd`, `bearer.gd`, `point.gd`, on the shared base `fallback.gd`, `
 - `caster`, for the cast's own group: the cards land on the caster (a lone `blast` explodes on you).
 - `bearer`, for a payload that a body or a live shot may cast: the cards land on **whatever fired
   the payload** (owner, 2026-11-06).
-- `point`, for a payload that only a point can cast (a shot that is gone, a beam's tip, a rain's
-  spot, a familiar's orb, `on expire` of a shot): the cards land on the point it began at
+- `point`, for a payload that only a point can cast (a shot that is gone, a beam's tip, a
+  familiar's orb, `on expire` of a shot): the cards land on the point it began at
   (`on hit · bolt · blast` explodes where the bolt hits, with no second carrier).
 
 All three are carriers like any other, with two differences: no form card fires them, so
@@ -104,7 +104,7 @@ may cast the payload could use it:
 | Trigger | The payload is cast by |
 | --- | --- |
 | `on cast` | whoever cast the carrier (its group's `by`) |
-| `timer`, `on hurt`, `on recast` | its own shot (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`: a decoy), or what it moves (`MOVES_CASTER`: the shot that cast it, else the wizard's body); a beam's or swing's tip, a rain, a familiar, a portal: a point |
+| `timer`, `on hurt`, `on recast` | its own shot (`CASTS_FROM_SHOT`), its own body (`CASTS_FROM_BODY`: a decoy), or what it moves (`MOVES_CASTER`: the shot that cast it, else the wizard's body); a beam's or swing's tip, a familiar, a portal: a point |
 | `on expire` | a move's end: what it moved (the wizard's body, or the shot); a shot with `pull`: what it pulled there; anything else: a point |
 | `on hit`, `on kill`, `on reaction` | a shot that flies on after its hit (it pierces, sticks, or its hits never spend it: a wall), what a move moves (a dash's pass and a teleport's landing are that body's or shot's strikes: `Carrier.hit_caster`), else a point |
 | `on wall` | a shot that bounces on, else a point |
@@ -171,7 +171,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
-| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line) |
+| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), wall (one solid line) |
 | `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
@@ -180,7 +180,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | `payload_cast_by` | from its traits (the fallback carriers above) | none: every carrier answers by its yes/no flags |
 | `hit_caster` | the point | dash and teleport (`CarrierMove`): what they move casts their hits' payloads |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
-| `reach_of` | 0 | atom, beam, swing, slam, rain (for an enemy's telegraph) |
+| `reach_of` | 0 | atom, beam, swing, slam (for an enemy's telegraph) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 
 Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the

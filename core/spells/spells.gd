@@ -85,9 +85,7 @@ extends Node
 ## with its aim reversed (a move back the other way: the two add up to none, rules R4 F1); an echo
 ## hits at half damage.
 ##
-## Payload and line carriers (B2c): `rain` strikes the aim point after its `lifetime` with its own
-## hit and cards and drops its payload there (a `form_shown` cue `&"rain"` says where and when; an
-## `on expire` trigger on it fires as it lands); `familiar` and `decoy` ask `ai` for an entity
+## Entities and walls (B2c): `familiar` and `decoy` ask `ai` for an entity
 ## (`entity_spawn_requested`) a step ahead along the aim, as a rune is placed (`_placed_at`),
 ## count it as a live shot of their tag until `entity_ended`, give a decoy's body its shield as a
 ## barrier and turn the shots round it with its deflect as it appears (`CarrierDecoy`), and fire an
@@ -171,8 +169,8 @@ class PendingLaunch:
 	## The group to fire, or null for the single `spell` of an echo or a held carrier's repeat.
 	var group: CompiledGroup = null
 	var spell: CompiledSpell = null
-	## For a single `spell` or a rain's `landing`: an echo's copy (half damage); for a single
-	## `spell`, `again` is a held carrier cast again (`_repeats`).
+	## For a single `spell`: `echoed` is an echo's copy (half damage), `again` a held carrier cast
+	## again (`_repeats`).
 	var echoed: bool = false
 	var again: bool = false
 	var origin: Vector2 = Vector2.ZERO
@@ -188,9 +186,6 @@ class PendingLaunch:
 	var cost: int = 0
 	## The scatter stream's seed for this firing, so it points the same way however late it runs.
 	var seed: int = 0
-	## The rain whose payload this is, so it strikes and its own trigger (`on expire`) fires as it
-	## lands; `echoed` when that rain is an echo (it strikes at half damage).
-	var landing: CompiledSpell = null
 	## A payload that waited out its wind-up (`_fire`): it fires now as `_fire` would, its wind-up
 	## over.
 	var wound: bool = false
@@ -289,11 +284,11 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
 ## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
 ## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a row of its carrier
-## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a rain's spot and a familiar's orb,
+## (`LC_ROW`: a beam's or a swing's tip, `Carrier.tip_of`), an actor's body (a wizard's dash, a decoy) or a point (a familiar's orb,
 ## which Entities moves: `familiar_at`, keyed by `_lc_seq`). One `_lc_tied` to its row ends with
 ## it (a shot, a beam, a swing); the others
-## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
-## entity that ended, a rain whose landing was dropped). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
+## live `_lc_left` seconds (a dash, an entity) or until they leave (`_lc_leave`: an
+## entity that ended). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
 ## `_lc_way` its way where nothing else gives one.
 const LC_SLOT: int = 0
 const LC_ROW: int = 1
@@ -372,7 +367,7 @@ var _one_slot: PackedInt32Array = PackedInt32Array([-1])
 ## (CASTER_BODY, a staff's cast, by any actor: a player's wizard or an enemy); the body of an actor
 ## that fired a payload (`body_caster(id)`, CASTER_BODIES and below: a decoy's, or the wizard's for a
 ## dash's timer or end, a barrier's block; owner, 2026-11-06); the point it starts from
-## (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or a familiar fired); or the
+## (CASTER_POINT: a payload whose shot is gone, or one a beam or a familiar fired); or the
 ## slot of the shot that fired the payload, while it is the shot with `_caster_seq`. One rule for
 ## every card that names the caster: dash, teleport, pull, swap and recoil move it; orbit, familiar
 ## and a returning shot circle it or come back to it; a beam, swing or slam is held by it; the cards
@@ -413,7 +408,7 @@ var _ring_turn: float = 0.0
 var _penta_rings: Dictionary = {}
 
 ## The ray being sent (`RayHit`): what a hit with no shot slot is (a beam's, a swing's, a slam's, a
-## dash's, a rain's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
+## dash's, a zap, a jump). `_rays[0]` is the empty one (no ray out, tag 0); every
 ## `_ray_begin` takes the next record of the stack (made once, then reused) and `_ray_end` gives it
 ## back, so a ray sent from inside another's hit handler leaves the outer one as it was.
 var _rays: Array[RayHit] = [RayHit.new()]
@@ -771,7 +766,7 @@ const TREE_AT_POINT: String = "Where it ends"
 ## a trigger row shows the first carrier its payload fires) and `name` (the carrier's or the
 ## trigger card's display name). The cast's first row also has its `mana` and `damage`. A
 ## payload's further carriers (a multicast in it) are rows of their own at the payload's depth,
-## with no trigger; a rain's carried group is read the same way below it. A wasted trigger has no row.
+## with no trigger. A wasted trigger has no row.
 func cast_tree(cast: CompiledCast) -> Array[Dictionary]:
 	var rows: Array[Dictionary] = []
 	if cast.group != null:
@@ -796,8 +791,6 @@ func _tree_group(group: CompiledGroup, depth: int, trigger: int, trigger_id: Str
 		rows.append({"depth": depth, "trigger": trigger if by_trigger else -1, "slots": slots, "name": shown})
 		# A trigger row's carrier keeps its own payloads one level further in.
 		var inner: int = depth + 1
-		if spell.own_payload != null and not spell.own_payload.is_empty():
-			_tree_group(spell.own_payload, inner, -1, &"", rows)
 		for fires in spell.triggers:
 			if fires.payload != null and not fires.payload.is_empty():
 				_tree_group(fires.payload, inner, fires.slot, fires.id, rows)
@@ -1083,8 +1076,8 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 	return tag
 
 
-## How far the carrier of `tag` reaches along its aim (its flight, a beam's or swing's length, a
-## rain's aim point; 0 for one that is not aimed) and its hit radius: a telegraph lane's length
+## How far the carrier of `tag` reaches along its aim (its flight, a beam's or swing's length;
+## 0 for one that is not aimed) and its hit radius: a telegraph lane's length
 ## and width (gameplay/feel/lanes.gd). 0 for a tag with no carrier.
 func carrier_reach(tag: int) -> float:
 	var spell: CompiledSpell = _profiles.get(tag) as CompiledSpell
@@ -1410,7 +1403,7 @@ func _ray_end() -> void:
 ## chain (`chain` jumps left, `prev` the body before), siphon, possess, relay and `on hit` go with
 ## it, and the hit's push throws the body outward from `centre` (a whole circle strikes from
 ## `centre`, `Projectiles.sweep`). `hit` is what it hits with when not its spell's own (an echo's),
-## else null. A swing, a slam, a dash, a teleport, a rain and a blast all strike through here. The
+## else null. A swing, a slam, a dash, a teleport and a blast all strike through here. The
 ## bodies are copied out first (onto `_strike_bodies`): what a hit sets off can sweep. Returns what
 ## it hit with at the end (relay may have taken an element on), for a carrier that strikes again
 ## to keep, as a live beam does.
@@ -1441,7 +1434,7 @@ func _strike(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Arr
 
 
 ## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once (`_strike`),
-## with `hit` (null: its own): a rain where it lands, a teleport where it lands, a blast. It strikes
+## with `hit` (null: its own): a teleport where it lands, a blast. It strikes
 ## every body there, its caster's own too, but `spare` (a melee carrier's body, `CarrierKit.spared`:
 ## a teleport's, which lands with it), and a wall hides none (owner, 2026-11-06).
 func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile, chain: int = -1, prev: int = 0, spare: Node = null) -> void:
@@ -1501,7 +1494,7 @@ func _cast_as(caster: int, seq: int) -> void:
 	_caster_seq = seq
 
 
-## A one-off homing pick for a card of `actor` (a teleport's target, a rain's spot): a target of
+## A one-off homing pick for a card of `actor` (a teleport's target): a target of
 ## another team within `within` pixels of `at`, any way round, picked at random, rolled afresh for
 ## each pick (owner, 2026-11-06: "homing should just always pick a random enemy in range"; it may
 ## be the one picked last). Its centre, or INF for none; `projectiles.homing_target_radius` is its
@@ -1625,7 +1618,7 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 
 
 ## One carrier of a group, launched; returns the shots made. `mirror` fires it once more with its
-## aim reversed (a wall behind, a rain at the point mirrored through the caster, an orbit starting
+## aim reversed (a wall behind, an orbit starting
 ## on the other side of its circle, a dash or teleport back the other way: the two moves add up
 ## to none, rules R4 F1), and `echo` schedules it once more. `echoed` is true for that second firing, which hits at half damage and does not
 ## echo again; on a held carrier it is a second held copy. `again` is a held carrier cast again
@@ -1727,7 +1720,7 @@ func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 ## and each cast turns the other way from the one before (owner, 2026-11-06: "Penta could simply
 ## swap rotation direction every cast"; `_penta_rings`): a cast stands where its card's last ring
 ## has turned to (the first from a start of the card's own), so casts in a row (a held button, a
-## rain cast again, a mirror, an echo) sweep back and forth. A copy that stays on its point and
+## mirror, an echo) sweep back and forth. A copy that stays on its point and
 ## aims from it (a beam) turns with its ring while it lasts (`_ring_*`, CarrierBeam). A still shot
 ## stays where it was placed, as anywhere, and a flying one flies off. It does not follow its
 ## centre (owner: "Don't let it follow the centre"). Each point stops short of a wall, and each
@@ -1836,7 +1829,6 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 		_pending_free.append(PendingLaunch.new())
 	var launch: PendingLaunch = _pending_free.pop_back()
 	launch.cost = 0
-	launch.landing = null
 	launch.echoed = false
 	launch.again = false
 	launch.wound = false
@@ -1889,7 +1881,6 @@ func _run_pending() -> void:
 		var staff: int = launch.staff
 		var generation: int = launch.generation
 		var heading: Vector2 = launch.heading
-		var landing: CompiledSpell = launch.landing
 		var echoed: bool = launch.echoed
 		var again: bool = launch.again
 		var wound: bool = launch.wound
@@ -1897,17 +1888,18 @@ func _run_pending() -> void:
 		_scatter_from(launch.seed)
 		_release_launch(launch)
 		_cast_as(caster, caster_seq)
-		if landing != null:
-			_carrier_of(landing).land(landing, group, actor, staff, generation, origin, heading, echoed)
-		elif wound:
+		if wound:
 			_fire(group, actor, staff, generation, origin, heading, source, caster, true)
 		elif is_finite(fall_floor):
 			# Skyfall: its hole has opened, and it falls from there onto its floor line.
 			_skyfall.begin(fall_floor, actor)
 			_echo_spell = spell if echoed else null
-			_launch(spell, SpellTag.make(actor, staff, spell.node, generation), actor, origin, heading, source)
+			var falling: int = SpellTag.make(actor, staff, spell.node, generation)
+			_launch(spell, falling, actor, origin, heading, source)
 			_echo_spell = null
 			_skyfall.end()
+			# What it made counts now, not its wait (`Skyfall.open`).
+			shot_ended(falling)
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
 		elif not again:
@@ -1937,38 +1929,35 @@ func _release_launch(launch: PendingLaunch) -> void:
 	launch.cost = 0
 	launch.group = null
 	launch.spell = null
-	launch.landing = null
 	launch.fall_floor = INF
 	launch.source = null
 	_pending_free.append(launch)
 
 
 ## Forgets the waiting launches `drops` picks (an edit, a switch-off or a closed caster; never
-## per frame). One that kept its build (`_delay`) lets go of it; a rain's landing that goes takes
-## the rain off the live carriers, so its timer ends with it.
+## per frame). One that kept its build (`_delay`) lets go of it.
 func _drop_pending(drops: Callable) -> void:
 	var i: int = _pending.size() - 1
 	while i >= 0:
 		var launch: PendingLaunch = _pending[i]
 		if drops.call(launch):
 			_pending.remove_at(i)
-			if launch.landing != null:
-				_lc_leave(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation), false)
 			var keeps: bool = launch.caster != CASTER_BODY
 			var tag: int = SpellTag.make(launch.actor, launch.staff, 0, launch.generation)
+			# Skyfall: a fall that waited counted as a live shot (`Skyfall.open`); it never falls now.
+			var fell: int = SpellTag.make(launch.actor, launch.staff, launch.spell.node, launch.generation) if is_finite(launch.fall_floor) else 0
 			_release_launch(launch)
+			if fell != 0:
+				shot_ended(fell)
 			if keeps:
 				_generation_gone(tag)
 		i -= 1
 
 
-## True when `launch` fires a carrier with one of `tags` (its group's own carriers, its echo, or
-## a rain of it landing).
+## True when `launch` fires a carrier with one of `tags` (its group's own carriers, or its echo).
 func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 	if launch.spell != null:
 		return tags.has(SpellTag.make(launch.actor, launch.staff, launch.spell.node, launch.generation))
-	if launch.landing != null and tags.has(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation)):
-		return true
 	if launch.group != null:
 		for spell in launch.group.spells:
 			if tags.has(SpellTag.make(launch.actor, launch.staff, spell.node, launch.generation)):
@@ -3439,7 +3428,7 @@ func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 
 
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
-## its first carrier's flight (speed x life), a beam's or swing's length, a rain's aim point;
+## its first carrier's flight (speed x life), a beam's or swing's length;
 ## 0 for one that is not aimed (a nova, an orbit, a still shot, a decoy...) or no build.
 func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff, mana)
@@ -3573,9 +3562,8 @@ func _holds(spell: CompiledSpell, tag: int) -> bool:
 	return spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 and _is_current(tag)
 
 
-## True when a held `spell` is cast again rather than kept on: a rain and a swing are over at once,
-## so while held each is cast anew every wind-up and lifetime (a rain falls again, a swing sweeps
-## back), until switched off. Its hold ends only then, not between two of them.
+## True when a held `spell` is cast again rather than kept on: a swing is over at once, so while
+## held it is cast anew every wind-up and lifetime (it sweeps back), until switched off. Its hold ends only then, not between two of them.
 static func _repeats(spell: CompiledSpell) -> bool:
 	return spell != null and spell.has_trait(Carrier.REPEATS_HELD)
 
@@ -3613,7 +3601,7 @@ func _group_has(group: CompiledGroup, node: int) -> bool:
 	if group == null:
 		return false
 	for spell in group.spells:
-		if spell.node == node or _group_has(spell.own_payload, node):
+		if spell.node == node:
 			return true
 		for trigger in spell.triggers:
 			if _group_has(trigger.payload, node):

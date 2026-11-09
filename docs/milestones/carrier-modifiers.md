@@ -1,6 +1,6 @@
 # Carrier modifiers: Nova and Skyfall
 
-**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it, and built (docs/DECISIONS.md, 2026-11-09); Parts 4-5 planned. The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
+**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it, and merged #650; Part 4 (rain removed) done the same day; Part 5 planned. The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
 
 The same day, on the orbit's look: "Hmm maybe orbit should also just be a modifier instead of a carrier" (Part 5).
 
@@ -155,7 +155,7 @@ What it does *not* need, compared with the first version of this plan: no second
 
 Gone as a phase: with the owner's hole, a falling beam is cast down from the hole to its floor line and strikes only near the floor, so it is a pillar with no beam code of its own beyond its floor line.
 
-## Part 4: removing rain
+## Part 4: removing rain (done 2026-11-09; what differed from this plan: docs/DECISIONS.md, "Rain is gone")
 
 - **The carrier and the card:** delete `core/spells/carriers/rain.gd` and `content/spells/forms/rain/`. Its two combos (`rain_blast_drop`, `rain_frost_field`, since #648) move to Skyfall's folder as `skyfall` combos.
 - **The payload-carrier code, which only rain used:**
@@ -197,7 +197,7 @@ The owner, 2026-11-09, on the orbit's look: "Hmm maybe orbit should also just be
 | --- | --- | --- | --- |
 | 1 Nova modifier, nova form gone (done, #648) | medium (most of it mechanical: about 100 files go from `nova` to `nova, bolt`) | no | the pacing count (`copies`); 8 swings or slams start the staff animation once; tests that measured the old nova's single batch (test_spells_land_shots) now see 8 launches |
 | 2 Skyfall (the hole, the beam's pillar with it) | medium to large: one PR | yes (each shot's floor line in the move and hit passes, mirrored in the kernel) | a step that jumps past the band must still hit what stands in it, alike in the GDScript and the kernel; the falling context reaching every shot and placement (`_land_shots`, `_placed_at`) and payloads of airborne shots; the waiting queue on rebuilds |
-| 4 rain gone | medium | no | the Bone Scepter's staff; the payload-carrier code removed |
+| 4 rain gone (done) | medium | no | the Bone Scepter's staff; the payload-carrier code removed |
 | 5 orbit as a modifier (if wanted) | large | yes (orbit motion draws a quad body's own mesh) | every carrier's rows through orbit motion; still shots that move; a sweeping beam; the kernel compared byte for byte |
 
 One PR each. Phase 4 needs phase 2, so the Bone Scepter and the combos have something to move to; phase 3 is part of phase 2.

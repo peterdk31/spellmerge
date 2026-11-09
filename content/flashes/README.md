@@ -22,7 +22,7 @@ A flash is one shaped glow that a cue's `flash` part shows: a shot's end, a cast
 | `ring_in` | shape | a ring that gathers in (a rune's or orbit's cast) |
 | `rune_burst` | shape | a rune going off: a dotted flash over the diamond, a diamond ring widening to twice its size |
 | `rise` | shape | light pulled up off a spot (where a teleport leaves): a column that thins to a line and lifts off the top, a flat ring gathering in |
-| `fall` | shape | light struck down onto a spot (where a teleport lands, a rain falls): a streak falling to the floor, then the column flashing and thinning away, a cross, a flat ring thrown out |
+| `fall` | shape | light struck down onto a spot (where a teleport lands, a swap trades): a streak falling to the floor, then the column flashing and thinning away, a cross, a flat ring thrown out |
 | `poof` | clouds | a staff's personality swap: bone clouds along the staff, biggest at 35% of it |
 | `quake` | cracks | the ground struck (a slam): cracks out from the impact, cooling from white-hot to dark stone |
 | `shell` | shell | a blast's ragged shell |

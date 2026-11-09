@@ -8,8 +8,7 @@ extends RefCounted
 ## 2026-11-01; a test fails on any card or carrier id in the AI's code). Read-only.
 ##
 ## It reads the cast's own group: its carriers and its fallback on the caster. What its triggers
-## fire later is not part of the cast's summary, except that a cast whose carriers only carry
-## payloads (a rain) counts the payload's damage.
+## fire later is not part of the cast's summary.
 
 ## Made whole by the staff compiler (`CastSense.of`) and never changed after: the state walk
 ## hashes it once (core/sim/README.md).
@@ -23,13 +22,13 @@ var reach: float = 0.0
 var close_reach: float = 0.0
 ## The hit width of its first carrier (pixels).
 var radius: float = 0.0
-## What the whole cast may deal: every carrier's hit times its shots, times the group's repeats
-## (a payload's for a carrier that only carries one). 0 when it hurts nobody.
+## What the whole cast may deal: every carrier's hit times its shots, times the group's repeats;
+## 0 when it hurts nobody.
 var damage: float = 0.0
 ## The widest explosion at a carrier's end (`blast`): closer than this its caster is hurt too.
 var blast: float = 0.0
 ## True when it hits round a point or round its caster rather than along a line (a nova, a ring,
-## an orbit, a rain, a rune).
+## an orbit, a fall from the sky, a rune).
 var area: bool = false
 ## Shot speed of its first aimed carrier (pixels a second), for leading a moving target; 0 for
 ## one that is there at once (a beam, a swing) or not aimed.
@@ -54,7 +53,7 @@ var heals_self: bool = false
 var status: bool = false
 ## True when it stays on until the button is pressed again (`hold`).
 var sustained: bool = false
-## True when holding the button keeps it going or casts it anew (a beam, a rain, a swing): worth
+## True when holding the button keeps it going or casts it anew (a beam, a swing): worth
 ## holding as one long cast. (A held button casts any staff again when it is ready.)
 var repeats_held: bool = false
 ## Its cost and its delay (`CompiledCast.mana`, `delay`).
@@ -138,7 +137,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
 	var ring: bool = falls or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
-	if ring or spell.has_trait(CarrierTraits.CARRIES_PAYLOAD):
+	if ring:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.
 	var near: float = 0.0
@@ -158,11 +157,3 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 			damage += hit.damage * shots * repeats
 		if hit.status_id != &"":
 			status = true
-	if spell.own_payload != null and not spell.own_payload.is_empty():
-		# A carrier that carries a payload (a rain) hurts with what it drops.
-		for dropped: CompiledSpell in spell.own_payload.spells:
-			if dropped.hit != null and dropped.hit.heal <= 0 and dropped.fallback == CompiledSpell.FALLBACK_NONE:
-				damage += dropped.hit.damage * float(maxi(dropped.shots, 1)) * shots * repeats
-			if dropped.hit != null and dropped.hit.heal > 0:
-				heals = true
-			blast = maxf(blast, dropped.behaviour(ModifierBase.Behaviour.BLAST))

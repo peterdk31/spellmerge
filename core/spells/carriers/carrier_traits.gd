@@ -32,15 +32,13 @@ const PIERCE: int = 1 << 10
 const RING: int = 1 << 11
 ## A payload its shot fires goes outward from the shot's caster, not along the shot's way.
 const OUTWARD: int = 1 << 12
-## Held, it is cast anew each time it is over (a rain falls again, a swing sweeps back).
+## Held, it is cast anew each time it is over (a swing sweeps back).
 const REPEATS_HELD: int = 1 << 13
 ## It plays its own staff animation with its wind-up and strike.
 const OWN_POSE: int = 1 << 14
 ## It is over at once, so a homing one looks at least as far as it goes.
 const INSTANT_HOMING: int = 1 << 15
-## It reads a payload of its own after it, as a trigger does (a rain).
-const CARRIES_PAYLOAD: int = 1 << 16
-## The staff keeps working through its `lifetime` (a beam, a rain, a dash): its staff animation's
+## The staff keeps working through its `lifetime` (a beam, a dash): its staff animation's
 ## strike lasts that long.
 const HOLDS_STAFF: int = 1 << 17
 ## Does it travel along a path through the world (a bolt, a swap, an orbit)? Linger, sticky

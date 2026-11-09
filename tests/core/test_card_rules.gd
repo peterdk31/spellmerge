@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 ## is checked the day it lands.
 ##
 ## A cell: compile the card on the carrier (`[card, carrier]`; a trigger gets a plain payload
-## after its carrier, a carrier that reads its own payload, rain and familiar, gets one too). When
+## after its carrier). When
 ## the compiler lists the card as wasted: W. Otherwise the cast runs
 ## in a small world (tests/support/card_rules_world.gd: the real Spells, projectile manager, Combat,
 ## Entities and actor kit) and its trace (every hit with its whole profile, damage, statuses, moves,
@@ -124,7 +124,7 @@ var _modifiers: Array[ModifierBase] = []
 var _triggers: Array[TriggerBase] = []
 var _elements: Array[ElementBase] = []
 var _multicasts: Array[MulticastBase] = []
-## The plain payload a trigger (and a rain or familiar) fires: the straight carrier with the most
+## The plain payload a trigger fires: the straight carrier with the most
 ## shots, so a fire shows wherever it happens.
 var _payload: FormBase = null
 ## What the enemy shooter and the relay donor cast: the straight carrier of one shot that reaches
@@ -371,8 +371,6 @@ static func reach(form: FormBase) -> float:
 			return form.orbit_radius
 		&"wall":
 			return SpellLimits.WALL_REACH
-		&"rain":
-			return form.ray_length if form.ray_length > 0.0 else SpellLimits.RAIN_REACH
 		&"dash":
 			# On its way: a dash strikes what its body passes (rules R4c).
 			return form.ray_length * 0.5
@@ -406,8 +404,6 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 	# Without this a ✓ could be noise: every carrier, cast alike twice, in the busiest scenes.
 	for form in _forms:
 		var cards: Array[StringName] = [form.id]
-		if form.carries_payload():
-			cards.append(_payload.id)
 		for scene: Dictionary in [CROWD_AGAIN, SHOOTER]:
 			var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
 			var first: PackedStringArray = _run(cards, form, scene, seconds)
@@ -432,8 +428,6 @@ func test_forcing_keeps_every_wasted_card() -> void:
 			forced += 1
 		for trigger in _triggers:
 			var cards: Array[StringName] = [trigger.id, form.id, _payload.id]
-			if form.carries_payload():
-				cards.insert(2, _payload.id)
 			if not _compiler.compile_staff(cards, _staff).wasted.has(0):
 				continue
 			StaffCompiler.keep_wasted = true
@@ -628,8 +622,6 @@ func _casts(card: SpellComponent, form: FormBase, scene: Dictionary, forced: boo
 			without.append(plain)
 		return [with, without, slot]
 	var tail: Array[StringName] = [form.id]
-	if form.carries_payload():
-		tail.append(_payload.id)
 	if card is TriggerBase:
 		with.append(card.id)
 		with.append_array(extra)

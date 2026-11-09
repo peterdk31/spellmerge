@@ -66,13 +66,13 @@ func test_a_bolt_runs_every_behaviour() -> void:
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:
 	# Cells the audit found silent (M2-rules.md findings 4, 5, 6, 9), now wasted with a reason.
-	for cards: Array in [["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["linger", "beam"], ["magnet", "swing"], ["growth", "slam"], ["siphon", "decoy"], ["pull", "decoy"], ["shield", "rain"], ["hold", "slam"], ["skyfall", "swing"], ["skyfall", "dash"]]:
+	for cards: Array in [["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["linger", "beam"], ["magnet", "swing"], ["growth", "slam"], ["siphon", "decoy"], ["pull", "decoy"], ["shield", "familiar"], ["hold", "slam"], ["skyfall", "swing"], ["skyfall", "dash"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
 
 
 func test_cards_that_work_are_not_listed() -> void:
-	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["mirror", "dash"], ["mirror", "teleport"], ["growth", "swap"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["zap", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "rain"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "swap"], ["pull", "bolt"], ["pull", "swing"], ["pull", "beam"], ["mirror", "wall"], ["mirror", "rain"], ["mirror", "decoy"], ["sniper", "rune"], ["sniper", "decoy"], ["heavy", "rain"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"], ["nova", "dash"], ["nova", "teleport"], ["nova", "swing"], ["nova", "wall"], ["nova", "decoy"], ["nova", "rain"], ["skyfall", "bolt"], ["skyfall", "beam"], ["skyfall", "rune"], ["skyfall", "wall"], ["skyfall", "decoy"]]:
+	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["mirror", "dash"], ["mirror", "teleport"], ["growth", "swap"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["zap", "wall"], ["shield", "dash"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "swap"], ["pull", "bolt"], ["pull", "swing"], ["pull", "beam"], ["mirror", "wall"], ["mirror", "decoy"], ["sniper", "rune"], ["sniper", "decoy"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"], ["nova", "dash"], ["nova", "teleport"], ["nova", "swing"], ["nova", "wall"], ["nova", "decoy"], ["skyfall", "bolt"], ["skyfall", "beam"], ["skyfall", "rune"], ["skyfall", "wall"], ["skyfall", "decoy"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 
@@ -83,8 +83,7 @@ func test_a_familiar_hands_nothing_on() -> void:
 	var staff: CompiledStaff = _staff(["heavy", "familiar", "bolt"])
 	check(staff.wasted.has(0), "heavy on a familiar is wasted: %s" % staff.wasted)
 	var familiar: CompiledSpell = staff.casts[0].group.spells[0]
-	check(familiar.own_payload == null, "it reads no payload of its own")
-	check(familiar.payload == null, "and has none without a trigger")
+	check(familiar.payload == null, "it has no payload without a trigger")
 	check(staff.casts.size() == 2, "the bolt is the next cast: %d casts" % staff.casts.size())
 
 
@@ -111,6 +110,6 @@ func test_infusions_and_numbers_that_mean_nothing_are_listed() -> void:
 	for cards: Array in [["fire", "decoy"], ["frost", "decoy"], ["overcharge", "decoy"], ["pierce", "dash"], ["split", "dash"], ["slow", "teleport"], ["pierce", "swing"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
-	for cards: Array in [["fire", "blast", "dash"], ["overcharge", "blast", "teleport"], ["fire", "dash"], ["overcharge", "teleport"], ["mend", "teleport"], ["sniper", "bolt"], ["pierce", "rune"], ["timer", "bolt", "nova", "bolt"], ["zap", "bolt"], ["slow", "bolt"], ["timer", "swap", "nova", "bolt"], ["zap", "nova", "bolt"], ["mend", "rain"], ["overcharge", "rain"]]:
+	for cards: Array in [["fire", "blast", "dash"], ["overcharge", "blast", "teleport"], ["fire", "dash"], ["overcharge", "teleport"], ["mend", "teleport"], ["sniper", "bolt"], ["pierce", "rune"], ["timer", "bolt", "nova", "bolt"], ["zap", "bolt"], ["slow", "bolt"], ["timer", "swap", "nova", "bolt"], ["zap", "nova", "bolt"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])

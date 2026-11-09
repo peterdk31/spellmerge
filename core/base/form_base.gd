@@ -50,14 +50,14 @@ const POSE_RANGES: Dictionary = {
 @export_range(0.0, 360.0) var spread: float = 0.0
 ## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"atom" (the
 ## atom and bolt), &"rune",
-## &"orbit", &"beam", &"dash", &"teleport", &"swap", &"wall", &"rain", &"decoy",
+## &"orbit", &"beam", &"dash", &"teleport", &"swap", &"wall", &"decoy",
 ## &"familiar", &"swing" or &"slam". The carrier decides what every other card does on it.
 @export var carrier: StringName = &"atom"
 ## Extra targets each shot passes through before it ends.
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
 @export var orbit_radius: float = 0.0
-## RAY and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
+## RAY: how far it reaches in pixels. DASH and TELEPORT: how far the caster
 ## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
 ## SWING: degrees the sweep hits over, centred on the aim.
@@ -71,7 +71,7 @@ const POSE_RANGES: Dictionary = {
 ## last animation had it) and back on the aim after the last. A key says when, as `phase` and `at`:
 ##   "wind"    `at` 0 to 1 of the carrier's `wind_up`
 ##   "strike"  `at` 0 to 1 of its strike, the carrier's own working time: a swing's sweep, a slam's
-##             ring, a beam's, orbit's, rain's or dash's life (a held one's until its last shot ends);
+##             ring, a beam's, orbit's or dash's life (a held one's until its last shot ends);
 ##             the others have none, so their strike keys pass at once
 ##   "hold"    `at` in seconds; these keys repeat for as long as the strike lasts (a held beam
 ##             straining), each round from the last of them
@@ -101,11 +101,11 @@ var _pose_packed: bool = false
 ## docs/milestones/spell-spectacle-2.md, S6 2), so how a carrier looks is cue files, not keys of its
 ## own: `cast_cue` on its caster's staff when a seat casts it (`spell_cast`: the flash, a ring with
 ## it, the camera kicked back; `cast` when not given); `shown_cue` where the carrier shows itself
-## (`form_shown`, whoever casts it: a rain's telegraph, where a teleport leaves, each
+## (`form_shown`, whoever casts it: where a teleport leaves, each
 ## end of a swap's trade, a decoy or familiar appearing), as big as the event's `length`; `impact_cue`
 ## where its shots strike, on a body or a wall (`projectile_impact`: the flare in the shot's colours
 ## and cards; `impact` when not given), as big as its `radius`; and `end_cue` where a carrier with no
-## shot ends (`carrier_ended`: a teleport or dash landing, a rain falling, a slam's strike, a decoy or
+## shot ends (`carrier_ended`: a teleport or dash landing, a slam's strike, a decoy or
 ## familiar going), as big as that event says; `wind_cue` while a cast of it winds up (`cast_winding`:
 ## an enemy's telegraph, only for a caster not on the players' team; its `size` the wind-up's
 ## seconds; `wind`, a lane along the aim, when not given; docs/milestones/cast-timing.md, T6b).
@@ -223,12 +223,6 @@ static func pack_pose(keys: Array[Dictionary]) -> PackedFloat32Array:
 		out[at + PK_EASE] = float(POSE_EASES.get(key.get("ease", "inout"), 0))
 		out[at + PK_MOOD] = float(POSE_MOODS.find(StringName(str(key.get("mood", "")))) + 1)
 	return out
-
-
-## True for the carriers that read a payload of their own, as a trigger does (a rain; a familiar
-## casts only what its triggers give it, rules R4 F3).
-func carries_payload() -> bool:
-	return Carriers.of(carrier).has(Carrier.CARRIES_PAYLOAD)
 
 
 func ranges() -> Dictionary:

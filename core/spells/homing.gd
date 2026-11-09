@@ -5,7 +5,7 @@ extends RefCounted
 ## a new form to). It holds what its spell's homing cards give (`start`), the target it keeps and
 ## the seed of its random pick; `steer` turns what moves over time, `point` bends what is over at
 ## once (a beam ends on its target when that is within its length). A one-off pick that keeps
-## nothing (a teleport's target, a rain's spot) is `CarrierKit.pick_target`.
+## nothing (a teleport's target) is `CarrierKit.pick_target`.
 ## The manager's shots keep the same numbers in its packed arrays, for speed, and pick the same
 ## way (`Projectiles.homing_point`).
 

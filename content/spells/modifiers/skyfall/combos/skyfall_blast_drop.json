@@ -1,0 +1,10 @@
+{
+	"id": "skyfall_blast_drop",
+	"name": "Blast drop",
+	"does": "A bolt hits an imp, and a fire bolt falls from a hole over the spot it hit and blasts there: the imp it hit and the one beside it both burn.",
+	"needs": "skyfall",
+	"casts": [{"staff": 0, "cards": ["on_hit", "bolt", "skyfall", "fire", "blast", "bolt"]}],
+	"imps": [[100, 0], [100, 20]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+}

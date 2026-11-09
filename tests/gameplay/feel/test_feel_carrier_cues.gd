@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The carriers' moments in gameplay/feel are cues their cards name: `form_shown` plays a card's
 ## `shown_cue` where the carrier shows itself (where a teleport leaves, each end of a swap,
 ## a decoy or familiar appearing), `carrier_ended` its `end_cue` where a carrier with no
-## shot ends (a teleport landing, a rain falling, a slam's strike, a decoy going). The cues use the
+## shot ends (a teleport landing, a slam's strike, a decoy going). The cues use the
 ## columns of light (`rise`, `fall`) drawn by `shot_flash.gdshader`.
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_feel_carrier_cues.gd
@@ -62,12 +62,6 @@ func test_each_end_of_a_swap_shows() -> void:
 	bus.form_shown.emit(0, &"swap", Vector2(80, 0), Vector2.LEFT, 80.0, FROST, 0)
 	check_equal(feel.flashes_of(&"fall"), 2, "a column struck down at both ends of the trade")
 	check_equal(feel.flashes_of(&"rise"), 2, "and one pulled up, their rings crossing")
-
-
-func test_a_rain_falls_where_it_lands() -> void:
-	bus.carrier_ended.emit(1, &"rain", Vector2(40, 40), Vector2.DOWN, 16.0, FROST, 0)
-	check_equal(feel.flashes_of(&"fall"), 1, "a column struck down where it fell")
-	check_equal(feel.flashes_of(&"spray"), 1, "a splash thrown up")
 
 
 ## A dash's moments are cues its card names (spell-spectacle-2.md, S5): `dash_start` where it

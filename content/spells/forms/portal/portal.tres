@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="FormBase" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
 [ext_resource type="Texture2D" path="res://content/spells/forms/portal/icon.svg" id="2_icon"]
+[ext_resource type="Shader" path="res://content/spells/forms/portal/portal.gdshader" id="3_shader"]
 
 [resource]
 script = ExtResource("1_base")
@@ -21,6 +22,7 @@ spread = 40.0
 carrier = &"portal"
 pierce = 0
 ray_length = 160.0
+look_shader = ExtResource("3_shader")
 staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift": -2, "push": 3, "stretch": -0.2, "glow": 1.0, "ease": "in"}, {"phase": "after", "at": 0.16, "turn": -20, "ease": "out"}, {"phase": "after", "at": 0.34}])
 cast_cue = &"cast_gather"
 shown_cue = &"portal_open"

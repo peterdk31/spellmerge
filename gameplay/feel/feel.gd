@@ -89,7 +89,7 @@ const BirthsScript := preload("res://gameplay/feel/births.gd")
 const BLAST_SHADER: Shader = preload("res://core/projectiles/shot_blast.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
-const PortalRingsScript := preload("res://gameplay/feel/portal_rings.gd")
+const PortalLookScript := preload("res://gameplay/feel/portal_look.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const MarksScript := preload("res://gameplay/feel/marks.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
@@ -385,8 +385,10 @@ var _live_beams: Array[MeshInstance2D] = []
 var _form_looks: Dictionary = {}
 ## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
 var _swing_trails: SwingTrailsScript = null
-## The open portals' gates (`PortalRingsScript`), drawn every frame.
-var _portal_rings: PortalRingsScript = null
+## The open portals' gates (`PortalLookScript`), drawn every frame from one typed read of them
+## (`CarrierPortal.read_view` into `_portal_view`, refilled each frame).
+var _portal_look: PortalLookScript = null
+var _portal_view: PortalView = PortalView.new()
 ## The spectacle (`spectacle.gd`): motes, floor marks, spell light and their settings.
 var _spectacle: SpectacleScript = null
 ## The party's shared camera, eased towards Coop's view (`view_fitted`) as it is drawn.
@@ -604,8 +606,8 @@ func _ready() -> void:
 		_live_paths.append(_make_beam_path())
 	_swing_trails = SwingTrailsScript.new(swing_mesh())
 	add_child(_swing_trails)
-	_portal_rings = PortalRingsScript.new()
-	add_child(_portal_rings)
+	_portal_look = PortalLookScript.new()
+	add_child(_portal_look)
 	_spectacle = SpectacleScript.new()
 	_spectacle.name = "Spectacle"
 	_spectacle.events = events
@@ -689,6 +691,8 @@ func _ready() -> void:
 	if spells == null:
 		spells = get_node_or_null("/root/Spells")
 	_warm_card_looks()
+	if _portal_look != null and spells is SpellRuntime:
+		_portal_look.use_shaders((spells as SpellRuntime).look_shaders(Carrier.LOOK_PORTAL))
 	if projectiles != null and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
 	_spectacle.attach(projectiles, spells)
@@ -730,8 +734,8 @@ func step(real_delta: float) -> void:
 	_draw_live_beams(real_delta)
 	if _swing_trails != null:
 		_swing_trails.step(spells.call("carrier", &"swing") if spells != null and spells.has_method("carrier") else null, _clock, _swing_ramp, preset.beam_alpha, _spectacle.births if _spectacle.motes_on() else null, _swing_shader_of)
-	if _portal_rings != null:
-		_portal_rings.step(spells.call("carrier", &"portal") if spells != null and spells.has_method("carrier") else null, projectiles, _clock)
+	if _portal_look != null:
+		_step_portals()
 	_status_motes(real_delta)
 	_spectacle.step(_clock, _actor_table())
 	if _lanes != null:
@@ -739,6 +743,18 @@ func step(real_delta: float) -> void:
 		_lanes.step()
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
+
+
+## The open portals, read once (`CarrierPortal.read_view`), drawn by the portal look; their motes
+## into the spectacle's pool while motes are on.
+func _step_portals() -> void:
+	var portals: CarrierPortal = CarrierPortal.of(spells as SpellRuntime) if spells is SpellRuntime else null
+	if portals != null:
+		portals.read_view(_portal_view)
+	else:
+		_portal_view.portals = 0
+		_portal_view.gates = 0
+	_portal_look.step(_portal_view, _actor_table(), _spectacle.pool if _spectacle.motes_on() else null, _clock)
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
@@ -1699,6 +1715,9 @@ func _warm_card_looks() -> void:
 	for drawer: int in [Carrier.LOOK_BEAM, Carrier.LOOK_SWING]:
 		for shader: Shader in spells.call(&"look_shaders", drawer):
 			ShaderWarmupScript.want(shader, ShaderWarmupScript.MESH)
+	# The portals' lenses are a batch of quads (`portal_look.gd`).
+	for shader: Shader in spells.call(&"look_shaders", Carrier.LOOK_PORTAL):
+		ShaderWarmupScript.want(shader, ShaderWarmupScript.BATCH)
 
 
 ## Gives `node`'s own material `shader` (a beam's or a trail's: each node keeps its own material,

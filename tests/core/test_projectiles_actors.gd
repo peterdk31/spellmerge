@@ -103,13 +103,13 @@ func test_a_hit_and_its_impact_carry_the_casters_actor_id() -> void:
 	check(not impacts.is_empty() and impacts.all(func(c: int) -> bool: return c == IMP), "its impacts name the id too")
 
 
-## Horde H1: an actor id past the old 512 casts, hits and is hit like any other, and its tag
+## An actor id past the old 512 (ACTORS 1024) casts, hits and is hit like any other, and its tag
 ## names it.
 func test_a_high_actor_id_casts_and_its_hit_names_it() -> void:
 	while table.open_count() < 1000:
 		ActorSeats.enemy(table)
 	var high: int = ActorSeats.enemy(table)
-	check_equal(high, 1000, "the horde's actor 1000 is open")
+	check_equal(high, 1000, "actor 1000 is open")
 	var tag: int = SpellTagScript.make(high, 2, 3, 1)
 	var wizard: Node2D = _target(Vector2(200.0, 100.0), ManagerScript.LAYER_PLAYER, WIZ_0)
 	check(mgr.spawn(high, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER, 0, tag) >= 0, "its shot is made")

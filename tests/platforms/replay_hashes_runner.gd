@@ -1,6 +1,6 @@
 extends Node
 ## The same game on every platform, a first look (online-ready N2b, docs/milestones/online-ready.md):
-## a scripted sandbox fight and a horde run of a bot are recorded and played back on the real game
+## a scripted sandbox fight and a wave of two bots are recorded and played back on the real game
 ## (tests/support/replay_run.gd), and every tick's state hash, per area, is printed, so the runs on
 ## Linux, Windows and the web can be compared line by line. `tools/platform_hashes.py` exports the
 ## three builds, runs each and names the first tick and area that part (tools/README.md).
@@ -11,16 +11,16 @@ extends Node
 ##     build/linux-test/Spellmerge.x86_64 --headless -- --replay-hashes --ticks=600
 ##
 ## User arguments (on the web, the page's `args`):
-## - `--scenes=sandbox,horde` (SCENES: also `wave`, two bots in the waves);
+## - `--scenes=sandbox,wave` (SCENES: the scripted sandbox fight, two bots in the waves);
 ## - `--ticks=N`, the ticks of each run (TICKS);
 ## - `--keep=SCENE:TICK`, repeatable: the played run of SCENE prints every leaf of tick TICK
 ##   (`REPLAY LEAF`), so the compare tool names the members that part;
-## - `--no-native`: the projectile manager and the swarm on their GDScript (the Windows Test export
+## - `--no-native`: the projectile manager on its GDScript (the Windows Test export
 ##   has no native module where MinGW is missing; `--no-native` on Linux shows that changes nothing).
 ##
-## Every platform plays the same game: the run's seed is fixed (RUN_SEED), and the projectile cap and
-## the horde's alive cap are the web's everywhere (CAP and the web's horde cap: this machine's
-## session rules the run is recorded with, N11; the replay then carries them). The lines, one
+## Every platform plays the same game: the run's seed is fixed (RUN_SEED), and the projectile cap is
+## the web's everywhere (CAP: this machine's session rules the run is recorded with, N11; the replay
+## then carries them). The lines, one
 ## per tick of the played run (fields separated by tabs, hashes in hex):
 ##
 ##     REPLAY START	<scene>	<platform>	ticks=<n>	native=<on|off>	cap=<n>
@@ -36,13 +36,12 @@ const ReplayRun := preload("res://tests/support/replay_run.gd")
 ## The runs, by name: how each starts, its fighter bots and its scripted players.
 const SCENES: Dictionary = {
 	"sandbox": {"start": &"sandbox_requested", "bots": 0, "scripted": 1},
-	"horde": {"start": &"horde_requested", "bots": 1, "scripted": 0},
 	"wave": {"start": &"play_requested", "bots": 2, "scripted": 0},
 }
-const DEFAULT_SCENES: PackedStringArray = ["sandbox", "horde"]
+const DEFAULT_SCENES: PackedStringArray = ["sandbox", "wave"]
 ## Ticks of each run: ten seconds of game.
 const TICKS: int = 600
-## The run's seed on every platform (any fixed one; a random one would deal each a different horde).
+## The run's seed on every platform (any fixed one; a random one would deal each different rolls).
 const RUN_SEED: int = 20261105
 ## The projectile cap every platform plays at: the web's (ProjectileManager.DEFAULT_CAP_WEB).
 const CAP: int = 1000
@@ -97,7 +96,6 @@ func _run_scene(scene: String) -> PackedStringArray:
 	run.ticks = _ticks
 	run.native = _native
 	run.cap = CAP
-	run.horde_web = 1
 	run.run_seed = RUN_SEED
 	print("REPLAY START\t%s\t%s\tticks=%d\tnative=%s\tcap=%d" % [scene, OS.get_name(), _ticks, "on" if _native and _native_loaded() else "off", CAP])
 	var recorded := Desync.new()

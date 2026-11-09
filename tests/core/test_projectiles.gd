@@ -345,8 +345,7 @@ func _test_cap_drop_order_after_other_deaths() -> void:
 	_check(_mgr.get_count() == 6 and _mgr.get_count_for(0) + _mgr.get_count_for(1) == 6, "the lists stay consistent under churn")
 
 
-## Regression (Horde H1): the stress run's horde scenarios go from a cap of 1,000 to 500 with
-## shots alive in slots past 500; set_cap read past its shrunk arrays and broke the manager.
+## Regression (2026-10-30): a cap going from 1,000 to 500 with shots alive in slots past 500; set_cap read past its shrunk arrays and broke the manager.
 func _test_a_smaller_cap_with_shots_in_high_slots() -> void:
 	_setup()
 	_mgr.set_cap(40)

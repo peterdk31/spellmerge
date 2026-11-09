@@ -1,12 +1,11 @@
 extends "res://tests/support/screenshot.gd"
-## The moments that had no look before S6 item 13 (docs/milestones/spell-spectacle-2.md): a horde
-## level-up, a gem picked up, a revive, a barrier blocking a hit, a body caught by a pull and a
-## wave starting, each its cue (content/cues), played by name in the live game as player 1's
+## The moments that had no look before S6 item 13 (docs/milestones/spell-spectacle-2.md): a revive,
+## a barrier blocking a hit, a body caught by a pull and a wave starting, each its cue (content/cues), played by name in the live game as player 1's
 ## wizard's, in a row (`moment_cues_1x` as a player sees it, `moment_cues_4x` enlarged), a few
 ## frames in. Their starter looks are for the owner to tune; before item 13 they drew nothing.
 
 ## The cues, left to right.
-const CUES: Array[StringName] = [&"level_up", &"gem_pickup", &"revive", &"shield_block", &"pull", &"wave_start"]
+const CUES: Array[StringName] = [&"revive", &"shield_block", &"pull", &"wave_start"]
 ## Pixels between neighbours.
 const GAP: float = 40.0
 

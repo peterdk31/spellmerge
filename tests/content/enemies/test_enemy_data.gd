@@ -37,7 +37,7 @@ func test_every_enemy_is_sound() -> void:
 
 
 func test_every_enemy_plays_by_the_enemy_ai() -> void:
-	# The dummies and the horde's swarmers too (owner, 2026-11-01): one system for every enemy.
+	# The dummies and the swarmers too (owner, 2026-11-01): one system for every enemy.
 	for data in _enemies():
 		check(data.profile != null, "%s names a profile" % data.id)
 		var body: Node = data.scene.instantiate()

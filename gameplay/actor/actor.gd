@@ -135,10 +135,6 @@ var caster: Caster = null
 var downable: bool = false
 ## The possession holding this actor now (another controller possesses it), or null.
 var possessed_by: Possession = null
-## An id already open in the actor table that this actor takes as its own when it first opens one,
-## instead of a new id (the swarm's promotion, docs/milestones/horde-swarm.md: a swarmer's id stays
-## with the full actor that replaces it). Set before adding the actor; used once.
-var take_id: int = ActorsScript.NONE
 ## The actor whose body this one belongs to (a decoy belongs to its caster), or NONE: that actor's
 ## shots pass it as they pass its own body (its hurt circle is a projectile target owned by that
 ## actor: `Caster.own_hurtbox`, Combat). Set before adding the actor.
@@ -273,8 +269,8 @@ func step(delta: float) -> void:
 	if mover != null:
 		mover.step(delta)
 		if delta < full:
-			# A step a hold covered part of moves the body for what is left of it, as a swarm row
-			# moves (online-ready N4): whoever moves it by its velocity moves it that far.
+			# A step a hold covered part of moves the body for what is left of it (online-ready
+			# N4): whoever moves it by its velocity moves it that far.
 			velocity *= delta / full
 	else:
 		velocity = Vector2.ZERO
@@ -447,8 +443,7 @@ func _on_possess_requested(caster: int, target: int, seconds: float, _tag: int) 
 
 
 ## The controller of the actor `caster` possesses this actor for `seconds` (`Possession.begin`):
-## what `possess_requested` for this id does, also for a request heard before this actor was made
-## (the swarm's promotion). Returns the possession, or null when none started.
+## what `possess_requested` for this id does. Returns the possession, or null when none started.
 func take_possession(caster: int, seconds: float) -> Possession:
 	if actors == null or id == ActorsScript.NONE:
 		return null
@@ -594,13 +589,7 @@ func set_size(factor: float) -> void:
 func _open_id() -> void:
 	if actors == null or id != ActorsScript.NONE:
 		return
-	if take_id != ActorsScript.NONE and actors.is_open(take_id):
-		# Its id is handed over (promotion): the table hears its driver instead.
-		id = take_id
-		take_id = ActorsScript.NONE
-		actors.set_driver(id, team(), seat())
-	else:
-		id = actors.open(team(), ramp, seat())
+	id = actors.open(team(), ramp, seat())
 	if id == ActorsScript.NONE:
 		push_warning("Actor %s: the actor table is full, so this actor has no id." % name)
 		return

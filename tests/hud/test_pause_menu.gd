@@ -5,8 +5,7 @@ extends SceneTree
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
 ## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
-## open builder; in the horde's build break (the game stopped until every player is ready) the
-## menu opens and closes as always, its own stop apart from the break's (online-ready N4). Input goes through the real input manager's virtual devices.
+## open builder; the menu's stop is a reason of its own (online-ready N4). Input goes through the real input manager's virtual devices.
 ##
 ## godot --headless --path . --script res://tests/hud/test_pause_menu.gd
 
@@ -71,7 +70,6 @@ func _initialize() -> void:
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
-	_test_a_horde_break_is_its_own_stop()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: hud/menus pause menu")
@@ -710,18 +708,3 @@ func _test_the_run_ending_closes_it() -> void:
 	_frame()
 	_bus.run_ended.emit(false)
 	_check(not _menu().is_open() and not _stops, "a run ending closes the menu and lets the game go")
-
-
-func _test_a_horde_break_is_its_own_stop() -> void:
-	_setup(2)
-	# The director's build break stops the game with a reason of its own (Sim.stops), so the menu
-	# opens and closes in it as always: its own stop comes and goes, the break's stands apart.
-	_bus.horde_break_changed.emit(true)
-	for way: StringName in [&"accept", &"back", &"pause"]:
-		_tap(0, &"pause")
-		_frame()
-		_check(_menu().is_open() and _menu().owner_player == 0 and _stops, "%s: the menu opens in a horde break and asks its stop" % way)
-		_tap(0, way)
-		_frame()
-		_check(not _menu().is_open() and not _stops, "%s: it closes and lets its own stop go" % way)
-	_bus.horde_break_changed.emit(false)

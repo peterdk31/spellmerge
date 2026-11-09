@@ -89,11 +89,11 @@ class CompareTest(unittest.TestCase):
         self.assertIn("parts at tick 1, in one run has 2 ticks, the other 1", text)
 
     def test_a_scene_not_played_is_a_parting(self) -> None:
-        a = ph.parse("linux", log(("w0", {"A": "1"})) + "\n" + log(("w0", {"A": "1"}), scene="horde"))
+        a = ph.parse("linux", log(("w0", {"A": "1"})) + "\n" + log(("w0", {"A": "1"}), scene="wave"))
         b = ph.parse("web", log(("w0", {"A": "1"})))
         text, agree = ph.report(a, b)
         self.assertFalse(agree)
-        self.assertIn("not played: horde", text)
+        self.assertIn("not played: wave", text)
 
 
 class RunProblemsTest(unittest.TestCase):

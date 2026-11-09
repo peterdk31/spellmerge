@@ -11,7 +11,6 @@ extends RefCounted
 ## - `shot_cap`: the most shots alive at once (`ProjectileManager.set_cap`; at the cap the oldest
 ##   shot of the richest budget drops). The "Max shots" setting; a change in a run is a command
 ##   (`shot_cap_requested`), applied at the next tick and recorded with it.
-## - `horde_alive`: the most horde enemies alive at once (`Horde.max_alive`), lower on the web.
 ## - `hit_work`: the hit-test work one projectile step may do (`ProjectileManager.work_per_step`;
 ##   past it the rest of the shots are tested in the next step). Only benchmarks change it.
 ## - `fire_shots`: the shots one budget's trigger fires may make in one step
@@ -23,13 +22,8 @@ extends RefCounted
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
-## The most horde enemies alive at once on the desktop and on the web (horde H1b; a crowd past it
-## waits off screen). The web's is lower so its frame holds (gameplay/horde/horde.gd).
-const HORDE_ALIVE_DESKTOP: int = 225
-const HORDE_ALIVE_WEB: int = 150
 ## The ranges a replay's header is held to (the decoder refuses any other value).
 const MAX_SHOT_CAP: int = 1 << 20
-const MAX_HORDE_ALIVE: int = 1 << 16
 const MAX_WORK: int = 0x7fffffff
 ## Every rule, in a replay header's order: its member, its name in a decoder's message, and the
 ## range a header may hold. A new rule is a member and a row here (and its default); copying,
@@ -37,15 +31,13 @@ const MAX_WORK: int = 0x7fffffff
 ## a row).
 const FIELDS: Array = [
 	[&"shot_cap", "shot cap", 1, MAX_SHOT_CAP],
-	[&"horde_alive", "horde cap", 1, MAX_HORDE_ALIVE],
 	[&"hit_work", "hit work", 1, MAX_WORK],
 	[&"fire_shots", "fire shots", 0, MAX_WORK],
 ]
 ## The header's bytes: a 32-bit number for each of FIELDS.
-const BYTES: int = 16
+const BYTES: int = 12
 
 var shot_cap: int = ManagerScript.DEFAULT_CAP_DESKTOP
-var horde_alive: int = HORDE_ALIVE_DESKTOP
 var hit_work: int = ManagerScript.WORK_PER_STEP
 var fire_shots: int = SpellLimits.FIRE_SHOTS_PER_STEP
 
@@ -57,12 +49,11 @@ const DERIVED: Array[StringName] = [&"_machine"]
 static var _machine: SessionRules = null
 
 
-## The defaults of this platform: the web's lower shot cap and horde.
+## The defaults of this platform: the web's lower shot cap.
 static func defaults() -> SessionRules:
 	var made := SessionRules.new()
 	if OS.has_feature("web"):
 		made.shot_cap = ManagerScript.DEFAULT_CAP_WEB
-		made.horde_alive = HORDE_ALIVE_WEB
 	return made
 
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The rules of the game, in 12 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty`, `progression` and `horde` (the horde mode's director, docs/milestones/horde.md). Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
+The rules of the game, in 11 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
@@ -46,7 +46,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_shield_requested`, `pull_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
-| `body_replaced` | `horde` (the swarm's promotion) | `core/spells` (and through it `core/projectiles`), `feel` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
@@ -59,13 +58,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud`, `feel` (its walls' colours for motes) |
-| `view_fitted` | `coop` | `horde` (enemies appear just outside it) |
+| `view_fitted` | `coop` | `feel` (the party camera) |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `wave_started`, `build_break_started` | `flow` | `hud` |
 | `sandbox_changed` | `flow` | `hud` |
-| `horde_started`, `horde_ended` | `flow` | `horde`, `hud` |
-| `horde_status`, `horde_picks_offered`, `horde_pick_taken`, `horde_break_changed`, `horde_ready_changed`, `horde_over` | `horde` | `hud` |
-| `bag_set_requested` | `horde` | `player` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` | none yet |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
@@ -77,8 +73,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `pause_requested` | HUD | `run` |
 | `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `ai_view_changed` | HUD | `ai` (Entities) |
-| `horde_requested` | HUD | `flow` |
-| `horde_pick_requested`, `horde_ready_requested` | HUD | `horde` |
 
 `device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 

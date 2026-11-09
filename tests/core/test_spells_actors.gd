@@ -74,9 +74,9 @@ func before_each() -> void:
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
 	rune.carrier = &"rune"
 	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
-	var swarm: FormBase = _form(&"swarm", 30.0, 5.0)
-	swarm.shots = SpellLimits.FIRE_SHOTS_PER_STEP
-	swarm.spread = 360.0
+	var spray: FormBase = _form(&"spray", 30.0, 5.0)
+	spray.shots = SpellLimits.FIRE_SHOTS_PER_STEP
+	spray.spread = 360.0
 	var beam: FormBase = _form(&"beam", 0.0, 5.0)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
@@ -265,7 +265,7 @@ func test_a_reopened_caster_goes_on_round_the_ring() -> void:
 	check(_spells.profile(old) != null and _spells.profile(old) != _spells.profile(fresh), "with its old numbers")
 
 
-# --- A horde's actor ids (Horde H1) -------------------------------------------------------
+# --- High actor ids (ACTORS 1024) -------------------------------------------------------
 
 ## The staffs' cooldowns count down only up to the highest row that cast (Spells._cooldown_rows):
 ## an actor past the old 512 still gets its staff back, and so does a low one beside it.
@@ -290,7 +290,7 @@ func test_a_high_actor_ids_cooldown_runs_down() -> void:
 
 func test_each_seat_has_its_own_fire_count_a_step() -> void:
 	for seat in 2:
-		_build(W0 + seat, [&"timer", &"swarm", &"rune"])
+		_build(W0 + seat, [&"timer", &"spray", &"rune"])
 		_cast(W0 + seat, Vector2(300.0 * seat, 0.0))
 	_tick(31)
 	check_equal(_spells.fires_waited, 0, "two seats fire a full step's worth each")
@@ -298,7 +298,7 @@ func test_each_seat_has_its_own_fire_count_a_step() -> void:
 
 func test_unseated_casters_share_one_fire_count_a_step() -> void:
 	for caster in 2:
-		_build(caster, [&"timer", &"swarm", &"rune"])
+		_build(caster, [&"timer", &"spray", &"rune"])
 		_cast(caster, Vector2(300.0 * caster, 0.0))
 	_build(W0, [&"timer", &"bolt", &"rune"])
 	_cast(W0, Vector2(600.0, 0.0), Vector2.DOWN)

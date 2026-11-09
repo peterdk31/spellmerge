@@ -13,8 +13,8 @@ extends Node
 ##
 ## The physics step's real cost: the engine's TIME_PHYSICS_PROCESS and TIME_PROCESS monitors are
 ## each the LONGEST step (and process pass) of the last second, refreshed once a second, so their
-## average is an average of maxima, far above a typical step (horde swarm S4: 30 ms "a step" when
-## the steps took about 12). So the probe also times every physics step's scripts itself: a marker
+## average is an average of maxima, far above a typical step (once 30 ms "a step" when the steps
+## took about 12). So the probe also times every physics step's scripts itself: a marker
 ## child runs first in each physics step (lowest priority) and the probe last (highest), and the
 ## clock between them is the step's scripts (`physics_scripts_average_ms`). Process the same way
 ## (`process_scripts_average_ms`). What a frame spends besides (the physics server, the message

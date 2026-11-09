@@ -5,15 +5,14 @@ extends RefCounted
 ## Tick in its `_ready` (`join`) and says all of this itself, so the Tick calls typed Callables
 ## in its written order and knows nothing of what an area is or does:
 ##
-##     SimArea.join(self, &"Horde") \
-##         .steps(&"Swarm", physics_step) \
-##         .steps(&"Horde", step_timers, [BREAK]) \
+##     SimArea.join(self, &"Projectiles") \
+##         .steps(&"Projectiles", step) \
 ##         .renewed_by(begin_run) \
 ##         .takes_rules(take_rules)
 ##
 ## - **Steps** (`steps`): each under a key of `TickScript.STEPS`, the tick's written order. A step
 ##   runs while the game goes; while it is stopped, only a step whose `own_stops` hold every reason
-##   it is stopped for (the horde's timers through its own build break, not through the pause menu).
+##   it is stopped for (a step that must run through a stop of its own, never through the pause menu).
 ## - **A run's start** (`renewed_by`): its `begin_run`, which ends what it holds and takes a fresh
 ##   game's state (core/sim/sim_fresh.gd), called in `TickScript.RUN_ORDER`. An area that starts
 ##   each run fresh some other way says why instead (`fresh_because`); tests/core/test_tick.gd fails

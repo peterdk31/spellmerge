@@ -60,10 +60,10 @@ func test_a_full_table_opens_none_until_one_closes() -> void:
 	check_equal(_actors.open(ActorsScript.TEAM_WIZARDS, 0), 300, "a closed id is free again")
 
 
-## Horde H1 (docs/milestones/horde.md, "Scale"): the table holds four seats and a horde of 1,000,
-## and an id past the old 512 works like any other.
-func test_the_table_holds_a_horde_and_high_ids_work() -> void:
-	check(ActorsScript.ACTORS >= 1024, "room for four seats and a horde of 1,000")
+## The table holds four seats and a crowd of 1,000 (ACTORS 1024, owner 2026-11-09), and an id past
+## the old 512 works like any other.
+func test_the_table_holds_a_crowd_and_high_ids_work() -> void:
+	check(ActorsScript.ACTORS >= 1024, "room for four seats and a crowd of 1,000")
 	_open_enemies(700)
 	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 1, 1)
 	check_equal(wizard, 700, "the next id is past 511")
@@ -256,34 +256,6 @@ func test_spend_hold_over_a_partial_an_exact_and_a_long_step() -> void:
 	check_equal(_actors.spend_hold(id, 0.75), 0.5, "a hold shorter than the step runs the rest")
 	check_equal(_actors.held_count, 0, "and ends")
 	check_equal(_actors.spend_hold(99999, 0.25), 0.25, "a bad id is never held")
-
-
-## `spend_holds` (a crowd's step, Horde swarm S4) answers and spends as `spend_hold` one by one: a
-## second table, given the same holds, is asked row by row.
-func test_spend_holds_does_what_spend_hold_does_for_each() -> void:
-	var twin := own(ActorsScript.new()) as ActorsScript
-	var holds: Array[float] = [0.0, 0.75, 0.25, 0.1, 0.0, 2.0]
-	var ids := PackedInt32Array()
-	for seconds in holds:
-		var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-		twin.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-		if seconds > 0.0:
-			_actors.hold(id, seconds)
-			twin.hold(id, seconds)
-		ids.append(id)
-	ids.append(99999)
-	ids.append(ActorsScript.NONE)
-	var seconds_out := PackedFloat64Array()
-	seconds_out.resize(ids.size() + 1)
-	seconds_out[ids.size()] = -7.0
-	for step in 3:
-		_actors.spend_holds(ids, ids.size(), 0.25, seconds_out)
-		for i in ids.size():
-			check_equal(seconds_out[i], maxf(twin.spend_hold(ids[i], 0.25), 0.0), "step %d, actor %d runs what spend_hold says" % [step, ids[i]])
-		check_equal(_actors.held_count, twin.held_count, "step %d: as many held" % step)
-		for id in holds.size():
-			check_equal(_actors.held_left(id), twin.held_left(id), "step %d: actor %d's stop left" % [step, id])
-	check_equal(seconds_out[ids.size()], -7.0, "nothing past `count` is written")
 
 
 func test_a_hold_ends_when_the_actor_closes_opens_again_or_the_table_clears() -> void:

@@ -2,11 +2,11 @@ extends SceneTree
 ## Shot scale H0 (docs/milestones/shot-scale.md): the baseline for every later part. Three scenes,
 ## each at 10,000, 30,000, 50,000 and 100,000 live shots, timed part by part:
 ##
-## - **storm:** the shots fly over the horde arena (1280x720) from four wizards in the middle, with
+## - **storm:** the shots fly over a large arena (1280x720) from four wizards in the middle, with
 ##   eight training bodies in their way: what flying costs (the kernel's passes, drawing).
 ## - **crowd:** the same shots among CROWD bodies on a lattice over the arena, each on a small circle
-##   about its home (as the swarm moves): what hitting costs as the game does it, with the hit-work
-##   budget (`WORK_PER_STEP`): past the desktop cap it is spent every step and shots wait, each
+##   about its home: what hitting costs as the game does it, with the hit-work budget
+##   (`WORK_PER_STEP`): past the desktop cap it is spent every step and shots wait, each
 ##   sweeping its whole untested path when its turn comes (H2), so no damage is lost.
 ## - **crowd_all:** the crowd with the budget lifted (`work_per_step` = UNBUDGETED), every shot
 ##   tested every step: what hitting would cost if nothing waited (H2's question), and the kernel's
@@ -431,7 +431,7 @@ func _time_listeners(scene: String, count: int, steps: int) -> void:
 	_timed.clear()
 
 
-## The crowd on its circles, as the swarm writes `position` each step.
+## The crowd on its circles, its `position` written each step.
 func _move() -> void:
 	if not _moving:
 		return

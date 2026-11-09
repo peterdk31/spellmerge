@@ -366,8 +366,7 @@ func hurt_by(caster: int) -> void:
 	carry_grudge(attacker, GRUDGE_TIME)
 
 
-## Chase `attacker` for `seconds`, as if hurt by it just now (the horde swarm's promotion keeps a
-## swarmer's grudge).
+## Chase `attacker` for `seconds`, as if hurt by it just now.
 func carry_grudge(attacker: Node2D, seconds: float) -> void:
 	if seconds <= 0.0 or not _is_valid_target(attacker):
 		return

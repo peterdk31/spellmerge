@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
-## Tests for the set bag (horde H2, docs/milestones/horde.md): `bag_set_requested` for a seat makes
-## that seat's bag exactly the list and sends `bag_changed`; other seats keep theirs; a bag set
-## before the wizard first drives survives the first fill (and is announced when it binds); a
-## bag set after the fill replaces it, and the builder then refuses a card no longer in it.
+## Tests for the set bag (each run mode's, owner 2026-11-05): `set_bag` makes the seat's bag
+## exactly the list and sends `bag_changed`; a bag set before the wizard first drives survives the
+## first fill (and is announced when it binds); a bag set after the fill replaces it, and the
+## builder then refuses a card no longer in it.
 ##
 ## godot --headless --path . --script res://tests/gameplay/player/test_player_bag_set.gd
 
@@ -95,20 +95,10 @@ func test_seat_wizard_with_no_bag_fills_every_card() -> void:
 func test_a_set_bag_replaces_the_filled_one_and_is_announced() -> void:
 	var body := _wizard(0)
 	_bags.clear()
-	_world.bus.bag_set_requested.emit(0, _ids("dash fire bolt"))
+	Fixture.controller(body).set_bag(_ids("dash fire bolt"))
 	check_equal(Fixture.controller(body).bag, _ids("dash fire bolt"), "the bag is exactly the list")
 	check_equal(_bags.size(), 1, "bag_changed is sent once")
 	check_equal(_bags[0], [0, _ids("dash fire bolt")], "for that seat, with the new bag")
-
-
-func test_only_the_named_seat_takes_it() -> void:
-	var first := _wizard(0)
-	var second := _wizard(1)
-	_bags.clear()
-	_world.bus.bag_set_requested.emit(1, _ids("bolt"))
-	check_equal(Fixture.controller(first).bag.size(), 5, "seat 0 keeps its bag")
-	check_equal(Fixture.controller(second).bag, _ids("bolt"), "seat 1 has the set bag")
-	check_equal(_bags.size(), 1, "only seat 1 announces")
 
 
 func test_a_bag_set_before_the_first_drive_survives_the_first_fill() -> void:
@@ -123,14 +113,14 @@ func test_a_bag_set_before_the_first_drive_survives_the_first_fill() -> void:
 func test_the_set_bag_is_a_copy() -> void:
 	var body := _wizard(0)
 	var cards: Array[StringName] = _ids("dash bolt")
-	_world.bus.bag_set_requested.emit(0, cards)
+	Fixture.controller(body).set_bag(cards)
 	cards.append(&"rune")
 	check_equal(Fixture.controller(body).bag, _ids("dash bolt"), "changing the sent list later changes nothing")
 
 
 func test_the_builder_refuses_a_card_outside_the_set_bag() -> void:
 	var body := _wizard(0)
-	_world.bus.bag_set_requested.emit(0, _ids("dash"))
+	Fixture.controller(body).set_bag(_ids("dash"))
 	_world.bus.staff_change_requested.emit(0, 0, 0, &"rune")
 	check_equal(_refused, [0] as Array[int], "a card no longer in the bag is refused")
 	check(body.caster.cards_of(0).is_empty() or body.caster.cards_of(0)[0] == &"", "and the staff is unchanged")
@@ -138,5 +128,5 @@ func test_the_builder_refuses_a_card_outside_the_set_bag() -> void:
 
 func test_an_empty_set_bag_is_kept_empty() -> void:
 	var body := _wizard(3)
-	_world.bus.bag_set_requested.emit(3, [] as Array[StringName])
+	Fixture.controller(body).set_bag([] as Array[StringName])
 	check(Fixture.controller(body).bag.is_empty(), "an empty list empties the bag")

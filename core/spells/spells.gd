@@ -263,7 +263,7 @@ var _generation_live: Dictionary = {}
 ## actor * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
 ## Every cooldown row from this one on is 0: `step` counts down only the rows below it, not all
-## ACTORS x STAFFS of them (4,096 since Horde H1, about 0.3 ms a physics step in GDScript).
+## ACTORS x STAFFS of them (4,096 since 2026-10-30, about 0.3 ms a physics step in GDScript).
 ## Actor ids are handed out lowest first, so it stays near the highest id that ever cast.
 var _cooldown_rows: int = 0
 ## actor * STAFFS + staff -> when its winding cast leaves (`_clock`; INF: none winds up), the
@@ -695,7 +695,6 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.disconnect(_on_reaction)
 		events.entity_ended.disconnect(_on_entity_ended)
 		events.caster_move_finished.disconnect(_moves.finished)
-		events.body_replaced.disconnect(_on_body_replaced)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -712,7 +711,6 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.reaction_landed.connect(_on_reaction)
 		events.entity_ended.connect(_on_entity_ended)
 		events.caster_move_finished.connect(_moves.finished)
-		events.body_replaced.connect(_on_body_replaced)
 
 
 ## True when the card `card_id` does something on the carrier `carrier` (`FormBase.carrier`) on its
@@ -3706,25 +3704,6 @@ func familiar_at(key: int, at: Vector2) -> void:
 
 ## An entity `ai` made for a carrier ended where it stood: the carrier its kind names (a decoy, a
 ## familiar) runs its end (`CarrierEntity.entity_ended`).
-## The body `old` was replaced by `new` for the same actor (`body_replaced`: the swarm's
-## promotion): what keeps `old` keeps `new` from now on: the projectile manager's shots
-## (`replace_body`), the jump queue's targets and each carrier's rows (a sweep's struck bodies:
-## `Carrier.replace_body`). What keeps a body by its key (a chain's last body, a zap's rolls, a
-## shot's homing: N5) keeps the actor's key, which is the same.
-func _on_body_replaced(_actor: int, old: Node, new: Node) -> void:
-	if old == null or new == null or old == new:
-		return
-	if projectiles != null:
-		projectiles.replace_body(old, new)
-	# A chain's last body is a key, the same actor's (N5): only the nodes kept are replaced.
-	for at in _jq_target.size():
-		var held: Variant = _jq_target[at]
-		if is_instance_valid(held) and held == old:
-			_jq_target[at] = new as Node2D
-	for carrier: Carrier in _carriers.values():
-		carrier.replace_body(old, new)
-
-
 func _on_entity_ended(actor: int, kind: StringName, position: Vector2, tag: int) -> void:
 	var carrier: CarrierEntity = _carriers.get(kind) as CarrierEntity
 	if carrier != null:

@@ -1,17 +1,16 @@
 extends SceneTree
-## Times the per-body cost of the projectile manager and of Combat (Horde swarm S5,
-## docs/milestones/horde-swarm.md, "Cheaper targets") with 600 and 1,000 swarm bodies, and prints
-## `BENCH:` lines. Each body is what a swarmer is: a bare Node2D (no script, no children)
-## registered through Combat as a plain body (its own actor id, its hurt circle a projectile
-## target, a touch that hurts), moved by writing its `position` every step, round a small circle
+## Times the per-body cost of the projectile manager and of Combat with a crowd of 600 and 1,000
+## bodies, and prints `BENCH:` lines. Each body is the cheapest a body can be: a bare Node2D (no
+## script, no children) registered through Combat as a plain body (its own actor id, its hurt
+## circle a projectile target, a touch that hurts), moved by writing its `position` every step, round a small circle
 ## about its home on a lattice over the room. Four wizards stand in the middle (Combat rows on the
-## wizards' team, so the swarm's touch hurts them, and projectile targets of their own casters) and
+## wizards' team, so the crowd's touch hurts them, and projectile targets of their own casters) and
 ## keep the web cap of shots (500) flying outward on a fixed fan, a third of them piercing.
 ##
 ## Timed (medians, so a busy machine moves them less): the manager's whole `step`, its target
 ## refresh alone (`_refresh_targets`: positions, teams, the grid), the same shots with no targets
 ## (what the step costs without bodies), and Combat's `step` (statuses, contact). Each runs in the
-## horde arena (1280x720) and in the usual room (640x360, denser: more bodies to a grid cell).
+## large arena (1280x720) and in the usual room (640x360, denser: more bodies to a grid cell).
 ##
 ## It also prints a fingerprint of every shot hit and every touch (`HITS:` counts and a hash of
 ## step, caster, body, tag and point), so two versions can be compared on the same scene: the
@@ -25,7 +24,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
-## The horde arena, and the usual room H1 measured in.
+## A large arena, and the usual room.
 const ARENA: Vector2 = Vector2(1280.0, 720.0)
 const SMALL_ROOM: Vector2 = Vector2(640.0, 360.0)
 const SHOTS: int = 500
@@ -96,7 +95,7 @@ func _run(count: int) -> void:
 		_actors.set_driver(row, ActorSeats.ActorsScript.TEAM_WIZARDS, ActorSeats.ActorsScript.NONE)
 		_mgr.add_target(wizard, 7.0, ManagerScript.LAYER_PLAYER, _casters[seat], Vector2(0.0, -8.0))
 		_index_of[wizard.get_instance_id()] = -1 - seat
-	# The swarm: a jittered lattice over the room, each on a small circle round its home.
+	# The crowd: a jittered lattice over the room, each on a small circle round its home.
 	for i in count:
 		var body := Node2D.new()
 		var home := Vector2(fmod(float(i) * 97.31, _room.x - 40.0) + 20.0, fmod(float(i) * 53.77 + float(i / 13) * 7.0, _room.y - 40.0) + 20.0)
@@ -166,7 +165,7 @@ func _tick() -> void:
 	_step_no += 1
 
 
-## Every body on its circle (as the swarm writes `position` each step).
+## Every body on its circle, its `position` written each step.
 func _move() -> void:
 	var t: float = float(_step_no) * DT
 	for i in _bodies.size():

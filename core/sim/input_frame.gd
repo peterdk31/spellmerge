@@ -26,8 +26,9 @@ extends RefCounted
 ##     frame.add_command(&"staff_change_requested", [2, 0, &"fire"])
 ##     var back: InputFrame = InputFrame.from_bytes(frame.to_bytes())   # null if rejected
 
-## The format's version, the frame's first byte.
-const VERSION: int = 1
+## The format's version, the frame's first byte (2: the horde's commands gone, the kinds after
+## them renumbered).
+const VERSION: int = 2
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -59,7 +60,6 @@ const LEAVE: StringName = &"leave"
 const COMMAND_NAMES: Array[StringName] = [
 	JOIN, LEAVE,
 	&"staff_change_requested", &"card_move_requested", &"staff_cards_requested",
-	&"horde_pick_requested", &"horde_ready_requested",
 	&"sandbox_action_requested", &"sandbox_spawn_requested",
 	&"reward_pick_requested", &"door_vote_requested",
 	&"shot_cap_requested",
@@ -68,7 +68,6 @@ const COMMAND_NAMES: Array[StringName] = [
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
 	"iis", "iiii", "iS",
-	"i", "",
 	"s", "si",
 	"i", "i",
 	"i",

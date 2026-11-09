@@ -1,14 +1,14 @@
 extends "res://tests/support/screenshot.gd"
 ## Cues lighting the room (docs/milestones/spell-spectacle-2.md, S6 item 4): in the crypt arena
 ## made dark (ambient 0.6, so the light reads), with spell light on, a row of cues played as player
-## 1's at once: `heal`, `level_up`, `revive`, `shield_block`, `rune_burst` and `blast`, a few
+## 1's at once: `heal`, `revive`, `shield_block`, `rune_burst` and `blast`, a few
 ## frames in (`cue_light`, and `cue_light_2x` round the row). Before the `light` part their
 ## flashes lit by their kinds (`FlashKind.room_light`); a cue with a `light` part lights by it
 ## instead.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ROOM := preload("res://content/rooms/crypt/arena_01.tscn")
-const CUES: Array[StringName] = [&"heal", &"level_up", &"revive", &"shield_block", &"rune_burst", &"blast"]
+const CUES: Array[StringName] = [&"heal", &"revive", &"shield_block", &"rune_burst", &"blast"]
 const MIDDLE := Vector2(320.0, 200.0)
 const GAP: float = 80.0
 

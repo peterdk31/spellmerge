@@ -5,7 +5,7 @@ extends RefCounted
 ## docs/milestones/M2-actors.md, "Tags"). It packs the staff (0-3: the A, X, Y and B buttons) in
 ## bits 0-1, a generation (0-7, a ring that advances on each build change of that staff) in bits
 ## 2-4, the node (0-511: the compiled spell's index in its staff's cycle, `CompiledSpell.node`)
-## in bits 5-13 and the caster (0-1023, `caster_of`; 10 bits since Horde H1) in bits 14-23,
+## in bits 5-13 and the caster (0-1023, `caster_of`; 10 bits since 2026-10-30) in bits 14-23,
 ## under `FLAG` (bit 24). `FLAG` sits above every enemy attack tag of gameplay/ai (1,000 to
 ## 101,000), so the two never meet, and keeps every tag above 0, which means "no tag" to
 ## `gameplay/combat`. Every tag stays below `FLAG << 1` (1 << 25), well under `LIMIT` (1 << 29),

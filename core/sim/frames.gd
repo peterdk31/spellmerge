@@ -6,7 +6,7 @@ extends Node
 ## the game never knows which.
 ##
 ## - **The tick's start:** the Tick autoload (core/sim/tick.gd) calls `tick` first in every tick,
-##   also while the game is stopped or held (the horde's level-up break takes its picks then).
+##   also while the game is stopped or held (a command still arrives then).
 ## - **A tick that stands still** (online-ready N4: the game stopped or held; the Tick calls
 ##   `stood`): its presses carry to the next tick that steps, ORed into its frames, so a tap during a
 ##   downed wizard's stop is not lost. The recording keeps each tick's own frames; a replay carries
@@ -166,7 +166,7 @@ func stood() -> void:
 ## Start a run by `start` (one of `Replay.STARTS`) for seat `starter` and record it from its first
 ## tick. Returns the replay it records into (it grows each tick until `stop_recording`). The run's
 ## seed is `run_seed`, or a random one when it is 0 (the platform runs, N2b, pick theirs, so every
-## platform plays the same horde).
+## platform plays the same run).
 func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	stop_playing()
 	var replay := Replay.new()

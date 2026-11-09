@@ -7,7 +7,9 @@ extends "res://tests/support/suite.gd"
 const TickScript := preload("res://core/sim/tick.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
-const HordeScript := preload("res://gameplay/horde/horde.gd")
+## A stop of the test's own, which the Flow stand-in's step runs through (as an area's step may
+## run through a stop it makes itself).
+const OWN_STOP: StringName = &"own_stop"
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 
 ## Every call the stand-ins got this test: [what, delta].
@@ -99,10 +101,8 @@ func before_each() -> void:
 	_join("Projectiles").steps(&"Projectiles", _stand_in("Projectiles").step).renewed_by(_stand_in("Projectiles").begin_run).takes_rules(_stand_in("Projectiles").take_rules)
 	_join("Spells").steps(&"Spells", _stand_in("Spells").step).renewed_by(_stand_in("Spells").begin_run).takes_rules(_stand_in("Spells").take_rules)
 	_join("Combat").steps(&"Combat", _stand_in("Combat").step).renewed_by(_stand_in("Combat").begin_run)
-	_join("Flow").steps(&"Flow", _stand_in("Flow").step).fresh_because("a stand-in")
+	_join("Flow").steps(&"Flow", _stand_in("Flow").step, [OWN_STOP] as Array[StringName]).fresh_because("a stand-in")
 	_join("Coop").steps(&"Coop", _stand_in("Coop").step_rules).fresh_because("a stand-in")
-	var horde: Area = _stand_in("Horde")
-	_join("Horde").steps(&"Swarm", horde.physics_step).steps(&"Horde", horde.step_timers, [HordeScript.BREAK] as Array[StringName]).renewed_by(horde.begin_run).takes_rules(horde.take_rules)
 
 
 func after_each() -> void:
@@ -145,7 +145,7 @@ func _names() -> Array[String]:
 func test_a_tick_runs_the_areas_in_the_written_order() -> void:
 	_body("a")
 	_tick.run(TickScript.DT)
-	check_equal(_names(), ["Frames.tick", "Projectiles.step", "Spells.step", "Combat.step", "Entities.step", "Horde.physics_step", "body a", "Flow.step", "Coop.step_rules", "Horde.step_timers"], "the order")
+	check_equal(_names(), ["Frames.tick", "Projectiles.step", "Spells.step", "Combat.step", "Entities.step", "body a", "Flow.step", "Coop.step_rules"], "the order")
 	check_equal(_tick.count, 1, "one tick counted")
 
 
@@ -214,22 +214,22 @@ func test_a_held_game_runs_only_the_frames_for_its_ticks() -> void:
 	check(_names().has("body a") and not _names().has("Frames.stood"), "then the game steps again")
 
 
-## A stop (the horde's build break, the pause menu) lasts until its `go`; a step runs through the
-## stops that are its own only: in a break the director's timers run on (a joiner's bag), but not
-## while the menu stops the game too.
+## A stop (an area's own, the pause menu) lasts until its `go`; a step runs through the stops that
+## are its own only: in its own stop the Flow stand-in steps on, but not while the menu stops the
+## game too.
 func test_a_stopped_game_runs_the_frames_and_the_steps_through_their_own_stops() -> void:
 	_body("a")
-	_tick.sim.stop(HordeScript.BREAK)
+	_tick.sim.stop(OWN_STOP)
 	_tick.run(TickScript.DT)
-	check_equal(_names(), ["Frames.tick", "Horde.step_timers", "Frames.stood"], "the frames and the break's timers")
+	check_equal(_names(), ["Frames.tick", "Flow.step", "Frames.stood"], "the frames and the step through its own stop")
 	calls.clear()
 	_tick.sim.stop(CoopScript.MENU)
 	_tick.run(TickScript.DT)
 	check_equal(_names(), ["Frames.tick", "Frames.stood"], "with the menu open too, only the frames")
-	_tick.sim.go(HordeScript.BREAK)
+	_tick.sim.go(OWN_STOP)
 	calls.clear()
 	_tick.run(TickScript.DT)
-	check_equal(_names(), ["Frames.tick", "Frames.stood"], "the break over, the menu still stops it")
+	check_equal(_names(), ["Frames.tick", "Frames.stood"], "its own stop over, the menu still stops it")
 	_tick.sim.go(CoopScript.MENU)
 	calls.clear()
 	_tick.run(TickScript.DT)
@@ -272,7 +272,7 @@ func test_every_delta_is_the_physics_step() -> void:
 
 
 ## A run's start (online-ready N3b): the clock counts from 0 again, every area that takes the rules
-## takes the run's, then the services and the horde director are made fresh in RUN_ORDER; the rest
+## takes the run's, then the services are made fresh in RUN_ORDER; the rest
 ## is not asked.
 func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	for i in 3:
@@ -280,8 +280,8 @@ func test_a_run_starts_the_clock_again_and_makes_the_areas_fresh() -> void:
 	calls.clear()
 	_tick.begin_run()
 	check_equal(_tick.count, 0, "the clock from 0")
-	var expected: Array[String] = ["Projectiles.take_rules", "Spells.take_rules", "Horde.take_rules"]
-	for area: String in ["Entities", "Projectiles", "Spells", "Combat", "Horde"]:
+	var expected: Array[String] = ["Projectiles.take_rules", "Spells.take_rules"]
+	for area: String in ["Entities", "Projectiles", "Spells", "Combat"]:
 		expected.append("%s.begin_run" % area)
 	check_equal(_names(), expected, "the rules handed over, then the areas made fresh in order")
 	_tick.run(TickScript.DT)

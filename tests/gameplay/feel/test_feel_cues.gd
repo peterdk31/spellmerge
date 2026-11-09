@@ -402,7 +402,7 @@ func test_a_flash_part_is_read_into_typed_fields() -> void:
 
 
 ## A cue with an `every` plays at most that often for one actor, parts and weight (S6, item 13: a
-## gem picked up in a horde, hundreds a second); another actor's play is its own.
+## moment that may come hundreds of times a second); another actor's play is its own.
 func test_a_cue_with_every_plays_at_most_that_often_per_actor() -> void:
 	var cue: CueBase = _made([{"flash": &"burst", "zoom": 1, "seconds": 2.0}])
 	cue.every = 0.5
@@ -427,12 +427,12 @@ func test_a_cue_with_every_plays_at_most_that_often_per_actor() -> void:
 
 ## The moments that had no look (S6, item 13) each have a cue file, played by name from their area.
 func test_the_new_moments_have_cues() -> void:
-	for id: StringName in [&"level_up", &"gem_pickup", &"revive", &"shield_block", &"pull", &"wave_start"]:
+	for id: StringName in [&"revive", &"shield_block", &"pull", &"wave_start"]:
 		var cue: CueBase = feel.cue_of(id)
 		check(cue != null, "%s is a cue file" % id)
 		if cue != null:
 			check(not cue.parts.is_empty(), "%s shows something" % id)
-	check(feel.cue_of(&"gem_pickup").every > 0.0, "a gem pickup is throttled")
+	check(feel.cue_of(&"pull").every > 0.0, "a pull is throttled")
 
 
 ## A light part's keys are checked like any part's (S6, item 4).

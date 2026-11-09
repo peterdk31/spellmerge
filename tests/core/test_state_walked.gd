@@ -5,8 +5,8 @@ extends "res://tests/support/suite.gd"
 ## script) shows when the state is walked. A problem is a reference to a node it does not own, an
 ## engine object, a Callable or an object key, named by its path with the fix.
 ##
-## - The determinism tests' scenes (tests/core/sim_scenes.gd: a staffed fight, a spell storm, a horde
-##   wave), walked after two seconds.
+## - The determinism tests' scenes (tests/core/sim_scenes.gd: a staffed fight, a spell storm),
+##   walked after two seconds.
 ## - Every card of content/spells, cast in the card rules' world (tests/support/card_rules_world.gd)
 ##   and walked as it casts, flies and lands. New cards and carriers are walked the day they land,
 ##   with no edit here.
@@ -30,10 +30,6 @@ func test_a_staffed_fight_walks_without_problems() -> void:
 
 func test_a_spell_storm_walks_without_problems() -> void:
 	_check_scene(&"storm")
-
-
-func test_a_horde_wave_walks_without_problems() -> void:
-	_check_scene(&"horde")
 
 
 ## Every card of content/spells, cast alone (a carrier) or on

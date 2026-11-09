@@ -15,18 +15,6 @@ extends Node
 ## budget, which the desktop export measures, and in CI's software renderer it alone took about
 ## seven of the web run's fourteen minutes (2026-10-28, when the run went past its timeout).
 ##
-## The horde scenarios (Horde H1, docs/milestones/horde.md, "Scale") hold 500+ enemies: mostly
-## swarmers (the imp's data with no staff: they only chase and hurt by touch, as the horde's
-## swarm enemies do) and a share (`staffed`, 10%) of staff enemies (the imp as above), against
-## the same four bots, in the usual room (the 1280x720 horde arena is H2's). `horde` (600
-## enemies) is the desktop's, `horde, web` (500) the web's; both keep 500 shots (`HORDE_SHOTS`, the
-## web cap when their curve was measured), so the enemies are what differs and the curve in
-## docs/milestones/horde.md and horde-swarm.md stays comparable. They are not in the default run
-## (`scenarios`): they take longer than the rest together, and the exported runs have fixed
-## timeouts (tests/build.json). `stress.gd -- --horde` runs them (`HORDE`), alone. They pass
-## like the others plus a frame line (`p95_line_ms`): a provisional line from the first
-## measurement (2026-10-30), past which the scenario fails, unlike the others, which only warn.
-##
 ## How the numbers are held. The bots cast their built spells through the real input
 ## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
@@ -57,65 +45,24 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const SwarmScript := preload("res://gameplay/horde/swarm.gd")
 const TreeProfileScript := preload("res://tests/benchmark/tree_profile.gd")
 const TickScript := preload("res://core/sim/tick.gd")
 
 const PLAYERS: int = 4
-## The horde scenarios' frame line (p95, milliseconds; headless, so game logic only):
-## provisional, from the first measurement (2026-10-30, docs/milestones/horde.md, "Scale": p95
-## about 310 ms at 600 enemies on the build machine, the physics steps at their limit of 8 a
-## frame), with room for a slower or busier machine. It only catches a collapse; 60 FPS at 500+
-## enemies needs the swarm work described there (H6). Not checked in a web build, whose WASM
-## and software renderer are several times slower.
-const P95_LINE_HORDE_MS: float = 600.0
-## The shots the horde scenarios keep in the air: the web cap when their curve was measured
-## (docs/milestones/horde.md), so a raised cap does not move it.
-const HORDE_SHOTS: int = 500
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
 ## whether hit particles start. The web and desktop scenarios follow the caps on purpose (each
-## budget is its cap). `desktop_only`
-## scenarios are left out of a web build (`scenarios_for`). A horde scenario (`staffed`: the
-## share of its enemies that carry a staff, the rest are swarmers) has a frame line,
-## `p95_line_ms`: its 95th percentile frame must stay under it.
+## budget is its cap). `desktop_only` scenarios are left out of a web build (`scenarios_for`).
 const SCENARIOS: Array[Dictionary] = [
 	{"label": "web", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB},
 	{"label": "desktop", "enemies": 200, "shots": ProjectileManagerScript.DEFAULT_CAP_DESKTOP, "desktop_only": true},
 	{"label": "web, render loop off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "render": false},
 	{"label": "web, hit particles off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "particles": false},
-	{"label": "horde", "enemies": 600, "shots": HORDE_SHOTS, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
-	{"label": "horde, web", "enemies": 500, "shots": HORDE_SHOTS, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS},
-	{"label": "horde, swarm", "enemies": 1016, "swarm": 1000, "staff_enemies": 16, "shots": HORDE_SHOTS, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
-	{"label": "horde, swarm, web size", "enemies": 525, "swarm": 500, "staff_enemies": 25, "shots": HORDE_SHOTS, "p95_line_ms": P95_LINE_HORDE_MS},
 ]
-## The horde scenarios, run by `stress.gd -- --horde` instead of the default ones.
-const HORDE: Array[int] = [4, 5]
-## The swarm scenarios (docs/milestones/horde-swarm.md, S1 and S4): `swarm` swarmers (the crypt
-## mite's kind with ENEMY_HEALTH) in a swarm (`swarm.gd`) the runner steps, with its look (the
-## batched `SwarmLook` the director gives it in play), beside `staff_enemies` staff enemies as full
-## actors (the bots fight only actors). Swarmers, staff enemies and the four wizards are all actors,
-## so together they stay within the actor table (`Actors.ACTORS`, 1,024): 1,000 + 16 + 4. (Asked for
-## 1,000 + 50, the runner tried 30 more spawns every frame that the full table refused, each making
-## and freeing a node: about 4 ms a frame of nothing, S4.) The runner then steps the projectile
-## manager, Spells and Combat itself, before the swarm's step, and times them per physics step
-## (`BENCH: stress parts, physics step`), the look's step apart from the swarm's and its drawing
-## (Feel's flash and the batches, in its `_process`) per frame. `horde, swarm` is the desktop's
-## 1,000; `horde, swarm, web size` the web's 500, also measured on the desktop (scripts in WASM run
-## roughly 2-3x slower, so the web frame is estimated from it). Run by `stress.gd -- --horde-swarm`,
-## alone; `--swarm=N` and `--staff=M` set the counts of both (a sweep), `--profile` adds the tree
-## profile (tree_profile.gd), `--profile-signals` also times the hot events' listeners.
-const HORDE_SWARM: Array[int] = [6, 7]
-const SWARM_KIND_ID: StringName = &"crypt_mite"
-## Swarmers added per frame at most.
-const SWARM_SPAWN_PER_FRAME: int = 60
 ## Game seconds a scenario takes to build up before frames are measured, and to measure.
 const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
 ## Health of a stress enemy (the game's imp has 20), so the crowd lasts.
 const ENEMY_HEALTH: float = 120.0
-## A horde swarmer: the imp's body with no staff, a little faster, hurting by touch.
-const SWARM_SPEED: float = 55.0
-const SWARM_CONTACT: int = 3
 ## Enemies added per frame at most, and filler shots per physics step at most: TOP_UP_PER_STEP,
 ## or more for a larger target (one TOP_UP_SHARE of it a step). Sized for 3,000 shots; at the
 ## desktop's 6,000 more shots end on the crowd each step than 120 can replace, and the run fell
@@ -141,6 +88,8 @@ const SEED: int = 24
 ## A scenario passes at this share of its targets.
 const REACH: float = 0.9
 const FRAME_BUDGET_MS: float = 1000.0 / 60.0
+## The hot events whose listeners the tree profile times (`--profile-signals`).
+const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
 
 ## The build of each player: the cards of staff X and staff Y (the A staff keeps its dash).
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
@@ -167,9 +116,6 @@ const STAFFS: Array[Array] = [
 ## tree) for a short run.
 var warm_up: float = WARM_UP
 var measure: float = MEASURE
-## Whether a horde scenario's frame line can fail it; a short test run turns it off (its
-## measured window is too short and its machine too busy for a frame time to mean much).
-var frame_lines: bool = true
 ## The scenarios to run, in order (indexes into SCENARIOS); `_ready` keeps the ones for this
 ## build (`scenarios_for`).
 var scenarios: Array[int] = [0, 2, 3, 1]
@@ -187,48 +133,6 @@ var _probe: Node
 var _rng := RandomNumberGenerator.new()
 var _enemies: Array[Node2D] = []
 var _enemy_data: EnemyBase = null
-## The horde's swarmer (`_swarm_data`), how many staff enemies a horde scenario keeps standing,
-## and how many of the crowd carry a staff now.
-var _swarm_data: EnemyBase = null
-## The hot events whose listeners the tree profile times (`--profile-signals`).
-const PROFILED_SIGNALS: Array[StringName] = [&"damage_dealt", &"projectile_hit", &"enemy_died", &"hit_landed", &"status_applied", &"reaction_triggered", &"spell_cast"]
-
-
-## The swarm's look, timed: its step (inside the swarm's) and its drawing (in `_process`).
-class TimedLook:
-	extends SwarmLook
-	var runner: Node
-
-	func step(delta: float) -> void:
-		var start: int = Time.get_ticks_usec()
-		super.step(delta)
-		runner.call(&"count_look", Time.get_ticks_usec() - start, false)
-
-	func step_feel(real_delta: float) -> void:
-		var start: int = Time.get_ticks_usec()
-		super.step_feel(real_delta)
-		runner.call(&"count_look", Time.get_ticks_usec() - start, true)
-
-
-## The swarm scenario's swarm, its node, its kind and how many swarmers it keeps; the systems it
-## steps itself, and microseconds and steps timed in the measured window.
-var _swarm: SwarmScript = null
-var _swarm_node: Node2D = null
-var _swarm_kind: SwarmKind = null
-var _target_swarm: int = 0
-var _combat: Node = null
-var _spells: Node = null
-var _spells_usec: int = 0
-var _spells_max_usec: int = 0
-var _swarm_usec: int = 0
-var _projectiles_usec: int = 0
-var _combat_usec: int = 0
-var _swarm_max_usec: int = 0
-var _projectiles_max_usec: int = 0
-var _combat_max_usec: int = 0
-var _timed_steps: int = 0
-var _target_staffed: int = 0
-var _staffed: int = 0
 ## The wizards of the scenario running and their Downed components, by seat.
 var _wizards: Array[Actor] = []
 var _downs: Array[Downed] = []
@@ -265,19 +169,7 @@ var _process_frames: int = 0
 ## changes the order nodes process in).
 var profile: bool = false
 var _tree_profile: Node = null
-## `--swarm=N` and `--staff=M`: the swarm scenarios' counts instead of their own (-1: their own).
-var swarm_override: int = -1
-var staff_override: int = -1
-## The swarm's look (TimedLook) and its microseconds: its step within the swarm's, per physics step,
-## and its drawing per frame.
-var _look: SwarmLook = null
-var _look_usec: int = 0
-var _look_draw_usec: int = 0
-var _look_draw_frames: int = 0
 
-
-## False with `--no-native`: the swarm and its look run their GDScript too.
-var _native: bool = true
 
 func _ready() -> void:
 	OS.add_logger(_log)
@@ -292,23 +184,15 @@ func _ready() -> void:
 		_finish(["the Events, PlayerInput, Flow and Projectiles autoloads must exist"])
 		return
 	_default_cap = int(_projectiles.call("get_cap"))
-	scenarios = scenarios_for(scenarios_from_args(OS.get_cmdline_user_args() + OS.get_cmdline_args(), scenarios), OS.has_feature("web"))
+	scenarios = scenarios_for(scenarios, OS.has_feature("web"))
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	profile = profile or args.has("--profile")
-	# `--no-native` runs the projectile manager's, the swarm's and WallSlide's GDScript in place of the
-	# module (native/README.md).
+	# `--no-native` runs the projectile manager's and WallSlide's GDScript in place of the module
+	# (native/README.md).
 	if args.has("--no-native"):
-		_native = false
 		_projectiles.set(&"native", false)
 		WallSlide.use_native(false)
 	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
-	for arg in args:
-		if arg.begins_with("--swarm="):
-			swarm_override = arg.trim_prefix("--swarm=").to_int()
-		elif arg.begins_with("--staff="):
-			staff_override = arg.trim_prefix("--staff=").to_int()
-	if OS.has_feature("web"):
-		frame_lines = false
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
@@ -324,13 +208,6 @@ static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
 		if not (web and bool(SCENARIOS[index].get("desktop_only", false))):
 			out.append(index)
 	return out
-
-
-## The scenarios a run's user arguments ask for: the horde ones for `--horde`, else `default`.
-static func scenarios_from_args(args: PackedStringArray, default: Array[int]) -> Array[int]:
-	if args.has("--horde-swarm"):
-		return HORDE_SWARM.duplicate()
-	return HORDE.duplicate() if args.has("--horde") else default.duplicate()
 
 
 func _exit_tree() -> void:
@@ -352,28 +229,6 @@ func _next_scenario() -> void:
 	var scenario: Dictionary = SCENARIOS[scenarios[_current]]
 	_target_enemies = scenario["enemies"]
 	_target_shots = scenario["shots"]
-	_target_staffed = ceili(float(_target_enemies) * float(scenario.get("staffed", 1.0)))
-	_target_swarm = int(scenario.get("swarm", 0))
-	if _target_swarm > 0:
-		_target_staffed = int(scenario.get("staff_enemies", 0))
-		if swarm_override >= 0:
-			_target_swarm = maxi(swarm_override, 1)
-		if staff_override >= 0:
-			_target_staffed = staff_override
-		_target_enemies = _target_swarm + _target_staffed
-	_look_usec = 0
-	_look_draw_usec = 0
-	_look_draw_frames = 0
-	_swarm_usec = 0
-	_spells_usec = 0
-	_spells_max_usec = 0
-	_projectiles_usec = 0
-	_combat_usec = 0
-	_swarm_max_usec = 0
-	_projectiles_max_usec = 0
-	_combat_max_usec = 0
-	_timed_steps = 0
-	_staffed = 0
 	_rng.seed = SEED
 	_casts = [0, 0, 0, 0]
 	_peak_enemies = 0
@@ -429,10 +284,6 @@ func _start_measuring(scenario: Dictionary) -> void:
 	if _enemy_data == null:
 		_finish(["the enemy data is missing"])
 		return
-	_swarm_data = swarm_data(_enemy_data)
-	if _target_swarm > 0 and not _start_swarm():
-		_finish(["the swarm could not start"])
-		return
 	_wizards.clear()
 	_downs.clear()
 	for index in PLAYERS:
@@ -448,45 +299,8 @@ func _start_measuring(scenario: Dictionary) -> void:
 			if not wizard.caster.set_staff(at + 1, cards):
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
-	var crowd: String = "%d enemies" % _target_enemies
-	if _target_swarm > 0:
-		crowd = "%d enemies (%d swarmers with their look, %d staff enemies)" % [_target_enemies, _target_swarm, _target_staffed]
-	print("BENCH: stress scenario %s: %d players, %s, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, crowd, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
+	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_active = true
-
-
-## The swarm scenario: a swarm of the crypt mite's kind (with ENEMY_HEALTH) under a node of the
-## world, on the room's floor; the projectile manager, Spells and Combat are stepped by the runner.
-func _start_swarm() -> bool:
-	var registry: Node = get_tree().root.get_node_or_null("Registry")
-	var mite: EnemyBase = registry.call("get_resource", &"enemies", SWARM_KIND_ID) as EnemyBase if registry != null else null
-	_combat = get_tree().root.get_node_or_null("Combat")
-	_spells = get_tree().root.get_node_or_null("Spells")
-	var world := _flow.get("world") as Node2D
-	if mite == null or _combat == null or _spells == null or world == null:
-		return false
-	var data: EnemyBase = mite.duplicate() as EnemyBase
-	data.max_health = ENEMY_HEALTH
-	_swarm_kind = SwarmKind.new()
-	_swarm_kind.enemy_id = SWARM_KIND_ID
-	if not _swarm_kind.prepare(data):
-		return false
-	_swarm_node = Node2D.new()
-	_swarm_node.name = "Swarm"
-	world.add_child(_swarm_node)
-	_swarm = SwarmScript.new()
-	_swarm.native = _native
-	_swarm.start(_swarm_node, ENEMY_AREA)
-	# Its look, as the director gives it (horde.gd, `_start_swarm`): a child of the same node.
-	var look := TimedLook.new()
-	look.native = _native
-	look.runner = self
-	look.setup(_swarm)
-	_swarm_node.add_child(look)
-	_swarm.look = look
-	_look = look
-	_ticking(false)
-	return true
 
 
 ## The imp's data with more health, so the crowd is not killed within seconds.
@@ -499,17 +313,6 @@ func _stress_enemy_data() -> EnemyBase:
 		return null
 	var copy: EnemyBase = data.duplicate() as EnemyBase
 	copy.max_health = ENEMY_HEALTH
-	return copy
-
-
-## A horde swarmer made from a staff enemy's data: the same body with no staff, cards or mana,
-## so it only chases and hurts by touch (the horde's swarm enemies are made in parallel, Horde
-## H4; the run does not depend on their folders).
-static func swarm_data(from: EnemyBase) -> EnemyBase:
-	var copy: EnemyBase = from.duplicate() as EnemyBase
-	copy.staffs = [] as Array[StaffCards]
-	copy.move_speed = SWARM_SPEED
-	copy.contact_damage = SWARM_CONTACT
 	return copy
 
 
@@ -573,40 +376,12 @@ func _time_parts() -> void:
 func _physics_process(delta: float) -> void:
 	if not _active:
 		return
-	if _swarm != null:
-		_step_swarm_timed(delta)
 	_top_up_shots()
 	var count: int = int(_projectiles.call("get_count"))
 	_peak_shots = maxi(_peak_shots, count)
 	if _measuring:
 		_shot_sum += count
 		_shot_samples += 1
-
-
-## The swarm scenario's physics step: the projectile manager, Spells, Combat and the swarm, each
-## timed. (The runner steps after the world, so the systems run after the actors' step here instead
-## of before it; that changes the order within a step, not its cost.)
-func _step_swarm_timed(delta: float) -> void:
-	var start: int = Time.get_ticks_usec()
-	_projectiles.call("step", delta)
-	var shot: int = Time.get_ticks_usec()
-	_spells.call("step", delta)
-	var cast: int = Time.get_ticks_usec()
-	_combat.call("step", delta)
-	var fought: int = Time.get_ticks_usec()
-	_swarm.step(delta)
-	var done: int = Time.get_ticks_usec()
-	if not _measuring:
-		return
-	_timed_steps += 1
-	_projectiles_usec += shot - start
-	_spells_usec += cast - shot
-	_spells_max_usec = maxi(_spells_max_usec, cast - shot)
-	_combat_usec += fought - cast
-	_swarm_usec += done - fought
-	_projectiles_max_usec = maxi(_projectiles_max_usec, shot - start)
-	_combat_max_usec = maxi(_combat_max_usec, fought - cast)
-	_swarm_max_usec = maxi(_swarm_max_usec, done - fought)
 
 
 ## The tree profile (`--profile`); with `--profile-signals` the hot events' listeners are timed too.
@@ -619,17 +394,6 @@ func _start_tree_profile() -> void:
 			names.append(signal_name)
 	if (OS.get_cmdline_user_args() + OS.get_cmdline_args()).has("--profile-signals"):
 		_tree_profile.call(&"time_signals", _events, names)
-
-
-## The look's time (TimedLook): `usec` of its step (`drawn` false) or of its drawing.
-func count_look(usec: int, drawn: bool) -> void:
-	if not _measuring:
-		return
-	if drawn:
-		_look_draw_usec += usec
-		_look_draw_frames += 1
-	else:
-		_look_usec += usec
 
 
 ## Nobody dies and nobody runs dry: this is a stress scene, not a balance test.
@@ -646,13 +410,10 @@ func _keep_wizards_up() -> void:
 
 func _top_up_enemies() -> void:
 	var alive: int = 0
-	_staffed = 0
 	for i in range(_enemies.size() - 1, -1, -1):
 		var enemy: Node2D = _enemies[i]
 		if is_instance_valid(enemy) and not enemy.is_queued_for_deletion():
 			alive += 1
-			if (enemy as Actor).data == _enemy_data:
-				_staffed += 1
 		else:
 			_enemies.remove_at(i)
 	var world := _flow.get("world") as Node2D
@@ -660,24 +421,14 @@ func _top_up_enemies() -> void:
 		return
 	var add: int = mini(_target_enemies - alive, SPAWN_PER_FRAME)
 	for i in add:
-		if _target_swarm > 0 and _staffed >= _target_staffed:
-			break
-		var data: EnemyBase = _enemy_data if _staffed < _target_staffed else _swarm_data
-		var enemy := data.scene.instantiate() as Actor
+		var enemy := _enemy_data.scene.instantiate() as Actor
 		if enemy == null:
 			continue
-		enemy.data = data
-		if data == _enemy_data:
-			_staffed += 1
+		enemy.data = _enemy_data
 		enemy.position = ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y)
 		world.add_child(enemy)
 		_enemies.append(enemy)
 		alive += 1
-	if _swarm != null:
-		var room: int = mini(_target_swarm - _swarm.count, SWARM_SPAWN_PER_FRAME)
-		for i in room:
-			_swarm.spawn(_swarm_kind, ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y))
-		alive += _swarm.count
 	_peak_enemies = maxi(_peak_enemies, alive)
 	if _measuring:
 		_enemy_sum += alive
@@ -735,8 +486,6 @@ func _end_scenario() -> void:
 			_tree_profile = null
 	var mean_enemies: float = float(_enemy_sum) / maxf(1.0, float(_enemy_samples))
 	var mean_shots: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
-	if scenario.has("staffed"):
-		print("BENCH: stress %s: staff enemies standing at the end %d (target %d), the rest swarmers" % [label, _staffed, _target_staffed])
 	print("BENCH: stress %s: enemies mean %.0f peak %d of %d, shots mean %.0f peak %d of %d, spell hits %d, reactions %d, casts per player (measured window) %s" % [label, mean_enemies, _peak_enemies, _target_enemies, mean_shots, _peak_shots, _target_shots, _hits, _reactions, str(_casts)])
 	# The run holds the cap full on purpose, so `dropped` is how often shots pushed past it; the
 	# fires that waited are the trigger fires the pacing moved to a later step (none is lost).
@@ -752,11 +501,6 @@ func _end_scenario() -> void:
 			_failures.append("%s: bot %d never cast a spell while measured" % [label, index + 1])
 	if _probe == null or int(_probe.call("frame_count")) == 0:
 		_failures.append("%s: no frames were measured" % label)
-	elif frame_lines and scenario.has("p95_line_ms"):
-		var p95: float = _probe.call("percentile_95")
-		var line: float = scenario["p95_line_ms"]
-		if p95 > line:
-			_failures.append("%s: p95 frame time %.2f ms is over its line of %.1f ms" % [label, p95, line])
 	_teardown_scenario()
 	_next_scenario()
 
@@ -773,10 +517,6 @@ func _report_parts() -> void:
 	var crowd: float = maxf(1.0, float(_enemies.size()))
 	print("BENCH: stress parts, enemy step: avg %.3f ms max %.3f ms for one pass over %d enemies (%.1f us each; includes the combat lookups)" % [float(_enemy_step_usec) / frames / 1000.0, float(_enemy_step_max_usec) / 1000.0, _enemies.size(), float(_enemy_step_usec) / frames / crowd])
 	print("BENCH: stress parts, combat status lookups (speed factor and knockback): avg %.3f ms max %.3f ms per pass" % [float(_lookup_usec) / frames / 1000.0, float(_lookup_max_usec) / 1000.0])
-	if _timed_steps > 0:
-		var steps: float = float(_timed_steps)
-		print("BENCH: stress parts, physics step (%d steps, %d swarmers at the end): swarm without its look avg %.3f ms (max with it %.3f), swarm look step avg %.3f ms, projectile manager avg %.3f ms max %.3f, Spells avg %.3f ms max %.3f, Combat avg %.3f ms max %.3f" % [_timed_steps, _swarm.count if _swarm != null else 0, float(_swarm_usec - _look_usec) / steps / 1000.0, float(_swarm_max_usec) / 1000.0, float(_look_usec) / steps / 1000.0, float(_projectiles_usec) / steps / 1000.0, float(_projectiles_max_usec) / 1000.0, float(_spells_usec) / steps / 1000.0, float(_spells_max_usec) / 1000.0, float(_combat_usec) / steps / 1000.0, float(_combat_max_usec) / 1000.0])
-		print("BENCH: stress parts, swarm look drawing (Feel's flash and squash, the batches' buffers; its _process): avg %.3f ms a frame" % (float(_look_draw_usec) / maxf(1.0, float(_look_draw_frames)) / 1000.0))
 	print("BENCH: stress parts, Feel step (hit particles, flashes, labels; the particles' own work is in the renderer and the particles-off run): avg %.3f ms per pass" % (float(_feel_step_usec) / frames / 1000.0))
 
 
@@ -850,32 +590,10 @@ func _teardown_scenario() -> void:
 	if _flow != null:
 		_flow.call("stop_run")
 	_enemies.clear()
-	_stop_swarm()
 	_restore_diagnostics()
 	if _probe != null:
 		_probe.free()
 		_probe = null
-
-
-## The swarm scenario's end: the swarm forgotten, the systems step themselves again.
-## The game's Tick steps the services (`on`) or the swarm's run steps them by hand.
-func _ticking(on: bool) -> void:
-	var tick: TickScript = get_tree().root.get_node_or_null("Tick") as TickScript
-	if tick == null:
-		return
-	for area: Node in [_projectiles, _spells, _combat]:
-		if area != null:
-			tick.set_ticking(area, on)
-
-
-func _stop_swarm() -> void:
-	if _swarm != null:
-		_swarm.stop()
-	_swarm = null
-	_look = null
-	_swarm_node = null
-	_target_swarm = 0
-	_ticking(true)
 
 
 ## Back to drawing with particles, after a variant (and when the run ends).

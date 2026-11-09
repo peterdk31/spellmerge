@@ -37,10 +37,10 @@ extends RefCounted
 ##    already there is written in place (what outside holds on to it still does), else one is made
 ##    (`new()`, no arguments).
 ## 3. **The actor table's nodes** are set again from the bodies (`Actors.set_node`); a node another
-##    made (a plain body Combat registers: the swarm's rows) is its maker's to set (4).
-## 4. **`restore_nodes()`** of every object restored that has one, the outermost first (the horde
-##    sets up its swarm, then the swarm makes its rows): the nodes it makes from its state that are
-##    no bodies (the swarm's bare rows), set in the actor table.
+##    made (a plain body Combat registers) is its maker's to set (4).
+## 4. **`restore_nodes()`** of every object restored that has one, the outermost first (a holder
+##    sets up what it holds, then that one makes its nodes): the nodes it makes from its state that
+##    are no bodies (bare nodes registered as plain bodies), set in the actor table.
 ## 5. **References** are resolved: by actor id through the table, then the path under that node.
 ## 6. **`rebuild_derived()`** of every object restored that has one, the innermost first: the DERIVED
 ##    members that follow the state (a lookup by node, a cache).

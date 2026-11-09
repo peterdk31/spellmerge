@@ -236,7 +236,7 @@ func test_a_new_room_wipes_the_layer() -> void:
 	check_equal(viewport.render_target_clear_mode, SubViewport.CLEAR_MODE_ONCE, "it is cleared once")
 	check_equal(viewport.render_target_update_mode, SubViewport.UPDATE_ONCE, "in one render")
 	marks.enter(Rect2(0.0, 0.0, 1344.0, 784.0), null, 8.0)
-	check_equal(marks.layer_size(), Vector2i(1344, 784), "a bigger room: a bigger layer (the horde's, about 4.2 MB)")
+	check_equal(marks.layer_size(), Vector2i(1344, 784), "a bigger room: a bigger layer (about 4.2 MB)")
 	marks.enter(Rect2(0.0, 0.0, 9000.0, 300.0), null, 8.0)
 	check_equal(marks.layer_size(), Vector2i(MarksScript.MAX_SIDE, 300), "at most MAX_SIDE across")
 

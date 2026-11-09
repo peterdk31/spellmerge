@@ -29,7 +29,6 @@ const BODY_SCENES: Array[PackedScene] = [
 	preload("res://content/enemies/bone_husk/bone_husk.tscn"),
 	preload("res://content/rooms/crypt/arena_01.tscn"),
 	preload("res://content/rooms/crypt/sandbox.tscn"),
-	preload("res://content/rooms/horde/horde.tscn"),
 	preload("res://content/rooms/crypt/decals/torch.tscn"),
 ]
 
@@ -459,7 +458,7 @@ func test_a_light_spots_data_is_read_and_checked() -> void:
 ## Every light spot in the rooms' and decals' scenes is whole.
 func test_every_light_spot_in_the_content_is_whole() -> void:
 	var seen: int = 0
-	for path: String in ["res://content/rooms/crypt/arena_01.tscn", "res://content/rooms/crypt/sandbox.tscn", "res://content/rooms/horde/horde.tscn", "res://content/rooms/crypt/decals/torch.tscn"]:
+	for path: String in ["res://content/rooms/crypt/arena_01.tscn", "res://content/rooms/crypt/sandbox.tscn", "res://content/rooms/crypt/decals/torch.tscn"]:
 		var scene: Node = (load(path) as PackedScene).instantiate()
 		for node: Node in scene.find_children("*", "", true, false):
 			if node.is_in_group(LightSpot.GROUP):

@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## back from the same start gives the same state hash in every area at every tick. When they part,
 ## the desync report names the first tick, the areas and each differing member.
 ##
-## The runs (a scripted player in the sandbox, a wave of two bots, a horde run of a bot), how each
+## The runs (a scripted player in the sandbox, a wave of two bots), how each
 ## starts from a fresh game and what is held to the tick until N3 and N4 are in
 ## tests/support/replay_run.gd, which the platform runner (N2b) shares.
 ##
@@ -37,21 +37,17 @@ func test_a_wave_of_bots_replays_tick_for_tick() -> void:
 	await _check_replay(&"play_requested", 2, 0)
 
 
-func test_a_horde_run_of_a_bot_replays_tick_for_tick() -> void:
-	await _check_replay(&"horde_requested", 1, 0)
-
-
 ## A run starts from a fresh game's state (online-ready N3b): a replay recorded in a fresh game
 ## plays the same after other runs in the same game, and a run recorded after other runs plays the
 ## same as the one recorded fresh (the same frames and seed). The other runs between use what the
-## run does not (a horde's swarm and director, a wave's AI), and every service's clocks, counters,
+## run does not (a wave's AI, the sandbox's dummies), and every service's clocks, counters,
 ## pools and slots. Without `Tick.begin_run` the runs part at tick 0.
 func test_a_sandbox_replay_plays_the_same_after_other_runs() -> void:
-	await _check_after_other_runs(&"sandbox_requested", 0, 1, [&"horde_requested", &"play_requested"])
+	await _check_after_other_runs(&"sandbox_requested", 0, 1, [&"play_requested", &"play_requested"])
 
 
-func test_a_horde_replay_plays_the_same_after_other_runs() -> void:
-	await _check_after_other_runs(&"horde_requested", 1, 0, [&"sandbox_requested", &"horde_requested"])
+func test_a_wave_replay_plays_the_same_after_other_runs() -> void:
+	await _check_after_other_runs(&"play_requested", 2, 0, [&"sandbox_requested", &"play_requested"])
 
 
 ## The run started by `start` with `bots` bots and `scripted` scripted players, recorded fresh,

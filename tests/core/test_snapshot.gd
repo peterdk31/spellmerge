@@ -31,10 +31,6 @@ func test_a_spell_storm_restored_plays_on_the_same() -> void:
 	_check_restored(&"storm", BEFORE)
 
 
-func test_a_horde_wave_restored_plays_on_the_same() -> void:
-	_check_restored(&"horde", BEFORE)
-
-
 ## A possession under way: the enemy's controller drives one wizard and a puppet added in play
 ## drives the other (a node no scene makes, and controllers pointed at in another body).
 ## One part of a world, for the unit tests below.
@@ -117,6 +113,35 @@ func test_a_snapshot_restores_plain_objects() -> void:
 	check(snapshot.restore({"holder": holder}).is_empty() and holder.data.v == 7, "the snapshot itself never changed")
 
 
+## An object that makes nodes from its state (`restore_nodes`), holding another that does too; the
+## calls go to one list both share (not state).
+class Maker:
+	extends RefCounted
+	const DERIVED: Array[StringName] = [&"calls"]
+	var label: String = ""
+	var inner: Maker = null
+	var calls: Array[String] = []
+
+	func restore_nodes() -> void:
+		calls.append(label)
+
+
+## `restore_nodes()` of every object restored that has one, the outermost first: a holder sets up
+## what it holds before that one makes its nodes (core/sim/snapshot.gd, step 4).
+func test_restore_nodes_runs_outermost_first() -> void:
+	var outer := Maker.new()
+	outer.label = "outer"
+	outer.inner = Maker.new()
+	outer.inner.label = "inner"
+	var calls: Array[String] = []
+	outer.calls = calls
+	outer.inner.calls = calls
+	var snapshot := Snapshot.take({"maker": outer})
+	_check_problems(&"makers", snapshot.problems)
+	check_equal(snapshot.restore({"maker": outer}).size(), 0, "restored without problems")
+	check_equal(calls, ["outer", "inner"] as Array[String], "the holder first, then what it holds")
+
+
 ## Restored into a plain fight (no possession, no puppet), so both are made again.
 func test_a_possessed_fight_restored_plays_on_the_same() -> void:
 	_check_restored(&"possessed", BEFORE, &"fight")
@@ -149,11 +174,6 @@ func test_a_fight_rolled_back_plays_on_the_same() -> void:
 ## The storm rolled back: shots, carriers and the stage's imps of another timeline.
 func test_a_storm_rolled_back_plays_on_the_same() -> void:
 	_check_rolled_back(&"storm")
-
-
-## The horde rolled back to before its first enemies: those it made since go.
-func test_a_horde_rolled_back_plays_on_the_same() -> void:
-	_check_rolled_back(&"horde", 5)
 
 
 ## Play `scene` for `before` ticks, snapshot it, play on, and restore the snapshot into the same

@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
-## The horde's swarmers (horde H4, docs/milestones/horde.md): the Crypt Mite and the Bone Husk are
-## cheap, touch-only strays for a horde of 500+. Each is an actor with one 32 px body and the
+## The swarmers (the `swarmer` profile): the Crypt Mite and the Bone Husk are cheap, touch-only
+## strays, made for crowds. Each is an actor with one 32 px body and the
 ## stray Face, no staff, no cards and no mana, so it has no Caster and no Telegraph: it only
 ## chases and hurts by touch (the enemy AI with nothing to cast, by the `swarmer` profile). The mite is small, fast and dies to two plain bolts; the husk is
 ## slow, tough and hits harder. Both die like any enemy (`enemy_died`).
@@ -52,7 +52,7 @@ func test_each_is_a_cheap_body_with_a_stray_face() -> void:
 		if face != null:
 			check(face.style == Face.Style.STRAY or face.style == Face.Style.STRAY_ONE, "%s: a stray's eyes" % data.id)
 			check_equal(face.resting_mood, Face.Mood.ANGRY, "%s: angry at rest" % data.id)
-		# No more nodes than the Cinder Rod's scene: nothing per enemy that a horde would multiply.
+		# No more nodes than the Cinder Rod's scene: nothing per enemy that a crowd would multiply.
 		check(body.get_child_count() < (own(ImpData.scene.instantiate()) as Node).get_child_count(), "%s: fewer nodes than the Cinder Rod" % data.id)
 
 

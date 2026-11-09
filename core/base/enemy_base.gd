@@ -22,7 +22,7 @@ extends Resource
 
 ## Its own colour when hit (Feel): the spray of a hit on its body and its death's puff, in the
 ## palette ramp nearest it; not its spell's colours (those are its shots'). Ember for every enemy so
-## far, and for a body with no enemy data (a swarmer, a stand-in).
+## far, and for a body with no enemy data (a stand-in).
 const DEFAULT_HIT_COLOR: Color = Color("e0592f")
 @export var hit_color: Color = DEFAULT_HIT_COLOR
 

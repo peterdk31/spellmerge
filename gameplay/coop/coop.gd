@@ -19,7 +19,7 @@ extends Node
 ## where it would be bigger than the room, and is pushed in from the edge instead). A wizard whose
 ## seat drives another actor (possess, actors G9) counts twice: its own standing body and the actor
 ## its seat drives (`ActorController.driving` of its home controller), so both stay in view. It is
-## sent as `view_fitted` when it changes; the horde spawns just outside it. The view is VIEW_SIZE,
+## sent as `view_fitted` when it changes. The view is VIEW_SIZE,
 ## the game's own, never the window's, so it is the same on every machine (online-ready N9). The
 ## camera that shows it is drawing only: Feel's party camera (gameplay/feel/party_camera.gd) eases
 ## towards it on real time; nothing here reads a camera.

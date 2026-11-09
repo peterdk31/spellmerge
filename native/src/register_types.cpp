@@ -14,7 +14,6 @@
 #include "jobs.h"
 #include "mote_kernel.h"
 #include "shot_kernel.h"
-#include "swarm_kernel.h"
 
 using namespace godot;
 
@@ -23,8 +22,6 @@ static void initialize_spellmerge(ModuleInitializationLevel p_level) {
 		return;
 	}
 	GDREGISTER_CLASS(ShotKernel);
-	GDREGISTER_CLASS(SwarmKernel);
-	GDREGISTER_CLASS(SwarmLookKernel);
 	GDREGISTER_CLASS(MoteKernel);
 	GDREGISTER_CLASS(DMathKernel);
 	GDREGISTER_CLASS(BodyKernel);
@@ -35,7 +32,6 @@ static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {
 		return;
 	}
 	ShotKernel::free_names();
-	SwarmKernel::free_names();
 	MoteKernel::free_names();
 	jobs::shutdown();
 }

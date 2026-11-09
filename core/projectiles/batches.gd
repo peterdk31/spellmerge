@@ -3,7 +3,7 @@ extends RefCounted
 ## Godot culls a MultiMeshInstance2D by the box it read from its MultiMesh at the node's last
 ## redraw, not by where the instances are now; a batch is drawn every frame without a redraw, so
 ## with a box worked out from its instances it vanished whole once the camera left where they were
-## at first (the shots, then the horde's swarmers and gems, 2026-11-02). Every MultiMesh made here
+## at first (the shots, then other batches, 2026-11-02). Every MultiMesh made here
 ## has the world as its box (WORLD); a batch with a box of its own (the projectile manager's,
 ## fitted to the room) sets it after. `tests/core/test_batches.gd` fails for a script that makes a
 ## MultiMesh any other way, and for a scene or resource whose MultiMesh has no box.

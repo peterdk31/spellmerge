@@ -241,8 +241,8 @@ int64_t MoteKernel::give_off(Object *m, const PackedFloat32Array &given, int64_t
 	int64_t handed = 0;
 	const int64_t handed_most = settle_out.n / _settle_stride;
 
-	// The chunk being written: taken out of the list while written, as the swarm look's (`ptrw`
-	// then copies the buffer only if the renderer still holds it).
+	// The chunk being written: taken out of the list while written (`ptrw` then copies the buffer
+	// only if the renderer still holds it).
 	int64_t chunk = -1;
 	bool failed = false;
 	PackedFloat32Array buffer;

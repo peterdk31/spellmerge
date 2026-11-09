@@ -10,7 +10,7 @@ extends RefCounted
 ##   every content id, `content_of`), the run's seed (`run_seed`: the runs it starts deal theirs
 ##   from it, core/sim/replay_tape.gd), how it started (`start`, one of STARTS, and `starter`, the seat that
 ##   asked), the seats joined at the start (`seats`, a bit per seat) and the run's rules (`rules`:
-##   the shot cap, the horde's cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
+##   the shot cap, the step budgets; core/sim/session_rules.gd, online-ready N11),
 ##   so it plays the same on a machine whose own settings are others.
 ## - **The ticks:** per tick a byte of the seats with a frame (a bit each), then each seat's frame
 ##   (its length, then `InputFrame` bytes). The game's stops need no mark: they are its state
@@ -26,12 +26,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 
 const MAGIC: PackedByteArray = [0x53, 0x4d, 0x52, 0x50]
 ## The file format's version (2: the run's rules in the header, N11; 3: no "paused" bit in a
-## tick's byte, the stops being state, N4). A replay of another format is refused.
-const FORMAT: int = 3
+## tick's byte, the stops being state, N4; 4: no horde, its start, cap and commands gone). A replay
+## of another format is refused.
+const FORMAT: int = 4
 const FOLDER: String = "user://replays/"
 const EXTENSION: String = ".replay"
-## The requests a run starts by (core/events): Play, the sandbox, the horde.
-const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested", &"horde_requested"]
+## The requests a run starts by (core/events): Play, the sandbox.
+const STARTS: Array[StringName] = [&"play_requested", &"sandbox_requested"]
 const SEATS: int = 4
 ## Limits: four hours at 60 ticks a second, and the file's bytes.
 const MAX_TICKS: int = 60 * 60 * 60 * 4

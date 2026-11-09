@@ -7,7 +7,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 The projectile manager's hot loops run in C++ where the module is built (`native/README.md`, docs/DECISIONS.md 2026-11-02).
 
 - **Run the Windows build.** The Windows export carries the module (MinGW-w64 in CI), but no test runs a Windows binary: one run of the exported game on Windows (or under Wine in CI) should show `is_native()` true.
-- **More kernels, measured first.** Left in GDScript, by cost in the stress runs: the actors' step (looks, the AI, staffs: node work, about the same from C++), the hit handlers (Combat, Spells, Feel), the swarm's chase loop (it calls the AI and Combat; about 0.8 ms for 1,000) and the manager's target refresh (0.6 ms for 1,000 bodies). A data-oriented actor step, like the swarm's, is the bigger lever than porting node code.
+- **More kernels, measured first.** Left in GDScript, by cost in the stress runs: the actors' step (looks, the AI, staffs: node work, about the same from C++), the hit handlers (Combat, Spells, Feel) and the manager's target refresh (0.6 ms for 1,000 bodies). A data-oriented actor step (packed arrays, one batched look) is the bigger lever than porting node code.
 - **The real-GPU web harness** (`wingpu.sh`) has not run the extension-capable web build yet.
 
 ## Carrier traits and card needs (owner, 2026-10-30)

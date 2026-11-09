@@ -1,6 +1,6 @@
 extends Node
 ## The shields' shells (the owner's pick, 2026-11-06: look D, "Mote shell"): everything a Shield
-## card's charges guard is drawn as a see-through bubble of motes, a swarm on its surface that
+## card's charges guard is drawn as a see-through bubble of motes, a cloud on its surface that
 ## follows it. Two things hold charges, and both are drawn the same way, by the same rule:
 ##  - a barrier on an actor (a Shield on its caster, on a move, an enemy's): combat's
 ##    `barrier_changed` says when it is given, blocks, runs out or goes (`change`);

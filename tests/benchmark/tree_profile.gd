@@ -1,7 +1,6 @@
 extends Node
-## A diagnostic profile of the whole frame (horde swarm S4, docs/milestones/horde-swarm.md): where a
-## frame's time goes, by script, without Godot's debugger. The stress run adds it on `--profile`
-## (`stress.gd -- --horde-swarm --profile`); it changes the order nodes process in, so it is never
+## A diagnostic profile of the whole frame: where a frame's time goes, by script, without Godot's
+## debugger. The stress run adds it on `--profile` (`stress.gd -- --profile`); it changes the order nodes process in, so it is never
 ## part of a normal measured run.
 ##
 ## How: every node that processes (`_process` or `_physics_process`) is put in a group by its script

@@ -2,8 +2,7 @@ extends RefCounted
 ## The native module (native/README.md): Spellmerge's own C++, built from source for each platform
 ## and loaded as a GDExtension (`native/spellmerge.gdextension`, written by `ci/build/native.sh`).
 ## It holds only faster versions of GDScript the game already has (the projectile manager's hot
-## loops, `ShotKernel`; the horde swarm's, `SwarmKernel` and `SwarmLookKernel`; the motes' trail
-## births, `MoteKernel`; the deterministic maths, `DMathKernel`; a body's move against the walls, `BodyKernel`), so the game runs
+## loops, `ShotKernel`; the motes' trail births, `MoteKernel`; the deterministic maths, `DMathKernel`; a body's move against the walls, `BodyKernel`), so the game runs
 ## the same without it: a checkout where it was never built (slower). This file is the one place
 ## that asks whether it is there.
 ##
@@ -24,20 +23,6 @@ static func shot_kernel() -> Object:
 	if not _loaded_or_tell():
 		return null
 	return ClassDB.instantiate(&"ShotKernel")
-
-
-## A new `SwarmKernel` (the horde swarm's loops), or null when the module is not loaded.
-static func swarm_kernel() -> Object:
-	if not _loaded_or_tell():
-		return null
-	return ClassDB.instantiate(&"SwarmKernel")
-
-
-## A new `SwarmLookKernel` (the swarm look's loops), or null when the module is not loaded.
-static func swarm_look_kernel() -> Object:
-	if not _loaded_or_tell():
-		return null
-	return ClassDB.instantiate(&"SwarmLookKernel")
 
 
 ## A new `DMathKernel` (the deterministic maths of online-ready N7, `DMath` in core/sim/dmath.gd), or

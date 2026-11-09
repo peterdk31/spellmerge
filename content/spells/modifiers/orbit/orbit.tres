@@ -15,5 +15,5 @@ lifetime_base = 3.0
 behaviour_id = &"orbit"
 behaviour_strength = 0.333333
 behaviour_reach = 36.0
-look_layer = 17
+look_id = &"curl"
 cue = &"orbit"

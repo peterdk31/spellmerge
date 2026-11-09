@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"frost"
-look_layers = PackedInt32Array(2)
+look_ids = Array[StringName]([&"flecks"])
 form = "rime"
 rough = 0.35
 fill = 0.5

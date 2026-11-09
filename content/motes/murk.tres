@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"murk"
-look_layers = PackedInt32Array(4)
+look_ids = Array[StringName]([&"pull"])
 gravity = 40.0
 drag = 4.0
 bounce = 0.0

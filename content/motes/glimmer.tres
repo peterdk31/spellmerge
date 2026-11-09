@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"glimmer"
-look_layers = PackedInt32Array(6)
+look_ids = Array[StringName]([&"motes"])
 gravity = -20.0
 drag = 3.0
 bounce = 0.0

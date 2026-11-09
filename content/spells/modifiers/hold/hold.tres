@@ -12,4 +12,4 @@ complexity = 1
 icon = ExtResource("2_icon")
 behaviour_id = &"hold"
 behaviour_strength = 1.0
-look_layer = 21
+look_id = &"drift"

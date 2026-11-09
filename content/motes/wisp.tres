@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"wisp"
-look_layers = PackedInt32Array(3)
+look_ids = Array[StringName]([&"gusts"])
 gravity = 0.0
 drag = 1.0
 bounce = 0.0

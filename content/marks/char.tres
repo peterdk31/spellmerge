@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_base")
 id = &"char"
-look_layers = PackedInt32Array(5)
+look_ids = Array[StringName]([&"sparks"])
 form = "crack"
 rough = 0.85
 lines = 7

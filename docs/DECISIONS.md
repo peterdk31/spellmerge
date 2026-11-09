@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-09: Cards name their look; the numbers stay inside the engine (owner session)
+
+- **Asked:** the owner, on "look layer 17 instead of 10": "What is 10 and 17? We should work on giving these names instead of numbers".
+- **Now:** a card says `look_id = &"curl"` (an infusion or a modifier), a mote or mark kind `look_ids = [&"embers"]`, and the names are one table, `core/base/look_names.gd` (`LookNames.NAMES`, at the number of each look: `plain` 0, `embers` 1 ... `drift` 21). The engine still reads numbers (the shaders, the packed look bits, the native kernel), through `look_layer` / `look_layers`, which are now worked out from the names, as `behaviour` is from `behaviour_id`. So no engine code, shader or kernel changed, and a test or tool that sets `look_layer` still names the card.
+- **Checked:** `tests/core/test_look_names.gd` holds the table to the projectile manager's `LOOK_*` constants name for name, and every card and mote or mark kind to a known name; the validator names an unknown one (`range_problems`, `problems`). The allowed shares in `test_original_looks.gd` are names now (burst, glitter, weight, ripple, curl, zig, double, converge, drift).
+- **Why not rename the engine's numbers too:** they are what the GPU and the kernel carry per shot (a bit each), so they stay numbers; only what a person writes is a name.
+
 ## 2026-11-09: Orbit 5B: runes, pools and walls circle as they are (owner session)
 
 - **Asked:** the owner, "Do it" (5B of docs/milestones/carrier-modifiers.md, after 5A, #654): "a turning ring of stones is the best thing it makes".

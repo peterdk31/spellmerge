@@ -22,11 +22,16 @@ extends SpellComponent
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 
-## The particles this card makes its shots give off: a LOOK_* kind of `core/projectiles` (0
-## none, 1 embers, 2 frost flecks ... see the LOOK_* constants in
-## `core/projectiles/projectile_manager.gd`). A shot gives off the kinds of all its infusions
-## and modifiers, mixed at random from its tail; two cards with the same kind add nothing more.
-@export var look_layer: int = 0
+## The particles this card makes its shots give off, by name (`LookNames`: `embers`, `flecks`,
+## `curl` ...; empty for none). A shot gives off the looks of all its infusions and modifiers,
+## mixed at random from its tail; two cards with the same look add nothing more.
+@export var look_id: StringName = &""
+## `look_id` as its number, the LOOK_* kind of `core/projectiles` the engine reads (0 for none).
+var look_layer: int:
+	get:
+		return LookNames.layer_of(look_id)
+	set(value):
+		look_id = LookNames.name_of(value)
 
 ## The places in `status_look()`.
 const STATUS_LOOK_STATUS: int = 0
@@ -52,6 +57,13 @@ func ranges() -> Dictionary:
 		"status_duration": Vector2(0.0, 30.0),
 		"status_strength": Vector2(0.0, 100.0),
 		"damage_scale": Vector2(0.1, 4.0),
-		"look_layer": Vector2(0.0, 21.0),
 	})
 	return limits
+
+
+## The range problems, and a look name that is no look.
+func range_problems() -> PackedStringArray:
+	var problems: PackedStringArray = super()
+	if look_id != &"" and LookNames.layer_of(look_id) == 0:
+		problems.append("look_id: %s is not a look (%s)" % [look_id, ", ".join(LookNames.NAMES.slice(1))])
+	return problems

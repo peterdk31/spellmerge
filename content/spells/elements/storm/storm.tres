@@ -15,4 +15,4 @@ status_duration = 4.0
 status_strength = 100.0
 damage_scale = 1.0
 tint = Color(0.9490, 0.7608, 0.1882, 1)
-look_layer = 3
+look_id = &"gusts"

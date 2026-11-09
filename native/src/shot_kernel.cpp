@@ -63,6 +63,8 @@ constexpr int S_GONE = 7;
 constexpr int F_TURNED = 64;
 constexpr int F_WAVE = 128;
 constexpr int F_DEFERRED = 256;
+// The manager's F_QUAD: a shot of a still body (a rune's, a stone's), whatever its motion.
+constexpr int F_QUAD = 512;
 constexpr int CASTER_BODY = -1;
 constexpr int CASTER_POINT = -2;
 constexpr double SPIRAL_PERIOD = 0.5;
@@ -913,6 +915,7 @@ const Constant CONSTANTS[] = {
 	{ "F_TURNED", (double)F_TURNED },
 	{ "F_WAVE", (double)F_WAVE },
 	{ "F_DEFERRED", (double)F_DEFERRED },
+	{ "F_QUAD", (double)F_QUAD },
 	{ "CASTER_BODY", (double)CASTER_BODY },
 	{ "CASTER_POINT", (double)CASTER_POINT },
 	{ "SPIRAL_PERIOD", (double)SPIRAL_PERIOD },
@@ -1507,10 +1510,11 @@ void ShotKernel::count_draw(Object *m) {
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedInt64Array> seq, drawn_seq;
 	Arr<PackedFloat32Array> radius, drawn_radius, drawn_size;
-	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, body_meshes;
+	Arr<PackedInt32Array> look, drawn_look, drawn_particles, ramp, batch_counts, body_meshes, flags;
 	Arr<PackedColorArray> drawn_color;
 	alive.load(m, k.alive);
 	motion.load(m, k.motion);
+	flags.load(m, k.flags);
 	body.load(m, k.body);
 	body_meshes.load(m, k.body_meshes);
 	drawn_batch.load(m, k.drawn_batch);
@@ -1541,19 +1545,19 @@ void ShotKernel::count_draw(Object *m) {
 				// `_remember_drawn`.
 				const double r = radius[slot];
 				const int64_t rmp = ramp[slot];
-				const int64_t mot = motion[slot];
+				const bool quad = (flags[slot] & F_QUAD) != 0;
 				drawn_seq[slot] = seq[slot];
 				drawn_radius[slot] = radius[slot];
 				drawn_look[slot] = look[slot];
-				// `_batch_of`: a shot of a card body draws in its body's pair (`body_batch`) while its
-				// motion is written as the body's mesh (`mesh_of_motion`: a quad still, else a head).
+				// `_batch_of`: a shot of a card body draws in its body's pair (`body_batch`) while it is
+				// written as the body's mesh (`mesh_of`: a quad for a still body, F_QUAD, else a head).
 				int64_t batch = BATCH_BOLT;
 				const int64_t b = (int64_t)body[slot];
-				if (b > 0 && b <= body_meshes.n && body_meshes[b - 1] == (mot == MOTION_STILL ? MESH_QUAD : MESH_HEAD)) {
+				if (b > 0 && b <= body_meshes.n && body_meshes[b - 1] == (quad ? MESH_QUAD : MESH_HEAD)) {
 					batch = BATCH_BODY_FIRST + 2 * ((int64_t)body[slot] - 1) + (is_hat_ramp(rmp) ? 0 : 1);
 				} else if (!is_hat_ramp(rmp)) {
-					batch = mot == MOTION_STILL ? BATCH_ENEMY_STILL : BATCH_ENEMY;
-				} else if (mot == MOTION_STILL) {
+					batch = quad ? BATCH_ENEMY_STILL : BATCH_ENEMY;
+				} else if (quad) {
 					batch = BATCH_STILL;
 				}
 				drawn_batch[slot] = (uint8_t)batch;
@@ -1602,8 +1606,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
 	Arr<PackedFloat32Array> drawn_size, born, life, light_intensity, light_reach;
-	Arr<PackedInt32Array> drawn_particles, draw_out, rooms;
+	Arr<PackedInt32Array> drawn_particles, draw_out, rooms, flags;
 	Arr<PackedColorArray> drawn_color, core;
+	flags.load(m, k.flags);
 	life.load(m, k.life);
 	light_intensity.load(m, k.look_light_intensity);
 	light_reach.load(m, k.look_light_reach);
@@ -1777,9 +1782,9 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		buf[14] = cr.b;
 		buf[15] = (float)(1.0 - (double)KIND_BOLT / KIND_STEPS);
 	};
-	// A shot that lays a tail: a head, not a stone, and not a rune.
-	auto is_tail = [](int64_t mot, int64_t batch) {
-		return mot != MOTION_STILL;
+	// A shot that lays a tail: a head, not a stone, and not a rune (a still body, F_QUAD, circling or not).
+	auto is_tail = [&](int64_t slot) {
+		return (flags[slot] & F_QUAD) == 0;
 	};
 	std::vector<TailPlan> &tails = _scratch->tails;
 	if (tails_on && (int64_t)tails.size() < high) {
@@ -1821,7 +1826,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			const int64_t mot = motion[slot];
 			const Vector2 at = drawn_point(slot, mot);
 			const int64_t batch = drawn_batch[slot];
-			if (tails_on && is_tail(mot, batch)) {
+			if (tails_on && is_tail(slot)) {
 				plan_tail(slot, at, tails[slot]);
 			}
 			const int64_t index = row[batch];
@@ -1832,7 +1837,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 			float *b = out_buffer[batch] + index * DRAW_STRIDE;
 			const double size = drawn_size[slot];
 			const Color look_data = drawn_color[slot];
-			if (mot == MOTION_STILL) {
+			if ((flags[slot] & F_QUAD) != 0) {
 				// `_write_stones` for a shot that is not solid: one quad, a rune's or a card body's
 				// (its batch's shader draws it).
 				Vector2 dir = Vector2(1, 0);
@@ -1861,7 +1866,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 		group_ask[g] = (float)((double)group_ask[g] + (double)(particles > 1 ? particles : 1));
 		by_group[group_end[g]] = (int32_t)slot;
 		group_end[g] += 1;
-		if (tails_on && is_tail(motion[slot], drawn_batch[slot])) {
+		if (tails_on && is_tail(slot)) {
 			lay_tail(slot, tails[slot]);
 		}
 	}

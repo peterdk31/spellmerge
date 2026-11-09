@@ -14,5 +14,5 @@ damage_mult = 1.25
 mana_mult = 1.5
 behaviour_id = &"skyfall"
 behaviour_strength = 1.0
-look_layer = 21
+look_id = &"drift"
 cue = &"skyfall"

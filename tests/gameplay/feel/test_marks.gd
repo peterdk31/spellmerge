@@ -118,8 +118,8 @@ func test_problems_name_what_is_wrong() -> void:
 	kind.form = "smear"
 	kind.body_shade = "light"
 	kind.edge_from = "sky"
-	kind.look_layers = PackedInt32Array([30])
-	check_equal(kind.problems().size(), 4, "a form, a shade (light is not a mark's), a source and a layer: %s" % [kind.problems()])
+	kind.look_ids = [&"no_such_look"] as Array[StringName]
+	check_equal(kind.problems().size(), 4, "a form, a shade (light is not a mark's), a source and a look: %s" % [kind.problems()])
 	var ember := MoteKind.new()
 	ember.id = &"ember"
 	ember.look_layers = PackedInt32Array([1])

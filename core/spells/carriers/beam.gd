@@ -67,6 +67,9 @@ var _bm_hit: Array[HitProfile] = []
 var _bm_shield: PackedInt32Array = PackedInt32Array()
 var _bm_origin: PackedVector2Array = PackedVector2Array()
 var _bm_dir: PackedVector2Array = PackedVector2Array()
+## How far each live beam has swept round its caster (Orbit, `CarrierKit.orbit_sweep`): its staff
+## turns as far round the hand, so it starts from the turned staff's tip.
+var _bm_swept: PackedFloat32Array = PackedFloat32Array()
 var _bm_bend: PackedVector2Array = PackedVector2Array()
 var _bm_end: PackedVector2Array = PackedVector2Array()
 var _bm_reach: PackedFloat32Array = PackedFloat32Array()
@@ -159,7 +162,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring, _bm_swept]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -437,6 +440,7 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_caster[at] = caster
 	_bm_caster_seq[at] = caster_seq
 	_bm_turn[at] = 0.0
+	_bm_swept[at] = 0.0
 	_bm_ring_centre[at] = kit.ring_centre()
 	_bm_ring[at] = Vector4(kit.ring_radius(), kit.ring_angle(), kit.clock(), kit.ring_turn())
 	var legs: int = maxi(spell.pierce, 0) + 1
@@ -499,6 +503,7 @@ func _beam_follow(at: int, delta: float) -> void:
 	var sweep: float = kit.orbit_sweep(_bm_spell[at]) * delta
 	if sweep != 0.0:
 		_bm_turn[at] += sweep
+		_bm_swept[at] += sweep
 	# Whether its way was set from its caster's this step (turned by `_bm_turn`); else a sweep turns
 	# the way it has.
 	var aimed: bool = false
@@ -509,6 +514,14 @@ func _beam_follow(at: int, delta: float) -> void:
 			_bm_origin[at] = kit.aim_origin(holder)
 			_bm_dir[at] = DMath.rotated(kit.aim_dir(holder), _bm_turn[at])
 			aimed = true
+			if _bm_swept[at] != 0.0:
+				# The whole staff turns round the hand as the beam sweeps: it starts from the turned
+				# tip (short of a wall), and the staff is drawn turned with it.
+				var hand: Vector2 = kit.aim_pivot(holder)
+				if hand.is_finite():
+					var tip: Vector2 = hand + DMath.rotated(_bm_origin[at] - hand, _bm_swept[at])
+					_bm_origin[at] = kit.projectiles.clip_to_walls(hand, tip)
+				kit.turn_staff(holder, _bm_swept[at])
 		elif kit.aim_seen(holder):
 			_end_beam(at, false)
 			return
@@ -974,6 +987,7 @@ func _grow_beams() -> void:
 	_bm_turn.resize(size)
 	_bm_ring_centre.resize(size)
 	_bm_ring.resize(size)
+	_bm_swept.resize(size)
 	_bm_count.resize(size)
 	_bm_chain.resize(size)
 	_bm_prev.resize(size)

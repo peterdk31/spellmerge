@@ -12,11 +12,10 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 ## The first six modifiers, which never share a look with each other.
 const FIRST_SIX: Array[StringName] = [&"split", &"pierce", &"homing", &"chain", &"bigger", &"faster"]
 
-## The look kinds later modifiers may share (docs/DECISIONS.md, "The later cards' looks"): 9
-## burst, 12 glitter, 15 weight, 16 ripple, 17 curl, 18 zig, 19 double, 20 converge, 21 drift. A
-## share is for cards that rarely sit on one shot or say the same thing; a new card may take one
-## of these kinds with no edit here (its folder alone adds it); any other kind must be its own.
-const SHARED_KINDS: Array[int] = [9, 12, 15, 16, 17, 18, 19, 20, 21]
+## The looks later modifiers may share (docs/DECISIONS.md, "The later cards' looks"). A share is for
+## cards that rarely sit on one shot or say the same thing; a new card may take one of these looks
+## with no edit here (its folder alone adds it); any other look must be its own.
+const SHARED_LOOKS: Array[StringName] = [&"burst", &"glitter", &"weight", &"ripple", &"curl", &"zig", &"double", &"converge", &"drift"]
 
 var _first_six: Array[ModifierBase] = []
 var _later: Array[ModifierBase] = []
@@ -55,34 +54,34 @@ func test_the_registry_finds_the_cards() -> void:
 
 func test_every_modifier_has_a_look() -> void:
 	for card: ModifierBase in _all():
-		check(card.look_layer > 0 and card.look_layer < ManagerScript.LOOK_COUNT, "%s gives off a look" % card.id)
+		check(card.look_layer > 0 and card.look_layer < ManagerScript.LOOK_COUNT, "%s gives off a look (%s)" % [card.id, card.look_id])
 
 
 func test_no_modifier_shares_a_look_with_an_infusion() -> void:
 	var taken: Dictionary = {}
 	for infusion: ElementBase in _infusions:
-		taken[infusion.look_layer] = infusion.id
+		taken[infusion.look_id] = infusion.id
 	for card: ModifierBase in _all():
-		check(not taken.has(card.look_layer), "%s's look is not an infusion's (kind %d, %s)" % [card.id, card.look_layer, str(taken.get(card.look_layer, ""))])
+		check(not taken.has(card.look_id), "%s's look is not an infusion's (%s, %s)" % [card.id, card.look_id, str(taken.get(card.look_id, ""))])
 
 
 func test_no_first_modifier_shares_a_look() -> void:
 	var seen: Dictionary = {}
 	for card: ModifierBase in _first_six:
-		check(not seen.has(card.look_layer), "%s has a look of its own among the first six (kind %d)" % [card.id, card.look_layer])
-		seen[card.look_layer] = card.id
+		check(not seen.has(card.look_id), "%s has a look of its own among the first six (%s)" % [card.id, card.look_id])
+		seen[card.look_id] = card.id
 	for card: ModifierBase in _later:
-		check(not seen.has(card.look_layer) or card.look_layer == 9, "%s does not hide a first card (kind %d)" % [card.id, card.look_layer])
+		check(not seen.has(card.look_id) or card.look_id == &"burst", "%s does not hide a first card (%s)" % [card.id, card.look_id])
 
 
 func test_shared_looks_are_the_allowed_ones() -> void:
 	var by_kind: Dictionary = {}
 	for card: ModifierBase in _all():
-		var ids: Array = by_kind.get(card.look_layer, [])
+		var ids: Array = by_kind.get(card.look_id, [])
 		ids.append(String(card.id))
-		by_kind[card.look_layer] = ids
-	for kind: int in by_kind:
-		var ids: Array = by_kind[kind]
+		by_kind[card.look_id] = ids
+	for look: StringName in by_kind:
+		var ids: Array = by_kind[look]
 		if ids.size() < 2:
 			continue
-		check(SHARED_KINDS.has(kind), "kind %d is shared by %s, which is not allowed" % [kind, str(ids)])
+		check(SHARED_LOOKS.has(look), "the look %s is shared by %s, which is not allowed" % [look, str(ids)])

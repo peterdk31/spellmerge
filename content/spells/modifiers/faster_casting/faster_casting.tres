@@ -13,4 +13,4 @@ icon = ExtResource("2_icon")
 wind_up_mult = 0.5
 wind_down_mult = 0.5
 mana_mult = 1.25
-look_layer = 21
+look_id = &"drift"

@@ -146,10 +146,13 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.
 	var near: float = 0.0
-	if spell_reach <= 0.0:
-		if ring and spell.speed > 0.0 and not circles:
+	if circles:
+		# Its circle is where it goes, whatever it would have flown or been placed.
+		near = carried
+	elif spell_reach <= 0.0:
+		if ring and spell.speed > 0.0:
 			near = spell.speed * spell.lifetime
-		near = maxf(near, spell.orbit_radius + spell.radius)
+		near = maxf(near, spell.radius)
 		near = maxf(near, spell.ray_length)
 		near = maxf(near, carried)
 	close_reach = maxf(close_reach, near if spell_reach <= 0.0 else spell_reach)

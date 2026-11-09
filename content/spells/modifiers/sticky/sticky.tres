@@ -12,4 +12,4 @@ complexity = 2
 icon = ExtResource("2_icon")
 behaviour_id = &"sticky"
 behaviour_strength = 1.0
-look_layer = 15
+look_id = &"weight"

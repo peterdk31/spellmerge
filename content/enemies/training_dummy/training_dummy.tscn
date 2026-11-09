@@ -7,7 +7,7 @@
 [ext_resource type="Texture2D" path="res://content/enemies/training_dummy/idle.svg" id="5_idle"]
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="6_ai"]
 
-[node name="TrainingDummy" type="CharacterBody2D"]
+[node name="TrainingDummy" type="Node2D"]
 script = ExtResource("1_actor")
 body_offset = Vector2(0, -14)
 hand_offset = Vector2(0, -14)

@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
@@ -10,14 +10,8 @@
 [ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
 [ext_resource type="Texture2D" path="res://content/enemies/crypt_mite/idle.svg" id="10_idle"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
-radius = 5.0
-
-[node name="CryptMite" type="CharacterBody2D"]
+[node name="CryptMite" type="Node2D"]
 script = ExtResource("1_actor")
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-shape = SubResource("CircleShape2D_body")
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("2_health")

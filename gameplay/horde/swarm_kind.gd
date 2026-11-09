@@ -8,7 +8,7 @@ extends Resource
 ## - from the `EnemyBase`: health, walking speed, touch damage, and the scene (the full actor a
 ##   swarmer is promoted to, part S3);
 ## - from the scene: the hurt circle (its `Hurtbox`'s radius and offset), the body's radius (its
-##   collision circle, else its `Mover.body_radius`), the body offset the AI looks from
+##   `Mover.body_radius`, what the full actor walks against the walls with), the body offset the AI looks from
 ##   (`Actor.body_offset`), the body sprite (its `Sprite`'s texture and position) and the stray
 ##   face (its `Face`'s style, resting mood, anchor and glow), for the look (part S2).
 ##
@@ -28,7 +28,7 @@ var contact_damage: int = 0
 ## The hurt circle: radius and centre from the feet (the scene's `Hurtbox`).
 var hurt_radius: float = 8.0
 var hurt_offset: Vector2 = Vector2(0.0, -12.0)
-## The body's radius, for spacing and walls (the scene's collision circle).
+## The body's radius, for spacing and walls (the scene's `Mover.body_radius`).
 var body_radius: float = 6.0
 ## Where the AI looks from (the scene's `Actor.body_offset`).
 var body_offset: Vector2 = Vector2(0.0, -12.0)
@@ -66,17 +66,11 @@ func prepare(data: EnemyBase) -> bool:
 	var actor := body as Actor
 	if actor != null:
 		body_offset = actor.body_offset
-	var found_radius: bool = false
 	for child: Node in body.get_children():
 		if child is Hurtbox:
 			hurt_radius = (child as Hurtbox).radius
 			hurt_offset = (child as Hurtbox).offset
-		elif child is CollisionShape2D:
-			var circle := (child as CollisionShape2D).shape as CircleShape2D
-			if circle != null:
-				body_radius = circle.radius
-				found_radius = true
-		elif child is Mover and not found_radius:
+		elif child is Mover:
 			body_radius = (child as Mover).body_radius
 		elif child is Face:
 			var face := child as Face

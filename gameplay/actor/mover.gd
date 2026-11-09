@@ -81,7 +81,7 @@ func detach() -> void:
 
 
 ## Set the actor's `velocity` for this step: the walk (or its dashes), every other move and
-## Combat's push. The actor moves the body afterwards (`move_and_slide`).
+## Combat's push. The actor moves the body afterwards (`Actor.move`).
 func step(delta: float) -> void:
 	if actor.is_down():
 		_count = 0

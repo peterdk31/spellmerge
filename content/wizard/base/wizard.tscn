@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head.svg" id="2_head"]
@@ -11,18 +11,12 @@
 [ext_resource type="Script" path="res://gameplay/player/player.gd" id="15_player"]
 [ext_resource type="Script" path="res://gameplay/player/staff_look.gd" id="16_look"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
-radius = 6.0
-
-[node name="Wizard" type="CharacterBody2D" groups=["wizards"]]
+[node name="Wizard" type="Node2D" groups=["wizards"]]
 script = ExtResource("1_actor")
 ramp = 0
 idle_team = 0
 hand_offset = Vector2(0, -12)
 staff_reach = 14.0
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
-shape = SubResource("CircleShape2D_body")
 
 [node name="Health" type="Node" parent="."]
 script = ExtResource("10_health")

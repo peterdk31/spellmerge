@@ -9,6 +9,7 @@
 #include <godot_cpp/core/defs.hpp>
 #include <godot_cpp/godot.hpp>
 
+#include "body_kernel.h"
 #include "dmath_kernel.h"
 #include "jobs.h"
 #include "mote_kernel.h"
@@ -26,6 +27,7 @@ static void initialize_spellmerge(ModuleInitializationLevel p_level) {
 	GDREGISTER_CLASS(SwarmLookKernel);
 	GDREGISTER_CLASS(MoteKernel);
 	GDREGISTER_CLASS(DMathKernel);
+	GDREGISTER_CLASS(BodyKernel);
 }
 
 static void uninitialize_spellmerge(ModuleInitializationLevel p_level) {

@@ -837,9 +837,8 @@ func _aim_for(sense: CastSense, now: Vector2, error: float) -> Vector2:
 	if aimed_actor != null:
 		point += aimed_actor.body_offset - actor.body_offset
 	if sense != null and sense.speed > 0.0 and profile.lead > 0.0:
-		var body := aimed as CharacterBody2D
-		if body != null:
-			point += body.velocity * (point.length() / sense.speed) * profile.lead
+		if aimed_actor != null:
+			point += aimed_actor.velocity * (point.length() / sense.speed) * profile.lead
 	if point == Vector2.ZERO:
 		point = actor.aim
 	return DMath.rotated(point.normalized(), error)

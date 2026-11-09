@@ -537,8 +537,6 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 		return
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)
-	if node is CharacterBody2D:
-		_leaf(_join(path, ".velocity"), (node as CharacterBody2D).velocity)
 	_members_of(path, object, script)
 
 

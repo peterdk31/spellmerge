@@ -419,6 +419,11 @@ const STILL_START: float = 1.25
 const STILL_END: float = 1.0
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
+## A still shot's hit size as drawn, as a share of its quad (LOOK_GRID x zoom): the unit a still
+## card's shader shapes its look in (`FormBase.look_shape`) and its motes leave by
+## (`StillShotView.reach`). The shaders hold the same number (`STILL_HIT` in shot_palette.gdshaderinc;
+## test_projectile_looks compares them).
+const STILL_HIT: float = 0.15
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
 ## `set_look`). The body stays plain; each kind is a style of particle the shot gives off along
 ## its path (births for Feel's motes, `_give_off_sparks`), and a shot shows every kind its cards
@@ -621,11 +626,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## There are more draw batches now (`register_body` numbered a card body): `count` in all. Whoever
 ## mirrors the batches (Feel's spell light) adds theirs for the new ones.
 signal batches_grown(count: int)
-## The rows of a watched batch (`watch_rows`) were drawn this frame: its first `count` rows in
-## `rows` (DRAW_STRIDE floats each, as the batch uploads them), read now and not kept (the buffer
-## is the batch's own). Feel gives off a still card's motes from where its shots are drawn
-## (`gameplay/feel/still_motes.gd`): view only, nothing the simulation reads.
-signal rows_drawn(batch: int, rows: PackedFloat32Array, count: int)
+## The still shots of a watched card body's batch (`watch_body`) were drawn this frame: `view` says
+## where each is, its size, colours and still clock (`read_still_rows`), read now and not kept (it is
+## the manager's, refilled next frame). Feel gives off a still card's motes from where its shots are
+## drawn (`gameplay/feel/still_motes.gd`): view only, nothing the simulation reads.
+signal still_shots_drawn(view: StillShotView)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
 ## which gives the same game either way (native/README.md), and the hit test's scratch, which only
@@ -640,7 +645,7 @@ const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes, and the functions that draw (core/sim/README.md;
 ## the frame's `_process`, `update_draw` and the sparks it gives off, on real time and the drawing's
 ## own generator).
-const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"_process", &"update_draw", &"_give_off_sparks", &"_give_off_spark", &"texture", &"_look_light_intensity", &"_look_light_reach", &"_body", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_still_views", &"_body_shapes", &"_draw_node", &"_still_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -958,8 +963,9 @@ var _buffers: Array[PackedFloat32Array] = []
 ## mesh of its own (`mirror_batch`: Feel's spell light). Each frame it is handed the very buffer
 ## the batch uploads, so no row is written twice.
 var _mirrors: Array[MultiMesh] = []
-## The batches whose rows are handed out each frame (`watch_rows`, `rows_drawn`): 1 a watched one.
-var _watched: PackedByteArray = PackedByteArray()
+## The view of each watched batch's still shots (`watch_body`, `still_shots_drawn`), by batch: null
+## for one not watched.
+var _still_views: Array[StillShotView] = []
 ## The first batches' nodes by name: the hat ramps' bolts and runes, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
@@ -973,6 +979,10 @@ var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 var _body_shaders: Array[Shader] = []
 ## Each card body's mesh (MESH_HEAD or MESH_QUAD), body `n` at `n - 1` (`register_body`).
 var _body_meshes: PackedInt32Array = PackedInt32Array()
+## The card bodies shaped by their card (`set_body_shape`: its `look_shape`, and its `look_open` and
+## `look_fade`), handed to their batches' shader as `look_shape` and `look_clock`: {body: [shape,
+## clock]}. A body never shaped leaves its shader's own defaults alone.
+var _body_shapes: Dictionary = {}
 var _batch_total: int = BATCH_BODY_FIRST
 ## What the drawing wrote (`_draw_shots`, `ShotKernel.draw_shots`): the instances of each batch
 ## (BATCH_*), then the particles asked for, 0 (was the trails' cost), the shots drawn, the enemy shots drawn,
@@ -1325,6 +1335,43 @@ func register_body(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	return body
 
 
+## The body number (from 1) of a card's own shader drawing `mesh`, if it was numbered
+## (`register_body`), or 0. Only a look up: it numbers nothing, so asking makes no batches.
+func body_of(shader: Shader, mesh: int = MESH_QUAD) -> int:
+	if shader == null:
+		return 0
+	for at in _body_shaders.size():
+		if _body_shaders[at] == shader and _body_meshes[at] == (MESH_HEAD if mesh == MESH_HEAD else MESH_QUAD):
+			return at + 1
+	return 0
+
+
+## Card body `body`'s look shape (`FormBase.look_shape`, in its drawn hit size's units, STILL_HIT)
+## and its clock (`Vector2(look_open, look_fade)`, seconds), handed to its batches' shader as the
+## uniforms `look_shape` and `look_clock`, so the shader draws its look by the card's numbers and
+## whoever gives off its motes (`still_motes.gd`, from the card's `CardLook`) reads the same ones.
+## Spells sets them as it numbers the card's body. A body is its shader, so the cards sharing one
+## must share these (test_card_looks checks the cards do).
+func set_body_shape(body: int, shape: Vector2, clock: Vector2) -> void:
+	if body < 1 or body > _body_shaders.size():
+		return
+	_body_shapes[body] = [shape, clock]
+	for enemy: bool in [false, true]:
+		var batch: int = body_batch(body, enemy)
+		if batch < _nodes.size() and _nodes[batch] != null:
+			_apply_body_shape(_nodes[batch], body)
+
+
+## Hands card body `body`'s look shape and clock to its batch `node`'s shader, once it has them.
+func _apply_body_shape(node: MultiMeshInstance2D, body: int) -> void:
+	var shaped: Variant = _body_shapes.get(body)
+	if shaped == null:
+		return
+	var material := node.material as ShaderMaterial
+	material.set_shader_parameter(&"look_shape", shaped[0])
+	material.set_shader_parameter(&"look_clock", shaped[1])
+
+
 ## The mesh the shot in `slot` is written as (`_write_stones` or `_write_head`): MESH_QUAD for a
 ## shot of a still body (`F_QUAD`: spawned still, circling or not), MESH_HEAD for any other. A card
 ## body draws a shot only while this is its mesh.
@@ -1396,6 +1443,7 @@ func _make_body_batches(body: int) -> void:
 		if _nodes[batch] == null:
 			_nodes[batch] = _make_batch(_batch_z(batch), _body_shaders[body - 1], head_mesh() if mesh == MESH_HEAD else null)
 			_nodes[batch].multimesh.custom_aabb = _nodes[BATCH_BOLT].multimesh.custom_aabb
+			_apply_body_shape(_nodes[batch], body)
 			_place_body_node(body, enemy)
 
 
@@ -1436,18 +1484,28 @@ func mirror_batch(batch: int, multimesh: MultiMesh) -> void:
 		multimesh.visible_instance_count = 0
 
 
-## Hand batch `batch`'s rows out each frame they are drawn (`rows_drawn`), or stop with `on` false.
-func watch_rows(batch: int, on: bool) -> void:
-	if batch < 0:
+## Hand out card body `body`'s still shots each frame its batches draw any (`still_shots_drawn`,
+## a `StillShotView` per batch of its pair), or stop with `on` false. Only a still body's (MESH_QUAD)
+## shots are read; a frame costs nothing more for a body nobody watches.
+func watch_body(body: int, on: bool) -> void:
+	if body < 1 or body > _body_shaders.size() or _body_meshes[body - 1] != MESH_QUAD:
 		return
-	if _watched.size() <= batch:
-		_watched.resize(maxi(batch + 1, _batch_total))
-	_watched[batch] = 1 if on else 0
+	for enemy: bool in [false, true]:
+		var batch: int = body_batch(body, enemy)
+		if _still_views.size() <= batch:
+			_still_views.resize(batch + 1)
+		var view: StillShotView = null
+		if on:
+			view = _still_views[batch] if _still_views[batch] != null else StillShotView.new()
+			view.body = body
+			view.enemy = enemy
+		_still_views[batch] = view
 
 
-## True while batch `batch`'s rows are handed out (`watch_rows`).
-func rows_watched(batch: int) -> bool:
-	return batch >= 0 and batch < _watched.size() and _watched[batch] == 1
+## True while card body `body`'s still shots are handed out (`watch_body`).
+func body_watched(body: int) -> bool:
+	var batch: int = body_batch(body, false)
+	return body >= 1 and batch < _still_views.size() and _still_views[batch] != null
 
 
 ## The MultiMesh mirroring batch `batch` (`mirror_batch`), or null.
@@ -5045,8 +5103,11 @@ func update_draw(fraction: float = -1.0) -> void:
 			multimesh.buffer = rows
 			if mirror != null:
 				mirror.buffer = rows
-			if batch < _watched.size() and _watched[batch] == 1:
-				rows_drawn.emit(batch, rows, out)
+			if batch < _still_views.size() and _still_views[batch] != null:
+				var view: StillShotView = _still_views[batch]
+				read_still_rows(rows, out, view)
+				view.time = sim_time
+				still_shots_drawn.emit(view)
 		multimesh.visible_instance_count = out
 		if mirror != null:
 			mirror.visible_instance_count = out
@@ -5667,6 +5728,43 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 13] = core.g
 	buffer[i + 14] = core.b
 	buffer[i + 15] = 1.0 - (kind + code) / KIND_STEPS
+
+
+## Read the first `count` still shots' rows of `rows` (as `_write_stones` writes them, with
+## `_write_quad`; the native kernel writes the same, byte for byte) into `view`: where each is drawn,
+## the way its quad turns, its hit size as drawn (STILL_HIT), its ramp and look bits, its core and
+## its still clock. The one place the rows are read back off the GPU's layout, beside the code that
+## writes them, so a viewer never decodes a row (`StillShotView`).
+static func read_still_rows(rows: PackedFloat32Array, count: int, view: StillShotView) -> void:
+	count = mini(count, rows.size() / DRAW_STRIDE)
+	view.hold(count)
+	view.count = count
+	for n in count:
+		var i: int = n * DRAW_STRIDE
+		var x_axis := Vector2(rows[i], rows[i + 4])
+		var size: float = x_axis.length()
+		view.at[n] = Vector2(rows[i + 3], rows[i + 7])
+		view.across[n] = x_axis / size if size > 0.0 else Vector2.RIGHT
+		view.reach[n] = size * STILL_HIT
+		view.ramp[n] = roundi(rows[i + 8] * 255.0) % 4
+		view.look[n] = roundi(rows[i + 9] * 255.0) | (roundi(rows[i + 10] * 255.0) << 8) | (roundi(rows[i + 11] * 255.0) << 16)
+		view.core[n] = Color(rows[i + 12], rows[i + 13], rows[i + 14])
+		var coded: float = (1.0 - rows[i + 15]) * KIND_STEPS
+		var code: float = coded - roundf(coded)
+		view.since[n] = still_since(code)
+		view.left[n] = still_left(code)
+
+
+## A still shot's seconds since it was placed, from its clock's code (`still_code`): STILL_START once
+## past them. As `still_since` in shot_palette.gdshaderinc.
+static func still_since(code: float) -> float:
+	return clampf((code - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0) * STILL_START if code > 0.01 else STILL_START
+
+
+## A still shot's seconds of life left, from its clock's code (`still_code`): STILL_END while it has
+## more. As `still_left` in shot_palette.gdshaderinc.
+static func still_left(code: float) -> float:
+	return (1.0 - clampf((-code - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0)) * STILL_END if code < -0.01 else STILL_END
 
 
 ## Write a live shot's instance at float index `i` of `buffer`: its data in the transform, which

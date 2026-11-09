@@ -286,6 +286,47 @@ func test_a_still_shot_tells_its_shader_its_start_and_its_end() -> void:
 	check(ManagerScript.still_code(0.2, 0.3) > 0.0, "and its start before")
 
 
+## The value of `const float <name> = <value>;` in shader text `code`, or NAN.
+func _shader_const(code: String, name: String) -> float:
+	var found := RegEx.create_from_string("const\\s+float\\s+%s\\s*=\\s*([-0-9.]+)\\s*;" % name).search(code)
+	return found.get_string(1).to_float() if found != null else NAN
+
+
+func test_the_shader_include_holds_the_managers_still_numbers() -> void:
+	var code: String = (load("res://core/projectiles/shot_palette.gdshaderinc") as ShaderInclude).code
+	var mine: Dictionary = {"STILL_START": ManagerScript.STILL_START, "STILL_END": ManagerScript.STILL_END, "TRACE_FROM": ManagerScript.TRACE_FROM, "TRACE_SPAN": ManagerScript.TRACE_SPAN, "STILL_HIT": ManagerScript.STILL_HIT}
+	for name: String in mine:
+		check(is_equal_approx(_shader_const(code, name), float(mine[name])), "shot_palette.gdshaderinc's %s is the manager's %s (%f)" % [name, mine[name], _shader_const(code, name)])
+
+
+func test_a_still_shot_reads_back_as_it_was_written() -> void:
+	var slot: int = mgr.spawn(1, Vector2(50.0, 60.0), Vector2.ZERO, 5.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.set_core(slot, Color(0.25, 0.5, 0.75))
+	mgr.set_look(slot, (1 << 0) | (1 << 9))
+	for i in 18:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	var view := StillShotView.new()
+	ManagerScript.read_still_rows(mgr._still_node.multimesh.buffer, 1, view)
+	check_equal(view.count, 1, "one shot read")
+	check(view.at[0].distance_to(Vector2(50.0, 60.0)) < 0.01, "where it was written (%s)" % view.at[0])
+	check(view.across[0].is_equal_approx(Vector2.RIGHT), "a lone shot's quad runs along +x")
+	check(is_equal_approx(view.reach[0], ManagerScript.look_size(14.0) * ManagerScript.STILL_HIT), "its hit size as drawn")
+	check_equal(view.ramp[0], 1, "its caster's hat ramp")
+	check_equal(view.look[0], (1 << 0) | (1 << 9), "its look bits")
+	check(view.core[0].is_equal_approx(Color(0.25, 0.5, 0.75)), "its core")
+	check(absf(view.since[0] - 0.3) < 0.01, "0.3 s since it was placed (%f)" % view.since[0])
+	check(is_equal_approx(view.left[0], ManagerScript.STILL_END), "far from its end")
+	for clock: Vector2 in [Vector2(0.0, 3.0), Vector2(0.6, 3.0), Vector2(1.2, 3.0), Vector2(3.0, 0.75), Vector2(3.0, 0.1)]:
+		var code: float = ManagerScript.still_code(clock.x, clock.y)
+		check(absf(ManagerScript.still_since(code) - minf(clock.x, ManagerScript.STILL_START)) < 0.001 or code < 0.0, "since round trips at %s" % clock)
+		check(absf(ManagerScript.still_left(code) - minf(clock.y, ManagerScript.STILL_END)) < 0.001 or code > 0.0, "left round trips at %s" % clock)
+	var rows := PackedFloat32Array()
+	rows.resize(ManagerScript.DRAW_STRIDE * 2)
+	ManagerScript.read_still_rows(rows, 5, view)
+	check_equal(view.count, 2, "never more than the rows hold")
+
+
 func test_a_walls_stones_turn_along_its_row() -> void:
 	var slot: int = mgr.spawn(0, Vector2(80.0, 80.0), Vector2.ZERO, 5.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	check(mgr.set_solid(slot, Vector2(0.0, 2.0), 3, 9.0), "it is made a row of three stones")

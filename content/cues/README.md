@@ -56,7 +56,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 | `zap` | the zap card's `cue`, wherever a zap shows itself (`form_shown` `zap`), as long as the zap | a jagged arc of lightning in the shot's colours for 0.25 s; a spark into the air (22 px or less, `if_size_upto`) for 0.15 s |
 | `discharge_arc` | Feel, for `discharge_arc`, from the struck body to each one zapped, as long as the gap | the arc in exactly the discharge's colour (`color`) |
 | `nova` | the Nova modifier's `cue`, once per nova at its caster (`cue_shown`) | the ring leaving the caster, 120 px across, a ring of its cards' motes, and a burn ring on the floor round the caster |
-| `rune_burst` | the rune card's `impact_cue`, where a rune goes off (on a body or not: a rune lies on the floor) | the rune's burst (a dotted flash over the diamond, a diamond ring widening) and its scar on the floor, as big as the rune |
+| `rune_burst` | the rune card's `impact_cue`, where a rune goes off (on a body or not: a rune lies on the floor) | the crystal slamming down (a column struck down onto the spot, `fall`; the owner, 2026-11-09: yes to the slam-down), the rune's burst (a dotted flash, a ring widening) and its scar on the floor, as big as the rune |
 | `telegraph` | no card now (it was the rain's `shown_cue`; kept for a card that warns of a spot) | a ring closing on a spot, for the seconds until then (`size`) |
 | `vanish` | the teleport card's `shown_cue`, where it leaves | a column of light pulled up off the spot (`rise`) |
 | `portal_open` | the portal card's `shown_cue`, at each of its gates as it opens | a ring gathering in and a quick spiral, glimmers and its cards' motes |

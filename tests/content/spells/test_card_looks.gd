@@ -23,6 +23,7 @@ const PLAIN: Dictionary = {
 	Carrier.LOOK_BEAM: "res://core/projectiles/shot_beam.gdshader",
 	Carrier.LOOK_SWING: "res://core/projectiles/shot_swing.gdshader",
 	Carrier.LOOK_ORB: "res://core/projectiles/shot_orbit.gdshader",
+	Carrier.LOOK_PORTAL: "res://core/projectiles/shot_portal.gdshader",
 }
 ## The particle rule of a shader that draws its card particles (a still shot's quad, an orb):
 ## 4 + 2 a kind, at most MAX_PARTICLES. The others' particles are Feel's motes.
@@ -51,7 +52,7 @@ func test_some_cards_have_a_look_of_their_own() -> void:
 	var ids: Array[StringName] = []
 	for each: Array in _looked_cards():
 		ids.append((each[0] as FormBase).id)
-	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"swap", &"beam", &"swing", &"familiar"]:
+	for id: StringName in [&"rune", &"wall", &"pool", &"bolt", &"swap", &"beam", &"swing", &"familiar", &"portal"]:
 		check(ids.has(id), "%s draws with its folder's shader" % id)
 
 
@@ -94,7 +95,7 @@ func test_no_card_shader_reads_the_light_floats() -> void:
 
 func test_every_card_shader_is_warmed_before_the_first_room() -> void:
 	# Each area warms the card shaders it draws, as it draws them: the projectile manager its
-	# bodies (numbered when Spells starts), Feel its beams' and trails', Entities its orbs'.
+	# bodies (numbered when Spells starts), Feel its beams', trails' and portals', Entities its orbs'.
 	var manager := own(ProjectilesScript.new()) as ProjectilesScript
 	var spells := own(SpellsScript.new()) as Node
 	spells.set(&"registry", registry)
@@ -143,3 +144,21 @@ func test_every_card_shader_takes_every_uniform_its_area_sets() -> void:
 		for line: String in plain.split("\n"):
 			if line.begins_with("uniform "):
 				check(code.contains(line), "%s keeps its area's `%s`" % [form.id, line])
+
+
+func test_every_still_cards_look_is_one_its_shader_and_clock_can_draw() -> void:
+	# A still card's shape and clock reach its shader by its body (`set_body_shape`), and a body is
+	# its shader: cards sharing one must share them, or one card's motes leave from the other's shape.
+	# Its coming and going fit what the still clock tells (`STILL_START`, `STILL_END`).
+	var by_shader: Dictionary = {}
+	for each: Array in _looked_cards():
+		var form: FormBase = each[0]
+		if each[1] != Carrier.LOOK_STILL:
+			continue
+		check(form.look_open <= ProjectilesScript.STILL_START and form.look_fade <= ProjectilesScript.STILL_END, "%s comes and goes within what its still clock tells" % form.id)
+		var numbers: Array = [form.look_shape, form.look_open, form.look_fade]
+		if by_shader.has(form.look_shader):
+			var first: Array = by_shader[form.look_shader]
+			check(first[1] == numbers, "%s shares %s's shader, so its look shape and clock too" % [form.id, first[0]])
+		else:
+			by_shader[form.look_shader] = [form.id, numbers]

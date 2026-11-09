@@ -14,18 +14,34 @@ var shader: Shader = null
 ## How bright and how far it lights the room (spell light), times the light's own: 1 as any shot.
 var light_intensity: float = 1.0
 var light_reach: float = 1.0
-## The motes its still shots give off while they stand (`FormBase.look_motes`: a MoteKind id, empty
-## for none), how many a second each shot gives off, and from where (`look_motes_from`: 0 the oval of
-## its hit size, 1 along its piece of a row).
-var motes: StringName = &""
-var mote_rate: float = 0.0
-var motes_from: int = 0
+## The streams of motes its still shots give off while they stand (`FormBase.look_motes`, one
+## `StillMoteSource` each; empty for none), in its `shape`. Shared with the card: never change them.
+var motes: Array[StillMoteSource] = []
+## The shape of its still look, in its hit size as drawn (`FormBase.look_shape`), and the seconds
+## it takes to open and the seconds of its end it fades over (`look_open`, `look_fade`): what its
+## shader draws by (`ProjectileManager.set_body_shape`) and its motes leave by. Its card's, from
+## `from_card` (the card holds the defaults); nothing for a look of no card, which has no motes.
+var shape: Vector2 = Vector2.ZERO
+var open: float = 0.0
+var fade: float = 0.0
 
 ## The look of a card with none of its own, or of an id that is no carrier card: drawn plain, lit
 ## as any. Shared.
 static var PLAIN: CardLook = CardLook.new()
 
 
+## The whole look of the carrier card `card`, made in one piece (Spells makes one per card and
+## shares it): nothing is set on it after.
+static func from_card(card: FormBase) -> CardLook:
+	var look := of(card.look_shader, card.look_light_intensity, card.look_light_reach)
+	look.motes = card.look_motes
+	look.shape = card.look_shape
+	look.open = card.look_open
+	look.fade = card.look_fade
+	return look
+
+
+## A look of a shader and light only (no still motes; a test's stand-in for a card's).
 static func of(look_shader: Shader, intensity: float, reach: float) -> CardLook:
 	var look := CardLook.new()
 	look.shader = look_shader

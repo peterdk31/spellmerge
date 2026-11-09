@@ -55,9 +55,10 @@ func id() -> StringName:
 	return &"portal"
 
 
-## What draws its look: no look of its own (cues, or a body that is not the card's).
+## What draws its look: Feel's portal gates (a card's `look_shader` draws each gate's lens; the
+## lips and drift round it are motes), read through `read_view`.
 func look_drawer() -> int:
-	return LOOK_NONE
+	return LOOK_PORTAL
 
 
 ## The portals of the runtime `spells` (its bound `portal` carrier), for what reads its own
@@ -520,3 +521,46 @@ func portal_infusions(at: int) -> PackedColorArray:
 ## Open portals now (tests).
 func portal_count() -> int:
 	return _pt_on.count(1)
+
+
+## What a viewer may know of the open portals and their gates now, into `view` (Feel's portal look:
+## one typed read a frame, no getter called by name): each open portal's caster, look, core,
+## infusions, seconds open and left, and its gates (the mouth first) where the projectile manager
+## has them. Allocates nothing once `view` has held as many.
+func read_view(view: PortalView) -> void:
+	view.portals = 0
+	view.gates = 0
+	if kit == null or kit.projectiles == null:
+		return
+	var manager := kit.projectiles
+	for at in _pt_on.size():
+		if _pt_on[at] == 0 or _pt_gates_used[at] == 0:
+			continue
+		var p: int = view.portals
+		var spell: CompiledSpell = _pt_spell[at]
+		view.hold_portals(p + 1)
+		view.key[p] = _pt_born[at]
+		view.caster[p] = _pt_actor[at]
+		view.look[p] = spell.look if spell != null else 0
+		view.core[p] = spell.tint if spell != null else Color.WHITE
+		view.infusions[p] = spell.infusion_looks if spell != null else PackedColorArray()
+		var seconds: Vector2 = portal_seconds(at)
+		view.since[p] = seconds.x
+		view.left[p] = seconds.y
+		view.first_gate[p] = view.gates
+		var count: int = 0
+		for n in _pt_gates_used[at]:
+			var gate: int = _pt_gates[at * _pt_stride + n]
+			var centre: Vector2 = manager.gate_position(gate)
+			if not centre.is_finite():
+				continue
+			var g: int = view.gates
+			view.hold_gates(g + 1)
+			view.centre[g] = centre
+			view.face[g] = manager.gate_face(gate)
+			view.radius[g] = manager.gate_radius(gate)
+			view.mouth[g] = 1 if manager.gate_is_mouth(gate) else 0
+			view.gates += 1
+			count += 1
+		view.gate_count[p] = count
+		view.portals += 1

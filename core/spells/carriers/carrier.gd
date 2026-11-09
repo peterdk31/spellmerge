@@ -50,14 +50,15 @@ const BY_POINT: int = 4
 ## What draws its look (`look_drawer`), and so which area a card's `look_shader` (and light) is
 ## for (docs/milestones/card-looks.md): the projectile manager's head batches (LOOK_SHOT: a shot
 ## that flies or orbits), its quad batches (LOOK_STILL: a still shot), Feel's beams (LOOK_BEAM),
-## Feel's swing trails (LOOK_SWING), Entities' familiar orbs (LOOK_ORB), or nothing of its own
-## (LOOK_NONE: cues only, or the caster's own look).
+## Feel's swing trails (LOOK_SWING), Entities' familiar orbs (LOOK_ORB), Feel's portal gates
+## (LOOK_PORTAL), or nothing of its own (LOOK_NONE: cues only, or the caster's own look).
 const LOOK_NONE: int = 0
 const LOOK_SHOT: int = 1
 const LOOK_STILL: int = 2
 const LOOK_BEAM: int = 3
 const LOOK_SWING: int = 4
 const LOOK_ORB: int = 5
+const LOOK_PORTAL: int = 6
 
 
 ## Its id, the `carrier` a form card names (&"atom"); &"" for the carrier that runs nothing, which

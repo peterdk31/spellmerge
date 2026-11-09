@@ -1,9 +1,10 @@
 extends "res://tests/support/suite.gd"
 ## Still motes (gameplay/feel/still_motes.gd; the owner, 2026-11-09: "use motes for everything you
 ## can"): a still carrier card that names `look_motes` has its shots give off that kind all the time
-## while they stand, from the rows the projectile manager draws them by (`watch_rows`, `rows_drawn`):
-## along each piece of a wall's row, over a pool's oval, thinning while it comes and as it goes (its
-## still clock), in the shot's colours and now and then its infusions' own kinds.
+## while they stand, from a view of where the projectile manager draws them (`watch_body`,
+## `still_shots_drawn`, `StillShotView`): along each piece of a wall's row, over a pool's oval (the
+## card's `look_shape`, which its shader draws by too), thinning while it comes and as it goes
+## (`look_open`, `look_fade`), in the shot's colours and now and then its infusions' own kinds.
 ##
 ## godot --headless --path . --script res://tests/gameplay/feel/test_still_motes.gd
 
@@ -17,12 +18,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const WALL := preload("res://content/spells/forms/wall/wall.tres")
 const POOL := preload("res://content/spells/forms/pool/pool.tres")
+const RUNE := preload("res://content/spells/forms/rune/rune.tres")
 const FIRE_LOOK: int = 1 << 0
 
 var mgr: ManagerScript
 var motes: MotesScript
 var still: StillMotesScript
-var spells: Node
+var spells: SpellRuntime
 
 
 func before_each() -> void:
@@ -34,10 +36,10 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	mgr.set_cap(200)
 	root.add_child(mgr)
-	spells = own(SpellsScript.new()) as Node
-	spells.set(&"registry", registry)
-	spells.set(&"projectiles", mgr)
-	spells.call(&"register_bodies")
+	spells = own(SpellsScript.new()) as SpellRuntime
+	spells.registry = registry
+	spells.projectiles = mgr
+	spells.register_bodies()
 	var kinds: Array[MoteKind] = []
 	for kind: Resource in registry.get_all(&"motes"):
 		kinds.append(kind as MoteKind)
@@ -46,8 +48,7 @@ func before_each() -> void:
 	root.add_child(motes)
 	still = StillMotesScript.new()
 	still.attach(mgr, spells)
-	mgr.rows_drawn.connect(func(batch: int, rows: PackedFloat32Array, count: int) -> void:
-		still.give_off(batch, rows, count, mgr.sim_time, motes))
+	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void: still.give_off(view, motes))
 
 
 ## A still shot of `form`'s body at `at` living `life` seconds; a wall's a row of five across x.
@@ -77,23 +78,54 @@ func _written(from: int) -> Array:
 	return found
 
 
-func test_the_wall_and_the_pool_name_their_motes() -> void:
-	for form: FormBase in [WALL, POOL]:
-		check_equal(form.look_motes, &"rising", "%s gives off rising motes" % form.id)
-		check(form.look_mote_rate > 0.0, "%s gives some off every second" % form.id)
+func test_the_still_cards_name_their_streams() -> void:
+	for form: FormBase in [WALL, POOL, RUNE]:
+		check(not form.look_motes.is_empty(), "%s gives off motes" % form.id)
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-	check_equal(WALL.look_motes_from, StillMotesScript.FROM_ROW, "a wall's leave along its row")
-	check_equal(POOL.look_motes_from, StillMotesScript.FROM_AREA, "a pool's over its oval")
-	var cards: Array[StringName] = spells.call(&"still_mote_cards")
-	check(cards.has(&"wall") and cards.has(&"pool") and not cards.has(&"rune"), "Spells names the still cards that give off motes (%s)" % [cards])
+		for source: StillMoteSource in form.look_motes:
+			check(source.start <= ManagerScript.STILL_START and source.stop <= ManagerScript.STILL_START, "%s's %s start and stop within what its still clock tells" % [form.id, source.kind])
+	check(WALL.look_motes[0].kind == &"seam" and WALL.look_motes[0].from == StillMoteSource.FROM_ROW, "a wall's stream rises off its seam")
+	check(POOL.look_motes[0].kind == &"rising" and POOL.look_motes[0].from == StillMoteSource.FROM_AREA, "a pool's motes rise off its mire")
+	check(RUNE.look_motes.all(func(s: StillMoteSource) -> bool: return s.start >= 1.0), "a rune's only once armed")
+	var cards: Array[StringName] = spells.still_mote_cards()
+	check(cards.has(&"wall") and cards.has(&"pool") and cards.has(&"rune"), "Spells names the still cards that give off motes (%s)" % [cards])
+
+
+func test_a_source_that_cannot_give_off_is_reported() -> void:
+	var source := StillMoteSource.new()
+	check(" ".join(source.problems(&"x")).contains("no mote kind"), "a source of no kind")
+	source.kind = &"rising"
+	check(" ".join(source.problems(&"x")).contains("never given off"), "at no rate")
+	source.rate = 500.0
+	check(" ".join(source.problems(&"x")).contains("at most"), "too fast")
+	source.rate = 5.0
+	source.start = 1.0
+	source.stop = 0.5
+	check(" ".join(source.problems(&"x")).contains("before they start"), "stopping before it starts")
+	source.stop = 0.0
+	check(source.problems(&"x").is_empty(), "a good one: %s" % source.problems(&"x"))
+
+
+func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
+	var later := own(ManagerScript.new()) as ManagerScript
+	root.add_child(later)
+	spells.projectiles = later
+	var body: int = spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD)
+	check(body > 0, "a launch numbers a body the start did not")
+	var material := later._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"look_shape"), POOL.look_shape, "and shapes it by its card, as the start does")
+	check_equal(spells._body_of(&"pool", POOL.look_shader, ManagerScript.MESH_QUAD), body, "asked again, the same body")
+	spells.projectiles = mgr
 
 
 func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
 	var form := FormBase.new()
 	form.id = &"test_form"
 	form.carrier = &"atom"
-	form.look_motes = &"rising"
-	form.look_mote_rate = 10.0
+	var source := StillMoteSource.new()
+	source.kind = &"rising"
+	source.rate = 10.0
+	form.look_motes = [source] as Array[StillMoteSource]
 	check(" ".join(form.look_problems()).contains("never given off"), "a flying card's still motes are reported")
 
 
@@ -103,21 +135,78 @@ func test_a_wall_streams_motes_along_its_row() -> void:
 	_place(WALL, Vector2(200.0, 150.0))
 	_run(90)
 	var found: Array = _written(before)
-	# Five pieces at 16 a second for about 1.5 s, less while its seam opens.
-	check(found.size() > 60, "a stream of motes (%d)" % found.size())
+	# Five pieces at 7 a second for about 1.5 s, less while its seam opens.
+	check(found.size() > 25, "a stream of motes (%d)" % found.size())
 	var half: float = WALL.spread * 2.0 + WALL.radius * 4.0
+	var spacing: float = WALL.look_motes[0].spacing
 	for each: Array in found:
 		var at := Vector2(each[0], each[1])
 		check(absf(at.x - 200.0) <= half and absf(at.y - 150.0) <= 6.0, "a mote leaves from along the row (%s)" % at)
-	check(found.all(func(each: Array) -> bool: return each[2] == &"rising"), "all rising: a plain wall has no infusion kinds")
+		var off: float = fposmod(at.x, spacing)
+		check(off < 0.01 or off > spacing - 0.01, "a shield's spacing apart, on the world's grid (%s)" % at)
+	check(found.all(func(each: Array) -> bool: return each[2] == &"seam"), "all its seam's: a plain wall has no infusion kinds")
+
+
+func test_a_strike_parts_the_wall_s_stream_for_a_moment() -> void:
+	_run(30)
+	_place(WALL, Vector2(200.0, 150.0))
+	_run(60)
+	var foot: Vector2 = Vector2(200.0, 150.0 + floorf(ManagerScript.look_size(WALL.radius) * ManagerScript.STILL_HIT * WALL.look_shape.y + 0.5))
+	var before: int = motes.next_row()
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
+	var knocked: Array = _written(before)
+	check_equal(knocked.size(), StillMotesScript.KNOCKED, "a few motes knocked out where it struck")
+	var parted: int = still.parted
+	before = motes.next_row()
+	_run(20)
+	check(still.parted > parted, "births near it held back (%d)" % (still.parted - parted))
+	for each: Array in _written(before):
+		check(Vector2(each[0], each[1]).distance_to(foot) >= StillMotesScript.PART_REACH - 1.0, "none leaves from where it struck while it parts (%s)" % [each])
+	_run(30)
+	parted = still.parted
+	_run(30)
+	check_equal(still.parted, parted, "after half a second the stream closes again")
+	before = motes.next_row()
+	still.struck(Vector2(500.0, 300.0), mgr.sim_time, motes)
+	check_equal(motes.next_row(), before, "a strike far from any still shot does nothing")
+
+
+func test_a_strike_where_a_wall_was_does_nothing() -> void:
+	_run(30)
+	_place(WALL, Vector2(200.0, 150.0), 0.5)
+	_run(60)
+	var before: int = motes.next_row()
+	var parted: int = still.parted
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
+	check_equal(motes.next_row(), before, "the wall ended: no motes knocked out of thin air")
+	_place(WALL, Vector2(200.0, 150.0))
+	_run(30)
+	check_equal(still.parted, parted, "and a new wall there is not parted by it")
 
 
 func test_none_while_it_comes_in_and_fewer_as_it_goes() -> void:
-	check_equal(StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(0.0, 3.0)) / ManagerScript.KIND_STEPS), 0.0, "none the moment it is placed")
-	check(is_equal_approx(StillMotesScript.strength(1.0 - ManagerScript.KIND_RUNE / ManagerScript.KIND_STEPS), 1.0), "all once it stands")
-	var ending: float = StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(3.0, 0.4)) / ManagerScript.KIND_STEPS)
+	var end: float = ManagerScript.STILL_END
+	check_equal(StillMotesScript.strength(0.0, end, 0.3, 0.8), 0.0, "none the moment it is placed")
+	check(is_equal_approx(StillMotesScript.strength(0.15, end, 0.3, 0.8), 0.5), "half way through opening, half")
+	check(is_equal_approx(StillMotesScript.strength(ManagerScript.STILL_START, end, 0.3, 0.8), 1.0), "all once it stands")
+	var ending: float = StillMotesScript.strength(ManagerScript.STILL_START, 0.4, 0.3, 0.8)
 	check(ending > 0.0 and ending < 0.5, "fewer near its end (%f)" % ending)
-	check_equal(StillMotesScript.strength(1.0 - (ManagerScript.KIND_RUNE + ManagerScript.still_code(3.0, 0.0)) / ManagerScript.KIND_STEPS), 0.0, "none at its end")
+	check_equal(StillMotesScript.strength(ManagerScript.STILL_START, 0.0, 0.3, 0.8), 0.0, "none at its end")
+	check(is_equal_approx(StillMotesScript.strength(0.0, end, 0.0, 0.0), 1.0), "a card that opens and fades at once gives off all from the start")
+	check_equal(StillMotesScript.strength(-0.2, end, 0.0, 0.8), 0.0, "none before its stream starts")
+
+
+func test_the_card_shapes_its_shader_and_its_motes_alike() -> void:
+	for form: FormBase in [WALL, POOL]:
+		var body: int = mgr.body_of(form.look_shader, ManagerScript.MESH_QUAD)
+		check(body > 0 and still.watches(body), "%s's body is watched" % form.id)
+		var material := mgr._nodes[ManagerScript.body_batch(body, false)].material as ShaderMaterial
+		check_equal(material.get_shader_parameter(&"look_shape"), form.look_shape, "%s's shader draws by its card's shape" % form.id)
+		check_equal(material.get_shader_parameter(&"look_clock"), Vector2(form.look_open, form.look_fade), "and comes and goes by its card's clock")
+		var look: CardLook = spells.look_of(form.id, Carrier.LOOK_STILL)
+		check(look.shape == form.look_shape and look.open == form.look_open and look.fade == form.look_fade, "%s's motes read the same numbers (its CardLook)" % form.id)
+		var own: String = form.look_shader.code
+		check(own.contains("STILL_HIT") and not own.contains("0.15"), "%s's shader takes its hit size from STILL_HIT, not a copy" % form.id)
 
 
 func test_a_fire_pool_gives_off_embers_too() -> void:
@@ -136,11 +225,37 @@ func test_a_fire_pool_gives_off_embers_too() -> void:
 		check(absf(at.x) <= 30.0 and absf(at.y) <= 16.0, "a mote leaves from the pool's oval (%s)" % at)
 
 
-func test_a_card_with_no_still_motes_gives_none() -> void:
-	var rune: FormBase = load("res://content/spells/forms/rune/rune.tres") as FormBase
+func test_a_rune_drips_and_its_ring_gives_off_once_armed() -> void:
 	_run(30)
 	var before: int = motes.next_row()
-	_place(rune, Vector2(100.0, 100.0))
+	_place(RUNE, Vector2(100.0, 100.0))
+	_run(54)
+	check_equal(_written(before).size(), 0, "nothing while it arms")
+	before = motes.next_row()
+	_run(90)
+	var found: Array = _written(before)
+	var drips: Array = found.filter(func(each: Array) -> bool: return each[2] == &"drip")
+	var rising: Array = found.filter(func(each: Array) -> bool: return each[2] == &"rising")
+	check(drips.size() >= 3 and rising.size() >= 2, "armed, it drips and its ring gives off (%d drips, %d rising)" % [drips.size(), rising.size()])
+	for each: Array in drips:
+		check(absf(each[0] - 100.0) < 0.5 and each[1] < 100.0, "a drip shows over its middle, at the crystal's foot (%s)" % [each])
+
+
+func test_a_pool_splashes_only_as_it_lands() -> void:
+	_run(30)
+	var before: int = motes.next_row()
+	_place(POOL, Vector2(300.0, 200.0))
+	_run(24)
+	var splash: int = _written(before).filter(func(each: Array) -> bool: return each[2] == &"spark").size()
+	check(splash >= 4, "drops thrown as it lands (%d)" % splash)
+	before = motes.next_row()
 	_run(60)
-	check_equal(_written(before).size(), 0, "a rune's motes are its shader's")
-	check(not still.watches(ManagerScript.BATCH_STILL), "the plain still batch is not watched")
+	check_equal(_written(before).filter(func(each: Array) -> bool: return each[2] == &"spark").size(), 0, "and no more once it has")
+
+
+func test_a_plain_still_shot_gives_none() -> void:
+	_run(30)
+	var before: int = motes.next_row()
+	mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 5.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_run(90)
+	check_equal(_written(before).size(), 0, "a still shot of no card's body is not watched")

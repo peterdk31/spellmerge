@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## The portal's mote rift (the owner's pick, 2026-11-09; gameplay/feel/portal_rings.gd) with one, two
+## The portal's mote rift (the owner's pick, 2026-11-09; gameplay/feel/portal_look.gd: the lens the card's shader, the lips real motes) with one, two
 ## and four infusions: three wizards in a column, fire; fire and frost; frost, void, fire and
 ## lightning (the dev staff, for five cards), each casting a portal to the right. `portal_rifts` open (a lip an infusion, the motes in
 ## turn), `portal_rifts_opening` a tenth of a second after they open (tall, not yet wide), both at

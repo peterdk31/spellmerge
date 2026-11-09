@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ## through, out of its exit; a fire homing split portal whose three exits fan ahead, a held
 ## beam into its mouth coming out of all three as burning legs that bend onto a dummy off the line; and a frost portal of player 2
 ## with a held beam of its own. Each gate is a ring in its caster's colour (gameplay/feel/
-## portal_rings.gd), the mouth swirling in, the exits out with a notch, a dotted line between.
+## portal_look.gd), the mouth swirling in, the exits out with a notch, a dotted line between.
 ## `portal_looks` is the whole screen and `portal_looks_ring` a crop of the homing row.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")

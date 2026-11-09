@@ -132,16 +132,26 @@ var _pose_packed: bool = false
 ## How far its carrier's light reaches, times what its size gives (a shot's `SHOT_REACH` and zoom,
 ## a still one's quad): 1 as today, from 0.25 to 2.
 @export var look_light_reach: float = 1.0
-## Motes its carrier's still shots give off all the time while they stand (the owner, 2026-11-09:
-## "use motes for everything you can", the world's magic building blocks): a `MoteKind` id
-## (content/motes; empty for none), how many a second each shot gives off (each piece of a solid
-## one, a wall's), and from where (LOOK_MOTES_*): anywhere on the oval of its hit size seen at a
-## slant (a pool's surface), or along its piece of the row on the floor (a wall's seam). Fewer while
-## it comes and as it goes (its still clock). Feel gives them off (`gameplay/feel/still_motes.gd`)
-## in the shot's colours, its infusions in turn, a share of them its infusions' own kinds.
-@export var look_motes: StringName = &""
-@export var look_mote_rate: float = 0.0
-@export_enum("area", "row") var look_motes_from: int = 0
+## The motes its carrier's still shots give off all the time while they stand (the owner,
+## 2026-11-09: "use motes for everything you can", the world's magic building blocks): one
+## `StillMoteSource` a stream (its kind, rate, where it leaves from in `look_shape`, how high, from
+## when, how far apart), as many as its look needs (a rune's drips and the motes rising off its
+## ring). Fewer while it comes and as it goes (`look_open`, `look_fade`). Feel gives them off
+## (`gameplay/feel/still_motes.gd`) in the shot's colours, its infusions in turn, a share of them its
+## infusions' own kinds. Empty for none.
+@export var look_motes: Array[StillMoteSource] = []
+## The shape of a still card's look, in its hit size as drawn (`ProjectileManager.STILL_HIT` of its
+## quad): an oval's half width and half depth (a pool, seen at a slant), or a piece's half span of
+## its row and its seam's depth below its middle (a wall). Its look shader reads it as the uniform
+## `look_shape` (`ProjectileManager.set_body_shape`) and its motes leave from it, so the two never
+## part.
+@export var look_shape: Vector2 = Vector2(1.0, 1.0)
+## Seconds a still card's look takes to open once placed, and the seconds of its end it fades over
+## (at most `ProjectileManager.STILL_START` and `STILL_END`: its still clock tells no more). Its look
+## shader reads them as the uniform `look_clock` (x open, y fade) when it draws its own coming and
+## going by them (a wall's seam), and its motes come in and thin with them.
+@export var look_open: float = 0.3
+@export var look_fade: float = 0.8
 ## The old names of renamed look fields this card was loaded with (`_set`), each still taken (a
 ## `shot_shader` is its `look_shader`), and named by `look_problems` so the card is fixed.
 var _renamed: PackedStringArray = PackedStringArray()
@@ -180,10 +190,17 @@ func look_problems() -> PackedStringArray:
 		found.append("%s: look_shader '%s' is not a canvas_item shader" % [id, look_shader.resource_path])
 	if look_shader != null and Carriers.exists(carrier) and Carriers.of(carrier).look_drawer() == Carrier.LOOK_NONE:
 		found.append("%s: look_shader '%s' is never drawn: its carrier `%s` has no look of its own (Carrier.look_drawer)" % [id, look_shader.resource_path, carrier])
-	if look_motes != &"" and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
-		found.append("%s: look_motes '%s' are never given off: only a still carrier's shots drawn by a look_shader of the card's own give them off" % [id, look_motes])
-	if look_motes != &"" and look_mote_rate <= 0.0:
-		found.append("%s: look_motes '%s' at a rate of %s a second are never given off" % [id, look_motes, look_mote_rate])
+	if not look_motes.is_empty() and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
+		found.append("%s: look_motes are never given off: only a still carrier's shots drawn by a look_shader of the card's own give them off" % id)
+	for source: StillMoteSource in look_motes:
+		if source == null:
+			found.append("%s: an empty look mote source" % id)
+		else:
+			found.append_array(source.problems(id))
+	if look_shape.x <= 0.0 or look_shape.y < 0.0:
+		found.append("%s: look_shape %s has no size: its width must be above 0 and its depth not below" % [id, look_shape])
+	if look_open < 0.0 or look_fade < 0.0:
+		found.append("%s: look_open %s and look_fade %s are seconds, never below 0" % [id, look_open, look_fade])
 	return found
 
 
@@ -241,7 +258,6 @@ func ranges() -> Dictionary:
 		"knockback": Vector2(0.0, 2000.0),
 		"look_light_intensity": Vector2(0.0, 2.0),
 		"look_light_reach": Vector2(0.25, 2.0),
-		"look_mote_rate": Vector2(0.0, 120.0),
 	})
 	return limits
 

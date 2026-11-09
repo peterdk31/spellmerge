@@ -1,5 +1,5 @@
 extends SceneTree
-## Tests for core/projectiles, part 2: orbit shots with per-actor anchors, homing
+## Tests for core/projectiles, part 2: orbit shots (`set_orbit`) with per-actor anchors, homing
 ## (turn rate, every 4th step, work budget), `homing_aim` for a beam, a card's moves on a shot
 ## (`move_shot`: they add up), and `ray()`.
 ## The manager is stepped by hand.
@@ -9,6 +9,7 @@ extends SceneTree
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const OrbitShot := preload("res://tests/support/orbit_shot.gd")
 
 const DT: float = 1.0 / 60.0
 ## How far round a shot homing looks here (the Homing card's reach).
@@ -33,7 +34,11 @@ func _initialize() -> void:
 	await process_frame
 	_test_orbit_circles_the_anchor()
 	_test_orbit_follows_each_actors_anchor()
-	_test_orbit_hits_what_crosses_it_and_ignores_walls()
+	_test_set_orbit_takes_only_a_live_straight_shot_with_a_centre()
+	_test_an_orbit_turns_by_its_speed_and_its_drift()
+	_test_a_speed_curve_changes_an_orbits_turn_over_its_life()
+	_test_orbit_hits_what_crosses_it()
+	_test_a_wall_across_its_circle_ends_an_orbit_and_a_ghost_passes()
 	_test_orbit_pierce_and_expiry()
 	_test_orbit_ring_over_a_crowd()
 	_test_orbit_hits_again_each_time_it_comes_round()
@@ -117,9 +122,9 @@ func _wall_rects() -> Array[Rect2]:
 
 func _test_orbit_circles_the_anchor() -> void:
 	_setup()
-	_check(_mgr.spawn_orbit(0, 40.0, 0.0, 3.0, 5.0) == -1, "an orbit needs an anchor first")
+	_check(OrbitShot.start(_mgr, 0, 40.0, 0.0, 3.0, 5.0) == -1, "an orbit needs an anchor first")
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
-	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, 3.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 5)
+	var slot: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 3.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 5)
 	_check(slot >= 0 and _mgr.get_position_of(slot).is_equal_approx(Vector2(140.0, 100.0)), "it starts at the angle given, one radius from the anchor")
 	var worst: float = 0.0
 	for _i in 120:
@@ -128,12 +133,119 @@ func _test_orbit_circles_the_anchor() -> void:
 	_check(worst < 0.01, "it keeps its radius all the way round (%f off)" % worst)
 	var expected: Vector2 = Vector2(100.0, 100.0) + Vector2.from_angle(6.0) * 40.0
 	_check(_mgr.get_position_of(slot).distance_to(expected) < 0.5, "after 2 s at 3 rad/s it is 6 rad round")
-	var back: int = _mgr.spawn_orbit(0, 40.0, 0.0, -3.0, 5.0)
+	var back: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, -3.0, 5.0)
 	_mgr.step(DT)
 	_check(_mgr.get_position_of(back).y < 100.0, "a negative speed turns the other way")
-	_check(_mgr.spawn_orbit(ManagerScript.ACTORS, 40.0, 0.0, 3.0, 5.0) == -1 and _mgr.spawn_orbit(-1, 40.0, 0.0, 3.0, 5.0) == -1, "only an actor orbits")
-	_check(_mgr.spawn_orbit(0, 40.0, 0.0, 3.0, 0.0) == -1 and _mgr.spawn_orbit(0, INF, 0.0, 3.0, 1.0) == -1, "bad numbers are refused")
+	_check(OrbitShot.start(_mgr, ManagerScript.ACTORS, 40.0, 0.0, 3.0, 5.0) == -1 and OrbitShot.start(_mgr, -1, 40.0, 0.0, 3.0, 5.0) == -1, "only an actor's shot circles an anchor")
+	_check(OrbitShot.start(_mgr, 0, 40.0, 0.0, 3.0, 0.0) == -1 and OrbitShot.start(_mgr, 0, INF, 0.0, 3.0, 1.0) == -1, "bad numbers are refused")
 	_check(_mgr.get_count() == 2, "refused orbits took no slot")
+
+
+## `set_orbit` turns a live straight shot onto its circle, and only that: a still shot, a shot
+## already circling, an empty slot, bad numbers and a shot with no centre (no `centre` given and
+## no anchor for its actor) are refused, and the shot is left as it was.
+func _test_set_orbit_takes_only_a_live_straight_shot_with_a_centre() -> void:
+	_setup()
+	var bolt: int = _mgr.spawn(1, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 5.0)
+	_check(not _mgr.set_orbit(bolt, 30.0, 0.0, 1.0), "no anchor for its actor and no centre: refused")
+	_check(_mgr._motion[bolt] == ManagerScript.MOTION_STRAIGHT and _mgr.get_position_of(bolt) == Vector2(50.0, 50.0) and _mgr.get_velocity_of(bolt) == Vector2(100.0, 0.0), "and the shot is left as it was")
+	_check(not (_mgr.set_orbit(bolt, INF, 0.0, 1.0, Vector2.ZERO) or _mgr.set_orbit(bolt, 30.0, NAN, 1.0, Vector2.ZERO) or _mgr.set_orbit(bolt, 30.0, 0.0, INF, Vector2.ZERO)), "bad numbers are refused")
+	_check(not (_mgr.set_orbit(-1, 30.0, 0.0, 1.0, Vector2.ZERO) or _mgr.set_orbit(_mgr._cap, 30.0, 0.0, 1.0, Vector2.ZERO)), "a slot that is no live shot is refused")
+	var rune: int = _mgr.spawn(1, Vector2(80.0, 50.0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_check(not _mgr.set_orbit(rune, 30.0, 0.0, 1.0, Vector2(100.0, 100.0)), "a still shot does not circle")
+	_check(_mgr.set_orbit(bolt, 30.0, 0.0, 1.0, Vector2(200.0, 200.0)), "a straight shot circles a centre given")
+	_check(_mgr._motion[bolt] == ManagerScript.MOTION_ORBIT and _mgr.get_position_of(bolt).is_equal_approx(Vector2(230.0, 200.0)), "on the circle at its angle")
+	_check(not _mgr.set_orbit(bolt, 30.0, 0.0, 1.0, Vector2(200.0, 200.0)), "a shot already circling is refused")
+	_mgr.set_anchor(1, Vector2(300.0, 300.0))
+	var other: int = _mgr.spawn(1, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 5.0)
+	_check(_mgr.set_orbit(other, 20.0, PI * 0.5, 1.0) and _mgr.get_position_of(other).is_equal_approx(Vector2(300.0, 320.0)), "with an anchor its actor's body is the centre")
+	var nobody: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 5.0)
+	_check(not _mgr.set_orbit(nobody, 20.0, 0.0, 1.0), "a shot of no actor has no anchor to circle")
+	_check(_mgr.set_orbit(nobody, 20.0, 0.0, 1.0, Vector2(400.0, 100.0)), "but circles a point given")
+
+
+## Its turn is its speed over its radius plus its drift (`_orbit_turn`): a faster shot goes round
+## faster, one with no speed turns by its drift only, and its velocity is the tangent at that turn.
+func _test_an_orbit_turns_by_its_speed_and_its_drift() -> void:
+	_setup()
+	var centre: Vector2 = Vector2(300.0, 300.0)
+	_mgr.set_anchor(0, centre)
+	var slow: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 5.0)
+	var fast: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(0.0, -80.0), 5.0)
+	var drifting: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 5.0)
+	var still: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2.ZERO, 5.0)
+	var against: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 5.0)
+	_mgr.set_orbit(slow, 40.0, 0.0, 0.0)
+	_mgr.set_orbit(fast, 40.0, 0.0, 0.0)
+	_mgr.set_orbit(drifting, 40.0, 0.0, 0.5)
+	_mgr.set_orbit(still, 40.0, 0.0, TAU / 3.0)
+	_mgr.set_orbit(against, 40.0, 0.0, -1.0)
+	_check(_mgr.get_velocity_of(fast).distance_to(Vector2(0.0, 80.0)) < 0.001, "its velocity is the tangent, at its speed, whichever way it flew (%s)" % _mgr.get_velocity_of(fast))
+	for _i in 60:
+		_mgr.step(DT)
+	var turned: Callable = func(slot: int) -> float: return (_mgr.get_position_of(slot) - centre).angle()
+	_check(absf(turned.call(slow) - 1.0) < 0.001, "40 px/s on a 40 px circle turns 1 rad a second (%f)" % turned.call(slow))
+	_check(absf(turned.call(fast) - 2.0) < 0.001, "twice as fast turns twice as far (%f)" % turned.call(fast))
+	_check(absf(turned.call(drifting) - 1.5) < 0.001, "a drift adds to its speed's turn (%f)" % turned.call(drifting))
+	_check(absf(turned.call(still) - TAU / 3.0) < 0.001, "with no speed it turns by its drift alone: a third of a turn (%f)" % turned.call(still))
+	_check(absf(turned.call(against)) < 0.001 and _mgr.get_velocity_of(against).length() < 0.001, "a drift against its speed holds it still (%f)" % turned.call(against))
+	_check(is_equal_approx(_mgr.get_velocity_of(fast).length(), 80.0) and _mgr.get_velocity_of(still).distance_to(Vector2.from_angle(TAU / 3.0).orthogonal() * (-40.0 * TAU / 3.0)) < 0.01, "its velocity stays the tangent at its turn (%s)" % _mgr.get_velocity_of(still))
+	for slot: int in [slow, fast, drifting, still, against]:
+		_check(absf(_mgr.get_position_of(slot).distance_to(centre) - 40.0) < 0.01, "each keeps its radius")
+
+
+## A speed curve (`set_speed_curve`, before or after `set_orbit`) changes the turn over the shot's
+## life: from 2x its speed to 0 at an ease of 1, a 1 rad/s orbit of 2 s turns 1.5 rad in its first
+## second and 0.375 rad in the next half (the curve read at each step's middle, so exact for a line).
+func _test_a_speed_curve_changes_an_orbits_turn_over_its_life() -> void:
+	_setup()
+	var centre: Vector2 = Vector2(300.0, 300.0)
+	_mgr.set_anchor(0, centre)
+	var before: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 2.0)
+	_check(_mgr.set_speed_curve(before, 2.0, 0.0, 1.0), "a curve on the straight shot")
+	_check(_mgr.set_orbit(before, 40.0, 0.0, 0.0), "then the orbit")
+	var after: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 2.0)
+	_check(_mgr.set_orbit(after, 40.0, 0.0, 0.0), "the orbit first")
+	_check(_mgr.set_speed_curve(after, 2.0, 0.0, 1.0), "then a curve on the circling shot")
+	var plain: int = _mgr.spawn(0, Vector2(10.0, 10.0), Vector2(40.0, 0.0), 2.0)
+	_mgr.set_orbit(plain, 40.0, 0.0, 0.0)
+	for _i in 60:
+		_mgr.step(DT)
+	var at_one: float = (_mgr.get_position_of(before) - centre).angle()
+	_check(absf(at_one - 1.5) < 0.001, "it turned 1.5 rad in its first second (%f)" % at_one)
+	_check(absf((_mgr.get_position_of(after) - centre).angle() - at_one) < 0.0001, "the same, the curve set before or after")
+	_check(absf((_mgr.get_position_of(plain) - centre).angle() - 1.0) < 0.001, "with no curve it turned 1 rad")
+	for _i in 30:
+		_mgr.step(DT)
+	var later: float = (_mgr.get_position_of(before) - centre).angle() - at_one
+	_check(absf(later - 0.375) < 0.001, "and 0.375 rad in the next half second, slowing (%f)" % later)
+
+
+## No special rule keeps a circling shot from walls (orbit as a modifier, 5A): it is not born inside
+## one, a room wall across its circle ends it as any shot, and a ghost one passes.
+func _test_a_wall_across_its_circle_ends_an_orbit_and_a_ghost_passes() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_anchor(0, Vector2(100.0, 100.0))
+	var walls: Array[Rect2] = [Rect2(130.0, 80.0, 32.0, 40.0)]
+	_mgr.set_walls(walls)
+	_check(OrbitShot.start(_mgr, 0, 40.0, 0.0, 2.0, 5.0) == -1, "an orbit shot is not born inside a wall")
+	# From the far side of the circle, turning 2 rad/s, it reaches the wall at about -0.52 rad (1.3 s).
+	var walled: int = OrbitShot.start(_mgr, 0, 40.0, PI, 2.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 6)
+	var ghost: int = OrbitShot.start(_mgr, 0, 40.0, PI, 2.0, 5.0)
+	_check(walled >= 0 and ghost >= 0, "both start outside it")
+	_check(_mgr.set_ghost(ghost), "a circling shot takes ghost")
+	var walls_before: int = _mgr.wall_hits
+	for _i in 70:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(walled), "it circles until it reaches the wall")
+	for _i in 30:
+		_mgr.step(DT)
+	_check(not _mgr.is_alive(walled) and _mgr.wall_hits == walls_before + 1, "the wall ends it (%d wall hits)" % (_mgr.wall_hits - walls_before))
+	_check(_expired.size() == 1 and _expired[0][2] == 6 and absf((_expired[0][1] as Vector2).y - 80.0) < 1.0, "with its expiry, on the wall's top face (%s)" % str(_expired))
+	for _i in 60:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(ghost) and absf(_mgr.get_position_of(ghost).distance_to(Vector2(100.0, 100.0)) - 40.0) < 0.01, "a ghost one circles on through it")
 
 
 ## Rules R4h: growth grows any shot (a rune's trigger circle too); on an orbit, linger stops the
@@ -147,14 +259,14 @@ func _test_orbit_and_still_shots_take_the_travel_cards_they_can() -> void:
 	var rune: int = _mgr.spawn(0, Vector2(400.0, 100.0), Vector2.ZERO, 5.0, 6.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
 	_check(_mgr.set_growth(rune, 2.0), "a rune takes growth")
 	_check(not (_mgr.set_linger(rune, 1.0) or _mgr.set_spiral(rune, 10.0) or _mgr.set_sticky(rune, 1.0)), "a rune does not move: no linger, spiral or sticky")
-	var grown: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 5.0)
+	var grown: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 1.0, 5.0)
 	_check(_mgr.set_growth(grown, 2.0), "an orbit takes growth")
 	for _i in 60:
 		_mgr.step(DT)
 	_check(absf(_mgr.get_growth_of(rune) - 2.0) < 0.05 and absf(_mgr.get_growth_of(grown) - 2.0) < 0.05, "a rune and an orbit shot grow by the factor a second (%f, %f)" % [_mgr.get_growth_of(rune), _mgr.get_growth_of(grown)])
 	_check(_mgr.get_position_of(rune).is_equal_approx(Vector2(400.0, 100.0)), "the rune stays where it is")
 	# Linger: half way through its 2 s life the orbit stops turning for 1 s, still round its caster.
-	var held: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 2.0)
+	var held: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 1.0, 2.0)
 	_check(_mgr.set_linger(held, 1.0), "an orbit takes linger")
 	for _i in 66:
 		_mgr.step(DT)
@@ -169,7 +281,7 @@ func _test_orbit_and_still_shots_take_the_travel_cards_they_can() -> void:
 	_check(_mgr.is_alive(held) and absf(angle_difference((_mgr.get_position_of(held) - centre - Vector2(30.0, 0.0)).angle(), angle)) > 0.3, "then it circles on, its life made longer by the linger")
 	_mgr.set_anchor(0, centre)
 	# Spiral: the radius weaves `width` pixels (half each way) round the circle.
-	var weave: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 5.0)
+	var weave: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 1.0, 5.0)
 	_check(_mgr.set_spiral(weave, 10.0), "an orbit takes spiral")
 	var nearest: float = INF
 	var farthest: float = 0.0
@@ -182,7 +294,7 @@ func _test_orbit_and_still_shots_take_the_travel_cards_they_can() -> void:
 	# Sticky: the orbit shot that hits leaves its circle and rides its target.
 	_mgr.clear()
 	var foe: Node2D = _target(centre + Vector2(0.0, 40.0), 6.0)
-	var sticker: int = _mgr.spawn_orbit(0, 40.0, 0.0, 2.0, 5.0)
+	var sticker: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 2.0, 5.0)
 	_check(_mgr.set_sticky(sticker, 1.0), "an orbit takes sticky")
 	for _i in 60:
 		_mgr.step(DT)
@@ -199,7 +311,7 @@ func _test_orbit_follows_each_actors_anchor() -> void:
 	var slots: Array[int] = []
 	for p in 4:
 		_mgr.set_anchor(p, Vector2(100.0 * float(p + 1), 50.0))
-		slots.append(_mgr.spawn_orbit(p, 20.0, 0.0, 2.0, 5.0))
+		slots.append(OrbitShot.start(_mgr, p, 20.0, 0.0, 2.0, 5.0))
 	for i in 30:
 		for p in 4:
 			_mgr.set_anchor(p, Vector2(100.0 * float(p + 1) + float(i), 50.0 + float(p)))
@@ -216,23 +328,16 @@ func _test_orbit_follows_each_actors_anchor() -> void:
 	_check(_mgr.get_count_for(2) == 0, "the owner's count follows")
 
 
-func _test_orbit_hits_what_crosses_it_and_ignores_walls() -> void:
+func _test_orbit_hits_what_crosses_it() -> void:
 	_setup()
 	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
 	var enemy: Node2D = _target(Vector2(100.0, 140.0), 8.0)
-	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, PI, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 3)
+	var slot: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, PI, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 3)
 	for _i in 30:
 		_mgr.step(DT)
 	_check(_hits.size() == 1 and _hits[0][1] == enemy and _hits[0][3] == 3, "an orbit shot hits an enemy that stands on its circle, with its tag")
 	_check(not _mgr.is_alive(slot), "and ends without pierce")
-	var walls: Array[Rect2] = [Rect2(130.0, 80.0, 32.0, 40.0)]
-	_mgr.set_walls(walls)
-	var through: int = _mgr.spawn_orbit(0, 40.0, 0.0, 2.0, 5.0)
-	_check(through >= 0, "an orbit shot can start inside a wall")
-	for _i in 30:
-		_mgr.step(DT)
-	_check(_mgr.is_alive(through) and _mgr.wall_hits == 0, "and passes through walls")
 
 
 func _test_orbit_pierce_and_expiry() -> void:
@@ -240,7 +345,7 @@ func _test_orbit_pierce_and_expiry() -> void:
 	_mgr.set_anchor(1, Vector2(200.0, 200.0))
 	_target(Vector2(240.0, 200.0), 10.0)
 	_target(Vector2(160.0, 200.0), 10.0)
-	var slot: int = _mgr.spawn_orbit(1, 40.0, 0.0, 1.0, 0.5, 4.0, ManagerScript.LAYER_ENEMY, 5, 8)
+	var slot: int = OrbitShot.start(_mgr, 1, 40.0, 0.0, 1.0, 0.5, 4.0, ManagerScript.LAYER_ENEMY, 5, 8)
 	for _i in 20:
 		_mgr.step(DT)
 	_check(_mgr.is_alive(slot), "a piercing orbit shot survives its hits (%d)" % _hits.size())
@@ -257,7 +362,7 @@ func _test_orbit_ring_over_a_crowd() -> void:
 	# a piercing shot hits a target once while it touches it, however many it touches.
 	for i in 5:
 		_target(Vector2(240.0 + float(i), 200.0), 10.0)
-	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
+	var slot: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
 	for _i in 10:
 		_mgr.step(DT)
 	_check(_mgr.is_alive(slot), "a ring with pierce left survives a crowd")
@@ -266,7 +371,7 @@ func _test_orbit_ring_over_a_crowd() -> void:
 	# With no pierce it ends on its first touch, like any shot.
 	_mgr.clear()
 	_hits.clear()
-	var thin: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 1)
+	var thin: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 1)
 	_mgr.step(DT)
 	_check(not _mgr.is_alive(thin) and _hits.size() == 1, "a ring with pierce 0 ends on its first touch")
 
@@ -276,7 +381,7 @@ func _test_orbit_hits_again_each_time_it_comes_round() -> void:
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
 	_target(Vector2(240.0, 200.0), 6.0)
 	# One turn a second; it starts on the target, so it touches it at 0, 1, 2 and 3 seconds.
-	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, TAU, 3.4, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
+	var slot: int = OrbitShot.start(_mgr, 0, 40.0, 0.0, TAU, 3.4, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
 	for _i in 200:
 		_mgr.step(DT)
 	_check(_hits.size() == 4, "a ring hits a target again each time it comes round to it (%d hits)" % _hits.size())
@@ -383,7 +488,7 @@ func _test_homing_rules() -> void:
 	_check(velocity.angle() > 0.0 and velocity.angle() <= 0.5 * 20.0 * DT * 1.01, "and never turns faster than the rate (%f rad)" % velocity.angle())
 	var rune: int = _mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
-	var orbit: int = _mgr.spawn_orbit(0, 10.0, 0.0, 1.0, 1.0)
+	var orbit: int = OrbitShot.start(_mgr, 0, 10.0, 0.0, 1.0, 1.0)
 	_check(_mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "a still shot can home (it creeps), an orbit shot cannot (rules R4i)")
 	_check(not _mgr.set_homing(-1, 3.0, HOMING_REACH) and not _mgr.set_homing(slot, -1.0, HOMING_REACH) and not _mgr.set_homing(slot, NAN, HOMING_REACH), "bad slots and rates are refused")
 	_check(not _mgr.set_homing(slot, 3.0, 0.0) and not _mgr.set_homing(slot, 3.0, INF), "a range not above 0 and finite is refused")

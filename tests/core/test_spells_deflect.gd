@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Deflect (melee I3; docs/milestones/M2-staffs.md, "Phase I: melee", "Deflect"): a shot of another
 ## team that touches a deflecting carrier turns off it, flies 1.7 times faster with its life
 ## started again, and becomes the carrier's caster's (its team, hit credit and targets); a rally
-## speeds up each time. It works on every carrier that touches shots: a shot (bolt, orbit, wall),
+## speeds up each time. It works on every carrier that touches shots: a shot (bolt, a circling bolt, wall),
 ## a swing's sweep and a beam's line. With a shield on the same carrier the deflect goes first
 ## (owner, 2026-10-29), so the compiler lists the shield as wasted; a deflect sets off `on block`.
 ## Swings and beams now touch shots, so a shield on them blocks too (the parry). All are the real
@@ -108,13 +108,23 @@ func test_a_deflected_homing_shot_hunts_its_new_casters_enemies() -> void:
 	check(arena.lost(imp) > 0, "it turned onto the imp off its line")
 
 
-func test_a_deflecting_orbit_turns_a_shot_that_flies_into_its_ring() -> void:
-	# Where the orbit shot starts (its radius out along the aim), coming in slowly.
-	_cast(["deflect", "orbit"])
-	var shot: int = _enemy_shot(Vector2(38.0, 0.0), Vector2(-10.0, 0.0))
-	arena.run(0.2)
-	check(deflected.size() >= 1, "the ring deflects it")
+func test_a_deflecting_orbit_turns_a_shot_behind_its_caster() -> void:
+	# A deflecting bolt that circles its caster (Orbit, docs/milestones/carrier-modifiers.md Part 5)
+	# guards it all round: it comes round to a shot waiting on its circle behind the wizard.
+	_cast(["deflect", "orbit", "bolt"])
+	var shot: int = _enemy_shot(Vector2(-36.0, 0.0), Vector2(0.0, 2.0))
+	arena.run(1.0)
+	check(deflected.size() >= 1, "the circling bolt deflects it")
 	check_equal(arena.projectiles.get_actor_of(shot), 0, "it is the wizard's now")
+
+
+func test_a_deflecting_bolt_that_flies_off_leaves_a_shot_behind_alone() -> void:
+	# The same without Orbit: the bolt flies off along the aim and never meets it.
+	_cast(["deflect", "bolt"])
+	var shot: int = _enemy_shot(Vector2(-36.0, 0.0), Vector2(0.0, 2.0))
+	arena.run(1.0)
+	check_equal(deflected.size(), 0, "nothing deflects it")
+	check_equal(arena.projectiles.get_actor_of(shot), enemy, "it is still the enemy's")
 
 
 func test_a_deflecting_wall_sends_shots_back() -> void:

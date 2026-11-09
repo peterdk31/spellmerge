@@ -22,7 +22,13 @@ extends SceneTree
 ## (`exclude`), so the wizards' shots hit them from step 10 on, and the self-hit flags left the
 ## state line; and again for online-ready N7, 2026-11-07, when the manager's trig became `DMath`'s,
 ## the same on every platform: the same events in the same order at every step, a homing or
-## returning shot's velocity and place differing in the last digit of a float).
+## returning shot's velocity and place differing in the last digit of a float; and again for orbit
+## as a modifier 5A, 2026-11-09, when `spawn_orbit` became `set_orbit` on a live shot: a circling
+## shot turns by its drift plus its speed over its radius and walls end it, so one of the wizards'
+## orbits that was born in the bottom wall is refused (every slot after it one lower), the ones
+## whose circle crosses that wall end there, and half the wizards' orbits are bolts with a speed
+## (and speed curves) where all had a fixed angular speed; the drift-only orbits move as before,
+## to the bit).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -60,6 +66,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const NativeScript := preload("res://core/native/native.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const OrbitShot := preload("res://tests/support/orbit_shot.gd")
 
 const EXPECTED_PATH: String = "res://tests/core/fixtures/projectile_step/expected.json"
 const DT: float = 1.0 / 60.0
@@ -277,9 +284,20 @@ func _spawn_kit() -> void:
 	for i in 12:
 		var s: int = m.spawn(i % 4, Vector2(80.0 + float(i) * 40.0, 300.0), Vector2.from_angle(-PI * 0.5 + float(i - 6) * 0.2) * 160.0, 1.3, 4.0, ManagerScript.LAYER_ENEMY, i % 3, TAG_SPLITS if i % 4 == 0 else TAG_KIT)
 		m.set_homing(s, 3.0, 160.0 if i % 2 == 0 else 60.0)
-	# Orbit shots round the wizards (wizard 3's anchor is cleared at step 50).
+	# Orbit shots round the wizards (wizard 3's anchor is cleared at step 50; the bottom wall ends
+	# those whose circle crosses it, and refuses one born in it). Half have no speed and turn by
+	# their drift alone; half are bolts cast from the wizard's body, turned by their speed over the
+	# radius against a drift, two with a speed curve set before their orbit and one after.
 	for i in 8:
-		m.spawn_orbit(i % 4, 24.0 + float(i) * 3.0, float(i) * 0.8, 2.5 if i % 2 == 0 else -3.0, 1.4, 4.0, ManagerScript.LAYER_ENEMY, 1000, TAG_KIT)
+		if i % 2 == 0:
+			OrbitShot.start(m, i % 4, 24.0 + float(i) * 3.0, float(i) * 0.8, 2.5, 1.4, 4.0, ManagerScript.LAYER_ENEMY, 1000, TAG_KIT)
+			continue
+		var s: int = m.spawn(i % 4, m.get_anchor(i % 4), Vector2(0.0, -90.0 - float(i) * 20.0), 1.4, 4.0, ManagerScript.LAYER_ENEMY, 1000, TAG_KIT)
+		if i == 3 or i == 7:
+			m.set_speed_curve(s, 2.2, 0.2, 1.5)
+		m.set_orbit(s, 24.0 + float(i) * 3.0, float(i) * 0.8, -1.0)
+		if i == 5:
+			m.set_speed_curve(s, 0.5, 2.0, 1.0)
 	# Returning shots: to the wizard, with a spiral, with homing, with linger.
 	for i in 4:
 		var s: int = m.spawn(i, Vector2(140.0 + float(i) * 110.0, 270.0), Vector2.from_angle(-PI * 0.5 + float(i - 2) * 0.3) * 200.0, 1.2, 4.0, ManagerScript.LAYER_ENEMY, 5, TAG_KIT)
@@ -338,7 +356,7 @@ func _spawn_kit() -> void:
 	var high: int = m.spawn(1, Vector2(500.0, 220.0), Vector2(-60.0, -15.0), 1.4, 4.0, ManagerScript.LAYER_ENEMY, 50, TAG_KIT)
 	for carrier: int in [low, high]:
 		var around: Vector2 = m.get_position_of(carrier)
-		var o: int = m.spawn_orbit(2, 18.0, 0.5, 4.0, 1.2, 4.0, ManagerScript.LAYER_ENEMY, 1000, TAG_KIT, around)
+		var o: int = OrbitShot.start(m, 2, 18.0, 0.5, 4.0, 1.2, 4.0, ManagerScript.LAYER_ENEMY, 1000, TAG_KIT, around)
 		m.set_caster_shot(o, carrier)
 		var r: int = m.spawn(3, around + Vector2(5.0, 0.0), Vector2(90.0, 40.0), 0.8, 4.0, ManagerScript.LAYER_ENEMY, 5, TAG_KIT)
 		m.set_return(r)

@@ -28,7 +28,8 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 |---|---|---|
 | `cast` | a carrier card's `cast_cue` when it names none (the decoy's, the familiar's) | the cast flash at the staff tip in the seat's colours (`bare`), a 1.5 px kick back against the aim |
 | `cast_atom`, `cast_swing`, `cast_bolt`, `cast_beam`, `cast_wall` | the atom's, swing's, bolt's and slam's, beam's and wall's `cast_cue` | the cast flash, shorter or longer (and twice as big for a wall), and the kick |
-| `cast_orbit`, `cast_rune`, `cast_gather` | the orbit's, rune's, and the swap's and teleport's `cast_cue` | the cast flash and a ring gathering in (`ring_in`), the build-up; a rune's flash twice as big |
+| `cast_rune`, `cast_gather` | the rune's, and the swap's and teleport's `cast_cue` | the cast flash and a ring gathering in (`ring_in`), the build-up; a rune's flash twice as big |
+| `orbit` | the Orbit card's `cue`, once round the caster when what it carries starts to circle (`size` the circle's radius) | a ring gathering in and a ring of the spell's motes out to the circle |
 | `cast_ring` | the dash's `cast_cue` | the cast flash and a ring flashing out (`ring_out`) |
 | `cast_self` | a cast with no carrier card, whose cards land on the caster (`CarrierCaster.cast_cue`) | the cast flash small, a ring drawing in (`ring_in`) and a few `glimmer` motes round the staff head; no kick |
 | `impact` | a carrier card's `impact_cue` when it names none, and a shot of no card | a small burst where the shot strikes, in its colour and cards |
@@ -42,7 +43,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 | `parry` | Feel, for a swing's block (`shot_blocked` while the blocking carrier is a swing) | a big four-point star in exactly Spark gold, the parrying actor held alone |
 | `deflect` | Feel, for `shot_deflected`, aimed the way the shot now flies | a big white-hot cross in the deflecting actor's colours |
 | `enemy_death` | Feel, for `enemy_died` | a white-hot ring, the killing shot's cards' motes and chips in the colours of the body's own art, ichor in those colours on the floor, and a puff in the body's own colour (`body`); the killer and the shot held, a shake (Feel breaks the body into motes of its art first) |
-| `expire` | Feel, for `projectile_expired` of a flying or orbiting shot (not one that ended on a wall) | a small flare in the shot's own colours and cards, and a puff of its cards' motes on along its way (`share` 1: each kind's own count) |
+| `expire` | Feel, for `projectile_expired` of a flying or circling shot (not one that ended on a wall) | a small flare in the shot's own colours and cards, and a puff of its cards' motes on along its way (`share` 1: each kind's own count) |
 | `boss_death` | Feel, for `enemy_died` of an enemy whose data says `boss` | the same as `enemy_death` with many more motes and a bigger pool of ichor, and the game-wide stop |
 | `player_downed` | Feel, for `player_downed` (it names no position, so this cue draws nothing) | the game-wide stop and a big shake |
 | `self_hit` | Feel, for a hit of an actor by its own spell | a ring in exactly pink, so it is never taken for an enemy's hit |

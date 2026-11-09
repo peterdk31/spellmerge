@@ -479,7 +479,8 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 # --- Fixed move distances and the payload's caster (owner, 2026-10-27) ------------------------
 
 ## A dash card that moves a fixed 48 px at 240 px/s, a teleport that blinks 64 px, a timer
-## trigger that fires once after 0.25 s, an orbit, and faster (speed x1.5).
+## trigger that fires once after 0.25 s, a slow speck (`orb`) and Orbit to circle it 20 px out
+## (docs/milestones/carrier-modifiers.md Part 5), and faster (speed x1.5).
 func _distance_cards() -> void:
 	var short: FormBase = _form(&"short", 240.0, 0.25)
 	short.carrier = &"dash"
@@ -489,9 +490,13 @@ func _distance_cards() -> void:
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
 	timer.wind_up = 0.25
-	var orbit: FormBase = _form(&"ring", 3.0, 1.0)
-	orbit.carrier = &"orbit"
-	orbit.orbit_radius = 20.0
+	_form(&"orb", 3.0, 1.0)
+	var orbit := ModifierBase.new()
+	orbit.behaviour = ModifierBase.Behaviour.ORBIT
+	orbit.behaviour_strength = 1.0 / 3.0
+	orbit.behaviour_reach = 20.0
+	orbit.lifetime_base = 1.0
+	_put(orbit, &"orbit")
 	var faster := ModifierBase.new()
 	faster.speed_mult = 1.5
 	_put(faster, &"faster")
@@ -709,7 +714,7 @@ func test_a_payload_whose_shot_is_gone_dashes_the_wizard_to_its_point() -> void:
 
 func test_an_orbit_in_a_payload_circles_the_shot_that_fired_it() -> void:
 	_distance_cards()
-	_build(0, [&"timer", &"bolt", &"ring"])
+	_build(0, [&"timer", &"bolt", &"orbit", &"orb"])
 	_cast(0)
 	var bolt: int = _others(-1)[0]
 	_tick(30)
@@ -722,7 +727,7 @@ func test_an_orbit_in_a_payload_circles_the_shot_that_fired_it() -> void:
 
 func test_an_orbit_in_a_payload_whose_shot_is_gone_circles_where_it_ended() -> void:
 	_distance_cards()
-	_build(0, [&"on_expire", &"bolt", &"ring"])
+	_build(0, [&"on_expire", &"bolt", &"orbit", &"orb"])
 	_cast(0)
 	_tick(62)
 	var ring: Array[int] = _others(-1)

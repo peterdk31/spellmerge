@@ -1,6 +1,6 @@
 # Carrier modifiers: Nova and Skyfall
 
-**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it, and merged #650; Part 4 (rain removed) done the same day; Part 5 planned. The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
+**Status: Part 1 (Nova) merged #648 (2026-11-09). Part 2 (Skyfall) rewritten with the owner the same day around the hole, Part 3 folded into it, and merged #650; Part 4 (rain removed) merged #652 the same day; Part 5 (Orbit) decided with the owner and planned (5A, 5B). The owner's answers below.** The owner, 2026-11-09: "Rain is looking really bad. I dont really like rain. Maybe remove it and add an AOE modifier instead, which makes the modified carrier "rain down" from above. Could be used for a fireballs from above or beams or whatever", and "Nova could probably be replaced by a "Nova" modifier card instead, which would allow us to make novas of other carriers".
 
 The same day, on the orbit's look: "Hmm maybe orbit should also just be a modifier instead of a carrier" (Part 5).
 
@@ -179,17 +179,65 @@ Gone as a phase: with the owner's hole, a falling beam is cast down from the hol
   - form_base.gd:53, 60, 74, 104, 108, staff_poses.gd:91, modifier_base.gd:223, feel.gd:1665 and 2382.
 - **Docs:** CARRIERS.md (lines 26, 88, 107, 174, 183), content/spells/README.md:33 and 45, core/README.md, DESIGN.md:27, BACKLOG.md:40 (the rain cue item goes), and a DECISIONS.md entry.
 
-## Part 5 (proposal): Orbit as a modifier too
+## Part 5: Orbit as a modifier (decided 2026-11-09)
 
-The owner, 2026-11-09, on the orbit's look: "Hmm maybe orbit should also just be a modifier instead of a carrier". Not yet decided; this part says what it would take, so it can be weighed with the other two.
+The owner, 2026-11-09, on the orbit's look: "Hmm maybe orbit should also just be a modifier instead of a carrier", then yes (question 11), and in the talk that followed: "Orbit is motion only", "no special cases". The rule and the decisions are below. Two PRs: 5A and 5B.
 
-- **The idea:** the next carrier circles its caster instead of going out. `orbit · bolt` is a bolt circling you; `orbit · rune` runes circling you; `orbit · wall` a ring of stones turning round you; `orbit · pool` a puddle that follows you round; `orbit · beam` a beam sweeping round like a lighthouse.
-- **How:** a behaviour, `ORBIT`, with `behaviour_reach` the circle's radius and the carrier's speed as how fast it turns (`turn = speed / radius`, as `CarrierOrbit.spawn_row` does now, orbit.gd:26-29). The carrier spawns its rows through the manager's orbit motion (`spawn_orbit`) instead of its own. Copies are spread evenly round the circle by the stages above: `orbit · triple · bolt` is today's three orbs, and with Nova, eight.
-- **Still carriers that orbit** (rune, wall, pool) move, so they gain MOVES. Their looks are quads, and the card-looks rule sends a shot whose motion draws another mesh to its motion's plain batch (card-looks.md, phase 1): an orbiting rune would draw as a plain orbit shot. Orbit motion would have to draw the body's own mesh (a quad body stays a quad while it circles), in the GDScript and the native kernel. This is the one native change in the whole plan.
-- **A beam that sweeps** turns its aim round the caster each step. It is beam work, like Part 3's pillar.
-- **Where it does nothing:** carriers that move the caster or are held by the body (MELEE: swing, slam, dash, teleport), and the familiar, which already circles.
-- **What goes:** `core/spells/carriers/orbit.gd`, `content/spells/forms/orbit/` (the modifier takes the id `orbit`, as Nova does), and every staff naming `orbit` becomes `orbit, triple, bolt` (or whatever keeps today's three orbs). The orbit card needs no look of its own: whatever circles keeps its own.
-- **Lifetime:** a bolt lives about a second, today's orbit three. The card would lengthen its carrier's life (a `lifetime_mult`), or circling bolts are gone almost at once (question 13).
+### The rule
+
+**Orbit changes only how the next carrier moves.** Every row the carrier makes circles its caster instead of going out. Everything else is the carrier's own: its look, size, hits, pierce, payloads, infusions, pose. Orbit adds no count, no spread, no pierce and no look to what circles.
+
+- **Where a row starts:** on the circle, in the direction it would have gone. That is the way from its caster to the row's start point, or its heading when it starts at the caster. So `orbit · bolt` is one orb starting at the aim. `orbit · split · bolt` is Split's fan circling as a tight cluster, which Sniper or a wild card tightens or loosens. `orbit · nova · bolt` is eight orbs spread evenly, because the copies leave eight ways. `orbit · wall` is the wall's stones side by side across the aim, circling as an arc.
+- **Its caster** is whatever cast it, as for the orbit carrier today (`CarrierOrbit.spawn_row`'s centre, `Spells._register_shots`): the wizard's body, which it follows, or for a payload the shot or point that cast it. `skyfall · orbit · bolt` falls, then circles the spot it landed on. `on_hit · bolt · orbit · rune` circles where the bolt hit.
+- **Radius:** the card's `behaviour_reach`, 36 px. Reach does not widen it (that would give Reach a second meaning). A bigger circle is a later card, such as an upgraded Orbit, with a bigger number. With two orbit cards on one carrier, the larger radius counts, as `behaviour_reach` does for homing.
+- **Turn:** `turn = drift + speed / radius`. The carrier keeps its own speed and spends it going round. The card adds a slow drift, its `behaviour_strength` in turns a second (1/3: one turn in the orbit's 3 s), so a carrier with speed 0 still circles. The turn follows the shot's speed through its life, so Faster, Slow and the speed curves (`speed_start`, `speed_end`, `speed_ease`) act on it as on any shot. At 36 px, a rune, pool, wall or beam makes 0.33 turns a second, a bolt 1.3, a swap 1.7 and an atom 5.2.
+- **Duration:** fixed, 3 s, through a general card field (below), not through orbit code.
+- **No special rules for circling shots.** Room walls end them as they end any shot, and Ghost lets them pass. The AI predicts them like any shot, from their present (tangent) velocity. Homing does nothing on them (owner: question 6 a), because orbit motion has no heading to steer. A deflected one leaves its circle and flies on along its tangent, which is the deflect rule (`deflect_shot`). The spiral-out from the caster when cast is drawing only, so it stays.
+
+### Duration: a new general card field, `lifetime_base`
+
+`ModifierBase.lifetime_base: float = 0.0` (0 means none) sets the carrier's lifetime before any factor applies. The compiler sets the base first, then applies the factors (`lifetime_mult`, and `reach_mult` where it means life), so the order of the cards does not matter. With several cards that set a base, the longest wins.
+
+Orbit's `.tres` says `lifetime_base = 3.0`, and no orbit code knows about it. So a bolt (1.2 s) and a rune (8 s) both circle for 3 s, `orbit · slow · bolt` circles for 9 s slowly, and `orbit · reach · bolt` circles longer, because Reach on a flying shot means more life (owner: question 3 a). `hold` keeps a held carrier going as it does anywhere. The field goes in `staff_compiler.gd` next to `lifetime_mult` (about lines 390 and 500), with its own row in the card text and a test in `tests/core/test_staff_compiler.gd`.
+
+### Where it works: traits only
+
+Orbit is a `ModifierBase.Behaviour.ORBIT`, added at the end of the enum, with a `RULES` row that names no carrier:
+
+- **5A:** `{"needs": {"any": FLIES | LINE, "not": MOVES_CASTER | OWN_POSE}}`, so bolt, atom, swap and beam.
+- **5B:** `{"needs": {"any": FLIES | STAYS | LINE, "not": MOVES_CASTER | OWN_POSE | SPAWNS | GATES}}`, which adds rune, pool and wall.
+
+It does nothing on dash and teleport (they move the caster), swing and slam (they strike from the hand), and familiar, decoy and portal (they make actors or gates, not rows). A lone `orbit` lands on the caster or point fallback and does nothing. If actors should circle one day, the row changes; no exception is added. `tests/core/test_card_rules.gd` checks every carrier against the row.
+
+### How it is built (low coupling, like Skyfall)
+
+- **`core/spells/orbit.gd`** (`class_name Orbit`, a RefCounted like `skyfall.gd`) holds all of the modifier. `orbits(spell)` says whether it applies (`spell.behaviour(ORBIT) > 0` and `carrier.works(ORBIT)`). `circle(slot, spell, actor, origin)` puts a live row on its circle: the start angle from the row's start point or heading, the radius, the drift, and the centre by today's rule.
+- **One hook in the runtime:** `Spells._land_shots`, which sees every row a carrier makes (Skyfall's hook already sits there), calls `Orbit.circle` on each row of a spell that orbits. No carrier knows about orbit. Each carrier still spawns its rows as before, and they are turned into circlers afterwards.
+- **The projectile manager** gains `set_orbit(slot, radius, angle, drift, centre)` on a live slot. It replaces `spawn_orbit`, whose one caller goes with the carrier. The orbit step reads the turn from the shot's present speed (`drift + _speed[slot] / _orbit_radius[slot]`) instead of a stored angular speed. The step, and `set_orbit`'s setup, are mirrored in `native/` (`ShotKernel`) and compared byte for byte by `tests/core/test_native_kernel.gd`.
+- **Orbit motion keeps the body's own look.** Today an orbit shot's body, batch and head come from its motion (`KIND_ORBIT`, `BATCH_ORBIT`, `HEAD_ORBIT`, projectile_manager.gd about lines 391, 360, 487, 5100, 5418-5428, 6340, and `feel.gd:1326`). That is a special case, so it goes. A circling bolt draws as a bolt, in the bolt batch; in 5B a circling rune draws as a rune. The body comes from what the carrier spawned (flying head or still quad), not from the motion. GDScript and native alike.
+- **The beam sweeps.** `beam.gd`'s step turns its aim round its caster by the turn (drift only, since a beam's speed is 0) each step, for its 3 s. A held beam sweeps for as long as it is held. The beam keeps its own length. Homing does nothing on a sweeping beam, as on a circling shot.
+- **The cue:** the card's `cue = &"orbit"`, shown when cast: a ring of motes traced at the radius in the spell's infusion colours (the owner's rule: motes for everything; question 9 yes). It is today's `cast_orbit` remade in motes and renamed. What circles keeps its own look and cues.
+
+### Part 5A: the modifier on flying carriers and the beam; the carrier goes
+
+1. `Behaviour.ORBIT` with its `RULES` row (5A needs), and `lifetime_base` in ModifierBase and the compiler, with tests.
+2. `core/spells/orbit.gd`, the `_land_shots` hook, and `set_orbit` plus the speed-driven turn in the manager and `ShotKernel`.
+3. Orbit motion draws its body's own head and batch: `KIND_ORBIT`, `BATCH_ORBIT` and `HEAD_ORBIT` go (GDScript, native, Feel).
+4. Orbit's special cases go: the room-wall skips (projectile_manager.gd:3099 and 3459), and the AI threat skips (2897, 2958, 3023). `move_shot` refusing an orbit shot (2325) is audited: what pushes a shot (pull, recoil, swap, move) moves a circling shot's centre, unless a real rule turns up. That would be brought to the owner, not decided alone.
+5. The beam's sweep.
+6. The card: `content/spells/modifiers/orbit/` with `orbit.tres` (`behaviour_id = &"orbit"`, `behaviour_strength = 1/3`, `behaviour_reach = 36`, `lifetime_base = 3.0`, no pierce, damage x1, `mana_mult` about 1.5, `cue = &"orbit"`, a `look_layer`), an icon, `assets.json`, `combos/` and `test_orbit.gd`. Description: "The next spell circles you instead of leaving."
+7. **What goes:** `core/spells/carriers/orbit.gd`, `content/spells/forms/orbit/` (the modifier takes the id, as Nova did), `FormBase.orbit_radius` and its range row, `CompiledSpell.orbit_radius`, `SpellLimits.ORBIT_TURN`, `CarrierTraits.RING` (only the orbit carrier has it: cast_sense.gd:139, staff_compiler.gd:532, spells.gd:1971 read it), `spawn_orbit`, and the `cast_orbit` cue (renamed). The carrier count test goes from 14 to 13.
+8. **Content:** no staff names `orbit`. The ten combos are rewritten to keep what they show. Today's three orbs become `orbit · split · bolt` (a cluster) or `orbit · nova · bolt` (a ring), whichever the combo means: `fire_fan_orbit`, `void_ring`, `decoy_timer_orbit_deflect`, `frost_carousel` (it adds pierce itself now), `hold_fire_orbit`, `hold_shield_orbit`, `shield_orbit_ring`, `double_beam_and_ring`, `triple_three_ways`, `on_hurt_orbit_nova`.
+9. **Tests that name orbit** move to the modifier: test_hold, test_return, test_zap, test_penta, test_decoy, test_on_hurt, test_shield, test_card_rules, test_behaviour_table, test_spells_cast, test_spells_multicast, test_spells_land_shots, test_spells_moves, test_spells_actors, test_spells_deflect, test_projectile_bodies, test_staff_compiler, test_staff_runtime, test_cast_sense, test_trigger_table, test_validators, test_cast_timing, the player bag and build tests, test_radial_builder, test_feel_form_looks, the benchmarks and the screenshot scripts. New tests: start angle from the start point; turn from speed (an atom outturns a bolt, Slow slows it, speed 0 drifts one turn in 3 s); a circling shot ends on a room wall and Ghost passes it; the AI sees a circling shot; `lifetime_base` with factors in any order; a sweeping beam; the native kernel's orbit step.
+10. **Docs:** CARRIERS.md, content/spells/README.md, core/README.md, DESIGN.md (the card list), card-looks.md (the orbit look note), BACKLOG.md, and a DECISIONS.md entry: "Orbit is a modifier: motion only, no special cases".
+
+### Part 5B: runes, pools and walls circle
+
+1. The `RULES` row widens to the 5B needs.
+2. A still carrier's row becomes a circler through the same `set_orbit`. The manager keeps its body (quad, its card shader, its still-shot age codes `still_since`/`still_left` for the rune) while its motion is orbit. This is the native change: the body is chosen per slot by what was spawned, not by `motion == MOTION_STILL` (projectile_manager.gd:1319, 1338, 2903, 2964, 3028 and the kernel's mirror). `_moves` already counts an orbit as moving, so Linger, Sticky and Spiral read circling runes as moving; the card-rules test is updated to say so.
+3. Their motes follow them. Pool and wall motes come from still rows (`gameplay/feel/still_motes.gd`, `look_motes_from`). They read a circling quad body's row the same way, wherever it is.
+4. A circling wall still blocks (`BLOCKS`), and a circling pool still slows where it is. Each acts at its row's present place, as its rule already says.
+5. Screenshot sheet: `orbit` on bolt, atom, swap, beam, rune, pool and wall, with 1, 2 and 4 infusions. Then a real-GPU check (`webstorm.sh`).
 
 ## Order, size, risk
 
@@ -198,7 +246,8 @@ The owner, 2026-11-09, on the orbit's look: "Hmm maybe orbit should also just be
 | 1 Nova modifier, nova form gone (done, #648) | medium (most of it mechanical: about 100 files go from `nova` to `nova, bolt`) | no | the pacing count (`copies`); 8 swings or slams start the staff animation once; tests that measured the old nova's single batch (test_spells_land_shots) now see 8 launches |
 | 2 Skyfall (the hole, the beam's pillar with it) | medium to large: one PR | yes (each shot's floor line in the move and hit passes, mirrored in the kernel) | a step that jumps past the band must still hit what stands in it, alike in the GDScript and the kernel; the falling context reaching every shot and placement (`_land_shots`, `_placed_at`) and payloads of airborne shots; the waiting queue on rebuilds |
 | 4 rain gone (done) | medium | no | the Bone Scepter's staff; the payload-carrier code removed |
-| 5 orbit as a modifier (if wanted) | large | yes (orbit motion draws a quad body's own mesh) | every carrier's rows through orbit motion; still shots that move; a sweeping beam; the kernel compared byte for byte |
+| 5A orbit modifier on flyers and the beam, carrier gone | large (many tests name orbit) | yes (turn from speed, body look not by motion) | rows turned into circlers after they spawn; walls and the AI now meet circling shots; the beam's sweep; the kernel compared byte for byte |
+| 5B runes, pools and walls circle | medium | yes (a quad body under orbit motion) | still-shot looks, age codes and motes on a moving row; card rules that read MOVES |
 
 One PR each. Phase 4 needs phase 2, so the Bone Scepter and the combos have something to move to; phase 3 is part of phase 2.
 
@@ -240,3 +289,17 @@ On how Skyfall works, the owner asked whether it is "an opening in the sky that 
 - Then (questions a to c, owner: "I agree!"): an airborne shot still homes and waves but touches nothing; what an airborne shot casts falls too, to the same floor line; the floor is a horizontal line through the spot.
 
 Then (the same day): "Please use motes for everything you can. I really like that they are sorta the 'magic' building blocks in this world we are creating." So the opening in the sky, the falling body and the landing are built of motes first (the falling carrier a stream of motes in its colours, the pillar's edges shedding motes, motes thrown up where it lands), and Nova's ring cue gets more motes too.
+
+### On Orbit (2026-11-09, the talk after question 11)
+
+The owner: "no special cases". The answers to the talk, as built into Part 5:
+
+- **Count:** Orbit is motion only and makes one of whatever it carries. More come from Split, Nova and the like.
+- **Where a row starts:** in the direction it would have gone (yes).
+- **Turn:** the card's own drift, scaled by the carrier's speed: `drift + speed / radius`, with a drift of one turn in the orbit's life (yes). An atom circles faster than a bolt.
+- **Radius:** the card's own number. Reach does not widen it, because that would be a special case. A later, upgraded orbit card can have a bigger one.
+- **Duration:** fixed, 3 s, "implemented well and with low coupling": the general field `lifetime_base`, set before the factors, so Slow and Reach still act on it (option a).
+- **Pierce:** none of its own.
+- **Homing:** does nothing on a circling carrier (a).
+- **Walls and the AI:** no special rules. Walls end circling shots, Ghost passes them, and the AI sees them.
+- **Phasing:** 5A, then 5B. **Look:** a ring of motes traced at the radius when cast.

@@ -17,7 +17,7 @@
 | Carrier (cards) | Drawn by | Shader today | In its folder after |
 | --- | --- | --- | --- |
 | rune, wall, pool | the projectile manager, still batches | `forms/<card>/*.gdshader` | done (#632) |
-| atom (atom, bolt, nova), swap, orbit's shots | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all | phase 1 |
+| atom (atom, bolt), swap, and any of them circling (Orbit) | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all | phase 1 |
 | beam | Feel, one beam mesh per live beam (`Feel._make_beam`) | `core/projectiles/shot_beam.gdshader` | phase 2 |
 | swing | Feel's swing trails (`swing_trails.gd`) | `core/projectiles/shot_swing.gdshader` | phase 2 |
 | familiar (its orb) | Entities (`entities.gd`), one MultiMesh for every familiar | `core/projectiles/shot_orbit.gdshader` | phase 3 |

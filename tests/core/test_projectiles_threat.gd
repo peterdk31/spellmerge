@@ -81,6 +81,23 @@ func test_a_still_shot_on_the_point() -> void:
 	check(mgr.threat_away.x < -0.9, "step away from it: %s" % mgr.threat_away)
 
 
+## A circling shot is seen as any moving shot (orbit as a modifier, 5A): along its velocity, the
+## tangent of its circle where it is now, by the native scan and the GDScript one alike.
+func test_a_circling_shot_is_seen_ahead_on_its_tangent() -> void:
+	for native: bool in [true, false]:
+		mgr.clear()
+		mgr.set_native(native)
+		mgr.set_anchor(WIZ, Vector2(100.0, 100.0))
+		var slot: int = mgr.spawn(WIZ, Vector2(140.0, 100.0), Vector2.ZERO, 3.0, 4.0, ManagerScript.ACTOR_LAYERS)
+		check(mgr.set_orbit(slot, 40.0, 0.0, 2.0), "it circles its wizard")
+		var when: float = mgr.threat(Vector2(140.0, 140.0), 4.0, ActorsScript.TEAM_ENEMIES, IMP)
+		# 80 px/s down its tangent from (140, 100): nearest (140, 140) after 40 px, 0.5 s.
+		check(absf(when - 0.5) < 0.001 and mgr.threat_slot == slot, "a point ahead on its tangent sees it in 0.5 s (native %s: %s)" % [native, when])
+		check(mgr.threat_away.is_equal_approx(Vector2.RIGHT) or mgr.threat_away.is_equal_approx(Vector2.LEFT), "the way off is across its tangent: %s" % mgr.threat_away)
+		check_equal(mgr.threat(Vector2(140.0, 60.0), 4.0, ActorsScript.TEAM_ENEMIES, IMP), -1.0, "a point behind it sees none (native %s)" % native)
+		check_equal(mgr.threat(Vector2(140.0, 140.0), 4.0, ActorsScript.TEAM_WIZARDS, IMP), -1.0, "its own team does not dodge it")
+
+
 ## With THREAT_GRID_FROM shots or more an ask goes through the threat grid (performance,
 ## 2026-11-02). It must find what one pass over every shot finds (the same exact test, in slot
 ## order), for every kind of shot: fast ones whose paths span many cells, still ones, ones whose
@@ -103,7 +120,11 @@ func _compare_with_one_pass(shots: int, grid: bool) -> void:
 		var at := Vector2(rng.randf_range(-950.0, 950.0), rng.randf_range(-950.0, 950.0))
 		var speed: float = [0.0, 60.0, 250.0, 900.0, 3000.0][i % 5]
 		var motion: int = ManagerScript.MOTION_STILL if speed == 0.0 else ManagerScript.MOTION_STRAIGHT
-		mgr.spawn(casters[i % 4], at, Vector2.from_angle(rng.randf() * TAU) * speed, rng.randf_range(0.2, 4.0), rng.randf_range(1.0, 12.0), ManagerScript.ACTOR_LAYERS, 0, 0, motion)
+		var slot: int = mgr.spawn(casters[i % 4], at, Vector2.from_angle(rng.randf() * TAU) * speed, rng.randf_range(0.2, 4.0), rng.randf_range(1.0, 12.0), ManagerScript.ACTOR_LAYERS, 0, 0, motion)
+		# Every seventh moving shot circles a point beside it (orbit as a modifier, 5A): seen on its tangent.
+		if i % 7 == 3 and motion == ManagerScript.MOTION_STRAIGHT:
+			var round_radius: float = 20.0 + float(i % 50)
+			mgr.set_orbit(slot, round_radius, float(i), 3.0 if i % 2 == 0 else -2.0, at - Vector2.from_angle(float(i)) * round_radius)
 	check_equal(mgr.get_count() >= ManagerScript.THREAT_GRID_FROM, grid, "shots for the grid or not: %d" % mgr.get_count())
 	mgr.step(1.0 / 60.0)
 	var asked: int = 0

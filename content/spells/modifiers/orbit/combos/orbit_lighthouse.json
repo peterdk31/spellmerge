@@ -1,0 +1,10 @@
+{
+	"id": "orbit_lighthouse",
+	"name": "Lighthouse",
+	"does": "A frost beam that sweeps round its caster instead of staying on the aim, chilling the imps on every side.",
+	"needs": "orbit",
+	"casts": [{"staff": 0, "cards": ["orbit", "frost", "beam"]}],
+	"imps": [[100, 0], [0, 100], [-100, 0], [0, -100]],
+	"seconds": 3.2,
+	"checks": [{"kind": "status", "imps": [0, 1, 2, 3], "status": "chill"}]
+}

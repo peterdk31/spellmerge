@@ -1,9 +1,9 @@
 {
 	"id": "triple_three_ways",
 	"name": "Triple three ways",
-	"does": "A fire bolt, a nova and a void orbit in one cast: the imp far ahead burns, the ring hits the one behind and the orbit hexes the one beside.",
-	"casts": [{"staff": 0, "cards": ["triple", "fire", "bolt", "nova", "bolt", "void", "orbit"]}],
-	"imps": [[150, 0], [-60, 0], [0, -36]],
+	"does": "A fire bolt, a nova and a void pool in one cast: the imp far ahead burns, the ring hits the one behind and the pool hexes the one standing off to the side just ahead.",
+	"casts": [{"staff": 0, "cards": ["triple", "fire", "bolt", "nova", "bolt", "void", "pool"]}],
+	"imps": [[150, 0], [-60, 0], [50, 22]],
 	"seconds": 1.5,
 	"checks": [{"kind": "status", "imps": [0], "status": "burn"}, {"kind": "damaged", "imps": [1]}, {"kind": "status", "imps": [2], "status": "hex"}]
 }

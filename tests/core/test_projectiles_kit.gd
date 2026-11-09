@@ -9,6 +9,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const EventsScript :=preload("res://core/events/events.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const OrbitShot := preload("res://tests/support/orbit_shot.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -36,6 +37,7 @@ func _initialize() -> void:
 	_test_bounce_off_a_horizontal_wall_and_corner()
 	_test_bounce_count_runs_out()
 	_test_ghost_passes_walls()
+	_test_a_circling_shot_bounces_back_round_its_circle()
 	_test_spiral_weaves_round_its_line()
 	_test_return_comes_back_and_hits_twice()
 	_test_a_returning_shot_homes_on_its_way_back()
@@ -173,6 +175,34 @@ func _test_bounce_count_runs_out() -> void:
 	_run(120)
 	_check(not _mgr.is_alive(slot) and _expired.size() == 1 and _expired[0][3], "after its bounces a shot ends on the next wall, with the wall flag")
 	_check(_mgr.wall_hits == 3, "that took three wall hits (%d)" % _mgr.wall_hits)
+
+
+## Bounce on a circling shot (orbit as a modifier, 5A; owner: "Build it"): at a wall across its
+## circle it turns back round the way it came, staying on its circle and out of the wall, one bounce
+## spent each time, and it ends on the wall once they are spent. A 50 px circle round (100, 100) and
+## a wall from x 140 cut it at about +-37 degrees; at 2 rad/s it meets the wall after 1.25 s, then
+## every 2.5 s on the open arc's other end.
+func _test_a_circling_shot_bounces_back_round_its_circle() -> void:
+	_setup()
+	_mgr.set_walls([Rect2(140.0, 0.0, 32.0, 200.0)] as Array[Rect2])
+	var centre := Vector2(100.0, 100.0)
+	var slot: int = OrbitShot.start(_mgr, 0, 50.0, PI, 2.0, 10.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, centre)
+	_check(_mgr.set_bounce(slot, 3), "a circling shot takes bounce")
+	var inside: bool = false
+	for _i in 90:
+		_mgr.step(DT)
+		inside = inside or _mgr.get_position_of(slot).x > 141.0
+	_check(_mgr.is_alive(slot) and _mgr.wall_hits == 1 and _expired.is_empty(), "it met the wall once and lives on (%d wall hits)" % _mgr.wall_hits)
+	_check(absf(_mgr.get_position_of(slot).distance_to(centre) - 50.0) < 0.5, "still on its circle (%s)" % _mgr.get_position_of(slot))
+	var away: Vector2 = _mgr.get_position_of(slot) - centre
+	_check(away.cross(_mgr.get_velocity_of(slot)) < 0.0, "going round the other way now")
+	for _i in 390:
+		_mgr.step(DT)
+		inside = inside or (_mgr.is_alive(slot) and _mgr.get_position_of(slot).x > 141.0)
+	_check(not inside, "never inside the wall")
+	_check(_mgr.wall_hits == 3 and _mgr.is_alive(slot), "it swings to and fro on the open arc, a bounce each end (%d wall hits)" % _mgr.wall_hits)
+	_run(90)
+	_check(not _mgr.is_alive(slot) and _expired.size() == 1 and _expired[0][3], "its bounces spent, it ends on the wall (%d wall hits)" % _mgr.wall_hits)
 
 
 func _test_ghost_passes_walls() -> void:
@@ -320,9 +350,13 @@ func _test_speed_curve_eases_over_life() -> void:
 	# Refused where it means nothing, and for bad numbers.
 	var still: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
-	var orbit: int = _mgr.spawn_orbit(0, 30.0, 0.0, 1.0, 1.0)
+	var orbit: int = OrbitShot.start(_mgr, 0, 30.0, 0.0, 1.0, 1.0)
 	var flyer: int = _fire(Vector2(10.0, 0.0))
-	_check(not (_mgr.set_speed_curve(still, 2.0, 0.0, 1.0) or _mgr.set_speed_curve(orbit, 2.0, 0.0, 1.0)), "a still or orbiting shot takes no curve")
+	_check(not _mgr.set_speed_curve(still, 2.0, 0.0, 1.0), "a still shot takes no curve")
+	# A circling shot takes one (orbit as a modifier, 5A): the orbit pass turns it by the curve's
+	# speed; its velocity is left to that pass, not scaled here.
+	var round_velocity: Vector2 = _mgr.get_velocity_of(orbit)
+	_check(_mgr.set_speed_curve(orbit, 2.0, 0.0, 1.0) and _mgr.get_velocity_of(orbit) == round_velocity, "a circling shot takes a curve, read by the orbit pass")
 	_check(not (_mgr.set_speed_curve(flyer, 0.0, 1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, -1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, 1.0, 0.0) or _mgr.set_speed_curve(flyer, INF, 0.0, 1.0) or _mgr.set_speed_curve(-1, 2.0, 0.0, 1.0)), "nor bad numbers or no shot")
 	_check(_mgr.set_speed_curve(flyer, 100.0, 0.0, 1.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(1000.0, 0.0)), "a huge start counts as given: no cap (owner, 2026-11-09)")
 	# A reused slot starts clean.
@@ -633,9 +667,12 @@ func _test_setters_refuse_bad_slots() -> void:
 	_setup()
 	var still: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(100.0, 100.0))
-	var orbit: int = _mgr.spawn_orbit(0, 30.0, 0.0, 1.0, 1.0)
-	var bad: bool = _mgr.set_bounce(still, 1) or _mgr.set_ghost(orbit) or _mgr.set_return(still) or _mgr.set_sticky(still, 1.0)
-	_check(not bad, "travel behaviours are refused for still and orbit shots")
+	var orbit: int = OrbitShot.start(_mgr, 0, 30.0, 0.0, 1.0, 1.0)
+	var bad: bool = _mgr.set_bounce(still, 1) or _mgr.set_ghost(still) or _mgr.set_return(still) or _mgr.set_sticky(still, 1.0)
+	_check(not bad, "travel behaviours are refused for still shots")
+	_check(not _mgr.set_return(orbit), "return, which steers a straight flight, is refused for orbit shots")
+	_check(_mgr.set_ghost(orbit), "but a circling shot takes ghost: it passes the walls that would end it (orbit as a modifier, 5A)")
+	_check(_mgr.set_bounce(orbit, 1), "and bounce: it turns back round its circle at a wall (owner, 2026-11-09)")
 	_check(not (_mgr.set_bounce(-1, 1) or _mgr.set_bounce(99999, 1) or _mgr.set_linger(5, 1.0)), "and for empty or unknown slots")
 	var flyer: int = _fire(Vector2(10.0, 0.0))
 	_check(not (_mgr.set_bounce(flyer, -1) or _mgr.set_linger(flyer, 0.0) or _mgr.set_sticky(flyer, INF)), "bad numbers are refused")

@@ -102,14 +102,41 @@ func test_a_flying_shot_of_a_head_body_draws_in_its_batch() -> void:
 
 func test_an_orbit_shot_deflected_keeps_its_head_body() -> void:
 	var head: int = mgr.register_body(BOLT, ManagerScript.MESH_HEAD)
-	var slot: int = mgr.spawn_orbit(0, 30.0, 0.0, 2.0, 1.0, 5.0, ManagerScript.LAYER_ENEMY, 0, 0, Vector2(100, 100))
-	check(slot >= 0 and mgr._motion[slot] == ManagerScript.MOTION_ORBIT, "an orbit shot round a point")
+	# A bolt of 60 px/s set circling a point 30 px out: it turns 2 rad/s (orbit as a modifier, 5A).
+	var slot: int = mgr.spawn(0, Vector2(130, 100), Vector2(60, 0), 1.0, 5.0)
+	check(mgr.set_orbit(slot, 30.0, 0.0, 0.0, Vector2(100, 100)) and mgr._motion[slot] == ManagerScript.MOTION_ORBIT, "an orbit shot round a point")
 	if slot < 0:
 		return
-	mgr.set_form(slot, &"orbit", head)
-	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(head, true), "an orbit shot is written as a head")
+	mgr.set_form(slot, &"bolt", head)
+	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(head, true), "a circling shot keeps its card's head body")
+	check_equal(mgr._kind_of(slot), ManagerScript.KIND_BOLT, "and is a bolt to the world: its motion is not its body")
+	mgr.step(DT)
+	var tangent: Vector2 = mgr.get_velocity_of(slot)
 	mgr.deflect_shot(slot, 0, Vector2.LEFT, 0)
 	check_equal(mgr._batch_of(slot), ManagerScript.body_batch(head, true), "flying straight after a deflect, still a head of its body")
+	check_equal(mgr._motion[slot], ManagerScript.MOTION_STRAIGHT, "it left its circle")
+	var from: Vector2 = mgr.get_position_of(slot)
+	mgr.step(DT)
+	var went: Vector2 = mgr.get_position_of(slot) - from
+	check(went.normalized().dot(tangent.normalized()) > 0.999 and absf(went.length() / DT - 60.0 * SpellLimits.DEFLECT_SPEEDUP) < 0.01, "and flies on along its tangent at its speed, sped up: %s" % (went / DT))
+
+
+## Regression (5A review): a circling shot with no speed of its own (turned by its drift alone, as a
+## circling rune will be) stopped dead when deflected, its curve's speed being 0. It flies on along its
+## tangent at the speed it went round with, sped up, whatever its curve was.
+func test_a_deflected_drift_only_orbit_flies_on() -> void:
+	var slot: int = mgr.spawn(0, Vector2(130, 100), Vector2.ZERO, 2.0, 5.0)
+	check(mgr.set_orbit(slot, 30.0, 0.0, 2.0, Vector2(100, 100)), "a still shot set circling by its drift")
+	mgr.step(DT)
+	var tangent: Vector2 = mgr.get_velocity_of(slot)
+	check(absf(tangent.length() - 60.0) < 0.01, "it goes round at drift x radius: %s" % tangent)
+	mgr.deflect_shot(slot, 0, Vector2.LEFT, 0)
+	var from: Vector2 = mgr.get_position_of(slot)
+	mgr.step(DT)
+	var went: Vector2 = (mgr.get_position_of(slot) - from) / DT
+	check(went.normalized().dot(tangent.normalized()) > 0.99 and absf(went.length() - 60.0 * SpellLimits.DEFLECT_SPEEDUP) < 0.01, "deflected, it flies on along its tangent, sped up: %s" % went)
+	mgr.step(DT * 30.0)
+	check(mgr.get_velocity_of(slot).length() > 60.0, "and keeps that speed (no curve left to slow it)")
 
 
 func test_a_reused_slot_forgets_its_card() -> void:
@@ -169,6 +196,4 @@ func test_a_body_keeps_the_first_batches_draw_order() -> void:
 		check(at.call(ManagerScript.body_batch(early_head, enemy)) < at.call(ManagerScript.body_batch(late_head, enemy)), "%s head bodies in the order they were numbered" % side)
 		check(at.call(ManagerScript.body_batch(late_head, enemy)) < at.call(runes), "%s head bodies draw under the runes, as a plain bolt does" % side)
 		check(at.call(runes) < at.call(ManagerScript.body_batch(stone, enemy)), "%s quad body draws above the plain runes" % side)
-		if not enemy:
-			check(at.call(ManagerScript.body_batch(stone, enemy)) < at.call(ManagerScript.BATCH_ORBIT), "a quad body draws under the orbit shots, as a rune does")
 	root.remove_child(mgr)

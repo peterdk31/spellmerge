@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/orbit/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"orbit"
+display_name = "Orbit"
+description = "The next spell circles you instead of leaving."
+complexity = 2
+icon = ExtResource("2_icon")
+mana_mult = 1.5
+lifetime_base = 3.0
+behaviour_id = &"orbit"
+behaviour_strength = 0.333333
+behaviour_reach = 36.0
+look_layer = 17
+cue = &"orbit"

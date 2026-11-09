@@ -5,8 +5,8 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## `moving_looks` (1x, as a player sees it), a column per infusion (plain, fire, frost, storm,
 ## void, lightning):
-##   top     three orbit shots circling (radius 36, as the orbit form): their tails bend
-##           round the circle, behind each shot
+##   top     three bolts with the Orbit modifier circling (its radius and drift, the bolt's own
+##           speed; orbit as a modifier, 5A): their tails bend round the circle, behind each shot
 ##   middle  a nova of bolts a quarter of a second after its cast: eight bolts flying out
 ##   bottom  spiralling bolts (the spiral modifier): their tails bend with every turn
 ## `moving_orbits_4x`: the first three orbit columns at 4x.
@@ -20,7 +20,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const ORBIT := preload("res://content/spells/forms/orbit/orbit.tres")
+const ORBIT := preload("res://content/spells/modifiers/orbit/orbit.tres")
 const NOVA := preload("res://content/spells/modifiers/nova/nova.tres")
 const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
 
@@ -41,12 +41,15 @@ func take() -> void:
 	lay_floor()
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 300)
-	var orbit_radius: float = float(ORBIT.get("orbit_radius"))
-	var spin: float = float(ORBIT.get("speed")) / orbit_radius
+	# The card's circle and drift (core/spells/orbit.gd: `behaviour_reach`, TAU x `behaviour_strength`).
+	var orbit_radius: float = float(ORBIT.get("behaviour_reach"))
+	var drift: float = TAU * float(ORBIT.get("behaviour_strength"))
 	for e in 6:
 		var x: float = 55.0 + e * 106.0
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 		var look: PackedInt32Array = PackedInt32Array() if e == 0 else PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))])
+		var circling: PackedInt32Array = look.duplicate()
+		circling.append(int(ORBIT.get("look_layer")))
 		# Each column is its own player's (0-3, then 0 and 1 again), so the orbits have anchors
 		# of their own; the plain ones show that player's colour.
 		var player: int = wizards[e % 4]
@@ -54,8 +57,10 @@ func take() -> void:
 			_shots.call("set_anchor", player, Vector2(x, 60.0))
 		for n in 3:
 			var centre: Vector2 = Vector2(x, 60.0)
-			var orb: int = _shots.call("spawn_orbit", player, orbit_radius, n * TAU / 3.0, spin, 600.0, float(ORBIT.get("radius")), 1, 0, 0, centre) as int
-			_dress(orb, tint, look)
+			var angle: float = n * TAU / 3.0
+			var orb: int = _shots.call("spawn", player, centre, Vector2.from_angle(angle) * float(BOLT.get("speed")), 600.0, float(BOLT.get("radius"))) as int
+			_shots.call("set_orbit", orb, orbit_radius, angle, drift, centre)
+			_dress(orb, tint, circling)
 		var shots: int = roundi(float(NOVA.get("behaviour_strength")))
 		for n in shots:
 			var dir: Vector2 = Vector2.from_angle(n * TAU / shots)

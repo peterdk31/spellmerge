@@ -63,11 +63,6 @@ func before_each() -> void:
 	var rune: FormBase = _form(&"rune", 5, 0.0, 10.0)
 	rune.carrier = &"rune"
 	rune.radius = 6.0
-	var orb: FormBase = _form(&"orb", 5, 0.0, 5.0)
-	orb.carrier = &"orbit"
-	orb.orbit_radius = 40.0
-	orb.radius = 6.0
-	orb.pierce = 8
 	var beam: FormBase = _form(&"beam", 5, 0.0, 0.1)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
@@ -97,6 +92,13 @@ func before_each() -> void:
 	nova.behaviour_strength = 8.0
 	nova.cue = &"nova"
 	_put(nova, &"nova")
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5): the next carrier circles its caster 40 px out.
+	var orbit: ModifierBase = ModifierBase.new()
+	orbit.behaviour = ModifierBase.Behaviour.ORBIT
+	orbit.behaviour_strength = 1.0 / 3.0
+	orbit.behaviour_reach = 40.0
+	orbit.lifetime_base = 5.0
+	_put(orbit, &"orbit")
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
@@ -239,13 +241,18 @@ func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
 	_cast(0, 0, 10.0, Vector2(30, 30))
 	_tick(10)
 	check_equal(_mgr.get_position_of(_slots()[0]), Vector2(42, 30), "a rune stays where it was placed, twice its size ahead (rules R4 F3)")
-	_build(1, 0, {"form": &"orb"})
-	check_equal(_cast(1), SpellsScript.REFUSED, "an orbit needs the caster's anchor")
-	_mgr.set_anchor(1, Vector2(100, 100))
-	check_equal(_cast(1), 2.0, "with it the orbit is cast")
+	# A circling bolt with no anchor to go round is cast all the same and flies on as it was made.
+	_build(1, 0, {"form": &"bolt", "modifiers": [&"orbit"]})
+	check_equal(_cast(1), 2.0, "with no anchor a circling bolt is still cast")
 	_tick(10)
-	var orbit_slot: int = _slots(_spells.current_tag(1, 0))[0]
-	check(is_equal_approx(_mgr.get_position_of(orbit_slot).distance_to(Vector2(100, 100)), 40.0), "it circles the anchor at the form's radius")
+	var lost: Array[int] = _slots(_spells.current_tag(1, 0))
+	check(lost.size() == 1 and _mgr.get_position_of(lost[0]).x > 40.0, "and flies straight on: nothing to circle")
+	_mgr.set_anchor(2, Vector2(100, 100))
+	_build(2, 0, {"form": &"bolt", "modifiers": [&"orbit"]})
+	check_equal(_cast(2), 2.0, "with its anchor it is cast")
+	_tick(10)
+	var orbit_slot: int = _slots(_spells.current_tag(2, 0))[0]
+	check(is_equal_approx(_mgr.get_position_of(orbit_slot).distance_to(Vector2(100, 100)), 40.0), "it circles the anchor at the card's radius")
 
 
 func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
@@ -262,10 +269,6 @@ func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
 	_build(2, 0, {"form": &"rune", "element": &"fire"})
 	_cast(2, 0, 10.0, Vector2(30, 30))
 	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(2, 0))[0]), Color(0.88, 0.35, 0.18), "a rune has it too")
-	_mgr.set_anchor(3, Vector2(100, 100))
-	_build(3, 0, {"form": &"orb", "element": &"fire"})
-	_cast(3)
-	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(3, 0))[0]), Color(0.88, 0.35, 0.18), "and an orbit shot")
 
 
 func test_a_beam_and_a_full_fan_announce_nothing_for_looks() -> void:
@@ -538,16 +541,23 @@ func test_a_beams_held_spell_flies_along_the_beam_from_the_hit() -> void:
 	check_equal(_mgr.get_velocity_of(shots[0]).normalized(), Vector2.RIGHT, "along the beam")
 
 
-func test_a_held_spell_from_an_orbit_shot_goes_outward_from_the_caster() -> void:
+func test_a_held_spell_from_a_rune_goes_outward_from_the_caster() -> void:
+	# A carrier that does not fly along its way (`OUTWARD`: a rune) fires its payload away from its
+	# caster's body through the shot, not along the aim. The wizard's body stands off the cast's line.
 	_mgr.set_anchor(0, Vector2(200, 200))
-	_target(Vector2(200, 160))
-	_build(0, 0, _held(&"orb", &"on_hit", &"bolt"))
-	_cast(0, 0, 10.0, Vector2(200, 200), Vector2.UP)
-	_tick(10)
+	_target(Vector2(190, 176))
+	# The rune pierces, so it is still there to say where its caster is; its bolt pierces, so it flies
+	# on through the target it starts in.
+	_build(0, 0, {"form": &"rune", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"pierce"]}})
+	_cast(0, 0, 10.0, Vector2(190, 200), Vector2.UP)
+	# Past the rune's arming (SpellLimits.RUNE_ARM), and within its bolt's life.
+	_tick(80)
 	var held: Array[int] = _slots(_spells.current_tag(0, 0, 1))
-	check_equal(held.size(), 1, "the orbit shot hit and fired")
-	var outward: Vector2 = (_mgr.get_position_of(held[0]) - Vector2(200, 200)).normalized()
-	check(_mgr.get_velocity_of(held[0]).normalized().is_equal_approx(outward), "away from the caster through the shot")
+	check_equal(held.size(), 1, "the rune hit and fired")
+	if held.size() == 1:
+		var outward: Vector2 = (_mgr.get_position_of(held[0]) - Vector2(200, 200)).normalized()
+		check(_mgr.get_velocity_of(held[0]).normalized().is_equal_approx(outward), "away from the caster through the shot: %s" % _mgr.get_velocity_of(held[0]))
+		check(not _mgr.get_velocity_of(held[0]).normalized().is_equal_approx(Vector2.UP), "not along the aim")
 
 
 func test_hit_profile_gives_combat_the_numbers() -> void:

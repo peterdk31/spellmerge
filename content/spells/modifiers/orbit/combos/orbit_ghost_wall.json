@@ -1,0 +1,11 @@
+{
+	"id": "orbit_ghost_wall",
+	"name": "Ghost orbit",
+	"does": "A room wall ends a circling bolt as it ends any shot, but a ghost one passes it and keeps going round to the imp beyond.",
+	"needs": "ghost",
+	"casts": [{"staff": 0, "cards": ["orbit", "ghost", "bolt"]}],
+	"imps": [[-36, 0]],
+	"walls": [[-6, 20, 12, 40], [-6, -60, 12, 40]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

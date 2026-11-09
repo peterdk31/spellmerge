@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## four staffs on four buttons, the start cards and the bag, `staff_change_requested`,
 ## `staff_cards_requested` and `card_move_requested` applied and announced (`staff_changed`) or
 ## refused (`build_refused`), casting through `Spells.cast_staff`, a sustained (`hold`) card
-## switched off only by a new press, mana held by sustained cards, the orbit anchor, and four
+## switched off only by a new press, mana held by sustained cards, the anchor a circling shot goes
+## round (Orbit), and four
 ## players building at once. And the seat (the PlayerController) on an actor that is not its
 ## wizard: its input and casts follow the actor it drives, while its HUD numbers and builder stay
 ## its own wizard's (owner, 2026-10-28), also while no controller drives the wizard; `release`
@@ -87,11 +88,9 @@ func before_each() -> void:
 	bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void: _stats.append([p, h, mh, m, mm]))
 	var bolt := _card(FormBase.new(), &"bolt") as FormBase
 	bolt.wind_down = 0.25
-	var orbit := _card(FormBase.new(), &"orbit") as FormBase
-	orbit.carrier = &"orbit"
-	orbit.orbit_radius = 30.0
-	orbit.lifetime = 5.0
-	orbit.pierce = 16
+	var rune := _card(FormBase.new(), &"rune") as FormBase
+	rune.carrier = &"rune"
+	rune.lifetime = 5.0
 	var dash := _card(FormBase.new(), &"dash") as FormBase
 	dash.carrier = &"dash"
 	dash.speed = 220.0
@@ -103,6 +102,12 @@ func before_each() -> void:
 	var hold := _card(ModifierBase.new(), &"hold") as ModifierBase
 	hold.behaviour = ModifierBase.Behaviour.HOLD
 	hold.behaviour_strength = 1.0
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5): the next carrier circles its caster.
+	var orbit := _card(ModifierBase.new(), &"orbit") as ModifierBase
+	orbit.behaviour = ModifierBase.Behaviour.ORBIT
+	orbit.behaviour_strength = 1.0 / 3.0
+	orbit.behaviour_reach = 30.0
+	orbit.lifetime_base = 3.0
 
 
 func after_each() -> void:
@@ -220,11 +225,11 @@ func test_a_dash_card_dashes_the_wizard() -> void:
 
 
 func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> void:
-	var player := _wizard(0, [[], [], [&"hold", &"orbit"], []])
+	var player := _wizard(0, [[], [], [&"hold", &"rune"], []])
 	var caster: Caster = player.caster
 	_world.hold(0, &"staff_3")
 	_run(1)
-	check(_spells.is_holding(player.id, 2), "the press switches the orbit on")
+	check(_spells.is_holding(player.id, 2), "the press switches the rune on")
 	check_equal(caster.free_mana(2), caster.mana_of(2) - 5.0, "its mana is held, from its own staff's pool")
 	check_equal(caster.free_mana(0), caster.mana_of(0), "another staff's pool is not held")
 	_run(20)
@@ -275,8 +280,8 @@ func test_cards_move_and_swap_between_slots_staffs_and_the_bag() -> void:
 	bus.card_move_requested.emit(0, 1, 0, 2, 3)
 	check_equal(caster.cards_of(2)[3], &"bolt", "a card moves to another staff")
 	check_equal(caster.cards_of(1)[0], &"", "and leaves its slot")
-	bus.card_move_requested.emit(0, PlayerController.BAG, _seat(player).bag.find(&"orbit"), 3, 0)
-	check_equal(caster.cards_of(3)[0], &"orbit", "a card comes from the bag")
+	bus.card_move_requested.emit(0, PlayerController.BAG, _seat(player).bag.find(&"rune"), 3, 0)
+	check_equal(caster.cards_of(3)[0], &"rune", "a card comes from the bag")
 	bus.card_move_requested.emit(0, 3, 0, PlayerController.BAG, 0)
 	check_equal(caster.cards_of(3)[0], &"", "and goes back")
 
@@ -285,8 +290,8 @@ func test_a_whole_staff_request_sets_every_slot_in_one_change() -> void:
 	var player := _wizard(1)
 	var caster: Caster = player.caster
 	_changed.clear()
-	_world.bus.staff_cards_requested.emit(1, 2, _ids("fire bolt orbit"))
-	check_equal(caster.cards_of(2).slice(0, 4), _ids("fire bolt orbit -"), "the cards fill the first slots, the rest is empty")
+	_world.bus.staff_cards_requested.emit(1, 2, _ids("fire bolt rune"))
+	check_equal(caster.cards_of(2).slice(0, 4), _ids("fire bolt rune -"), "the cards fill the first slots, the rest is empty")
 	check_equal(caster.cards_of(2).size(), caster.slot_count(), "the row keeps the staff's slots")
 	check_equal(_changed.size(), 1, "one change, announced once")
 	_world.bus.staff_cards_requested.emit(1, 2, [] as Array[StringName])
@@ -305,14 +310,14 @@ func test_a_wrong_whole_staff_request_is_refused_and_changes_nothing() -> void:
 	_world.bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"))
 	check_equal(_refused.size(), 3, "three refusals")
 	check_equal(caster.cards_of(1), before, "the staff is as it was")
-	_world.bus.staff_cards_requested.emit(1, 1, _ids("orbit"))
+	_world.bus.staff_cards_requested.emit(1, 1, _ids("rune"))
 	check_equal(caster.cards_of(1), before, "another player's request is not this wizard's")
 
 
 func test_four_players_build_different_staffs_at_once() -> void:
 	for index in 4:
 		_wizard(index, [[], [], [], []])
-	var cards: Array[StringName] = [&"bolt", &"orbit", &"dash", &"fire"]
+	var cards: Array[StringName] = [&"bolt", &"rune", &"dash", &"fire"]
 	for index in 4:
 		_world.bus.staff_change_requested.emit(index, index, 0, cards[index])
 	for index in 4:
@@ -323,11 +328,11 @@ func test_four_players_build_different_staffs_at_once() -> void:
 
 
 func test_the_orbit_anchor_follows_the_wizard_and_goes_when_it_falls() -> void:
-	var player := _wizard(0, [[], [&"orbit"], [], []])
+	var player := _wizard(0, [[], [&"orbit", &"bolt"], [], []])
 	player.global_position = Vector2(100, 50)
 	_world.hold(0, &"staff_2")
 	_run(1)
-	check(_world.projectiles.get_count() > 0, "the orbit shot flies")
+	check(_world.projectiles.get_count() > 0, "the circling bolt flies")
 	check(_world.projectiles.get_anchor(player.id).is_finite(), "the anchor is set")
 	_world.hurt(player, 1000)
 	_run(1)
@@ -431,7 +436,7 @@ func test_a_wizard_no_controller_drives_is_still_its_seats_panel_and_builder() -
 	check(wizard.caster.mana_of(0) > wizard.caster.max_mana_of(0) - 5.0, "it gets mana back")
 	check_equal(_stats.back()[3], float(floori(wizard.caster.mana_of(0))), "which shows too, with no controller on it")
 	check(_staff_casts.is_empty(), "a cast no seat pressed is no staff_cast")
-	_world.bus.staff_cards_requested.emit(0, 1, _ids("orbit"))
-	check_equal(wizard.caster.cards_of(1)[0], &"orbit", "seat 0's builder builds it")
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("rune"))
+	check_equal(wizard.caster.cards_of(1)[0], &"rune", "seat 0's builder builds it")
 	check(not _changed.is_empty() and _changed.back()[1] == 1, "and announces it")
 	check(seat.driven() == null, "while the seat drives nothing")

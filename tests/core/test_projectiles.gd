@@ -65,7 +65,7 @@ func _initialize() -> void:
 	_test_wall_stops_a_piercing_shot_and_a_fast_shot()
 	_test_target_in_front_of_a_wall_is_hit_by_a_long_step()
 	_test_shot_born_in_a_wall_takes_no_slot()
-	_test_wall_walk_is_capped()
+	_test_wall_walk_covers_the_whole_path()
 	_test_wall_hits_from_every_direction()
 	_test_wall_edges_and_clearing()
 	_test_clip_to_walls()
@@ -917,20 +917,24 @@ func _test_shot_born_in_a_wall_takes_no_slot() -> void:
 	_check(_mgr.wall_hits == 1, "it counts as ended on a wall (%d)" % _mgr.wall_hits)
 
 
-func _test_wall_walk_is_capped() -> void:
+## No cap on the walk (owner, 2026-11-09: "Caps are not logical"): however fast a shot is, it hits
+## the wall it reaches and flies on through open air.
+func _test_wall_walk_covers_the_whole_path() -> void:
 	_setup()
-	_mgr.set_bounds(Rect2(0.0, 0.0, 2000.0, 360.0))
+	_mgr.set_bounds(Rect2(0.0, 0.0, 4000.0, 360.0))
 	var far_wall: Array[Rect2] = [Rect2(1200.0, 0.0, 32.0, 360.0)]
 	_mgr.set_walls(far_wall)
-	# One step of 1,800 px is 225 cells, more than MAX_WALL_VISITS: the shot is
-	# ended even though the wall lies in the part that is not walked.
+	# One step of 1,800 px is 225 cells: the whole of it is walked, so the wall at 1,200 px is hit.
+	var hits: int = _mgr.wall_hits
 	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(108000.0, 0.0), 5.0)
 	_mgr.step(DT)
-	_check(not _mgr.is_alive(shot), "a step too long to walk ends the shot instead of crossing the wall")
-	# A long step with nothing in the way, within the cap, flies on.
-	var near: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(18000.0, 0.0), 5.0)
+	_check(not _mgr.is_alive(shot) and _mgr.wall_hits == hits + 1, "a 1,800 px step ends on the wall it reaches")
+	# The same step with nothing in the way flies on: open air is never taken for a wall.
+	var beyond: Array[Rect2] = [Rect2(3900.0, 0.0, 32.0, 360.0)]
+	_mgr.set_walls(beyond)
+	var clear: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(108000.0, 0.0), 5.0)
 	_mgr.step(DT)
-	_check(_mgr.is_alive(near), "a 300 px step toward a far wall is walked and clear")
+	_check(_mgr.is_alive(clear), "a 1,800 px step through open air flies on")
 
 
 func _test_wall_hits_from_every_direction() -> void:

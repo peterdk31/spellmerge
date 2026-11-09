@@ -162,7 +162,7 @@ const POOL_TICK: float = 0.5
 const POOL_REACH: float = 64.0
 ## Pixels of slack on "a payload starts touching the body that fired it": a payload starts where
 ## the shot that hit was, whose centre may stand its own radius off the body, more than the
-## payload's when that shot was bigger (a `bigger` bolt's 8 px against a nova shot's 5).
+## payload's when that shot was bigger (a `bigger` bolt's 8 px against an atom's 1.5).
 const SOURCE_TOUCH: float = 8.0
 ## Knockback of one hit in pixels per second (M1's fire bolt had 120).
 const KNOCKBACK: float = 120.0
@@ -180,23 +180,19 @@ const EXPIRE_BACKOFF: float = 2.0
 ## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05
 
-## The portal (docs/milestones/portal.md). The most portals one thing goes through in a row (a shot, a beam's leg): an engine safeguard
-## against a loop or a runaway fork, not a build limit (P4, P5).
-const PORTAL_JUMPS: int = 4
-## Seconds a body that came through a portal waits before another takes it (P6).
+## The portal (docs/milestones/portal.md). Seconds a body that came through a portal waits before another takes it (P6).
 const PORTAL_REST: float = 0.4
-## The most exits one portal opens (an engine safeguard: the most shots a carrier has, 24).
-const PORTAL_EXITS_MOST: int = 24
+## Exits a portal row has room for at first; it widens for a portal with more (no cap: owner,
+## 2026-11-09, "Caps are not logical").
+const PORTAL_EXITS_START: int = 24
 ## Portal rows made at once; more are made when needed.
 const PORTAL_ROWS_START: int = 8
 
 ## Penta (docs/milestones/portal.md, "Penta"). How far its ring stands from its caster's centre.
 const PENTA_RING: float = 64.0
 ## A penta's ring stands no further out than this share of its carrier's reach (`Carrier.reach_of`),
-## so a carrier that goes a short way (a nova's ring) still meets in the middle.
+## so a carrier that goes a short way (an atom's flight) still meets in the middle.
 const PENTA_WITHIN: float = 0.8
 ## How fast a penta's ring turns, in radians a second (owner, 2026-11-06: "rotate continuously"):
 ## once round every two seconds.
 const PENTA_TURN: float = PI
-## The most copies one penta casts (an engine safeguard: the most shots a carrier has).
-const PENTA_MOST: int = 24

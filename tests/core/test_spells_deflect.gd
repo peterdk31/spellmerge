@@ -165,7 +165,7 @@ func test_a_deflect_sets_off_on_block() -> void:
 	# The nova goes off where the shot was turned and chills an imp beside it, out of the arc.
 	var imp: Node2D = arena.add_imp(Vector2(30.0, -32.0))
 	_enemy_shot(Vector2(60.0, 0.0), Vector2(-200.0, 0.0))
-	_cast(["on_block", "deflect", "swing", "frost", "nova"])
+	_cast(["on_block", "deflect", "swing", "frost", "nova", "bolt"])
 	arena.run(1.0)
 	check_equal(deflected.size(), 1, "deflected")
 	check(arena.was_given(imp, &"chill"), "the block's nova chilled the imp")

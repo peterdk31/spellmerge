@@ -40,8 +40,8 @@ func test_a_piercing_return_bolt_hits_twice() -> void:
 
 
 func test_its_on_expire_goes_off_at_home() -> void:
-	check(_lost(["on_expire", "return", "bolt", "nova"], Vector2(-45.0, 0.0)) > 0, "the nova at the caster's feet hits the imp behind")
-	check_equal(_lost(["on_expire", "bolt", "nova"], Vector2(-45.0, 0.0)), 0, "without return the nova goes off far away")
+	check(_lost(["on_expire", "return", "bolt", "nova", "bolt"], Vector2(-45.0, 0.0)) > 0, "the nova at the caster's feet hits the imp behind")
+	check_equal(_lost(["on_expire", "bolt", "nova", "bolt"], Vector2(-45.0, 0.0)), 0, "without return the nova goes off far away")
 
 
 func test_it_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:

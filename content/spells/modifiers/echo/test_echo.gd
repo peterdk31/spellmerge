@@ -52,8 +52,8 @@ func test_the_echo_hits_a_moment_after_the_bolt() -> void:
 
 
 func test_the_timer_nova_is_rung_twice() -> void:
-	var cards: Array = ["timer", "echo", "bolt", "nova"]
-	var plain: int = _lost(["timer", "bolt", "nova"], Vector2(132.0, 40.0), 2.5)
+	var cards: Array = ["timer", "echo", "bolt", "nova", "bolt"]
+	var plain: int = _lost(["timer", "bolt", "nova", "bolt"], Vector2(132.0, 40.0), 2.5)
 	check(plain > 0, "a plain timed nova reaches the imp")
 	check_equal(_lost(cards, Vector2(132.0, 40.0), 2.5), plain * 2, "the echo's nova rings it a second time")
 

@@ -39,7 +39,7 @@ func test_a_nova_from_the_staff_tip_spares_its_caster() -> void:
 		var arena := ArenaScript.new(root)
 		arena.answer_moves()
 		var body: Node2D = arena.add_guard(0, Vector2(-off, 0.0))
-		arena.install_cards(0, 0, ["nova"])
+		arena.install_cards(0, 0, ["nova", "bolt"])
 		check(arena.cast(0, 0), "a nova is cast")
 		arena.run(1.0)
 		check_equal(arena.lost(body), 0, "a nova cast %d px off its caster's body never hits it" % int(off))

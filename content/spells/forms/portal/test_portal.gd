@@ -1,10 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## The portal carrier (docs/milestones/portal.md): its gates in the projectile manager, beams that
-## go on from every exit, shots that go through (a copy at every further exit), both ways, the jump
-## cap, bodies moved and given its infusion's status, and what it does nothing with.
+## go on from every exit, shots that go through (a copy at every further exit), both ways, no cap
+## on exits or passes, bodies moved and given its infusion's status, and what it does nothing with.
 ##
 ## godot --headless --path . --script res://content/spells/forms/portal/test_portal.gd
 
+const SpellsScript := preload("res://core/spells/spells.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
@@ -139,7 +140,10 @@ func test_a_beam_leg_out_of_a_homing_frost_portal_bends_onto_a_target_and_chills
 	check(_arena.was_given(imp, &"chill"), "and takes the portal's frost on the way")
 
 
-func test_beams_through_portals_that_lead_into_each_other_stop_at_the_jump_cap() -> void:
+## No cap on how many portals a beam goes through (owner, 2026-11-09): each leg out of one walks
+## from the next step with the length its beam had left, so portals that lead into each other
+## make legs until the length runs out, and then no more.
+func test_beams_through_portals_that_lead_into_each_other_end_when_their_length_does() -> void:
 	_arena = ArenaScript.new(root)
 	# Player 1's portal faces player 0's: what leaves one exit walks into the other's mouth.
 	_arena.place_caster(1, Vector2(300, 0))
@@ -150,8 +154,25 @@ func test_beams_through_portals_that_lead_into_each_other_stop_at_the_jump_cap()
 	check(_arena.cast(1, 0, Vector2.LEFT), "the second, facing it")
 	check(_arena.cast(0, 1), "the beam")
 	_arena.run(0.6)
-	check(_beams().beam_count() >= 3, "the beam goes through more than one portal (%d rows)" % _beams().beam_count())
-	check(_beams().beam_count() <= 1 + SpellLimits.PORTAL_JUMPS, "and no more than the cap (%d rows)" % _beams().beam_count())
+	var legs: int = _beams().beam_count()
+	check(legs >= 3, "the beam goes through more than one portal (%d rows)" % legs)
+	_arena.run(0.6)
+	check_equal(_beams().beam_count(), legs, "and stops making legs once its length is spent")
+
+
+## No cap on a portal's exits (owner, 2026-11-09; it was 24): three splits open 27.
+func test_a_portal_opens_every_exit_its_cards_ask_for() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["split", "split", "split", "portal"])
+	check(_arena.spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100000.0) != SpellsScript.REFUSED, "the portal is cast")
+	var portals: CarrierPortal = _portals()
+	var at: int = -1
+	for row in portals.portal_slots():
+		if portals.portal_on(row):
+			at = row
+	check(at >= 0, "it opened")
+	if at >= 0:
+		check_equal(portals.portal_gate_count(at), 28, "its mouth and twenty-seven exits")
 
 
 func test_a_shot_into_the_mouth_comes_out_of_every_exit() -> void:

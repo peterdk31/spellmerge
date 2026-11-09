@@ -18,7 +18,7 @@ A floor mark is a scorch, a crack, a frost rime, a burn ring, a rune's scar, ich
 | `crack` | crack | none | floor shadow | floor shadow | `slam`, `quake` |
 | `frost` | rime | 2 (frost) | spell shadow | spell base | a frost card's `blast` or `fireball` (`cards`) |
 | `char` | crack | 5 (lightning) | spell shadow | floor shadow | a lightning card's `blast` or `fireball` (`cards`) |
-| `burn_ring` | ring | none | floor shadow | spell shadow | `nova`, round its caster |
+| `burn_ring` | ring | none | floor shadow | spell shadow | `nova` (the Nova card's cue), round its caster |
 | `rune_scar` | rune | none | spell shadow | floor shadow | `rune_burst`, where a rune goes off |
 | `ichor` | blot | none | surface shadow | surface base | `enemy_death`, `boss_death`: the body's own colours, a dull sap |
 | `speck` | speck | none | spell shadow | spell shadow | a settled mote (`chip`, `fleck`), in its own colours |

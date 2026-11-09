@@ -53,7 +53,7 @@ func test_every_combo_row_is_a_clip() -> void:
 func test_a_new_combo_row_is_a_clip_with_no_code_change() -> void:
 	var row: Dictionary = {
 		"id": "fake_row", "name": "Fake row", "does": "Test only.", "seconds": 1.5,
-		"casts": [{"staff": 0, "cards": ["fire", "bolt"]}, {"staff": 1, "cards": ["nova"], "at": 0.5, "player": 1}],
+		"casts": [{"staff": 0, "cards": ["fire", "bolt"]}, {"staff": 1, "cards": ["nova", "bolt"], "at": 0.5, "player": 1}],
 		"imps": [[80, 10]], "checks": [{"kind": "damaged", "imps": [0]}],
 	}
 	var more: Array = _combos.duplicate()

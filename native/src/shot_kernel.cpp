@@ -55,7 +55,6 @@ constexpr int S_EXPIRE = 6;
 constexpr int S_FROZEN = 9;
 constexpr double GRID_CELL = 64.0;
 constexpr double WALL_CELL = 8.0;
-constexpr int MAX_WALL_VISITS = 64;
 constexpr int S_HELD = 2;
 constexpr int S_RETURNING = 3;
 constexpr int S_WAITING = 8;
@@ -586,8 +585,7 @@ struct HitPass {
 		}
 		double t = 0.0;
 		const int64_t full = std::abs(end_x - cx) + std::abs(end_y - cy) + 1;
-		const int64_t visits = MIN(full, (int64_t)MAX_WALL_VISITS);
-		for (int64_t v = 0; v < visits; v++) {
+		for (int64_t v = 0; v < full; v++) {
 			if (cx >= 0 && cx < wall_w && cy >= 0 && cy < wall_h && wall_cells[cy * wall_w + cx] != 0) {
 				return t;
 			}
@@ -604,7 +602,7 @@ struct HitPass {
 				return -1.0;
 			}
 		}
-		return full > visits ? t : -1.0;
+		return -1.0;
 	}
 
 	// `_cell_info`.
@@ -907,7 +905,6 @@ const Constant CONSTANTS[] = {
 	{ "S_FROZEN", (double)S_FROZEN },
 	{ "GRID_CELL", (double)GRID_CELL },
 	{ "WALL_CELL", (double)WALL_CELL },
-	{ "MAX_WALL_VISITS", (double)MAX_WALL_VISITS },
 	{ "S_HELD", (double)S_HELD },
 	{ "S_RETURNING", (double)S_RETURNING },
 	{ "S_WAITING", (double)S_WAITING },

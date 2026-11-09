@@ -145,21 +145,21 @@ func test_zoom_locks_when_held_still_and_turning_picks_slower() -> void:
 func test_zoom_unlocks_on_a_sweep_and_on_letting_go() -> void:
 	var radial: RadialScript = _open(PauseMenuScript.Ring.ZOOM)
 	var zoom: RingZoomScript = radial.ring_picker as RingZoomScript
-	var nova: Vector2 = radial.direction_to(&"nova")
-	_push(nova, 1.0)
+	var atom: Vector2 = radial.direction_to(&"atom")
+	_push(atom, 1.0)
 	_frames(3)
-	check(zoom.is_locked(), "locked on the nova")
-	var far: Vector2 = nova.rotated(2.0)
+	check(zoom.is_locked(), "locked on the atom")
+	var far: Vector2 = atom.rotated(2.0)
 	_push(far, 1.0)
 	_frame()
 	check(not zoom.is_locked(), "a fast sweep unlocks")
-	check(radial.pointed_id() != &"nova", "and the plain ring picks where the stick is now")
+	check(radial.pointed_id() != &"atom", "and the plain ring picks where the stick is now")
 	_frames(3)
 	check(zoom.is_locked(), "held still again, it locks again")
 	_let_go()
 	check(not zoom.is_locked(), "letting go unlocks")
 	check_equal(radial.pointed_id(), &"", "and drops the card")
-	_push(nova, 0.6)
+	_push(atom, 0.6)
 	_frames(4)
 	check(not zoom.is_locked(), "a half push never locks")
 
@@ -167,7 +167,7 @@ func test_zoom_unlocks_on_a_sweep_and_on_letting_go() -> void:
 func test_zoom_slides_past_the_fan_edge() -> void:
 	var radial: RadialScript = _open(PauseMenuScript.Ring.ZOOM)
 	var zoom: RingZoomScript = radial.ring_picker as RingZoomScript
-	var start: float = RadialScript.angle_of(radial.direction_to(&"nova"))
+	var start: float = RadialScript.angle_of(radial.direction_to(&"atom"))
 	_push(RadialScript.direction_of(start), 1.0)
 	_frames(3)
 	check(zoom.is_locked(), "locked")
@@ -179,7 +179,7 @@ func test_zoom_slides_past_the_fan_edge() -> void:
 		_frame()
 	check(zoom.is_locked(), "a steady turn keeps the lock")
 	var edge: StringName = radial.pointed_id()
-	check(edge != &"nova", "the fan's edge is further on")
+	check(edge != &"atom", "the fan's edge is further on")
 	_frames(8)
 	check(radial.pointed_id() != edge, "held past the edge, the fan slides on (%s, then %s)" % [edge, radial.pointed_id()])
 

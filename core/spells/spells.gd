@@ -14,8 +14,8 @@ extends Node
 ## wind-down, and the staff's cooldown after the cycle's last cast; docs/milestones/
 ## cast-timing.md) is per actor and staff and ticks in
 ## `step` (physics). A cast is a group: its carriers leave along the aim; each carrier's shots are
-## a fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
-## compiler; homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
+## a fan (straight), a ring (orbit), still shots or rays; split multiplied them in the
+## compiler, and a nova casts the carrier several ways (`_cast_nova`); homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
 ## its line, at random (`_staff_spread`). Cards that landed on the caster (or a payload's origin)
 ## strike everything there (`_strike_round`); a dash card asks the caster's body to move
 ## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
@@ -1624,15 +1624,10 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	_echo_spell = spell if echoed else null
-	var launched: int = _cast_once(spell, tag, actor, origin, heading, source)
-	if launched > 0:
-		_recoil(spell, tag, actor, heading)
+	var launched: int = _cast_nova(spell, tag, actor, origin, heading, source)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
 		# The same cast again, its aim reversed: every card it has does what it did the first time.
-		var backwards: int = _cast_once(spell, tag, actor, origin, -heading, source)
-		launched += backwards
-		if backwards > 0:
-			_recoil(spell, tag, actor, -heading)
+		launched += _cast_nova(spell, tag, actor, origin, -heading, source)
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
@@ -1652,12 +1647,61 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	return launched
 
 
+## One firing of `spell` along `heading`, as a nova when it has one (owner, 2026-11-09): the cast
+## made `copies` times from `origin` by the same caster, copy k along `heading` turned by k/copies
+## of a full turn (copy 0 along the aim), and the card's cue (`nova`) played once at the centre.
+## Both a firing and its mirror go through here, so a card never does more on one than on the
+## other; each way recoils on its own, so a nova's pushes cancel as a mirror's do. Returns the shots
+## made.
+func _cast_nova(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
+	var copies: int = spell.nova_ways()
+	if copies <= 1:
+		var once: int = _cast_once(spell, tag, actor, origin, heading, source, 0.0)
+		if once > 0:
+			_recoil(spell, tag, actor, heading)
+		return once
+	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
+	var made: int = 0
+	for n in copies:
+		var turn: float = TAU * float(n) / float(copies)
+		var aim: Vector2 = DMath.rotated(way, turn) if n > 0 else way
+		var shots: int = _cast_once(spell, tag, actor, origin, aim, source, turn)
+		if shots > 0:
+			_recoil(spell, tag, actor, aim)
+		made += shots
+	var cue: StringName = spell.cue_of(ModifierBase.Behaviour.NOVA)
+	if made > 0 and events != null and cue != &"":
+		cue_tag = tag
+		events.cue_shown.emit(actor, cue, _caster_centre(actor, origin), way, 0.0, spell.tint, spell.look)
+		cue_tag = 0
+	return made
+
+
+## The middle of what casts now: the body casting it (its anchor), else `origin`, the point or shot
+## casting a payload. A nova's ring shows there and a Penta ring stands round it.
+func _caster_centre(actor: int, origin: Vector2) -> Vector2:
+	var body: int = body_of(_caster, actor)
+	if body >= 0 and projectiles != null and projectiles.get_anchor(body).is_finite():
+		return projectiles.get_anchor(body)
+	return origin
+
+
+## How many copies a Penta ring of `spell` casts: its Penta cards' count (5 a card, more add, with no
+## cap: owner, 2026-11-09), or 0 when it has none or Penta does nothing on its carrier.
+func _penta_copies(spell: CompiledSpell) -> int:
+	var penta: float = spell.behaviour(ModifierBase.Behaviour.PENTA)
+	if penta <= 0.0 or not _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
+		return 0
+	return maxi(roundi(penta), 1)
+
+
 ## One cast of `spell` along `heading`: its carrier launched once, or as a Penta ring when it has
-## one. Both a firing and its mirror (the same cast, aim reversed) go through here, so a card
-## never does more on one than on the other. Returns the shots made.
-func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
-	if spell.behaviour(ModifierBase.Behaviour.PENTA) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.PENTA):
-		return _penta(spell, tag, actor, origin, heading, source)
+## one, that ring turned on by `offset` radians (a nova copy's share of the turn, so a nova of Penta
+## rings spreads its rings out instead of stacking them). Returns the shots made.
+func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node, offset: float) -> int:
+	var copies: int = _penta_copies(spell)
+	if copies > 0:
+		return _penta(spell, copies, tag, actor, origin, heading, source, offset)
 	return _launch(spell, tag, actor, origin, heading, source)
 
 
@@ -1675,15 +1719,11 @@ func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 ## aims from it (a beam) turns with its ring while it lasts (`_ring_*`, CarrierBeam). A still shot
 ## stays where it was placed, as anywhere, and a flying one flies off. It does not follow its
 ## centre (owner: "Don't let it follow the centre"). Each point stops short of a wall, and each
-## copy is cast by its point. Returns the shots made.
-func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node) -> int:
-	var copies: int = clampi(roundi(spell.behaviour(ModifierBase.Behaviour.PENTA)), 1, SpellLimits.PENTA_MOST)
+## copy is cast by its point. `copies` is `_penta_copies(spell)`; `offset` turns this ring on from
+## where the card's ring stands (a nova copy's share of the turn). Returns the shots made.
+func _penta(spell: CompiledSpell, copies: int, tag: int, actor: int, origin: Vector2, heading: Vector2, source: Node, offset: float) -> int:
 	var way: Vector2 = heading.normalized() if not heading.is_zero_approx() else Vector2.RIGHT
-	# The centre: the body casting it (its anchor), else the point or shot casting this payload.
-	var centre: Vector2 = origin
-	var body: int = body_of(_caster, actor)
-	if body >= 0 and projectiles != null and projectiles.get_anchor(body).is_finite():
-		centre = projectiles.get_anchor(body)
+	var centre: Vector2 = _caster_centre(actor, origin)
 	# Where the card's last ring has turned to (its own start the first time), turning back.
 	var turned: float = SpellRuntime.penta_start(tag)
 	var turn: float = SpellLimits.PENTA_TURN
@@ -1692,10 +1732,11 @@ func _penta(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading
 		turned = fposmod(last.x + last.z * (_clock - last.y), TAU)
 		turn = -last.z
 	_penta_rings[tag] = Vector3(turned, _clock, turn)
-	# Within the carrier's reach of the middle, so a short one (a nova's ring) still meets there.
+	turned += offset
+	# Within the carrier's reach of the middle, so a short one (an atom's) still meets there.
 	var carried: float = _carrier_of(spell).reach_of(spell)
 	if carried <= 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES):
-		# A ring of shots (a nova) is not aimed, but its shots fly this far.
+		# A fan all the way round is not aimed, but its shots fly this far.
 		carried = spell.speed * spell.lifetime
 	var radius: float = minf(SpellLimits.PENTA_RING, carried * SpellLimits.PENTA_WITHIN) if carried > 0.0 else SpellLimits.PENTA_RING
 	_cast_as(CASTER_POINT, 0)
@@ -2331,12 +2372,22 @@ func _fire(group: CompiledGroup, actor: int, staff: int, generation: int, at: Ve
 	_launch_as(group, actor, staff, generation, at, heading, source, caster, seq)
 
 
-## The shots one firing of `group` makes, at least 1 for each carrier (a beam, a move, an area).
+## The shots one firing of `group` makes, at least 1 for each carrier (a beam, a move, an area),
+## times the copies its cards cast of it (`copies_of`: mirror, nova, penta).
 func _shots_of(group: CompiledGroup) -> int:
 	var shots: int = 0
 	for spell in group.spells:
-		shots += maxi(spell.shots, 1)
+		shots += maxi(spell.shots, 1) * copies_of(spell)
 	return maxi(shots, 1)
+
+
+## How many times one firing of `spell` casts its carrier: twice with Mirror, times its Nova ways,
+## times its Penta ring's copies where Penta works.
+func copies_of(spell: CompiledSpell) -> int:
+	var copies: int = spell.nova_ways() * maxi(_penta_copies(spell), 1)
+	if spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0:
+		copies *= 2
+	return copies
 
 
 ## The fires that waited for room (`_fire`), oldest first, while their budget has room in this
@@ -2399,7 +2450,7 @@ func _heading(spell: CompiledSpell, slot: int, at: Vector2, actor: int) -> Vecto
 
 ## When a carrier that lives `life` seconds first does what it does every `interval` (a timer's
 ## tick, an arc's zap): after the interval, or half its life when that is shorter, so a short
-## carrier (a swap, a nova, a beam) does it once before it ends (owner, 2026-10-29).
+## carrier (a swap, an atom, a beam) does it once before it ends (owner, 2026-10-29).
 static func first_tick(interval: float, life: float) -> float:
 	return minf(interval, life * 0.5)
 
@@ -3366,10 +3417,11 @@ func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
 
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
 ## its first carrier's flight (speed x life), a beam's or swing's length, a rain's aim point;
-## 0 for one that is not aimed (a nova's ring, an orbit, a still shot, a decoy...) or no build.
+## 0 for one that is not aimed (a nova, an orbit, a still shot, a decoy...) or no build.
 func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff, mana)
-	if first == null:
+	if first == null or first.nova_ways() > 1:
+		# A nova goes every way: not aimed.
 		return 0.0
 	return _carrier_of(first).reach_of(first)
 

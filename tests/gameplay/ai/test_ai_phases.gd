@@ -32,7 +32,7 @@ func _boss() -> EnemyBase:
 	var angry := EnemyPhase.new()
 	angry.health_below = 0.5
 	angry.transition = 1.0
-	angry.staffs = [_entry([&"nova"]), _entry([&"dash"])] as Array[StaffCards]
+	angry.staffs = [_entry([&"nova", &"bolt"]), _entry([&"dash"])] as Array[StaffCards]
 	angry.profile = Fixture.exact().duplicate() as AIProfile
 	angry.profile.aggression = 1.0
 	angry.look = PhaseLook.new()

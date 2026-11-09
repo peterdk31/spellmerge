@@ -81,6 +81,10 @@ signal damaged(by: int, amount: float)
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
 const VIEW: Array[StringName] = [&"_looks"]
+## State as who it points at: the controller driving it now, which may be another body's (a
+## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
+## and who drives what is the controller's `driving`.
+const REFS: Array[StringName] = [&"controller"]
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY

@@ -12,7 +12,8 @@ extends Carrier
 ## rays read as they walk (a beam goes on from the other side: `CarrierBeam`); this carrier moves
 ## the flying shots that went in (`Projectiles.shots_into_gates`: the first way out keeps the shot,
 ## every other is a full copy of it) and the bodies (`target_move_requested`, the exits taken in
-## turn), each no more than SpellLimits.PORTAL_JUMPS times in a row. It hurts nothing itself; its
+## turn), as often as they come to it (no cap: owner, 2026-11-09; a shot passes once a step and
+## its life runs on, a body rests `PORTAL_REST` after each pass). It hurts nothing itself; its
 ## infusion goes to everything that comes out of it (owner, 2026-11-05). Its end points are every
 ## gate: its blast, its `on expire` payload and its end look happen at each when it closes.
 
@@ -39,13 +40,7 @@ var _pt_turn: PackedInt32Array = PackedInt32Array()
 var _pt_radius: PackedFloat32Array = PackedFloat32Array()
 var _pt_zap_at: PackedFloat32Array = PackedFloat32Array()
 var _pt_zap_rolls: PackedInt32Array = PackedInt32Array()
-var _pt_stride: int = SpellLimits.PORTAL_EXITS_MOST + 1
-
-## The shots that have gone through portals: slot, its birth (`get_seq_of`), how many times.
-var _jump_slot: PackedInt32Array = PackedInt32Array()
-var _jump_seq: PackedInt64Array = PackedInt64Array()
-var _jump_count: PackedInt32Array = PackedInt32Array()
-var _jumps_used: int = 0
+var _pt_stride: int = SpellLimits.PORTAL_EXITS_START + 1
 ## The bodies that came through a portal, and the clock time each may go through again.
 var _rest_body: Array[Node2D] = []
 var _rest_until: PackedFloat64Array = PackedFloat64Array()
@@ -125,6 +120,9 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if at < 0:
 		at = _pt_on.size()
 		_fit_rows(at * 2)
+	# Room for its mouth and every exit before any gate is written.
+	var exits: int = maxi(spell.shots, 1)
+	_fit_stride(exits + 1)
 	var born: int = _pt_next_born
 	_pt_next_born += 1
 	_pt_on[at] = 1
@@ -144,7 +142,6 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	if mouth >= 0:
 		_pt_gates[at * _pt_stride] = mouth
 		used = 1
-	var exits: int = clampi(spell.shots, 1, SpellLimits.PORTAL_EXITS_MOST)
 	for n in exits:
 		# Fanned as a split fans shots, each facing out along its own way (P1).
 		var angle: float = DMath.angle(way) + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
@@ -192,7 +189,6 @@ func step(delta: float) -> void:
 	if kit.projectiles != null and kit.projectiles.has_gates():
 		_pass_shots()
 		_pass_bodies()
-	_forget_jumps()
 
 
 ## Growth widens its gates, as a growing shot widens, up to the room's size.
@@ -252,9 +248,6 @@ func _pass_shots() -> void:
 		var gate: int = gates[i]
 		if not kit.projectiles.is_alive(slot):
 			continue
-		var jumps: int = _jumps_of(slot)
-		if jumps >= SpellLimits.PORTAL_JUMPS:
-			continue
 		var outs: int = kit.projectiles.gate_outs(gate, _outs)
 		if outs == 0:
 			continue
@@ -283,7 +276,6 @@ func _pass_shots() -> void:
 					moved = -1
 			if moved < 0:
 				continue
-			_set_jumps(moved, jumps + 1)
 			if portal != null:
 				kit.infuse_shot(moved, portal.hit, portal.tint)
 				# Its homing steers what comes out of it (the shot's own homing, if any, stays).
@@ -365,47 +357,7 @@ func _shown(gate: int, at: Vector2, way: Vector2) -> void:
 	kit.events.cue_shown.emit(SpellTag.caster_of(tag), &"portal_through", at, way.normalized() if not way.is_zero_approx() else Vector2.RIGHT, kit.projectiles.gate_radius(gate), tint, 0)
 
 
-# --- The shots' jumps and the bodies' rests ------------------------------------------------------
-
-func _jumps_of(slot: int) -> int:
-	var seq: int = kit.projectiles.get_seq_of(slot)
-	for i in _jumps_used:
-		if _jump_slot[i] == slot and _jump_seq[i] == seq:
-			return _jump_count[i]
-	return 0
-
-
-func _set_jumps(slot: int, count: int) -> void:
-	var seq: int = kit.projectiles.get_seq_of(slot)
-	for i in _jumps_used:
-		if _jump_slot[i] == slot:
-			_jump_seq[i] = seq
-			_jump_count[i] = count
-			return
-	if _jumps_used == _jump_slot.size():
-		var size: int = maxi(16, _jumps_used * 2)
-		_jump_slot.resize(size)
-		_jump_seq.resize(size)
-		_jump_count.resize(size)
-	_jump_slot[_jumps_used] = slot
-	_jump_seq[_jumps_used] = seq
-	_jump_count[_jumps_used] = count
-	_jumps_used += 1
-
-
-## The shots that went through and have ended since are forgotten.
-func _forget_jumps() -> void:
-	var i: int = 0
-	while i < _jumps_used:
-		var slot: int = _jump_slot[i]
-		if kit.projectiles != null and kit.projectiles.is_alive(slot) and kit.projectiles.get_seq_of(slot) == _jump_seq[i]:
-			i += 1
-			continue
-		_jumps_used -= 1
-		_jump_slot[i] = _jump_slot[_jumps_used]
-		_jump_seq[i] = _jump_seq[_jumps_used]
-		_jump_count[i] = _jump_count[_jumps_used]
-
+# --- The bodies' rests -----------------------------------------------------------------------
 
 func _resting(body: Node2D, now: float) -> bool:
 	for i in _rest_body.size():
@@ -484,7 +436,6 @@ func clear() -> void:
 	_pt_on.fill(0)
 	_pt_spell.fill(null)
 	_pt_gates_used.fill(0)
-	_jumps_used = 0
 	_rest_body.clear()
 	_rest_until.clear()
 
@@ -494,6 +445,20 @@ func replace_body(old: Node, new: Node) -> void:
 	for i in _rest_body.size():
 		if _rest_body[i] == old:
 			_rest_body[i] = new as Node2D
+
+
+## Widens every row's gates to room for `need` (the mouth and its exits), keeping each row's gates.
+func _fit_stride(need: int) -> void:
+	if need <= _pt_stride:
+		return
+	var wider: int = maxi(need, _pt_stride * 2)
+	var gates := PackedInt32Array()
+	gates.resize(_pt_on.size() * wider)
+	for row in _pt_on.size():
+		for k in _pt_gates_used[row]:
+			gates[row * wider + k] = _pt_gates[row * _pt_stride + k]
+	_pt_gates = gates
+	_pt_stride = wider
 
 
 func _fit_rows(size: int) -> void:

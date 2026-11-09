@@ -15,8 +15,8 @@ extends "res://tests/support/screenshot.gd"
 ## carrier, the second with nothing left to fire (wasted); a long staff that does not fit the row.
 const CARDS: Array = [
 	[&"dash"],
-	[&"fire", &"bolt", &"frost", &"nova", &"bolt"],
-	[&"fire", &"on_hit", &"on_expire", &"bolt", &"lightning", &"nova", &"homing"],
+	[&"fire", &"bolt", &"frost", &"nova", &"bolt", &"bolt"],
+	[&"fire", &"on_hit", &"on_expire", &"bolt", &"lightning", &"nova", &"bolt", &"homing"],
 	[&"bolt", &"fire", &"bolt", &"frost", &"bolt", &"lightning", &"bolt", &"void", &"bolt", &"storm", &"bolt", &"pierce", &"bolt", &"chain", &"bolt", &"bigger", &"orbit"],
 ]
 ## Which staffs each player casts before the shot (staff_1 to staff_4), so the four corners show

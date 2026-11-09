@@ -6,6 +6,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://content/spells/modifiers/penta/test_penta.gd
 
+const SpellsScript := preload("res://core/spells/spells.gd")
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 var _arena: ArenaScript = null
@@ -238,10 +239,19 @@ func test_two_cards_cast_ten() -> void:
 	check_equal(_shots().size(), 10, "ten bolts")
 
 
+## No cap on the copies (owner, 2026-11-09: cards are not limited; it was 24): six cards cast thirty.
+func test_more_cards_keep_adding_copies() -> void:
+	_arena = ArenaScript.new(root)
+	var staff: CompiledStaff = _arena.install_cards(0, 0, ["penta", "penta", "penta", "penta", "penta", "penta", "bolt"])
+	check_equal(_arena.spells.copies_of(staff.casts[0].group.spells[0]), 30, "the fire budget counts thirty")
+	check(_arena.spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100000.0) != SpellsScript.REFUSED, "cast with mana to spare")
+	check_equal(_shots().size(), 30, "thirty bolts")
+
+
 func test_a_short_carrier_rings_within_its_reach() -> void:
 	_arena = ArenaScript.new(root)
 	var imp: Node2D = _arena.add_imp(Vector2(150, 0))
-	_arena.install_cards(0, 0, ["on_hit", "bolt", "penta", "frost", "nova"])
+	_arena.install_cards(0, 0, ["on_hit", "bolt", "penta", "frost", "nova", "bolt"])
 	check(_arena.cast(0, 0), "cast")
 	_arena.run(1.5)
 	check(_arena.was_given(imp, &"chill"), "five novas round the hit close over the imp in the middle")
@@ -252,6 +262,6 @@ func test_wasted_where_nothing_leaves_from_a_point() -> void:
 	for carrier: String in ["dash", "teleport", "swing", "slam"]:
 		var built: CompiledStaff = _arena.install_cards(0, 0, ["penta", carrier])
 		check(built.wasted.has(0), "penta does nothing on a %s" % carrier)
-	for carrier: String in ["bolt", "beam", "nova", "rune", "wall", "rain", "orbit", "decoy", "familiar", "swap", "portal"]:
+	for carrier: String in ["bolt", "beam", "rune", "wall", "rain", "orbit", "decoy", "familiar", "swap", "portal"]:
 		var built: CompiledStaff = _arena.install_cards(0, 0, ["penta", carrier])
 		check(not built.wasted.has(0), "penta works on a %s" % carrier)

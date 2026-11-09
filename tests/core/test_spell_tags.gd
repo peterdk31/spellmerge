@@ -31,7 +31,7 @@ func before_each() -> void:
 	_spells = own(SpellsScript.new())
 	_spells.set("registry", _fake)
 	_form(&"bolt", 1, 5, 1)
-	_form(&"nova", 2, 4, 8).spread = 360.0
+	_form(&"halo", 2, 4, 8).spread = 360.0
 	_form(&"heavy", 4, 4, 1)
 	var beam: FormBase = _form(&"beam", 2, 3, 1)
 	beam.carrier = &"beam"
@@ -156,7 +156,7 @@ func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
 
 
 func test_a_built_staff_registers_every_node() -> void:
-	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"nova", &"on_hit", {"form": &"bolt"})))
+	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"form": &"bolt"})))
 	var tag: int = _begin(2, 1, staff)
 	check(SpellTag.caster_of(tag) == 2 and SpellTag.staff_of(tag) == 1 and SpellTag.node_of(tag) == 0, "the first tag names caster, staff and node 0")
 	for node in staff.nodes.size():
@@ -188,7 +188,7 @@ func test_four_players_build_at_once_without_mixing() -> void:
 	for i in tags.size():
 		check(_spells.call("profile", tags[i]) == builds[i].nodes[0], "tag %d finds its own spell" % i)
 	# Rebuilding one staff leaves the others alone.
-	var rebuilt: int = _begin(1, 0, _staff({"form": &"nova"}))
+	var rebuilt: int = _begin(1, 0, _staff({"form": &"halo"}))
 	var at: int = SpellLimits.STAFFS
 	check(rebuilt != tags[at], "the new build has a new tag")
 	for i in tags.size():
@@ -201,7 +201,7 @@ func test_a_rebuild_mid_flight_keeps_the_old_profile_until_the_last_shot_ends() 
 	var old_tag: int = _begin(0, 0, old)
 	_spells.call("shot_started", old_tag)
 	_spells.call("shot_started", old_tag)
-	var new_tag: int = _begin(0, 0, _staff({"form": &"nova"}))
+	var new_tag: int = _begin(0, 0, _staff({"form": &"halo"}))
 	check(new_tag != old_tag, "a rebuild moves to a new generation")
 	check(_spells.call("profile", old_tag) == old.nodes[0], "shots in the air keep their old numbers")
 	check_equal(_spells.call("generations_held", 0, 0), 2, "old and new are both held")
@@ -213,7 +213,7 @@ func test_a_rebuild_mid_flight_keeps_the_old_profile_until_the_last_shot_ends() 
 
 
 func test_a_rebuild_mid_flight_keeps_every_node_until_the_last_shot_of_any_node() -> void:
-	var old: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"nova", &"on_hit", {"form": &"bolt"})))
+	var old: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"halo", &"on_hit", {"form": &"bolt"})))
 	var tag0: int = _begin(0, 0, old)
 	var tag1: int = _spells.call("current_tag", 0, 0, 1)
 	var tag2: int = _spells.call("current_tag", 0, 0, 2)
@@ -236,7 +236,7 @@ func test_a_rebuild_mid_flight_keeps_every_node_until_the_last_shot_of_any_node(
 
 func test_a_rebuild_with_no_shots_in_the_air_frees_the_old_build_at_once() -> void:
 	var old_tag: int = _begin(3, 1, _staff({"form": &"bolt"}))
-	_begin(3, 1, _staff({"form": &"nova"}))
+	_begin(3, 1, _staff({"form": &"halo"}))
 	check(_spells.call("profile", old_tag) == null, "nothing needs the old build")
 	check_equal(_spells.call("generations_held", 3, 1), 1, "one generation held")
 
@@ -257,7 +257,7 @@ func test_the_ring_wraps_after_eight_builds() -> void:
 	for build in range(1, SpellLimits.GENERATIONS):
 		var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
 		check_equal(SpellTag.generation_of(tag), build, "build %d is generation %d" % [build, build])
-	var wrapped: int = _begin(0, 0, _staff({"form": &"nova"}))
+	var wrapped: int = _begin(0, 0, _staff({"form": &"halo"}))
 	check_equal(wrapped, first_tag, "the ninth build reuses generation 0")
 	check_equal((_spells.get("revoked_tags") as PackedInt64Array).size(), 0, "nothing was in the air, so nothing is revoked")
 
@@ -270,7 +270,7 @@ func test_a_full_ring_revokes_the_oldest_generations_shots() -> void:
 		var tag: int = _begin(0, 0, _staff({"form": &"bolt"}))
 		_spells.call("shot_started", tag)
 	check_equal(_spells.call("generations_held", 0, 0), SpellLimits.GENERATIONS, "all eight generations are held")
-	var newest: CompiledStaff = _staff({"form": &"nova"})
+	var newest: CompiledStaff = _staff({"form": &"halo"})
 	var tag: int = _begin(0, 0, newest)
 	check_equal(tag, first_tag, "the ring is back at generation 0")
 	var revoked: PackedInt64Array = _spells.get("revoked_tags")
@@ -308,5 +308,5 @@ func test_a_tag_gives_its_spells_cards() -> void:
 	var tag: int = _begin(0, 1, _staff({"form": &"bolt", "element": &"fire", "modifiers": [&"homing", &"pierce"]}))
 	check_equal(_spells.call("cards_of", tag), [&"bolt", &"fire", &"homing", &"pierce"] as Array[StringName], "form, infusion, modifiers")
 	check_equal(_spells.call("cards_of", tag + 4096), [] as Array[StringName], "a tag with no spell: none")
-	_begin(0, 1, _staff({"form": &"nova"}))
+	_begin(0, 1, _staff({"form": &"halo"}))
 	check_equal(_spells.call("cards_of", tag), [] as Array[StringName], "a rebuilt staff's old tag (no shot in the air): none")

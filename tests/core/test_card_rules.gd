@@ -306,7 +306,8 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [LINE]
 		ModifierBase.Behaviour.HOLD, ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.RETURN:
 			return [OPEN]
-		ModifierBase.Behaviour.MIRROR:
+		ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.NOVA:
+			# A nova is a mirror with eight ways: one of them goes behind.
 			return [BACK]
 		ModifierBase.Behaviour.BOUNCE:
 			return [WALL]

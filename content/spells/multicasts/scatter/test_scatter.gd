@@ -41,12 +41,12 @@ func test_three_carriers_leave_in_one_cast() -> void:
 
 
 func test_the_nova_rings_three_times() -> void:
-	var one: int = _lost(["nova"], Vector2(20.0, 0.0), 1.0)
+	var one: int = _lost(["nova", "bolt"], Vector2(20.0, 0.0), 1.0)
 	check(one > 0, "a single nova hurts")
 	check(one * 3 < ArenaScript.IMP_HEALTH, "the imp survives three rings")
 	# Each ring is turned a random way, so how many of its eight shots reach the imp varies; but
 	# every ring reaches it, so three rings hurt at least twice as much as one.
-	check(_lost(["scatter", "nova", "nova", "nova"], Vector2(20.0, 0.0), 1.0) >= one * 2, "three rings hurt at least twice as much as one")
+	check(_lost(["scatter", "nova", "bolt", "nova", "bolt", "nova", "bolt"], Vector2(20.0, 0.0), 1.0) >= one * 2, "three rings hurt at least twice as much as one")
 
 
 func test_a_bolt_flies_off_aim_for_some_casts() -> void:
@@ -68,21 +68,21 @@ func test_a_bolt_flies_off_aim_for_some_casts() -> void:
 
 func test_the_scatter_costs_more_mana_than_one_carrier() -> void:
 	var arena := ArenaScript.new(root)
-	var plain: CompiledStaff = arena.install_cards(0, 0, ["nova"])
-	var scatter: CompiledStaff = arena.install_cards(0, 1, ["scatter", "nova", "nova", "nova"])
+	var plain: CompiledStaff = arena.install_cards(0, 0, ["nova", "bolt"])
+	var scatter: CompiledStaff = arena.install_cards(0, 1, ["scatter", "nova", "bolt", "nova", "bolt", "nova", "bolt"])
 	check(scatter.casts[0].mana >= plain.casts[0].mana + 4.0, "the card adds its 4 mana")
 	arena.free_all()
 
 
 func test_four_players_scatter_at_once() -> void:
-	var one: int = _lost(["nova"], Vector2(20.0, 0.0), 1.0)
+	var one: int = _lost(["nova", "bolt"], Vector2(20.0, 0.0), 1.0)
 	var arena := ArenaScript.new(root)
 	var imps: Array[Node2D] = []
 	for player in 4:
 		var at := Vector2(0.0, 150.0 * player)
 		arena.place_caster(player, at)
 		imps.append(arena.add_imp(at + Vector2(20.0, 0.0)))
-		arena.install_cards(player, 0, ["scatter", "nova", "nova", "nova"])
+		arena.install_cards(player, 0, ["scatter", "nova", "bolt", "nova", "bolt", "nova", "bolt"])
 	for player in 4:
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(1.0)

@@ -3,7 +3,7 @@ extends "res://tests/support/screenshot.gd"
 ##
 ## Card sheets first: every real card the registry found (so a new card adds itself), pointed at
 ## in turn, its ring and hub cropped into sheets of eight (radial_cards_1, radial_cards_2, ...).
-## Then shots, in the sandbox with the radial builder picked: one player pointing at a nova (the hub
+## Then shots, in the sandbox with the radial builder picked: one player pointing at an atom (the hub
 ## shows its numbers, the marked slot its ghost, the card info panel the marked card), then after
 ## two cards were put in, the one-kind ring on the modifiers, LT held half way to a clear, and all
 ## four players with their radials open at once, every quarter laid out alike (the corner panels
@@ -37,7 +37,7 @@ func take() -> void:
 		return
 	var radial: Node = _hud.call("get_radial", 0)
 	await _card_sheets(radial)
-	await _point(0, &"nova", true)
+	await _point(0, &"atom", true)
 	await shot("radial_pointing")
 	tap(0, &"staff_2")
 	await _point(0, &"split", true)

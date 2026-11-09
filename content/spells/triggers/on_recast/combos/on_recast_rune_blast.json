@@ -1,0 +1,13 @@
+{
+	"id": "on_recast_rune_blast",
+	"name": "Remote rune",
+	"does": "A rune is laid a step ahead; casting the staff again lays a second one and bursts the first into a fire blast that burns an imp standing just past it, out of the rune's touch.",
+	"casts": [
+		{"staff": 0, "cards": ["on_recast", "rune", "fire", "blast"]},
+		{"staff": 0, "cards": ["on_recast", "rune", "fire", "blast"], "at": 1.5}
+	],
+	"imps": [[70, 0]],
+	"seconds": 2.5,
+	"needs": "on_recast",
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

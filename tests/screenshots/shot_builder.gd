@@ -26,7 +26,7 @@ func take() -> void:
 	_input.call("add_virtual_device", 0)
 	# These shots are the list builder's (the radial one is the default).
 	_hud.call("_on_builder_options_changed", false, 0, true)
-	# Play's bag is only dash and bolt (owner, 2026-11-05); these shots build with split, nova,
+	# Play's bag is only dash and bolt (owner, 2026-11-05); these shots build with split, atom,
 	# homing and orbit, from a fire bolt on X, so this run's bag is every card.
 	flow.set("start_cards", SHOT_CARDS.duplicate(true))
 	flow.set("play_bag", _every_card())
@@ -35,7 +35,7 @@ func take() -> void:
 	await _open_builders([0])
 	var builder: Node = _hud.call("get_builder", 0)
 	await shot("builder_opened")
-	# Two cards after the fire bolt: a split and a nova; the plan shows both casts.
+	# Two cards after the fire bolt: a split and an atom; the plan shows both casts.
 	await _press(0, builder.call("slot_button", 2))
 	await _press(0, _row(builder, "Split"))
 	await _press(0, _row(builder, "Nova"))
@@ -43,10 +43,10 @@ func take() -> void:
 		fail("the builder of player 1 is not open")
 		return
 	await shot("builder_one_player")
-	# Pick the nova up to move it: it is marked held and the hint says "Place".
+	# Pick the atom up to move it: it is marked held and the hint says "Place".
 	await _press(0, builder.call("slot_button", 3))
 	if (builder.call("held") as Array)[0] != 1:
-		fail("the nova is not held in builder_holding")
+		fail("the atom is not held in builder_holding")
 		return
 	await shot("builder_holding")
 	tap(0, &"back")

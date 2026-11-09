@@ -8,6 +8,9 @@ extends ActorController
 ## seat stays on the one actor its leader drives. Made by the possession, and freed when the
 ## possession ends or the leader moves into its body.
 
+## State as who it points at: the controller it copies, never entered (core/sim/README.md).
+const REFS: Array[StringName] = [&"leader_controller"]
+
 ## The controller it copies.
 var leader_controller: ActorController = null
 

@@ -3,7 +3,7 @@
 	"name": "Beam hit nova",
 	"does": "Every imp the beam strikes sets off a frost nova, so an imp standing beside the line is chilled too.",
 	"needs": "on_hit",
-	"casts": [{"staff": 0, "cards": ["on_hit", "beam", "frost", "nova"]}],
+	"casts": [{"staff": 0, "cards": ["on_hit", "beam", "frost", "nova", "bolt"]}],
 	"imps": [[100, 0], [100, 24]],
 	"seconds": 1.5,
 	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [1], "status": "chill"}]

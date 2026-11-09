@@ -4,7 +4,7 @@
 	"does": "Two players: one sets an imp burning, the other's pulsing storm bolt sets off Flare on it.",
 	"casts": [
 		{"staff": 0, "cards": ["fire", "bolt"], "player": 0},
-		{"staff": 0, "cards": ["storm", "timer", "bolt", "storm", "nova"], "at": 0.4, "player": 1}
+		{"staff": 0, "cards": ["storm", "timer", "bolt", "storm", "nova", "bolt"], "at": 0.4, "player": 1}
 	],
 	"imps": [[100, 0]],
 	"seconds": 3.0,

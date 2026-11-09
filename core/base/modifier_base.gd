@@ -81,6 +81,12 @@ enum Behaviour {
 	## copy, as on any carrier). Each copy is cast by its point (`SpellRuntime._penta`). Not on a
 	## carrier that moves its caster or strikes from the hand.
 	PENTA,
+	## The carrier is cast `behaviour_strength` times (8 the card; more cards add, with no cap) instead of once, from the same place by the same caster, each copy
+	## aimed out along the aim turned by its share of a full turn (owner, 2026-11-09: "a Nova
+	## modifier card, which would allow us to make novas of other carriers"; it replaced the nova
+	## form). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
+	## carrier, as Mirror does: eight moves round a circle add up to none, and each still strikes.
+	NOVA,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -94,7 +100,7 @@ enum Stack { ADD, MULTIPLY, CHANCE }
 ##   carrier's yes/no answers (`CarrierTraits`): "any": at least one of these flags; "not": none of
 ##   these; "or_cards": a card with one of these behaviours on the carrier does instead (what a
 ##   blast strikes is the carrier's hit, rules R4 F2). None: it works on every carrier (numbers,
-##   blast, echo, mirror: a move and its mirror add up to none, rules R4 F1).
+##   blast, echo, mirror, nova: a move and its mirror add up to none, rules R4 F1).
 ## - "stacks": a `Stack` (ADD when missing).
 ## A card names its behaviour by its name (`behaviour_id`), so a behaviour added or taken out never
 ## renumbers a card. `tests/core/test_behaviour_table.gd` checks every row.
@@ -129,6 +135,8 @@ const RULES: Dictionary = {
 	# A dash or teleport moves its caster, a swing or slam strikes from the hand: nothing of them
 	# leaves from a point of a ring. More cards add copies.
 	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
+	# Mirror's rule with N ways (owner, 2026-11-09: a dash's moves cancel, each still strikes).
+	Behaviour.NOVA: {},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

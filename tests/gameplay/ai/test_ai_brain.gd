@@ -36,10 +36,10 @@ func _profile() -> AIProfile:
 
 func test_it_casts_the_staff_that_reaches() -> void:
 	fx.players[0].position = Vector2(200.0, 0.0)
-	var imp: Actor = _enemy([["nova"], ["fire", "bolt"]])
+	var imp: Actor = _enemy([["nova", "swing"], ["fire", "bolt"]])
 	fx.run(imp, 40)
 	check(casts[1] > 0, "far off it casts the bolt: %s" % casts)
-	check_equal(casts[0], 0, "never the nova, which cannot reach")
+	check_equal(casts[0], 0, "never the nova of swings, which cannot reach")
 	fx.players[0].position = imp.position + Vector2(24.0, 0.0)
 	casts = PackedInt32Array([0, 0, 0, 0])
 	fx.run(imp, 40)

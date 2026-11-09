@@ -1,14 +1,14 @@
 extends "res://tests/support/screenshot.gd"
 ## What Feel draws when five of the forms are cast and when their shots end (`form_looks`). One
-## column per form (bolt, beam, nova, rune, orbit). Row 1: the cast flash on the wizard's staff
-## (the body of a beam and a nova is drawn with it). Row 2: where a player's shot ends. Row 3:
+## column per form (bolt, beam, dash, rune, orbit). Row 1: the cast flash on the wizard's staff
+## (the body of a beam is drawn with it). Row 2: where a player's shot ends. Row 3:
 ## where an enemy's shot ends, which is the same ember mark in every column. Each column is its
 ## own take (a flash lasts a tenth of a second), put together into one sheet.
 
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const COLUMN := 128
-const FORMS: Array[StringName] = [&"bolt", &"beam", &"nova", &"rune", &"orbit"]
+const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune", &"orbit"]
 const ROWS_Y: Array[float] = [70.0, 170.0, 270.0]
 
 
@@ -38,8 +38,6 @@ func take() -> void:
 		events.call("emit_signal", "spell_cast", 0, form, Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT)
 		if form == &"beam":
 			events.call("emit_signal", "form_shown", wizard, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
-		elif form == &"nova":
-			events.call("emit_signal", "form_shown", wizard, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"), 0)
 		# The manager names the form of the shot while it sends the impact.
 		projectiles.set("impact_form", form)
 		events.call("emit_signal", "projectile_impact", wizard, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)

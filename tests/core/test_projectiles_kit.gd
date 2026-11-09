@@ -324,7 +324,7 @@ func _test_speed_curve_eases_over_life() -> void:
 	var flyer: int = _fire(Vector2(10.0, 0.0))
 	_check(not (_mgr.set_speed_curve(still, 2.0, 0.0, 1.0) or _mgr.set_speed_curve(orbit, 2.0, 0.0, 1.0)), "a still or orbiting shot takes no curve")
 	_check(not (_mgr.set_speed_curve(flyer, 0.0, 1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, -1.0, 1.0) or _mgr.set_speed_curve(flyer, 1.0, 1.0, 0.0) or _mgr.set_speed_curve(flyer, INF, 0.0, 1.0) or _mgr.set_speed_curve(-1, 2.0, 0.0, 1.0)), "nor bad numbers or no shot")
-	_check(_mgr.set_speed_curve(flyer, 100.0, 0.0, 1.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(10.0 * ManagerScript.SPEED_START_MOST, 0.0)), "a huge start counts as SPEED_START_MOST")
+	_check(_mgr.set_speed_curve(flyer, 100.0, 0.0, 1.0) and _mgr.get_velocity_of(flyer).is_equal_approx(Vector2(1000.0, 0.0)), "a huge start counts as given: no cap (owner, 2026-11-09)")
 	# A reused slot starts clean.
 	_mgr.clear()
 	var again: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 1.0)

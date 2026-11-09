@@ -76,7 +76,7 @@ func test_an_actor_holds_every_staff_of_its_data() -> void:
 	data.staffs = [
 		StaffCards.make(_staff(2), [&"fire", &"bolt"] as Array[StringName]),
 		StaffCards.make(_staff(1), [&"dash"] as Array[StringName]),
-		StaffCards.make(_staff(1), [&"nova"] as Array[StringName]),
+		StaffCards.make(_staff(2), [&"nova", &"bolt"] as Array[StringName]),
 	] as Array[StaffCards]
 	var body: Actor = fx.enemy(ImpData.scene, data, Vector2(100.0, 0.0))
 	check(body.caster != null, "it has a caster")

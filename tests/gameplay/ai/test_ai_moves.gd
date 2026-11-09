@@ -69,14 +69,14 @@ func before_each() -> void:
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var nova := FormBase.new()
-	nova.base_damage = 3
-	nova.speed = 150.0
-	nova.lifetime = 0.5
-	nova.shots = 8
-	nova.spread = 360.0
-	nova.mana_cost = 2.0
-	_put(nova, &"nova")
+	var halo := FormBase.new()
+	halo.base_damage = 3
+	halo.speed = 150.0
+	halo.lifetime = 0.5
+	halo.shots = 8
+	halo.spread = 360.0
+	halo.mana_cost = 2.0
+	_put(halo, &"halo")
 	var dash := FormBase.new()
 	dash.carrier = &"dash"
 	dash.ray_length = 60.0

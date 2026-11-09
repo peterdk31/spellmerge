@@ -351,6 +351,11 @@ func infusions_of(look: int) -> int:
 	return present if present & (present - 1) != 0 else 0
 
 
+## The look bits of the infusions on a spell of the look `look` (one or more; 0 for none).
+func infusion_layers(look: int) -> int:
+	return look & _infusion_mask
+
+
 ## The colour of the infusion of the lowest of the look bits `bits` (one infusion's at least).
 func _infusion_colour(bits: int) -> Color:
 	var layer: int = 1

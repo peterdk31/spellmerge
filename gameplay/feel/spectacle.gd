@@ -32,6 +32,7 @@ const StreamsScript := preload("res://gameplay/feel/streams.gd")
 const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BarriersScript := preload("res://gameplay/feel/barriers.gd")
+const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -91,6 +92,9 @@ var births: BirthsScript = BirthsScript.new()
 ## `streams.gd`), given off into `births` each step. Feel ends one when its carrier ends
 ## (`end_streams`).
 var streams: StreamsScript = StreamsScript.new()
+## The motes still carriers' shots give off while they stand (`still_motes.gd`: a wall's stream, a
+## pool's rising motes), from the rows the projectile manager draws them by.
+var still_motes: StillMotesScript = StillMotesScript.new()
 
 ## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
@@ -168,9 +172,26 @@ func _ready() -> void:
 ## The projectile manager and the spell runtime are known (Feel finds them after its children are
 ## made): spell light can be made now.
 func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
+	if projectiles != null and projectiles != manager and projectiles.rows_drawn.is_connected(_on_rows_drawn):
+		projectiles.rows_drawn.disconnect(_on_rows_drawn)
+		projectiles.batches_grown.disconnect(_on_batches_grown)
 	projectiles = manager
 	spells = runtime
 	_make_light(spell_light)
+	still_motes.attach(manager, runtime)
+	if manager != null and not manager.rows_drawn.is_connected(_on_rows_drawn):
+		manager.rows_drawn.connect(_on_rows_drawn)
+		manager.batches_grown.connect(_on_batches_grown)
+
+
+## A watched batch's rows were drawn: its still shots give off their motes (`still_motes.gd`).
+func _on_rows_drawn(batch: int, rows: PackedFloat32Array, count: int) -> void:
+	still_motes.give_off(batch, rows, count, projectiles.sim_time, pool if motes_on() else null)
+
+
+## The manager numbered a card body: watch the still cards' batches again (a body keeps its number).
+func _on_batches_grown(_count: int) -> void:
+	still_motes.attach(projectiles, spells)
 
 
 ## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams' and Feel's own

@@ -403,9 +403,15 @@ const BEND_ZERO: float = 0.225
 const BEND_SPAN: float = 0.2
 const BEND_RADIUS: float = 16.0
 const BEND_CORNER: float = 0.5
-## A rune traces itself onto the floor over its first RUNE_TRACE seconds; while it does, the code
-## beside its kind is TRACE_FROM + TRACE_SPAN x how much is drawn (0 once it is whole).
-const RUNE_TRACE: float = 0.25
+## A still shot's clock, the code beside its kind (`still_code`), so its card's shader can draw its
+## coming and its going (the owner's carrier looks, 2026-11-09: a rune's crystal drops in and fills
+## while it arms, a pool spills in and dries out): over its first STILL_START seconds the code is
+## TRACE_FROM + TRACE_SPAN x how far through them it is, over its last STILL_END seconds of life the
+## same negated (how far through its end), and 0 between. STILL_START covers a rune's arming
+## (`SpellLimits.RUNE_ARM`, 1 s) and a little more; the shaders hold the same numbers
+## (`still_since`, `still_left` in shot_palette.gdshaderinc).
+const STILL_START: float = 1.25
+const STILL_END: float = 1.0
 const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
@@ -614,6 +620,11 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## There are more draw batches now (`register_body` numbered a card body): `count` in all. Whoever
 ## mirrors the batches (Feel's spell light) adds theirs for the new ones.
 signal batches_grown(count: int)
+## The rows of a watched batch (`watch_rows`) were drawn this frame: its first `count` rows in
+## `rows` (DRAW_STRIDE floats each, as the batch uploads them), read now and not kept (the buffer
+## is the batch's own). Feel gives off a still card's motes from where its shots are drawn
+## (`gameplay/feel/still_motes.gd`): view only, nothing the simulation reads.
+signal rows_drawn(batch: int, rows: PackedFloat32Array, count: int)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the native switch,
 ## which gives the same game either way (native/README.md), and the hit test's scratch, which only
@@ -626,7 +637,7 @@ const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_pa
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
+const VIEW: Array[StringName] = [&"texture", &"_look_light_intensity", &"_look_light_reach", &"_body_shaders", &"_body_meshes", &"_batch_total", &"_nodes", &"_buffers", &"_mirrors", &"_watched", &"_draw_node", &"_still_node", &"_orbit_node", &"_enemy_node", &"_enemy_still_node", &"_rooms", &"_batch_counts", &"_draw_out", &"drawn", &"particle_demand", &"particle_share", &"drawn_enemy", &"_drawn_seq", &"_drawn_radius", &"_drawn_look", &"_drawn_batch", &"_drawn_color", &"_drawn_size", &"_drawn_particles", &"spark_births", &"spark_birth_count", &"tail_births_on", &"tail_thin_most", &"tail_spacing", &"tail_births", &"tail_demand", &"_tail_from", &"_tail_carry", &"_tail_n", &"_tail_wanted", &"_tail_thin", &"_end_births", &"_end_count", &"_end_wanted", &"_spark_moment", &"_spark_rng", &"_by_group", &"_group_start", &"_group_end", &"_group_tail", &"_group_ask", &"_group_spacing", &"_group_share", &"_group_want", &"_group_frame", &"_group_seen", &"_group_sort", &"_draw_frame", &"tailless_particle_cap", &"tail_births_cap", &"spark_motes"]
 ## The run's rules a new run keeps (`begin_run`): the cap and the hit-test work a step may do, set
 ## from the session's rules just before (`take_rules`, online-ready N11). The tailless motes' pool,
 ## its tail births and whether something takes the births are this machine's look (VIEW): they
@@ -938,6 +949,8 @@ var _buffers: Array[PackedFloat32Array] = []
 ## mesh of its own (`mirror_batch`: Feel's spell light). Each frame it is handed the very buffer
 ## the batch uploads, so no row is written twice.
 var _mirrors: Array[MultiMesh] = []
+## The batches whose rows are handed out each frame (`watch_rows`, `rows_drawn`): 1 a watched one.
+var _watched: PackedByteArray = PackedByteArray()
 ## The first batches' nodes by name: the hat ramps' bolts, runes and orbits, the enemy ramp's
 ## flying shots and runes (drawn one layer above the others).
 var _draw_node: MultiMeshInstance2D = null
@@ -1410,6 +1423,20 @@ func mirror_batch(batch: int, multimesh: MultiMesh) -> void:
 		var source: MultiMesh = _nodes[batch].multimesh
 		multimesh.instance_count = source.instance_count
 		multimesh.visible_instance_count = 0
+
+
+## Hand batch `batch`'s rows out each frame they are drawn (`rows_drawn`), or stop with `on` false.
+func watch_rows(batch: int, on: bool) -> void:
+	if batch < 0:
+		return
+	if _watched.size() <= batch:
+		_watched.resize(maxi(batch + 1, _batch_total))
+	_watched[batch] = 1 if on else 0
+
+
+## True while batch `batch`'s rows are handed out (`watch_rows`).
+func rows_watched(batch: int) -> bool:
+	return batch >= 0 and batch < _watched.size() and _watched[batch] == 1
 
 
 ## The MultiMesh mirroring batch `batch` (`mirror_batch`), or null.
@@ -4861,6 +4888,8 @@ func update_draw(fraction: float = -1.0) -> void:
 			multimesh.buffer = rows
 			if mirror != null:
 				mirror.buffer = rows
+			if batch < _watched.size() and _watched[batch] == 1:
+				rows_drawn.emit(batch, rows, out)
 		multimesh.visible_instance_count = out
 		if mirror != null:
 			mirror.visible_instance_count = out
@@ -5240,16 +5269,19 @@ func _share_groups() -> void:
 
 
 ## Write the rune quad of the still shot in `slot` drawn at `at` into `buffer` from instance
-## `out` on, one for each stone of a solid shot's row; returns the instance after the last.
+## `out` on, one for each stone of a solid shot's row; returns the instance after the last. A solid
+## shot's quads turn along its row (`Solid.across`), so its card's shader knows which way the row
+## runs (the wall's seam; its shader draws upright whichever way its quad turns).
 func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2, size: float, at: Vector2, look_data: Color) -> int:
 	var stones: int = 1
 	var step: Vector2 = Vector2.ZERO
 	if _any_solid and _solids.has(slot):
 		var solid: Solid = _solids[slot]
+		dir = solid.across
 		stones = solid.stones
 		step = solid.across * solid.gap * _radius[slot]
 		at -= _solid_half(slot, solid)
-	var code: float = trace_code(sim_time - _born[slot])
+	var code: float = still_code(sim_time - _born[slot], _life[slot])
 	var kind: int = _kind_of(slot)
 	var light_reach: float = _look_light_reach[slot]
 	var light_intensity: float = _look_light_intensity[slot]
@@ -5405,11 +5437,18 @@ static func bend_code(bend: float) -> float:
 	return BEND_ZERO + BEND_SPAN * clampf(bend * BEND_RADIUS, -1.0, 1.0)
 
 
-## The code of a rune `age` seconds old (see RUNE_TRACE): how much of it is traced, 0 when whole.
-static func trace_code(age: float) -> float:
-	if age >= RUNE_TRACE or age < 0.0:
+## The code of a still shot `age` seconds old with `left` seconds of life (see STILL_START): how far
+## through its start it is, or (negative) how far through its end, 0 between. Its end is told once
+## it has less life left than it has lived, so a short life is half coming and half going. A time
+## out of order (a negative age) is 0.
+static func still_code(age: float, left: float) -> float:
+	if age < 0.0:
 		return 0.0
-	return TRACE_FROM + TRACE_SPAN * age / RUNE_TRACE
+	if left < STILL_END and left < age:
+		return -(TRACE_FROM + TRACE_SPAN * (1.0 - maxf(left, 0.0) / STILL_END))
+	if age < STILL_START:
+		return TRACE_FROM + TRACE_SPAN * age / STILL_START
+	return 0.0
 
 
 ## The instance colour of a shot, which the shot shaders read as data, a byte per
@@ -5450,11 +5489,11 @@ static func ramp_look(ramp: int, look: int) -> int:
 ## colour of the core (custom data). A square quad (`length` 0) is centred on `at`; a long one
 ## reaches `diameter` / 2 ahead of `at` and the rest behind it (a bolt and its tail).
 ## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) and `code`
-## (0 to below 0.5: a bend, `bend_code`, or a rune's trace, `trace_code`) go in the alpha of the
+## (above -0.5 and below 0.5: a bend, `bend_code`, or a still shot's clock, `still_code`) go in the alpha of the
 ## custom data as 1 - (kind + code) / 16, which the shot shaders read back.
 func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int, length: float = 0.0, code: float = 0.0) -> void:
 	assert(kind >= 0 and kind <= KIND_MAX, "the kind must fit the alpha encoding")
-	assert(code >= 0.0 and code < 0.5, "the code must round away from the kind")
+	assert(code > -0.5 and code < 0.5, "the code must round away from the kind")
 	var along: float = diameter
 	var centre: Vector2 = at
 	if length > 0.0:

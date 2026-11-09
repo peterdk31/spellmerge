@@ -77,3 +77,15 @@ func test_a_rune_cast_on_a_hit_goes_off_on_that_body_once_armed() -> void:
 	arena.run(SpellLimits.RUNE_ARM + 0.3)
 	check(arena.lost(imp) > by_bolt, "and the rune it left goes off on the same imp")
 	arena.free_all()
+
+
+## Its look (the owner's pick, 2026-11-09: the hovering seal): its shader knows when it is armed from
+## its still clock (`ProjectileManager.still_code`), which covers its arming, and arms when the rune
+## does.
+func test_its_look_arms_when_it_does() -> void:
+	var card: FormBase = _form(&"rune")
+	check(card.look_shader == preload("res://content/spells/forms/rune/rune.gdshader"), "drawn by its folder's shader")
+	var code: String = card.look_shader.code
+	check(code.contains("const float ARM = %s;" % String.num(SpellLimits.RUNE_ARM, 1)), "the shader arms at SpellLimits.RUNE_ARM")
+	check(code.contains("still_since("), "it reads its time since it was placed")
+	check(ManagerScript.STILL_START > SpellLimits.RUNE_ARM, "the still clock runs past its arming")

@@ -107,7 +107,8 @@ constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
 constexpr double KIND_STEPS = 16.0;
-constexpr double RUNE_TRACE = 0.25;
+constexpr double STILL_START = 1.25;
+constexpr double STILL_END = 1.0;
 constexpr double TRACE_FROM = 0.02;
 constexpr double TRACE_SPAN = 0.42;
 constexpr int BATCH_BOLT = 0;
@@ -953,7 +954,8 @@ const Constant CONSTANTS[] = {
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
 	{ "KIND_STEPS", (double)KIND_STEPS },
-	{ "RUNE_TRACE", (double)RUNE_TRACE },
+	{ "STILL_START", (double)STILL_START },
+	{ "STILL_END", (double)STILL_END },
 	{ "TRACE_FROM", (double)TRACE_FROM },
 	{ "TRACE_SPAN", (double)TRACE_SPAN },
 	{ "BATCH_BOLT", (double)BATCH_BOLT },
@@ -1168,12 +1170,18 @@ inline Color look_color(int64_t ramp, int64_t zoom, int64_t look) {
 	return Color((float)((double)red / 255.0), (float)((double)(bits & 255) / 255.0),
 			(float)((double)((bits >> 8) & 255) / 255.0), (float)((double)((bits >> 16) & 255) / 255.0));
 }
-// `trace_code`.
-inline double trace_code(double age) {
-	if (age >= RUNE_TRACE || age < 0.0) {
+// `still_code`.
+inline double still_code(double age, double left) {
+	if (age < 0.0) {
 		return 0.0;
 	}
-	return TRACE_FROM + TRACE_SPAN * age / RUNE_TRACE;
+	if (left < STILL_END && left < age) {
+		return -(TRACE_FROM + TRACE_SPAN * (1.0 - MAX(left, 0.0) / STILL_END));
+	}
+	if (age < STILL_START) {
+		return TRACE_FROM + TRACE_SPAN * age / STILL_START;
+	}
+	return 0.0;
 }
 
 // `_write_quad` for a square quad (length 0): every rune.
@@ -1579,9 +1587,10 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const Names &k = *names;
 	Arr<PackedByteArray> alive, motion, drawn_batch, body;
 	Arr<PackedVector2Array> prev, pos, vel, orbit_centre;
-	Arr<PackedFloat32Array> drawn_size, born, light_intensity, light_reach;
+	Arr<PackedFloat32Array> drawn_size, born, life, light_intensity, light_reach;
 	Arr<PackedInt32Array> drawn_particles, draw_out, rooms;
 	Arr<PackedColorArray> drawn_color, core;
+	life.load(m, k.life);
 	light_intensity.load(m, k.look_light_intensity);
 	light_reach.load(m, k.look_light_reach);
 	alive.load(m, k.alive);
@@ -1602,7 +1611,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 	const int64_t high = m->get(k.high);
 	const double sim_time = m->get(k.sim_time);
 	const int64_t batches = m->get(k.batch_total);
-	ERR_FAIL_COND(high > alive.n || high > body.n || high > light_intensity.n || high > light_reach.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
+	ERR_FAIL_COND(high > alive.n || high > body.n || high > life.n || high > light_intensity.n || high > light_reach.n || batches < BATCH_BODY_FIRST || draw_out.n < DRAW_OUT_FIRST + batches || rooms.n < batches);
 	// The groups (the manager's GROUPS, `_plan_groups`): each drawn slot is placed with its group's
 	// in `_by_group`, and its particles and tail asked for are added to its group's.
 	Arr<PackedInt32Array> group, group_end, by_group;
@@ -1816,7 +1825,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				if (vel[slot].length_squared() > 0.0f) {
 					dir = vel[slot].normalized();
 				}
-				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, trace_code(sim_time - (double)born[slot]));
+				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, still_code(sim_time - (double)born[slot], (double)life[slot]));
 			} else {
 				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
 			}

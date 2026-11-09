@@ -74,8 +74,7 @@ func test_a_kind_reads_its_numbers_from_the_enemy_and_its_scene() -> void:
 		var hurtbox := body.get_node(^"Hurtbox") as Hurtbox
 		check_equal(kind.hurt_radius, hurtbox.radius, "%s: the hurt circle's radius from the scene" % data.id)
 		check_equal(kind.hurt_offset, hurtbox.offset, "%s: the hurt circle's offset from the scene" % data.id)
-		var circle := (body.get_node(^"CollisionShape2D") as CollisionShape2D).shape as CircleShape2D
-		check_equal(kind.body_radius, circle.radius, "%s: the body's radius from the scene" % data.id)
+		check_equal(kind.body_radius, (body.get_node(^"Mover") as Mover).body_radius, "%s: the body's radius from the scene (its Mover's)" % data.id)
 		check_equal(kind.body_offset, body.body_offset, "%s: the body offset from the scene" % data.id)
 		var sprite := body.get_node(^"Sprite") as Sprite2D
 		check(kind.texture == sprite.texture and kind.sprite_offset == sprite.position, "%s: the body sprite from the scene" % data.id)

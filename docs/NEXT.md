@@ -104,7 +104,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] ~~**Shot scale: draw cost by count (H4).**~~ Dropped 2026-11-05: the tails became motes (#562), and H0 measures `update_draw` at 4.7 ms at 100,000 (shot-scale.md).
 - [x] **Online-ready: stops in ticks (N4).** (`gameplay/feel/`, `core/sim/`, `gameplay/horde/`, `hud/menus/pause/`) N4: hit-stop, the downed stop, the level-up break and the pause menu stop the tick. After N3. Done (#624).
 - [x] **Online-ready: deterministic maths, the GDScript side (N7b).** (`core/native/`, `core/sim/dmath.gd`, simulation trig calls) N7: the `DMath` class, its GDScript twin and every simulation trig call. After N7a. Done (#621).
-- [ ] **Online-ready: our own body movement in C++ (N6).** (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
+- [x] **Online-ready: our own body movement in C++ (N6).** Built 2026-11-09, awaiting the owner's playtest (milestones/online-ready.md, N6). (`native/`, `gameplay/actor/`, `native/README.md`) N6, with its GDScript twin. After N3 and N7a; the owner edits `native/SConstruct`.
 - [x] **Online-ready: session settings (N11).** (`core/settings/`, `core/sim/`, `gameplay/flow/`) N11. After N3. Done (#623).
 - [ ] **Shot scale: cheaper hits (H3).** (`gameplay/combat/`, `gameplay/feel/`, `core/spells/`) H3, one PR per listener, biggest first by H0. After N3.
 - [x] ~~**Shot scale: bundled hit events (H3b).**~~ Dropped 2026-11-07 by the owner after its first two parts were measured on a branch: about 10-15% of a hit's cost for a second hit path every feature would have to know (DECISIONS 2026-11-07). Speed work on hits goes into each listener (H3) and the caps (H7).

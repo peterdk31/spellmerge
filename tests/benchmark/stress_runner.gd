@@ -295,11 +295,12 @@ func _ready() -> void:
 	scenarios = scenarios_for(scenarios_from_args(OS.get_cmdline_user_args() + OS.get_cmdline_args(), scenarios), OS.has_feature("web"))
 	var args: PackedStringArray = OS.get_cmdline_user_args() + OS.get_cmdline_args()
 	profile = profile or args.has("--profile")
-	# `--no-native` runs the projectile manager's and the swarm's GDScript in place of the native
+	# `--no-native` runs the projectile manager's, the swarm's and WallSlide's GDScript in place of the
 	# module (native/README.md).
 	if args.has("--no-native"):
 		_native = false
 		_projectiles.set(&"native", false)
+		WallSlide.use_native(false)
 	print("BENCH: native module %s" % ("on" if _projectiles.call(&"is_native") else "off"))
 	for arg in args:
 		if arg.begins_with("--swarm="):

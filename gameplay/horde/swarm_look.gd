@@ -43,7 +43,7 @@ extends Node2D
 ##
 ## **What the swarm must call:**
 ## - `step(delta)` in its physics step, after it set the rows' velocities and aims and BEFORE it
-##   moves their positions (a full actor's looks step after its Mover and before `move_and_slide`).
+##   moves their positions (a full actor's looks step after its Mover and before its move).
 ## - `on_hit(row)` for every `damage_dealt` naming a swarmer's node (as Combat's hit sends a full
 ##   actor its `damaged`, which CreatureLook, Face and Feel react to).
 ## - `on_row_died(row)` when the swarmer in `row` died, before its row is removed (Feel's death

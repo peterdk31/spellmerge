@@ -132,7 +132,7 @@ func release(seat: int, action: StringName) -> void:
 
 
 ## `count` steps: the runtime ticks first (the stand-in's delays), then every wizard steps and
-## its body moves by its velocity when `move` (as `move_and_slide` would, without walls), then the
+## its body moves by its velocity when `move` (as `Actor.move` would, without walls), then the
 ## systems.
 func run(count: int, move: bool = true) -> void:
 	for i in count:

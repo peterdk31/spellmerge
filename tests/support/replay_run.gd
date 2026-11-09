@@ -251,8 +251,11 @@ func _check_settings(start: StringName) -> void:
 		problems.append("%s: the shot cap is %d, not the run's %d" % [start, now, game.rules.shot_cap])
 
 
-## The projectile manager and the swarm on their GDScript (`native` false).
+## Every native kernel off: the projectile manager and the swarm on their GDScript (`native`
+## false), the maths and the bodies' moves on their twins (`DMath`, `WallSlide`).
 func _kernels_off() -> void:
+	DMath.use_native(false)
+	WallSlide.use_native(false)
 	_root.get_node("Projectiles").set(&"native", false)
 	var swarm: Object = _root.get_node("Horde").get(&"swarm")
 	if swarm != null:

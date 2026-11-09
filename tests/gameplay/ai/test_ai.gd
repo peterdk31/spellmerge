@@ -4,7 +4,7 @@ extends SceneTree
 ## (`fire · bolt`, staffs F9) through a real Spells with the real cards. Since actors G6 the imp is
 ## an actor (gameplay/actor) driven by its AIController; targets come from the projectile
 ## manager's target grid (another team's hurt circles). Time moves by fixed binary-fraction
-## deltas; the test moves the body by its velocity like move_and_slide() would.
+## deltas; the test moves the body by its velocity (`Actor.move`, without walls).
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai.gd
 

@@ -529,7 +529,7 @@ def check_issue_form(path: str, text: str) -> list[Finding]:
 # in GDScript would not parse where the module is not built, so this file instantiates it by name,
 # with a literal name of one of the module's own classes.
 NATIVE_FILE = "core/native/native.gd"
-NATIVE_CLASSES = frozenset({"ShotKernel", "SwarmKernel", "SwarmLookKernel", "MoteKernel", "DMathKernel"})
+NATIVE_CLASSES = frozenset({"ShotKernel", "SwarmKernel", "SwarmLookKernel", "MoteKernel", "DMathKernel", "BodyKernel"})
 _NATIVE_INSTANTIATE = re.compile(r"\bClassDB\s*\.\s*instantiate\s*\(\s*&?[\"'](\w+)[\"']\s*\)")
 
 

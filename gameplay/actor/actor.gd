@@ -1,5 +1,5 @@
 class_name Actor
-extends CharacterBody2D
+extends Node2D
 ## An actor (actors G4, docs/milestones/M2-actors.md, "The actor"): anything that acts, a wizard
 ## or an enemy, as one kind of body built from components. This is the root script of an actor
 ## scene. A wizard and an enemy differ only in which components they have and which controller
@@ -39,8 +39,14 @@ extends CharacterBody2D
 ## anchor and aim to the systems, the casts asked for), the Mover steps (sets `velocity`), the
 ## Hurtbox follows down and up, the looks step (read only), and a home controller that is away
 ## (it drives another actor, or another controller drives this one) watches its body
-## (`ActorController.watch_home`, read only). `_physics_process` then calls
-## `move_and_slide()`. Tests call `step(delta)` with fixed deltas and move the body themselves.
+## (`ActorController.watch_home`, read only). The tick then moves the body by its `velocity`
+## (`move`). Tests call `step(delta)` with fixed deltas and move the body themselves.
+##
+## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
+## along the walls (the room's and the solid shots', the projectile manager's wall grid,
+## `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
+## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
 ## health, walking speed, contact damage, staff, cards and mana. Data with no staff or no cards
@@ -63,10 +69,6 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
-
-## Physics: an actor is on no body layer and collides only with walls (layer 1), so actors walk
-## through each other; spells find it by its hurt circle (the projectile manager), not by physics.
-const LAYER_WALLS: int = 1
 
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).
 signal died(killer: int)
@@ -114,6 +116,9 @@ var sim: Sim = null
 var id: int = ActorsScript.NONE
 ## Where it aims (unit length).
 var aim: Vector2 = Vector2.DOWN
+## The body's velocity in pixels per second: set by the Mover in `step`, moved by in `move` (which
+## leaves what it moved by: along a wall, its slide).
+var velocity: Vector2 = Vector2.ZERO
 ## What its controller wants this step; made once, never replaced.
 var intent: ActorIntent = ActorIntent.new()
 ## The controller in its scene (or null), and the one driving it now (or null).
@@ -159,12 +164,6 @@ var _down: bool = false
 var _dying: bool = false
 ## True from the moment it starts leaving the tree until it is back.
 var _leaving: bool = false
-
-
-func _init() -> void:
-	collision_layer = 0
-	collision_mask = LAYER_WALLS
-	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 
 
 func _enter_tree() -> void:
@@ -214,7 +213,26 @@ func _exit_tree() -> void:
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move.
 func tick_step(delta: float) -> void:
 	step(delta)
-	move_and_slide()
+	move(delta)
+
+
+## Move the body by `velocity` for `delta` seconds, sliding along the walls (see the class doc); when
+## a wall changed the move, `velocity` is left as what it moved by. A body standing still is moved
+## too: a wall laid over it (a Wall card's) pushes it out.
+func move(delta: float) -> void:
+	if delta <= 0.0:
+		return
+	var from: Vector2 = global_position
+	var unhindered: Vector2 = from + velocity * delta
+	var to: Vector2 = projectiles.slide_body(from, velocity * delta, wall_radius()) if projectiles != null else unhindered
+	global_position = to
+	if to != unhindered:
+		velocity = (to - from) / delta
+
+
+## The radius of the body against the walls: its Mover's `body_radius` (0 without a Mover).
+func wall_radius() -> float:
+	return mover.body_radius if mover != null else 0.0
 
 
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
@@ -551,8 +569,8 @@ func _apply_data() -> void:
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
-## points and circles kept in pixels (hurt circle, body and hand) with it. A hurt circle already
-## registered is registered again at its new size.
+## points and circles kept in pixels (hurt circle, body, hand and the Mover's `body_radius`) with
+## it. A hurt circle already registered is registered again at its new size.
 func set_size(factor: float) -> void:
 	if factor <= 0.0 or is_equal_approx(factor, size):
 		return
@@ -561,6 +579,8 @@ func set_size(factor: float) -> void:
 	scale = Vector2(factor, factor)
 	body_offset *= by
 	hand_offset *= by
+	if mover != null:
+		mover.body_radius *= by
 	if hurtbox != null:
 		hurtbox.radius *= by
 		hurtbox.offset *= by

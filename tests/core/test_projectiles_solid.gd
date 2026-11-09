@@ -30,32 +30,16 @@ func _wall(at: Vector2, seconds: float = 1.0) -> int:
 	return slot
 
 
-## A body of radius 6 on the walls' mask at `at`, as an actor's.
-func _body(at: Vector2) -> CharacterBody2D:
-	var body := CharacterBody2D.new()
-	body.collision_layer = 0
-	body.collision_mask = ManagerScript.WALL_LAYER
-	var shape := CollisionShape2D.new()
-	var circle := CircleShape2D.new()
-	circle.radius = 6.0
-	shape.shape = circle
-	body.add_child(shape)
-	root.add_child(body)
-	own(body)
-	body.global_position = at
-	return body
-
-
 func test_a_body_cannot_walk_through_it_while_it_stands() -> void:
 	_wall(Vector2(200.0, 100.0))
-	var body: CharacterBody2D = _body(Vector2(170.0, 100.0))
-	await physics_frame
-	check(body.test_move(body.global_transform, Vector2(60.0, 0.0)), "the wall stops the body")
-	check(not body.test_move(body.global_transform, Vector2(0.0, 60.0)), "beside it the way is open")
+	# A body of radius 6, as an actor's, walking 60 px at it (online-ready N6: `slide_body`).
+	var at: Vector2 = Vector2(170.0, 100.0)
+	var stopped: Vector2 = mgr.slide_body(at, Vector2(60.0, 0.0), 6.0)
+	check(stopped.x < 200.0 - 5.0 - 6.0 + 0.01 and stopped.x > 170.0, "the wall stops the body short of its stones: %s" % stopped)
+	check_equal(mgr.slide_body(at, Vector2(0.0, 60.0), 6.0), Vector2(170.0, 160.0), "beside it the way is open")
 	for i in 70:
 		mgr.step(DT)
-	await physics_frame
-	check(not body.test_move(body.global_transform, Vector2(60.0, 0.0)), "once it is gone the body walks on")
+	check_equal(mgr.slide_body(at, Vector2(60.0, 0.0), 6.0), Vector2(230.0, 100.0), "once it is gone the body walks on")
 
 
 func test_a_shot_ends_on_it() -> void:

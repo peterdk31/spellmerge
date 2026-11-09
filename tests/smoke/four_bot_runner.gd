@@ -103,8 +103,7 @@ func _ready() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
-	# Game time runs at real speed: the game never scales the engine's time (online-ready N4; the
-	# bodies' move_and_slide takes the engine's step until N6).
+	# Game time runs at real speed: the game never scales the engine's time (online-ready N4).
 	_events.emit_signal("play_requested", 0)
 	_started = true
 

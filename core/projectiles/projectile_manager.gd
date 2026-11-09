@@ -94,7 +94,7 @@ extends Node2D
 ## without asking the manager anything; it changes nothing here.
 ## A solid shot (`set_solid`, the Wall card, rules R4 F6) is a wall too while it lives: a
 ## segment across it that lies in the wall grid (shots end on it or bounce off it, a ghost passes)
-## and a static body on WALL_LAYER that bodies cannot walk through. It hits along that segment.
+## that bodies cannot walk through (`slide_body`). It hits along that segment.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -589,8 +589,6 @@ const TINT_STRENGTH: float = 0.45
 const WALL_CELL: float = 8.0
 ## A room wall's mark in the wall grid; the bits below it count the solid shots on a cell.
 const ROOM_CELL: int = 128
-## The physics layer of the room's walls (the actors' `LAYER_WALLS`): a solid shot's body is on it.
-const WALL_LAYER: int = 1
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -628,7 +626,7 @@ signal rows_drawn(batch: int, rows: PackedFloat32Array, count: int)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_spare_bodies", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -912,22 +910,17 @@ var _any_solid: bool = false
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
-## Static bodies of solid shots that ended, kept for the next one.
-var _spare_bodies: Array[StaticBody2D] = []
 
 
 ## A solid shot's wall (`set_solid`): `stones` stones `gap` radii apart across `across`, laid at
 ## `at` with `radius` (where it lay last: it is laid again when the shot moves or grows).
 class Solid:
-	## Not state: the static body, laid again by `_lay_solid` (core/sim/README.md).
-	const DERIVED: Array[StringName] = [&"body"]
 	var across: Vector2 = Vector2.RIGHT
 	var stones: int = 1
 	var gap: float = 0.0
 	var at: Vector2 = Vector2.INF
 	var radius: float = 0.0
 	var cells: PackedInt32Array = PackedInt32Array()
-	var body: StaticBody2D = null
 
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
@@ -1748,9 +1741,9 @@ func _add_wall(rect: Rect2) -> void:
 
 ## Make the still shot in `slot` a wall while it lives (the Wall card, rules R4 F6): a row of
 ## `stones` stones across `across`, `gap` pixels apart (and its radius thick, both growing with
-## it). It lies in the wall grid and as a static body on WALL_LAYER, it hits along its row, and
-## it follows the shot when homing moves it, stopping at a wall. False for an empty slot or a
-## shot that is not still.
+## it). It lies in the wall grid, which bodies cannot walk through (`slide_body`), it hits along its
+## row, and it follows the shot when homing moves it, stopping at a wall. False for an empty slot
+## or a shot that is not still.
 func set_solid(slot: int, across: Vector2, stones: int, gap: float) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STILL or across.is_zero_approx() or not across.is_finite():
 		return false
@@ -1801,24 +1794,6 @@ func _lay_solid(slot: int, solid: Solid) -> void:
 				_wall_cells[cell] += 1
 				solid.cells.append(cell)
 	_has_walls = _has_walls or not solid.cells.is_empty()
-	if solid.body == null and is_inside_tree():
-		solid.body = _spare_bodies.pop_back() if not _spare_bodies.is_empty() else _new_solid_body()
-	if solid.body != null:
-		solid.body.collision_layer = WALL_LAYER
-		solid.body.position = solid.at
-		solid.body.rotation = DMath.angle(solid.across)
-		var shape := (solid.body.get_child(0) as CollisionShape2D).shape as RectangleShape2D
-		shape.size = Vector2(half.length() + solid.radius, solid.radius) * 2.0
-
-
-func _new_solid_body() -> StaticBody2D:
-	var body := StaticBody2D.new()
-	body.collision_mask = 0
-	var shape := CollisionShape2D.new()
-	shape.shape = RectangleShape2D.new()
-	body.add_child(shape)
-	add_child(body)
-	return body
 
 
 ## Take a solid shot's cells out of the wall grid.
@@ -1868,15 +1843,12 @@ func ray_cast_by(slot: int) -> void:
 	_ray_caster_seq = _seq[_ray_caster] if _ray_caster >= 0 else -1
 
 
-## The solid shot in `slot` ended: its wall goes, and its body waits for the next one.
+## The solid shot in `slot` ended: its wall goes.
 func _drop_solid(slot: int) -> void:
 	var solid: Solid = _solids[slot]
 	_solids.erase(slot)
 	_any_solid = not _solids.is_empty()
 	_lift_solid(solid)
-	if solid.body != null:
-		solid.body.collision_layer = 0
-		_spare_bodies.append(solid.body)
 
 
 ## The point where the segment from `from` to `to` first meets a wall, or `to` when
@@ -1911,6 +1883,15 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return true
 	return false
+
+
+## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
+## walls it meets: the room's and the solid shots' (online-ready N6: the actors' move, in place of
+## the engine's physics; `WallSlide`).
+func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
+	if not _has_walls:
+		return from + motion
+	return WallSlide.slide(_wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
 
 
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0

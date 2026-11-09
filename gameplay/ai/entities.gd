@@ -257,12 +257,7 @@ func step(delta: float) -> void:
 				spells.familiar_at(_key[row], _position[row])
 			continue
 		var decoy: Actor = _decoys[row]
-		decoy.step(delta)
-		if decoy.is_inside_tree() and Engine.is_in_physics_frame():
-			decoy.move_and_slide()
-		else:
-			# A test's step (`move_and_slide` would move it by the frame's time, not `delta`).
-			decoy.position += decoy.velocity * delta
+		decoy.tick_step(delta)
 		_position[row] = decoy.global_position
 		if decoy.health != null and decoy.health.is_depleted():
 			_end(row, true)

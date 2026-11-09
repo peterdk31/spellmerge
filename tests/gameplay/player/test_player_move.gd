@@ -108,7 +108,6 @@ func _test_wizard_scene() -> void:
 	if wizard == null:
 		return
 	_check(wizard.is_in_group(&"wizards") and not wizard.is_in_group(&"players"), "the wizard is in the wizards group (the players group is gone, actors G8)")
-	_check(wizard.get_node_or_null("CollisionShape2D") is CollisionShape2D, "the wizard scene has a collision shape")
 	_check(wizard.get_node_or_null("Health") is Health, "the wizard scene has a Health")
 	_check(wizard.get_node_or_null("Hurtbox") is Hurtbox, "the wizard scene has the kit's Hurtbox")
 	_check(wizard.get_node_or_null("Mover") is Mover, "the wizard scene has the kit's Mover")
@@ -118,8 +117,8 @@ func _test_wizard_scene() -> void:
 	_check(wizard.get_node_or_null("Sprite") is Sprite2D, "the wizard scene has a Sprite node")
 	_check(wizard.get_node_or_null("StaffLook") is StaffLook, "the wizard scene has a StaffLook")
 	_check(wizard.get_node_or_null("Face") is Face, "the wizard scene wears a Face")
-	_check(wizard.collision_mask == Actor.LAYER_WALLS and wizard.collision_mask == 1, "wizards collide only with walls")
-	_check(wizard.collision_layer == 0, "wizards are on no body layer")
+	_check(wizard.get_class() == "Node2D" and wizard.get_node_or_null("CollisionShape2D") == null, "wizards are no physics bodies (online-ready N6)")
+	_check((wizard.get_node("Mover") as Mover).body_radius == 6.0, "they walk against the walls as circles of their Mover's radius")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	var caster := wizard.get_node("Caster") as Caster
 	_check(caster.staff_count == 4, "the wizard has four staffs")

@@ -267,3 +267,36 @@ func _cast_and_read() -> Array:
 	_arena.free_all()
 	_arena = null
 	return out
+
+
+func test_its_look_reads_the_open_portals_through_one_view() -> void:
+	_arena = ArenaScript.new(root)
+	_arena.install_cards(0, 0, ["fire", "frost", "split", "portal"])
+	check(_arena.cast(0, 0), "the portal is cast")
+	_arena.run(0.5)
+	check_equal(_portals().look_drawer(), Carrier.LOOK_PORTAL, "a portal is drawn by the portal look")
+	var view := PortalView.new()
+	_portals().read_view(view)
+	check_equal(view.portals, 1, "one portal open")
+	check_equal(view.gates, 4, "its mouth and three exits")
+	if view.portals != 1 or view.gates != 4:
+		return
+	check_equal(view.first_gate[0], 0, "its gates from the first")
+	check_equal(view.gate_count[0], 4, "all four")
+	check_equal(view.mouth[0], 1, "the mouth first")
+	check(view.mouth[1] == 0 and view.mouth[2] == 0 and view.mouth[3] == 0, "then the exits")
+	check(absf(view.since[0] - 0.5) < 0.05, "open about half a second (%f)" % view.since[0])
+	check(view.left[0] > 3.0 and view.left[0] < 4.0, "with the rest of its life left (%f)" % view.left[0])
+	check_equal(view.infusions[0].size(), 2, "fire and frost, in slot order")
+	check(view.look[0] != 0, "its spell's look bits")
+	var pm: ManagerScript = _arena.projectiles
+	var found: int = 0
+	for gate in pm.gate_rows():
+		if pm.gate_open(gate):
+			for g in view.gates:
+				if view.centre[g].is_equal_approx(pm.gate_position(gate)) and view.radius[g] == pm.gate_radius(gate):
+					found += 1
+	check_equal(found, 4, "each gate where the projectile manager has it")
+	_arena.run(4.0)
+	_portals().read_view(view)
+	check(view.portals == 0 and view.gates == 0, "nothing once it closed")

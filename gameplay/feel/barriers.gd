@@ -16,15 +16,14 @@ extends Node
 ## The last charge bursts the whole shell outward; a barrier that runs out, or a shot that ends
 ## with charges left, flickers, cools and goes. Looks only.
 ##
-## The shell's motes are rows of a batch of its own, drawn by the motes' own shader and material
-## (`Motes.draw_material`), rewritten every frame where they are now: each row is a `ward` mote just
-## born there, standing still, its age (so its shade, white-hot to the base colour) twinkling. What
-## flies off goes into the mote pool as ordinary moments (`Motes.burst`). Nothing is allocated per
-## frame: the rows and the shells' numbers are packed arrays that grow only when more shells are up
-## at once than ever before. `Motes.density` (the "Particle amount" setting) scales the motes of a
+## The shell's motes are placed motes (`placed_motes.gd`), rewritten every frame where they are now:
+## each a `ward` mote just born there, standing still, its age (so its shade, white-hot to the base
+## colour) twinkling. What flies off goes into the mote pool as ordinary moments (`Motes.burst`).
+## Nothing is allocated per frame: the rows and the shells' numbers are packed arrays that grow only
+## when more shells are up at once than ever before. `Motes.density` (the "Particle amount" setting) scales the motes of a
 ## shell and what flies off; with no pool (particles off) nothing is drawn.
 
-const BatchesScript := preload("res://core/projectiles/batches.gd")
+const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const MotesScript := preload("res://gameplay/feel/mote.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -79,11 +78,9 @@ var shown: int = 0
 ## Rows written last frame (for tests).
 var rows_written: int = 0
 
-var _node: MultiMeshInstance2D = null
-var _buffer: PackedFloat32Array = PackedFloat32Array()
+## The shells' motes, placed each frame.
+var _placed: PlacedMotesScript = null
 var _room: int = 0
-var _rows_room: int = 0
-var _z: int = 0
 ## Shell `s`: what it guards (ON_*, and its actor or slot; -1 free; a shot's sequence), its motes,
 ## charges, radius and half its length (a capsule's: from its middle to one end's centre; zero for
 ## a circle), when it was given and when it runs out (Feel's clock), when it began to fade (-1 not
@@ -118,10 +115,10 @@ var _rim_out: Vector2 = Vector2.RIGHT
 
 
 func _init(z: int = 16) -> void:
-	_z = z
 	_rng.seed = 0x5e11
 	_grow(FIRST_ROOM)
-	_fit_rows(FIRST_ROOM * 2 * motes_per_charge(shell_radius(8.0)))
+	_placed = PlacedMotesScript.new(z, "Shells", FIRST_ROOM * 2 * motes_per_charge(shell_radius(8.0)))
+	add_child(_placed)
 
 
 ## The radius of the shell round a circle (a hurt circle, a shot's) of radius `inner`.
@@ -355,21 +352,17 @@ func step(now: float, pool: MotesScript, table: ActorsScript, projectiles: Proje
 	_spin = fmod(_spin + SPIN * delta, TAU)
 	rows_written = 0
 	shown = 0
-	if pool == null:
-		if _node != null:
-			_node.visible = false
+	if not _placed.begin(pool, now):
 		return
 	if projectiles != null:
 		_take_shots(projectiles, table, pool)
-	_bind(pool)
 	var kind: int = pool.kind_index(KIND)
 	var close: float = 1.0 - exp(-CLOSE_RATE * delta)
 	var needed: int = 0
 	for s in _on.size():
 		if _on[s] >= 0:
 			needed += _count[s]
-	_fit_rows(needed)
-	var row: int = 0
+	_placed.hold(needed)
 	for s in _on.size():
 		if _on[s] < 0:
 			continue
@@ -382,14 +375,9 @@ func step(now: float, pool: MotesScript, table: ActorsScript, projectiles: Proje
 			continue
 		shown += 1
 		if kind >= 0:
-			row = _write(s, row, close, kind)
-	rows_written = row
-	if row == 0:
-		_node.visible = false
-		return
-	_node.multimesh.visible_instance_count = row
-	_node.multimesh.buffer = _buffer
-	_node.visible = true
+			_write(s, close, kind)
+	rows_written = _placed.rows
+	_placed.finish()
 
 
 ## Shell `s` moved to where what it guards is now. False when it should go quietly (an actor gone).
@@ -413,12 +401,12 @@ func _follow(s: int, table: ActorsScript, projectiles: ProjectileManagerScript) 
 	return true
 
 
-## Shell `s`'s rows from `row` on; returns the next free row.
-func _write(s: int, row: int, close: float, kind: int) -> int:
+## Shell `s`'s motes, placed.
+func _write(s: int, close: float, kind: int) -> void:
 	var first: int = s * MOST_MOTES
 	var count: int = _count[s]
 	if count == 0:
-		return row
+		return
 	var age: float = _now - _given[s]
 	var swell: float = clampf(age / SWELL, 0.0, 1.0)
 	var grow: float = 0.45 + 0.55 * swell + 0.12 * sin(swell * PI)
@@ -430,15 +418,13 @@ func _write(s: int, row: int, close: float, kind: int) -> int:
 	var flicker: bool = fade >= 0.0 or (left < FLICKER and left > 0.0)
 	if flicker and posmod(floori(_now / FLICKER_STEP), 2) == 1:
 		_ease(s, close)
-		return row
+		return
 	var radius: float = _radius[s]
 	var half: Vector2 = _half[s]
 	# Swelling: the shell drawn smaller, then back to its size.
 	_radius[s] = radius * grow
 	_half[s] = half * minf(grow, 1.0)
-	var coded_source: float = float(_source[s]) / MotesScript.SOURCE_CODE
-	var coded_kind: float = float(kind) / MotesScript.KIND_CODE
-	var coded_life: float = ROW_LIFE / MotesScript.LIFE_MAX
+	var source: int = _source[s]
 	var core: Color = _core[s]
 	var step_angle: float = TAU / float(count)
 	for i in count:
@@ -452,25 +438,9 @@ func _write(s: int, row: int, close: float, kind: int) -> int:
 			shade_age = 0.0
 		if fade >= 0.0:
 			shade_age = lerpf(shade_age, FADED_AGE, clampf(fade, 0.0, 1.0))
-		var at: int = row * MotesScript.DRAW_STRIDE
-		_buffer[at + MotesScript.ROW_VX] = 0.0
-		_buffer[at + MotesScript.ROW_BORN] = _now - shade_age
-		_buffer[at + MotesScript.ROW_X] = roundf(p.x)
-		_buffer[at + MotesScript.ROW_VY] = 0.0
-		_buffer[at + MotesScript.ROW_VZ] = 0.0
-		_buffer[at + MotesScript.ROW_Y] = roundf(p.y)
-		_buffer[at + MotesScript.ROW_SOURCE] = coded_source
-		_buffer[at + MotesScript.ROW_KIND] = coded_kind
-		_buffer[at + MotesScript.ROW_LIFE] = coded_life
-		_buffer[at + MotesScript.ROW_HEIGHT] = 0.0
-		_buffer[at + MotesScript.ROW_CORE] = core.r
-		_buffer[at + MotesScript.ROW_CORE + 1] = core.g
-		_buffer[at + MotesScript.ROW_CORE + 2] = core.b
-		_buffer[at + MotesScript.ROW_SEED] = phase / TAU
-		row += 1
+		_placed.put(p, kind, source, core, shade_age, phase / TAU, ROW_LIFE)
 	_radius[s] = radius
 	_half[s] = half
-	return row
 
 
 ## Shell `s`'s motes eased toward their even places, not drawn (a flicker's off frame).
@@ -510,10 +480,9 @@ func _centre_of(actor: int, table: ActorsScript, projectiles: ProjectileManagerS
 	return Vector2.INF
 
 
-## Row `row` of the shells' batch as written last frame (for tests; Motes.DRAW_STRIDE floats).
+## Row `row` of the shells' motes as placed last frame (for tests; Motes.DRAW_STRIDE floats).
 func row_data(row: int) -> PackedFloat32Array:
-	var at: int = row * MotesScript.DRAW_STRIDE
-	return _buffer.slice(at, at + MotesScript.DRAW_STRIDE)
+	return _placed.row_data(row)
 
 
 ## How many motes the shell of `actor` has now (0 for none; for tests).
@@ -588,34 +557,3 @@ func _grow(room: int) -> void:
 	_angle.resize(room * MOST_MOTES)
 	_phase.resize(room * MOST_MOTES)
 
-
-## Room in the batch for `rows` rows (it only ever grows, doubling, so a frame rarely allocates).
-func _fit_rows(rows: int) -> void:
-	if rows <= _rows_room:
-		return
-	_rows_room = maxi(rows, _rows_room * 2)
-	_buffer.resize(_rows_room * MotesScript.DRAW_STRIDE)
-	if _node != null:
-		_node.multimesh.instance_count = _rows_room
-
-
-## The batch, drawn with `pool`'s material and quad (made the first time; a new pool, after the
-## "Particles" setting changed, is taken up).
-func _bind(pool: MotesScript) -> void:
-	if _node == null:
-		var multimesh: MultiMesh = BatchesScript.multimesh()
-		multimesh.use_colors = true
-		multimesh.use_custom_data = true
-		multimesh.mesh = pool.draw_quad()
-		multimesh.instance_count = _rows_room
-		multimesh.visible_instance_count = 0
-		_node = MultiMeshInstance2D.new()
-		_node.name = "Shells"
-		_node.multimesh = multimesh
-		_node.top_level = true
-		_node.z_index = _z
-		_node.visible = false
-		add_child(_node)
-	if _node.material != pool.draw_material():
-		_node.material = pool.draw_material()
-		_node.multimesh.mesh = pool.draw_quad()

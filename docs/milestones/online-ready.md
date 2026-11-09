@@ -4,9 +4,11 @@
 
 **This phase builds no netcode.** Networking stays banned by hard rule 4 until the netcode phase sketched at the end, which needs its own owner exception (like the native module's of 2026-11-02). The owner will give it (2026-11-06: "netcode can easily be allowed"): the rule and its check change when netcode work starts. Phase N makes the game *ready* for it, and pays off without it: replays, bug reports that replay exactly, and tests that never flake on frame time.
 
+**Horde mode was removed on 2026-11-09** (docs/DECISIONS.md): what the parts below say of the horde, its director and its swarm is history; the platform runs and the replay and snapshot tests play the sandbox fight and a wave now.
+
 ## Why
 
-Spellmerge has up to about 3,000 shots, 200 actors and a 500+ horde swarm in a room. Sending that state every tick costs far too much bandwidth, so online co-op will send **inputs only**: every machine runs the same simulation from the same inputs (deterministic lockstep). That only works if the same inputs give the same game, to the bit, on every machine and platform (Linux, Windows, the web).
+Spellmerge has up to about 3,000 shots and hundreds of actors in a room. Sending that state every tick costs far too much bandwidth, so online co-op will send **inputs only**: every machine runs the same simulation from the same inputs (deterministic lockstep). That only works if the same inputs give the same game, to the bit, on every machine and platform (Linux, Windows, the web).
 
 The code already goes a long way:
 
@@ -14,7 +16,7 @@ The code already goes a long way:
 - seats are kept apart from actor ids, and only HUD, input and co-op rules take seats;
 - spell scatter, staff spread, dash and teleport seeds hash the actor id and cast count; the AI brain's RNG is seeded;
 - actors step in a fixed order, and areas talk through synchronous `core/` events;
-- the HUD already changes the game only through `*_requested` events (`card_move_requested`, `staff_change_requested`, `horde_pick_requested`, ...), which are commands;
+- the HUD already changes the game only through `*_requested` events (`card_move_requested`, `staff_change_requested`, `sandbox_spawn_requested`, ...), which are commands;
 - headless runs are frame-deterministic on one machine, the clip tests check two runs agree at every frame, and the native kernels match their GDScript byte for byte.
 
 ## What breaks determinism today (the audit, 2026-11-04)

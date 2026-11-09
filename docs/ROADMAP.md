@@ -10,7 +10,7 @@ A third, by the owner on 2026-10-28: every character becomes a living staff, wit
 
 A fourth, by the owner on 2026-10-29: every card follows the general rules on every carrier, with no special cases and no silent no-ops, checked by a test that finds every card and carrier by itself ([M2-rules.md](milestones/M2-rules.md), phase R), before D3.
 
-A fifth, by the owner on 2026-10-30: **Horde**, a separate game mode against a growing horde of 500+ enemies with level-up card picks, in every build, to test the mechanics at scale ([horde.md](milestones/horde.md)). It is built to be removed easily and builds nothing of M3.
+A fifth, by the owner on 2026-10-30: **Horde**, a separate game mode against a growing horde of 500+ enemies, to test the mechanics at scale. Removed by the owner on 2026-11-09, with all its code (docs/DECISIONS.md); its enemies, the Crypt Mite and the Bone Husk, stay as ordinary enemies.
 
 A sixth, by the owner on 2026-11-01: **an enemy AI that plays whatever staffs it holds** (it reads what each staff casts next), with profiles, phases for bosses, dodging, channelled casts, teamwork, bots on the same AI and an enemy arena ([M2-enemy-ai.md](milestones/M2-enemy-ai.md), phase AI). It is the baseline; designing new enemies and bosses on it stays M3 and later.
 

@@ -1,8 +1,8 @@
 # The same game on every platform (online-ready N8, docs/milestones/online-ready.md), called by
 # daily.yml after the build.
 #
-# Plays the same recorded runs (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight,
-# a horde run of a bot and two bots in the waves) in the build's test exports (build.yml's
+# Plays the same recorded runs (tests/platforms/replay_hashes_runner.gd: a scripted sandbox fight
+# and two bots in the waves) in the build's test exports (build.yml's
 # test-exports artifact): on Linux with the native module and on its GDScript twins, on a Windows
 # runner and in headless Chrome (the web build, its native module built by Emscripten). Then
 # compares every tick's state hash with Linux (tools/platform_hashes.py). A platform that parts is
@@ -26,7 +26,7 @@ permissions:
 
 env:
   PYTHONPATH: ci
-  SCENES: sandbox,horde,wave
+  SCENES: sandbox,wave
   TICKS: "600" # ten seconds of game in each scene
 
 jobs:

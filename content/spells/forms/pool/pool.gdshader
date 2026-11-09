@@ -31,6 +31,11 @@ render_mode blend_premul_alpha;
 uniform float particle_share = 1.0;
 
 const float GRID = 24.0;
+// Its oval's half width and half depth in its hit size as drawn (STILL_HIT), its card's `look_shape`
+// (set by the projectile manager, `set_body_shape`), so its motes leave from the oval it draws. Its
+// come and go are its own (the splash, the drying), not the card's `look_clock`.
+uniform vec2 look_shape = vec2(1.0, 1.0);
+
 // Seconds it splashes in for (the drops a little longer).
 const float SPILL = 0.35;
 const float DROPS = 0.47;
@@ -99,9 +104,9 @@ vec4 body_look(vec2 uv) {
 	vec2 size = vec2(GRID) * zoom;
 	vec2 local = uv * size - size * 0.5;
 	vec2 p = floor(vec2(axis.x * local.x - axis.y * local.y, axis.y * local.x + axis.x * local.y));
-	float reach = size.x * 0.15;
+	float reach = size.x * STILL_HIT;
 	// Its hit size, wide and shallow: seen from above at a slant.
-	vec2 r = vec2(reach * 1.3, reach * 0.75);
+	vec2 r = reach * look_shape;
 	vec4 colour = vec4(0.0);
 	// What the cards give off: particles born at random points of the outline.
 	if (emit_count() > 0.5) {

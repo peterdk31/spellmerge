@@ -172,26 +172,26 @@ func _ready() -> void:
 ## The projectile manager and the spell runtime are known (Feel finds them after its children are
 ## made): spell light can be made now.
 func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
-	if projectiles != null and projectiles != manager and projectiles.rows_drawn.is_connected(_on_rows_drawn):
-		projectiles.rows_drawn.disconnect(_on_rows_drawn)
+	if projectiles != null and projectiles != manager and projectiles.still_shots_drawn.is_connected(_on_still_shots_drawn):
+		projectiles.still_shots_drawn.disconnect(_on_still_shots_drawn)
 		projectiles.batches_grown.disconnect(_on_batches_grown)
 	projectiles = manager
 	spells = runtime
 	_make_light(spell_light)
-	still_motes.attach(manager, runtime)
-	if manager != null and not manager.rows_drawn.is_connected(_on_rows_drawn):
-		manager.rows_drawn.connect(_on_rows_drawn)
+	still_motes.attach(manager, runtime as SpellRuntime)
+	if manager != null and not manager.still_shots_drawn.is_connected(_on_still_shots_drawn):
+		manager.still_shots_drawn.connect(_on_still_shots_drawn)
 		manager.batches_grown.connect(_on_batches_grown)
 
 
-## A watched batch's rows were drawn: its still shots give off their motes (`still_motes.gd`).
-func _on_rows_drawn(batch: int, rows: PackedFloat32Array, count: int) -> void:
-	still_motes.give_off(batch, rows, count, projectiles.sim_time, pool if motes_on() else null)
+## A watched card body's still shots were drawn: they give off their motes (`still_motes.gd`).
+func _on_still_shots_drawn(view: StillShotView) -> void:
+	still_motes.give_off(view, pool if motes_on() else null)
 
 
-## The manager numbered a card body: watch the still cards' batches again (a body keeps its number).
+## The manager numbered a card body: watch the still cards' bodies again (a body keeps its number).
 func _on_batches_grown(_count: int) -> void:
-	still_motes.attach(projectiles, spells)
+	still_motes.attach(projectiles, spells as SpellRuntime)
 
 
 ## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams' and Feel's own

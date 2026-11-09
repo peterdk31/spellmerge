@@ -29,3 +29,4 @@ look_shader = ExtResource("3_shader")
 look_motes = &"rising"
 look_mote_rate = 16.0
 look_motes_from = 1
+look_shape = Vector2(1.25, 0.6)

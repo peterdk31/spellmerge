@@ -4,6 +4,8 @@
 
 Phases 1 and 2 are the architecture fixes and come first: they change how the rest are built. Each phase is one PR.
 
+**Phase 1 done (2026-11-09, `owner/carrier-looks-p1`).** As planned, with these choices: the manager fills the view by reading back the rows it drew (`read_still_rows`, beside `_write_quad`), so the native kernel needs no change (its rows are the same to the bit, `test_native_kernel`) and a frame costs nothing more for a body nobody watches; bodies are watched by number (`watch_body`, both batches of the pair; the view names its body and ramp half); `body_of` answers 0 for none, the manager's "no body" everywhere else, not -1; a still card's look is shaped by `look_shape` (its hit size as drawn, `STILL_HIT` of its quad, now one constant in the manager and the include) and comes and goes by `look_open` and `look_fade`, handed to its shader as the uniforms `look_shape` and `look_clock` (`set_body_shape`, by Spells when it numbers the body); the pool's shader draws its own splash and drying, so it reads only the shape. The include's `STILL_*`, `TRACE_*` and `STILL_HIT` are compared with the manager's by `test_projectile_looks`.
+
 ## What the review found
 
 ### Coupling (the main finding)

@@ -103,7 +103,7 @@ vec4 rune_look(vec2 uv) {
 	vec2 local = uv * size - size * 0.5;
 	vec2 p = floor(vec2(axis.x * local.x - axis.y * local.y, axis.y * local.x + axis.x * local.y));
 	// The ring at its hit size, seen from above at a slant.
-	vec2 r = vec2(size.x * 0.15, size.x * 0.15 * 0.625);
+	vec2 r = vec2(size.x * STILL_HIT, size.x * STILL_HIT * 0.625);
 	vec4 colour = vec4(0.0);
 	// What the cards give off: particles born at random points of the ring.
 	if (emit_count() > 0.5) {

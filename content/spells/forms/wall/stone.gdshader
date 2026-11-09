@@ -29,9 +29,13 @@ render_mode blend_premul_alpha;
 uniform float particle_share = 1.0;
 
 const float GRID = 24.0;
-// Seconds the seam takes to open, and the seconds of its end it fades over.
-const float OPEN = 0.3;
-const float FADE = 0.8;
+// Its card's look shape and clock (set by the projectile manager, `set_body_shape`), so the motes
+// given off along its seam leave from the seam it draws and come and go with it: `look_shape` is a
+// piece's half span of its row and its seam's depth below its middle, in its hit size as drawn
+// (STILL_HIT); `look_clock` the seconds its seam takes to open and the seconds of its end it fades
+// over.
+uniform vec2 look_shape = vec2(1.0, 1.0);
+uniform vec2 look_clock = vec2(0.3, 0.8);
 // World pixels a band of the seam is long (one infusion's).
 const float BAND = 4.0;
 
@@ -44,12 +48,12 @@ varying flat vec4 pal;
 void vertex() {
 	float code = coded_code(INSTANCE_CUSTOM.a);
 	float since = still_since(code);
-	float fade = clamp((1.0 - still_left(code) / STILL_END) / FADE, 0.0, 1.0);
+	float fade = clamp((STILL_END - still_left(code)) / max(look_clock.y, 0.001), 0.0, 1.0);
 	vec2 at = MODEL_MATRIX[3].xy;
 	// Its seed from where it stands, so its motes keep their ways when other shots come and go.
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, fract(dot(floor(at), vec2(0.1031, 0.1137))) * 97.0, true);
 	SET_LOOK(L);
-	float k = 1.0 - clamp(since / OPEN, 0.0, 1.0);
+	float k = 1.0 - clamp(since / max(look_clock.x, 0.001), 0.0, 1.0);
 	axis = length(MODEL_MATRIX[0].xy) > 0.0001 ? normalize(MODEL_MATRIX[0].xy) : vec2(1.0, 0.0);
 	piece = vec4(1.0 - k * k, fade, 0.0, dot(at, axis));
 	pal = palette_floats(L.core, L.bits);
@@ -60,12 +64,12 @@ vec4 body_look(vec2 uv) {
 	vec2 size = vec2(GRID) * zoom;
 	vec2 local = uv * size - size * 0.5;
 	vec2 p = floor(vec2(axis.x * local.x - axis.y * local.y, axis.y * local.x + axis.x * local.y));
-	float reach = size.x * 0.15;
+	float reach = size.x * STILL_HIT;
 	// Its span of the seam (its half, a pixel more than half the step to the next piece so they
 	// meet), through its foot, open from its middle; how high its stream's glow reaches.
-	float span = reach * 1.25;
+	float span = reach * look_shape.x;
 	float open = (span + 0.5) * piece.x;
-	vec2 foot = vec2(0.0, floor(reach * 0.6 + 0.5));
+	vec2 foot = vec2(0.0, floor(reach * look_shape.y + 0.5));
 	float high = reach * 2.8;
 	vec2 across = vec2(-axis.y, axis.x);
 	vec4 colour = vec4(0.0);

@@ -553,8 +553,9 @@ func _ready() -> void:
 ## Publishes the infusion table (every infusion's colour by its look layer, `InfusionTable`) for the
 ## shaders, reads every carrier card's look once (`_looks`, for `look_of` and `look_shaders`) and hands each
 ## shot carrier card's own shader (LOOK_SHOT, LOOK_STILL) to the projectile manager now
-## (`register_body`, with the mesh its shots are written as), so it has its batches and is warmed
-## before the first room, not first drawn in the middle of one. A launch numbers any it did not know
+## (`register_body`, with the mesh its shots are written as; a still one's look shape and clock with
+## it, `set_body_shape`), so it has its batches and is warmed before the first room, not first drawn
+## in the middle of one. A launch numbers any it did not know
 ## too. The other areas warm the shaders they draw themselves (`look_shaders`).
 func register_bodies() -> void:
 	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
@@ -569,7 +570,9 @@ func register_bodies() -> void:
 		var drawer: int = _remember_look(form)
 		var mesh: int = _shot_mesh(drawer)
 		if form.look_shader != null and mesh != NO_SHOT_MESH and projectiles != null:
-			projectiles.register_body(form.look_shader, mesh)
+			var body: int = projectiles.register_body(form.look_shader, mesh)
+			if drawer == Carrier.LOOK_STILL:
+				projectiles.set_body_shape(body, form.look_shape, Vector2(form.look_open, form.look_fade))
 
 
 ## Each carrier card's look by its id, read from the card once (at start, `register_bodies`, or the
@@ -637,11 +640,7 @@ func _read_look(form: StringName) -> bool:
 ## Keeps `card`'s look in `_looks` (once) and returns the area that draws its carrier.
 func _remember_look(card: FormBase) -> int:
 	if not _looks.has(card.id):
-		var look: CardLook = CardLook.of(card.look_shader, card.look_light_intensity, card.look_light_reach)
-		look.motes = card.look_motes
-		look.mote_rate = card.look_mote_rate
-		look.motes_from = card.look_motes_from
-		_looks[card.id] = look
+		_looks[card.id] = CardLook.from_card(card)
 		_look_drawers[card.id] = Carriers.of(card.carrier).look_drawer()
 	return int(_look_drawers[card.id])
 

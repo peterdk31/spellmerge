@@ -197,3 +197,89 @@ func test_a_body_keeps_the_first_batches_draw_order() -> void:
 		check(at.call(ManagerScript.body_batch(late_head, enemy)) < at.call(runes), "%s head bodies draw under the runes, as a plain bolt does" % side)
 		check(at.call(runes) < at.call(ManagerScript.body_batch(stone, enemy)), "%s quad body draws above the plain runes" % side)
 	root.remove_child(mgr)
+
+
+func test_a_body_is_looked_up_without_being_numbered() -> void:
+	var grown: Array[int] = []
+	mgr.batches_grown.connect(func(count: int) -> void: grown.append(count))
+	check_equal(mgr.body_of(STONE), 0, "a shader never numbered is no body")
+	check_equal(mgr.batch_count(), ManagerScript.BATCH_BODY_FIRST, "and asking made no batches")
+	check(grown.is_empty(), "nor told of any")
+	var stone: int = mgr.register_body(STONE)
+	check_equal(mgr.body_of(STONE), stone, "once numbered, it is found")
+	check_equal(mgr.body_of(STONE, ManagerScript.MESH_HEAD), 0, "under another mesh it is another body, not numbered")
+	check_equal(mgr.body_of(null), 0, "no shader is no body")
+
+
+## A still shot of no actor at `at` drawn by `body` (the manager in the tree, its batches made).
+func _drawn_still(body: int, at: Vector2, life: float = 5.0) -> int:
+	var slot: int = mgr.spawn(0, at, Vector2.ZERO, life, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.set_form(slot, &"pool", body)
+	return slot
+
+
+func test_a_watched_body_hands_out_its_still_shots_drawn() -> void:
+	root.add_child(mgr)
+	var pool: int = mgr.register_body(POOL)
+	var stone: int = mgr.register_body(STONE)
+	var views: Array = []
+	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void:
+		views.append([view.body, view.enemy, view.count, view.at[0] if view.count > 0 else Vector2.INF, view.reach[0] if view.count > 0 else 0.0, view.since[0] if view.count > 0 else -1.0, view.left[0] if view.count > 0 else -1.0, view.ramp[0] if view.count > 0 else -1, view.look[0] if view.count > 0 else -1, view.time]))
+	mgr.watch_body(pool, true)
+	check(mgr.body_watched(pool) and not mgr.body_watched(stone), "only the body asked for is watched")
+	mgr.update_draw(1.0)
+	check(views.is_empty(), "a frame that draws none of its shots hands out nothing")
+	var slot: int = _drawn_still(pool, Vector2(120.0, 90.0))
+	mgr.set_look(slot, 1 << 0)
+	_drawn_still(stone, Vector2(300.0, 90.0))
+	for n in 30:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check_equal(views.size(), 1, "the watched body's batch is handed out, the other's not (%s)" % [views])
+	if views.size() != 1:
+		return
+	var seen: Array = views[0]
+	check_equal(seen[0], pool, "the view names its body")
+	check(seen[1], "a shot of no actor is the enemy ramp's batch of the pair")
+	check_equal(seen[2], 1, "one shot drawn")
+	check(seen[3].distance_to(Vector2(120.0, 90.0)) < 0.01, "where it was drawn (%s)" % seen[3])
+	check(is_equal_approx(seen[4], ManagerScript.look_size(14.0) * ManagerScript.STILL_HIT), "its hit size as drawn (%f)" % seen[4])
+	check(absf(seen[5] - 0.5) < 0.02, "half a second since it was placed (%f)" % seen[5])
+	check(is_equal_approx(seen[6], ManagerScript.STILL_END), "far from its end: STILL_END left (%f)" % seen[6])
+	check_equal(seen[7], 0, "the enemy ramp reads as ramp 0")
+	check_equal(seen[8], ManagerScript.ramp_look(-1, 1 << 0), "its look bits, the enemy ramp's flag with them")
+	check(is_equal_approx(seen[9], mgr.sim_time), "drawn at the manager's clock")
+	mgr.watch_body(pool, false)
+	views.clear()
+	mgr.update_draw(1.0)
+	check(views.is_empty() and not mgr.body_watched(pool), "unwatched, nothing is handed out")
+
+
+func test_a_head_body_is_never_watched() -> void:
+	var head: int = mgr.register_body(BOLT, ManagerScript.MESH_HEAD)
+	mgr.watch_body(head, true)
+	check(not mgr.body_watched(head), "only still bodies' shots are read back")
+	mgr.watch_body(99, true)
+	check(not mgr.body_watched(99), "nor a body never numbered")
+
+
+func test_a_bodys_shape_reaches_its_shader() -> void:
+	root.add_child(mgr)
+	var pool: int = mgr.register_body(POOL)
+	for enemy: bool in [false, true]:
+		var material := mgr._nodes[ManagerScript.body_batch(pool, enemy)].material as ShaderMaterial
+		check_equal(material.get_shader_parameter(&"look_shape"), ManagerScript.BODY_SHAPE, "before its card says, the plain shape")
+	mgr.set_body_shape(pool, Vector2(1.3, 0.75), Vector2(0.2, 0.5))
+	for enemy: bool in [false, true]:
+		var material := mgr._nodes[ManagerScript.body_batch(pool, enemy)].material as ShaderMaterial
+		check_equal(material.get_shader_parameter(&"look_shape"), Vector2(1.3, 0.75), "its card's shape, both batches")
+		check_equal(material.get_shader_parameter(&"look_clock"), Vector2(0.2, 0.5), "and its clock")
+	var stone: int = mgr.register_body(STONE)
+	mgr.set_body_shape(stone, Vector2(1.25, 0.6), Vector2(0.3, 0.8))
+	var later := ManagerScript.new()
+	own(later)
+	var kept: int = later.register_body(STONE)
+	later.set_body_shape(kept, Vector2(1.25, 0.6), Vector2(0.3, 0.8))
+	root.add_child(later)
+	var made := later._nodes[ManagerScript.body_batch(kept, false)].material as ShaderMaterial
+	check_equal(made.get_shader_parameter(&"look_shape"), Vector2(1.25, 0.6), "a shape set before the batches are made reaches them when they are")

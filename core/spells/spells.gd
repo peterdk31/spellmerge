@@ -198,7 +198,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -481,6 +481,8 @@ var _poses: StaffPoses = null
 var _moves: CasterMoves = null
 ## The Skyfall modifier, all of it (`core/spells/skyfall.gd`).
 var _skyfall: Skyfall = null
+## The circling modifier (core/spells/orbit.gd).
+var _orbit: Orbit = null
 
 
 func _init() -> void:
@@ -488,6 +490,7 @@ func _init() -> void:
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)
 	_skyfall = Skyfall.new(_kit)
+	_orbit = Orbit.new(_kit)
 	_carriers = Carriers.make_all()
 	for carrier: Carrier in _carriers.values():
 		carrier.bind(_kit, _poses)
@@ -1366,6 +1369,10 @@ func _land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: 
 ## exclusion. Each shot still gets its cards before its record, and every list a shot joins (a
 ## behaviour's, the lifecycle's, the zappers', the magnets') gets them in the order of `slots`.
 func _land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
+	# Orbit: a spell that circles puts its rows on their circle first, so its cards are set on a
+	# circler (what steers a straight flight refuses it) and Skyfall leaves it be: it circles the spot
+	# on the floor line instead of falling.
+	_orbit.circle(slots, count, spell, tag)
 	_travel_shots(slots, count, spell)
 	# Skyfall: while something falls, its shots fall onto its floor line.
 	_skyfall.land_shots(slots, count)
@@ -1968,7 +1975,7 @@ func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 ## Degrees (as radians) off the aim of shot `n` of `count`: none for one shot, an even ring
 ## for a 360 degree spread, otherwise an even fan centred on the aim.
 func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
-	if count <= 1 or spell.has_trait(Carrier.RING):
+	if count <= 1:
 		return 0.0
 	if spell.spread >= 360.0:
 		return TAU * n / count
@@ -3437,6 +3444,9 @@ func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
 		return 0.0
 	if _skyfall.falls(first):
 		# Skyfall: it falls where it is cast, not along an aim.
+		return 0.0
+	if Orbit.orbits_on(first, _carrier_of(first)):
+		# Orbit: it circles its caster, not along an aim.
 		return 0.0
 	return _carrier_of(first).reach_of(first)
 

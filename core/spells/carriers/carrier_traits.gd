@@ -28,8 +28,6 @@ const SHOTS: int = 1 << 8
 const SPREAD: int = 1 << 9
 ## Its hits spend `pierce`.
 const PIERCE: int = 1 << 10
-## Its shots spread round a circle instead of a fan.
-const RING: int = 1 << 11
 ## A payload its shot fires goes outward from the shot's caster, not along the shot's way.
 const OUTWARD: int = 1 << 12
 ## Held, it is cast anew each time it is over (a swing sweeps back).

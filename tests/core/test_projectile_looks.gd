@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt, rune, orbit)
+## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt or rune; a circling shot is a bolt)
 ## with its ramp (actors G3a: its caster's `Actors.ramp_of`), its look layers and its core colour in the instance data that
 ## shot shaders read (`shot_head.gdshader`, the still shots' shaders), at a size that follows its hit radius in whole pixels; cards
 ## give the layers (`look_layer`), the compiler combines every infusion's and modifier's look
@@ -130,17 +130,12 @@ func test_wizard_shots_carry_their_body_ramp_look_and_core() -> void:
 	check_equal(seen, [0, 1, 2, 3] as Array[int], "each shot names its wizard's ramp")
 
 
-func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
+func test_runes_are_drawn_as_their_form() -> void:
 	var rune: int = mgr.spawn(1, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.set_look(rune, ManagerScript.pack_look(PackedInt32Array([2])))
-	mgr.set_anchor(2, Vector2(200.0, 200.0))
-	mgr.spawn_orbit(2, 20.0, 0.0, 1.0, 1.0)
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._still_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
 	check_equal(look_at(mgr._still_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its ramp, its zoom (radius 14) and its layers")
-	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight")
-	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.HEAD_LIVE | ManagerScript.HEAD_ORBIT, "flagged an orbit shot")
-	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "in its caster's ramp")
 
 
 func test_a_shot_of_no_actor_is_drawn_as_an_enemys_bolt() -> void:
@@ -202,21 +197,27 @@ func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	check_equal(roundi(buffer[5]), ManagerScript.HEAD_LIVE, "flagged alive: the core is drawn")
 
 
+## A circling shot keeps its own look (orbit as a modifier, 5A): it is drawn in the bolts' batch
+## as the bolt it is, with no orbit flag, only its place spiralling out from its caster.
 func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
 	mgr.set_anchor(0, Vector2(200.0, 200.0))
-	var slot: int = mgr.spawn_orbit(0, 36.0, 0.0, 4.0, 5.0, 6.0)
+	# 144 px/s round a 36 px circle: 4 rad/s, by its speed.
+	var slot: int = mgr.spawn(0, Vector2(236.0, 200.0), Vector2(144.0, 0.0), 5.0, 6.0)
+	check(mgr.set_orbit(slot, 36.0, 0.0, 0.0), "it circles its caster")
 	check(mgr._tail_from[slot].is_equal_approx(Vector2(200.0, 200.0)), "its tail starts on its caster")
 	mgr.step(1.0 / 60.0)
 	check(is_equal_approx(mgr.get_position_of(slot).distance_to(Vector2(200.0, 200.0)), 36.0), "it hits at its circle from the start")
 	mgr.update_draw(1.0)
-	var buffer: PackedFloat32Array = mgr._orbit_node.multimesh.buffer
+	check_equal(mgr._draw_node.multimesh.visible_instance_count, 1, "in the bolts' batch")
+	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 	var drawn_out: float = Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0))
 	check(drawn_out > 1.0 and drawn_out < 6.0, "but is drawn near its caster at first (%.1f px out)" % drawn_out)
-	check_equal(roundi(buffer[5]), ManagerScript.HEAD_LIVE | ManagerScript.HEAD_ORBIT, "as an orbit shot")
+	check_equal(kind_at(mgr._draw_node, 0), ManagerScript.KIND_BOLT, "as the bolt it is")
+	check_equal(roundi(buffer[5]), ManagerScript.HEAD_LIVE, "a live head, with no orbit flag")
 	for i in 20:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
-	buffer = mgr._orbit_node.multimesh.buffer
+	buffer = mgr._draw_node.multimesh.buffer
 	check(is_equal_approx(Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0)), 36.0), "and on its circle after ORBIT_GROW")
 
 
@@ -426,10 +427,7 @@ func test_lightning_shots_are_drawn_with_the_others() -> void:
 	mgr.set_look(lightning, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_SPARKS, ManagerScript.LOOK_EMBERS])))
 	var enemy: int = mgr.spawn(-1, Vector2(100.0, 200.0), Vector2(200.0, 0.0), 2.0)
 	mgr.set_look(enemy, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_SPARKS])))
-	mgr.set_anchor(2, Vector2(300.0, 200.0))
-	var orbit: int = mgr.spawn_orbit(2, 30.0, 0.0, 3.0, 2.0)
-	mgr.set_look(orbit, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_SPARKS])))
-	check(plain >= 0 and lightning >= 0 and enemy >= 0 and orbit >= 0, "four shots")
+	check(plain >= 0 and lightning >= 0 and enemy >= 0, "three shots")
 	for i in 3:
 		mgr.step(1.0 / 60.0)
 	mgr.update_draw(1.0)
@@ -438,8 +436,7 @@ func test_lightning_shots_are_drawn_with_the_others() -> void:
 		counts.append(mgr._nodes[batch].multimesh.visible_instance_count)
 	check_equal(counts[ManagerScript.BATCH_BOLT], 2, "the plain and lightning's bolts in the bolts' batch")
 	check_equal(counts[ManagerScript.BATCH_ENEMY], 1, "an enemy's lightning in the enemy batch")
-	check_equal(counts[ManagerScript.BATCH_ORBIT], 1, "a lightning orbit in the orbits'")
-	check_equal(mgr.drawn, 4, "four shots drawn")
+	check_equal(mgr.drawn, 3, "three shots drawn")
 	check_equal(mgr.drawn_enemy, 1, "one of them an enemy's")
 
 

@@ -42,7 +42,7 @@ func test_no_card_locks_its_staff_for_long() -> void:
 
 func test_the_big_cards_cost_mana_instead() -> void:
 	# Each was a lockout of 2 s or more before the retune.
-	for id: StringName in [&"dash", &"teleport", &"swap", &"orbit", &"decoy", &"familiar"]:
+	for id: StringName in [&"dash", &"teleport", &"swap", &"decoy", &"familiar"]:
 		check(_form(id).mana_cost >= 20.0, "%s costs %s mana" % [id, _form(id).mana_cost])
 	check(_form(&"familiar").mana_cost > _form(&"bolt").mana_cost * 5.0, "a familiar costs many bolts")
 

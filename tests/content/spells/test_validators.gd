@@ -188,8 +188,6 @@ func test_a_form_needs_what_its_carrier_uses() -> void:
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a straight form with speed is fine")
 	form.speed = 0.0
 	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["speed"] as Array[String], "straight needs speed")
-	form.carrier = &"orbit"
-	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["orbit_radius"] as Array[String], "orbit needs a radius")
 	form.carrier = &"beam"
 	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["ray_length"] as Array[String], "a ray needs a length")
 	form.carrier = &"rune"

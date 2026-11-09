@@ -1,9 +1,9 @@
 {
 	"id": "void_ring",
 	"name": "Void ring",
-	"does": "Circling shots hex every imp that crosses the orbit.",
-	"casts": [{"staff": 0, "cards": ["void", "orbit"]}],
-	"imps": [[36, 0], [0, -36], [-36, 0]],
+	"does": "A ring of void bolts circles the caster and hexes every imp that crosses it.",
+	"casts": [{"staff": 0, "cards": ["void", "orbit", "nova", "bolt"]}],
+	"imps": [[33.3, 13.8], [13.8, -33.3], [-33.3, -13.8]],
 	"seconds": 3.0,
 	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "hex"}]
 }

@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## A carrier whose shot is one pool row (`Carrier.rows_only`: the atom's flying shots, the rune's
-## still ones, the orbit's circling ones) makes a launch's rows together and sets them up in one
+## still ones; with Orbit the flying ones are put on their circle there) makes a launch's rows together and sets them up in one
 ## `Spells._land_shots` (the atom also spawns them in one `ProjectileManager.spawn_batch`). It must
 ## leave exactly what one shot at a time leaves: every array of the
 ## manager and every record of the runtime. Every card is cast, the carriers from a staff and as a
@@ -30,9 +30,9 @@ const SETS: Array = [
 		[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"bolt", &"fire", &"triple", &"bolt"],
 		[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"bolt", &"frost", &"deflect", &"return", &"split", &"nova", &"bolt"],
 		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"bolt", &"void", &"chain", &"split", &"atom"],
-		[&"timer", &"split", &"split", &"orbit", &"fire", &"bolt"],
+		[&"timer", &"split", &"split", &"orbit", &"bolt", &"fire", &"bolt"],
 		[&"growth", &"homing", &"split", &"rune"],
-		[&"on_expire", &"split", &"bolt", &"split", &"orbit"],
+		[&"on_expire", &"split", &"bolt", &"split", &"orbit", &"bolt"],
 		[&"on_expire", &"triple", &"bolt", &"homing", &"split", &"rune"],
 		[&"split", &"beam"],
 		[&"split", &"swing"],
@@ -52,12 +52,12 @@ const SETS: Array = [
 		[&"on_expire", &"split", &"bolt", &"familiar"],
 		[&"on_expire", &"split", &"bolt", &"split", &"atom"],
 		[&"timer", &"split", &"rune", &"split", &"nova", &"bolt"],
-		[&"on_hit", &"split", &"orbit", &"split", &"rune"],
+		[&"on_hit", &"split", &"orbit", &"bolt", &"split", &"rune"],
 		[&"dash"],
 		[&"teleport"],
 		[&"on_expire", &"bolt", &"dash"],
 		[&"on_expire", &"bolt", &"teleport"],
-		[&"bigger", &"split", &"split", &"orbit"],
+		[&"bigger", &"split", &"split", &"orbit", &"bolt"],
 		[&"triple", &"split", &"rune"],
 		[&"double", &"split", &"nova", &"bolt"],
 	],
@@ -66,12 +66,12 @@ const SETS: Array = [
 		[&"burst", &"split", &"bolt", &"split", &"portal"],
 		[&"echo", &"split", &"nova", &"bolt"],
 		[&"faster", &"heavy", &"split", &"nova", &"bolt"],
-		[&"hold", &"split", &"orbit"],
+		[&"hold", &"split", &"orbit", &"bolt"],
 		[&"mend", &"split", &"nova", &"bolt"],
 		[&"mirror", &"split", &"rune", &"penta", &"bolt"],
-		[&"on_block", &"shield", &"split", &"orbit", &"split", &"nova", &"bolt"],
+		[&"on_block", &"shield", &"split", &"orbit", &"bolt", &"split", &"nova", &"bolt"],
 		[&"on_cast", &"split", &"nova", &"bolt", &"split", &"bolt"],
-		[&"on_hurt", &"split", &"orbit", &"fire", &"nova", &"bolt"],
+		[&"on_hurt", &"split", &"orbit", &"bolt", &"fire", &"nova", &"bolt"],
 		[&"on_kill", &"overcharge", &"split", &"nova", &"bolt", &"split", &"rune"],
 		[&"on_reaction", &"fire", &"split", &"nova", &"bolt", &"frost", &"split", &"nova", &"bolt"],
 		[&"on_wall", &"bounce", &"split", &"nova", &"bolt", &"split", &"atom"],

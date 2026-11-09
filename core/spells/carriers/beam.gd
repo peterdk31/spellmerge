@@ -469,7 +469,7 @@ func _beam_step(at: int, delta: float) -> void:
 	if _bm_life[at] <= 0.0:
 		_end_beam(at, true)
 		return
-	_beam_follow(at)
+	_beam_follow(at, delta)
 	if _bm_on[at] == 0:
 		return
 	_beam_path(at)
@@ -489,25 +489,36 @@ func _beam_step(at: int, delta: float) -> void:
 
 ## Puts live beam `at` where its caster holds it now: a body (the wizard's, or one that fired its
 ## payload, a decoy's) at its staff along its aim, a shot as it flies. A beam whose body has no aim
-## any more (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
-func _beam_follow(at: int) -> void:
+## any more (down, gone) ends quietly; one whose shot is gone stays where the shot last was. Orbit: a
+## beam that circles sweeps round its caster by `delta`'s share of its sweep (`Orbit.sweep_of`),
+## turning further off whatever aim it follows (a point's beam turns on its own).
+func _beam_follow(at: int, delta: float) -> void:
 	if _bm_parent[at] >= 0:
 		_leg_follow(at)
 		return
+	var sweep: float = kit.orbit_sweep(_bm_spell[at]) * delta
+	if sweep != 0.0:
+		_bm_turn[at] += sweep
+	# Whether its way was set from its caster's this step (turned by `_bm_turn`); else a sweep turns
+	# the way it has.
+	var aimed: bool = false
 	var caster: int = _bm_caster[at]
 	var holder: int = SpellRuntime.body_of(caster, _bm_actor[at])
 	if holder >= 0:
 		if kit.aim_origin(holder).is_finite():
 			_bm_origin[at] = kit.aim_origin(holder)
 			_bm_dir[at] = DMath.rotated(kit.aim_dir(holder), _bm_turn[at])
+			aimed = true
 		elif kit.aim_seen(holder):
 			_end_beam(at, false)
+			return
 	elif caster >= 0:
 		if kit.projectiles.is_alive(caster) and kit.projectiles.get_seq_of(caster) == _bm_caster_seq[at]:
 			_bm_origin[at] = kit.projectiles.get_position_of(caster)
 			var way: Vector2 = kit.projectiles.get_velocity_of(caster)
 			if not way.is_zero_approx():
 				_bm_dir[at] = DMath.rotated(way.normalized(), _bm_turn[at])
+				aimed = true
 		else:
 			_bm_caster[at] = SpellRuntime.CASTER_POINT
 	elif _bm_ring[at].x > 0.0:
@@ -518,6 +529,9 @@ func _beam_follow(at: int) -> void:
 		_bm_origin[at] = kit.ring_point(centre, ring.x, angle)
 		if not _bm_origin[at].is_equal_approx(centre):
 			_bm_dir[at] = DMath.rotated(_bm_origin[at].direction_to(centre), _bm_turn[at])
+			aimed = true
+	if sweep != 0.0 and not aimed:
+		_bm_dir[at] = DMath.rotated(_bm_dir[at], sweep)
 
 
 ## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,

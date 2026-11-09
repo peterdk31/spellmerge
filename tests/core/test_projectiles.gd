@@ -539,25 +539,21 @@ func _test_one_thousand_run_and_draw() -> void:
 
 
 ## A shot's body is tinted by its owner and its core takes the element's colour
-## (`set_core`), so no shot is only the owner's colour; runes and orbit shots have batches
-## (and art) of their own.
+## (`set_core`), so no shot is only the owner's colour; runes have a batch (and art) of their own.
 func _test_shot_core_colour_and_batches() -> void:
 	_setup()
 	root.add_child(_mgr)
 	var frost := Color(0.5, 0.75, 0.94)
 	var bolt: int = _mgr.spawn(1, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
 	var rune: int = _mgr.spawn(2, Vector2(20.0, 0.0), Vector2.ZERO, 1.0, 8.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	_mgr.set_anchor(3, Vector2(100.0, 100.0))
-	var orb: int = _mgr.spawn_orbit(3, 20.0, 0.0, 1.0, 1.0)
-	_check(_mgr.set_core(bolt, frost) and _mgr.set_core(rune, frost) and _mgr.set_core(orb, frost), "set_core takes a colour for a live shot")
+	_check(_mgr.set_core(bolt, frost) and _mgr.set_core(rune, frost), "set_core takes a colour for a live shot")
 	_check(not _mgr.set_core(-1, frost) and not _mgr.set_core(999999, frost), "set_core refuses a slot out of range")
 	_check(not _mgr.set_core(bolt, Color(NAN, 0.0, 0.0)), "set_core refuses a colour that is not finite")
 	_mgr.update_draw()
-	_check(_mgr.drawn == 3, "the three shots are drawn (%d)" % _mgr.drawn)
+	_check(_mgr.drawn == 2, "the two shots are drawn (%d)" % _mgr.drawn)
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the bolt is in the bolt batch")
 	_check(_mgr._still_node.multimesh.visible_instance_count == 1, "the rune is in the rune batch")
-	_check(_mgr._orbit_node.multimesh.visible_instance_count == 1, "the orbit shot is in the orbit batch")
-	for node: MultiMeshInstance2D in [_mgr._draw_node, _mgr._still_node, _mgr._orbit_node]:
+	for node: MultiMeshInstance2D in [_mgr._draw_node, _mgr._still_node]:
 		var buffer: PackedFloat32Array = node.multimesh.buffer
 		_check(is_equal_approx(buffer[12], frost.r) and is_equal_approx(buffer[13], frost.g) and is_equal_approx(buffer[14], frost.b), "the core colour is in the custom data")
 	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
@@ -579,7 +575,7 @@ func _test_shot_core_colour_and_batches() -> void:
 	_check(again >= 0 and is_equal_approx(plain[12], 1.0) and is_equal_approx(plain[13], 1.0) and is_equal_approx(plain[14], 1.0), "a new shot has a white core, not the last one's")
 	var art := PlaceholderTexture2D.new()
 	_mgr.texture = art
-	_check(_mgr._still_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art")
+	_check(_mgr._draw_node.texture == art and _mgr._still_node.texture == art, "bolts and runes use the shared art")
 	root.remove_child(_mgr)
 
 
@@ -663,33 +659,27 @@ func _test_batches_upload_only_the_used_slice() -> void:
 	root.remove_child(_mgr)
 
 
-## Bolts, runes, orbit shots and enemy shots at once: each batch has the room, the
+## Bolts, runes and enemy shots at once: each batch has the room, the
 ## buffer size and the positions of its own shots, and none is dropped.
 func _test_every_batch_is_sized_to_its_own_shots() -> void:
 	_setup()
 	root.add_child(_mgr)
 	_mgr.set_cap(300)
 	var stride: int = ManagerScript.DRAW_STRIDE
-	_mgr.set_anchor(3, Vector2(100.0, 100.0))
 	var bolts: int = 70
 	var runes: int = 5
-	var orbits: int = 3
 	var hostile: int = 2
 	for i in bolts:
 		_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
 	for i in runes:
 		_mgr.spawn(2, Vector2(float(i) + 1.0, 50.0), Vector2.ZERO, 5.0, 8.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	var orbit_slots: Array[int] = []
-	for i in orbits:
-		orbit_slots.append(_mgr.spawn_orbit(3, 20.0 + float(i) * 10.0, float(i), 1.0, 1.0))
 	for i in hostile:
 		_mgr.spawn(EventsScript.NO_PLAYER, Vector2(float(i) + 1.0, 90.0), Vector2(0.0, 1.0), 5.0, 5.0, ManagerScript.LAYER_PLAYER)
 	_mgr.update_draw()
-	_check(_mgr.drawn == bolts + runes + orbits + hostile, "every shot is drawn (%d)" % _mgr.drawn)
+	_check(_mgr.drawn == bolts + runes + hostile, "every shot is drawn (%d)" % _mgr.drawn)
 	var wanted: Array = [
 		[_mgr._draw_node, bolts, 128],
 		[_mgr._still_node, runes, ManagerScript.MIN_BATCH],
-		[_mgr._orbit_node, orbits, ManagerScript.MIN_BATCH],
 		[_mgr._enemy_node, hostile, ManagerScript.MIN_BATCH],
 	]
 	for row: Array in wanted:
@@ -701,17 +691,10 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 	var bolt_buffer: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
 	var rune_buffer: PackedFloat32Array = _mgr._still_node.multimesh.buffer
 	var hostile_buffer: PackedFloat32Array = _mgr._enemy_node.multimesh.buffer
-	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
 	# A shot in flight holds its head where it is drawn; the shader puts the quad round its trail.
 	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts)), "the last bolt is at its place")
 	_check(is_equal_approx(rune_buffer[(runes - 1) * stride + 3], float(runes)) and is_equal_approx(rune_buffer[7], 50.0), "the last rune is at its place")
 	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0), "the last enemy shot is at its place")
-	var orbit_ok: bool = true
-	for i in orbits:
-		# Just cast: drawn on its caster, before it spirals out to its circle (ORBIT_GROW).
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], 100.0)
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], 100.0)
-	_check(orbit_ok and orbit_slots.min() >= 0, "the orbit shots are at their places")
 	root.remove_child(_mgr)
 
 

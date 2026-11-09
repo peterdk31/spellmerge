@@ -224,6 +224,12 @@ func on_floor(spell: CompiledSpell, point: Vector2) -> Vector2:
 	return _rt._skyfall.on_floor(spell, point)
 
 
+## Orbit: how fast a beam of `spell` sweeps round its caster, in radians a second (0 for one that
+## does not circle; core/spells/orbit.gd).
+func orbit_sweep(spell: CompiledSpell) -> float:
+	return _rt._orbit.sweep_of(spell)
+
+
 ## A shot spawned in `slot` (-1 when the manager refused it) takes its cards and its record and does
 ## not hit `source` for a while: 1 when it was made. What a carrier calls after `projectiles.spawn`.
 func land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:

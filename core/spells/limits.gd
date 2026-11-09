@@ -168,8 +168,6 @@ const SLAM_SHARE: float = 1.0
 const HEAL_ENEMY_SHARE: float = 0.1
 ## Speed of a chain jump when the spell's own speed is lower (a rune or a beam has none).
 const CHAIN_MIN_SPEED: float = 300.0
-## Radians per second an orbit form turns when it gives no speed.
-const ORBIT_TURN: float = 3.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that
 ## ended on a wall fires in front of it.
 const EXPIRE_BACKOFF: float = 2.0

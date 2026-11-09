@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The look of each form in gameplay/feel (#244, part 2; the glow look, 2026-10-27): a cast
-## flash at the staff and, for a ring carrier, a ring (a dash's flashes out, a rune's and an
-## orbit's gather in), a flash where its shot lands in the shot's own colours and cards (a
+## flash at the staff and, for a ring carrier, a ring (a dash's flashes out, a rune's gathers
+## in), a flash where its shot lands in the shot's own colours and cards (a
 ## rune goes off in a burst of its own), a beam that opens wide and thins, and an enemy's shot
 ## that always shows the same ember mark no player's flare resembles. The cast and the impact are
 ## the cues the carrier card names (`FormBase.cast_cue`, `impact_cue`; S6 2).
@@ -25,7 +25,7 @@ class CardsRegistry:
 		return super(folder, id)
 
 
-const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune", &"orbit"]
+const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune"]
 ## The beam card's own look (`FormBase.look_shader`; docs/milestones/card-looks.md, phase 2).
 const BEAM_CARD_SHADER: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
 
@@ -113,11 +113,11 @@ func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:
 func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
 	var want: Dictionary = {
 		&"bolt": [1, 0, 0, 0, 0], &"beam": [1, 0, 0, 0, 0], &"dash": [1, 0, 1, 0, 0],
-		&"rune": [1, 0, 0, 1, 0], &"orbit": [1, 0, 0, 1, 0],
+		&"rune": [1, 0, 0, 1, 0],
 	}
 	for form: StringName in want:
 		_cast(0, form)
-		check_equal(_kinds(), want[form] as Array[int], "%s: a dash flashes a ring out, a rune and an orbit gather one in" % form)
+		check_equal(_kinds(), want[form] as Array[int], "%s: a dash flashes a ring out, a rune gathers one in" % form)
 		feel.step(1.0)
 
 
@@ -166,7 +166,7 @@ func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 func test_each_form_ends_its_own_way() -> void:
 	var want: Dictionary = {
 		&"bolt": [0, 1, 0, 0, 0], &"beam": [0, 1, 0, 0, 0], &"dash": [0, 1, 1, 0, 0],
-		&"rune": [0, 0, 0, 0, 1], &"orbit": [0, 1, 0, 0, 0], &"": [0, 1, 0, 0, 0],
+		&"rune": [0, 0, 0, 0, 1], &"": [0, 1, 0, 0, 0],
 	}
 	for form: StringName in want:
 		_impact(0, form)

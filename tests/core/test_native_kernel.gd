@@ -65,6 +65,9 @@ var _holders: Array[Node] = []
 ## Tail births laid while the tails were off (S5 step 4), and whether a frame hit the most.
 var _tails_laid: int = 0
 var _tails_capped: bool = false
+## Whether a circling shot went round backwards after a bounce (its `_orbit_way`), so the kernel's
+## orbit pass is compared on one.
+var _turned_back: bool = false
 
 
 func _initialize() -> void:
@@ -166,7 +169,7 @@ func _test_both_step_alike(threads: int) -> void:
 		mgr.spark_motes = true
 		mgr._spark_rng.seed = 11
 		mgr.set_walls([Rect2(0, 0, 960, 24), Rect2(0, 516, 960, 24), Rect2(0, 0, 24, 540), Rect2(936, 0, 24, 540),
-				Rect2(300, 200, 40, 40), Rect2(620, 300, 40, 40)] as Array[Rect2])
+				Rect2(300, 200, 40, 40), Rect2(620, 300, 40, 40), Rect2(500, 150, 24, 24)] as Array[Rect2])
 		_mgrs.append(mgr)
 		_buses.append(bus)
 		_tables.append(table)
@@ -191,6 +194,7 @@ func _test_both_step_alike(threads: int) -> void:
 	_batch_seen.fill(0)
 	_tails_laid = 0
 	_tails_capped = false
+	_turned_back = false
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -208,6 +212,7 @@ func _test_both_step_alike(threads: int) -> void:
 		_compare_draw(step)
 		_tails_laid += _mgrs[1].tail_births
 		_tails_capped = _tails_capped or (_mgrs[1].tail_births == _mgrs[1].tail_births_cap and _mgrs[1].tail_spacing > ManagerScript.TAIL_SPACING)
+		_turned_back = _turned_back or _mgrs[1]._orbit_way.has(-1.0)
 		# Threat asks: enough in a step for the grid (from the third), and some in a step without it.
 		var asks: int = 6 if step % 3 != 2 else 1
 		for n in asks:
@@ -229,6 +234,7 @@ func _test_both_step_alike(threads: int) -> void:
 		_check(_batch_seen[batch] > 0, "batch %d was drawn and compared" % batch)
 	_check(_mgrs[1].drawn > 300, "and draws them (%d)" % _mgrs[1].drawn)
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
+	_check(_turned_back, "a circling shot bounced and went round backwards")
 
 
 
@@ -341,7 +347,20 @@ func _drive(side: int, step: int) -> void:
 				# A rune, or one of the card bodies (their batches, the enemy ramp's too).
 				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		elif kind == 1:
-			slot = m.spawn_orbit(caster if caster != _imp else 0, rng.randf_range(20.0, 60.0), rng.randf() * TAU, rng.randf_range(-4.0, 4.0), rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1)
+			# A shot set circling its caster's body (orbit as a modifier, 5A): most are bolts cast with
+			# a speed, turned by it over their radius plus a drift; some have no speed and only drift.
+			# (The speed curve below takes them too: the orbit pass reads `_curve_factor`.)
+			var who: int = caster if caster != _imp else 0
+			var round_radius: float = rng.randf_range(20.0, 60.0)
+			var angle: float = rng.randf() * TAU
+			var drift: float = rng.randf_range(-4.0, 4.0)
+			var own_speed: Vector2 = velocity if rng.randf() < 0.75 else Vector2.ZERO
+			slot = m.spawn(who, m.get_anchor(who), own_speed, rng.randf_range(0.5, 2.0), rng.randf_range(1.5, 6.0), ManagerScript.LAYER_ENEMY, 1000, 1)
+			if slot >= 0 and not m.set_orbit(slot, round_radius, angle, drift):
+				_failures.append("step %d: set_orbit refused a live straight shot" % step)
+			if slot >= 0 and slot % 2 == 0:
+				# Some bounce: a wall across the circle (the block by the imp's anchor) turns them back round.
+				m.set_bounce(slot, 3)
 			if slot >= 0 and slot % 3 == 0:
 				# An orbit shot of a card body: a head body's pair, or plain for a quad body.
 				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
@@ -377,9 +396,10 @@ func _drive(side: int, step: int) -> void:
 				m.set_return(slot)
 				if rng.randf() < 0.5:
 					m.set_homing(slot, 2.5, 140.0)
-		# A speed curve on any of them (only a flying shot takes it): it sets the speed of the kinds
-		# above before homing turns and spiral weaves it, and a returning one turns with its speed.
-		if rng.randf() < 0.2:
+		# A speed curve on any of them (a flying or circling shot takes it): it sets the speed of the
+		# kinds above before homing turns and spiral weaves it, a returning one turns with its speed,
+		# and a circling one turns by it. Circling shots take one more often, so many are compared.
+		if rng.randf() < (0.5 if kind == 1 else 0.2):
 			m.set_speed_curve(slot, rng.randf_range(0.3, 5.0), rng.randf_range(0.0, 2.0), rng.randf_range(0.3, 3.0))
 		# Rarer kinds, from the same draws on both sides.
 		var extra: float = rng.randf()

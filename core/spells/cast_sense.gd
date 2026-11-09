@@ -112,6 +112,11 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 	if falls:
 		spell_reach = 0.0
 	var carried: float = spell.radius if falls else spell_reach
+	# Orbit: it circles its caster, an area as wide as its circle, not aimed.
+	var circles: bool = Orbit.orbits_on(spell, carrier)
+	if circles:
+		spell_reach = 0.0
+		carried = spell.orbit_radius + spell.radius
 	if ways > 1:
 		spell_reach = 0.0
 	if first:
@@ -136,13 +141,13 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = falls or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = falls or circles or ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring:
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.
 	var near: float = 0.0
 	if spell_reach <= 0.0:
-		if ring and spell.speed > 0.0:
+		if ring and spell.speed > 0.0 and not circles:
 			near = spell.speed * spell.lifetime
 		near = maxf(near, spell.orbit_radius + spell.radius)
 		near = maxf(near, spell.ray_length)

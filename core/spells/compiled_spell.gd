@@ -55,6 +55,8 @@ var traits: int = 0
 ## What draws its carrier's look (`Carrier.look_drawer`, LOOK_*), kept with the traits.
 var look_drawer: int = Carrier.LOOK_NONE
 var pierce: int = 0
+## The circle it goes round when it has the Orbit card (core/spells/orbit.gd): the largest of its
+## Orbit cards' `behaviour_reach`; 0 without one.
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
 ## SWING: degrees its sweep hits over (`FormBase.arc`). `wind_up`: the seconds its cast winds up

@@ -26,10 +26,11 @@ extends SceneTree
 ## and lights alone, and the trail rows and their `--no-tails` switch are gone.)
 ##
 ## Each scenario fills its own projectile manager (not the autoload) with `shots` shots from a
-## seeded generator: four seats' and the enemies' (no actor) bolts, a few orbits, a fifth with
-## lightning's look, the rest with up to three of the other card kinds, a third bouncing off the
-## room's border, and two wizards walking round (their orbits' anchors; their dashes' streaks are
-## Feel's since 2026-11-05, a `stream` cue part). A shot that ends is replaced, so the count holds. The
+## seeded generator: four seats' and the enemies' (no actor) bolts, a fifth with lightning's look,
+## the rest with up to three of the other card kinds, a third bouncing off the room's border. (The
+## few orbit shots and the two wizards walking round as their anchors went with orbit as a
+## modifier, 5A, 2026-11-09: a circling shot is drawn as the bolt it is, so it costs the GPU what a
+## bolt does.) A shot that ends is replaced, so the count holds. The
 ## manager is stepped and drawn by hand at a fixed 60 steps a second, so a frame is the same on
 ## every run of the same code: a change that should look the same can be compared pixel by pixel
 ## (the saved frames of two checkouts). It prints `BENCH: shot gpu` lines: the GPU time of a frame
@@ -185,16 +186,14 @@ func _scenario(scenario: Dictionary) -> void:
 	# Stepped and drawn by hand only (see the top).
 	_mgr.set_process(false)
 	_mgr.set_walls([Rect2(0.0, 0.0, 640.0, 8.0), Rect2(0.0, 352.0, 640.0, 8.0), Rect2(0.0, 0.0, 8.0, 360.0), Rect2(632.0, 0.0, 8.0, 360.0)] as Array[Rect2])
-	for seat in 4:
-		_mgr.set_anchor(seat, Vector2(160.0 + 100.0 * seat, 180.0))
 	for i in shots:
 		_spawn()
-	for n in WARM_STEPS:
-		_step(n, shots)
+	for _n in WARM_STEPS:
+		_step(shots)
 	var label: String = scenario["label"]
 	if not _frames_dir.is_empty():
 		for f in SAVED_FRAMES:
-			_step(WARM_STEPS + f, shots)
+			_step(shots)
 			_mgr.update_draw(1.0)
 			_throw_motes(WARM_STEPS + f)
 			await process_frame
@@ -211,7 +210,7 @@ func _scenario(scenario: Dictionary) -> void:
 	var last: int = Time.get_ticks_usec()
 	for f in _timed if _time else 0:
 		var stepped: int = Time.get_ticks_usec()
-		_step(WARM_STEPS + SAVED_FRAMES + f, shots)
+		_step(shots)
 		step_times.append(float(Time.get_ticks_usec() - stepped) / 1000.0)
 		var before: int = Time.get_ticks_usec()
 		_mgr.update_draw(1.0)
@@ -277,11 +276,8 @@ func _vertices() -> int:
 	return total
 
 
-## One step: the wizards walk, the step, and new shots for the ones that ended.
-func _step(n: int, shots: int) -> void:
-	for seat in 2:
-		var angle: float = float(n) * 0.09 + float(seat) * PI
-		_mgr.set_anchor(seat, Vector2(320.0, 180.0) + Vector2(cos(angle), sin(angle)) * 120.0)
+## One step: the step, and new shots for the ones that ended.
+func _step(shots: int) -> void:
 	_mgr.step(DT)
 	while _mgr.get_count() < shots:
 		_spawn()
@@ -290,15 +286,11 @@ func _step(n: int, shots: int) -> void:
 func _spawn() -> void:
 	var caster: int = _rng.randi_range(-1, 3)
 	var radius: float = _rng.randf_range(2.0, 8.0)
-	var slot: int = -1
-	if _rng.randf() < 0.06 and caster >= 0:
-		slot = _mgr.spawn_orbit(caster, _rng.randf_range(20.0, 60.0), _rng.randf() * TAU, _rng.randf_range(2.0, 5.0), _rng.randf_range(0.8, 2.0), radius)
-	else:
-		var at := Vector2(_rng.randf_range(24.0, 616.0), _rng.randf_range(24.0, 336.0))
-		var velocity := Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(90.0, 520.0)
-		slot = _mgr.spawn(caster, at, velocity, _rng.randf_range(0.5, 2.0), radius)
-		if slot >= 0 and _rng.randf() < 0.33:
-			_mgr.set_bounce(slot, 3)
+	var at := Vector2(_rng.randf_range(24.0, 616.0), _rng.randf_range(24.0, 336.0))
+	var velocity := Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(90.0, 520.0)
+	var slot: int = _mgr.spawn(caster, at, velocity, _rng.randf_range(0.5, 2.0), radius)
+	if slot >= 0 and _rng.randf() < 0.33:
+		_mgr.set_bounce(slot, 3)
 	if slot < 0:
 		return
 	var kinds := PackedInt32Array()

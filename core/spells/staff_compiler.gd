@@ -391,6 +391,10 @@ static func _numbers_count(modifier: ModifierBase, on: Carrier, blasts: bool, pa
 		any = true
 		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
 			return true
+	if modifier.lifetime_base > 0.0:
+		any = true
+		if on.has(Carrier.SPEED) or on.has(Carrier.LASTS):
+			return true
 	if modifier.shot_mult != 1:
 		any = true
 		if on.has(Carrier.SHOTS):
@@ -447,7 +451,6 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.form_id = form.id
 		spell.form_name = _name(form)
 		spell.lifetime = form.lifetime
-		spell.orbit_radius = form.orbit_radius
 		spell.ray_length = form.ray_length
 		spell.arc = form.arc
 		spell.wind_up = maxf(form.wind_up, 0.0)
@@ -481,6 +484,13 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 		spell.element_ids.append(element.id)
 		damage *= element.damage_scale
 		heals = heals or element.heals
+	# A card's `lifetime_base` replaces the form's life before any factor (the longest counts), so
+	# the factors below act on it whatever the slot order.
+	var life_base: float = 0.0
+	for modifier in modifiers:
+		life_base = maxf(life_base, modifier.lifetime_base)
+	if life_base > 0.0:
+		spell.lifetime = life_base
 	for modifier in modifiers:
 		spell.modifier_ids.append(modifier.id)
 		damage *= modifier.damage_mult
@@ -504,6 +514,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 			spell.ray_length *= modifier.reach_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ZAP:
 			spell.zap_reach = maxf(spell.zap_reach, modifier.behaviour_reach)
+		elif modifier.behaviour == ModifierBase.Behaviour.ORBIT:
+			spell.orbit_radius = maxf(spell.orbit_radius, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
 			spell.behaviour_cues[modifier.behaviour] = modifier.cue
@@ -529,7 +541,7 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	spell.shots = shots
 	spell.shots_requested = shots
 	spell.pierce = pierce
-	if spell.shots > 1 and spell.spread <= 0.0 and not carrier.has(Carrier.RING):
+	if spell.shots > 1 and spell.spread <= 0.0:
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
 	spell.hit.damage = spell.damage
@@ -545,7 +557,8 @@ func _build(form: FormBase, on: Carrier, elements: Array[ElementBase], modifiers
 	# A swing's sweep, a slam's shockwave (`burst`), a beam's ray.
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
-	if spell.homing_curve > 0.0:
+	# Orbit: a carrier that circles has no heading of its own to steer, so homing does nothing on it.
+	if spell.homing_curve > 0.0 and not Orbit.orbits_on(spell, carrier):
 		spell.homing_range = carrier.homing_range(spell.ray_length, homing_reach)
 		# Past 180 degrees it would be bending back the other way: that is all the way round.
 		spell.homing_angle = minf(rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / spell.homing_curve), 180.0)

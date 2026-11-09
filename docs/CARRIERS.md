@@ -17,9 +17,9 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | Flag | The question |
 | --- | --- |
 | `FLIES` | Does it fly out on its own, as a shot (a bolt, a hook, a swap)? |
-| `MOVES` | Does it travel along a path through the world (also an orbit)? |
+| `MOVES` | Does it travel along a path through the world (a bolt, a swap; circling with Orbit too)? |
 | `LINE` | Is it a line that is there at once (a beam)? |
-| `STAYS` | Is it a shot that stays in the world a while (a bolt, a rune, an orbit, a wall...)? |
+| `STAYS` | Is it a shot that stays in the world a while (a bolt, a rune, a pool, a wall...)? |
 | `HITS` | Does it hit things itself (not a decoy or a familiar)? |
 | `LASTS` | Does it last a while (not a slam or a teleport, which are over at once)? |
 | `STEERS` | Can homing steer it (turn it, bend it, place it on a target, or creep it toward one: a rune, a wall, a decoy)? |
@@ -29,7 +29,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `BLOCKS` | Does it stand in the world and stop other actors' shots (a wall)? Read only by the AI's summary (`CastSense`). |
 | `SPAWNS` | Does it make a body of its own that stays (a decoy, a familiar)? Read only by `CastSense`. |
 | `GATES` | Does it open a way through that shots and bodies take (a portal)? Read only by `CastSense` (`opens`: the AI casts it to open a fight). |
-| `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, an orbit, a wall)? |
+| `CASTS_FROM_SHOT` | Is it shots of the projectile manager, each casting what it fires while it lives (a bolt, a rune, a pool, a wall)? |
 | `CASTS_FROM_BODY` | Is it a body of its own, an actor, that casts what it fires (a decoy)? |
 | `CASTERLESS` | Is it cast by nothing a push could move (the point fallback)? Recoil needs a caster to push. |
 | `MELEE` | Is it held by or carried with the body that casts it, never leaving it (swing, slam, dash, teleport)? Then it never hits that body (`CarrierKit.spared`); a ranged carrier spares it only until it has left it: a shot over time, a beam along its path (it hits its caster when it bounces or bends back into them). |
@@ -114,8 +114,8 @@ The runtime does what the compiled rule promises, and decides each time which it
 a payload casts all of it**, its carriers too, not only its left-over cards (owner, 2026-11-06): a
 payload fired from an actor's body (a decoy's own, or the wizard's for a dash's timer, `on hurt`
 or end, a barrier's block) is cast by that body, the way a staff's own cast is cast by the
-wizard's: a dash, teleport, pull or swap in it moves that body, an orbit or familiar circles and
-follows it, a returning shot comes back to it, a beam, swing or slam is held by it, recoil pushes
+wizard's: a dash, teleport, pull or swap in it moves that body, a circling carrier (Orbit) or a
+familiar circles and follows it, a returning shot comes back to it, a beam, swing or slam is held by it, recoil pushes
 it. A shot casts its payload the same way, as before. Only a point moves nothing (a move cast by
 one moves the wizard, rules R4c). The payload's actor stays the wizard: kill credit, budgets,
 colours and tag.
@@ -172,7 +172,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 | Hook | Default | Overridden by |
 | --- | --- | --- |
 | `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), wall (one solid line) |
-| `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
+| `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows), pool (forgets what it touches every `POOL_TICK`, so it strikes it again), portal (moves what went into its gates) |
@@ -288,3 +288,12 @@ it is refused by the validator.
 Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`), implement it, and,
 if it does not work on every carrier, say what it needs in `ModifierBase.RULES` "needs" (or `TriggerBase.NEEDS`), traits and cards alike. If it
 needs something no flag asks yet, add the flag and answer it on each carrier.
+
+A modifier that changes **how any carrier is cast or moves** (Nova, Skyfall, Orbit) is a module of
+its own beside the runtime, not code in each carrier: `core/spells/skyfall.gd` and
+`core/spells/orbit.gd` hold all of theirs, and the runtime calls them at a few marked lines (Orbit:
+`Spells._land_shots`, which sees every row a carrier makes, turns each into a circler with
+`Projectiles.set_orbit` before its other cards are set, and the beam's step asks
+`CarrierKit.orbit_sweep`). No carrier knows about them, so taking one out is its file, its card
+folder and those lines. What the card sets that any card could set is a general field, not the
+module's (Orbit's 3 s is `ModifierBase.lifetime_base`).

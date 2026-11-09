@@ -426,21 +426,21 @@ func test_the_wizards_own_held_beam_still_pulls_the_wizard_on_its_later_hits() -
 	world.free_all()
 
 
-## The distance of every live orbit shot from `centre`.
+## The distance of every live circling shot (its spell has the Orbit card) from `centre`.
 func _orbits_from(world: World, centre: Vector2) -> PackedFloat32Array:
 	var out := PackedFloat32Array()
 	for slot in world.projectiles.get_cap():
 		if not world.projectiles.is_alive(slot):
 			continue
 		var spell: CompiledSpell = world.spells.profile(world.projectiles.get_tag_of(slot))
-		if spell != null and spell.carrier == &"orbit":
+		if spell != null and spell.behaviour(ModifierBase.Behaviour.ORBIT) > 0.0:
 			out.append(world.projectiles.get_position_of(slot).distance_to(centre))
 	return out
 
 
 func test_a_decoys_timer_orbit_circles_the_decoy_and_follows_it() -> void:
-	var orbit: FormBase = load("res://content/spells/forms/orbit/orbit.tres") as FormBase
-	var made: Array = _decoy_world([&"timer", &"homing", &"decoy", &"orbit"], Vector2(140.0, 0.0))
+	var orbit: ModifierBase = load("res://content/spells/modifiers/orbit/orbit.tres") as ModifierBase
+	var made: Array = _decoy_world([&"timer", &"homing", &"decoy", &"orbit", &"bolt"], Vector2(140.0, 0.0))
 	var world: World = made[0]
 	var decoy: Actor = made[2]
 	if decoy != null:
@@ -449,14 +449,14 @@ func test_a_decoys_timer_orbit_circles_the_decoy_and_follows_it() -> void:
 			var around: PackedFloat32Array = _orbits_from(world, world.projectiles.get_anchor(decoy.id))
 			check(not around.is_empty(), "orbs fly")
 			for distance in around:
-				check(absf(distance - orbit.orbit_radius) < 3.0, "every orb circles the decoy at its radius (%s)" % around)
+				check(absf(distance - orbit.behaviour_reach) < 3.0, "every orb circles the decoy at its radius (%s)" % around)
 		check(decoy.global_position.distance_to(made[3]) > 15.0, "and the decoy crept on meanwhile (%s to %s)" % [made[3], decoy.global_position])
 	world.free_all()
 
 
 func test_an_orbit_in_a_dashs_timer_circles_the_wizard() -> void:
-	var orbit: FormBase = load("res://content/spells/forms/orbit/orbit.tres") as FormBase
-	var made: Array = _world([&"timer", &"dash", &"orbit"], Vector2(400.0, 300.0))
+	var orbit: ModifierBase = load("res://content/spells/modifiers/orbit/orbit.tres") as ModifierBase
+	var made: Array = _world([&"timer", &"dash", &"orbit", &"bolt"], Vector2(400.0, 300.0))
 	var world: World = made[0]
 	var wizard: Actor = made[1]
 	var start: Vector2 = wizard.global_position
@@ -465,7 +465,7 @@ func test_an_orbit_in_a_dashs_timer_circles_the_wizard() -> void:
 	var around: PackedFloat32Array = _orbits_from(world, world.projectiles.get_anchor(wizard.id))
 	check(not around.is_empty(), "an orbit flies")
 	for distance in around:
-		check(absf(distance - orbit.orbit_radius) < 3.0, "it circles the wizard, not a spot on its way (%s)" % around)
+		check(absf(distance - orbit.behaviour_reach) < 3.0, "it circles the wizard, not a spot on its way (%s)" % around)
 	world.free_all()
 
 

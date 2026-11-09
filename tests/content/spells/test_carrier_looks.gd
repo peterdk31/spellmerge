@@ -31,7 +31,7 @@ func _cues_of(form: FormBase) -> Dictionary:
 
 func test_every_carrier_card_casts_and_lands_in_a_cue() -> void:
 	var forms: Array[FormBase] = _forms()
-	check(forms.size() >= 15, "the carrier cards are found: %d" % forms.size())
+	check(forms.size() >= 14, "the carrier cards are found: %d" % forms.size())
 	for form: FormBase in forms:
 		check(form.cast_cue != &"", "%s has a cast cue" % form.id)
 		check(form.impact_cue != &"", "%s has an impact cue" % form.id)

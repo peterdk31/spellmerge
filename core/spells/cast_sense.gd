@@ -106,6 +106,11 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		return
 	var carrier: Carrier = Carriers.of(spell.carrier)
 	var spell_reach: float = carrier.reach_of(spell)
+	# A nova casts it every way at once: not aimed, an area as far out as each copy goes.
+	var ways: int = spell.nova_ways()
+	var carried: float = spell_reach
+	if ways > 1:
+		spell_reach = 0.0
 	if first:
 		radius = spell.radius
 		speed = spell.speed if spell_reach > 0.0 and spell.speed > 0.0 and spell.has_trait(CarrierTraits.FLIES) else 0.0
@@ -128,7 +133,7 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 		sustained = true
 	if spell.has_trait(CarrierTraits.REPEATS_HELD) or spell.has_trait(CarrierTraits.LINE):
 		repeats_held = true
-	var ring: bool = spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
+	var ring: bool = ways > 1 or spell.spread >= 360.0 or spell.has_trait(CarrierTraits.RING) or spell.has_trait(CarrierTraits.OUTWARD)
 	if ring or spell.has_trait(CarrierTraits.CARRIES_PAYLOAD):
 		area = true
 	# How near a cast that is not aimed must be: a ring's flight, an orbit's circle, a melee arc.
@@ -138,9 +143,10 @@ func _read_spell(spell: CompiledSpell, repeats: float, first: bool) -> void:
 			near = spell.speed * spell.lifetime
 		near = maxf(near, spell.orbit_radius + spell.radius)
 		near = maxf(near, spell.ray_length)
+		near = maxf(near, carried)
 	close_reach = maxf(close_reach, near if spell_reach <= 0.0 else spell_reach)
 	var hit: HitProfile = spell.hit
-	var shots: float = float(maxi(spell.shots, 1))
+	var shots: float = float(maxi(spell.shots, 1) * ways)
 	if hit != null:
 		if hit.heal > 0:
 			heals = true

@@ -158,7 +158,7 @@ func test_a_zap_sets_off_on_hit() -> void:
 	var arena := ArenaScript.new(root)
 	var near: Node2D = arena.add_imp(Vector2(0.0, 50.0))
 	var behind: Node2D = arena.add_imp(Vector2(0.0, 75.0))
-	arena.install_cards(0, 0, ["zap", "on_hit", "rune", "nova"])
+	arena.install_cards(0, 0, ["zap", "on_hit", "rune", "nova", "bolt"])
 	for n in 4:
 		arena.cast(0, 0)
 		arena.run(1.2)

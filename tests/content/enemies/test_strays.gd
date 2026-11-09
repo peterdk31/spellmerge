@@ -26,7 +26,7 @@ const GLOWS: Array[Color] = [
 	Color(0.878, 0.541, 0.847, 1),
 ]
 ## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"void", &"rain", &"nova"]]
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"rain", &"void", &"blast"]]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -156,7 +156,7 @@ func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:
 
 
 func test_a_stray_plays_its_carriers_staff_animation() -> void:
-	# The Bone Scepter casts void · rain · nova: its rain's animation raises the staff, glowing,
+	# The Bone Scepter casts rain · void · blast: its rain's animation raises the staff, glowing,
 	# until the rain falls, as a wizard's does (ActorLook's pose, shared by every look).
 	var world := AiFixture.new(root, 1)
 	world.players[0].position = Vector2(70.0, 0.0)

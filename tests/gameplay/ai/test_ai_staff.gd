@@ -66,14 +66,14 @@ func before_each() -> void:
 	bolt.radius = 4.0
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
-	var nova := FormBase.new()
-	nova.base_damage = 3
-	nova.speed = 150.0
-	nova.lifetime = 0.5
-	nova.shots = 8
-	nova.spread = 360.0
-	nova.mana_cost = 2.0
-	_put(nova, &"nova")
+	var halo := FormBase.new()
+	halo.base_damage = 3
+	halo.speed = 150.0
+	halo.lifetime = 0.5
+	halo.shots = 8
+	halo.spread = 360.0
+	halo.mana_cost = 2.0
+	_put(halo, &"halo")
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor
 	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
@@ -234,9 +234,9 @@ func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	if winding.size() == 1:
 		check(is_equal_approx(_spells.carrier_reach(winding[0][3]), 200.0), "its lane as far as the bolt flies (%.1f)" % _spells.carrier_reach(winding[0][3]))
 		check(is_equal_approx(_spells.carrier_radius(winding[0][3]), 4.0), "as wide as the bolt")
-	var ring := _enemy(_data([&"nova"]), Vector2(0.0, 40.0))
+	var ring := _enemy(_data([&"halo"]), Vector2(0.0, 40.0))
 	_until_windup(ring, 1.0)
-	check(_ai(ring).is_telegraphing(), "a nova winds up too")
+	check(_ai(ring).is_telegraphing(), "a halo winds up too")
 	check(winding.size() == 2 and _spells.carrier_reach(winding[1][3]) == 0.0, "but its lane shows none: it is not aimed")
 
 
@@ -278,10 +278,10 @@ func test_it_walks_round_a_wall_instead_of_shooting_into_it() -> void:
 
 
 func test_a_cast_that_is_not_aimed_ignores_walls() -> void:
-	var enemy := _enemy(_data([&"nova"], 100.0, 10.0), Vector2(0.0, 0.0))
+	var enemy := _enemy(_data([&"halo"], 100.0, 10.0), Vector2(0.0, 0.0))
 	_projectiles.set_bounds(Rect2(-400.0, -400.0, 800.0, 800.0))
 	_projectiles.set_walls([Rect2(32.0, -40.0, 16.0, 64.0)] as Array[Rect2])
-	check(_until_windup(enemy, 1.0), "a nova winds up behind the wall as before")
+	check(_until_windup(enemy, 1.0), "a halo winds up behind the wall as before")
 
 
 ## A minion (owner, 2026-11-01: an idea for a card, not built yet): an enemy handed to an AI of the

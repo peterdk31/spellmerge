@@ -28,7 +28,7 @@ The characters and the story were rewritten on 2026-10-28 at the owner's word (d
 
 ## Writing rules
 
-- Names are plain nouns, two words at most ("Hexed Bolt", not "The Bolt of Eternal Hexing"). Spell parts keep the names of the registry: Bolt, Beam, Nova, Rune, Orbit; Fire, Frost, Storm, Void; Split, Pierce, Homing, Chain, Bigger, Faster; On Hit, On Expire, Timer.
+- Names are plain nouns, two words at most ("Hexed Bolt", not "The Bolt of Eternal Hexing"). Spell parts keep the names of the registry: Bolt, Beam, Rune, Orbit; Fire, Frost, Storm, Void; Split, Pierce, Homing, Chain, Bigger, Faster, Nova; On Hit, On Expire, Timer.
 - Describe the effect truthfully first. A description must never promise something the component does not do.
 - Humour is aimed at the in-world guild, its wizards and the magic. It never mocks the real player for playing badly or losing, and never targets real groups of people.
 - No swearing, no real-world politics or religion, no graphic violence; fights are about spells and imps.

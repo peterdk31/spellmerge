@@ -1,0 +1,10 @@
+{
+	"id": "nova_fire_spin",
+	"name": "Fire spin",
+	"does": "A nova of swings is eight sweeps at once: a spin that burns every imp crowding the caster, the one behind too.",
+	"needs": "nova",
+	"casts": [{"staff": 0, "cards": ["nova", "fire", "swing"]}],
+	"imps": [[20, 0], [0, 20], [-20, 0], [0, -20]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0, 1, 2, 3], "status": "burn"}]
+}

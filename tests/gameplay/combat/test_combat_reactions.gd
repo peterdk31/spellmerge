@@ -428,26 +428,28 @@ func test_an_enemy_reacts_once_per_wait_and_the_next_hit_does_its_own_status() -
 	check_equal(_ids(), [&"flare", &"flare"], "after the wait it reacts again")
 
 
-func test_twenty_stillness_hits_freeze_for_no_more_than_the_limit() -> void:
+## No cap on EXTEND (owner, 2026-11-09: "Caps are not logical"): every reaction adds its 2 s, and
+## half a second passes between them, so twenty freeze for far longer than the old 4 s limit.
+func test_twenty_stillness_hits_keep_adding_to_the_freeze() -> void:
 	var enemy := _enemy(Vector2.ZERO, 1000)
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
 	for i in 20:
 		_hit(0, enemy, &"void")
-		check(_combat.status_left(enemy, &"freeze") <= CombatScript.MAX_FREEZE, "frozen no longer than the cap")
 		_run(CombatScript.REACTION_WAIT + STEP)
-	check(_combat.has_status(enemy, &"freeze"), "still frozen: the cap is a ceiling")
+	check(_combat.has_status(enemy, &"freeze"), "still frozen")
+	check(_combat.status_left(enemy, &"freeze") > 20.0, "every reaction added its time: %.1f s left" % _combat.status_left(enemy, &"freeze"))
 
 
-func test_twenty_stillness_hits_on_hex_stay_under_the_caps() -> void:
+func test_twenty_stillness_hits_on_hex_keep_adding_up() -> void:
 	var enemy := _enemy(Vector2.ZERO, 100000)
 	_combat.apply_status(0, enemy, &"hex", 4.0, 25.0)
 	for i in 20:
 		_hit(0, enemy, &"frost")
 		_run(CombatScript.REACTION_WAIT + STEP)
-	check(_combat.status_left(enemy, &"hex") <= CombatScript.MAX_EXTENDED_TIME, "hex time under its cap")
+	check(_combat.status_left(enemy, &"hex") > 20.0, "every reaction added its time: %.1f s" % _combat.status_left(enemy, &"hex"))
 	var before: float = _combat.health_of(enemy)
 	_combat.hit(0, enemy, 100)
-	check(before - _combat.health_of(enemy) <= 100 + 100, "hex adds at most 100 per cent")
+	check(before - _combat.health_of(enemy) > 100 + 100, "and its strength: hex adds more than 100 per cent (%.0f)" % (before - _combat.health_of(enemy)))
 
 
 func test_shatter_doubles_for_a_frozen_and_gusted_enemy() -> void:

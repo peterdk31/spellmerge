@@ -56,9 +56,9 @@ func before_each() -> void:
 	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.wind_down = 0.2
-	var nova: FormBase = _form(&"nova", 300.0, 1.0)
-	nova.shots = 8
-	nova.spread = 360.0
+	var halo: FormBase = _form(&"halo", 300.0, 1.0)
+	halo.shots = 8
+	halo.spread = 360.0
 	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
 	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 40.0
@@ -130,15 +130,15 @@ func _wait_ready(player: int, staff: int) -> void:
 
 
 func test_a_staff_casts_its_cycle_in_order_then_cools_down() -> void:
-	_install(0, 1, "fire bolt nova")
+	_install(0, 1, "fire bolt halo")
 	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), 2.0, "cast 1 spends the bolt's mana")
 	check_equal(_mgr.get_count(), 1, "one bolt")
 	check(is_equal_approx(_spells.cooldown_left(0, 1), 0.2), "the bolt's wind-down, got %s" % _spells.cooldown_left(0, 1))
 	check_equal(_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0), SpellsScript.REFUSED, "refused while it winds down")
-	check_equal(_spells.cast_index(0, 1), 1, "the nova is next")
+	check_equal(_spells.cast_index(0, 1), 1, "the halo is next")
 	_wait_ready(0, 1)
 	_spells.cast_staff(0, 1, Vector2.ZERO, AIM, 100.0)
-	check_equal(_mgr.get_count(), 9, "eight nova shots joined the bolt")
+	check_equal(_mgr.get_count(), 9, "eight halo shots joined the bolt")
 	check_equal(_spells.cast_index(0, 1), 0, "after the last card the staff starts over")
 	check(_spells.cooldown_left(0, 1) >= 0.5, "after its wind-down and the staff's cooldown")
 
@@ -161,12 +161,12 @@ func test_multicast_fires_two_carriers_along_the_aim() -> void:
 
 func test_a_payload_fires_on_hit_under_its_own_node() -> void:
 	_target(Vector2(60, 0))
-	_install(1, 2, "on_hit bolt nova")
+	_install(1, 2, "on_hit bolt halo")
 	_spells.cast_staff(1, 2, Vector2.ZERO, AIM, 100.0)
 	_tick(20)
 	var nova_tag: int = _spells.current_tag(1, 2, 1)
-	check(_spells.live_shots(nova_tag) > 0, "the nova flies under node 1's tag")
-	check(_spells.profile(nova_tag) != null and _spells.profile(nova_tag).form_id == &"nova", "that tag is the nova's")
+	check(_spells.live_shots(nova_tag) > 0, "the halo flies under node 1's tag")
+	check(_spells.profile(nova_tag) != null and _spells.profile(nova_tag).form_id == &"halo", "that tag is the halo's")
 
 
 func test_a_lone_blast_asks_for_an_area_hit_on_the_caster() -> void:
@@ -236,7 +236,7 @@ func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> v
 	check_equal(_mgr.get_count(), 16, "sixteen bolts in the air")
 	var old_tag: int = tags[5]
 	var old_element: StringName = _spells.profile(old_tag).element_id
-	_install(1, 1, "nova")
+	_install(1, 1, "halo")
 	check(_spells.profile(old_tag) != null, "the old build stays while its bolt flies")
 	check_equal(_spells.profile(old_tag).element_id, old_element, "with its old numbers")
 	_tick(120)
@@ -321,30 +321,30 @@ func test_the_staff_s_wind_up_comes_before_every_cast() -> void:
 func test_a_payload_winds_up_where_its_trigger_fired() -> void:
 	_target(Vector2(30.0, 0.0))
 	_form(&"bolt", 300.0, 1.0).wind_down = 0.1
-	var nova: FormBase = _form(&"slow_nova", 0.0, 0.2)
-	nova.carrier = &"atom"
-	nova.shots = 8
-	nova.spread = 360.0
-	nova.speed = 200.0
-	nova.wind_up = 0.2
-	_install(0, 2, "on_hit bolt slow_nova")
+	var halo: FormBase = _form(&"slow_halo", 0.0, 0.2)
+	halo.carrier = &"atom"
+	halo.shots = 8
+	halo.spread = 360.0
+	halo.speed = 200.0
+	halo.wind_up = 0.2
+	_install(0, 2, "on_hit bolt slow_halo")
 	_spells.cast_staff(0, 2, Vector2.ZERO, AIM, 100.0)
-	check(not _spells.is_winding(0, 2), "the cast itself winds up nothing: the nova is a payload's")
+	check(not _spells.is_winding(0, 2), "the cast itself winds up nothing: the halo is a payload's")
 	var hit_at: int = -1
 	for step in 30:
 		_tick(1)
 		if hit_at < 0 and _mgr.get_count() == 0:
 			hit_at = step
 		if _mgr.get_count() > 1:
-			check(hit_at >= 0 and step - hit_at >= 10, "the nova left about 0.2 s after the hit (steps %d to %d)" % [hit_at, step])
+			check(hit_at >= 0 and step - hit_at >= 10, "the halo left about 0.2 s after the hit (steps %d to %d)" % [hit_at, step])
 			check_equal(_mgr.get_count(), 8, "all eight of its shots")
 			return
-	check(false, "the nova never left (hit at step %d)" % hit_at)
+	check(false, "the halo never left (hit at step %d)" % hit_at)
 
 
 # --- Skipping (docs/milestones/cast-timing.md, part T3) ----------------------------------------
 
-## A staff whose first cast is a dear nova (`dear`, 10 mana) and then two bolts (2 each).
+## A staff whose first cast is a dear halo (`dear`, 10 mana) and then two bolts (2 each).
 func _dear_then_bolts(player: int) -> void:
 	var dear: FormBase = _form(&"dear", 0.0, 0.3)
 	dear.mana_cost = 10.0

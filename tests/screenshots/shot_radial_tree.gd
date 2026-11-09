@@ -5,10 +5,10 @@ extends "res://tests/support/screenshot.gd"
 ## and whose on hurt fires a last bolt) and the marker on a card deep in it (radial_tree), then
 ## all four players with their trees open at once (radial_tree_four_players).
 
-const NESTED: Array[StringName] = [&"timer", &"on_hurt", &"hold", &"decoy", &"on_expire", &"fire", &"bolt", &"blast", &"frost", &"nova", &"bolt"]
+const NESTED: Array[StringName] = [&"timer", &"on_hurt", &"hold", &"decoy", &"on_expire", &"fire", &"bolt", &"blast", &"frost", &"nova", &"bolt", &"bolt"]
 const OTHERS: Array = [
-	[&"on_hit", &"on_expire", &"bolt", &"fire", &"nova", &"frost", &"nova"],
-	[&"double", &"bolt", &"on_hit", &"orbit", &"lightning", &"nova"],
+	[&"on_hit", &"on_expire", &"bolt", &"fire", &"nova", &"bolt", &"frost", &"nova", &"bolt"],
+	[&"double", &"bolt", &"on_hit", &"orbit", &"lightning", &"nova", &"bolt"],
 	[&"homing", &"bolt", &"split", &"bolt", &"on_wall", &"bolt", &"rune"],
 ]
 

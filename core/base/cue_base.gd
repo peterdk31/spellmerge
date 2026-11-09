@@ -31,7 +31,7 @@ extends Resource
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint
 ##   `plain`      true: white in no one's ramp, without the cards (stone chips)
 ##   `bare`       true: in the caster's ramp, without the cards (a dash's landing ring, a cast's flash)
-##   `no_cards`   true: in the cue's ramp and tint, without the cards (a nova's impact ring)
+##   `no_cards`   true: in the cue's ramp and tint, without the cards (a wall's impact ring)
 ##   `body`       true: in the own colour of the body the cue is of (a dying enemy's
 ##                `EnemyBase.hit_color`: its death puff, S6), in no one's ramp and without the
 ##                cards; plain white when the cue has no body colour

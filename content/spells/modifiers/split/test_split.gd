@@ -41,6 +41,6 @@ func test_split_throws_a_fan_and_hits_three_targets_side_by_side() -> void:
 	check_equal(hit.size(), 3, "once each")
 
 
-func test_split_on_a_nova_has_no_shot_limit() -> void:
-	var spell: CompiledSpell = _compile_with(&"nova", [&"split", &"split"])
-	check_equal(spell.shots, _compile_with(&"nova", []).shots * 9, "every split multiplies: no build limit")
+func test_split_on_split_has_no_shot_limit() -> void:
+	var spell: CompiledSpell = _compile_with(&"bolt", [&"split", &"split"])
+	check_equal(spell.shots, _compile_with(&"bolt", []).shots * 9, "every split multiplies: no build limit")

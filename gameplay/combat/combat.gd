@@ -165,14 +165,6 @@ const FROZEN_BONUS: int = 2
 ## An actor reacts at most once per this many seconds; a hit inside the wait does its own
 ## status instead. Keeps fast spells from setting the same reaction off on every hit.
 const REACTION_WAIT: float = 0.5
-## Limits for the reaction EXTEND effect: the longest freeze, the longest any other extended
-## status, the largest share of hex or gust in per cent, and the fastest burn.
-const MAX_FREEZE: float = 4.0
-const MAX_EXTENDED_TIME: float = 8.0
-const MAX_EXTENDED_PERCENT: float = 100.0
-const MAX_EXTENDED_BURN: float = 20.0
-## By ST_*: the most power EXTEND gives a status (chill's EXTEND is a freeze, freeze has none).
-const STATUS_EXTENDED_MAX: Array[float] = [MAX_EXTENDED_BURN, 0.0, 0.0, MAX_EXTENDED_PERCENT, MAX_EXTENDED_PERCENT, MAX_EXTENDED_PERCENT]
 
 ## What a row holds: nothing, a kit Actor (health in its Health), or a plain body (health in the
 ## row).
@@ -1208,7 +1200,8 @@ func _burst(by: int, row: int, centre: Vector2, reaction: ReactionRow) -> void:
 
 
 ## EXTEND: the status lasts longer and is stronger. A chilled actor freezes for the row's
-## duration; a frozen one stays frozen that much longer.
+## duration; a frozen one stays frozen that much longer. Every reaction adds its whole duration
+## and strength (no cap: owner, 2026-11-09, "Caps are not logical"); REACTION_WAIT paces them.
 func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 	var st: int = STATUS_AT.get(reaction.status_id, -1)
 	if st < 0 or st == ST_FREEZE:
@@ -1219,12 +1212,12 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		_status_left[at + ST_CHILL] = 0.0
 		_status_power[at + ST_CHILL] = 0.0
 		_chill_stacks[row] = 0
-		_status_left[at + ST_FREEZE] = minf(_status_left[at + ST_FREEZE] + reaction.duration, MAX_FREEZE)
+		_status_left[at + ST_FREEZE] += reaction.duration
 		if newly and events != null:
 			events.status_applied.emit(by, _nodes[row], FREEZE)
 		return
-	_status_left[at + st] = minf(_status_left[at + st] + reaction.duration, MAX_EXTENDED_TIME)
-	_status_power[at + st] = minf(_status_power[at + st] + reaction.strength, STATUS_EXTENDED_MAX[st])
+	_status_left[at + st] += reaction.duration
+	_status_power[at + st] += reaction.strength
 
 
 ## SPREAD: the status, as it is now, goes on every other actor in the circle.

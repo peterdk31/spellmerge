@@ -32,9 +32,9 @@ func before_each() -> void:
 	_staff.cooldown = 0.5
 	var bolt: FormBase = _form(&"bolt", 5, 1)
 	bolt.wind_down = 0.2
-	var nova: FormBase = _form(&"nova", 4, 8)
-	nova.spread = 360.0
-	nova.wind_down = 0.4
+	var halo: FormBase = _form(&"halo", 4, 8)
+	halo.spread = 360.0
+	halo.wind_down = 0.4
 	_form(&"rain", 3, 1).carrier = &"rain"
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
@@ -127,12 +127,12 @@ func _forms(group: CompiledGroup) -> Array[StringName]:
 # --- The examples of "Reading a staff" ----------------------------------------
 
 func test_two_casts_then_recharge() -> void:
-	var staff: CompiledStaff = _compile("fire bolt frost nova")
+	var staff: CompiledStaff = _compile("fire bolt frost halo")
 	check_equal(staff.casts.size(), 2, "two casts")
 	var first: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal([first.form_id, first.element_id], [&"bolt", &"fire"], "cast 1 is a fire bolt")
 	var second: CompiledSpell = staff.casts[1].group.spells[0]
-	check_equal([second.form_id, second.element_id], [&"nova", &"frost"], "cast 2 is a frost nova")
+	check_equal([second.form_id, second.element_id], [&"halo", &"frost"], "cast 2 is a frost halo")
 	check(not staff.casts[0].ends_cycle, "cast 1 does not end the cycle")
 	check(staff.casts[1].ends_cycle, "cast 2 ends it")
 
@@ -159,7 +159,7 @@ func test_a_lone_blast_explodes_on_the_caster() -> void:
 
 
 func test_double_with_a_payload_on_the_second_bolt() -> void:
-	var staff: CompiledStaff = _compile("double fire bolt on_hit bolt frost nova")
+	var staff: CompiledStaff = _compile("double fire bolt on_hit bolt frost halo")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
 	check_equal(_forms(group), [&"bolt", &"bolt"] as Array[StringName], "two bolts together")
@@ -169,15 +169,15 @@ func test_double_with_a_payload_on_the_second_bolt() -> void:
 	var payload: CompiledGroup = group.spells[1].payload
 	check(payload != null, "the second has a payload")
 	if payload != null:
-		check_equal([payload.spells[0].form_id, payload.spells[0].element_id], [&"nova", &"frost"], "a frost nova on hit")
+		check_equal([payload.spells[0].form_id, payload.spells[0].element_id], [&"halo", &"frost"], "a frost halo on hit")
 
 
 func test_a_group_resumes_after_its_payload() -> void:
-	var staff: CompiledStaff = _compile("double on_hit bolt nova bolt")
+	var staff: CompiledStaff = _compile("double on_hit bolt halo bolt")
 	check_equal(staff.casts.size(), 1, "one cast")
 	var group: CompiledGroup = staff.casts[0].group
 	check_equal(_forms(group), [&"bolt", &"bolt"] as Array[StringName], "the last bolt joins the cast")
-	check_equal(_forms(group.spells[0].payload), [&"nova"] as Array[StringName], "the first fires a nova on hit")
+	check_equal(_forms(group.spells[0].payload), [&"halo"] as Array[StringName], "the first fires a halo on hit")
 	check(group.spells[1].payload == null, "the last bolt holds nothing")
 	check(staff.casts[0].ends_cycle, "then recharge")
 
@@ -220,12 +220,12 @@ func test_a_trigger_in_the_last_slot_wraps_and_is_wasted() -> void:
 func test_a_counter_dash_reads_in_slot_order() -> void:
 	_form(&"dash", 1, 1).carrier = &"dash"
 	_trigger(&"on_block", TriggerBase.Event.BLOCK)
-	var staff: CompiledStaff = _compile("shield on_block dash nova")
+	var staff: CompiledStaff = _compile("shield on_block dash halo")
 	var dash: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal(dash.form_id, &"dash", "a dash")
 	check_equal(dash.behaviour(ModifierBase.Behaviour.SHIELD), 1.0, "with one shield")
 	check(dash.fires_on(TriggerBase.Event.BLOCK), "that fires on a block")
-	check_equal(_forms(dash.payload), [&"nova"] as Array[StringName], "a nova")
+	check_equal(_forms(dash.payload), [&"halo"] as Array[StringName], "a halo")
 
 
 # --- More rules ---------------------------------------------------------------
@@ -277,14 +277,14 @@ func test_several_infusions_ride_one_shot_first_one_first() -> void:
 
 
 func test_each_trigger_takes_its_own_payload_in_order() -> void:
-	var staff: CompiledStaff = _compile("on_hit on_expire bolt nova fire bolt")
+	var staff: CompiledStaff = _compile("on_hit on_expire bolt halo fire bolt")
 	check_equal(staff.casts.size(), 1, "one cast reads both payloads")
 	check(staff.wasted.is_empty(), "nothing is wasted: %s" % staff.wasted)
 	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
 		check_equal(bolt.triggers[0].event, TriggerBase.Event.HIT, "the first is on hit")
-		check_equal(_forms(bolt.triggers[0].payload), [&"nova"] as Array[StringName], "and fires the nova")
+		check_equal(_forms(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "and fires the halo")
 		check_equal(bolt.triggers[1].event, TriggerBase.Event.EXPIRE, "the second is on expire")
 		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and fires the next group, the fire bolt")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "with its fire")
@@ -294,15 +294,15 @@ func test_each_trigger_takes_its_own_payload_in_order() -> void:
 
 
 func test_the_same_trigger_twice_fires_two_payloads() -> void:
-	var bolt: CompiledSpell = _compile("on_hit on_hit bolt nova bolt").casts[0].group.spells[0]
+	var bolt: CompiledSpell = _compile("on_hit on_hit bolt halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "both count")
 	if bolt.triggers.size() == 2:
-		check_equal(_forms(bolt.triggers[0].payload), [&"nova"] as Array[StringName], "a nova on hit")
+		check_equal(_forms(bolt.triggers[0].payload), [&"halo"] as Array[StringName], "a halo on hit")
 		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "and a bolt on hit")
 
 
 func test_a_trigger_with_no_cards_left_is_wasted_and_the_others_keep_theirs() -> void:
-	var staff: CompiledStaff = _compile("on_hit on_expire bolt nova")
+	var staff: CompiledStaff = _compile("on_hit on_expire bolt halo")
 	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 1, "only on hit has a payload")
 	check(not staff.wasted.has(0), "on hit counts")
@@ -310,14 +310,14 @@ func test_a_trigger_with_no_cards_left_is_wasted_and_the_others_keep_theirs() ->
 
 
 func test_payloads_nest_before_the_next_trigger_reads() -> void:
-	# On hit: a bolt that, on expire, fires a nova. On expire: a fire bolt.
-	var staff: CompiledStaff = _compile("on_hit on_expire bolt on_expire bolt nova fire bolt")
+	# On hit: a bolt that, on expire, fires a halo. On expire: a fire bolt.
+	var staff: CompiledStaff = _compile("on_hit on_expire bolt on_expire bolt halo fire bolt")
 	var bolt: CompiledSpell = staff.casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
 		var inner: CompiledSpell = bolt.triggers[0].payload.spells[0]
 		check_equal(inner.form_id, &"bolt", "on hit fires a bolt")
-		check_equal(_forms(inner.payload), [&"nova"] as Array[StringName], "whose own payload is read first")
+		check_equal(_forms(inner.payload), [&"halo"] as Array[StringName], "whose own payload is read first")
 		check_equal(bolt.triggers[1].payload.spells[0].element_id, &"fire", "then on expire takes the fire bolt")
 
 
@@ -357,20 +357,20 @@ func test_a_burst_or_scatter_works_without_adding_a_carrier() -> void:
 
 
 func test_a_multicast_in_one_payload_counts_for_that_payload_only() -> void:
-	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double nova nova bolt").casts[0].group.spells[0]
+	var bolt: CompiledSpell = _compile("on_hit on_expire bolt double halo halo bolt").casts[0].group.spells[0]
 	check_equal(bolt.triggers.size(), 2, "two triggers")
 	if bolt.triggers.size() == 2:
-		check_equal(_forms(bolt.triggers[0].payload), [&"nova", &"nova"] as Array[StringName], "the double takes two novas")
+		check_equal(_forms(bolt.triggers[0].payload), [&"halo", &"halo"] as Array[StringName], "the double takes two halos")
 		check_equal(_forms(bolt.triggers[1].payload), [&"bolt"] as Array[StringName], "the next payload starts after them")
 
 
 func test_a_trigger_that_never_fires_keeps_its_place_and_the_next_still_reads() -> void:
 	_form(&"slam", 1, 1).carrier = &"slam"
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
-	# A slam is over at once: its timer never fires, but it still reads the nova, so on hit gets the bolt.
-	var staff: CompiledStaff = _compile("timer on_hit slam nova bolt")
+	# A slam is over at once: its timer never fires, but it still reads the halo, so on hit gets the bolt.
+	var staff: CompiledStaff = _compile("timer on_hit slam halo bolt")
 	var slam: CompiledSpell = staff.casts[0].group.spells[0]
-	check(staff.wasted.has(0) and staff.wasted.has(3), "the timer and its nova are wasted: %s" % staff.wasted)
+	check(staff.wasted.has(0) and staff.wasted.has(3), "the timer and its halo are wasted: %s" % staff.wasted)
 	check_equal(slam.triggers.size(), 1, "only on hit is left")
 	if slam.triggers.size() == 1:
 		check_equal(_forms(slam.triggers[0].payload), [&"bolt"] as Array[StringName], "and it fires the bolt")
@@ -391,10 +391,10 @@ func test_scatter_and_burst_mark_the_group() -> void:
 
 
 func test_rain_carries_its_own_payload() -> void:
-	var rain: CompiledSpell = _compile("rain frost nova").casts[0].group.spells[0]
+	var rain: CompiledSpell = _compile("rain frost halo").casts[0].group.spells[0]
 	check(rain.own_payload != null, "rain reads a payload")
 	if rain.own_payload != null:
-		check_equal(rain.own_payload.spells[0].element_id, &"frost", "a frost nova falls")
+		check_equal(rain.own_payload.spells[0].element_id, &"frost", "a frost halo falls")
 
 
 func test_the_numbers_of_a_cast() -> void:
@@ -404,29 +404,29 @@ func test_the_numbers_of_a_cast() -> void:
 	check(is_equal_approx(cast.delay, 0.2 + 0.5), "the wind-down, then the staff's cooldown: the cycle ends, got %s" % cast.delay)
 	var split: CompiledSpell = _compile("split bolt").casts[0].group.spells[0]
 	check_equal(split.shots, 3, "split triples the shots")
-	var many: CompiledSpell = _compile("split split split nova").casts[0].group.spells[0]
+	var many: CompiledSpell = _compile("split split split halo").casts[0].group.spells[0]
 	check_equal(many.shots, 216, "no shot limit any more")
 
 
 func test_the_staff_cooldown_follows_only_the_cycle_s_last_cast() -> void:
-	var staff: CompiledStaff = _compile("bolt nova")
+	var staff: CompiledStaff = _compile("bolt halo")
 	check(is_equal_approx(staff.casts[0].delay, 0.2), "a cast inside the cycle waits its wind-down only, got %s" % staff.casts[0].delay)
 	check(is_equal_approx(staff.casts[1].delay, 0.4 + 0.5), "the last waits its wind-down and the cooldown, got %s" % staff.casts[1].delay)
 
 
 func test_a_payload_adds_no_wind_down() -> void:
-	# docs/milestones/cast-timing.md: no staff waits on a payload, so a slow nova fired on hit
+	# docs/milestones/cast-timing.md: no staff waits on a payload, so a slow halo fired on hit
 	# keeps the bolt's pace (it used to add its 0.4 s to every bolt, hit or miss).
-	var cast: CompiledCast = _compile("on_hit bolt nova").casts[0]
+	var cast: CompiledCast = _compile("on_hit bolt halo").casts[0]
 	check(is_equal_approx(cast.wind_down, 0.2), "the bolt's wind-down alone, got %s" % cast.wind_down)
-	check(not cast.wasted.has(2), "the nova still fires on hit")
-	var rain: CompiledCast = _compile("rain nova").casts[0]
+	check(not cast.wasted.has(2), "the halo still fires on hit")
+	var rain: CompiledCast = _compile("rain halo").casts[0]
 	check(is_equal_approx(rain.wind_down, _fake.items[&"rain"].wind_down), "a rain's own payload adds none either, got %s" % rain.wind_down)
 
 
 func test_a_payload_multicast_adds_no_wind_down() -> void:
 	(_fake.items[&"double"] as MulticastBase).wind_down = 1.0
-	var cast: CompiledCast = _compile("on_hit bolt double nova nova").casts[0]
+	var cast: CompiledCast = _compile("on_hit bolt double halo halo").casts[0]
 	check(is_equal_approx(cast.wind_down, 0.2), "a double in a payload adds no time, got %s" % cast.wind_down)
 	var own: CompiledCast = _compile("double bolt bolt").casts[0]
 	check(is_equal_approx(own.wind_down, 0.2 + 0.2 + 1.0), "the cast's own double does, got %s" % own.wind_down)
@@ -436,14 +436,14 @@ func test_a_shorter_wind_down_on_a_payload_is_wasted() -> void:
 	var quick: ModifierBase = _modifier(&"quick")
 	quick.wind_down_mult = 0.5
 	check(not _compile("quick bolt").casts[0].wasted.has(0), "a shorter wind-down counts on the cast's own carrier")
-	var payload: CompiledCast = _compile("on_hit bolt quick nova").casts[0]
+	var payload: CompiledCast = _compile("on_hit bolt quick halo").casts[0]
 	check(payload.wasted.has(2), "but not on a payload's: it adds no wind-down to shorten")
 
 
 func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void:
 	# docs/milestones/cast-timing.md, T2: the staff's wind-up, every carrier's of the cast's own
 	# group and its modifiers' `wind_up_add`; a payload's winds up on its own.
-	(_fake.items[&"nova"] as FormBase).wind_up = 0.3
+	(_fake.items[&"halo"] as FormBase).wind_up = 0.3
 	var charge: ModifierBase = _modifier(&"charge")
 	charge.wind_up_add = 2.0
 	charge.damage_mult = 4.0
@@ -451,10 +451,10 @@ func test_a_cast_winds_up_for_its_staff_its_carriers_and_their_charges() -> void
 	var cast: CompiledCast = _compile("charge bolt").casts[0]
 	check(is_equal_approx(cast.wind_up, 0.1 + 2.0), "the staff's and the charge's, got %s" % cast.wind_up)
 	check(not cast.wasted.has(0), "the charge counts: its damage")
-	var two: CompiledCast = _compile("double bolt nova").casts[0]
+	var two: CompiledCast = _compile("double bolt halo").casts[0]
 	check(is_equal_approx(two.wind_up, 0.1 + 0.3), "two carriers add up, got %s" % two.wind_up)
-	var payload: CompiledCast = _compile("on_hit bolt nova").casts[0]
-	check(is_equal_approx(payload.wind_up, 0.1), "a payload's nova adds nothing to the cast, got %s" % payload.wind_up)
+	var payload: CompiledCast = _compile("on_hit bolt halo").casts[0]
+	check(is_equal_approx(payload.wind_up, 0.1), "a payload's halo adds nothing to the cast, got %s" % payload.wind_up)
 	check(is_equal_approx(payload.group.spells[0].triggers[0].payload.wind_up, 0.3), "it winds up on its own, got %s" % payload.group.spells[0].triggers[0].payload.wind_up)
 
 
@@ -465,11 +465,11 @@ func test_a_timer_ticks_its_payload_s_whole_wind_up() -> void:
 	var charge: ModifierBase = _modifier(&"charge")
 	charge.wind_up_add = 2.0
 	charge.damage_mult = 4.0
-	var plain: CompiledSpell = _compile("timer bolt nova").casts[0].group.spells[0]
+	var plain: CompiledSpell = _compile("timer bolt halo").casts[0].group.spells[0]
 	check(is_equal_approx(plain.triggers[0].interval, 0.5), "a plain payload: the timer's own, got %s" % plain.triggers[0].interval)
-	var slow: CompiledSpell = _compile("timer bolt charge nova").casts[0].group.spells[0]
+	var slow: CompiledSpell = _compile("timer bolt charge halo").casts[0].group.spells[0]
 	check(is_equal_approx(slow.triggers[0].interval, 2.5), "a charged payload ticks slower, got %s" % slow.triggers[0].interval)
-	var hit: CompiledSpell = _compile("on_hit bolt nova").casts[0].group.spells[0]
+	var hit: CompiledSpell = _compile("on_hit bolt halo").casts[0].group.spells[0]
 	check_equal(hit.triggers[0].interval, 0.0, "a trigger that is no timer has no tick")
 
 
@@ -482,15 +482,15 @@ func test_an_empty_staff_has_no_cast_and_unknown_cards_are_wasted() -> void:
 
 func test_cards_past_the_staff_slots_are_ignored() -> void:
 	_staff.slots = 1
-	var staff: CompiledStaff = _compile("bolt nova")
+	var staff: CompiledStaff = _compile("bolt halo")
 	check_equal(staff.casts.size(), 1, "one slot, one cast")
 	check_equal(_forms(staff.casts[0].group), [&"bolt"] as Array[StringName], "only the bolt")
 
 
 func test_every_compiled_spell_has_its_own_node() -> void:
-	# Cast 1 is two bolts (one with a nova on hit); cast 2 reads the blast, wraps and reads the
+	# Cast 1 is two bolts (one with a halo on hit); cast 2 reads the blast, wraps and reads the
 	# same cards again, so the cycle holds six spells.
-	var staff: CompiledStaff = _compile("double on_hit bolt nova bolt blast")
+	var staff: CompiledStaff = _compile("double on_hit bolt halo bolt blast")
 	check_equal(staff.casts.size(), 2, "two casts")
 	check_equal(staff.nodes.size(), 6, "three spells per cast")
 	for i in staff.nodes.size():
@@ -514,7 +514,7 @@ func test_each_kind_of_card_has_short_lines_of_its_numbers() -> void:
 	var bolt: FormBase = _fake.items[&"bolt"]
 	bolt.mana_cost = 5.0
 	check_equal(_spells.call("component_stats", &"bolt"), PackedStringArray(["Dmg 5", "Mana 5", "Delay 0.2s"]), "a carrier: damage, mana, delay")
-	check_equal((_spells.call("component_stats", &"nova") as PackedStringArray)[0], "Dmg 4x8", "shots multiply the damage")
+	check_equal((_spells.call("component_stats", &"halo") as PackedStringArray)[0], "Dmg 4x8", "shots multiply the damage")
 	(_fake.items[&"split"] as ModifierBase).damage_mult = 0.5
 	check_equal(_spells.call("component_stats", &"split"), PackedStringArray(["Dmg x0.5", "Shots x3"]), "a modifier: what it changes")
 	check_equal(_spells.call("component_stats", &"homing"), PackedStringArray(["Homes in"]), "a behaviour in words")
@@ -582,11 +582,11 @@ func test_a_slam_is_an_area_hit() -> void:
 
 
 func test_the_builder_view_counts_a_casts_damage() -> void:
-	# A bolt hits for 5 once, a nova for 4 with 8 shots: 5 + 32, the on-hit payload left out.
-	var ids: Array[StringName] = [&"double", &"bolt", &"nova"]
+	# A bolt hits for 5 once, a halo for 4 with 8 shots: 5 + 32, the on-hit payload left out.
+	var ids: Array[StringName] = [&"double", &"bolt", &"halo"]
 	var view: Dictionary = _spells.call("staff_view", ids, _staff)
-	check_equal(int((view["casts"] as Array)[0]["damage"]), 37, "a bolt and a nova together")
-	var payload: Dictionary = _spells.call("staff_view", [&"on_hit", &"bolt", &"nova"] as Array[StringName], _staff)
+	check_equal(int((view["casts"] as Array)[0]["damage"]), 37, "a bolt and a halo together")
+	var payload: Dictionary = _spells.call("staff_view", [&"on_hit", &"bolt", &"halo"] as Array[StringName], _staff)
 	check_equal(int((payload["casts"] as Array)[0]["damage"]), 5, "a payload is not counted: it depends on what is hit")
 
 

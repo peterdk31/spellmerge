@@ -1,7 +1,7 @@
 class_name CarrierAtom
 extends Carrier
 ## A shot that flies out on its own along the aim (`&"atom"`: the atom, the smallest; the bolt, a
-## bigger, slower one; and the nova, bolts whose shots fan all the way round). The plain carrier:
+## bigger, slower one). The plain carrier:
 ## every card runs on it through the shot path (`Spells._apply_travel`, the projectile manager's
 ## kit).
 
@@ -22,14 +22,6 @@ func required_fields() -> Dictionary:
 
 ## The velocities of a launch's rows (`spawn_rows`), kept between launches.
 var _velocities: PackedVector2Array = PackedVector2Array()
-
-
-## A fan of flying shots; a nova (a fan all the way round) shows its ring once, when a shot flew.
-func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
-	var made: int = super(spell, tag, actor, origin, direction, source, lifetime, chain, prev)
-	if kit.events != null and made > 0 and spell.shots > 1 and spell.spread >= 360.0:
-		kit.events.form_shown.emit(actor, &"nova", origin, direction, 0.0, spell.tint, spell.look)
-	return made
 
 
 func rows_only() -> bool:

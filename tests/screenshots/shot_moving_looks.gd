@@ -7,7 +7,7 @@ extends "res://tests/support/screenshot.gd"
 ## void, lightning):
 ##   top     three orbit shots circling (radius 36, as the orbit form): their tails bend
 ##           round the circle, behind each shot
-##   middle  a nova a quarter of a second after its cast: eight bolts flying out
+##   middle  a nova of bolts a quarter of a second after its cast: eight bolts flying out
 ##   bottom  spiralling bolts (the spiral modifier): their tails bend with every turn
 ## `moving_orbits_4x`: the first three orbit columns at 4x.
 
@@ -21,7 +21,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
 const ORBIT := preload("res://content/spells/forms/orbit/orbit.tres")
-const NOVA := preload("res://content/spells/forms/nova/nova.tres")
+const NOVA := preload("res://content/spells/modifiers/nova/nova.tres")
 const BOLT := preload("res://content/spells/forms/bolt/bolt.tres")
 
 var _shots: Node = null
@@ -56,10 +56,10 @@ func take() -> void:
 			var centre: Vector2 = Vector2(x, 60.0)
 			var orb: int = _shots.call("spawn_orbit", player, orbit_radius, n * TAU / 3.0, spin, 600.0, float(ORBIT.get("radius")), 1, 0, 0, centre) as int
 			_dress(orb, tint, look)
-		var shots: int = int(NOVA.get("shots"))
+		var shots: int = roundi(float(NOVA.get("behaviour_strength")))
 		for n in shots:
 			var dir: Vector2 = Vector2.from_angle(n * TAU / shots)
-			var slot: int = _shots.call("spawn", player, Vector2(x, 180.0), dir * float(NOVA.get("speed")), 600.0, float(NOVA.get("radius"))) as int
+			var slot: int = _shots.call("spawn", player, Vector2(x, 180.0), dir * float(BOLT.get("speed")), 600.0, float(BOLT.get("radius"))) as int
 			_dress(slot, tint, look)
 		var bolt: int = _shots.call("spawn", player, Vector2(x - 50.0, 300.0), Vector2(float(BOLT.get("speed")) * 0.5, 0.0), 600.0, float(BOLT.get("radius"))) as int
 		_shots.call("set_spiral", bolt, 40.0)

@@ -38,11 +38,14 @@ func test_a_bolt_is_an_aimed_shot() -> void:
 
 
 func test_a_nova_hits_round_its_caster() -> void:
-	var sense: CastSense = _sense(["nova"])
+	var sense: CastSense = _sense(["nova", "bolt"])
 	check_equal(sense.reach, 0.0, "a nova is not aimed")
 	check(sense.area, "it hits round its caster")
 	check(sense.close_reach > 20.0, "within its ring: %s" % sense.close_reach)
 	check(sense.damage > 0.0, "and hurts")
+	var bolt: CastSense = _sense(["bolt"])
+	check(is_equal_approx(sense.close_reach, bolt.reach), "each copy flies as far as a bolt: %s vs %s" % [sense.close_reach, bolt.reach])
+	check(sense.damage > bolt.damage * 4.0, "eight copies count eight times: %s vs %s" % [sense.damage, bolt.damage])
 
 
 func test_moves_blocks_spawns_heals() -> void:
@@ -77,7 +80,7 @@ func test_a_blast_is_known() -> void:
 
 
 func test_a_rain_hurts_with_what_it_drops() -> void:
-	var sense: CastSense = _sense(["rain", "nova"])
+	var sense: CastSense = _sense(["rain", "nova", "bolt"])
 	check(sense.area, "a rain falls on a point")
 	check(sense.damage > 0.0, "and hurts with its payload")
 

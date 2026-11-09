@@ -46,18 +46,18 @@ const MEASURE: int = 600
 const FIRE_CAPS: Array[int] = [64, 128, 256, 512, 1024, 1000000]
 const SHOT_CAPS: Array[int] = [ManagerScript.DEFAULT_CAP_WEB, ManagerScript.DEFAULT_CAP_DESKTOP]
 const SEAT_STAFFS: Array[Array] = [
-	[&"split", &"on_hit", &"nova", &"split", &"bolt"],
-	[&"bounce", &"bounce", &"on_wall", &"beam", &"nova"],
-	[&"timer", &"orbit", &"split", &"nova"],
-	[&"pierce", &"pierce", &"on_hit", &"bolt", &"split", &"on_hit", &"bolt", &"nova"],
+	[&"split", &"on_hit", &"nova", &"bolt", &"split", &"bolt"],
+	[&"bounce", &"bounce", &"on_wall", &"beam", &"nova", &"bolt"],
+	[&"timer", &"orbit", &"split", &"nova", &"bolt"],
+	[&"pierce", &"pierce", &"on_hit", &"bolt", &"split", &"on_hit", &"bolt", &"nova", &"bolt"],
 ]
-const ENEMY_STAFF: Array[StringName] = [&"on_hit", &"nova", &"bolt"]
+const ENEMY_STAFF: Array[StringName] = [&"on_hit", &"nova", &"bolt", &"bolt"]
 ## The burst: its carrier, and the payloads timed.
-const BURST_CARRIER: Array[StringName] = [&"split", &"split", &"split", &"nova"]
+const BURST_CARRIER: Array[StringName] = [&"split", &"split", &"split", &"nova", &"bolt"]
 const BURST_PAYLOADS: Dictionary = {
 	"a bolt": [&"bolt"],
 	"a split bolt": [&"split", &"bolt"],
-	"a nova": [&"nova"],
+	"a nova": [&"nova", &"bolt"],
 }
 ## Steps timed after a burst's cast, and bursts averaged.
 const BURST_STEPS: int = 30

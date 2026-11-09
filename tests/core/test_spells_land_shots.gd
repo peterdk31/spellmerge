@@ -26,10 +26,10 @@ const STEPS: int = 90
 ## folder is covered with no edit here.
 const SETS: Array = [
 	[
-		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova"],
-		[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"fire", &"triple", &"bolt"],
-		[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"frost", &"deflect", &"return", &"split", &"nova"],
-		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"void", &"chain", &"split", &"atom"],
+		[&"homing", &"bounce", &"spiral", &"split", &"split", &"nova", &"bolt"],
+		[&"timer", &"ghost", &"linger", &"growth", &"split", &"nova", &"bolt", &"fire", &"triple", &"bolt"],
+		[&"on_expire", &"sticky", &"shield", &"magnet", &"split", &"nova", &"bolt", &"frost", &"deflect", &"return", &"split", &"nova", &"bolt"],
+		[&"on_hit", &"zap", &"lightning", &"pierce", &"split", &"nova", &"bolt", &"void", &"chain", &"split", &"atom"],
 		[&"timer", &"split", &"split", &"orbit", &"fire", &"bolt"],
 		[&"growth", &"homing", &"split", &"rune"],
 		[&"on_expire", &"split", &"bolt", &"split", &"orbit"],
@@ -51,7 +51,7 @@ const SETS: Array = [
 		[&"on_expire", &"split", &"bolt", &"rain"],
 		[&"on_expire", &"split", &"bolt", &"familiar"],
 		[&"on_expire", &"split", &"bolt", &"split", &"atom"],
-		[&"timer", &"split", &"rune", &"split", &"nova"],
+		[&"timer", &"split", &"rune", &"split", &"nova", &"bolt"],
 		[&"on_hit", &"split", &"orbit", &"split", &"rune"],
 		[&"dash"],
 		[&"teleport"],
@@ -59,25 +59,25 @@ const SETS: Array = [
 		[&"on_expire", &"bolt", &"teleport"],
 		[&"bigger", &"split", &"split", &"orbit"],
 		[&"triple", &"split", &"rune"],
-		[&"double", &"split", &"nova"],
+		[&"double", &"split", &"nova", &"bolt"],
 	],
 	[
-		[&"blast", &"split", &"nova"],
+		[&"blast", &"split", &"nova", &"bolt"],
 		[&"burst", &"split", &"bolt", &"split", &"portal"],
-		[&"echo", &"split", &"nova"],
-		[&"faster", &"heavy", &"split", &"nova"],
+		[&"echo", &"split", &"nova", &"bolt"],
+		[&"faster", &"heavy", &"split", &"nova", &"bolt"],
 		[&"hold", &"split", &"orbit"],
-		[&"mend", &"split", &"nova"],
+		[&"mend", &"split", &"nova", &"bolt"],
 		[&"mirror", &"split", &"rune", &"penta", &"bolt"],
-		[&"on_block", &"shield", &"split", &"orbit", &"split", &"nova"],
-		[&"on_cast", &"split", &"nova", &"split", &"bolt"],
-		[&"on_hurt", &"split", &"orbit", &"fire", &"nova"],
-		[&"on_kill", &"overcharge", &"split", &"nova", &"split", &"rune"],
-		[&"on_reaction", &"fire", &"split", &"nova", &"frost", &"split", &"nova"],
-		[&"on_wall", &"bounce", &"split", &"nova", &"split", &"atom"],
+		[&"on_block", &"shield", &"split", &"orbit", &"split", &"nova", &"bolt"],
+		[&"on_cast", &"split", &"nova", &"bolt", &"split", &"bolt"],
+		[&"on_hurt", &"split", &"orbit", &"fire", &"nova", &"bolt"],
+		[&"on_kill", &"overcharge", &"split", &"nova", &"bolt", &"split", &"rune"],
+		[&"on_reaction", &"fire", &"split", &"nova", &"bolt", &"frost", &"split", &"nova", &"bolt"],
+		[&"on_wall", &"bounce", &"split", &"nova", &"bolt", &"split", &"atom"],
 		[&"possess", &"pull", &"split", &"bolt"],
-		[&"reach", &"recoil", &"relay", &"split", &"nova"],
-		[&"scatter", &"faster_casting", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt"],
+		[&"reach", &"recoil", &"relay", &"split", &"nova", &"bolt"],
+		[&"scatter", &"faster_casting", &"siphon", &"slow", &"sniper", &"storm", &"split", &"nova", &"bolt", &"bolt"],
 	],
 ]
 ## The spread of the staff they are on, in degrees: every shot draws from the generator.
@@ -151,17 +151,17 @@ func _sets() -> Array:
 
 
 ## A staff that casts the card `id` on shots that make a crowd, by its kind: a carrier split; a
-## modifier or an infusion on a split bolt; a trigger that fires a nova from a split bolt; a
-## multicast that pulls a nova and a bolt.
+## modifier or an infusion on a split bolt; a trigger that fires a nova of bolts from a split
+## bolt; a multicast that pulls a nova of bolts and a bolt.
 func _plain_staff(id: StringName) -> Array:
 	var card: SpellComponent = _registry.call("get_resource", &"spells", id) as SpellComponent
 	match card.kind() if card != null else &"":
 		&"form":
 			return [&"split", id]
 		&"trigger":
-			return [id, &"split", &"bolt", &"split", &"nova"]
+			return [id, &"split", &"bolt", &"split", &"nova", &"bolt"]
 		&"multicast":
-			return [id, &"split", &"nova", &"bolt"]
+			return [id, &"split", &"nova", &"bolt", &"bolt"]
 	return [id, &"split", &"bolt"]
 
 

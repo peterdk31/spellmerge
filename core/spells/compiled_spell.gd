@@ -190,6 +190,13 @@ func cue_of(kind: int) -> StringName:
 	return behaviour_cues.get(kind, &"") as StringName
 
 
+## How many ways it is cast at once (`ModifierBase.Behaviour.NOVA`): its Nova cards' count (8 a
+## card, more add, with no cap: owner, 2026-10-29, cards are not limited), or 1 without one.
+func nova_ways() -> int:
+	var ways: float = behaviour(ModifierBase.Behaviour.NOVA)
+	return maxi(roundi(ways), 1)
+
+
 ## How many spells there are in this chain of payloads, this one included (following the first
 ## spell of each payload).
 func chain_length() -> int:

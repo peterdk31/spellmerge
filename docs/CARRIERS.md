@@ -1,6 +1,6 @@
 # Carriers
 
-A carrier is what a form card fires: an atom (the Atom, Bolt and Nova cards), a rune, a beam, a dash, a decoy and so on. The carrier
+A carrier is what a form card fires: an atom (the Atom and Bolt cards), a rune, a beam, a dash, a decoy and so on. The carrier
 is the important part of a cast. **Each carrier decides for itself what it does with every other
 card on it, both in what the card does and in how it looks**, and it has to decide every one:
 there is no default.
@@ -171,7 +171,7 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
-| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), atom (adds the nova's ring) |
+| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | portal (a mouth and its exits, gates of the projectile manager), dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line) |
 | `shoot` | a shot flying along its heading | rune (still, placed ahead), pool (still, spread `ray_length` ahead, never spent), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |

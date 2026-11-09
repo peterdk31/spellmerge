@@ -21,7 +21,7 @@ func test_many_modifiers_all_attach_to_one_carrier() -> void:
 func test_two_triggers_fire_their_own_payloads() -> void:
 	_target(Vector2(80.0, 0.0))
 	# A piercing bolt: a nova when it hits, a bolt where it ends.
-	var cards: Array[StringName] = [&"on_hit", &"on_expire", &"pierce", &"bolt", &"nova", &"bolt"]
+	var cards: Array[StringName] = [&"on_hit", &"on_expire", &"pierce", &"bolt", &"nova", &"bolt", &"bolt"]
 	StaffKit.build(_spells, 0, 0, cards)
 	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "it is cast")
 	var nova_tag: int = _spells.current_tag(0, 0, 1)
@@ -37,7 +37,7 @@ func test_two_triggers_fire_their_own_payloads() -> void:
 func test_a_shot_ending_on_a_wall_fires_its_on_wall_and_its_on_expire() -> void:
 	var walls: Array[Rect2] = [Rect2(100.0, -50.0, 50.0, 100.0)]
 	_mgr.set_walls(walls)
-	StaffKit.build(_spells, 0, 0, [&"on_wall", &"on_expire", &"bolt", &"nova", &"bolt"] as Array[StringName])
+	StaffKit.build(_spells, 0, 0, [&"on_wall", &"on_expire", &"bolt", &"nova", &"bolt", &"bolt"] as Array[StringName])
 	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
 	_tick(40)
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 8, "on wall fired the nova")
@@ -53,7 +53,7 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 		_target(center + Vector2.from_angle(TAU * n / 8.0 + 0.2) * 40.0, 4.0)
 	var recipe: Dictionary = {
 		"form": &"bolt", "trigger": &"on_hit",
-		"held": {"form": &"nova", "trigger": &"on_hit", "held": {"form": &"bolt"}},
+		"held": {"form": &"bolt", "modifiers": [&"nova"], "trigger": &"on_hit", "held": {"form": &"bolt"}},
 	}
 	var spell: CompiledSpell = _compile_recipe(recipe)
 	check_equal(spell.chain_length(), 3, "bolt, on hit, nova, on hit, bolt: three spells deep")
@@ -97,8 +97,8 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 func test_fires_past_a_steps_room_wait_for_the_next_step_with_the_real_triggers() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 40.0, 3.0)
-	var hold: Dictionary = {"form": &"nova", "modifiers": [&"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
-	check_equal(_compile_recipe(hold).shots, 24, "the nova is 24 shots")
+	var hold: Dictionary = {"form": &"bolt", "modifiers": [&"nova", &"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
+	check_equal(_compile_recipe(hold).shots * _compile_recipe(hold).nova_ways(), 24, "the nova is 8 fans of 3 shots")
 	_spells.fire_shots_per_step = 32
 	_build_and_cast(0, 0, hold)
 	_build_and_cast(0, 1, hold)

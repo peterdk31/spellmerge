@@ -80,8 +80,7 @@ extends Node2D
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL
 ## pixel cells, so a wall check is a walk over the cells the step's path crosses
-## (a few for a normal shot; at most MAX_WALL_VISITS for a huge step, and a path
-## not fully walked then counts as a wall hit) and needs no physics query. A
+## (a few for a normal shot, all of them for a very fast one) and needs no physics query. A
 ## projectile whose path enters a solid cell ends there, even a piercing one,
 ## unless `set_bounce` gave it bounces (then it turns back). It is checked as a
 ## point, not a circle. The step is cut at the wall first, so a target in front of the wall is still hit by a fast
@@ -283,8 +282,6 @@ const PROF_PAST_BUDGET: int = 6
 const PROF_AFTER: int = 7
 const PROF_PARTS: int = 8
 
-## The most wall cells one shot walks in one step (see `_wall_hit`).
-const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping. A unit is one target
 ## examined by the native hit pass (about 0.13 us); a hit's listeners cost about 400 of them (about
 ## 50 us; shot scale H2, measured with H0's crowd, docs/DECISIONS.md 2026-11-05).
@@ -294,8 +291,6 @@ const HIT_WORK: int = 400
 const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
-## The most a speed curve multiplies a shot's speed by (`set_speed_curve`), however many cards.
-const SPEED_START_MOST: float = 4.0
 ## The threat grid (see `threat`): built from this many live shots (below, one pass is cheaper),
 ## its cells at least THREAT_CELL pixels and at most THREAT_GRID_MAX a side, and a shot whose path
 ## covers more than THREAT_SPAN_MAX cells is tried by every query instead of filed.
@@ -1897,8 +1892,7 @@ func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
 ## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
 ## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
 func line_clear(from: Vector2, to: Vector2) -> bool:
-	var cells: int = ceili(from.distance_to(to) / WALL_CELL) * 2 + 2
-	return _wall_hit(from, to, maxi(cells, MAX_WALL_VISITS)) < 0.0
+	return _wall_hit(from, to) < 0.0
 
 
 ## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell
@@ -1922,7 +1916,7 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
 ## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
 ## most |dx| + |dy| + 1 of them, in cells.
-func _wall_hit(from: Vector2, to: Vector2, max_visits: int = MAX_WALL_VISITS) -> float:
+func _wall_hit(from: Vector2, to: Vector2) -> float:
 	if not _has_walls:
 		return -1.0
 	var start: Vector2 = (from - _bounds.position) / WALL_CELL
@@ -1957,12 +1951,10 @@ func _wall_hit(from: Vector2, to: Vector2, max_visits: int = MAX_WALL_VISITS) ->
 		per_y = absf(1.0 / delta.y)
 		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
 	var t: float = 0.0
-	# A huge step (after a hitch) walks at most MAX_WALL_VISITS cells; a path
-	# that is still unchecked after that counts as a hit, so a shot never
-	# crosses a wall it did not look at.
+	# Every cell the path crosses, however fast the shot (no cap: owner, 2026-11-09): a wall it
+	# reaches is hit, and open air is never taken for one.
 	var full: int = absi(end_x - cx) + absi(end_y - cy) + 1
-	var visits: int = mini(full, max_visits)
-	for _n in visits:
+	for _n in full:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return t
 		if next_x < next_y:
@@ -1975,7 +1967,7 @@ func _wall_hit(from: Vector2, to: Vector2, max_visits: int = MAX_WALL_VISITS) ->
 			cy += step_y
 		if t > 1.0:
 			return -1.0
-	return t if full > visits else -1.0
+	return -1.0
 
 
 ## The batch's culling box must cover the whole area. Without it the renderer
@@ -2633,14 +2625,14 @@ func set_growth(slot: int, factor: float) -> bool:
 ## the change comes early (every spell shot's default, SpellLimits.SHOT_SPEED_*: start 2.2, end 0.2, ease 1.5),
 ## below 1 late. Homing and spiral turn and weave the speed it has; a deflect speeds the whole curve
 ## up and starts it again with its life. Only a shot that flies; false otherwise, or for bad numbers.
-## `start` above SPEED_START_MOST counts as SPEED_START_MOST.
+## Any finite numbers count as given, however many cards multiplied them (no cap: owner, 2026-11-09).
 func set_speed_curve(slot: int, start: float, end: float, ease_power: float) -> bool:
 	if not _is_flyer(slot) or not (start > 0.0) or not (end >= 0.0) or not (ease_power > 0.0):
 		return false
 	if not is_finite(start) or not is_finite(end) or not is_finite(ease_power):
 		return false
-	_curve_from[slot] = minf(start, SPEED_START_MOST)
-	_curve_to[slot] = minf(end, SPEED_START_MOST)
+	_curve_from[slot] = start
+	_curve_to[slot] = end
 	_curve_ease[slot] = ease_power
 	_curve_speed[slot] = _vel[slot].length()
 	_vel[slot] = _vel[slot] * _curve_from[slot]
@@ -4565,7 +4557,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		# goes on from the other side (`ray_gate`).
 		var gate_at: float = gate_cut(a, b) if gates else -1.0
 		if gate_at >= 0.0:
-			var wall_at: float = _wall_hit(a, b, 1 << 30) if _has_walls and not ghost else -1.0
+			var wall_at: float = _wall_hit(a, b) if _has_walls and not ghost else -1.0
 			if wall_at < 0.0 or gate_at <= wall_at:
 				var into: Vector2 = a.lerp(b, gate_at)
 				g_gate = gate_hit
@@ -4577,7 +4569,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 				break
 		if _has_walls and not ghost:
 			# A ray walks every cell it crosses, however long it is.
-			var cut: float = _wall_hit(a, b, 1 << 30)
+			var cut: float = _wall_hit(a, b)
 			if cut >= 0.0:
 				var at: Vector2 = a.lerp(b, cut)
 				var heading: Vector2 = (b - a) / piece if piece > 0.0 else Vector2.ZERO

@@ -57,9 +57,9 @@ func before_each() -> void:
 	var ring: FormBase = _form(&"ring", 5, 300.0, 1.0)
 	ring.shots = 24
 	ring.spread = 360.0
-	var nova: FormBase = _form(&"nova", 5, 300.0, 1.0)
-	nova.shots = 8
-	nova.spread = 360.0
+	var halo: FormBase = _form(&"halo", 5, 300.0, 1.0)
+	halo.shots = 8
+	halo.spread = 360.0
 	var rune: FormBase = _form(&"rune", 5, 0.0, 10.0)
 	rune.carrier = &"rune"
 	rune.radius = 6.0
@@ -92,6 +92,11 @@ func before_each() -> void:
 	homing.behaviour_strength = 6.0
 	homing.behaviour_reach = 160.0
 	_put(homing, &"homing")
+	var nova: ModifierBase = ModifierBase.new()
+	nova.behaviour = ModifierBase.Behaviour.NOVA
+	nova.behaviour_strength = 8.0
+	nova.cue = &"nova"
+	_put(nova, &"nova")
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
@@ -220,7 +225,7 @@ func test_split_fans_the_shots_over_the_spread() -> void:
 
 
 func test_a_nova_is_an_even_ring() -> void:
-	_build(0, 0, {"form": &"nova"})
+	_build(0, 0, {"form": &"halo"})
 	_cast(0)
 	var sum: Vector2 = Vector2.ZERO
 	for slot in _slots():
@@ -244,10 +249,10 @@ func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
 
 
 func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
-	_build(0, 0, {"form": &"nova", "element": &"fire"})
+	_build(0, 0, {"form": &"halo", "element": &"fire"})
 	_cast(0)
 	var shots: Array[int] = _slots()
-	check_equal(shots.size(), 8, "the nova made its ring")
+	check_equal(shots.size(), 8, "the halo made its ring")
 	for slot in shots:
 		check_equal(_mgr.get_core_of(slot), Color(0.88, 0.35, 0.18), "a shot of the ring has the element's core")
 	_build(1, 0, {"form": &"bolt"})
@@ -263,7 +268,7 @@ func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
 	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(3, 0))[0]), Color(0.88, 0.35, 0.18), "and an orbit shot")
 
 
-func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
+func test_a_beam_and_a_full_fan_announce_nothing_for_looks() -> void:
 	var seen: Array = []
 	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, _look: int) -> void: seen.append([player, form, origin, direction, length, tint]))
 	_build(2, 0, {"form": &"beam", "element": &"fire"})
@@ -280,14 +285,33 @@ func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	check(CarrierBeam.of(_spells).beam_origin(at).direction_to(CarrierBeam.of(_spells).beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
 	check(is_equal_approx(CarrierBeam.of(_spells).beam_reach(at), 200.0), "as long as it got (%s)" % str(CarrierBeam.of(_spells).beam_reach(at)))
 	check_equal(CarrierBeam.of(_spells).beam_tint(at), Color(0.88, 0.35, 0.18), "in the element's colour")
-	_build(1, 0, {"form": &"nova"})
+	_build(1, 0, {"form": &"halo"})
 	_cast(1)
-	check_equal(seen.size(), 1, "one nova, one announcement, not one per shot")
-	check_equal(seen[0][1], &"nova", "as a nova")
-	seen.clear()
+	check_equal(seen.size(), 0, "a fan all the way round is drawn as its shots, no announcement")
 	_build(0, 0, {"form": &"bolt"})
 	_cast(0)
 	check_equal(seen.size(), 0, "a bolt has no announcement, it is drawn as a shot")
+
+
+## The Nova modifier (owner, 2026-11-09): the carrier cast eight ways from one place, and its ring
+## shown once, by its card's cue, at the caster.
+func test_a_nova_casts_eight_ways_and_shows_its_ring_once() -> void:
+	var cues: Array = []
+	_bus.cue_shown.connect(func(caster: int, cue: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void: cues.append([caster, cue, at]))
+	_mgr.set_anchor(1, Vector2(30, 40))
+	var tag: int = _build(1, 0, {"form": &"bolt", "modifiers": [&"nova"]})
+	_cast(1, 0, 10.0, Vector2(30, 40))
+	var slots: Array[int] = _slots(tag)
+	check_equal(slots.size(), 8, "eight bolts")
+	var ways: Array[int] = []
+	for slot in slots:
+		ways.append(posmod(roundi(rad_to_deg(_mgr.get_velocity_of(slot).angle()) / 45.0), 8))
+	ways.sort()
+	check_equal(ways, [0, 1, 2, 3, 4, 5, 6, 7], "one each way round")
+	check_equal(cues.size(), 1, "one ring for the nova, not one per copy")
+	if cues.size() == 1:
+		check_equal(cues[0][1], &"nova", "its card's cue")
+		check_equal(cues[0][2], Vector2(30, 40), "at its caster")
 
 
 func test_a_beam_hits_instantly_and_counts_as_a_shot() -> void:
@@ -318,7 +342,7 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point_along_the_shot() -> voi
 func test_the_held_spell_cannot_hit_the_target_that_fired_it() -> void:
 	var near: Node2D = _target(Vector2(60, 0))
 	var far: Node2D = _target(Vector2(160, 0))
-	_build(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova"}})
+	_build(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"halo"}})
 	_cast(0)
 	_tick(60)
 	var on_near: int = 0
@@ -328,8 +352,8 @@ func test_the_held_spell_cannot_hit_the_target_that_fired_it() -> void:
 			on_near += 1
 		elif hit[1] == far:
 			on_far += 1
-	check_equal(on_near, 1, "the near target was hit by the first shot only, not by the nova born on it")
-	check(on_far >= 1, "the nova reached something new")
+	check_equal(on_near, 1, "the near target was hit by the first shot only, not by the halo born on it")
+	check(on_far >= 1, "the halo reached something new")
 
 
 func test_on_expire_fires_where_the_shot_ended() -> void:
@@ -594,10 +618,10 @@ func test_counts_return_to_zero_after_a_busy_fight() -> void:
 	for n in 6:
 		_target(Vector2(60 + 40 * n, 20 * (n % 3)))
 	var recipes: Array[Dictionary] = [
-		{"form": &"nova", "modifiers": [&"chain"], "trigger": &"on_hit", "held": {"form": &"bolt", "trigger": &"on_expire", "held": {"form": &"short"}}},
+		{"form": &"halo", "modifiers": [&"chain"], "trigger": &"on_hit", "held": {"form": &"bolt", "trigger": &"on_expire", "held": {"form": &"short"}}},
 		{"form": &"bolt", "modifiers": [&"split", &"homing"], "trigger": &"timer", "held": {"form": &"short"}},
 		{"form": &"beam", "modifiers": [&"chain"], "trigger": &"on_expire", "held": {"form": &"bolt"}},
-		{"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit_twice", "held": {"form": &"nova"}},
+		{"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit_twice", "held": {"form": &"halo"}},
 	]
 	for player in 4:
 		_build(player, 0, recipes[player])

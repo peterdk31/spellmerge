@@ -32,7 +32,7 @@ const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
 ## The four-player clips: where the wizards stand, the cards they all cast, how often and how long.
 const FOUR_ORIGINS: Array[Vector2] = [Vector2(0.0, -42.0), Vector2(0.0, -14.0), Vector2(0.0, 14.0), Vector2(0.0, 42.0)]
 const FOUR_PLAYER_CARDS: Array = [&"fire", &"frost", &"bigger", &"bolt"]
-const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova"]
+const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova", &"bolt"]
 ## A card that does something only with others round it has its own row (none today: faster
 ## casting, which replaced quicken, works on a plain bolt; docs/milestones/cast-timing.md, T9).
 const OWN_ROWS: Dictionary = {}
@@ -131,7 +131,7 @@ static func _component(id: StringName, kind: StringName, title: String) -> Dicti
 		&"form":
 			cards = [id]
 		&"trigger":
-			cards = [id, &"bolt", &"nova"]
+			cards = [id, &"bolt", &"nova", &"bolt"]
 			if TRIGGER_NEEDS.has(id):
 				cards.insert(1, TRIGGER_NEEDS[id])
 		&"multicast":

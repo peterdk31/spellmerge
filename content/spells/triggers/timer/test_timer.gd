@@ -14,14 +14,14 @@ func test_the_card_is_timer() -> void:
 
 
 func test_it_compiles_into_the_spell_numbers() -> void:
-	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"timer", "held": {"form": &"nova"}})
+	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"timer", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
 	var trigger: TriggerBase = _trigger(&"timer")
 	check_equal(spell.triggers.size(), 1, "one trigger")
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
 	check_equal(spell.triggers[0].interval, trigger.wind_up, "its tick is its wind-up (its payload adds none here; docs/milestones/cast-timing.md, T8)")
-	check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "the payload is the nova")
+	check(spell.payload != null and spell.payload.spells[0].form_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:

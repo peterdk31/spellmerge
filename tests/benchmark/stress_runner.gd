@@ -146,20 +146,20 @@ const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 ## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
 const STAFFS: Array[Array] = [
 	[
-		[&"fire", &"split", &"bigger", &"on_hit", &"nova", &"storm", &"bolt"],
+		[&"fire", &"split", &"bigger", &"on_hit", &"nova", &"bolt", &"storm", &"bolt"],
 		[&"frost", &"timer", &"orbit", &"fire", &"split", &"bolt"],
 	],
 	[
 		[&"storm", &"chain", &"pierce", &"beam"],
-		[&"void", &"homing", &"split", &"on_expire", &"bolt", &"fire", &"nova"],
+		[&"void", &"homing", &"split", &"on_expire", &"bolt", &"fire", &"nova", &"bolt"],
 	],
 	[
-		[&"frost", &"timer", &"rune", &"frost", &"nova"],
-		[&"storm", &"split", &"pierce", &"nova"],
+		[&"frost", &"timer", &"rune", &"frost", &"nova", &"bolt"],
+		[&"storm", &"split", &"pierce", &"nova", &"bolt"],
 	],
 	[
 		[&"fire", &"split", &"homing", &"faster", &"on_hit", &"bolt", &"frost", &"split", &"bolt"],
-		[&"void", &"on_hit", &"nova", &"fire", &"nova"],
+		[&"void", &"on_hit", &"nova", &"bolt", &"fire", &"nova", &"bolt"],
 	],
 ]
 

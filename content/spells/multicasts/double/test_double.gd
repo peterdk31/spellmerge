@@ -63,21 +63,21 @@ func test_the_card_is_a_valid_multicast() -> void:
 
 func test_two_carriers_leave_in_one_cast() -> void:
 	var arena := ArenaScript.new(root)
-	var staff: CompiledStaff = arena.install_cards(0, 0, ["double", "fire", "bolt", "nova"])
+	var staff: CompiledStaff = arena.install_cards(0, 0, ["double", "fire", "bolt", "nova", "bolt"])
 	check_equal(staff.casts.size(), 1, "one cast")
 	if staff.casts.size() == 1:
 		var group: CompiledGroup = staff.casts[0].group
 		check_equal(group.spells.size(), 2, "two carriers in the group")
 		if group.spells.size() == 2:
 			check_equal([group.spells[0].form_id, group.spells[0].element_id], [&"bolt", &"fire"], "a fire bolt first")
-			check_equal([group.spells[1].form_id, group.spells[1].element_id], [&"nova", &""], "the fire stays on the bolt")
+			check_equal([group.spells[1].form_id, group.spells[1].element_id], [&"bolt", &""], "the fire stays on the bolt")
 	check(staff.wasted.is_empty(), "no card is wasted")
 	arena.free_all()
 
 
 func test_without_double_the_cards_make_two_casts() -> void:
 	var arena := ArenaScript.new(root)
-	var staff: CompiledStaff = arena.install_cards(0, 0, ["fire", "bolt", "nova"])
+	var staff: CompiledStaff = arena.install_cards(0, 0, ["fire", "bolt", "nova", "bolt"])
 	check_equal(staff.casts.size(), 2, "a bolt, then a nova")
 	arena.free_all()
 
@@ -100,7 +100,7 @@ func test_four_players_double_at_once() -> void:
 		arena.place_caster(player, at)
 		imps.append(arena.add_imp(at + Vector2(90.0, 0.0)))
 		imps.append(arena.add_imp(at + Vector2(-50.0, 0.0)))
-		arena.install_cards(player, 0, ["double", "bolt", "nova"])
+		arena.install_cards(player, 0, ["double", "bolt", "nova", "bolt"])
 	for player in 4:
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(1.5)

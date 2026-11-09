@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The look of each form in gameplay/feel (#244, part 2; the glow look, 2026-10-27): a cast
-## flash at the staff and, for a ring carrier, a ring (a nova's flashes out, a rune's and an
+## flash at the staff and, for a ring carrier, a ring (a dash's flashes out, a rune's and an
 ## orbit's gather in), a flash where its shot lands in the shot's own colours and cards (a
 ## rune goes off in a burst of its own), a beam that opens wide and thins, and an enemy's shot
 ## that always shows the same ember mark no player's flare resembles. The cast and the impact are
@@ -25,7 +25,7 @@ class CardsRegistry:
 		return super(folder, id)
 
 
-const FORMS: Array[StringName] = [&"bolt", &"beam", &"nova", &"rune", &"orbit"]
+const FORMS: Array[StringName] = [&"bolt", &"beam", &"dash", &"rune", &"orbit"]
 ## The beam card's own look (`FormBase.look_shader`; docs/milestones/card-looks.md, phase 2).
 const BEAM_CARD_SHADER: Shader = preload("res://content/spells/forms/beam/beam.gdshader")
 
@@ -93,7 +93,7 @@ func test_the_looks_are_cues_the_cards_name_not_in_the_preset() -> void:
 		check(registry.get_resource(&"spells", form) is FormBase, "%s is a carrier card" % form)
 		check(_card_cue(form, true) != null, "%s has a cast cue" % form)
 		check(_card_cue(form, false) != null, "%s has an impact cue" % form)
-	check_equal(_card_cue(&"nova", true).id, &"cast_nova", "a nova has a cast flash of its own")
+	check_equal(_card_cue(&"dash", true).id, &"cast_ring", "a dash has a cast flash of its own")
 	var flashes: int = 0
 	for part: Dictionary in _card_cue(&"bolt", true).parts:
 		if StringName(part.get("part", "flash")) == &"flash":
@@ -112,12 +112,12 @@ func test_a_cast_flashes_at_the_staff_in_its_players_colours() -> void:
 
 func test_the_ring_carriers_add_a_ring_to_their_cast() -> void:
 	var want: Dictionary = {
-		&"bolt": [1, 0, 0, 0, 0], &"beam": [1, 0, 0, 0, 0], &"nova": [1, 0, 1, 0, 0],
+		&"bolt": [1, 0, 0, 0, 0], &"beam": [1, 0, 0, 0, 0], &"dash": [1, 0, 1, 0, 0],
 		&"rune": [1, 0, 0, 1, 0], &"orbit": [1, 0, 0, 1, 0],
 	}
 	for form: StringName in want:
 		_cast(0, form)
-		check_equal(_kinds(), want[form] as Array[int], "%s: a nova flashes a ring out, a rune and an orbit gather one in" % form)
+		check_equal(_kinds(), want[form] as Array[int], "%s: a dash flashes a ring out, a rune and an orbit gather one in" % form)
 		feel.step(1.0)
 
 
@@ -152,25 +152,25 @@ func test_a_carrier_whose_impact_cue_is_a_quake_cracks_the_floor_where_it_strike
 
 func test_a_cue_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
-	_cast(0, &"nova")
+	_cast(0, &"dash")
 	check_equal(feel.flashes_of(&"ring_out"), 0, "no registry: no cue to play")
-	check_equal(feel._form_cues_of(&"nova"), FeelScript.NO_FORM_CUES, "the defaults")
+	check_equal(feel._form_cues_of(&"dash"), FeelScript.NO_FORM_CUES, "the defaults")
 	check_equal(feel._form_cues_of(&""), FeelScript.NO_FORM_CUES, "no form id, the defaults")
 	feel.registry = registry
-	_cast(0, &"nova")
-	check_equal(feel.flashes_of(&"ring_out"), 1, "once the registry is there the nova has its ring")
-	check_equal(feel._form_cues_of(&"nova")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
+	_cast(0, &"dash")
+	check_equal(feel.flashes_of(&"ring_out"), 1, "once the registry is there the dash has its ring")
+	check_equal(feel._form_cues_of(&"dash")[FeelScript.CUE_IMPACT], &"impact_ring", "and its flare")
 	check_equal(feel._form_cues_of(&"fire_bolt"), FeelScript.NO_FORM_CUES, "an id that is no carrier card: the defaults")
 
 
 func test_each_form_ends_its_own_way() -> void:
 	var want: Dictionary = {
-		&"bolt": [0, 1, 0, 0, 0], &"beam": [0, 1, 0, 0, 0], &"nova": [0, 1, 1, 0, 0],
+		&"bolt": [0, 1, 0, 0, 0], &"beam": [0, 1, 0, 0, 0], &"dash": [0, 1, 1, 0, 0],
 		&"rune": [0, 0, 0, 0, 1], &"orbit": [0, 1, 0, 0, 0], &"": [0, 1, 0, 0, 0],
 	}
 	for form: StringName in want:
 		_impact(0, form)
-		check_equal(_kinds(), want[form] as Array[int], "%s: a burst, a nova's with a ring, a rune goes off" % form)
+		check_equal(_kinds(), want[form] as Array[int], "%s: a burst, a dash's with a ring, a rune goes off" % form)
 		feel.step(1.0)
 
 
@@ -206,7 +206,7 @@ func test_a_flash_ends_after_its_seconds() -> void:
 
 func test_the_batch_draws_the_live_flashes() -> void:
 	_impact(0, &"bolt")
-	_impact(1, &"nova")
+	_impact(1, &"dash")
 	feel.step(0.01)
 	var multimesh: MultiMesh = feel._flash_node.multimesh
 	check_equal(multimesh.visible_instance_count, 3, "a burst, and a burst and a ring (a wall's chips are motes)")
@@ -371,7 +371,7 @@ func test_a_casts_kick_is_its_cues() -> void:
 func test_a_rings_impact_has_the_shots_colour_but_not_its_cards() -> void:
 	var frost := Color("4fd6dc")
 	var look: int = ProjectilesScript.pack_look(PackedInt32Array([ProjectilesScript.LOOK_FLECKS]))
-	_impact(1, &"nova", frost, look)
+	_impact(1, &"dash", frost, look)
 	check_equal(feel.flash_dress(&"burst"), [frost, look], "its burst: the colour and the cards")
 	check_equal(feel.flash_dress(&"ring_out"), [frost, 0], "its ring: the colour only (`no_cards`)")
 

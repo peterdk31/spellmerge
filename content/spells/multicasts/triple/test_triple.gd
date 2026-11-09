@@ -71,14 +71,14 @@ func test_the_card_is_a_valid_multicast() -> void:
 
 func test_three_carriers_leave_in_one_cast() -> void:
 	var arena := ArenaScript.new(root)
-	var staff: CompiledStaff = arena.install_cards(0, 0, ["triple", "fire", "bolt", "beam", "nova"])
+	var staff: CompiledStaff = arena.install_cards(0, 0, ["triple", "fire", "bolt", "beam", "nova", "rune"])
 	check_equal(staff.casts.size(), 1, "one cast")
 	if staff.casts.size() == 1:
 		var group: CompiledGroup = staff.casts[0].group
 		var forms: Array[StringName] = []
 		for spell in group.spells:
 			forms.append(spell.form_id)
-		check_equal(forms, [&"bolt", &"beam", &"nova"] as Array[StringName], "three carriers in the group")
+		check_equal(forms, [&"bolt", &"beam", &"rune"] as Array[StringName], "three carriers in the group")
 		if group.spells.size() == 3:
 			check_equal(group.spells[0].element_id, &"fire", "a fire bolt first")
 			check_equal(group.spells[1].element_id, &"", "the fire stays on the bolt")

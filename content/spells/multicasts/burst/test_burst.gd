@@ -40,8 +40,8 @@ func test_the_bolt_hits_three_times() -> void:
 
 
 func test_the_nova_rings_three_times() -> void:
-	var one: int = _lost(["frost", "nova"], Vector2(40.0, 0.0), 1.0)
-	var three: int = _lost(["burst", "frost", "nova"], Vector2(40.0, 0.0), 1.0)
+	var one: int = _lost(["frost", "nova", "bolt"], Vector2(40.0, 0.0), 1.0)
+	var three: int = _lost(["burst", "frost", "nova", "bolt"], Vector2(40.0, 0.0), 1.0)
 	check(one > 0, "a single frost nova hurts")
 	check(one * 3 < ArenaScript.IMP_HEALTH, "the imp survives three rings")
 	check_equal(three, one * 3, "three rings, three hits")

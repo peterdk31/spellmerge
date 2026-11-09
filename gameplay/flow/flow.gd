@@ -122,19 +122,19 @@ const HORDE_START_CARDS: Array = [[&"dash"], [&"swing"], [], []]
 const HORDE_BAG: Array[StringName] = [&"dash", &"swing"]
 ## The cards a sandbox run starts with (owner, 2026-11-01: two showcase builds of the trigger
 ## tree on Y and B, to read in the builder's tree and try on the dummies). A and X as Play's.
-## Y, the most shots: a fire nova split three times (216 shots) whose every shot, when it ends,
-## fires a frost nova split three times (216 each): far past the projectile cap (6,000 on
-## desktop), which it holds for about three seconds; 67.5 mana. Two payload levels only: a
+## Y, the most shots: a fire nova of bolts split three times (216 shots) whose every shot, when it
+## ends, fires a frost nova of bolts split three times (216 each): far past the projectile cap (6,000 on
+## desktop), which it holds for a few seconds; 67.5 mana. Two payload levels only: a
 ## third would queue a million shots, minutes of backlog at `SpellLimits.FIRE_SHOTS_PER_STEP`.
 ## B, a decoy turret: every 0.5 s it fires a homing fire, frost and lightning bolt (the
-## lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova
-## with a blast; 34.6 mana, every card used.
+## lightning one sets off a chaining lightning atom on hit), and when it is hurt a void nova of
+## bolts; 59.6 mana, every card used.
 const SANDBOX_START_CARDS: Array = [
 	[&"dash"],
 	[&"fire", &"bolt"],
-	[&"on_expire", &"fire", &"split", &"split", &"split", &"nova", &"frost", &"split", &"split", &"split", &"nova"],
+	[&"on_expire", &"fire", &"split", &"split", &"split", &"nova", &"bolt", &"frost", &"split", &"split", &"split", &"nova", &"bolt"],
 	[&"timer", &"on_hurt", &"decoy", &"triple", &"homing", &"fire", &"bolt", &"homing", &"frost", &"bolt",
-		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"blast", &"nova"],
+		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"nova", &"bolt"],
 ]
 ## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
 ## spawn after these stands another of the first, `dummy_id`).

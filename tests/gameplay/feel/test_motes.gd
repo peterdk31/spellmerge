@@ -689,7 +689,7 @@ func test_a_flashs_sparks_are_its_cues_motes() -> void:
 	var want: Dictionary = {
 		&"impact": &"spark", &"expire": &"spark", &"deflect": &"spark", &"parry": &"spark", &"slam": &"spark",
 		&"shield_block": &"spark", &"gem_pickup": &"spark", &"rune_burst": &"spark", &"cast": &"spark",
-		&"cast_nova": &"spark", &"cast_rune": &"spark", &"cast_wall": &"spark", &"appear": &"spark",
+		&"cast_rune": &"spark", &"cast_wall": &"spark", &"appear": &"spark",
 		&"rainfall": &"spark", &"conjure": &"spark", &"trade": &"spark", &"vanish": &"glimmer",
 		&"dismiss": &"glimmer", &"revive": &"glimmer",
 	}

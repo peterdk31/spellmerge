@@ -86,8 +86,9 @@ func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 	check(not core.is_equal_approx(body), "the two are not the same colour")
 
 
+## A nova's ring is its card's cue (`nova`), which the spell runtime shows once per nova (`cue_shown`).
 func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
-	bus.form_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST, 7)
+	bus.cue_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST, 7)
 	check_equal(_shown().size(), 0, "no sprite: the ring is a flash")
 	check_equal(feel.flashes_of(&"ring_out", 0), 1, "a ring flashes out")
 	check_equal(feel.flash_dress(&"ring_out"), [FROST, 7], "in the element's colours, with the cast's cards")
@@ -114,7 +115,7 @@ func test_a_shot_whose_life_runs_out_pops() -> void:
 
 func test_forms_end() -> void:
 	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
+	bus.cue_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	feel.step(1.0)
 	check_equal(_shown().size(), 0, "after its seconds the beam is gone")
 	check_equal(feel.live_flashes(), 0, "and the ring")

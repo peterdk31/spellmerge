@@ -2,7 +2,7 @@
 	"id": "on_wall_bolt_nova",
 	"name": "On wall bolt nova",
 	"does": "A bolt flies at the wall ahead and a fire nova bursts where it strikes, lighting an imp standing by the wall off the aim.",
-	"casts": [{"staff": 0, "cards": ["on_wall", "bolt", "fire", "nova"]}],
+	"casts": [{"staff": 0, "cards": ["on_wall", "bolt", "fire", "nova", "bolt"]}],
 	"imps": [[60, 30]],
 	"walls": [[80, -200, 16, 400]],
 	"seconds": 1.5,

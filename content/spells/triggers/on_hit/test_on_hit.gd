@@ -14,14 +14,14 @@ func test_the_card_is_on_hit() -> void:
 
 
 func test_it_compiles_into_the_spell_numbers() -> void:
-	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova"}})
+	var spell: CompiledSpell = _compile_recipe({"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
 	var trigger: TriggerBase = _trigger(&"on_hit")
 	check_equal(spell.triggers.size(), 1, "one trigger")
 	if spell.triggers.is_empty():
 		return
 	check_equal(spell.triggers[0].event, trigger.event, "the event is compiled")
 	check_equal(spell.triggers[0].interval, 0.0, "no timer: no tick (docs/milestones/cast-timing.md, T8)")
-	check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "the payload is the nova")
+	check(spell.payload != null and spell.payload.spells[0].form_id == &"bolt" and spell.payload.spells[0].nova_ways() == 8, "the payload is a nova of bolts")
 
 
 func test_it_works_for_all_four_players_at_once() -> void:
@@ -39,7 +39,7 @@ func test_it_works_for_all_four_players_at_once() -> void:
 
 func test_on_hit_fires_the_held_spell_from_the_hit_point() -> void:
 	_target(Vector2(80.0, 0.0))
-	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova"}})
+	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
 	_tick(60)
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	var bolt_hits: int = 0
@@ -54,7 +54,7 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point() -> void:
 
 
 func test_on_hit_does_not_fire_without_a_hit() -> void:
-	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova"}})
+	_build_and_cast(0, 0, {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "modifiers": [&"nova"]}})
 	_tick(120)
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 0, "a bolt that hits nothing fires nothing")
 

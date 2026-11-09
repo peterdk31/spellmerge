@@ -49,8 +49,8 @@ func test_it_halves_a_charge_in_either_order() -> void:
 
 func test_it_quickens_a_charged_payload() -> void:
 	# A payload adds no wind-down, but a charge there winds up where the trigger fired.
-	var plain: CompiledCast = _cast(["on_hit", "bolt", "charge", "nova"])
-	var fast: CompiledCast = _cast(["on_hit", "bolt", "faster_casting", "charge", "nova"])
+	var plain: CompiledCast = _cast(["on_hit", "bolt", "charge", "nova", "bolt"])
+	var fast: CompiledCast = _cast(["on_hit", "bolt", "faster_casting", "charge", "nova", "bolt"])
 	var plain_up: float = plain.group.spells[0].triggers[0].payload.wind_up
 	var fast_up: float = fast.group.spells[0].triggers[0].payload.wind_up
 	check(is_equal_approx(fast_up, plain_up * 0.5), "the payload winds up half as long: %s of %s" % [fast_up, plain_up])
@@ -59,7 +59,7 @@ func test_it_quickens_a_charged_payload() -> void:
 
 func test_it_is_wasted_on_a_plain_payload() -> void:
 	# Nothing to shorten: no wind-down (a payload's) and no wind-up.
-	var cast: CompiledCast = _cast(["on_hit", "bolt", "faster_casting", "nova"])
+	var cast: CompiledCast = _cast(["on_hit", "bolt", "faster_casting", "nova", "bolt"])
 	check(cast.wasted.has(2), "a plain payload nova has no cast time to shorten")
 
 

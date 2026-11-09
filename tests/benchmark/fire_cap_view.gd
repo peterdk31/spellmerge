@@ -30,8 +30,8 @@ const WALL: float = 8.0
 const CROWD_CENTER := Vector2(400.0, 180.0)
 ## Seconds between bursts.
 const EVERY: float = 3.0
-const CARRIER: Array[StringName] = [&"split", &"split", &"split", &"nova"]
-const PAYLOADS: Array[Array] = [[&"bolt"], [&"split", &"bolt"], [&"nova"]]
+const CARRIER: Array[StringName] = [&"split", &"split", &"split", &"nova", &"bolt"]
+const PAYLOADS: Array[Array] = [[&"bolt"], [&"split", &"bolt"], [&"nova", &"bolt"]]
 const PAYLOAD_NAMES: Array[String] = ["a bolt", "a split bolt", "a nova"]
 ## The cases `--auto` runs, and how long each.
 const PHASES: Array[Dictionary] = [

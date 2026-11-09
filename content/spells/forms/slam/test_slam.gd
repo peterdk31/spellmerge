@@ -78,7 +78,7 @@ func test_its_caster_is_skipped_and_a_teammate_is_hit() -> void:
 func test_its_blast_and_payload_go_off_at_the_impact() -> void:
 	var arena := ArenaScript.new(root)
 	var past: Node2D = arena.add_imp(Vector2(20.0, 56.0))
-	arena.install_cards(0, 0, ["on_expire", "slam", "frost", "nova"])
+	arena.install_cards(0, 0, ["on_expire", "slam", "frost", "nova", "bolt"])
 	arena.cast(0, 0)
 	arena.run(1.5)
 	check(arena.was_given(past, &"chill"), "the payload nova went off at the impact and chilled an imp out of the ring")

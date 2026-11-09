@@ -539,7 +539,6 @@ func test_every_status_is_a_row_of_each_table() -> void:
 	check_equal(CombatScript.STATUS_AT.size(), CombatScript.STATUS_COUNT, "and nothing else is")
 	check_equal(CombatScript.STATUS_APPLIED.size(), CombatScript.STATUS_COUNT, "STATUS_APPLIED has a row a status")
 	check_equal(CombatScript.STATUS_STRENGTH_PER_POWER.size(), CombatScript.STATUS_COUNT, "STATUS_STRENGTH_PER_POWER too")
-	check_equal(CombatScript.STATUS_EXTENDED_MAX.size(), CombatScript.STATUS_COUNT, "STATUS_EXTENDED_MAX too")
 	for status in CombatScript.REACTING_STATUSES:
 		check(CombatScript.STATUS_AT.has(status), "%s, a reacting status, is a status" % status)
 	for status in SpellValidator.KNOWN_STATUSES:

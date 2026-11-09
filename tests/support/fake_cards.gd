@@ -16,7 +16,7 @@ const ICONS: Array[Texture2D] = [
 	preload("res://content/spells/modifiers/split/icon.svg"),
 	preload("res://content/spells/elements/fire/icon.svg"),
 	preload("res://content/spells/triggers/on_hit/icon.svg"),
-	preload("res://content/spells/forms/nova/icon.svg"),
+	preload("res://content/spells/multicasts/double/icon.svg"),
 ]
 
 

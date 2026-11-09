@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
-const COMBOS: Array[String] = ["on_recast_rune_nova", "on_recast_slow_frost"]
+const COMBOS: Array[String] = ["on_recast_rune_blast", "on_recast_slow_frost"]
 
 
 func _card() -> TriggerBase:

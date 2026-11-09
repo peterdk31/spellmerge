@@ -101,7 +101,7 @@ const CuePlanScript := preload("res://gameplay/feel/cue_plan.gd")
 const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
+## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
 ## Four players' beam sprites and the enemies' (one share for every enemy caster, staffs F7).
@@ -1364,7 +1364,7 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int, shot: int) -> v
 ## projectile manager's `impact_form` while the impact is sent; `impact`, a flare, for none), in the
 ## shot's colour and cards (its `impact_core`, `impact_look` and `impact_tag`) and its caster's `ramp`:
 ## an enemy's lands the same way, in the enemy ramp (staffs F7: one look for every spell). As big as
-## the card's radius: a rune goes off in `rune_burst`, a nova's adds a ring (`impact_ring`).
+## the card's radius: a rune goes off in `rune_burst`, a wall's adds a ring (`impact_ring`).
 func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2) -> void:
 	var form: StringName = &""
 	var core: Color = Color.WHITE
@@ -2380,7 +2380,7 @@ func _on_barrier_changed(actor: int, charges: int, seconds: float, tag: int, way
 	_spectacle.barrier_changed(actor, charges, seconds, tag, way, radius, _ramp_of(actor))
 
 
-## A carrier showed itself: its card's `shown_cue` (a nova's ring, a rain's telegraph
+## A carrier showed itself: its card's `shown_cue` (a rain's telegraph
 ## with `length` its seconds, where a teleport leaves, each end of a swap, a decoy or familiar
 ## appearing, a dash's dust and lightning arc, S5), then a beam (drawn by `shot_beam.gdshader` in
 ## the element's ramp) with the cast's cards, in the caster's ramp: an enemy's look the same, in the

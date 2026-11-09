@@ -37,7 +37,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
 - **Beams longer than the beam shader holds (owner, 2026-10-29).** `shot_beam.gdshader` takes 80 path points; a live beam with more (a homing beam with 9 or more pierce, a beam bouncing about 78 times) keeps its ends and sharpest turns and drops gentle curve points (`Feel._thin_beam`), so it is only lossy past 78 real turns. The full fix, if a build ever gets there: draw a long beam as consecutive meshes of up to 80 points each, with a shader flag so only the beam's true ends get flares; the shader stays the same size (a bigger uniform array is not an option: WebGL's limits and the owner's GPU, #400). The same applies to fissures: each leg of a bouncing fissure takes one of the player's 24 beam cue slots (`FORMS_PER_PLAYER`), so a fissure with more legs, or several at once, ends its oldest legs' look early.
-- **The `rain` cue (from B2c).** Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
+- **The `rain` cue (from B2c).** Feel draws only `beam` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
 
 ## From the actors rework (phase G, 2026-10-28)
 
@@ -188,7 +188,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
-- **Ring multicast (owner, 2026-10-30, idea).** A multicast that fires the carrier's shots in a full circle round the caster, like nova does for a bolt, so any carrier can be a ring. Not scheduled.
+- **Ring multicast (owner, 2026-10-30, idea). Done (2026-11-09)** as the Nova modifier: any carrier cast eight ways round its caster (docs/milestones/carrier-modifiers.md, Part 1).
 
 - **Relic idea: The Nuke (#416, p3, idea).** For M3, when relics arrive: no mana regeneration, every cast spends all current mana, a full refill every X seconds. Open: how a cast scales with the mana spent, and the refill interval.
 

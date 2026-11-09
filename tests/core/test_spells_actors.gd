@@ -94,6 +94,7 @@ func before_each() -> void:
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"zap", ModifierBase.Behaviour.ZAP, 2.0).behaviour_reach = 60.0
+	_modifier(&"nova", ModifierBase.Behaviour.NOVA, 8.0).cue = &"nova"
 	_trigger(&"on_hurt", TriggerBase.Event.HURT)
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 
@@ -395,9 +396,18 @@ func test_an_enemys_hit_names_its_actor_id() -> void:
 
 func test_form_shown_names_the_actor_id() -> void:
 	var imp: int = ActorSeats.enemy(_table)
-	_build(imp, [&"swarm"])
+	_build(imp, [&"decoy"])
 	_cast(imp)
-	check_equal(_shown, [imp] as Array[int], "a nova's cue names its caster")
+	check_equal(_shown, [imp] as Array[int], "a decoy's showing names its caster")
+
+
+func test_a_novas_cue_names_the_actor_id() -> void:
+	var imp: int = ActorSeats.enemy(_table)
+	_build(imp, [&"nova", &"bolt"])
+	_cast(imp)
+	check_equal(_areas.size(), 1, "one ring for the nova")
+	if _areas.size() == 1:
+		check_equal(_areas[0][0], imp, "it names its caster")
 
 
 func test_entity_spawn_names_the_actor_id() -> void:

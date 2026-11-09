@@ -1,0 +1,10 @@
+{
+	"id": "nova_beam_wheel",
+	"name": "Beam wheel",
+	"does": "A nova of beams: eight beams out round the caster at once, so the imps standing on every diagonal are struck.",
+	"needs": "nova",
+	"casts": [{"staff": 0, "cards": ["nova", "beam"]}],
+	"imps": [[42, 42], [-42, 42], [-42, -42], [42, -42]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2, 3]}]
+}

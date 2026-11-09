@@ -71,7 +71,7 @@ func test_it_strikes_sooner_than_a_steady_shot() -> void:
 
 func test_it_goes_as_far_as_its_speed_and_life() -> void:
 	# A bolt flies 220 px/s for 1.2 s: 264 px. Its nova goes off where it ends.
-	var cards: Array = ["on_expire", "bolt", "nova"]
+	var cards: Array = ["on_expire", "bolt", "nova", "bolt"]
 	check(_lost(cards, Vector2(262.0, 30.0), 1.8) > 0, "it ends where speed x life says")
 	check_equal(_lost(cards, Vector2(140.0, 30.0), 1.8), 0, "not short of it")
 

@@ -184,14 +184,14 @@ func test_every_real_card_can_be_picked_and_shows_its_numbers() -> void:
 func test_the_right_stick_picks_a_card_with_a_rumble() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_point(0, &"nova")
-	check_equal(radial.pointed_id(), &"nova", "the stick picked the nova")
+	_point(0, &"atom")
+	check_equal(radial.pointed_id(), &"atom", "the stick picked the atom")
 	check_equal(_rumbles.size(), 1, "landing on it rumbles once")
 	check_equal(int(_rumbles[0][0]), InputManagerScript.virtual_device_id(0), "the player's own pad")
-	check_equal(radial.hub_lines()[0], "Nova", "the hub shows its name")
+	check_equal(radial.hub_lines()[0], "Atom", "the hub shows its name")
 	check_equal(radial.hub_lines()[1], "Carrier", "and its kind")
 	check(radial.hub_lines().size() > 2 and radial.hub_lines()[2].begins_with("Dmg"), "and its numbers")
-	_input.send_virtual_aim(0, radial.direction_to(&"nova"))
+	_input.send_virtual_aim(0, radial.direction_to(&"atom"))
 	_frame()
 	check_equal(_rumbles.size(), 1, "staying on the same card does not rumble again")
 
@@ -224,8 +224,8 @@ func test_a_wobble_past_the_border_keeps_the_card() -> void:
 func test_letting_go_of_the_stick_lets_the_card_go_and_shows_the_staff() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_point(0, &"nova")
-	check_equal(radial.pointed_id(), &"nova", "pointed while held")
+	_point(0, &"atom")
+	check_equal(radial.pointed_id(), &"atom", "pointed while held")
 	_let_go(0)
 	check_equal(radial.pointed_id(), &"", "letting go picks nothing")
 	check_equal(radial.hub_lines()[0], "Staff 2", "the hub shows the staff's numbers again")
@@ -238,16 +238,16 @@ func test_letting_go_of_the_stick_lets_the_card_go_and_shows_the_staff() -> void
 func test_rt_puts_the_card_in_and_moves_the_marker_on() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_point(0, &"nova")
+	_point(0, &"atom")
 	_tap(0, &"staff_2")
 	_frame()
-	check_equal(_single, [[0, 1, 2, &"nova"]], "an empty slot takes the card")
-	check_equal(radial.cards_of(1).slice(0, 3), _ids("fire bolt nova"), "the player answered")
+	check_equal(_single, [[0, 1, 2, &"atom"]], "an empty slot takes the card")
+	check_equal(radial.cards_of(1).slice(0, 3), _ids("fire bolt atom"), "the player answered")
 	check_equal(radial.marked_slot(), 3, "the marker moved on")
 	check(_rumbles.size() >= 2, "putting a card in rumbles")
 	_tap(0, &"staff_2")
 	_frame()
-	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt nova nova"), "a held stick keeps the card picked for the next slot")
+	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt atom atom"), "a held stick keeps the card picked for the next slot")
 
 
 func test_rt_on_a_card_pushes_the_rest_right_or_replaces_it() -> void:
@@ -297,7 +297,7 @@ func test_lt_takes_a_card_out_and_closes_the_gap() -> void:
 func test_lt_past_the_last_card_is_an_undo() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_point(0, &"nova")
+	_point(0, &"atom")
 	_tap(0, &"staff_2")
 	_frame()
 	_point(0, &"split")
@@ -308,7 +308,7 @@ func test_lt_past_the_last_card_is_an_undo() -> void:
 	check_equal(radial.hint_verbs()[1], RadialScript.UNDO_VERB, "and the hint says so")
 	_tap(0, &"staff_4")
 	_frame()
-	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt nova -"), "the last card came out")
+	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt atom -"), "the last card came out")
 	check_equal(radial.marked_slot(), 3, "the marker stepped back to it")
 	_tap(0, &"staff_4")
 	_frame()
@@ -420,9 +420,9 @@ func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 	var share: int = roundi(mana / 100.0 * 100.0)
 	check_equal(radial.number_lines()[0], "Mana %d%%" % share, "the dearest cast as a share of the viewed staff's own pool, not another staff's")
 	check_equal(radial.hub_lines()[0], "Staff 2", "with nothing pointed at, the hub shows the staff")
-	_point(0, &"nova")
+	_point(0, &"atom")
 	check(radial.number_lines()[1].contains(" > "), "a pointed card shows what RT would make of the damage: %s" % radial.number_lines()[1])
-	var dear: Array[StringName] = _ids("split split split split split split nova")
+	var dear: Array[StringName] = _ids("split split split split split split nova bolt")
 	_bus.staff_cards_requested.emit(0, 1, dear)
 	check(radial.number_lines()[0].get_slice(" > ", 0).ends_with("!"), "a cast dearer than all the mana is marked: %s" % radial.number_lines()[0])
 
@@ -460,8 +460,8 @@ func test_four_radials_open_at_once_each_for_its_own_player() -> void:
 func test_the_slots_frame_each_cast_of_the_cycle() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	# The dev staff draws one carrier a cast: fire bolt, then frost nova.
-	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost nova"))
+	# The dev staff draws one carrier a cast: fire bolt, then frost atom.
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost atom"))
 	var groups: PackedInt32Array = radial.slot_groups()
 	check_equal(Array(groups.slice(0, 5)), [0, 0, 1, 1, -1], "two casts of two cards, and an empty slot in none")
 	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
@@ -472,8 +472,8 @@ func test_pointing_at_a_card_shows_the_casts_as_rt_would_leave_them() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	radial.mark_slot(1)
-	_point(0, &"nova")
-	# Pushed in after the fire: the fire now infuses the nova, and the bolt is a cast of its own.
+	_point(0, &"atom")
+	# Pushed in after the fire: the fire now infuses the atom, and the bolt is a cast of its own.
 	check_equal(Array(radial.slot_groups().slice(0, 4)), [0, 0, 1, -1], "the preview's casts while pointing")
 	check_equal(radial.cards_of(1).slice(0, 3), _ids("fire bolt -"), "the staff itself is unchanged")
 	_let_go(0)
@@ -528,12 +528,12 @@ func test_the_card_info_shows_the_marked_card() -> void:
 	check_equal(info["kind"], "Carrier", "its kind")
 	check(not (info["lines"] as PackedStringArray).is_empty(), "its lore line")
 	check_equal(info["stats"], _spells.component_stats(&"bolt"), "its numbers")
-	_point(0, &"nova")
+	_point(0, &"atom")
 	check_equal(radial.card_info()["id"], &"bolt", "pointing at a card on the ring does not change it")
 	_let_go(0)
 	radial.mark_slot(5)
 	check_equal(radial.card_info()["name"], RadialScript.EMPTY_SLOT_TEXT, "an empty slot says so")
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt nova"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"))
 	radial.mark_slot(0)
 	check_equal(radial.card_info()["kind"], "Trigger", "a trigger")
 	check((radial.card_info()["stats"] as PackedStringArray).is_empty(), "shows no numbers")
@@ -587,7 +587,7 @@ func test_y_swaps_the_ring_for_the_tree_and_back() -> void:
 func test_the_tree_rows_come_from_the_staffs_plan() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire nova frost nova"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"))
 	_tap(0, &"extra")
 	_frame()
 	var rows: Array[Dictionary] = radial.tree_view().rows()
@@ -598,25 +598,25 @@ func test_the_tree_rows_come_from_the_staffs_plan() -> void:
 		check_equal([int(rows[1]["depth"]), int(rows[1]["trigger"]), rows[1]["name"]], [1, 0, _spells.component_name(&"on_hit")], "on hit, one level in")
 		check_equal([int(rows[2]["depth"]), int(rows[2]["trigger"]), rows[2]["name"]], [1, 1, _spells.component_name(&"on_expire")], "on expire beside it")
 	# An edit while the tree is open shows at once.
-	_bus.staff_cards_requested.emit(0, 1, _ids("bolt nova"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("bolt atom"))
 	check_equal(radial.tree_view().rows().size(), 2, "two casts, a row each")
 
 
 func test_the_marked_card_is_marked_in_the_tree_and_a_tile_marks_its_slot() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire nova frost nova"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit on_expire bolt fire atom frost atom"))
 	_tap(0, &"extra")
 	_frame()
 	var tree: TreeViewScript = radial.tree_view()
 	radial.mark_slot(4)
 	_frame()
-	check_equal(Array(tree.marked_rows()), [1], "the fire nova's row is marked for the nova")
+	check_equal(Array(tree.marked_rows()), [1], "the fire atom's row is marked for the atom")
 	radial.mark_slot(1)
 	_frame()
 	check_equal(Array(tree.marked_rows()), [2], "on expire's own row for its trigger card")
 	var at: Vector2 = tree.tile_center(6)
-	check(at.x >= 0.0, "the last nova has a tile")
+	check(at.x >= 0.0, "the last atom has a tile")
 	check_equal(tree.slot_at(at), 6, "the tile under a point is found, as P1's click finds it")
 	check_equal(tree.slot_at(tree.position - Vector2(5.0, 5.0)), -1, "outside the tree is no tile")
 
@@ -624,7 +624,7 @@ func test_the_marked_card_is_marked_in_the_tree_and_a_tile_marks_its_slot() -> v
 func test_rt_puts_nothing_in_from_the_tree() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_point(0, &"nova")
+	_point(0, &"atom")
 	_tap(0, &"extra")
 	_frame()
 	check_equal(radial.pointed_id(), &"", "the tree has no pointed card")
@@ -667,7 +667,7 @@ func test_a_tall_tree_scrolls_and_follows_the_marker() -> void:
 func test_the_replay_steps_through_the_rows_and_loops() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt nova"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("on_hit bolt atom"))
 	_tap(0, &"extra")
 	_frame()
 	var tree: TreeViewScript = radial.tree_view()

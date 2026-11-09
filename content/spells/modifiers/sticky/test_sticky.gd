@@ -120,7 +120,7 @@ func test_a_planted_nova_hits_its_imp_with_the_whole_ring_at_any_distance() -> v
 	for x: float in [80.0, 90.0, 95.0, 100.0, 105.0, 110.0, 120.0, 130.0]:
 		var arena := ArenaScript.new(root)
 		var imp: Node2D = arena.add_imp(Vector2(x, 0.0))
-		arena.install_cards(0, 0, ["sticky", "on_expire", "bolt", "nova"])
+		arena.install_cards(0, 0, ["sticky", "on_expire", "bolt", "nova", "bolt"])
 		arena.cast(0, 0)
 		arena.run(2.0)
 		lost.append(arena.lost(imp))

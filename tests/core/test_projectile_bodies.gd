@@ -127,12 +127,12 @@ func test_a_reused_slot_forgets_its_card() -> void:
 func test_an_impact_is_told_as_the_card_with_its_body() -> void:
 	mgr.set_walls([Rect2(150.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	var slot: int = mgr.spawn(0, Vector2(100, 100), Vector2(240, 0), 5.0)
-	mgr.set_form(slot, &"nova")
+	mgr.set_form(slot, &"atom")
 	for _i in 30:
 		mgr.step(DT)
 	check_equal(told.size(), 2, "it ended on the wall: its impact, then its end")
 	for each: Array in told:
-		check_equal(each[0], &"nova", "told as the nova it is, not a bolt")
+		check_equal(each[0], &"atom", "told as the atom it is, not a bolt")
 		check_equal(each[1], ManagerScript.KIND_BOLT, "with its bolt's body")
 	check_equal(mgr.impact_form, &"", "nothing told outside the event")
 	check_equal(mgr.impact_body, 0, "no body outside the event")

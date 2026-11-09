@@ -53,8 +53,8 @@ func test_a_slow_bolt_reaches_an_imp_later() -> void:
 
 
 func test_a_slow_timer_lays_its_payloads_close() -> void:
-	check(_lost(["timer", "slow", "bolt", "nova"], Vector2(33.0, 45.0), 2.5) > 0, "a nova goes off near the caster")
-	check_equal(_lost(["timer", "bolt", "nova"], Vector2(33.0, 45.0), 2.5), 0, "a fast bolt's first nova is far away")
+	check(_lost(["timer", "slow", "bolt", "nova", "bolt"], Vector2(33.0, 45.0), 2.5) > 0, "a nova goes off near the caster")
+	check_equal(_lost(["timer", "bolt", "nova", "bolt"], Vector2(33.0, 45.0), 2.5), 0, "a fast bolt's first nova is far away")
 
 
 func test_four_players_crawl_at_once() -> void:
@@ -89,7 +89,7 @@ func test_a_slowed_nova_on_hit_does_not_shotgun_the_imp_it_was_born_on() -> void
 	plain.free_all()
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(100, 0))
-	arena.install_cards(0, 0, ["on_hit", "bolt", "slow", "nova"])
+	arena.install_cards(0, 0, ["on_hit", "bolt", "slow", "nova", "bolt"])
 	check(arena.cast(0, 0), "cast")
 	arena.run(2.0)
 	check(by_bolt > 0, "a bolt alone hurts it")

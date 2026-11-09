@@ -57,9 +57,9 @@ func before_each() -> void:
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
 	beam.ray_length = 200.0
-	var nova: FormBase = _form(&"nova", 300.0, 0.2)
-	nova.shots = 8
-	nova.spread = 360.0
+	var halo: FormBase = _form(&"halo", 300.0, 0.2)
+	halo.shots = 8
+	halo.spread = 360.0
 	var slow: ModifierBase = _modifier(&"slow", ModifierBase.Behaviour.NONE, 0.0)
 	slow.speed_mult = 0.3
 	slow.lifetime_mult = 3.0
@@ -293,15 +293,15 @@ func test_the_body_ahead_is_zapped_before_the_shot_hits_it() -> void:
 func test_a_zap_sets_off_on_hit() -> void:
 	# `on hit` fires its payload at the first zapped imp, from there (a second, before the next zap).
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
-	_build(0, [&"zap", &"on_hit", &"rune", &"nova"])
+	_build(0, [&"zap", &"on_hit", &"rune", &"halo"])
 	_cast()
 	_tick(roundi(SpellLimits.ZAP_AGAIN / DT))
-	var novas: int = 0
+	var halos: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
-		if spell != null and spell.form_id == &"nova":
-			novas += 1
-	check_equal(novas, 8, "the zap fired the nova payload once: eight nova shots")
+		if spell != null and spell.form_id == &"halo":
+			halos += 1
+	check_equal(halos, 8, "the zap fired the halo payload once: eight halo shots")
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
 
 
@@ -309,7 +309,7 @@ func test_a_zap_sets_off_on_hit() -> void:
 func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	var imp: Node2D = _target(Vector2(30.0, 40.0))
 	_mgr.set_walls([Rect2(-100.0, 16.0, 300.0, 8.0)] as Array[Rect2])
-	_build(0, [&"zap", &"on_wall", &"orb", &"nova"])
+	_build(0, [&"zap", &"on_wall", &"orb", &"halo"])
 	_cast()
 	var walls: Array[int] = [0]
 	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: walls[0] += 1)
@@ -400,16 +400,16 @@ func test_a_beam_does_not_zap_out_of_reach() -> void:
 ## A beam's zap is a hit of the beam: `on hit` fires its payload from the zapped imp.
 func test_a_beam_zap_sets_off_on_hit() -> void:
 	var imp: Node2D = _target(Vector2(100.0, 40.0))
-	_build(0, [&"zap", &"on_hit", &"beam", &"nova"])
+	_build(0, [&"zap", &"on_hit", &"beam", &"halo"])
 	_cast()
 	_tick(60)
-	var novas: int = 0
+	var halos: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])
-		if spell != null and spell.form_id == &"nova":
-			novas += 1
+		if spell != null and spell.form_id == &"halo":
+			halos += 1
 	check(not _hits_on(imp).is_empty(), "the imp was zapped")
-	check_equal(novas, 8, "the zap fired the nova payload once: eight nova shots")
+	check_equal(halos, 8, "the zap fired the halo payload once: eight halo shots")
 
 
 ## Rules R4a for a beam's zap: one that ends on a wall sets off no `on wall` (a beam's zap has no slot).
@@ -418,7 +418,7 @@ func test_a_beam_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	_mgr.set_walls([Rect2(50.0, 16.0, 100.0, 8.0)] as Array[Rect2])
 	var walls: Array[int] = [0]
 	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: walls[0] += 1)
-	_build(0, [&"zap", &"on_wall", &"beam", &"nova"])
+	_build(0, [&"zap", &"on_wall", &"beam", &"halo"])
 	_cast()
 	var most: int = 0
 	for _i in 60:

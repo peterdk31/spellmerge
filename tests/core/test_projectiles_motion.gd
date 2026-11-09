@@ -152,7 +152,9 @@ func _test_set_orbit_takes_only_a_live_straight_shot_with_a_centre() -> void:
 	_check(not (_mgr.set_orbit(bolt, INF, 0.0, 1.0, Vector2.ZERO) or _mgr.set_orbit(bolt, 30.0, NAN, 1.0, Vector2.ZERO) or _mgr.set_orbit(bolt, 30.0, 0.0, INF, Vector2.ZERO)), "bad numbers are refused")
 	_check(not (_mgr.set_orbit(-1, 30.0, 0.0, 1.0, Vector2.ZERO) or _mgr.set_orbit(_mgr._cap, 30.0, 0.0, 1.0, Vector2.ZERO)), "a slot that is no live shot is refused")
 	var rune: int = _mgr.spawn(1, Vector2(80.0, 50.0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
-	_check(not _mgr.set_orbit(rune, 30.0, 0.0, 1.0, Vector2(100.0, 100.0)), "a still shot does not circle")
+	# A still shot circles too (5B), keeping its quad body: a rune, by its drift alone (no speed).
+	_check(_mgr.set_orbit(rune, 30.0, 0.0, 1.0, Vector2(100.0, 100.0)) and _mgr._motion[rune] == ManagerScript.MOTION_ORBIT, "a still shot circles")
+	_check(_mgr._kind_of(rune) == ManagerScript.KIND_RUNE and _mgr.mesh_of(rune) == ManagerScript.MESH_QUAD, "and keeps its rune's body")
 	_check(_mgr.set_orbit(bolt, 30.0, 0.0, 1.0, Vector2(200.0, 200.0)), "a straight shot circles a centre given")
 	_check(_mgr._motion[bolt] == ManagerScript.MOTION_ORBIT and _mgr.get_position_of(bolt).is_equal_approx(Vector2(230.0, 200.0)), "on the circle at its angle")
 	_check(not _mgr.set_orbit(bolt, 30.0, 0.0, 1.0, Vector2(200.0, 200.0)), "a shot already circling is refused")

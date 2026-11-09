@@ -99,9 +99,10 @@ enum Behaviour {
 	## its Orbit cards), turning `behaviour_strength` turns a second plus its own speed over that
 	## radius (a beam, with no speed, sweeps at the drift). It changes only how it moves: no count,
 	## pierce or look of its own; homing and return do nothing on it, room walls end it as any shot
-	## (ghost passes; bounce turns it back round its circle). How long it circles is the card's `lifetime_base`. All of it is
-	## `core/spells/orbit.gd`. Only on a carrier that flies or is a line, and not one that moves
-	## its caster or strikes from the hand.
+	## (ghost passes; bounce turns it back round its circle; a wall stops at one). How long it
+	## circles is the card's `lifetime_base`. All of it is `core/spells/orbit.gd`. Only on a carrier
+	## that flies, stays (a rune, a pool, a wall: they circle as they are) or is a line, and not one
+	## that moves its caster, strikes from the hand, or makes a body or a gate.
 	ORBIT,
 }
 
@@ -155,9 +156,10 @@ const RULES: Dictionary = {
 	Behaviour.NOVA: {},
 	# Nothing of a swing, slam, dash or teleport leaves the body to fall.
 	Behaviour.SKYFALL: {"needs": {"not": CarrierTraits.MELEE}},
-	# A row that flies or a beam goes round; nothing of a dash, teleport, swing or slam leaves the
-	# body to circle (5B adds runes, pools and walls).
-	Behaviour.ORBIT: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
+	# A row that flies or stays (a rune, a pool, a wall) or a beam goes round; nothing of a dash,
+	# teleport, swing or slam leaves the body to circle, and a decoy, familiar or portal makes a
+	# body or a gate, not a row (carrier-modifiers 5B).
+	Behaviour.ORBIT: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.STAYS | CarrierTraits.LINE, "not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE | CarrierTraits.SPAWNS | CarrierTraits.GATES}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

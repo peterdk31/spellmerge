@@ -283,6 +283,9 @@ func _orbit_cards() -> void:
 	var rune: FormBase = _form(&"rune", 3, 1)
 	rune.carrier = &"rune"
 	rune.lifetime = 8.0
+	var decoy: FormBase = _form(&"decoy", 0, 1)
+	decoy.carrier = &"decoy"
+	decoy.lifetime = 8.0
 
 
 func _life(cards: String) -> float:
@@ -301,10 +304,12 @@ func test_a_cards_lifetime_base_comes_before_every_factor() -> void:
 	check(is_equal_approx(_life("orbit long bolt"), 5.0) and is_equal_approx(_life("long orbit bolt"), 5.0), "the longest base counts, in either order")
 	check(is_equal_approx(_life("long slow orbit bolt"), 15.0) and is_equal_approx(_life("slow orbit long bolt"), 15.0), "and the factors act on it")
 	check(is_equal_approx(_life("long bolt"), 5.0), "a base works with no Orbit too: it is a general field")
-	# A wasted card changes nothing: Orbit does nothing on a rune yet (Part 5B), so the rune keeps its life.
-	var rune: CompiledStaff = _compile("orbit rune")
-	check(rune.wasted.has(0), "orbit on a rune is wasted")
-	check(is_equal_approx((rune.casts[0].group.spells[0] as CompiledSpell).lifetime, 8.0), "and the rune lives its own 8 s")
+	# A rune circles too (Part 5B): its 8 s become the card's 3 s.
+	check(is_equal_approx(_life("orbit rune"), 3.0), "a circling rune lives the card's 3 s: %s" % _life("orbit rune"))
+	# A wasted card changes nothing: Orbit does nothing on a decoy (a body, not a row), so it keeps its life.
+	var decoy: CompiledStaff = _compile("orbit decoy")
+	check(decoy.wasted.has(0), "orbit on a decoy is wasted")
+	check(is_equal_approx((decoy.casts[0].group.spells[0] as CompiledSpell).lifetime, 8.0), "and the decoy lives its own 8 s")
 
 
 func test_the_circle_comes_from_the_orbit_card() -> void:

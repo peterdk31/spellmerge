@@ -240,6 +240,10 @@ const F_TURNED: int = 64
 const F_WAVE: int = 128
 ## Passed over by the hit-work budget (WORK_PER_STEP): its path from `_untested` on is still to test.
 const F_DEFERRED: int = 256
+## Its body is a quad (a rune's, a stone's, a card's still body): it was spawned still, and keeps
+## that body whatever its motion later (Orbit sets it circling: carrier-modifiers 5B). Its drawing,
+## kind and tail read this, never its motion.
+const F_QUAD: int = 512
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
@@ -351,8 +355,9 @@ const MIN_BATCH: int = 64
 ## carrier; MESH_HEAD, the shots' `head_mesh`, for one that flies or orbits): the hat ramps', then
 ## the enemy ramp's one layer up. Body `n` draws in BATCH_BODY_FIRST + 2 (n - 1), and + 1 for the
 ## enemy ramp. A body is a shader and a mesh: the same shader under both meshes is two bodies. A
-## shot is drawn in its body's pair only while its motion is written as the body's mesh
-## (`mesh_of_motion`); otherwise in its motion's own batch, plainly (`_batch_of`). A body's nodes
+## shot is drawn in its body's pair only while it is written as the body's mesh (`mesh_of`: a quad
+## for a shot of a still body, `F_QUAD`, a head for any other); otherwise in its own body's plain
+## batch (`_batch_of`). A body's nodes
 ## keep the first batches' draw order (`_place_body_node`): a head body's after the bolts', a quad
 ## body's after the runes'. `batch_count()` says how many there are now; `batches_grown` tells when
 ## there are more.
@@ -734,6 +739,8 @@ var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
 var _orbit_drift: PackedFloat32Array = PackedFloat32Array()
 ## Which way an orbit shot goes round: 1 the way it set out, -1 back (each bounce off a wall turns it).
 var _orbit_way: PackedFloat32Array = PackedFloat32Array()
+## The angle an orbit shot set out from (`set_orbit`), for how far it has gone round (`_turned`).
+var _orbit_from: PackedFloat32Array = PackedFloat32Array()
 ## Where an orbit shot's caster was at its last step (INF before its first), for `_drawn_at`.
 var _orbit_centre: PackedVector2Array = PackedVector2Array()
 ## Homing: how far it turns in radians a pixel flown (the same curve at any speed; 0 for none)
@@ -926,6 +933,8 @@ var _ray_caster_seq: int = -1
 ## `at` with `radius` (where it lay last: it is laid again when the shot moves or grows).
 class Solid:
 	var across: Vector2 = Vector2.RIGHT
+	## Its row as it was laid: a shot carried round its caster turns it by as much (`_turned`).
+	var across_from: Vector2 = Vector2.RIGHT
 	var stones: int = 1
 	var gap: float = 0.0
 	var at: Vector2 = Vector2.INF
@@ -1314,10 +1323,11 @@ func register_body(shader: Shader, mesh: int = MESH_QUAD) -> int:
 	return body
 
 
-## The mesh a shot of `motion` is written as (`_write_stones` or `_write_head`): MESH_QUAD for a
-## still shot, MESH_HEAD for any other. A card body draws a shot only while this is its mesh.
-static func mesh_of_motion(motion: int) -> int:
-	return MESH_QUAD if motion == MOTION_STILL else MESH_HEAD
+## The mesh the shot in `slot` is written as (`_write_stones` or `_write_head`): MESH_QUAD for a
+## shot of a still body (`F_QUAD`: spawned still, circling or not), MESH_HEAD for any other. A card
+## body draws a shot only while this is its mesh.
+func mesh_of(slot: int) -> int:
+	return MESH_QUAD if (_flags[slot] & F_QUAD) != 0 else MESH_HEAD
 
 
 ## How many draw batches there are now: the first four and a pair for each card body.
@@ -1542,6 +1552,7 @@ func set_cap(value: int) -> void:
 	_orbit_angle.resize(_cap)
 	_orbit_drift.resize(_cap)
 	_orbit_way.resize(_cap)
+	_orbit_from.resize(_cap)
 	_orbit_centre.resize(_cap)
 	_turn.resize(_cap)
 	_home_at.resize(_cap)
@@ -1762,6 +1773,7 @@ func set_solid(slot: int, across: Vector2, stones: int, gap: float) -> bool:
 		return false
 	var solid := Solid.new()
 	solid.across = across.normalized()
+	solid.across_from = solid.across
 	solid.stones = maxi(stones, 1)
 	solid.gap = gap / maxf(_radius[slot], 0.01)
 	_solids[slot] = solid
@@ -1776,13 +1788,16 @@ func _solid_half(slot: int, solid: Solid) -> Vector2:
 
 
 ## A solid shot's step, in place of a wall check: when it moved or grew it is lifted, stopped
-## where a wall cuts its way, and laid again.
+## where a wall cuts its way (`_place_at`: a circling one holds there, pressing on the wall until
+## its circle clears it), and laid again, its row turned as far as the shot has gone round
+## (`_turned`: a circling wall is carried round as one piece).
 func _step_solid(slot: int, solid: Solid) -> void:
 	if _pos[slot] == solid.at and _radius[slot] == solid.radius:
 		return
 	_lift_solid(solid)
 	if _pos[slot] != _prev[slot] and _wall_hit(_prev[slot], _pos[slot]) >= 0.0:
-		_pos[slot] = _prev[slot]
+		_place_at(slot, _prev[slot])
+	solid.across = DMath.rotated(solid.across_from, _turned(slot))
 	_lay_solid(slot, solid)
 
 
@@ -2214,20 +2229,22 @@ func spawn(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	return _spawn_row(caster, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion)
 
 
-## The live straight shot in `slot` circles its caster from now on (the Orbit card,
+## The live straight or still shot in `slot` circles its caster from now on (the Orbit card,
 ## core/spells/orbit.gd): its actor's anchor (see `set_anchor`), or with a finite `centre` that
 ## point (a payload's orbit, whose caster is a shot or the point where one ended; `set_caster_shot`
 ## then makes it follow the shot). It goes onto the circle `orbit_radius` pixels out at `angle`
 ## (radians, 0 = east) and turns `drift` radians a second plus its own speed over the radius
 ## (`_orbit_turn`: its speed curve still acts, so Faster, Slow and the curve cards turn it faster
-## or slower). Its motion is the circle's, so what steers or turns a straight flight is refused or
-## leaves it (homing, return, spiral's line: a spiral weaves its radius instead; a bounce turns it
-## back round its circle, `_wall_end`), and its speed curve (`set_speed_curve`, before or after) is read by the orbit pass. Everything else is
-## its own: its body, look, hits, pierce, ghost, walls.
-## False (and nothing changes) for a slot that is not a live straight shot, bad numbers, or no
-## centre (no `centre` and no anchor for its actor).
+## or slower; a still one has no speed and turns by its drift). Its motion is the circle's, so what
+## steers or turns a straight flight is refused or leaves it (homing, return, spiral's line: a
+## spiral weaves its radius instead; a bounce turns it back round its circle, `_wall_end`), and its
+## speed curve (`set_speed_curve`, before or after) is read by the orbit pass. Everything else is
+## its own: its body (a still one stays a quad, `F_QUAD`), look, hits, pierce, ghost, walls (a
+## solid one stops at a room wall and its row turns with it, `_step_solid`). False (and nothing
+## changes) for a slot that is no live straight or still shot, bad numbers, or no centre (no
+## `centre` and no anchor for its actor).
 func set_orbit(slot: int, orbit_radius: float, angle: float, drift: float, centre: Vector2 = Vector2.INF) -> bool:
-	if not _is_flyer(slot) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(drift):
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(drift):
 		return false
 	var actor: int = _actor[slot]
 	if not centre.is_finite() and (actor < 0 or actor >= ACTORS or not _anchors[actor].is_finite()):
@@ -2252,6 +2269,7 @@ func set_orbit(slot: int, orbit_radius: float, angle: float, drift: float, centr
 	_orbit_drift[slot] = drift
 	_orbit_way[slot] = 1.0
 	_join(slot, B_ORBIT)
+	_orbit_from[slot] = angle
 	_pos[slot] = around + DMath.from_angle(angle) * _orbit_radius[slot]
 	_prev[slot] = _pos[slot]
 	_base[slot] = _pos[slot]
@@ -3245,7 +3263,7 @@ func _write_row(slot: int, caster: int, origin: Vector2, velocity: Vector2, life
 	_join_group(slot, group_of(caster, tag))
 	_skip_on[slot] = 0.0
 	_skip_near[slot] = 0.0
-	_flags[slot] = 0
+	_flags[slot] = F_QUAD if motion == MOTION_STILL else 0
 	_bounce[slot] = 0
 	_shield[slot] = 0
 	_deflect[slot] = 0
@@ -3981,12 +3999,10 @@ func _wall_end(slot: int) -> void:
 		# Its circle is its path: it turns back round it from where it met the wall, the bounce
 		# rule in its motion (the face does not matter; the orbit pass puts it back on the circle).
 		_orbit_way[slot] = -_orbit_way[slot]
-		if _orbit_centre[slot].is_finite() and not at.is_equal_approx(_orbit_centre[slot]):
-			_orbit_angle[slot] = DMath.angle(at - _orbit_centre[slot])
 		_vel[slot] = -_vel[slot]
 	else:
 		_vel[slot] = _bounced(at, heading, _vel[slot])
-	_pos[slot] = at
+	_place_at(slot, at)
 	_base[slot] = at
 	# A bounced shot may hit what it hit before.
 	_forget_all(slot)
@@ -4144,6 +4160,20 @@ func _orbit_turn(slot: int, delta: float) -> float:
 	if radius <= 0.0:
 		return _orbit_way[slot] * _orbit_drift[slot]
 	return _orbit_way[slot] * (_orbit_drift[slot] + _curve_speed[slot] * _curve_factor(slot, delta) / radius)
+
+
+## Puts the shot in `slot` back at `at` (a wall stopped or turned it), its motion going on from
+## there: a circling one's angle round its centre too, so the orbit pass carries it on from `at`.
+func _place_at(slot: int, at: Vector2) -> void:
+	_pos[slot] = at
+	if _motion[slot] == MOTION_ORBIT and _orbit_centre[slot].is_finite() and not at.is_equal_approx(_orbit_centre[slot]):
+		_orbit_angle[slot] = DMath.angle(at - _orbit_centre[slot])
+
+
+## How far the shot in `slot` has gone round its caster since it was set circling (radians; 0 for a
+## shot that does not circle): what turns a circling wall's row with it.
+func _turned(slot: int) -> float:
+	return _orbit_angle[slot] - _orbit_from[slot] if _motion[slot] == MOTION_ORBIT else 0.0
 
 
 ## The factor of its speed the shot in `slot` goes at in a step of `delta` (`set_speed_curve`): read
@@ -5063,7 +5093,7 @@ func _give_off_sparks(fraction: float) -> void:
 ## One try of `_give_off_sparks` on the drawn shot in `slot`: a birth of one of its kinds, kept at
 ## that kind's rate. Returns false once the frame's SPARK_BIRTHS_MAX are taken.
 func _give_off_spark(slot: int, fraction: float, span: float) -> bool:
-	if _alive[slot] == 0 or _motion[slot] == MOTION_STILL:
+	if _alive[slot] == 0 or (_flags[slot] & F_QUAD) != 0:
 		return true
 	var bits: int = _look[slot] & EMITTING_MASK
 	var kind: int = 0
@@ -5159,7 +5189,7 @@ func _draw_shots(fraction: float) -> void:
 		_group_ask[group] += float(maxi(_drawn_particles[slot], 1))
 		_by_group[_group_end[group]] = slot
 		_group_end[group] += 1
-		if motion == MOTION_STILL:
+		if (_flags[slot] & F_QUAD) != 0:
 			# Only a rune's quad turns with the shot (a bolt's head is a `+` whatever way it flies).
 			var dir: Vector2 = Vector2.RIGHT
 			if _vel[slot].length_squared() > 0.0:
@@ -5208,9 +5238,10 @@ func _lay_tail(slot: int, at: Vector2) -> void:
 ## it along (the owner, 2026-11-06: an Atom fired at a target close by left its tail a step or two
 ## short, the gap between its last drawn point and the hit). Laid now, while its slot is still its
 ## own, into `_end_births`; the next frame lays them after the drawn shots' tails (`_lay_ends`).
-## A rune (still) lays no tail, and an orbit shot ends where it would have been drawn.
+## A rune (a still body, circling or not) lays no tail, and an orbit shot ends where it would have
+## been drawn.
 func _end_tail(slot: int, to: Vector2) -> void:
-	if not tail_births_on or _motion[slot] == MOTION_STILL:
+	if not tail_births_on or (_flags[slot] & F_QUAD) != 0:
 		return
 	if _motion[slot] == MOTION_ORBIT:
 		to = _drawn_at(slot, to)
@@ -5477,18 +5508,19 @@ func _batch_of(slot: int) -> int:
 	# A card body draws its shot only while the shot's motion is written as the body's mesh; a shot
 	# whose motion changed past it (or a card's shader numbered for the other mesh) draws plain.
 	var body: int = _body[slot]
-	if body > 0 and _body_meshes[body - 1] == mesh_of_motion(_motion[slot]):
+	var quad: bool = (_flags[slot] & F_QUAD) != 0
+	if body > 0 and _body_meshes[body - 1] == (MESH_QUAD if quad else MESH_HEAD):
 		return body_batch(body, not is_hat_ramp(_ramp[slot]))
 	if not is_hat_ramp(_ramp[slot]):
-		return BATCH_ENEMY_STILL if _motion[slot] == MOTION_STILL else BATCH_ENEMY
-	return BATCH_STILL if _motion[slot] == MOTION_STILL else BATCH_BOLT
+		return BATCH_ENEMY_STILL if quad else BATCH_ENEMY
+	return BATCH_STILL if quad else BATCH_BOLT
 
 
-## The body a shot has to the world (KIND_BOLT or KIND_RUNE): a still shot is a rune however it is
-## drawn (a card body is its batch's shader), any other a bolt, circling or not (its motion is not
-## its body).
+## The body a shot has to the world (KIND_BOLT or KIND_RUNE): a shot of a still body (`F_QUAD`) is
+## a rune however it is drawn (a card body is its batch's shader) and however it moves, any other a
+## bolt, circling or not (its motion is not its body).
 func _kind_of(slot: int) -> int:
-	return KIND_RUNE if _motion[slot] == MOTION_STILL else KIND_BOLT
+	return KIND_RUNE if (_flags[slot] & F_QUAD) != 0 else KIND_BOLT
 
 
 ## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*, and bring

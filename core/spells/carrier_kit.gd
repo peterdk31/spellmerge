@@ -230,6 +230,12 @@ func orbit_sweep(spell: CompiledSpell) -> float:
 	return _rt._orbit.sweep_of(spell)
 
 
+## The carrier `actor` holds has turned its staff `radians` round the hand, on top of its animation
+## (`StaffPoses.turn_staff`: a sweeping beam turns the staff with it).
+func turn_staff(actor: int, radians: float) -> void:
+	_rt._poses.turn_staff(actor, radians)
+
+
 ## A shot spawned in `slot` (-1 when the manager refused it) takes its cards and its record and does
 ## not hit `source` for a while: 1 when it was made. What a carrier calls after `projectiles.spawn`.
 func land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
@@ -240,16 +246,6 @@ func land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: i
 ## wrote them; -1 for one not made), in turn: how many were made.
 func land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
 	return _rt._land_shots(slots, count, spell, tag, source, chain, prev)
-
-
-## The two halves of `land_shot`, for a carrier that sets the shot up in between (a wall): the
-## behaviours the projectile manager runs, then the shot's record (`chain` jumps left after `prev`).
-func apply_travel(slot: int, spell: CompiledSpell) -> void:
-	_rt._apply_travel(slot, spell)
-
-
-func register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int) -> void:
-	_rt._register(slot, tag, spell, chain, prev)
 
 
 ## The shot in `slot` takes on the infusions of `donor` for its later hits (a portal's: it passed

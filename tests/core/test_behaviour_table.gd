@@ -77,15 +77,15 @@ func test_cards_that_work_are_not_listed() -> void:
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 
 
-func test_orbit_circles_what_flies_and_a_beam() -> void:
-	# Orbit (docs/milestones/carrier-modifiers.md Part 5A) needs a carrier that flies or is a line,
-	# and not one that moves its caster or strikes from the hand; nothing makes actors or gates circle.
-	for carrier: String in ["bolt", "atom", "swap", "beam"]:
+func test_orbit_circles_what_flies_stays_or_is_a_line() -> void:
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5) needs a carrier that flies, stays (a rune, a
+	# pool, a wall: 5B) or is a line, and not one that moves its caster or strikes from the hand;
+	# nothing makes actors or gates circle.
+	for carrier: String in ["bolt", "atom", "swap", "beam", "rune", "pool", "wall"]:
 		var staff: CompiledStaff = _staff(["orbit", carrier])
 		check(not staff.wasted.has(0), "orbit counts on a %s: %s" % [carrier, staff.wasted])
 		check(staff.casts[0].group.spells[0].behaviour(ModifierBase.Behaviour.ORBIT) > 0.0, "and rides on it")
-	# Runes, pools and walls circle in Part 5B; until then they are listed.
-	for carrier: String in ["dash", "teleport", "swing", "slam", "decoy", "familiar", "portal", "rune", "pool", "wall"]:
+	for carrier: String in ["dash", "teleport", "swing", "slam", "decoy", "familiar", "portal"]:
 		var staff: CompiledStaff = _staff(["orbit", carrier])
 		check(staff.wasted.has(0), "orbit on a %s is listed as wasted: %s" % [carrier, staff.wasted])
 	# A lone orbit lands on its caster and does nothing there.

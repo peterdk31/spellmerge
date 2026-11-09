@@ -27,9 +27,6 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	var slot: int = kit.projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, SpellRuntime.PIERCE_ALL, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
 	if slot < 0:
 		return 0
-	kit.apply_travel(slot, spell)
+	# Solid first (only a still shot becomes a wall), then its cards and record as any shot's.
 	kit.projectiles.set_solid(slot, direction.orthogonal(), spell.shots, spell.spread if spell.spread > 0.0 else spell.radius * 2.0)
-	kit.register(slot, tag, spell, carried, prev)
-	if source != null:
-		kit.projectiles.exclude(slot, source)
-	return 1
+	return kit.land_shot(slot, spell, tag, source, carried, prev)

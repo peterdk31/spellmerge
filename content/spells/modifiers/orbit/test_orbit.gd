@@ -215,11 +215,97 @@ func test_a_beam_sweeps_round_its_caster() -> void:
 	check(absf(swept - TAU / 3.0) < 0.1, "it swept a third of a turn in a second (%.2f rad)" % swept)
 
 
+## The owner, watching the sheet: the sweep should turn the whole staff round the wizard, not
+## pivot the beam on the staff's tip. The beam starts from the staff's tip turned round the hand,
+## and the drawn staff turns with it (`StaffPoses.turn_staff`).
+func test_a_held_beam_turns_the_whole_staff_round_the_hand() -> void:
+	var tip := Vector2(14.0, 0.0)
+	_spells.set_aim(0, AT + tip, Vector2.RIGHT, AT)
+	_cast([&"orbit"], &"beam")
+	var beams: CarrierBeam = CarrierBeam.of(_spells)
+	check(beams.beam_origin(0).is_equal_approx(AT + tip), "it starts at the staff's tip (%s)" % beams.beam_origin(0))
+	_tick(60, {0: AT})
+	var turned: float = TAU / 3.0
+	var want: Vector2 = AT + DMath.rotated(tip, turned)
+	check(beams.beam_origin(0).distance_to(want) < 0.5, "a second on, from the tip turned a third of a turn round the hand: %s, not %s" % [beams.beam_origin(0), want])
+	var way: Vector2 = (beams.beam_end(0) - beams.beam_origin(0)).normalized()
+	check(absf(DMath.angle_to(DMath.from_angle(turned), way)) < 0.05, "pointing straight out from the hand along the turned staff")
+	check(absf(_spells.poses().staff_pose(0).x - turned) < 0.05, "and the drawn staff turned as far (%.2f rad)" % _spells.poses().staff_pose(0).x)
+
+
 func test_wasted_on_what_never_leaves_the_body() -> void:
 	for form: StringName in [&"dash", &"teleport", &"swing", &"slam", &"decoy", &"familiar", &"portal"]:
 		check(not Carriers.of(form).works(ModifierBase.Behaviour.ORBIT), "nothing of a %s circles" % form)
-	for form: StringName in [&"bolt", &"atom", &"swap", &"beam"]:
+	for form: StringName in [&"bolt", &"atom", &"swap", &"beam", &"rune", &"pool", &"wall"]:
 		check(Carriers.of(_form(form).carrier).works(ModifierBase.Behaviour.ORBIT), "a %s circles" % form)
+
+
+## The live slot of the first shot of `tag`, or -1.
+func _first(tag: int) -> int:
+	var slots: Array[int] = _slots(tag)
+	return slots[0] if not slots.is_empty() else -1
+
+
+## Part 5B: a still carrier circles as it is. A rune, a pool and a wall stay what they are (a rune's
+## body, a pool's slow, a wall's stones), on the circle the way they would have stood, turning by the
+## drift alone (they have no speed), 1/3 of a turn a second.
+func test_a_rune_pool_and_wall_circle_as_they_are() -> void:
+	var tags: Array[int] = [_cast([&"orbit"], &"rune", Vector2.RIGHT, 0), _cast([&"orbit"], &"pool", Vector2.RIGHT, 1), _cast([&"orbit"], &"wall", Vector2.RIGHT, 2)]
+	var names: Array[String] = ["rune", "pool", "wall"]
+	var before: Array[float] = []
+	for n in 3:
+		var slot: int = _first(tags[n])
+		check(slot >= 0, "a %s is made" % names[n])
+		if slot < 0:
+			return
+		check_equal(_mgr._motion[slot], ManagerScript.MOTION_ORBIT, "the %s circles" % names[n])
+		check_equal(_mgr._kind_of(slot), ManagerScript.KIND_RUNE, "and keeps its still body")
+		check(_mgr.get_position_of(slot).is_equal_approx(_at(n) + Vector2.RIGHT * 36.0), "starting on the circle the way it stood (%s)" % (_mgr.get_position_of(slot) - _at(n)))
+		before.append(_angle_of(slot, _at(n)))
+	# The rune arms first (held still), then all go round by their drift.
+	_tick(roundi((SpellLimits.RUNE_ARM + 1.0) / DT), _all())
+	for n in range(1, 3):
+		var turned: float = wrapf(_angle_of(_first(tags[n]), _at(n)) - before[n], -PI, PI)
+		check(absf(wrapf(turned - (SpellLimits.RUNE_ARM + 1.0) * TAU / 3.0, -PI, PI)) < 0.05, "the %s turned a third of a turn a second (%.2f rad)" % [names[n], turned])
+	var rune_turned: float = wrapf(_angle_of(_first(tags[0]), _at(0)) - before[0], -PI, PI)
+	check(absf(rune_turned - TAU / 3.0) < 0.05, "the rune turned once armed (%.2f rad)" % rune_turned)
+
+
+func test_a_circling_wall_blocks_where_it_is_and_its_row_turns_with_it() -> void:
+	var tag: int = _cast([&"orbit"], &"wall")
+	var slot: int = _first(tag)
+	if slot < 0:
+		check(false, "a wall is made")
+		return
+	var start: Vector2 = _mgr.get_position_of(slot)
+	var row: Vector2 = _mgr.get_solid_half_of(slot).normalized()
+	check(_mgr.circle_blocked(start, 2.0), "it is a wall where it stands")
+	_tick(roundi(0.75 / DT), _all())
+	var now: Vector2 = _mgr.get_position_of(slot)
+	check(now.distance_to(start) > 30.0, "it went round (%s to %s)" % [start, now])
+	check(_mgr.circle_blocked(now, 2.0) and not _mgr.circle_blocked(start, 2.0), "its stones moved with it: a wall where it is now, none where it was")
+	var turned: float = absf(DMath.angle_to(row, _mgr.get_solid_half_of(slot).normalized()))
+	check(absf(turned - PI / 2.0) < 0.1, "its row turned a quarter turn with its quarter of the circle (%.2f rad)" % turned)
+
+
+func test_a_circling_wall_stops_at_a_room_wall() -> void:
+	# A room wall across the circle, a quarter turn round from where the wall stands.
+	var room := Rect2(AT.x - 6.0, AT.y + 20.0, 12.0, 40.0)
+	_mgr.set_walls([room] as Array[Rect2])
+	var tag: int = _cast([&"orbit"], &"wall")
+	var inside: bool = false
+	for step in 150:
+		_tick(1, _all())
+		var slot: int = _first(tag)
+		if slot < 0:
+			break
+		inside = inside or room.has_point(_mgr.get_position_of(slot))
+	var slot: int = _first(tag)
+	check(slot >= 0, "it is not ended by the wall: a wall stops at one, as it does when it creeps")
+	if slot >= 0:
+		var at: Vector2 = _mgr.get_position_of(slot)
+		check(not inside, "never inside the room wall")
+		check(at.x > room.end.x - 1.0 and at.y > AT.y, "it waits against the wall's near side (%s)" % at)
 
 
 func test_its_cue_is_shown_round_the_caster() -> void:

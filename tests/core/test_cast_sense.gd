@@ -68,7 +68,12 @@ func test_a_circling_cast_is_an_area_round_its_caster() -> void:
 	var beam: CastSense = _sense(["orbit", "beam"])
 	check_equal(beam.reach, 0.0, "a sweeping beam is not aimed either")
 	check(beam.area, "it sweeps round its caster")
-	check(_sense(["orbit", "rune"]).reach == _sense(["rune"]).reach, "on a rune it does nothing yet (5B), so the rune reads as before")
+	# A rune, a pool or a wall circles too (5B): the same, an area as wide as its circle.
+	for still: String in ["rune", "pool", "wall"]:
+		var circling: CastSense = _sense(["orbit", still])
+		var placed: CompiledSpell = _spell(["orbit", still])
+		check(circling.reach == 0.0 and circling.area, "a circling %s is an area round its caster" % still)
+		check(is_equal_approx(circling.close_reach, placed.orbit_radius + placed.radius), "as near as its circle: %s" % circling.close_reach)
 
 
 func test_moves_blocks_spawns_heals() -> void:

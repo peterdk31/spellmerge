@@ -47,6 +47,7 @@ constexpr int LIGHT_REACH_FLOAT = 2;
 constexpr int LIGHT_INTENSITY_FLOAT = 6;
 constexpr int MOTION_ORBIT = 2;
 constexpr int F_GHOST = 8;
+constexpr int F_FALLING = 1;
 constexpr int S_IDLE = 0;
 constexpr int S_MOVING = 1;
 constexpr int S_DONE = 4;
@@ -897,6 +898,7 @@ const Constant CONSTANTS[] = {
 	{ "LIGHT_REACH_FLOAT", (double)LIGHT_REACH_FLOAT },
 	{ "LIGHT_INTENSITY_FLOAT", (double)LIGHT_INTENSITY_FLOAT },
 	{ "F_GHOST", (double)F_GHOST },
+	{ "F_FALLING", (double)F_FALLING },
 	{ "S_IDLE", (double)S_IDLE },
 	{ "S_MOVING", (double)S_MOVING },
 	{ "S_DONE", (double)S_DONE },
@@ -1087,7 +1089,8 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			st = h.state[slot];
 			h.state[slot] = S_DONE;
 		}
-		if (st >= S_STUCK || !limit.has_point(h.pos[slot])) {
+		// A falling shot (Skyfall, `set_floor`) takes its turn in GDScript (`_hit_slot`, `_fall`).
+		if (st >= S_STUCK || !limit.has_point(h.pos[slot]) || (h.flags[slot] & F_FALLING) != 0) {
 			h.save(m, 0, starved_before);
 			return n * 2 + YIELD_WHOLE;
 		}

@@ -87,6 +87,13 @@ enum Behaviour {
 	## form). Each copy is a whole cast, so a carrier keeps its own shots and reach. Works on every
 	## carrier, as Mirror does: eight moves round a circle add up to none, and each still strikes.
 	NOVA,
+	## The carrier falls from the sky (owner, 2026-11-09; docs/milestones/carrier-modifiers.md Part
+	## 2): a hole opens `SpellLimits.SKYFALL_HEIGHT` up the screen from where it is cast, and after
+	## `SpellLimits.SKYFALL_SECONDS` the carrier is cast from it straight down, onto a floor line
+	## through that spot. Its shots touch nothing in the air (`set_floor`); a placed
+	## carrier lands on the line. All of it is `core/spells/skyfall.gd`. Not on a carrier held by or
+	## carried with the body.
+	SKYFALL,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -137,6 +144,8 @@ const RULES: Dictionary = {
 	Behaviour.PENTA: {"needs": {"not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
 	# Mirror's rule with N ways (owner, 2026-11-09: a dash's moves cancel, each still strikes).
 	Behaviour.NOVA: {},
+	# Nothing of a swing, slam, dash or teleport leaves the body to fall.
+	Behaviour.SKYFALL: {"needs": {"not": CarrierTraits.MELEE}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.

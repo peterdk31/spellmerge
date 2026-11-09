@@ -228,8 +228,9 @@ const MOTION_ORBIT: int = 2
 const CASTER_BODY: int = -1
 const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
-## Bits 1 and 2 were F_SELF and F_SELF_LIVE (a shot that may hit its caster once it has left it),
-## gone 2026-11-06: every shot does, by `exclude`.
+## Bit 1 is F_FALLING (`set_floor`: a shot falling onto its floor line, Skyfall); bit 2 was
+## F_SELF_LIVE (a shot that may hit its caster once it has left it), gone 2026-11-06.
+const F_FALLING: int = 1
 ## Bit 4 was F_ALLY (a mend shot that hits teammates), gone in actors G3c: every shot does.
 const F_GHOST: int = 8
 const F_STUCK: int = 16
@@ -286,6 +287,10 @@ const PROF_PARTS: int = 8
 ## examined by the native hit pass (about 0.13 us); a hit's listeners cost about 400 of them (about
 ## 50 us; shot scale H2, measured with H0's crowd, docs/DECISIONS.md 2026-11-05).
 const HIT_WORK: int = 400
+## How far above its floor line a falling shot (`set_floor`) is an ordinary shot: above it, it is in
+## the air and touches nothing; within it, it hits what stands close to the line (owner,
+## 2026-11-09: "only hit, if they stand close to the fake floor wall").
+const FALL_BAND: float = 12.0
 ## The most a returning homing shot's way home bends off the line to its caster (radians): under
 ## a right angle, so it always closes in (`_pass_return`).
 const RETURN_BEND: float = PI / 3.0
@@ -760,6 +765,8 @@ var _growth: PackedFloat32Array = PackedFloat32Array()
 ## Speed over life (`set_speed_curve`): the factors on its speed when it leaves and as its life runs
 ## out, the power of the ease between them, and the speed they are factors of.
 var _curve_from: PackedFloat32Array = PackedFloat32Array()
+## A falling shot's floor line, its y (`set_floor`; read only with F_FALLING).
+var _floor: PackedFloat32Array = PackedFloat32Array()
 var _curve_to: PackedFloat32Array = PackedFloat32Array()
 var _curve_ease: PackedFloat32Array = PackedFloat32Array()
 var _curve_speed: PackedFloat32Array = PackedFloat32Array()
@@ -1036,6 +1043,9 @@ var _gate_live: int = 0
 ## `ray_gate_heading` its way in and `ray_gate_left` the length it had left. Read right after the
 ## call, like `ray_end`.
 var ray_gates: bool = false
+## Pixels at the start of the next ray that are in the air (a falling beam, Skyfall): it walks them
+## touching nothing, then hits and meets walls as usual. Used up by that ray, like `ray_gates`.
+var ray_air: float = 0.0
 var ray_gate: int = -1
 var ray_gate_at: Vector2 = Vector2.INF
 var ray_gate_heading: Vector2 = Vector2.ZERO
@@ -1544,6 +1554,7 @@ func set_cap(value: int) -> void:
 	_radius0.resize(_cap)
 	_growth.resize(_cap)
 	_curve_from.resize(_cap)
+	_floor.resize(_cap)
 	_curve_to.resize(_cap)
 	_curve_ease.resize(_cap)
 	_curve_speed.resize(_cap)
@@ -2550,6 +2561,25 @@ func set_bounce(slot: int, times: int) -> bool:
 	return true
 
 
+## The shot falls onto the floor line at `y` (Skyfall, docs/milestones/carrier-modifiers.md Part
+## 2): it is in the air until its step comes within FALL_BAND of the line (it hits nothing and
+## passes over walls), an ordinary shot within the band, and it ends at the line as it would at
+## the end of its life. Only a shot that flies.
+func set_floor(slot: int, y: float) -> bool:
+	if not _is_flyer(slot) or not is_finite(y):
+		return false
+	_floor[slot] = y
+	_flags[slot] |= F_FALLING
+	return true
+
+
+## A falling shot's floor line (`set_floor`), or INF for a shot that is not falling.
+func get_floor_of(slot: int) -> float:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or (_flags[slot] & F_FALLING) == 0:
+		return INF
+	return _floor[slot]
+
+
 ## The shot ignores walls: it neither ends nor bounces on one.
 func set_ghost(slot: int) -> bool:
 	if not _is_flyer(slot):
@@ -3414,6 +3444,12 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 		if _test_deferred(slot):
 			_kill(slot)
 		return
+	var landed: bool = false
+	if (_flags[slot] & F_FALLING) != 0:
+		landed = _fall(slot)
+		if _pos[slot].y < _floor[slot] - FALL_BAND:
+			return
+	var seq_now: int = _seq[slot]
 	# A shot that meets a wall is cut short there: it can still hit what is
 	# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
 	# solid one is a wall and stops at one (`_step_solid`).
@@ -3446,6 +3482,25 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 	# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
 	if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
 		_wall_end(slot)
+	elif landed and _alive[slot] != 0 and _seq[slot] == seq_now and (_flags[slot] & F_STUCK) == 0:
+		_expire(slot)
+
+
+## A falling shot's step (`set_floor`): cut at its floor line if it reached it (true: it lands),
+## and its path's start moved down to where it enters the band, so only that part meets walls and
+## hits. Above the band it touches nothing (`_hit_slot` stops there).
+func _fall(slot: int) -> bool:
+	var from: Vector2 = _prev[slot]
+	var to: Vector2 = _pos[slot]
+	var floor_y: float = _floor[slot]
+	var landed: bool = to.y >= floor_y and to.y > from.y
+	if landed:
+		to = from.lerp(to, (floor_y - from.y) / (to.y - from.y)) if from.y < floor_y else from
+		_pos[slot] = to
+	var top: float = floor_y - FALL_BAND
+	if from.y < top and to.y >= top:
+		_prev[slot] = from.lerp(to, (top - from.y) / (to.y - from.y))
+	return landed
 
 
 ## Mark the shot in `slot` passed over by the hit-work budget: its path from `_prev` on (or from
@@ -4370,6 +4425,25 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
 
 
+## `_path`'s first `used` pieces with the first `air` pixels taken off its start (`ray_air`): returns
+## how many pieces are left, 0 when the whole path is shorter.
+func _trim_path(used: int, air: float) -> int:
+	var left: float = air
+	var first: int = 0
+	while first < used:
+		var piece: float = _path[first].distance_to(_path[first + 1])
+		if piece > left:
+			_path[first] = _path[first].move_toward(_path[first + 1], left)
+			break
+		left -= piece
+		first += 1
+	if first >= used:
+		return 0
+	for i in range(first, used + 1):
+		_path[i - first] = _path[i]
+	return used - first
+
+
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
 ## toward `bend` (a homing beam: `bend` along the aim, `end` on the target), walked as
 ## RAY_SEGMENTS straight pieces. With `hit` false it only finds how far the beam gets (walls, and
@@ -4392,6 +4466,7 @@ func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce
 func _no_ray() -> float:
 	_ray_caster = -1
 	ray_gates = false
+	ray_air = 0.0
 	_set_ray_gate(-1, Vector2.INF, Vector2.ZERO, 0.0)
 	return 0.0
 
@@ -4491,6 +4566,15 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
 func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
+	var air: float = ray_air
+	if air > 0.0:
+		# Its first `ray_air` pixels are in the air (a falling beam): walked touching nothing.
+		ray_air = 0.0
+		var left: int = _trim_path(segments, air)
+		if left == 0:
+			_no_ray()
+			return air
+		return air + _ray_path(caster, left, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0

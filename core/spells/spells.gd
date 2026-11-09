@@ -194,13 +194,16 @@ class PendingLaunch:
 	## A payload that waited out its wind-up (`_fire`): it fires now as `_fire` would, its wind-up
 	## over.
 	var wound: bool = false
+	## Skyfall: a single `spell` that falls from its hole at `origin` onto this floor line (`Skyfall`);
+	## INF for any other launch.
+	var fall_floor: float = INF
 
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -481,12 +484,15 @@ var _poses: StaffPoses = null
 ## The moves carriers make of their caster or of the shot that cast them (dash, teleport, pull,
 ## swap, recoil): `CasterMoves`.
 var _moves: CasterMoves = null
+## The Skyfall modifier, all of it (`core/spells/skyfall.gd`).
+var _skyfall: Skyfall = null
 
 
 func _init() -> void:
 	_kit = CarrierKit.new(self)
 	_poses = StaffPoses.new(_kit)
 	_moves = CasterMoves.new(_kit)
+	_skyfall = Skyfall.new(_kit)
 	_carriers = Carriers.make_all()
 	for carrier: Carrier in _carriers.values():
 		carrier.bind(_kit, _poses)
@@ -1368,6 +1374,8 @@ func _land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: 
 ## behaviour's, the lifecycle's, the zappers', the magnets') gets them in the order of `slots`.
 func _land_shots(slots: PackedInt32Array, count: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
 	_travel_shots(slots, count, spell)
+	# Skyfall: while something falls, its shots fall onto its floor line.
+	_skyfall.land_shots(slots, count)
 	var made: int = _register_shots(slots, count, tag, spell, chain, prev)
 	if source != null:
 		for n in count:
@@ -1524,7 +1532,8 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 ## with a wall in the way, at `origin` (never in the wall).
 func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
 	var ahead: Vector2 = origin + heading * spell.radius * 2.0
-	return ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin
+	# Skyfall: while something falls, it is placed on its floor line.
+	return _skyfall.on_floor(spell, ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin)
 
 
 ## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
@@ -1702,6 +1711,9 @@ func _cast_once(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	var copies: int = _penta_copies(spell)
 	if copies > 0:
 		return _penta(spell, copies, tag, actor, origin, heading, source, offset)
+	if _skyfall.falls(spell):
+		# Skyfall: it opens its hole over where it is cast and falls from there later.
+		return _skyfall.open(spell, tag, actor, _skyfall.spot_of(actor, origin))
 	return _launch(spell, tag, actor, origin, heading, source)
 
 
@@ -1748,7 +1760,8 @@ func _penta(spell: CompiledSpell, copies: int, tag: int, actor: int, origin: Vec
 		_ring_angle = turned + TAU * float(n) / float(copies)
 		var point: Vector2 = SpellRuntime.ring_point(projectiles, centre, radius, _ring_angle)
 		var aim: Vector2 = point.direction_to(centre) if not point.is_equal_approx(centre) else way
-		made += _launch(spell, tag, actor, point, aim, source)
+		# Skyfall: each copy falls onto its point of the ring (owner, 2026-11-09).
+		made += _skyfall.open(spell, tag, actor, point) if _skyfall.falls(spell) else _launch(spell, tag, actor, point, aim, source)
 	_ring_radius = 0.0
 	_ring_angle = 0.0
 	_ring_turn = 0.0
@@ -1827,6 +1840,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.echoed = false
 	launch.again = false
 	launch.wound = false
+	launch.fall_floor = INF
 	launch.seed = hash(Vector3i(_scatter_key, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.actor = actor
@@ -1879,6 +1893,7 @@ func _run_pending() -> void:
 		var echoed: bool = launch.echoed
 		var again: bool = launch.again
 		var wound: bool = launch.wound
+		var fall_floor: float = launch.fall_floor
 		_scatter_from(launch.seed)
 		_release_launch(launch)
 		_cast_as(caster, caster_seq)
@@ -1886,6 +1901,13 @@ func _run_pending() -> void:
 			_carrier_of(landing).land(landing, group, actor, staff, generation, origin, heading, echoed)
 		elif wound:
 			_fire(group, actor, staff, generation, origin, heading, source, caster, true)
+		elif is_finite(fall_floor):
+			# Skyfall: its hole has opened, and it falls from there onto its floor line.
+			_skyfall.begin(fall_floor, actor)
+			_echo_spell = spell if echoed else null
+			_launch(spell, SpellTag.make(actor, staff, spell.node, generation), actor, origin, heading, source)
+			_echo_spell = null
+			_skyfall.end()
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
 		elif not again:
@@ -1916,6 +1938,7 @@ func _release_launch(launch: PendingLaunch) -> void:
 	launch.group = null
 	launch.spell = null
 	launch.landing = null
+	launch.fall_floor = INF
 	launch.source = null
 	_pending_free.append(launch)
 
@@ -3422,6 +3445,9 @@ func next_cast_reach(actor: int, staff: int, mana: float = INF) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff, mana)
 	if first == null or first.nova_ways() > 1:
 		# A nova goes every way: not aimed.
+		return 0.0
+	if _skyfall.falls(first):
+		# Skyfall: it falls where it is cast, not along an aim.
 		return 0.0
 	return _carrier_of(first).reach_of(first)
 

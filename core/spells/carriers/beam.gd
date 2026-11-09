@@ -87,6 +87,9 @@ var _bm_parent: PackedInt32Array = PackedInt32Array()
 var _bm_parent_born: PackedInt64Array = PackedInt64Array()
 var _bm_gate_in: PackedInt32Array = PackedInt32Array()
 var _bm_gate_out: PackedInt32Array = PackedInt32Array()
+## A falling beam's floor line (Skyfall: cast down from its hole, it strikes only near the line), INF
+## for every other.
+var _bm_floor: PackedFloat32Array = PackedFloat32Array()
 ## What steers live beam `at` when it homes: its own spell, or, for a leg out of a homing portal
 ## whose beam does not home, that portal's spell (a portal's homing steers what comes out of it).
 var _bm_steer: Array[CompiledSpell] = []
@@ -156,7 +159,7 @@ func hit_kind() -> StringName:
 func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
 	super(runtime_kit, staff_poses)
 	var rows: int = SpellLimits.BEAM_ROWS_START
-	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_steer, _bm_ring_centre, _bm_ring]:
+	for column: Variant in [_bm_on, _bm_born, _bm_spell, _bm_source, _bm_tag, _bm_actor, _bm_caster, _bm_caster_seq, _bm_life, _bm_span, _bm_tick, _bm_turn, _bm_count, _bm_chain, _bm_prev, _bm_hit, _bm_shield, _bm_origin, _bm_dir, _bm_bend, _bm_end, _bm_reach, _bm_tip, _bm_tip_dir, _bm_hit_at, _bm_zap_hit, _bm_zap_rolls, _bm_zapped_count, _bm_due_count, _bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer, _bm_ring_centre, _bm_ring]:
 		column.resize(rows)
 	_bm_zapped.resize(rows * SpellRuntime.ZAP_MEMORY)
 	_bm_zapped_at.resize(rows * SpellRuntime.ZAP_MEMORY)
@@ -423,6 +426,10 @@ func start(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading:
 	_bm_reach[at] = 0.0
 	_bm_hit_at[at] = kit.clock()
 	_bm_length[at] = spell.ray_length
+	# Skyfall: a beam cast down from its hole reaches its floor line and no further.
+	_bm_floor[at] = kit.floor_now()
+	if is_finite(_bm_floor[at]) and _bm_dir[at].y > 0.0:
+		_bm_length[at] = minf(_bm_length[at], (_bm_floor[at] - origin.y) / _bm_dir[at].y)
 	_bm_gate[at] = -1
 	_bm_parent[at] = -1
 	_bm_steer[at] = spell
@@ -681,6 +688,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	# step on (`step`) with the length the beam had left, so a loop of portals paces itself and ends.
 	if not hit:
 		kit.projectiles.ray_gates = true
+		kit.projectiles.ray_air = _air(at)
 		_bm_reach[at] = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], _bm_length[at], spell.pierce, SpellRuntime.HITS, tag, width, source, false, bounces, steer, ghost)
 		_bm_tip[at] = kit.projectiles.ray_end
 		_bm_tip_dir[at] = kit.projectiles.ray_end_heading
@@ -690,6 +698,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 		return
 	var ray: RayHit = kit.ray_begin(tag, _bm_dir[at], _bm_chain[at], _bm_prev[at], _bm_hit[at], -1)
 	kit.projectiles.ray_gates = true
+	kit.projectiles.ray_air = _air(at)
 	var got: float = kit.projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], _bm_length[at], spell.pierce, SpellRuntime.HITS, tag, width, source, true, bounces, steer, ghost)
 	var gate: int = kit.projectiles.ray_gate
 	var gate_heading: Vector2 = kit.projectiles.ray_gate_heading
@@ -723,6 +732,15 @@ func _keep_gate(at: int) -> void:
 	_bm_gate[at] = kit.projectiles.ray_gate
 	_bm_gate_heading[at] = kit.projectiles.ray_gate_heading
 	_bm_gate_left[at] = kit.projectiles.ray_gate_left
+
+
+## How much of live beam `at`'s length is in the air: a falling beam's (Skyfall) down to the band
+## above its floor line (`Projectiles.FALL_BAND`), where it starts to strike; 0 for any other.
+func _air(at: int) -> float:
+	var floor_y: float = _bm_floor[at]
+	if not is_finite(floor_y) or _bm_dir[at].y <= 0.0:
+		return 0.0
+	return maxf((floor_y - SpellRuntime.ProjectilesScript.FALL_BAND - _bm_origin[at].y) / _bm_dir[at].y, 0.0)
 
 
 ## Live beam `at` stopped at a gate: a leg goes on from every gate it leads to (P4), each a full
@@ -790,6 +808,7 @@ func _start_leg(parent: int, gate: int, out: int) -> void:
 	_bm_parent_born[at] = _bm_born[parent]
 	_bm_gate_in[at] = gate
 	_bm_gate_out[at] = out
+	_bm_floor[at] = INF
 	# Its own homing, or else the portal's: a portal's homing steers what comes out of it.
 	_bm_steer[at] = portal if portal != null and portal.homing_range > 0.0 and _bm_steer[parent] != null and _bm_steer[parent].homing_range <= 0.0 else _bm_steer[parent]
 	var legs: int = maxi(spell.pierce, 0) + 1
@@ -954,7 +973,7 @@ func _grow_beams() -> void:
 	_bm_tip.resize(size)
 	_bm_tip_dir.resize(size)
 	_bm_hit_at.resize(size)
-	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_steer]:
+	for column: Variant in [_bm_length, _bm_gate, _bm_gate_heading, _bm_gate_left, _bm_parent, _bm_parent_born, _bm_gate_in, _bm_gate_out, _bm_floor, _bm_steer]:
 		column.resize(size)
 	_bm_zap_hit.resize(size)
 	_bm_zap_rolls.resize(size)

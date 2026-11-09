@@ -1,0 +1,10 @@
+{
+	"id": "skyfall_frost_row",
+	"name": "Frost row",
+	"does": "A split frost bolt falls from a hole over the caster as three, fanning out on the way down and landing side by side: the imps crowding the caster are chilled at once, the one behind too.",
+	"needs": "skyfall",
+	"casts": [{"staff": 0, "cards": ["skyfall", "split", "frost", "bolt"]}],
+	"imps": [[-15, 0], [0, 0], [15, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "chill"}]
+}

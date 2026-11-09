@@ -26,7 +26,7 @@ func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, dire
 	if spell.speed > 0.0 and spell.orbit_radius > 0.0:
 		turn = spell.speed / spell.orbit_radius
 	# The actor's own body is the manager's own centre (its anchor); any other caster, where it is.
-	var centre: Vector2 = Vector2.INF if kit.caster_body(actor) == actor else kit.caster_place(actor, origin)
+	var centre: Vector2 = Vector2.INF if kit.caster_body(actor) == actor else kit.on_floor(spell, kit.caster_place(actor, origin))
 	return kit.projectiles.spawn_orbit(actor, spell.orbit_radius, DMath.angle(direction) + TAU * n / count, turn, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, centre)
 
 

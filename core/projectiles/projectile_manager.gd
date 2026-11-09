@@ -627,8 +627,8 @@ const RAMP_LIGHT_COLORS: Array[Color] = [
 ## mirrors the batches (Feel's spell light) adds theirs for the new ones.
 signal batches_grown(count: int)
 ## The still shots of a watched card body's batch (`watch_body`) were drawn this frame: `view` says
-## where each is, its size, colours and still clock (`read_still_rows`), read now and not kept (it is
-## the manager's, refilled next frame). Feel gives off a still card's motes from where its shots are
+## where each is, its size, colours and still clock (read from the rows by `row_*`), read now and not
+## kept (it is the manager's, and lets the rows go as soon as this returns). Feel gives off a still card's motes from where its shots are
 ## drawn (`gameplay/feel/still_motes.gd`): view only, nothing the simulation reads.
 signal still_shots_drawn(view: StillShotView)
 
@@ -5105,9 +5105,9 @@ func update_draw(fraction: float = -1.0) -> void:
 				mirror.buffer = rows
 			if batch < _still_views.size() and _still_views[batch] != null:
 				var view: StillShotView = _still_views[batch]
-				read_still_rows(rows, out, view)
-				view.time = sim_time
+				view.open(rows, out, sim_time)
 				still_shots_drawn.emit(view)
+				view.close()
 		multimesh.visible_instance_count = out
 		if mirror != null:
 			mirror.visible_instance_count = out
@@ -5730,29 +5730,46 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 15] = 1.0 - (kind + code) / KIND_STEPS
 
 
-## Read the first `count` still shots' rows of `rows` (as `_write_stones` writes them, with
-## `_write_quad`; the native kernel writes the same, byte for byte) into `view`: where each is drawn,
-## the way its quad turns, its hit size as drawn (STILL_HIT), its ramp and look bits, its core and
-## its still clock. The one place the rows are read back off the GPU's layout, beside the code that
-## writes them, so a viewer never decodes a row (`StillShotView`).
-static func read_still_rows(rows: PackedFloat32Array, count: int, view: StillShotView) -> void:
-	count = mini(count, rows.size() / DRAW_STRIDE)
-	view.hold(count)
-	view.count = count
-	for n in count:
-		var i: int = n * DRAW_STRIDE
-		var x_axis := Vector2(rows[i], rows[i + 4])
-		var size: float = x_axis.length()
-		view.at[n] = Vector2(rows[i + 3], rows[i + 7])
-		view.across[n] = x_axis / size if size > 0.0 else Vector2.RIGHT
-		view.reach[n] = size * STILL_HIT
-		view.ramp[n] = roundi(rows[i + 8] * 255.0) % 4
-		view.look[n] = roundi(rows[i + 9] * 255.0) | (roundi(rows[i + 10] * 255.0) << 8) | (roundi(rows[i + 11] * 255.0) << 16)
-		view.core[n] = Color(rows[i + 12], rows[i + 13], rows[i + 14])
-		var coded: float = (1.0 - rows[i + 15]) * KIND_STEPS
-		var code: float = coded - roundf(coded)
-		view.since[n] = still_since(code)
-		view.left[n] = still_left(code)
+## Still shot `n`'s row of `rows` read back (as `_write_stones` writes it, with `_write_quad`; the
+## native kernel writes the same, byte for byte): where it is drawn, the way its quad turns, its hit
+## size as drawn (STILL_HIT), its ramp, its look bits, its core and its still clock's code. The one
+## place a row is read back off the GPU's layout, beside the code that writes it; `StillShotView`
+## reads through them, so a viewer never decodes a row.
+static func row_place(rows: PackedFloat32Array, n: int) -> Vector2:
+	var i: int = n * DRAW_STRIDE
+	return Vector2(rows[i + 3], rows[i + 7])
+
+
+static func row_across(rows: PackedFloat32Array, n: int) -> Vector2:
+	var i: int = n * DRAW_STRIDE
+	var x_axis := Vector2(rows[i], rows[i + 4])
+	return x_axis.normalized() if x_axis.length_squared() > 0.0 else Vector2.RIGHT
+
+
+static func row_reach(rows: PackedFloat32Array, n: int) -> float:
+	var i: int = n * DRAW_STRIDE
+	return Vector2(rows[i], rows[i + 4]).length() * STILL_HIT
+
+
+static func row_ramp(rows: PackedFloat32Array, n: int) -> int:
+	return roundi(rows[n * DRAW_STRIDE + 8] * 255.0) % 4
+
+
+static func row_look(rows: PackedFloat32Array, n: int) -> int:
+	var i: int = n * DRAW_STRIDE
+	return roundi(rows[i + 9] * 255.0) | (roundi(rows[i + 10] * 255.0) << 8) | (roundi(rows[i + 11] * 255.0) << 16)
+
+
+static func row_core(rows: PackedFloat32Array, n: int) -> Color:
+	var i: int = n * DRAW_STRIDE
+	return Color(rows[i + 12], rows[i + 13], rows[i + 14])
+
+
+## The still clock's code beside the kind in row `n` (`still_code`; read with `still_since` and
+## `still_left`).
+static func row_code(rows: PackedFloat32Array, n: int) -> float:
+	var coded: float = (1.0 - rows[n * DRAW_STRIDE + 15]) * KIND_STEPS
+	return coded - roundf(coded)
 
 
 ## A still shot's seconds since it was placed, from its clock's code (`still_code`): STILL_START once

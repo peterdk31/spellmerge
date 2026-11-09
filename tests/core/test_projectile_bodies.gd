@@ -224,7 +224,7 @@ func test_a_watched_body_hands_out_its_still_shots_drawn() -> void:
 	var stone: int = mgr.register_body(STONE)
 	var views: Array = []
 	mgr.still_shots_drawn.connect(func(view: StillShotView) -> void:
-		views.append([view.body, view.enemy, view.count, view.at[0] if view.count > 0 else Vector2.INF, view.reach[0] if view.count > 0 else 0.0, view.since[0] if view.count > 0 else -1.0, view.left[0] if view.count > 0 else -1.0, view.ramp[0] if view.count > 0 else -1, view.look[0] if view.count > 0 else -1, view.time]))
+		views.append([view.body, view.enemy, view.count, view.at(0) if view.count > 0 else Vector2.INF, view.reach(0) if view.count > 0 else 0.0, view.clock(0).x if view.count > 0 else -1.0, view.clock(0).y if view.count > 0 else -1.0, view.ramp(0) if view.count > 0 else -1, view.look(0) if view.count > 0 else -1, view.time]))
 	mgr.watch_body(pool, true)
 	check(mgr.body_watched(pool) and not mgr.body_watched(stone), "only the body asked for is watched")
 	mgr.update_draw(1.0)
@@ -249,6 +249,7 @@ func test_a_watched_body_hands_out_its_still_shots_drawn() -> void:
 	check_equal(seen[7], 0, "the enemy ramp reads as ramp 0")
 	check_equal(seen[8], ManagerScript.ramp_look(-1, 1 << 0), "its look bits, the enemy ramp's flag with them")
 	check(is_equal_approx(seen[9], mgr.sim_time), "drawn at the manager's clock")
+	check(mgr._still_views[ManagerScript.body_batch(pool, true)].count == 0, "the view lets the rows go once it was handed out (nothing kept to copy when they are written again)")
 	mgr.watch_body(pool, false)
 	views.clear()
 	mgr.update_draw(1.0)

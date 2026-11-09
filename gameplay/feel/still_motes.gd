@@ -31,24 +31,24 @@ const PART_REACH: float = 5.0
 const PART_SECONDS: float = 0.5
 const KNOCKED: int = 6
 const KNOCK_REACH: float = 10.0
-## The strikes remembered at once (the oldest is forgotten first), and so the most a frame looks
-## for: a storm of shots on a wall finds the still shots it struck MOST_STRIKES times a frame at most.
+## The strikes held at once, waiting for the still shots and parting them (the oldest is let go
+## first): a storm of shots on a wall costs MOST_STRIKES searches a frame at most.
 const MOST_STRIKES: int = 16
 
 ## Each watched card body's look: {body: CardLook}.
 var _looks: Dictionary = {}
-## The last view of each watched batch (the manager's, refilled each frame it draws): where its shots
-## were last drawn, for a strike to find the shot it struck. {body * 2 + enemy: StillShotView}.
-var _views: Dictionary = {}
 ## The infusions' own kinds of a look's infusion layers, kept: {layers: PackedInt32Array}.
 var _own_kinds: Dictionary = {}
-## Recent strikes: where, and the clock when (a ring of MOST_STRIKES).
+## Strikes waiting for the next drawing of the still shots (`struck`): where, the clock when, how many.
+var _wait_at: PackedVector2Array = PackedVector2Array()
+var _wait_when: PackedFloat32Array = PackedFloat32Array()
+var _waiting: int = 0
+## The clock until which some strike still parts the streams (none to look at past it).
+var _parting_until: float = -INF
+## Strikes that met a still shot, parting its streams: where, and the clock when (a ring).
 var _strike_at: PackedVector2Array = PackedVector2Array()
 var _strike_when: PackedFloat32Array = PackedFloat32Array()
 var _strike_next: int = 0
-## Strikes looked for this frame, and the manager's clock it was counted at.
-var _strikes_looked: int = 0
-var _strikes_at: float = -1.0
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The manager's clock when shots were last handed out, and the seconds since the one before.
 var _seen: float = -1.0
@@ -63,6 +63,8 @@ func _init() -> void:
 	_strike_at.resize(MOST_STRIKES)
 	_strike_when.resize(MOST_STRIKES)
 	_strike_when.fill(-INF)
+	_wait_at.resize(MOST_STRIKES)
+	_wait_when.resize(MOST_STRIKES)
 
 
 ## Watch the body of every still card that gives off motes (`spells` names them and their looks;
@@ -71,7 +73,6 @@ func _init() -> void:
 ## skipped until then.
 func attach(projectiles: ProjectilesScript, spells: SpellRuntime) -> void:
 	_looks.clear()
-	_views.clear()
 	if projectiles == null or spells == null:
 		return
 	for form: StringName in spells.still_mote_cards():
@@ -90,81 +91,124 @@ func watches(body: int) -> bool:
 	return _looks.has(body)
 
 
-## A watched body's still shots were drawn (`view`, `still_shots_drawn`): each of them gives off its
-## share of each of its card's streams into `pool` (null: none now).
+## A watched body's still shots were drawn (`view`, `still_shots_drawn`; read now, never kept): the
+## strikes waiting for a still shot find theirs among them, and each shot gives off its share of each
+## of its card's streams into `pool` (null: none now). The work follows the motes, not the shots: for
+## each stream, as many picks as the whole batch would give off at full strength this frame, each a
+## shot at random kept as often as its strength says (its clock, its start and stop), so each shot
+## gives off what it would one by one, and a shot that gives off nothing this frame is never read
+## (a wall's hundreds of pieces give off a few motes a frame).
 func give_off(view: StillShotView, pool: MotesScript) -> void:
-	_views[view.body * 2 + (1 if view.enemy else 0)] = view
 	if view.time != _seen:
 		_frame = clampf(view.time - _seen, 0.0, LONGEST_FRAME) if _seen >= 0.0 else 0.0
 		_seen = view.time
 	var look: CardLook = _looks.get(view.body) as CardLook
-	if look == null or pool == null or _frame <= 0.0:
+	if look == null:
+		return
+	if _waiting > 0:
+		_meet_strikes(view, look, pool)
+	if pool == null or _frame <= 0.0 or view.count == 0:
 		return
 	for source: StillMoteSource in look.motes:
-		var kind: int = pool.kind_index(source.kind)
-		if kind >= 0:
-			_give_off_source(view, look, source, kind, pool)
-
-
-## One stream `source` (its kind `kind`) of every shot of `view`.
-func _give_off_source(view: StillShotView, look: CardLook, source: StillMoteSource, kind: int, pool: MotesScript) -> void:
-	for n in view.count:
-		if source.stop > 0.0 and view.since[n] >= source.stop:
-			continue
-		var many: int = floori(source.rate * _frame * strength(view.since[n] - source.start, view.left[n], look.open, look.fade) + _rng.randf())
-		if many <= 0:
-			continue
-		var bits: int = view.look[n]
-		var ramp_source: int = MotesScript.spell_source(view.ramp[n], bits)
-		var own: PackedInt32Array = _own_kinds_of(pool, bits)
-		var reach: float = view.reach[n]
-		var height: float = source.height * reach
-		for m in many:
-			var ground: Vector2 = view.at[n] + _point(source, look.shape, reach, view.at[n], view.across[n])
-			if _parted(ground, view.time):
-				parted += 1
+		var picks: int = floori(source.rate * _frame * view.count + _rng.randf())
+		for p in picks:
+			var n: int = _rng.randi() % view.count
+			var clock: Vector2 = view.clock(n)
+			if source.stop > 0.0 and clock.x >= source.stop:
 				continue
-			var k: int = kind
-			if not own.is_empty() and _rng.randf() < OWN_SHARE:
-				k = own[_rng.randi() % own.size()]
-			pool.throw_part(k, ground - Vector2(0.0, height), Vector2.UP, ramp_source, view.core[n], 1, 0.0, -1.0, 1.0, false, true, Vector2.ZERO, 1.0, bits, height)
-			given += 1
+			if _rng.randf() < strength(clock.x - source.start, clock.y, look.open, look.fade):
+				_give_off_shot(view, n, look, source, 1, pool)
 
 
-## A shot or a beam struck a wall at `at`, at the projectile manager's clock `now`: if it is one of
-## the still shots drawn in the last frame (a wall made by a card), its streams part there for
-## PART_SECONDS and KNOCKED motes of the shot's first stream are knocked out into `pool` (null:
-## none), in its colours. A batch drawn longer ago than LONGEST_FRAME is not where its shots are any
-## more (the manager hands out no view of a batch that draws none: a wall that ended).
-func struck(at: Vector2, now: float, pool: MotesScript) -> void:
-	if now != _strikes_at:
-		_strikes_at = now
-		_strikes_looked = 0
-	if _views.is_empty() or _strikes_looked >= MOST_STRIKES:
+## `many` motes of the stream `source` off shot `n` of `view`.
+func _give_off_shot(view: StillShotView, n: int, look: CardLook, source: StillMoteSource, many: int, pool: MotesScript) -> void:
+	var kind: int = pool.kind_index(source.kind)
+	if kind < 0:
 		return
-	_strikes_looked += 1
-	for key: int in _views:
-		var view: StillShotView = _views[key]
-		var look: CardLook = _looks.get(view.body) as CardLook
-		if look == null or now - view.time > LONGEST_FRAME:
+	var bits: int = view.look(n)
+	var ramp_source: int = MotesScript.spell_source(view.ramp(n), bits)
+	var core: Color = view.core(n)
+	var own: PackedInt32Array = _own_kinds_of(pool, bits)
+	var middle: Vector2 = view.at(n)
+	var across: Vector2 = view.across(n)
+	var reach: float = view.reach(n)
+	var height: float = source.height * reach
+	for m in many:
+		var ground: Vector2 = middle + _point(source, look.shape, reach, middle, across)
+		if _parted(ground, view.time):
+			parted += 1
 			continue
-		for n in view.count:
-			var reach: float = view.reach[n]
-			var span: float = maxf(look.shape.x, look.shape.y) * reach + PART_REACH
-			if view.at[n].distance_squared_to(at) > span * span:
-				continue
+		var k: int = kind
+		if not own.is_empty() and _rng.randf() < OWN_SHARE:
+			k = own[_rng.randi() % own.size()]
+		pool.throw_part(k, ground - Vector2(0.0, height), Vector2.UP, ramp_source, core, 1, 0.0, -1.0, 1.0, false, true, Vector2.ZERO, 1.0, bits, height)
+		given += 1
+
+
+## A shot or a beam struck a wall at `at`, at the projectile manager's clock `now`. It waits for the
+## next drawing of the watched still shots (`give_off`): if it struck one of them (a wall made by a
+## card), that shot's streams part there for PART_SECONDS and KNOCKED motes of its first stream are
+## knocked out, in its colours; a strike no still shot meets within LONGEST_FRAME (a room's wall, or
+## where a wall ended) is let go. At most MOST_STRIKES wait at once.
+func struck(at: Vector2, now: float) -> void:
+	if _looks.is_empty():
+		return
+	if _waiting >= MOST_STRIKES:
+		_let_go_older_than(now - LONGEST_FRAME)
+	if _waiting >= MOST_STRIKES:
+		return
+	_wait_at[_waiting] = at
+	_wait_when[_waiting] = now
+	_waiting += 1
+
+
+## The waiting strikes that struck a shot of `view` (whose card's look is `look`): parted and
+## knocked, and let go; those too old are let go too.
+func _meet_strikes(view: StillShotView, look: CardLook, pool: MotesScript) -> void:
+	var w: int = 0
+	while w < _waiting:
+		var at: Vector2 = _wait_at[w]
+		var met: int = -1
+		if view.time - _wait_when[w] <= LONGEST_FRAME:
+			for n in view.count:
+				var span: float = maxf(look.shape.x, look.shape.y) * view.reach(n) + PART_REACH
+				if view.at(n).distance_squared_to(at) <= span * span:
+					met = n
+					break
+		if met < 0 and view.time - _wait_when[w] <= LONGEST_FRAME:
+			w += 1
+			continue
+		if met >= 0:
 			_strike_at[_strike_next] = at
-			_strike_when[_strike_next] = now
+			_strike_when[_strike_next] = view.time
 			_strike_next = (_strike_next + 1) % MOST_STRIKES
-			var first: StillMoteSource = look.motes[0]
-			var kind: int = pool.kind_index(first.kind) if pool != null else -1
+			_parting_until = view.time + PART_SECONDS
+			var kind: int = pool.kind_index(look.motes[0].kind) if pool != null else -1
 			if kind >= 0:
-				pool.throw_part(kind, at, Vector2.UP, MotesScript.spell_source(view.ramp[n], view.look[n]), view.core[n], KNOCKED, KNOCK_REACH, 360.0, 1.0, false, true, Vector2.ZERO, 1.0, view.look[n])
-			return
+				var bits: int = view.look(met)
+				pool.throw_part(kind, at, Vector2.UP, MotesScript.spell_source(view.ramp(met), bits), view.core(met), KNOCKED, KNOCK_REACH, 360.0, 1.0, false, true, Vector2.ZERO, 1.0, bits)
+		_waiting -= 1
+		_wait_at[w] = _wait_at[_waiting]
+		_wait_when[w] = _wait_when[_waiting]
+
+
+## Lets go of the waiting strikes struck before the manager's clock `then` (no still shot was drawn
+## since: none of them met one).
+func _let_go_older_than(then: float) -> void:
+	var w: int = 0
+	while w < _waiting:
+		if _wait_when[w] < then:
+			_waiting -= 1
+			_wait_at[w] = _wait_at[_waiting]
+			_wait_when[w] = _wait_when[_waiting]
+		else:
+			w += 1
 
 
 ## True while a strike parts the streams at `at` (the manager's clock `now`).
 func _parted(at: Vector2, now: float) -> bool:
+	if now >= _parting_until:
+		return false
 	for s in MOST_STRIKES:
 		if now - _strike_when[s] < PART_SECONDS and _strike_at[s].distance_squared_to(at) < PART_REACH * PART_REACH:
 			return true

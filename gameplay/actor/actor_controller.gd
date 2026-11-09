@@ -10,7 +10,9 @@ extends Node
 ## table (`core/actors`) follows every change of driver.
 ##
 ## A subclass overrides `think`, and `started`/`stopped` when it keeps state about the actor it
-## drives (an AI's target and windup start over when it comes back), `set_aside` when it keeps
+## drives (an AI's target and windup start over when it comes back), `bind`/`unbind` when it hears
+## the signals of the actor it drives (connected there only, so a restored snapshot moves them:
+## `rebuild_derived`), `set_aside` when it keeps
 ## state about another controller taking its actor (possess, G9), and `watch_home` when it reads
 ## its own body while it is away (a seat's panel shows its own wizard; owner, 2026-10-28).
 ##
@@ -32,6 +34,9 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## State as who they point at: the bodies it drives and is home to, never entered (core/sim/README.md;
 ## a controller's own list is REFS, so this one is named after the base).
 const REFS_CONTROLLER: Array[StringName] = [&"driving", &"home_actor"]
+## Not state: the body whose signals it hears now (`bind`), which its connections are; set up again
+## from `driving` (`rebuild_derived`).
+const DERIVED_CONTROLLER: Array[StringName] = [&"_bound"]
 
 ## The actor it drives now, or null. Set by `Actor.drive` (and the home actor's `_ready`) only.
 var driving: Actor = null
@@ -39,6 +44,8 @@ var driving: Actor = null
 var home_actor: Actor = null
 ## The possessions it holds, oldest first (kept by `Possession` only).
 var possessions: Array[Possession] = []
+## The body whose signals it hears now (`bind`), or null.
+var _bound: Actor = null
 
 
 ## Write `actor.intent` for this step (`delta` seconds). The base wants nothing.
@@ -54,6 +61,32 @@ func started(_actor: Actor) -> void:
 ## It stops driving `actor` (a `release`, or a guest taking over).
 func stopped(_actor: Actor) -> void:
 	pass
+
+
+## It hears the signals of `actor`, the body it starts driving, and nothing else changes. A
+## subclass that hears the body it drives connects them here (after the base's) and calls it from
+## its `started`, so a restored snapshot can move them (`rebuild_derived`) without a fresh start.
+func bind(actor: Actor) -> void:
+	_bound = actor
+
+
+## It stops hearing `actor`: a subclass disconnects here (before the base's) and calls it from its
+## `stopped`.
+func unbind(actor: Actor) -> void:
+	if _bound == actor:
+		_bound = null
+
+
+## A snapshot restored (online-ready N10, core/sim/snapshot.gd): it hears the body it drives now,
+## which may be another than before (a possession restored into a world without it).
+func rebuild_derived() -> void:
+	if _bound == driving:
+		return
+	if _bound != null and is_instance_valid(_bound):
+		unbind(_bound)
+	_bound = null
+	if driving != null and is_instance_valid(driving):
+		bind(driving)
 
 
 ## True while it winds up a cast it has committed to (an AI's telegraph): the face's furious

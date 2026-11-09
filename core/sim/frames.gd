@@ -219,6 +219,20 @@ func play(replay: Replay) -> bool:
 	return true
 
 
+## The replay played goes on from its tick `tick` (a snapshot of that tick restored: a player
+## joining a run, a replay sought; online-ready N10). False, and nothing changes, when no replay
+## plays or it has no such tick. Presses carried through ticks that stood still are dropped: they
+## are input, which no snapshot holds (a snapshot taken while the game stands loses them).
+func seek(tick: int) -> bool:
+	if not is_playing() or tick < 0 or tick > _tape.replay.tick_count():
+		return false
+	_tape.at = tick
+	_carried.fill(0)
+	for seat in SEATS:
+		_pending[seat].clear()
+	return true
+
+
 ## Stop playing (by itself once the frames run out): the seats take their own input again.
 func stop_playing() -> void:
 	if is_playing():

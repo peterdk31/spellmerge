@@ -168,8 +168,7 @@ func started(actor: Actor) -> void:
 	_actor = actor
 	_aside = false
 	forget_presses()
-	if actor.caster != null:
-		actor.caster.cast_done.connect(_on_cast_done)
+	bind(actor)
 	if _home == null and actor.home_controller == self:
 		_bind_home(actor)
 	elif actor != _home:
@@ -234,10 +233,22 @@ func is_set_aside() -> bool:
 
 
 func stopped(actor: Actor) -> void:
-	if actor.caster != null and actor.caster.cast_done.is_connected(_on_cast_done):
-		actor.caster.cast_done.disconnect(_on_cast_done)
+	unbind(actor)
 	if _actor == actor:
 		_actor = null
+
+
+## It hears the casts of the body it drives.
+func bind(actor: Actor) -> void:
+	super(actor)
+	if actor.caster != null and not actor.caster.cast_done.is_connected(_on_cast_done):
+		actor.caster.cast_done.connect(_on_cast_done)
+
+
+func unbind(actor: Actor) -> void:
+	if actor.caster != null and actor.caster.cast_done.is_connected(_on_cast_done):
+		actor.caster.cast_done.disconnect(_on_cast_done)
+	super(actor)
 
 
 ## The seat's input frame becomes the actor's intent for this step (see the class doc).

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-09: Online play is host-ordered lockstep (owner)
+
+- **Asked:** the owner: "Tell me if Lockstep is the right way to implement multiplayer. Or if it is overkill. Will it give good performance?", then, on the answer: "I agree. Continue with the implementation." This settles the question left open on 2026-11-06 (lockstep, the plan, or host-authoritative with Godot's own multiplayer).
+- **Lockstep, as docs/milestones/online-ready.md sketches it** (host-ordered: the host fixes each tick's frames with a short input delay and repeats a late seat's last frame, so nobody waits). The game is the shape lockstep is made for: few players, very many moving things. Sending state at 20 Hz would cost about 30 KB an update at 3,000 shots, some 5 Mbit/s a client and 15 Mbit/s of the host's upload for three, and nothing at the 100,000 cap; shots cannot be guessed on a client either (homing, bounces, triggers), which would need the same determinism. Inputs are a few KB/s whatever the shot count.
+- **Not overkill:** the costly part (N1-N9: one clock, chance by hash, `DMath`, our own wall slide, the walker, hash and desync report, the platforms compared in CI, the simulation/view line) is built and Linux, Windows and the web agree to the bit. Host-authoritative would also need state rebuilt on clients many times a second (the looks read the simulation's members), interpolation and prediction.
+- **Performance, as weighed:** no tick cost beyond the game itself (every machine runs it offline anyway; the hash runs once a second); the weakest machine (likely the web) sets the shot cap (N11), and the game may slow as a last resort (2026-11-06). The cost is feel over distance: a player's input lands after the round trip to the host and 2-4 ticks, good under about 80 ms, sluggish over about 150; each machine draws its own staff at once as a view-only guess, and rollback on N10's snapshots is measured before it is promised. Host-authoritative clients would wait out the same round trip.
+- **Next:** N10 (snapshots: joining mid-run, and rollback later), N12, then a netcode spike (two machines over the internet, one of them the web build, which needs WebRTC or a relay rather than plain UDP) measuring the input delay at real pings before rollback is decided.
+
 ## 2026-11-09: Orbit is a modifier: motion only, no special cases (owner session)
 
 - **Asked:** the owner, on the orbit carrier's look: "maybe orbit should also just be a modifier instead of a carrier", then "Orbit is motion only" and "no special cases" (docs/milestones/carrier-modifiers.md Part 5, 5A here). Before building, Claude flagged that room walls ending circling shots may make Orbit useless in corridors (the old orbit skipped walls on purpose); the owner chose to build it as decided and judge it in play.
@@ -206,7 +214,7 @@ The owner asked for a review of N1–N4, N5, N7 and N11 for structure and coupli
 
 - **Slowing the game is allowed** (owner: "Slowing the game is an option if we have to!"). Owner decision 4 of online-ready (60 ticks a second, fixed) stands for normal play, but online a session may run slower when a machine cannot keep up: fewer ticks a second, or the game's speed lowered. A last resort, after the session rules (N11) are capped at the weakest machine's.
 - **Netcode can be allowed** (owner: "netcode can easily be allowed"). The netcode phase's exception to hard rule 4 is a formality, not an open question. The rule (AGENTS.md) and its check (`ci/smbot/rules.py`, owner-only) change when netcode work starts; until then networking stays banned.
-- **Asked in the same talk, still open:** whether online play is lockstep (the plan) or host-authoritative with Godot's own multiplayer (the host simulates, clients draw; lighter for weak machines and the web, more bandwidth), and whether to pause the lockstep-only parts (N6, N7, N8, N10) for a netcode spike first.
+- **Asked in the same talk, settled 2026-11-09 (lockstep, above):** whether online play is lockstep (the plan) or host-authoritative with Godot's own multiplayer (the host simulates, clients draw; lighter for weak machines and the web, more bandwidth), and whether to pause the lockstep-only parts (N6, N7, N8, N10) for a netcode spike first.
 
 ## 2026-11-06: One clock: the Tick (online-ready N3a, owner session)
 

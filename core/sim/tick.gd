@@ -67,8 +67,11 @@ const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"
 ## The name the actor table is part of the state under.
 const ACTORS: StringName = &"Actors"
 
-## Ticks since the run began (or the game, before any run).
-var count: int = 0
+## Ticks since the run began (or the game, before any run): the game's clock, `sim.tick`, which is
+## state (a snapshot restores it, online-ready N10). Read only.
+var count: int:
+	get:
+		return sim.tick
 ## The game's time and chance (`sim.gd`, online-ready N3c): the tick (`count`) and the run's seed,
 ## dealt at each run's start. Areas and bodies take it as their `sim` (`Sim.found`).
 var sim: Sim = Sim.new()
@@ -149,7 +152,6 @@ func _physics_process(_delta: float) -> void:
 
 ## One tick of `delta` seconds (the game's is always DT), in the written order (see the class doc).
 func run(delta: float) -> void:
-	sim.tick = count
 	# The frames run in every tick, stopped and held too (the horde's break takes its picks then).
 	var ticks_frames: bool = frames != null and frames.auto_tick
 	if ticks_frames:
@@ -166,7 +168,7 @@ func run(delta: float) -> void:
 		_run_steps(delta, stopped)
 	if (stopped or held) and ticks_frames:
 		frames.stood()
-	count += 1
+	sim.tick += 1
 
 
 ## Every step in order; while the game is stopped, only those that run through its stops.
@@ -231,7 +233,6 @@ func _show_stop() -> void:
 ## RUN_ORDER, and the actor table last. So a run plays the same whatever ran before it in this
 ## game, and a replay recorded in any run plays the same in any other.
 func begin_run() -> void:
-	count = 0
 	sim.tick = 0
 	# The last run's stops and hold end with it (a new run starts with the game going).
 	sim.hold_left = 0

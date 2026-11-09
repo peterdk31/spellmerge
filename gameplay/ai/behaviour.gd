@@ -11,6 +11,11 @@ extends RefCounted
 ## walk), `plan_urgent` (dash that way if a staff's next cast moves the caster). It reads only
 ## what the brain perceived and what each staff casts next (`CastSense`), never a card.
 
+## Made whole and never changed after (core/sim/README.md, "Made once"): one copy serves every
+## AI, and a brain knows its running behaviour by which copy it is, so a snapshot keeps it as
+## itself (core/sim/snapshot.gd), never a copy.
+const FROZEN: bool = true
+
 ## Its place in the brain's list (set once by `AIBehaviours`), for `memo` and `picks`.
 var index: int = -1
 

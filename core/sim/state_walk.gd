@@ -33,7 +33,8 @@ extends RefCounted
 ## - an object of a script (an actor's intent, a compiled spell, a brain), walked member by member;
 ##   one met twice is walked once, and later meetings are the number of its first (in walk order);
 ## - a node of a simulation script that is the holder's own descendant (an actor's components), walked
-##   too, with its `position` (and a body's `velocity`);
+##   too, with its `position` (and a body's `velocity`); a body walked as an area is walked with
+##   the simulation nodes added to it in play that no member holds (`added_in_play`);
 ## - a reference to a simulation node it does not own that has an int `id` (an actor: a brain's
 ##   typed target actor): that id, as "actor.gd#7";
 ## - a resource from a file (content: a card, enemy data) or a scene: its path, since data cannot
@@ -216,6 +217,71 @@ static func members(script: Script) -> PackedStringArray:
 	if not _members.has(script):
 		_plan(script)
 	return _members[script]
+
+
+## How `script`'s state members are walked, in `members` order: each a StringName and one of PLAIN,
+## REF, SPARE, PACKED or 0 (by what it holds). For the snapshot (`Snapshot`), which walks the same
+## members by the same plan.
+static func plan(script: Script) -> Array:
+	if not _members.has(script):
+		_plan(script)
+	return [_member_names[script], _how[script]]
+
+
+## Whether objects of `script` are FROZEN (made whole, never changed after).
+static func is_frozen(script: Script) -> bool:
+	return _frozen_of(script)
+
+
+## Whether objects of `script` say when they are idle (`func idle() -> bool`).
+static func says_idle(script: Script) -> bool:
+	return _idles_of(script)
+
+
+## Whether a node of `script` is walked when its holder owns it: a simulation script that is not
+## view as a whole (as a walk with no `also_simulation` decides).
+static func enters(script: Script) -> bool:
+	if script == null:
+		return false
+	if not _enters.has(script):
+		_enters[script] = is_simulation(script) and not is_view_only(script)
+	return _enters[script]
+
+
+## True for a body: a node with an actor id (an `Actor`; `Tick.state_areas`' "actor 7").
+static func is_body(object: Object) -> bool:
+	if not object is Node:
+		return false
+	var id: Variant = object.get(&"id")
+	return typeof(id) == TYPE_INT and int(id) >= 0
+
+
+## The simulation nodes (`enters`) added to `body` in play, which its scene does not make: the
+## outermost node of each branch with no owner (a node of a scene has its scene's root as its
+## owner; their own children are theirs to make), under the body or its scene's simulation nodes. A body built in code has no scene: each simulation
+## node directly under it. A body walked as an area is walked with them, after its members (a
+## possession's puppet, which no member of its body holds), and a snapshot makes them again.
+static func added_in_play(body: Node) -> Array[Node]:
+	var out: Array[Node] = []
+	if body.scene_file_path == "":
+		for child: Node in body.get_children():
+			if enters(child.get_script() as Script):
+				out.append(child)
+		return out
+	_added_under(body, out)
+	return out
+
+
+## Under the scene's simulation nodes only (a component may hold one): a body's looks and sprites
+## are view, and a hash walks every body.
+static func _added_under(at: Node, out: Array[Node]) -> void:
+	for child: Node in at.get_children():
+		if not enters(child.get_script() as Script):
+			continue
+		if child.owner == null:
+			out.append(child)
+		else:
+			_added_under(child, out)
 
 
 ## Who `value` points at, for a REFS member: null, "<freed>", an actor as "actor.gd#7", a resource
@@ -541,6 +607,11 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)
 	_members_of(path, object, script)
+	if root and is_body(node):
+		# The simulation nodes added to it in play that no member holds (a possession's puppet).
+		for added: Node in added_in_play(node):
+			if not _seen.has(added.get_instance_id()):
+				_object(_join(path, "/" + str(node.get_path_to(added))), added, node)
 
 
 ## Every state member of `object` (of `script`), in order, by how its plan says.
@@ -576,9 +647,7 @@ func _walks_into(script: Script) -> bool:
 		return false
 	if not also_simulation.is_empty() and also_simulation.has(script):
 		return not is_view_only(script)
-	if not _enters.has(script):
-		_enters[script] = is_simulation(script) and not is_view_only(script)
-	return _enters[script]
+	return enters(script)
 
 
 ## Hands one leaf to the sink, or, in the hash's walk (`values`), appends its value.

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-11-09: Lockstep decided; snapshots N10a (owner session)
+
+The owner asked whether lockstep is right for online play or overkill; the answer (bandwidth of state sync at Spellmerge's shot counts, N1-N9 already built, the cost being input delay over distance) is in DECISIONS, and the owner agreed. N10a then built snapshots: `core/sim/snapshot.gd` saves every state member by the walker's plan and makes a world so again (bodies remade from their scene, references by actor id, `restore_nodes`/`rebuild_derived` hooks). A fresh game restoring a snapshot of a sandbox run, a wave or a horde run and playing the replay on agrees at every tick; the scripted fight, storm, horde wave and a possession restore and roll back too. On the way: the clock is `sim.tick` alone, controllers bind to the body they drive through `bind`/`unbind`, AI behaviours are FROZEN, and a body's nodes added in play are walked. Decoys and the rest of the content go with N12 (N10b).
+
 ## 2026-11-08: Feel: one hit look per body and staff a frame (owner session)
 
 `BodyLooks.PER_BODY` is 1 (was 3): measured with 1 per body and 1 per two frames beside it, it took Feel's hit listeners about 7 us a hit lower (storm 17 to 10, crowd 20 to 13; crowd_all 49 to 44 ms a step at 30,000 bolts), the same hits and damage, and the storm's heavily hit bodies show one spray instead of a white blob of stacked ones. The owner picked 1 per body; DECISIONS has the numbers.

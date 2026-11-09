@@ -88,7 +88,10 @@ func test_a_run_deals_its_seed_and_counts_from_zero() -> void:
 	tick.run(TickScript.DT)
 	tick.run(TickScript.DT)
 	var sim: Sim = tick.sim
-	check_equal(sim.tick, 1, "the sim's tick is the tick being run")
+	# The ticks run so far, so during a tick the number of that tick: the game's clock, state that a
+	# snapshot restores (online-ready N10).
+	check_equal(sim.tick, 2, "the sim's tick counts the ticks run")
+	check_equal(tick.count, sim.tick, "the Tick's count is the sim's clock")
 	var replay := Replay.new()
 	replay.run_seed = 31
 	frames.set(&"_tape", ReplayTape.playing(replay))
@@ -96,7 +99,7 @@ func test_a_run_deals_its_seed_and_counts_from_zero() -> void:
 	var first: int = sim.run_seed
 	check_equal(sim.tick, 0, "a run counts from 0")
 	tick.run(TickScript.DT)
-	check_equal(sim.tick, 0, "its first tick is 0")
+	check_equal(sim.tick, 1, "its first tick was 0")
 	frames.set(&"_tape", ReplayTape.playing(replay))
 	tick.begin_run()
 	check_equal(sim.run_seed, first, "a replay's run takes the same seed")

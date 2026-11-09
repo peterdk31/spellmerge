@@ -59,10 +59,8 @@ func before_each() -> void:
 	var halo: FormBase = _form(&"halo", 300.0, 1.0)
 	halo.shots = 8
 	halo.spread = 360.0
-	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
-	orbit.carrier = &"orbit"
-	orbit.orbit_radius = 40.0
-	orbit.pierce = 16
+	var rune: FormBase = _form(&"rune", 0.0, 2.0)
+	rune.carrier = &"rune"
 	var fire := ElementBase.new()
 	fire.status_id = &"burn"
 	fire.status_duration = 2.0
@@ -191,13 +189,12 @@ func test_a_blast_in_a_payload_lands_where_the_bolt_hits() -> void:
 
 
 func test_hold_keeps_its_shots_and_reserves_mana_until_switched_off() -> void:
-	_mgr.set_anchor(0, Vector2.ZERO)
-	_install(0, 0, "hold orbit")
+	_install(0, 0, "hold rune")
 	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 2.0, "the first press casts")
 	check(_spells.is_holding(0, 0), "it is on")
 	check_equal(_reserved.get(0, 0.0), 2.0, "its mana is reserved")
 	_tick(300)
-	check_equal(_mgr.get_count(), 1, "the orbit outlives its own two seconds")
+	check_equal(_mgr.get_count(), 1, "the rune outlives its own two seconds")
 	_wait_ready(0, 0)
 	check_equal(_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0), 0.0, "the next press switches it off and spends nothing")
 	check(not _spells.is_holding(0, 0), "it is off")
@@ -208,8 +205,7 @@ func test_hold_keeps_its_shots_and_reserves_mana_until_switched_off() -> void:
 
 
 func test_editing_a_staff_switches_its_hold_off() -> void:
-	_mgr.set_anchor(1, Vector2.ZERO)
-	_install(1, 3, "hold orbit")
+	_install(1, 3, "hold rune")
 	_spells.cast_staff(1, 3, Vector2.ZERO, AIM, 100.0)
 	_install(1, 3, "bolt")
 	check(not _spells.is_holding(1, 3), "the edit switched it off")

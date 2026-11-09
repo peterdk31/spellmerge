@@ -12,7 +12,7 @@ const E := TriggerBase.Event
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the carriers it can
 ## fire on. Every carrier not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
-const SHOTS: Array = [&"atom", &"rune", &"orbit", &"swap", &"wall", &"pool"]
+const SHOTS: Array = [&"atom", &"rune", &"swap", &"wall", &"pool"]
 ## What is over at once: no timer ticks, nothing hears a hurt on it (rules R4d) and nothing is left
 ## for a recast.
 const AT_ONCE: Array = [&"slam", &"teleport"]
@@ -39,7 +39,7 @@ func before_each() -> void:
 		trigger.event = event as TriggerBase.Event
 		trigger.wind_up = 0.5
 		_put(trigger, StringName("on_" + String(E.keys()[event]).to_lower()))
-	for behaviour: int in [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT, ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.GHOST, ModifierBase.Behaviour.RELAY]:
+	for behaviour: int in [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT, ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.GHOST, ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.ORBIT]:
 		var modifier := ModifierBase.new()
 		modifier.behaviour = behaviour as ModifierBase.Behaviour
 		modifier.behaviour_strength = 1.0
@@ -107,7 +107,6 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy"],
 		[&"on_wall", &"dash"],
-		[&"on_wall", &"orbit"],
 		[&"on_wall", &"rune"],
 		[&"on_wall", &"swing"],
 		[&"on_hurt", &"slam"],
@@ -126,7 +125,7 @@ func test_triggers_that_never_fire_are_wasted() -> void:
 
 func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
-		[&"on_hit", &"atom"], [&"on_timer", &"atom"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
+		[&"on_hit", &"atom"], [&"on_timer", &"atom"], [&"on_hurt", &"rune"], [&"on_timer", &"wall"],
 		[&"on_hit", &"beam"], [&"on_hit", &"swing"], [&"on_wall", &"beam"], [&"on_wall", &"swap"],
 		[&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
 		[&"on_timer", &"beam"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
@@ -160,3 +159,8 @@ func test_the_cards_an_event_needs() -> void:
 	# So does a ghost beam (rules R4f).
 	check(_compile([&"on_wall", &"ghost", &"beam", &"atom"]).wasted.has(0), "on wall on a ghost beam is wasted")
 	check(not _compile([&"on_wall", &"beam", &"atom"]).wasted.has(0), "a plain beam meets walls")
+	# A circling shot is a shot (Orbit, docs/milestones/carrier-modifiers.md Part 5): room walls end
+	# it, so on wall fires on it, and on hurt fires while it circles.
+	check(not _compile([&"on_wall", &"orbit", &"atom", &"atom"]).wasted.has(0), "on wall on a circling shot fires")
+	check(_compile([&"on_wall", &"orbit", &"ghost", &"atom", &"atom"]).wasted.has(0), "a ghost one passes the walls")
+	check(not _compile([&"on_hurt", &"orbit", &"atom", &"atom"]).wasted.has(0), "on hurt on a circling shot fires")

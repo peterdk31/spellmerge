@@ -257,14 +257,17 @@ func _run_motion_timings(cap: int) -> void:
 	_check(turned > 0, "cap %d: some homing shots found a target in a step (%d)" % [cap, turned])
 	_log("step, full cap of homing shots near %d packed enemies (%d searched)" % [ENEMIES, turned], homing_us / float(REPEATS), 1, "per step")
 
-	# Orbit: the whole cap circles four anchors inside the crowd.
+	# Orbit: the whole cap circles four anchors inside the crowd: bolts of 80 px/s set circling
+	# (`set_orbit`, orbit as a modifier 5A), each turned by its speed over its radius.
 	var orbit_us: float = 0.0
 	for i in REPEATS:
 		_mgr.clear()
 		for player in PLAYERS:
 			_mgr.set_anchor(_casters[player], CROWD_CENTER + Vector2(float(player) * 8.0 - 12.0, 0.0))
 		for n in cap:
-			_mgr.spawn_orbit(_casters[n % PLAYERS], 20.0 + float(n % 40), float(n) * 0.37, 2.0, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			var caster: int = _casters[n % PLAYERS]
+			var slot: int = _mgr.spawn(caster, _mgr.get_anchor(caster), Vector2(0.0, 80.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			_mgr.set_orbit(slot, 20.0 + float(n % 40), float(n) * 0.37, 0.0)
 		var start: int = Time.get_ticks_usec()
 		_mgr.step(DT)
 		orbit_us += float(Time.get_ticks_usec() - start)

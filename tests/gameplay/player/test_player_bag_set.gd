@@ -37,7 +37,7 @@ var _refused: Array[int] = []
 func before_each() -> void:
 	_world = Fixture.new(root, true)
 	_registry = FakeRegistry.new()
-	for id: StringName in [&"dash", &"fire", &"bolt", &"orbit", &"split"]:
+	for id: StringName in [&"dash", &"fire", &"bolt", &"rune", &"split"]:
 		var card := SpellComponent.new()
 		card.id = id
 		_registry.items[id] = card
@@ -124,14 +124,14 @@ func test_the_set_bag_is_a_copy() -> void:
 	var body := _wizard(0)
 	var cards: Array[StringName] = _ids("dash bolt")
 	_world.bus.bag_set_requested.emit(0, cards)
-	cards.append(&"orbit")
+	cards.append(&"rune")
 	check_equal(Fixture.controller(body).bag, _ids("dash bolt"), "changing the sent list later changes nothing")
 
 
 func test_the_builder_refuses_a_card_outside_the_set_bag() -> void:
 	var body := _wizard(0)
 	_world.bus.bag_set_requested.emit(0, _ids("dash"))
-	_world.bus.staff_change_requested.emit(0, 0, 0, &"orbit")
+	_world.bus.staff_change_requested.emit(0, 0, 0, &"rune")
 	check_equal(_refused, [0] as Array[int], "a card no longer in the bag is refused")
 	check(body.caster.cards_of(0).is_empty() or body.caster.cards_of(0)[0] == &"", "and the staff is unchanged")
 

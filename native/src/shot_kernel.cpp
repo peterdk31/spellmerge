@@ -102,7 +102,6 @@ constexpr double TAIL_SPACING = 2.0;
 constexpr double TAIL_PLAYER_SHARE = 0.25;
 constexpr double ORBIT_GROW = 0.25;
 constexpr int HEAD_LIVE = 1;
-constexpr int HEAD_ORBIT = 2;
 constexpr int DRAW_STRIDE = 16;
 constexpr int KIND_BOLT = 1;
 constexpr int KIND_RUNE = 2;
@@ -113,10 +112,9 @@ constexpr double TRACE_FROM = 0.02;
 constexpr double TRACE_SPAN = 0.42;
 constexpr int BATCH_BOLT = 0;
 constexpr int BATCH_STILL = 1;
-constexpr int BATCH_ORBIT = 2;
-constexpr int BATCH_ENEMY = 3;
-constexpr int BATCH_ENEMY_STILL = 4;
-constexpr int BATCH_BODY_FIRST = 5;
+constexpr int BATCH_ENEMY = 2;
+constexpr int BATCH_ENEMY_STILL = 3;
+constexpr int BATCH_BODY_FIRST = 4;
 // `_draw_out`: its totals first (DRAW_*), then each batch's rows written from DRAW_OUT_FIRST on; how
 // many batches there are is the manager's `_batch_total`, which grows with the card bodies.
 constexpr int DRAW_ASKED = 0;
@@ -269,7 +267,8 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(caster_slot, "_caster_slot", PACKED_INT32_ARRAY) \
 	X(caster_at, "_caster_at", PACKED_VECTOR2_ARRAY) \
 	X(orbit_angle, "_orbit_angle", PACKED_FLOAT32_ARRAY) \
-	X(orbit_speed, "_orbit_speed", PACKED_FLOAT32_ARRAY) \
+	X(orbit_drift, "_orbit_drift", PACKED_FLOAT32_ARRAY) \
+	X(orbit_way, "_orbit_way", PACKED_FLOAT32_ARRAY) \
 	X(orbit_radius, "_orbit_radius", PACKED_FLOAT32_ARRAY) \
 	X(wave, "_wave", PACKED_FLOAT32_ARRAY) \
 	X(wave_age, "_wave_age", PACKED_FLOAT32_ARRAY) \
@@ -948,7 +947,6 @@ const Constant CONSTANTS[] = {
 	{ "TAIL_PLAYER_SHARE", (double)TAIL_PLAYER_SHARE },
 	{ "ORBIT_GROW", (double)ORBIT_GROW },
 	{ "HEAD_LIVE", (double)HEAD_LIVE },
-	{ "HEAD_ORBIT", (double)HEAD_ORBIT },
 	{ "DRAW_STRIDE", (double)DRAW_STRIDE },
 	{ "KIND_BOLT", (double)KIND_BOLT },
 	{ "KIND_RUNE", (double)KIND_RUNE },
@@ -959,7 +957,6 @@ const Constant CONSTANTS[] = {
 	{ "TRACE_SPAN", (double)TRACE_SPAN },
 	{ "BATCH_BOLT", (double)BATCH_BOLT },
 	{ "BATCH_STILL", (double)BATCH_STILL },
-	{ "BATCH_ORBIT", (double)BATCH_ORBIT },
 	{ "BATCH_ENEMY", (double)BATCH_ENEMY },
 	{ "BATCH_ENEMY_STILL", (double)BATCH_ENEMY_STILL },
 	{ "BATCH_BODY_FIRST", (double)BATCH_BODY_FIRST },
@@ -1094,7 +1091,7 @@ int64_t ShotKernel::hits(Object *m, int64_t n, int64_t top, int64_t resume, cons
 			h.save(m, 0, starved_before);
 			return n * 2 + YIELD_WHOLE;
 		}
-		if (h.has_walls && h.motion[slot] != MOTION_ORBIT && (h.flags[slot] & F_GHOST) == 0 &&
+		if (h.has_walls && (h.flags[slot] & F_GHOST) == 0 &&
 				h.wall_hit(h.prev[slot], h.pos[slot]) >= 0.0) {
 			h.save(m, 0, starved_before);
 			return n * 2 + YIELD_WHOLE;
@@ -1255,6 +1252,13 @@ void ShotKernel::homing_pass(Object *m, int64_t first, int64_t count, double del
 	});
 }
 
+// `_curve_factor`: the factor of its speed a shot with this life, span and curve goes at in a step of
+// `delta`, read at the middle of the step (1 for a shot with no curve).
+static inline double curve_factor(double life, double span, double from, double to, double ease, double delta) {
+	const double left = clampf((life + delta * 0.5) / span, 0.0, 1.0);
+	return from + (to - from) * (1.0 - dmath::pow(left, ease));
+}
+
 // The behaviour passes that need nothing of GDScript (`_pass_growth`, `_pass_linger`, `_pass_orbit`,
 // `_pass_return`, `_pass_curve`, `_pass_homing`, `_pass_spiral`), over the shots `_members[first ..
 // first + count - 1]`, not catching up: a shot whose caster is another shot waits for its turn
@@ -1326,17 +1330,25 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 	} else if (kind == B_ORBIT) {
 		Arr<PackedInt32Array> caster_slot, actor;
 		Arr<PackedVector2Array> caster_at, anchors, orbit_centre;
-		Arr<PackedFloat32Array> orbit_angle, orbit_speed, orbit_radius, wave, wave_age;
+		Arr<PackedFloat32Array> orbit_angle, orbit_drift, orbit_way, orbit_radius, wave, wave_age;
+		Arr<PackedFloat32Array> life, span, curve_from, curve_to, curve_ease, curve_speed;
 		caster_slot.load(m, k.caster_slot);
 		actor.load(m, k.actor);
 		caster_at.load(m, k.caster_at);
 		anchors.load(m, k.anchors);
 		orbit_centre.load(m, k.orbit_centre);
 		orbit_angle.load(m, k.orbit_angle);
-		orbit_speed.load(m, k.orbit_speed);
+		orbit_drift.load(m, k.orbit_drift);
+		orbit_way.load(m, k.orbit_way);
 		orbit_radius.load(m, k.orbit_radius);
 		wave.load(m, k.wave);
 		wave_age.load(m, k.wave_age);
+		life.load(m, k.life);
+		span.load(m, k.span);
+		curve_from.load(m, k.curve_from);
+		curve_to.load(m, k.curve_to);
+		curve_ease.load(m, k.curve_ease);
+		curve_speed.load(m, k.curve_speed);
 		each_member(first, count, _width, [&](int64_t n) {
 			const int64_t slot = members[n];
 			const int64_t st = state[slot];
@@ -1355,14 +1367,21 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 				state[slot] = S_GONE;
 				return;
 			}
+			// `_orbit_turn`: its drift, plus its speed (its curve's, `_curve_factor`) over its radius, the
+			// way it goes round (`_orbit_way`: a bounce turns it back).
+			double turn = (double)orbit_drift[slot];
+			if ((double)orbit_radius[slot] > 0.0) {
+				turn += (double)curve_speed[slot] * curve_factor((double)life[slot], (double)span[slot], (double)curve_from[slot], (double)curve_to[slot], (double)curve_ease[slot], delta) / (double)orbit_radius[slot];
+			}
+			turn = (double)orbit_way[slot] * turn;
 			if (st == S_MOVING) {
-				orbit_angle[slot] = (float)UtilityFunctions::wrapf((double)orbit_angle[slot] + (double)orbit_speed[slot] * delta, -PI_D, PI_D);
+				orbit_angle[slot] = (float)UtilityFunctions::wrapf((double)orbit_angle[slot] + turn * delta, -PI_D, PI_D);
 				wave_age[slot] = (float)((double)wave_age[slot] + delta);
 			}
 			const Vector2 away = dmath::from_angle((double)orbit_angle[slot]);
 			const double reach = (double)orbit_radius[slot] + (double)wave[slot] * dmath::sin(TAU_D * (double)wave_age[slot] / SPIRAL_PERIOD);
 			pos[slot] = centre + vmul(away, reach);
-			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * (double)orbit_speed[slot]);
+			vel[slot] = vmul(Vector2(-away.y, away.x), (double)orbit_radius[slot] * turn);
 			orbit_centre[slot] = centre;
 		});
 	} else if (kind == B_CURVE) {
@@ -1378,10 +1397,7 @@ bool ShotKernel::run_pass(Object *m, int64_t kind, int64_t first, int64_t count,
 			if (state[slot] != S_MOVING) {
 				return;
 			}
-			// At the middle of the step, as `_pass_curve`.
-			const double left = clampf(((double)life[slot] + delta * 0.5) / (double)span[slot], 0.0, 1.0);
-			const double from = (double)curve_from[slot];
-			const double factor = from + ((double)curve_to[slot] - from) * (1.0 - dmath::pow(left, (double)curve_ease[slot]));
+			const double factor = curve_factor((double)life[slot], (double)span[slot], (double)curve_from[slot], (double)curve_to[slot], (double)curve_ease[slot], delta);
 			vel[slot] = vmul(vel[slot].normalized(), (double)curve_speed[slot] * factor);
 			pos[slot] = prev[slot] + vmul(vel[slot], delta);
 		});
@@ -1539,8 +1555,6 @@ void ShotKernel::count_draw(Object *m) {
 					batch = mot == MOTION_STILL ? BATCH_ENEMY_STILL : BATCH_ENEMY;
 				} else if (mot == MOTION_STILL) {
 					batch = BATCH_STILL;
-				} else if (mot == MOTION_ORBIT) {
-					batch = BATCH_ORBIT;
 				}
 				drawn_batch[slot] = (uint8_t)batch;
 				drawn_color[slot] = look_color(rmp, look_core_zoom(r), look[slot]);
@@ -1827,7 +1841,7 @@ void ShotKernel::draw_shots(Object *m, double fraction) {
 				}
 				write_quad(b, dir, size, at, look_data, core[slot], KIND_RUNE, still_code(sim_time - (double)born[slot], (double)life[slot]));
 			} else {
-				write_head(b, at, HEAD_LIVE | (mot == MOTION_ORBIT ? HEAD_ORBIT : 0), look_data, core[slot], pos[slot] - prev[slot]);
+				write_head(b, at, HEAD_LIVE, look_data, core[slot], pos[slot] - prev[slot]);
 			}
 			// Its light multipliers in the row's free floats (as the GDScript writes them after `_write_head` or `_write_quad`).
 			b[LIGHT_REACH_FLOAT] = light_reach[slot];
@@ -1905,9 +1919,6 @@ struct Threat {
 	// `rad` of `point` (-1 for never or not a threat), and whether it is still.
 	double when(int64_t s, const Vector2 &point, double rad, int64_t tm, int64_t own, double horizon, bool &still, Vector2 &rel) {
 		if (alive[s] == 0 || (team[s] == tm && tm != TEAM_NONE) || (actor[s] == own && own >= 0)) {
-			return -2.0;
-		}
-		if (motion[s] == MOTION_ORBIT) {
 			return -2.0;
 		}
 		const double reach = rad + (double)radius[s];
@@ -2009,7 +2020,7 @@ int64_t ShotKernel::threat_fill(Object *m, double horizon) {
 	int64_t used = 0;
 	const int64_t room = slots.n;
 	for (int64_t s = 0; s < high; s++) {
-		if (t.alive[s] == 0 || t.motion[s] == MOTION_ORBIT) {
+		if (t.alive[s] == 0) {
 			continue;
 		}
 		const Vector2 at = t.pos[s];

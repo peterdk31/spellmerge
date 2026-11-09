@@ -66,15 +66,30 @@ func test_a_bolt_runs_every_behaviour() -> void:
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:
 	# Cells the audit found silent (M2-rules.md findings 4, 5, 6, 9), now wasted with a reason.
-	for cards: Array in [["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["linger", "beam"], ["magnet", "swing"], ["growth", "slam"], ["siphon", "decoy"], ["pull", "decoy"], ["shield", "familiar"], ["hold", "slam"], ["skyfall", "swing"], ["skyfall", "dash"]]:
+	for cards: Array in [["spiral", "rune"], ["linger", "wall"], ["linger", "beam"], ["magnet", "swing"], ["growth", "slam"], ["siphon", "decoy"], ["pull", "decoy"], ["shield", "familiar"], ["hold", "slam"], ["skyfall", "swing"], ["skyfall", "dash"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
 
 
 func test_cards_that_work_are_not_listed() -> void:
-	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["mirror", "dash"], ["mirror", "teleport"], ["growth", "swap"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["zap", "wall"], ["shield", "dash"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "swap"], ["pull", "bolt"], ["pull", "swing"], ["pull", "beam"], ["mirror", "wall"], ["mirror", "decoy"], ["sniper", "rune"], ["sniper", "decoy"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"], ["nova", "dash"], ["nova", "teleport"], ["nova", "swing"], ["nova", "wall"], ["nova", "decoy"], ["skyfall", "bolt"], ["skyfall", "beam"], ["skyfall", "rune"], ["skyfall", "wall"], ["skyfall", "decoy"]]:
+	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["mirror", "dash"], ["mirror", "teleport"], ["growth", "swap"], ["growth", "rune"], ["magnet", "rune"], ["zap", "wall"], ["shield", "dash"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["spiral", "beam"], ["growth", "beam"], ["relay", "swing"], ["mirror", "swap"], ["pull", "bolt"], ["pull", "swing"], ["pull", "beam"], ["mirror", "wall"], ["mirror", "decoy"], ["sniper", "rune"], ["sniper", "decoy"], ["shield", "decoy"], ["deflect", "decoy"], ["heavy", "dash"], ["chain", "teleport"], ["deflect", "dash"], ["nova", "dash"], ["nova", "teleport"], ["nova", "swing"], ["nova", "wall"], ["nova", "decoy"], ["skyfall", "bolt"], ["skyfall", "beam"], ["skyfall", "rune"], ["skyfall", "wall"], ["skyfall", "decoy"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
+
+
+func test_orbit_circles_what_flies_and_a_beam() -> void:
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5A) needs a carrier that flies or is a line,
+	# and not one that moves its caster or strikes from the hand; nothing makes actors or gates circle.
+	for carrier: String in ["bolt", "atom", "swap", "beam"]:
+		var staff: CompiledStaff = _staff(["orbit", carrier])
+		check(not staff.wasted.has(0), "orbit counts on a %s: %s" % [carrier, staff.wasted])
+		check(staff.casts[0].group.spells[0].behaviour(ModifierBase.Behaviour.ORBIT) > 0.0, "and rides on it")
+	# Runes, pools and walls circle in Part 5B; until then they are listed.
+	for carrier: String in ["dash", "teleport", "swing", "slam", "decoy", "familiar", "portal", "rune", "pool", "wall"]:
+		var staff: CompiledStaff = _staff(["orbit", carrier])
+		check(staff.wasted.has(0), "orbit on a %s is listed as wasted: %s" % [carrier, staff.wasted])
+	# A lone orbit lands on its caster and does nothing there.
+	check(_staff(["orbit"]).wasted.has(0), "a lone orbit is wasted")
 
 
 func test_a_familiar_hands_nothing_on() -> void:

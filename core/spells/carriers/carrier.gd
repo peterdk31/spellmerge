@@ -24,7 +24,6 @@ const SPEED: int = CarrierTraits.SPEED
 const SHOTS: int = CarrierTraits.SHOTS
 const SPREAD: int = CarrierTraits.SPREAD
 const PIERCE: int = CarrierTraits.PIERCE
-const RING: int = CarrierTraits.RING
 const OUTWARD: int = CarrierTraits.OUTWARD
 const REPEATS_HELD: int = CarrierTraits.REPEATS_HELD
 const OWN_POSE: int = CarrierTraits.OWN_POSE
@@ -336,7 +335,7 @@ var _slots: PackedInt32Array = PackedInt32Array()
 ## makes none: the runtime falls back to it, unbound, for a carrier id no carrier has.
 ##
 ## A carrier whose shot is one pool row and nothing more (`rows_only`: the atom's flying shots, the
-## rune's still ones, the orbit's circling ones) makes them together when the pool has a free slot
+## rune's still ones) makes them together when the pool has a free slot
 ## for each: every row first, in order (`spawn_rows`, the spread drawn per shot as before), then all
 ## of them set up in one `land_shots`, which reads what the launch's shots share once. The same
 ## shots and records as one at a time (test_spells_land_shots). With no room for each, a spawn may

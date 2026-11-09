@@ -72,7 +72,9 @@ func test_the_longer_stop_stands() -> void:
 
 
 func test_a_frozen_orbit_shot_holds_its_place() -> void:
-	var slot: int = mgr.spawn_orbit(0, 40.0, 0.0, 4.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, Vector2.ZERO)
+	# 160 px/s round a 40 px circle: it turns 4 rad/s by its speed (orbit as a modifier, 5A).
+	var slot: int = mgr.spawn(0, Vector2(40.0, 0.0), Vector2(0.0, 160.0), 5.0)
+	check(mgr.set_orbit(slot, 40.0, 0.0, 0.0, Vector2.ZERO), "it circles the point")
 	_run(1)
 	var at: Vector2 = mgr.get_position_of(slot)
 	mgr.freeze_shot(slot, 0.25)

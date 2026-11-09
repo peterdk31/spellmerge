@@ -1,8 +1,8 @@
 {
 	"id": "double_beam_and_ring",
 	"name": "Double beam and ring",
-	"does": "A frost beam and a void orbit in one cast: the beam chills the imp ahead while the ring hexes the one beside.",
-	"casts": [{"staff": 0, "cards": ["double", "frost", "beam", "void", "orbit"]}],
+	"does": "A frost beam and a void nova in one cast: the beam chills the imp ahead while the ring hexes the one beside.",
+	"casts": [{"staff": 0, "cards": ["double", "frost", "beam", "void", "nova", "bolt"]}],
 	"imps": [[100, 0], [0, 36]],
 	"seconds": 1.5,
 	"checks": [{"kind": "status", "imps": [0], "status": "chill"}, {"kind": "status", "imps": [1], "status": "hex"}]

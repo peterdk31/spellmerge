@@ -446,13 +446,13 @@ func test_four_radials_open_at_once_each_for_its_own_player() -> void:
 		_open(player)
 	for player in 4:
 		check(_radial(player).is_open(), "player %d's radial is open" % (player + 1))
-	_point(2, &"orbit")
+	_point(2, &"rune")
 	_tap(2, &"staff_2")
 	_frame()
 	for player in 4:
-		var expected: Array[StringName] = _ids("fire bolt orbit") if player == 2 else _ids("fire bolt -")
+		var expected: Array[StringName] = _ids("fire bolt rune") if player == 2 else _ids("fire bolt -")
 		check_equal(_radial(player).cards_of(1).slice(0, 3), expected, "player %d's staff" % (player + 1))
-		check_equal(_radial(player).pointed_id(), &"orbit" if player == 2 else &"", "player %d's pointer" % (player + 1))
+		check_equal(_radial(player).pointed_id(), &"rune" if player == 2 else &"", "player %d's pointer" % (player + 1))
 	_tap(1, &"back")
 	_frame()
 	check(not _radial(1).is_open() and _radial(0).is_open() and _radial(3).is_open(), "B closes only its owner's")

@@ -7,6 +7,13 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 
 
+func _spell(cards: Array) -> CompiledSpell:
+	var arena := ArenaScript.new(root)
+	var staff: CompiledStaff = arena.install_cards(0, 0, cards)
+	arena.free_all()
+	return staff.casts[0].group.spells[0]
+
+
 func _sense(cards: Array, cast: int = 0) -> CastSense:
 	var arena := ArenaScript.new(root)
 	var staff: CompiledStaff = arena.install_cards(0, 0, cards)
@@ -48,6 +55,22 @@ func test_a_nova_hits_round_its_caster() -> void:
 	check(sense.damage > bolt.damage * 4.0, "eight copies count eight times: %s vs %s" % [sense.damage, bolt.damage])
 
 
+func test_a_circling_cast_is_an_area_round_its_caster() -> void:
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5): it goes round its caster, not out along
+	# the aim, so it is not aimed and reaches as far as its circle and its size.
+	var sense: CastSense = _sense(["orbit", "bolt"])
+	var spell: CompiledSpell = _spell(["orbit", "bolt"])
+	check_equal(sense.reach, 0.0, "a circling bolt is not aimed")
+	check(sense.area, "it hits round its caster")
+	check(is_equal_approx(sense.close_reach, spell.orbit_radius + spell.radius), "within its circle: %s vs %s + %s" % [sense.close_reach, spell.orbit_radius, spell.radius])
+	check(sense.close_reach < _sense(["bolt"]).reach, "much nearer than a bolt flies")
+	check(sense.damage > 0.0, "and hurts")
+	var beam: CastSense = _sense(["orbit", "beam"])
+	check_equal(beam.reach, 0.0, "a sweeping beam is not aimed either")
+	check(beam.area, "it sweeps round its caster")
+	check(_sense(["orbit", "rune"]).reach == _sense(["rune"]).reach, "on a rune it does nothing yet (5B), so the rune reads as before")
+
+
 func test_moves_blocks_spawns_heals() -> void:
 	check(_sense(["dash"]).moves_caster, "a dash moves its caster")
 	check(_sense(["dash"]).move_reach > 30.0, "its distance: %s" % _sense(["dash"]).move_reach)
@@ -68,8 +91,8 @@ func test_moves_blocks_spawns_heals() -> void:
 func test_held_and_sustained() -> void:
 	check(_sense(["beam"]).repeats_held, "a beam goes on while held")
 	check(_sense(["swing"]).repeats_held, "a swing sweeps again while held")
-	var hold: CastSense = _sense(["hold", "orbit"])
-	check(hold.sustained, "a held orbit stays until pressed again")
+	var hold: CastSense = _sense(["hold", "rune"])
+	check(hold.sustained, "a held rune stays until pressed again")
 	check(not _sense(["bolt"]).sustained, "a bolt does not")
 
 

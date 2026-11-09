@@ -1,9 +1,9 @@
 {
 	"id": "on_hurt_orbit_nova",
 	"name": "On hurt orbit nova",
-	"does": "A shot circles the caster; when an enemy shot hurts the caster, a fire nova bursts from them and lights an imp standing close.",
-	"casts": [{"staff": 0, "cards": ["on_hurt", "orbit", "fire", "nova", "bolt"]}],
-	"imps": [[0, 40]],
+	"does": "A bolt circles the caster; when an enemy shot hurts the caster, a fire nova bursts from them and lights an imp standing close.",
+	"casts": [{"staff": 0, "cards": ["on_hurt", "orbit", "bolt", "fire", "nova", "bolt"]}],
+	"imps": [[0, 60]],
 	"guard": true,
 	"foes": [[100, 0]],
 	"seconds": 2.0,

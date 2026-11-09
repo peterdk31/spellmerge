@@ -3,9 +3,10 @@ extends "res://tests/support/screenshot.gd"
 ## `look_layer`), packed as the compiler packs them; it fails when fewer than 40 shots are drawn.
 ##
 ## `looks_sheet` (1x, as a player sees it):
-##   top left    every carrier with every infusion: a row of bolts, a row of runes (plain,
-##               fire, frost, storm, void, lightning) and a row of orbit shots (one per player,
-##               fire, frost, storm, void)
+##   top left    every carrier with every infusion: a row of bolts and a row of runes (plain,
+##               fire, frost, storm, void, lightning); a circling shot is drawn as the bolt it is
+##               (orbit as a modifier, 5A), so it has no row of its own (shot_moving_looks.gd
+##               shows the circling ones)
 ##   top right   the modifier looks on a fire bolt (bigger, pierce, homing) and the kinds no
 ##               card has yet (motes, burst, orbiters, glitter); then combined: all five infusions on
 ##               one bolt, and every kind at once on a bolt, a bigger bolt and a rune
@@ -61,12 +62,6 @@ func take() -> void:
 		var rune: int = _shots.call("spawn", 0, Vector2(x, 80.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
 		_shots.call("set_form", rune, &"rune", _shots.call("register_body", RUNE))
 		_dress(rune, tint, look)
-	for p in 4:
-		var anchor := Vector2(40.0 + p * 60.0, 140.0)
-		_shots.call("set_anchor", p, anchor)
-		for n in 2:
-			var orb: int = _shots.call("spawn_orbit", p, 16.0, n * PI, 0.0001, 600.0, 6.0) as int
-			_dress(orb, ELEMENTS[p].get("tint") as Color, PackedInt32Array([int(ELEMENTS[p].get("look_layer"))]))
 	# Modifier looks and the kinds no card uses yet, each on a fire bolt.
 	var fire: Resource = ELEMENTS[0]
 	var fire_tint: Color = fire.get("tint") as Color

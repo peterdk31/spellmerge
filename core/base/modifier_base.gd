@@ -94,6 +94,15 @@ enum Behaviour {
 	## carrier lands on the line. All of it is `core/spells/skyfall.gd`. Not on a carrier held by or
 	## carried with the body.
 	SKYFALL,
+	## The carrier circles its caster instead of going out (owner, 2026-11-09;
+	## docs/milestones/carrier-modifiers.md Part 5): `behaviour_reach` pixels out (the largest of
+	## its Orbit cards), turning `behaviour_strength` turns a second plus its own speed over that
+	## radius (a beam, with no speed, sweeps at the drift). It changes only how it moves: no count,
+	## pierce or look of its own; homing and return do nothing on it, room walls end it as any shot
+	## (ghost passes; bounce turns it back round its circle). How long it circles is the card's `lifetime_base`. All of it is
+	## `core/spells/orbit.gd`. Only on a carrier that flies or is a line, and not one that moves
+	## its caster or strikes from the hand.
+	ORBIT,
 }
 
 ## How more cards of one behaviour on a carrier combine (`StaffCompiler.stacked`): counts add
@@ -146,6 +155,9 @@ const RULES: Dictionary = {
 	Behaviour.NOVA: {},
 	# Nothing of a swing, slam, dash or teleport leaves the body to fall.
 	Behaviour.SKYFALL: {"needs": {"not": CarrierTraits.MELEE}},
+	# A row that flies or a beam goes round; nothing of a dash, teleport, swing or slam leaves the
+	# body to circle (5B adds runes, pools and walls).
+	Behaviour.ORBIT: {"needs": {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "not": CarrierTraits.MOVES_CASTER | CarrierTraits.OWN_POSE}},
 }
 
 ## The card's behaviour, by its name: a `Behaviour` key in lower case (`&"homing"`); empty for none.
@@ -233,6 +245,10 @@ static func stacks(behaviour: int) -> Stack:
 ## Factor on the carrier's `lifetime`. With `speed_mult` it makes a slow shot that still goes as
 ## far (slow: speed x0.3, lifetime x3). Several multiply.
 @export var lifetime_mult: float = 1.0
+## Seconds the carrier lives before any factor (0: its form card's `lifetime`). The compiler sets
+## it first and then applies every `lifetime_mult` and `reach_mult`, so slot order does not matter;
+## with several cards that set one, the longest counts (Orbit: 3 s, whatever it carries).
+@export var lifetime_base: float = 0.0
 
 # --- Range (reach) ----------------------------------------------------------------------
 
@@ -274,6 +290,7 @@ func ranges() -> Dictionary:
 		"behaviour_reach": Vector2(0.0, 360.0),
 		"spread_mult": Vector2(0.0, 4.0),
 		"lifetime_mult": Vector2(0.1, 4.0),
+		"lifetime_base": Vector2(0.0, 30.0),
 		"reach_mult": Vector2(0.1, 4.0),
 		"speed_start": Vector2(0.1, 4.0),
 		"speed_end": Vector2(0.0, 4.0),

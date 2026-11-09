@@ -21,10 +21,8 @@ render_mode blend_premul_alpha, world_vertex_coords;
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
 
-// The flags (HEAD_LIVE, HEAD_ORBIT in projectile_manager.gd): the shot is alive (its core is drawn), an orbit
-// shot.
+// The flags (HEAD_LIVE in projectile_manager.gd): the shot is alive (its core is drawn).
 const float HF_LIVE = 1.0;
-const float HF_ORBIT = 2.0;
 // The quad kinds (HEAD_Q_* in projectile_manager.gd), in UV.y.
 const float Q_LIGHT = 0.0;
 const float Q_CORE = 1.0;

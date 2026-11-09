@@ -83,9 +83,6 @@ func before_each() -> void:
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
 	dash.carrier = &"dash"
 	dash.ray_length = 80.0
-	var orb: FormBase = _form(&"orb", 0.0, 5.0)
-	orb.carrier = &"orbit"
-	orb.orbit_radius = 30.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
 	decoy.carrier = &"decoy"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
@@ -95,6 +92,10 @@ func before_each() -> void:
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"zap", ModifierBase.Behaviour.ZAP, 2.0).behaviour_reach = 60.0
 	_modifier(&"nova", ModifierBase.Behaviour.NOVA, 8.0).cue = &"nova"
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5): what it carries circles its caster 30 px out.
+	var orbit: ModifierBase = _modifier(&"orbit", ModifierBase.Behaviour.ORBIT, 1.0 / 3.0)
+	orbit.behaviour_reach = 30.0
+	orbit.lifetime_base = 5.0
 	_trigger(&"on_hurt", TriggerBase.Event.HURT)
 	_trigger(&"timer", TriggerBase.Event.TIMER).wind_up = 0.5
 
@@ -531,12 +532,30 @@ func test_on_hurt_on_an_enemys_carrier_fires_on_its_actor_hurt() -> void:
 # --- Unchanged ----------------------------------------------------------------------------
 
 func test_an_orbit_circles_its_casters_anchor() -> void:
+	# An enemy's circling bolt goes round its anchor, as a wizard's does.
 	var imp: int = ActorSeats.enemy(_table)
-	_build(imp, [&"orb"])
-	check_equal(_cast(imp, Vector2(200.0, 200.0)), SpellsScript.REFUSED, "with no anchor, no orbit")
 	_mgr.set_anchor(imp, Vector2(200.0, 200.0))
+	_build(imp, [&"orbit", &"bolt"])
 	check(_cast(imp, Vector2(200.0, 200.0)) >= 0.0, "with its anchor it casts")
 	check_equal(_mgr.get_count_for(imp), 1, "one shot round it")
+	_tick(20)
+	var slot: int = _slot_of(imp)
+	check(slot >= 0 and is_equal_approx(_mgr.get_position_of(slot).distance_to(Vector2(200.0, 200.0)), 30.0), "on its circle, 30 px out")
+	# With no anchor there is nothing to circle: the row goes on as it was made.
+	var lost: int = ActorSeats.enemy(_table)
+	_build(lost, [&"orbit", &"bolt"])
+	check(_cast(lost, Vector2(0.0, 400.0)) >= 0.0, "with no anchor it still casts")
+	_tick(20)
+	var straight: int = _slot_of(lost)
+	check(straight >= 0 and _mgr.get_position_of(straight).x > 60.0, "and its bolt flies straight on: %s" % [_mgr.get_position_of(straight) if straight >= 0 else Vector2.INF])
+
+
+## The first live shot of `caster` (-1 for none).
+func _slot_of(caster: int) -> int:
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot) and _mgr.get_actor_of(slot) == caster:
+			return slot
+	return -1
 
 
 func test_next_cast_reach_for_a_telegraph() -> void:
@@ -546,8 +565,8 @@ func test_next_cast_reach_for_a_telegraph() -> void:
 	check(is_equal_approx(_spells.next_cast_reach(imp, 0), 300.0), "a bolt reaches its speed times its life")
 	_build(imp, [&"beam"])
 	check(is_equal_approx(_spells.next_cast_reach(imp, 0), 200.0), "a beam its length")
-	_build(imp, [&"orb"])
-	check_equal(_spells.next_cast_reach(imp, 0), 0.0, "an orbit is not aimed")
+	_build(imp, [&"orbit", &"bolt"])
+	check_equal(_spells.next_cast_reach(imp, 0), 0.0, "a circling bolt is not aimed")
 
 
 func test_a_four_player_staff_is_unchanged() -> void:

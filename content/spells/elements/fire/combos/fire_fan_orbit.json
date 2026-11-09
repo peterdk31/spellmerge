@@ -1,8 +1,8 @@
 {
 	"id": "fire_fan_orbit",
 	"name": "Fire fan orbit",
-	"does": "A ring that throws a fan of three fire bolts outward every half second.",
-	"casts": [{"staff": 0, "cards": ["fire", "timer", "orbit", "fire", "split", "bolt"]}],
+	"does": "A ring of bolts circles the caster, and each throws a fan of three fire bolts every half second.",
+	"casts": [{"staff": 0, "cards": ["timer", "orbit", "nova", "bolt", "fire", "split", "bolt"]}],
 	"imps": [[110, 0], [55, 95], [-55, 95], [-110, 0], [-55, -95], [55, -95]],
 	"seconds": 3.0,
 	"checks": [{"kind": "status_count", "status": "burn", "min": 3}, {"kind": "max_shots", "max": 120}]

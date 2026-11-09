@@ -26,7 +26,7 @@ extends "res://tests/support/suite.gd"
 ## there is chosen by what the card does (its `ModifierBase.Behaviour` or `TriggerBase.Event`, read
 ## from the enums), never by the card's id or the carrier's: homing gets a target off the line,
 ## bounce a wall, ghost a wall with a target behind it, shield and deflect an enemy that shoots at
-## the wizard, on kill a target that dies, on hurt the wizard hurt or an enemy that shoots (a body of the carrier's own is hurt when it is: a decoy), on reaction a target with a
+## the wizard, on kill a target that dies, on hurt the wizard hurt or an enemy that shoots (a body of the carrier's own is hurt when it is: a decoy), orbit the open with what circles written down, on reaction a target with a
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
 ## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
@@ -284,6 +284,10 @@ const WEAK: Dictionary = {"name": "target dies", "line": true, "weak": true}
 const WEAK_HEALTH: float = 0.01
 const HURT: Dictionary = {"name": "wizard hurt", "hurt": true}
 const REACTING: Dictionary = {"name": "target with a status", "line": true, "status": true}
+## Nothing in the way; every sample the trace also says which of the wizard's shots circle (their
+## motion is the manager's orbit) and which way each beam points, so a carrier that circles or
+## sweeps shows it (`circling`; Orbit, docs/milestones/carrier-modifiers.md Part 5).
+const CIRCLING: Dictionary = {"name": "open, what circles", "circling": true}
 
 
 ## The scenes in which a modifier of `behaviour` shows what it does (it works when one of them
@@ -315,6 +319,8 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [WALL_TARGET]
 		ModifierBase.Behaviour.RELAY:
 			return [DONOR]
+		ModifierBase.Behaviour.ORBIT:
+			return [CIRCLING]
 	return []
 
 
@@ -367,8 +373,6 @@ static func reach(form: FormBase) -> float:
 		&"pool":
 			# In the puddle: it spreads `ray_length` ahead.
 			return form.ray_length
-		&"orbit":
-			return form.orbit_radius
 		&"wall":
 			return SpellLimits.WALL_REACH
 		&"dash":
@@ -707,7 +711,7 @@ func _plain_of(card: SpellComponent) -> StringName:
 	var modifier := card as ModifierBase
 	if modifier == null or modifier.behaviour == ModifierBase.Behaviour.NONE:
 		return &""
-	if is_equal_approx(modifier.damage_mult, 1.0) and is_equal_approx(modifier.speed_mult, 1.0) and is_equal_approx(modifier.radius_mult, 1.0) and modifier.shot_mult == 1 and modifier.extra_pierce == 0 and is_equal_approx(modifier.spread_mult, 1.0) and is_equal_approx(modifier.lifetime_mult, 1.0):
+	if is_equal_approx(modifier.damage_mult, 1.0) and is_equal_approx(modifier.speed_mult, 1.0) and is_equal_approx(modifier.radius_mult, 1.0) and modifier.shot_mult == 1 and modifier.extra_pierce == 0 and is_equal_approx(modifier.spread_mult, 1.0) and is_equal_approx(modifier.lifetime_mult, 1.0) and modifier.lifetime_base <= 0.0:
 		return &""
 	var id: StringName = StringName("%s~plain" % modifier.id)
 	if not _shelf.extra.has(id):
@@ -808,10 +812,30 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 		world.press(scene.get("repeat", false))
 	for step: int in scene.get("again", []):
 		world.press_at(step)
+	if scene.get("circling", false):
+		var watch: Callable = _watch_circling.bind(world)
+		for step in range(0, int(ceilf(seconds / World.STEP)), World.SAMPLE_EVERY):
+			if not world.at_step.has(step):
+				world.at_step[step] = []
+			(world.at_step[step] as Array).append(watch)
 	world.run(seconds, 0.0 if not scene.get("repeat", false) else seconds)
 	var trace: PackedStringArray = world.trace
 	world.free_all()
 	return trace
+
+
+## The `circling` scene's lines: each of the wizard's shots that circles (its motion is the
+## manager's orbit), and the way each beam points, in whole degrees.
+func _watch_circling(world: World) -> void:
+	var projectiles: World.ProjectilesScript = world.projectiles
+	for slot in projectiles._high:
+		if projectiles.is_alive(slot) and projectiles.get_actor_of(slot) == world.wizard.id and projectiles._motion[slot] == World.ProjectilesScript.MOTION_ORBIT:
+			world._put("circling %s" % world._node(projectiles.get_tag_of(slot)))
+	var beams: CarrierBeam = CarrierBeam.of(world.spells)
+	for at in beams.beam_slots():
+		if beams.beam_on(at) and beams.beam_point_count(at) >= 2:
+			var way: Vector2 = beams.beam_point(at, 1) - beams.beam_point(at, 0)
+			world._put("beam %s points %d" % [world._who(beams.beam_caster(at)), roundi(rad_to_deg(DMath.angle(way)))])
 
 
 ## True for the columns whose payload a shot's hit fires (on it, right there): a target always

@@ -39,7 +39,7 @@ func _play(combo: Dictionary, drop: String = "", again: bool = false) -> Array:
 		if seat == 0:
 			reserved[0] = amount)
 	for at: Array in combo["imps"]:
-		arena.add_imp(Vector2(float(at[0]), float(at[1])))
+		arena.add_imp(Vector2(float(at[0]), float(at[1])), float(at[2]) if at.size() > 2 else ArenaScript.IMP_HEALTH)
 	var entry: Dictionary = combo["casts"][0]
 	var cards: Array = []
 	for id: Variant in entry["cards"]:
@@ -112,7 +112,7 @@ func test_four_players_hold_each() -> void:
 	arena.bus.mana_reserved.connect(func(seat: int, _at: int, amount: float) -> void: reserved[seat] = amount)
 	for player in 4:
 		arena.place_caster(player, Vector2(0.0, 150.0 * player))
-		arena.install_cards(player, 0, ["hold", "fire", "orbit"])
+		arena.install_cards(player, 0, ["hold", "fire", "pool"])
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(LONG)
 	for player in 4:
@@ -121,16 +121,16 @@ func test_four_players_hold_each() -> void:
 	arena.free_all()
 
 
-## The held orbit a bolt fires when it hits (`on hit · bolt · hold · orbit`), as a node and its
-## tag, from `compiled`; -1 when the cards do not read that way.
+## The held pool a bolt fires when it hits (`on hit · bolt · hold · pool`), as a node, from
+## `compiled`; -1 when the cards do not read that way.
 func _payload_node(compiled: CompiledStaff) -> int:
 	if compiled == null or compiled.casts.is_empty():
 		return -1
 	var bolt: CompiledSpell = compiled.casts[0].group.spells[0]
 	if bolt.payload == null or bolt.payload.is_empty():
 		return -1
-	var orbit: CompiledSpell = bolt.payload.spells[0]
-	return orbit.node if orbit.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else -1
+	var pool: CompiledSpell = bolt.payload.spells[0]
+	return pool.node if pool.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else -1
 
 
 ## Phase R, R1f (docs/milestones/M2-rules.md, finding 13): a hold carrier in a payload is a hold
@@ -143,22 +143,22 @@ func test_a_held_payload_holds_and_the_next_cast_ends_it() -> void:
 		if seat == 0:
 			reserved[0] = amount)
 	arena.add_imp(Vector2(60.0, 0.0), 100000)
-	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "pool"])
 	var node: int = _payload_node(compiled)
-	check(node >= 0, "the bolt carries a held orbit as its payload")
+	check(node >= 0, "the bolt carries a held pool as its payload")
 	if node < 0:
 		arena.free_all()
 		return
 	var tag: int = arena.spells.current_tag(0, 0, node)
 	check(arena.cast(0, 0), "the bolt is cast")
 	arena.run(LONG + 1.0)
-	check(arena.spells.live_shots(tag) > 0, "the held orbit outlives its lifetime")
+	check(arena.spells.live_shots(tag) > 0, "the held pool outlives its lifetime")
 	check(arena.spells.is_holding(0, 0), "and switches its staff on")
 	check_equal(arena.spells.reserved_mana(0, 0), compiled.casts[0].mana, "it reserves the cast's mana")
 	check_equal(reserved[0], compiled.casts[0].mana, "and tells the seat's HUD")
 	check(arena.cast(0, 0), "the next press is taken")
 	arena.run(0.5)
-	check_equal(arena.spells.live_shots(tag), 0, "and switches the held orbit off")
+	check_equal(arena.spells.live_shots(tag), 0, "and switches the held pool off")
 	check(not arena.spells.is_holding(0, 0), "the staff holds nothing")
 	check_equal(arena.spells.reserved_mana(0, 0), 0.0, "and its mana is free")
 	check_equal(reserved[0], 0.0, "the HUD hears it")
@@ -170,16 +170,16 @@ func test_a_held_payload_holds_and_the_next_cast_ends_it() -> void:
 func test_a_held_payload_of_an_edited_build_lives_its_own_life() -> void:
 	var arena := ArenaScript.new(root)
 	arena.add_imp(Vector2(150.0, 0.0), 100000)
-	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "pool"])
 	var node: int = _payload_node(compiled)
 	var tag: int = arena.spells.current_tag(0, 0, node)
 	check(arena.cast(0, 0), "the bolt is cast")
 	arena.run(0.05)
-	arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "pool"])
 	arena.run(1.0)
-	check(arena.spells.live_shots(tag) > 0, "the old bolt hit and fired its orbit")
+	check(arena.spells.live_shots(tag) > 0, "the old bolt hit and fired its pool")
 	check(not arena.spells.is_holding(0, 0), "which switches nothing on")
 	check_equal(arena.spells.reserved_mana(0, 0), 0.0, "and reserves nothing")
 	arena.run(LONG)
-	check_equal(arena.spells.live_shots(tag), 0, "it ends after an orbit's lifetime")
+	check_equal(arena.spells.live_shots(tag), 0, "it ends after a pool's lifetime")
 	arena.free_all()

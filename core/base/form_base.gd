@@ -1,6 +1,6 @@
 class_name FormBase
 extends SpellComponent
-## A carrier (bolt, beam, rune, orbit, dash, teleport, ...): what leaves the caster
+## A carrier (bolt, beam, rune, dash, teleport, ...): what leaves the caster
 ## and ends a group when a staff is read (docs/milestones/M2-staffs.md). It sets the base
 ## numbers the infusions and modifiers before it then change. The class keeps its old name,
 ## `FormBase`, and its kind `&"form"`.
@@ -50,13 +50,11 @@ const POSE_RANGES: Dictionary = {
 @export_range(0.0, 360.0) var spread: float = 0.0
 ## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"atom" (the
 ## atom and bolt), &"rune",
-## &"orbit", &"beam", &"dash", &"teleport", &"swap", &"wall", &"decoy",
+## &"beam", &"dash", &"teleport", &"swap", &"wall", &"decoy",
 ## &"familiar", &"swing" or &"slam". The carrier decides what every other card does on it.
 @export var carrier: StringName = &"atom"
 ## Extra targets each shot passes through before it ends.
 @export var pierce: int = 0
-## ORBIT only: distance from the caster in pixels.
-@export var orbit_radius: float = 0.0
 ## RAY: how far it reaches in pixels. DASH and TELEPORT: how far the caster
 ## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
@@ -71,7 +69,7 @@ const POSE_RANGES: Dictionary = {
 ## last animation had it) and back on the aim after the last. A key says when, as `phase` and `at`:
 ##   "wind"    `at` 0 to 1 of the carrier's `wind_up`
 ##   "strike"  `at` 0 to 1 of its strike, the carrier's own working time: a swing's sweep, a slam's
-##             ring, a beam's, orbit's or dash's life (a held one's until its last shot ends);
+##             ring, a beam's or dash's life (a held one's until its last shot ends);
 ##             the others have none, so their strike keys pass at once
 ##   "hold"    `at` in seconds; these keys repeat for as long as the strike lasts (a held beam
 ##             straining), each round from the last of them
@@ -237,7 +235,6 @@ func ranges() -> Dictionary:
 		"shots": Vector2(1, 24),
 		"spread": Vector2(0.0, 360.0),
 		"pierce": Vector2(0, 16),
-		"orbit_radius": Vector2(0.0, 256.0),
 		"ray_length": Vector2(0.0, 1024.0),
 		"arc": Vector2(0.0, 360.0),
 		"wind_up": Vector2(0.0, 2.0),

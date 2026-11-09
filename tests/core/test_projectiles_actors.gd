@@ -13,6 +13,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const SpellTagScript := preload("res://core/spells/spell_tag.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const OrbitShot := preload("res://tests/support/orbit_shot.gd")
 
 const DT: float = 1.0 / 60.0
 ## Enemies (unseated) at ids 0-6.
@@ -222,10 +223,11 @@ func test_at_the_cap_a_tie_drops_from_the_shared_budget() -> void:
 
 
 func test_an_enemy_orbit_follows_its_own_anchor_and_ends_with_it() -> void:
-	check_equal(mgr.spawn_orbit(IMP, 20.0, 0.0, 1.0, 5.0), -1, "no anchor, no orbit")
+	var early: int = mgr.spawn(IMP, Vector2(300.0, 200.0), Vector2(10.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_PLAYER)
+	check(not mgr.set_orbit(early, 20.0, 0.0, 1.0), "no anchor, no orbit")
 	mgr.set_anchor(IMP, Vector2(300.0, 200.0))
 	mgr.set_anchor(WIZ_0, Vector2(100.0, 100.0))
-	var slot: int = mgr.spawn_orbit(IMP, 20.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_PLAYER)
+	var slot: int = OrbitShot.start(mgr, IMP, 20.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_PLAYER)
 	check(slot >= 0, "an enemy's orbit spawns round its anchor")
 	mgr.set_anchor(IMP, Vector2(340.0, 200.0))
 	_run(1)
@@ -235,7 +237,11 @@ func test_an_enemy_orbit_follows_its_own_anchor_and_ends_with_it() -> void:
 	check(not mgr.is_alive(slot), "clearing the anchor ends it")
 	check(expired.is_empty(), "quietly")
 	check_equal(mgr.get_anchor(WIZ_0), Vector2(100.0, 100.0), "a wizard's anchor is untouched")
-	check_equal(mgr.spawn_orbit(EventsScript.NO_PLAYER, 20.0, 0.0, 1.0, 5.0, 4.0, ManagerScript.LAYER_PLAYER, 0, 0, Vector2(50.0, 50.0)), -1, "no actor has no orbit")
+	# A shot of no actor has no anchor to circle, but circles a point it is given (a payload's orbit
+	# round where its carrier ended needs no actor; orbit as a modifier, 5A).
+	var loose: int = mgr.spawn(EventsScript.NO_PLAYER, Vector2(10.0, 10.0), Vector2(10.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_PLAYER)
+	check(not mgr.set_orbit(loose, 20.0, 0.0, 1.0), "no actor has no anchor to circle")
+	check(mgr.set_orbit(loose, 20.0, 0.0, 1.0, Vector2(50.0, 50.0)), "but circles a point given")
 
 
 func test_a_shield_stops_other_teams_shots_but_not_its_own_teams() -> void:
@@ -287,13 +293,11 @@ func test_a_wizard_draws_in_its_hat_ramp_and_an_enemy_in_the_enemy_batch() -> vo
 
 
 func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
-	mgr.set_anchor(IMP, Vector2(300.0, 200.0))
 	var bolt: int = mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 2.0, 5.0, ManagerScript.LAYER_PLAYER)
 	mgr.set_look(bolt, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])))
 	mgr.spawn(IMP, Vector2(150.0, 100.0), Vector2.ZERO, 2.0, 14.0, ManagerScript.LAYER_PLAYER, 0, 0, ManagerScript.MOTION_STILL)
-	mgr.spawn_orbit(IMP, 20.0, 0.0, 1.0, 2.0, 5.0, ManagerScript.LAYER_PLAYER)
 	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_enemy, 3, "a bolt, a rune and an orbit shot in the enemy batches")
+	check_equal(mgr.drawn_enemy, 2, "a bolt and a rune in the enemy batches")
 	var node: MultiMeshInstance2D = mgr._enemy_node
 	check(node.material is ShaderMaterial, "drawn by the shot shaders")
 	check_equal(node.z_index, mgr._draw_node.z_index + 1, "one layer above the hat ramps' shots")
@@ -304,19 +308,13 @@ func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
 	check_equal(mgr._enemy_still_node.multimesh.visible_instance_count, 1, "the rune in the enemy rune batch")
 	kinds.append(roundi((1.0 - rune_buffer[15]) * ManagerScript.KIND_STEPS))
 	var buffer: PackedFloat32Array = node.multimesh.buffer
-	check_equal(node.multimesh.visible_instance_count, 2, "the bolt and the orbit shot in the enemy shot batch")
-	for i in 2:
-		var at: int = i * ManagerScript.DRAW_STRIDE
-		var kind: int = roundi((1.0 - buffer[at + 15]) * ManagerScript.KIND_STEPS)
-		# A shot in flight is drawn as its head; an orbit shot's is flagged so.
-		if kind == ManagerScript.KIND_BOLT and (roundi(buffer[at + 5]) & ManagerScript.HEAD_ORBIT) != 0:
-			kind = ManagerScript.KIND_ORBIT
-		kinds.append(kind)
-		var bits: int = roundi(buffer[at + 9] * 255.0) | (roundi(buffer[at + 10] * 255.0) << 8) | (roundi(buffer[at + 11] * 255.0) << 16)
-		if kind == ManagerScript.KIND_BOLT:
-			check_equal(bits & ~ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "the bolt keeps its cards' look")
+	check_equal(node.multimesh.visible_instance_count, 1, "the bolt in the enemy shot batch")
+	# A shot in flight is drawn as its head.
+	kinds.append(roundi((1.0 - buffer[15]) * ManagerScript.KIND_STEPS))
+	var bits: int = roundi(buffer[9] * 255.0) | (roundi(buffer[10] * 255.0) << 8) | (roundi(buffer[11] * 255.0) << 16)
+	check_equal(bits & ~ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "the bolt keeps its cards' look")
 	kinds.sort()
-	check_equal(kinds, [ManagerScript.KIND_BOLT, ManagerScript.KIND_RUNE, ManagerScript.KIND_ORBIT] as Array[int], "each its own body")
+	check_equal(kinds, [ManagerScript.KIND_BOLT, ManagerScript.KIND_RUNE] as Array[int], "each its own body")
 
 
 func test_the_ramp_colours_are_four_hats_and_blight() -> void:

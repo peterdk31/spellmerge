@@ -329,18 +329,22 @@ func test_mirror_only_mirrors_the_carrier_it_is_on() -> void:
 
 
 func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
-	# Rules R4g: mirror is one rule, the carrier fired again with its aim reversed.
-	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
-	orbit.carrier = &"orbit"
-	orbit.orbit_radius = 40.0
+	# Rules R4g: mirror is one rule, the carrier fired again with its aim reversed. A circling bolt
+	# starts on its circle the way it would have gone (Orbit, docs/milestones/carrier-modifiers.md
+	# Part 5), so the mirrored one starts on the far side.
+	var orbit := ModifierBase.new()
+	orbit.behaviour = ModifierBase.Behaviour.ORBIT
+	orbit.behaviour_strength = 1.0 / 3.0
+	orbit.behaviour_reach = 40.0
+	_put(orbit, &"orbit")
 	_mgr.set_anchor(0, Vector2.ZERO)
-	_build(0, [&"mirror", &"orbit"])
+	_build(0, [&"mirror", &"orbit", &"bolt"])
 	_cast()
 	var found: Array[Vector2] = []
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
 			found.append(_mgr.get_position_of(slot))
-	check_equal(found.size(), 2, "two orbit shots")
+	check_equal(found.size(), 2, "two circling bolts")
 	check(found.size() == 2 and found[0].is_equal_approx(-found[1]) and found[0].x > 30.0, "on opposite sides of the circle, the first along the aim: %s" % [found])
 
 

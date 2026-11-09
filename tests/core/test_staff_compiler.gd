@@ -247,8 +247,7 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	beam.ray_length = 300.0
 	var rune: FormBase = _form(&"rune", 3, 1)
 	rune.carrier = &"rune"
-	var orbit: FormBase = _form(&"orbit", 3, 1)
-	orbit.carrier = &"orbit"
+	_orbit_cards()
 	check_equal((_compile("homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a bolt looks as far as its card reaches")
 	check_equal((_compile("far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "a card that reaches further looks further, with no change to core")
 	check_equal((_compile("homing far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "two cards look as far as the further one")
@@ -257,9 +256,65 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	check_equal((_compile("far_homing beam").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "and as far as its card reaches, past its end")
 	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "no homing card, no homing")
 	check_equal((_compile("homing rune").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a rune homes as far as its card reaches (it creeps, rules R4i)")
-	var staff: CompiledStaff = _compile("homing orbit")
-	check_equal((staff.casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "an orbit has nothing to aim")
-	check(staff.wasted.has(0) and not (staff.casts[0].group.spells[0] as CompiledSpell).modifier_ids.has(&"homing"), "so homing on it is wasted and left off it")
+	# Orbit (docs/milestones/carrier-modifiers.md Part 5): a circling bolt has no heading to steer.
+	check_equal((_compile("homing orbit bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "a circling bolt has nothing to aim")
+	check_equal((_compile("orbit homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "whichever card comes first")
+
+
+## The Orbit card as content/spells/modifiers/orbit/ has it, one with a wider circle, and cards that
+## stretch life: a factor (slow) and a longer base.
+func _orbit_cards() -> void:
+	if _fake.items.has(&"orbit"):
+		return
+	var orbit: ModifierBase = _modifier(&"orbit")
+	orbit.behaviour = ModifierBase.Behaviour.ORBIT
+	orbit.behaviour_strength = 1.0 / 3.0
+	orbit.behaviour_reach = 36.0
+	orbit.lifetime_base = 3.0
+	var wide: ModifierBase = _modifier(&"wide_orbit")
+	wide.behaviour = ModifierBase.Behaviour.ORBIT
+	wide.behaviour_strength = 1.0 / 3.0
+	wide.behaviour_reach = 60.0
+	wide.lifetime_base = 3.0
+	_modifier(&"slow").lifetime_mult = 3.0
+	_modifier(&"long").lifetime_base = 5.0
+	var reach: ModifierBase = _modifier(&"reach")
+	reach.reach_mult = 1.6
+	var rune: FormBase = _form(&"rune", 3, 1)
+	rune.carrier = &"rune"
+	rune.lifetime = 8.0
+
+
+func _life(cards: String) -> float:
+	return (_compile(cards).casts[0].group.spells[0] as CompiledSpell).lifetime
+
+
+func test_a_cards_lifetime_base_comes_before_every_factor() -> void:
+	# `ModifierBase.lifetime_base` sets the carrier's life before any factor, so the slot order does
+	# not matter, and the longest base counts (Orbit: 3 s, whatever it carries).
+	_orbit_cards()
+	_fake.items[&"bolt"].lifetime = 1.2
+	check(is_equal_approx(_life("bolt"), 1.2), "a bolt lives its own 1.2 s")
+	check(is_equal_approx(_life("orbit bolt"), 3.0), "with Orbit, 3 s: %s" % _life("orbit bolt"))
+	check(is_equal_approx(_life("slow orbit bolt"), 9.0) and is_equal_approx(_life("orbit slow bolt"), 9.0), "a factor acts on the base in either order: %s, %s" % [_life("slow orbit bolt"), _life("orbit slow bolt")])
+	check(is_equal_approx(_life("reach orbit bolt"), 4.8) and is_equal_approx(_life("orbit reach bolt"), 4.8), "reach on a flying shot means more life, on the base: %s, %s" % [_life("reach orbit bolt"), _life("orbit reach bolt")])
+	check(is_equal_approx(_life("orbit long bolt"), 5.0) and is_equal_approx(_life("long orbit bolt"), 5.0), "the longest base counts, in either order")
+	check(is_equal_approx(_life("long slow orbit bolt"), 15.0) and is_equal_approx(_life("slow orbit long bolt"), 15.0), "and the factors act on it")
+	check(is_equal_approx(_life("long bolt"), 5.0), "a base works with no Orbit too: it is a general field")
+	# A wasted card changes nothing: Orbit does nothing on a rune yet (Part 5B), so the rune keeps its life.
+	var rune: CompiledStaff = _compile("orbit rune")
+	check(rune.wasted.has(0), "orbit on a rune is wasted")
+	check(is_equal_approx((rune.casts[0].group.spells[0] as CompiledSpell).lifetime, 8.0), "and the rune lives its own 8 s")
+
+
+func test_the_circle_comes_from_the_orbit_card() -> void:
+	_orbit_cards()
+	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).orbit_radius, 0.0, "no Orbit card, no circle")
+	check_equal((_compile("orbit bolt").casts[0].group.spells[0] as CompiledSpell).orbit_radius, 36.0, "the card's reach is the circle's radius")
+	check_equal((_compile("orbit wide_orbit bolt").casts[0].group.spells[0] as CompiledSpell).orbit_radius, 60.0, "with two, the larger counts")
+	check_equal((_compile("wide_orbit orbit bolt").casts[0].group.spells[0] as CompiledSpell).orbit_radius, 60.0, "in either order")
+	check_equal((_compile("reach orbit bolt").casts[0].group.spells[0] as CompiledSpell).orbit_radius, 36.0, "reach does not widen it")
+	check(is_equal_approx((_compile("orbit bolt").casts[0].group.spells[0] as CompiledSpell).behaviour(ModifierBase.Behaviour.ORBIT), 1.0 / 3.0), "its drift is the card's strength")
 
 
 func test_a_shield_means_nothing_at_a_payload_origin() -> void:

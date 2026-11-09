@@ -11,7 +11,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/core/test_wall_slide.gd
 
-const NativeScript := preload("res://core/native/native.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const CELL: float = 8.0
@@ -27,6 +26,11 @@ func before_each() -> void:
 	_cells.fill(0)
 
 
+func after_each() -> void:
+	WallSlide.use_native(true)
+	super.after_each()
+
+
 ## Make the cells from (`x0`, `y0`) to (`x1`, `y1`), both included, walls.
 func _wall(x0: int, y0: int, x1: int, y1: int) -> void:
 	for y in range(y0, y1 + 1):
@@ -34,19 +38,16 @@ func _wall(x0: int, y0: int, x1: int, y1: int) -> void:
 			_cells[y * W + x] = 128
 
 
+## The behaviour is the GDScript's (the reference); the native kernel is held to it below.
 func _slide(from: Vector2, motion: Vector2, radius: float = 6.0) -> Vector2:
-	return WallSlide.slide(_cells, W, H, CELL, Vector2.ZERO, from, motion, radius)
+	return WallSlide.gd_slide(_cells, W, H, CELL, Vector2.ZERO, from, motion, radius)
 
 
-## The module's kernel, configured, or null (and a failure when the module is required).
-func _kernel() -> Object:
-	var kernel: Object = NativeScript.body_kernel()
-	if kernel == null:
-		if OS.get_environment("SPELLMERGE_NATIVE") == "required":
-			check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
-		return null
-	check(kernel.call(&"configure", {"ITERATIONS": WallSlide.ITERATIONS, "MIN_STRIDE": WallSlide.MIN_STRIDE}), "the kernel takes WallSlide's numbers")
-	return kernel
+## Whether WallSlide runs the native kernel (a failure when the module is required but not loaded).
+func _native() -> bool:
+	if not WallSlide.native_on() and OS.get_environment("SPELLMERGE_NATIVE") == "required":
+		check(false, "SPELLMERGE_NATIVE=required, but the native module is not loaded (ci/build/native.sh)")
+	return WallSlide.native_on()
 
 
 func test_open_floor_moves_the_whole_way() -> void:
@@ -125,8 +126,7 @@ func test_outside_the_grid_is_open() -> void:
 
 
 func test_the_native_kernel_gives_the_same_bits() -> void:
-	var kernel: Object = _kernel()
-	if kernel == null:
+	if not _native():
 		return
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 20261109
@@ -152,8 +152,8 @@ func test_the_native_kernel_gives_the_same_bits() -> void:
 			if n % 7 == 0:
 				motion *= 20.0
 			var radius: float = [0.0, 0.7, 3.0, 5.0, 6.0, 7.0, 12.0, 20.0][n % 8]
-			var gd: Vector2 = WallSlide.slide(_cells, W, H, CELL, origin, from, motion, radius)
-			var native: Vector2 = kernel.call(&"slide", _cells, W, H, CELL, origin, from, motion, radius)
+			var gd: Vector2 = WallSlide.gd_slide(_cells, W, H, CELL, origin, from, motion, radius)
+			var native: Vector2 = WallSlide.slide(_cells, W, H, CELL, origin, from, motion, radius)
 			cases += 1
 			if gd != from + motion:
 				pushed += 1
@@ -171,7 +171,7 @@ func test_the_manager_answers_by_its_grid_and_either_side() -> void:
 	mgr.set_walls([Rect2(80.0, 0.0, 24.0, 240.0)])
 	var native_side: Vector2 = mgr.slide_body(Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0)
 	check_equal(native_side, Vector2(74.0, 100.0), "a room wall stops it")
-	mgr.native = false
+	WallSlide.use_native(false)
 	check_equal(mgr.slide_body(Vector2(50.0, 100.0), Vector2(60.0, 0.0), 6.0), native_side, "the GDScript says the same")
 
 

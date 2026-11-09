@@ -257,8 +257,7 @@ func step(delta: float) -> void:
 				spells.familiar_at(_key[row], _position[row])
 			continue
 		var decoy: Actor = _decoys[row]
-		decoy.step(delta)
-		decoy.move(delta)
+		decoy.tick_step(delta)
 		_position[row] = decoy.global_position
 		if decoy.health != null and decoy.health.is_depleted():
 			_end(row, true)

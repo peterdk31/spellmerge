@@ -43,7 +43,8 @@ const MIN_SECONDS: float = 0.01
 
 ## Walking speed in pixels per second at full tilt (an enemy's from `EnemyBase.move_speed`).
 @export var speed: float = 90.0
-## The body's radius for a teleport's landing (about the hurt circle's).
+## The body's radius: the circle it walks against the walls with (`Actor.move`) and a teleport's
+## landing checks (about the hurt circle's).
 @export var body_radius: float = 6.0
 
 ## The moves running (the first `_count`): each one's mode, velocity, seconds left (0 or less:

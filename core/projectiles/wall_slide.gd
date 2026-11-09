@@ -5,8 +5,12 @@ extends RefCounted
 ## on every machine. It replaces Godot's `move_and_slide`, whose solver is the engine's and not
 ## guaranteed the same across platforms and builds. The projectile manager owns the wall grid
 ## (room walls and solid shots, one byte a `cell`-pixel square from `origin`, 0 for open) and asks
-## this through `ProjectileManager.slide_body`; the native module's `BodyKernel` does the same in
-## C++ (native/README.md), and `tests/core/test_wall_slide.gd` compares the two to the bit.
+## this through `ProjectileManager.slide_body`; it knows nothing of the grid's owner.
+##
+## **Native:** `slide` runs the native module's `BodyKernel` when it is loaded, else `gd_slide`,
+## this file's GDScript, which the C++ mirrors line by line (native/README.md), as `DMath` does;
+## `use_native(false)` runs the GDScript (tests compare the two to the bit:
+## `tests/core/test_wall_slide.gd`). The kernel keeps nothing of the grid it is handed.
 ##
 ## **How:** the move is cut into strides of at most half the radius (MIN_STRIDE at least, half a
 ## cell at most), so a body never crosses into a wall in one stride however fast it goes. After
@@ -33,10 +37,42 @@ const RIGHT: int = 1
 const UP: int = 2
 const DOWN: int = 3
 
+const NativeScript := preload("res://core/native/native.gd")
+## Not state: which side runs `slide` (both give the same bits), this machine's choice.
+const DERIVED: Array[StringName] = [&"_kernel"]
+
+## The native module's `BodyKernel`, configured with these constants, or null (no module, or
+## switched off by a test).
+static var _kernel: Object = _native_kernel()
+
+
+## Whether `slide` runs the native module's kernel.
+static func native_on() -> bool:
+	return _kernel != null
+
+
+## Run the native module's kernel (when it is loaded) or `gd_slide`.
+static func use_native(on: bool) -> void:
+	_kernel = _native_kernel() if on else null
+
+
+static func _native_kernel() -> Object:
+	var kernel: Object = NativeScript.body_kernel()
+	if kernel == null or not kernel.call(&"configure", {"ITERATIONS": ITERATIONS, "MIN_STRIDE": MIN_STRIDE}):
+		return null
+	return kernel
+
 
 ## Where a circle of `radius` at `from` ends after moving by `motion` against the wall grid `cells`
 ## (`w` by `h` cells of `cell` pixels, its corner at `origin`; a cell is a wall when it is not 0).
 static func slide(cells: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
+	if _kernel != null:
+		return _kernel.call(&"slide", cells, w, h, cell, origin, from, motion, radius)
+	return gd_slide(cells, w, h, cell, origin, from, motion, radius)
+
+
+## `slide` in GDScript: the reference the native kernel mirrors, and the fallback without it.
+static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
 	var px: float = from.x
 	var py: float = from.y
 	var mx: float = motion.x

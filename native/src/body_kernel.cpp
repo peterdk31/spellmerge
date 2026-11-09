@@ -17,12 +17,6 @@ using namespace godot;
 
 namespace {
 
-inline double minf(double a, double b) { return a < b ? a : b; }
-inline double maxf(double a, double b) { return a > b ? a : b; }
-inline int64_t mini(int64_t a, int64_t b) { return a < b ? a : b; }
-inline int64_t maxi(int64_t a, int64_t b) { return a > b ? a : b; }
-inline int64_t ceili(double x) { return (int64_t)std::ceil(x); }
-
 // `WallSlide._near`.
 bool near(const uint8_t *cells, int64_t w, int64_t h, double cell, double ox, double oy, double lx, double ly,
 		double hx, double hy) {

@@ -626,7 +626,7 @@ signal rows_drawn(batch: int, rows: PackedFloat32Array, count: int)
 ## a ray's scratch per nesting level (`_ray_level`) and a sweep's results (`sweep`), refilled by
 ## each, which a run's start must keep whole: they grow together, by the size of the first (found by
 ## N3c's stress runs).
-const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"_body_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
+const DERIVED: Array[StringName] = [&"events", &"actors", &"_auto_actors", &"_passes", &"_targets", &"_ray_nodes", &"_ray_along", &"_ray_points", &"_ray_heads", &"_ray_walks", &"_ray_turns", &"sweep_nodes", &"sweep_points", &"sweep_heads", &"_kernel", &"native", &"_target_mark", &"_target_entry", &"_cand_target", &"_cand_along", &"_cand_point", &"_cand_found", &"_target_id", &"_head_mesh", &"step_profile", &"profile_clock", &"native_threads"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_stuck_to"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
@@ -1152,9 +1152,6 @@ var _threat_stamp: int = 0
 var native: bool = true:
 	set = set_native
 var _kernel: Object = null
-## The native module's `BodyKernel` for `slide_body` (`WallSlide` in C++), or null to run the
-## GDScript; switched with `native`.
-var _body_kernel: Object = null
 ## The threads the native kernel's loops run on: 0 for its own choice (the machine's cores less
 ## one; 1 on the web). This machine's, never a run's: the kernel gives the same bits on one thread
 ## or many (shot scale H5, rule T2), and tests compare the two.
@@ -1203,12 +1200,8 @@ func _init() -> void:
 func set_native(on: bool) -> void:
 	native = on
 	_kernel = null
-	_body_kernel = null
 	if not on:
 		return
-	var body_kernel: Object = NativeScript.body_kernel()
-	if body_kernel != null and body_kernel.call(&"configure", {"ITERATIONS": WallSlide.ITERATIONS, "MIN_STRIDE": WallSlide.MIN_STRIDE}):
-		_body_kernel = body_kernel
 	var kernel: Object = NativeScript.shot_kernel()
 	if kernel == null:
 		return
@@ -1894,12 +1887,10 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
 ## walls it meets: the room's and the solid shots' (online-ready N6: the actors' move, in place of
-## the engine's physics; `WallSlide`, and the native `BodyKernel` when the module is loaded).
+## the engine's physics; `WallSlide`).
 func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
 	if not _has_walls:
 		return from + motion
-	if _body_kernel != null:
-		return _body_kernel.call(&"slide", _wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
 	return WallSlide.slide(_wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
 
 

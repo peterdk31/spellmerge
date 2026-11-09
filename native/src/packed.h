@@ -38,6 +38,11 @@ struct Arr {
 
 // GDScript's helpers, as the engine writes them.
 inline int64_t floori(double x) { return (int64_t)std::floor(x); }
+inline int64_t ceili(double x) { return (int64_t)std::ceil(x); }
+inline double minf(double a, double b) { return a < b ? a : b; }
+inline double maxf(double a, double b) { return a > b ? a : b; }
+inline int64_t mini(int64_t a, int64_t b) { return a < b ? a : b; }
+inline int64_t maxi(int64_t a, int64_t b) { return a > b ? a : b; }
 inline int64_t clampi(int64_t v, int64_t lo, int64_t hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline double clampf(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline Vector2 vmin(const Vector2 &a, const Vector2 &b) { return Vector2(MIN(a.x, b.x), MIN(a.y, b.y)); }

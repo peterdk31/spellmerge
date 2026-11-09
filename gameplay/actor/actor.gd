@@ -223,10 +223,10 @@ func move(delta: float) -> void:
 	if delta <= 0.0:
 		return
 	var from: Vector2 = global_position
-	var free: Vector2 = from + velocity * delta
-	var to: Vector2 = projectiles.slide_body(from, velocity * delta, wall_radius()) if projectiles != null else free
+	var unhindered: Vector2 = from + velocity * delta
+	var to: Vector2 = projectiles.slide_body(from, velocity * delta, wall_radius()) if projectiles != null else unhindered
 	global_position = to
-	if to != free:
+	if to != unhindered:
 		velocity = (to - from) / delta
 
 

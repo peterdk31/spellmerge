@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="MoteKind" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/mote_kind.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"drip"
+gravity = 120.0
+drag = 0.0
+bounce = 0.0
+wobble = 0.0
+wobble_rate = 0.0
+glow = 0.6
+shade_from = 0
+shape = "
+#
+
+o
+"
+shape_play = "pick"
+shape_rate = 8.0
+shape_turns = false
+count = 1
+speed = Vector2(0.0, 0.0)
+spread = 0.0
+up = Vector2(0.0, 0.0)
+life = Vector2(0.3, 0.4)
+height = 4.0

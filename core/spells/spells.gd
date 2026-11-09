@@ -615,7 +615,7 @@ func still_mote_cards() -> Array[StringName]:
 		return found
 	for card: Resource in source.call(&"get_all", &"spells"):
 		var form := card as FormBase
-		if form != null and form.look_shader != null and form.look_motes != &"" and _remember_look(form) == Carrier.LOOK_STILL:
+		if form != null and form.look_shader != null and not form.look_motes.is_empty() and _remember_look(form) == Carrier.LOOK_STILL:
 			found.append(form.id)
 	return found
 

@@ -167,6 +167,7 @@ func _ready() -> void:
 	events.room_entered.connect(_on_room_entered)
 	events.room_entered.connect(_fit_marks)
 	events.floor_marks_changed.connect(set_floor_marks)
+	events.projectile_impact.connect(_on_impact)
 
 
 ## The projectile manager and the spell runtime are known (Feel finds them after its children are
@@ -182,6 +183,13 @@ func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 	if manager != null and not manager.still_shots_drawn.is_connected(_on_still_shots_drawn):
 		manager.still_shots_drawn.connect(_on_still_shots_drawn)
 		manager.batches_grown.connect(_on_batches_grown)
+
+
+## A shot or a beam struck something: on a wall (no target), a card's still shots there part their
+## streams for a moment (`still_motes.gd`, the wall's stream).
+func _on_impact(_caster: int, target: Node, position: Vector2, _direction: Vector2) -> void:
+	if target == null:
+		still_motes.struck(position, projectiles.sim_time if projectiles != null else 0.0, pool if motes_on() else null)
 
 
 ## A watched card body's still shots were drawn: they give off their motes (`still_motes.gd`).

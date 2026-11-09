@@ -1,8 +1,24 @@
-[gd_resource type="Resource" script_class="FormBase" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="FormBase" load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
 [ext_resource type="Texture2D" path="res://content/spells/forms/rune/icon.svg" id="2_icon"]
 [ext_resource type="Shader" path="res://content/spells/forms/rune/rune.gdshader" id="3_shader"]
+[ext_resource type="Script" path="res://core/base/still_mote_source.gd" id="9_source"]
+
+[sub_resource type="Resource" id="Mote_1"]
+script = ExtResource("9_source")
+kind = &"drip"
+rate = 5.0
+from = 3
+height = 0.28
+start = 1.0
+
+[sub_resource type="Resource" id="Mote_2"]
+script = ExtResource("9_source")
+kind = &"rising"
+rate = 3.0
+from = 2
+start = 1.0
 
 [resource]
 script = ExtResource("1_base")
@@ -25,3 +41,5 @@ staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.06, "turn": 35, "lift
 cast_cue = &"cast_rune"
 impact_cue = &"rune_burst"
 look_shader = ExtResource("3_shader")
+look_motes = Array[ExtResource("9_source")]([SubResource("Mote_1"), SubResource("Mote_2")])
+look_shape = Vector2(1, 0.625)

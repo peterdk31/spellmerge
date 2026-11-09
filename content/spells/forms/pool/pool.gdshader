@@ -5,9 +5,10 @@ render_mode blend_premul_alpha;
 // A pool, the glowing mire (content/spells/forms/pool/; the owner's pick, 2026-11-09): a dark, thick
 // blob on the floor at its hit size, seen from above at a slant, its outline wobbling; veins of light
 // slowly shifting through its dark (white-hot, light and base where a warped noise is near its
-// middle), a lit rim (light along its top, base elsewhere) and a dark lip under its bottom edge. It
-// splashes in while it is new (it overshoots and settles, drops thrown out) and dries out over its
-// last second, shrinking, breaking up into scorch. Its card particles are given off from its
+// middle), a lit rim one pixel wide where a pixel beside it is outside the wobbling outline (light
+// along its top, base elsewhere) and a dark lip under its bottom edge. It splashes in while it is
+// new (it overshoots and settles; the drops it throws are motes, a stream of its card's
+// `look_motes` off its rim for its first moments) and dries out over its last second, shrinking, breaking up into scorch. Its card particles are given off from its
 // outline. It is drawn upright on the screen even when its quad turns with a moving pool.
 // The many motes rising off it from all over (the owner, 2026-11-09: "this needs more motes!") are
 // real motes, the card's `look_motes` (`rising`), given off by Feel from where its shots are drawn
@@ -37,13 +38,12 @@ const float GRID = 24.0;
 // draws a body no card has shaped yet.
 uniform vec2 look_shape = vec2(1.0, 1.0);
 
-// Seconds it splashes in for (the drops a little longer).
+// Seconds it splashes in for.
 const float SPILL = 0.35;
-const float DROPS = 0.47;
 
-// Worked out once a pool (vertex): its size (overshooting as it splashes in, shrinking as it dries),
-// how far it has dried (0 to 1), how far its drops have flown (-1 once they have landed).
-varying flat vec3 life;
+// Worked out once a pool (vertex): its size (overshooting as it splashes in, shrinking as it dries)
+// and how far it has dried (0 to 1).
+varying flat vec2 life;
 // Its palette (`palette_floats`): the materials of its infusions, -1 past them.
 varying flat vec4 pal;
 // The quad's +x on the screen (it turns with a moving pool; the drawing stays upright).
@@ -59,7 +59,7 @@ void vertex() {
 	float k = clamp(since / SPILL, 0.0, 1.0) - 1.0;
 	float splash = max(0.05, 1.0 + 2.70158 * k * k * k + 1.70158 * k * k);
 	float size = since < SPILL ? splash : mix(1.0, 0.8, dry);
-	life = vec3(size, dry, since < DROPS ? since / DROPS : -1.0);
+	life = vec2(size, dry);
 	pal = palette_floats(L.core, L.bits);
 	axis = length(MODEL_MATRIX[0].xy) > 0.0001 ? normalize(MODEL_MATRIX[0].xy) : vec2(1.0, 0.0);
 }
@@ -69,6 +69,12 @@ float wobble(vec2 e) {
 	float a = atan(e.y, e.x);
 	float t = sim_time + seed;
 	return life.x * (1.0 + 0.07 * sin(3.0 * a + t * 1.1 + 1.0) + 0.05 * sin(5.0 * a - t * 1.7) + 0.035 * sin(7.0 * a + t * 2.3));
+}
+
+// True for the pixel `p` (from its centre) inside the outline of a pool of half sizes `r`.
+bool in_pool(vec2 p, vec2 r) {
+	vec2 e = p / r;
+	return length(e) <= wobble(e);
 }
 
 // A number in [0, 1) for the lattice point `i`, by its seed: no sine (a GPU's sine of a big number
@@ -131,34 +137,21 @@ vec4 body_look(vec2 uv) {
 		}
 	}
 	vec2 e = p / r;
-	float w = wobble(e);
-	bool inside = length(e) <= w;
+	bool inside = in_pool(p, r);
 	if (inside) {
 		if (life.y > 0.0 && hash(p.x, p.y, 31.0) < life.y * 1.15) {
 			// Drying out: it breaks up, leaving scorch.
 			colour = hash(p.x, p.y, 32.0) < 0.55 * (1.0 - life.y) ? vec4(OUTLINE, 1.0) : colour;
 		} else {
-			// Its rim where a pixel beside it is outside (the outline's wobble taken as the same).
-			bool edge = length((p + vec2(1.0, 0.0)) / r) > w || length((p - vec2(1.0, 0.0)) / r) > w
-					|| length((p + vec2(0.0, 1.0)) / r) > w || length((p - vec2(0.0, 1.0)) / r) > w;
+			// Its rim where a pixel beside it is outside (each judged by its own place on the outline,
+			// so the rim is one pixel all round, as the pick's mockup).
+			bool edge = !in_pool(p + vec2(1.0, 0.0), r) || !in_pool(p - vec2(1.0, 0.0), r)
+					|| !in_pool(p + vec2(0.0, 1.0), r) || !in_pool(p - vec2(0.0, 1.0), r);
 			colour = vec4(edge ? (e.y < -0.2 ? palette_turn(pal, 0, 2, hi) : palette_turn(pal, 0, 1, mid)) : mire(p), 1.0);
 		}
-	} else if (p.y > 0.0 && length((p - vec2(0.0, 1.0)) / r) <= w) {
+	} else if (p.y > 0.0 && in_pool(p - vec2(0.0, 1.0), r)) {
 		// A dark lip under its bottom edge.
 		colour = vec4(OUTLINE, 1.0);
-	}
-	// Splashing in: drops thrown out, up and down again.
-	if (life.z >= 0.0) {
-		float k = life.z;
-		for (int n = 0; n < 9; n++) {
-			float i = float(n);
-			float ang = hash(i, 3.0, 0.0) * TAU;
-			float d = (0.7 + 0.6 * hash(i, 4.0, 0.0)) * r.x * k;
-			vec2 at = vec2(cos(ang) * d, sin(ang) * d * r.y / r.x - sin(k * 3.1416) * 6.0);
-			if (on(p, at)) {
-				colour = vec4(palette_turn(pal, n, k < 0.6 ? 2 : 1, k < 0.6 ? hi : mid), 1.0);
-			}
-		}
 	}
 	if (colour.a > 0.0) {
 		return colour;

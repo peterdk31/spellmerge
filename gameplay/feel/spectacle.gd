@@ -189,7 +189,7 @@ func attach(manager: ProjectileManagerScript, runtime: Object = null) -> void:
 ## streams for a moment (`still_motes.gd`, the wall's stream).
 func _on_impact(_caster: int, target: Node, position: Vector2, _direction: Vector2) -> void:
 	if target == null:
-		still_motes.struck(position, projectiles.sim_time if projectiles != null else 0.0, pool if motes_on() else null)
+		still_motes.struck(position, projectiles.sim_time if projectiles != null else 0.0)
 
 
 ## A watched card body's still shots were drawn: they give off their motes (`still_motes.gd`).

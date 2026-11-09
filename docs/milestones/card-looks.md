@@ -17,11 +17,12 @@
 | Carrier (cards) | Drawn by | Shader today | In its folder after |
 | --- | --- | --- | --- |
 | rune, wall, pool | the projectile manager, still batches | `forms/<card>/*.gdshader` | done (#632) |
-| atom (atom, bolt), swap, and any of them circling (Orbit) | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all | phase 1 |
+| atom (atom, bolt), swap, and any of them circling (Orbit) | the projectile manager, head batches (`head_mesh`) | `core/projectiles/shot_head.gdshader`, one for all; the bolt's `forms/bolt/bolt.gdshader` and the swap's `forms/swap/swap.gdshader` (the chasing pair, 2026-11-09) their own | phase 1 |
 | beam | Feel, one beam mesh per live beam (`Feel._make_beam`) | `core/projectiles/shot_beam.gdshader` | phase 2 |
 | swing | Feel's swing trails (`swing_trails.gd`) | `core/projectiles/shot_swing.gdshader` | phase 2 |
 | familiar (its orb) | Entities (`entities.gd`), one MultiMesh for every familiar | `core/projectiles/shot_orbit.gdshader` | phase 3 |
-| dash, teleport, rain, slam, portal | cues only (`content/cues/`, flashes in `content/flashes/`) | none of their own | already data in content: nothing to move |
+| portal | Feel's portal look (`portal_look.gd`, `Carrier.LOOK_PORTAL`): a lens quad a gate, its lips real motes | `forms/portal/portal.gdshader` (`core/projectiles/shot_portal.gdshader` the fallback) | done (carrier-looks-fixes.md, phase 2) |
+| dash, teleport, slam | cues only (`content/cues/`, flashes in `content/flashes/`) | none of their own | already data in content: nothing to move |
 | decoy | the actor look (a copy of its caster) | `shot_sprite.gdshader`, shared by every sprite | stays: it is not a look of the card |
 
 Effects stay in `core/projectiles/` (flashes, blasts, arcs, statuses, sprites, motes): they belong to no card, and cues already pick them as data.
@@ -48,7 +49,7 @@ What every card shader keeps, as today's shot shaders do (core/README.md, "The s
 - **Draw order stays.** At one z, the first batches draw in `BATCH_ORDER` (bolts, then runes, then orbits), and a node made later draws above them. `_make_body_batches` adds a body's pair at the end, so a bolt with its own look would start drawing over runes, walls and orbit shots. A head body's pair is moved to sit right after `BATCH_BOLT`'s node (and its enemy half after `BATCH_ENEMY`'s), a quad body's after `BATCH_STILL`'s (`BATCH_ENEMY_STILL`'s), each new body after the bodies of its mesh already there; a test checks a bolt of its own look still draws under a rune at the same z, as a plain bolt does.
 - **Spell light:** a body batch of heads is lit as shots (`ROWS_SHOT`), one of quads as runes (`ROWS_RUNE`). `batch_mesh(batch)` answers from the body's mesh, so it stops being `static`: `spell_light.gd` asks the manager it lights (not `ProjectileManagerScript`), and a light test covers a head body's batch.
 - **Contract for a flying card shader:** copy `shot_head.gdshader` (its vertex stage places the head's quads from the instance; tails stay Feel's motes and are not the shader's). Warmed as a batch (`ShaderWarmup.want(shader, BATCH)`), as the head shader is.
-- **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `forms/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom, nova and swap keep the shared head (no `look_shader`) until someone wants one of them to look different: a shader per card costs a compile and **four draw calls** with Spell light on (its pair of batches, and the light batch `spell_light._add_batches` mirrors for each), so sharing stays the default.
+- **Cards:** the bolt gets a look of its own (owner, 2026-11-08: "let's try yes"): `forms/bolt/bolt.gdshader`, a copy of the head shader made distinct, shown beside the plain head in `shot_looks.gd` for the owner to judge. The atom keeps the shared head (no `look_shader`; the swap got its own with the carrier looks of 2026-11-09, and the nova became a modifier) until someone wants it to look different: a shader per card costs a compile and **four draw calls** with Spell light on (its pair of batches, and the light batch `spell_light._add_batches` mirrors for each), so sharing stays the default.
 
 ## Phase 1b: a card's light and its reach (the atom lit less than the bolt)
 

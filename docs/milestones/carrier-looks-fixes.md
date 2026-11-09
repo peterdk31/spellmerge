@@ -1,6 +1,6 @@
 # Carrier looks: fixes after #642
 
-**Status: plan (2026-11-09), from a review of #642 the day it merged, for the next session.** The owner asked for #642 to be merged as it was, then reviewed "with good software architecture and low coupling", and the fixes saved as a plan to follow. #642 gave five carriers new looks on the owner's picks (rune C hovering seal, pool B+ glowing mire, swap B chasing pair, wall H rising motes, portal I mote rift), and still cards real motes (`gameplay/feel/still_motes.gd`). The owner's rule since: **motes for everything we can**, they are the world's magic building blocks.
+**Status: done (2026-11-10): phases 1 to 4 (#659, #660, #661, phase 4's PR). Planned 2026-11-09 from a review of #642 the day it merged.** The owner asked for #642 to be merged as it was, then reviewed "with good software architecture and low coupling", and the fixes saved as a plan to follow. #642 gave five carriers new looks on the owner's picks (rune C hovering seal, pool B+ glowing mire, swap B chasing pair, wall H rising motes, portal I mote rift), and still cards real motes (`gameplay/feel/still_motes.gd`). The owner's rule since: **motes for everything we can**, they are the world's magic building blocks.
 
 Phases 1 and 2 are the architecture fixes and come first: they change how the rest are built. Each phase is one PR.
 
@@ -67,6 +67,12 @@ Review (same day): a strike only finds still shots drawn in the last frame (a wa
 - Size: medium. Native: no.
 
 ## Phase 4: checks and docs
+
+**Done (2026-11-10, `owner/carrier-looks-p4`).** Measured on the owner's GPU (`webstorm`'s steps with the GL probe in the page, one pair of runs: main before phase 1, `917243e4`, and after phase 3, `5a53affb`; a storm of `fire,split,split,split,pool,frost,split,split,split,wall` for 10 s, cap 1000, native on):
+- **Compiles** (every program over 100 ms): the rune's 369/358 ms became 292/327 ms (its two mote loops gone); the pool's (~360 ms) and the wall's (~210/335 ms) are as they were; the portal's two new shaders (the card's and the plain fallback, both warmed) take 155 to 253 ms each, 0.8 s more behind the loading screen; the slowest is still the flash shader (1.5 to 1.7 s, unchanged). Nothing near the D3D danger (`webgl-d3d-shaders`).
+- **Frames:** 6.36 ms avg, 7.70 p95 before; 7.89 ms avg, 9.90 p95 after: the scripts' share grew 3.67 to 5.05 ms a frame. Headless, the same storm showed it in the drawing (`update_draw` +0.5 ms, run twice a frame by the storm): still motes' `give_off` read every still shot every frame (0.9 ms a call over ~230 wall and pool pieces) though at 7 motes a second a piece only one in eight gives off a frame. **Fixed:** a stream now picks as many shots as the whole batch would give off at full strength this frame and keeps each pick as often as that shot's strength says (the same motes a shot on average; the work follows the motes, not the shots), and `StillShotView` reads its rows lazily, only while it is handed out (`open`, `close`; the manager's `row_*` readers beside `_write_quad`), so a shot that gives off nothing is never decoded; a strike waits for the next drawing to meet the shot it struck (nothing kept between frames), and the parting check is skipped while nothing parts. Headless after (two alternated pairs): process scripts 3.40/3.50 ms before phase 1, 3.62/3.50 ms now; `update_draw` +0.2 to 0.3 ms.
+- **Sheet:** `shot_portal_rifts` stages its portals in an empty room (seated wizards casting through Spells, a laid floor, no run).
+- **Docs:** card-looks.md's carrier table (the swap's and the portal's own looks).
 
 - **Measure on a real GPU** with the owner's harness (`~/spellmerge-gpu-harness/webstorm.sh`, Windows Chrome): first-room compile time of the rune, pool, swap and wall shaders, and frame time with many pools and walls giving off motes. Fix whatever it shows.
 - **A clean portal sheet:** `shot_portal_rifts` stages its portals in an empty room (no run, no waves, no telegraphs), with 1, 2 and 4 infusions, like `shot_carrier_palettes`.

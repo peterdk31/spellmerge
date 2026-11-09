@@ -78,6 +78,11 @@ func _written(from: int) -> Array:
 	return found
 
 
+## How many of the motes written from `from` on were born at `at`.
+func _born_at(from: int, at: Vector2) -> int:
+	return _written(from).filter(func(each: Array) -> bool: return Vector2(each[0], each[1]).distance_to(at) < 0.01).size()
+
+
 func test_the_still_cards_name_their_streams() -> void:
 	for form: FormBase in [WALL, POOL, RUNE]:
 		check(not form.look_motes.is_empty(), "%s gives off motes" % form.id)
@@ -153,9 +158,9 @@ func test_a_strike_parts_the_wall_s_stream_for_a_moment() -> void:
 	_run(60)
 	var foot: Vector2 = Vector2(200.0, 150.0 + floorf(ManagerScript.look_size(WALL.radius) * ManagerScript.STILL_HIT * WALL.look_shape.y + 0.5))
 	var before: int = motes.next_row()
-	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
-	var knocked: Array = _written(before)
-	check_equal(knocked.size(), StillMotesScript.KNOCKED, "a few motes knocked out where it struck")
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time)
+	_run(1)
+	check_equal(_born_at(before, Vector2(200.0, 150.0)), StillMotesScript.KNOCKED, "at its next drawing, a few motes knocked out where it struck")
 	var parted: int = still.parted
 	before = motes.next_row()
 	_run(20)
@@ -167,8 +172,9 @@ func test_a_strike_parts_the_wall_s_stream_for_a_moment() -> void:
 	_run(30)
 	check_equal(still.parted, parted, "after half a second the stream closes again")
 	before = motes.next_row()
-	still.struck(Vector2(500.0, 300.0), mgr.sim_time, motes)
-	check_equal(motes.next_row(), before, "a strike far from any still shot does nothing")
+	still.struck(Vector2(500.0, 300.0), mgr.sim_time)
+	_run(1)
+	check_equal(_born_at(before, Vector2(500.0, 300.0)), 0, "a strike far from any still shot does nothing")
 
 
 func test_a_strike_where_a_wall_was_does_nothing() -> void:
@@ -177,8 +183,10 @@ func test_a_strike_where_a_wall_was_does_nothing() -> void:
 	_run(60)
 	var before: int = motes.next_row()
 	var parted: int = still.parted
-	still.struck(Vector2(200.0, 150.0), mgr.sim_time, motes)
-	check_equal(motes.next_row(), before, "the wall ended: no motes knocked out of thin air")
+	still.struck(Vector2(200.0, 150.0), mgr.sim_time)
+	_run(1)
+	check_equal(_born_at(before, Vector2(200.0, 150.0)), 0, "the wall ended: no motes knocked out of thin air")
+	_run(10)
 	_place(WALL, Vector2(200.0, 150.0))
 	_run(30)
 	check_equal(still.parted, parted, "and a new wall there is not parted by it")
@@ -232,7 +240,7 @@ func test_a_rune_drips_and_its_ring_gives_off_once_armed() -> void:
 	_run(54)
 	check_equal(_written(before).size(), 0, "nothing while it arms")
 	before = motes.next_row()
-	_run(90)
+	_run(180)
 	var found: Array = _written(before)
 	var drips: Array = found.filter(func(each: Array) -> bool: return each[2] == &"drip")
 	var rising: Array = found.filter(func(each: Array) -> bool: return each[2] == &"rising")

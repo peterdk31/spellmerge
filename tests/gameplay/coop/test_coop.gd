@@ -56,6 +56,7 @@ func _initialize() -> void:
 	_test_every_leave_order()
 	_test_join_before_play()
 	_test_duplicate_device_events()
+	_test_a_device_joining_during_a_replay_joins_nobody()
 	_test_leave_and_rejoin_same_slot()
 	_test_wizards_go_by_actor_id()
 	_test_last_standing_leaves_restarts_the_room()
@@ -289,6 +290,34 @@ func _test_duplicate_device_events() -> void:
 	_events.emit_signal("device_left", 2, 80)
 	_check(_left_events.is_empty(), "device_left for a slot nobody holds sends no player_left")
 	_check(_coop.joined_count() == 1, "the count did not move")
+	_stop()
+
+
+## Coop hears the simulation's seats (the frames service's `seat_joined` and `seat_left`), never a
+## device (netcode spike S1): while a replay plays, a pad joining here seats nobody and adds no
+## wizard; once the replay ends its seat is seated.
+func _test_a_device_joining_during_a_replay_joins_nobody() -> void:
+	_stop()
+	var frames: Node = root.get_node("Frames")
+	var replay := Replay.new()
+	replay.build = Replay.build_of()
+	replay.content = Replay.content_of(root.get_node("Registry"))
+	replay.seats = 0b0001
+	var frame_list: Array[InputFrame] = []
+	for seat in 4:
+		var frame := InputFrame.new()
+		frame.seat = seat
+		frame_list.append(frame)
+	replay.add_tick(frame_list, 0b0001)
+	_check(bool(frames.call("play", replay)), "the replay plays")
+	_check(_joined_events == [0], "the replay's seat joins, got %s" % [_joined_events])
+	var wizards: int = _wizard_count()
+	_input.add_virtual_device(2)
+	_check(_joined_events == [0], "a device joining while it plays joins nobody, got %s" % [_joined_events])
+	_check(not _coop.is_joined(2) and _wizard_count() == wizards, "no seat, no wizard")
+	frames.call("stop_playing")
+	_check(_joined_events == [0, 2], "once it ends the device's seat joins, got %s" % [_joined_events])
+	_check(_coop.is_joined(2), "seated")
 	_stop()
 
 

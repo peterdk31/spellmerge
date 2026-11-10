@@ -133,6 +133,24 @@ func header_bytes() -> PackedByteArray:
 	return _encode(false)
 
 
+## The seats seated before tick `tick` plays (a bit each): the header's, then each JOIN and LEAVE
+## of the ticks before it (a replay sought, `Frames.seek`).
+func seats_at(tick: int) -> int:
+	var mask: int = seats & 0x0f
+	var frames: Array[InputFrame] = []
+	for seat in SEATS:
+		frames.append(InputFrame.new())
+	for at in mini(tick, _offsets.size()):
+		read_tick(at, frames)
+		for seat in SEATS:
+			for command: Array in frames[seat].commands:
+				if command[0] == InputFrame.JOIN:
+					mask |= 1 << seat
+				elif command[0] == InputFrame.LEAVE:
+					mask &= ~(1 << seat)
+	return mask
+
+
 ## The whole replay as bytes: the header, the tick count, the ticks.
 func to_bytes() -> PackedByteArray:
 	return _encode(true)

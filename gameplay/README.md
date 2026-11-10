@@ -18,7 +18,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
-| `device_joined`, `device_left` | `core/input` | `coop` |
+| `device_joined`, `device_left` | `core/input` | the frames service (`core/sim`) |
+| `seat_joined`, `seat_left` | the frames service (`core/sim`) | `coop` |
 | `spell_cast` | `player` | `feel` |
 | `actor_cast` | `actor` (the Caster, every actor's cast; actors G8) | nobody yet (a body's cast movement is its carrier's `staff_pose`, drawn by its look) |
 | `staff_shown` | `actor` (the Caster, another staff put on show; living staffs H4) | `feel` (the poof) |
@@ -74,7 +75,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `sandbox_requested`, `sandbox_action_requested`, `sandbox_spawn_requested` | HUD | `flow` |
 | `ai_view_changed` | HUD | `ai` (Entities) |
 
-`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
+`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 
 ## Allowed files
 

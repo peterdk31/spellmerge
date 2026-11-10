@@ -34,6 +34,9 @@ const EVENTS: Dictionary = {
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
+	# Seats.
+	&"seat_joined": [["player", TYPE_INT]],
+	&"seat_left": [["player", TYPE_INT]],
 	# Spells and combat.
 	&"actor_cast": [["caster", TYPE_INT], ["actor", TYPE_OBJECT]],
 	&"staff_shown": [["caster", TYPE_INT], ["actor", TYPE_OBJECT], ["staff", TYPE_INT]],

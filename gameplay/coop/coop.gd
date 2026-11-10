@@ -2,8 +2,10 @@ extends Node
 ## Co-op (autoload `Coop`): joining and leaving mid-run, the party's shared view and revives. Up to four players; nobody ever waits for another player.
 ##
 ## Joining and leaving: `core/input` turns a button press (or an unplugged
-## gamepad, or a bot's virtual device) into `device_joined` / `device_left`. Coop
-## turns those into `player_joined(player)` / `player_left(player)`, once each
+## gamepad, or a bot's virtual device) into `device_joined` / `device_left`, and the frames
+## service (core/sim) into the simulation's `seat_joined` / `seat_left` (offline as the device
+## does; while a replay plays, as its frames say). Coop hears only those, never a device, and
+## turns them into `player_joined(player)` / `player_left(player)`, once each
 ## per change, in any order and in any slots. `flow` hears them and adds or
 ## removes the wizard, `difficulty` counts the players. Coop knows the wizards only as the
 ## actors in the `wizards` group (the wizard scene puts its root there; actors G7) and their
@@ -105,8 +107,8 @@ func _ready() -> void:
 	if events == null:
 		push_warning("Coop: the Events autoload is missing, so nobody can join.")
 		return
-	events.device_joined.connect(_on_device_joined)
-	events.device_left.connect(_on_device_left)
+	events.seat_joined.connect(_on_seat_joined)
+	events.seat_left.connect(_on_seat_left)
 	events.room_laid_out.connect(_on_room_laid_out)
 	events.room_entered.connect(_on_room_entered)
 	# A command, heard at the tick's start (core/events, online-ready N2).
@@ -305,7 +307,7 @@ func _all_valid() -> bool:
 	return true
 
 
-func _on_device_joined(player: int, _device: int) -> void:
+func _on_seat_joined(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS or _joined[player]:
 		return
 	_joined[player] = true
@@ -316,7 +318,7 @@ func _on_device_joined(player: int, _device: int) -> void:
 	refresh_wizards()
 
 
-func _on_device_left(player: int, _device: int) -> void:
+func _on_seat_left(player: int) -> void:
 	if player < 0 or player >= PLAYER_SLOTS or not _joined[player]:
 		return
 	_set_revive(player, 0.0)

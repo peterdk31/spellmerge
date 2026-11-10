@@ -55,7 +55,7 @@ class StandInFrames:
 	func _ready() -> void:
 		pass
 
-	func ticks_due() -> int:
+	func begin_step(_delta: float) -> int:
 		asked += 1
 		return due
 

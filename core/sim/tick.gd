@@ -32,7 +32,7 @@ extends Node
 ##
 ## **Time:** `step(delta)` keeps its signature everywhere, and the delta is always `DT`, 1/60 of a
 ## second: the game never scales the engine's time (N4). A physics step runs the ticks the frames
-## service says (`Frames.ticks_due`): one, but for a live replay (the online client; netcode spike
+## service says (`Frames.begin_step`): one, but for a live replay (the online client; netcode spike
 ## S1) none while its next tick has not arrived and up to three to catch up. A slow frame runs up
 ## to `max_physics_steps_per_frame` physics steps; a faster game (a test, a benchmark) raises the tick rate,
 ## `Engine.physics_ticks_per_second`. `count` is the ticks since the run began (`begin_run`), or
@@ -145,8 +145,8 @@ func set_ticking(node: Node, on: bool) -> bool:
 
 
 func _physics_process(_delta: float) -> void:
-	# Asked first, also under a picture's pause: a live replay's pump reads what arrived.
-	var due: int = frames.ticks_due() if frames != null and frames.auto_tick else 1
+	# First, also under a picture's pause: a live replay's feed reads what arrived and sends.
+	var due: int = frames.begin_step(DT) if frames != null and frames.auto_tick else 1
 	# A pause not the sim's (the pause menu while a replay plays): the picture's alone, so no tick
 	# (the replay waits).
 	if get_tree().paused and not _shown_stopped:

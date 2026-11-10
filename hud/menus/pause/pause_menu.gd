@@ -461,10 +461,11 @@ func _set_paused(on: bool) -> void:
 	if not is_inside_tree():
 		return
 	var frames: FramesScript = get_node_or_null(^"/root/Frames") as FramesScript
-	if frames != null and not frames.hears_commands():
+	var seat: int = owner_player if owner_player >= 0 else _closing_player
+	if frames != null and not frames.hears_commands(seat):
 		get_tree().paused = on
 	elif _events != null:
-		_events.pause_requested.emit(owner_player if owner_player >= 0 else _closing_player, 1 if on else 0)
+		_events.pause_requested.emit(seat, 1 if on else 0)
 
 
 func _on_sandbox_changed(on: bool) -> void:

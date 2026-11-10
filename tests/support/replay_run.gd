@@ -171,38 +171,94 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 ## `replay` played live from a fresh game (netcode spike S1: as the online client plays the host's
 ## run while it arrives, `Frames.play_live`), no bot watching: its header first, then its tick `k`
 ## added at the physics step `arrive_at[k]` (counted from 0 at the play's start; never earlier than
-## the tick before). Each tick's hashes go to `into`, taken as the next tick starts (the local seat's
-## frame handed out: the only hook inside a step that runs several ticks) and after the last.
-## Per step, `steps` gets [the ticks played before it, the ticks there to play].
-func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, steps: Array[Vector2i], cushion: int = 2) -> void:
+## the tick before). Seat 0, the run's own player, is this machine's here (the client's): its frames
+## come from `Contrary` and are sent to the feed, never played. At the start of every step (the
+## feed's pump) the hashes go to `into` and the ticks played so far to `played`, so a step that ran
+## several ticks is seen after its last, and a step that waited is seen again unchanged. Per step,
+## `steps` gets [the ticks played before it, the ticks there to play].
+func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played: PackedInt32Array, steps: Array[Vector2i], cushion: int = 2) -> void:
 	await fresh()
+	_input.call("add_virtual_device", 0)
+	var contrary := Contrary.new()
+	_frames.call("set_source", 0, contrary)
 	await _tree.physics_frame
-	var live: Replay = Replay.from_bytes(replay.header_bytes())
-	var state := {"step": 0, "fed": 0}
-	var pump := func() -> void:
-		while state["fed"] < replay.tick_count() and arrive_at[state["fed"]] <= state["step"]:
-			var problem: String = live.add_tick_bytes(replay.tick_bytes(state["fed"]))
-			if problem != "":
-				problems.append("live tick %d: %s" % [state["fed"], problem])
-			state["fed"] += 1
-		if state["fed"] == replay.tick_count():
-			_frames.call("close_live")
-		steps.append(Vector2i(int(_frames.call("play_tick")), live.tick_count()))
-		state["step"] += 1
-	var sent := func(tick: int, _frame: InputFrame) -> void:
-		if tick > 0:
+	var feed := LiveRun.new(1, cushion)
+	feed.host = replay
+	feed.live = Replay.from_bytes(replay.header_bytes())
+	feed.arrive_at = arrive_at
+	feed.frames = _frames
+	feed.steps = steps
+	feed.capture = func(at: int) -> void:
+		if at > 0:
 			_capture(into)
-	# The client's seat: not in the run, so its frames are empty; they are handed out all the same.
-	if not bool(_frames.call("play_live", live, 1 << 3, pump, sent, cushion)):
+			played.append(at)
+	if not bool(_frames.call("play_live", feed.live, feed)):
 		problems.append("%s: the live replay did not play" % replay.start)
 		return
 	var limit: int = (arrive_at[arrive_at.size() - 1] if not arrive_at.is_empty() else 0) + replay.tick_count() + 10
-	while bool(_frames.call("is_playing")) and state["step"] < limit:
+	while bool(_frames.call("is_playing")) and feed.step < limit:
 		await _tree.physics_frame
 	if bool(_frames.call("is_playing")):
 		problems.append("%s: the live replay did not end after its last tick" % replay.start)
-	_capture(into)
+	else:
+		# Played out: every tick ran.
+		feed.capture.call(replay.tick_count())
+	for problem in feed.problems:
+		problems.append(problem)
+	if feed.sent == 0 or feed.sent < feed.step - 1:
+		problems.append("%s: %d frames sent in %d steps (one a step)" % [replay.start, feed.sent, feed.step])
+	if contrary.tick == 0:
+		problems.append("%s: the local seat's source was never asked" % replay.start)
 	_check_settings(replay.start)
+
+
+## The feed of `play_live`: the host's ticks as `arrive_at` lets them in, closed once all are in;
+## the local seat's frames counted, never played.
+class LiveRun:
+	extends LiveFeed
+	var host: Replay
+	var live: Replay
+	var arrive_at: PackedInt32Array
+	var frames: Node
+	var steps: Array[Vector2i]
+	var capture: Callable
+	var step: int = 0
+	var fed: int = 0
+	var sent: int = 0
+	var problems: PackedStringArray = PackedStringArray()
+
+	func pump() -> void:
+		capture.call(int(frames.call("play_tick")))
+		while fed < host.tick_count() and arrive_at[fed] <= step:
+			var problem: String = live.add_tick_bytes(host.tick_bytes(fed))
+			if problem != "":
+				problems.append("live tick %d: %s" % [fed, problem])
+			fed += 1
+		if fed == host.tick_count():
+			frames.call("close_live")
+		steps.append(Vector2i(int(frames.call("play_tick")), live.tick_count()))
+		step += 1
+
+	func send(_tick: int, frame: InputFrame) -> void:
+		if frame.seat != 0:
+			problems.append("a frame of seat %d sent" % frame.seat)
+		sent += 1
+
+
+## The live client's own player on seat 0: the other way round from `Scripted` (it walks the square
+## backwards and presses every staff every tick), so a run that played its frames would part.
+class Contrary:
+	extends FrameSource
+	var tick: int = 0
+
+	func fill_frame(frame: InputFrame, _delta: float) -> void:
+		var leg: int = (tick / 40) % 4
+		frame.set_move([Vector2.LEFT, Vector2.UP, Vector2.RIGHT, Vector2.DOWN][leg])
+		frame.aim = (tick * 1300) % InputFrame.AIM_STEPS
+		for staff in 4:
+			frame.hold(staff, true)
+			frame.press(staff)
+		tick += 1
 
 
 ## `replay`'s run started in a fresh game and made as `from` says (a snapshot taken after its tick

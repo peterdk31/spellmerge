@@ -80,6 +80,15 @@ signal device_joined(player: int, device: int)
 ## Sender: core/input. `device` left slot `player`, by a button press or an unplugged gamepad. The slot is free again.
 signal device_left(player: int, device: int)
 
+# --- Seats (sender: core/sim, the frames service) -----------------------------
+
+## Sender: the frames service (core/sim/frames.gd). The seat `player` plays from now on: the
+## simulation's join (Coop hears it), never a device's. Offline as its device joins; while a replay
+## plays (a file, or an online client's live one), at the start of the tick whose frame says so.
+signal seat_joined(player: int)
+## Sender: the frames service. The seat `player` plays no more (as `seat_joined`).
+signal seat_left(player: int)
+
 # --- Spells and combat ------------------------------------------------------
 
 ## Sender: player. A cast left the wand of the seat `player`'s wizard (seat-keyed: for the HUD and Feel).

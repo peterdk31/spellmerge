@@ -20,7 +20,7 @@ The steps are **W1 to W8** (W for the world's things). Each is one PR, in order.
 5. **One hit can fire several reactions** (the owner, unsure; the rule below makes it matter little).
 6. **Props don't move in this plan.** No knockback on a prop, no rolling barrels. A prop with a Mover can come later.
 7. **It runs beside the online lobby** ("Run beside it"), not after L2. W1 to W5 touch the actor kit, Combat and the wall grid, which the netcode stands on, so each of those PRs runs `tools/online_pair.sh` and the determinism tests before it merges, and rebases on whichever lobby PR merged first.
-8. **Damage numbers are a node of their own** that any actor can wear: "make this a new node you can attach to an actor (since it is also useful on enemies/allies/bosses)" (W4).
+8. **Damage numbers are a node of their own, on every actor:** "make this a new node you can attach to an actor (since it is also useful on enemies/allies/bosses)", then "Add the damage numbers to every actor" (W4).
 9. **The hub gets a place for every prop** ("This makes it easy for me to test them"): a prop yard that stands every prop there is, found by folder, in place of a gallery room in the sandbox (W7).
 
 ## The rule: if it acts it's an actor; if it only stands, it's a prop
@@ -104,16 +104,16 @@ General rules, true of any actor, never "if it is a prop":
 
 ## W4: damage numbers on any actor (a look)
 
-Today only the sandbox's training dummy shows damage numbers, inside its own look (`DummyLook`, gameplay/ai/dummy_look.gd). They move into a look of their own, **`DamageNumbers`** (`gameplay/actor/damage_numbers.gd`, an `ActorLook`), that any actor's scene can have as a child: a prop, an enemy, an ally, a boss, a wizard.
+Today only the sandbox's training dummy shows damage numbers, inside its own look (`DummyLook`, gameplay/ai/dummy_look.gd). They move into a look of their own, **`DamageNumbers`** (`gameplay/actor/damage_numbers.gd`, an `ActorLook`), and **every actor wears one** (the owner, 2026-11-10: "Add the damage numbers to every actor"): wizards, enemies, allies, bosses, decoys, props, dummies.
 
-- What it does is what the dummy's does now: each hit on its actor (`Actor.damaged`, its own hits only) rises from above the actor for a moment, from a small pool of labels, the oldest reused; new numbers written once a frame, nothing allocated per step (the dummy's performance fix of 2026-11-02 kept).
-- Its numbers are data on the node: where a number starts (above the actor's hurt circle by default, so it fits any size), how far it rises, how long it shows, how many at once; and whether it shows heals too.
+- **Every actor, by one rule:** the actor adds a `DamageNumbers` itself when it is set up, as it adds `Phases` (no scene edited, and an actor made later has one too). A scene that wants other numbers (a boss's bigger ones) holds its own `DamageNumbers` child, and the actor uses that one instead of adding one.
+- **One drawer for all of them**, so a room of 200 enemies in a storm of hits stays cheap: an actor's `DamageNumbers` holds no labels of its own; it hands each hit (`Actor.damaged`, its own hits only) to one shared drawer in Feel, which keeps a pool of numbers for the whole screen, writes new ones once a frame and draws them all in one batch (the dummy's performance fix of 2026-11-02, for every actor). When the pool is full the oldest number gives way. An actor never hit costs nothing but the node.
+- Each number rises from above its actor for a moment. Its numbers are data on the node: where a number starts (above the actor's hurt circle by default, so it fits any size), how far it rises, how long it shows, its size; and whether it shows heals too.
+- **A setting hides them** (the options' "Damage numbers": on by default). It is the view's, never one of the run's rules: it changes nothing in the game.
 - The colour says what kind of hit it was: the hit's element (its ramp's light shade), white for a plain one, and the heal colour for a heal. A hit that does nothing (invincible, the hub) shows its number struck through or dim, so a test in the hub still reads what it would have done.
 - `DummyLook` keeps its damage per second, statuses and last reaction, and wears a `DamageNumbers` for its numbers.
 - View only: it is a look, read only, on Feel's clock, never hashed.
-- Which actors wear one is each scene's choice: the props' shared scene and the training dummy in this plan. Enemies, allies and bosses wearing one, and a setting to hide them, are the owner's to decide after trying it.
-
-**Tests:** its numbers for hits, heals and an invincible actor; the dummy's numbers as before; `shot_damage_numbers.gd` draws them on a prop, an enemy and a boss-sized actor.
+**Tests:** every actor scene in `content/` has one once set up (found by folder, so a new one is checked too); a scene's own is used, not doubled; its numbers for hits, heals and an invincible actor; the dummy's numbers as before; the setting hides them all; a storm on 200 enemies allocates nothing per frame; `shot_damage_numbers.gd` draws them on a wizard, an enemy, a prop and a boss-sized actor.
 
 ## W5: reactions and states (gameplay)
 

@@ -53,6 +53,10 @@ extends CanvasLayer
 ##   it. Another player's `pause` does nothing while it is open.
 ## - The online line (`hud/widgets/online_line.gd`, node Root/OnlineLine, made here; netcode spike
 ##   S4): the text of `online_line_changed` at the top middle while a run is played online.
+## - The stone line (`hud/widgets/stone_line.gd`, node Root/StoneLine, made here; online-lobby L1):
+##   in the hub, how many wizards stand on the teleporter stone, or that A starts the run, at the
+##   top middle under the online line (`start_stone_changed`). While the stone is lit, a player's
+##   `accept` (A, Enter) with no menu open sends the command `run_requested` (`poll`).
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
 ##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
@@ -73,12 +77,17 @@ const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
 const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
+const StoneLineScript := preload("res://hud/widgets/stone_line.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
 const BUILDER_ACTION: StringName = &"back"
+## A on the hub's lit stone starts the run (`run_requested`; online-lobby L1).
+const START_ACTION: StringName = &"accept"
 ## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
+## How far below the online line the stone line sits, in pixels.
+const STONE_LINE_DROP: float = 12.0
 ## Space between a corner panel and its builder, which sits beside it.
 const BUILDER_GAP: float = 2.0
 ## The "Wave N" line and the build break line (hammer and "Build 12") sit side by side in one
@@ -112,6 +121,9 @@ var _pause_menu: PauseMenuScript = null
 ## theirs was open then.
 var _seen_pause: Array[int] = [0, 0, 0, 0]
 var _seen_back: Array[int] = [0, 0, 0, 0]
+var _seen_start: Array[int] = [0, 0, 0, 0]
+## True while the hub's teleporter stone is lit (`start_stone_changed`).
+var _stone_lit: bool = false
 var _had_menu: Array[bool] = [false, false, false, false]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
@@ -134,6 +146,7 @@ var _break_left: float = 0.0
 ## The frame rate readout (see the top).
 var _fps: FpsCounterScript = null
 var _online_line: OnlineLineScript = null
+var _stone_line: StoneLineScript = null
 
 
 func _ready() -> void:
@@ -230,6 +243,7 @@ func _ready() -> void:
 		for player in PLAYER_COUNT:
 			_seen_pause[player] = input.get_press_count(player, PAUSE_ACTION)
 			_seen_back[player] = input.get_press_count(player, BUILDER_ACTION)
+			_seen_start[player] = input.get_press_count(player, START_ACTION)
 	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus)
 	for builder in _builders:
@@ -254,11 +268,19 @@ func _ready() -> void:
 	_online_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN))
 	_online_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	_online_line.bind(events)
+	# The stone line: under the online line, while the party is in the hub.
+	_stone_line = StoneLineScript.new()
+	_stone_line.name = "StoneLine"
+	root_control.add_child(_stone_line)
+	_stone_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN + STONE_LINE_DROP))
+	_stone_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_stone_line.bind(events)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
 		events.player_stats_changed.connect(_on_stats_changed)
 		events.room_entered.connect(_on_room_entered)
+		events.start_stone_changed.connect(_on_start_stone_changed)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
@@ -293,10 +315,11 @@ func _show_break_seconds() -> void:
 	_break_label.text = "Build %d" % ceili(_break_left)
 
 
-## Read every joined player's `pause` and `back` presses since the last poll (several presses in
-## one frame count once) and open or close menus as the top of this file says. Presses outside a
-## room are dropped. Called every frame by _process; tests call it directly. One player's press
-## never touches another player's menus.
+## Read every joined player's `pause`, `back` and `accept` presses since the last poll (several
+## presses in one frame count once) and open or close menus as the top of this file says; `accept`
+## with no menu open while the hub's stone is lit sends `run_requested`. Presses outside a room are
+## dropped. Called every frame by _process; tests call it directly. One player's press never
+## touches another player's menus.
 func poll() -> void:
 	if input == null:
 		return
@@ -307,8 +330,13 @@ func poll() -> void:
 		var back_count: int = input.get_press_count(player, BUILDER_ACTION)
 		var back_now: bool = back_count > _seen_back[player]
 		_seen_back[player] = back_count
+		var start_count: int = input.get_press_count(player, START_ACTION)
+		var start_now: bool = start_count > _seen_start[player]
+		_seen_start[player] = start_count
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
+			if start_now and _stone_lit and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
+				events.run_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and not had_menu and not _has_menu(player) and _in_room \
@@ -442,6 +470,11 @@ func _on_player_left(player: int) -> void:
 	_panels[player].reset()
 	_panels[player].clear_staffs()
 	_refresh(player)
+
+
+## The hub's stone lit or out: while lit, a seat's `accept` with no menu open starts the run.
+func _on_start_stone_changed(_standing: int, _wizards: int, lit: bool) -> void:
+	_stone_lit = lit
 
 
 func _on_room_entered(_room_id: StringName) -> void:

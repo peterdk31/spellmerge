@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RoomBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/room_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/rooms/hub/hub.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"hub"
+scene = ExtResource("2_scene")
+player_spawns = PackedVector2Array(560, 528, 608, 528, 672, 528, 720, 528)
+dummy_spawns = PackedVector2Array(256, 336, 208, 416, 304, 416)
+dummy_ids = Array[StringName]([&"training_dummy"])
+start_stone = Rect2(592, 336, 96, 96)
+invincible = true
+ambient = 0.9

@@ -33,6 +33,7 @@ const HitSharesScript := preload("res://gameplay/feel/hit_shares.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const BarriersScript := preload("res://gameplay/feel/barriers.gd")
 const StillMotesScript := preload("res://gameplay/feel/still_motes.gd")
+const RimMotesScript := preload("res://gameplay/feel/rim_motes.gd")
 
 ## Motes draw under the floor marks, the beams and every flash and telegraph (Feel's FORM_Z 18
 ## less 2; docs/milestones/spell-spectacle.md, "Budget and degradation": never over a telegraph).
@@ -95,6 +96,8 @@ var streams: StreamsScript = StreamsScript.new()
 ## The motes still carriers' shots give off while they stand (`still_motes.gd`: a wall's stream, a
 ## pool's rising motes), from the rows the projectile manager draws them by.
 var still_motes: StillMotesScript = StillMotesScript.new()
+## The motes a room's floor edge gives off, as its art (`MoteRim`; the hub's island).
+var rim_motes: RimMotesScript = RimMotesScript.new()
 
 ## The motes, and how many they hold (`MoteCap.default_cap()` until the setting changes it). They
 ## always exist (S3: every particle is a mote; the smallest "Particles" stop is a Minimal ring).
@@ -202,7 +205,7 @@ func _on_batches_grown(_count: int) -> void:
 	still_motes.attach(projectiles, spells as SpellRuntime)
 
 
-## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams' and Feel's own
+## Once a frame, at Feel's clock `now`: the trails' particles thrown, the streams', the room's rims' and Feel's own
 ## drawings' given off, the barriers' shells drawn where their actors are (`table`, the actor
 ## table), then the motes and the marks stepped.
 func step(now: float, table: ActorsScript = null) -> void:
@@ -211,6 +214,7 @@ func step(now: float, table: ActorsScript = null) -> void:
 	_trail_motes()
 	streams.step(now, projectiles, births, motes_on())
 	_drawn_motes()
+	rim_motes.give_off(now, pool if motes_on() else null, _ramp_table)
 	if barriers != null:
 		barriers.step(now, pool if motes_on() else null, table, projectiles)
 	if pool != null:
@@ -841,6 +845,8 @@ func light_beam(i: int, path: PackedVector3Array, points: int, player: int, look
 ## (`RoomBase.ambient`, P3b).
 func _on_room_entered(room_id: StringName) -> void:
 	use_room(registry.get_resource(ROOM_FOLDER, room_id) as RoomBase if registry != null else null)
+	# The room's world is in the tree by now: its rims are read (none in most rooms).
+	rim_motes.take(get_tree() if is_inside_tree() else null)
 
 
 ## The room `room` (null for none) is the one played in now: its walls' colours and motes, and its

@@ -13,7 +13,7 @@ var plays: Array[int] = []
 func _menu(channel: String) -> Control:
 	var bus := own(EventsScript.new()) as EventsScript
 	bus.sandbox_requested.connect(func(player: int) -> void: requests.append(player))
-	bus.play_requested.connect(func(player: int) -> void: plays.append(player))
+	bus.hub_requested.connect(func(player: int) -> void: plays.append(player))
 	var menu := MenuScene.instantiate() as Control
 	menu.set("events", bus)
 	menu.set("channel", channel)
@@ -52,6 +52,6 @@ func test_it_sends_only_sandbox_requested() -> void:
 	var menu := _menu("preview")
 	(menu.get_node("%Sandbox") as Button).pressed.emit()
 	check_equal(requests, [0] as Array[int], "sandbox_requested(0)")
-	check_equal(plays, [] as Array[int], "not play_requested")
+	check_equal(plays, [] as Array[int], "not hub_requested")
 	(menu.get_node("%Play") as Button).pressed.emit()
-	check_equal(plays, [0] as Array[int], "Play still starts the normal game")
+	check_equal(plays, [0] as Array[int], "Play still takes everyone to the hub")

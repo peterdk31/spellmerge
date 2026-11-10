@@ -37,6 +37,17 @@ func test_a_wave_of_bots_replays_tick_for_tick() -> void:
 	await _check_replay(&"play_requested", 2, 0)
 
 
+## The hub (online-lobby L1): a player walks onto the teleporter stone and presses A, which starts
+## the run of waves in the same recording; the replay starts it on the same tick and plays on the
+## same (its frames carry the press; nothing else does).
+func test_a_run_started_from_the_hub_replays_tick_for_tick() -> void:
+	_run.stone_press_at = 120
+	await _check_replay(&"hub_requested", 0, 1)
+	var flow: Node = root.get_node("Flow")
+	check_equal(flow.get(&"mode"), &"waves", "the replay started the run from the stone")
+	check_equal(flow.get(&"room_id"), flow.get(&"room_id_to_play"), "in the run's room")
+
+
 ## A run starts from a fresh game's state (online-ready N3b): a replay recorded in a fresh game
 ## plays the same after other runs in the same game, and a run recorded after other runs plays the
 ## same as the one recorded fresh (the same frames and seed). The other runs between use what the

@@ -21,7 +21,7 @@ extends Node
 ## the same command at the same tick. With no sink (a test's own bus) a command applies as it is
 ## sent. The simulation hears a command through `listen`, never by connecting to its signal (that
 ## would hear it as it is sent); the HUD and tests may still connect to see it sent. The requests
-## that start a run (`play_requested`, `sandbox_requested`) are not commands: a
+## that start a run (`play_requested`, `sandbox_requested`, `hub_requested`) are not commands: a
 ## replay's header says how its run started.
 ##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
@@ -29,7 +29,9 @@ const NO_PLAYER: int = -1
 
 # --- Player intent from the HUD (sender: hud) -------------------------------
 
-## The Play button was pressed. Heard by flow.
+## A run of waves, at once, for `player`: the automated runs (the bots, the stress run), the tests and
+## the online spike's Host/Join send it (the main menu's Play sends `hub_requested` since online-lobby
+## L1). Heard by flow. A run's start, not a command.
 signal play_requested(player: int)
 ## Sender: hud. `player` asked to put the card `card_id` into slot `slot` of their staff `staff` (0-3: A, X, Y, B); `&""` empties the slot. Heard by player, which applies it (staffs, docs/milestones/M2-staffs.md).
 signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
@@ -62,6 +64,15 @@ signal spell_light_changed(on: bool)
 signal tailless_motes_changed(pool: int)
 ## The Sandbox button was pressed (in every build). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
+## Sender: hud. The main menu's Play was pressed: everyone goes to the hub, the island where players
+## join and start a run from the teleporter stone (docs/milestones/online-lobby.md, L1). Heard by
+## flow, which starts it, and core/input, which joins the keyboard first. A run's start, as
+## `sandbox_requested` is (`Replay.STARTS`), not a command.
+signal hub_requested(player: int)
+## Sender: hud. `player` pressed A (`accept`) with no menu open while the hub's teleporter stone was
+## lit (`start_stone_changed`): start the run (online-lobby L1). A command: heard by flow at the next
+## tick's start, which starts the run of waves if the stone is still lit then.
+signal run_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `reset_dummies` or `clear_enemies`. Heard by flow (staffs B7; the enemy arena, enemy AI AI8).
 signal sandbox_action_requested(player: int, action: StringName)
 ## Sender: hud. `player` asked the enemy arena (the sandbox page, enemy AI AI8) for `count` enemies of the registry's `enemy_id`. Heard by flow.
@@ -138,7 +149,7 @@ signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)
 signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
 ## Sender: core/spells. A carrier of the actor `caster` with no shot to end it ended at `at`, for looks only: a teleport or dash where its body landed (the carrier's end point), a slam where it struck. `form` names its form card (Feel plays the card's `end_cue` there), `direction` the way it went, `size` how big in pixels (a slam's ring, its card's radius), `tint` and `look` as `form_shown`'s.
 signal carrier_ended(caster: int, form: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
-## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; S6 item 13: flow `wave_start`, player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
+## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`; S6 item 13: flow `wave_start` and `stone_lit` (the hub's stone lighting, as no actor), player `revive`, combat `shield_block` and `pull`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
 signal cue_shown(caster: int, cue: StringName, at: Vector2, direction: Vector2, size: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
@@ -259,6 +270,12 @@ signal loading_finished()
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
+## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
+## teleporter stone (`RoomBase.start_stone`); `lit` while all of them do (and at least one is there),
+## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
+## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone)
+## and feel (the stone's lit look, `RoomBase.STONE_LIT`).
+signal start_stone_changed(standing: int, wizards: int, lit: bool)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.

@@ -60,6 +60,7 @@ Cards name the cues they play (S6 2): a carrier's `cast_cue` (`FormBase`; on its
 | `telegraph` | no card now (it was the rain's `shown_cue`; kept for a card that warns of a spot) | a ring closing on a spot, for the seconds until then (`size`) |
 | `vanish` | the teleport card's `shown_cue`, where it leaves | a column of light pulled up off the spot (`rise`) |
 | `portal_open` | the portal card's `shown_cue`, at each of its gates as it opens | a ring gathering in and a quick spiral, glimmers and its cards' motes |
+| `stone_lit` | flow, at the hub's teleporter stone as it lights (every wizard on it; online-lobby L1) | a wide ring going out and a ring of glimmers rising off the stone's edge |
 | `portal_through` | the portal carrier (`cue_shown`), where a shot, a body or nothing else goes into a gate and where it comes out | a small ring going out without its cards and a few sparks (`often`) |
 | `portal_close` | the portal card's `end_cue`, at each of its gates as it closes (`carrier_ended`) | a ring closing, a puff and its cards' motes |
 | `appear` | the teleport card's `end_cue`, at `carrier_ended` where it lands | a column struck down (`fall`), a spray, a small shake and punch |

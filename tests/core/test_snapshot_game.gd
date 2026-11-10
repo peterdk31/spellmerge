@@ -6,8 +6,9 @@ extends "res://tests/support/suite.gd"
 ## player joining the run online would. Every tick from there agrees with the recorded run's in every
 ## area. When they part, the desync report names the first tick, the areas and each member.
 ##
-## Every room the registry finds plays a wave so (online-ready N12): a new room is covered the day
-## its folder lands, with no test written for it. Cards and enemies are covered the same way, in a
+## Every room the registry finds that holds a wave (it has enemy spawns) plays one so (online-ready
+## N12): a new room is covered the day its folder lands, with no test written for it. The hub holds
+## none; its own start is resumed from a snapshot on its stone. Cards and enemies are covered the same way, in a
 ## scripted fight each (tests/core/test_content_determinism.gd).
 ##
 ## The runs are the replay test's (tests/support/replay_run.gd). Each takes seconds: the runner plays
@@ -48,11 +49,25 @@ func test_a_sandbox_run_restored_plays_on_the_same() -> void:
 func test_a_wave_in_every_room_restored_plays_on_the_same() -> void:
 	var registry := own(RegistryScript.new()) as RegistryScript
 	registry.scan()
-	var rooms: Array[StringName] = registry.get_ids(&"rooms")
+	var rooms: Array[StringName] = []
+	for id: StringName in registry.get_ids(&"rooms"):
+		# A room with no enemy spawns holds no wave (the hub: its own test below).
+		if not (registry.get_resource(&"rooms", id) as RoomBase).enemy_spawns.is_empty():
+			rooms.append(id)
 	check(rooms.size() >= 2, "it finds the rooms (%d)" % rooms.size())
 	for room in rooms:
 		_run.room = room
 		await _check_resumed(&"play_requested", 0, 1)
+
+
+## The hub (online-lobby L1), snapshot while its player stands on the lit stone, resumed: the
+## resumed game starts the run of waves on the same tick (the press after the snapshot) and plays on
+## the same.
+func test_the_hub_restored_starts_its_run_on_the_same_tick() -> void:
+	_run.stone_press_at = SNAPSHOT_AT + 20
+	await _check_resumed(&"hub_requested", 0, 1)
+	_run.stone_press_at = -1
+	check_equal(root.get_node("Flow").get(&"mode"), &"waves", "the resumed game started the run from the stone")
 
 
 ## A run started by `start` with `bots` fighter bots and `scripted` scripted players, recorded with a

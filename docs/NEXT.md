@@ -115,6 +115,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Online-ready: snapshots of all content (N10b), with N12.** (`gameplay/ai/entities.gd` decoys, whatever N12's replays through a snapshot find) N10b: built 2026-11-09 (milestones/online-ready.md, N10).
 - [x] **Online-ready: new content covered by itself (N12).** (`tests/core/`) N12: built 2026-11-09 (milestones/online-ready.md, N12).
 - [ ] **Netcode spike: plan approved 2026-11-10, started the same day (the owner's go); S1 (the live replay) and S2 (`net/` over the loopback, the rule-4 exception drafted) done; S3 next.** (milestones/netcode-spike.md) Lockstep over WebRTC (browsers built in, desktops by the WebRTC extension), measured: S1 a live replay (`core/sim`), S2 `net/` over a loopback (and the rule-4 exception), S3 the extension in the desktop builds (CI), S4 the WebRTC link (codes by copy and paste, a public STUN server) and Host/Join, S5 measurements and write-up. After N12.
+- [ ] **Online lobby: the hub offline (L1).** (`content/rooms/hub/`, `gameplay/flow/`, `core/base/room_base.gd`, `gameplay/actor/health.gd`, `hud/widgets/`, `art/tilesets/hub/`) [online-lobby.md](milestones/online-lobby.md), L1: Play goes to the hub, players join and leave there, hits take nothing, the teleporter stone starts the run. Built 2026-11-10 in an owner session, branch `owner/online-lobby-l1`.
+- [ ] **Online lobby: the server and room codes (L2), up to three guests (L3), what the owner's tries find (L4).** (`server/signal/`, `net/`, `core/input/`, `hud/menus/main_menu/`) [online-lobby.md](milestones/online-lobby.md). L2 after L1 and the owner's one-time steps (a Cloudflare account, the deploy, the rules change).
 
 ## Blocked
 

@@ -65,8 +65,8 @@ extends Node
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in every build) starts a run in the sandbox room
-## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
-## `dummy_spawns` (more spawns stand more training dummies, a group to try homing, pierce and
+## (`sandbox`): no waves, the room's dummies at its `dummy_spawns` (`RoomBase.dummy_id`: the
+## training dummy, the shooting dummy, then a group of training dummies to try homing, pierce and
 ## spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
 ## `sandbox_action_requested`: `clear_enemies` takes the enemies the arena spawned away,
 ## `reset_dummies` puts fresh dummies back; `sandbox_spawn_requested` (the enemy arena, enemy AI AI8)
@@ -76,7 +76,18 @@ extends Node
 ## `sandbox_cards` (SANDBOX_START_CARDS), not `start_cards`: Play's A and X, and two showcase
 ## builds on Y (the most shots) and B (a decoy turret).
 ##
-## Modes: `mode` says which run this is: MODE_WAVES (Play) or MODE_SANDBOX (above).
+## The hub (docs/milestones/online-lobby.md, L1): `hub_requested` (the main menu's Play) starts a run
+## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
+## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
+## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
+## have Play's setup. Its teleporter stone (`RoomBase.start_stone`) is lit while every wizard stands
+## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`.
+## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
+## the tick's start, every wizard keeping its staffs (`start_run`'s `kept`); that run's end
+## (everyone down) brings everyone back to the hub, staffs kept again. A run started by
+## `play_requested` restarts as before.
+##
+## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX or MODE_HUB (above).
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -123,13 +134,15 @@ const SANDBOX_START_CARDS: Array = [
 	[&"timer", &"on_hurt", &"decoy", &"triple", &"homing", &"fire", &"bolt", &"homing", &"frost", &"bolt",
 		&"on_hit", &"homing", &"lightning", &"bolt", &"chain", &"lightning", &"atom", &"void", &"nova", &"bolt"],
 ]
-## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
-## spawn after these stands another of the first, `dummy_id`).
+## The sandbox room and the hub's (which dummies each stands is its own data, `RoomBase.dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
-const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
-## The run modes (`mode`): Play's waves, the sandbox.
+const HUB_ROOM_ID: StringName = &"hub"
+## The cue played at the stone's centre as it lights (content/cues).
+const STONE_LIT_CUE: StringName = &"stone_lit"
+## The run modes (`mode`): Play's waves, the sandbox, the hub.
 const MODE_WAVES: StringName = &"waves"
 const MODE_SANDBOX: StringName = &"sandbox"
+const MODE_HUB: StringName = &"hub"
 ## The cue played on every standing wizard as a wave starts (`_show_wave_start`).
 const WAVE_START_CUE: StringName = &"wave_start"
 ## The actions of `sandbox_action_requested`.
@@ -168,7 +181,7 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -240,6 +253,14 @@ var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
 var _next_wave_left: float = -1.0
 var _enemy_data: EnemyBase = null
+## The hub's stone: the wizards on it and in the room at the last count (whether it is lit).
+var _stone_standing: int = 0
+var _stone_wizards: int = 0
+## True while the run of waves in progress was started from the hub's stone: its end goes back there.
+var _back_to_hub: bool = false
+## What `start_stone_changed` last said, as (standing, wizards): only what is drawn, so a game whose
+## state a snapshot replaced sends the stone's count again (DERIVED). (-1, -1) before any.
+var _stone_sent: Vector2i = Vector2i(-1, -1)
 
 
 func _ready() -> void:
@@ -269,10 +290,12 @@ func _ready() -> void:
 		return
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
+	events.hub_requested.connect(_on_hub_requested)
 	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
+	events.listen(&"run_requested", _on_run_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -280,10 +303,14 @@ func _ready() -> void:
 	events.player_left.connect(_on_player_left)
 
 
-## Advance the intro, the next wave's and the restart timers by `delta` seconds.
+## Advance the intro, the next wave's and the restart timers by `delta` seconds; in the hub, the
+## stone.
 func step(delta: float) -> void:
 	if intro != null:
 		intro.step(delta)
+	if mode == MODE_HUB and state == State.RUNNING:
+		_count_stone()
+		return
 	if _next_wave_left >= 0.0:
 		_next_wave_left -= delta
 		if _next_wave_left <= 0.0:
@@ -296,6 +323,13 @@ func step(delta: float) -> void:
 		_restart_left = -1.0
 		if mode == MODE_SANDBOX:
 			_stand_everyone_up()
+		elif _back_to_hub:
+			_back_to_hub = false
+			var kept: Array = _staffs_by_seat()
+			mode = MODE_HUB
+			if not start_run(_starter, kept):
+				push_warning("Flow: the hub did not start again after the run, so the run is over.")
+				stop_run()
 		elif not start_run(_starter):
 			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
 			push_warning("Flow: the restart failed, so the run is over; Play starts a new one.")
@@ -331,7 +365,7 @@ func enemies_left() -> int:
 	return _enemies.size()
 
 
-## The sandbox's dummies still standing.
+## The dummies of the sandbox or the hub still standing.
 func dummies() -> Array[Node]:
 	return _dummies.duplicate()
 
@@ -360,9 +394,11 @@ func _seat_of(wizard: Node) -> int:
 	return controller.seat if controller != null else -1
 
 
-## Build the world and start the run now, replacing any run in progress. Returns
+## Build the world and start the run now, replacing any run in progress. `kept` (by seat, as
+## `_staffs_by_seat` makes it) gives a seat's wizard the cards its staffs held before (through the
+## hub's stone and back); a seat with none there starts with its mode's start cards. Returns
 ## false (and starts nothing) when content is missing or no player has a device.
-func start_run(requester: int) -> bool:
+func start_run(requester: int, kept: Array = []) -> bool:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_for_mode()) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
@@ -404,9 +440,9 @@ func start_run(requester: int) -> bool:
 	new_world.name = WORLD_NAME
 	new_world.add_child(layout)
 	_add_camera(new_world, size)
-	_spawn_players(new_world, room, players)
+	_spawn_players(new_world, room, players, kept)
 	match mode:
-		MODE_SANDBOX:
+		MODE_SANDBOX, MODE_HUB:
 			wave = 0
 			_spawn_dummies(new_world, room)
 		_:
@@ -417,6 +453,8 @@ func start_run(requester: int) -> bool:
 	state = State.RUNNING
 	_show_world(new_world)
 	_set_walls(new_world)
+	for wizard: Node2D in _wizards:
+		_take_room_rules(wizard as Actor)
 	if events != null:
 		events.room_laid_out.emit(Rect2(Vector2.ZERO, size))
 		events.room_entered.emit(room.id)
@@ -424,13 +462,17 @@ func start_run(requester: int) -> bool:
 		if mode == MODE_WAVES:
 			events.wave_started.emit(wave)
 			_show_wave_start()
+	_count_stone()
 	return true
 
 
-## The room the next run of `mode` is in: the sandbox's, or `room_id_to_play`.
+## The room the next run of `mode` is in: the sandbox's, the hub's, or `room_id_to_play`.
 func room_id_for_mode() -> StringName:
-	if mode == MODE_SANDBOX:
-		return SANDBOX_ROOM_ID
+	match mode:
+		MODE_SANDBOX:
+			return SANDBOX_ROOM_ID
+		MODE_HUB:
+			return HUB_ROOM_ID
 	return room_id_to_play
 
 
@@ -446,6 +488,7 @@ func stop_run() -> void:
 			_detach(shown)
 	_restart_left = -1.0
 	_next_wave_left = -1.0
+	_back_to_hub = false
 	wave = 0
 	_clear_run()
 	state = State.IDLE
@@ -453,6 +496,7 @@ func stop_run() -> void:
 	mode = MODE_WAVES
 	if was == MODE_SANDBOX and events != null:
 		events.sandbox_changed.emit(false)
+	_count_stone()
 
 
 func _on_play_requested(player: int) -> void:
@@ -465,6 +509,12 @@ func _on_play_requested(player: int) -> void:
 ## Play, once the work before a room is loaded: the intro first on a new save, else the run.
 func _start_play(player: int) -> void:
 	mode = MODE_WAVES
+	_back_to_hub = false
+	_intro_then_run(player)
+
+
+## The intro first on a new save (the run of `mode` starts when it ends), else the run now.
+func _intro_then_run(player: int) -> void:
 	if wants_intro():
 		play_intro(player)
 	else:
@@ -559,6 +609,95 @@ func _start_sandbox(player: int) -> void:
 		mode = MODE_WAVES
 
 
+func _on_hub_requested(player: int) -> void:
+	if state != State.IDLE:
+		return
+	if not _load_then(_start_hub.bind(player)):
+		_start_hub(player)
+
+
+## The hub, once the work before a room is loaded: after the intro on a new save, as Play's run.
+func _start_hub(player: int) -> void:
+	mode = MODE_HUB
+	_back_to_hub = false
+	_intro_then_run(player)
+	if state == State.IDLE:
+		# Nothing started (content missing): idle is MODE_WAVES.
+		mode = MODE_WAVES
+
+
+## The command `run_requested` (a seat pressed A on the lit stone; the HUD sends it, heard at the
+## tick's start): the run of waves starts, for that seat, while the stone is lit. The stone's count
+## is the last tick's, made again when a wizard joined or left since, so it is exact here.
+func _on_run_requested(player: int) -> void:
+	if not is_stone_lit() or state != State.RUNNING or get_wizard(player) == null:
+		return
+	_start_run_from_stone(player)
+
+
+## The run of waves, from the hub's stone, for seat `seat`: every wizard keeps its staffs, and the
+## run's end brings everyone back to the hub.
+func _start_run_from_stone(seat: int) -> void:
+	var kept: Array = _staffs_by_seat()
+	mode = MODE_WAVES
+	_back_to_hub = true
+	if not start_run(seat, kept):
+		# It refused before freeing anything (content missing): the hub stands as it was.
+		push_warning("Flow: the run from the stone did not start, so the party stays in the hub.")
+		_back_to_hub = false
+		mode = MODE_HUB
+
+
+## The cards every wizard's staffs hold now, by seat (empty for a seat with none): what
+## `start_run` makes each seat's wizard with, so staffs carry over (owner, 2026-11-10).
+func _staffs_by_seat() -> Array:
+	var out: Array = [[], [], [], []]
+	for wizard: Node2D in _wizards:
+		var seat: int = _seat_of(wizard) if is_instance_valid(wizard) else -1
+		if seat >= 0 and seat < PLAYER_SLOTS:
+			out[seat] = PlayerScript.staff_cards(wizard as Actor)
+	return out
+
+
+## The wizards in the world now.
+func _wizard_count() -> int:
+	var count: int = 0
+	for wizard: Node2D in _wizards:
+		if is_instance_valid(wizard):
+			count += 1
+	return count
+
+
+## True while the hub's stone is lit: every wizard of the hub stands on it, and there is one.
+func is_stone_lit() -> bool:
+	return mode == MODE_HUB and _stone_wizards > 0 and _stone_standing == _stone_wizards
+
+
+## Count the wizards on the hub's stone and in the room (none out of the hub) into the state that
+## decides whether it is lit, and send `start_stone_changed` when what was last sent differs (also
+## after a snapshot restored the state under a game that had sent another count); the stone's cue
+## plays as it lights.
+func _count_stone() -> void:
+	var standing: int = 0
+	var wizards: int = 0
+	if mode == MODE_HUB and state != State.IDLE and _room != null:
+		wizards = _wizard_count()
+		for wizard: Node2D in _wizards:
+			if is_instance_valid(wizard) and _room.start_stone.has_point(wizard.position):
+				standing += 1
+	_stone_standing = standing
+	_stone_wizards = wizards
+	var now := Vector2i(standing, wizards)
+	if now == _stone_sent or events == null:
+		return
+	var was_lit: bool = _stone_sent.y > 0 and _stone_sent.x == _stone_sent.y
+	_stone_sent = now
+	var lit: bool = is_stone_lit()
+	events.start_stone_changed.emit(standing, wizards, lit)
+	if lit and not was_lit:
+		events.cue_shown.emit(EventsScript.NO_PLAYER, STONE_LIT_CUE, _room.start_stone.get_center(), Vector2.ZERO, 0.0, Color.WHITE, 0)
+
+
 ## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
 ## player's staffs or menus.
 func _on_sandbox_action_requested(player: int, action: StringName) -> void:
@@ -618,11 +757,14 @@ func _on_player_joined(player: int) -> void:
 		return
 	_add_wizard(world, _room, player, _joiner_spawn(_room, player))
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
-	if joiner != null:
+	# In a room where hits take nothing (the hub), a joiner needs no moment of protection.
+	if joiner != null and not _room.invincible:
 		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
 	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
+	# Heard at the tick's start: the stone goes out under a joiner before any command is applied.
+	_count_stone()
 
 
 ## Remove the wizard of a player who left. If everyone still here is down, the
@@ -639,6 +781,7 @@ func _on_player_left(player: int) -> void:
 	if parent != null:
 		parent.remove_child(wizard)
 	wizard.queue_free()
+	_count_stone()
 	if state == State.RUNNING and _restart_left < 0.0 and _all_down():
 		_restart_left = restart_delay()
 
@@ -758,12 +901,13 @@ func _add_camera(parent: Node2D, size: Vector2) -> void:
 	parent.add_child(camera)
 
 
-func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int]) -> void:
+func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], kept: Array = []) -> void:
 	_wizards.clear()
 	for index in PLAYER_SLOTS:
 		_downed[index] = false
 	for index: int in players:
-		_add_wizard(parent, room, index)
+		var cards: Array = kept[index] if index < kept.size() else []
+		_add_wizard(parent, room, index, Vector2.INF, cards)
 
 
 ## The player spawn for a mid-run joiner: the one farthest from every enemy and
@@ -840,10 +984,12 @@ func bag_for_mode() -> Array[StringName]:
 	return out
 
 
-func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
+## Add the wizard of seat `index` at `at` (INF: its spawn) with the staffs `cards` (by staff; empty:
+## the mode's start cards).
+func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF, cards: Array = []) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	var cards: Array = start_cards_for_mode()
-	PlayerScript.seat_wizard(wizard, index, null, cards.duplicate(true), staffs_for_mode(), bag_for_mode())
+	var staff_cards: Array = cards if not cards.is_empty() else start_cards_for_mode()
+	PlayerScript.seat_wizard(wizard, index, null, staff_cards.duplicate(true), staffs_for_mode(), bag_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():
@@ -851,6 +997,17 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	# Its hurtbox registers it with Combat when it enters the tree.
 	parent.add_child(wizard)
 	_wizards.append(wizard)
+	# A joiner's world is in the tree, so its components are found; a new run's wizards get it once
+	# their world is shown (`start_run`).
+	if wizard.is_inside_tree():
+		_take_room_rules(wizard)
+
+
+## The room's rules on wizard `wizard` (in the tree, its components found): in an `invincible` room
+## (the hub) hits take nothing from it.
+func _take_room_rules(wizard: Actor) -> void:
+	if wizard.health != null and _room != null:
+		wizard.health.invincible = _room.invincible
 
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:
@@ -883,20 +1040,14 @@ func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int)
 		_enemies.append(enemy)
 
 
-## The dummy the sandbox stands at its `spawn`-th dummy spawn: DUMMY_IDS in order, then more
-## training dummies.
-static func dummy_id(spawn: int) -> StringName:
-	return DUMMY_IDS[spawn] if spawn < DUMMY_IDS.size() else DUMMY_IDS[0]
-
-
-## Stand the sandbox's dummies at the room's `dummy_spawns` (`dummy_id`), from the registry. A
-## missing one is skipped with a warning; the sandbox runs without it.
+## Stand the room's dummies at its `dummy_spawns` from the registry (`RoomBase.dummy_id`). A missing
+## one is skipped with a warning; the room runs without it.
 func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
 	for i in room.dummy_spawns.size():
-		var id: StringName = dummy_id(i)
+		var id: StringName = room.dummy_id(i)
 		var data: EnemyBase = registry.get_resource(ENEMY_FOLDER, id) as EnemyBase if registry != null else null
 		if data == null or data.scene == null:
-			push_warning("Flow: the dummy '%s' is missing from the registry, so the sandbox runs without it." % id)
+			push_warning("Flow: the dummy '%s' is missing from the registry, so the room runs without it." % id)
 			continue
 		var node: Node = data.scene.instantiate()
 		var dummy := node as Actor

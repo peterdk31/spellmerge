@@ -69,6 +69,7 @@ func _initialize() -> void:
 	_test_the_enemy_arena()
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
+	_test_a_on_the_lit_stone_starts_the_run()
 	_test_the_run_ending_closes_it()
 	_teardown()
 	if _failures.is_empty():
@@ -690,6 +691,42 @@ func _test_b_opens_the_builder_in_play_only() -> void:
 	_tap(0, &"back")
 	_frame()
 	_check(not _hud.get_radial(0).is_open(), "no builder outside a room")
+
+
+## The hub's stone (online-lobby L1): A (`accept`) sends `run_requested` for its player only while
+## the stone is lit and that player has no menu open; never while the pause menu is open.
+func _test_a_on_the_lit_stone_starts_the_run() -> void:
+	_setup(2)
+	var asked: Array[int] = []
+	_bus.run_requested.connect(func(player: int) -> void: asked.append(player))
+	_tap(1, &"accept")
+	_frame()
+	_check(asked.is_empty(), "A with no stone lit asks nothing")
+	_bus.start_stone_changed.emit(2, 2, true)
+	_tap(1, &"accept")
+	_frame()
+	_check(asked.size() == 1 and asked[0] == 1, "A on the lit stone asks for the run, for its player: %s" % [asked])
+	_tap(0, &"back")
+	_frame()
+	_tap(0, &"accept")
+	_frame()
+	_check(asked.size() == 1 and asked[0] == 1, "A inside a builder is the builder's: %s" % [asked])
+	_tap(0, &"pause")
+	_frame()
+	_tap(1, &"pause")
+	_frame()
+	_tap(1, &"accept")
+	_frame()
+	_check(asked.size() == 1 and asked[0] == 1, "A while paused asks nothing: %s" % [asked])
+	# That A worked the menu (its focused Resume may have closed it): close it if it is still open.
+	if _menu().is_open():
+		_tap(1, &"pause")
+		_frame()
+	_check(not _menu().is_open() and not _hud.get_radial(0).is_open(), "no menu open now")
+	_bus.start_stone_changed.emit(1, 2, false)
+	_tap(1, &"accept")
+	_frame()
+	_check(asked.size() == 1 and asked[0] == 1, "A once the stone is out asks nothing: %s" % [asked])
 
 
 func _test_start_closes_the_builder() -> void:

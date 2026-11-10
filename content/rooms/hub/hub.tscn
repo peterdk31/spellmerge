@@ -1,0 +1,318 @@
+[gd_scene load_steps=17 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/stone.svg" id="3_stone"]
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/stone_lit.svg" id="4_stone_lit"]
+[ext_resource type="Texture2D" path="res://art/tilesets/hub/altar.svg" id="5_altar"]
+[ext_resource type="Script" path="res://core/base/mote_rim.gd" id="9_rim"]
+
+[sub_resource type="Resource" id="MoteRim_hub"]
+script = ExtResource("9_rim")
+kind = &"rim_ember"
+rate = 5.0
+reach = 6.0
+spread = 120.0
+ramps = Array[PackedColorArray]([PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.6353, 0.2353, 1, 0.8784, 0.349, 0.1843, 1, 0.5608, 0.1765, 0.1647, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.9529, 0.651, 1, 0.949, 0.7608, 0.1882, 1, 0.7216, 0.502, 0.1216, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.9333, 1, 0.651, 1, 0.7059, 0.9098, 0.1647, 1, 0.2471, 0.4196, 0.06275, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.7686, 0.9647, 0.949, 1, 0.3098, 0.8392, 0.8627, 1, 0.1216, 0.4392, 0.502, 1), PackedColorArray(0.9569, 0.9451, 0.9176, 1, 0.8784, 0.5412, 0.8471, 1, 0.6275, 0.1882, 0.6039, 1, 0.2902, 0.07843, 0.3137, 1)])
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_96x256"]
+size = Vector2(96, 256)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_128x64"]
+size = Vector2(128, 64)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_160x32"]
+size = Vector2(160, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_192x32"]
+size = Vector2(192, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_256x32"]
+size = Vector2(256, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_352x32"]
+size = Vector2(352, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_384x32"]
+size = Vector2(384, 32)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1280x64"]
+size = Vector2(1280, 64)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1280x128"]
+size = Vector2(1280, 128)
+
+[node name="Hub" type="Node2D"]
+
+[node name="Void" type="Sprite2D" parent="."]
+z_index = -3
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(0, 0)
+texture = ExtResource("1_void")
+centered = false
+region_enabled = true
+region_rect = Rect2(0, 0, 1280, 832)
+
+[node name="Floor" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(96, 256)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(96, 256, 1088, 256)
+
+[node name="Floor2" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(128, 192)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(128, 192, 1024, 64)
+
+[node name="Floor3" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(128, 512)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(128, 512, 1024, 64)
+
+[node name="Floor4" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(160, 160)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(160, 160, 960, 32)
+
+[node name="Floor5" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(160, 576)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(160, 576, 960, 32)
+
+[node name="Floor6" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(192, 128)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(192, 128, 896, 32)
+
+[node name="Floor7" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(192, 608)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(192, 608, 896, 32)
+
+[node name="Floor8" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(256, 96)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(256, 96, 768, 32)
+
+[node name="Floor9" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(256, 640)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(256, 640, 768, 32)
+
+[node name="Floor10" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(352, 672)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(352, 672, 576, 32)
+
+[node name="Floor11" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+texture_repeat = 2
+position = Vector2(384, 64)
+texture = ExtResource("2_floor")
+centered = false
+region_enabled = true
+region_rect = Rect2(384, 64, 512, 32)
+
+[node name="Walls" type="StaticBody2D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Void1" type="CollisionShape2D" parent="Walls"]
+position = Vector2(640, 32)
+shape = SubResource("RectangleShape2D_1280x64")
+
+[node name="Void2" type="CollisionShape2D" parent="Walls"]
+position = Vector2(192, 80)
+shape = SubResource("RectangleShape2D_384x32")
+
+[node name="Void3" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1088, 80)
+shape = SubResource("RectangleShape2D_384x32")
+
+[node name="Void4" type="CollisionShape2D" parent="Walls"]
+position = Vector2(128, 112)
+shape = SubResource("RectangleShape2D_256x32")
+
+[node name="Void5" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1152, 112)
+shape = SubResource("RectangleShape2D_256x32")
+
+[node name="Void6" type="CollisionShape2D" parent="Walls"]
+position = Vector2(96, 144)
+shape = SubResource("RectangleShape2D_192x32")
+
+[node name="Void7" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1184, 144)
+shape = SubResource("RectangleShape2D_192x32")
+
+[node name="Void8" type="CollisionShape2D" parent="Walls"]
+position = Vector2(80, 176)
+shape = SubResource("RectangleShape2D_160x32")
+
+[node name="Void9" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1200, 176)
+shape = SubResource("RectangleShape2D_160x32")
+
+[node name="Void10" type="CollisionShape2D" parent="Walls"]
+position = Vector2(64, 224)
+shape = SubResource("RectangleShape2D_128x64")
+
+[node name="Void11" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1216, 224)
+shape = SubResource("RectangleShape2D_128x64")
+
+[node name="Void12" type="CollisionShape2D" parent="Walls"]
+position = Vector2(48, 384)
+shape = SubResource("RectangleShape2D_96x256")
+
+[node name="Void13" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1232, 384)
+shape = SubResource("RectangleShape2D_96x256")
+
+[node name="Void14" type="CollisionShape2D" parent="Walls"]
+position = Vector2(64, 544)
+shape = SubResource("RectangleShape2D_128x64")
+
+[node name="Void15" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1216, 544)
+shape = SubResource("RectangleShape2D_128x64")
+
+[node name="Void16" type="CollisionShape2D" parent="Walls"]
+position = Vector2(80, 592)
+shape = SubResource("RectangleShape2D_160x32")
+
+[node name="Void17" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1200, 592)
+shape = SubResource("RectangleShape2D_160x32")
+
+[node name="Void18" type="CollisionShape2D" parent="Walls"]
+position = Vector2(96, 624)
+shape = SubResource("RectangleShape2D_192x32")
+
+[node name="Void19" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1184, 624)
+shape = SubResource("RectangleShape2D_192x32")
+
+[node name="Void20" type="CollisionShape2D" parent="Walls"]
+position = Vector2(128, 656)
+shape = SubResource("RectangleShape2D_256x32")
+
+[node name="Void21" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1152, 656)
+shape = SubResource("RectangleShape2D_256x32")
+
+[node name="Void22" type="CollisionShape2D" parent="Walls"]
+position = Vector2(176, 688)
+shape = SubResource("RectangleShape2D_352x32")
+
+[node name="Void23" type="CollisionShape2D" parent="Walls"]
+position = Vector2(1104, 688)
+shape = SubResource("RectangleShape2D_352x32")
+
+[node name="Void24" type="CollisionShape2D" parent="Walls"]
+position = Vector2(640, 768)
+shape = SubResource("RectangleShape2D_1280x128")
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_rim"]]
+visible = false
+closed = true
+points = PackedVector2Array(384, 64, 896, 64, 896, 96, 1024, 96, 1024, 128, 1088, 128, 1088, 160, 1120, 160, 1120, 192, 1152, 192, 1152, 256, 1184, 256, 1184, 512, 1152, 512, 1152, 576, 1120, 576, 1120, 608, 1088, 608, 1088, 640, 1024, 640, 1024, 672, 928, 672, 928, 704, 352, 704, 352, 672, 256, 672, 256, 640, 192, 640, 192, 608, 160, 608, 160, 576, 128, 576, 128, 512, 96, 512, 96, 256, 128, 256, 128, 192, 160, 192, 160, 160, 192, 160, 192, 128, 256, 128, 256, 96, 384, 96)
+metadata/mote_rim = SubResource("MoteRim_hub")
+
+[node name="Stone" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+position = Vector2(592, 336)
+texture = ExtResource("3_stone")
+centered = false
+
+[node name="StoneLit" type="Sprite2D" parent="." groups=["start_stone_lit"]]
+visible = false
+z_index = -2
+texture_filter = 1
+position = Vector2(592, 336)
+texture = ExtResource("4_stone_lit")
+centered = false
+
+[node name="Altar" type="Sprite2D" parent="."]
+z_index = -2
+texture_filter = 1
+position = Vector2(960, 336)
+texture = ExtResource("5_altar")
+centered = false
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="P1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(560, 528)
+
+[node name="P2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(608, 528)
+
+[node name="P3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(672, 528)
+
+[node name="P4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(720, 528)
+
+[node name="DummySpawns" type="Node2D" parent="."]
+
+[node name="Dummy1" type="Marker2D" parent="DummySpawns"]
+position = Vector2(256, 336)
+
+[node name="Dummy2" type="Marker2D" parent="DummySpawns"]
+position = Vector2(208, 416)
+
+[node name="Dummy3" type="Marker2D" parent="DummySpawns"]
+position = Vector2(304, 416)

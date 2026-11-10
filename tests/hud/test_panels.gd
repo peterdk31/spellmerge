@@ -385,12 +385,14 @@ func _test_bad_indices_are_ignored() -> void:
 	_free_hud(parts)
 
 
-## The panels send no event but the player intent `spell_swap_requested` (a `swap` press);
+## The panels send no event but the player intents `spell_swap_requested` (a `swap` press) and
+## `run_requested` (A on the hub's lit stone; tested in test_pause_menu.gd);
 ## the corner panel itself sends nothing. (Tested in test_quick.gd.)
 func _test_hud_sends_no_events() -> void:
 	var source := FileAccess.get_file_as_string("res://hud/panels/panels.gd")
 	source = source.replace("events.spell_swap_requested.emit(player)", "")
+	source = source.replace("events.run_requested.emit(player)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/staff_row.gd")
-	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request")
+	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request and A on the hub's lit stone")
 	_check(not source.contains("Input."), "the panel scripts read no input")

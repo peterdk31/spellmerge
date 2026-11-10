@@ -1,7 +1,8 @@
 extends Control
 ## The main menu: the name, the tagline, the build version and the Sandbox and Play buttons.
-## Play only sends the intent event `play_requested`; the flow area hears it and
-## starts the arena. The menu never calls flow and never changes the scene itself.
+## Play only sends the intent event `hub_requested`; the flow area hears it and takes everyone
+## to the hub, where players join and start a run from the teleporter stone (docs/milestones/
+## online-lobby.md, L1). The menu never calls flow and never changes the scene itself.
 ## In every build a Sandbox button stands above Play (owner, 2026-11-05); it sends
 ## `sandbox_requested`. In `dev` and `preview` builds it has the focus, so those builds start in
 ## the sandbox with one press (staffs B7); in the others Play has it.
@@ -24,7 +25,7 @@ extends Control
 
 const EventsScript := preload("res://core/events/events.gd")
 
-## The player index sent with `play_requested`: the menu is used by P1 (the mouse
+## The player index sent with `hub_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
 const MENU_PLAYER: int = 0
 ## The build channels where the Sandbox button has the focus (`BuildInfo.channel()`); it shows in all.
@@ -255,7 +256,7 @@ func _on_play_pressed() -> void:
 	if events == null:
 		push_warning("Main menu: the Events autoload is missing, so Play does nothing.")
 		return
-	events.play_requested.emit(MENU_PLAYER)
+	events.hub_requested.emit(MENU_PLAYER)
 
 
 func _on_sandbox_pressed() -> void:

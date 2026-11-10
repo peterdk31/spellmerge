@@ -142,6 +142,19 @@ static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: A
 	return controller
 
 
+## The cards `body`'s staffs hold now, by staff, each a list of card ids by slot (`&""` for an
+## empty slot): what `seat_wizard` takes as `cards`, so a wizard made again keeps its staffs (Flow,
+## from the hub into a run and back; online-lobby L1). Empty for a body with no Caster.
+static func staff_cards(body: Actor) -> Array:
+	var out: Array = []
+	var caster: Caster = body.caster if body != null else null
+	if caster == null:
+		return out
+	for at in caster.staff_count:
+		out.append(caster.cards_of(at))
+	return out
+
+
 ## The PlayerController in `body`'s scene (its home controller), or null. Works before `body` is
 ## in the tree.
 static func of(body: Node) -> PlayerController:

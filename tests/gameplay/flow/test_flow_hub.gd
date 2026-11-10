@@ -99,6 +99,11 @@ func _place(seat: int, on: bool) -> void:
 	wizard.position = centre + Vector2(-24.0 + 16.0 * seat, 8.0) if on else centre + Vector2(0.0, 160.0)
 
 
+## The next physics step starts: the frames service sends a run's start the game asked for.
+func from_frames() -> void:
+	frames.call(&"begin_step", DT)
+
+
 ## One tick of Flow.
 func _tick() -> void:
 	flow.step(DT)
@@ -278,6 +283,8 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 		wizard.health.take(wizard.health.max_health)
 	check(flow.is_restarting(), "everyone down ends the run")
 	flow.step(FlowScript.RESTART_DELAY)
+	# The hub is a run's start of its own: the frames service sends it as the next step starts.
+	from_frames()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal(flow.room_id, FlowScript.HUB_ROOM_ID, "the hub's room")
 	check_equal(_wizards().size(), 2, "both are there")
@@ -310,6 +317,8 @@ func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -
 	for wizard in _wizards():
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
+	# The hub is a run's start of its own: the frames service sends it as the next step starts.
+	from_frames()
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
 	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(2), fresh_y, "seat 1's staff did not come back: the hub's own again")
 	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(2), fresh_y, "seat 0's neither")

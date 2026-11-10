@@ -173,6 +173,7 @@ func _ready() -> void:
 	events.loading_started.connect(func() -> void: _loading = true)
 	events.loading_finished.connect(func() -> void: _loading = false)
 	events.start_stone_changed.connect(func(_standing: int, wizards: int, _lit: bool) -> void: _in_lobby = wizards > 0)
+	frames.recorded_anew.connect(_on_recorded_anew)
 
 
 func _physics_process(_delta: float) -> void:
@@ -358,6 +359,15 @@ func _step_host() -> void:
 			_admit(guest)
 	if _host != null and phase == PLAYING:
 		_step_run()
+
+
+## The run that is recorded began anew (the party is back in its hub; the frames service's
+## `recorded_anew`): when it is the party's, every guest machine in it is sent the new recording.
+func _on_recorded_anew(replay: Replay) -> void:
+	if _host == null or not _party or _host.replay == null or _host.replay != _replay:
+		return
+	_replay = replay
+	_host.rebegin(replay)
 
 
 ## The guest machine `guest` is ready: it is joined to the run (by hand: the run starts).

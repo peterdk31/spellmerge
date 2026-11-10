@@ -32,6 +32,11 @@ extends NetSession
 ##   device's LEAVE, in its frame) is taken off by the host, whose next LOBBY frees the number.
 ##   With no input layer (Host and Join by code's tests, the measured grid) the seats it is made
 ##   with are its own, as the host's lobby then says too.
+## - **The host's run begun anew** (a party back in its hub): a second header is the next
+##   recording's. It and the ticks that follow are kept until this machine has played the one
+##   before to its end (its game then asked for the same start, between the same two ticks);
+##   then the next is played (`Frames.play_live` again) and the host is told (RUN), so what was
+##   sent before is known to be of the recording before.
 ## - **Catching up** on a run joined a while in: while more than FAR ticks wait, each step runs
 ##   as many as fit the time a step has (`pace`), not the usual three.
 ##
@@ -59,6 +64,9 @@ const FAR: int = 120
 const BURST_START: int = 8
 const BURST_MOST: int = 480
 const BURST_USEC: int = 9000
+## The most recordings of the host's that wait to be played (it began its run anew while this
+## machine was still behind).
+const MAX_NEXTS: int = 4
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const _NO_DEVICE: int = InputManagerScript.NO_DEVICE
@@ -136,6 +144,10 @@ var _framed_at: int = -1
 var _players: Array[Player] = [null, null, null, null]
 ## The asks sent (0 to 255, then round again).
 var _asks: int = 0
+## The host's recordings that follow the one played, in order (the run began anew): each is
+## played once the one before is played out. And the headers taken.
+var _nexts: Array[Replay] = []
+var _headers: int = 0
 ## Catching up: the ticks a step runs now (0: not catching up), when its ticks began, and how
 ## many of them are still to step.
 var _burst: int = 0
@@ -252,6 +264,7 @@ func pump() -> bool:
 		_send(NetMessage.of_ping(_now()))
 	_pumps += 1
 	var drained: bool = super()
+	_play_next()
 	_seat_players()
 	# The host gone and everything it sent read: no more ticks will come.
 	if drained and not link.is_open():
@@ -313,9 +326,11 @@ func _take(message: NetMessage) -> String:
 		NetMessage.TICK:
 			if replay == null:
 				return "a tick before the header"
-			if message.tick != replay.tick_count():
-				return "tick %d, not %d" % [message.tick, replay.tick_count()]
-			return replay.add_tick_bytes(message.body)
+			# Of the newest recording there is: the one played, or the last that follows it.
+			var into: Replay = replay if _nexts.is_empty() else _nexts.back()
+			if message.tick != into.tick_count():
+				return "tick %d, not %d" % [message.tick, into.tick_count()]
+			return into.add_tick_bytes(message.body)
 		NetMessage.PONG:
 			var took: int = (_now() - message.stamp) & 0xffffffff
 			if took <= MAX_RTT_MS:
@@ -335,14 +350,18 @@ func _take(message: NetMessage) -> String:
 
 
 func _take_header(message: NetMessage) -> String:
-	if replay != null:
-		return "a second header"
 	var run := Replay.new()
 	var why: String = run.decode(message.body)
 	if why != "":
 		return "the header: " + why
 	if run.tick_count() != 0:
 		return "a header with ticks"
+	if replay != null:
+		# The host's run began anew: played once the one before is played out.
+		if _nexts.size() >= MAX_NEXTS:
+			return "%d recordings waiting" % _nexts.size()
+		_nexts.append(run)
+		return ""
 	_delay.start()
 	_count_delay()
 	feed.replay = run
@@ -352,7 +371,31 @@ func _take_header(message: NetMessage) -> String:
 		return "the host's run is not this game's (its build is %s)" % run.build
 	replay = run
 	started = true
+	_headers = 1
 	return ""
+
+
+## The recording played is played out and the host's next one is here: it is played from its
+## first tick, and the host told. (This machine's game asked for that start itself, at the last
+## tick of the one before, and has waited since.)
+func _play_next() -> void:
+	if _nexts.is_empty() or not started or problem != "" or not frames.is_live() or frames.play_tick() < replay.tick_count():
+		return
+	var run: Replay = _nexts.pop_front()
+	feed.replay = run
+	if not frames.play_live(feed):
+		feed.replay = replay
+		_refuse("the host's next run is not this game's (its build is %s)" % run.build)
+		return
+	replay = run
+	_headers += 1
+	checks = NetChecks.new(checks.every)
+	# The ticks are counted anew: the frames' tags and the presses timed start over.
+	_last_for = 0
+	_sent_at = -1
+	for seat in Replay.SEATS:
+		_presses[seat] = null
+	_send(NetMessage.of_run(_headers))
 
 
 ## The host's word on the seats: which of this machine's players holds which. A player with a

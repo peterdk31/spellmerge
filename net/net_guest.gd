@@ -24,6 +24,11 @@ extends NetSession
 ##   Commands that do not fit the tick's frame (its count, its bytes) wait for the next.
 ## - **The link is read** once a tick, when the first of its seats' frames is built, and before the
 ##   run by `pump` from whoever holds the host. No `_process`, no thread.
+## - **A run begun anew** (`rebegin`: the party back in its hub): the guest is sent the new
+##   recording's header and its ticks from the first. What it sent for the recording before (its
+##   frames, its checks, on their way or sent before it has played that far) is dropped, not
+##   refused: the guest says when it plays the new one (RUN, the number of headers it has taken),
+##   and only from then is what it sends used.
 ## - **Its check** of a tick is compared with the host's own of that tick (`kept`, the host's);
 ##   where they differ the guest is told and the parting kept here (`parted_tick`).
 ## - **The guest gone** (the link closed and all it sent used, or refused): its seats leave, as a
@@ -68,6 +73,10 @@ var admitted: bool = false
 var check_from: int = 0
 ## This machine's pings heard (whoever holds the host knows from them that it is ready).
 var pings_heard: int = 0
+## The headers sent to it (the recordings it was joined to), and the one it says it plays (RUN;
+## the first needs no saying). Its frames and checks are used while the two are the same.
+var headers_sent: int = 0
+var plays_run: int = 1
 ## The host's own checks by tick (the host's dictionary, shared), and the tick of this guest's last.
 var kept: Dictionary[int, Dictionary] = {}
 var checked_to: int = -1
@@ -247,6 +256,34 @@ func seat_one(seat: int, on: bool) -> void:
 		input.leave(seat)
 
 
+## The run began anew, recorded into `run`: its header goes out, its ticks follow from the first,
+## and nothing this guest sent for the recording before is used (its seats stand until it says it
+## plays the new one). The host calls it between ticks, for a guest in the run.
+func rebegin(run: Replay) -> void:
+	replay = run
+	sent_ticks = 0
+	stats.ticks = 0
+	check_from = 0
+	checked_to = -1
+	_read_at = -1
+	_waiting = 0
+	for seat in Replay.SEATS:
+		_queued[seat].clear()
+		_queued_for[seat].clear()
+		_newest_for[seat] = 0
+		_last[seat] = null
+		_presses[seat] = 0
+		_commands[seat].clear()
+		_freed_at[seat] = -1
+	send_header()
+
+
+## The run's header goes out: one more recording this guest is joined to.
+func send_header() -> void:
+	headers_sent += 1
+	send(NetMessage.of_header(replay.header_bytes()))
+
+
 ## Seat `seat` is this machine's player `local`'s: a virtual device joins it through the input
 ## layer, and its frames come from here. Between ticks only (see the top). False, and nothing
 ## changes, when somebody holds the seat.
@@ -347,6 +384,12 @@ func _take(message: NetMessage) -> String:
 			return _take_frame(message)
 		NetMessage.HASHES:
 			return _take_check(message)
+		NetMessage.RUN:
+			# The next one, and one it was sent: never ahead of the host.
+			if message.run != plays_run + 1 or message.run > headers_sent:
+				return "it says it plays recording %d after %d of %d" % [message.run, plays_run, headers_sent]
+			plays_run = message.run
+			return ""
 		NetMessage.SEAT_ASK:
 			if _asks.size() >= MAX_ASKS_WAITING:
 				return "%d asks for a seat waiting" % _asks.size()
@@ -358,6 +401,10 @@ func _take(message: NetMessage) -> String:
 func _take_frame(message: NetMessage) -> String:
 	if replay == null:
 		return "a frame before the run"
+	# Of the recording before (the run began anew since): on its way, or sent before the guest
+	# played that far. Dropped.
+	if plays_run != headers_sent:
+		return ""
 	var frame := InputFrame.new()
 	var why: String = frame.decode(message.body)
 	if why != "":
@@ -384,6 +431,8 @@ func _take_frame(message: NetMessage) -> String:
 
 ## The guest's check of a tick: one per window, in order, of a tick the host has played.
 func _take_check(message: NetMessage) -> String:
+	if replay != null and plays_run != headers_sent:
+		return ""
 	if replay == null or message.tick >= replay.tick_count():
 		return "a check of tick %d, not played yet" % message.tick
 	if message.tick <= checked_to or posmod(message.tick, checks.every) != checks.every - 1:

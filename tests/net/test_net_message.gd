@@ -33,6 +33,7 @@ func _valid() -> Array[PackedByteArray]:
 		NetMessage.of_ping(1234),
 		NetMessage.of_pong(1234),
 		NetMessage.of_seat_ask(2),
+		NetMessage.of_run(2),
 		NetMessage.of_lobby(7, PackedByteArray([NetMessage.NOBODY, 0, NetMessage.NOBODY, 3])),
 	]
 
@@ -61,6 +62,16 @@ func test_every_kind_comes_back_as_written() -> void:
 	var holders := PackedByteArray([NetMessage.NOBODY, 1, 0, NetMessage.NOBODY])
 	check_equal(_message.decode(NetMessage.of_lobby(300, holders)), "", "a lobby")
 	check_equal([_message.kind, _message.answered, _message.holders], [NetMessage.LOBBY, 300 & 0xff, holders], "the asks answered (a byte) and each seat's holder")
+
+
+func test_the_recording_a_client_plays_is_said_by_its_number() -> void:
+	check_equal(_message.decode(NetMessage.of_run(3)), "", "the client plays the host's third recording")
+	check_equal([_message.kind, _message.run], [NetMessage.RUN, 3], "its number")
+	var bytes: PackedByteArray = NetMessage.of_run(2)
+	for none in [0, 1]:
+		bytes[NetMessage.HEAD_BYTES] = none
+		check(_message.decode(bytes) != "", "the first recording needs no saying: %d is refused" % none)
+	check_equal(NetMessage.of_run(0), NetMessage.of_run(2), "and is never written")
 
 
 func test_a_seat_is_asked_for_and_given_only_within_the_four() -> void:
@@ -190,7 +201,7 @@ func test_random_bytes_are_refused_or_read_whole() -> void:
 			check_equal(_message.kind, 0, "a refused message is left empty")
 			continue
 		taken += 1
-		check(_message.kind >= NetMessage.HEADER and _message.kind <= NetMessage.LOBBY, "a known kind")
+		check(_message.kind >= NetMessage.HEADER and _message.kind <= NetMessage.RUN, "a known kind")
 		check(_message.tick >= 0 and _message.tick <= NetMessage.MAX_TICK, "a tick in range")
 		check(_message.hashes.size() <= NetMessage.MAX_AREAS and _message.names.size() <= NetMessage.MAX_PARTED, "within its limits")
 		for name: String in _message.hashes:

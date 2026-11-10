@@ -13,6 +13,7 @@ extends RefCounted
 ## | PARTED | host | a tick whose check failed, and the areas that differ (some of them) |
 ## | PING, PONG | client, host | a stamp, sent back as it came |
 ## | SEAT_ASK | client | one of its players wants a seat: which of its players (0 to 3), never a device |
+## | RUN | client | it plays the host's next recording from here: which one (the headers it has taken, 2 and up), so what it sent before is known to be of the one before |
 ## | LOBBY | host | how many asks it has answered, and for each of the four seats which of that client's players holds it (NOBODY: none of them) |
 ##
 ## The decoder is strict, as the frame's and the replay's are: every size is checked against the
@@ -35,6 +36,7 @@ const PING: int = 6
 const PONG: int = 7
 const SEAT_ASK: int = 8
 const LOBBY: int = 9
+const RUN: int = 10
 ## LOBBY: a seat that is none of this client's.
 const NOBODY: int = 255
 ## A machine's players are 0 to this.
@@ -66,6 +68,8 @@ var hashes: Dictionary[String, int] = {}
 var names: PackedStringArray = PackedStringArray()
 ## SEAT_ASK: which of the client's players asks (0 to MAX_LOCAL).
 var local: int = 0
+## RUN: which of the host's recordings the client plays from here (2 to 255).
+var run: int = 0
 ## LOBBY: the asks answered so far (0 to 255, then round again), and for each seat which of the
 ## client's players holds it (0 to MAX_LOCAL, or NOBODY).
 var answered: int = 0
@@ -153,6 +157,13 @@ static func of_lobby(asks: int, seat_holders: PackedByteArray) -> PackedByteArra
 	return out
 
 
+## The client plays the host's recording number `number` (the headers it has taken) from here.
+static func of_run(number: int) -> PackedByteArray:
+	var out: PackedByteArray = _start(RUN, 1)
+	out.append(clampi(number, 2, 255))
+	return out
+
+
 static func _start(of_kind: int, length: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(HEAD_BYTES)
@@ -210,6 +221,7 @@ func _clear() -> void:
 	hashes = {}
 	names = PackedStringArray()
 	local = 0
+	run = 0
 	answered = 0
 	holders = PackedByteArray()
 
@@ -258,6 +270,10 @@ func _decode(bytes: PackedByteArray) -> String:
 			if length != 1 or bytes[HEAD_BYTES] > MAX_LOCAL:
 				return "a seat asked for by no player"
 			local = bytes[HEAD_BYTES]
+		RUN:
+			if length != 1 or bytes[HEAD_BYTES] < 2:
+				return "a recording that is none"
+			run = bytes[HEAD_BYTES]
 		LOBBY:
 			if length != 1 + Replay.SEATS:
 				return "a lobby of %d bytes" % length

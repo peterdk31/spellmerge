@@ -331,6 +331,14 @@ func step(delta: float) -> void:
 			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
 			# run's tools are picked from.
 			_back_to_hub = false
+			if frames != null:
+				# The hub is a run's start of its own: asked of the frames service, which sends it
+				# between ticks, the same on every machine, and begins a new recording there
+				# when this run is recorded (a recording never grows past one stretch of play).
+				var starter: int = _starter
+				stop_run()
+				frames.restart(&"hub_requested", starter)
+				return
 			mode = MODE_HUB
 			if not start_run(_starter):
 				push_warning("Flow: the hub did not start again after the run, so the run is over.")

@@ -23,6 +23,7 @@ extends Node
 ## then carries them). The lines, one
 ## per tick of the played run (fields separated by tabs, hashes in hex):
 ##
+##     REPLAY BUILD	webrtc=<on|off>	(once, before the scenes: what the export was built with)
 ##     REPLAY START	<scene>	<platform>	ticks=<n>	native=<on|off>	cap=<n>
 ##     REPLAY INPUT	<scene>	<md5 of the replay's bytes: the same inputs on every platform>
 ##     REPLAY TICK	<scene>	<tick>	<whole>	<area>=<hash>	...
@@ -76,6 +77,10 @@ func _run() -> void:
 	var problems := PackedStringArray()
 	# Out of the main menu's first frames: the menu is ready and the game idle.
 	await get_tree().physics_frame
+	# What this export was built with, apart from the replays (not one of their problems; the tool
+	# reports it on its own). This is the one run of the Windows export, so the one place that
+	# sees whether its WebRTC extension loaded (netcode spike S3).
+	print("REPLAY BUILD\twebrtc=%s" % ("on" if NetWebRTC.available() else "off"))
 	for scene in _scenes:
 		if not SCENES.has(scene):
 			problems.append("unknown scene %s" % scene)

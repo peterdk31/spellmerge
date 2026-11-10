@@ -106,6 +106,17 @@ class RunProblemsTest(unittest.TestCase):
         self.assertIn("did not finish (REPLAY HASHES FAILED: boom)", lines[0])
         self.assertEqual(ph.run_problems(ph.parse("web", "nothing"))[1], 2)
 
+    def test_an_export_without_webrtc_is_its_own_problem(self) -> None:
+        good = log(("w0", {"A": "1"}))
+        on = ph.parse("windows", "console.log: REPLAY BUILD\twebrtc=on\n" + good)
+        self.assertEqual(on.build, {"webrtc": "on"})
+        self.assertEqual(list(on.scenes), ["sandbox"])  # the build line is no scene
+        self.assertEqual(ph.run_problems(on), ([], 0))
+        lines, status = ph.run_problems(ph.parse("windows", "REPLAY BUILD\twebrtc=off\n" + good))
+        self.assertEqual(status, 2)
+        self.assertIn("windows: the export has no WebRTC", lines[0])
+        self.assertNotIn("did not finish", lines[0])
+
     def test_a_replay_parting_from_its_own_recording(self) -> None:
         lines, status = ph.run_problems(ph.parse("windows", log(("w0", {"A": "1"}), self_check="parts at tick 7")))
         self.assertEqual(status, 1)

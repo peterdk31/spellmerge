@@ -3376,3 +3376,12 @@ The owner asked for the three ideas picked from a review of every card: a trigge
 - **Licenses:** it also holds libsrtp (BSD-3-Clause) and plog (MIT), beyond the four of decision 8; each desktop build ships all seven license files and a note of where the sources are listed.
 - **Why:** one script knows the release, so an update is its pins (and its license list where the libraries changed); the build script and the game know only that a build has WebRTC or not (`NetWebRTC.available()`).
 
+
+## 2026-11-10: The online lobby is the hub, joined by room codes through a Cloudflare signalling server (owner decisions)
+
+- **Now:** a plan, docs/milestones/online-lobby.md, to build from (L1 the hub offline, L2 the server and room codes, L3 up to three guest machines, L4 reconnects and the rest).
+- **The server:** a Cloudflare Worker with a Durable Object a room, on the free plan, carrying only the `NetCode` offers and answers between the machines of one five-character room code (owner: "if Cloudflare is just as easy and free, we can use them"; AWS's WebSocket API is not free for good).
+- **The lobby is the M5 hub** (owner: "This room IS the M5 hub!"): for now a large island in the void with the teleporter stone in the middle, three dummies together and the multiplayer altar; later it carries the host's save and meta progress (one of three save files).
+- **Starting:** every joined wizard on the stone, then A by anyone. **In the hub hits land and take nothing.**
+- **Joining:** only while the host is in the hub, by catching up on the hub's recording (inputs only, the existing decoders; owner: "Go with the replay for joining now!"); the joining machine's wizards appear on the altar; the code is typed in the main menu. Reconnects during a run come later, with a strict snapshot over the wire.
+- **Why:** pasted codes of about 900 characters, swapped both ways, were too clunky across machines; a hub players walk in has to be simulation, so it is a run of its own kind in lockstep, and a replay is the join that trusts nothing new.

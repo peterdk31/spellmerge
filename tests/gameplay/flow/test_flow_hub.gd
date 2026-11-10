@@ -331,3 +331,59 @@ func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:
 	var world: Node = flow.world
 	_press_a(0)
 	check(flow.world == world, "run_requested out of the hub changes nothing")
+
+
+## The altar (online-lobby L2): which seats' wizards stand on it is told as it changes.
+func test_the_seats_on_the_altar_are_told_as_they_change() -> void:
+	var told: Array[int] = []
+	var hear: Callable = func(seats: int) -> void: told.append(seats)
+	events.connect("altar_changed", hear)
+	_start([0, 2])
+	_tick()
+	told.clear()
+	var altar: Rect2 = _room().altar
+	flow.get_wizard(2).position = altar.get_center()
+	_tick()
+	_tick()
+	check_equal(told, [0b0100] as Array[int], "seat 2's wizard steps on it: told once, by its seat")
+	flow.get_wizard(0).position = altar.position + Vector2(4.0, 4.0)
+	_tick()
+	check_equal(told.back(), 0b0101, "both")
+	flow.get_wizard(2).position = altar.end + Vector2(8.0, 8.0)
+	_tick()
+	check_equal(told.back(), 0b0001, "one steps off")
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(told.back(), 0, "out of the hub nobody is on it")
+	events.disconnect("altar_changed", hear)
+	_stop()
+
+
+## Asked for in the hub, the hub starts anew (net/ begins a recording of it for a machine that
+## joins): everyone back at their spawn, the same seats.
+func test_the_hub_asked_for_in_the_hub_starts_anew() -> void:
+	_start([0, 1])
+	_tick()
+	var before: Vector2 = flow.get_wizard(1).position
+	flow.get_wizard(1).position = before + Vector2(64.0, 0.0)
+	var first: Node = flow.get_wizard(1)
+	events.emit_signal("hub_requested", 0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "still the hub")
+	check_equal(_wizards().size(), 2, "the same two seats")
+	check(flow.get_wizard(1) != first, "with new wizards")
+	check_equal(flow.get_wizard(1).position, before, "at their spawns")
+	# Not from a run of waves: that run plays on.
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	events.emit_signal("hub_requested", 0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the hub asked for during a run changes nothing")
+	_stop()
+

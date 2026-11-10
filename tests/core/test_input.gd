@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_test_a_used_keyboard_keeps_p1()
 	_test_one_device_per_player()
 	_test_a_machine_told_its_seats_seats_its_devices_there()
+	_test_a_machine_whose_seats_are_given_asks_and_is_seated_where_told()
 	_test_a_provisional_keyboard_is_taken_over_on_its_own_seat()
 	_test_own_seats_given_back_seat_the_devices_as_before()
 	_test_full_game_rejects_a_fifth()
@@ -202,6 +203,35 @@ func _test_a_used_keyboard_keeps_p1() -> void:
 	_check(not _manager.is_keyboard_provisional(), "a key join is for real")
 	_press_join(0)
 	_check(_manager.device_of(1) == 0, "the pad is P2")
+
+
+## A machine whose seats another gives out (online lobby L2): with `join_asker` set, a device
+## that would join is not seated here; whoever set it is called with the device and seats it
+## where it says with `join_as`. Leaving is the device's own, as ever.
+func _test_a_machine_whose_seats_are_given_asks_and_is_seated_where_told() -> void:
+	_setup()
+	var asked: Array[int] = []
+	_manager.join_asker = func(device: int) -> void: asked.append(device)
+	_press_join(4)
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(asked == [4, InputManagerScript.KEYBOARD], "each device that presses join is asked for, got %s" % [asked])
+	_check(_manager.joined_count() == 0 and _log.is_empty(), "and nobody is seated here")
+	_check(_manager.join(7) == NO_PLAYER and asked.back() == 7, "a join by call is asked for too")
+	_check(_manager.join_as(4, 2) == 2 and _manager.device_of(2) == 4, "seated where it is told: the pad is P3")
+	_check(_manager.join_as(InputManagerScript.KEYBOARD, 3) == 3 and not _manager.is_keyboard_provisional(), "the keyboard P4, for real")
+	_check(_log == [["joined", 2, 4], ["joined", 3, InputManagerScript.KEYBOARD]], "joined as told, got %s" % [_log])
+	_check(_manager.join_as(4, 0) == NO_PLAYER, "a device that has a seat is not seated twice")
+	_check(_manager.join_as(9, 2) == NO_PLAYER and _manager.device_of(2) == 4, "nor on a seat that is taken")
+	_check(_manager.join_as(9, 4) == NO_PLAYER and _manager.join_as(InputManagerScript.virtual_device_id(0), 0) == NO_PLAYER and _manager.join_as(NO_DEVICE, 0) == NO_PLAYER, "nor outside the four, nor a virtual device, nor none")
+	_manager.handle_event(_key(KEY_W))
+	_check(_manager.get_move(3).y < -0.5, "the keyboard moves the seat it was given")
+	var count: int = asked.size()
+	_press_join(4)
+	_check(asked.size() == count, "a device that plays asks no more")
+	_check(_manager.add_virtual_device(0) != NO_DEVICE, "a virtual device takes its slot as ever (the other machine's seat)")
+	_manager.join_asker = Callable()
+	_press_join(6)
+	_check(_manager.device_of(1) == 6, "with nobody giving seats, a device seats itself again: the lowest free")
 
 
 ## A machine that plays with another one (netcode spike S4): told that only P2 is its own, its

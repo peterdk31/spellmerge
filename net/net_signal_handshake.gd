@@ -53,6 +53,8 @@ var _room_given: bool = false
 ## offer was sent, and when the server named the guest.
 var _guests: Dictionary[int, NetHandshake] = {}
 var _offered: Dictionary[int, bool] = {}
+## The guests whose answer was taken: they look for this machine now, with no more use of the server.
+var _answered_by: Dictionary[int, bool] = {}
 var _named_at: Dictionary[int, int] = {}
 ## The links not handed over by `next_link` yet (the host's), and the first ever made.
 var _links: Array[NetLink] = []
@@ -75,6 +77,11 @@ func offer() -> String:
 		return "it has begun already"
 	_hosting = true
 	return _open()
+
+
+## A room's code, as a player typed it.
+func takes(typed: String) -> bool:
+	return NetSignal.typed_room_code(typed) != ""
 
 
 ## A joining machine: `code` is the room code as a player typed it. (A host is given nothing by
@@ -116,8 +123,8 @@ func link() -> NetLink:
 	return _first
 
 
-## The host's next link not handed over yet, or null: one for each guest machine, in the order
-## they were found.
+## The next link not handed over yet, or null: the host's, one for each guest machine in the
+## order they were found; a joining machine's one link, once.
 func next_link() -> NetLink:
 	return _links.pop_front() if not _links.is_empty() else null
 
@@ -176,8 +183,13 @@ func _hear() -> bool:
 			_room = _message.code
 			_room_given = true
 		NetSignal.GUEST:
-			if not _room_given or _guests.has(_message.id):
+			# The server gives an id again once its guest left; one still linking here (it left
+			# the server with its link) lets the newcomer wait its turn: the server names it
+			# anew when it asks again.
+			if not _room_given or (_guests.has(_message.id) and not _answered_by.has(_message.id)):
 				return false
+			if _guests.has(_message.id):
+				return true
 			var inner: NetHandshake = _make_rtc()
 			var why: String = inner.offer()
 			if why != "":
@@ -190,10 +202,17 @@ func _hear() -> bool:
 		NetSignal.ANSWER:
 			# An answer for nobody (a guest let go a moment ago) is nothing.
 			var inner: NetHandshake = _guests.get(_message.id)
-			if inner != null and _offered[_message.id] and inner.take(_message.code) != "":
-				_drop(_message.id)
+			if inner != null and _offered[_message.id]:
+				if inner.take(_message.code) != "":
+					_drop(_message.id)
+				else:
+					_answered_by[_message.id] = true
 		NetSignal.GONE:
-			_drop(_message.id)
+			# A guest that answered leaves the server as soon as it holds its link, which may be
+			# a moment before this machine holds its own: it is not gone. The inner handshake
+			# gives up by itself if no link comes.
+			if not _answered_by.has(_message.id):
+				_drop(_message.id)
 		NetSignal.JOINED:
 			if _joined_at >= 0:
 				return false
@@ -248,6 +267,7 @@ func _poll_host() -> void:
 			return
 		if _rtc.link() != null:
 			_first = _rtc.link()
+			_links.append(_first)
 			_socket.send(NetSignal.bye())
 			_socket.close()
 			return
@@ -281,6 +301,7 @@ func _drop(id: int) -> void:
 func _forget(id: int) -> void:
 	_guests.erase(id)
 	_offered.erase(id)
+	_answered_by.erase(id)
 	_named_at.erase(id)
 
 

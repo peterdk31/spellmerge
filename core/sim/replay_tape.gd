@@ -24,8 +24,6 @@ var at: int = 0
 var seated: int = 0
 ## A live replay's feed (null: a replay file).
 var feed: LiveFeed = null
-## A live replay's local seats (a bit each): its feed's when the play started.
-var local_seats: int = 0
 var _dealer: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
@@ -33,7 +31,6 @@ func _init(of: Replay, playing_it: bool, fed_by: LiveFeed = null) -> void:
 	replay = of
 	plays = playing_it
 	feed = fed_by
-	local_seats = fed_by.local_seats & 0x0f if fed_by != null else 0
 	seated = of.seats & 0x0f if playing_it else 0
 	_dealer.seed = of.run_seed
 
@@ -96,7 +93,7 @@ func ticks_due() -> int:
 
 ## Whether seat `seat`'s input is this machine's (a live replay's local seat).
 func is_local(seat: int) -> bool:
-	return seat >= 0 and local_seats & (1 << seat) != 0
+	return feed != null and seat >= 0 and seat < 4 and feed.local_seats & (1 << seat) != 0
 
 
 ## The next recorded tick into `frames` (by seat).

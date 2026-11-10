@@ -26,6 +26,12 @@ func offer() -> String:
 	return "this build cannot link two machines"
 
 
+## Whether what a joining player typed or pasted (`typed`) is this kind of handshake's to take:
+## whoever offers several ways in asks each, and never looks at the text itself.
+func takes(_typed: String) -> bool:
+	return true
+
+
 ## The other machine's code. "" when it was taken, else why it was not. Nothing changes then,
 ## unless `problem()` says so after: the handshake itself failed on it.
 func take(_code: String) -> String:

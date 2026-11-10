@@ -24,6 +24,10 @@ extends Resource
 ## A starts the run. Empty (the default) in every other room. Its lit look is the scene's nodes in
 ## the group STONE_LIT, shown only while it is lit.
 @export var start_stone: Rect2 = Rect2()
+## The multiplayer altar, in room pixels (the hub; docs/milestones/online-lobby.md, L2): a seat
+## whose wizard stands in it may open the room to other machines with A (`altar_changed`, the HUD's
+## `online_open_requested`). Empty (the default) in every other room.
+@export var altar: Rect2 = Rect2()
 ## True for a room where wizards take nothing from hits (the hub): a hit still lands (its flash, its
 ## push, its statuses) but takes no health (`Health.invincible`), so nobody is downed there.
 @export var invincible: bool = false

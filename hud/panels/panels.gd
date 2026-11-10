@@ -124,6 +124,8 @@ var _seen_back: Array[int] = [0, 0, 0, 0]
 var _seen_start: Array[int] = [0, 0, 0, 0]
 ## True while the hub's teleporter stone is lit (`start_stone_changed`).
 var _stone_lit: bool = false
+## The seats whose wizards stand on the hub's multiplayer altar (`altar_changed`), a bit each.
+var _altar_seats: int = 0
 var _had_menu: Array[bool] = [false, false, false, false]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
@@ -281,6 +283,7 @@ func _ready() -> void:
 		events.player_stats_changed.connect(_on_stats_changed)
 		events.room_entered.connect(_on_room_entered)
 		events.start_stone_changed.connect(_on_start_stone_changed)
+		events.altar_changed.connect(func(seats: int) -> void: _altar_seats = seats)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
@@ -335,8 +338,11 @@ func poll() -> void:
 		_seen_start[player] = start_count
 		var had_menu: bool = _had_menu[player]
 		if input.is_joined(player):
-			if start_now and _stone_lit and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
-				events.run_requested.emit(player)
+			if start_now and not had_menu and not _has_menu(player) and not _pause_menu.is_open() and events != null:
+				if _stone_lit:
+					events.run_requested.emit(player)
+				elif _altar_seats & (1 << player) != 0:
+					events.online_open_requested.emit(player)
 			if paused_now:
 				_on_pause_pressed(player)
 			elif back_now and not had_menu and not _has_menu(player) and _in_room \

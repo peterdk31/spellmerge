@@ -55,11 +55,12 @@ npx wrangler deploy         # the owner's: deploys it (signs in through the brow
 
 Or from GitHub, with nothing installed: **Actions > deploy-signal > Run workflow** (`.github/workflows/deploy-signal.yml`; on main, the owner only). It needs two secrets in the `automation` environment, `CLOUDFLARE_API_TOKEN` (a token from the "Edit Cloudflare Workers" template, limited to this account) and `CLOUDFLARE_ACCOUNT_ID`, and writes the Worker's address in the run's summary.
 
-After the first deploy the Worker's address (`wss://spellmerge-signal.<account>.workers.dev/room`) goes into `NetSignal.URL` (`net/net_signal.gd`).
+The Worker's address is `NetSignal.URL` (`net/net_signal.gd`): `wss://spellmerge-signal.peterdk31.workers.dev/room`, deployed first on 2026-11-10 by the workflow.
 
-**Not checked yet:** `worker.js` has not run on Cloudflare or under `wrangler dev` (that needs wrangler installed); `rooms.js`, which it only wraps, is what the tests cover.
+**Checking a deploy:** `worker.js` has no test of its own (that needs wrangler; `rooms.js`, which it only wraps, is what the tests cover). After a deploy, play the game's real handshake against it: `godot --headless --path . --script res://tests/net/signal_runner.gd -- --signal=<the address>` prints `SIGNAL OK` (it did on the first deploy).
 
 ## Milestones
 
 - **Online lobby L2** (2026-11-10): the rooms, the Worker, the local server, the tests.
-- **Open:** the first deploy and a try of `worker.js` against it; a CI job for `node --test` (`ci/` is the owner's).
+- **Deployed** (2026-11-10): the first deploy, and the game's handshake through it.
+- **Open:** a CI job for `node --test` (`ci/` is the owner's).

@@ -20,6 +20,18 @@ extends Node
 ##     ONLINE <role> ROW <the counters, JSON>   (the host's, as it leaves)
 ##     ONLINE <role> LINE <the counters' last line on the screen>
 ##     ONLINE <role> OK | FAILED: <why>      (then the process quits)
+##
+## **A room** (online lobby L2, docs/milestones/online-lobby.md; `tools/online_room.sh`): with
+## `--signal=<the room server's address>` the two go the players' other way. The host presses
+## Play (the hub, two players of its own), opens the room at the altar and hands over the room's
+## code; the joining process, with two players of its own, joins by it through the room server
+## and is put into the host's hub. The four walk onto the teleporter stone, the host's first
+## player starts the run with A, and they fight it; back in the hub they do it again. The host
+## passes when every hash check agreed, the joining machine held two seats and a run was started
+## from the stone.
+##
+##     godot --headless --path . -- --online --online-role=host --signal=ws://127.0.0.1:8787/room --ticks=1500
+##     godot --headless --path . -- --online --online-role=join --signal=ws://127.0.0.1:8787/room
 
 const NetPlayScript := preload("res://net/net_play.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -27,6 +39,10 @@ const FramesScript := preload("res://core/sim/frames.gd")
 
 const HANDOFF: String = "user://net/"
 const HOST_CODE: String = "online_runner_host.code"
+const ROOM_CODE: String = "online_runner_room.code"
+## A room: the players each machine brings.
+const OWN_PLAYERS: int = 2
+const HUB_ROOM: String = "res://content/rooms/hub/hub.tres"
 const JOIN_CODE: String = "online_runner_join.code"
 ## The host's run, in ticks, and the longest the whole thing may take, in seconds.
 const TICKS: int = 600
@@ -47,7 +63,49 @@ class Scripted:
 		frame.hold(0, steps % 90 >= 60)
 
 
+## A player in a room: it walks onto the hub's stone and waits there, casting now and then; in a
+## run it walks a square and fights as `Scripted` does. It reads where its wizard stands (the
+## game's own copy of it here), and nothing else of the game.
+class Walker:
+	extends FrameSource
+	var runner: Node = null
+	var seat: int = 0
+	var steps: int = 0
+
+	func fill_frame(frame: InputFrame, _delta: float) -> void:
+		steps += 1
+		frame.aim = posmod(steps * 300 + seat * 2000, InputFrame.AIM_STEPS)
+		var wizard: Node2D = runner.call(&"wizard_of", seat) as Node2D
+		if bool(runner.get(&"in_hub")) and wizard != null:
+			var to: Vector2 = (runner.get(&"stone") as Vector2) + Vector2(-24.0 + 16.0 * seat, 8.0) - wizard.position
+			if to.length() > 6.0:
+				frame.set_move(to.normalized())
+			if steps % 120 == 30 + seat * 11:
+				frame.press(1)
+			return
+		frame.set_move([Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][(steps / 30) % 4] * 0.5)
+		if steps % 40 == 5:
+			frame.press(1)
+		frame.hold(1, steps % 90 >= 60)
+
+
+## A room: true while the party is in the hub, and its stone's middle.
+var in_hub: bool = false
+var stone: Vector2 = Vector2.ZERO
+
 var _hosting: bool = true
+## The room server's address ("": by hand, the codes through files).
+var _signal: String = ""
+var _input: Node = null
+var _flow: Node = null
+var _opened: bool = false
+var _handed_room: bool = false
+## A room: the runs started from the stone, the most seats the joining machine held at once, and
+## the wizards last counted in the hub.
+var _runs: int = 0
+var _most_seats: int = 0
+var _hub_wizards: int = 0
+var _walkers: Array[Walker] = [null, null, null, null]
 var _ticks: int = TICKS
 var _play: NetPlayScript
 var _events: EventsScript
@@ -66,6 +124,8 @@ func _ready() -> void:
 			_hosting = arg.trim_prefix("--online-role=") != "join"
 		elif arg.begins_with("--ticks="):
 			_ticks = maxi(arg.trim_prefix("--ticks=").to_int(), 1)
+		elif arg.begins_with("--signal="):
+			_signal = arg.trim_prefix("--signal=")
 	_play = get_node_or_null(^"/root/NetPlay") as NetPlayScript
 	_events = get_node_or_null(^"/root/Events") as EventsScript
 	_frames = get_node_or_null(^"/root/Frames") as FramesScript
@@ -77,10 +137,76 @@ func _ready() -> void:
 	_events.online_changed.connect(_on_online_changed)
 	_events.online_line_changed.connect(func(line: String) -> void: _last_line = line)
 	DirAccess.make_dir_recursive_absolute(HANDOFF)
-	if _hosting:
+	if _signal != "":
+		_ready_room()
+	elif _hosting:
 		DirAccess.remove_absolute(HANDOFF + HOST_CODE)
 		DirAccess.remove_absolute(HANDOFF + JOIN_CODE)
 		_events.online_host_requested.emit.call_deferred(0)
+
+
+## A room: the handshake goes through the room server at `_signal` (one machine: no STUN server),
+## this machine's players are seated, and the host presses Play.
+func _ready_room() -> void:
+	_input = get_node_or_null(^"/root/PlayerInput")
+	_flow = get_node_or_null(^"/root/Flow")
+	var room: RoomBase = load(HUB_ROOM) as RoomBase
+	if _input == null or _flow == null or room == null:
+		_finish("the PlayerInput or Flow autoload, or the hub, is missing")
+		return
+	stone = room.start_stone.get_center()
+	_play.room_handshake_maker = func() -> NetHandshake:
+		var through := NetSignalHandshake.new(_signal)
+		through.rtc_maker = func() -> NetHandshake: return NetRtc.new(PackedStringArray())
+		return through
+	_events.start_stone_changed.connect(_on_stone)
+	for player in OWN_PLAYERS:
+		_input.call(&"add_virtual_device", player)
+	if _hosting:
+		DirAccess.remove_absolute(HANDOFF + ROOM_CODE)
+		_events.room_entered.connect(_on_room_entered)
+		_events.hub_requested.emit.call_deferred(0)
+
+
+## The host is in its hub: a wizard of its opens the room at the altar (once).
+func _on_room_entered(_room_id: StringName) -> void:
+	if not _opened:
+		_opened = true
+		_events.online_open_requested.emit.call_deferred(0)
+
+
+## Where the party is; and with all four on the lit stone, the host's first player presses A.
+func _on_stone(_standing: int, wizards: int, lit: bool) -> void:
+	in_hub = wizards > 0
+	_hub_wizards = wizards
+	if _hosting and lit and wizards == OWN_PLAYERS * 2 and _play.phase == NetPlayScript.PLAYING:
+		_runs += 1
+		_events.run_requested.emit(0)
+
+
+## This machine's wizard on `seat`, or null (a `Walker` asks).
+func wizard_of(seat: int) -> Node2D:
+	return _flow.call(&"get_wizard", seat) as Node2D
+
+
+## A room: each seat this machine plays gets its scripted player (the host's own two; the seats
+## the host gave the joining machine).
+func _seat_walkers() -> void:
+	var mine: int = 0
+	if _hosting:
+		mine = (1 << OWN_PLAYERS) - 1
+	elif _play.session is NetClient:
+		mine = (_play.session as NetClient).feed.local_seats
+		var held: int = 0
+		for seat in Replay.SEATS:
+			held += 1 if mine & (1 << seat) != 0 else 0
+		_most_seats = maxi(_most_seats, held)
+	for seat in Replay.SEATS:
+		if mine & (1 << seat) != 0 and _walkers[seat] == null:
+			_walkers[seat] = Walker.new()
+			_walkers[seat].runner = self
+			_walkers[seat].seat = seat
+			_frames.set_source(seat, _walkers[seat])
 
 
 func _process(delta: float) -> void:
@@ -89,6 +215,8 @@ func _process(delta: float) -> void:
 	_waited += delta
 	if _waited > PATIENCE:
 		_finish("it took longer than %d seconds (phase %s)" % [PATIENCE, _play.phase])
+	elif _signal != "":
+		_process_room()
 	elif _hosting and not _answered and _play.phase == NetPlayScript.CODE:
 		var answer: String = _handed(JOIN_CODE)
 		if answer != "":
@@ -103,8 +231,37 @@ func _process(delta: float) -> void:
 		_host_leaves()
 
 
+## A room: the code handed over, the joining machine joining by it, the seats played, and the
+## host leaving once its ticks are played.
+func _process_room() -> void:
+	_seat_walkers()
+	if not _hosting and not _joined:
+		var room_code: String = _handed(ROOM_CODE)
+		if room_code != "":
+			_joined = true
+			_events.online_join_requested.emit(0, room_code)
+	elif _hosting and _play.phase == NetPlayScript.PLAYING and _play.session.stats.ticks >= _ticks:
+		_most_seats = 0
+		var theirs: int = (_play.session as NetHost).client_seats()
+		for seat in Replay.SEATS:
+			_most_seats += 1 if theirs & (1 << seat) != 0 else 0
+		_host_leaves()
+
+
 func _on_online_changed(phase: StringName, code: String, note: String) -> void:
 	print("ONLINE %s %s %s" % [_role(), phase, note])
+	if _signal != "":
+		match phase:
+			NetPlayScript.CODE:
+				if not _handed_room:
+					_handed_room = true
+					_hand(ROOM_CODE, code)
+			NetPlayScript.FAILED:
+				_finish(note)
+			NetPlayScript.ENDED:
+				if not _hosting:
+					_finish("")
+		return
 	match phase:
 		NetPlayScript.CODE:
 			if note == "":
@@ -130,6 +287,12 @@ func _host_leaves() -> void:
 		why = "only %d hash checks came back in %d ticks" % [stats.checks, _ticks]
 	elif stats.read_bytes == 0 or stats.stood_in >= stats.ticks:
 		why = "the client's frames never arrived"
+	elif _signal != "" and _most_seats != OWN_PLAYERS:
+		why = "the joining machine holds %d seats, not %d" % [_most_seats, OWN_PLAYERS]
+	elif _signal != "" and _runs == 0:
+		why = "no run was started from the stone (%d wizards in the hub)" % _hub_wizards
+	if _signal != "":
+		print("ONLINE host ROOM %d run(s) from the stone, %d seats on the joining machine" % [_runs, _most_seats])
 	_play.session.link.close()
 	_finish(why)
 
@@ -142,6 +305,8 @@ func _finish(why: String) -> void:
 		# The joining side: it must have played the host's run.
 		if _frames.ticks < 60:
 			why = "the client's game never ran"
+		elif _signal != "" and _most_seats != OWN_PLAYERS:
+			why = "this machine held %d seats, not %d" % [_most_seats, OWN_PLAYERS]
 	print("ONLINE %s LINE %s" % [_role(), _last_line])
 	print("ONLINE %s %s" % [_role(), "OK" if why == "" else "FAILED: " + why])
 	get_tree().quit(0 if why == "" else 1)

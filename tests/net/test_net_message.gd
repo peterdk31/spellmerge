@@ -32,6 +32,8 @@ func _valid() -> Array[PackedByteArray]:
 		NetMessage.of_parted(59, PackedStringArray(["Combat", "actor 7"])),
 		NetMessage.of_ping(1234),
 		NetMessage.of_pong(1234),
+		NetMessage.of_seat_ask(2),
+		NetMessage.of_lobby(7, PackedByteArray([NetMessage.NOBODY, 0, NetMessage.NOBODY, 3])),
 	]
 
 
@@ -54,6 +56,31 @@ func test_every_kind_comes_back_as_written() -> void:
 	check_equal([_message.kind, _message.stamp], [NetMessage.PING, 0xfffffffe], "its stamp, 32 bits")
 	check_equal(_message.decode(NetMessage.of_pong(77)), "", "a pong")
 	check_equal([_message.kind, _message.stamp], [NetMessage.PONG, 77], "its stamp")
+	check_equal(_message.decode(NetMessage.of_seat_ask(3)), "", "an ask for a seat")
+	check_equal([_message.kind, _message.local], [NetMessage.SEAT_ASK, 3], "its player")
+	var holders := PackedByteArray([NetMessage.NOBODY, 1, 0, NetMessage.NOBODY])
+	check_equal(_message.decode(NetMessage.of_lobby(300, holders)), "", "a lobby")
+	check_equal([_message.kind, _message.answered, _message.holders], [NetMessage.LOBBY, 300 & 0xff, holders], "the asks answered (a byte) and each seat's holder")
+
+
+func test_a_seat_is_asked_for_and_given_only_within_the_four() -> void:
+	var ask: PackedByteArray = NetMessage.of_seat_ask(1)
+	ask[NetMessage.HEAD_BYTES] = 4
+	check(_message.decode(ask) != "", "a fifth player is refused")
+	ask[NetMessage.HEAD_BYTES] = 255
+	check(_message.decode(ask) != "", "and no player")
+	check_equal(NetMessage.of_seat_ask(9), NetMessage.of_seat_ask(3), "an ask is never written for more than the fourth")
+	var lobby: PackedByteArray = NetMessage.of_lobby(0, PackedByteArray([0, 1, 2, 3]))
+	check_equal(_message.decode(lobby), "", "four players on four seats")
+	lobby[NetMessage.HEAD_BYTES + 2] = 4
+	check(_message.decode(lobby).contains("held by player 4"), "a seat held by a fifth player is refused")
+	lobby[NetMessage.HEAD_BYTES + 2] = 0
+	check(_message.decode(lobby).contains("two seats"), "a player on two seats is refused")
+	check_equal(_message.holders, PackedByteArray(), "and nothing of it is kept")
+	var short: PackedByteArray = NetMessage.of_lobby(0, PackedByteArray([0]))
+	check_equal(_message.decode(short), "", "holders left out are nobody")
+	check_equal(_message.holders, PackedByteArray([0, NetMessage.NOBODY, NetMessage.NOBODY, NetMessage.NOBODY]), "so the lobby is whole")
+	check_equal(NetMessage.of_lobby(0, PackedByteArray([9, 0, 0, 0])).slice(NetMessage.HEAD_BYTES + 1, NetMessage.HEAD_BYTES + 2), PackedByteArray([NetMessage.NOBODY]), "a holder that is no player is written as nobody")
 
 
 func test_a_parting_names_at_most_its_limit_and_only_names() -> void:
@@ -163,7 +190,7 @@ func test_random_bytes_are_refused_or_read_whole() -> void:
 			check_equal(_message.kind, 0, "a refused message is left empty")
 			continue
 		taken += 1
-		check(_message.kind >= NetMessage.HEADER and _message.kind <= NetMessage.PONG, "a known kind")
+		check(_message.kind >= NetMessage.HEADER and _message.kind <= NetMessage.LOBBY, "a known kind")
 		check(_message.tick >= 0 and _message.tick <= NetMessage.MAX_TICK, "a tick in range")
 		check(_message.hashes.size() <= NetMessage.MAX_AREAS and _message.names.size() <= NetMessage.MAX_PARTED, "within its limits")
 		for name: String in _message.hashes:

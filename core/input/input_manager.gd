@@ -125,6 +125,12 @@ var events: EventsScript = null
 
 ## Gives the name of a gamepad by device id; tests replace it.
 var joy_name_provider: Callable = Input.get_joy_name
+## Who gives this machine's real devices their seats, when it is not this layer: while valid, a
+## device that would join (the `join` action, `join`) is not seated here; this is called with the
+## device, and whoever set it seats it later, on the seat it says (`join_as`). A machine that
+## plays another machine's run sets it (net/): the host gives the seats out. Invalid: seats are
+## taken here, as ever. This layer knows nothing of why.
+var join_asker: Callable = Callable()
 ## Shakes a gamepad: (device, weak 0..1, strong 0..1, seconds). Tests replace it.
 var vibrator: Callable = Input.start_joy_vibration
 
@@ -247,6 +253,9 @@ func joined_count() -> int:
 func join(device: int, provisional: bool = false) -> int:
 	if device == NO_DEVICE or is_virtual(device) or player_of(device) != NO_PLAYER:
 		return NO_PLAYER
+	if join_asker.is_valid():
+		join_asker.call(device)
+		return NO_PLAYER
 	var player: int = NO_PLAYER
 	if device == KEYBOARD:
 		if _own_count > 0 and _devices[_own_first] == NO_DEVICE:
@@ -259,6 +268,18 @@ func join(device: int, provisional: bool = false) -> int:
 	if player != NO_PLAYER:
 		_keyboard_provisional = provisional and device == KEYBOARD
 		_assign(player, device)
+	return player
+
+
+## Seat the real device `device` on `player`, whatever this machine's own seats are: the answer
+## to `join_asker`. Returns `player`, or NO_PLAYER (and nothing changes) when the device has
+## joined already, is no real device, or the seat is taken.
+func join_as(device: int, player: int) -> int:
+	if device == NO_DEVICE or is_virtual(device) or player_of(device) != NO_PLAYER or not _valid(player) or _devices[player] != NO_DEVICE:
+		return NO_PLAYER
+	if device == KEYBOARD:
+		_keyboard_provisional = false
+	_assign(player, device)
 	return player
 
 
@@ -372,7 +393,7 @@ func handle_event(event: InputEvent) -> void:
 	var player: int = player_of(device)
 	if player == NO_PLAYER:
 		if event.is_action_pressed(JOIN):
-			if device != KEYBOARD and is_keyboard_provisional():
+			if device != KEYBOARD and is_keyboard_provisional() and not join_asker.is_valid():
 				_hand_over(device)
 			else:
 				join(device)

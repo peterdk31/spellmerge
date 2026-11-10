@@ -25,8 +25,8 @@ extends RefCounted
 ## Nothing here names a networking class (`NetSignalSocket` does).
 
 ## The room server's address: the one place the game is told it (the owner's deploy of
-## `server/signal/`). "" until it is deployed: a build without it says so and connects nowhere.
-const URL: String = ""
+## `server/signal/`, 2026-11-10). With "" here a build says so and connects nowhere.
+const URL: String = "wss://spellmerge-signal.peterdk31.workers.dev/room"
 
 ## The characters of a room code: letters and digits that are not misread for one another.
 const ALPHABET: String = "2346789ABCDEFGHJKMNPQRTWXYZ"

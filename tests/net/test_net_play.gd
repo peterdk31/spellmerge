@@ -10,6 +10,7 @@ extends "res://tests/support/suite.gd"
 
 const NetPlayScript := preload("res://net/net_play.gd")
 const LoopHandshake := preload("res://tests/net/loop_handshake.gd")
+const RoomHandshake := preload("res://tests/net/room_handshake.gd")
 const ContentFight := preload("res://tests/core/content_fight.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
@@ -26,6 +27,9 @@ class Machine:
 	var fight: ContentFight
 	var play: NetPlayScript
 	var handshake: LoopHandshake = null
+	var room: RoomHandshake = null
+	## Every seat that joined (seat + 1) or left (-seat - 1) on this machine.
+	var seats: Array[int] = []
 	## Every `online_changed`, as [phase, code, note], and every line.
 	var changes: Array[Array] = []
 	var lines: PackedStringArray = PackedStringArray()
@@ -43,10 +47,15 @@ class Machine:
 		play.handshake_maker = func() -> NetHandshake:
 			handshake = LoopHandshake.new(table)
 			return handshake
+		play.room_handshake_maker = func() -> NetHandshake:
+			room = RoomHandshake.new(table)
+			return room
 		root.add_child(play)
 		play.set_physics_process(false)
 		fight.fight.bus.online_changed.connect(func(phase: StringName, code: String, note: String) -> void: changes.append([phase, code, note]))
 		fight.fight.bus.online_line_changed.connect(func(line: String) -> void: lines.append(line))
+		fight.fight.bus.seat_joined.connect(func(seat: int) -> void: seats.append(seat + 1))
+		fight.fight.bus.seat_left.connect(func(seat: int) -> void: seats.append(-seat - 1))
 
 	func phases() -> Array[StringName]:
 		var out: Array[StringName] = []
@@ -79,6 +88,10 @@ class Machine:
 var _registry: RegistryScript
 var _host: Machine
 var _client: Machine
+## A third machine, made by the tests that need one.
+var _third: Machine = null
+var _card: SpellComponent = null
+var _table: Dictionary = {}
 
 
 func before_each() -> void:
@@ -88,14 +101,18 @@ func before_each() -> void:
 	for found: Resource in _registry.get_all(&"spells"):
 		if found is SpellComponent and (found as SpellComponent).id == CARD:
 			card = found as SpellComponent
-	var table: Dictionary = {}
-	_host = Machine.new(root, card, table)
-	_client = Machine.new(root, card, table)
+	_card = card
+	_table = {}
+	_third = null
+	_host = Machine.new(root, card, _table)
+	_client = Machine.new(root, card, _table)
 
 
 func after_each() -> void:
 	_host.free_all()
 	_client.free_all()
+	if _third != null:
+		_third.free_all()
 	for name: String in ["online_host_parted", "online_client_parted"]:
 		DirAccess.remove_absolute(Replay.FOLDER + name + Replay.EXTENSION)
 
@@ -113,6 +130,8 @@ func _steps(count: int) -> void:
 	for i in count:
 		_host.step()
 		_client.step()
+		if _third != null:
+			_third.step()
 
 
 ## Host and Join pressed and the codes swapped as two players would; both step until `phase`.
@@ -196,6 +215,8 @@ func test_the_run_starts_only_when_both_machines_have_loaded() -> void:
 	# The host the slower one: the client's pings wait for it.
 	_host.free_all()
 	_client.free_all()
+	if _third != null:
+		_third.free_all()
 	before_each()
 	_seat_scripted_players()
 	_host.fight.fight.bus.play_load_requested.connect(func() -> void: _host.fight.fight.bus.loading_started.emit())
@@ -211,10 +232,10 @@ func test_each_machine_seats_its_own_device_on_its_own_seat() -> void:
 	# Nobody has joined: the menus were worked with the mouse.
 	_host.fight.fight.bus.online_host_requested.emit(0)
 	check_equal([_host.fight.input.device_of(0), _host.fight.input.is_keyboard_provisional()], [KEYBOARD, true], "the host's keyboard is seat 0, until a gamepad wants it")
-	check_equal([_host.fight.input.own_first_seat(), _host.fight.input.own_seat_count()], [0, 1], "and seat 0 alone is the host machine's")
+	check_equal([_host.fight.input.own_first_seat(), _host.fight.input.own_seat_count()], [0, 4], "and the host machine's players take seats as ever: the lowest free")
 	_steps(4)
 	_client.fight.fight.bus.online_join_requested.emit(0, _host.play.code)
-	check_equal([_client.fight.input.device_of(NetHost.SEAT), _client.fight.input.is_joined(0)], [KEYBOARD, false], "the client's keyboard is the client's seat, not seat 0")
+	check_equal(_client.fight.input.joined_count(), 0, "the client's devices are not seated before the host says where")
 	_steps(4)
 	_host.fight.fight.bus.online_answer_requested.emit(0, _client.play.code)
 	_steps(WARM_UP + 10)
@@ -240,13 +261,18 @@ func test_a_gamepad_that_joined_before_join_was_pressed_is_the_clients_seat() ->
 	_host.fight.fight.bus.online_host_requested.emit(0)
 	_steps(4)
 	_client.fight.fight.bus.online_join_requested.emit(0, _host.play.code)
-	check_equal([_client.fight.input.device_of(NetHost.SEAT), _client.fight.input.is_joined(0)], [3, false], "Join moves it to the client's seat")
+	check_equal(_client.fight.input.device_of(0), 3, "it stays where it is until the machines are linked")
+	_steps(4)
+	_host.fight.fight.bus.online_answer_requested.emit(0, _client.play.code)
+	_steps(WARM_UP + 10)
+	check_equal(_client.play.phase, NetPlayScript.PLAYING, "the run plays")
+	check_equal([_client.fight.input.device_of(NetHost.SEAT), InputManagerScript.is_virtual(_client.fight.input.device_of(0))], [3, true], "the host seated it on the seat it gave; seat 0 is the host's")
 	check_equal(_client.fight.input.player_of(KEYBOARD), InputManagerScript.NO_PLAYER, "and the keyboard stays out")
 
 
 func test_a_refused_code_says_why_and_another_may_be_given() -> void:
 	_seat_scripted_players()
-	_client.fight.fight.bus.online_join_requested.emit(0, "not the host's code")
+	_client.fight.fight.bus.online_join_requested.emit(0, NetCode.PREFIX + "bm90")
 	check_equal(_client.play.phase, NetPlayScript.FAILED, "Join with what is no host's code fails")
 	check(_client.play.note.contains("not the host's code") and _client.play.note.ends_with("."), "and says why, as a sentence (%s)" % _client.play.note)
 	check_equal([_client.fight.input.own_first_seat(), _client.fight.input.own_seat_count()], [0, 4], "the machine's seats are as they were")
@@ -300,7 +326,7 @@ func test_a_machine_that_leaves_before_the_run_fails_the_other() -> void:
 	_host.fight.fight.bus.online_leave_requested.emit(0)
 	_steps(2)
 	check_equal(_host.play.phase, NetPlayScript.OFF, "the host gave up")
-	check_equal([_client.play.phase, _client.play.note], [NetPlayScript.FAILED, "The host left."], "the client is told")
+	check_equal([_client.play.phase, _client.play.note], [NetPlayScript.FAILED, "The host left, or its party cannot be joined right now."], "the client is told")
 	check(_client.play.session == null and not _client.fight.frames.is_live(), "and holds no session and plays nothing")
 
 
@@ -387,3 +413,214 @@ func test_a_failed_check_is_said_once_and_the_run_saved() -> void:
 	if host_run != null and client_run != null:
 		check(host_run.tick_count() > (_host.play.session as NetHost).parted_tick and client_run.tick_count() > 0, "with the ticks up to the parting (%d, %d)" % [host_run.tick_count(), client_run.tick_count()])
 		check_equal(client_run.run_seed, host_run.run_seed, "of the same run")
+
+
+# --- A room: the hub's altar and Join online (online lobby L2) -------------------
+
+## The host's party stands in the hub and a wizard of its presses A on the altar.
+func _open_room() -> void:
+	_seat_scripted_players()
+	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	_steps(4)
+
+
+func _join_room(machine: Machine, typed: String = RoomHandshake.ROOM) -> void:
+	machine.fight.fight.bus.online_join_requested.emit(0, typed)
+	for i in WARM_UP + 20:
+		_host.step()
+		_client.step()
+		if _third != null:
+			_third.step()
+
+
+func test_the_altar_opens_a_room_and_says_its_code() -> void:
+	_seat_scripted_players()
+	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	check_equal(_host.phases(), [NetPlayScript.MAKING] as Array[StringName], "A on the altar: the room is being made")
+	_steps(4)
+	check_equal(_host.changes.back(), [NetPlayScript.CODE, RoomHandshake.ROOM, ""], "then its code is said")
+	check(not _host.lines.is_empty() and _host.lines[-1].contains(RoomHandshake.ROOM), "and shown in the HUD's line (%s)" % ", ".join(_host.lines))
+	check(_host.play.session == null and not _host.fight.frames.is_recording(), "the party plays on as it was: nothing is recorded, nobody is linked")
+	check_equal(_host.fight.input.joined_count(), 1, "and nobody's seat changed")
+
+
+func test_a_machine_joins_the_room_by_its_code_and_plays_the_hosts_run() -> void:
+	_open_room()
+	_join_room(_client, " kq7rm ")
+	check_equal([_host.play.phase, _client.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING], "both play")
+	check_equal(_client.phases(), [NetPlayScript.MAKING, NetPlayScript.LINKED, NetPlayScript.PLAYING] as Array[StringName], "the joining machine shows no code of its own")
+	check(_host.fight.frames.is_recording() and _client.fight.frames.is_live(), "the host records its hub, the joining machine plays it live")
+	check_equal((_host.play.session as NetHost).replay.start, NetPlayScript.ROOM_START, "begun as the hub")
+	check_equal((_host.play.session as NetHost).guest_seats(), 1 << 1, "the joining machine's player has the lowest free seat")
+	check(InputManagerScript.is_virtual(_host.fight.input.device_of(1)) and _client.fight.input.is_joined(1), "a virtual device on the host, the machine's own device on it there")
+	check(_host.room != null and _host.room.problem() == "" and _host.play.code == RoomHandshake.ROOM, "the room stays open under the run")
+	_steps(200)
+	check(_host.ticks >= 200 and _client.ticks >= _host.ticks - 10, "both play (%d and %d ticks)" % [_host.ticks, _client.ticks])
+	var first: int = -1
+	for tick in mini(_host.run.hashes.size(), _client.run.hashes.size()):
+		if _host.run.hashes[tick] != _client.run.hashes[tick]:
+			first = tick
+			break
+	check_equal(first, -1, "the same state at every tick both ran")
+	var totals: NetStats = (_host.play.session as NetHost).totals()
+	check(totals.checks >= 2 and totals.mismatches == 0, "the checks passed (%d)" % totals.checks)
+	check(_client.play.session.stats.presses > 0, "the joining machine's presses are in the host's ticks")
+	check(_host.lines[-1].begins_with("Room %s, 1 machine(s) joined." % RoomHandshake.ROOM), "the host's line keeps the room's code and says who is in (%s)" % _host.lines[-1])
+
+
+func test_the_room_stays_open_when_the_machine_leaves_and_another_joins() -> void:
+	_open_room()
+	_join_room(_client)
+	_steps(60)
+	_client.play.session.link.close()
+	_steps(6)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.CODE, RoomHandshake.ROOM], "the machine gone: the room is open as before")
+	check(_host.play.note.contains("still open"), "and the host is told (%s)" % _host.play.note)
+	check(_host.play.session == null and not _host.fight.frames.is_recording(), "the recording ended with it")
+	check(not _host.fight.input.is_joined(1), "and its seat left, as an unplugged pad's")
+	check_equal(_client.play.phase, NetPlayScript.ENDED, "the machine that left plays on alone")
+	# Another machine joins the same room, into a hub begun anew.
+	_third = Machine.new(root, _card, _table)
+	_third.fight.input.add_virtual_device(NetHost.SEAT)
+	_third.fight.frames.set_source(0, null)
+	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_join_room(_third)
+	check_equal([_host.play.phase, _third.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING], "the next machine plays")
+	check((_host.play.session as NetHost).replay.tick_count() < WARM_UP + 60, "in a recording begun for it")
+
+
+func test_a_machine_that_comes_while_the_party_is_out_of_the_hub_is_turned_away() -> void:
+	_open_room()
+	# The party left the hub (a run from the stone).
+	_host.fight.fight.bus.start_stone_changed.emit(0, 0, false)
+	_host.seats.clear()
+	_join_room(_client)
+	check_equal(_client.play.phase, NetPlayScript.FAILED, "it does not get in")
+	check(_client.play.note.contains("cannot be joined"), "and is told so (%s)" % _client.play.note)
+	check_equal(_host.seats, [] as Array[int], "no wizard of its ever stood in the host's run, even for a moment")
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.CODE, RoomHandshake.ROOM], "the room stays open")
+	check(_host.play.note.contains("hub only"), "and the host is told what happened (%s)" % _host.play.note)
+	check(not _host.fight.frames.is_recording() and not _host.fight.input.is_joined(1), "nothing was recorded and nobody seated")
+	check_equal(_client.fight.input.device_of(NetHost.SEAT), InputManagerScript.virtual_device_id(NetHost.SEAT), "the machine's player sits where it sat")
+
+
+func test_a_wrong_room_code_fails_and_says_so() -> void:
+	_open_room()
+	_client.fight.fight.bus.online_join_requested.emit(0, "KQ7R")
+	check_equal(_client.play.phase, NetPlayScript.FAILED, "what is no room's code fails at once")
+	check(_client.play.note.contains("letters and digits"), "and says what a code is (%s)" % _client.play.note)
+	_table[&"open"] = false
+	_steps(2)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.FAILED, ""], "the room closed (the server's doing): the host is told")
+	check(_host.play.note.contains("closed"), "in words (%s)" % _host.play.note)
+	check_equal(_host.lines[-1], "", "and the HUD's line with the code is cleared")
+	_client.fight.fight.bus.online_join_requested.emit(0, RoomHandshake.ROOM)
+	_steps(4)
+	check_equal(_client.play.phase, NetPlayScript.FAILED, "a room that is closed is none")
+	check(_client.play.note.contains("No room has the code"), "and it says so (%s)" % _client.play.note)
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	_steps(4)
+	check_equal(_host.play.phase, NetPlayScript.CODE, "the host may open a room again")
+
+
+func test_the_altar_asked_again_says_the_code_again_and_closes_nothing() -> void:
+	_open_room()
+	var said: int = _host.changes.size()
+	var first: RoomHandshake = _host.room
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.CODE, RoomHandshake.ROOM], "A on the altar again (it is also the dash): the room stays open")
+	check(_host.room == first and _table.get(&"open", false), "the same room")
+	check(_host.changes.size() > said and _host.lines[-1].contains(RoomHandshake.ROOM), "and its code is said again")
+	_join_room(_client)
+	check_equal(_client.play.phase, NetPlayScript.PLAYING, "a machine still joins it")
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	check_equal(_host.play.phase, NetPlayScript.PLAYING, "A on the altar under the run changes nothing")
+
+
+func test_the_altar_opens_nothing_under_a_replay() -> void:
+	_seat_scripted_players()
+	var replay: Replay = _host.fight.frames.record(&"sandbox_requested", 0, 5)
+	for i in 4:
+		_host.fight.frames.tick(ContentFight.DT)
+	_host.fight.frames.stop_recording()
+	check(_host.fight.frames.play(replay), "a replay plays")
+	_host.fight.fight.bus.online_open_requested.emit(0)
+	check_equal([_host.play.phase, _host.room == null], [NetPlayScript.OFF, true], "A on the altar in a replay opens no room")
+
+
+func test_the_host_waits_for_the_joining_machines_pings_not_for_any_messages() -> void:
+	_open_room()
+	# A second player on the joining machine: two asks for seats reach the host beside its pings.
+	_client.fight.input.add_virtual_device(2)
+	_client.fight.fight.bus.online_join_requested.emit(0, RoomHandshake.ROOM)
+	var pings_at_start: int = -1
+	for i in WARM_UP + 20:
+		_steps(1)
+		if _host.play.phase == NetPlayScript.PLAYING:
+			pings_at_start = (_host.play.session as NetHost).guests[0].pings_heard
+			break
+	check(pings_at_start >= NetPlayScript.READY_PINGS, "the run began only once the machine's pings said it was ready (%d heard)" % pings_at_start)
+
+
+## A party of several machines (online lobby L3 through the room): a second machine joins while
+## the first plays, catches up on what was recorded, and each leaves on its own.
+func test_a_second_machine_joins_the_party_while_the_first_plays() -> void:
+	_open_room()
+	_join_room(_client)
+	_steps(90)
+	check_equal(_host.play.phase, NetPlayScript.PLAYING, "the first machine plays")
+	var recording: Replay = (_host.play.session as NetHost).replay
+	_third = Machine.new(root, _card, _table)
+	_third.fight.input.add_virtual_device(NetHost.SEAT)
+	_third.fight.frames.set_source(0, null)
+	_host.seats.clear()
+	_join_room(_third)
+	check_equal([_host.play.phase, _client.play.phase, _third.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING, NetPlayScript.PLAYING], "all three play")
+	var host: NetHost = _host.play.session as NetHost
+	check(host.replay == recording, "in the recording the first machine plays: it did not begin anew under it")
+	check_equal([host.guests.size(), host.guest_seats()], [2, 0b0110], "two guest machines, a seat each: the lowest free")
+	check_equal(_host.seats, [3], "the second machine's player was seated once, in the run")
+	check(_host.changes.back()[0] == NetPlayScript.PLAYING and _host.phases().count(NetPlayScript.PLAYING) == 1, "the host went on playing: no phase was said again")
+	# However slow this machine is under the test's own captures: a step's time is never short.
+	(_third.play.session as NetClient).burst_usec = 1 << 40
+	_steps(200)
+	for machine: Machine in [_client, _third]:
+		var first: int = -1
+		for tick in mini(_host.run.hashes.size(), machine.run.hashes.size()):
+			if _host.run.hashes[tick] != machine.run.hashes[tick]:
+				first = tick
+				break
+		check_equal(first, -1, "the same state at every tick the host and a guest ran")
+	check(_third.ticks >= _host.ticks - 12, "the machine that came later caught up (%d of %d ticks)" % [_third.ticks, _host.ticks])
+	var totals: NetStats = host.totals()
+	check(totals.checks >= 4 and totals.mismatches == 0, "both machines' checks passed (%d)" % totals.checks)
+	check(_host.lines[-1].contains("2 machine(s) joined"), "the host's line says who is in (%s)" % _host.lines[-1])
+	# The first machine leaves: the second plays on with the host.
+	_client.play.session.link.close()
+	_steps(6)
+	check_equal([_host.play.phase, host.guests.size(), _third.play.phase], [NetPlayScript.PLAYING, 1, NetPlayScript.PLAYING], "one machine gone, the other plays on")
+	check(not _host.fight.input.is_joined(1) and _host.fight.input.is_joined(2), "its seat left; the other's stays")
+	check(_host.fight.frames.is_recording(), "the recording goes on")
+	_third.play.session.link.close()
+	_steps(6)
+	check_equal([_host.play.phase, _host.play.code], [NetPlayScript.CODE, RoomHandshake.ROOM], "the last one gone: the room is open as before")
+	check(_host.play.session == null and not _host.fight.frames.is_recording(), "and the recording ended")
+
+
+func test_a_fourth_guest_machine_is_not_taken() -> void:
+	_open_room()
+	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	var links: Array[NetLink] = []
+	for i in NetHost.GUESTS + 1:
+		var joiner := RoomHandshake.new(_table)
+		check_equal(joiner.take(RoomHandshake.ROOM), "", "machine %d names the room" % (i + 2))
+		joiner.poll()
+		links.append(joiner.link())
+		_steps(2)
+	check_equal((_host.play.session as NetHost).guests.size(), NetHost.GUESTS, "three guest machines are taken")
+	check(links[0].is_open() and links[1].is_open() and links[2].is_open(), "their links are open")
+	check(not links[3].is_open(), "the fourth's is closed: the host takes three")
+

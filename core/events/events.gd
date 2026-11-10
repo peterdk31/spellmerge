@@ -95,6 +95,8 @@ signal online_host_requested(player: int)
 signal online_join_requested(player: int, code: String)
 ## Sender: hud. The host's `player` gave the code `code` the joining player sent back (pasted text, as above). Heard by net.
 signal online_answer_requested(player: int, code: String)
+## Sender: hud. `player` pressed A (`accept`) with no menu open while their wizard stood on the hub's multiplayer altar (`altar_changed`): open this party to other machines (online-lobby L2). Not a command: the simulation never knows a network exists. Heard by net, which opens a room and says its code (`online_changed`); nothing connects anywhere before this.
+signal online_open_requested(player: int)
 ## Sender: hud. `player` gave up hosting or joining before the run began. Heard by net.
 signal online_leave_requested(player: int)
 ## Sender: net. A run will start soon that cannot wait at its start: do the work that must be ready before a room now (behind the loading screen, `loading_started` to `loading_finished`), so the run starts on the tick it is asked for. Two machines that start one run together must: a load takes each its own time. Heard by flow (its `play_tasks`); with nothing to load, nothing happens.
@@ -276,6 +278,8 @@ signal sandbox_changed(on: bool)
 ## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone)
 ## and feel (the stone's lit look, `RoomBase.STONE_LIT`).
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
+## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (`RoomBase.altar`), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
+signal altar_changed(seats: int)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.

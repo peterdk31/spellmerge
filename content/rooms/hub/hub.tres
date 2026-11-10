@@ -11,5 +11,6 @@ player_spawns = PackedVector2Array(560, 528, 608, 528, 672, 528, 720, 528)
 dummy_spawns = PackedVector2Array(256, 336, 208, 416, 304, 416)
 dummy_ids = Array[StringName]([&"training_dummy"])
 start_stone = Rect2(592, 336, 96, 96)
+altar = Rect2(960, 336, 96, 96)
 invincible = true
 ambient = 0.9

@@ -70,6 +70,7 @@ func _initialize() -> void:
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_a_on_the_lit_stone_starts_the_run()
+	_test_a_on_the_altar_asks_to_open_the_room()
 	_test_the_run_ending_closes_it()
 	_teardown()
 	if _failures.is_empty():
@@ -691,6 +692,47 @@ func _test_b_opens_the_builder_in_play_only() -> void:
 	_tap(0, &"back")
 	_frame()
 	_check(not _hud.get_radial(0).is_open(), "no builder outside a room")
+
+
+## The hub's altar (online-lobby L2): A (`accept`) sends `online_open_requested` for a player
+## whose wizard stands on it (`altar_changed`), with no menu open; the lit stone's A comes first.
+func _test_a_on_the_altar_asks_to_open_the_room() -> void:
+	_setup(2)
+	var asked: Array[int] = []
+	var runs: Array[int] = []
+	_bus.online_open_requested.connect(func(player: int) -> void: asked.append(player))
+	_bus.run_requested.connect(func(player: int) -> void: runs.append(player))
+	_tap(1, &"accept")
+	_frame()
+	_check(asked.is_empty(), "A away from the altar asks nothing")
+	_bus.altar_changed.emit(0b0010)
+	_tap(0, &"accept")
+	_frame()
+	_check(asked.is_empty(), "A by a player who is not on the altar asks nothing")
+	_tap(1, &"accept")
+	_frame()
+	_check((asked.size() == 1 and asked[0] == 1), "A on the altar asks to open the room, for its player: %s" % [asked])
+	_tap(1, &"back")
+	_frame()
+	_tap(1, &"accept")
+	_frame()
+	_check((asked.size() == 1 and asked[0] == 1), "A inside a builder is the builder's: %s" % [asked])
+	_tap(1, &"back")
+	_frame()
+	if _hud.get_radial(1).is_open():
+		_hud.get_radial(1).close()
+	_frame()
+	_frame()
+	_check(not _hud.get_radial(1).is_open(), "its builder is closed again")
+	_bus.start_stone_changed.emit(2, 2, true)
+	_tap(1, &"accept")
+	_frame()
+	_check((asked.size() == 1 and asked[0] == 1) and (runs.size() == 1 and runs[0] == 1), "on the lit stone A starts the run, not the room: %s %s" % [asked, runs])
+	_bus.start_stone_changed.emit(0, 2, false)
+	_bus.altar_changed.emit(0)
+	_tap(1, &"accept")
+	_frame()
+	_check((asked.size() == 1 and asked[0] == 1), "A once off the altar asks nothing: %s" % [asked])
 
 
 ## The hub's stone (online-lobby L1): A (`accept`) sends `run_requested` for its player only while

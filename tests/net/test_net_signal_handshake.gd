@@ -457,3 +457,36 @@ func test_a_machine_that_cannot_link_fails_at_the_first_guest() -> void:
 	host.poll()
 	check_equal(host.problem(), "this build cannot link two machines", "said as the inner handshake says it")
 	check_equal(socket.state(), FakeSocket.CLOSED, "and the room is closed")
+
+
+func test_a_guest_that_leaves_the_server_once_it_answered_still_links() -> void:
+	# The joining machine holds its link a moment before the host holds its own, and leaves the
+	# server at once: the host hears it gone while it is still linking with it.
+	var hosted: Array = _hosted()
+	var host: NetSignalHandshake = hosted[0]
+	var socket: FakeSocket = hosted[1]
+	socket.arrive('{"t":"guest","id":1}')
+	_run(null, [host], 4)
+	check(socket.sent[-1].begins_with('{"t":"offer","id":1,'), "guest 1 was offered")
+	var guest := LoopHandshake.new(_table(0))
+	check_equal(guest.take(LoopHandshake.HOST_CODE), "", "the joining machine's inner handshake takes the offer")
+	socket.arrive('{"t":"answer","id":1,"code":"%s"}' % LoopHandshake.JOIN_CODE)
+	socket.arrive('{"t":"gone","id":1}')
+	socket.arrive('{"t":"guest","id":1}')
+	_run(null, [host], 4)
+	check_equal(host.problem(), "", "gone from the server after its answer, and its id given to the next: no fault")
+	var link: NetLink = host.next_link()
+	check(link != null and link.is_open(), "the host holds its link to it all the same")
+	check(host.next_link() == null, "once")
+
+
+func test_a_joining_machine_hands_its_link_over_once_by_next_link() -> void:
+	var hosted: Array = _hosted()
+	var host: NetSignalHandshake = hosted[0]
+	var guest: NetSignalHandshake = _joining(hosted[2])[0]
+	check(guest.next_link() == null, "none before it is linked")
+	_run(hosted[2], [host, guest])
+	var link: NetLink = guest.next_link()
+	check(link != null and link == guest.link(), "the link, as whoever holds several machines asks for it")
+	check(guest.next_link() == null, "once")
+

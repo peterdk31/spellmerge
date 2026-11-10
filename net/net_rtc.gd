@@ -69,6 +69,11 @@ func offer() -> String:
 	return why
 
 
+## A pasted code of this kind starts as `NetCode`'s do.
+func takes(typed: String) -> bool:
+	return typed.strip_edges().begins_with(NetCode.PREFIX)
+
+
 func take(code: String) -> String:
 	if _problem != "":
 		return _problem

@@ -262,3 +262,40 @@ func test_the_replay_the_client_received_played_offline_is_the_hosts_run() -> vo
 	check_equal(Desync.first_parting(pair.host_run, run), -1, "and is the host's run at every tick")
 	offline.frames.stop_playing()
 	offline.free_all()
+
+
+## Online lobby L2: a machine joins a run the host has played alone for a while (the hub). It
+## plays the recording from its first tick, far faster than it was made, and then live.
+func test_a_machine_that_joins_a_run_under_way_catches_up_and_agrees_at_every_tick() -> void:
+	var pair: NetPair = _new_pair(50.0)
+	# Nobody plays the host's second seat until the other machine is given it.
+	pair.host_fight.frames.set_source(NetHost.SEAT, null)
+	var replay: Replay = pair.host_fight.frames.record(&"sandbox_requested", 0, 0x5e55)
+	var alone: int = 900
+	for i in alone:
+		pair.step(true, false)
+	check_equal(pair.host_ticks(), 0, "the host played alone: no run is begun with the other machine")
+	check_equal(replay.tick_count(), alone, "fifteen seconds of it, recorded")
+	# The other machine asks for a seat for its player, and the host joins it to the run.
+	pair.client.link.send(NetMessage.of_seat_ask(0))
+	for i in 8:
+		pair.step()
+		pair.host.pump()
+	check_equal(pair.host.guest_seats(), 1 << NetHost.SEAT, "it is given the free seat")
+	check(pair.host.begin(replay), "and joined to the run under way")
+	# However slow this machine is under the test's own captures: a step's time is never short.
+	pair.client.burst_usec = 1 << 40
+	var steps_needed: int = 0
+	while pair.host_ticks() - pair.client_ticks() > 12 and steps_needed < 600:
+		pair.step()
+		steps_needed += 1
+	check(steps_needed < alone / LiveFeed.CATCH_UP / 2, "it caught up far sooner than at three ticks a step (%d steps)" % steps_needed)
+	pair.run(240)
+	check(not pair.client.is_catching_up(), "and paces as ever from there")
+	check(pair.let_client_catch_up(), "it plays every tick")
+	check_equal(pair.first_parting(), -1, "and agrees at every tick: those before it came, and those it plays in")
+	var totals: NetStats = pair.host.totals()
+	check(totals.checks >= 2 and totals.mismatches == 0, "the checks since it joined passed (%d)" % totals.checks)
+	check(pair.client.stats.presses > 0, "its presses are in the host's ticks")
+	check(pair.client_fight.wizard_casts > 0 and pair.host_fight.wizard_casts > 0, "both fights fought")
+

@@ -153,3 +153,20 @@ func test_it_stays_off_when_disabled() -> void:
 	flow.intro_enabled = false
 	events.play_requested.emit(0)
 	check_equal(flow.state, FlowScript.State.RUNNING, "with the intro off, Play starts the run")
+
+
+## A run that is recorded or played back never shows the intro (online lobby L2): the intro
+## takes the machine's own time, and a recording must start the same on the machine that made it
+## and on every one that plays it (an online host's among them).
+func test_a_run_recorded_or_played_back_shows_no_intro_on_a_new_save() -> void:
+	var frames: Node = root.get_node("Frames")
+	var replay: Replay = frames.call(&"record", &"hub_requested", 0) as Replay
+	check_equal([flow.state, flow.intro == null], [FlowScript.State.RUNNING, true], "recorded: the hub starts at once, with no intro")
+	flow.stop_run()
+	frames.call(&"stop_recording")
+	check(not flow.save.has_flag(FlowScript.INTRO_SEEN), "which it has not seen")
+	check(bool(frames.call(&"play", replay)), "the replay plays")
+	check_equal([flow.state, flow.intro == null], [FlowScript.State.RUNNING, true], "the hub starts at once, with no intro")
+	check_equal(flow.mode, FlowScript.MODE_HUB, "in the hub")
+	frames.call(&"stop_playing")
+

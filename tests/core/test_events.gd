@@ -38,6 +38,7 @@ const EVENTS: Dictionary = {
 	&"online_join_requested": [["player", TYPE_INT], ["code", TYPE_STRING]],
 	&"online_answer_requested": [["player", TYPE_INT], ["code", TYPE_STRING]],
 	&"online_leave_requested": [["player", TYPE_INT]],
+	&"online_open_requested": [["player", TYPE_INT]],
 	&"play_load_requested": [],
 	&"online_changed": [["phase", TYPE_STRING_NAME], ["code", TYPE_STRING], ["note", TYPE_STRING]],
 	&"online_line_changed": [["line", TYPE_STRING]],
@@ -112,6 +113,7 @@ const EVENTS: Dictionary = {
 	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
 	&"loading_finished": [],
 	&"start_stone_changed": [["standing", TYPE_INT], ["wizards", TYPE_INT], ["lit", TYPE_BOOL]],
+	&"altar_changed": [["seats", TYPE_INT]],
 	&"wave_started": [["wave", TYPE_INT]],
 	&"sandbox_changed": [["on", TYPE_BOOL]],
 	&"build_break_started": [["seconds", TYPE_FLOAT]],
@@ -126,7 +128,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"room_laid_out", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started", &"start_stone_changed",
+	&"run_started", &"run_ended", &"room_laid_out", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed",
 	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]

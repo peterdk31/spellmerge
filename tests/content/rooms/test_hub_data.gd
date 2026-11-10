@@ -43,6 +43,7 @@ func test_the_other_rooms_have_no_stone_and_hurt() -> void:
 	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
 		var room: RoomBase = load(path) as RoomBase
 		check(not room.start_stone.has_area(), "%s has no stone" % room.id)
+		check(not room.altar.has_area(), "%s has no altar" % room.id)
 		check(not room.invincible, "%s hurts" % room.id)
 
 
@@ -179,5 +180,6 @@ func test_the_altar_stands_on_the_island() -> void:
 	var altar := room_root.get_node("Altar") as Sprite2D
 	var area: Rect2 = RoomScan.sprite_rect(altar)
 	check(not area.intersects(_room().start_stone), "the altar is not the stone")
+	check_equal(area, _room().altar, "the altar's art covers the altar (where A opens the room)")
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(area), "the altar is clear of the wall %s" % wall)

@@ -13,6 +13,7 @@ const FramesScript := preload("res://core/sim/frames.gd")
 
 const DT: float = 1.0 / 60.0
 const SEAT: int = NetHost.SEAT
+const NOBODY: int = NetMessage.NOBODY
 
 
 ## An area of two numbers, for the checks.
@@ -129,7 +130,9 @@ func test_start_seats_the_client_and_sends_the_header() -> void:
 	check_equal(_seats, [SEAT + 1], "seated by the frames service, as a pad's")
 	check(_frames.is_recording(), "the run is recorded")
 	var message: NetMessage = _next()
-	check_equal(message.kind, NetMessage.HEADER, "the header goes out first")
+	check_equal([message.kind, message.holders], [NetMessage.LOBBY, PackedByteArray([NOBODY, 0, NOBODY, NOBODY])], "the seats go out first: the client's first player holds its seat")
+	message = _next()
+	check_equal(message.kind, NetMessage.HEADER, "then the header")
 	var header: Replay = Replay.from_bytes(message.body)
 	check(header != null and header.tick_count() == 0, "a replay's header, no ticks")
 	if header != null:
@@ -216,22 +219,6 @@ func test_more_commands_than_a_frame_holds_wait_for_the_next() -> void:
 	check_equal(_recorded(2).commands.size(), 18 - InputFrame.MAX_COMMANDS, "the rest in the next")
 	check_equal(_heard.size(), 18, "every one applied")
 	check_equal(_heard[17], [SEAT, 2, 5, &"bolt"], "in order")
-
-
-func test_a_clients_leave_and_join_seat_through_the_input_layer() -> void:
-	_start()
-	_tick()
-	_send(1, _frame(0, 0, Vector2.ZERO, [[InputFrame.LEAVE]]))
-	_tick()
-	check(not _input.is_joined(SEAT), "the client's device left: its virtual device leaves here")
-	check_equal(_seats, [-SEAT - 1], "and the seat, by the frames service")
-	check_equal(_recorded(1).commands, [[InputFrame.LEAVE]], "the recording says so at that tick, once")
-	_send(2, _frame(0b0001, 0, Vector2.ZERO, [[InputFrame.JOIN]]))
-	_tick()
-	check(_input.is_joined(SEAT), "it joins again")
-	check_equal(_seats, [-SEAT - 1, SEAT + 1], "seated again")
-	check_equal(_recorded(2).commands, [[InputFrame.JOIN]], "recorded once")
-	check(_recorded(2).is_held(0), "with the frame's input")
 
 
 func test_the_client_gone_its_seat_leaves_and_the_host_plays_on() -> void:
@@ -432,7 +419,8 @@ func test_a_leave_takes_a_place_in_the_frame_it_is_recorded_in() -> void:
 	check_equal(_recorded(1).commands.size(), InputFrame.MAX_COMMANDS, "fifteen commands and the leave fill the frame")
 	check(_recorded(1).commands.has([InputFrame.LEAVE]), "the leave is recorded, not dropped for want of room")
 	_tick()
-	check_equal(_recorded(2).commands, [[&"staff_change_requested", 3, 0, &"fire"]], "the command behind them waits for the next tick")
+	check(_recorded(2).commands.is_empty(), "a command behind the leave goes with the seat")
+	check_equal(_guest.problem, "", "and is no fault of the client's")
 
 
 func test_checks_are_taken_one_a_window_in_order() -> void:
@@ -519,7 +507,6 @@ func test_guests_take_seats_of_their_own_up_to_three() -> void:
 	for i in 5:
 		links.append(NetLoopback.pair()[0])
 	check(host.add_guest(links[0], 1 << 0) == null, "seat 0 is the host's")
-	check(host.add_guest(links[0], 0) == null, "a guest plays a seat")
 	check(host.add_guest(links[0], 1 << 4) == null, "one of the four")
 	check(host.add_guest(links[0], (1 << 1) | (1 << 2)) != null, "a guest on seats 2 and 3")
 	check(host.add_guest(links[1], 1 << 2) == null, "a seat another guest plays")
@@ -530,6 +517,10 @@ func test_guests_take_seats_of_their_own_up_to_three() -> void:
 	for seat in [1, 2, 3]:
 		full.add_guest(NetLoopback.pair()[0], 1 << seat)
 	check_equal(full.guests.size(), NetHost.GUESTS, "three guests, one a seat")
+	check(full.add_guest(NetLoopback.pair()[0]) == null, "and no fourth machine, with seats named or to ask for")
+	var asking := NetHost.new(_frames, _input)
+	var guest: NetGuest = asking.add_guest(links[3])
+	check(guest != null and guest.seats == 0, "a guest with no seat named beforehand is taken: it asks for its seats")
 
 
 ## Two guest machines, one on seats 1 and 2, one on seat 3, with the test playing both.
@@ -564,7 +555,7 @@ func test_every_guest_gets_the_header_and_every_tick() -> void:
 			_message.decode(bytes)
 			kinds.append([_message.kind, _message.tick])
 			bytes = far[i].read()
-		check_equal(kinds, [[NetMessage.HEADER, 0], [NetMessage.TICK, 0], [NetMessage.TICK, 1]], "guest %d: the header, then each tick" % i)
+		check_equal(kinds, [[NetMessage.LOBBY, 0], [NetMessage.HEADER, 0], [NetMessage.TICK, 0], [NetMessage.TICK, 1]], "guest %d: its seats, the header, then each tick" % i)
 	var header: Replay = Replay.new()
 	check_equal(header.decode(_host.replay.header_bytes()), "", "the header")
 	check_equal(header.seats, 0b1111, "seats every machine's seats")
@@ -674,3 +665,168 @@ func test_a_guest_of_two_seats_shares_one_limit_of_frames_waiting() -> void:
 		_tick()
 	check(_guest.problem.contains("frames waiting"), "more than its limit over its two seats: refused (%s)" % _guest.problem)
 	check(_host.guests[1].hears(), "the other guest plays on")
+
+
+# --- Seats asked for and given, and a run joined a while in (online lobby L2) ----
+
+func test_a_clients_leave_gives_the_seat_back_and_an_ask_seats_it_again() -> void:
+	_start()
+	_tick()
+	_drain()
+	_send(1, _frame(0, 0, Vector2.ZERO, [[InputFrame.LEAVE]]))
+	_tick()
+	check(not _input.is_joined(SEAT), "the client's player left: its virtual device leaves here")
+	check_equal(_seats, [-SEAT - 1], "and the seat, by the frames service")
+	check_equal(_recorded(1).commands, [[InputFrame.LEAVE]], "the recording says so at that tick, once")
+	check_equal(_guest.seats, 0, "the seat is the client's no more")
+	var message: NetMessage = _next()
+	check_equal([message.kind, message.holders], [NetMessage.LOBBY, PackedByteArray([NOBODY, NOBODY, NOBODY, NOBODY])], "and the client is told, before the tick that says so")
+	# Its last frames were on their way: dropped, not refused. A JOIN in a frame seats nobody.
+	_send(2, _frame(0b0001, 0, Vector2.ZERO, [[InputFrame.JOIN]]))
+	_tick()
+	check_equal([_guest.problem, _input.is_joined(SEAT)], ["", false], "a frame for the seat just given back is dropped, and its JOIN seats nobody")
+	_drain()
+	_far.send(NetMessage.of_seat_ask(2))
+	_tick()
+	check(_input.is_joined(SEAT) and InputManagerScript.is_virtual(_input.device_of(SEAT)), "an ask seats a player of the client's on the lowest free seat")
+	check_equal(_seats, [-SEAT - 1, SEAT + 1], "seated again, by the frames service")
+	message = _next()
+	check_equal([message.kind, message.answered, message.holders], [NetMessage.LOBBY, 1, PackedByteArray([NOBODY, 2, NOBODY, NOBODY])], "the lobby answers the ask: that player's seat")
+	# With no seat of the client's the link is read after the tick, so the join is in the next.
+	_send(4, _frame(0b0001))
+	_tick()
+	check_equal(_recorded(4).commands, [[InputFrame.JOIN]], "the join is recorded at its tick")
+	check(_recorded(4).is_held(0), "and the seat plays the client's frames from that tick")
+
+
+func test_each_of_the_clients_players_is_given_a_seat_until_none_is_free() -> void:
+	_start()
+	_drain()
+	for player in [1, 2, 3]:
+		_far.send(NetMessage.of_seat_ask(player))
+	_tick()
+	check_equal(_guest.seats, 0b1110, "three seats beside the host's own")
+	check_equal([_guest.seat_of(0), _guest.seat_of(1), _guest.seat_of(2), _guest.seat_of(3)], [1, 2, 3, -1], "each player the lowest free seat, in the order asked; the fourth none")
+	var last := NetMessage.new()
+	var lobbies: int = 0
+	while true:
+		var bytes: PackedByteArray = _far.read()
+		if bytes.is_empty():
+			break
+		_message.decode(bytes)
+		if _message.kind == NetMessage.LOBBY:
+			lobbies += 1
+			last.decode(bytes)
+	check_equal([lobbies, last.answered, last.holders], [3, 3, PackedByteArray([NOBODY, 0, 1, 2])], "every ask is answered, the one given no seat too")
+	_far.send(NetMessage.of_seat_ask(1))
+	_tick()
+	check_equal(_guest.seats, 0b1110, "a player that has a seat is not given a second")
+	# Each seat plays its own frames.
+	for seat in [1, 2, 3]:
+		var frame: InputFrame = _frame(1 << (seat - 1))
+		frame.seat = seat
+		_send(2, frame)
+	_tick()
+	_host.replay.read_tick(2, _read)
+	check_equal([_read[1].held_bits, _read[2].held_bits, _read[3].held_bits], [0b001, 0b010, 0b100], "each seat its own frame")
+	var theirs: InputFrame = _frame(0b1111)
+	theirs.seat = 0
+	_send(3, theirs)
+	_tick()
+	check(_guest.problem.contains("a frame of seat 0"), "a frame for a seat that is not the client's closes the link (%s)" % _guest.problem)
+	_tick()
+	check_equal(_guest.seats, 0, "and its seats are given back")
+	check(not _input.is_joined(1) and not _input.is_joined(2) and not _input.is_joined(3) and _input.is_joined(0), "their wizards leave; the host's own stays")
+
+
+func test_a_run_under_way_is_joined_from_its_first_tick() -> void:
+	# Areas enough that every part of a check's window holds some.
+	for i in 240:
+		_areas["area %d" % i] = Area.new()
+	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	for i in NetHost.SEND_A_TICK + 100:
+		_frames.tick(DT)
+	check(_host.begin(replay), "the host joins the client to the run it records")
+	check(not _host.begin(replay), "once")
+	var message: NetMessage = _next()
+	check_equal(message.kind, NetMessage.LOBBY, "the seats first")
+	message = _next()
+	check_equal(message.kind, NetMessage.HEADER, "then the header")
+	check(_next().kind == 0, "no tick before the next tick has stepped")
+	_tick()
+	var got: int = 0
+	while _next().kind == NetMessage.TICK:
+		check_equal(_message.tick, got, "the ticks from the first, in order")
+		got += 1
+	check_equal(got, NetHost.SEND_A_TICK, "what was recorded before goes out at a set pace")
+	_tick()
+	while _next().kind == NetMessage.TICK:
+		got += 1
+	check_equal(got, replay.tick_count(), "and the client has every tick a tick later")
+	# The checks start with the first whole window after it joined.
+	var every: int = _host.checks.every
+	var first_whole: int = ceili(float(NetHost.SEND_A_TICK + 100) / every) * every
+	while replay.tick_count() < first_whole + every:
+		_tick()
+	# The client played the run from its first tick, so it checks every window: the one the
+	# host joined it in the middle of, too.
+	var client := NetChecks.new()
+	var mine: Dictionary[String, int] = {}
+	for tick in range(first_whole - every, first_whole):
+		mine = client.add(tick, _areas)
+	_far.send(NetMessage.of_hashes(first_whole - 1, mine))
+	_tick()
+	check_equal([_guest.problem, _guest.stats.checks, _guest.stats.mismatches, _guest.parted_tick], ["", 0, 0, -1], "the window it joined in the middle of is not compared: the host hashed only a part of it")
+	for tick in range(first_whole, first_whole + every):
+		mine = client.add(tick, _areas)
+	_far.send(NetMessage.of_hashes(first_whole + every - 1, mine))
+	_tick()
+	check_equal([_guest.problem, _guest.stats.checks, _guest.stats.mismatches], ["", 1, 0], "the first whole window after the join is checked, and agrees")
+
+
+## A seat is only ever given between ticks: an ask read while a tick's frames are being built
+## (through a seat of the client's that is higher than the one given) must not seat a wizard on
+## the host a tick before the recording, and so every other machine, says so.
+func test_a_seat_asked_for_while_a_tick_is_built_is_given_between_ticks() -> void:
+	_start()
+	_far.send(NetMessage.of_seat_ask(1))
+	_tick()
+	_tick()
+	check_equal([_guest.seat_of(0), _guest.seat_of(1)], [1, 2], "the client's two players hold seats 1 and 2")
+	# Its first player leaves: seat 1 is free, below the seat it still plays.
+	_send(2, _frame(0, 0, Vector2.ZERO, [[InputFrame.LEAVE]]))
+	_tick()
+	check_equal(_guest.seats, 0b0100, "seat 1 is given back; it still plays seat 2")
+	_seats.clear()
+	var joined_at: Array[int] = []
+	var hear: Callable = func(_seat: int) -> void: joined_at.append(_host.replay.tick_count())
+	_bus.seat_joined.connect(hear)
+	# The ask is read when seat 2 is asked for its frame: seat 1's frame of that tick is built.
+	_far.send(NetMessage.of_seat_ask(3))
+	_tick()
+	_tick()
+	_bus.seat_joined.disconnect(hear)
+	check_equal(_seats, [SEAT + 1], "the player is seated on the freed seat, once")
+	var recorded_at: int = -1
+	for tick in _host.replay.tick_count():
+		_host.replay.read_tick(tick, _read)
+		if _read[SEAT].commands.has([InputFrame.JOIN]) and tick > 0:
+			recorded_at = tick
+	check(recorded_at > 0, "the join is recorded")
+	check_equal(joined_at, [recorded_at] as Array[int], "and the host seated it at the very tick the recording says, not one before")
+
+
+func test_a_flood_of_asks_closes_the_link() -> void:
+	_start()
+	for i in NetGuest.MAX_ASKS_WAITING + 1:
+		_far.send(NetMessage.of_seat_ask(i % 4))
+	_tick()
+	check(_guest.problem.contains("asks for a seat waiting"), "more asks waiting than its limit: refused (%s)" % _guest.problem)
+
+
+func test_the_pings_heard_are_counted_apart_from_asks() -> void:
+	_far.send(NetMessage.of_seat_ask(0))
+	_far.send(NetMessage.of_seat_ask(1))
+	_far.send(NetMessage.of_ping(1))
+	_host.pump()
+	check_equal([_guest.pings_heard, _guest.stats.read], [1, 3], "one ping among three messages: whoever waits for the client to be ready counts pings")

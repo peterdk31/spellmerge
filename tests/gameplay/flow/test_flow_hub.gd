@@ -286,9 +286,11 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 		check(wizard.health.invincible and not wizard.is_down(), "standing, and hits take nothing again")
 
 
-## Owner, 2026-11-10: "staffs should carry over". What a seat built in the hub is in its staffs in
-## the run, and back in the hub after it; a seat that joins mid-run starts with Play's cards.
-func test_staffs_built_in_the_hub_carry_into_the_run_and_back() -> void:
+## Owner, 2026-11-10: the hub is the arsenal a run's tools are picked from. What a seat built in
+## the hub is in its staffs in the run; a seat that joins mid-run starts with Play's cards; and
+## back in the hub after the run (lost or won) nothing of the run comes with the party, its
+## staffs neither: it is ready for a new run.
+func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -> void:
 	_start([0, 1])
 	var built: Array[StringName] = [&"bolt", &"dash", &"bolt"]
 	events.emit_signal("staff_cards_requested", 1, 2, built)
@@ -309,7 +311,8 @@ func test_staffs_built_in_the_hub_carry_into_the_run_and_back() -> void:
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
-	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(2).slice(0, 3), built, "seat 1's staff came back to the hub")
+	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(2), fresh_y, "seat 1's staff did not come back: the hub's own again")
+	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(2), fresh_y, "seat 0's neither")
 
 
 func test_a_run_of_play_requested_still_restarts() -> void:
@@ -331,3 +334,59 @@ func test_the_hub_and_its_command_are_ignored_elsewhere() -> void:
 	var world: Node = flow.world
 	_press_a(0)
 	check(flow.world == world, "run_requested out of the hub changes nothing")
+
+
+## The altar (online-lobby L2): which seats' wizards stand on it is told as it changes.
+func test_the_seats_on_the_altar_are_told_as_they_change() -> void:
+	var told: Array[int] = []
+	var hear: Callable = func(seats: int) -> void: told.append(seats)
+	events.connect("altar_changed", hear)
+	_start([0, 2])
+	_tick()
+	told.clear()
+	var altar: Rect2 = _room().altar
+	flow.get_wizard(2).position = altar.get_center()
+	_tick()
+	_tick()
+	check_equal(told, [0b0100] as Array[int], "seat 2's wizard steps on it: told once, by its seat")
+	flow.get_wizard(0).position = altar.position + Vector2(4.0, 4.0)
+	_tick()
+	check_equal(told.back(), 0b0101, "both")
+	flow.get_wizard(2).position = altar.end + Vector2(8.0, 8.0)
+	_tick()
+	check_equal(told.back(), 0b0001, "one steps off")
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(told.back(), 0, "out of the hub nobody is on it")
+	events.disconnect("altar_changed", hear)
+	_stop()
+
+
+## Asked for in the hub, the hub starts anew (net/ begins a recording of it for a machine that
+## joins): everyone back at their spawn, the same seats.
+func test_the_hub_asked_for_in_the_hub_starts_anew() -> void:
+	_start([0, 1])
+	_tick()
+	var before: Vector2 = flow.get_wizard(1).position
+	flow.get_wizard(1).position = before + Vector2(64.0, 0.0)
+	var first: Node = flow.get_wizard(1)
+	events.emit_signal("hub_requested", 0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_HUB, "still the hub")
+	check_equal(_wizards().size(), 2, "the same two seats")
+	check(flow.get_wizard(1) != first, "with new wizards")
+	check_equal(flow.get_wizard(1).position, before, "at their spawns")
+	# Not from a run of waves: that run plays on.
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	events.emit_signal("hub_requested", 0)
+	_tick()
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the hub asked for during a run changes nothing")
+	_stop()
+

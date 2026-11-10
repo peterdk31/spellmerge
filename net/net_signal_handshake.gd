@@ -1,0 +1,304 @@
+class_name NetSignalHandshake
+extends NetHandshake
+## The handshake through the room server (online lobby L2, docs/milestones/online-lobby.md,
+## Part 1): what the players did by copy and paste (`NetRtc`'s two codes) the server carries, so
+## a player only says or types a room's five characters. The codes, their checks and the link
+## are the inner handshake's as they were (`NetRtc`, one for each other machine); this only
+## hands its codes to the server and the server's to it.
+##
+## - **The host** calls `offer`: the socket to the server opens, a room is asked for, and
+##   `code()` is the room's code once the server gave it. For every guest the server names, an
+##   inner handshake makes its offer, which goes to that guest through the server, and takes
+##   the answer that comes back. `link()` is there once a guest's machine was found (the first;
+##   `next_link()` hands them over one by one). The room stays open for more until `close`.
+## - **A joining machine** `take`s the room code a player typed. It joins the room, takes the
+##   host's offer, sends its answer, and `link()` is the link to the host. Its socket closes
+##   then: the server's part is done. `code()` stays "": it has nothing to hand over by hand.
+## - **Nothing connects anywhere before `offer` or `take`,** and then only to the room server
+##   (the address given, `NetSignal.URL` in the game) and what the inner handshake talks to.
+## - **What the server says is untrusted:** only `NetSignal`'s forms are taken, only the kinds
+##   this side is sent, only in an order that makes sense; anything else ends the handshake
+##   (`problem`). A code it hands over is checked by the inner handshake exactly as a pasted one
+##   (`NetCode.read`): one that is refused costs a host that guest, and a joining machine the try.
+## - **The clock is given** (milliseconds; the engine's unless told), as `NetRtc`'s is.
+##
+## Names no networking class: the socket is `NetSignalSocket`'s, the link `NetRtc`'s.
+
+## The server answers the connection, and then a room's opening or joining, within this long each.
+const CONNECT_MS: int = 10000
+## A joining machine holds a link this long after it joined the room, or gives up.
+const JOIN_MS: int = 30000
+## A guest that has not become a link this long after the server named it is let go (a host).
+const GUEST_MS: int = 60000
+## Messages taken in one poll.
+const MAX_READ: int = 16
+
+## The time in milliseconds (a test's own; the engine's clock otherwise).
+var clock: Callable = Callable()
+## Makes an inner handshake (a `NetHandshake`); invalid: WebRTC's (`NetRtc`). Tests give their own.
+var rtc_maker: Callable = Callable()
+
+var _url: String
+var _socket: NetSignalSocket
+var _message: NetSignal = NetSignal.new()
+var _hosting: bool = false
+var _problem: String = ""
+## When the socket was opened, and when `open` or `join` was said on it (-1: not yet).
+var _opened_at: int = -1
+var _said_at: int = -1
+## The host: its room's code; a joining machine: the room it asked for.
+var _room: String = ""
+var _room_given: bool = false
+## The host's guests on their way to a link, by the server's id: the inner handshake, whether its
+## offer was sent, and when the server named the guest.
+var _guests: Dictionary[int, NetHandshake] = {}
+var _offered: Dictionary[int, bool] = {}
+var _named_at: Dictionary[int, int] = {}
+## The links not handed over by `next_link` yet (the host's), and the first ever made.
+var _links: Array[NetLink] = []
+var _first: NetLink = null
+## A joining machine: when it was put in the room (-1: not yet), its inner handshake, whether its
+## answer was sent.
+var _joined_at: int = -1
+var _rtc: NetHandshake = null
+var _answered: bool = false
+
+
+## `url`: the room server's address. `socket`: the tests' own (none: a WebSocket).
+func _init(url: String = NetSignal.URL, socket: NetSignalSocket = null) -> void:
+	_url = url
+	_socket = socket if socket != null else NetSignalSocket.new()
+
+
+func offer() -> String:
+	if _opened_at >= 0:
+		return "it has begun already"
+	_hosting = true
+	return _open()
+
+
+## A joining machine: `code` is the room code as a player typed it. (A host is given nothing by
+## hand: the server brings the answers.)
+func take(code: String) -> String:
+	if _problem != "":
+		return _problem
+	if _hosting:
+		return "the room's server brings the other machine's code"
+	if _opened_at >= 0:
+		return "a code was given already"
+	var room: String = NetSignal.typed_room_code(code)
+	if room == "":
+		return "a room's code is %d letters and digits" % NetSignal.CODE_LENGTH
+	_room = room
+	return _open()
+
+
+## The host's room code once the server gave it; "" on a joining machine.
+func code() -> String:
+	return _room if _hosting and _room_given else ""
+
+
+func poll() -> void:
+	if _opened_at < 0 or _problem != "":
+		return
+	# A joining machine that holds its link has closed its socket: the server's part is done.
+	if _hosting or _first == null:
+		_poll_server()
+	if _problem != "":
+		return
+	if _hosting:
+		_poll_guests()
+	else:
+		_poll_host()
+
+
+func link() -> NetLink:
+	return _first
+
+
+## The host's next link not handed over yet, or null: one for each guest machine, in the order
+## they were found.
+func next_link() -> NetLink:
+	return _links.pop_front() if not _links.is_empty() else null
+
+
+func problem() -> String:
+	return _problem
+
+
+func close() -> void:
+	if _problem == "":
+		_problem = "given up"
+	_let_go()
+
+
+func _open() -> String:
+	var why: String = _socket.open(_url)
+	if why != "":
+		return _fail(why)
+	_opened_at = _now()
+	return ""
+
+
+## The socket moved on and what the server said heard.
+func _poll_server() -> void:
+	_socket.poll()
+	var state: int = _socket.state()
+	if _said_at < 0:
+		if state == NetSignalSocket.OPEN:
+			_socket.send(NetSignal.open() if _hosting else NetSignal.join(_room))
+			_said_at = _now()
+		elif state == NetSignalSocket.CLOSED or _now() - _opened_at >= CONNECT_MS:
+			_fail("the room server could not be reached")
+		return
+	for at in MAX_READ:
+		var text: String = _socket.read()
+		if text == "":
+			break
+		var mine: Array[StringName] = NetSignal.FOR_HOST if _hosting else NetSignal.FOR_GUEST
+		if not _message.read(text) or not mine.has(_message.kind) or not _hear():
+			_fail("the room server said something that is no message of its")
+		if _problem != "":
+			return
+	var answered: bool = _room_given if _hosting else _joined_at >= 0
+	if state == NetSignalSocket.CLOSED:
+		_fail("the room is closed" if answered else "the room server closed the connection")
+	elif not answered and _now() - _said_at >= CONNECT_MS:
+		_fail("the room server did not answer")
+
+
+## One message of the server's taken (`_message`). False when it makes no sense now.
+func _hear() -> bool:
+	match _message.kind:
+		NetSignal.ROOM:
+			if _room_given:
+				return false
+			_room = _message.code
+			_room_given = true
+		NetSignal.GUEST:
+			if not _room_given or _guests.has(_message.id):
+				return false
+			var inner: NetHandshake = _make_rtc()
+			var why: String = inner.offer()
+			if why != "":
+				# This machine cannot link at all: no guest will fare better.
+				_fail(why)
+				return true
+			_guests[_message.id] = inner
+			_offered[_message.id] = false
+			_named_at[_message.id] = _now()
+		NetSignal.ANSWER:
+			# An answer for nobody (a guest let go a moment ago) is nothing.
+			var inner: NetHandshake = _guests.get(_message.id)
+			if inner != null and _offered[_message.id] and inner.take(_message.code) != "":
+				_drop(_message.id)
+		NetSignal.GONE:
+			_drop(_message.id)
+		NetSignal.JOINED:
+			if _joined_at >= 0:
+				return false
+			_joined_at = _now()
+		NetSignal.OFFER:
+			if _joined_at < 0 or _rtc != null:
+				return false
+			_rtc = _make_rtc()
+			var why: String = _rtc.take(_message.code)
+			if why != "":
+				_fail("the host's code was not taken: %s" % why)
+		NetSignal.NO_ROOM:
+			_fail("no room has the code %s" % _room)
+		NetSignal.FULL:
+			_fail("the room %s is full" % _room)
+		NetSignal.CLOSED:
+			_fail("the host closed the room" if not _hosting else "the room is closed")
+	return true
+
+
+## The host: each guest's inner handshake moves on; its offer goes out once made, and its link
+## is kept once there.
+func _poll_guests() -> void:
+	for id: int in _guests.keys():
+		var inner: NetHandshake = _guests[id]
+		inner.poll()
+		if inner.problem() != "" or _now() - _named_at[id] >= GUEST_MS:
+			_drop(id)
+		elif inner.link() != null:
+			_links.append(inner.link())
+			if _first == null:
+				_first = inner.link()
+			_forget(id)
+		elif not _offered[id] and inner.code() != "":
+			var text: String = NetSignal.offer(id, inner.code())
+			if text == "":
+				_drop(id)
+			else:
+				_socket.send(text)
+				_offered[id] = true
+
+
+## A joining machine: its inner handshake moves on; its answer goes out once made, and with the
+## link there the server's part is done.
+func _poll_host() -> void:
+	if _first != null:
+		return
+	if _rtc != null:
+		_rtc.poll()
+		if _rtc.problem() != "":
+			_fail(_rtc.problem())
+			return
+		if _rtc.link() != null:
+			_first = _rtc.link()
+			_socket.send(NetSignal.bye())
+			_socket.close()
+			return
+		if not _answered and _rtc.code() != "":
+			var text: String = NetSignal.answer(_rtc.code())
+			if text == "":
+				_fail("this machine's code could not be made")
+				return
+			_socket.send(text)
+			_answered = true
+	if _joined_at >= 0 and _now() - _joined_at >= JOIN_MS:
+		_fail("the host's machine was not found in time")
+
+
+func _make_rtc() -> NetHandshake:
+	var inner: NetHandshake = rtc_maker.call() as NetHandshake if rtc_maker.is_valid() else null
+	if inner == null:
+		var rtc := NetRtc.new()
+		rtc.clock = clock
+		inner = rtc
+	return inner
+
+
+## A guest on its way is let go (it left, its code was refused, it took too long).
+func _drop(id: int) -> void:
+	if _guests.has(id):
+		_guests[id].close()
+		_forget(id)
+
+
+func _forget(id: int) -> void:
+	_guests.erase(id)
+	_offered.erase(id)
+	_named_at.erase(id)
+
+
+func _fail(why: String) -> String:
+	if _problem == "":
+		_problem = why
+		_let_go()
+	return why
+
+
+## The socket and every handshake still on its way are closed. A link made is its holder's.
+func _let_go() -> void:
+	_socket.close()
+	for id: int in _guests.keys():
+		_drop(id)
+	if _rtc != null and _first == null:
+		_rtc.close()
+
+
+func _now() -> int:
+	return int(clock.call()) if clock.is_valid() else Time.get_ticks_msec()

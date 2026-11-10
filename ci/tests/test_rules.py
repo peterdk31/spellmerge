@@ -84,7 +84,7 @@ class BannedApiTest(unittest.TestCase):
         self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
 
     def test_only_the_netcode_may_name_its_networking_classes(self) -> None:
-        link = "var peer := WebRTCPeerConnection.new()\nvar channel: WebRTCDataChannel = null\n"
+        link = "var peer := WebRTCPeerConnection.new()\nvar channel: WebRTCDataChannel = null\nvar ws := WebSocketPeer.new()\n"
         self.assertEqual(banned(link, "net/net_webrtc.gd"), [])
         for path in ("core/sim/frames.gd", "gameplay/coop/coop.gd", "hud/menus/main_menu.gd", "tests/net/test_net_link.gd",
                      "content/relics/a/a.gd", "network/x.gd"):
@@ -92,7 +92,7 @@ class BannedApiTest(unittest.TestCase):
                 self.assertTrue(banned(link, path), f"not flagged in {path}")
         # Nothing else of the network is allowed there, and no other ban is lifted.
         for bad in ("var http := HTTPRequest.new()", "var tcp := StreamPeerTCP.new()", "var s := TCPServer.new()",
-                    "var ws := WebSocketPeer.new()", "var p := PacketPeerUDP.new()", "var a := IP.get_local_addresses()",
+                    "var ws := WebSocketMultiplayerPeer.new()", "var p := PacketPeerUDP.new()", "var a := IP.get_local_addresses()",
                     "var m := WebRTCMultiplayerPeer.new()", "var e := WebRTCPeerConnectionExtension.new()",
                     "var c: WebRTCDataChannelExtension = null", "var api: SceneMultiplayer = null",
                     "var peer: MultiplayerPeer = null", '@rpc("any_peer")\nfunc hit() -> void:\n\tpass', 'OS.shell_open("https://example.com")',
@@ -100,6 +100,29 @@ class BannedApiTest(unittest.TestCase):
                     "var x: Variant = bytes_to_var_with_objects(bytes)"):
             with self.subTest(code=bad):
                 self.assertTrue(banned(bad, "net/net_webrtc.gd"), f"not flagged in net/: {bad}")
+
+    def test_the_room_server_imports_its_own_and_calls_nothing_else(self) -> None:
+        def signal(text: str, path: str = "server/signal/worker.js") -> list[str]:
+            return [f.message for f in rules.check_signal_source(path, text)]
+
+        good = ('import { DurableObject } from "cloudflare:workers";\nimport { Rooms } from "./rooms.js";\n'
+                'import { createHash } from "node:crypto";\nimport { createServer } from "node:http";\n'
+                "export default {\n  async fetch(request, env) {\n    return env.ROOMS.get(id).fetch(request);\n  },\n};\n"
+                "export class R extends DurableObject {\n  async fetch() {\n    return new Response(null);\n  }\n}\n")
+        self.assertEqual(signal(good), [])
+        tests = ('import assert from "node:assert/strict";\nimport { test } from "node:test";\nimport { listen } from "../local.js";\n'
+                 'const r = await fetch("http://127.0.0.1:1/room");\n')
+        self.assertEqual(signal(tests, "server/signal/test/local.test.js"), [])
+        self.assertTrue(signal(tests), "a test's imports and its fetch are the tests' only")
+        for bad in ('import fs from "node:fs";', 'import { exec } from "node:child_process";', 'import x from "left-pad";',
+                    'import "https://example.com/x.js";', 'import { a } from "../../../ci/x.js";', 'import x from "./data.json";',
+                    'const m = await import("./rooms.js");', 'const fs = require("node:fs");', 'eval("1");',
+                    'const f = new Function("return 1");', 'await fetch("https://example.com");', 'const r = fetch(url);',
+                    'const key = process.env.SECRET;', 'const s = connect({ hostname: "example.com", port: 25 });',
+                    'export { x } from "node:net";', 'globalThis["fet" + "ch"](url);', "self.fetch(url);"):
+            with self.subTest(code=bad):
+                self.assertTrue(signal(good + bad + "\n"), f"not flagged: {bad}")
+                self.assertTrue(signal(bad + "\n", "server/signal/test/rooms.test.js") or "fetch" in bad, f"not flagged in a test: {bad}")
 
     def test_native_sources_compute_only(self) -> None:
         def native(text: str) -> list[str]:
@@ -309,6 +332,28 @@ class RepoTest(unittest.TestCase):
         self.commit()
         self.assertEqual(self.check(BOT), [])
         self.assertIn(("bot-path", "error", "net/net_link.gd"), self.check())
+
+    def test_the_room_server_is_claudes_only_and_only_there(self) -> None:
+        self.write("server/signal/rooms.js", "export const A = 1;\n")
+        self.write("server/signal/wrangler.toml", 'name = "spellmerge-signal"\n')
+        self.write("server/signal/package.json", '{"private": true}\n')
+        self.commit()
+        self.assertEqual(self.check(BOT), [])
+        found = self.check()
+        for path in ("server/signal/rooms.js", "server/signal/wrangler.toml"):
+            self.assertIn(("bot-path", "error", path), found)
+            self.assertIn(("file-type", "error", path), found)
+        self.assertIn(("bot-path", "error", "server/signal/package.json"), found)
+        self.write("core/sim/helper.js", "export const A = 1;\n")
+        self.write("server/other/worker.js", "export const A = 1;\n")
+        self.write("net/wrangler.toml", 'name = "x"\n')
+        self.write("server/signal/node_modules/x/index.mjs", "export const A = 1;\n")
+        self.write("server/signal/build.sh", "#!/bin/sh\n")
+        self.commit()
+        found = self.check(BOT)
+        for path in ("core/sim/helper.js", "server/other/worker.js", "net/wrangler.toml",
+                     "server/signal/node_modules/x/index.mjs", "server/signal/build.sh"):
+            self.assertIn(("file-type", "error", path), found)
 
     def test_the_native_build_is_the_owners(self) -> None:
         # Its SCons script runs in the job that builds the game; its profile says what the C++ reaches.

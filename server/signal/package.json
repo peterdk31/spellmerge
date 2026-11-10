@@ -1,0 +1,12 @@
+{
+  "name": "spellmerge-signal",
+  "private": true,
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "description": "Spellmerge's signalling server: hands two machines each other's codes by a room code, and nothing else.",
+  "scripts": {
+    "test": "node --test",
+    "local": "node local.js",
+    "deploy": "wrangler deploy"
+  }
+}

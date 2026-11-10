@@ -57,6 +57,7 @@ BOT_PATHS = (
     "core/",
     "native/",  # the native module's C++ (native/README.md): Claude's and the owner's only
     "net/",  # the netcode (net/README.md): the one folder that may hold networking classes
+    "server/",  # the room server (server/signal/README.md): Claude's and the owner's only; its deploy is the owner's
     "project.godot",
     "export_presets.cfg",
     "tests/build.json",  # the build settings and exported-build tests (smbot.config)
@@ -99,6 +100,23 @@ _NATIVE_BANNED = re.compile(
     r"\bpthread_\w+|\b(CreateThread|_beginthread\w*)\b|\b(asm|__asm__)\b|"
     r"(->|\.)\s*(call|callv|call_deferred)\s*\(|\bget_singleton\b|\bClassDB::instantiate\b|"
     r"\bgdextension_interface::(?!object_get_instance_from_id\b)\w+")
+# The room server (server/signal/README.md; the owner's decision 9 of 2026-11-10,
+# docs/milestones/online-lobby.md): a few hundred lines of JavaScript that run on Cloudflare, never
+# in the game, in server/signal/ only. Its JavaScript and its deploy settings are Claude's and the
+# owner's (BOT_PATHS); it imports nothing but its own files, Cloudflare's Workers module and the
+# parts of Node its local server and tests use, never makes code from text, and calls no other
+# server (check_signal_source). No dependency is ever committed (node_modules stays out).
+SIGNAL_DIR = "server/signal/"
+BOT_SIGNAL_TYPES = frozenset({".js", ".toml"})
+SIGNAL_TESTS = SIGNAL_DIR + "test/"
+SIGNAL_IMPORTS = frozenset({"cloudflare:workers", "node:crypto", "node:http"})
+SIGNAL_TEST_IMPORTS = frozenset({"node:assert/strict", "node:test"})
+_SIGNAL_IMPORT = re.compile(r"""\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+)["']""")
+_SIGNAL_BANNED = re.compile(
+    r"\beval\s*\(|\bnew\s+Function\b|\bimport\s*\(|\brequire\s*\(|\bprocess\.env\b|\bchild_process\b|"
+    r"\bimportScripts\b|\bWebAssembly\b|\bconnect\s*\(|\bglobalThis\b|\bself\s*[.\[]")
+# A call of the global fetch (a method named fetch, as a Worker's own, is not one).
+_SIGNAL_FETCH = re.compile(r"(?<![.\w])(?<!async )fetch\s*\(")
 ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
@@ -106,11 +124,12 @@ ISSUE_FORM_LABELS = frozenset({"bug", "idea", "copyright"})
 
 # The netcode (net/README.md; the owner's exception of 2026-11-10 to the networking ban): the one
 # folder whose scripts may name networking classes, and only the ones the netcode uses (a WebRTC
-# peer and its data channel; HTTP, sockets and the rest stay banned there too). It is one of
+# peer and its data channel, and since the online lobby the WebSocket to the room server;
+# HTTP, raw sockets and the rest stay banned there too). It is one of
 # BOT_PATHS, so only Claude's and the owner's PRs change it; every other ban holds there as
 # everywhere.
 NET_DIR = "net/"
-NET_CLASSES = frozenset({"WebRTCPeerConnection", "WebRTCDataChannel"})
+NET_CLASSES = frozenset({"WebRTCPeerConnection", "WebRTCDataChannel", "WebSocketPeer"})
 
 # Dependabot only updates GitHub Actions; those files still need owner review.
 DEPENDENCY_BOT_PATHS = (".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/dependabot.yml")
@@ -376,6 +395,7 @@ def check_file_type(change: Change, role: str) -> list[Finding]:
     if role == BOT:
         allowed = (name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
                    or (path.startswith(NATIVE_DIR) and (suffix in BOT_NATIVE_TYPES or name in BOT_NATIVE_NAMES))
+                   or (path.startswith(SIGNAL_DIR) and suffix in BOT_SIGNAL_TYPES)
                    or (path.startswith(ISSUE_FORMS) and suffix in (".yml", ".yaml")))
     else:
         allowed = name in CONTRIBUTOR_NAMES or suffix in CONTRIBUTOR_TYPES
@@ -438,9 +458,35 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
         findings += check_banned_apis(path, text)
     if path.startswith(NATIVE_DIR) and suffix in BOT_NATIVE_TYPES:
         findings += check_native_source(path, text)
+    if path.startswith(SIGNAL_DIR) and suffix == ".js":
+        findings += check_signal_source(path, text)
     if suffix == ".gd":
         findings += check_typed(path, text, "error" if role == BOT else "warning")
     findings += check_license(path, text)
+    return findings
+
+
+def check_signal_source(path: str, text: str) -> list[Finding]:
+    """The room server's JavaScript (server/signal/README.md) imports only its own files and
+    SIGNAL_IMPORTS, makes no code from text and calls no other server."""
+    findings = []
+    in_tests = path.startswith(SIGNAL_TESTS)
+    for m in _SIGNAL_IMPORT.finditer(text):
+        module = m.group(1) or m.group(2)
+        own = re.fullmatch(r"\.{1,2}/[\w./-]+\.js", module) is not None and "/../" not in module[2:]
+        if not (own or module in SIGNAL_IMPORTS or (in_tests and module in SIGNAL_TEST_IMPORTS)):
+            findings.append(Finding("signal-source", "error", path, _line_of(text, m.start()),
+                                    f"The room server may not import `{module}`.",
+                                    "Import only its own files, cloudflare:workers, node:crypto and node:http "
+                                    "(its tests also node:test and node:assert/strict). It has no dependencies."))
+    banned = list(_SIGNAL_BANNED.finditer(text))
+    if not in_tests:
+        banned += list(_SIGNAL_FETCH.finditer(text))
+    for m in banned:
+        findings.append(Finding("signal-source", "error", path, _line_of(text, m.start()),
+                                f"The room server may not do this (found `{m.group(0).strip()}`): it only hands "
+                                "messages between the sockets of one room.",
+                                "Remove it; the server makes no code from text, loads nothing and calls no other server."))
     return findings
 
 

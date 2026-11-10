@@ -1,0 +1,111 @@
+# Deploys the room server (server/signal/README.md; docs/milestones/online-lobby.md, Part 1) to
+# Cloudflare Workers. Run by hand only (Actions > deploy-signal > Run workflow, on main, owner
+# only): it tests the server (`node --test`), then deploys what `server/signal/wrangler.toml`
+# says with wrangler, and writes the Worker's address in the run's summary.
+#
+# - The first run makes the Worker. Its address (wss://spellmerge-signal.<subdomain>.workers.dev/room)
+#   then goes into `NetSignal.URL` (net/net_signal.gd).
+# - Secrets, both in the `automation` environment (docs/SECURITY-CHECKLIST.md, section 5):
+#   CLOUDFLARE_API_TOKEN (a token that may only edit this account's Workers scripts) and
+#   CLOUDFLARE_ACCOUNT_ID. Only the deploy step itself sees them: wrangler is fetched in a step
+#   that has none.
+# - wrangler is fetched from npm by exact version and its package checked against the hash below
+#   (npm's own, of that version). To update: a version at least two weeks old, with its
+#   `dist.integrity` from https://registry.npmjs.org/wrangler/<version>.
+#
+# No AI anywhere, and nothing here is triggered by a push, a PR or an issue.
+name: deploy-signal
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  WRANGLER_VERSION: "4.152.0"
+  WRANGLER_INTEGRITY: "sha512-lmXTF1sCDEqBaEMpreGczvg/x3AIh1d/qxc4BN7utQ4jEDwdA4YG0L6kr3ev0TtVLHRb6QLySNAOAunwn+dHeA=="
+
+jobs:
+  check:
+    name: check the manual run
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          REF: ${{ github.ref }}
+          ACTOR_ID: ${{ github.actor_id }}
+          OWNER_ID: ${{ vars.OWNER_ID }}
+        run: |
+          [[ "$REF" == refs/heads/main ]] || { echo "::error::The room server deploys from main only (this run: $REF)."; exit 1; }
+          [[ -n "$OWNER_ID" && "$ACTOR_ID" == "$OWNER_ID" ]] || { echo "::error::Only the owner deploys the room server."; exit 1; }
+
+  test:
+    name: the server's tests
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: node --test
+        working-directory: server/signal
+        run: node --test
+
+  deploy:
+    name: deploy to Cloudflare
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-signal
+      cancel-in-progress: false
+    environment: automation
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Fetch wrangler (pinned, checked; no secret in this step)
+        run: |
+          set -euo pipefail
+          got="$(npm view "wrangler@$WRANGLER_VERSION" dist.integrity)"
+          [[ "$got" == "$WRANGLER_INTEGRITY" ]] || { echo "::error::wrangler $WRANGLER_VERSION is not the package that was pinned (npm says $got)."; exit 1; }
+          mkdir -p "$RUNNER_TEMP/wrangler"
+          cd "$RUNNER_TEMP/wrangler"
+          npm init --yes >/dev/null
+          npm install --save-exact --no-audit --no-fund "wrangler@$WRANGLER_VERSION"
+          # What was installed is the checked package (npm compares the download with this hash).
+          installed="$(node -e 'const l=require("./package-lock.json");console.log(l.packages["node_modules/wrangler"].integrity)')"
+          [[ "$installed" == "$WRANGLER_INTEGRITY" ]] || { echo "::error::The installed wrangler is not the pinned package ($installed)."; exit 1; }
+          ./node_modules/.bin/wrangler --version
+      - name: Deploy
+        working-directory: server/signal
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          set -euo pipefail
+          [[ -n "$CLOUDFLARE_API_TOKEN" && -n "$CLOUDFLARE_ACCOUNT_ID" ]] || { echo "::error::Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in the automation environment."; exit 1; }
+          "$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler" deploy 2>&1 | tee "$RUNNER_TEMP/deploy.txt"
+      - name: Say the address
+        run: |
+          address="$(grep -oE 'https://[A-Za-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/deploy.txt" | head -1 || true)"
+          {
+            echo "### The room server is deployed"
+            if [[ -n "$address" ]]; then
+              echo "Its address for \`NetSignal.URL\` (net/net_signal.gd): \`wss://${address#https://}/room\`"
+            else
+              echo "wrangler printed no workers.dev address: look it up in the Cloudflare dashboard (Workers & Pages > spellmerge-signal)."
+            fi
+          } >>"$GITHUB_STEP_SUMMARY"

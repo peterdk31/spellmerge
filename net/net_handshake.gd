@@ -13,6 +13,12 @@ extends RefCounted
 ##
 ## A code given to `take` is untrusted text: a handshake checks it before using it and says why
 ## when it refuses one (the player may paste another).
+##
+## What carries the codes and the link is never known past this seam: by hand (`NetRtc`), a room
+## server (`NetSignalHandshake`), or later a platform's own lobbies and relay.
+
+## True once `next_link` handed the one link over.
+var _handed: bool = false
 
 
 ## The host's start: its code is being made. "" when it began, else why it cannot.
@@ -39,6 +45,16 @@ func poll() -> void:
 ## The link once the machines found each other (open), else null.
 func link() -> NetLink:
 	return null
+
+
+## A host that takes more than one other machine: its next link not handed over yet, or null
+## (one for each machine, in the order they were found). A handshake of two machines hands over
+## its one link once. Whoever holds several machines asks this, never which handshake it holds.
+func next_link() -> NetLink:
+	if _handed or link() == null:
+		return null
+	_handed = true
+	return link()
 
 
 ## Why no link will come ("" while one still may, or is there).

@@ -34,7 +34,8 @@ const ENEMY: StringName = &"enemy"
 const DT: float = 1.0 / 60.0
 ## The plain carrier a card that needs one is cast on, and what the wizards cast otherwise.
 const PLAIN: StringName = &"bolt"
-const WIZARDS_AT: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.0, 60.0)]
+## Where the wizards stand, by seat (two unless the fight is made with more: an online party's).
+const WIZARDS_AT: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(0.0, 60.0), Vector2(-40.0, 20.0), Vector2(-40.0, 80.0)]
 const FOES_AT: Array[Vector2] = [Vector2(150.0, 10.0), Vector2(190.0, 70.0)]
 ## The fight's shot cap: room for every shot its casts make (a burst, a split on a scatter).
 const SHOT_CAP: int = 512
@@ -99,8 +100,9 @@ static func staff_for(card: SpellComponent) -> Array[StringName]:
 
 
 ## The fight of `content` (a card's or an enemy's resource), as `kind` says, built fresh under a
-## world of its own in `root` (`world`).
-func _init(root: Node, fight_kind: StringName, resource: Resource) -> void:
+## world of its own in `root` (`world`), with `wizards` scripted wizards (2 to 4; those past seat 1
+## cast plain bolts as seat 1's does).
+func _init(root: Node, fight_kind: StringName, resource: Resource, wizards: int = 2) -> void:
 	# Everything under a world of its own, named as in every fight, so a snapshot's parents (by path
 	# under the world: Entities, for the decoys) are found again in a fresh one.
 	world = Node2D.new()
@@ -137,7 +139,7 @@ func _init(root: Node, fight_kind: StringName, resource: Resource) -> void:
 	var cards: Array[StringName] = [PLAIN]
 	if kind == CARD:
 		cards = staff_for(resource as SpellComponent)
-	for seat in WIZARDS_AT.size():
+	for seat in clampi(wizards, 1, WIZARDS_AT.size()):
 		var source := Scripted.new()
 		source.seat = seat
 		_sources.append(source)

@@ -26,6 +26,8 @@ var _bus: EventsScript
 var _input: InputManagerScript
 var _frames: FramesScript
 var _host: NetHost
+## The one guest machine, on seat SEAT.
+var _guest: NetGuest
 ## The client's end of the link.
 var _far: NetLoopback
 var _heard: Array = []
@@ -55,7 +57,8 @@ func before_each() -> void:
 	_areas = {"one": Area.new(), "two": Area.new()}
 	var ends: Array[NetLoopback] = NetLoopback.pair()
 	_far = ends[1]
-	_host = NetHost.new(_frames, _input, ends[0], func() -> Dictionary: return _areas)
+	_host = NetHost.new(_frames, _input, func() -> Dictionary: return _areas)
+	_guest = _host.add_guest(ends[0], 1 << SEAT)
 	_read.clear()
 	for seat in 4:
 		_read.append(InputFrame.new())
@@ -168,7 +171,7 @@ func test_a_frame_is_used_at_its_tick_and_stood_in_for_when_late() -> void:
 	var stood: InputFrame = _recorded(2)
 	check(stood.is_held(0) and stood.move_vector() == Vector2.RIGHT, "tick 2, no frame: the last stands in, the button still held")
 	check(not stood.is_pressed(0), "but not pressed again")
-	check_equal(_host.stats.stood_in, 1, "counted")
+	check_equal(_guest.stats.stood_in, 1, "counted")
 	# It arrives two ticks late, with a press of another staff and a command.
 	_send(2, _frame(0b0011, 0b0010, Vector2.LEFT, [[&"staff_change_requested", 1, 0, &"frost"]]))
 	_tick()
@@ -176,7 +179,7 @@ func test_a_frame_is_used_at_its_tick_and_stood_in_for_when_late() -> void:
 	check(late.is_pressed(1) and late.is_held(1) and late.move_vector() == Vector2.LEFT, "the late frame's press comes with the next tick")
 	check_equal(late.commands, [[&"staff_change_requested", 1, 0, &"frost"]], "and its command")
 	check_equal(_heard, [[SEAT, 1, 0, &"frost"]], "applied once, as the client's seat's")
-	check_equal(_host.stats.late_frames, 1, "counted as late")
+	check_equal(_guest.stats.late_frames, 1, "counted as late")
 	_tick()
 	check(not _recorded(4).is_pressed(1) and _recorded(4).commands.is_empty(), "a tick later neither comes again")
 	check_equal(_heard.size(), 1, "the command applied once")
@@ -231,7 +234,7 @@ func test_a_clients_leave_and_join_seat_through_the_input_layer() -> void:
 	check(_recorded(2).is_held(0), "with the frame's input")
 
 
-func test_the_client_gone_its_seat_stands_and_the_host_plays_on() -> void:
+func test_the_client_gone_its_seat_leaves_and_the_host_plays_on() -> void:
 	_start()
 	_send(0, _frame(0b0001, 0b0001, Vector2.RIGHT))
 	_send(1, _frame(0b0001, 0, Vector2.RIGHT))
@@ -239,12 +242,15 @@ func test_the_client_gone_its_seat_stands_and_the_host_plays_on() -> void:
 	_tick()
 	_tick()
 	check(_recorded(1).is_held(0), "what arrived before it closed is used")
+	check(_input.is_joined(SEAT), "the seat plays while what it sent lasts")
 	_tick()
+	check(not _input.is_joined(SEAT), "then its seat leaves, as a pad pulled out would")
+	check_equal([_recorded(2).commands, _recorded(2).held_bits], [[[InputFrame.LEAVE]], 0], "in the seat's own frame of that tick, which holds nothing")
+	check_equal(_seats, [-SEAT - 1], "the frames service says so")
 	_tick()
-	check(_recorded(3).held_bits == 0 and _recorded(3).move == Vector2i.ZERO, "then the seat's frames are empty: its wizard stands")
 	check_equal(_host.replay.tick_count(), 4, "and the host ran every tick")
-	check_equal(_host.stats.stood_in, 0, "a seat that is gone is not stood in for")
-	check(_host.is_running() and _input.is_joined(SEAT), "the run goes on, the seat stays")
+	check_equal(_guest.stats.stood_in, 0, "a seat that is gone is not stood in for")
+	check(_host.is_running() and _guest.is_gone() and not _host.hears_guests(), "the run goes on, the guest gone")
 
 
 func test_a_ping_is_answered_before_the_run_and_in_it() -> void:
@@ -271,13 +277,13 @@ func test_what_a_client_must_not_send_closes_the_link() -> void:
 	# What is sent, and a word of the reason it must be refused for.
 	var cases: Dictionary[String, Array] = {
 		"bytes that are no message": ["too short", garbage],
-		"a host's kind (a tick)": ["not a client's", NetMessage.of_tick(0, PackedByteArray([0]))],
-		"a header": ["not a client's", NetMessage.of_header(Replay.new().header_bytes())],
-		"a pong": ["not a client's", NetMessage.of_pong(1)],
+		"a host's kind (a tick)": ["not a guest's", NetMessage.of_tick(0, PackedByteArray([0]))],
+		"a header": ["not a guest's", NetMessage.of_header(Replay.new().header_bytes())],
+		"a pong": ["not a guest's", NetMessage.of_pong(1)],
 		"a frame of another seat": ["seat 0", NetMessage.of_frame(1, other_seat.to_bytes())],
 		"a frame that is no frame": ["version", NetMessage.of_frame(1, bad_frame)],
 		"a frame for an earlier tick than the last": ["after one for 5", NetMessage.of_frame(5, frame_bytes), NetMessage.of_frame(4, frame_bytes)],
-		"a frame far ahead": ["at tick", NetMessage.of_frame(NetHost.MAX_AHEAD + 10, frame_bytes)],
+		"a frame far ahead": ["at tick", NetMessage.of_frame(NetGuest.MAX_AHEAD + 10, frame_bytes)],
 		"a check of a tick not played": ["not played yet", NetMessage.of_hashes(500, none)],
 		"a check of a tick that ends no check": ["after one of", NetMessage.of_hashes(0, none)],
 	}
@@ -290,7 +296,7 @@ func test_what_a_client_must_not_send_closes_the_link() -> void:
 		for at in range(1, sent.size()):
 			_far.send(sent[at])
 		_tick()
-		check(not _far.is_open() and _host.problem.contains(sent[0]), "%s closes the link, for that (%s)" % [what, _host.problem])
+		check(not _far.is_open() and _guest.problem.contains(sent[0]), "%s closes the link, for that (%s)" % [what, _guest.problem])
 		_tick()
 		check_equal(_host.replay.tick_count(), 3, "%s: the host plays on" % what)
 
@@ -305,13 +311,13 @@ func test_a_frame_before_the_run_closes_the_link() -> void:
 func test_it_reads_a_set_number_of_messages_a_tick() -> void:
 	_start()
 	_drain()
-	for i in NetHost.MAX_READ + 20:
+	for i in NetGuest.MAX_READ + 20:
 		_far.send(NetMessage.of_ping(i))
 	_tick()
 	var pongs: int = 0
 	while _next().kind != 0:
 		pongs += 1 if _message.kind == NetMessage.PONG else 0
-	check_equal(pongs, NetHost.MAX_READ, "no more than its limit in one tick")
+	check_equal(pongs, NetGuest.MAX_READ, "no more than its limit in one tick")
 	_tick()
 	pongs = 0
 	while _next().kind != 0:
@@ -322,10 +328,10 @@ func test_it_reads_a_set_number_of_messages_a_tick() -> void:
 func test_too_many_frames_waiting_close_the_link() -> void:
 	_start()
 	for round in 12:
-		for i in NetHost.MAX_READ:
-			_send(NetHost.MAX_AHEAD, _frame())
+		for i in NetGuest.MAX_READ:
+			_send(NetGuest.MAX_AHEAD, _frame())
 		_tick()
-	check(not _far.is_open(), "closed: %s" % _host.problem)
+	check(not _far.is_open(), "closed: %s" % _guest.problem)
 	check(_host.replay.tick_count() == 12, "the host played on")
 
 
@@ -337,7 +343,7 @@ func test_a_refused_client_is_not_read_or_used_again() -> void:
 	_send(2, _frame(0b0001, 0b0001, Vector2.RIGHT, [[&"staff_change_requested", 0, 0, &"bolt"]]))
 	_far.send(NetMessage.of_ping(5))
 	_tick()
-	check(_host.problem != "" and not _host.hears_client(), "refused")
+	check(_guest.problem != "" and not _guest.hears(), "refused")
 	_drain()
 	_tick()
 	_tick()
@@ -346,7 +352,7 @@ func test_a_refused_client_is_not_read_or_used_again() -> void:
 	while _next().kind != 0:
 		answered = answered or _message.kind == NetMessage.PONG
 	check(not answered, "nor its ping answered")
-	check_equal(_host.stats.read, 1, "nothing was read after the refusal")
+	check_equal(_guest.stats.read, 1, "nothing was read after the refusal")
 
 
 func test_frames_queued_before_a_refusal_are_dropped() -> void:
@@ -355,7 +361,7 @@ func test_frames_queued_before_a_refusal_are_dropped() -> void:
 	_tick()
 	_far.send(NetMessage.of_pong(1))
 	_tick()
-	check(_host.problem != "", "refused")
+	check(_guest.problem != "", "refused")
 	_tick()
 	_tick()
 	check(_recorded(3).held_bits == 0 and not _recorded(3).is_pressed(0), "a frame that waited for its tick is not used once the client is refused")
@@ -370,8 +376,8 @@ func test_a_flood_of_commands_closes_the_link() -> void:
 	for i in 6:
 		_send(1, _frame(0, 0, Vector2.ZERO, commands))
 	_tick()
-	check(_host.problem.contains("commands waiting"), "more commands waiting than its limit: refused (%s)" % _host.problem)
-	check(_recorded(1).commands.is_empty(), "and none of them is passed on")
+	check(_guest.problem.contains("commands waiting"), "more commands waiting than its limit: refused (%s)" % _guest.problem)
+	check_equal(_recorded(1).commands, [[InputFrame.LEAVE]], "and none of them is passed on: its seat leaves")
 	_tick()
 	check_equal(_host.replay.tick_count(), 3, "the host plays on")
 
@@ -392,7 +398,7 @@ func test_frames_used_together_never_make_a_frame_past_its_limit() -> void:
 		check(_recorded(tick + 1).to_bytes().size() <= InputFrame.MAX_BYTES, "tick %d's frame is within a frame's limit (%d bytes)" % [tick + 1, _recorded(tick + 1).to_bytes().size()])
 	check_equal(heard.size(), 12, "every command applied, over as many ticks as it took")
 	check(_recorded(1).commands.size() < 12 and _recorded(1).commands.size() >= 1, "some in the first tick, the rest after")
-	check_equal(_host.problem, "", "nothing refused: these are a client's to send")
+	check_equal(_guest.problem, "", "nothing refused: these are a client's to send")
 	check(Replay.from_bytes(_host.replay.to_bytes()) != null, "and the recording still decodes")
 
 
@@ -440,7 +446,7 @@ func test_checks_are_taken_one_a_window_in_order() -> void:
 	check(_far.is_open(), "a check of a window's last tick is taken")
 	_far.send(NetMessage.of_hashes(3, none))
 	_tick()
-	check(_host.problem.contains("after one of 3"), "the same check again is refused (%s)" % _host.problem)
+	check(_guest.problem.contains("after one of 3"), "the same check again is refused (%s)" % _guest.problem)
 
 
 ## The client's check of the ticks up to `tick`, hashed as the host hashes (the same areas).
@@ -463,13 +469,13 @@ func test_a_check_that_agrees_passes_and_one_that_differs_is_kept_and_told() -> 
 	_drain()
 	_far.send(NetMessage.of_hashes(checks[0][0], checks[0][1]))
 	_tick()
-	check_equal([_host.stats.checks, _host.stats.mismatches, _host.parted_tick], [1, 0, -1], "the first agrees")
+	check_equal([_guest.stats.checks, _guest.stats.mismatches, _host.parted_tick], [1, 0, -1], "the first agrees")
 	# The client's game parted in one area: its hash of it is another.
 	var theirs: Dictionary[String, int] = checks[1][1]
 	theirs["two"] = theirs["two"] + 1
 	_far.send(NetMessage.of_hashes(checks[1][0], theirs))
 	_tick()
-	check_equal([_host.stats.checks, _host.stats.mismatches], [2, 1], "the second differs")
+	check_equal([_guest.stats.checks, _guest.stats.mismatches], [2, 1], "the second differs")
 	check_equal(_host.parted_tick, 7, "the tick is kept")
 	check_equal(_host.parted_areas, PackedStringArray(["two"]), "and the area that differs")
 	var told: NetMessage = null
@@ -488,10 +494,10 @@ func test_a_check_the_host_no_longer_keeps_is_counted_not_refused() -> void:
 	_start()
 	for i in NetHost.MAX_CHECKS_KEPT + 4:
 		_tick()
-	check_equal(_host.stats.unchecked, 4, "the oldest checks go once too many wait for the client's")
+	check_equal(_guest.stats.unchecked, 4, "the oldest checks go once too many wait for the client's")
 	_far.send(NetMessage.of_hashes(0, {"one": 1} as Dictionary[String, int]))
 	_tick()
-	check_equal(_host.stats.unchecked, 6, "the client's check of one of them is counted (and this tick's oldest went)")
+	check_equal(_guest.stats.unchecked, 6, "the client's check of one of them is counted (and this tick's oldest went)")
 	check(_far.is_open() and _host.parted_tick < 0, "and nothing else: no parting, the link open")
 
 
@@ -503,3 +509,168 @@ func test_stop_gives_the_seat_back_and_hands_the_run() -> void:
 	check_equal(replay.tick_count(), 2, "its ticks")
 	check(not _input.is_joined(SEAT) and _frames.source_of(SEAT) == null, "the client's seat is free again")
 	check(not _frames.is_recording() and not _far.is_open(), "the recording stopped, the link closed")
+
+
+## Several guest machines (online lobby L3): each on seats of its own, the header and every tick
+## to each, each one's frames used for its own seats only.
+func test_guests_take_seats_of_their_own_up_to_three() -> void:
+	var host := NetHost.new(_frames, _input)
+	var links: Array[NetLink] = []
+	for i in 5:
+		links.append(NetLoopback.pair()[0])
+	check(host.add_guest(links[0], 1 << 0) == null, "seat 0 is the host's")
+	check(host.add_guest(links[0], 0) == null, "a guest plays a seat")
+	check(host.add_guest(links[0], 1 << 4) == null, "one of the four")
+	check(host.add_guest(links[0], (1 << 1) | (1 << 2)) != null, "a guest on seats 2 and 3")
+	check(host.add_guest(links[1], 1 << 2) == null, "a seat another guest plays")
+	check(host.add_guest(links[1], 1 << 3) != null and host.guests.size() == 2, "a second guest on seat 4")
+	check(host.add_guest(links[2], 1 << 3) == null, "taken")
+	check_equal(host.guest_seats(), 0b1110, "the guests' seats")
+	var full := NetHost.new(_frames, _input)
+	for seat in [1, 2, 3]:
+		full.add_guest(NetLoopback.pair()[0], 1 << seat)
+	check_equal(full.guests.size(), NetHost.GUESTS, "three guests, one a seat")
+
+
+## Two guest machines, one on seats 1 and 2, one on seat 3, with the test playing both.
+func _two_guests() -> Array[NetLoopback]:
+	_host.stop()
+	_host = NetHost.new(_frames, _input, func() -> Dictionary: return _areas)
+	var a: Array[NetLoopback] = NetLoopback.pair()
+	var b: Array[NetLoopback] = NetLoopback.pair()
+	_guest = _host.add_guest(a[0], (1 << 1) | (1 << 2))
+	_host.add_guest(b[0], 1 << 3)
+	return [a[1], b[1]]
+
+
+func _frame_of(seat: int, held: int, move: Vector2) -> PackedByteArray:
+	var frame := InputFrame.new()
+	frame.seat = seat
+	frame.held_bits = held
+	frame.set_move(move)
+	return frame.to_bytes()
+
+
+func test_every_guest_gets_the_header_and_every_tick() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	check(_host.start(&"sandbox_requested", 0, 99) != null, "it starts")
+	check(_input.is_joined(1) and _input.is_joined(2) and _input.is_joined(3), "every guest's seats seated")
+	_tick()
+	_tick()
+	for i in 2:
+		var kinds: Array = []
+		var bytes: PackedByteArray = far[i].read()
+		while not bytes.is_empty():
+			_message.decode(bytes)
+			kinds.append([_message.kind, _message.tick])
+			bytes = far[i].read()
+		check_equal(kinds, [[NetMessage.HEADER, 0], [NetMessage.TICK, 0], [NetMessage.TICK, 1]], "guest %d: the header, then each tick" % i)
+	var header: Replay = Replay.new()
+	check_equal(header.decode(_host.replay.header_bytes()), "", "the header")
+	check_equal(header.seats, 0b1111, "seats every machine's seats")
+	check_equal(_host.stats.ticks, 2, "the host's ticks counted")
+
+
+func test_each_guest_plays_its_own_seats() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	_host.start(&"sandbox_requested", 0, 99)
+	far[0].send(NetMessage.of_frame(0, _frame_of(1, 0b0001, Vector2.LEFT)))
+	far[0].send(NetMessage.of_frame(0, _frame_of(2, 0b0010, Vector2.UP)))
+	far[1].send(NetMessage.of_frame(0, _frame_of(3, 0b0100, Vector2.RIGHT)))
+	_tick()
+	_host.replay.read_tick(0, _read)
+	check_equal([_read[1].held_bits, _read[1].move_vector()], [0b0001, Vector2.LEFT], "seat 2 from the first guest")
+	check_equal([_read[2].held_bits, _read[2].move_vector()], [0b0010, Vector2.UP], "seat 3 from the first guest too")
+	check_equal([_read[3].held_bits, _read[3].move_vector()], [0b0100, Vector2.RIGHT], "seat 4 from the second")
+
+
+func test_a_guest_that_sends_another_guests_seat_is_closed_alone() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	_host.start(&"sandbox_requested", 0, 99)
+	_tick()
+	far[0].send(NetMessage.of_frame(1, _frame_of(3, 0b0001, Vector2.LEFT)))
+	far[1].send(NetMessage.of_frame(1, _frame_of(3, 0b0100, Vector2.RIGHT)))
+	_tick()
+	var second: NetGuest = _host.guests[1]
+	check(_guest.problem.contains("a frame of seat 3") and not far[0].is_open(), "the first guest is closed (%s)" % _guest.problem)
+	check(second.hears() and second.problem == "", "the second plays on")
+	_tick()
+	_tick()
+	check(not _input.is_joined(1) and not _input.is_joined(2), "the first guest's seats left")
+	check(_input.is_joined(3), "the second's stays")
+	_host.replay.read_tick(1, _read)
+	check_equal(_read[3].held_bits, 0b0100, "seat 4 is the second guest's own frame, never the first's")
+	check(_host.is_running() and _host.hears_guests(), "the run goes on")
+
+
+func test_each_guests_checks_are_its_own() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	_host.checks = NetChecks.new(2)
+	_host.start(&"sandbox_requested", 0, 99)
+	var theirs := NetChecks.new(2)
+	var mine: Dictionary[String, int] = {}
+	for tick in 2:
+		_tick()
+		mine = _client_check(theirs, tick)
+	var other: Dictionary[String, int] = mine.duplicate()
+	other["two"] = other["two"] + 1
+	far[0].send(NetMessage.of_hashes(1, mine))
+	far[1].send(NetMessage.of_hashes(1, other))
+	_tick()
+	var second: NetGuest = _host.guests[1]
+	check_equal([_guest.stats.checks, _guest.stats.mismatches, _guest.parted_tick], [1, 0, -1], "the first agrees")
+	check_equal([second.stats.checks, second.stats.mismatches, second.parted_tick], [1, 1, 1], "the second parted at tick 1")
+	check_equal([_host.parted_tick, _host.parted_areas], [1, PackedStringArray(["two"])], "the host knows the first parting")
+	var told: Array = [false, false]
+	for i in 2:
+		var bytes: PackedByteArray = far[i].read()
+		while not bytes.is_empty():
+			_message.decode(bytes)
+			told[i] = told[i] or _message.kind == NetMessage.PARTED
+			bytes = far[i].read()
+	check_equal(told, [false, true], "only the guest that parted is told")
+	check_equal(_host.totals().checks, 2, "the totals add the guests' up")
+
+
+## A guest gone while one of its seats still had a frame for the tick: each seat leaves at the tick
+## its own LEAVE is recorded in (the seat seen gone this tick; the other, built before that was
+## seen, the next), never off the host's game a tick before the recording says so.
+func test_a_gone_guests_seats_leave_each_in_its_own_frame() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	_host.start(&"sandbox_requested", 0, 99)
+	_tick()
+	far[0].send(NetMessage.of_frame(1, _frame_of(1, 0b0001, Vector2.LEFT)))
+	far[0].close()
+	var joined: Array = []
+	for i in 3:
+		_tick()
+		joined.append([_input.is_joined(1), _input.is_joined(2)])
+	check_equal(joined, [[true, false], [false, false], [false, false]], "seat 3 (no frame) leaves at once, seat 2 (its frame used) a tick later")
+	check_equal([_left_in(1), _left_in(2)], [2, 1], "each in the tick its device left in")
+	check(_input.is_joined(3), "the other guest's seat stays")
+
+
+## The tick of the host's recording whose frame of `seat` holds a LEAVE, or -1.
+func _left_in(seat: int) -> int:
+	for tick in _host.replay.tick_count():
+		_host.replay.read_tick(tick, _read)
+		if _read[seat].commands.has([InputFrame.LEAVE]):
+			return tick
+	return -1
+
+
+## A guest of several seats holds no more frames waiting than one of one seat: the limit is the
+## guest's, all its seats together.
+func test_a_guest_of_two_seats_shares_one_limit_of_frames_waiting() -> void:
+	var far: Array[NetLoopback] = _two_guests()
+	_host.start(&"sandbox_requested", 0, 99)
+	var half: int = NetGuest.MAX_QUEUED / 2
+	var sent: int = 0
+	while sent <= half:
+		for i in mini(NetGuest.MAX_READ / 2, half + 1 - sent):
+			far[0].send(NetMessage.of_frame(NetGuest.MAX_AHEAD, _frame_of(1, 0, Vector2.ZERO)))
+			far[0].send(NetMessage.of_frame(NetGuest.MAX_AHEAD, _frame_of(2, 0, Vector2.ZERO)))
+			sent += 1
+		_tick()
+	check(_guest.problem.contains("frames waiting"), "more than its limit over its two seats: refused (%s)" % _guest.problem)
+	check(_host.guests[1].hears(), "the other guest plays on")

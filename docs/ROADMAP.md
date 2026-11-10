@@ -20,6 +20,8 @@ An eighth, by the owner on 2026-11-04: **online-ready**, a deterministic simulat
 
 A ninth, by the owner on 2026-11-10: **the online lobby**, room codes through a small signalling server on Cloudflare's free plan, and the hub as the lobby: an island in the void where local and online players take up to four seats from any machines and start a run from the teleporter stone ([online-lobby.md](milestones/online-lobby.md)). It follows the netcode spike ([netcode-spike.md](milestones/netcode-spike.md)) and does not wait for its S5: L1 (the hub, offline) and L2 (the server and room codes) first, for a working lobby as soon as possible. The hub is the one M5 grows.
 
+A tenth, planned with the owner on 2026-11-10 and approved on 2026-11-11: **props**, things in the world that stand, block, take hits, react by casting spell cards and give off motes (a barrel's fuse and blast, a crate's rubble, a brazier's embers), each an actor with no controller and one content folder ([props.md](milestones/props.md), phase W). It runs beside the online lobby (owner, 2026-11-10).
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

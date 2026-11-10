@@ -59,6 +59,10 @@ var cap_request: Vector2i = Vector2i(-1, 0)
 var run_seed: int = 0
 ## What went wrong on the way, in words (empty when all went as asked).
 var problems: PackedStringArray = PackedStringArray()
+## The hub's scripted player (online-lobby L1): at 0 or more the scripted players are `StoneWalker`s,
+## walking from the hub's first spawn onto the teleporter stone, and the "HUD" sends the player's A
+## (`run_requested`, a command) at this tick, which starts the run of waves; -1, the `Scripted` player.
+var stone_press_at: int = -1
 ## A tick to snapshot the recorded run after (online-ready N10; -1 for none), and the snapshot.
 var snapshot_at: int = -1
 var snapshot: Snapshot = null
@@ -100,6 +104,37 @@ class Scripted:
 		tick += 1
 
 
+## The hub's player (online-lobby L1), reading nothing of the game either: from the hub's first
+## player spawn it walks towards the stone's centre at full tilt (90 px/s: 1.5 px a tick) until it
+## is well onto the stone, and stands; once the run has started (`after`, the tick of the "HUD"'s A
+## plus one) it plays as `Scripted` does, so the run has shots, hits and walking to replay. Where the
+## spawn and the stone are is the room's data (content, never the game's state).
+class StoneWalker:
+	extends FrameSource
+	const HUB := preload("res://content/rooms/hub/hub.tres")
+	## Pixels a tick at full tilt (Mover.speed 90 at 60 ticks a second).
+	const STEP: float = 1.5
+	var way: Vector2
+	var walk: int
+	var after: int
+	var tick: int = 0
+	var then: Scripted = Scripted.new()
+
+	func _init(press_at: int) -> void:
+		var room: RoomBase = HUB
+		var to: Vector2 = room.start_stone.get_center() - room.player_spawns[0]
+		way = to.normalized()
+		walk = floori((to.length() - 8.0) / STEP)
+		after = press_at + 1
+
+	func fill_frame(frame: InputFrame, delta: float) -> void:
+		if tick < walk:
+			frame.set_move(way)
+		elif tick > after:
+			then.fill_frame(frame, delta)
+		tick += 1
+
+
 func _init(tree: SceneTree) -> void:
 	_tree = tree
 	_root = tree.root
@@ -113,7 +148,8 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 	var players: Array[BotScript] = _join_bots(bots)
 	for at in scripted:
 		_input.call("add_virtual_device", bots + at)
-		_frames.call("set_source", bots + at, Scripted.new())
+		var source: FrameSource = Scripted.new() if stone_press_at < 0 else StoneWalker.new(stone_press_at)
+		_frames.call("set_source", bots + at, source)
 	# One physics step after the game is fresh, as `play` takes.
 	await _tree.physics_frame
 	# At the start of a physics step, before the tick: the run starts and its first tick is this step's.
@@ -127,6 +163,9 @@ func record(start: StringName, bots: int, scripted: int, into: Desync) -> Replay
 		if scripted > 0 and i == REBUILD_AT:
 			# As the radial builder sends it: applied at the next tick's start, and recorded there.
 			events.emit_signal("staff_cards_requested", bots, 0, REBUILT)
+		if i == stone_press_at and scripted > 0:
+			# As the HUD's panels send A on the lit stone: applied at the next tick's start.
+			events.emit_signal("run_requested", bots)
 		if i == cap_request.x:
 			events.emit_signal("shot_cap_requested", 0, cap_request.y)
 		if scripted > 0 and i == PAUSE_AT:

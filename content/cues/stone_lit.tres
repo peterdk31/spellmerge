@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"stone_lit"
+parts = Array[Dictionary]([{"flash": &"ring_out", "zoom": 4, "seconds": 0.6, "bare": true, "way": &"right"}, {"part": &"motes", "kind": &"glimmer", "count": 28, "radius": 44.0, "spread": 360.0, "ring": true, "up": 2.0, "life": 0.8}])

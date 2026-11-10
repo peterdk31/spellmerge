@@ -24,6 +24,11 @@ var health: float = 100.0
 ## True from a `protect` until its time has run out: the actor steps Health only then (read only).
 var protecting: bool = false
 
+## True while hits take nothing (a wizard in the hub, `RoomBase.invincible`; online-lobby L1). Unlike
+## `protect`, the hit still lands: Combat sends it, pushes and flashes the body; only the health
+## stays as it was, so it is never depleted by a hit.
+var invincible: bool = false
+
 ## Seconds left of `protect`.
 var _protect_left: float = 0.0
 
@@ -42,10 +47,10 @@ func step(delta: float) -> void:
 	protecting = _protect_left > 0.0
 
 
-## Lose `amount` (from `killer`, an event's player or -1). Ignored at 0 health, while protected,
-## or for 0 or less. Returns true if it was applied; at 0 `depleted` follows.
+## Lose `amount` (from `killer`, an event's player or -1). Ignored at 0 health, while protected or
+## `invincible`, or for 0 or less. Returns true if it was applied; at 0 `depleted` follows.
 func take(amount: float, killer: int = -1) -> bool:
-	if health <= 0.0 or is_protected() or amount <= 0.0:
+	if health <= 0.0 or is_protected() or invincible or amount <= 0.0:
 		return false
 	health = maxf(health - amount, 0.0)
 	if health < EMPTY:

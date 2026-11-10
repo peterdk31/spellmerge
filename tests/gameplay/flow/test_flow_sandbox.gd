@@ -65,12 +65,12 @@ func _wizards() -> Array[Actor]:
 	return found
 
 
-## The dummies the sandbox room should stand: `Flow.dummy_id` for each of its spawns.
+## The dummies the sandbox room should stand: its `dummy_id` for each of its spawns.
 func _wanted_ids() -> Array[StringName]:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.SANDBOX_ROOM_ID) as RoomBase
 	var ids: Array[StringName] = []
 	for i in room.dummy_spawns.size():
-		ids.append(FlowScript.dummy_id(i))
+		ids.append(room.dummy_id(i))
 	return ids
 
 
@@ -98,10 +98,12 @@ func test_sandbox_starts_the_sandbox_room_with_both_dummies() -> void:
 
 
 func test_spawns_past_the_named_dummies_stand_training_dummies() -> void:
-	check_equal(FlowScript.dummy_id(0), &"training_dummy", "the first")
-	check_equal(FlowScript.dummy_id(1), &"shooting_dummy", "the second")
-	check_equal(FlowScript.dummy_id(2), &"training_dummy", "every one after is a training dummy")
-	check_equal(FlowScript.dummy_id(5), &"training_dummy", "every one after is a training dummy")
+	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.SANDBOX_ROOM_ID) as RoomBase
+	check_equal(room.dummy_id(0), &"training_dummy", "the first")
+	check_equal(room.dummy_id(1), &"shooting_dummy", "the second")
+	check_equal(room.dummy_id(2), &"training_dummy", "every one after is a training dummy")
+	check_equal(room.dummy_id(5), &"training_dummy", "every one after is a training dummy")
+	check_equal(RoomBase.new().dummy_id(0), &"", "a room that names none stands none")
 
 
 func test_the_dummies_stand_at_the_rooms_dummy_spawns() -> void:

@@ -684,6 +684,7 @@ func _ready() -> void:
 	events.shot_blocked.connect(_on_shot_blocked)
 	events.room_entered.connect(_on_room_entered)
 	events.view_fitted.connect(_on_view_fitted)
+	events.start_stone_changed.connect(_on_start_stone_changed)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -869,6 +870,17 @@ func _grow_reactions(size: int) -> void:
 	_react_left.resize(size)
 	_react_total.resize(size)
 	_react_amount.resize(size)
+
+
+## The hub's teleporter stone (online-lobby L1): its lit look, the room scene's nodes in the group
+## `RoomBase.STONE_LIT`, shows while every wizard there stands on it.
+func _on_start_stone_changed(_standing: int, _wizards: int, lit: bool) -> void:
+	if not is_inside_tree():
+		return
+	for node: Node in get_tree().get_nodes_in_group(RoomBase.STONE_LIT):
+		var item := node as CanvasItem
+		if item != null:
+			item.visible = lit
 
 
 ## A run starts (`room_entered`): no reaction was heard and no hit was juiced, so the first ones

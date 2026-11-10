@@ -191,9 +191,10 @@ func _ready() -> void:
 		# Heard before Flow (the autoloads' order), so the run starts with the keyboard in.
 		events.play_requested.connect(_on_run_requested)
 		events.sandbox_requested.connect(_on_run_requested)
+		events.hub_requested.connect(_on_run_requested)
 
 
-## A run was asked for (Play, the sandbox) by seat `requester`. The menu's buttons may
+## A run was asked for (Play's hub, the sandbox, a run of waves) by seat `requester`. The menu's buttons may
 ## be pressed with the mouse by nobody who has joined: the keyboard then takes slot 0,
 ## provisionally (a gamepad that joins before the keyboard is used takes P1 over). Anyone already
 ## joined (a gamepad, in any slot) plays as they are and the keyboard stays out. The device layer's

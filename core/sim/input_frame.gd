@@ -64,6 +64,7 @@ const COMMAND_NAMES: Array[StringName] = [
 	&"reward_pick_requested", &"door_vote_requested",
 	&"shot_cap_requested",
 	&"pause_requested",
+	&"run_requested",
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
@@ -72,6 +73,7 @@ const COMMAND_SHAPES: PackedStringArray = [
 	"i", "i",
 	"i",
 	"i",
+	"",
 ]
 
 var seat: int = 0

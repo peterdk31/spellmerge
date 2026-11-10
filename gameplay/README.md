@@ -68,6 +68,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
+| `hub_requested` | HUD | `flow`, `core/input` |
+| `run_requested` | HUD (a command) | `flow` |
+| `start_stone_changed` | `flow` | `hud`, `feel` |
 | `staff_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
@@ -76,7 +79,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `play_load_requested` | net | `flow` (loads `play_tasks` ahead of a run two machines start together) |
 | `ai_view_changed` | HUD | `ai` (Entities) |
 
-`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
+`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); the frames service turns them into the simulation's `seat_joined` and `seat_left` (offline at once; while a replay plays, only as its frames say), and `coop` turns those into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `hub_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the hub and send `room_entered`; `play_requested` starts a run of waves at once (the tests, the bots, the online spike's Host/Join).
 
 ## Allowed files
 

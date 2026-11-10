@@ -70,7 +70,7 @@ func _initialize() -> void:
 	_test_restart_goes_back_to_wave_one()
 	_test_build_break_is_fixed()
 	_test_build_break_ignores_builders()
-	_test_main_menu_only_sends_play_requested()
+	_test_main_menu_only_sends_hub_requested()
 	_stop()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/flow (play, wave, room_entered, room_cleared, restart)")
@@ -567,9 +567,9 @@ func _check_arena_walls(projectiles: Node, when: String) -> void:
 	_check(pillar.is_equal_approx(Vector2(160.0, 144.0)), "%s: a path right ends on the pillar at x 160, got %s" % [when, pillar])
 
 
-## The menu's Play button sends `play_requested` and nothing else: it neither
+## The menu's Play button sends `hub_requested` and nothing else (online-lobby L1): it neither
 ## names flow nor changes the scene (text scan of the script and a button press).
-func _test_main_menu_only_sends_play_requested() -> void:
+func _test_main_menu_only_sends_hub_requested() -> void:
 	var source: String = FileAccess.get_file_as_string("res://hud/menus/main_menu/main_menu.gd")
 	_check(not source.is_empty(), "the menu script can be read")
 	for banned: String in ["Flow", "change_scene", "current_scene", "gameplay/"]:
@@ -578,11 +578,12 @@ func _test_main_menu_only_sends_play_requested() -> void:
 	var menu := (load("res://hud/menus/main_menu/main_menu.tscn") as PackedScene).instantiate() as Control
 	root.add_child(menu)
 	var seen: Array[int] = []
-	_events.connect("play_requested", func(player: int) -> void: seen.append(player))
+	_events.connect("hub_requested", func(player: int) -> void: seen.append(player))
 	var button := menu.get_node("%Play") as Button
 	button.pressed.emit()
-	_check(seen == [0], "pressing Play sent play_requested(0), got %s" % [seen])
+	_check(seen == [0], "pressing Play sent hub_requested(0), got %s" % [seen])
 	_check(_flow.state == FlowScript.State.RUNNING, "flow, not the menu, started the room")
+	_check(_flow.room_id == FlowScript.HUB_ROOM_ID, "Play's room is the hub, got %s" % _flow.room_id)
 	_stop()
 	if is_instance_valid(menu):
 		menu.free()

@@ -163,7 +163,8 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 		_capture(into)
 		if paused_run:
 			_check_stopped(replay.start + " played", i)
-	if bool(_frames.call("is_playing")):
+	# Played out: it ends as the next step starts (its last tick stepped with its own seats).
+	if int(_frames.call("play_tick")) != replay.tick_count():
 		problems.append("%s: the replay did not run out after its last tick" % replay.start)
 	_check_settings(replay.start)
 
@@ -174,7 +175,8 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 ## the tick before). Seat 0, the run's own player, is this machine's here (the client's): its frames
 ## come from `Contrary` and are sent to the feed, never played. At the start of every step (the
 ## feed's pump) the hashes go to `into` and the ticks played so far to `played`, so a step that ran
-## several ticks is seen after its last, and a step that waited is seen again unchanged. Per step,
+## several ticks is seen after its last, a step that waited is seen again unchanged, and the last
+## tick is seen at the step that ends the replay. Per step,
 ## `steps` gets [the ticks played before it, the ticks there to play].
 func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played: PackedInt32Array, steps: Array[Vector2i], cushion: int = 2) -> void:
 	await fresh()
@@ -184,7 +186,7 @@ func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played
 	await _tree.physics_frame
 	var feed := LiveRun.new(1, cushion)
 	feed.host = replay
-	feed.live = Replay.from_bytes(replay.header_bytes())
+	feed.replay = Replay.from_bytes(replay.header_bytes())
 	feed.arrive_at = arrive_at
 	feed.frames = _frames
 	feed.steps = steps
@@ -192,7 +194,7 @@ func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played
 		if at > 0:
 			_capture(into)
 			played.append(at)
-	if not bool(_frames.call("play_live", feed.live, feed)):
+	if not bool(_frames.call("play_live", feed)):
 		problems.append("%s: the live replay did not play" % replay.start)
 		return
 	var limit: int = (arrive_at[arrive_at.size() - 1] if not arrive_at.is_empty() else 0) + replay.tick_count() + 10
@@ -200,9 +202,6 @@ func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played
 		await _tree.physics_frame
 	if bool(_frames.call("is_playing")):
 		problems.append("%s: the live replay did not end after its last tick" % replay.start)
-	else:
-		# Played out: every tick ran.
-		feed.capture.call(replay.tick_count())
 	for problem in feed.problems:
 		problems.append(problem)
 	if feed.sent == 0 or feed.sent < feed.step - 1:
@@ -217,7 +216,6 @@ func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, played
 class LiveRun:
 	extends LiveFeed
 	var host: Replay
-	var live: Replay
 	var arrive_at: PackedInt32Array
 	var frames: Node
 	var steps: Array[Vector2i]
@@ -230,13 +228,12 @@ class LiveRun:
 	func pump() -> void:
 		capture.call(int(frames.call("play_tick")))
 		while fed < host.tick_count() and arrive_at[fed] <= step:
-			var problem: String = live.add_tick_bytes(host.tick_bytes(fed))
+			var problem: String = replay.add_tick_bytes(host.tick_bytes(fed))
 			if problem != "":
 				problems.append("live tick %d: %s" % [fed, problem])
 			fed += 1
-		if fed == host.tick_count():
-			frames.call("close_live")
-		steps.append(Vector2i(int(frames.call("play_tick")), live.tick_count()))
+		closed = fed == host.tick_count()
+		steps.append(Vector2i(int(frames.call("play_tick")), replay.tick_count()))
 		step += 1
 
 	func send(_tick: int, frame: InputFrame) -> void:
@@ -277,7 +274,8 @@ func resume(replay: Replay, from: Snapshot, tick: int, bots: int, into: Desync) 
 	for i in range(tick + 1, replay.tick_count()):
 		await _tree.physics_frame
 		_capture(into)
-	if bool(_frames.call("is_playing")):
+	# Played out: it ends as the next step starts (its last tick stepped with its own seats).
+	if int(_frames.call("play_tick")) != replay.tick_count():
 		problems.append("%s: the replay did not run out after its last tick" % replay.start)
 	_check_settings(replay.start)
 

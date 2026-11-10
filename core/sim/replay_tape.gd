@@ -13,7 +13,7 @@ extends RefCounted
 ##   (`run_rules`). This is instance state of the tape the frames service holds, never a global.
 ## - **Live** (`feed`; netcode spike S1, docs/milestones/netcode-spike.md): a replay that grows
 ##   while it plays (the online client's, `Frames.play_live`), fed by a `LiveFeed`. A tick not
-##   there yet is waited for, not the end; it ends once `closed` and played out.
+##   there yet is waited for, not the end; it ends once its feed is closed and it is played out.
 
 var replay: Replay = null
 ## True while it plays, false while it records.
@@ -24,8 +24,8 @@ var at: int = 0
 var seated: int = 0
 ## A live replay's feed (null: a replay file).
 var feed: LiveFeed = null
-## A live replay that will grow no more (the host gone): it ends once played out.
-var closed: bool = false
+## A live replay's local seats (a bit each): its feed's when the play started.
+var local_seats: int = 0
 var _dealer: RandomNumberGenerator = RandomNumberGenerator.new()
 
 
@@ -33,6 +33,7 @@ func _init(of: Replay, playing_it: bool, fed_by: LiveFeed = null) -> void:
 	replay = of
 	plays = playing_it
 	feed = fed_by
+	local_seats = fed_by.local_seats & 0x0f if fed_by != null else 0
 	seated = of.seats & 0x0f if playing_it else 0
 	_dealer.seed = of.run_seed
 
@@ -79,7 +80,7 @@ func ahead() -> int:
 
 ## True once it has nothing more to play: played out, and not live or live and closed.
 func is_done() -> bool:
-	return not has_tick() and (feed == null or closed)
+	return not has_tick() and (feed == null or feed.closed)
 
 
 ## How many ticks to run this physics step: 1; for a live replay none while it has none (it waits),
@@ -95,7 +96,7 @@ func ticks_due() -> int:
 
 ## Whether seat `seat`'s input is this machine's (a live replay's local seat).
 func is_local(seat: int) -> bool:
-	return feed != null and feed.is_local(seat)
+	return seat >= 0 and local_seats & (1 << seat) != 0
 
 
 ## The next recorded tick into `frames` (by seat).

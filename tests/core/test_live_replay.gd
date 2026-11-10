@@ -23,8 +23,7 @@ var _heard: Array = []
 var _seats: Array = []
 ## The host's run: a replay of seats 0 and 1.
 var _host: Replay
-## The live replay played and its feed.
-var _live: Replay
+## The live replay's feed.
 var _feed: Feed
 
 
@@ -33,7 +32,6 @@ var _feed: Feed
 class Feed:
 	extends LiveFeed
 	var host: Replay
-	var live: Replay
 	var fed: int = 0
 	var let_through: int = 0
 	var pumps: int = 0
@@ -51,7 +49,7 @@ class Feed:
 			on_pump.call()
 			return
 		while let_through > 0 and fed < host.tick_count():
-			var problem: String = live.add_tick_bytes(host.tick_bytes(fed))
+			var problem: String = replay.add_tick_bytes(host.tick_bytes(fed))
 			if problem != "":
 				problems.append("tick %d: %s" % [fed, problem])
 			fed += 1
@@ -92,10 +90,9 @@ func after_each() -> void:
 
 
 func _new_feed(cushion: int = 2) -> void:
-	_live = Replay.from_bytes(_host.header_bytes())
 	_feed = Feed.new(1 << LOCAL, cushion)
 	_feed.host = _host
-	_feed.live = _live
+	_feed.replay = Replay.from_bytes(_host.header_bytes())
 
 
 ## A run of `ticks` ticks of seats 0 and 1: seat 0 walks a turning way and presses a staff now and
@@ -134,12 +131,12 @@ func _hosts_run(ticks: int) -> Replay:
 	return replay
 
 
-## Plays `_live` with seat LOCAL this machine's (its virtual device joined first, as the client's
+## Plays the feed's replay with seat LOCAL this machine's (its virtual device joined first, as the client's
 ## own device is).
 func _play() -> bool:
 	_input.add_virtual_device(LOCAL)
 	_seats.clear()
-	return _frames.play_live(_live, _feed)
+	return _frames.play_live(_feed)
 
 
 ## One physics step as the Tick runs it: the ticks the frames service says. Returns how many ran.
@@ -177,7 +174,7 @@ func test_ticks_held_back_are_caught_up_as_the_feed_paces() -> void:
 	for i in 6:
 		ran.append(_step())
 	check_equal(ran, [3, 3, 3, 1, 1, 1] as Array[int], "the default pace: up to three a step while more than its cushion are ahead, then one")
-	check_equal(_live.tick_count() - _frames.play_tick(), 0, "all played")
+	check_equal(_feed.replay.tick_count() - _frames.play_tick(), 0, "all played")
 	for i in 4:
 		_feed.let_through = 1
 		check_equal(_step(), 1, "one arriving a step: one a step")
@@ -280,8 +277,11 @@ func test_the_seats_are_the_replays_not_this_machines_devices() -> void:
 	check_equal(_frames.joined_seats(), [0, 2] as Array[int], "it plays no more")
 	check(_input.is_joined(LOCAL), "the replay's leave of the local seat leaves this machine's device be")
 	check(_input.is_joined(3), "and the device on seat 3, which the replay never seated, stays")
+	_seats.clear()
 	_frames.stop_playing()
-	check(_frames.joined_seats().has(3), "once the replay ends, the seats are this machine's devices again")
+	check_equal(_frames.joined_seats(), [1, 3] as Array[int], "once the replay ends, the seats are this machine's devices again")
+	check_equal(_seats, [-1, -3, 2, 4], "and say so: the replay's seats leave, this machine's join")
+	check(not _input.is_joined(0) and not _input.is_joined(2), "the virtual devices the replay was given are given back")
 
 
 ## A replay file too: a device joining while it plays seats nobody until it ends.
@@ -293,7 +293,8 @@ func test_a_device_joining_while_a_file_plays_seats_nobody_until_it_ends() -> vo
 	_frames.tick(DT)
 	check(not _frames.joined_seats().has(3), "the replay's seats")
 	_frames.stop_playing()
-	check_equal(_seats, [4], "seated once the replay ends")
+	check_equal(_seats, [-1, -2, 4], "once the replay ends its seats leave and the device's is seated")
+	check(not _input.is_joined(0) and not _input.is_joined(1) and _input.is_joined(3), "the replay's devices are given back, the other stays")
 
 
 func test_it_ends_once_closed_and_played_out() -> void:
@@ -303,13 +304,14 @@ func test_it_ends_once_closed_and_played_out() -> void:
 	_step()
 	check(_frames.is_playing(), "out of ticks and open: it waits")
 	_feed.let_through = 1
-	_frames.close_live()
-	check(_frames.is_playing(), "closed with a tick left: it plays on")
-	check_equal(_step(), 1, "the tick left runs")
-	check(not _frames.is_playing() and not _frames.is_live(), "then it ends")
-	check_equal(_feed.pumps, 3, "the feed pumped once a step")
-	check_equal(_step(), 1, "and a step is the game's own again: one tick")
-	check_equal(_feed.pumps, 3, "with no feed")
+	_feed.closed = true
+	check_equal(_step(), 1, "closed with a tick left: it runs")
+	check(_frames.is_playing(), "and the replay plays through that tick (its seats are the tick's)")
+	check_equal(_step(), 1, "at the next step it ends, and the step is the game's own: one tick")
+	check(not _frames.is_playing() and not _frames.is_live(), "ended")
+	check_equal(_feed.pumps, 4, "the feed pumped once a step while it played")
+	_step()
+	check_equal(_feed.pumps, 4, "and no more")
 
 
 ## Whoever plays it may stop it from inside its feed (a link that closes while it reads or sends):
@@ -322,21 +324,28 @@ func test_it_may_be_stopped_from_its_own_feed() -> void:
 	check(not _frames.is_playing(), "stopped")
 	_new_feed()
 	_feed.on_pump = func() -> void: _frames.stop_playing()
-	check(_frames.play_live(_live, _feed), "it plays again")
+	check(_frames.play_live(_feed), "it plays again")
 	check_equal(_frames.begin_step(DT), 1, "stopped from its pump: a step of the game's own")
 	check(not _frames.is_playing(), "stopped")
 
 
 func test_a_replay_of_another_build_or_content_is_refused() -> void:
+	var good: Replay = _feed.replay
 	var other_build: Replay = Replay.from_bytes(_host.header_bytes())
 	other_build.build = "other 0123"
-	check(not _frames.play_live(other_build, _feed), "another build: refused (online it would part)")
+	_feed.replay = other_build
+	check(not _frames.play_live(_feed), "another build: refused (online it would part)")
 	var other_content: Replay = Replay.from_bytes(_host.header_bytes())
 	other_content.content += 1
-	check(not _frames.play_live(other_content, _feed), "other content: refused")
-	check(not _frames.play_live(_live, null), "no feed: refused")
+	_feed.replay = other_content
+	check(not _frames.play_live(_feed), "other content: refused")
+	_feed.replay = null
+	check(not _frames.play_live(_feed) and not _frames.play_live(null), "no replay or no feed: refused")
 	check(not _frames.is_playing(), "nothing plays")
 	check(_frames.play(other_build), "a replay file of another build still plays (with a warning)")
+	_frames.stop_playing()
+	_feed.replay = good
+	check(_frames.play_live(_feed), "the good one plays")
 
 
 func test_commands_are_heard_offline_and_from_local_seats_live() -> void:

@@ -64,6 +64,8 @@ var kind: StringName
 var content: StringName
 ## Ticks stepped: the players' clock.
 var ticks: int = 0
+## Physics steps taken by `physics_step`: the players' clock there.
+var steps: int = 0
 ## Casts of a staff holding the content, counted from the bus: seat 0's first staff (a card the
 ## player never casts would pass for nothing) and the staffed enemy's.
 var wizard_casts: int = 0
@@ -166,6 +168,26 @@ static func _staff() -> StaffBase:
 func step() -> void:
 	for source in _sources:
 		source.tick = ticks
+	_tick()
+
+
+## One physics step as the Tick runs it (netcode spike S2): the frames service says how many ticks
+## (`Frames.begin_step`: one, but for a live replay none while it waits and more to catch up), and
+## `after_tick` is called after each. The players' clock is the steps, so they play on while the
+## game waits, as a person does. Returns the ticks run.
+func physics_step(after_tick: Callable = Callable()) -> int:
+	for source in _sources:
+		source.tick = steps
+	steps += 1
+	var due: int = frames.begin_step(DT)
+	for i in due:
+		_tick()
+		if after_tick.is_valid():
+			after_tick.call()
+	return due
+
+
+func _tick() -> void:
 	frames.tick(DT)
 	fight.projectiles.step(DT)
 	fight.spells.call("step", DT)

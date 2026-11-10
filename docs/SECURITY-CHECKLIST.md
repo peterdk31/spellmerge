@@ -121,6 +121,18 @@ There is no API for these, so they are done by hand once:
 - [ ] Once the rules check exists, `reuse lint` passes on `main`.
 - [ ] `CLA.md` and `docs/cla-signatures.json` stay on `main` for the contributions merged before the community intake (2026-10-22); `docs/cla-signatures.json` can only be changed by the bot's own PRs (the rules script enforces this).
 
+## 11. Online play (`net/`)
+
+The owner's exception to hard rule 4 (2026-11-10, `docs/DECISIONS.md`): networking classes may be named in `net/` only. Check this whenever `net/` or the networking rule in `ci/smbot/rules.py` changes.
+
+- [ ] `NET_CLASSES` in `ci/smbot/rules.py` lists only `WebRTCPeerConnection` and `WebRTCDataChannel`, and `NET_DIR` is `net/`. HTTP, sockets, the engine's multiplayer classes and `@rpc` stay banned there too.
+- [ ] `net/` is in `BOT_PATHS`: a contributor's PR that touches it fails the `rules` check.
+- [ ] No networking class is named outside `net/`: `grep -rnE 'WebRTC|HTTPRequest|HTTPClient|StreamPeer|TCPServer|UDPServer|PacketPeer|WebSocket|ENet' --include='*.gd' --include='*.tscn' --include='*.tres' . | grep -v '^./net/'` prints nothing but comments.
+- [ ] Nothing in `net/` turns bytes into values by itself: `grep -rnE 'bytes_to_var|str_to_var' net/` prints nothing. Every message goes through `NetMessage`, `InputFrame` and `Replay`, whose decoders check every size and value.
+- [ ] Nothing outside `net/` names its classes but the tests: `grep -rnE '\bNet(Session|Host|Client|Link|Loopback|Conditioner|Message|Checks|Stats|PressProbe)\b' --include='*.gd' core gameplay hud content` prints nothing (from S4: the one place that starts a session).
+- [ ] From S4: nothing connects anywhere until a player presses Host or Join; the only address in `net/` is the one STUN server; a pasted code is checked for its size and form before WebRTC is handed it.
+- [ ] From S3: the WebRTC extension in the desktop builds is the pinned release, checked by its SHA-256, never committed; update it when it has a security release.
+
 ## Dry runs before M0 is done
 
 The plan requires every pipeline part to pass a dry run. Record each result in `docs/LOG.md`.

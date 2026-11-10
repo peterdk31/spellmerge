@@ -56,6 +56,7 @@ BOT_PATHS = (
     "llms.txt",
     "core/",
     "native/",  # the native module's C++ (native/README.md): Claude's and the owner's only
+    "net/",  # the netcode (net/README.md): the one folder that may hold networking classes
     "project.godot",
     "export_presets.cfg",
     "tests/build.json",  # the build settings and exported-build tests (smbot.config)
@@ -102,6 +103,14 @@ ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
 ISSUE_FORM_LABELS = frozenset({"bug", "idea", "copyright"})
+
+# The netcode (net/README.md; the owner's exception of 2026-11-10 to the networking ban): the one
+# folder whose scripts may name networking classes, and only the ones the netcode uses (a WebRTC
+# peer and its data channel; HTTP, sockets and the rest stay banned there too). It is one of
+# BOT_PATHS, so only Claude's and the owner's PRs change it; every other ban holds there as
+# everywhere.
+NET_DIR = "net/"
+NET_CLASSES = frozenset({"WebRTCPeerConnection", "WebRTCDataChannel"})
 
 # Dependabot only updates GitHub Actions; those files still need owner review.
 DEPENDENCY_BOT_PATHS = (".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/dependabot.yml")
@@ -161,8 +170,10 @@ BANNED_APIS = (
         _rx(r"\b(HTTPRequest|HTTPClient|StreamPeerTCP|StreamPeerTLS|TCPServer|UDPServer|PacketPeerUDP|"
             r"PacketPeerDTLS|DTLSServer|WebSocketPeer|WebSocketMultiplayerPeer|WebRTCPeerConnection|"
             r"WebRTCDataChannel|WebRTCMultiplayerPeer|ENetMultiplayerPeer|ENetConnection|ENetPacketPeer|"
-            r"MultiplayerPeerExtension)\b|\bIP\s*\.\s*\w+"),
-        "The game has no networking or HTTP code (no tracking, no downloads).",
+            r"MultiplayerPeerExtension|WebRTCPeerConnectionExtension|WebRTCDataChannelExtension|MultiplayerPeer|"
+            r"OfflineMultiplayerPeer|MultiplayerAPI|MultiplayerAPIExtension|SceneMultiplayer|MultiplayerSpawner|"
+            r"MultiplayerSynchronizer)\b|\bIP\s*\.\s*\w+|^\s*@rpc\b"),
+        "Networking and HTTP code is only allowed in net/, which Claude and the owner maintain (no tracking, no downloads).",
         "Remove the networking code. Player feedback goes through GitHub Discussions links instead.",
     ),
     BannedApi(
@@ -550,6 +561,8 @@ def check_banned_apis(path: str, text: str) -> list[Finding]:
             if path == LINKS_FILE and m.group(0).strip().endswith("shell_open"):
                 continue  # checked by check_links_file
             if api.id == "dynamic-code" and _is_native_instantiate(path, text, m.start()):
+                continue
+            if api.id == "network" and path.startswith(NET_DIR) and m.group(0) in NET_CLASSES:
                 continue
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"{api.message} (found `{m.group(0).strip()}`)", api.fix))

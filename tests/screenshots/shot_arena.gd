@@ -5,12 +5,12 @@ extends "res://tests/support/screenshot.gd"
 ## air and a wizard mid-dash; the pause menu (P2 opened it); a cast and a hit (muzzle flash,
 ## squash, vignette) with 4x crops; an imp's death; enemy readability (an imp winding up, a
 ## hurt imp, an enemy shot beside a player's shot); player 4 down, and the revive ring half
-## full; a protected wizard; the Coop camera at zoom 0.5 (wizards in the corners of an area
+## full; a protected wizard; the party camera at zoom 0.5 (wizards in the corners of an area
 ## twice the screen). Look at them for legible 12/14 px text over the translucent panels.
 
 
 func take() -> void:
-	if not need(["PlayerInput", "Flow", "Hud", "Combat", "Projectiles", "Coop"]):
+	if not need(["PlayerInput", "Flow", "Hud", "Combat", "Projectiles", "Coop", "Feel"]):
 		return
 	settle_frames = 30
 	var input: Node = root.get_node("PlayerInput")
@@ -135,9 +135,9 @@ func take() -> void:
 		return
 	_crop_round(protected_image, wizard1, "protected_invulnerable")
 	await settle()
-	var camera: Camera2D = root.get_node("Coop").get("camera") as Camera2D
+	var camera: Camera2D = _party_camera().get("camera") as Camera2D
 	if camera == null or camera.zoom.x > 0.51:
-		fail("the Coop camera is not at zoom 0.5 in coop_camera_zoom_half")
+		fail("the party camera is not at zoom 0.5 in coop_camera_zoom_half")
 		return
 	print("SHOT: camera zoom %.2f" % camera.zoom.x)
 	await shot("staged_zoom_half_wizards_placed_outside_room")
@@ -215,8 +215,10 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 
 
 ## Put the wizards in the four corners of an area twice the screen and snap the
-## Coop camera to fit them, which zooms it out to its limit (0.5). The room is only
-## one screen, so its camera limits are widened first, or the zoom would stay at 1.
+## party camera to fit them, which zooms it out to its limit (0.5). The room is only
+## one screen, so the room Coop keeps the view inside (`room`, from `room_laid_out`) and the
+## camera's limits are widened first, or the zoom would stay at 1. Coop fits the view on the
+## tick (`step_rules`, sending `view_fitted` to Feel's party camera), which is then snapped to it.
 ## Most of the picture is then outside the room; the panels are what is looked at.
 func _spread_wizards(flow: Node) -> void:
 	var coop: Node = root.get_node("Coop")
@@ -225,13 +227,21 @@ func _spread_wizards(flow: Node) -> void:
 		var wizard: Node2D = flow.call("get_wizard", index) as Node2D
 		if wizard != null:
 			wizard.global_position = corners[index]
-	var camera: Camera2D = coop.get("camera") as Camera2D
+	coop.set("room", Rect2(-64.0, -64.0, 1408.0, 848.0))
+	var party: RefCounted = _party_camera()
+	var camera: Camera2D = party.get("camera") as Camera2D
 	if camera != null:
 		camera.limit_left = -64
 		camera.limit_top = -64
 		camera.limit_right = 1344
 		camera.limit_bottom = 784
-	coop.call("snap")
+	coop.call("step_rules", 0.0)
+	party.call("snap")
+
+
+## Feel's party camera (gameplay/feel/party_camera.gd), which eases the world's camera to Coop's view.
+func _party_camera() -> RefCounted:
+	return root.get_node("Feel").get("party_camera") as RefCounted
 
 
 ## A 4x enlarged crop of `image` around `node` (see `save_crop`).

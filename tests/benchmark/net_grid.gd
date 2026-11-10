@@ -46,7 +46,7 @@ func _initialize() -> void:
 		registry.free()
 		quit(1)
 		return
-	print("BENCH: net grid: %d ticks of %s a run; rtt and jitter in ms, loss each way; delay in ticks; press = the client's press to its tick, mean / worst ms; stood = host ticks with a late frame stood in; waited = client steps with no tick; B/s to the client / to the host; us/tick on the link (host / client) and hashing (host / client)" % [ticks, card_id])
+	print("BENCH: net grid: %d ticks of %s a run; rtt and jitter in ms, loss each way; delay in ticks at the end (and how often the ping moved it); press = the client's press to its tick, mean / worst ms; stood = host ticks with a late frame stood in; waited = client steps with no tick; B/s to the client / to the host; us/tick on the link (host / client) and hashing (host / client)" % [ticks, card_id])
 	var failed: bool = false
 	for link in LINKS:
 		for rtt in ROUND_TRIPS:
@@ -73,9 +73,9 @@ func _run(card: SpellComponent, ticks: int, rtt_ms: float, jitter_ms: float, los
 	var client: NetStats = pair.client.stats
 	failed = failed or host.mismatches > 0 or host.checks == 0 or pair.host.problem != "" or pair.client.problem != ""
 	var seconds: float = float(ticks) / 60.0
-	print("BENCH: net grid: rtt %3d jitter %2d loss %2d%%: delay %2d, press %3d / %3d ms (%d), stood %4d, late %4d, waited %4d, most ahead %2d, %5d / %5d B/s, link %4.1f / %4.1f us/tick, hash %5.1f / %5.1f us/tick, checks %d ok%s" % [
+	print("BENCH: net grid: rtt %3d jitter %2d loss %2d%%: delay %2d (moved %d), press %3d / %3d ms (%d), stood %4d, late %4d, waited %4d, most ahead %2d, %5d / %5d B/s, link %4.1f / %4.1f us/tick, hash %5.1f / %5.1f us/tick, checks %d ok%s" % [
 		roundi(rtt_ms), roundi(jitter_ms), roundi(loss * 100.0),
-		client.delay, roundi(client.press_ms()), roundi(client.press_steps_worst * NetStats.TICK_MS), client.presses,
+		client.delay, client.retunes, roundi(client.press_ms()), roundi(client.press_steps_worst * NetStats.TICK_MS), client.presses,
 		host.stood_in, host.late_frames, client.steps_waited, client.most_ahead,
 		roundi(host.sent_bytes / seconds), roundi(client.sent_bytes / seconds),
 		float(host.net_usec) / ticks, float(client.net_usec) / ticks,

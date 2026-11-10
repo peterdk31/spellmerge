@@ -155,6 +155,35 @@ func test_a_delay_too_short_makes_frames_late_and_nothing_else() -> void:
 	check_equal(pair.first_parting(), -1, "and agrees at every tick")
 
 
+## The client's delay follows its ping in the run (S5): the link gets fast, then slow, and the
+## real host takes every frame (it closes the link on one for an earlier tick than the one
+## before) while the machines agree.
+func test_the_delay_follows_a_link_that_changes_in_the_run() -> void:
+	var pair: NetPair = _new_pair(200.0, 30.0)
+	check(pair.start(), "the host starts")
+	pair.run(120)
+	var slow: int = pair.client.delay
+	check(slow >= 12 + 2 + 1, "the delay of 200 ms (%d)" % slow)
+	for link: NetConditioner in [pair.host_link, pair.client_link]:
+		link.delay_ms = 10.0
+	pair.run(900)
+	var fast: int = pair.client.delay
+	check(fast <= 8 and pair.client.stats.retunes > 0, "the link fast: the delay falls (%d to %d)" % [slow, fast])
+	for link: NetConditioner in [pair.host_link, pair.client_link]:
+		link.delay_ms = 150.0
+	pair.run(300)
+	check(pair.client.delay >= 18 + 2 + 1, "the link slow: the delay rises (%d to %d)" % [fast, pair.client.delay])
+	# Until it rose (three slow pings) its frames were late; since, they are on time.
+	var stood: int = pair.host.stats.stood_in
+	pair.run(300)
+	check_equal([pair.host.problem, pair.client.problem], ["", ""], "the host took every frame")
+	check(pair.host.stats.stood_in - stood <= 3, "and once the delay rose its frames are on time again (%d ticks stood in)" % (pair.host.stats.stood_in - stood))
+	check_equal(pair.host_ticks(), 120 + 900 + 600, "the host ran every tick")
+	check(pair.let_client_catch_up(), "the client plays them all")
+	check_equal(pair.first_parting(), -1, "and agrees at every tick")
+	check_equal([pair.host.stats.mismatches, pair.host.parted_tick], [0, -1], "every check passed")
+
+
 func test_the_host_is_on_time_while_the_client_stalls_and_the_client_catches_up() -> void:
 	var pair: NetPair = _new_pair(50.0)
 	check(pair.start(), "the host starts")

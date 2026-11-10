@@ -13,8 +13,10 @@ extends NetSession
 ##   checked by the replay's decoder, and the seat's frame is sent for the host's tick
 ##   `tick + delay`, `tick` being the next this machine plays. The host gone, the feed is
 ##   `closed` and the replay ends once played out.
-## - **The input delay `delay`** (`D`, in ticks): given, or when the header arrives worked out
-##   from the ping measured until then: the round trip in ticks, the cushion, and one.
+## - **The input delay `delay`** (`D`, in ticks) is `NetDelay`'s: given, and then never moved,
+##   or following the ping through the run. This tells it each ping answered and each frame
+##   sent. A frame is never for an earlier host tick than the one before it (the host refuses
+##   that): while the delay falls and this machine waits for ticks, its frames keep the last's.
 ## - **`after_tick`**, called after every tick has stepped, hashes the tick's part of the state
 ##   and sends each whole check to the host, which compares and says when one failed
 ##   (`NetSession`: `parted_tick`).
@@ -32,8 +34,8 @@ const MAX_READ: int = 600
 ## A ping every this many physics steps.
 const PING_EVERY: int = 30
 ## The input delay when none is given and no ping came back in time, and the most it is set to.
-const DEFAULT_DELAY: int = 6
-const MAX_DELAY: int = 60
+const DEFAULT_DELAY: int = NetDelay.DEFAULT
+const MAX_DELAY: int = NetDelay.MOST
 ## A ping that takes longer is not counted.
 const MAX_RTT_MS: int = 10000
 
@@ -70,7 +72,9 @@ var clock: Callable = Callable()
 ## This machine's seat.
 var seat: int = 1
 ## The input delay in ticks; below 0 until it is worked out from the ping.
-var delay: int = -1
+var delay: int:
+	get:
+		return _delay.ticks
 ## True once the host's header was taken and the live replay started.
 var started: bool = false
 
@@ -78,6 +82,9 @@ var started: bool = false
 var _pumps: int = 0
 ## The replay's next tick when the last frame was sent (-1: none sent).
 var _sent_at: int = -1
+## The host's tick the last frame was sent for (they never go back).
+var _last_for: int = 0
+var _delay: NetDelay
 var _presses: NetPressProbe
 
 
@@ -85,7 +92,7 @@ func _init(frames_service: FramesScript, over: NetLink, state_areas: Callable = 
 	super(frames_service, over, state_areas)
 	max_read = MAX_READ
 	seat = on_seat
-	delay = mini(input_delay, MAX_DELAY)
+	_delay = NetDelay.new(input_delay, cushion)
 	feed = Feed.new(1 << on_seat, cushion)
 	feed.client = weakref(self)
 	_presses = NetPressProbe.new(stats, on_seat)
@@ -108,7 +115,8 @@ func pump() -> bool:
 
 
 ## The seat's frame of this physics step goes to the host (the feed), for the host's tick
-## `tick + delay`; `tick` is the next this machine plays.
+## `tick + delay` (never an earlier one than the frame before); `tick` is the next this machine
+## plays.
 func send_frame(tick: int, frame: InputFrame) -> void:
 	stats.steps += 1
 	# The step before ran no tick when the next to play is still the same.
@@ -120,7 +128,9 @@ func send_frame(tick: int, frame: InputFrame) -> void:
 		return
 	var began: int = Time.get_ticks_usec()
 	_presses.sent(frame, _pumps)
-	_send(NetMessage.of_frame(tick + delay, frame.to_bytes()))
+	_last_for = maxi(tick + _delay.step(), _last_for)
+	_count_delay()
+	_send(NetMessage.of_frame(_last_for, frame.to_bytes()))
 	stats.net_usec += Time.get_ticks_usec() - began
 
 
@@ -149,6 +159,10 @@ func _take(message: NetMessage) -> String:
 			var took: int = (_now() - message.stamp) & 0xffffffff
 			if took <= MAX_RTT_MS:
 				stats.add_rtt(float(took))
+				_delay.add_rtt(float(took))
+				if started:
+					_delay.retune()
+				_count_delay()
 			return ""
 		NetMessage.PARTED:
 			_part(message.tick, message.names)
@@ -167,11 +181,8 @@ func _take_header(message: NetMessage) -> String:
 		return "a header with ticks"
 	if run.seats & feed.local_seats == 0:
 		return "the host seated nobody on seat %d" % seat
-	if delay < 0:
-		delay = DEFAULT_DELAY
-		if stats.pings > 0:
-			delay = clampi(ceili(stats.rtt_smooth_ms / NetStats.TICK_MS) + feed.cushion + 1, 1, MAX_DELAY)
-	stats.delay = delay
+	_delay.start()
+	_count_delay()
 	feed.replay = run
 	# The frames service refuses a run of another build or other content.
 	if not frames.play_live(feed):
@@ -180,6 +191,13 @@ func _take_header(message: NetMessage) -> String:
 	replay = run
 	started = true
 	return ""
+
+
+## The delay's numbers into the counters.
+func _count_delay() -> void:
+	stats.delay = _delay.ticks
+	stats.retunes = _delay.retunes
+	stats.rtt_mid_ms = _delay.rtt_ms()
 
 
 func _refuse(why: String) -> void:

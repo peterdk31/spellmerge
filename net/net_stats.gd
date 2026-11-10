@@ -4,14 +4,18 @@ extends RefCounted
 ## A session counts as it goes; whoever owns it shows `line()` or logs `row()`.
 
 ## A tick's length, in milliseconds.
-const TICK_MS: float = 1000.0 / 60.0
+const TICK_MS: float = NetDelay.TICK_MS
 
-## The round trip, in milliseconds: the last ping's, and smoothed (the client measures it).
+## The round trip, in milliseconds: the last ping's, smoothed, and the middle one of the last
+## few, which the input delay is worked out from (the client measures it).
 var rtt_ms: float = 0.0
 var rtt_smooth_ms: float = 0.0
+var rtt_mid_ms: float = 0.0
 var pings: int = 0
-## The client's input delay `D`, in ticks.
+## The client's input delay `D`, in ticks, and how often the ping moved it in the run (a rise,
+## or a fall begun).
 var delay: int = 0
+var retunes: int = 0
 
 ## Messages and bytes, each way.
 var sent: int = 0
@@ -81,7 +85,7 @@ func press_ms() -> float:
 ## The counters as a row, by name (a log's line, the grid's).
 func row() -> Dictionary:
 	return {
-		"rtt_ms": snappedf(rtt_smooth_ms, 0.1), "delay": delay,
+		"rtt_ms": snappedf(rtt_smooth_ms, 0.1), "rtt_mid_ms": snappedf(rtt_mid_ms, 0.1), "delay": delay, "retunes": retunes,
 		"sent": sent, "sent_bytes": sent_bytes, "read": read, "read_bytes": read_bytes,
 		"steps": steps, "steps_waited": steps_waited, "ticks_run": ticks_run, "most_ahead": most_ahead,
 		"presses": presses, "press_ms": snappedf(press_ms(), 0.1), "press_worst_ms": snappedf(press_steps_worst * TICK_MS, 0.1),
@@ -95,4 +99,4 @@ func row() -> Dictionary:
 func line() -> String:
 	if ticks > 0:
 		return "host: %d ticks, %d stood in, %d late, %d/%d checks parted, %d B out, %d B in" % [ticks, stood_in, late_frames, mismatches, checks, sent_bytes, read_bytes]
-	return "client: ping %d ms, delay %d, %d ticks, waited %d, press %d ms, %d checks, %d B out, %d B in" % [roundi(rtt_smooth_ms), delay, ticks_run, steps_waited, roundi(press_ms()), checks, sent_bytes, read_bytes]
+	return "client: ping %d ms (middle %d), delay %d (moved %d), %d ticks, waited %d, press %d ms, %d checks, %d B out, %d B in" % [roundi(rtt_smooth_ms), roundi(rtt_mid_ms), delay, retunes, ticks_run, steps_waited, roundi(press_ms()), checks, sent_bytes, read_bytes]

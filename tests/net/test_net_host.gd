@@ -900,3 +900,86 @@ func test_a_recording_is_said_once_and_in_order() -> void:
 	_tick()
 	check(_guest.problem.contains("plays recording 2 after 2"), "said twice: refused (%s)" % _guest.problem)
 
+
+func test_a_leave_sent_round_a_run_begun_anew_still_gives_the_seat_back() -> void:
+	# In a frame still waiting for its tick when the run begins anew.
+	_start()
+	_tick()
+	_send(40, _frame(0, 0, Vector2.ZERO, [[InputFrame.LEAVE]]))
+	_tick()
+	check(_input.is_joined(SEAT), "its tick has not come: the seat is still held")
+	_host.rebegin(_frames.record(&"hub_requested", 0, 11))
+	_seats.clear()
+	_tick()
+	check(not _input.is_joined(SEAT) and _guest.seats == 0, "the player left: its seat is given back in the new recording")
+	check_equal(_recorded(0).commands, [[InputFrame.LEAVE]], "recorded at the tick it happens")
+	check_equal(_seats, [-SEAT - 1], "once")
+
+
+func test_a_leave_in_a_frame_of_the_recording_before_is_not_dropped_with_the_frame() -> void:
+	_start()
+	_tick()
+	_host.rebegin(_frames.record(&"hub_requested", 0, 11))
+	_tick()
+	# The client has not said it plays the new recording: this frame is of the one before.
+	_send(900, _frame(0b0001, 0, Vector2.RIGHT, [[InputFrame.LEAVE]]))
+	_tick()
+	_tick()
+	check_equal(_guest.problem, "", "no fault")
+	check(not _input.is_joined(SEAT) and _guest.seats == 0, "its leave holds: the seat is given back")
+	check_equal(_recorded(2).held_bits, 0, "and nothing else of that frame is used")
+
+
+func test_the_recording_a_guest_plays_is_counted_past_a_byte() -> void:
+	_start()
+	_tick()
+	_guest.headers_sent = 300
+	_guest.plays_run = 255
+	_far.send(NetMessage.of_run(256))
+	_tick()
+	check_equal([_guest.problem, _guest.plays_run], ["", 256], "the 256th is said as 0 on the wire and taken as the next")
+	_far.send(NetMessage.of_run(256))
+	_tick()
+	check(_guest.problem.contains("plays recording"), "the same again is refused (%s)" % _guest.problem)
+
+
+func test_a_guest_still_owed_ticks_gets_the_rest_of_the_recording_before_the_new_one() -> void:
+	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	for i in NetHost.SEND_A_TICK + 100:
+		_frames.tick(DT)
+	_host.begin(replay)
+	_tick()
+	_drain()
+	check_equal(_guest.sent_ticks, NetHost.SEND_A_TICK, "the guest is still owed the rest")
+	var last: int = replay.tick_count()
+	check(_host.rebegin(_frames.record(&"hub_requested", 0, 11)), "the run begins anew")
+	var ticks: int = 0
+	while _next().kind == NetMessage.TICK:
+		check_equal(_message.tick, NetHost.SEND_A_TICK + ticks, "the recording before, on from where it was")
+		ticks += 1
+	check_equal(NetHost.SEND_A_TICK + ticks, last, "to its last tick: the guest plays it to its end")
+	check_equal(_message.kind, NetMessage.HEADER, "and only then the new recording's header")
+	check_equal(_guest.problem, "", "the guest stays")
+
+
+func test_a_guest_too_far_behind_a_run_begun_anew_is_let_go() -> void:
+	var replay: Replay = _frames.record(&"sandbox_requested", 0, 7)
+	for i in NetHost.MAX_FLUSH + 300:
+		_frames.tick(DT)
+	_host.begin(replay)
+	_tick()
+	check(_host.rebegin(_frames.record(&"hub_requested", 0, 11)), "the run begins anew")
+	check(not _host.guests.has(_guest) and not _far.is_open(), "more owed than its link takes at once: it is let go, and may join again")
+	check(_guest.problem.contains("behind a run that began anew"), "with the reason kept (%s)" % _guest.problem)
+	check(not _input.is_joined(SEAT), "its seat left")
+
+
+func test_a_host_whose_run_was_begun_anew_untold_sends_nothing_of_the_wrong_recording() -> void:
+	_start()
+	_tick()
+	_drain()
+	_frames.record(&"hub_requested", 0, 11)
+	check(not _host.is_running(), "the frames service records another run than the host's: it is not running")
+	_tick()
+	check(_next().kind == 0, "and sends no tick of a recording the guest was never given the header of")
+

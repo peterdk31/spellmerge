@@ -444,10 +444,33 @@ func test_a_live_replay_waits_for_its_feed_to_bring_the_next_recording() -> void
 			from.replay.add_tick_bytes(next.tick_bytes(from.fed))
 			from.fed += 1
 	from.asks = 0
+	# This machine's player leaves in the very step the next recording begins: still its to send.
+	from.sent.clear()
+	_input.leave(LOCAL)
 	var ran: int = _step()
+	check(not from.sent.is_empty() and _frame_has(_sent_frame(0), InputFrame.LEAVE), "a leave pressed in between goes out in the seat's next frame")
 	check_equal(heard, [0] as Array[int], "the next recording's start is sent as it begins")
 	check(ran >= 1 and _frames.is_live(), "and it is played in the same step, with no tick asked of a replay that has none (%d)" % ran)
 	check_equal(_frames.play_tick(), ran, "from its first tick")
 	# The feed's own callback holds the feed: let go, or neither is ever freed.
 	from.on_pump = Callable()
+
+
+func test_a_live_replay_whose_feed_goes_before_the_next_recording_leaves_the_game_running() -> void:
+	var heard: Array[int] = _hear_starts()
+	check(_play(), "the live replay plays")
+	_feed.let_through = 6
+	_feed.asks = 6
+	_step()
+	_frames.restart(&"hub_requested", 0)
+	_step()
+	check(_frames.is_live() and heard.is_empty(), "it waits for the next recording")
+	# The host is gone before its next header came.
+	_feed.closed = true
+	_step()
+	_step()
+	check(not _frames.is_playing(), "the replay ends")
+	check_equal(heard, [0] as Array[int], "and the run the game asked for starts here all the same: nobody is left in an empty game")
+	_step()
+	check_equal(heard, [0] as Array[int], "once")
 

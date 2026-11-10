@@ -166,6 +166,10 @@ func fill_seat(seat: int, frame: InputFrame, tick: int) -> void:
 		stats.stood_in += 1
 	var last_used: InputFrame = _last[seat]
 	if last_used == null:
+		# No frame of its own in this recording yet; a leave kept from before still holds.
+		if _commands[seat].has([InputFrame.LEAVE]):
+			_commands[seat].clear()
+			take_back(seat)
 		return
 	frame.move = last_used.move
 	frame.aim = last_used.aim
@@ -268,6 +272,10 @@ func rebegin(run: Replay) -> void:
 	_read_at = -1
 	_waiting = 0
 	for seat in Replay.SEATS:
+		# A player who left just before: that is no input of the recording before, and still holds.
+		var left: bool = _commands[seat].has([InputFrame.LEAVE])
+		for frame: InputFrame in _queued[seat]:
+			left = left or frame.commands.has([InputFrame.LEAVE])
 		_queued[seat].clear()
 		_queued_for[seat].clear()
 		_newest_for[seat] = 0
@@ -275,6 +283,8 @@ func rebegin(run: Replay) -> void:
 		_presses[seat] = 0
 		_commands[seat].clear()
 		_freed_at[seat] = -1
+		if left and owns(seat):
+			_commands[seat].append([InputFrame.LEAVE])
 	send_header()
 
 
@@ -385,10 +395,11 @@ func _take(message: NetMessage) -> String:
 		NetMessage.HASHES:
 			return _take_check(message)
 		NetMessage.RUN:
-			# The next one, and one it was sent: never ahead of the host.
-			if message.run != plays_run + 1 or message.run > headers_sent:
+			# The next one, and one it was sent: never ahead of the host. (The number on the wire
+			# is a byte, round again after 255; the count here is not.)
+			if message.run != (plays_run + 1) & 0xff or plays_run + 1 > headers_sent:
 				return "it says it plays recording %d after %d of %d" % [message.run, plays_run, headers_sent]
-			plays_run = message.run
+			plays_run += 1
 			return ""
 		NetMessage.SEAT_ASK:
 			if _asks.size() >= MAX_ASKS_WAITING:
@@ -401,15 +412,18 @@ func _take(message: NetMessage) -> String:
 func _take_frame(message: NetMessage) -> String:
 	if replay == null:
 		return "a frame before the run"
-	# Of the recording before (the run began anew since): on its way, or sent before the guest
-	# played that far. Dropped.
-	if plays_run != headers_sent:
-		return ""
 	var frame := InputFrame.new()
 	var why: String = frame.decode(message.body)
 	if why != "":
 		return "a frame: " + why
 	var seat: int = frame.seat
+	# Of the recording before (the run began anew since): on its way, or sent before the guest
+	# played that far. Dropped, but for its player's leave, which is no input of that recording:
+	# the seat is given back when its frame is next built.
+	if plays_run != headers_sent:
+		if owns(seat) and frame.commands.has([InputFrame.LEAVE]) and not _commands[seat].has([InputFrame.LEAVE]):
+			_commands[seat].append([InputFrame.LEAVE])
+		return ""
 	if not owns(seat):
 		# A seat it gave back a moment ago: its last frames were on their way. Any other seat is
 		# never this machine's to play.

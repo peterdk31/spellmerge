@@ -44,6 +44,9 @@ const MAX_CHECKS_KEPT: int = 32
 ## The most ticks sent to a guest after one tick: one that joined a run under way is sent what
 ## was recorded before at this pace.
 const SEND_A_TICK: int = 240
+## The most ticks of a recording still owed to a guest that are sent at once when the run begins
+## anew (four ticks' worth: its link holds that easily).
+const MAX_FLUSH: int = SEND_A_TICK * 4
 
 
 ## A guest's seat's source: the host, held weakly (the frames service holds the source, the
@@ -206,6 +209,18 @@ func admit(guest: NetGuest) -> bool:
 func rebegin(run: Replay) -> bool:
 	if replay == null or run == null or run == replay:
 		return false
+	# The recording before goes out whole first: a guest still catching up on it gets the rest
+	# now (it must play it to its end, to be where the new one starts). One too far behind for
+	# its link to take that at once is let go; it may join again.
+	for guest: NetGuest in guests.duplicate():
+		if not guest.admitted:
+			continue
+		if replay.tick_count() - guest.sent_ticks > MAX_FLUSH:
+			guest.problem = "it was %d ticks behind a run that began anew" % (replay.tick_count() - guest.sent_ticks)
+			remove_guest(guest)
+			continue
+		while guest.sent_ticks < replay.tick_count() and guest.hears():
+			guest.send_tick(_tick_message(guest.sent_ticks))
 	replay = run
 	stats.ticks = run.tick_count()
 	checks = NetChecks.new(checks.every)
@@ -231,9 +246,10 @@ func stop(keep_recording: bool = false) -> Replay:
 	return replay
 
 
-## True while the run it began is recorded.
+## True while the run it began is the one the frames service records (not another begun since
+## that this host was never told of: `rebegin`).
 func is_running() -> bool:
-	return replay != null and frames.is_recording()
+	return replay != null and frames.recorded() == replay
 
 
 ## True while any guest can still be heard.

@@ -278,6 +278,8 @@ signal sandbox_changed(on: bool)
 ## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone)
 ## and feel (the stone's lit look, `RoomBase.STONE_LIT`).
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
+## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run of waves from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
+signal hub_changed(in_hub: bool)
 ## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (`RoomBase.altar`), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.

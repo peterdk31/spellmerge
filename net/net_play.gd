@@ -38,7 +38,7 @@ extends Node
 ##    starts anew, recorded), and the joining machine plays the recording from its first tick
 ##    until it has caught up, then on, live. From the hub into a run and back is the game's own
 ##    doing, inside that recording. A machine that comes while the party is out of the hub
-##    (`start_stone_changed` says where it is) is turned away: joining is in the hub only.
+##    (`hub_changed` says where it is) is turned away: joining is in the hub only.
 ## 3. **While it plays** the frames service drives the sessions; this only calls their
 ##    `after_tick` on the Tick's `ticked`, sends the counters' line about once a second
 ##    (`online_line_changed`) and logs them (`NetLog`), and when a hash check fails says so once
@@ -130,7 +130,7 @@ var _handshake: NetHandshake = null
 ## The host's: the seat that asked, and the run it records (null: none).
 var _starter: int = 0
 var _replay: Replay = null
-## True while the party is in the hub (`start_stone_changed`): where a machine may join.
+## True while the party is in the hub (`hub_changed`): where a machine may join.
 var _in_lobby: bool = false
 ## True while the loading screen is up (`loading_started` to `loading_finished`).
 var _loading: bool = false
@@ -172,7 +172,7 @@ func _ready() -> void:
 	events.online_leave_requested.connect(_on_leave_requested)
 	events.loading_started.connect(func() -> void: _loading = true)
 	events.loading_finished.connect(func() -> void: _loading = false)
-	events.start_stone_changed.connect(func(_standing: int, wizards: int, _lit: bool) -> void: _in_lobby = wizards > 0)
+	events.hub_changed.connect(func(in_hub: bool) -> void: _in_lobby = in_hub)
 	frames.recorded_anew.connect(_on_recorded_anew)
 
 
@@ -449,7 +449,8 @@ func _step_run() -> void:
 			if guest.admitted and not guest.hears():
 				_last_problem = guest.problem
 				_host.remove_guest(guest)
-		over = _admitted() == 0
+		# Not while a machine still waits to be joined: it is joined to this run when ready.
+		over = _host.guests.is_empty()
 	else:
 		over = not _client.is_playing()
 	if over or _steps % LOG_EVERY == 0:

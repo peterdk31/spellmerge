@@ -18,6 +18,8 @@ A seventh, by the owner on 2026-11-03: **spell spectacle**, three drawn-only lay
 
 An eighth, by the owner on 2026-11-04: **online-ready**, a deterministic simulation (the same inputs give the same game on every platform), input frames and replays, one tick clock, and snapshots, so online co-op can be added later ([online-ready.md](milestones/online-ready.md), phase N). It builds no netcode; networking stays banned until its own owner exception. Approved the same day: after the owner lane's current work, beside D3 and C2 (it does not hold them up), and done before M3 starts. It runs in one order with **shot scale** (threads in the shot kernel, toward 100,000 shots; [shot-scale.md](milestones/shot-scale.md)), approved the same day on five shared rules.
 
+A ninth, by the owner on 2026-11-10: **the online lobby**, room codes through a small signalling server on Cloudflare's free plan, and the hub as the lobby: an island in the void where local and online players take up to four seats from any machines and start a run from the teleporter stone ([online-lobby.md](milestones/online-lobby.md)). It follows the netcode spike ([netcode-spike.md](milestones/netcode-spike.md)) and does not wait for its S5: L1 (the hub, offline) and L2 (the server and room codes) first, for a working lobby as soon as possible. The hub is the one M5 grows.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

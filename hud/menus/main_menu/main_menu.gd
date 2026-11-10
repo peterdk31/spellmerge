@@ -8,6 +8,19 @@ extends Control
 ## Below Play, "Fullscreen: Off" (or On) asks `Display` (core) to fill the screen: on the web a
 ## click or key press is what lets the browser do it (owner, 2026-10-27). F11 or Alt+Enter do the
 ## same anywhere.
+## **Host and Join** (netcode spike S4, docs/milestones/netcode-spike.md; in every build): two
+## players on two machines play a sandbox together by swapping one code each way, by copy and
+## paste. The menu knows no network: it sends what its player asked (`online_host_requested`,
+## `online_join_requested` with the host's code, `online_answer_requested` with the code that came
+## back, `online_leave_requested`) and shows what `online_changed` says: this machine's code with a
+## Copy button, a box for the other player's code, and a line of plain words. A pasted code is
+## only passed on, as it is; net/ checks it.
+## **Pasting** (the Paste button, or the paste keys in the box) is the menu's own: it replaces
+## what the box holds with the clipboard's text, so a second paste never adds to the first. In a
+## browser the clipboard reaches the game a moment after it is asked for (the engine's web build
+## hands over what it held before, and the browser may first ask the player to allow it), so there
+## the box is filled when the text has arrived: it is asked for at once and read again
+## PASTE_CHECKS times, PASTE_WAIT apart.
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -40,6 +53,33 @@ const REPLAY_HASHES_ARGUMENT: String = "--replay-hashes"
 const REPLAY_HASHES_RUNNER: String = "res://tests/platforms/replay_hashes_runner.gd"
 const REPLAY_HASHES_NODE: String = "ReplayHashesRunner"
 
+## Two game processes linked through Host and Join (`--online`, tests/net/online_runner.gd; netcode
+## spike S4).
+const ONLINE_ARGUMENT: String = "--online"
+const ONLINE_RUNNER: String = "res://tests/net/online_runner.gd"
+const ONLINE_NODE: String = "OnlineRunner"
+
+## The most characters of a pasted code passed on (the box's limit; net/ has its own).
+const CODE_MAX_CHARS: int = 16384
+## In a browser: how often the clipboard is read again after a paste, and the seconds between.
+const PASTE_CHECKS: int = 4
+const PASTE_WAIT: float = 0.3
+## What the online box says in each phase of `online_changed`, as the host and as the joining
+## player (a phase's `note`, when it has one, is shown instead or after).
+const ONLINE_TEXT: Dictionary[StringName, Array] = {
+	EventsScript.ONLINE_OFF: ["", "Paste the host's code below, then press Connect."],
+	EventsScript.ONLINE_MAKING: ["Making this machine's code...", "Making this machine's code..."],
+	EventsScript.ONLINE_CODE: [
+		"Copy this machine's code and send it to the other player. Paste the code they send back below, then press Connect.",
+		"Copy this machine's code and send it back to the host. The game starts when the host has given it.",
+	],
+	EventsScript.ONLINE_LINKING: ["Looking for the other machine...", "Looking for the other machine..."],
+	EventsScript.ONLINE_LINKED: ["Found each other. Starting...", "Found each other. Waiting for the host to start..."],
+	EventsScript.ONLINE_PLAYING: ["", ""],
+	EventsScript.ONLINE_ENDED: ["", ""],
+	EventsScript.ONLINE_FAILED: ["Cancel, then press Host to try again.", "Paste the host's code below and press Connect to try again."],
+}
+
 ## The event bus. Only tests set this, before adding the node; otherwise the
 ## "Events" autoload is used.
 var events: EventsScript = null
@@ -55,6 +95,29 @@ var display: Node = null
 @onready var _play: Button = %Play
 @onready var _sandbox: Button = %Sandbox
 @onready var _fullscreen: Button = %Fullscreen
+@onready var _hint: Label = %Hint
+@onready var _host: Button = %Host
+@onready var _join: Button = %Join
+@onready var _online: Control = %Online
+@onready var _online_status: Label = %OnlineStatus
+@onready var _mine_row: Control = %MineRow
+@onready var _mine: LineEdit = %Mine
+@onready var _copy: Button = %Copy
+@onready var _theirs_row: Control = %TheirsRow
+@onready var _theirs: LineEdit = %Theirs
+@onready var _paste: Button = %Paste
+@onready var _connect: Button = %Connect
+@onready var _cancel: Button = %Cancel
+
+## Whether this menu's player asked to host (else to join), while the online box is open.
+var _hosting: bool = false
+## Reads the clipboard's text (the window service's; tests give their own).
+var clipboard_reader: Callable = DisplayServer.clipboard_get
+## Whether the clipboard arrives a moment after it is asked for (a browser; tests may set it).
+var clipboard_is_late: bool = OS.has_feature("web")
+## Clipboard reads still to make after a paste, and the seconds to the next.
+var _paste_checks: int = 0
+var _paste_wait: float = 0.0
 
 
 func _ready() -> void:
@@ -70,6 +133,18 @@ func _ready() -> void:
 	if display != null:
 		display.connect(&"fullscreen_changed", func(_on: bool) -> void: _show_fullscreen())
 		_show_fullscreen()
+	_host.pressed.connect(_on_host_pressed)
+	_join.pressed.connect(_on_join_pressed)
+	_copy.pressed.connect(_on_copy_pressed)
+	_paste.pressed.connect(_on_paste_pressed)
+	_connect.pressed.connect(_on_connect_pressed)
+	_theirs.text_submitted.connect(func(_text: String) -> void: _on_connect_pressed())
+	_cancel.pressed.connect(_on_cancel_pressed)
+	_theirs.max_length = CODE_MAX_CHARS
+	_theirs.gui_input.connect(_on_box_input)
+	set_process(false)
+	if events != null:
+		events.online_changed.connect(_on_online_changed)
 	_sandbox.visible = true
 	if SANDBOX_FOCUS_CHANNELS.has(channel):
 		_sandbox.grab_focus()
@@ -82,6 +157,7 @@ func _ready() -> void:
 	_start_timing_test(args)
 	_start_storm(args)
 	_start_replay_hashes(args)
+	_start_runner(args, ONLINE_ARGUMENT, ONLINE_NODE)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -160,6 +236,9 @@ func _runner_script(node_name: String) -> GDScript:
 		REPLAY_HASHES_NODE:
 			if ResourceLoader.exists(REPLAY_HASHES_RUNNER):
 				return load("res://tests/platforms/replay_hashes_runner.gd") as GDScript
+		ONLINE_NODE:
+			if ResourceLoader.exists(ONLINE_RUNNER):
+				return load("res://tests/net/online_runner.gd") as GDScript
 	return null
 
 
@@ -184,6 +263,122 @@ func _on_sandbox_pressed() -> void:
 		push_warning("Main menu: the Events autoload is missing, so Sandbox does nothing.")
 		return
 	events.sandbox_requested.emit(MENU_PLAYER)
+
+
+func _on_host_pressed() -> void:
+	if events == null:
+		push_warning("Main menu: the Events autoload is missing, so Host does nothing.")
+		return
+	_hosting = true
+	_open_online()
+	events.online_host_requested.emit(MENU_PLAYER)
+
+
+## Join opens the box for the host's code; nothing is asked of anyone until Connect.
+func _on_join_pressed() -> void:
+	if events == null:
+		push_warning("Main menu: the Events autoload is missing, so Join does nothing.")
+		return
+	_hosting = false
+	_open_online()
+	_show_online(EventsScript.ONLINE_OFF, "", "")
+	_theirs.grab_focus()
+
+
+## The online box takes the place of the menu's buttons (the two do not fit the screen together).
+func _open_online() -> void:
+	_set_online_open(true)
+	_mine.text = ""
+	_theirs.text = ""
+
+
+func _set_online_open(open: bool) -> void:
+	_online.visible = open
+	for button: Control in [_sandbox, _play, _fullscreen, _host.get_parent() as Control, _hint]:
+		button.visible = not open
+	if not open:
+		_fullscreen.visible = display != null
+
+
+func _on_copy_pressed() -> void:
+	if _mine.text != "":
+		DisplayServer.clipboard_set(_mine.text)
+		_copy.text = "Copied"
+
+
+## The box's own paste keys are the menu's (see the top): the box never pastes by itself.
+func _on_box_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"ui_paste"):
+		_theirs.accept_event()
+		_on_paste_pressed()
+
+
+## Paste: the box holds what the clipboard holds. In a browser that text arrives a moment later.
+func _on_paste_pressed() -> void:
+	var text: String = String(clipboard_reader.call())
+	if not clipboard_is_late:
+		_fill_box(text)
+		return
+	_paste_checks = PASTE_CHECKS
+	_paste_wait = PASTE_WAIT
+	set_process(true)
+
+
+func _process(delta: float) -> void:
+	_paste_wait -= delta
+	if _paste_wait > 0.0 or _paste_checks <= 0:
+		return
+	_paste_wait = PASTE_WAIT
+	_paste_checks -= 1
+	_fill_box(String(clipboard_reader.call()))
+	if _paste_checks <= 0:
+		set_process(false)
+
+
+func _fill_box(text: String) -> void:
+	if text != "":
+		_theirs.text = text.substr(0, CODE_MAX_CHARS)
+		_theirs.caret_column = _theirs.text.length()
+
+
+## The other player's code is passed on as it is: the host's to Join, the one sent back to Host.
+func _on_connect_pressed() -> void:
+	if events == null or _theirs.text.strip_edges() == "":
+		return
+	if _hosting:
+		events.online_answer_requested.emit(MENU_PLAYER, _theirs.text)
+	else:
+		events.online_join_requested.emit(MENU_PLAYER, _theirs.text)
+
+
+func _on_cancel_pressed() -> void:
+	_set_online_open(false)
+	if events != null:
+		events.online_leave_requested.emit(MENU_PLAYER)
+	_host.grab_focus()
+
+
+func _on_online_changed(phase: StringName, code: String, note: String) -> void:
+	if _online.visible:
+		_show_online(phase, code, note)
+
+
+## The online box for `phase`: its line of words, this machine's code once made, and the box for
+## the other's code while one is wanted (the host: once its own is made; Join: before any).
+func _show_online(phase: StringName, code: String, note: String) -> void:
+	var words: Array = ONLINE_TEXT.get(phase, ["", ""])
+	var text: String = words[0 if _hosting else 1]
+	if note != "":
+		text = note if text == "" else "%s %s" % [note, text]
+	elif phase == EventsScript.ONLINE_FAILED:
+		text = "It did not work. " + text
+	_online_status.text = text
+	if _mine.text != code:
+		_mine.text = code
+		_copy.text = "Copy"
+	_mine_row.visible = code != ""
+	var wants_code: bool = phase == EventsScript.ONLINE_CODE if _hosting else (phase == EventsScript.ONLINE_OFF or phase == EventsScript.ONLINE_FAILED)
+	_theirs_row.visible = wants_code
 
 
 func _on_fullscreen_pressed() -> void:

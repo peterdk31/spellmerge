@@ -51,6 +51,8 @@ extends CanvasLayer
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
 ##   it. Another player's `pause` does nothing while it is open.
+## - The online line (`hud/widgets/online_line.gd`, node Root/OnlineLine, made here; netcode spike
+##   S4): the text of `online_line_changed` at the top middle while a run is played online.
 ## - The frame rate readout (`hud/widgets/fps_counter.gd`, node Root/FpsCounter, made here; owner,
 ##   2026-11-02): "60 FPS" at the bottom middle, over everything, shown while the pause menu's
 ##   "Show FPS" switch is on (read after the menu is bound, then `show_fps_changed`).
@@ -70,6 +72,7 @@ const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 const FpsCounterScript := preload("res://hud/widgets/fps_counter.gd")
+const OnlineLineScript := preload("res://hud/widgets/online_line.gd")
 
 const PLAYER_COUNT: int = 4
 const PAUSE_ACTION: StringName = &"pause"
@@ -130,6 +133,7 @@ var _break_label: Label = null
 var _break_left: float = 0.0
 ## The frame rate readout (see the top).
 var _fps: FpsCounterScript = null
+var _online_line: OnlineLineScript = null
 
 
 func _ready() -> void:
@@ -243,6 +247,13 @@ func _ready() -> void:
 	_fps.grow_vertical = Control.GROW_DIRECTION_BEGIN
 	_fps.visible = _pause_menu.show_fps
 	_pause_menu.show_fps_changed.connect(_on_show_fps_changed)
+	# The online line: at the top middle, while a run is played with another machine.
+	_online_line = OnlineLineScript.new()
+	_online_line.name = "OnlineLine"
+	root_control.add_child(_online_line)
+	_online_line.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE, int(EDGE_MARGIN))
+	_online_line.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_online_line.bind(events)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)

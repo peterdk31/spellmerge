@@ -7,6 +7,12 @@ extends Node
 ## (P1), so P2-P4 are gamepads. The `leave` action, or unplugging a gamepad,
 ## frees the slot.
 ##
+## **This machine's seats** (`set_own_seats(first, count)`; all four, from P1, unless told): the
+## slots its real devices may take from then on. The keyboard takes only the first of them and a gamepad the
+## lowest free one, so a machine told its seats are "P2 alone" (one that plays a run with another
+## machine, which holds P1) seats its keyboard or its first gamepad as P2 and no second device. A
+## virtual device takes whatever slot it is added for. This layer knows nothing of why.
+##
 ## A keyboard that joined only because P1's Play was clicked with the mouse (flow calls
 ## `join(KEYBOARD, true)`) holds P1 provisionally: the first gamepad to press `join` takes P1 over
 ## as long as the keyboard has not been used since (a key press or a mouse click). So one player
@@ -141,6 +147,9 @@ var _aim_stick: Array[Vector2] = []
 ## Per player: the raw left stick, for menu_move().
 var _move_stick: Array[Vector2] = []
 var _mouse_aiming: bool = false
+## This machine's seats: the first slot its real devices may take, and how many (`set_own_seats`).
+var _own_first: int = 0
+var _own_count: int = MAX_PLAYERS
 ## True while the keyboard holds P1 provisionally (see the top).
 var _keyboard_provisional: bool = false
 ## How far the mouse moved (pixels) since the cast key last turned mouse aim off.
@@ -239,30 +248,68 @@ func join(device: int, provisional: bool = false) -> int:
 		return NO_PLAYER
 	var player: int = NO_PLAYER
 	if device == KEYBOARD:
-		if _devices[0] == NO_DEVICE:
-			player = 0
+		if _own_count > 0 and _devices[_own_first] == NO_DEVICE:
+			player = _own_first
 	else:
-		player = _devices.find(NO_DEVICE)
+		for own in range(_own_first, _own_first + _own_count):
+			if _devices[own] == NO_DEVICE:
+				player = own
+				break
 	if player != NO_PLAYER:
 		_keyboard_provisional = provisional and device == KEYBOARD
 		_assign(player, device)
 	return player
 
 
-## True while the keyboard holds P1 provisionally.
+## True while the keyboard holds its seat (P1, or this machine's first) provisionally.
 func is_keyboard_provisional() -> bool:
-	return _keyboard_provisional and _devices[0] == KEYBOARD
+	return _keyboard_provisional and player_of(KEYBOARD) != NO_PLAYER
 
 
-## A gamepad takes P1 over from a provisional keyboard: the wizard stays, its input is the pad's.
+## A gamepad takes the provisional keyboard's seat over: the wizard stays, its input is the pad's.
 func _hand_over(device: int) -> void:
+	var player: int = player_of(KEYBOARD)
 	_keyboard_provisional = false
-	_clear_state(0)
+	_clear_state(player)
 	_mouse_aiming = false
 	_mouse_travel = 0.0
-	_devices[0] = device
-	_pad_kind[0] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
-	glyph_kind_changed.emit(0)
+	_devices[player] = device
+	_pad_kind[player] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
+	glyph_kind_changed.emit(player)
+
+
+## This machine's seats are the `count` slots from `first` (see the top). A real device whose
+## seat is still one of them keeps it (its wizard is not touched); the others leave and join again
+## in their order, each taking the place it would have had it joined now (a provisional keyboard
+## stays provisional), and those with no place left stay out. With `reseat` every real device
+## leaves and joins again, as if it joined now (a menu's reset: nobody plays). Virtual devices are
+## not touched. False, and nothing changes, for seats outside the four.
+func set_own_seats(first: int = 0, count: int = MAX_PLAYERS, reseat: bool = false) -> bool:
+	if first < 0 or count < 0 or first + count > MAX_PLAYERS:
+		return false
+	if first == _own_first and count == _own_count:
+		return true
+	var provisional: bool = is_keyboard_provisional()
+	var real: Array[int] = []
+	for player in MAX_PLAYERS:
+		var device: int = _devices[player]
+		if device != NO_DEVICE and not is_virtual(device) and (reseat or player < first or player >= first + count):
+			real.append(device)
+			leave(player)
+	_own_first = first
+	_own_count = count
+	for device in real:
+		join(device, provisional and device == KEYBOARD)
+	return true
+
+
+## The first of this machine's seats, and how many it has (`set_own_seats`).
+func own_first_seat() -> int:
+	return _own_first
+
+
+func own_seat_count() -> int:
+	return _own_count
 
 
 ## Add the virtual device for `player` (a bot). Returns its device id, or

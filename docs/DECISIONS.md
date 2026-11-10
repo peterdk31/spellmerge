@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-10: Host and Join: a machine is told its seats, and an online run loads before it starts (netcode spike S4)
+
+- **A machine is told its seats** (`PlayerInput.set_own_seats`), instead of one device joining as a given seat as the plan said. The input layer's own rules (the keyboard takes the first seat, a gamepad the lowest free one, a gamepad takes over from a keyboard seated by a mouse click) then put the client's device on the client's seat and keep every other device out, and the input layer knows nothing of a network. Each machine has one seat in the spike.
+- **A run two machines start together loads before it starts.** Flow's loading screen (the shader warm-up) takes each machine its own time, so a run that loaded at its start began on a different tick on each and they parted at the first check; found by playing the real game in two processes. Each machine now loads when the link opens (`play_load_requested`), and the host starts when it is loaded and has heard the client's pings. A replay file played by a person has the same flaw (nothing plays one yet; the platform runs turn the loading off): whoever adds that loads first too.
+- **A code is never made without a candidate, and only the host runs out of time.** WebRTC's gathering can say done before its last candidates are handed over; a code made then reached nobody (one test run in ten). And the joining machine's code travels by hand, so it waits as long as its player.
+- **A pasted code is checked as far as a script can:** its form, the lines a data channel's description always holds, each candidate's grammar and address (never a host's name). WebRTC may still refuse what passes; that ends the handshake.
+- **Connecting has its own seam, `NetHandshake`**, beside `NetLink`: Host and Join (`NetPlay`) know a handshake and the sessions, never WebRTC, so they are tested on a stepped clock with a stand-in.
+- **No web fallback for pasting:** the plan's "plain web text field the game reads" would need `JavaScriptBridge`, banned everywhere by hard rule 4. Pasting into the game's own box works in a browser, once the menu does the paste itself (the engine's web build hands the clipboard over one paste late).
+- **The client gone, its seat leaves the host's run** (the session is stopped), rather than its wizard standing for the rest of it.
+- **The real game is checked in two processes** (`tools/online_pair.sh`), beside the unit tests: the autoloads together are where the loading flaw was. Not yet in the build's checks (`ci/` is the owner's).
+
 ## 2026-11-10: The netcode lives in `net/`, the one folder that may name networking classes (owner)
 
 - **Decided by the owner** in the netcode spike's plan (docs/milestones/netcode-spike.md, decision 1: "Ill allow it!"): an exception to hard rule 4's networking ban for a new folder `net/`, Claude's and the owner's only, as `native/` is for native code (2026-11-02).

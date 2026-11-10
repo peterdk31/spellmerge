@@ -27,6 +27,9 @@ func _initialize() -> void:
 	_test_a_gamepad_takes_p1_from_a_provisional_keyboard()
 	_test_a_used_keyboard_keeps_p1()
 	_test_one_device_per_player()
+	_test_a_machine_told_its_seats_seats_its_devices_there()
+	_test_a_provisional_keyboard_is_taken_over_on_its_own_seat()
+	_test_own_seats_given_back_seat_the_devices_as_before()
 	_test_full_game_rejects_a_fifth()
 	_test_leave_frees_the_slot()
 	_test_leave_by_button()
@@ -199,6 +202,93 @@ func _test_a_used_keyboard_keeps_p1() -> void:
 	_check(not _manager.is_keyboard_provisional(), "a key join is for real")
 	_press_join(0)
 	_check(_manager.device_of(1) == 0, "the pad is P2")
+
+
+## A machine that plays with another one (netcode spike S4): told that only P2 is its own, its
+## keyboard is P2, a gamepad takes P2 when the keyboard has not, and no second device joins.
+func _test_a_machine_told_its_seats_seats_its_devices_there() -> void:
+	_setup()
+	_check(_manager.set_own_seats(1, 1), "P2 alone is this machine's")
+	_check(_manager.own_first_seat() == 1 and _manager.own_seat_count() == 1, "and it says so")
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.device_of(1) == InputManagerScript.KEYBOARD and not _manager.is_joined(0), "the keyboard joins as P2, not P1")
+	_press_join(0)
+	_check(_manager.player_of(0) == NO_PLAYER and _manager.joined_count() == 1, "a gamepad finds no seat left")
+	_manager.handle_event(_key(KEY_W))
+	_check(_manager.get_move(1).y < -0.5 and _manager.get_move(0) == Vector2.ZERO, "the keyboard moves P2")
+	_check(_manager.add_virtual_device(0) != NO_DEVICE, "a virtual device still takes any free slot (the other machine's seat)")
+	_check(_log == [["joined", 1, InputManagerScript.KEYBOARD], ["joined", 0, InputManagerScript.virtual_device_id(0)]], "joined as told, got %s" % [_log])
+	# With the keyboard out, the first gamepad is P2.
+	_setup()
+	_manager.set_own_seats(1, 1)
+	_press_join(3)
+	_check(_manager.device_of(1) == 3, "a gamepad joins as P2")
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "the keyboard finds its seat taken")
+	# Two seats from P3: the keyboard the first, a gamepad the next.
+	_setup()
+	_manager.set_own_seats(2, 2)
+	_press_join(0)
+	_manager.handle_event(_key(KEY_ENTER))
+	_press_join(1)
+	_check(_manager.device_of(2) == 0 and _manager.device_of(3) == 1 and _manager.joined_count() == 2, "gamepads take P3 and P4; the keyboard, which takes only the first, stays out")
+	_check(not _manager.set_own_seats(3, 2) and not _manager.set_own_seats(-1, 1) and _manager.own_first_seat() == 2, "seats outside the four are refused")
+
+
+## The mouse click that asked for the run seats the keyboard provisionally on this machine's
+## first seat, wherever that is, and the first gamepad takes that seat over.
+func _test_a_provisional_keyboard_is_taken_over_on_its_own_seat() -> void:
+	_setup()
+	_manager.set_own_seats(1, 1)
+	_check(_manager.join(InputManagerScript.KEYBOARD, true) == 1 and _manager.is_keyboard_provisional(), "the keyboard holds P2 provisionally")
+	_press_join(0)
+	_check(_manager.device_of(1) == 0 and _manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "the gamepad is P2 now, the keyboard out")
+	_check(not _manager.is_joined(0) and _manager.joined_count() == 1, "P1 was never touched")
+	_check(_log == [["joined", 1, InputManagerScript.KEYBOARD]], "no leave or join: the wizard stays, got %s" % [_log])
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 1.0))
+	_check(_manager.get_move(1).x > 0.5, "the pad moves P2")
+
+
+## A machine told its seats while devices are joined: a device whose seat is still the machine's
+## keeps it (its wizard is not touched), one outside leaves and takes the place it would joining
+## now, or none. With `reseat` everyone is seated anew (a menu's reset), a provisional keyboard
+## still provisional.
+func _test_own_seats_given_back_seat_the_devices_as_before() -> void:
+	_setup()
+	_manager.join(InputManagerScript.KEYBOARD, true)
+	_press_join(4)
+	_check(_manager.device_of(0) == 4 and _manager.joined_count() == 1, "a gamepad took P1 from the provisional keyboard")
+	_setup()
+	_manager.handle_event(_key(KEY_ENTER))
+	_manager.handle_event(_key(KEY_W))
+	_log.clear()
+	_check(_manager.set_own_seats(1, 1), "P2 alone")
+	_check(_manager.device_of(1) == InputManagerScript.KEYBOARD and _manager.joined_count() == 1, "the keyboard, outside its machine's seats, moved to P2")
+	_check(_manager.get_move(1) == Vector2.ZERO, "and it holds nothing it held before")
+	_check(_log == [["left", 0, InputManagerScript.KEYBOARD], ["joined", 1, InputManagerScript.KEYBOARD]], "it left and joined again, got %s" % [_log])
+	_log.clear()
+	_check(_manager.set_own_seats(), "all four again")
+	_check(_manager.device_of(1) == InputManagerScript.KEYBOARD and _log.is_empty(), "a device whose seat is still the machine's keeps it: nothing leaves or joins")
+	_press_join(4)
+	_check(_manager.device_of(0) == 4, "and a gamepad takes the lowest free seat as ever")
+	_log.clear()
+	_manager.set_own_seats(1, 1)
+	_check(_manager.device_of(1) == InputManagerScript.KEYBOARD and _manager.joined_count() == 1, "told P2 alone again, only the device outside it leaves")
+	_check(_log == [["left", 0, 4]], "and finds no place, got %s" % [_log])
+	_press_join(4)
+	_check(_manager.set_own_seats(0, 4, true), "all four, everyone seated anew")
+	_check(_manager.device_of(0) == InputManagerScript.KEYBOARD and _manager.joined_count() == 1, "the keyboard is P1 again, as if it joined now")
+	_press_join(4)
+	_check(_manager.device_of(1) == 4, "and a gamepad joins as P2")
+	_log.clear()
+	_check(_manager.set_own_seats(0, 4) and _log.is_empty(), "told what it is already, nothing moves")
+	_setup()
+	_manager.join(InputManagerScript.KEYBOARD, true)
+	_manager.set_own_seats(1, 1, true)
+	_check(_manager.device_of(1) == InputManagerScript.KEYBOARD and _manager.is_keyboard_provisional(), "a provisional keyboard stays provisional on its new seat")
+	_manager.add_virtual_device(0)
+	_manager.set_own_seats(0, 4, true)
+	_check(_manager.device_of(0) == InputManagerScript.virtual_device_id(0) and _manager.player_of(InputManagerScript.KEYBOARD) == NO_PLAYER, "a virtual device is never moved; the keyboard finds P1 taken")
 
 
 func _test_keyboard_blocked_by_gamepad_in_slot_zero() -> void:

@@ -3,7 +3,9 @@ extends "res://tests/support/suite.gd"
 ## a bus, input manager and frames service of its own, the test playing the host by writing its
 ## messages into the link: the client pings, takes the host's header only of this build and
 ## content with a seat for it, plays the ticks as they arrive, sends its seat's frame every step
-## for the host's tick `tick + delay`, works its delay out from its ping, times its presses,
+## for the host's tick `tick + delay`, works its delay out from its ping and again in the run
+## (`NetDelay`, tests/net/test_net_delay.gd: here what goes on the wire, its frames never for an
+## earlier tick), times its presses,
 ## sends its checks, keeps a parting it is told of, ends when the host is gone, and
 ## closes the link on whatever a host must not send.
 
@@ -32,6 +34,8 @@ var _message: NetMessage = NetMessage.new()
 ## The host's run: its header, and the ticks it has made.
 var _run: Replay
 var _host_frames: Array[InputFrame] = []
+## The pings the test answered.
+var _answers: int = 0
 
 
 func before_each() -> void:
@@ -185,6 +189,140 @@ func test_the_delay_comes_from_the_ping_when_none_is_given() -> void:
 	_far.send(NetMessage.of_header(_run.header_bytes()))
 	_step()
 	check_equal(_client.delay, NetClient.DEFAULT_DELAY, "no ping answered: the default")
+
+
+## A client with no delay given, on a link of its own.
+func _follow_the_ping() -> void:
+	var ends: Array[NetLoopback] = NetLoopback.pair()
+	_far = ends[1]
+	_client = NetClient.new(_frames, ends[0], Callable(), SEAT, 2)
+	_client.clock = func() -> float: return _now
+	_answers = 0
+
+
+## A round trip, in milliseconds, that asks for a delay of `ticks` (the cushion of 2 and one in
+## it).
+func _rtt_asking(ticks: int) -> int:
+	return int((ticks - 3) * 1000.0 / 60.0) - 8
+
+
+## The host's answer to a ping, read in the next step as a round trip of `rtt_ms`.
+func _pong(rtt_ms: int) -> void:
+	_far.send(NetMessage.of_pong((int(_now + 1000.0 / 60.0) - rtt_ms) & 0xffffffff))
+	_answers += 1
+
+
+## The header arrives after one ping answered in `rtt_ms`.
+func _link_up_at(rtt_ms: int) -> void:
+	_step()
+	_pong(rtt_ms)
+	_step()
+	_link_up()
+
+
+## `steps` steps of the run, the host making `ticks` ticks a step (0: the client waits; more
+## than one: it catches up) and answering every ping in `rtt_ms`. Returns the host's tick each
+## frame sent was for.
+func _play(steps: int, rtt_ms: int, ticks: int = 1) -> PackedInt32Array:
+	var sent_for := PackedInt32Array()
+	for i in steps:
+		_host_ticks(ticks)
+		_step()
+		while true:
+			var bytes: PackedByteArray = _far.read()
+			if bytes.is_empty():
+				break
+			check_equal(_message.decode(bytes), "", "what the client sends is a whole message")
+			if _message.kind == NetMessage.FRAME:
+				sent_for.append(_message.tick)
+			elif _message.kind == NetMessage.PING:
+				_pong(rtt_ms)
+	return sent_for
+
+
+## The run until `count` more pings were answered in `rtt_ms` and the answers read.
+func _play_answers(count: int, rtt_ms: int) -> PackedInt32Array:
+	var sent_for := PackedInt32Array()
+	var until: int = _answers + count
+	while _answers < until:
+		sent_for.append_array(_play(1, rtt_ms))
+	sent_for.append_array(_play(1, rtt_ms))
+	return sent_for
+
+
+## How `sent_for` goes on: [the frames for an earlier tick than the one before, the largest step
+## forward].
+func _steps_of(sent_for: PackedInt32Array) -> Array[int]:
+	var back: int = 0
+	var most: int = 0
+	for i in range(1, sent_for.size()):
+		if sent_for[i] < sent_for[i - 1]:
+			back += 1
+		most = maxi(most, sent_for[i] - sent_for[i - 1])
+	return [back, most]
+
+
+## A first ping taken while the machine was busy (a second) set the delay for the whole run
+## before: the browser check of S4 played at a delay of 60 ticks on a ping of 190 ms.
+func test_a_bad_first_ping_does_not_keep_the_delay_high() -> void:
+	_follow_the_ping()
+	_link_up_at(1000)
+	check_equal(_client.delay, NetClient.MAX_DELAY, "a second's ping: the most delay")
+	var sent_for: PackedInt32Array = _play(400, 20)
+	check_equal([_client.delay, _client.stats.delay], [2 + 2 + 1, 2 + 2 + 1], "the pings at 20 ms since: the delay of 20 ms")
+	check_equal(_client.stats.retunes, 1, "counted: one fall")
+	check_equal(_steps_of(sent_for), [0, 1] as Array[int], "no frame was for an earlier tick than the one before, and no tick was left without one")
+	check_equal(sent_for[sent_for.size() - 1], _frames.play_tick() - 1 + _client.delay, "the frames are for the tick and the delay again")
+	# It fell a tick at a time, never faster than one every LOWER_EVERY steps: no three frames in
+	# a row are for one tick.
+	var same: int = 0
+	for i in range(1, sent_for.size()):
+		same = same + 1 if sent_for[i] == sent_for[i - 1] else 0
+		check(same <= 1, "frame %d: no row of frames for one tick" % i)
+		if same > 1:
+			break
+
+
+## A rise on the wire: the frames skip ahead, and the host stands the last in for the ticks
+## between.
+func test_the_delay_rises_at_once_when_the_ping_does_and_not_for_a_ping_held_up() -> void:
+	_follow_the_ping()
+	_link_up_at(_rtt_asking(5))
+	check_equal(_client.delay, 5, "the delay the ping asks for")
+	var sent_for: PackedInt32Array = _play_answers(2, _rtt_asking(5))
+	sent_for.append_array(_play_answers(2, _rtt_asking(15)))
+	check_equal([_client.delay, _client.stats.retunes], [5, 0], "two slow answers of five: not moved")
+	check_equal(_steps_of(sent_for), [0, 1] as Array[int], "a frame a tick")
+	sent_for.append_array(_play_answers(1, _rtt_asking(15)))
+	check_equal([_client.delay, _client.stats.delay, _client.stats.retunes], [15, 15, 1], "the third: up, at once")
+	check_equal(_steps_of(sent_for), [0, 11] as Array[int], "the frames skip the ten ticks, none goes back")
+
+
+## The host closes the link on a frame for an earlier tick than the one before it. While the
+## client waits for ticks its next tick stands still, so a delay that fell would send one.
+func test_no_frame_is_for_an_earlier_tick_while_the_delay_falls_and_the_client_waits() -> void:
+	_follow_the_ping()
+	_link_up_at(1000)
+	var sent_for: PackedInt32Array = _play_answers(2, 20)
+	var falling: int = _client.delay
+	sent_for.append_array(_play(40, 20, 0))
+	check(_client.delay <= falling - 8, "the delay fell while the client waited (%d to %d)" % [falling, _client.delay])
+	# Then the ticks come three a step for a while: it catches up, the delay still falling.
+	var caught_up: PackedInt32Array = _play(20, 20, 3)
+	check_equal(_steps_of(caught_up), [0, 3] as Array[int], "catching up, its frames go on by the ticks it ran or one less")
+	sent_for.append_array(caught_up)
+	sent_for.append_array(_play(400, 20))
+	check_equal(_client.delay, 5, "and on to the ping's")
+	check_equal(_steps_of(sent_for)[0], 0, "no frame was for an earlier tick than the one before")
+	check_equal(sent_for[sent_for.size() - 1], _frames.play_tick() - 1 + 5, "the frames are for the tick and the delay again")
+
+
+func test_a_delay_given_is_never_moved() -> void:
+	_link_up()
+	var sent_for: PackedInt32Array = _play(200, 300)
+	check(_client.stats.pings > 3, "the pings are still measured (%d)" % _client.stats.pings)
+	check_equal([_client.delay, _client.stats.retunes], [4, 0], "the delay given")
+	check_equal(sent_for[sent_for.size() - 1], _frames.play_tick() - 1 + 4, "and the frames are for the tick and it")
 
 
 func test_a_header_of_another_game_is_refused() -> void:

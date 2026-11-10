@@ -41,6 +41,7 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 Each area README states the area's job, the milestone that builds and opens it, the file types allowed, an entry script and the dependency direction `core` ← `gameplay` ← `content`.
 
 - [core/README.md](core/README.md): shared services: event bus, registry, input, saving, base classes, projectile manager, pools.
+- [net/README.md](net/README.md): online play (the netcode spike): the messages, the host's and the client's sessions, the links; the one folder that may hold networking classes.
 - [hud/README.md](hud/README.md): panels, spell builder UI, menus, widgets and the one theme.
 - [gameplay/README.md](gameplay/README.md): shared rules for the gameplay sub-areas and an events-at-a-glance table.
 - [gameplay/ai/README.md](gameplay/ai/README.md): shared enemy behaviours: steering, targeting, attack patterns.

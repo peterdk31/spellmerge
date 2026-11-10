@@ -83,6 +83,24 @@ class BannedApiTest(unittest.TestCase):
         self.assertTrue(banned('ClassDB.instantiate(name)', rules.NATIVE_FILE))
         self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
 
+    def test_only_the_netcode_may_name_its_networking_classes(self) -> None:
+        link = "var peer := WebRTCPeerConnection.new()\nvar channel: WebRTCDataChannel = null\n"
+        self.assertEqual(banned(link, "net/net_webrtc.gd"), [])
+        for path in ("core/sim/frames.gd", "gameplay/coop/coop.gd", "hud/menus/main_menu.gd", "tests/net/test_net_link.gd",
+                     "content/relics/a/a.gd", "network/x.gd"):
+            with self.subTest(path=path):
+                self.assertTrue(banned(link, path), f"not flagged in {path}")
+        # Nothing else of the network is allowed there, and no other ban is lifted.
+        for bad in ("var http := HTTPRequest.new()", "var tcp := StreamPeerTCP.new()", "var s := TCPServer.new()",
+                    "var ws := WebSocketPeer.new()", "var p := PacketPeerUDP.new()", "var a := IP.get_local_addresses()",
+                    "var m := WebRTCMultiplayerPeer.new()", "var e := WebRTCPeerConnectionExtension.new()",
+                    "var c: WebRTCDataChannelExtension = null", "var api: SceneMultiplayer = null",
+                    "var peer: MultiplayerPeer = null", '@rpc("any_peer")\nfunc hit() -> void:\n\tpass', 'OS.shell_open("https://example.com")',
+                    "JavaScriptBridge.eval(code)", 'var f := FileAccess.open("/etc/passwd", FileAccess.READ)',
+                    "var x: Variant = bytes_to_var_with_objects(bytes)"):
+            with self.subTest(code=bad):
+                self.assertTrue(banned(bad, "net/net_webrtc.gd"), f"not flagged in net/: {bad}")
+
     def test_native_sources_compute_only(self) -> None:
         def native(text: str) -> list[str]:
             return [f.message for f in rules.check_native_source("native/src/k.cpp", text)]
@@ -285,6 +303,12 @@ class RepoTest(unittest.TestCase):
         for path in ("native/src/shot_kernel.cpp", "native/src/shot_kernel.h"):
             self.assertIn(("bot-path", "error", path), found)
             self.assertIn(("file-type", "error", path), found)
+
+    def test_the_netcode_is_claudes_only(self) -> None:
+        self.write("net/net_link.gd", "class_name NetLink\nextends RefCounted\n")
+        self.commit()
+        self.assertEqual(self.check(BOT), [])
+        self.assertIn(("bot-path", "error", "net/net_link.gd"), self.check())
 
     def test_the_native_build_is_the_owners(self) -> None:
         # Its SCons script runs in the job that builds the game; its profile says what the C++ reaches.

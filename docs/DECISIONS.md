@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-10: The netcode lives in `net/`, the one folder that may name networking classes (owner)
+
+- **Decided by the owner** in the netcode spike's plan (docs/milestones/netcode-spike.md, decision 1: "Ill allow it!"): an exception to hard rule 4's networking ban for a new folder `net/`, Claude's and the owner's only, as `native/` is for native code (2026-11-02).
+- **Drafted narrower than asked (netcode spike S2):** in `net/` a script may name `WebRTCPeerConnection` and `WebRTCDataChannel` and nothing else of the network (`NET_CLASSES`, `ci/smbot/rules.py`). HTTP, sockets, WebSocket and the rest stay banned there as everywhere, since WebRTC is all the plan uses; a signalling server (the netcode phase) would need the owner to add a class. Every other ban holds in `net/`.
+- **Nothing outside `net/` knows a network exists.** `net/` hands the frames service a seat's frames (the host, a `FrameSource`) or a live replay (the client, a `LiveFeed`), and knows `core/sim` and `core/input` only. Gameplay and the HUD never name it; S4's Host and Join go through events.
+- **What comes off the wire is untrusted:** decoded strictly with limits (`NetMessage`, then `Replay`'s and `InputFrame`'s decoders), each side taking only the other's kinds, and anything else closes the link. Never `bytes_to_var`.
+- **The rules also ban the engine's own multiplayer classes** (`MultiplayerPeer`, `SceneMultiplayer`, `MultiplayerAPI`, the spawner and synchronizer, the WebRTC extension classes) and `@rpc`, everywhere, `net/` included: they were never on the list (found by S2's review).
+- **A session writes no file and logs nothing.** It keeps why it closed the link and what parted; whoever holds it shows and saves. (The first draft saved a replay from the session; file access is not a session's job, and the rules flag it outside `core/`.)
+- **The hash checks are spread over the second** (one part of the state a tick, `SimHash.slice`, a whole check every 60 ticks) rather than the whole state every 60 ticks as the plan said: a whole hash costs tens of milliseconds in a crowd (N3c), a hitch a second on both machines.
+
 ## 2026-11-09: Horde mode is gone (owner)
 
 - **Asked:** the owner: "it is time to remove the Horde mode. It was only meant for a showcase ... remove it and all related code." The mode kept needing special care in every part of online-ready (its swarm, its director's timers and build break, its replay and snapshot cases).

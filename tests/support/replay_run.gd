@@ -168,6 +168,43 @@ func play(replay: Replay, bots: int, into: Desync) -> void:
 	_check_settings(replay.start)
 
 
+## `replay` played live from a fresh game (netcode spike S1: as the online client plays the host's
+## run while it arrives, `Frames.play_live`), no bot watching: its header first, then its tick `k`
+## added at the physics step `arrive_at[k]` (counted from 0 at the play's start; never earlier than
+## the tick before). Each tick's hashes go to `into`, taken as the next tick starts (the local seat's
+## frame handed out: the only hook inside a step that runs several ticks) and after the last.
+## Per step, `steps` gets [the ticks played before it, the ticks there to play].
+func play_live(replay: Replay, arrive_at: PackedInt32Array, into: Desync, steps: Array[Vector2i], cushion: int = 2) -> void:
+	await fresh()
+	await _tree.physics_frame
+	var live: Replay = Replay.from_bytes(replay.header_bytes())
+	var state := {"step": 0, "fed": 0}
+	var pump := func() -> void:
+		while state["fed"] < replay.tick_count() and arrive_at[state["fed"]] <= state["step"]:
+			var problem: String = live.add_tick_bytes(replay.tick_bytes(state["fed"]))
+			if problem != "":
+				problems.append("live tick %d: %s" % [state["fed"], problem])
+			state["fed"] += 1
+		if state["fed"] == replay.tick_count():
+			_frames.call("close_live")
+		steps.append(Vector2i(int(_frames.call("play_tick")), live.tick_count()))
+		state["step"] += 1
+	var sent := func(tick: int, _frame: InputFrame) -> void:
+		if tick > 0:
+			_capture(into)
+	# The client's seat: not in the run, so its frames are empty; they are handed out all the same.
+	if not bool(_frames.call("play_live", live, 1 << 3, pump, sent, cushion)):
+		problems.append("%s: the live replay did not play" % replay.start)
+		return
+	var limit: int = (arrive_at[arrive_at.size() - 1] if not arrive_at.is_empty() else 0) + replay.tick_count() + 10
+	while bool(_frames.call("is_playing")) and state["step"] < limit:
+		await _tree.physics_frame
+	if bool(_frames.call("is_playing")):
+		problems.append("%s: the live replay did not end after its last tick" % replay.start)
+	_capture(into)
+	_check_settings(replay.start)
+
+
 ## `replay`'s run started in a fresh game and made as `from` says (a snapshot taken after its tick
 ## `tick`: a player joining it, online-ready N10), then played on from the next tick, `bots` bots
 ## watching; each tick's hashes from there to `into`. The snapshot's problems go to `problems`.

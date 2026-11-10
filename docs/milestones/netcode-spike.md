@@ -1,6 +1,6 @@
 # Netcode spike: lockstep over WebRTC, browsers and desktops, measured
 
-**Status (2026-11-10): approved by the owner** ("I agree"), with every decision below taken. Not started: the owner asked for the plan to be committed only, and the parts wait for the owner's go. Asked on 2026-11-09 after phase N (docs/milestones/online-ready.md) was done: "Shall I draft the spike plan for you to approve first?" "yes".
+**Status (2026-11-10): approved by the owner** ("I agree"), with every decision below taken; the owner gave the go the same day ("Continue with the multiplayer plan"). **S1 built** (below); S2 next. Asked on 2026-11-09 after phase N (docs/milestones/online-ready.md) was done: "Shall I draft the spike plan for you to approve first?" "yes".
 
 A spike, not the netcode: the smallest lockstep that lets two players, each in a browser or a desktop build, play a run together, measured before anything is promised. What it measures decides the netcode phase (sketched in online-ready.md, "After phase N"): its signalling, its input delay, and whether it needs rollback.
 
@@ -84,6 +84,8 @@ Nothing outside `net/` knows a network exists. `core/sim` learns one generic thi
   - a press made while no tick runs reaches the seat's next frame;
   - the local seat's frames are handed out while the replay plays;
   - a replay file still records, plays, seeks and ends as before (the replay and snapshot tests).
+
+  **Built (2026-11-10):** `Replay.header_bytes`, `tick_bytes` and `add_tick_bytes` (the file's decoder, per tick); `ReplayTape` live (closed, local seats, cushion, pump, sent; `CATCH_UP` 3); `Frames.play_live`, `close_live`, `is_live`, `ticks_due`, `hears_commands`; the Tick runs `ticks_due` ticks a physics step, asked also under the picture's pause; the pause menu sends `pause_requested` online. Tests: `tests/core/test_live_replay.gd` (waits, catches up 3-3-3-1 past a cushion of 2, the fed frames and commands, the local seat's frames, commands and a press made while waiting handed out with their tick, the end once closed, another build or content refused), `tests/core/test_live_replay_game.gd` (a scripted sandbox run with its storm, rebuild and pause, played whole and live with jitter, a late start and stalls: the same hashes at all 240 ticks; no step ran a tick not there, none ran more than three, waits and catch-ups both seen), the Tick's ticks a step in `test_tick.gd`, the tick bytes in `test_replay.gd`. Each new test was checked against its fix broken.
 - **S2: `net/` over the loopback** (and the rule's exception, decision 1). The messages, both sessions, the loopback and the conditioner. Tests run two scripted fights (N12's `ContentFight`, each with its own frames service) linked by the loopback on a stepped clock, and check:
   - the client agrees with the host at every tick, at 0 to 200 ms of delay with jitter and 5% loss;
   - the host runs every tick on time whatever the link does;

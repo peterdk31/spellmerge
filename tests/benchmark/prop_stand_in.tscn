@@ -1,0 +1,20 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
+[ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
+[ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="3_hurtbox"]
+[ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="4_caster"]
+
+[node name="PropStandIn" type="Node2D" groups=["prop_stand_in"]]
+script = ExtResource("1_actor")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+
+[node name="Hurtbox" type="Node" parent="."]
+script = ExtResource("3_hurtbox")
+radius = 10.0
+offset = Vector2(0, -8)
+
+[node name="Caster" type="Node" parent="."]
+script = ExtResource("4_caster")

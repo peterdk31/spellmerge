@@ -80,8 +80,14 @@ var areas: Callable = Callable()
 var phase: StringName = OFF
 var code: String = ""
 var note: String = ""
-## The session, from LINKED until the other machine is gone. Read only.
-var session: NetSession = null
+## The session, from LINKED until the other machine is gone: the host's (`NetHost`, with the one
+## guest machine) or the client's (`NetClient`). Read only.
+var session: RefCounted:
+	get:
+		return _host if _host != null else _client
+
+var _host: NetHost = null
+var _client: NetClient = null
 
 var _hosting: bool = false
 var _handshake: NetHandshake = null
@@ -139,8 +145,12 @@ func step() -> void:
 
 ## A tick has stepped (the Tick's `ticked`; a test's own loop): the session sends and hashes.
 func after_tick() -> void:
-	if session != null and phase == PLAYING:
-		session.after_tick()
+	if phase != PLAYING:
+		return
+	if _host != null:
+		_host.after_tick()
+	elif _client != null:
+		_client.after_tick()
 
 
 func is_hosting() -> bool:
@@ -210,9 +220,10 @@ func _step_handshake() -> void:
 		return
 	_handshake = null
 	if _hosting:
-		session = NetHost.new(frames, input, link, areas)
+		_host = NetHost.new(frames, input, areas)
+		_host.add_guest(link, 1 << NetHost.SEAT)
 	else:
-		session = NetClient.new(frames, link, areas)
+		_client = NetClient.new(frames, link, areas)
 	_show(LINKED)
 	# Whatever must load before a room loads now, not at the run's start.
 	events.play_load_requested.emit()
@@ -222,24 +233,29 @@ func _step_before_run() -> void:
 	# Not while this machine loads: the other hears nothing from it until it is ready.
 	if _loading:
 		return
-	session.pump()
-	# A client whose run has started is playing, whatever came after the header (a link refused
-	# then ends the run as any closed link does).
-	var started: bool = not _hosting and (session as NetClient).started
-	if session.problem != "" and not started:
-		_fail("the link was closed: %s" % session.problem)
-		return
 	if _hosting:
+		_host.pump()
+		var guest: NetGuest = _host.guests[0]
+		if guest.problem != "":
+			_fail("the link was closed: %s" % guest.problem)
+			return
 		# Before the run a client sends only pings.
-		if session.stats.read < READY_PINGS and session.link.is_open():
+		if guest.stats.read < READY_PINGS and guest.link.is_open():
 			return
-		if (session as NetHost).start(START, 0) == null:
-			_fail("the other player left" if not session.link.is_open() else "seat %d is held by a device of this machine" % (NetHost.SEAT + 1))
+		if _host.start(START, 0) == null:
+			_fail("the other player left" if not guest.link.is_open() else "seat %d is held by a device of this machine" % (NetHost.SEAT + 1))
 			return
-	elif not (session as NetClient).started:
-		if not session.link.is_open():
-			_fail("the host left")
-		return
+	else:
+		_client.pump()
+		# A client whose run has started is playing, whatever came after the header (a link refused
+		# then ends the run as any closed link does).
+		if _client.problem != "" and not _client.started:
+			_fail("the link was closed: %s" % _client.problem)
+			return
+		if not _client.started:
+			if not _client.link.is_open():
+				_fail("the host left")
+			return
 	_steps = 0
 	_parting_told = false
 	_log.open(_hosting)
@@ -248,12 +264,12 @@ func _step_before_run() -> void:
 
 func _step_run() -> void:
 	_steps += 1
-	if session.parted_tick >= 0 and not _parting_told:
+	if _parted_tick() >= 0 and not _parting_told:
 		_parting_told = true
 		_tell_parting()
-	var over: bool = not (session as NetHost).hears_client() if _hosting else not (session as NetClient).is_playing()
+	var over: bool = not _host.hears_guests() if _hosting else not _client.is_playing()
 	if over or _steps % LOG_EVERY == 0:
-		_log.row(session.stats.row())
+		_log.row(_stats().row())
 	if over:
 		_end()
 	elif _steps % LINE_EVERY == 0:
@@ -266,28 +282,42 @@ func _step_run() -> void:
 func _tell_parting() -> void:
 	var saved_as: String = "online_host_parted" if _hosting else "online_client_parted"
 	var saved: bool = frames.save_run(saved_as) == OK
-	var row: Dictionary = {"parted_tick": session.parted_tick, "parted_areas": session.parted_areas, "replay": saved_as if saved else ""}
+	var row: Dictionary = {"parted_tick": _parted_tick(), "parted_areas": _parted_areas(), "replay": saved_as if saved else ""}
 	_log.row(row)
-	print("NetPlay: the two machines parted at tick %d in %s%s" % [session.parted_tick, ", ".join(session.parted_areas), "; this side's run is saved as the replay %s" % saved_as if saved else ""])
+	print("NetPlay: the two machines parted at tick %d in %s%s" % [_parted_tick(), ", ".join(_parted_areas()), "; this side's run is saved as the replay %s" % saved_as if saved else ""])
 
 
 func _line() -> String:
-	var line: String = session.stats.line()
-	if session.parted_tick >= 0:
-		line = "PARTED at tick %d (%s). %s" % [session.parted_tick, ", ".join(session.parted_areas), line]
+	var line: String = _stats().line()
+	if _parted_tick() >= 0:
+		line = "PARTED at tick %d (%s). %s" % [_parted_tick(), ", ".join(_parted_areas()), line]
 	return line
+
+
+## The session's counters: the client's, or the host's with its guests' added up.
+func _stats() -> NetStats:
+	return _host.totals() if _host != null else _client.stats
+
+
+func _parted_tick() -> int:
+	return _host.parted_tick if _host != null else _client.parted_tick
+
+
+func _parted_areas() -> PackedStringArray:
+	return _host.parted_areas if _host != null else _client.parted_areas
 
 
 ## The other machine is gone from a run that played.
 func _end() -> void:
-	var why: String = session.problem
-	if _hosting:
+	var why: String = _host.guests[0].problem if _host != null else _client.problem
+	if _host != null:
 		# The client's seat leaves and the recording ends; the run plays on.
-		(session as NetHost).stop()
+		_host.stop()
 	# All four seats are this machine's again; its device keeps the seat it plays on.
 	input.set_own_seats()
 	_log.close()
-	session = null
+	_host = null
+	_client = null
 	var gone: String = "The other player left; the run plays on here." if _hosting else "The host left; the run plays on here, alone."
 	_show(ENDED, gone if why == "" else "%s (The link was closed: %s.)" % [gone, why])
 
@@ -304,9 +334,12 @@ func _let_go() -> void:
 	if _handshake != null:
 		_handshake.close()
 		_handshake = null
-	if session != null:
-		session.link.close()
-		session = null
+	if _host != null:
+		_host.stop()
+		_host = null
+	if _client != null:
+		_client.link.close()
+		_client = null
 	# No run plays: every device takes the place it would have joining now.
 	input.set_own_seats(0, InputManagerScript.MAX_PLAYERS, true)
 

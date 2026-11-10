@@ -1,14 +1,14 @@
 class_name NetSession
 extends RefCounted
-## One side of an online run (netcode spike S2, docs/milestones/netcode-spike.md): what the host's
-## and the client's sessions share (`NetHost`, `NetClient`). A session sits between a link and the
-## frames service and knows nothing else of the game.
+## One side of one link of an online run (netcode spike S2, docs/milestones/netcode-spike.md): what
+## the host's view of a guest machine and the client's session share (`NetGuest`, `NetClient`). A
+## session sits between a link and the frames service and knows nothing else of the game.
 ##
 ## - **Reading the link** (`pump`): at most `max_read` messages a call, each decoded strictly
 ##   (`NetMessage`) and handed to `_take`, which takes only the kinds the other side may send.
 ##   Anything else closes the link, `problem` says why, and nothing more is read from it.
 ## - **The checks** (`_check`): after every tick the tick's part of the state is hashed
-##   (`NetChecks`). The client sends each whole check, the host compares; the first that differs
+##   (`NetChecks`). The client sends each whole check, the host's guest compares; the first that differs
 ##   is kept on both sides (`parted_tick`, `parted_areas`).
 ## - **The link it is given is open.** Whoever holds the session makes it once the link is up, and
 ##   calls `pump` each physics step until the run starts and `after_tick` after every tick has

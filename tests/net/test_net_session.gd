@@ -57,7 +57,7 @@ func _plays_the_same(rtt_ms: float, jitter_ms: float, loss: float) -> void:
 		check_equal(pair.host_ticks(), i + 1, "%s: the host runs a tick every step (step %d)" % [label, i])
 		if pair.host_ticks() != i + 1:
 			return
-	check(pair.client.started and pair.client.problem == "" and pair.host.problem == "", "%s: linked (%s%s)" % [label, pair.client.problem, pair.host.problem])
+	check(pair.client.started and pair.client.problem == "" and pair.host.guests[0].problem == "", "%s: linked (%s%s)" % [label, pair.client.problem, pair.host.guests[0].problem])
 	check(pair.let_client_catch_up(), "%s: the client plays every tick (%d of %d)" % [label, pair.client_ticks(), pair.host_ticks()])
 	check_equal(pair.client_run.hashes.size(), TICKS, "%s: every tick captured" % label)
 	check_equal(pair.first_parting(), -1, "%s: the client agrees with the host at every tick" % label)
@@ -65,8 +65,8 @@ func _plays_the_same(rtt_ms: float, jitter_ms: float, loss: float) -> void:
 		check(false, "%s: %s" % [label, problem])
 	# The checks: one a second, the last may still be on its way.
 	pair.step(true, false)
-	check(pair.host.stats.checks >= TICKS / NetChecks.EVERY - 1, "%s: the host compared the client's checks (%d)" % [label, pair.host.stats.checks])
-	check_equal([pair.host.stats.mismatches, pair.host.parted_tick, pair.client.parted_tick], [0, -1, -1], "%s: none differed" % label)
+	check(pair.host.guests[0].stats.checks >= TICKS / NetChecks.EVERY - 1, "%s: the host compared the client's checks (%d)" % [label, pair.host.guests[0].stats.checks])
+	check_equal([pair.host.guests[0].stats.mismatches, pair.host.parted_tick, pair.client.parted_tick], [0, -1, -1], "%s: none differed" % label)
 	check(pair.host_fight.wizard_casts > 0 and pair.client_fight.wizard_casts == pair.host_fight.wizard_casts, "%s: the fights fought (%d casts)" % [label, pair.host_fight.wizard_casts])
 	# The client's seat is played on the host: its presses came back in the host's ticks.
 	check(pair.client.stats.presses > 0, "%s: the client's presses came back (%d)" % [label, pair.client.stats.presses])
@@ -76,10 +76,10 @@ func _plays_the_same(rtt_ms: float, jitter_ms: float, loss: float) -> void:
 	# last few still on their way (a press sent twice before it came back counts once).
 	var recorded: int = _presses_recorded(pair.host.replay, NetHost.SEAT)
 	check(recorded >= pair.client.stats.presses_sent - 2 and recorded > 0, "%s: the client's presses are in the host's recording (%d of %d sent)" % [label, recorded, pair.client.stats.presses_sent])
-	for ran in pair.client_ran:
+	for ran in pair.client_ran[0]:
 		check(ran <= LiveFeed.CATCH_UP, "%s: never more than three ticks a step" % label)
 	if loss == 0.0 and jitter_ms == 0.0:
-		check_equal(pair.host.stats.stood_in, 0, "%s: on a steady link with the delay from its ping, no frame is late" % label)
+		check_equal(pair.host.guests[0].stats.stood_in, 0, "%s: on a steady link with the delay from its ping, no frame is late" % label)
 
 
 ## The ticks of `replay` in which `seat` pressed a staff.
@@ -138,7 +138,7 @@ func test_the_client_agrees_at_every_tick_at_150_ms_with_jitter_and_loss() -> vo
 
 func test_the_client_agrees_at_every_tick_at_200_ms_with_jitter_and_loss() -> void:
 	_plays_the_same(200.0, 30.0, 0.05)
-	check(_pair.host.stats.stood_in > 0, "a lossy link makes frames late: the last stood in (%d ticks)" % _pair.host.stats.stood_in)
+	check(_pair.host.guests[0].stats.stood_in > 0, "a lossy link makes frames late: the last stood in (%d ticks)" % _pair.host.guests[0].stats.stood_in)
 	check(_pair.client.stats.steps_waited > 0, "and the client waited for ticks (%d steps)" % _pair.client.stats.steps_waited)
 
 
@@ -149,7 +149,7 @@ func test_a_delay_too_short_makes_frames_late_and_nothing_else() -> void:
 	check(pair.start(), "the host starts")
 	pair.run(200)
 	check_equal(pair.client.delay, 1, "the delay given")
-	check(pair.host.stats.late_frames > 150, "nearly every frame arrives after its tick (%d)" % pair.host.stats.late_frames)
+	check(pair.host.guests[0].stats.late_frames > 150, "nearly every frame arrives after its tick (%d)" % pair.host.guests[0].stats.late_frames)
 	check_equal(pair.host_ticks(), 200, "the host ran every tick")
 	check(pair.let_client_catch_up(), "the client plays them all")
 	check_equal(pair.first_parting(), -1, "and agrees at every tick")
@@ -174,14 +174,14 @@ func test_the_delay_follows_a_link_that_changes_in_the_run() -> void:
 	pair.run(300)
 	check(pair.client.delay >= 18 + 2 + 1, "the link slow: the delay rises (%d to %d)" % [fast, pair.client.delay])
 	# Until it rose (three slow pings) its frames were late; since, they are on time.
-	var stood: int = pair.host.stats.stood_in
+	var stood: int = pair.host.guests[0].stats.stood_in
 	pair.run(300)
-	check_equal([pair.host.problem, pair.client.problem], ["", ""], "the host took every frame")
-	check(pair.host.stats.stood_in - stood <= 3, "and once the delay rose its frames are on time again (%d ticks stood in)" % (pair.host.stats.stood_in - stood))
+	check_equal([pair.host.guests[0].problem, pair.client.problem], ["", ""], "the host took every frame")
+	check(pair.host.guests[0].stats.stood_in - stood <= 3, "and once the delay rose its frames are on time again (%d ticks stood in)" % (pair.host.guests[0].stats.stood_in - stood))
 	check_equal(pair.host_ticks(), 120 + 900 + 600, "the host ran every tick")
 	check(pair.let_client_catch_up(), "the client plays them all")
 	check_equal(pair.first_parting(), -1, "and agrees at every tick")
-	check_equal([pair.host.stats.mismatches, pair.host.parted_tick], [0, -1], "every check passed")
+	check_equal([pair.host.guests[0].stats.mismatches, pair.host.parted_tick], [0, -1], "every check passed")
 
 
 func test_the_host_is_on_time_while_the_client_stalls_and_the_client_catches_up() -> void:
@@ -193,7 +193,7 @@ func test_the_host_is_on_time_while_the_client_stalls_and_the_client_catches_up(
 	for i in 120:
 		pair.step(true, false)
 	check_equal(pair.host_ticks(), 180, "the host ran every tick meanwhile")
-	check(pair.host.stats.stood_in >= 100, "the client's last frame stood in (%d ticks)" % pair.host.stats.stood_in)
+	check(pair.host.guests[0].stats.stood_in >= 100, "the client's last frame stood in (%d ticks)" % pair.host.guests[0].stats.stood_in)
 	check(pair.host_ticks() - pair.client_ticks() >= 120, "the client is two seconds behind")
 	var steps_needed: int = 0
 	while pair.host_ticks() - pair.client_ticks() > behind_before + pair.client.feed.cushion and steps_needed < 400:
@@ -203,7 +203,7 @@ func test_the_host_is_on_time_while_the_client_stalls_and_the_client_catches_up(
 	pair.run(30)
 	check(pair.let_client_catch_up(), "the client plays every tick")
 	check_equal(pair.first_parting(), -1, "and agrees at every tick, the stall's too")
-	check_equal(pair.host.stats.mismatches, 0, "no check differed")
+	check_equal(pair.host.guests[0].stats.mismatches, 0, "no check differed")
 
 
 func test_the_host_plays_on_when_the_link_closes_and_the_clients_run_ends() -> void:

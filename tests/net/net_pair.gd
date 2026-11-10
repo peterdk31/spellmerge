@@ -1,67 +1,111 @@
 extends RefCounted
-## Two machines in one process (netcode spike S2, docs/milestones/netcode-spike.md): two scripted
-## fights of the same content (tests/core/content_fight.gd, each a world with its own frames
-## service and input layer), one the host's and one the client's, their sessions (`NetHost`,
-## `NetClient`) linked by a loopback with a conditioner at each end, on a clock of physics steps.
-## The session tests and the grid's benchmark both run on it.
+## Machines in one process (netcode spike S2; online lobby L3, docs/milestones/online-lobby.md): a
+## host and one to three guest machines, each a scripted fight of the same content
+## (tests/core/content_fight.gd, each a world with its own frames service and input layer), their
+## sessions (`NetHost`, a `NetClient` each) linked by loopbacks with a conditioner at each end, on
+## a clock of physics steps. The session tests and the grid's benchmark run on it.
 ##
-## The host's seat 0 and the client's seat 1 are scripted players (they read nothing of the game);
-## on the host seat 1 is the session's, on the client seat 0 is the replay's. Each machine's state
-## is captured after every tick it runs (`host_run`, `client_run`: by tick), so the two are
-## compared tick for tick whatever the link did.
+## Every seat is a scripted player (they read nothing of the game). A guest's seats are its own
+## (`guest_seats`, a bit each: one guest on seat 1 unless told); the host plays the rest. On the
+## host a guest's seats are the session's; on a guest every other machine's seat is the replay's.
+## Each machine's state is captured after every tick it runs (`host_run`, `client_runs`: by tick),
+## so they are compared tick for tick whatever the links did.
 ##
 ##     var pair := NetPair.new(root, ContentFight.CARD, card, 100.0)   # a 100 ms round trip
 ##     pair.start()
 ##     pair.run(600)
-##     Desync.first_parting(pair.host_run, pair.client_run)   # -1, up to the client's last tick
+##     pair.first_parting()   # -1, up to each guest's last tick
 ##     pair.free_all()
+##
+## `client`, `client_fight`, `client_link` and `client_run` are the first guest's.
 
 const ContentFight := preload("res://tests/core/content_fight.gd")
 
 const STEP_MS: float = 1000.0 / 60.0
-## The steps both sessions are pumped before the run starts (the client measures its ping).
+## The steps the sessions are pumped before the run starts (the guests measure their ping).
 const WARM_UP: int = 70
 
 var host_fight: ContentFight
-var client_fight: ContentFight
 var host: NetHost
-var client: NetClient
-## Each machine's end of the link, with its conditioner.
-var host_link: NetConditioner
-var client_link: NetConditioner
-## Physics steps since the pair was made: the link's clock.
+## Each guest machine: its fight, its session, its end of the link (with its conditioner), the
+## host's end of it, its state by tick, the ticks of the host's run it played, and the ticks it
+## ran in each step.
+var client_fights: Array[ContentFight] = []
+var clients: Array[NetClient] = []
+var client_links: Array[NetConditioner] = []
+var host_links: Array[NetConditioner] = []
+var client_runs: Array[Desync] = []
+var client_played: PackedInt32Array = PackedInt32Array()
+var client_ran: Array[PackedInt32Array] = []
+## The first guest's (the spike's pair).
+var client_fight: ContentFight:
+	get:
+		return client_fights[0]
+var client: NetClient:
+	get:
+		return clients[0]
+var client_link: NetConditioner:
+	get:
+		return client_links[0]
+var host_link: NetConditioner:
+	get:
+		return host_links[0]
+var client_run: Desync:
+	get:
+		return client_runs[0]
+## Physics steps since the pair was made: the links' clock.
 var steps: int = 0
-## Each machine's state after every tick it ran, by tick. Off (`captures`): nothing is captured
-## (the benchmark times the sessions, not the capture).
+## The host's state after every tick it ran, by tick. Off (`captures`): nothing is captured (the
+## benchmark times the sessions, not the capture).
 var host_run: Desync = Desync.new()
-var client_run: Desync = Desync.new()
 var captures: bool = true
-## The ticks the client ran in each of its steps since the start.
-var client_ran: PackedInt32Array = PackedInt32Array()
-var _client_played: int = 0
 
 
-## Two fights of `resource` (a card's or an enemy's, as `kind` says) under `root`, linked with a
-## round trip of `rtt_ms` (half each way), `jitter_ms` more each way at most, and a chance `loss`
-## each way. `delay` is the client's input delay in ticks (below 0: from its ping).
-## `over`: the host's and the client's ends of a link made elsewhere (a real one: WebRTC's), instead
-## of a loopback's.
-func _init(root: Node, kind: StringName, resource: Resource, rtt_ms: float = 0.0, jitter_ms: float = 0.0, loss: float = 0.0, delay: int = -1, link_seed: int = 1, over: Array[NetLink] = []) -> void:
-	host_fight = ContentFight.new(root, kind, resource)
-	client_fight = ContentFight.new(root, kind, resource)
-	var ends: Array[NetLink] = over
-	if ends.is_empty():
-		ends.assign(NetLoopback.pair())
-	host_link = _conditioned(ends[0], rtt_ms, jitter_ms, loss, link_seed)
-	client_link = _conditioned(ends[1], rtt_ms, jitter_ms, loss, link_seed + 1000)
-	# The host's own seat is a device of its machine, so its frames are recorded.
-	host_fight.input.add_virtual_device(0)
-	host = NetHost.new(host_fight.frames, host_fight.input, host_link, host_fight.areas)
-	# The client's own device, joined as its seat; seat 0 is the replay's there.
-	client_fight.input.add_virtual_device(NetHost.SEAT)
-	client_fight.frames.set_source(0, null)
-	client = NetClient.new(client_fight.frames, client_link, client_fight.areas, NetHost.SEAT, 2, delay)
-	client.clock = now_ms
+## Fights of `resource` (a card's or an enemy's, as `kind` says) under `root`, a guest machine for
+## each of `guest_seats` (its seats, a bit each), each linked with a round trip of `rtt_ms` (half
+## each way), `jitter_ms` more each way at most, and a chance `loss` each way. `delay` is the
+## guests' input delay in ticks (below 0: from their ping). `over`: the host's and the one guest's
+## ends of a link made elsewhere (a real one: WebRTC's), instead of a loopback's.
+func _init(root: Node, kind: StringName, resource: Resource, rtt_ms: float = 0.0, jitter_ms: float = 0.0, loss: float = 0.0, delay: int = -1, link_seed: int = 1, over: Array[NetLink] = [], guest_seats: Array[int] = []) -> void:
+	var seats_of: Array[int] = guest_seats.duplicate()
+	if seats_of.is_empty():
+		seats_of.append(1 << NetHost.SEAT)
+	var taken: int = 0
+	for seats in seats_of:
+		taken |= seats
+	# A wizard for every seat up to the highest a guest plays (two at least).
+	var wizards: int = 2
+	for seat in Replay.SEATS:
+		if taken & (1 << seat) != 0:
+			wizards = maxi(wizards, seat + 1)
+	host_fight = ContentFight.new(root, kind, resource, wizards)
+	host = NetHost.new(host_fight.frames, host_fight.input, host_fight.areas)
+	# The host's own seats are devices of its machine, so their frames are recorded.
+	for seat in wizards:
+		if taken & (1 << seat) == 0:
+			host_fight.input.add_virtual_device(seat)
+	for i in seats_of.size():
+		var ends: Array[NetLink] = []
+		ends.assign(over if i == 0 and not over.is_empty() else NetLoopback.pair())
+		var near: NetConditioner = _conditioned(ends[0], rtt_ms, jitter_ms, loss, link_seed + i * 7)
+		var far: NetConditioner = _conditioned(ends[1], rtt_ms, jitter_ms, loss, link_seed + i * 7 + 1000)
+		var fight := ContentFight.new(root, kind, resource, wizards)
+		# The guest's own devices, joined as its seats; the others are the replay's there.
+		for seat in wizards:
+			if seats_of[i] & (1 << seat) != 0:
+				fight.input.add_virtual_device(seat)
+			else:
+				fight.frames.set_source(seat, null)
+		var session := NetClient.new(fight.frames, far, fight.areas, seats_of[i], 2, delay)
+		session.clock = now_ms
+		host.add_guest(near, seats_of[i])
+		host_links.append(near)
+		client_links.append(far)
+		client_fights.append(fight)
+		clients.append(session)
+		client_runs.append(Desync.new())
+		client_played.append(0)
+		client_ran.append(PackedInt32Array())
 
 
 func _conditioned(end: NetLink, rtt_ms: float, jitter_ms: float, loss: float, link_seed: int) -> NetConditioner:
@@ -72,34 +116,41 @@ func _conditioned(end: NetLink, rtt_ms: float, jitter_ms: float, loss: float, li
 	return link
 
 
-## The link's clock: the steps, in milliseconds.
+## The links' clock: the steps, in milliseconds.
 func now_ms() -> float:
 	return steps * STEP_MS
 
 
-## Both sessions pumped for a while (the pings), then the host starts its run. False when it
-## could not.
+## The sessions pumped for a while (the pings), then the host starts its run. False when it could
+## not.
 func start(run_seed: int = 0x5e55) -> bool:
 	for i in WARM_UP:
 		steps += 1
 		host.pump()
-		client.pump()
+		for session in clients:
+			session.pump()
 	return host.start(&"sandbox_requested", 0, run_seed) != null
 
 
-## One physics step of both machines (or one of them: a machine that stalls), the host first.
-func step(host_steps: bool = true, client_steps: bool = true) -> void:
+## One physics step of every machine (or some of them: a machine that stalls), the host first.
+## `guests`: which guests step (a bit each, by their order), when `client_steps`.
+func step(host_steps: bool = true, client_steps: bool = true, guests: int = 0x0f) -> void:
 	steps += 1
-	# The link is the network's, not a machine's: what is due moves on while a machine stalls.
-	host_link.is_open()
-	client_link.is_open()
+	# The links are the network's, not a machine's: what is due moves on while a machine stalls.
+	for i in clients.size():
+		host_links[i].is_open()
+		client_links[i].is_open()
 	if host_steps:
 		host_fight.physics_step(_after_host_tick)
-	if client_steps:
-		# Until the host's header arrives the client's game has not begun (in the game: the menu).
-		if not client.started:
-			client.pump()
-		client_ran.append(client_fight.physics_step(_after_client_tick) if client.started else 0)
+	if not client_steps:
+		return
+	for i in clients.size():
+		if guests & (1 << i) == 0:
+			continue
+		# Until the host's header arrives the guest's game has not begun (in the game: the menu).
+		if not clients[i].started:
+			clients[i].pump()
+		client_ran[i].append(client_fights[i].physics_step(_after_client_tick.bind(i)) if clients[i].started else 0)
 
 
 func run(count: int) -> void:
@@ -107,24 +158,31 @@ func run(count: int) -> void:
 		step()
 
 
-## Steps until the client has played every tick the host made, at most `most` steps (the host
-## stands meanwhile). True when it has.
+## Steps until every guest has played every tick the host made, at most `most` steps (the host
+## stands meanwhile). True when they have.
 func let_client_catch_up(most: int = 600) -> bool:
 	for i in most:
-		if client_ticks() >= host_ticks():
+		if _caught_up():
 			return true
 		step(false, true)
-	return client_ticks() >= host_ticks()
+	return _caught_up()
+
+
+func _caught_up() -> bool:
+	for i in clients.size():
+		if client_played[i] < host_ticks():
+			return false
+	return true
 
 
 func host_ticks() -> int:
 	return host.replay.tick_count() if host.replay != null else 0
 
 
-## The ticks of the host's run the client has played (its fight ticks on by itself once the run
-## has ended, as the game would; those are not counted or captured).
+## The ticks of the host's run the first guest has played (its fight ticks on by itself once the
+## run has ended, as the game would; those are not counted or captured).
 func client_ticks() -> int:
-	return _client_played
+	return client_played[0]
 
 
 func _after_host_tick() -> void:
@@ -133,25 +191,39 @@ func _after_host_tick() -> void:
 		host_run.capture(host_fight.areas())
 
 
-func _after_client_tick() -> void:
-	if not client.is_playing():
+func _after_client_tick(i: int) -> void:
+	if not clients[i].is_playing():
 		return
-	_client_played += 1
-	client.after_tick()
+	client_played[i] += 1
+	clients[i].after_tick()
 	if captures:
-		client_run.capture(client_fight.areas())
+		client_runs[i].capture(client_fights[i].areas())
 
 
-## The first tick both machines ran at which they differ, or -1 (the client may have run fewer).
+## The first tick the host and any guest both ran at which they differ, or -1 (a guest may have
+## run fewer).
 func first_parting() -> int:
-	for tick in mini(host_run.hashes.size(), client_run.hashes.size()):
-		if host_run.hashes[tick] != client_run.hashes[tick]:
+	var first: int = -1
+	for i in clients.size():
+		var at: int = parting_of(i)
+		if at >= 0 and (first < 0 or at < first):
+			first = at
+	return first
+
+
+## The first tick the host and guest `i` both ran at which they differ, or -1.
+func parting_of(i: int) -> int:
+	var theirs: Desync = client_runs[i]
+	for tick in mini(host_run.hashes.size(), theirs.hashes.size()):
+		if host_run.hashes[tick] != theirs.hashes[tick]:
 			return tick
 	return -1
 
 
 func free_all() -> void:
 	host.stop()
-	client_fight.frames.stop_playing()
+	for fight in client_fights:
+		fight.frames.stop_playing()
 	host_fight.free_all()
-	client_fight.free_all()
+	for fight in client_fights:
+		fight.free_all()

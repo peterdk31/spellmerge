@@ -99,7 +99,7 @@ func _process(delta: float) -> void:
 		if code != "":
 			_joined = true
 			_events.online_join_requested.emit(0, code)
-	elif _hosting and _play.phase == NetPlayScript.PLAYING and _play.session.stats.ticks >= _ticks:
+	elif _hosting and _play.phase == NetPlayScript.PLAYING and (_play.session as NetHost).stats.ticks >= _ticks:
 		_host_leaves()
 
 
@@ -121,16 +121,17 @@ func _on_online_changed(phase: StringName, code: String, note: String) -> void:
 
 ## The host played its ticks: its counters are judged, and the process ends (the link with it).
 func _host_leaves() -> void:
-	var stats: NetStats = _play.session.stats
+	var host: NetHost = _play.session as NetHost
+	var stats: NetStats = host.totals()
 	print("ONLINE host ROW %s" % JSON.stringify(stats.row()))
 	var why: String = ""
-	if _play.session.parted_tick >= 0:
-		why = "the two parted at tick %d in %s" % [_play.session.parted_tick, ", ".join(_play.session.parted_areas)]
+	if host.parted_tick >= 0:
+		why = "the two parted at tick %d in %s" % [host.parted_tick, ", ".join(host.parted_areas)]
 	elif stats.checks < _ticks / NetChecks.EVERY - 2:
 		why = "only %d hash checks came back in %d ticks" % [stats.checks, _ticks]
 	elif stats.read_bytes == 0 or stats.stood_in >= stats.ticks:
 		why = "the client's frames never arrived"
-	_play.session.link.close()
+	host.guests[0].link.close()
 	_finish(why)
 
 

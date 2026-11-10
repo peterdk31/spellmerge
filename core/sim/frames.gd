@@ -249,6 +249,15 @@ func is_recording() -> bool:
 	return _tape != null and not _tape.plays
 
 
+## Save the run on the deck (the one recorded, or played, so far) as the replay file
+## `user://replays/<name>.replay` (`Replay.save`: `name` of letters, digits and `_`). ERR_UNAVAILABLE
+## with no run on the deck.
+func save_run(name: String) -> Error:
+	if _tape == null:
+		return ERR_UNAVAILABLE
+	return _tape.replay.save(name)
+
+
 ## Play `replay` from its first tick: its seats are seated (with virtual devices, where free), its
 ## run starts the way it started, and every tick takes its frames until they run out. False, and
 ## nothing happens, for a replay of other content.

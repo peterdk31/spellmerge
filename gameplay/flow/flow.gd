@@ -56,6 +56,9 @@ extends Node
 ## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
 ## then the intro or the run starts. Today that work is the shader warm-up
 ## (`core/projectiles/shader_warmup.gd`), once a session; with nothing to do Play starts at once.
+## `play_load_requested` does the same work ahead of a run that cannot wait at its start (one two
+## machines start together: a load takes each its own time, and the run must begin on the same
+## tick on both).
 ## To load something more before playing, add a LoadTask in `play_tasks`. It is off
 ## (`loading_enabled` false) only when a test script is the main loop; the automated runs (the
 ## four-bot and stress runs) load like a player, and wait for `room_entered`.
@@ -266,6 +269,7 @@ func _ready() -> void:
 		return
 	events.play_requested.connect(_on_play_requested)
 	events.sandbox_requested.connect(_on_sandbox_requested)
+	events.play_load_requested.connect(_on_play_load_requested)
 	# Commands, heard at the tick's start (core/events, online-ready N2).
 	events.listen(&"sandbox_action_requested", _on_sandbox_action_requested)
 	events.listen(&"sandbox_spawn_requested", _on_sandbox_spawn_requested)
@@ -531,6 +535,15 @@ func _on_loaded(next: Callable) -> void:
 func _is_automated() -> bool:
 	var tree: MainLoop = Engine.get_main_loop()
 	return (tree != null and tree.get_script() != null) or not OS.get_cmdline_user_args().is_empty()
+
+
+## A run will start soon that cannot wait at its start (`play_load_requested`: one two machines
+## start together, net/): what must be ready before a room is loaded now, behind the loading
+## screen, and Flow is idle again after. With nothing to load, or a run or a load under way,
+## nothing happens.
+func _on_play_load_requested() -> void:
+	if state == State.IDLE:
+		_load_then(func() -> void: pass)
 
 
 func _on_sandbox_requested(player: int) -> void:

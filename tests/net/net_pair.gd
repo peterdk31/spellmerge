@@ -44,10 +44,14 @@ var _client_played: int = 0
 ## Two fights of `resource` (a card's or an enemy's, as `kind` says) under `root`, linked with a
 ## round trip of `rtt_ms` (half each way), `jitter_ms` more each way at most, and a chance `loss`
 ## each way. `delay` is the client's input delay in ticks (below 0: from its ping).
-func _init(root: Node, kind: StringName, resource: Resource, rtt_ms: float = 0.0, jitter_ms: float = 0.0, loss: float = 0.0, delay: int = -1, link_seed: int = 1) -> void:
+## `over`: the host's and the client's ends of a link made elsewhere (a real one: WebRTC's), instead
+## of a loopback's.
+func _init(root: Node, kind: StringName, resource: Resource, rtt_ms: float = 0.0, jitter_ms: float = 0.0, loss: float = 0.0, delay: int = -1, link_seed: int = 1, over: Array[NetLink] = []) -> void:
 	host_fight = ContentFight.new(root, kind, resource)
 	client_fight = ContentFight.new(root, kind, resource)
-	var ends: Array[NetLoopback] = NetLoopback.pair()
+	var ends: Array[NetLink] = over
+	if ends.is_empty():
+		ends.assign(NetLoopback.pair())
 	host_link = _conditioned(ends[0], rtt_ms, jitter_ms, loss, link_seed)
 	client_link = _conditioned(ends[1], rtt_ms, jitter_ms, loss, link_seed + 1000)
 	# The host's own seat is a device of its machine, so its frames are recorded.

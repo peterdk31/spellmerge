@@ -174,6 +174,24 @@ func test_a_source_fills_its_seat_instead_of_the_device() -> void:
 	check_equal(frame.move_vector(), Vector2.LEFT, "the device again")
 
 
+## The run on the deck is saved as a replay file as far as it has got (netcode spike S4: an online
+## run that parted), while it goes on being recorded.
+func test_the_run_on_the_deck_is_saved_as_far_as_it_got() -> void:
+	check_equal(_frames.save_run("frames_test_run"), ERR_UNAVAILABLE, "with no run on the deck there is nothing to save")
+	_input.add_virtual_device(0)
+	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	for i in 5:
+		_frames.tick(DT)
+	check_equal(_frames.save_run("frames_test_run"), OK, "a run being recorded is saved")
+	check(_frames.save_run("not a name") != OK, "but not under a name that is no id")
+	_frames.tick(DT)
+	var saved: Replay = Replay.open("frames_test_run")
+	DirAccess.remove_absolute(Replay.FOLDER + "frames_test_run" + Replay.EXTENSION)
+	check(saved != null and saved.tick_count() == 5 and saved.run_seed == replay.run_seed, "the file holds the run up to then")
+	check(_frames.is_recording() and replay.tick_count() == 6, "and the recording goes on")
+	_frames.stop_recording()
+
+
 func test_a_recorded_run_plays_back_frame_for_frame() -> void:
 	var walker := Walker.new()
 	_input.add_virtual_device(0)

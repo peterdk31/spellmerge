@@ -156,6 +156,20 @@ func test_a_tick_runs_the_areas_in_the_written_order() -> void:
 	check_equal(_tick.count, 1, "one tick counted")
 
 
+## `ticked` (netcode spike S4): once after every tick, when everything of it has stepped and the
+## clock has moved on, held and stopped ticks too (a session follows every tick).
+func test_ticked_is_sent_after_every_tick_has_stepped() -> void:
+	_body("a")
+	var seen: Array[Array] = []
+	_tick.ticked.connect(func() -> void: seen.append([_tick.count, _names().back()]))
+	_tick.run(TickScript.DT)
+	check_equal(seen, [[1, "Coop.step_rules"]], "after the tick's last step, the clock moved on")
+	_tick.sim.hold(1)
+	_tick.run(TickScript.DT)
+	check_equal(seen.size(), 2, "a held tick is a tick too")
+	check_equal(seen[1], [2, "Frames.stood"], "after its frames stood")
+
+
 ## The game's state in parts (`SimHash.slice`, N3c): each area in exactly one part, the parts
 ## together the whole, the services spread one to a part, each body in the part of its id.
 func test_the_state_splits_into_parts_that_cover_it_once() -> void:

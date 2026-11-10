@@ -69,6 +69,12 @@ const RUN_ORDER: Array[StringName] = [&"Entities", &"Projectiles", &"Spells", &"
 ## The name the actor table is part of the state under.
 const ACTORS: StringName = &"Actors"
 
+## A tick has stepped (the last thing `run` does: its frames, its steps, the clock moved on). For
+## whoever follows the game tick by tick from outside the simulation (the netcode's sessions, net/:
+## they send the tick and hash its state). Nothing in the simulation may hear it: an area that
+## steps joins STEPS.
+signal ticked
+
 ## Ticks since the run began (or the game, before any run): the game's clock, `sim.tick`, which is
 ## state (a snapshot restores it, online-ready N10). Read only.
 var count: int:
@@ -174,6 +180,7 @@ func run(delta: float) -> void:
 	if (stopped or held) and ticks_frames:
 		frames.stood()
 	sim.tick += 1
+	ticked.emit()
 
 
 ## Every step in order; while the game is stopped, only those that run through its stops.

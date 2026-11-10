@@ -60,7 +60,83 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Fullscreen: Off"
 
-[node name="Status" type="Label" parent="Center/Lines"]
+[node name="OnlineButtons" type="HBoxContainer" parent="Center/Lines"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Host" type="Button" parent="Center/Lines/OnlineButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Host"
+
+[node name="Join" type="Button" parent="Center/Lines/OnlineButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Join"
+
+[node name="Online" type="VBoxContainer" parent="Center/Lines"]
+unique_name_in_owner = true
+visible = false
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="OnlineStatus" type="Label" parent="Center/Lines/Online"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 12
+text = "Online"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="MineRow" type="HBoxContainer" parent="Center/Lines/Online"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Mine" type="LineEdit" parent="Center/Lines/Online/MineRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+placeholder_text = "This machine's code"
+editable = false
+
+[node name="Copy" type="Button" parent="Center/Lines/Online/MineRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Copy"
+
+[node name="TheirsRow" type="HBoxContainer" parent="Center/Lines/Online"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Theirs" type="LineEdit" parent="Center/Lines/Online/TheirsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+placeholder_text = "Paste the other player's code here"
+
+[node name="Paste" type="Button" parent="Center/Lines/Online/TheirsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Paste"
+
+[node name="Connect" type="Button" parent="Center/Lines/Online/TheirsRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Connect"
+
+[node name="Cancel" type="Button" parent="Center/Lines/Online"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Cancel"
+
+[node name="Hint" type="Label" parent="Center/Lines"]
+unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.72, 1)
 theme_override_font_sizes/font_size = 12

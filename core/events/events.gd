@@ -73,6 +73,35 @@ signal ai_view_changed(on: bool)
 ## the tree for the picture once the game stands stopped.
 signal pause_requested(player: int, on: int)
 
+# --- Playing online (netcode spike S4, docs/milestones/netcode-spike.md) --------
+# The main menu's Host and Join. The HUD knows no network: it sends what its player asked and
+# shows what comes back. None is a command (no run plays yet; the run they start is a replay's
+# start, as Play's is).
+
+## Sender: hud. `player` pressed Host: this machine makes a code for the other player. Heard by net.
+signal online_host_requested(player: int)
+## Sender: hud. `player` pressed Join and gave the host's code `code` (pasted text: untrusted, checked by net before anything uses it). Heard by net, which answers with this machine's own code.
+signal online_join_requested(player: int, code: String)
+## Sender: hud. The host's `player` gave the code `code` the joining player sent back (pasted text, as above). Heard by net.
+signal online_answer_requested(player: int, code: String)
+## Sender: hud. `player` gave up hosting or joining before the run began. Heard by net.
+signal online_leave_requested(player: int)
+## Sender: net. A run will start soon that cannot wait at its start: do the work that must be ready before a room now (behind the loading screen, `loading_started` to `loading_finished`), so the run starts on the tick it is asked for. Two machines that start one run together must: a load takes each its own time. Heard by flow (its `play_tasks`); with nothing to load, nothing happens.
+signal play_load_requested()
+## The phases of `online_changed`, by name.
+const ONLINE_OFF: StringName = &"off"
+const ONLINE_MAKING: StringName = &"making"
+const ONLINE_CODE: StringName = &"code"
+const ONLINE_LINKING: StringName = &"linking"
+const ONLINE_LINKED: StringName = &"linked"
+const ONLINE_PLAYING: StringName = &"playing"
+const ONLINE_ENDED: StringName = &"ended"
+const ONLINE_FAILED: StringName = &"failed"
+## Sender: net. Where Host or Join stands: `phase` is `&"off"` (nothing asked, or given up), `&"making"` (this machine's code is being made), `&"code"` (`code` is this machine's code, for the other player), `&"linking"` (both codes given, the machines look for each other), `&"linked"` (they found each other; the run starts in a moment), `&"playing"` (the run plays), `&"ended"` (the other machine left a run that played) or `&"failed"`. `note` says in plain words what the player should know (why it failed, a code refused). Heard by hud (the main menu, the online line).
+signal online_changed(phase: StringName, code: String, note: String)
+## Sender: net. One line of text about the run played online (its counters), about once a second while it plays; `""` clears it. Heard by hud, which shows it as it is.
+signal online_line_changed(line: String)
+
 # --- Devices (sender: core/input) -------------------------------------------
 
 ## Sender: core/input. `device` (ids in input_manager.gd) took the free slot `player`, by a button press or as a bot's virtual device.

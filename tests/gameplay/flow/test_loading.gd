@@ -107,6 +107,25 @@ func test_the_sandbox_loads_too() -> void:
 	check(flow.sandbox and flow.state == FlowScript.State.RUNNING, "then it starts")
 
 
+## A run two machines start together cannot wait at its start (netcode spike S4): asked ahead,
+## the work is done behind the screen and nothing starts; the run asked for after starts on the
+## spot, as a later Play does.
+func test_a_load_asked_for_ahead_starts_nothing_and_the_run_after_starts_at_once() -> void:
+	events.play_load_requested.emit()
+	check_equal(flow.state, FlowScript.State.LOADING, "asked ahead, Flow loads")
+	check_equal(_started, 1, "behind the loading screen")
+	_load()
+	check(WarmupScript.warmed and _finished == 1, "the work is done")
+	check(flow.state == FlowScript.State.IDLE and flow.world == null, "and nothing started: Flow is idle")
+	events.play_load_requested.emit()
+	check_equal([flow.state, _started], [FlowScript.State.IDLE, 1], "asked again there is nothing to load: nothing happens")
+	events.sandbox_requested.emit(0)
+	check_equal(flow.state, FlowScript.State.RUNNING, "the run asked for after starts at once, with no screen")
+	check_equal(_started, 1, "the screen showed once")
+	events.play_load_requested.emit()
+	check_equal(flow.state, FlowScript.State.RUNNING, "asked during a run, nothing happens")
+
+
 func test_a_run_stopped_while_loading_starts_nothing() -> void:
 	events.play_requested.emit(0)
 	flow.stop_run()

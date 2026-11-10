@@ -786,7 +786,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _uses_mouse() -> bool:
-	return _input != null and index == 0 and _input.device_of(0) == InputManagerScript.KEYBOARD and is_inside_tree()
+	return _input != null and _input.device_of(index) == InputManagerScript.KEYBOARD and is_inside_tree()
 
 
 # --- Building ---------------------------------------------------------------------------

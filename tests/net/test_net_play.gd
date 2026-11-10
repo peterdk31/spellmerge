@@ -420,7 +420,7 @@ func test_a_failed_check_is_said_once_and_the_run_saved() -> void:
 ## The host's party stands in the hub and a wizard of its presses A on the altar.
 func _open_room() -> void:
 	_seat_scripted_players()
-	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.hub_changed.emit(true)
 	_host.fight.fight.bus.online_open_requested.emit(0)
 	_steps(4)
 
@@ -436,7 +436,7 @@ func _join_room(machine: Machine, typed: String = RoomHandshake.ROOM) -> void:
 
 func test_the_altar_opens_a_room_and_says_its_code() -> void:
 	_seat_scripted_players()
-	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.hub_changed.emit(true)
 	_host.fight.fight.bus.online_open_requested.emit(0)
 	check_equal(_host.phases(), [NetPlayScript.MAKING] as Array[StringName], "A on the altar: the room is being made")
 	_steps(4)
@@ -485,7 +485,7 @@ func test_the_room_stays_open_when_the_machine_leaves_and_another_joins() -> voi
 	_third = Machine.new(root, _card, _table)
 	_third.fight.input.add_virtual_device(NetHost.SEAT)
 	_third.fight.frames.set_source(0, null)
-	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.hub_changed.emit(true)
 	_join_room(_third)
 	check_equal([_host.play.phase, _third.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING], "the next machine plays")
 	check((_host.play.session as NetHost).replay.tick_count() < WARM_UP + 60, "in a recording begun for it")
@@ -494,7 +494,7 @@ func test_the_room_stays_open_when_the_machine_leaves_and_another_joins() -> voi
 func test_a_machine_that_comes_while_the_party_is_out_of_the_hub_is_turned_away() -> void:
 	_open_room()
 	# The party left the hub (a run from the stone).
-	_host.fight.fight.bus.start_stone_changed.emit(0, 0, false)
+	_host.fight.fight.bus.hub_changed.emit(false)
 	_host.seats.clear()
 	_join_room(_client)
 	check_equal(_client.play.phase, NetPlayScript.FAILED, "it does not get in")
@@ -612,7 +612,7 @@ func test_a_second_machine_joins_the_party_while_the_first_plays() -> void:
 
 func test_a_fourth_guest_machine_is_not_taken() -> void:
 	_open_room()
-	_host.fight.fight.bus.start_stone_changed.emit(0, 1, false)
+	_host.fight.fight.bus.hub_changed.emit(true)
 	var links: Array[NetLink] = []
 	for i in NetHost.GUESTS + 1:
 		var joiner := RoomHandshake.new(_table)
@@ -661,4 +661,26 @@ func test_the_run_begun_anew_goes_on_in_a_new_recording_on_every_machine() -> vo
 	check_equal(host.totals().mismatches, 0, "no check differed")
 	check(host.guests[0].stats.checks >= 1 and host.guests[1].stats.checks >= 1, "and the new recording's checks were made")
 	check_equal([host.guests[0].problem, host.guests[1].problem], ["", ""], "what was on its way from the recording before closed no link")
+
+
+func test_a_machine_still_waiting_to_be_joined_is_not_let_go_when_the_last_one_playing_leaves() -> void:
+	_open_room()
+	_join_room(_client)
+	_steps(30)
+	# Another machine links and has not said it is ready yet (no ping of its heard).
+	var waiting := RoomHandshake.new(_table)
+	waiting.take(RoomHandshake.ROOM)
+	waiting.poll()
+	var link: NetLink = waiting.link()
+	_steps(2)
+	var host: NetHost = _host.play.session as NetHost
+	check_equal(host.guests.size(), 2, "two guest machines: one plays, one waits")
+	_client.play.session.link.close()
+	_steps(6)
+	check(link.is_open(), "the one that plays leaves: the one that waits keeps its link")
+	check(_host.play.session == host and host.guests.size() == 1 and _host.fight.frames.is_recording(), "the party's session and its recording go on for it")
+	check_equal(_host.play.phase, NetPlayScript.PLAYING, "and the host says nothing of a room left empty")
+	link.close()
+	_steps(4)
+	check_equal([_host.play.phase, _host.play.session == null], [NetPlayScript.CODE, true], "with that one gone too, the room is open as before")
 

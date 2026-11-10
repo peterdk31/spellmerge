@@ -182,7 +182,7 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent", &"_altar_sent"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent", &"_altar_sent", &"_hub_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -264,6 +264,8 @@ var _back_to_hub: bool = false
 var _stone_sent: Vector2i = Vector2i(-1, -1)
 ## The seats last told to stand on the hub's altar (`altar_changed`; -1: nothing sent yet).
 var _altar_sent: int = -1
+## Whether the party was last told to be in the hub (`hub_changed`).
+var _hub_sent: bool = false
 
 
 func _ready() -> void:
@@ -710,6 +712,11 @@ func _count_stone() -> void:
 			var seat: int = _seat_of(wizard)
 			if seat >= 0 and seat < PLAYER_SLOTS and _room.altar.has_point(wizard.position):
 				at_altar |= 1 << seat
+	# Where the party is, for whoever lets other machines join it (net/): told as it changes.
+	var in_hub: bool = mode == MODE_HUB and state != State.IDLE and _room != null
+	if in_hub != _hub_sent and events != null:
+		_hub_sent = in_hub
+		events.hub_changed.emit(in_hub)
 	# Who stands on the altar is told to the HUD only (A there opens the room, net/'s to do).
 	if at_altar != _altar_sent and events != null:
 		_altar_sent = at_altar

@@ -286,9 +286,11 @@ func test_the_runs_end_brings_everyone_back_to_the_hub() -> void:
 		check(wizard.health.invincible and not wizard.is_down(), "standing, and hits take nothing again")
 
 
-## Owner, 2026-11-10: "staffs should carry over". What a seat built in the hub is in its staffs in
-## the run, and back in the hub after it; a seat that joins mid-run starts with Play's cards.
-func test_staffs_built_in_the_hub_carry_into_the_run_and_back() -> void:
+## Owner, 2026-11-10: the hub is the arsenal a run's tools are picked from. What a seat built in
+## the hub is in its staffs in the run; a seat that joins mid-run starts with Play's cards; and
+## back in the hub after the run (lost or won) nothing of the run comes with the party, its
+## staffs neither: it is ready for a new run.
+func test_staffs_built_in_the_hub_follow_into_the_run_and_nothing_comes_back() -> void:
 	_start([0, 1])
 	var built: Array[StringName] = [&"bolt", &"dash", &"bolt"]
 	events.emit_signal("staff_cards_requested", 1, 2, built)
@@ -309,7 +311,8 @@ func test_staffs_built_in_the_hub_carry_into_the_run_and_back() -> void:
 		wizard.health.take(wizard.health.max_health)
 	flow.step(FlowScript.RESTART_DELAY)
 	check_equal(flow.mode, FlowScript.MODE_HUB, "back in the hub")
-	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(2).slice(0, 3), built, "seat 1's staff came back to the hub")
+	check_equal((flow.get_wizard(1) as Actor).caster.cards_of(2), fresh_y, "seat 1's staff did not come back: the hub's own again")
+	check_equal((flow.get_wizard(0) as Actor).caster.cards_of(2), fresh_y, "seat 0's neither")
 
 
 func test_a_run_of_play_requested_still_restarts() -> void:

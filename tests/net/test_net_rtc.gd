@@ -279,12 +279,12 @@ func test_two_fights_through_the_real_link_agree_at_every_tick() -> void:
 		OS.delay_msec(2)
 	check_equal(_pair.client_ticks(), TICKS, "the client played every tick")
 	check_equal(_pair.first_parting(), -1, "the client agrees with the host at every tick")
-	check_equal([_pair.host.problem, _pair.client.problem], ["", ""], "neither side refused the link")
+	check_equal([_pair.host.guests[0].problem, _pair.client.problem], ["", ""], "neither side refused the link")
 	# The client's checks cross the wire too.
 	began = Time.get_ticks_msec()
-	while _pair.host.stats.checks < TICKS / NetChecks.EVERY - 1 and Time.get_ticks_msec() - began < PATIENCE_MS:
+	while _pair.host.guests[0].stats.checks < TICKS / NetChecks.EVERY - 1 and Time.get_ticks_msec() - began < PATIENCE_MS:
 		_pair.host.pump()
 		OS.delay_msec(2)
-	check(_pair.host.stats.checks >= TICKS / NetChecks.EVERY - 1, "the host compared the client's checks (%d)" % _pair.host.stats.checks)
-	check_equal([_pair.host.stats.mismatches, _pair.host.parted_tick], [0, -1], "none differed")
+	check(_pair.host.guests[0].stats.checks >= TICKS / NetChecks.EVERY - 1, "the host compared the client's checks (%d)" % _pair.host.guests[0].stats.checks)
+	check_equal([_pair.host.guests[0].stats.mismatches, _pair.host.parted_tick], [0, -1], "none differed")
 	check(_pair.client.stats.presses > 0 and _pair.host_fight.wizard_casts > 0, "the fights fought, the client's presses in them")

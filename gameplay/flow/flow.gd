@@ -84,7 +84,8 @@ extends Node
 ## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`.
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
 ## the tick's start, every wizard keeping its staffs (`start_run`'s `kept`); that run's end
-## (everyone down) brings everyone back to the hub, staffs kept again. A run started by
+## (everyone down) brings everyone back to the hub with nothing of the run, its staffs neither
+## (owner, 2026-11-10: the hub is the arsenal a run's tools are picked from). A run started by
 ## `play_requested` restarts as before.
 ##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX or MODE_HUB (above).
@@ -326,10 +327,12 @@ func step(delta: float) -> void:
 		if mode == MODE_SANDBOX:
 			_stand_everyone_up()
 		elif _back_to_hub:
+			# Back in the hub the party is ready for a new run: nothing of the run comes back
+			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
+			# run's tools are picked from.
 			_back_to_hub = false
-			var kept: Array = _staffs_by_seat()
 			mode = MODE_HUB
-			if not start_run(_starter, kept):
+			if not start_run(_starter):
 				push_warning("Flow: the hub did not start again after the run, so the run is over.")
 				stop_run()
 		elif not start_run(_starter):
@@ -656,7 +659,8 @@ func _start_run_from_stone(seat: int) -> void:
 
 
 ## The cards every wizard's staffs hold now, by seat (empty for a seat with none): what
-## `start_run` makes each seat's wizard with, so staffs carry over (owner, 2026-11-10).
+## `start_run` makes each seat's wizard with, so staffs follow the party from the hub into the
+## run (owner, 2026-11-10); nothing comes back from it.
 func _staffs_by_seat() -> Array:
 	var out: Array = [[], [], [], []]
 	for wizard: Node2D in _wizards:

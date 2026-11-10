@@ -2,7 +2,7 @@ class_name NetClient
 extends NetSession
 ## The client's side of an online run (netcode spike S2, docs/milestones/netcode-spike.md): it
 ## plays the host's run as a live replay (`Frames.play_live`, fed by its `feed`) and sends its
-## own seat's frames to the host.
+## own seats' frames to the host.
 ##
 ## - **Before the run:** whoever holds the session calls `pump` each physics step. It pings the
 ##   host, and when the host's header arrives it starts the live replay (`started`), unless the
@@ -11,9 +11,9 @@ extends NetSession
 ##   header's: a run joined a while in seated it later.) From then on the frames service
 ##   calls the feed.
 ## - **Every physics step** (the feed): the ticks that arrived are added to the replay, each
-##   checked by the replay's decoder, and the seat's frame is sent for the host's tick
-##   `tick + delay`, `tick` being the next this machine plays. The host gone, the feed is
-##   `closed` and the replay ends once played out.
+##   checked by the replay's decoder, and each of this machine's seats' frames is sent (a FRAME
+##   each, all for one host tick) for the host's tick `tick + delay`, `tick` being the next this
+##   machine plays. The host gone, the feed is `closed` and the replay ends once played out.
 ## - **The input delay `delay`** (`D`, in ticks) is `NetDelay`'s: given, and then never moved,
 ##   or following the ping through the run. This tells it each ping answered and each frame
 ##   sent. A frame is never for an earlier host tick than the one before it (the host refuses
@@ -30,7 +30,8 @@ extends NetSession
 ##   this machine still catches up, somebody who left since may sit on it). A seat is this
 ##   machine's (the feed's `local_seats`) while its device sits on it. A player who leaves (the
 ##   device's LEAVE, in its frame) is taken off by the host, whose next LOBBY frees the number.
-##   With no input layer (the spike's tests) the one seat it is made with is its own.
+##   With no input layer (Host and Join by code's tests, the measured grid) the seats it is made
+##   with are its own, as the host's lobby then says too.
 ## - **Catching up** on a run joined a while in: while more than FAR ticks wait, each step runs
 ##   as many as fit the time a step has (`pace`), not the usual three.
 ##
@@ -106,8 +107,11 @@ var feed: Feed
 var clock: Callable = Callable()
 ## Catching up: the time a step's ticks may take, in microseconds (a test's own; BURST_USEC).
 var burst_usec: int = BURST_USEC
-## This machine's seat: the one it was made with, or the first the host gave it (-1: none yet).
-var seat: int = 1
+## This machine's seats (a bit each): the ones it was made with, or those its devices sit on by
+## the host's word.
+var seats: int:
+	get:
+		return feed.local_seats
 ## The input layer whose devices the host seats (null: the one seat it was made with is its own).
 var input: InputManagerScript = null
 ## The input delay in ticks; below 0 until it is worked out from the ping.
@@ -124,7 +128,8 @@ var _sent_at: int = -1
 ## The host's tick the last frame was sent for (they never go back).
 var _last_for: int = 0
 var _delay: NetDelay
-var _presses: NetPressProbe
+## One probe a seat this machine has played (null for the others).
+var _presses: Array[NetPressProbe] = [null, null, null, null]
 ## The physics step the frames' tick was last worked out in (once a step, for all its seats).
 var _framed_at: int = -1
 ## This machine's players, by their number (0 to 3; null: no such player).
@@ -139,17 +144,16 @@ var _burst_left: int = 0
 var _burst_took: int = 0
 
 
-## `input_layer`: the layer whose devices the host seats (see the top); with it `on_seat` is
-## not used.
-func _init(frames_service: FramesScript, over: NetLink, state_areas: Callable = Callable(), on_seat: int = NetHost.SEAT, cushion: int = 2, input_delay: int = -1, input_layer: InputManagerScript = null) -> void:
+## `on_seats`: this machine's seats, a bit each (seat 0 is the host's: never one of them), when
+## no input layer is given. `input_layer`: the layer whose devices the host seats (see the top);
+## with it `on_seats` is not used.
+func _init(frames_service: FramesScript, over: NetLink, state_areas: Callable = Callable(), on_seats: int = 1 << NetHost.SEAT, cushion: int = 2, input_delay: int = -1, input_layer: InputManagerScript = null) -> void:
 	super(frames_service, over, state_areas)
 	max_read = MAX_READ
 	input = input_layer
-	seat = on_seat if input == null else -1
 	_delay = NetDelay.new(input_delay, cushion)
-	feed = Feed.new(1 << on_seat if input == null else 0, cushion)
+	feed = Feed.new(on_seats & 0x0e if input == null else 0, cushion)
 	feed.client = weakref(self)
-	_presses = NetPressProbe.new(stats, maxi(seat, 0))
 
 
 ## Take over the seating of this machine's devices (see the top): every device that sits on a
@@ -255,10 +259,16 @@ func pump() -> bool:
 	return drained
 
 
-## The seat's frame of this physics step goes to the host (the feed), for the host's tick
-## `tick + delay` (never an earlier one than the frame before); `tick` is the next this machine
-## plays.
+## A seat's frame of this physics step goes to the host (the feed calls it once a seat of this
+## machine's, in a step), for the host's tick `tick + delay` (never an earlier one than the frames
+## before); `tick` is the next this machine plays. The step's first works out the host's tick for
+## all of them.
 func send_frame(tick: int, frame: InputFrame) -> void:
+	var seat: int = frame.seat
+	if seat < 0 or seat >= Replay.SEATS or feed.local_seats & (1 << seat) == 0:
+		return
+	if _presses[seat] == null:
+		_presses[seat] = NetPressProbe.new(stats, seat)
 	# Once a step, whatever seats this machine holds: the step's counters, and the host's tick
 	# its frames are for.
 	var first: bool = _framed_at != _pumps
@@ -269,12 +279,11 @@ func send_frame(tick: int, frame: InputFrame) -> void:
 		if tick == _sent_at:
 			stats.steps_waited += 1
 		_sent_at = tick
-		_presses.played(replay, tick, _pumps)
+	_presses[seat].played(replay, tick, _pumps)
 	if problem != "" or not link.is_open():
 		return
 	var began: int = Time.get_ticks_usec()
-	if frame.seat == _presses.seat:
-		_presses.sent(frame, _pumps)
+	_presses[seat].sent(frame, _pumps)
 	if first:
 		_last_for = maxi(tick + _delay.step(), _last_for)
 		_count_delay()
@@ -351,7 +360,7 @@ func _take_header(message: NetMessage) -> String:
 ## is no player any more (its device may ask again).
 func _take_lobby(message: NetMessage) -> void:
 	if input == null:
-		# The one seat it was made with: the host's word on it is all there is to take.
+		# The seats it was made with: the host's word on them is all there is to take.
 		feed.local_seats = 0
 		for at in Replay.SEATS:
 			if message.holders[at] != NetMessage.NOBODY:
@@ -409,9 +418,6 @@ func _seat_players() -> void:
 			feed.local_seats &= ~bit
 			continue
 		player.sat = true
-		if seat < 0:
-			seat = player.seat
-			_presses.seat = player.seat
 
 
 ## The delay's numbers into the counters.

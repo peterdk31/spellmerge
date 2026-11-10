@@ -146,7 +146,7 @@ func test_devices_that_sat_in_the_menu_are_asked_for_by_number_and_seated_where_
 	_step()
 	check_equal([_input.device_of(3), _input.device_of(2)], [PAD, PAD + 1], "each is seated where the host said: the first pad on P4, the second on P3")
 	check_equal(_client.feed.local_seats, 0b1100, "and those seats are this machine's")
-	check_equal(_client.seat, 3, "the first seat it was given is the one its presses are timed on")
+	check_equal(_client.seats, 0b1100, "as the session says")
 	_start_run()
 	_host_ticks(3)
 	_step()

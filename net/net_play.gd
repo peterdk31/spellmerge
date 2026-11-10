@@ -4,7 +4,8 @@ extends Node
 ## run together. It hears the requests on the bus, has a handshake find the other machine
 ## (`NetHandshake`: it never knows which kind beyond choosing one by the way in, in
 ## `_handshake_for`, and never reads a code: each handshake says whether a typed text is its own),
-## makes the session once a link is there (`NetHost` or `NetClient`), and says where things stand on the bus.
+## makes the session once a link is there (`NetHost`, with a `NetGuest` for each guest machine, or
+## `NetClient`), and says where things stand on the bus.
 ## Nothing outside net/ calls it, and it calls nothing of the game but `core/`: the bus, the
 ## frames service (itself and through the sessions), the input layer (whose devices a client's
 ## session has seated by the host) and the Tick's `ticked`.
@@ -42,13 +43,16 @@ extends Node
 ##    `after_tick` on the Tick's `ticked`, sends the counters' line about once a second
 ##    (`online_line_changed`) and logs them (`NetLog`), and when a hash check fails says so once
 ##    and has this side's run saved as a replay (`Frames.save_run`).
-## 4. **The other machine gone:** its seats leave, as unplugged pads' do, and the host plays on.
-##    A room stays open (CODE again; the recording ends, so the next machine joins a hub begun
-##    anew); by hand it is ENDED. The joining machine's replay ends once played out and its game
+## 4. **A guest machine gone:** its seats leave, as unplugged pads' do, and the others play on.
+##    With the last one gone a party's room stays open (CODE again; the recording ends, so the
+##    next machine joins a hub begun anew); by hand it is ENDED. The joining machine's replay ends once played out and its game
 ##    goes on alone, its devices where they sat: ENDED. **Given up** before the run
 ##    (`online_leave_requested`) or failed: OFF or FAILED.
 ##
-## One other machine at a time (three: L3): a second link while one plays is closed.
+## **A party takes up to three guest machines** (`NetHost.GUESTS`; L3), each joined to the hub's
+## recording when it is ready, the others playing on meanwhile; a link past that is closed. A
+## machine that joins a recording others already play catches up on all of it (the recording
+## cannot begin anew under them). By hand it is one guest machine.
 ##
 ## It steps in its own `_physics_process` (never the simulation's: it reads the link and the
 ## engine's clock, and writes nothing the simulation reads but through the frames service). Tests
@@ -110,9 +114,14 @@ var areas: Callable = Callable()
 var phase: StringName = OFF
 var code: String = ""
 var note: String = ""
-## The session, from LINKED until the other machine is gone. Read only.
-var session: NetSession = null
+## The session, from the first link until the other machines are gone: the host's (`NetHost`,
+## with its guest machines) or the client's (`NetClient`). Read only.
+var session: RefCounted:
+	get:
+		return _host if _host != null else _client
 
+var _host: NetHost = null
+var _client: NetClient = null
 var _hosting: bool = false
 ## The host's: true for a party (its hub, joined a while in, open for the next machine when one
 ## leaves), false for one run two machines start together (a sandbox). Whatever the way in.
@@ -130,6 +139,8 @@ var _seated: bool = false
 ## Physics steps of the run played.
 var _steps: int = 0
 var _parting_told: bool = false
+## Why the last guest machine let go of was gone ("": its link just closed).
+var _last_problem: String = ""
 var _log: NetLog = NetLog.new()
 
 
@@ -168,21 +179,27 @@ func _physics_process(_delta: float) -> void:
 	step()
 
 
-## One physics step: the handshake moves on, the session is pumped until its run starts, and a
-## run that plays is watched (see the top).
+## One physics step: the handshake moves on, the machines not in the run yet are heard until
+## they are, and a run that plays is watched (see the top).
 func step() -> void:
 	if _handshake != null:
 		_step_handshake()
-	if session != null and phase == LINKED:
-		_step_before_run()
-	elif session != null and phase == PLAYING:
+	if _host != null:
+		_step_host()
+	elif _client != null and phase == LINKED:
+		_step_client_before_run()
+	elif _client != null and phase == PLAYING:
 		_step_run()
 
 
 ## A tick has stepped (the Tick's `ticked`; a test's own loop): the session sends and hashes.
 func after_tick() -> void:
-	if session != null and phase == PLAYING:
-		session.after_tick()
+	if phase != PLAYING:
+		return
+	if _host != null:
+		_host.after_tick()
+	elif _client != null:
+		_client.after_tick()
 
 
 func is_hosting() -> bool:
@@ -280,7 +297,7 @@ func _on_leave_requested(_player: int) -> void:
 func _step_handshake() -> void:
 	_handshake.poll()
 	if _handshake.problem() != "":
-		if session != null:
+		if _host != null and not _host.guests.is_empty():
 			# A room that closed under a run: the run plays on, and nobody else joins.
 			_handshake = null
 			code = ""
@@ -295,101 +312,163 @@ func _step_handshake() -> void:
 	var link: NetLink = _handshake.next_link()
 	if link == null:
 		return
-	if session != null:
-		# One other machine at a time.
-		link.close()
-		return
-	if not (_party and _hosting):
-		# Two machines found each other: that handshake is done. A party's goes on, for the next.
-		_handshake = null
 	if _hosting:
-		session = NetHost.new(frames, input, link, areas)
+		if _host == null:
+			_host = NetHost.new(frames, input, areas)
+		# By hand the other machine's first player has its seat beforehand; a party's are asked for.
+		if _host.add_guest(link, 0 if _party else 1 << NetHost.SEAT) == null:
+			# As many machines as the host takes.
+			link.close()
+			return
+		if not _party:
+			# Two machines found each other: that handshake is done. A party's goes on, for the next.
+			_handshake = null
 	else:
-		session = NetClient.new(frames, link, areas, NetHost.SEAT, 2, -1, input)
-	_show(LINKED)
+		_handshake = null
+		_client = NetClient.new(frames, link, areas, 1 << NetHost.SEAT, 2, -1, input)
+	if phase != PLAYING:
+		_show(LINKED)
 	# Whatever must load before a room loads now, not inside a run.
 	events.play_load_requested.emit()
 
 
-func _step_before_run() -> void:
-	# Not while this machine loads: the other hears nothing from it until it is ready.
+## The host's step: the guest machines not in the run yet are turned away, or heard until they
+## are ready and then joined to it; the run that plays is watched.
+func _step_host() -> void:
+	# Not while this machine loads: the others hear nothing from it until it is ready.
 	if _loading:
 		return
-	# A machine that comes while the party is out of the hub is turned away before anything of
-	# its is read: it is given no seat, even for a moment.
-	if _hosting and _party and not _in_lobby:
-		_before_run_over("a machine came while the party was out of the hub; joining is in the hub only")
+	for guest: NetGuest in _host.guests.duplicate():
+		# A machine that comes while the party is out of the hub is turned away before anything
+		# of its is read: it is given no seat, even for a moment.
+		if _host != null and not guest.admitted and _party and not _in_lobby:
+			_turn_away(guest, "a machine came while the party was out of the hub; joining is in the hub only")
+	if _host == null:
 		return
-	if not _hosting and not _seated:
+	_host.pump()
+	for guest: NetGuest in _host.guests.duplicate():
+		if _host == null or guest.admitted:
+			continue
+		if guest.problem != "":
+			_turn_away(guest, "the link was closed: %s" % guest.problem)
+		elif not guest.link.is_open():
+			_turn_away(guest, "the other player left")
+		elif guest.pings_heard >= READY_PINGS:
+			# Before the run a guest sends only pings and its asks for seats: it is loaded.
+			_admit(guest)
+	if _host != null and phase == PLAYING:
+		_step_run()
+
+
+## The guest machine `guest` is ready: it is joined to the run (by hand: the run starts).
+func _admit(guest: NetGuest) -> void:
+	if not _party:
+		_replay = _host.start(START, 0)
+		if _replay == null:
+			_fail("seat %d is held by a device of this machine" % (NetHost.SEAT + 1))
+			return
+	else:
+		if _host.replay == null:
+			if _replay == null or frames.recorded() != _replay or _replay.tick_count() > MAX_CATCH_UP:
+				# The hub begins anew, recorded: what the joining machine catches up on.
+				_replay = frames.record(ROOM_START, _starter)
+			_host.begin(_replay, false)
+		if not _host.admit(guest):
+			_turn_away(guest, "the other player left")
+			return
+	if phase != PLAYING:
+		_steps = 0
+		_parting_told = false
+		_log.open(true)
+		_show(PLAYING)
+
+
+## A guest machine that is not in the run is let go, with a word on why: a party waits for the
+## next (or plays on with the others); by hand it failed.
+func _turn_away(guest: NetGuest, why: String) -> void:
+	if not _party:
+		_fail(why)
+		return
+	_host.remove_guest(guest)
+	var said: String = why.substr(0, 1).to_upper() + why.substr(1) + "."
+	if phase == PLAYING:
+		# The others play on.
+		note = said
+		return
+	if _host.guests.is_empty():
+		_host.stop(true)
+		_host = null
+	_show(CODE if _handshake != null else OFF, said)
+
+
+## A joining machine before its run: its devices are handed to the host's seating, it pings, and
+## plays once the host's header has started its live replay.
+func _step_client_before_run() -> void:
+	# Not while this machine loads: the host hears nothing from it until it is ready.
+	if _loading:
+		return
+	if not _seated:
 		_seated = true
-		(session as NetClient).seat_devices()
-	session.pump()
+		_client.seat_devices()
+	_client.pump()
 	# A client whose run has started is playing, whatever came after the header (a link refused
 	# then ends the run as any closed link does).
-	var started: bool = not _hosting and (session as NetClient).started
-	if session.problem != "" and not started:
-		_before_run_over("the link was closed: %s" % session.problem)
+	if _client.problem != "" and not _client.started:
+		_fail("the link was closed: %s" % _client.problem)
 		return
-	if _hosting:
-		# Before the run a client sends only pings and its asks for seats.
-		if (session as NetHost).pings_heard < READY_PINGS and session.link.is_open():
-			return
-		if not session.link.is_open():
-			_before_run_over("the other player left")
-			return
-		if not _start_host():
-			return
-	elif not (session as NetClient).started:
-		if not session.link.is_open():
-			_before_run_over("the host left, or its party cannot be joined right now")
+	if not _client.started:
+		if not _client.link.is_open():
+			_fail("the host left, or its party cannot be joined right now")
 		return
 	_steps = 0
 	_parting_told = false
-	_log.open(_hosting)
+	_log.open(false)
 	_show(PLAYING)
-
-
-## The host's run begins for the machine that is ready. False when it does not (said already).
-func _start_host() -> bool:
-	var host: NetHost = session as NetHost
-	if not _party:
-		_replay = host.start(START, 0)
-		if _replay == null:
-			_fail("seat %d is held by a device of this machine" % (NetHost.SEAT + 1))
-		return _replay != null
-	if _replay == null or frames.recorded() != _replay or _replay.tick_count() > MAX_CATCH_UP:
-		# The hub begins anew, recorded: what the joining machine catches up on.
-		_replay = frames.record(ROOM_START, _starter)
-	if not host.begin(_replay):
-		_before_run_over("the other player left")
-		return false
-	return true
-
-
-## The link is gone, or no use, before its run began: a room waits for the next machine, with a
-## word on what happened; anything else failed.
-func _before_run_over(why: String) -> void:
-	if _party and _hosting and _handshake != null:
-		session.link.close()
-		(session as NetHost).stop(true)
-		session = null
-		_show(CODE, why.substr(0, 1).to_upper() + why.substr(1) + ".")
-	else:
-		_fail(why)
 
 
 func _step_run() -> void:
 	_steps += 1
-	if session.parted_tick >= 0 and not _parting_told:
+	if _parted_tick() >= 0 and not _parting_told:
 		_parting_told = true
 		_tell_parting()
-	var over: bool = not (session as NetHost).hears_client() if _hosting else not (session as NetClient).is_playing()
+	var over: bool
+	if _hosting:
+		# A guest machine that is gone is let go (between ticks, as a pad is pulled out): its
+		# seats leave. The others play on.
+		for guest: NetGuest in _host.guests.duplicate():
+			if guest.admitted and not guest.hears():
+				_last_problem = guest.problem
+				_host.remove_guest(guest)
+		over = _admitted() == 0
+	else:
+		over = not _client.is_playing()
 	if over or _steps % LOG_EVERY == 0:
-		_log.row(session.stats.row())
+		_log.row(_stats().row())
 	if over:
 		_end()
 	elif _steps % LINE_EVERY == 0:
 		events.online_line_changed.emit(_line())
+
+
+## The guest machines in the run.
+func _admitted() -> int:
+	var count: int = 0
+	for guest in _host.guests:
+		count += 1 if guest.admitted else 0
+	return count
+
+
+## The session's counters: the client's, or the host's with its guests' added up.
+func _stats() -> NetStats:
+	return _host.totals() if _host != null else _client.stats
+
+
+func _parted_tick() -> int:
+	return _host.parted_tick if _host != null else _client.parted_tick
+
+
+func _parted_areas() -> PackedStringArray:
+	return _host.parted_areas if _host != null else _client.parted_areas
 
 
 ## The first hash check that failed: said once, and this side's run saved for the tools (the
@@ -398,19 +477,19 @@ func _step_run() -> void:
 func _tell_parting() -> void:
 	var saved_as: String = "online_host_parted" if _hosting else "online_client_parted"
 	var saved: bool = frames.save_run(saved_as) == OK
-	var row: Dictionary = {"parted_tick": session.parted_tick, "parted_areas": session.parted_areas, "replay": saved_as if saved else ""}
+	var row: Dictionary = {"parted_tick": _parted_tick(), "parted_areas": _parted_areas(), "replay": saved_as if saved else ""}
 	_log.row(row)
-	print("NetPlay: the two machines parted at tick %d in %s%s" % [session.parted_tick, ", ".join(session.parted_areas), "; this side's run is saved as the replay %s" % saved_as if saved else ""])
+	print("NetPlay: the machines parted at tick %d in %s%s" % [_parted_tick(), ", ".join(_parted_areas()), "; this side's run is saved as the replay %s" % saved_as if saved else ""])
 
 
 func _line() -> String:
-	var line: String = session.stats.line()
-	if session.parted_tick >= 0:
-		line = "PARTED at tick %d (%s). %s" % [session.parted_tick, ", ".join(session.parted_areas), line]
-	if not _hosting and (session as NetClient).is_catching_up():
+	var line: String = _stats().line()
+	if _parted_tick() >= 0:
+		line = "PARTED at tick %d (%s). %s" % [_parted_tick(), ", ".join(_parted_areas()), line]
+	if _client != null and _client.is_catching_up():
 		line = "Catching up with the host. %s" % line
 	if _hosting and _party and code != "":
-		line = "Room %s. %s" % [code, line]
+		line = "Room %s, %d machine(s) joined. %s" % [code, _admitted(), line]
 	return line
 
 
@@ -419,33 +498,35 @@ func _room_line() -> String:
 	return "Online room %s: the code other machines join by." % code
 
 
-## The other machine is gone from a run that played.
+## The other machines are gone from a run that played.
 func _end() -> void:
-	var why: String = session.problem
+	var why: String = _client.problem if _client != null else _last_problem
+	_last_problem = ""
 	_log.close()
 	if _hosting and _party:
-		# Its seats leave; the party plays on, unrecorded, and the next machine joins a hub begun anew.
-		(session as NetHost).stop(true)
-		session = null
+		# Their seats left; the party plays on, unrecorded, and the next machine joins a hub begun anew.
+		_host.stop(true)
+		_host = null
 		if _replay != null and frames.recorded() == _replay:
 			frames.stop_recording()
 		_replay = null
 		if _handshake != null:
-			_show(CODE, "The other machine left; the room is still open.")
+			_show(CODE, "The other machines left; the room is still open.")
 			events.online_line_changed.emit(_room_line())
 		else:
 			code = ""
-			_show(ENDED, "The other machine left, and the room is closed; the party plays on here.")
+			_show(ENDED, "The other machines left, and the room is closed; the party plays on here.")
 			events.online_line_changed.emit("")
 		return
 	if _hosting:
 		# The client's seats leave and the recording ends; the run plays on.
-		(session as NetHost).stop()
+		_host.stop()
+		_host = null
 		_replay = null
 	else:
 		# Its devices stay on the seats they play on, and seat themselves again from now on.
-		(session as NetClient).release_devices()
-	session = null
+		_client.release_devices()
+		_client = null
 	var gone: String = "The other player left; the run plays on here." if _hosting else "The host left; the run plays on here, alone."
 	_show(ENDED, gone if why == "" else "%s (The link was closed: %s.)" % [gone, why])
 
@@ -465,13 +546,13 @@ func _let_go() -> void:
 	if _handshake != null:
 		_handshake.close()
 		_handshake = null
-	if session != null:
-		session.link.close()
-		if not _hosting:
-			(session as NetClient).release_devices(true)
-		else:
-			(session as NetHost).stop(_party)
-		session = null
+	if _host != null:
+		_host.stop(_party)
+		_host = null
+	if _client != null:
+		_client.link.close()
+		_client.release_devices(true)
+		_client = null
 
 
 func _show(now: StringName, with_note: String = "") -> void:

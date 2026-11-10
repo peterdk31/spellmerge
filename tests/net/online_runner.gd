@@ -40,7 +40,7 @@ const FramesScript := preload("res://core/sim/frames.gd")
 const HANDOFF: String = "user://net/"
 const HOST_CODE: String = "online_runner_host.code"
 const ROOM_CODE: String = "online_runner_room.code"
-## A room: the players each machine brings.
+## A room: the players each machine brings unless told (`--players=`).
 const OWN_PLAYERS: int = 2
 const HUB_ROOM: String = "res://content/rooms/hub/hub.tres"
 const JOIN_CODE: String = "online_runner_join.code"
@@ -106,6 +106,10 @@ var _runs: int = 0
 var _most_seats: int = 0
 var _hub_wizards: int = 0
 var _walkers: Array[Walker] = [null, null, null, null]
+## A room: this machine's players, and (the host's) the wizards of the whole party: its own and
+## every joining machine's (`--party=`; twice its own unless told).
+var _players: int = OWN_PLAYERS
+var _party: int = 0
 var _ticks: int = TICKS
 var _play: NetPlayScript
 var _events: EventsScript
@@ -126,6 +130,12 @@ func _ready() -> void:
 			_ticks = maxi(arg.trim_prefix("--ticks=").to_int(), 1)
 		elif arg.begins_with("--signal="):
 			_signal = arg.trim_prefix("--signal=")
+		elif arg.begins_with("--players="):
+			_players = clampi(arg.trim_prefix("--players=").to_int(), 1, Replay.SEATS)
+		elif arg.begins_with("--party="):
+			_party = clampi(arg.trim_prefix("--party=").to_int(), 2, Replay.SEATS)
+	if _party == 0:
+		_party = mini(_players * 2, Replay.SEATS)
 	_play = get_node_or_null(^"/root/NetPlay") as NetPlayScript
 	_events = get_node_or_null(^"/root/Events") as EventsScript
 	_frames = get_node_or_null(^"/root/Frames") as FramesScript
@@ -160,7 +170,7 @@ func _ready_room() -> void:
 		through.rtc_maker = func() -> NetHandshake: return NetRtc.new(PackedStringArray())
 		return through
 	_events.start_stone_changed.connect(_on_stone)
-	for player in OWN_PLAYERS:
+	for player in _players:
 		_input.call(&"add_virtual_device", player)
 	if _hosting:
 		DirAccess.remove_absolute(HANDOFF + ROOM_CODE)
@@ -179,7 +189,7 @@ func _on_room_entered(_room_id: StringName) -> void:
 func _on_stone(_standing: int, wizards: int, lit: bool) -> void:
 	in_hub = wizards > 0
 	_hub_wizards = wizards
-	if _hosting and lit and wizards == OWN_PLAYERS * 2 and _play.phase == NetPlayScript.PLAYING:
+	if _hosting and lit and wizards == _party and _play.phase == NetPlayScript.PLAYING:
 		_runs += 1
 		_events.run_requested.emit(0)
 
@@ -194,7 +204,7 @@ func wizard_of(seat: int) -> Node2D:
 func _seat_walkers() -> void:
 	var mine: int = 0
 	if _hosting:
-		mine = (1 << OWN_PLAYERS) - 1
+		mine = (1 << _players) - 1
 	elif _play.session is NetClient:
 		mine = (_play.session as NetClient).feed.local_seats
 		var held: int = 0
@@ -227,7 +237,7 @@ func _process(delta: float) -> void:
 		if code != "":
 			_joined = true
 			_events.online_join_requested.emit(0, code)
-	elif _hosting and _play.phase == NetPlayScript.PLAYING and _play.session.stats.ticks >= _ticks:
+	elif _hosting and _play.phase == NetPlayScript.PLAYING and (_play.session as NetHost).stats.ticks >= _ticks:
 		_host_leaves()
 
 
@@ -240,9 +250,9 @@ func _process_room() -> void:
 		if room_code != "":
 			_joined = true
 			_events.online_join_requested.emit(0, room_code)
-	elif _hosting and _play.phase == NetPlayScript.PLAYING and _play.session.stats.ticks >= _ticks:
+	elif _hosting and _play.phase == NetPlayScript.PLAYING and (_play.session as NetHost).stats.ticks >= _ticks:
 		_most_seats = 0
-		var theirs: int = (_play.session as NetHost).client_seats()
+		var theirs: int = (_play.session as NetHost).guest_seats()
 		for seat in Replay.SEATS:
 			_most_seats += 1 if theirs & (1 << seat) != 0 else 0
 		_host_leaves()
@@ -278,22 +288,24 @@ func _on_online_changed(phase: StringName, code: String, note: String) -> void:
 
 ## The host played its ticks: its counters are judged, and the process ends (the link with it).
 func _host_leaves() -> void:
-	var stats: NetStats = _play.session.stats
+	var host: NetHost = _play.session as NetHost
+	var stats: NetStats = host.totals()
 	print("ONLINE host ROW %s" % JSON.stringify(stats.row()))
 	var why: String = ""
-	if _play.session.parted_tick >= 0:
-		why = "the two parted at tick %d in %s" % [_play.session.parted_tick, ", ".join(_play.session.parted_areas)]
+	if host.parted_tick >= 0:
+		why = "the two parted at tick %d in %s" % [host.parted_tick, ", ".join(host.parted_areas)]
 	elif stats.checks < _ticks / NetChecks.EVERY - 2:
 		why = "only %d hash checks came back in %d ticks" % [stats.checks, _ticks]
 	elif stats.read_bytes == 0 or stats.stood_in >= stats.ticks:
 		why = "the client's frames never arrived"
-	elif _signal != "" and _most_seats != OWN_PLAYERS:
-		why = "the joining machine holds %d seats, not %d" % [_most_seats, OWN_PLAYERS]
+	elif _signal != "" and _most_seats != _party - _players:
+		why = "the joining machines hold %d seats, not %d" % [_most_seats, _party - _players]
 	elif _signal != "" and _runs == 0:
 		why = "no run was started from the stone (%d wizards in the hub)" % _hub_wizards
 	if _signal != "":
-		print("ONLINE host ROOM %d run(s) from the stone, %d seats on the joining machine" % [_runs, _most_seats])
-	_play.session.link.close()
+		print("ONLINE host ROOM %d run(s) from the stone, %d seats on %d joining machine(s)" % [_runs, _most_seats, host.guests.size()])
+	for guest in host.guests:
+		guest.link.close()
 	_finish(why)
 
 
@@ -305,8 +317,8 @@ func _finish(why: String) -> void:
 		# The joining side: it must have played the host's run.
 		if _frames.ticks < 60:
 			why = "the client's game never ran"
-		elif _signal != "" and _most_seats != OWN_PLAYERS:
-			why = "this machine held %d seats, not %d" % [_most_seats, OWN_PLAYERS]
+		elif _signal != "" and _most_seats != _players:
+			why = "this machine held %d seats, not %d" % [_most_seats, _players]
 	print("ONLINE %s LINE %s" % [_role(), _last_line])
 	print("ONLINE %s %s" % [_role(), "OK" if why == "" else "FAILED: " + why])
 	get_tree().quit(0 if why == "" else 1)

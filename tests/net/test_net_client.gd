@@ -54,7 +54,7 @@ func before_each() -> void:
 	_areas = {"one": Area.new(), "two": Area.new()}
 	var ends: Array[NetLoopback] = NetLoopback.pair()
 	_far = ends[1]
-	_client = NetClient.new(_frames, ends[0], func() -> Dictionary: return _areas, SEAT, 2, 4)
+	_client = NetClient.new(_frames, ends[0], func() -> Dictionary: return _areas, 1 << SEAT, 2, 4)
 	_client.clock = func() -> float: return _now
 	_run = Replay.new()
 	_run.build = Replay.build_of()
@@ -161,10 +161,45 @@ func test_it_sends_its_frame_every_step_for_the_tick_and_its_delay() -> void:
 	check(sent != null and sent.tick == 2 + 4, "two ticks played: for tick 2 and the delay")
 
 
+## A machine with two seats (online lobby L3): a frame for each of them every step, both for the
+## same host tick, the step counted once; its presses timed seat by seat.
+func test_a_machine_with_two_seats_sends_a_frame_for_each_every_step() -> void:
+	var ends: Array[NetLoopback] = NetLoopback.pair()
+	_far = ends[1]
+	_input.add_virtual_device(2)
+	_client = NetClient.new(_frames, ends[0], Callable(), (1 << SEAT) | (1 << 2), 2, 4)
+	_client.clock = func() -> float: return _now
+	_run.seats = 0b0111
+	_link_up()
+	_input.send_virtual(SEAT, &"move_left", 1.0)
+	_input.send_virtual(2, &"move_right", 1.0)
+	_step()
+	var seen: Array = []
+	var frame := InputFrame.new()
+	var sent: NetMessage = _next(NetMessage.FRAME)
+	while sent != null:
+		check_equal(frame.decode(sent.body), "", "a whole frame")
+		seen.append([sent.tick, frame.seat, frame.move_vector()])
+		sent = _next(NetMessage.FRAME)
+	check_equal(seen, [[4, SEAT, Vector2.LEFT], [4, 2, Vector2.RIGHT]], "one a seat, both for the next tick and the delay, each its own device's")
+	check_equal(_client.stats.steps, 1, "the step counted once")
+	_host_ticks(3)
+	_step()
+	_step()
+	_drain()
+	_step()
+	seen.clear()
+	sent = _next(NetMessage.FRAME)
+	while sent != null:
+		seen.append(sent.tick)
+		sent = _next(NetMessage.FRAME)
+	check_equal(seen, [2 + 4, 2 + 4], "two ticks played: both for tick 2 and the delay")
+
+
 func test_the_delay_comes_from_the_ping_when_none_is_given() -> void:
 	var ends: Array[NetLoopback] = NetLoopback.pair()
 	_far = ends[1]
-	_client = NetClient.new(_frames, ends[0], Callable(), SEAT, 2)
+	_client = NetClient.new(_frames, ends[0], Callable(), 1 << SEAT, 2)
 	_client.clock = func() -> float: return _now
 	_step()
 	var ping: NetMessage = _next(NetMessage.PING)
@@ -185,7 +220,7 @@ func test_the_delay_comes_from_the_ping_when_none_is_given() -> void:
 	before_each()
 	ends = NetLoopback.pair()
 	_far = ends[1]
-	_client = NetClient.new(_frames, ends[0], Callable(), SEAT, 2)
+	_client = NetClient.new(_frames, ends[0], Callable(), 1 << SEAT, 2)
 	_far.send(NetMessage.of_header(_run.header_bytes()))
 	_step()
 	check_equal(_client.delay, NetClient.DEFAULT_DELAY, "no ping answered: the default")
@@ -195,7 +230,7 @@ func test_the_delay_comes_from_the_ping_when_none_is_given() -> void:
 func _follow_the_ping() -> void:
 	var ends: Array[NetLoopback] = NetLoopback.pair()
 	_far = ends[1]
-	_client = NetClient.new(_frames, ends[0], Callable(), SEAT, 2)
+	_client = NetClient.new(_frames, ends[0], Callable(), 1 << SEAT, 2)
 	_client.clock = func() -> float: return _now
 	_answers = 0
 
@@ -281,6 +316,54 @@ func test_a_bad_first_ping_does_not_keep_the_delay_high() -> void:
 		check(same <= 1, "frame %d: no row of frames for one tick" % i)
 		if same > 1:
 			break
+
+
+## Two seats on a delay that falls: a step's two frames are for one tick, and the delay falls as
+## fast as it does with one seat (the step moves it, not each frame).
+func test_two_seats_fall_together_and_no_faster() -> void:
+	_follow_the_ping()
+	_input.add_virtual_device(2)
+	_client = NetClient.new(_frames, _far_end(), Callable(), (1 << SEAT) | (1 << 2), 2)
+	_client.clock = func() -> float: return _now
+	_run.seats = 0b0111
+	_link_up_at(1000)
+	var sent_for := PackedInt32Array()
+	# The steps between one tick of the fall and the next.
+	var gaps: Array[int] = []
+	var last_delay: int = _client.delay
+	var since: int = 0
+	for i in 400:
+		sent_for.append_array(_play(1, 20))
+		since += 1
+		if _client.delay < last_delay:
+			if last_delay < NetClient.MAX_DELAY:
+				gaps.append(since)
+			last_delay = _client.delay
+			since = 0
+	check(gaps.size() > 10, "it fell a tick at a time (%d)" % gaps.size())
+	check(gaps.all(func(gap: int) -> bool: return gap >= NetDelay.LOWER_EVERY), "a tick every %d steps at most, as with one seat: %s" % [NetDelay.LOWER_EVERY, str(gaps)])
+	check_equal(_client.delay, 2 + 2 + 1, "fell to the delay of 20 ms")
+	check_equal(_client.stats.retunes, 1, "one fall")
+	var pairs_apart: int = 0
+	var each := PackedInt32Array()
+	for i in range(0, sent_for.size() - 1, 2):
+		if sent_for[i] != sent_for[i + 1]:
+			pairs_apart += 1
+		each.append(sent_for[i])
+	check_equal(pairs_apart, 0, "every step's two frames are for one tick")
+	var same: int = 0
+	for i in range(1, each.size()):
+		same = same + 1 if each[i] == each[i - 1] else 0
+		check(same <= 1, "step %d: it fell no faster than a tick every %d steps" % [i, NetDelay.LOWER_EVERY])
+		if same > 1:
+			break
+
+
+## A fresh link for a client made in a test; its far end is the test's.
+func _far_end() -> NetLoopback:
+	var ends: Array[NetLoopback] = NetLoopback.pair()
+	_far = ends[1]
+	return ends[0]
 
 
 ## A rise on the wire: the frames skip ahead, and the host stands the last in for the ticks

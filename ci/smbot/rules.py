@@ -432,7 +432,7 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
         findings += _check_svg(path, text)
     if suffix == ".gdextension" or "type=\"GDExtension\"" in text:
         findings.append(Finding("banned-api", "error", path, 1,
-                                "A GDExtension is never committed: ci/build/native.sh writes the one the game loads.",
+                                "A GDExtension is never committed: CI makes the ones the game loads (ci/build/native.sh, webrtc.sh).",
                                 "Remove the file; native code is the native module's (native/README.md), built by CI."))
     if suffix in SCRIPT_TYPES:
         findings += check_banned_apis(path, text)

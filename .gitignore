@@ -24,3 +24,6 @@ __pycache__/
 /native/.sconsign*.dblite
 /native/spellmerge.gdextension
 /native/spellmerge.gdextension.uid
+
+# The WebRTC extension of the desktop builds (ci/build/webrtc.sh): the pinned release, never committed
+/addons/

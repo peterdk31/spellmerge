@@ -127,11 +127,14 @@ The owner's exception to hard rule 4 (2026-11-10, `docs/DECISIONS.md`): networki
 
 - [ ] `NET_CLASSES` in `ci/smbot/rules.py` lists only `WebRTCPeerConnection` and `WebRTCDataChannel`, and `NET_DIR` is `net/`. HTTP, sockets, the engine's multiplayer classes and `@rpc` stay banned there too.
 - [ ] `net/` is in `BOT_PATHS`: a contributor's PR that touches it fails the `rules` check.
-- [ ] No networking class is named outside `net/`: `grep -rnE 'WebRTC|HTTPRequest|HTTPClient|StreamPeer|TCPServer|UDPServer|PacketPeer|WebSocket|ENet' --include='*.gd' --include='*.tscn' --include='*.tres' . | grep -v '^./net/'` prints nothing but comments.
+- [ ] No networking class is named outside `net/`: `grep -rnE 'WebRTC|HTTPRequest|HTTPClient|StreamPeer|TCPServer|UDPServer|PacketPeer|WebSocket|ENet' --include='*.gd' --include='*.tscn' --include='*.tres' . | grep -vE '^./(net|tests)/'` prints nothing but comments, and in `tests/` the only hits are `NetWebRTC` (a class of `net/`), never an engine class.
 - [ ] Nothing in `net/` turns bytes into values by itself: `grep -rnE 'bytes_to_var|str_to_var' net/` prints nothing. Every message goes through `NetMessage`, `InputFrame` and `Replay`, whose decoders check every size and value.
-- [ ] Nothing outside `net/` names its classes but the tests: `grep -rnE '\bNet(Session|Host|Client|Link|Loopback|Conditioner|Message|Checks|Stats|PressProbe)\b' --include='*.gd' core gameplay hud content` prints nothing (from S4: the one place that starts a session).
+- [ ] Nothing outside `net/` names its classes but the tests: `grep -rnE '\bNet(Session|Host|Client|Link|Loopback|Conditioner|Message|Checks|Stats|PressProbe|WebRTC)\b' --include='*.gd' core gameplay hud content` prints nothing (from S4: the one place that starts a session).
 - [ ] From S4: nothing connects anywhere until a player presses Host or Join; the only address in `net/` is the one STUN server; a pasted code is checked for its size and form before WebRTC is handed it.
-- [ ] From S3: the WebRTC extension in the desktop builds is the pinned release, checked by its SHA-256, never committed; update it when it has a security release.
+- [ ] The WebRTC extension in the desktop builds is the pinned release (`WEBRTC_VERSION` and `WEBRTC_ZIP_SHA256` in `ci/build/godot.env`, the hash GitHub lists for the asset of godotengine/webrtc-native), checked on every run by `ci/build/webrtc.sh` and never committed: `git ls-files addons` prints nothing, and `addons/` is in `.gitignore`.
+- [ ] It parses what comes over the network (libdatachannel, mbedTLS), so it is updated when it or one of its libraries has a security release: watch godotengine/webrtc-native's releases. An update is the two pins, by the owner, and where the release's libraries changed, `LICENSES` and the notice in `ci/build/webrtc.sh` (the script fails until they match the archive).
+- [ ] The web exports carry nothing of it (the Web presets exclude `addons/*`; `ci/build/build.sh` checks both web packs), and each desktop zip has `licenses/webrtc-native/` with the license files and the note saying where the source is (MPL-2.0).
+- [ ] `net/net_webrtc.gd` only asks whether the extension's class exists; no script loads a library or names a `.gdextension`.
 
 ## Dry runs before M0 is done
 

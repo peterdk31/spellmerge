@@ -21,7 +21,8 @@
 #
 # Every mode first builds the native module (ci/build/native.sh: Linux for --quick, Linux and the
 # web for --web, all three for a full build) and fails without it; the exports are checked for it.
-# NATIVE=0 leaves it out, for local builds only.
+# NATIVE=0 leaves it out, for local builds only. Every mode also puts the pinned WebRTC extension in
+# addons/webrtc_native/ (ci/build/webrtc.sh), for the editor, the tests and the desktop exports.
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test and every card's own test (content/**/test_*.gd)
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
 #                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
@@ -167,6 +168,45 @@ check_native_export() {
   [[ "${NATIVE:-1}" == 0 ]] && return 0
   local lib; lib=$(basename "${NATIVE_LIBS[$1]}")
   [[ -f "$2/$lib" ]] || { echo "::error::the $1 export has no native module ($lib in $2)"; exit 1; }
+}
+
+# The WebRTC extension (docs/milestones/netcode-spike.md, S3): the pinned release, put in
+# addons/webrtc_native/ before the import, so the editor, the tests and the Linux and Windows
+# exports have WebRTC. ci/build/webrtc.sh knows the release (its files, its libraries' licenses,
+# its notice); here only its folder is known. The tests must then find it
+# (SPELLMERGE_WEBRTC=required, tests/net/test_net_webrtc.gd), and each export is checked
+# (`check_webrtc_export`): a desktop one carries its library, a web one nothing of it (the browser
+# has its own). The platform runs say whether an exported build loaded it (REPLAY BUILD,
+# tools/platform_hashes.py).
+WEBRTC_DIR=addons/webrtc_native
+setup_webrtc() {
+  step "WebRTC extension"
+  ci/build/webrtc.sh || { echo "::error::the WebRTC extension could not be set up (ci/build/webrtc.sh)"; exit 1; }
+  export SPELLMERGE_WEBRTC=required
+}
+
+# check_webrtc_export <platform> <export dir>
+check_webrtc_export() {
+  local platform=$1 dir=$2 lib found=0
+  if [[ "$platform" == web ]]; then
+    [[ -f "$dir/index.pck" ]] || { echo "::error::the web export in $dir has no index.pck to check"; exit 1; }
+    if grep -q -a "$(basename "$WEBRTC_DIR")" "$dir/index.pck"; then
+      echo "::error::the web export in $dir packs the WebRTC extension (export_presets.cfg must exclude addons/*)"
+      exit 1
+    fi
+    return 0
+  fi
+  # The platform's release library, whatever the release names it.
+  for lib in "$WEBRTC_DIR"/lib/*."$platform".template_release.*; do
+    [[ -f "$lib" && -f "$dir/$(basename "$lib")" ]] && found=1
+  done
+  ((found)) || { echo "::error::the $platform export in $dir has no WebRTC extension ($WEBRTC_DIR/lib/*.$platform.template_release.*)"; exit 1; }
+}
+
+# install_webrtc_notices <export dir>: the extension's licenses and its notice go out with it.
+install_webrtc_notices() {
+  rm -rf "$1/licenses/webrtc-native" && mkdir -p "$1/licenses"
+  cp -r "$WEBRTC_DIR/notices" "$1/licenses/webrtc-native"
 }
 
 # Runs Godot and fails if it exits non-zero or logs any error.
@@ -329,11 +369,16 @@ export_preset() { # export_preset <preset>: a release export to the preset's exp
   mkdir -p "$(dirname "$out")"
   godot_checked "export-${name// /-}" "$GODOT" --headless --path . --export-release "$preset" "$out"
   [[ -s "$out" ]] || { echo "::error::$preset export produced no $out"; exit 1; }
+  local platform
   case "$preset" in
-    Web*) check_native_export web "$(dirname "$out")" ;;
-    Windows*) check_native_export windows "$(dirname "$out")" ;;
-    Linux*) check_native_export linux "$(dirname "$out")" ;;
+    Web*) platform=web ;;
+    Windows*) platform=windows ;;
+    Linux*) platform=linux ;;
+    *) echo "::error::no platform known for the preset $preset"; exit 1 ;;
   esac
+  check_native_export "$platform" "$(dirname "$out")"
+  check_webrtc_export "$platform" "$(dirname "$out")"
+  [[ "$platform" == web ]] || install_webrtc_notices "$(dirname "$out")"
 }
 
 # check_native_loaded <linux|web>: the exported test runs say the native module ran (the timing
@@ -368,6 +413,7 @@ export_all() {
     rm -rf build/linux-test && mkdir -p build/linux-test
     godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/"$GAME_NAME".x86_64
     [[ -s build/linux-test/"$GAME_NAME".x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
+    check_webrtc_export linux build/linux-test
     while IFS=$'\t' read -r name arg label linux_ok web_ok web_timeout; do
       step "$label (exported Linux build with tests)"
       godot_checked "$name-linux" timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- "$arg"
@@ -399,6 +445,7 @@ export_all() {
   rm -rf build/web-test && mkdir -p build/web-test
   godot_checked export-web-test "$GODOT" --headless --path . --export-release "Web Test" build/web-test/index.html
   [[ -s build/web-test/index.html ]] || { echo "::error::Web Test export produced no index.html"; exit 1; }
+  check_webrtc_export web build/web-test
   while IFS=$'\t' read -r name arg label linux_ok web_ok web_timeout; do
     step "$label (exported web build with tests, headless Chrome)"
     PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args="$arg" --expect "$web_ok" \
@@ -459,6 +506,7 @@ setup_godot
 mkdir -p build/logs
 if ((QUICK)); then
   setup_native linux
+  setup_webrtc
   import_and_smoke
   ((TESTS)) && unit_tests
   ((SHOTS)) && screenshots
@@ -472,6 +520,7 @@ if ((${#ONLY_PLATFORMS[@]})); then
   # Linux too: the editor that imports and exports here runs on Linux, and it fails on an extension
   # with no library for its own platform.
   setup_native $(printf '%s\n' linux "${ONLY_PLATFORMS[@]}" | sort -u)
+  setup_webrtc
   if ((TESTS)); then
     import_and_smoke
     unit_tests
@@ -495,6 +544,7 @@ if ((${#ONLY_PLATFORMS[@]})); then
   exit 0
 fi
 setup_native linux web windows
+setup_webrtc
 import_and_smoke
 unit_tests
 screenshots

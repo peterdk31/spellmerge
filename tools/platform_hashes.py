@@ -67,6 +67,7 @@ class Run:
     name: str
     scenes: dict[str, Scene] = field(default_factory=dict)
     result: str = ""
+    build: dict[str, str] = field(default_factory=dict)  # REPLAY BUILD's fields: what the export has
 
 
 def parse(name: str, text: str) -> Run:
@@ -80,6 +81,9 @@ def parse(name: str, text: str) -> Run:
         kind = fields[0]
         if kind.startswith(DONE):
             run.result = kind
+            continue
+        if kind == "REPLAY BUILD":
+            run.build.update(part.split("=", 1) for part in fields[1:] if "=" in part)
             continue
         if len(fields) < 2:
             continue
@@ -181,9 +185,14 @@ def report(ref: Run, other: Run) -> tuple[str, bool]:
 
 def run_problems(run: Run) -> tuple[list[str], int]:
     """What is wrong with one run on its own, and the exit status it calls for: 2 when it did not
-    finish, 1 when a scene's replay parted from its own recording (REPLAY SELF), else 0."""
+    finish or its export lacks a part every build has (REPLAY BUILD), 1 when a scene's replay
+    parted from its own recording (REPLAY SELF), else 0."""
     if run.result != "REPLAY HASHES OK":
         return [f"{run.name}: the run did not finish ({run.result or 'no result line'})"], 2
+    if run.build.get("webrtc") == "off":
+        # Nothing to do with the hashes: the export is not the build that ships.
+        return [f"{run.name}: the export has no WebRTC: its extension is missing or did not load "
+                "(ci/build/webrtc.sh before the export)"], 2
     lines = [f"{run.name}: {name}: its replay {scene.self_check or 'printed no self check'} against its recording"
              for name, scene in run.scenes.items() if scene.self_check != "agree"]
     return lines, 1 if lines else 0
@@ -296,6 +305,8 @@ def main_run(opts: argparse.Namespace) -> int:
         natives = ["linux"] + (["web"] if "web" in platforms else [])
         if sh("ci/build/native.sh", *natives, log=OUT / "native.log") != 0:
             sys.exit("platform_hashes: the native module did not build (build/platforms/native.log)")
+        if sh("ci/build/webrtc.sh", log=OUT / "webrtc.log") != 0:
+            sys.exit("platform_hashes: the WebRTC extension could not be set up (build/platforms/webrtc.log)")
         export("Linux Test", "build/linux-test/Spellmerge.x86_64")
         if "windows" in platforms:
             export("Windows Test", "build/windows-test/Spellmerge.exe")

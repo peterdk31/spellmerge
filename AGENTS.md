@@ -22,12 +22,12 @@ These cover only security and copyright. Everything else is guidance.
 4. **No banned APIs** in `.gd`, `.tscn` or `.tres`:
    - starting programs or opening URLs (`OS.execute`, `OS.create_process`, `OS.shell_open`, ...)
    - networking and HTTP (`HTTPRequest`, `StreamPeerTCP`, `WebSocketPeer`, `IP`, ...). The netcode in `net/` is the exception, by the owner's decision of 2026-11-10 ([net/README.md](net/README.md)): Claude's and the owner's only, and only a WebRTC peer and its data channel (`WebRTCPeerConnection`, `WebRTCDataChannel`; `smbot.rules`). Nothing outside `net/` knows a network exists.
-   - `JavaScriptBridge`, and native code outside the native module (no `.gdextension`, no `GDExtensionManager`). The module in `native/` is the exception, by the owner's decision of 2026-11-02 ([native/README.md](native/README.md)): Claude's and the owner's only, built from source, its C++ limited to computing on the arrays the game hands it (allowed includes, no system or by-name engine calls; `smbot.rules`).
+   - `JavaScriptBridge`, and native code outside the native module (no `.gdextension`, no `GDExtensionManager`). The module in `native/` is the exception (the one other native library, the desktop builds' WebRTC extension, is the owner's, fetched by `ci/build/webrtc.sh` and never in the repository), by the owner's decision of 2026-11-02 ([native/README.md](native/README.md)): Claude's and the owner's only, built from source, its C++ limited to computing on the arrays the game hands it (allowed includes, no system or by-name engine calls; `smbot.rules`).
    - creating or swapping code at runtime (`GDScript.new`, `Expression`, `set_script`, `ClassDB.instantiate`; only `core/native/native.gd` makes the native module's classes by name)
    - calling singletons by name (`OS.call`, `Engine.get_singleton`)
    - `@tool` scripts and editor plugins
    - file access outside `user://`, and loading from a computed path. Write `load("res://...")` or `preload(...)` with a literal path; dynamic loading is done by `core/registry`.
-5. **Licenses:** code is GPL-3.0-or-later and assets are CC-BY-SA-4.0 by default (see [REUSE.toml](REUSE.toml)). A file may instead declare MIT, BSD, Apache-2.0, ISC, Zlib or CC0 (code), or CC0-1.0 or CC-BY-4.0 (assets), with an `SPDX-License-Identifier` line or a `<file>.license` file. Nothing else.
+5. **Licenses:** code is GPL-3.0-or-later and assets are CC-BY-SA-4.0 by default (see [REUSE.toml](REUSE.toml)). A file may instead declare MIT, BSD, Apache-2.0, ISC, Zlib or CC0 (code), or CC0-1.0 or CC-BY-4.0 (assets), with an `SPDX-License-Identifier` line or a `<file>.license` file. Nothing else. (A library that is only in the builds, never in the repository, is listed with its licenses in the builds instead: the WebRTC extension, `licenses/webrtc-native/`.)
 
 Copyright, in short: only original work or compatible licenses. No ripped game assets, no fan art of other IP, no names from other works (write Fireball, not Hadouken), and no AI prompts naming living artists or franchises. Code and files from a contributor are only used through the intake's tasks, after their CLA signature (a scheduled PR, or files on a `submissions/` branch); never copy code or assets pasted into an issue or a discussion. When in doubt, leave it out.
 
@@ -58,7 +58,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 
 ```sh
 tools/check.sh                     # the same hard rules CI runs, on your changes
-ci/build/build.sh --quick --tests  # the native module, import, smoke test and every unit test, spell validator included (downloads the pinned Godot and the native tools once)
+ci/build/build.sh --quick --tests  # the native module, import, smoke test and every unit test, spell validator included (downloads the pinned Godot, the native tools and the WebRTC extension once)
 ci/build/native.sh linux           # only the native module, after changing native/ (then tools/ptest.sh)
 tools/ptest.sh                     # the same unit tests in parallel, about a minute (after one build.sh --quick)
 python3 -m unittest discover -s ci/tests -t ci   # the automation's own tests, when you change ci/

@@ -3,6 +3,7 @@ extends SceneTree
 ## and on Windows for the replay hashes, online-ready N2b) must stay copies of `Linux`, `Web` and
 ## `Windows`: each pair, and their options, differ only in name,
 ## runnable, exclude_filter and export_path. A new option added to one must be added to both.
+## The web pair alone also excludes addons/* (the WebRTC extension is the desktop builds').
 ##
 ## godot --headless --path . --script res://tests/smoke/test_export_presets.gd
 
@@ -47,8 +48,14 @@ func _test_test_preset_matches(shipped_name: String, test_name: String) -> void:
 	_check(linux != "" and test != "", "both the %s and %s presets exist" % [shipped_name, test_name])
 	if linux == "" or test == "":
 		return
-	_check(config.get_value(test, "exclude_filter", "x") == "", "%s excludes nothing" % test_name)
-	_check(config.get_value(linux, "exclude_filter", "") == "tests/*, content/*/test_*.gd*", "%s still excludes tests/* and the cards' tests" % shipped_name)
+	# A web build leaves the WebRTC extension's folder out (the browser has its own; with it packed
+	# the game would try to load a library the web has none of: netcode spike S3). A desktop build
+	# must not: it is where its WebRTC comes from.
+	var web: bool = shipped_name == "Web"
+	var only_web: String = "addons/*" if web else ""
+	var shipped_filter: String = "tests/*, content/*/test_*.gd*" + (", " + only_web if web else "")
+	_check(config.get_value(test, "exclude_filter", "x") == only_web, "%s excludes nothing%s" % [test_name, " but addons/*" if web else ""])
+	_check(config.get_value(linux, "exclude_filter", "") == shipped_filter, "%s excludes tests/*, the cards' tests%s, and nothing else" % [shipped_name, " and addons/*" if web else ""])
 	_check(config.get_value(test, "runnable", true) == false, "%s is not runnable" % test_name)
 	_check(config.get_value(test, "export_path", "") != config.get_value(linux, "export_path", ""), "the two presets export to different paths")
 	_compare(config, linux, test)

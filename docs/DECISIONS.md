@@ -3356,3 +3356,12 @@ The owner asked for the three ideas picked from a review of every card: a trigge
 - **Connecting:** codes swapped by copy and paste (no signalling server in the spike), and a public STUN server (owner: "yes it can use a public STUN server").
 - **Host and Join in every build** (owner: "if Host/Join can work in all build, that will be great and I can easier test it").
 - **Why:** WebSocket, first proposed, needed a desktop host and a LAN-served web build. The owner asked whether WebRTC would let two browsers play in the sandbox, then allowed the extension, so one link serves browsers and desktops, and CI can test the real link.
+
+## 2026-11-10: The WebRTC extension in the desktop builds (netcode spike S3)
+
+- **Checked first** (owner: "make sure that it is a good plan"): release 1.2.2 of godotengine/webrtc-native loads in Godot 4.7.2 and links two peers in one process, so the release is fetched (decision 7's (a)), not built from source.
+- **As the release ships it:** its folder `addons/webrtc_native/` and its own `.gdextension`, put there by `ci/build/webrtc.sh` (pinned by version and SHA-256), never committed. The rules did not change: a committed `.gdextension` is still refused everywhere.
+- **The web builds leave it out** (the Web presets exclude `addons/*`): the browser has WebRTC of its own, and a packed extension with no web library would be asked for at every start.
+- **Licenses:** it also holds libsrtp (BSD-3-Clause) and plog (MIT), beyond the four of decision 8; each desktop build ships all seven license files and a note of where the sources are listed.
+- **Why:** one script knows the release, so an update is its pins (and its license list where the libraries changed); the build script and the game know only that a build has WebRTC or not (`NetWebRTC.available()`).
+

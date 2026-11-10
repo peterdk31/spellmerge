@@ -6,7 +6,7 @@ Two machines playing one run (the netcode spike, [docs/milestones/netcode-spike.
 
 **Nothing outside this folder knows a network exists.** The game sees input frames (`core/sim/frames.gd`), whatever made them: a device, a bot, a replay, or a session here. This folder knows `core/sim` and `core/input`, and nothing of gameplay or the HUD.
 
-This is the one folder whose scripts may name networking classes (the owner's exception to hard rule 4, 2026-11-10, docs/DECISIONS.md; `NET_DIR` in `ci/smbot/rules.py`), and only a WebRTC peer and its data channel. It is Claude's and the owner's only. So far (S2) it names none: the only link is the loopback, inside one process.
+This is the one folder whose scripts may name networking classes (the owner's exception to hard rule 4, 2026-11-10, docs/DECISIONS.md; `NET_DIR` in `ci/smbot/rules.py`), and only a WebRTC peer and its data channel. It is Claude's and the owner's only. So far it makes no peer: the only link is the loopback, inside one process, and `NetWebRTC` only asks whether this build has WebRTC.
 
 ## What is here
 
@@ -21,6 +21,7 @@ This is the one folder whose scripts may name networking classes (the owner's ex
 | `net_client.gd` (`NetClient`) | The client's session: gives the frames service a `LiveFeed` that plays the host's run, and sends its seat's frames |
 | `net_checks.gd` (`NetChecks`) | The hash checks: one part of the state each tick, a whole check every 60 |
 | `net_stats.gd` (`NetStats`) | A session's counters (ping, delay, late frames, waits, bytes, check and link time) |
+| `net_webrtc.gd` (`NetWebRTC`) | Whether this build has WebRTC: a browser's own, or the WebRTC extension that `ci/build/webrtc.sh` puts in the desktop builds and the test runs (S3; `addons/webrtc_native/`, never committed). A peer made without it logs an engine error, so ask first |
 | `net_press_probe.gd` (`NetPressProbe`) | Times the client's presses from the step they were sent to the step they ran (a measure for S5; it changes nothing) |
 
 The seams, each one-way: a session knows a `NetLink` (never what carries it), and reaches the game only through three things of `core/sim` and `core/input`: the frames service (`Frames.record`, `set_source`, `play_live`), the input layer's virtual device for the client's seat, and a `Callable` that hands it the game's areas for the checks. The frames service holds the host's `FrameSource` and the client's `LiveFeed` (small inner classes that call their session) and knows nothing of sessions.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SPDX-FileCopyrightText: 2026 peterdk31 and Spellmerge contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Two game processes on this machine play through a room: tools/online_room.sh [ticks]
+# Two game processes on this machine play through a room: tools/online_room.sh [ticks] [runs]
 #
 # The real game twice (headless), as two machines of two players each would play it (online lobby
 # L2, docs/milestones/online-lobby.md; tests/net/online_runner.gd with --signal): the host presses
@@ -10,11 +10,15 @@
 # deployed one) and is put into the host's hub; all four walk onto the stone, a run starts and is
 # fought. The host plays `ticks` ticks (1500) with the joining process and passes when every hash
 # check agreed, the joining machine held its two seats and a run was started from the stone.
+# With `runs` above 1 the party loses its runs on purpose (it stands and casts nothing), so it
+# comes back to the hub and starts the next: the host passes only when that many runs were
+# started from the stone, each after the first in a recording begun anew at the return to the hub.
 # Needs Node 22 or later, the pinned Godot and the WebRTC extension (ci/build/build.sh --quick
 # once). Logs: build/logs/room/.
 set -u
 cd "$(dirname "$0")/.."
 TICKS="${1:-1500}"
+RUNS="${2:-1}"
 TOOLS="$(readlink -f build/godot)"
 GODOT="$(find "$TOOLS" -maxdepth 1 -name 'Godot_v*_linux.x86_64' -type f | head -1)"
 if [[ ! -x "$GODOT" ]]; then
@@ -43,9 +47,9 @@ if [[ -z "$url" ]]; then
 fi
 # Both processes share one user:// (the room's code is handed over there), apart from the player's own.
 export XDG_CONFIG_HOME="$TOOLS/xdg/config" XDG_CACHE_HOME="$TOOLS/xdg/cache" XDG_DATA_HOME="$LOG/data"
-"$GODOT" --headless --path . -- --online --online-role=host "--signal=$url" "--ticks=$TICKS" >"$LOG/host.txt" 2>&1 &
+"$GODOT" --headless --path . -- --online --online-role=host "--signal=$url" "--ticks=$TICKS" "--runs=$RUNS" >"$LOG/host.txt" 2>&1 &
 host=$!
-"$GODOT" --headless --path . -- --online --online-role=join "--signal=$url" >"$LOG/join.txt" 2>&1 &
+"$GODOT" --headless --path . -- --online --online-role=join "--signal=$url" "--runs=$RUNS" >"$LOG/join.txt" 2>&1 &
 join=$!
 status=0
 wait "$host" || status=1

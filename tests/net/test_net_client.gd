@@ -434,7 +434,6 @@ func test_what_a_host_must_not_send_closes_the_link() -> void:
 	# What is sent, and a word of the reason it must be refused for.
 	var cases: Dictionary[String, Array] = {
 		"bytes that are no message": ["too short", PackedByteArray([1, 2, 3])],
-		"a second header": ["second header", NetMessage.of_header(_run.header_bytes())],
 		"a tick out of order": ["tick 3, not 0", NetMessage.of_tick(3, PackedByteArray([0]))],
 		"a tick that is none": ["seats", NetMessage.of_tick(0, PackedByteArray([0x1f]))],
 		"a tick with bytes left over": ["left over", NetMessage.of_tick(0, PackedByteArray([0, 0]))],

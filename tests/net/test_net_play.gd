@@ -624,3 +624,41 @@ func test_a_fourth_guest_machine_is_not_taken() -> void:
 	check(links[0].is_open() and links[1].is_open() and links[2].is_open(), "their links are open")
 	check(not links[3].is_open(), "the fourth's is closed: the host takes three")
 
+
+## The party is back in its hub after a run (Flow asks the frames service for the hub's start):
+## the host's recording begins anew there, and every guest machine goes on in the new one.
+func test_the_run_begun_anew_goes_on_in_a_new_recording_on_every_machine() -> void:
+	_open_room()
+	_join_room(_client)
+	_third = Machine.new(root, _card, _table)
+	_third.fight.input.add_virtual_device(NetHost.SEAT)
+	_third.fight.frames.set_source(0, null)
+	_join_room(_third)
+	(_third.play.session as NetClient).burst_usec = 1 << 40
+	_steps(100)
+	var host: NetHost = _host.play.session as NetHost
+	var first: Replay = host.replay
+	check(first.tick_count() > 100, "three machines play the first recording")
+	_host.fight.frames.restart(NetPlayScript.ROOM_START, 0)
+	_steps(120)
+	var second: Replay = host.replay
+	check(second != first and _host.fight.frames.recorded() == second, "the host records into a new recording, and its session sends that one")
+	check(second.tick_count() >= 110 and second.tick_count() < first.tick_count(), "which counts its ticks from the first (%d)" % second.tick_count())
+	check_equal(second.seats, 0b0111, "with every machine's seats in its header")
+	check_equal([_host.play.phase, _client.play.phase, _third.play.phase], [NetPlayScript.PLAYING, NetPlayScript.PLAYING, NetPlayScript.PLAYING], "everyone plays on")
+	for machine: Machine in [_client, _third]:
+		var replay: Replay = (machine.play.session as NetClient).replay
+		check_equal([replay.run_seed, replay.start], [second.run_seed, second.start], "a guest machine plays the new recording")
+		check(machine.ticks >= _host.ticks - 12, "and is where the host is (%d of %d ticks)" % [machine.ticks, _host.ticks])
+		var parting: int = -1
+		for tick in mini(_host.run.hashes.size(), machine.run.hashes.size()):
+			if _host.run.hashes[tick] != machine.run.hashes[tick]:
+				parting = tick
+				break
+		check_equal(parting, -1, "the same state at every tick, through the one recording and into the next")
+	check(_client.play.session.stats.presses > 0, "a guest's presses are in the host's ticks of the new recording too")
+	check_equal([host.guests[0].plays_run, host.guests[1].plays_run], [2, 2], "each said when it played the new one")
+	check_equal(host.totals().mismatches, 0, "no check differed")
+	check(host.guests[0].stats.checks >= 1 and host.guests[1].stats.checks >= 1, "and the new recording's checks were made")
+	check_equal([host.guests[0].problem, host.guests[1].problem], ["", ""], "what was on its way from the recording before closed no link")
+

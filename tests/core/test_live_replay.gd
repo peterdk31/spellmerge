@@ -364,3 +364,90 @@ func _frame_has(frame: InputFrame, command: StringName) -> bool:
 		if entry[0] == command:
 			return true
 	return false
+
+
+# --- A run begun anew by the game (`restart`; online lobby) ----------------------
+
+## Every `hub_requested` heard on the bus (the seat it was for).
+func _hear_starts() -> Array[int]:
+	var heard: Array[int] = []
+	_bus.hub_requested.connect(func(seat: int) -> void: heard.append(seat))
+	return heard
+
+
+func test_a_run_the_game_asks_for_starts_as_the_next_step_does_never_inside_a_tick() -> void:
+	var heard: Array[int] = _hear_starts()
+	_frames.tick(DT)
+	_frames.restart(&"hub_requested", 2)
+	check_equal(heard, [] as Array[int], "asked for inside a tick: nothing starts there")
+	_frames.begin_step(DT)
+	check_equal(heard, [2] as Array[int], "it starts as the next step does, for the seat that asked")
+	_frames.begin_step(DT)
+	check_equal(heard, [2] as Array[int], "once")
+	_frames.restart(&"hub_requested", 0)
+	_frames.tick(DT)
+	check_equal(heard, [2, 0] as Array[int], "whoever ticks by hand, with no step's start: at the tick's start")
+
+
+func test_a_run_recorded_begins_a_new_recording_there() -> void:
+	var heard: Array[int] = _hear_starts()
+	var anew: Array[Replay] = []
+	_frames.recorded_anew.connect(func(replay: Replay) -> void: anew.append(replay))
+	_input.add_virtual_device(0)
+	var first: Replay = _frames.record(&"sandbox_requested", 0, 5)
+	for i in 7:
+		_step()
+	_frames.restart(&"hub_requested", 0)
+	check(_frames.recorded() == first and anew.is_empty(), "asked for: the recording goes on until the step's end")
+	_step()
+	check_equal([anew.size(), heard], [1, [0] as Array[int]], "a new recording began as the next step did, and the start was sent")
+	var second: Replay = anew[0]
+	check(second != first and _frames.recorded() == second, "the frames service records into it")
+	check_equal([first.tick_count(), second.tick_count()], [7, 1], "the one before ended with the tick it was asked in; the new one holds the step's own tick")
+	check_equal([second.start, second.starter, second.seats], [&"hub_requested", 0, 0b0001], "its header: the start asked for, the seats joined now")
+	check(second.run_seed != 0 and second.build == first.build, "a seed of its own, the same build")
+	_frames.stop_recording()
+
+
+func test_a_replay_from_a_file_ends_there_and_the_game_goes_on() -> void:
+	var heard: Array[int] = _hear_starts()
+	check(_frames.play(_host), "a replay plays")
+	for i in 5:
+		_step()
+	_frames.restart(&"hub_requested", 1)
+	_step()
+	check(not _frames.is_playing(), "the replay ends where the game began a run anew: a recording is one stretch")
+	check_equal(heard, [1] as Array[int], "and the start is sent, so the game goes on by itself")
+
+
+func test_a_live_replay_waits_for_its_feed_to_bring_the_next_recording() -> void:
+	var heard: Array[int] = _hear_starts()
+	check(_play(), "the live replay plays")
+	_feed.let_through = 6
+	_feed.asks = 6
+	_step()
+	check_equal(_frames.play_tick(), 6, "it played what the host sent")
+	_frames.restart(&"hub_requested", 0)
+	check_equal(_step(), 0, "the game asked for a run anew: no tick runs, the picture holds")
+	check(_frames.is_live() and heard.is_empty(), "the replay still plays, and nothing started: the next recording is the feed's to bring")
+	# The feed brings the next recording in its pump (the host's new header arrived).
+	var next: Replay = _hosts_run(4)
+	next.start = &"hub_requested"
+	var from: Feed = _feed
+	from.on_pump = func() -> void:
+		if from.replay.start != &"hub_requested":
+			from.host = next
+			from.fed = 0
+			from.replay = Replay.from_bytes(next.header_bytes())
+			_frames.play_live(from)
+		while from.fed < next.tick_count():
+			from.replay.add_tick_bytes(next.tick_bytes(from.fed))
+			from.fed += 1
+	from.asks = 0
+	var ran: int = _step()
+	check_equal(heard, [0] as Array[int], "the next recording's start is sent as it begins")
+	check(ran >= 1 and _frames.is_live(), "and it is played in the same step, with no tick asked of a replay that has none (%d)" % ran)
+	check_equal(_frames.play_tick(), ran, "from its first tick")
+	# The feed's own callback holds the feed: let go, or neither is ever freed.
+	from.on_pump = Callable()
+

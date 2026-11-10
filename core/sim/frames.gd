@@ -54,6 +54,15 @@ extends Node
 ##   (`SessionRules.machine()`, changed by the "Max shots" setting, `projectile_cap_changed`). Online
 ##   (later), the host's come in here too, beside its inputs.
 ##
+## - **A run begun anew by the game** (`restart`; online lobby, docs/milestones/online-lobby.md): the
+##   game itself asks for a run's start (a party back in its hub after a run). It is sent at the
+##   start of the next physics step, never inside a tick, so every machine starts it between the
+##   same two ticks. With a run being recorded, a new recording begins there (`recorded_anew`):
+##   a recording is one stretch from a run's start, and whoever sends it on (net/) sends the new
+##   one. A replay played from a file ends there and the game goes on by itself; a live replay
+##   waits for its feed to bring the next recording (`play_live` again, which `begin_step` takes
+##   in its stride).
+##
 ## Nothing here allocates per tick, but a command (an array) and a recorded tick (its bytes).
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -61,6 +70,9 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const SEATS: int = 4
+
+## The run that is recorded began anew (`restart`): `replay` is the recording it goes into now.
+signal recorded_anew(replay: Replay)
 
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
@@ -94,6 +106,9 @@ var _pivots: Array[Callable] = [Callable(), Callable(), Callable(), Callable()]
 var _watched: InputFrame = InputFrame.new()
 ## Per seat: the presses of the ticks that stood still since the last tick that stepped (`stood`).
 var _carried: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## A run's start the game asked for (`restart`), sent at the next step's start: the start and
+## the seat it is for (empty: none).
+var _restart: Array = []
 
 
 func _init() -> void:
@@ -165,6 +180,9 @@ func next_run_rules() -> SessionRules:
 ## A tick starts: every seat's frame is built (or read from the replay played), recorded, and its
 ## commands applied. `delta` is the tick's length in seconds.
 func tick(delta: float) -> void:
+	# Whoever ticks by hand, with no `begin_step`: the run the game asked for starts here.
+	if not _restart.is_empty():
+		_begin_anew()
 	ticks += 1
 	# A replay played out ended with its last tick: this one is the game's own.
 	if is_playing() and _tape.is_done():
@@ -188,15 +206,20 @@ func tick(delta: float) -> void:
 ## the rest (see the class doc). A replay played out (a live one: and closed) ends here. Call it
 ## once a step: it reads the feed.
 func begin_step(delta: float) -> int:
+	if not _restart.is_empty():
+		_begin_anew()
 	if not is_live():
 		if is_playing() and _tape.is_done():
 			stop_playing()
 		return 1
 	var tape: ReplayTape = _tape
 	tape.feed.pump()
-	# The feed may stop it (a link that closed).
 	if tape != _tape:
-		return 1
+		# The feed stopped it (a link that closed), or began the next recording (the host's run
+		# began anew): that one is played from here.
+		if not is_live():
+			return 1
+		tape = _tape
 	if tape.is_done():
 		stop_playing()
 		return 1
@@ -207,6 +230,30 @@ func begin_step(delta: float) -> int:
 			if tape != _tape:
 				return 1
 	return tape.ticks_due()
+
+
+## The game asks for a run's start itself (one of `Replay.STARTS`, for seat `starter`): sent at
+## the start of the next physics step (see the top, "A run begun anew by the game"). Whoever asks
+## has ended its run first (it is idle until then).
+func restart(start: StringName, starter: int) -> void:
+	_restart = [start, starter]
+
+
+## The run the game asked for (`restart`) starts: recorded anew, after a replay from a file, or
+## plainly; a live replay's next recording is its feed's to bring.
+func _begin_anew() -> void:
+	var start: StringName = _restart[0]
+	var starter: int = _restart[1]
+	_restart = []
+	if is_live():
+		return
+	if is_playing():
+		stop_playing()
+		_send_start(start, starter)
+	elif is_recording():
+		recorded_anew.emit(record(start, starter))
+	else:
+		_send_start(start, starter)
 
 
 ## The tick just started stands still (the Tick, N4): its frames' presses wait for the next tick

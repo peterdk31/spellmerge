@@ -196,7 +196,27 @@ func admit(guest: NetGuest) -> bool:
 	guest.admitted = true
 	guest.sent_ticks = 0
 	guest.send_lobby()
-	guest.send(NetMessage.of_header(replay.header_bytes()))
+	guest.send_header()
+	return true
+
+
+## The run began anew (the party back in its hub): `run` is the recording it goes into now. Every
+## guest in the run is sent its header and its ticks from the first; the checks start over. False,
+## and nothing happens, with no run begun or `run` none. Call it between ticks.
+func rebegin(run: Replay) -> bool:
+	if replay == null or run == null or run == replay:
+		return false
+	replay = run
+	stats.ticks = run.tick_count()
+	checks = NetChecks.new(checks.every)
+	_kept.clear()
+	_check_from = ceili(float(run.tick_count()) / checks.every) * checks.every
+	_made_tick = -1
+	for guest in guests:
+		guest.checks = checks
+		if guest.admitted:
+			guest.rebegin(run)
+			guest.check_from = _check_from
 	return true
 
 

@@ -830,3 +830,73 @@ func test_the_pings_heard_are_counted_apart_from_asks() -> void:
 	_far.send(NetMessage.of_ping(1))
 	_host.pump()
 	check_equal([_guest.pings_heard, _guest.stats.read], [1, 3], "one ping among three messages: whoever waits for the client to be ready counts pings")
+
+
+# --- The run begun anew: a new recording for every guest (online lobby) ----------
+
+func test_a_run_begun_anew_goes_out_as_a_new_recording_and_what_was_sent_before_is_dropped() -> void:
+	_start()
+	for i in 4:
+		_send(i, _frame(0b0001))
+		_tick()
+	check(_recorded(3).is_held(0), "the client plays in the first recording")
+	_drain()
+	# The party is back in its hub: the frames service records anew, and the host is told.
+	var first: Replay = _host.replay
+	var second: Replay = _frames.record(&"hub_requested", 0, 11)
+	check(_host.rebegin(second), "the host takes the new recording")
+	check(not _host.rebegin(second) and not _host.rebegin(null), "once, and only a recording")
+	var message: NetMessage = _next()
+	check_equal(message.kind, NetMessage.HEADER, "its header goes out")
+	check_equal(Replay.from_bytes(message.body).run_seed, 11, "the new recording's")
+	# What the client sent for the recording before is still on its way: frames for ticks far
+	# past the new one's, a check of a tick it has not played. Dropped, not refused.
+	_send(4, _frame(0b0010))
+	_send(700, _frame(0b0010))
+	_far.send(NetMessage.of_hashes(59, {"one": 1} as Dictionary[String, int]))
+	_tick()
+	_tick()
+	check_equal(_guest.problem, "", "none of it closes the link")
+	check_equal([_recorded(0).held_bits, _recorded(1).held_bits], [0, 0], "and none of it is used: its seat stands in the new recording")
+	check_equal(_host.replay.tick_count(), 2, "which counts its ticks from the first")
+	var ticks: Array[int] = []
+	while _next().kind == NetMessage.TICK:
+		ticks.append(_message.tick)
+	check_equal(ticks, [0, 1] as Array[int], "its ticks go out from the first")
+	check(first.tick_count() == 4, "the recording before is as it ended")
+	# The client says it plays the new one: from there its frames and checks are used.
+	_far.send(NetMessage.of_run(2))
+	_send(2, _frame(0b0100))
+	_tick()
+	check_equal([_guest.problem, _recorded(2).held_bits], ["", 0b0100], "its frames are the new recording's from where it says so")
+	var every: int = _host.checks.every
+	while _host.replay.tick_count() < every:
+		_tick()
+	var client := NetChecks.new()
+	var mine: Dictionary[String, int] = {}
+	for tick in every:
+		mine = client.add(tick, _areas)
+	_far.send(NetMessage.of_hashes(every - 1, mine))
+	_tick()
+	check_equal([_guest.problem, _guest.stats.checks, _guest.stats.mismatches], ["", 1, 0], "and its checks start over with the new recording's first window")
+
+
+func test_a_client_may_only_say_it_plays_the_next_recording_it_was_sent() -> void:
+	_start()
+	_tick()
+	_far.send(NetMessage.of_run(2))
+	_tick()
+	check(_guest.problem.contains("plays recording 2"), "a recording it was never sent: refused (%s)" % _guest.problem)
+
+
+func test_a_recording_is_said_once_and_in_order() -> void:
+	_start()
+	_tick()
+	_host.rebegin(_frames.record(&"hub_requested", 0, 11))
+	_far.send(NetMessage.of_run(2))
+	_tick()
+	check_equal([_guest.problem, _guest.plays_run], ["", 2], "the next one is taken")
+	_far.send(NetMessage.of_run(2))
+	_tick()
+	check(_guest.problem.contains("plays recording 2 after 2"), "said twice: refused (%s)" % _guest.problem)
+

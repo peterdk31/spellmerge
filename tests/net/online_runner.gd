@@ -83,6 +83,10 @@ class Walker:
 			if steps % 120 == 30 + seat * 11:
 				frame.press(1)
 			return
+		# Told to lose its runs (`--runs`): it stands and casts nothing, so the party is soon back
+		# in the hub.
+		if bool(runner.get(&"loses_runs")):
+			return
 		frame.set_move([Vector2.RIGHT, Vector2.DOWN, Vector2.LEFT, Vector2.UP][(steps / 30) % 4] * 0.5)
 		if steps % 40 == 5:
 			frame.press(1)
@@ -92,6 +96,11 @@ class Walker:
 ## A room: true while the party is in the hub, and its stone's middle.
 var in_hub: bool = false
 var stone: Vector2 = Vector2.ZERO
+## A room: true when the party is to lose its runs, so it comes back to the hub and starts the
+## next (`--runs=N`: the host passes only with N runs started from the stone, each after the
+## first in a recording begun anew).
+var loses_runs: bool = false
+var _runs_wanted: int = 1
 
 var _hosting: bool = true
 ## The room server's address ("": by hand, the codes through files).
@@ -106,6 +115,7 @@ var _runs: int = 0
 var _most_seats: int = 0
 var _hub_wizards: int = 0
 var _walkers: Array[Walker] = [null, null, null, null]
+var _played: int = 0
 ## A room: this machine's players, and (the host's) the wizards of the whole party: its own and
 ## every joining machine's (`--party=`; twice its own unless told).
 var _players: int = OWN_PLAYERS
@@ -130,6 +140,9 @@ func _ready() -> void:
 			_ticks = maxi(arg.trim_prefix("--ticks=").to_int(), 1)
 		elif arg.begins_with("--signal="):
 			_signal = arg.trim_prefix("--signal=")
+		elif arg.begins_with("--runs="):
+			_runs_wanted = maxi(arg.trim_prefix("--runs=").to_int(), 1)
+			loses_runs = _runs_wanted > 1
 		elif arg.begins_with("--players="):
 			_players = clampi(arg.trim_prefix("--players=").to_int(), 1, Replay.SEATS)
 		elif arg.begins_with("--party="):
@@ -223,7 +236,7 @@ func _process(delta: float) -> void:
 	if _done:
 		return
 	_waited += delta
-	if _waited > PATIENCE:
+	if _waited > PATIENCE * (4.0 if loses_runs else 1.0):
 		_finish("it took longer than %d seconds (phase %s)" % [PATIENCE, _play.phase])
 	elif _signal != "":
 		_process_room()
@@ -250,12 +263,21 @@ func _process_room() -> void:
 		if room_code != "":
 			_joined = true
 			_events.online_join_requested.emit(0, room_code)
-	elif _hosting and _play.phase == NetPlayScript.PLAYING and (_play.session as NetHost).stats.ticks >= _ticks:
+	elif _hosting and _play.phase == NetPlayScript.PLAYING and _room_done():
 		_most_seats = 0
 		var theirs: int = (_play.session as NetHost).guest_seats()
 		for seat in Replay.SEATS:
 			_most_seats += 1 if theirs & (1 << seat) != 0 else 0
 		_host_leaves()
+
+
+## A room's host is done: its ticks are played (counted through every recording), and with
+## `--runs` the runs were started and the last has played a while.
+func _room_done() -> bool:
+	_played += 1
+	if loses_runs:
+		return _runs >= _runs_wanted and (_play.session as NetHost).stats.ticks >= 240 and in_hub == false
+	return (_play.session as NetHost).stats.ticks >= _ticks
 
 
 func _on_online_changed(phase: StringName, code: String, note: String) -> void:
@@ -300,8 +322,8 @@ func _host_leaves() -> void:
 		why = "the client's frames never arrived"
 	elif _signal != "" and _most_seats != _party - _players:
 		why = "the joining machines hold %d seats, not %d" % [_most_seats, _party - _players]
-	elif _signal != "" and _runs == 0:
-		why = "no run was started from the stone (%d wizards in the hub)" % _hub_wizards
+	elif _signal != "" and _runs < _runs_wanted:
+		why = "%d run(s) started from the stone, not %d (%d wizards in the hub)" % [_runs, _runs_wanted, _hub_wizards]
 	if _signal != "":
 		print("ONLINE host ROOM %d run(s) from the stone, %d seats on %d joining machine(s)" % [_runs, _most_seats, host.guests.size()])
 	for guest in host.guests:

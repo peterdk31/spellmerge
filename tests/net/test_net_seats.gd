@@ -302,3 +302,59 @@ func test_catching_up_runs_fewer_ticks_a_step_when_they_take_too_long() -> void:
 		slow = _step()
 	check(slow < fast and slow >= 1, "ticks that take too long: fewer, never none (%d)" % slow)
 
+
+# --- The host's run begun anew (online lobby) -------------------------------------
+
+func test_the_hosts_next_recording_is_played_once_the_one_before_is_played_out() -> void:
+	_client.seat_devices()
+	_lobby(1, [NOBODY, 0, NOBODY, NOBODY])
+	_start_run()
+	_host_ticks(6, 0b0011)
+	_step()
+	_sent()
+	# The host's run began anew: a second header, and that recording's ticks, numbered from 0.
+	var first: Replay = _run
+	_run = Replay.new()
+	_run.build = first.build
+	_run.content = first.content
+	_run.run_seed = 9
+	_run.start = &"hub_requested"
+	_run.seats = 0b0011
+	var starts: Array[int] = []
+	_bus.hub_requested.connect(func(seat: int) -> void: starts.append(seat))
+	_far.send(NetMessage.of_header(_run.header_bytes()))
+	_host_ticks(3, 0b0011)
+	_step()
+	check_equal([_client.problem, _client.replay.run_seed, starts.size()], ["", 5, 0], "a second header is no fault; the recording played is still the first, until it is played out")
+	for i in 8:
+		_step()
+	check_equal([_client.replay.run_seed, starts], [9, [0] as Array[int]], "played out, the next recording begins: its start is sent to the game")
+	check(_frames.is_live() and _client.is_playing(), "and it plays on, live")
+	for i in 6:
+		_step()
+	check_equal(_frames.play_tick(), 3, "its ticks from the first")
+	var said: Array[int] = []
+	var tags: Array[int] = []
+	while true:
+		var bytes: PackedByteArray = _far.read()
+		if bytes.is_empty():
+			break
+		_message.decode(bytes)
+		if _message.kind == NetMessage.RUN:
+			said.append(_message.run)
+			tags.clear()
+		elif _message.kind == NetMessage.FRAME:
+			tags.append(_message.tick)
+	check_equal(said, [2] as Array[int], "the host is told once that this machine plays its second recording")
+	check(not tags.is_empty() and tags[0] <= 4 + 2, "and the frames after that are for the new recording's ticks, counted from the first (%s)" % [tags.slice(0, 3)])
+	check_equal(_client.feed.local_seats, 0b0010, "its seat is its own as before")
+
+
+func test_more_recordings_than_it_may_hold_waiting_close_the_link() -> void:
+	_client.seat_devices()
+	_start_run()
+	for i in NetClient.MAX_NEXTS + 1:
+		_far.send(NetMessage.of_header(_run.header_bytes()))
+	_step()
+	check(_client.problem.contains("recordings waiting"), "refused (%s)" % _client.problem)
+

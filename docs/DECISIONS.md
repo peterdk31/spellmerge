@@ -3423,6 +3423,13 @@ The owner asked for the three ideas picked from a review of every card: a trigge
 - **So a new recording can begin where the party returns to the hub,** and later at each change of room in a run (the owner: "Everytime a room changes, we could reset the recording (i think?)"): at the hub nothing has to be carried, so only the guests' sessions must take a second header; between rooms the header must also hold what the party carries on (its staffs, its health). Not built yet: one recording still runs from the hub through its runs, at most four hours.
 - **L3's sessions and L2b's seats were built side by side and are merged:** L3's shape is kept (a `NetGuest` for each guest machine, the host hashing once), with seats asked for and given between ticks, guests admitted during the run, and `NetPlay` holding a party of up to three guest machines. A guest machine that is gone is let go between ticks, at once (L3 let each of its seats leave in its own frame; both record the leave at the tick it happens).
 
+## 2026-11-10: a recording is one visit to the hub and the run from it
+
+- **Back in the hub, a new recording begins** (the owner's rule that nothing comes back from a run makes it a plain start). Flow no longer starts the hub itself after a run: it ends the run and asks the frames service (`Frames.restart`), which sends the start as the next physics step begins. **Never inside a tick:** the host would otherwise step the rest of that tick in the new hub while a guest, which starts it when the new header is there, would not, and the two would part.
+- **The frames service owns "recorded anew"** (`recorded_anew`), since it alone knows a run is recorded; net/ hears it and sends the new recording on. Flow knows neither a recording nor a network.
+- **A guest says which recording it plays** (RUN). Ticks are counted from 0 in each recording, so a frame or a check on its way from the one before would be taken for one far ahead, or for another tick. The link is ordered, so one small message marks the place; what came before it is dropped, never refused.
+- **A replay from a file ends where the game began a run anew:** a recording is one stretch. Recordings made before this hold the hub after a run too; played back, they end at the return.
+- **Why:** it removes the four-hour bound on a session (a recording's most ticks) and keeps a later machine's catch-up to the current stretch. Between the rooms of one run the same works once the header carries what the party takes along.
 
 ## 2026-11-11: what a prop costs before props exist, and what W2 does about it (props W1)
 

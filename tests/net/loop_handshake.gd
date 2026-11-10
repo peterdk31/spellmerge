@@ -3,12 +3,13 @@ extends NetHandshake
 ## Join (`NetPlay`) are tested on a stepped clock with no network. Two of them share a `table`;
 ## the host's code is HOST_CODE and the joining side's JOIN_CODE, each made `making` polls after it
 ## was asked for, and the link (a loopback's two ends) is there for both once the host took the
-## answer. Any other text is refused, as a bad code is.
+## answer. Any other text is refused, as a bad code is. The codes have a real code's prefix and
+## alphabet, so the room server's messages carry them too (tests/net/test_net_signal_handshake.gd).
 
-const HOST_CODE: String = "the host's code"
-const JOIN_CODE: String = "the joining player's code"
+const HOST_CODE: String = "SM1.aG9zdA=="
+const JOIN_CODE: String = "SM1.am9pbg=="
 ## An answer that is a code but that the handshake itself fails on (as WebRTC may).
-const BROKEN_CODE: String = "a code the handshake breaks on"
+const BROKEN_CODE: String = "SM1.YnJva2Vu"
 
 ## Polls a code takes to make.
 var making: int = 2

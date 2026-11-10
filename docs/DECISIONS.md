@@ -3431,3 +3431,22 @@ The owner asked for the three ideas picked from a review of every card: a trigge
 - **A replay from a file ends where the game began a run anew:** a recording is one stretch. Recordings made before this hold the hub after a run too; played back, they end at the return.
 - **Why:** it removes the four-hour bound on a session (a recording's most ticks) and keeps a later machine's catch-up to the current stretch. Between the rooms of one run the same works once the header carries what the party takes along.
 
+## 2026-11-11: what a prop costs before props exist, and what W2 does about it (props W1)
+
+Measured with `tests/benchmark/prop_cost.gd` (headless, the owner's machine, native module on): stand-ins for props (an actor with Health, a Hurtbox and a Caster of two staffs, no controller, no Mover, standing still and never hit) in the real hub, at 0, 300 and 1,000.
+
+| | 0 | 300 | 1,000 | a stand-in |
+|---|---|---|---|---|
+| Tick, average | 0.26 ms | 3.03 ms | 10.25 ms | about 10 us |
+| of it the bodies' step | | 2.28 ms | 8.13 ms | 8.1 us: `Actor.step` 4.7 (the Caster's step 3.3, the Hurtbox's 0.7), `move` 1.6, the rest the Tick's loop |
+| of it Combat and Projectiles | | 0.46 ms | 1.57 ms | 1.6 us (a registered target each) |
+| State hash, whole | 7.1 ms | 48 ms | 156 ms | 0.12 ms |
+| State hash, worst tick of 60 | 2.7 ms | 11 ms | 32 ms | |
+| Snapshot taken | 62 ms | 140 ms | 348 ms | 0.29 ms |
+| Restored, every body made again (a machine joining) | 23 ms | 150 ms | 448 ms | 0.42 ms |
+
+What it means:
+
+- **A standing actor is far from free:** at 1,000 a tick costs 10 ms, more than half a 60 Hz frame, before anything is drawn; at 300 about 3 ms. A room of props as planned (hundreds on one huge map) needs W2.
+- **W2 does the first two items as planned:** a dormant body isn't stepped (the 8 us of the bodies' step, the Caster's mana and anchor work included), and an untouched body hashes as one value (the 0.12 ms). Combat's and the projectile manager's 1.6 us a target stay for now (1.6 ms at 1,000); W2 measures them again and, past a millisecond at 300, makes a target that stands still cheaper there too.
+- **The snapshot's third item waits:** taking a snapshot gets cheaper with the idle hash (an idle object is saved as its script already), and making 1,000 bodies again on a join takes under half a second, once a join. Rebuilding untouched props from the room instead is not needed now; the numbers after W2 are the check.

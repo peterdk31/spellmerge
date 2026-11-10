@@ -32,3 +32,11 @@ func attach() -> void:
 ## The actor leaves the tree: forget it in the systems.
 func detach() -> void:
 	pass
+
+
+## True while its state is as the actor's scene and data made it, but for what the actor's
+## `rest_leaf` holds (props W2: the state hash then sums the body up as one value). False here, so a
+## component that does not say is always walked member by member, and a new one is safe until it
+## does.
+func at_rest() -> bool:
+	return false

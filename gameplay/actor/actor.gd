@@ -42,6 +42,24 @@ extends Node2D
 ## (`ActorController.watch_home`, read only). The tick then moves the body by its `velocity`
 ## (`move`). Tests call `step(delta)` with fixed deltas and move the body themselves.
 ##
+## Dormant (props W2, docs/milestones/props.md): a body whose tick would change nothing is put to
+## sleep (`tick_step`, `Actors.sleep`) and the Tick skips it until `wake`: `dormant()` holds when no
+## controller drives or watches it, it
+## has no Mover, no phases and no possession, no hold, no protection counting down, its intent and
+## velocity are empty, its hurt circle is where its down state wants it, its Caster rests
+## (`Caster.rests`: pools full or not filling, nothing winding, its place sent) and so does every
+## look (`ActorLook.rests`). Checking that costs as much as the step, so it is checked once, after a
+## tick, and whatever changes what it reads wakes the body (`wake`). Asleep is a cache, not state:
+## an asleep body's tick would change nothing, so a body woken for nothing just sleeps again a tick
+## later, and every machine plays the same game whichever bodies it has asleep. A missed wake would
+## break that: under `Tick.verify_sleep` (on in the tests) the Tick checks every asleep body and
+## names one that is not dormant. A standing prop sleeps nearly always; a hit on it still lands
+## (Combat writes its health), as on any body.
+##
+## Resting (props W2): the state hash sums a dormant body that is still as it was made up as one
+## value (`rest_leaf`): its health full, not down, dying or leaving, and every component as made
+## (`ActorComponent.at_rest`). Only the hash does; a snapshot saves every body whole.
+##
 ## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
 ## along the walls (the room's and the solid shots', the projectile manager's wall grid,
 ## `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
@@ -207,16 +225,78 @@ func _exit_tree() -> void:
 
 
 ## One tick of the body (core/sim/tick.gd steps every actor's body by id): its step, then its move.
+## A tick that leaves it dormant puts it to sleep (`Actors.sleep`): the Tick skips it until
+## something wakes it (`wake`; props W2, see the class doc).
 func tick_step(delta: float) -> void:
 	step(delta)
 	move(delta)
+	if actors != null and id != ActorsScript.NONE and dormant():
+		actors.sleep(id)
+		# A move of the body from outside (a test, a restore, a placing) wakes it: its Caster must
+		# send the new place.
+		if not is_local_transform_notification_enabled():
+			set_notify_local_transform(true)
+
+
+## The body may have something to do again: the Tick steps it from the next tick on (props W2).
+## Whatever changes what `dormant` reads calls it: its driver (`drive`), its down state, a look
+## added, a possession, its Health's protection, its Caster's mana or cast, a hold (the actor
+## table's own), a move of the body (`_notification`).
+func wake() -> void:
+	if actors != null and id != ActorsScript.NONE:
+		actors.wake(id)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_LOCAL_TRANSFORM_CHANGED:
+		wake()
+
+
+## True while a tick would change nothing of the body (props W2; see the class doc): checked from
+## its state alone each tick, the order of `step`'s own checks.
+func dormant() -> bool:
+	if controller != null or home_controller != null or mover != null or phases != null or possessed_by != null:
+		return false
+	if _hold_shown or velocity != Vector2.ZERO:
+		return false
+	if intent.pressed_bits != 0 or intent.held_bits != 0 or intent.move != Vector2.ZERO or intent.aim != Vector2.ZERO:
+		return false
+	if health != null and health.protecting:
+		return false
+	if hurtbox != null and hurtbox.registered == _down:
+		return false
+	if actors != null and actors.holds(id):
+		return false
+	if caster != null and not caster.rests():
+		return false
+	for look in _looks:
+		if not look.rests():
+			return false
+	return true
+
+
+## The body as one value for the state hash while it rests (props W2; see the class doc): dormant,
+## its health full, not down, dying or leaving, and every component as it was made
+## (`ActorComponent.at_rest`); null otherwise, and the hash walks it member by member. The value
+## holds what may differ between two bodies made alike: where it stands and aims, its size, the staff
+## on show, its health and whether hits take any.
+func rest_leaf() -> Variant:
+	if _down or _dying or _leaving or not dormant():
+		return null
+	if health != null and health.health != health.max_health:
+		return null
+	for component in _components:
+		if not component.at_rest():
+			return null
+	return [position, aim, size, ticking, health.health if health != null else -1.0, health.invincible if health != null else false, caster.current if caster != null else -1]
 
 
 ## Move the body by `velocity` for `delta` seconds, sliding along the walls (see the class doc); when
 ## a wall changed the move, `velocity` is left as what it moved by. A body standing still is moved
-## too: a wall laid over it (a Wall card's) pushes it out.
+## too: a wall laid over it (a Wall card's) pushes it out. A body with no Mover never moves (a
+## training dummy, a prop; props W2): a wall laid over it leaves it where it is.
 func move(delta: float) -> void:
-	if delta <= 0.0:
+	if delta <= 0.0 or mover == null:
 		return
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
@@ -320,6 +400,7 @@ func drive(guest: ActorController) -> void:
 		controller.driving = self
 		controller.started(self)
 	_tell_driver()
+	wake()
 
 
 ## Give a guest controller back: the home controller drives again.
@@ -381,6 +462,7 @@ func is_down() -> bool:
 ## Down (`on`) or standing again. Called by the Downed component.
 func set_down(on: bool) -> void:
 	_down = on
+	wake()
 
 
 ## The name the old wizard slots asked by (`is_down`); the AI's target check and the bots still
@@ -424,6 +506,7 @@ func add_look(look: ActorLook) -> void:
 	look.setup(self)
 	add_child(look)
 	_looks.append(look)
+	wake()
 
 
 ## Stop stepping `look` and free it.

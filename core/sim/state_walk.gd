@@ -48,6 +48,9 @@ extends RefCounted
 ## An object whose script has `func idle() -> bool` and is idle (its state is a fresh one's, waiting
 ## to be started: a dash's homing while no dash homes) is one leaf, `&"idle"`, not its members (N3c:
 ## a carrier keeps one per row, nearly all idle, and they were most of a hash).
+## A body walked as an area that is at rest (`rest_leaf()` gives a value, not null: an actor that
+## is dormant and still as it was made, a standing prop; props W2) is one leaf, that value, not its
+## members. A snapshot does not use it: it saves every body whole.
 ## Anything else is a **problem**, named by its path and what it holds: a node that is not the
 ## holder's own (a service: DERIVED; another area's body: REFS), a node of a script outside the
 ## simulation, a Callable, a Signal, an RID or another engine object (a mesh, a material).
@@ -604,6 +607,13 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 	if _idles_of(script) and bool(object.call(&"idle")):
 		_leaf(_join(path, ".idle"), IDLE)
 		return
+	if root and node != null and node.has_method(&"rest_leaf"):
+		# A body at rest, as it was made and with nothing to do (props W2: a standing prop): one
+		# leaf of what may differ between two bodies made alike (`Actor.rest_leaf`).
+		var rest: Variant = node.call(&"rest_leaf")
+		if rest != null:
+			_leaf(_join(path, ".rest"), rest)
+			return
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)
 	_members_of(path, object, script)

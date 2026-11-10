@@ -1,6 +1,6 @@
 # Props: things in the world that stand, block, take hits, react and give off motes
 
-**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1 done (2026-11-11), W2 next.** It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
+**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1 and W2 done (2026-11-11), W3 next.** It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
 
 The steps are **W1 to W8** (W for the world's things). Each is one PR, in order.
 
@@ -95,6 +95,25 @@ General rules, true of any actor, never "if it is a prop":
 - **Snapshots** (only if W1 says so): a room-placed body that is still idle is made again from the room, not from the snapshot; only the touched ones are saved.
 
 **Tests:** `test_state_declared`, `test_state_walked`, `test_determinism` pass; a dormant body woken by a hit steps that tick and the next; a replay with props played twice agrees; W1's numbers again.
+
+**Done (2026-11-11).** What was built differs from the bullets above in two places, both found while building it:
+
+- **Asleep is a cache, with wakes.** Checking `Actor.dormant()` costs as much as the step it saves (4.8 us a body: the body's world position, its staffs, Spells' wind-ups), so it is checked once, after a tick (`tick_step`), and a dormant body is put to sleep in the actor table (`Actors.asleep`); the Tick skips it with one read. What changes what `dormant` reads wakes it (`Actor.wake`): a hold (the table's own), a protection, a mana change, a cast, a new driver, a possession, going down, a look added, a move of the body (its local transform notification). Asleep is never state: an asleep body's tick would change nothing, so a body woken for nothing sleeps again a tick later. A missed wake would change the game, so every suite runs the Tick with `verify_sleep` (each asleep body checked every tick; the test fails on one that is not dormant), and `tests/gameplay/actor/test_sleep_in_game.gd` plays 30 stand-ins blowing each other up in the hub with sleeping on and off and compares every tick's whole-game hash; with the hold's wake taken out, both fail.
+- **A resting body, not `idle()`.** `idle()` means a fresh object's state, and a snapshot makes an idle object again with `new()`, which would lose a body's place and data. So the hash alone sums a body up: `Actor.rest_leaf()` is one value (where it stands and aims, its size, health, `invincible`, ticking, the staff on show) while the body is dormant, whole and every component `at_rest()` (Health full, Hurtbox registered, Contact, Caster unedited with every pool full; false in the base, so a component that does not say is hashed whole). A snapshot still saves every body whole.
+- A body with no Mover never moves (`move()` returns at once), as the training dummy's doc already said.
+
+Numbers (`prop_cost.gd`, headless, the owner's machine; W1's in brackets):
+
+| | 300 | 1,000 |
+|---|---|---|
+| Tick, average | 0.74 ms (3.03) | 1.96 ms (10.25) |
+| of it the bodies' step | 0.19 ms (2.28) | 0.33 ms (8.13) |
+| of it Combat and Projectiles | 0.45 ms (0.46) | 1.49 ms (1.57) |
+| State hash, whole | 19 ms (48) | 59 ms (156) |
+| of it the bodies | 5.6 ms (35) | 20 ms (120) |
+| State hash, worst tick of 60 | 10 ms (11) | 28 ms (32) |
+
+**Left, by W1's rule and what was found:** Combat's and the projectile manager's 1.5 us a standing target stays (0.45 ms at 300, under the millisecond W1 set). The worst tick of a spread hash is Spells' area, which grows by about 24 us a caster (its installed staffs, compiled spells by tag and node counts, three tables the hash sorts and walks; every enemy pays it too): splitting Spells' hash by caster is online-ready N3c's "left for later", now with a reason, before the netcode checks hashes in a room of hundreds of props. Snapshots are unchanged (W1: under half a second to make 1,000 bodies again on a join).
 
 ## W3: a prop in the game (engine)
 

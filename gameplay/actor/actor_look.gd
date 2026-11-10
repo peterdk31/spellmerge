@@ -45,6 +45,13 @@ func step(_delta: float) -> void:
 	pass
 
 
+## True when it needs no step while its body has nothing to do (props W2, `Actor.dormant`): a look
+## that only answers its actor's signals. False here, so a look that animates on its own (a blink,
+## a bob) keeps its body stepped, and a new look is safe until it says.
+func rests() -> bool:
+	return false
+
+
 ## The aim the actor's staff animation turns from, or zero while it plays none (or it is down).
 func pose_dir() -> Vector2:
 	if actor == null or actor.spells == null or actor.is_down():

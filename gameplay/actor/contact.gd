@@ -9,3 +9,8 @@ extends ActorComponent
 
 ## Damage of one touch (an enemy's from `EnemyBase.contact_damage`); 0 hurts nobody.
 @export var damage: int = 0
+
+
+## Its damage is its data's and never changes in play (props W2).
+func at_rest() -> bool:
+	return true

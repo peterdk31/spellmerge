@@ -52,7 +52,7 @@ const RAMP_ENEMY: int = 4
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the node of each id,
 ## kept by its instance id: a lookup from the id (`node_of`), set again by each body as it opens
 ## (equality only, never an identity: N5).
-const DERIVED: Array[StringName] = [&"_node"]
+const DERIVED: Array[StringName] = [&"_node", &"asleep"]
 
 var _open: PackedByteArray = PackedByteArray()
 var _team: PackedInt32Array = PackedInt32Array()
@@ -79,6 +79,12 @@ var _births: int = 0
 ## it follows the game's time whoever steps the actor. And how many actors rest now.
 var _rest: PackedFloat32Array = PackedFloat32Array()
 var resting_count: int = 0
+## Per actor, 1 while its body is asleep (props W2, docs/milestones/props.md): its last tick left
+## it dormant (`Actor.dormant`: a tick would change nothing), so the Tick skips it with this one read
+## until something wakes it (`wake`). A cache, never state: an asleep body's tick changes nothing, so
+## a body woken for nothing (all of them after a snapshot is restored) only takes one tick to sleep
+## again. Read only; `sleep` and `wake` write it.
+var asleep: PackedByteArray = PackedByteArray()
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -95,6 +101,7 @@ func _init() -> void:
 	_birth.resize(ACTORS)
 	_held.resize(ACTORS)
 	_rest.resize(ACTORS)
+	asleep.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
@@ -117,6 +124,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_seat[id] = NONE
 	_home_seat[id] = NONE
 	_node[id] = 0
+	asleep[id] = 0
 	_births += 1
 	_birth[id] = _births
 	_release_hold(id)
@@ -301,7 +309,35 @@ func hold(id: int, seconds: float, rest: float = 0.0, plain: bool = false) -> bo
 	if _held[id] <= 0.0:
 		held_count += 1
 	_held[id] = maxf(_held[id], seconds)
+	asleep[id] = 0
 	return true
+
+
+## True while `id` is held or still rests after a hold: its step must run to spend it
+## (`Actor.dormant`, props W2).
+func holds(id: int) -> bool:
+	return id >= 0 and id < ACTORS and (_held[id] > 0.0 or _rest[id] > 0.0)
+
+
+## After a snapshot is restored (core/sim/snapshot.gd): every body awake, since the bodies under the
+## ids may be others now, and an awake body with nothing to do sleeps again after its next tick.
+func rebuild_derived() -> void:
+	asleep.fill(0)
+
+
+## The body of `id` had nothing to do at the end of its tick: the Tick skips it from now on, until
+## `wake` (props W2; `asleep`).
+func sleep(id: int) -> void:
+	if id >= 0 and id < ACTORS:
+		asleep[id] = 1
+
+
+## The body of `id` may have something to do again: the Tick steps it from the next tick on, and
+## it sleeps again after a tick that leaves it dormant. Whatever changes what `Actor.dormant` reads
+## calls it (a hold, a protection, a mana change, a cast, a new driver, a move of the body).
+func wake(id: int) -> void:
+	if id >= 0 and id < ACTORS:
+		asleep[id] = 0
 
 
 ## Seconds left of the local stop on `id` (0 when it is not held).
@@ -347,6 +383,7 @@ func _release_hold(id: int) -> void:
 ## Every actor closed and every seat free (a new run, and tests).
 func clear() -> void:
 	_open.fill(0)
+	asleep.fill(0)
 	_team.fill(NONE)
 	_ramp.fill(NONE)
 	_seat.fill(NONE)

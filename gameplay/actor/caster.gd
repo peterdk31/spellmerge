@@ -77,6 +77,9 @@ var _mana: PackedFloat32Array = PackedFloat32Array()
 var _has_build: PackedByteArray = PackedByteArray()
 ## True once the start cards were built (the first attach).
 var _built: bool = false
+## True once a staff or its cards changed after the start cards were built (`set_staff`,
+## `replace_staffs`): the caster is no longer as its scene and data made it (`at_rest`, props W2).
+var _edited: bool = false
 ## The plain staff used when `staff` is null.
 var _plain: StaffBase = null
 ## What `_push_place` sent last: the feet, aim and staff on show it was worked out from (INF feet:
@@ -120,6 +123,8 @@ func attach() -> void:
 				for id: Variant in start_cards[at]:
 					cards.append(StringName(str(id)))
 			set_staff(at, cards)
+		# The start cards are how it was made, not an edit.
+		_edited = false
 	else:
 		# Back in the tree with a fresh number: the staffs go in again.
 		for at in staff_count:
@@ -181,6 +186,38 @@ func step(delta: float) -> void:
 			cast(at, pressed)
 
 
+## True while a step would change nothing (props W2, `Actor.dormant`): every pool full or not
+## filling, no staff winding (a slowed body's wind-up is held back each step), and the place it
+## sent to the systems still the body's own. A downed actor's step clears its place each time, so
+## it never rests.
+func rests() -> bool:
+	if number < 0:
+		return true
+	if actor.is_down():
+		return false
+	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
+		return false
+	for at in staff_count:
+		var base: StaffBase = staff_of(at)
+		var mana: float = _mana[at]
+		if mana > base.max_mana or (mana < base.max_mana and base.mana_regen > 0.0):
+			return false
+		if actor.spells != null and actor.spells.is_winding(number, at):
+			return false
+	return true
+
+
+## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
+## and every pool full. The staff on show is in the actor's `rest_leaf`.
+func at_rest() -> bool:
+	if _edited:
+		return false
+	for at in staff_count:
+		if _mana[at] != max_mana_of(at):
+			return false
+	return true
+
+
 ## The projectile manager's anchor at the body and Spells' aim from the staff tip.
 ## The step sends them only when the body moved, turned or showed another staff since the last
 ## time (every actor does this every step; performance pass, 2026-10-28).
@@ -238,6 +275,8 @@ func cast(at: int, pressed: bool = true) -> bool:
 	if spent == SpellsScript.REFUSED:
 		return false
 	_mana[at] = maxf(_mana[at] - spent, 0.0)
+	# A pool to fill and a cast to wind up: its body has steps to take (props W2).
+	actor.wake()
 	cast_done.emit(at, origin, direction)
 	if actor.events != null:
 		actor.events.actor_cast.emit(actor.id, actor)
@@ -258,6 +297,8 @@ func max_mana_of(at: int) -> float:
 func set_mana(at: int, value: float) -> void:
 	if at >= 0 and at < _mana.size():
 		_mana[at] = clampf(value, 0.0, max_mana_of(at))
+		if actor != null:
+			actor.wake()
 
 
 ## Mana a cast of staff `at` may use now: its pool, minus what its sustained cards hold.
@@ -349,6 +390,7 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	for slot in slot_count(at):
 		row.append(cards[slot] if slot < cards.size() else &"")
 	_cards[at] = row
+	_edited = true
 	_install(at)
 	staff_built.emit(at)
 	return true
@@ -361,6 +403,8 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	if new_staffs.is_empty():
 		return
 	var before: int = staff_count
+	_edited = true
+	actor.wake()
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
@@ -476,6 +520,7 @@ func _on_mana_refund(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = minf(_mana[at] + amount, max_mana_of(at))
+		actor.wake()
 
 
 ## A cast that wound up left (`Spells`, docs/milestones/cast-timing.md): its mana is paid from the
@@ -485,3 +530,4 @@ func _on_mana_spend(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = maxf(_mana[at] - amount, 0.0)
+		actor.wake()

@@ -137,6 +137,70 @@ func test_random_bytes_never_break_the_decoder() -> void:
 			check_equal(replay.to_bytes(), bytes, "an accepted replay is exactly its bytes")
 
 
+## A replay that grows while it plays (netcode spike S1): its header alone reads back as a replay of
+## no ticks, and its ticks added one by one from their bytes make the same replay again.
+func test_a_replay_grows_from_its_header_and_its_ticks_bytes() -> void:
+	var replay := _made()
+	var live: Replay = Replay.from_bytes(replay.header_bytes())
+	check(live != null, "the header alone is a replay")
+	if live == null:
+		return
+	check_equal(live.tick_count(), 0, "of no ticks")
+	check(live.build == replay.build and live.content == replay.content and live.run_seed == replay.run_seed and live.seats == replay.seats, "with the whole header")
+	check(live.rules.equals(replay.rules), "and its rules")
+	for tick in replay.tick_count():
+		check_equal(live.add_tick_bytes(replay.tick_bytes(tick)), "", "tick %d is added" % tick)
+	check_equal(live.to_bytes(), replay.to_bytes(), "the same replay, tick for tick")
+	check(replay.tick_bytes(-1).is_empty() and replay.tick_bytes(3).is_empty(), "no bytes for a tick it does not hold")
+
+
+## A tick added from bytes is checked as a file's ticks are: a bad one is refused whole, and the
+## replay keeps the ticks it had.
+func test_a_tick_from_bytes_is_checked_as_a_files() -> void:
+	var source := _made()
+	var good: PackedByteArray = source.tick_bytes(1)
+	var cases: Dictionary = {}
+	cases["empty"] = PackedByteArray()
+	cases["cut short"] = good.slice(0, good.size() - 1)
+	var longer: PackedByteArray = good.duplicate()
+	longer.append(0)
+	cases["a byte left over"] = longer
+	var mask: PackedByteArray = good.duplicate()
+	mask[0] = 0x20
+	cases["an unknown bit"] = mask
+	var seat: PackedByteArray = good.duplicate()
+	# The seats byte, seat 0's length (2 bytes), then its frame: its version, its seat.
+	seat[4] = 1
+	cases["a frame under another seat"] = seat
+	var version: PackedByteArray = good.duplicate()
+	version[3] = 9
+	cases["a frame of another version"] = version
+	var length: PackedByteArray = good.duplicate()
+	length.encode_u16(1, 0xffff)
+	cases["a frame longer than its bytes"] = length
+	for name: String in cases:
+		var replay: Replay = Replay.from_bytes(source.header_bytes())
+		replay.add_tick_bytes(source.tick_bytes(0))
+		check(replay.add_tick_bytes(cases[name]) != "", "%s is refused" % name)
+		check_equal(replay.tick_count(), 1, "%s: the ticks it had stay" % name)
+		check_equal(replay.add_tick_bytes(good), "", "%s: a good tick is still taken after" % name)
+		check_equal(replay.tick_bytes(1), good, "%s: and it is that tick" % name)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 29
+	var fuzzed: Replay = Replay.from_bytes(source.header_bytes())
+	for i in 1000:
+		var bytes: PackedByteArray = good.duplicate()
+		bytes[rng.randi() % bytes.size()] = rng.randi() % 256
+		if rng.randi() % 4 == 0:
+			bytes = bytes.slice(0, rng.randi() % bytes.size())
+		var before: int = fuzzed.tick_count()
+		if fuzzed.add_tick_bytes(bytes) == "":
+			check_equal(fuzzed.tick_bytes(before), bytes, "an accepted tick is exactly its bytes")
+		else:
+			check_equal(fuzzed.tick_count(), before, "a refused tick adds nothing")
+	check(Replay.from_bytes(fuzzed.to_bytes()) != null, "whatever it took is a valid replay")
+
+
 func test_a_replay_is_saved_and_opened_in_user_replays() -> void:
 	var replay := _made()
 	check_equal(replay.save("test_round_trip"), OK, "saved")

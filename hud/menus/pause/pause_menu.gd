@@ -453,17 +453,19 @@ func _mark_focus() -> void:
 
 
 ## Open or close the game's pause. Offline the game stops for everyone by the command
-## `pause_requested` (the simulation's own stop, Coop's). While a replay plays, a live command would
-## change what it replays, so the menu only stands the picture still (the tree's pause, which runs
-## no tick: core/sim/tick.gd) and the replay waits.
+## `pause_requested` (the simulation's own stop, Coop's). While a replay file plays, a live command
+## would change what it replays, so the menu only stands the picture still (the tree's pause, which
+## runs no tick: core/sim/tick.gd) and the replay waits. Online (a live replay) the command goes to
+## the host as the seat's, and stops both machines when it comes back.
 func _set_paused(on: bool) -> void:
 	if not is_inside_tree():
 		return
 	var frames: FramesScript = get_node_or_null(^"/root/Frames") as FramesScript
-	if frames != null and frames.is_playing():
+	var seat: int = owner_player if owner_player >= 0 else _closing_player
+	if frames != null and not frames.hears_commands(seat):
 		get_tree().paused = on
 	elif _events != null:
-		_events.pause_requested.emit(owner_player if owner_player >= 0 else _closing_player, 1 if on else 0)
+		_events.pause_requested.emit(seat, 1 if on else 0)
 
 
 func _on_sandbox_changed(on: bool) -> void:

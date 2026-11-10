@@ -21,6 +21,11 @@ extends RefCounted
 ## The decoder is as strict as the frame's: every size, value and frame is checked when the
 ## bytes are read, and a bad file is rejected whole (`decode` says why). Nothing in it is ever
 ## code, a resource or a path.
+##
+## **A replay that grows while it plays** (netcode spike S1, docs/milestones/netcode-spike.md): the
+## header alone (`header_bytes`, read back by `decode` as a replay of no ticks), then its ticks one
+## by one (`tick_bytes` out, `add_tick_bytes` in, each checked by the same decoder as a file's).
+## The online client plays one so (`Frames.play_live`).
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 
@@ -51,6 +56,10 @@ var rules: SessionRules = SessionRules.defaults()
 var _data: PackedByteArray = PackedByteArray()
 ## Where each tick starts in `_data`.
 var _offsets: PackedInt32Array = PackedInt32Array()
+## Where the last tick `_check_tick` read ends in the bytes it read (scratch).
+var _checked_to: int = 0
+## The frame the decoder reads each tick's frames into, to check them (scratch).
+var _check_frame: InputFrame = InputFrame.new()
 
 
 ## How many ticks it holds.
@@ -91,8 +100,64 @@ func read_tick(tick: int, frames: Array[InputFrame]) -> int:
 	return mask
 
 
+## Tick `tick`'s bytes (the seats' byte, then each seat's frame), as `add_tick_bytes` takes them;
+## empty for a tick it does not hold.
+func tick_bytes(tick: int) -> PackedByteArray:
+	if tick < 0 or tick >= _offsets.size():
+		return PackedByteArray()
+	var end: int = _offsets[tick + 1] if tick + 1 < _offsets.size() else _data.size()
+	return _data.slice(_offsets[tick], end)
+
+
+## Append a tick from its bytes (`tick_bytes` of another replay): "" when they are one whole valid
+## tick, else why not (and nothing is added). Checked as a file's ticks are, and within the same
+## limits.
+func add_tick_bytes(bytes: PackedByteArray) -> String:
+	if _offsets.size() >= MAX_TICKS:
+		return "%d ticks" % (_offsets.size() + 1)
+	if _data.size() + bytes.size() > MAX_BYTES:
+		return "too long (%d bytes)" % (_data.size() + bytes.size())
+	var problem: String = _check_tick(bytes, 0, _offsets.size())
+	if problem != "":
+		return problem
+	if _checked_to != bytes.size():
+		return "tick %d: %d bytes left over" % [_offsets.size(), bytes.size() - _checked_to]
+	_offsets.append(_data.size())
+	_data.append_array(bytes)
+	return ""
+
+
+## The header alone as bytes (a replay of no ticks, as `decode` reads it): what an online client is
+## sent before the ticks.
+func header_bytes() -> PackedByteArray:
+	return _encode(false)
+
+
+## The seats seated before tick `tick` plays (a bit each): the header's, then each JOIN and LEAVE
+## of the ticks before it (a replay sought, `Frames.seek`).
+func seats_at(tick: int) -> int:
+	var mask: int = seats & 0x0f
+	var frames: Array[InputFrame] = []
+	for seat in SEATS:
+		frames.append(InputFrame.new())
+	for at in mini(tick, _offsets.size()):
+		read_tick(at, frames)
+		for seat in SEATS:
+			for command: Array in frames[seat].commands:
+				if command[0] == InputFrame.JOIN:
+					mask |= 1 << seat
+				elif command[0] == InputFrame.LEAVE:
+					mask &= ~(1 << seat)
+	return mask
+
+
 ## The whole replay as bytes: the header, the tick count, the ticks.
 func to_bytes() -> PackedByteArray:
+	return _encode(true)
+
+
+## The header, then the tick count and the ticks (`ticks`) or a count of none.
+func _encode(ticks: bool) -> PackedByteArray:
 	var out := PackedByteArray(MAGIC)
 	out.append(FORMAT)
 	var text: PackedByteArray = build.left(MAX_BUILD).to_ascii_buffer()
@@ -108,8 +173,9 @@ func to_bytes() -> PackedByteArray:
 	rules.encode_into(out)
 	at = out.size()
 	out.resize(at + 4)
-	out.encode_u32(at, _offsets.size())
-	out.append_array(_data)
+	out.encode_u32(at, _offsets.size() if ticks else 0)
+	if ticks:
+		out.append_array(_data)
 	return out
 
 
@@ -178,32 +244,43 @@ func _decode(bytes: PackedByteArray) -> String:
 	_data = bytes.slice(at)
 	_offsets = PackedInt32Array()
 	_offsets.resize(ticks)
-	var frame := InputFrame.new()
 	var read: int = 0
 	for tick in ticks:
-		if read >= _data.size():
-			return "tick %d is missing" % tick
 		_offsets[tick] = read
-		var mask: int = _data[read]
-		if mask > 0x0f:
-			return "tick %d: seats %d" % [tick, mask]
-		read += 1
-		for seat in SEATS:
-			if mask & (1 << seat) == 0:
-				continue
-			if read + 2 > _data.size():
-				return "tick %d: seat %d is cut short" % [tick, seat]
-			var length: int = _data.decode_u16(read)
-			if read + 2 + length > _data.size():
-				return "tick %d: seat %d is cut short" % [tick, seat]
-			var problem: String = frame.decode(_data.slice(read + 2, read + 2 + length))
-			if problem != "":
-				return "tick %d: seat %d: %s" % [tick, seat, problem]
-			if frame.seat != seat:
-				return "tick %d: seat %d holds seat %d's frame" % [tick, seat, frame.seat]
-			read += 2 + length
+		var problem: String = _check_tick(_data, read, tick)
+		if problem != "":
+			return problem
+		read = _checked_to
 	if read != _data.size():
 		return "%d bytes left over" % (_data.size() - read)
+	return ""
+
+
+## Check the tick (number `tick`) that starts at `at` in `data`: "" when it is one whole valid tick
+## (it ends at `_checked_to`), else why not.
+func _check_tick(data: PackedByteArray, at: int, tick: int) -> String:
+	var read: int = at
+	if read >= data.size():
+		return "tick %d is missing" % tick
+	var mask: int = data[read]
+	if mask > 0x0f:
+		return "tick %d: seats %d" % [tick, mask]
+	read += 1
+	for seat in SEATS:
+		if mask & (1 << seat) == 0:
+			continue
+		if read + 2 > data.size():
+			return "tick %d: seat %d is cut short" % [tick, seat]
+		var length: int = data.decode_u16(read)
+		if read + 2 + length > data.size():
+			return "tick %d: seat %d is cut short" % [tick, seat]
+		var problem: String = _check_frame.decode(data.slice(read + 2, read + 2 + length))
+		if problem != "":
+			return "tick %d: seat %d: %s" % [tick, seat, problem]
+		if _check_frame.seat != seat:
+			return "tick %d: seat %d holds seat %d's frame" % [tick, seat, _check_frame.seat]
+		read += 2 + length
+	_checked_to = read
 	return ""
 
 

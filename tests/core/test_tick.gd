@@ -44,13 +44,20 @@ class Area:
 		calls.append(["%s.take_rules" % name, float(rules.shot_cap)])
 
 
-## The frames service: records its tick and its stood ticks.
+## The frames service: records its tick and its stood ticks, and says how many ticks a physics step
+## runs (`due`).
 class StandInFrames:
 	extends FramesScript
 	var calls: Array = []
+	var due: int = 1
+	var asked: int = 0
 
 	func _ready() -> void:
 		pass
+
+	func begin_step(_delta: float) -> int:
+		asked += 1
+		return due
 
 	func tick(delta: float) -> void:
 		calls.append(["Frames.tick", delta])
@@ -255,6 +262,42 @@ func test_a_paused_tree_runs_no_tick_and_a_stop_pauses_the_tree() -> void:
 	_tick.sim.go(CoopScript.MENU)
 	_tick.run(TickScript.DT)
 	check(not paused, "and lets it go with the game")
+	root.remove_child(_tick)
+
+
+## A physics step runs the ticks the frames service says (netcode spike S1): none while a live
+## replay waits, up to three to catch up; it is asked every step, also under the picture's pause.
+func test_a_physics_step_runs_the_ticks_the_frames_say() -> void:
+	_frames.auto_tick = true
+	root.add_child(_tick)
+	await physics_frame
+	_frames.due = 0
+	await physics_frame
+	calls.clear()
+	var asked: int = _frames.asked
+	await physics_frame
+	await physics_frame
+	check(calls.is_empty(), "no tick while it says none")
+	check_equal(_frames.asked - asked, 2, "asked every step")
+	_frames.due = 3
+	await physics_frame
+	calls.clear()
+	asked = _frames.asked
+	await physics_frame
+	await physics_frame
+	var ticks: int = _names().count("Frames.tick")
+	check_equal(ticks, 3 * (_frames.asked - asked), "three ticks a step")
+	check(ticks > 0, "and some ran")
+	check_equal(_names().count("Combat.step"), ticks, "each a whole tick")
+	_frames.due = 1
+	paused = true
+	asked = _frames.asked
+	calls.clear()
+	await physics_frame
+	await physics_frame
+	check(calls.is_empty(), "the picture's pause: no tick")
+	check(_frames.asked > asked, "but still asked (a live replay reads what arrived)")
+	paused = false
 	root.remove_child(_tick)
 
 

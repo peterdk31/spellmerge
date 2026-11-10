@@ -19,9 +19,15 @@ extends Node
 ##   so the input layer knows no body.
 ## - **Commands:** the HUD's requests (core/events, `command_sink`) and the seat's device joining
 ##   or leaving go into the seat's next frame, and the frame's commands apply when its tick starts,
-##   seat by seat, in the order they were sent (`EventsScript.apply_command`). Joins and leaves
-##   happen as the device joins and leaves (Flow and Coop read the joined seats at a run's start);
-##   the frame tells a replay when, and a replay played joins and leaves its seats then.
+##   seat by seat, in the order they were sent (`EventsScript.apply_command`).
+## - **Seats** (who plays: `seat_joined`, `seat_left`, heard by Coop; `joined_seats`, read by Flow
+##   at a run's start): the simulation's, sent from here only, never from a device. Offline a seat
+##   joins and leaves as its device does (and the frame tells a recording when); while a replay
+##   plays, as the replay's frames say, at their tick's start, whatever this machine's devices do
+##   meanwhile (a pad plugged in during a replay, or an online client's own seat leaving and
+##   joining again, changes nothing until the replay says so). A replay's seats get virtual
+##   devices for the HUD (given back when it ends), but a live replay's local seats keep this
+##   machine's own. A source never seats: a JOIN or LEAVE it writes is dropped (`FrameSource`).
 ## - **Replays:** `record(start, starter)` starts a run and records every tick's frames (the seats
 ##   joined, or with a command) into a `Replay`, `stop_recording` hands it over; `play(replay)`
 ##   joins its seats, starts its run the same way and feeds its frames, one a tick, until they run
@@ -32,6 +38,17 @@ extends Node
 ##   (the projectile manager's threat grid and target table), which count as state and change the
 ##   next step, so a bot's run replays exactly only with the bot watching again (docs/DECISIONS.md,
 ##   2026-11-05). A person's input reads nothing of the game but where the hand is.
+## - **A live replay** (`play_live`; netcode spike S1, docs/milestones/netcode-spike.md): a replay
+##   that grows while it plays, the online client's, fed by a `LiveFeed` (core/sim/live_feed.gd).
+##   The Tick calls `begin_step` first in every physics step: the feed's `pump` adds the ticks that
+##   arrived, the seats whose input is this machine's (the feed's `local_seats`) build their frame
+##   from their source or device, with their commands, and hand it to the feed's `send` (one a
+##   step, also while the replay waits: the other machine hears this one at its own pace), and the
+##   step runs as many ticks as the feed paces (none while no tick is there: the picture holds).
+##   The replay's frames are the game's: a local seat's frame is never used here. It ends once its
+##   feed is closed and it is played out. Frames knows no network.
+## - **A replay's end:** at the start of the step (or tick) after its last tick, so its last tick
+##   steps with the replay's seats as every tick before.
 ## - **A run's start** (`next_run_seed`, `next_run_rules`; the Tick asks at `begin_run`): the seed
 ##   and rules of the replay on the deck, else a random seed and this machine's rules
 ##   (`SessionRules.machine()`, changed by the "Max shots" setting, `projectile_cap_changed`). Online
@@ -58,6 +75,9 @@ var mouse_world_override: Vector2 = Vector2.INF
 
 ## The frames of the tick in progress, by seat (four, reused).
 var _frames: Array[InputFrame] = []
+## While a live replay plays: the frames this machine's seats built this physics step, by seat
+## (four, reused), handed to its feed.
+var _built: Array[InputFrame] = []
 ## Per seat: the local input layer over its device.
 var _local: Array[LocalInput] = []
 ## Per seat: what fills its frame instead of its device, or null.
@@ -66,6 +86,8 @@ var _sources: Array[FrameSource] = [null, null, null, null]
 var _pending: Array[Array] = [[], [], [], []]
 ## The replay being recorded or played, or null.
 var _tape: ReplayTape = null
+## While a replay plays: the seats whose virtual device it added (a bit each), to give back.
+var _mirrored: int = 0
 ## Per seat: where the seat aims from (`set_aim_pivot`: a world point, INF for none), or invalid.
 var _pivots: Array[Callable] = [Callable(), Callable(), Callable(), Callable()]
 ## The frame a source watching a replay fills, dropped.
@@ -80,6 +102,9 @@ func _init() -> void:
 		var frame := InputFrame.new()
 		frame.seat = seat
 		_frames.append(frame)
+		var built := InputFrame.new()
+		built.seat = seat
+		_built.append(built)
 		_local.append(LocalInput.new())
 
 
@@ -141,6 +166,9 @@ func next_run_rules() -> SessionRules:
 ## commands applied. `delta` is the tick's length in seconds.
 func tick(delta: float) -> void:
 	ticks += 1
+	# A replay played out ended with its last tick: this one is the game's own.
+	if is_playing() and _tape.is_done():
+		stop_playing()
 	if is_playing():
 		_read_replay(delta)
 	else:
@@ -152,8 +180,33 @@ func tick(delta: float) -> void:
 		if _carried[seat] != 0:
 			_frames[seat].pressed_bits |= _carried[seat]
 			_carried[seat] = 0
-	if is_playing() and not _tape.has_tick():
+
+
+## A physics step starts (the Tick, before any of its ticks; `delta` is a step's length): returns
+## how many ticks it runs. 1, but while a live replay plays its feed is pumped, this machine's
+## seats' frames are built and sent, and then none runs while no tick is there and the feed paces
+## the rest (see the class doc). A replay played out (a live one: and closed) ends here. Call it
+## once a step: it reads the feed.
+func begin_step(delta: float) -> int:
+	if not is_live():
+		if is_playing() and _tape.is_done():
+			stop_playing()
+		return 1
+	var tape: ReplayTape = _tape
+	tape.feed.pump()
+	# The feed may stop it (a link that closed).
+	if tape != _tape:
+		return 1
+	if tape.is_done():
 		stop_playing()
+		return 1
+	for seat in SEATS:
+		if tape.is_local(seat):
+			_build_seat(seat, _built[seat], delta)
+			tape.feed.send(tape.at, _built[seat])
+			if tape != _tape:
+				return 1
+	return tape.ticks_due()
 
 
 ## The tick just started stands still (the Tick, N4): its frames' presses wait for the next tick
@@ -175,7 +228,7 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.run_seed = run_seed if run_seed != 0 else SimSeed.pick()
 	replay.start = start
 	replay.starter = starter
-	replay.seats = _joined_seats()
+	replay.seats = _device_seats()
 	replay.rules = SessionRules.machine().copy()
 	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
@@ -196,25 +249,59 @@ func is_recording() -> bool:
 	return _tape != null and not _tape.plays
 
 
-## Play `replay` from its first tick: its seats join (virtual devices, where free), its run starts
-## the way it started, and every tick takes its frames until they run out. False, and nothing
-## happens, for a replay of other content.
+## Play `replay` from its first tick: its seats are seated (with virtual devices, where free), its
+## run starts the way it started, and every tick takes its frames until they run out. False, and
+## nothing happens, for a replay of other content.
 func play(replay: Replay) -> bool:
-	if replay == null:
+	if replay == null or not _play(ReplayTape.playing(replay)):
 		return false
+	if replay.build != Replay.build_of():
+		push_warning("Frames: the replay was recorded by %s, this is %s; it may play differently." % [replay.build, Replay.build_of()])
+	return true
+
+
+## Play `feed`'s replay live, as the feed adds its ticks (the online client; see the class doc): it
+## starts as `play` does. The feed's local seats are this machine's: their frames are built each
+## physics step and sent to the feed, and their commands are heard. False, and nothing happens, for
+## no feed or replay, or a replay of another build or other content (online they would part).
+func play_live(feed: LiveFeed) -> bool:
+	if feed == null or feed.replay == null:
+		return false
+	if feed.replay.build != Replay.build_of():
+		push_warning("Frames: the live replay is of build %s, this is %s, so it is not played." % [feed.replay.build, Replay.build_of()])
+		return false
+	return _play(ReplayTape.playing(feed.replay, feed))
+
+
+## True while a live replay plays.
+func is_live() -> bool:
+	return is_playing() and _tape.is_live()
+
+
+## Whether a command seat `seat` sends now reaches the game (in its frame): always but while a
+## replay plays, whose frames say all (the pause menu then only stands the picture still), and
+## then for a live replay's local seats (their commands come back in the replay's frames).
+func hears_commands(seat: int) -> bool:
+	return _builds(seat)
+
+
+func _play(tape: ReplayTape) -> bool:
+	var replay: Replay = tape.replay
 	var here: int = Replay.content_of(registry)
 	if replay.content != here:
 		push_warning("Frames: the replay is of other content (%d, here %d), so it is not played." % [replay.content, here])
 		return false
-	if replay.build != Replay.build_of():
-		push_warning("Frames: the replay was recorded by %s, this is %s; it may play differently." % [replay.build, Replay.build_of()])
 	stop_recording()
-	_tape = ReplayTape.playing(replay)
+	var seated_before: int = _seated_now()
+	# One playing before it gives its devices back first.
+	_release_devices()
+	_tape = tape
 	_carried.fill(0)
+	_mirror_devices(tape.seated)
+	# The joins just made are the replay's own (a live replay's local seats hear them).
 	for seat in SEATS:
 		_pending[seat].clear()
-		if replay.seats & (1 << seat) != 0 and input != null and not input.is_joined(seat):
-			input.add_virtual_device(seat)
+	_seat_changes(seated_before, tape.seated)
 	_send_start(replay.start, replay.starter)
 	return true
 
@@ -227,16 +314,24 @@ func seek(tick: int) -> bool:
 	if not is_playing() or tick < 0 or tick > _tape.replay.tick_count():
 		return false
 	_tape.at = tick
+	# The snapshot restored the game's own seats (Coop's); these are the replay's at that tick.
+	_tape.seated = _tape.replay.seats_at(tick)
+	_mirror_devices(_tape.seated)
 	_carried.fill(0)
 	for seat in SEATS:
 		_pending[seat].clear()
 	return true
 
 
-## Stop playing (by itself once the frames run out): the seats take their own input again.
+## Stop playing (by itself at the step after its last tick): the replay's virtual devices are given
+## back, and the seats take their own input again, seated as their devices are.
 func stop_playing() -> void:
-	if is_playing():
-		_tape = null
+	if not is_playing():
+		return
+	var seated_before: int = _tape.seated
+	_release_devices()
+	_tape = null
+	_seat_changes(seated_before, _device_seats())
 
 
 func is_playing() -> bool:
@@ -260,27 +355,33 @@ func _send_start(start: StringName, starter: int) -> void:
 
 func _build(delta: float) -> void:
 	for seat in SEATS:
-		var frame: InputFrame = _frames[seat]
-		frame.clear()
-		var source: FrameSource = _sources[seat]
-		if source != null:
-			source.fill_frame(frame, delta)
-			if input != null and input.is_captured(seat):
-				frame.move = Vector2i.ZERO
-				frame.aim = InputFrame.AIM_KEEP
-				frame.held_bits = 0
-				frame.pressed_bits = 0
-				frame.captured = true
-		elif input != null and input.is_joined(seat):
-			var hand: Vector2 = _pivot(seat)
-			_local[seat].fill(frame, input, seat, delta, hand, _mouse_world() if hand != Vector2.INF else Vector2.INF)
-		var pending: Array = _pending[seat]
-		if pending.is_empty():
-			continue
-		for command: Array in pending:
-			if not frame.add_command(command[0], command.slice(1)):
-				push_warning("Frames: seat %d's %s does not fit a frame (its arguments, or too many commands), so it is dropped." % [seat, command[0]])
-		pending.clear()
+		_build_seat(seat, _frames[seat], delta)
+
+
+## Seat `seat`'s frame for a tick of `delta` seconds into `frame`: from its source, else its device
+## (else nothing), with the commands sent since its last frame.
+func _build_seat(seat: int, frame: InputFrame, delta: float) -> void:
+	frame.clear()
+	var source: FrameSource = _sources[seat]
+	if source != null:
+		source.fill_frame(frame, delta)
+		_drop_seating(frame)
+		if input != null and input.is_captured(seat):
+			frame.move = Vector2i.ZERO
+			frame.aim = InputFrame.AIM_KEEP
+			frame.held_bits = 0
+			frame.pressed_bits = 0
+			frame.captured = true
+	elif input != null and input.is_joined(seat):
+		var hand: Vector2 = _pivot(seat)
+		_local[seat].fill(frame, input, seat, delta, hand, _mouse_world() if hand != Vector2.INF else Vector2.INF)
+	var pending: Array = _pending[seat]
+	if pending.is_empty():
+		return
+	for command: Array in pending:
+		if not frame.add_command(command[0], command.slice(1)):
+			push_warning("Frames: seat %d's %s does not fit a frame (its arguments, or too many commands), so it is dropped." % [seat, command[0]])
+	pending.clear()
 
 
 ## Where seat `seat` aims its mouse from (its pivot's point), INF while it aims otherwise or has
@@ -303,10 +404,11 @@ func _mouse_world() -> Vector2:
 
 ## The replay's next tick, read and applied: one a tick. Where the recording stood stopped or held,
 ## the game stands so too, its stops being state (N4); a pause of the player's while it plays (the
-## pause menu) runs no tick, so the replay waits.
+## pause menu) runs no tick, so the replay waits. A live replay's local seats built their frames
+## at the step's start (`begin_step`); a live replay is ticked only for a tick it holds.
 func _read_replay(delta: float) -> void:
 	for seat in SEATS:
-		if _sources[seat] != null:
+		if _sources[seat] != null and not _tape.is_local(seat):
 			_watched.seat = seat
 			_watched.clear()
 			_sources[seat].fill_frame(_watched, delta)
@@ -314,24 +416,26 @@ func _read_replay(delta: float) -> void:
 		_read_tick()
 		_apply()
 		return
+	if _tape.is_live():
+		push_error("Frames: a live replay was ticked with no tick to play (tick %d); the Tick runs only what begin_step says." % _tape.at)
 	for seat in SEATS:
 		_frames[seat].clear()
 
 
+## The next tick read, and its seats' joins and leaves made (before any command applies, as offline
+## a device joins between ticks).
 func _read_tick() -> void:
 	_tape.read_tick(_frames)
+	var seated_before: int = _tape.seated
 	for seat in SEATS:
-		_pending[seat].clear()
-		if input == null:
-			continue
 		for command: Array in _frames[seat].commands:
-			if command[0] == InputFrame.JOIN and not input.is_joined(seat):
-				input.add_virtual_device(seat)
-			elif command[0] == InputFrame.LEAVE and input.is_joined(seat):
-				input.leave(seat)
-	# The joins just made sent their own; the replay's frames say all.
-	for seat in SEATS:
-		_pending[seat].clear()
+			if command[0] == InputFrame.JOIN:
+				_tape.seated |= 1 << seat
+			elif command[0] == InputFrame.LEAVE:
+				_tape.seated &= ~(1 << seat)
+	if _tape.seated != seated_before:
+		_mirror_devices(_tape.seated)
+		_seat_changes(seated_before, _tape.seated)
 
 
 ## The tick's commands apply, seat by seat, each seat's in the order sent.
@@ -352,18 +456,23 @@ func _apply() -> void:
 
 
 ## The seats joined now, in order: who plays a run that starts (Flow reads them here, never the
-## devices).
+## devices). While a replay plays, the replay's.
 func joined_seats() -> Array[int]:
 	var out: Array[int] = []
-	var mask: int = _joined_seats()
+	var mask: int = _seated_now()
 	for seat in SEATS:
 		if mask & (1 << seat) != 0:
 			out.append(seat)
 	return out
 
 
-## A bit per seat joined now.
-func _joined_seats() -> int:
+## A bit per seat seated now: the replay's while one plays, else each whose device is joined.
+func _seated_now() -> int:
+	return _tape.seated if is_playing() else _device_seats()
+
+
+## A bit per seat whose device is joined now.
+func _device_seats() -> int:
 	var mask: int = 0
 	if input != null:
 		for seat in SEATS:
@@ -374,33 +483,99 @@ func _joined_seats() -> int:
 
 ## The seats a recorded tick keeps: the joined ones and any with a command (a leave).
 func _recorded_seats() -> int:
-	var mask: int = _joined_seats()
+	var mask: int = _device_seats()
 	for seat in SEATS:
 		if not _frames[seat].commands.is_empty():
 			mask |= 1 << seat
 	return mask
 
 
-## A command was sent (core/events): into its seat's next frame. Dropped while a replay plays.
+## A command was sent (core/events): into its seat's next frame. Dropped while a replay plays, but
+## a live replay's local seats' (they go into the frames handed to its `sent`).
 func _on_command(command: StringName, args: Array) -> void:
-	if is_playing():
-		return
 	if args.is_empty() or typeof(args[0]) != TYPE_INT or int(args[0]) < 0 or int(args[0]) >= SEATS:
-		push_warning("Frames: %s for no seat is dropped." % command)
+		if not is_playing():
+			push_warning("Frames: %s for no seat is dropped." % command)
+		return
+	if not _builds(int(args[0])):
 		return
 	var entry: Array = [command]
 	entry.append_array(args.slice(1))
 	_pending[int(args[0])].append(entry)
 
 
+## A device joined seat `player`: in its next frame, and offline the seat is seated at once.
 func _on_device_joined(player: int, _device: int) -> void:
-	if player >= 0 and player < SEATS and not is_playing():
-		_pending[player].append([InputFrame.JOIN])
+	if player < 0 or player >= SEATS or not _builds(player):
+		return
+	_pending[player].append([InputFrame.JOIN])
+	if not is_playing() and events != null:
+		events.seat_joined.emit(player)
 
 
+## A device left seat `player`: in its next frame, and offline the seat leaves at once.
 func _on_device_left(player: int, _device: int) -> void:
-	if player >= 0 and player < SEATS and not is_playing():
-		_pending[player].append([InputFrame.LEAVE])
+	if player < 0 or player >= SEATS or not _builds(player):
+		return
+	_pending[player].append([InputFrame.LEAVE])
+	if not is_playing() and events != null:
+		events.seat_left.emit(player)
+
+
+## The seats `from` became `to` (a bit each): each seat left, then each joined, sent.
+func _seat_changes(from: int, to: int) -> void:
+	if events == null or from == to:
+		return
+	for seat in SEATS:
+		if from & (1 << seat) != 0 and to & (1 << seat) == 0:
+			events.seat_left.emit(seat)
+	for seat in SEATS:
+		if from & (1 << seat) == 0 and to & (1 << seat) != 0:
+			events.seat_joined.emit(seat)
+
+
+## A source's frame seats nobody (core/sim/frame_source.gd): a JOIN or LEAVE it wrote is dropped.
+func _drop_seating(frame: InputFrame) -> void:
+	for at in range(frame.commands.size() - 1, -1, -1):
+		var command: StringName = frame.commands[at][0]
+		if command == InputFrame.JOIN or command == InputFrame.LEAVE:
+			push_warning("Frames: seat %d's source wrote %s, which only the input layer does; it is dropped." % [frame.seat, command])
+			frame.commands.remove_at(at)
+
+
+## While a replay plays: each seat it seats gets a virtual device where it has none, and each it
+## does not loses the one given it here, so the HUD shows the replay's players. Only the devices
+## added here (`_mirrored`) are ever sent away: never a real one, a bot's, or a live replay's local
+## seat's. The devices' join and leave events are dropped (a replay plays).
+func _mirror_devices(seats: int) -> void:
+	if input == null:
+		return
+	for seat in SEATS:
+		if _tape.is_local(seat):
+			continue
+		var bit: int = 1 << seat
+		if seats & bit != 0 and not input.is_joined(seat):
+			input.add_virtual_device(seat)
+			_mirrored |= bit
+		elif seats & bit == 0 and _mirrored & bit != 0:
+			input.leave(seat)
+			_mirrored &= ~bit
+
+
+## The virtual devices the replay played was given leave (while it still plays, so they seat and
+## record nothing).
+func _release_devices() -> void:
+	if input != null:
+		for seat in SEATS:
+			if _mirrored & (1 << seat) != 0 and input.is_joined(seat):
+				input.leave(seat)
+	_mirrored = 0
+
+
+## Whether seat `seat`'s frames are built here now (from its source or device): always but while a
+## replay plays, and then only a live replay's local seats.
+func _builds(seat: int) -> bool:
+	return not is_playing() or _tape.is_local(seat)
 
 
 ## This machine's "Max shots" changed (the pause menu's setting, or the saved one loaded): the cap

@@ -264,6 +264,77 @@ func test_a_press_in_a_tick_that_stood_still_carries_to_the_next() -> void:
 	_frames.tick(DT)
 	check(not _frames.frame_of(0).is_pressed(2), "and only that one")
 
+## A source that passes on another machine's frame (the host's source for a client's seat, netcode
+## spike): its commands, and a JOIN and a LEAVE it must not write.
+class Remote:
+	extends FrameSource
+
+	func fill_frame(frame: InputFrame, _delta: float) -> void:
+		frame.add_command(&"staff_change_requested", [1, 0, &"fire"])
+		frame.add_command(InputFrame.LEAVE, [])
+		frame.add_command(InputFrame.JOIN, [])
+
+
+## A source may carry commands (they apply and are recorded as the seat's), but it seats nobody: a
+## JOIN or LEAVE it writes is dropped, since only the input layer seats (a device's join or leave
+## is what tells Coop and the recording).
+func test_a_sources_commands_apply_but_it_seats_nobody() -> void:
+	var seats: Array = []
+	_bus.seat_joined.connect(func(seat: int) -> void: seats.append(seat + 1))
+	_bus.seat_left.connect(func(seat: int) -> void: seats.append(-seat - 1))
+	_input.add_virtual_device(1)
+	check_equal(seats, [2], "a device joining seats its seat at once")
+	_frames.tick(DT)
+	_frames.set_source(1, Remote.new())
+	var replay: Replay = _frames.record(&"sandbox_requested", 1)
+	_frames.tick(DT)
+	check_equal(_heard, [[&"staff_change_requested", 1, 1, 0, &"fire"]], "the source's command applies as its seat's")
+	check_equal(_frames.frame_of(1).commands, [[&"staff_change_requested", 1, 0, &"fire"]], "its JOIN and LEAVE are dropped from the frame")
+	check_equal(seats, [2], "and seat nobody")
+	_input.leave(1)
+	check_equal(seats, [2, -2], "the input layer's leave does")
+	_frames.tick(DT)
+	_frames.stop_recording()
+	var frames: Array[InputFrame] = []
+	for seat in 4:
+		frames.append(InputFrame.new())
+	replay.read_tick(0, frames)
+	check_equal(frames[1].commands, [[&"staff_change_requested", 1, 0, &"fire"]], "recorded without them")
+	replay.read_tick(1, frames)
+	check(frames[1].commands.has([InputFrame.LEAVE]), "and the device's leave is recorded at its tick")
+	check_equal(replay.seats_at(1), 0b0010, "the replay's seats before the leave")
+	check_equal(replay.seats_at(2), 0, "and after")
+
+
+## A replay sought (a snapshot restored, online-ready N10) has the seats of the tick it goes on from,
+## and the virtual devices it gave a seat that has left since are given back.
+func test_a_replay_sought_has_that_ticks_seats() -> void:
+	_input.add_virtual_device(0)
+	_input.add_virtual_device(1)
+	var replay: Replay = _frames.record(&"sandbox_requested", 0)
+	for i in 6:
+		if i == 2:
+			_input.leave(1)
+		if i == 4:
+			_input.add_virtual_device(2)
+		_frames.tick(DT)
+	_frames.stop_recording()
+	for seat in 4:
+		_input.leave(seat)
+	check(_frames.play(replay), "it plays")
+	check_equal(_frames.joined_seats(), [0, 1] as Array[int], "the header's seats")
+	check(_frames.seek(4), "sought past seat 1's leave")
+	check_equal(_frames.joined_seats(), [0] as Array[int], "the seats of that tick")
+	check(_input.is_joined(0) and not _input.is_joined(1), "seat 1's virtual device is given back")
+	_frames.tick(DT)
+	check_equal(_frames.joined_seats(), [0, 2] as Array[int], "and it plays on: seat 2 joins at its tick")
+	check(_frames.seek(1), "sought back before the leave")
+	check_equal(_frames.joined_seats(), [0, 1] as Array[int], "seat 1 is seated again")
+	check(_input.is_joined(1) and not _input.is_joined(2), "with its device, and seat 2's given back")
+	_frames.stop_playing()
+	check(_frames.joined_seats().is_empty() and not _input.is_joined(0), "ended: every device it gave is given back")
+
+
 func test_a_wizard_takes_its_intent_from_its_seats_frame() -> void:
 	var world := WizardFixture.new(root, true)
 	var body: Actor = world.wizard(1, Vector2.ZERO, [[&"bolt"], [], [], []], null, false)

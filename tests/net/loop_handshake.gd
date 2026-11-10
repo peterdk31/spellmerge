@@ -35,6 +35,10 @@ func offer() -> String:
 	return ""
 
 
+func takes(typed: String) -> bool:
+	return typed.strip_edges().begins_with("SM1.")
+
+
 func take(code: String) -> String:
 	if _hosting:
 		if code == BROKEN_CODE:

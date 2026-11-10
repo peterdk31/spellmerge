@@ -68,17 +68,17 @@ const PASTE_WAIT: float = 0.3
 ## What the online box says in each phase of `online_changed`, as the host and as the joining
 ## player (a phase's `note`, when it has one, is shown instead or after).
 const ONLINE_TEXT: Dictionary[StringName, Array] = {
-	EventsScript.ONLINE_OFF: ["", "Paste the host's code below, then press Connect."],
-	EventsScript.ONLINE_MAKING: ["Making this machine's code...", "Making this machine's code..."],
+	EventsScript.ONLINE_OFF: ["", "Type the room's code below (the host opens a room at the altar in their hub), or paste a host's code, then press Connect."],
+	EventsScript.ONLINE_MAKING: ["Making this machine's code...", "Connecting..."],
 	EventsScript.ONLINE_CODE: [
 		"Copy this machine's code and send it to the other player. Paste the code they send back below, then press Connect.",
 		"Copy this machine's code and send it back to the host. The game starts when the host has given it.",
 	],
 	EventsScript.ONLINE_LINKING: ["Looking for the other machine...", "Looking for the other machine..."],
-	EventsScript.ONLINE_LINKED: ["Found each other. Starting...", "Found each other. Waiting for the host to start..."],
+	EventsScript.ONLINE_LINKED: ["Found each other. Starting...", "Found each other. Joining the host..."],
 	EventsScript.ONLINE_PLAYING: ["", ""],
 	EventsScript.ONLINE_ENDED: ["", ""],
-	EventsScript.ONLINE_FAILED: ["Cancel, then press Host to try again.", "Paste the host's code below and press Connect to try again."],
+	EventsScript.ONLINE_FAILED: ["Cancel, then press Host to try again.", "Type the room's code or paste the host's code below and press Connect to try again."],
 }
 
 ## The event bus. Only tests set this, before adding the node; otherwise the

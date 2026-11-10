@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## The client's session (netcode spike S2, docs/milestones/netcode-spike.md; net/net_client.gd) on
 ## a bus, input manager and frames service of its own, the test playing the host by writing its
 ## messages into the link: the client pings, takes the host's header only of this build and
-## content with a seat for it, plays the ticks as they arrive, sends its seat's frame every step
+## content, plays the ticks as they arrive, sends its seat's frame every step
 ## for the host's tick `tick + delay`, works its delay out from its ping and again in the run
 ## (`NetDelay`, tests/net/test_net_delay.gd: here what goes on the wire, its frames never for an
 ## earlier tick), times its presses,
@@ -194,17 +194,6 @@ func test_a_machine_with_two_seats_sends_a_frame_for_each_every_step() -> void:
 		seen.append(sent.tick)
 		sent = _next(NetMessage.FRAME)
 	check_equal(seen, [2 + 4, 2 + 4], "two ticks played: both for tick 2 and the delay")
-
-
-func test_a_header_that_leaves_out_one_of_its_seats_closes_the_link() -> void:
-	var ends: Array[NetLoopback] = NetLoopback.pair()
-	_far = ends[1]
-	_input.add_virtual_device(2)
-	_client = NetClient.new(_frames, ends[0], Callable(), (1 << SEAT) | (1 << 2), 2, 4)
-	_run.seats = 0b0011
-	_far.send(NetMessage.of_header(_run.header_bytes()))
-	_step()
-	check(not _client.started and _client.problem.contains("seated nobody on seat 2"), "refused: %s" % _client.problem)
 
 
 func test_the_delay_comes_from_the_ping_when_none_is_given() -> void:
@@ -424,7 +413,6 @@ func test_a_header_of_another_game_is_refused() -> void:
 	var cases: Dictionary[String, Array] = {
 		"another build": ["other 0123", func(run: Replay) -> void: run.build = "other 0123"],
 		"other content": ["not this game's", func(run: Replay) -> void: run.content += 1],
-		"no seat for this machine": ["seated nobody", func(run: Replay) -> void: run.seats = 0b0001],
 	}
 	for what: String in cases:
 		after_each()

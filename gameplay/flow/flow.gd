@@ -84,7 +84,8 @@ extends Node
 ## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`.
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
 ## the tick's start, every wizard keeping its staffs (`start_run`'s `kept`); that run's end
-## (everyone down) brings everyone back to the hub, staffs kept again. A run started by
+## (everyone down) brings everyone back to the hub with nothing of the run, its staffs neither
+## (owner, 2026-11-10: the hub is the arsenal a run's tools are picked from). A run started by
 ## `play_requested` restarts as before.
 ##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX or MODE_HUB (above).
@@ -181,7 +182,7 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent", &"_altar_sent"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
@@ -261,6 +262,8 @@ var _back_to_hub: bool = false
 ## What `start_stone_changed` last said, as (standing, wizards): only what is drawn, so a game whose
 ## state a snapshot replaced sends the stone's count again (DERIVED). (-1, -1) before any.
 var _stone_sent: Vector2i = Vector2i(-1, -1)
+## The seats last told to stand on the hub's altar (`altar_changed`; -1: nothing sent yet).
+var _altar_sent: int = -1
 
 
 func _ready() -> void:
@@ -324,10 +327,12 @@ func step(delta: float) -> void:
 		if mode == MODE_SANDBOX:
 			_stand_everyone_up()
 		elif _back_to_hub:
+			# Back in the hub the party is ready for a new run: nothing of the run comes back
+			# with it, its staffs neither (owner, 2026-11-10). The hub is the arsenal the next
+			# run's tools are picked from.
 			_back_to_hub = false
-			var kept: Array = _staffs_by_seat()
 			mode = MODE_HUB
-			if not start_run(_starter, kept):
+			if not start_run(_starter):
 				push_warning("Flow: the hub did not start again after the run, so the run is over.")
 				stop_run()
 		elif not start_run(_starter):
@@ -515,7 +520,9 @@ func _start_play(player: int) -> void:
 
 ## The intro first on a new save (the run of `mode` starts when it ends), else the run now.
 func _intro_then_run(player: int) -> void:
-	if wants_intro():
+	# Never in a run that is recorded or played back: the intro takes the machine's own time, and
+	# a recording must start the same on the machine that made it and on every one that plays it.
+	if wants_intro() and not (frames != null and (frames.is_recording() or frames.is_playing())):
 		play_intro(player)
 	else:
 		start_run(player)
@@ -610,6 +617,9 @@ func _start_sandbox(player: int) -> void:
 
 
 func _on_hub_requested(player: int) -> void:
+	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room).
+	if state == State.RUNNING and mode == MODE_HUB:
+		stop_run()
 	if state != State.IDLE:
 		return
 	if not _load_then(_start_hub.bind(player)):
@@ -649,7 +659,8 @@ func _start_run_from_stone(seat: int) -> void:
 
 
 ## The cards every wizard's staffs hold now, by seat (empty for a seat with none): what
-## `start_run` makes each seat's wizard with, so staffs carry over (owner, 2026-11-10).
+## `start_run` makes each seat's wizard with, so staffs follow the party from the hub into the
+## run (owner, 2026-11-10); nothing comes back from it.
 func _staffs_by_seat() -> Array:
 	var out: Array = [[], [], [], []]
 	for wizard: Node2D in _wizards:
@@ -680,11 +691,21 @@ func is_stone_lit() -> bool:
 func _count_stone() -> void:
 	var standing: int = 0
 	var wizards: int = 0
+	var at_altar: int = 0
 	if mode == MODE_HUB and state != State.IDLE and _room != null:
 		wizards = _wizard_count()
 		for wizard: Node2D in _wizards:
-			if is_instance_valid(wizard) and _room.start_stone.has_point(wizard.position):
+			if not is_instance_valid(wizard):
+				continue
+			if _room.start_stone.has_point(wizard.position):
 				standing += 1
+			var seat: int = _seat_of(wizard)
+			if seat >= 0 and seat < PLAYER_SLOTS and _room.altar.has_point(wizard.position):
+				at_altar |= 1 << seat
+	# Who stands on the altar is told to the HUD only (A there opens the room, net/'s to do).
+	if at_altar != _altar_sent and events != null:
+		_altar_sent = at_altar
+		events.altar_changed.emit(at_altar)
 	_stone_standing = standing
 	_stone_wizards = wizards
 	var now := Vector2i(standing, wizards)

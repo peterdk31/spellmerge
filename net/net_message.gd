@@ -12,6 +12,8 @@ extends RefCounted
 ## | HASHES | client | a tick, and each area's hash by name (the check, `NetChecks`) |
 ## | PARTED | host | a tick whose check failed, and the areas that differ (some of them) |
 ## | PING, PONG | client, host | a stamp, sent back as it came |
+## | SEAT_ASK | client | one of its players wants a seat: which of its players (0 to 3), never a device |
+## | LOBBY | host | how many asks it has answered, and for each of the four seats which of that client's players holds it (NOBODY: none of them) |
 ##
 ## The decoder is strict, as the frame's and the replay's are: every size is checked against the
 ## kind's limit before anything is read, a number is in range, a name is plain text, nothing is
@@ -31,6 +33,12 @@ const HASHES: int = 4
 const PARTED: int = 5
 const PING: int = 6
 const PONG: int = 7
+const SEAT_ASK: int = 8
+const LOBBY: int = 9
+## LOBBY: a seat that is none of this client's.
+const NOBODY: int = 255
+## A machine's players are 0 to this.
+const MAX_LOCAL: int = 3
 
 ## The envelope: the kind, then the length of the rest.
 const HEAD_BYTES: int = 5
@@ -56,6 +64,12 @@ var body: PackedByteArray = PackedByteArray()
 var hashes: Dictionary[String, int] = {}
 ## PARTED: the areas that differ.
 var names: PackedStringArray = PackedStringArray()
+## SEAT_ASK: which of the client's players asks (0 to MAX_LOCAL).
+var local: int = 0
+## LOBBY: the asks answered so far (0 to 255, then round again), and for each seat which of the
+## client's players holds it (0 to MAX_LOCAL, or NOBODY).
+var answered: int = 0
+var holders: PackedByteArray = PackedByteArray()
 
 
 static func of_header(replay_header: PackedByteArray) -> PackedByteArray:
@@ -121,6 +135,24 @@ static func of_pong(with_stamp: int) -> PackedByteArray:
 	return _stamped(PONG, with_stamp)
 
 
+## The client's player `player` (0 to MAX_LOCAL) wants a seat.
+static func of_seat_ask(player: int) -> PackedByteArray:
+	var out: PackedByteArray = _start(SEAT_ASK, 1)
+	out.append(clampi(player, 0, MAX_LOCAL))
+	return out
+
+
+## `asks` asks answered so far, and each of the four seats' holder among the client's players
+## (`seat_holders`: four of 0 to MAX_LOCAL or NOBODY; anything else is written as NOBODY).
+static func of_lobby(asks: int, seat_holders: PackedByteArray) -> PackedByteArray:
+	var out: PackedByteArray = _start(LOBBY, 1 + Replay.SEATS)
+	out.append(asks & 0xff)
+	for seat in Replay.SEATS:
+		var holder: int = seat_holders[seat] if seat < seat_holders.size() else NOBODY
+		out.append(holder if holder <= MAX_LOCAL else NOBODY)
+	return out
+
+
 static func _start(of_kind: int, length: int) -> PackedByteArray:
 	var out := PackedByteArray()
 	out.resize(HEAD_BYTES)
@@ -177,6 +209,9 @@ func _clear() -> void:
 	body = PackedByteArray()
 	hashes = {}
 	names = PackedStringArray()
+	local = 0
+	answered = 0
+	holders = PackedByteArray()
 
 
 func _decode(bytes: PackedByteArray) -> String:
@@ -219,6 +254,21 @@ func _decode(bytes: PackedByteArray) -> String:
 			if length != 4:
 				return "a stamp of %d bytes" % length
 			stamp = bytes.decode_u32(HEAD_BYTES)
+		SEAT_ASK:
+			if length != 1 or bytes[HEAD_BYTES] > MAX_LOCAL:
+				return "a seat asked for by no player"
+			local = bytes[HEAD_BYTES]
+		LOBBY:
+			if length != 1 + Replay.SEATS:
+				return "a lobby of %d bytes" % length
+			answered = bytes[HEAD_BYTES]
+			holders = bytes.slice(HEAD_BYTES + 1)
+			for seat in Replay.SEATS:
+				if holders[seat] > MAX_LOCAL and holders[seat] != NOBODY:
+					return "seat %d held by player %d" % [seat, holders[seat]]
+				# A player holds one seat.
+				if holders[seat] != NOBODY and holders.find(holders[seat]) != seat:
+					return "player %d on two seats" % holders[seat]
 		_:
 			return "unknown kind %d" % of_kind
 	kind = of_kind

@@ -23,7 +23,8 @@ const CATCH_UP: int = 3
 var replay: Replay = null
 ## No more ticks will come: the replay ends once played out.
 var closed: bool = false
-## The seats whose input is this machine's (a bit each). Read when the play starts.
+## The seats whose input is this machine's (a bit each). Read every step: the feed may change it
+## while the replay plays (the host gave this machine a seat, or took one back).
 var local_seats: int = 0
 ## The ticks the default pacing lets wait before it catches up.
 var cushion: int = 2

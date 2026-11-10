@@ -249,6 +249,11 @@ func is_recording() -> bool:
 	return _tape != null and not _tape.plays
 
 
+## The replay being recorded into now, or null with none.
+func recorded() -> Replay:
+	return _tape.replay if is_recording() else null
+
+
 ## Save the run on the deck (the one recorded, or played, so far) as the replay file
 ## `user://replays/<name>.replay` (`Replay.save`: `name` of letters, digits and `_`). ERR_UNAVAILABLE
 ## with no run on the deck.

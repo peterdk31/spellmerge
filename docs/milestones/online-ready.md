@@ -414,6 +414,8 @@ The tasks are in NEXT.md's owner lane in this order.
 
 ## After phase N: the netcode (a sketch, not approved)
 
+Phase N is done (2026-11-09). The spike that measures this sketch before it is planned in full: [netcode-spike.md](netcode-spike.md).
+
 Its own phase and its own owner exception to hard rule 4 (the owner, 2026-11-06: "netcode can easily be allowed"), best after M7 (Steamworks):
 
 - **Model:** host-ordered lockstep. Every machine sends its seats' input frames to the host (on Steam, through Steam's relay); the host fixes each tick's frames, with a short input delay (2–4 ticks), and sends them to all. A frame that arrives late is replaced by that seat's last one, so **a slow connection hurts only its own player and nobody waits** (pillar 2). Rollback on top is possible later, on N10's snapshots.

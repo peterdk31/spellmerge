@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/content/props/test_prop_data.gd
 
+const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
@@ -41,8 +42,9 @@ func test_every_prop_is_sound() -> void:
 
 
 ## Every prop's look loads (props W7): each state has one (`PropBase.problems` names one missing),
-## every layer's picture is there, and a mask has lit pixels to give off from; the test exploding
-## barrel too.
+## every layer's picture is there, its motes are a kind content/motes has (as every source in a
+## scene, tests/content/test_mote_sources.gd), and a mask has lit pixels to give off from; the test
+## exploding barrel too.
 func test_every_props_look_loads_and_its_masks_are_not_empty() -> void:
 	var all: Array[PropBase] = _props()
 	all.append(EXPLODING_BARREL)
@@ -52,6 +54,7 @@ func test_every_props_look_loads_and_its_masks_are_not_empty() -> void:
 			for i in look.layers.size():
 				var layer: PropLayer = look.layers[i]
 				for source in layer.motes:
+					check_equal(MoteKinds.problems(source.kind, "%s: %s, layer %d" % [data.id, look.state_id, i]), PackedStringArray(), "%s: its motes are a kind content/motes has" % data.id)
 					if source.from == MoteSource.From.MASK:
 						check(not ArtPixels.pixels_of(layer.texture).is_empty(), "%s: the mask of %s's layer %d has lit pixels" % [data.id, look.state_id, i])
 

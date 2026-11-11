@@ -47,7 +47,7 @@ kind = &"ward"
 from = 4
 stand = true
 life = 1.6
-ramps = Array[PackedColorArray]([PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.6353, 0.2353, 1, 0.8784, 0.349, 0.1843, 1, 0.5608, 0.1765, 0.1647, 1)])
+colours = Array[StringName]([&"fire"])
 
 [sub_resource type="Resource" id="idle_body"]
 script = ExtResource("9_layer")
@@ -71,7 +71,7 @@ rate = 30.0
 from = 4
 spread = 160.0
 reach = 8.0
-ramps = Array[PackedColorArray]([PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.9529, 0.651, 1, 0.949, 0.7608, 0.1882, 1, 0.7216, 0.502, 0.1216, 1)])
+colours = Array[StringName]([&"spark"])
 
 [sub_resource type="Resource" id="fuse_embers"]
 script = ExtResource("10_motes")
@@ -80,7 +80,7 @@ rate = 6.0
 at = Vector2(0, -22)
 spread = 90.0
 reach = 4.0
-ramps = Array[PackedColorArray]([PackedColorArray(0.9569, 0.9451, 0.9176, 1, 1, 0.6353, 0.2353, 1, 0.8784, 0.349, 0.1843, 1, 0.5608, 0.1765, 0.1647, 1)])
+colours = Array[StringName]([&"fire"])
 
 [sub_resource type="Resource" id="fusing_body"]
 script = ExtResource("9_layer")

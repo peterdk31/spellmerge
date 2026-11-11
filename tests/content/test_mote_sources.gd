@@ -3,17 +3,10 @@ extends "res://tests/support/suite.gd"
 ## scene under content/ in the group `mote_source` (a room's art, a decal) has a `MoteSource` with no
 ## problems, a mote kind that content/motes has, and art to read when it names `mote_art`. A
 ## prop's sources are its looks' (tests/content/props/test_prop_data.gd checks them with its looks,
-## by the same `kind_problems`). Found by folder, so a new scene is checked with no edit here.
+## by the same `mote_kinds.gd`). Found by folder, so a new scene is checked with no edit here.
 
+const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const CONTENT: String = "res://content"
-const MOTES: String = "res://content/motes/%s.tres"
-
-
-## What is wrong with the kind `kind`, in words after `owner` (empty when content/motes has it).
-static func kind_problems(kind: StringName, owner: String) -> PackedStringArray:
-	if kind != &"" and not ResourceLoader.exists(MOTES % kind):
-		return PackedStringArray(["%s: '%s' is no mote kind (content/motes/%s.tres)" % [owner, kind, kind]])
-	return PackedStringArray()
 
 
 func _scenes(path: String, found: PackedStringArray) -> PackedStringArray:
@@ -47,7 +40,7 @@ func test_every_mote_source_in_a_scene_is_sound() -> void:
 			check(art_path.is_empty() or (art != null and art.texture != null), "%s: its mote_art %s is a sprite with a picture" % [owner, art_path])
 			var found := PackedStringArray()
 			found.append_array(look.problems(art != null and art.texture != null))
-			found.append_array(kind_problems(look.kind, owner))
+			found.append_array(MoteKinds.problems(look.kind, owner))
 			check_equal(found, PackedStringArray(), "%s is sound" % owner)
 		root_node.free()
 	check(sources >= 1, "the scan finds the hub's rim at least (%d)" % sources)

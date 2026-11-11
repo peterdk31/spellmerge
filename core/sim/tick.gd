@@ -99,6 +99,9 @@ var _steps_seen: int = -1
 var _shown_stopped: bool = false
 ## The open actor ids of this tick, in order (reused).
 var _ids: PackedInt32Array = PackedInt32Array()
+## Each body's name in `state_areas` by actor id ("actor 3"), made once (the spread hash asks for
+## the areas every tick).
+var _body_names: PackedStringArray = PackedStringArray()
 
 
 func _init() -> void:
@@ -291,7 +294,8 @@ func _hand_rules() -> void:
 
 ## The game's state by area (online-ready N1's `SimHash.areas`, `Desync.capture`): "Sim" (the tick
 ## and the run's seed), each area joined, the actor table, then every actor's body by actor id
-## ("actor 3"). `SimHash.slice` spreads it over ticks.
+## ("actor 3"). `SimHash.slice` spreads it over ticks; the hash takes an area that keeps state by
+## actor id (Spells, by caster) as its parts ("Spells 3", `SimHash.Part`, props W3).
 func state_areas() -> Dictionary:
 	var out: Dictionary = {"Sim": sim}
 	for name: StringName in _areas:
@@ -305,8 +309,17 @@ func state_areas() -> Dictionary:
 			# Actor bodies only: a plain Combat body (a stand-in) holds an id too, and is its maker's.
 			var body: Actor = actors.node_of(_ids[i]) as Actor
 			if body != null:
-				out[SimHash.BODY_PREFIX + str(_ids[i])] = body
+				out[_body_name(_ids[i])] = body
 	return out
+
+
+func _body_name(id: int) -> String:
+	if id >= _body_names.size():
+		var from: int = _body_names.size()
+		_body_names.resize(id + 1)
+		for at in range(from, id + 1):
+			_body_names[at] = SimHash.BODY_PREFIX + str(at)
+	return _body_names[id]
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes

@@ -1,6 +1,6 @@
 # Props: things in the world that stand, block, take hits, react and give off motes
 
-**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1 and W2 done (2026-11-11), W3 next** (the owner: Spells' hash by caster is the next step). It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
+**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1, W2 and W3 done (2026-11-11), W4 next**. It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
 
 The steps are **W1 to W9** (W for the world's things). Each is one PR, in order.
 
@@ -128,6 +128,26 @@ Added by the owner after W2 (2026-11-11): "the fix for this should be added to t
 - The walker, the hash and snapshots stay generic: Spells says what its parts are (one method the hash asks, as `rest_leaf` is for a body), and a snapshot still saves Spells whole.
 
 **Done when:** `prop_cost.gd` shows Spells' hash flat in the props (within a millisecond from 0 to 1,000) and the worst tick of a spread hash at 1,000 props under 5 ms; `test_state_walked`, `test_determinism`, `test_content_determinism`, the replays across platforms (`tools/platform_hashes.py`) and the desync report's tests pass; the stress run's hash numbers before and after are in docs/DECISIONS.md.
+
+**Done (2026-11-11).** Built as above, with these differences:
+
+- **Parts are a kind of member, not Spells' own code** (`PARTED`, core/sim/README.md, "The hash"): any area may list the tables it keeps by actor id, and hand each id's over (`state_parts()`, `state_part(id)`). The hash makes the parts (`SimHash.parted`, also in `slice`, `areas` and `Desync.capture`): the area less those members under its own name, and "Spells 7" for caster 7, which `slice` puts with the body "actor 7". `SimHash.of`, a walk of the area itself and a snapshot take Spells whole, so nothing that hands Spells over alone loses a table.
+- **What is parted:** the tables that grew with the casters (`_installed`, `_profiles`, `_node_counts`, `_live`, `_generation_live`, `_last_infused`). The packed arrays kept by actor (wind-ups, cooldowns, cursors, generations) stay in Spells' area: each is one engine `hash()` call whatever the number of casters (flat), and the desync report already names the first index that differs, which is the caster's row. `_penta_rings` (by a Penta card's tag) stays too: only casters of Penta have a row.
+- **A resting caster** is its four builds as installed and its last infusion (each FROZEN, one leaf), and an id with none of it is an empty part. What says it rests is a new count, `_caster_live` (by caster, the sum of `_generation_live`, written only by the two functions that write that table): at 0 its only generations are its staffs' current ones, whose spells are its builds' nodes (set and freed together), so the tables are not looked at. While something of its builds is alive, its part is each generation it holds, staff by staff in order (looked up by key, never sorted): the generation, its node count, its live counts, and an older build's spells.
+- **The Tick keeps its bodies' names** ("actor 7", made once by id, not at every call): the spread hash asks for the areas every tick (`state_areas` took 0.66 ms at 1,000 bodies, most of it the names).
+
+Numbers (`prop_cost.gd`, headless, the owner's machine, main and W3 back to back):
+
+| | 0 | 300 | 1,000 |
+|---|---|---|---|
+| Spells' area | 2.03 ms (main) / 1.42 | 5.95 / 1.55 | 16.39 / 1.73 |
+| the casters' parts (W3) | 0.32 | 3.00 | 11.01 |
+| State hash, whole | 4.77 / 4.24 | 12.54 / 11.57 | 33.69 / 34.92 |
+| State hash, worst tick of 60 | 1.78 / 1.42 | 6.16 / 2.04 | 16.26 / 4.09 |
+
+Spells' area is flat (within 0.3 ms from 0 to 1,000) and the worst spread tick at 1,000 is 4.0 to 4.9 ms over five runs; it is Combat's tick now (2.8 ms at 1,000, its own tables by actor, which `PARTED` could take the same way) with the fixed cost of naming and slicing the areas (about 1 ms at 1,000). The whole hash is no cheaper: a caster's part costs about 10 us, nearly all of it the walker's own cost per area and per element (about 1 us an array element), as a resting body's `rest_leaf` does (11 us).
+
+**Left:** the walker's cost per area and per element (the next lever for the whole hash: bodies 11 ms and parts 10 ms at 1,000); Combat's tables by actor; the net check sends a name and a hash a part, one more per caster (about 17 bytes a caster a second).
 
 ## W4: a prop in the game (engine)
 

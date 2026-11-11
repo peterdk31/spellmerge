@@ -227,7 +227,8 @@ func _time_hash(count: int) -> void:
 	var by_area: Dictionary[String, int] = {}
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
-		var named: Dictionary = _tick.state_areas()
+		# An area with parts as its parts (Spells' casters, props W3), as `SimHash.areas` takes it.
+		var named: Dictionary = SimHash.parted(_tick.state_areas())
 		areas = named.size()
 		var walk := StateWalk.new()
 		walk.with_paths = false
@@ -238,7 +239,8 @@ func _time_hash(count: int) -> void:
 			if name.begins_with(SimHash.BODY_PREFIX):
 				body_total += Time.get_ticks_usec() - area_start
 			else:
-				by_area[name] = by_area.get(name, 0) + Time.get_ticks_usec() - area_start
+				var key: String = _area_of(name, named[name] as Object)
+				by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems
 		total += Time.get_ticks_usec() - start
@@ -256,7 +258,7 @@ func _time_hash(count: int) -> void:
 	var keys: Array = by_area.keys()
 	keys.sort_custom(func(a: String, b: String) -> bool: return by_area[a] > by_area[b])
 	var shown: Array[String] = []
-	for key: String in keys.slice(0, 4):
+	for key: String in keys.slice(0, 5):
 		shown.append("%s %.2f" % [key, float(by_area[key]) / HASH_PASSES / 1000.0])
 	print("BENCH: props %d: state hash, the costliest areas but the bodies (ms): %s" % [count, ", ".join(shown)])
 	for problem in problems.slice(0, 5):
@@ -292,6 +294,14 @@ func _time_snapshot(count: int) -> void:
 	if back != count:
 		_failures.append("props %d: the restore made %d stand-ins again" % [count, back])
 	print("BENCH: props %d: snapshot take avg %.2f ms, %d bodies, %d objects; restore into the same world %.2f ms, with the stand-ins made again %.2f ms" % [count, float(take_total) / SNAPSHOT_PASSES / 1000.0, snapshot.bodies.size(), objects, float(same) / 1000.0, float(made) / 1000.0])
+
+
+## What a hashed area is counted as: an area's parts ("Spells 7", `SimHash.Part`) together as
+## "Spells parts", anything else by its name.
+static func _area_of(name: String, object: Object) -> String:
+	if object is SimHash.Part and (object as SimHash.Part).id >= 0:
+		return name.substr(0, name.rfind(" ")) + " parts"
+	return name
 
 
 ## The objects a snapshot's value holds (`Snapshot.Obj`), counted through its lists and tables:

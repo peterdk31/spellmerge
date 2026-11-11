@@ -46,9 +46,11 @@ func capture(areas: Dictionary) -> void:
 	else:
 		var tick_hashes: Dictionary[String, int] = {}
 		leaves = {}
-		for name: Variant in areas:
+		# An area with parts as its parts, as `SimHash.areas` hashes it ("Spells 7": the caster).
+		var all: Dictionary = SimHash.parted(areas)
+		for name: Variant in all:
 			var kept: Dictionary = {}
-			tick_hashes[String(name)] = SimHash.area(walk, String(name), areas[name] as Object, func(path: String, value: Variant) -> void: kept[path] = _copy(value))
+			tick_hashes[String(name)] = SimHash.area(walk, String(name), all[name] as Object, func(path: String, value: Variant) -> void: kept[path] = _copy(value))
 			leaves[String(name)] = kept
 		hashes.append(tick_hashes)
 	for problem in walk.problems:

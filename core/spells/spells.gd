@@ -198,12 +198,16 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_part"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
 ## (core/sim/README.md).
 const SPARES: Array[StringName] = [&"_pending_free"]
+## State kept by caster, hashed caster by caster (`state_part`, "Spells 7" beside the body "actor 7")
+## and not with the rest of Spells (props W3, core/sim/README.md, "The hash"): the tables that grow
+## with the casters. A snapshot saves them whole.
+const PARTED: Array[StringName] = [&"_installed", &"_profiles", &"_node_counts", &"_live", &"_generation_live", &"_last_infused"]
 ## The session's settings a new run keeps (`begin_run`): a benchmark's fire budget.
 const RUN_KEEPS: Array[StringName] = [&"fire_shots_per_step"]
 
@@ -259,6 +263,15 @@ var _profiles: Dictionary = {}
 var _live: Dictionary = {}
 ## generation key (the depth-0 tag) -> live shots of all depths of that generation
 var _generation_live: Dictionary = {}
+## actor -> its sum of `_generation_live`: 0 when nothing of its builds is alive (no shot, no
+## launch that keeps a build), so its only generations are its staffs' current ones (an older one
+## is freed with its last shot). Written with `_generation_live` only (`_add_live`, `_take_live`).
+var _caster_live: PackedInt32Array = PackedInt32Array()
+## Every actor id from this one on has nothing in the PARTED tables: one past the highest that ever
+## had a build (`begin_generation`), so the parts are `state_parts()` of them.
+var _caster_rows: int = 0
+## The part being handed to the hash (`state_part`; reused, read before the next).
+var _part: Array = []
 
 ## actor * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
@@ -508,6 +521,7 @@ func _init() -> void:
 	_aim_origin.resize(ACTORS)
 	_aim_origin.fill(Vector2.INF)
 	_walk_turn.resize(ACTORS)
+	_caster_live.resize(ACTORS)
 	_aim_dir.resize(ACTORS)
 	_aim_dir.fill(Vector2.INF)
 	_aim_seen.resize(ACTORS)
@@ -988,11 +1002,12 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 		_live.erase(stale)
 	# The revoked build's waiting payloads go with its shots (its numbers are the new build's now).
 	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.generation == generation)
-	_generation_live.erase(key)
+	_take_live(key, _generation_live.get(key, 0))
 	for spell in compiled.nodes:
 		_profiles[SpellTag.make(actor, staff, spell.node, generation)] = spell
 	_node_counts[key] = compiled.nodes.size()
 	_installed[index] = compiled
+	_caster_rows = maxi(_caster_rows, actor + 1)
 	_cursor[index] = 0
 	if old >= 0:
 		_release_generation(actor, staff, old)
@@ -1011,8 +1026,7 @@ func current_tag(actor: int, slot: int, node: int = 0) -> int:
 func shot_started(tag: int) -> void:
 	if _profiles.has(tag):
 		_live[tag] = _live.get(tag, 0) + 1
-		var key: int = SpellTag.generation_key(tag)
-		_generation_live[key] = _generation_live.get(key, 0) + 1
+		_add_live(SpellTag.generation_key(tag))
 
 
 ## A shot with `tag` ended (hit, expired or was removed). The generation's spells (every
@@ -1035,13 +1049,28 @@ func shot_ended(tag: int) -> void:
 ## generation with none left is freed.
 func _generation_gone(tag: int) -> void:
 	var key: int = SpellTag.generation_key(tag)
-	var in_air: int = _generation_live.get(key, 0) - 1
-	if in_air > 0:
-		_generation_live[key] = in_air
-		return
-	_generation_live.erase(key)
-	if not _is_current(tag):
+	_take_live(key, 1)
+	if not _generation_live.has(key) and not _is_current(tag):
 		_erase_generation(tag)
+
+
+## One more shot or launch of the generation `key` is alive (`_generation_live`, and its caster's
+## sum, `_caster_live`).
+func _add_live(key: int) -> void:
+	_generation_live[key] = _generation_live.get(key, 0) + 1
+	_caster_live[SpellTag.caster_of(key)] += 1
+
+
+## `count` fewer of the generation `key` are alive (none left: its entry goes).
+func _take_live(key: int, count: int) -> void:
+	if count <= 0:
+		return
+	var left: int = _generation_live.get(key, 0) - count
+	_caster_live[SpellTag.caster_of(key)] -= count + mini(left, 0)
+	if left > 0:
+		_generation_live[key] = left
+	else:
+		_generation_live.erase(key)
 
 
 ## Live shots counted for `tag`.
@@ -1871,8 +1900,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(body_of(_caster, actor))
 	if launch.caster != CASTER_BODY:
-		var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
-		_generation_live[key] = _generation_live.get(key, 0) + 1
+		_add_live(SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation)))
 	_pending.append(launch)
 	return launch
 
@@ -3363,7 +3391,53 @@ func clear() -> void:
 	_profiles.clear()
 	_live.clear()
 	_generation_live.clear()
+	_caster_live.fill(0)
+	_caster_rows = 0
 	revoked_tags.clear()
+
+
+## How many casters' parts the state hash takes (props W3; core/sim/README.md, "The hash"): actor
+## ids 0 to this less one, each `state_part(id)`. Every other id has nothing in the PARTED tables.
+func state_parts() -> int:
+	return _caster_rows
+
+
+## Caster `actor`'s part of the PARTED tables, for the state hash (it is walked as "Spells 7", in
+## the spread hash's part with the body "actor 7"): its four staffs' builds as installed (FROZEN:
+## one leaf each) and the carrier of its last infused cast, and, only while something of its builds
+## is alive (`_caster_live`), each generation it holds, staff by staff in order: the generation, its
+## node count, what is alive of it, and each node's live shots and (for a generation no longer
+## current) its spell. A current generation's spells are its installed build's nodes, set together
+## in `begin_generation` and freed together. Walked by index, never by sorting a table. An id with
+## none of it (a caster gone, its shots ended) is empty. Read it before the next call: the array is
+## reused.
+func state_part(actor: int) -> Array:
+	_part.clear()
+	var base: int = actor * SpellLimits.STAFFS
+	if _caster_live[actor] == 0 and _last_infused[actor] == null and _installed[base] == null and _installed[base + 1] == null and _installed[base + 2] == null and _installed[base + 3] == null:
+		return _part
+	for staff in SpellLimits.STAFFS:
+		_part.append(_installed[base + staff])
+	_part.append(_last_infused[actor])
+	if _caster_live[actor] == 0:
+		return _part
+	_part.append(_caster_live[actor])
+	for staff in SpellLimits.STAFFS:
+		var current: int = _current[base + staff]
+		for generation in SpellLimits.GENERATIONS:
+			var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
+			if not _node_counts.has(key):
+				continue
+			var nodes: int = _node_counts[key]
+			_part.append(staff * SpellLimits.GENERATIONS + generation)
+			_part.append(nodes)
+			_part.append(_generation_live.get(key, 0))
+			for node in nodes:
+				var tag: int = SpellTag.make(actor, staff, node, generation)
+				_part.append(_live.get(tag, 0))
+				if generation != current:
+					_part.append(_profiles.get(tag))
+	return _part
 
 
 ## Opens the caster `actor` (an actor id a body opened in the actor table, actors G3b): its

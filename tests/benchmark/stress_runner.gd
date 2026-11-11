@@ -536,14 +536,15 @@ func _report_state_hash(label: String) -> void:
 	var by_area: Dictionary[String, int] = {}
 	for i in HASH_PASSES:
 		var start: int = Time.get_ticks_usec()
-		named = tick.state_areas()
+		# An area with parts as its parts (Spells' casters, props W3), as `SimHash.areas` takes it.
+		named = SimHash.parted(tick.state_areas())
 		var walk := StateWalk.new()
 		walk.with_paths = false
 		var hashes: Dictionary[String, int] = {}
 		for name: String in named:
 			var area_start: int = Time.get_ticks_usec()
 			hashes[name] = SimHash.area(walk, name, named[name] as Object)
-			var key: String = "bodies" if name.begins_with(SimHash.BODY_PREFIX) else name
+			var key: String = "bodies" if name.begins_with(SimHash.BODY_PREFIX) else _area_of(name, named[name] as Object)
 			by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems
@@ -574,6 +575,14 @@ func _report_state_hash(label: String) -> void:
 		part_total += part_took
 		part_most = maxi(part_most, part_took)
 	print("BENCH: stress %s: state hash spread over %d ticks: avg %.2f ms max %.2f ms a tick" % [label, HASH_SLICES, float(part_total) / float(HASH_SLICES) / 1000.0, float(part_most) / 1000.0])
+
+
+## What a hashed area is counted as: an area's parts ("Spells 7", `SimHash.Part`) together as
+## "Spells parts", anything else by its name.
+static func _area_of(name: String, object: Object) -> String:
+	if object is SimHash.Part and (object as SimHash.Part).id >= 0:
+		return name.substr(0, name.rfind(" ")) + " parts"
+	return name
 
 
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.

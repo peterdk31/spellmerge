@@ -102,7 +102,9 @@ func _check_scene(name: StringName) -> void:
 ## The hash's two walks agree on every area (core/sim/sim_hash.gd): the quick one (no paths, the
 ## values appended by the walk itself, its short ways: plain members, packed arrays, idle rows, spare
 ## pools) and the desync report's (paths, every leaf handed over).
-func _check_hash_modes(scene: StringName, areas: Dictionary) -> void:
+func _check_hash_modes(scene: StringName, named: Dictionary) -> void:
+	# An area with parts as its parts (Spells' casters, props W3), as the hash takes them.
+	var areas: Dictionary = SimHash.parted(named)
 	for name: Variant in areas:
 		var quick := StateWalk.new()
 		quick.with_paths = false

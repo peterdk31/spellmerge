@@ -44,6 +44,21 @@ class Area:
 		calls.append(["%s.take_rules" % name, float(rules.shot_cap)])
 
 
+## An area that keeps state by actor id, hashed id by id (`SimHash.Part`, props W3), as Spells does
+## by caster.
+class PartedArea:
+	extends Area
+	const PARTED: Array[StringName] = [&"by_id"]
+	var by_id: Array[int] = []
+	var shared: int = 0
+
+	func state_parts() -> int:
+		return by_id.size()
+
+	func state_part(id: int) -> Array:
+		return [by_id[id]]
+
+
 ## The frames service: records its tick and its stood ticks, and says how many ticks a physics step
 ## runs (`due`).
 class StandInFrames:
@@ -171,12 +186,19 @@ func test_ticked_is_sent_after_every_tick_has_stepped() -> void:
 
 
 ## The game's state in parts (`SimHash.slice`, N3c): each area in exactly one part, the parts
-## together the whole, the services spread one to a part, each body in the part of its id.
+## together the whole, the services spread one to a part, each body in the part of its id, and
+## each part an area keeps by actor id ("Kept 3", as Spells' casters, props W3) in the part of
+## that body.
 func test_the_state_splits_into_parts_that_cover_it_once() -> void:
 	for i in 5:
 		_body("b%d" % i)
+	var kept: PartedArea = own(PartedArea.new("Kept", calls)) as PartedArea
+	kept.by_id = [10, 11, 12, 13, 14]
 	var whole: Dictionary = _tick.state_areas()
 	check(whole.has("Sim") and whole.has("Spells") and whole.has("Actors") and whole.has("actor 4"), "the whole names the sim, the areas, the actor table and the bodies: %s" % [whole.keys()])
+	whole["Kept"] = kept
+	var all: Dictionary = SimHash.parted(whole)
+	check(all.has("Kept 4") and not all.has("Kept 5") and all["Kept"] is SimHash.Part, "each part is an area of its own, and the area less them another: %s" % [all.keys()])
 	var services: int = whole.size() - 5
 	for slices: int in [1, 2, 7, 60]:
 		var met: Dictionary = {}
@@ -184,10 +206,25 @@ func test_the_state_splits_into_parts_that_cover_it_once() -> void:
 			for name: String in SimHash.slice(whole, slice, slices):
 				check(not met.has(name), "%s is in one part of %d" % [name, slices])
 				met[name] = slice
-		check_equal(met.size(), whole.size(), "the %d parts cover the whole" % slices)
+		check_equal(met.size(), all.size(), "the %d parts cover the whole" % slices)
 		if slices >= services:
 			check(met["Sim"] != met["Spells"] and met["Spells"] != met["Projectiles"], "services one to a part of %d" % slices)
 		check_equal(met["actor 3"], 3 % slices, "a body by its id, of %d" % slices)
+		check_equal(met["Kept 3"], 3 % slices, "an id's part with its body, of %d" % slices)
+	# Hashed whole or spread, the same hashes.
+	var spread: Dictionary[String, int] = {}
+	for slice in 7:
+		spread.merge(SimHash.areas(SimHash.slice(whole, slice, 7)))
+	var at_once: Dictionary[String, int] = SimHash.areas(whole)
+	for name: String in at_once:
+		check_equal(spread.get(name), at_once[name], "%s hashes the same spread" % name)
+	# An id's part changes its own hash only, and the area alone (`of`) is all of it.
+	var before: int = SimHash.of(kept)
+	kept.by_id[3] = 99
+	var after: Dictionary[String, int] = SimHash.areas(whole)
+	for name: String in at_once:
+		check_equal(after[name] != at_once[name], name == "Kept 3", "a change of id 3 changes %s's hash: %s" % [name, name == "Kept 3"])
+	check(SimHash.of(kept) != before, "the area alone is hashed whole")
 
 
 func test_the_bodies_go_by_actor_id_not_by_tree_order() -> void:

@@ -16,7 +16,11 @@ extends RefCounted
 ##   what it is;
 ## - `SPARES` (free lists of spare records, each set whole when it is taken: Spells' spare launches),
 ##   walked as their size alone (N3c: their contents cannot change the game, and walking them was a
-##   fifth of the spells area's hash).
+##   fifth of the spells area's hash);
+## - `PARTED` (tables kept by actor id that grow with the actors: Spells' builds by caster), state
+##   that the hash walks id by id, each id's as a part of its own (`SimHash.Part`, "Spells 7", which
+##   the script hands over with `state_part(id)`), and not with the rest of the area (props W3). A
+##   walk of the area itself, not of its parts, walks them as any member; so does a snapshot.
 ## A list is a constant `Array[StringName]` named after its kind, or after its kind and `_` and a
 ## name of the script's own (`DERIVED_BEAM`): a script that extends one with a list cannot declare
 ## the same constant again, so it names its own. The lists are read from the script and the scripts
@@ -79,7 +83,7 @@ const VIEW_FOLDERS: Array[String] = [
 ]
 ## The kinds of list a simulation script may declare (see the class doc; RUN_KEEPS, the settings a
 ## new run keeps, is `SimFresh`'s).
-const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS", "SPARES", "RUN_KEEPS"]
+const LISTS: Array[String] = ["DERIVED", "VIEW", "REFS", "SPARES", "PARTED", "RUN_KEEPS"]
 
 ## Each problem, as "path: what it holds; the fix".
 var problems: PackedStringArray = PackedStringArray()
@@ -129,6 +133,10 @@ static var _frozen_hashes: Dictionary[int, int] = {}
 const FROZEN_LEAF: StringName = &"frozen"
 ## Script to whether its objects say when they are idle (`func idle() -> bool`).
 static var _idles: Dictionary[Script, bool] = {}
+## Script to its PARTED members, 1 each in `members` order (empty when it lists none).
+static var _parted: Dictionary[Script, PackedByteArray] = {}
+## The root's PARTED members while the area less its parts is walked (`SimHash.Part` -1), else empty.
+var _skip: PackedByteArray = PackedByteArray()
 ## The one leaf of an idle object.
 const IDLE: StringName = &"idle"
 ## Script to whether a node of it is walked when its holder owns it (`_walks_into`), for the scripts
@@ -141,8 +149,7 @@ static var _enters: Dictionary[Script, bool] = {}
 func walk(area: String, object: Object, sink: Callable) -> void:
 	_sink = sink
 	_seen.clear()
-	# The area itself is walked as its own holder (a body or a service is the root of its area).
-	_object(area, object, null, true)
+	_root(area, object)
 	_sink = Callable()
 
 
@@ -153,9 +160,27 @@ func values(area: String, object: Object, into: Array) -> void:
 	_collecting = true
 	_values = into
 	_seen.clear()
-	_object(area, object, null, true)
+	_root(area, object)
 	_values = []
 	_collecting = false
+
+
+## The area itself, walked as its own holder (a body or a service is the root of its area), or one
+## part of an area (`SimHash.Part`): the area less its PARTED members, or one id's (`state_part`).
+func _root(area: String, object: Object) -> void:
+	if not object is SimHash.Part:
+		_object(area, object, null, true)
+		return
+	var part: SimHash.Part = object
+	if part.id >= 0:
+		_value(area, part.area.call(&"state_part", part.id), part.area)
+		return
+	var script: Script = part.area.get_script() as Script
+	if not _members.has(script):
+		_plan(script)
+	_skip = _parted[script]
+	_object(area, part.area, null, true)
+	_skip = PackedByteArray()
 
 
 ## Whether `script` is a simulation script (in FOLDERS, not in VIEW_FOLDERS). An inner class has no path of its own and is
@@ -318,14 +343,17 @@ static func _plan(script: Script) -> void:
 	var skip: PackedStringArray = listed(script, "DERIVED") + listed(script, "VIEW")
 	var refs: PackedStringArray = listed(script, "REFS")
 	var spares: PackedStringArray = listed(script, "SPARES")
+	var parted: PackedStringArray = listed(script, "PARTED")
 	var names := PackedStringArray()
 	var how := PackedByteArray()
+	var skips := PackedByteArray()
 	var types: Dictionary[String, int] = {}
 	for info: Dictionary in script.get_script_property_list():
 		types[String(info["name"])] = int(info["type"])
 	for name in declared(script):
 		if not skip.has(name):
 			names.append(name)
+			skips.append(1 if parted.has(name) else 0)
 			# A bool, a number, a string, a vector, a colour ... (TYPE_BOOL to TYPE_NODE_PATH): it can
 			# hold nothing else.
 			var type: int = int(types.get(name, TYPE_NIL))
@@ -337,6 +365,7 @@ static func _plan(script: Script) -> void:
 				how.append(REF if refs.has(name) else (PLAIN if type >= TYPE_BOOL and type <= TYPE_NODE_PATH else 0))
 	_members[script] = names
 	_how[script] = how
+	_parted[script] = skips if parted.size() > 0 else PackedByteArray()
 	var named: Array[StringName] = []
 	for name in names:
 		named.append(StringName(name))
@@ -621,7 +650,12 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 			return
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)
-	_members_of(path, object, script)
+	if root and not _skip.is_empty():
+		var skip: PackedByteArray = _skip
+		_skip = PackedByteArray()
+		_members_of(path, object, script, skip)
+	else:
+		_members_of(path, object, script)
 	if root and is_body(node):
 		# The simulation nodes added to it in play that no member holds (a possession's puppet).
 		for added: Node in added_in_play(node):
@@ -629,11 +663,15 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 				_object(_join(path, "/" + str(node.get_path_to(added))), added, node)
 
 
-## Every state member of `object` (of `script`), in order, by how its plan says.
-func _members_of(path: String, object: Object, script: Script) -> void:
+## Every state member of `object` (of `script`), in order, by how its plan says; with `skip`, but
+## those it marks (the area less its PARTED members).
+func _members_of(path: String, object: Object, script: Script, skip: PackedByteArray = PackedByteArray()) -> void:
 	var names: Array = _member_names[script]
 	var how: PackedByteArray = _how[script]
+	var skipping: bool = not skip.is_empty()
 	for i in names.size():
+		if skipping and skip[i] != 0:
+			continue
 		var name: StringName = names[i]
 		if _collecting and how[i] == PLAIN:
 			_values.append(object.get(name))

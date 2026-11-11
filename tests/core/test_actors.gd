@@ -326,3 +326,18 @@ func test_a_runs_start_counts_the_births_again() -> void:
 	var id: int = _actors.open(ActorsScript.TEAM_WIZARDS, 0, 0)
 	check_equal(id, fresh_id, "the same id")
 	check_equal(_actors.key_of(id), fresh.key_of(fresh_id), "and the same key as a fresh game's")
+
+
+## Aim's one rule (props W4): another team is a foe, the world's never; a body of no team is
+## everyone's foe, and no team of our own aims at every team but the world's.
+func test_the_world_is_nobodys_foe_and_every_team_is_its() -> void:
+	const W := ActorsScript.TEAM_WIZARDS
+	const E := ActorsScript.TEAM_ENEMIES
+	const WORLD := ActorsScript.TEAM_WORLD
+	const NONE := ActorsScript.NONE
+	check(ActorsScript.is_foe(W, E) and ActorsScript.is_foe(E, W), "wizards and enemies are foes")
+	check(not ActorsScript.is_foe(W, W) and not ActorsScript.is_foe(E, E), "a team is not its own foe")
+	check(not ActorsScript.is_foe(W, WORLD) and not ActorsScript.is_foe(E, WORLD) and not ActorsScript.is_foe(NONE, WORLD), "nobody aims at the world")
+	check(not ActorsScript.is_foe(WORLD, WORLD), "not even the world")
+	check(ActorsScript.is_foe(WORLD, W) and ActorsScript.is_foe(WORLD, E), "the world aims at every other team")
+	check(ActorsScript.is_foe(NONE, W) and ActorsScript.is_foe(W, NONE), "no team: a foe of every team")

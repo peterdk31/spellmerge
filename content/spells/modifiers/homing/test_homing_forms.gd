@@ -160,7 +160,7 @@ func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 		_mgr.step(DT)
 	var now: Vector2 = _mgr.get_position_of(slots[0])
 	check(now.distance_to(target.global_position) < start.distance_to(target.global_position) - 8.0, "it crept toward the target: %s" % now)
-	check(_mgr.clip_to_walls(now - Vector2(30.0, 0.0), now + Vector2(30.0, 0.0)) != now + Vector2(30.0, 0.0), "its wall went with it")
+	check(_mgr.clip_to_walls(now - Vector2(30.0, 0.0), now + Vector2(30.0, 0.0), -1) != now + Vector2(30.0, 0.0), "its wall went with it")
 
 
 func test_homing_on_a_form_it_cannot_steer_is_wasted_and_changes_nothing() -> void:

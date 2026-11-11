@@ -520,7 +520,7 @@ func _beam_follow(at: int, delta: float) -> void:
 				var hand: Vector2 = kit.aim_pivot(holder)
 				if hand.is_finite():
 					var tip: Vector2 = hand + DMath.rotated(_bm_origin[at] - hand, _bm_swept[at])
-					_bm_origin[at] = kit.projectiles.clip_to_walls(hand, tip)
+					_bm_origin[at] = kit.projectiles.clip_to_walls(hand, tip, holder)
 				kit.turn_staff(holder, _bm_swept[at])
 		elif kit.aim_seen(holder):
 			_end_beam(at, false)
@@ -539,7 +539,7 @@ func _beam_follow(at: int, delta: float) -> void:
 		var ring: Vector4 = _bm_ring[at]
 		var centre: Vector2 = _bm_ring_centre[at]
 		var angle: float = ring.y + ring.w * (kit.clock() - ring.z)
-		_bm_origin[at] = kit.ring_point(centre, ring.x, angle)
+		_bm_origin[at] = kit.ring_point(_bm_actor[at], centre, ring.x, angle)
 		if not _bm_origin[at].is_equal_approx(centre):
 			_bm_dir[at] = DMath.rotated(_bm_origin[at].direction_to(centre), _bm_turn[at])
 			aimed = true
@@ -866,7 +866,7 @@ func _leg_follow(at: int) -> void:
 		way = kit.projectiles.gate_face(out)
 	way = way.normalized()
 	var centre: Vector2 = kit.projectiles.gate_position(out)
-	_bm_origin[at] = kit.projectiles.clip_to_walls(centre, centre + way * (kit.projectiles.gate_radius(out) + 1.0))
+	_bm_origin[at] = kit.projectiles.clip_to_walls(centre, centre + way * (kit.projectiles.gate_radius(out) + 1.0), SpellRuntime.ActorsScript.NONE)
 	_bm_dir[at] = way
 	_bm_length[at] = _bm_gate_left[parent]
 

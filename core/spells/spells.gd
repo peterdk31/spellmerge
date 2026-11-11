@@ -1577,11 +1577,11 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 
 ## Where a carrier its caster places (a rune, a decoy, a familiar) appears: a step ahead of
 ## `origin` along `heading`, twice its size (rules R4 F3), so a mirror's copy is placed behind;
-## with a wall in the way, at `origin` (never in the wall).
-func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
+## with a wall in the way, at `origin` (never in the wall; `actor`'s own footprint is none).
+func _placed_at(spell: CompiledSpell, actor: int, origin: Vector2, heading: Vector2) -> Vector2:
 	var ahead: Vector2 = origin + heading * spell.radius * 2.0
 	# Skyfall: while something falls, it is placed on its floor line.
-	return _skyfall.on_floor(spell, ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin)
+	return _skyfall.on_floor(spell, ahead if projectiles.clip_to_walls(origin, ahead, actor) == ahead else origin)
 
 
 ## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
@@ -1806,7 +1806,7 @@ func _penta(spell: CompiledSpell, copies: int, tag: int, actor: int, origin: Vec
 	_ring_turn = turn
 	for n in copies:
 		_ring_angle = turned + TAU * float(n) / float(copies)
-		var point: Vector2 = SpellRuntime.ring_point(projectiles, centre, radius, _ring_angle)
+		var point: Vector2 = SpellRuntime.ring_point(projectiles, actor, centre, radius, _ring_angle)
 		var aim: Vector2 = point.direction_to(centre) if not point.is_equal_approx(centre) else way
 		# Skyfall: each copy falls onto its point of the ring (owner, 2026-11-09).
 		made += _skyfall.open(spell, tag, actor, point) if _skyfall.falls(spell) else _launch(spell, tag, actor, point, aim, source)
@@ -1824,10 +1824,11 @@ static func penta_start(tag: int) -> float:
 	return float(posmod(hash(tag), 4096)) / 4096.0 * TAU
 
 
-## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall.
-static func ring_point(manager: ProjectilesScript, centre: Vector2, radius: float, angle: float) -> Vector2:
+## The point at `angle` on the ring of `radius` round `centre`, stopped short of a wall (not by
+## `actor`'s own footprint: the ring of its cast).
+static func ring_point(manager: ProjectilesScript, actor: int, centre: Vector2, radius: float, angle: float) -> Vector2:
 	var point: Vector2 = centre + DMath.from_angle(angle) * radius
-	return manager.clip_to_walls(centre, point) if manager != null else point
+	return manager.clip_to_walls(centre, point, actor) if manager != null else point
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way

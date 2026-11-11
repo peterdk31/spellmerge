@@ -56,8 +56,8 @@ extends Node2D
 ## every body whole.
 ##
 ## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
-## along the walls (the room's and the solid shots', the projectile manager's wall grid,
-## `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
+## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
+## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
 ## other (Combat's push parts them); spells find them by their hurt circles. No physics engine.
 ##
@@ -103,7 +103,8 @@ const REFS: Array[StringName] = [&"controller"]
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
-## The team it keeps while no controller drives it and it has no home controller.
+## The team it keeps while no controller drives it and it has no home controller: a prop's is
+## `Actors.TEAM_WORLD` (props W4).
 @export var idle_team: int = ActorsScript.NONE
 ## The body: the hurt circle's centre and the orbit anchor, from the feet.
 @export var body_offset: Vector2 = Vector2(0.0, -12.0)
@@ -252,9 +253,11 @@ func rest_leaf() -> Variant:
 
 ## Move the body by `velocity` for `delta` seconds, sliding along the walls (see the class doc); when
 ## a wall changed the move, `velocity` is left as what it moved by. A body standing still is moved
-## too: a wall laid over it (a Wall card's) pushes it out.
+## too: a wall laid over it (a Wall card's) pushes it out. A body with no Mover never moves (props
+## W4: a prop stands in its own footprint, which would push it out; a possession drives it, and it
+## still stands).
 func move(delta: float) -> void:
-	if delta <= 0.0:
+	if delta <= 0.0 or mover == null:
 		return
 	var from: Vector2 = global_position
 	var unhindered: Vector2 = from + velocity * delta
@@ -324,8 +327,13 @@ func step(delta: float) -> void:
 
 ## Whom it aims at: its driver's team (its home controller's while none drives it).
 func team() -> int:
-	var by: ActorController = controller if controller != null else home_controller
-	return by.team if by != null else idle_team
+	return controller.team if controller != null else own_team()
+
+
+## The team it is on by itself, whoever drives it now: its home controller's, else `idle_team` (a
+## prop's is the world's). A possessed enemy's death is still an enemy's (Combat).
+func own_team() -> int:
+	return home_controller.team if home_controller != null else idle_team
 
 
 ## The human seat (0-3) driving it now, or -1.

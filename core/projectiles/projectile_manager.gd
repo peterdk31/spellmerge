@@ -63,8 +63,8 @@ extends Node2D
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
 ## asks whether a caster is a wizard or an enemy; the actor table answers four questions, read
 ## once when a shot is spawned and kept with it (a shot keeps the caster it was cast by):
-## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick other
-##   teams, and a shield stops other teams' shots. Never for whether a hit lands: every shot and
+## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick foes
+##   (`Actors.is_foe`: another team, never the world's props), and a shield stops other teams' shots. Never for whether a hit lands: every shot and
 ##   beam hits both actor layers (ACTOR_LAYERS, actors G3c, owner 2026-10-28: "Everything should
 ##   be able to damage everything."), its own caster's body too: a shot spares only the body it
 ##   started on, until it has left it (`exclude`; owner, 2026-11-06: "a players own spells should
@@ -86,7 +86,14 @@ extends Node2D
 ## point, not a circle. The step is cut at the wall first, so a target in front of the wall is still hit by a fast
 ## shot, and one behind it is not. The wall walk is not charged to the work
 ## budget above (its length is capped instead). `wall_hits` counts these ends.
-## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
+## `clip_to_walls(from, to, by)` shortens a segment to the first wall.
+##
+## Footprints (props W4, docs/milestones/props.md): `set_footprint(actor, rect)` lays the cells a
+## body blocks (a prop's `Footprint`) into the same grid, so shots end on it, rays stop at it and
+## bodies slide along it as along any wall. Its body's hurt circle covers it, so a shot that meets
+## it hits the body first (the step is cut at the wall, then tested for hits). A body's own spells
+## leave its footprint (its shots, rays and staff tip, as a Wall card's payloads leave its row), and
+## a sweep's line to a body is not hidden by the footprint under it. `spawn` refuses
 ## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
 ## pool slot and evicts nobody at the cap. Each wall end, and each hit on a
 ## target, also sends `Events.projectile_impact(caster, target, position,
@@ -140,8 +147,8 @@ extends Node2D
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
-## found. It never homes on its shooter's own body, on a body of its shooter's team or on
-## targets it just hit. The search
+## found. It homes only on a foe (`Actors.is_foe`: never on its shooter's own body, a body of its
+## shooter's team or a prop of the world's) and never on targets it just hit. The search
 ## is charged to the step's hit-work budget (1 per target examined); when the budget is
 ## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
 ##
@@ -922,7 +929,8 @@ var _max_target_radius: float = 0.0
 var _grid_stale: bool = false
 
 ## The wall grid over the bounds: one byte per WALL_CELL cell, 0 for open: ROOM_CELL for a room
-## wall, plus one for every solid shot lying on it (`set_solid`).
+## wall, plus one for every solid shot and every footprint lying on it (`set_solid`,
+## `set_footprint`), at most ROOM_CELL - 1 (`_mark_cell`).
 var _wall_w: int = 1
 var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
@@ -931,6 +939,15 @@ var _has_walls: bool = false
 ## it for every shot).
 var _solids: Dictionary = {}
 var _any_solid: bool = false
+## The footprints (`set_footprint`): per actor, the world rectangle its body blocks as its two
+## corners (`[2 * id]` the lowest, `[2 * id + 1]` the highest; the same point for none), laid into
+## the wall grid; and how many are laid (the hot paths ask it first).
+var _footprints: PackedVector2Array = PackedVector2Array()
+var _footprints_laid: int = 0
+## The cells of a footprint that it could not count when it was laid (`ROOM_CELL - 1` things on
+## them already), by actor, so it never takes them out either: the counts stay exact. Empty but
+## for a cell crowded past its count.
+var _footprint_missed: Dictionary = {}
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
 var _ray_caster_seq: int = -1
@@ -1209,6 +1226,7 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
+	_footprints.resize(ACTORS * 2)
 	_group_count.resize(GROUPS)
 	_groups.resize(GROUPS)
 	_group_at.resize(GROUPS)
@@ -1270,7 +1288,7 @@ func native_constants() -> Dictionary:
 		constants.merge(script.get_script_constant_map())
 		script = script.get_base_script()
 	constants.merge({"PI": PI, "TAU": TAU, "HOMING_DRIFT": SpellLimits.HOMING_DRIFT,
-			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE})
+			"RAMP_ENEMY": ActorsScript.RAMP_ENEMY, "TEAM_NONE": ActorsScript.NONE, "TEAM_WORLD": ActorsScript.TEAM_WORLD})
 	return constants
 
 
@@ -1778,7 +1796,9 @@ func set_walls(rects: Array[Rect2]) -> void:
 		_add_wall(rect)
 
 
-## Remove every wall. A solid shot lays itself again at its next step.
+## Remove every wall. A solid shot lays itself again at its next step; the footprints are laid
+## again at once (a body that stands lays its own only when it enters the tree, which may be before
+## its room's walls are set).
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
@@ -1786,6 +1806,11 @@ func clear_walls() -> void:
 		var solid: Solid = _solids[slot]
 		solid.cells.clear()
 		solid.at = Vector2.INF
+	_footprint_missed.clear()
+	if _footprints_laid > 0:
+		for actor in ACTORS:
+			if _footprint_laid(actor):
+				_lay_footprint(actor)
 
 
 ## Add the rectangle shapes of a body (a room's static body) as walls. The body must
@@ -1878,8 +1903,7 @@ func _lay_solid(slot: int, solid: Solid) -> void:
 			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > reach * reach:
 				continue
 			var cell: int = y * _wall_w + x
-			if (_wall_cells[cell] & (ROOM_CELL - 1)) < ROOM_CELL - 1:
-				_wall_cells[cell] += 1
+			if _mark_cell(cell, 1):
 				solid.cells.append(cell)
 	_has_walls = _has_walls or not solid.cells.is_empty()
 
@@ -1893,7 +1917,20 @@ func _lift_solid(solid: Solid) -> void:
 ## Add `by` (1 or -1) to the count of every cell a solid shot lies on.
 func _mark_solid(solid: Solid, by: int) -> void:
 	for cell in solid.cells:
-		_wall_cells[cell] += by
+		_mark_cell(cell, by)
+
+
+## Add `by` (1 or -1) to the count of things laid on `cell` (solid shots and footprints), never
+## touching the room's mark: the count stays within 0 and ROOM_CELL - 1. Returns whether it
+## counted: past that many things on one cell one more is not counted (a solid shot and a footprint
+## each keep what they counted, so they take out only that).
+func _mark_cell(cell: int, by: int) -> bool:
+	var value: int = _wall_cells[cell]
+	var count: int = (value & (ROOM_CELL - 1)) + by
+	if count < 0 or count >= ROOM_CELL:
+		return false
+	_wall_cells[cell] = (value & ROOM_CELL) | count
+	return true
 
 
 ## The live solid shot that cast the shot in `slot` (a payload of a wall), or null.
@@ -1901,16 +1938,21 @@ func _own_solid(slot: int) -> Solid:
 	return _solid_of(_caster_slot[slot], _caster_seq[slot])
 
 
-## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when the
-## wall that cast it does not count: a wall's own payloads leave it (its row is lifted while
-## they look again). Asked only when it met a wall, so a step with none costs nothing.
-func _past_own_solid(slot: int, cut: float) -> float:
-	var own: Solid = _own_solid(slot)
-	if own == null:
-		return cut
-	_mark_solid(own, -1)
-	cut = _wall_hit(_prev[slot], _pos[slot])
-	_mark_solid(own, 1)
+## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when its own
+## walls do not count: a wall's payloads leave the wall that cast them, and a body's shots its
+## footprint (props W4). They are lifted while it looks again. Asked only when it met a wall, so a
+## step with none costs nothing.
+func _past_own_walls(slot: int, cut: float) -> float:
+	var own: Solid = _own_solid(slot) if _any_solid else null
+	if own != null:
+		_mark_solid(own, -1)
+	var lifted: bool = _mark_footprints_of(_actor[slot], ActorsScript.NONE, -1)
+	if own != null or lifted:
+		cut = _wall_hit(_prev[slot], _pos[slot])
+	if own != null:
+		_mark_solid(own, 1)
+	if lifted:
+		_mark_footprints_of(_actor[slot], ActorsScript.NONE, 1)
 	return cut
 
 
@@ -1940,16 +1982,119 @@ func _drop_solid(slot: int) -> void:
 
 
 ## The point where the segment from `from` to `to` first meets a wall, or `to` when
-## it is clear. If `from` is inside a wall, that is `from`.
-func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
-	var t: float = _wall_hit(from, to)
+## it is clear. If `from` is inside a wall, that is `from`. `by` is whose segment it is (an actor id,
+## or Actors.NONE for nobody's: a gate's): that body's own footprint does not count, as its spells
+## leave it (props W4). No default, so a new caller says whose.
+func clip_to_walls(from: Vector2, to: Vector2, by: int) -> Vector2:
+	var t: float = _wall_hit_sparing(by, ActorsScript.NONE, from, to)
 	if t < 0.0:
 		return to
 	return from.lerp(to, t)
 
 
-## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall and
-## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
+## The body of the actor `actor` blocks the world rectangle `rect` from now on (props W4: its
+## `Footprint`), in place of any it blocked before; an empty `rect` blocks nothing. The cells laid
+## are those whose centres lie in it: a footprint under a cell across may lay none, and the cells
+## laid reach at most half a cell past it. Its body's hurt circle should cover that (`Footprint`),
+## so a shot that meets the footprint hits the body. Laid in the wall grid as a solid shot is
+## (`circle_blocked`, `slide_body`, `line_clear` and every shot and ray see it) and laid again when
+## the walls are (`clear_walls`). Ids outside the table are ignored.
+func set_footprint(actor: int, rect: Rect2) -> void:
+	if actor < 0 or actor >= ACTORS:
+		return
+	rect = rect.abs()
+	if _footprint_laid(actor):
+		_mark_footprint(actor, -1)
+		_footprint_missed.erase(actor)
+		_footprints_laid -= 1
+	var blocks: bool = rect.has_area() and rect.is_finite()
+	_footprints[2 * actor] = rect.position if blocks else Vector2.ZERO
+	_footprints[2 * actor + 1] = rect.end if blocks else Vector2.ZERO
+	if blocks:
+		_footprints_laid += 1
+		_lay_footprint(actor)
+
+
+## The rectangle the body of `actor` blocks (`set_footprint`), empty for none.
+func footprint_of(actor: int) -> Rect2:
+	if not _footprint_laid(actor):
+		return Rect2()
+	return Rect2(_footprints[2 * actor], _footprints[2 * actor + 1] - _footprints[2 * actor])
+
+
+## True while the body of `actor` has a footprint laid.
+func _footprint_laid(actor: int) -> bool:
+	if actor < 0 or actor >= ACTORS:
+		return false
+	var low: Vector2 = _footprints[2 * actor]
+	var high: Vector2 = _footprints[2 * actor + 1]
+	return high.x > low.x and high.y > low.y
+
+
+## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
+## rectangle, as the cells from (x, y) up to (not with) (z, w).
+func _footprint_cells(actor: int) -> Vector4i:
+	var low: Vector2 = (_footprints[2 * actor] - _bounds.position) / WALL_CELL
+	var high: Vector2 = (_footprints[2 * actor + 1] - _bounds.position) / WALL_CELL
+	# A cell's centre is at its index and a half: in the rectangle from ceil(low - 0.5) on, up to
+	# (not with) ceil(high - 0.5).
+	return Vector4i(maxi(ceili(low.x - 0.5), 0), maxi(ceili(low.y - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w), mini(ceili(high.y - 0.5), _wall_h))
+
+
+## Lay the footprint of `actor` (newly set, or after the walls were cleared): one more on each of
+## its cells, those it could not count kept apart (`_footprint_missed`).
+func _lay_footprint(actor: int) -> void:
+	var cells: Vector4i = _footprint_cells(actor)
+	var missed := PackedInt32Array()
+	for y in range(cells.y, cells.w):
+		for x in range(cells.x, cells.z):
+			if not _mark_cell(y * _wall_w + x, 1):
+				missed.append(y * _wall_w + x)
+	if not missed.is_empty():
+		_footprint_missed[actor] = missed
+	if cells.z > cells.x and cells.w > cells.y:
+		_has_walls = true
+
+
+## Take the footprint of `actor` out (`by` -1) or put it back (1) on the cells it counted when it
+## was laid.
+func _mark_footprint(actor: int, by: int) -> void:
+	var cells: Vector4i = _footprint_cells(actor)
+	var missed: PackedInt32Array = _footprint_missed.get(actor, PackedInt32Array())
+	for y in range(cells.y, cells.w):
+		for x in range(cells.x, cells.z):
+			var cell: int = y * _wall_w + x
+			if missed.is_empty() or not missed.has(cell):
+				_mark_cell(cell, by)
+
+
+## Lift (`by` -1) or lay again (1) the footprints of the actors `a` and `b` (NONE: none), those
+## that are laid, each once; whether there were any.
+func _mark_footprints_of(a: int, b: int, by: int) -> bool:
+	var any: bool = false
+	if _footprint_laid(a):
+		_mark_footprint(a, by)
+		any = true
+	if b != a and _footprint_laid(b):
+		_mark_footprint(b, by)
+		any = true
+	return any
+
+
+## `_wall_hit` with the footprints of the actors `a` and `b` (NONE: none) not counted: a body's own
+## spells leave its footprint, and a line to a body is not hidden by the footprint under it (props
+## W4). They are lifted only when the path met a wall, so a path that meets none costs nothing more.
+func _wall_hit_sparing(a: int, b: int, from: Vector2, to: Vector2) -> float:
+	var cut: float = _wall_hit(from, to)
+	if cut < 0.0 or _footprints_laid == 0 or not _mark_footprints_of(a, b, -1):
+		return cut
+	cut = _wall_hit(from, to)
+	_mark_footprints_of(a, b, 1)
+	return cut
+
+
+## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall, no
+## solid shot (a Wall card's, whoever cast it) and no footprint, as a shot along it would find. Walks the whole
 ## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
 func line_clear(from: Vector2, to: Vector2) -> bool:
 	return _wall_hit(from, to) < 0.0
@@ -1974,7 +2119,7 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
-## walls it meets: the room's and the solid shots' (online-ready N6: the actors' move, in place of
+## walls it meets: the room's, the solid shots' and the footprints' (online-ready N6: the actors' move, in place of
 ## the engine's physics; `WallSlide`).
 func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
 	if not _has_walls:
@@ -2329,14 +2474,15 @@ func set_anchor(caster: int, position: Vector2) -> void:
 		_anchors[caster] = position
 
 
-## `set_anchor(caster, anchor)` and `clip_to_walls(from, to)` in one call: what every actor's
+## `set_anchor(caster, anchor)` and `clip_to_walls(from, to, caster)` in one call: what every actor's
 ## caster does every step (performance pass, 2026-10-28). Returns the clipped point.
 func place_caster(caster: int, anchor: Vector2, from: Vector2, to: Vector2) -> Vector2:
 	if caster >= 0 and caster < ACTORS and anchor.is_finite():
 		_anchors[caster] = anchor
 	if not _has_walls:
 		return to
-	var t: float = _wall_hit(from, to)
+	# Its own footprint does not cut its staff (props W4).
+	var t: float = _wall_hit_sparing(caster, ActorsScript.NONE, from, to)
 	return to if t < 0.0 else from.lerp(to, t)
 
 
@@ -2426,7 +2572,7 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		return false
 	_threat_step = -1
 	if seconds <= 0.0:
-		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
+		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset, _actor[slot]) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
 		_base[slot] += to - _pos[slot]
 		_pos[slot] = to
 		_prev[slot] = to
@@ -3581,8 +3727,8 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 		_step_solid(slot, _solids[slot])
 	elif _has_walls and (_flags[slot] & F_GHOST) == 0:
 		var cut: float = _wall_hit(_prev[slot], _pos[slot])
-		if cut >= 0.0 and _any_solid:
-			cut = _past_own_solid(slot, cut)
+		if cut >= 0.0 and (_any_solid or _footprints_laid > 0):
+			cut = _past_own_walls(slot, cut)
 		if cut >= 0.0:
 			walled = true
 			_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
@@ -4309,8 +4455,9 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 ## of `team` (NONE: no team, every target but its own body). For a shot (`slot` 0 or more) it
 ## also skips the targets the shot just hit and charges the work budget.
 func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int) -> int:
-	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it, nor
-	# a target the shot is still on (`_mark_memory`).
+	# Homing picks only a foe (`Actors.is_foe`, written out here and in the queries below: a call
+	# per target costs more than the test; never its own team, a teammate for a wizard, nor a prop of
+	# the world's), though every spell hits them, nor a target the shot is still on (`_mark_memory`).
 	var stamp: int = _mark_memory(slot) if slot >= 0 else -1
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
@@ -4322,7 +4469,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 			while t >= 0:
 				if slot >= 0:
 					_work_left -= 1
-				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
+				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
@@ -4688,7 +4835,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 						# How far either side of its centre line the body's circle reaches.
 						var width: float = PI if distance <= radius else DMath.asin(radius / distance)
 						var local: float = angle_difference(base, DMath.angle(to)) * turn
-						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit_sparing(caster, _target_owner[t], origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
@@ -4758,6 +4905,8 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	_ray_level(level)
 	if own != null:
 		_mark_solid(own, -1)
+	# And a body's own ray leaves its footprint (props W4).
+	var own_print: bool = _mark_footprints_of(caster, ActorsScript.NONE, -1)
 	# Cut the path at the first wall, or turn there while it has bounces: the rest of the path
 	# is dropped and it goes on, off the wall, for the length the rest had: along `steer`'s path
 	# (a homing beam homes again), else straight.
@@ -4846,6 +4995,8 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		at_piece += 1
 	if own != null:
 		_mark_solid(own, 1)
+	if own_print:
+		_mark_footprints_of(caster, ActorsScript.NONE, 1)
 	var nodes: Array = _ray_nodes[level]
 	var alongs: Array = _ray_along[level]
 	var points: Array = _ray_points[level]
@@ -6128,7 +6279,8 @@ func _refresh_targets() -> void:
 ## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
 ## just hit, for a chain) and so is `exclude_also`. With a `team` (not NONE), targets of that
-## team are skipped too: aim at other teams (a chain's jump, an arc's zap, a familiar's cast).
+## team are skipped too, and the world's always: aim at foes only (`Actors.is_foe`: a chain's jump,
+## an arc's zap, a familiar's cast).
 ## The hit circle's centre of the target returned is left in `nearest_point`. Allocation-free.
 func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null, team: int = ActorsScript.NONE) -> Node2D:
 	nearest_point = Vector2.INF
@@ -6144,7 +6296,7 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, skip) and t != skip_also and (team == ActorsScript.NONE or _target_team[t] != team):
+				if _query_match(t, point, radius, layers, skip) and t != skip_also and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team):
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d < best_sq:
 						best_sq = d
@@ -6156,7 +6308,8 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 	return _targets[best]
 
 
-## Fill `out` with the targets on `layers` not of `team` (Actors.NONE: of any) whose hit circle
+## Fill `out` with the targets on `layers` that are foes of `team` (`Actors.is_foe`: not of `team`,
+## Actors.NONE for none, and never the world's) whose hit circle
 ## overlaps the circle (`point`, `radius`), `centres` with where each one's hit circle is and
 ## `radii` with how big, in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
 ## run. With a finite `to`, the circles round every point of the line from `point` to `to` (a
@@ -6175,7 +6328,7 @@ func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Ar
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
 				var at: Vector2 = point if end == point else Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
-				if _query_match(t, at, radius, layers, -1) and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
+				if _query_match(t, at, radius, layers, -1) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
 						radii.resize(centres.size())

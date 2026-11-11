@@ -199,7 +199,7 @@ func _teleport(move: Vector2, tag: int) -> void:
 	var start: Vector2 = actor.global_position
 	var goal: Vector2 = start + move
 	if actor.projectiles != null:
-		var reached: Vector2 = actor.projectiles.clip_to_walls(start, goal)
+		var reached: Vector2 = actor.projectiles.clip_to_walls(start, goal, actor.id)
 		if reached != goal:
 			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
 		goal = reached

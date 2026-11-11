@@ -232,11 +232,11 @@ func _push_place_again() -> void:
 
 
 ## Where a cast leaves: the staff tip, or where a wall cuts the staff (the manager takes no pool
-## slot for a shot that starts inside a wall).
+## slot for a shot that starts inside a wall); its own body's footprint does not (props W4).
 func _origin() -> Vector2:
 	var tip: Vector2 = actor.muzzle_position()
 	if actor.projectiles != null:
-		return actor.projectiles.clip_to_walls(actor.global_position, tip)
+		return actor.projectiles.clip_to_walls(actor.global_position, tip, number)
 	return tip
 
 

@@ -355,7 +355,7 @@ func test_an_unopened_id_is_no_actor() -> void:
 func test_place_caster_sets_the_anchor_and_clips_like_the_two_calls() -> void:
 	mgr.set_walls([Rect2(200.0, 0.0, 16.0, 360.0)])
 	var clipped: Vector2 = mgr.place_caster(IMP, Vector2(150.0, 100.0), Vector2(150.0, 100.0), Vector2(250.0, 100.0))
-	check(clipped.is_equal_approx(mgr.clip_to_walls(Vector2(150.0, 100.0), Vector2(250.0, 100.0))), "clipped at the wall, as clip_to_walls (%s)" % clipped)
+	check(clipped.is_equal_approx(mgr.clip_to_walls(Vector2(150.0, 100.0), Vector2(250.0, 100.0), -1)), "clipped at the wall, as clip_to_walls (%s)" % clipped)
 	check(clipped.x <= 200.0, "short of the wall")
 	check_equal(mgr.get_anchor(IMP), Vector2(150.0, 100.0), "and the anchor is set")
 	check_equal(mgr.place_caster(IMP, Vector2.INF, Vector2(10.0, 10.0), Vector2(20.0, 10.0)), Vector2(20.0, 10.0), "a clear segment is not cut")

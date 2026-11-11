@@ -13,7 +13,7 @@ var _entities: Dictionary = {}
 
 ## Asks `ai` for one a step ahead along `heading`.
 func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, _source: Node, lifetime: float, _chain: int, _prev: int) -> int:
-	return _spawn(spell, tag, actor, kit.placed_at(spell, origin, heading), heading, lifetime)
+	return _spawn(spell, tag, actor, kit.placed_at(spell, actor, origin, heading), heading, lifetime)
 
 
 func step_order() -> int:

@@ -175,7 +175,7 @@ func _land_point(actor: int, spell: CompiledSpell, dir: Vector2) -> Vector2:
 	var pivot: Vector2 = kit.aim_pivot(actor)
 	if not offset.is_finite() or not pivot.is_finite() or kit.projectiles == null:
 		return offset
-	return kit.projectiles.clip_to_walls(pivot, pivot + offset) - pivot
+	return kit.projectiles.clip_to_walls(pivot, pivot + offset, actor) - pivot
 
 
 ## The carrier with `tag` struck `offset` from the hand (a slam's impact, where its hand was then):

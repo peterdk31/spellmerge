@@ -31,9 +31,9 @@ extends Node
 ## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
 ## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
 ## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
-## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every body not
-## on the wizards' team, a kit actor by its own controller's team so a possessed enemy still
-## counts; flow counts the wave by it), and the body is freed.
+## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every foe of
+## the wizards, a kit actor by its own team so a possessed enemy still counts and a prop of the
+## world's never does; flow counts the wave by it), and the body is freed.
 ##
 ## The one rules (owner, 2026-10-28), the same on every actor:
 ##  - **gust:** a spell hit shoves it harder (its power in per cent more), and a gusted body
@@ -655,14 +655,15 @@ func shield(actor: Variant) -> int:
 ## With a finite `to`, within `radius` of the line from `position` to `to`, toward the nearest
 ## point of the line (a beam's magnet). A pull replaces the push an actor had, so a magnet each
 ## step does not pile speed up. `caster` is who pulls (a pull does no damage); a body it newly
-## catches (not pulled in the last PULL_GAP_STEPS steps) plays PULL_CUE. With `foes_only`,
-## actors on the caster's team (the caster too) are left alone, their push and slam arming
-## included; a caster with no team pulls everyone.
+## catches (not pulled in the last PULL_GAP_STEPS steps) plays PULL_CUE. With `foes_only`, only
+## the caster's foes are pulled (`Actors.is_foe`): actors on its team (the caster too) and the
+## world's props are left alone, their push and slam arming included; a caster with no team pulls
+## every team but the world's.
 func pull(caster: int, position: Vector2, radius: float, strength: float, foes_only: bool = false, to: Vector2 = Vector2.INF) -> void:
 	if projectiles == null or strength <= 0.0:
 		return
 	var table: ActorsScript = _table()
-	var own_team: int = table.team_of(caster) if foes_only and table != null else ActorsScript.NONE
+	var own_team: int = table.team_of(caster) if table != null else ActorsScript.NONE
 	var near: Array[Node2D] = _take_scratch()
 	var end: Vector2 = to if to.is_finite() else position
 	var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.ACTOR_LAYERS, near, end)
@@ -670,7 +671,7 @@ func pull(caster: int, position: Vector2, radius: float, strength: float, foes_o
 		var row: int = _row_of_node(near[i])
 		if row == ActorsScript.NONE:
 			continue
-		if own_team != ActorsScript.NONE and _team(row) == own_team:
+		if foes_only and not ActorsScript.is_foe(own_team, _team(row)):
 			continue
 		var body: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
 		var toward: Vector2 = (Geometry2D.get_closest_point_to_segment(body, position, end) - body).normalized()
@@ -808,8 +809,8 @@ func _take(row: int, by: int, amount: float, quiet: bool) -> float:
 
 
 ## The body at row `row` died, killed by `by`: forget it, tell (`kill_landed` for a spell's own
-## hit, `enemy_died` for a body not on the wizards' team, a kit actor by its own controller's team
-## so a possessed enemy still counts) and free it. A kit Actor that something downs instead
+## hit, `enemy_died` for a foe of the wizards, a kit actor by its own team, `Actor.own_team`, so a
+## possessed enemy still counts and a prop of the world's never does) and free it. A kit Actor that something downs instead
 ## (`downable`) stays.
 func _die(row: int, by: int, where: Vector2, team: int) -> void:
 	var node: Node2D = _nodes[row]
@@ -821,10 +822,10 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 		if _tag != 0:
 			events.kill_landed.emit(by, node, where, _tag, _slot)
 		# A possessed enemy is on its driver's team while it lasts, but its death is an enemy's
-		# (the wave counts on it): an actor counts by its own controller's team. Its depletion
-		# already ended the possession, so `team` (read before the hit) is the driver's.
-		var own_team: int = kit.home_controller.team if kit != null and kit.home_controller != null else team
-		if own_team != ActorsScript.TEAM_WIZARDS:
+		# (the wave counts on it): an actor counts by its own team. Its depletion already ended the
+		# possession, so `team` (read before the hit) is the driver's. A prop is nobody's foe.
+		var own_team: int = kit.own_team() if kit != null else team
+		if ActorsScript.is_foe(ActorsScript.TEAM_WIZARDS, own_team):
 			events.enemy_died.emit(by, node, where, _slot)
 			hit_stop.killed(by, node, _slot)
 	if kit != null:
@@ -975,8 +976,8 @@ func _gust_power(row: int, profile: HitProfile) -> float:
 	return power
 
 
-## A charged actor (`actor`, of `team`, the body `victim`) was hit: every actor of another team
-## within STATIC_RANGE of `from` takes `amount`, credited to the charged actor, and
+## A charged actor (`actor`, of `team`, the body `victim`) was hit: every foe of it
+## (`Actors.is_foe`) within STATIC_RANGE of `from` takes `amount`, credited to the charged actor, and
 ## `reaction_triggered(actor, &"discharge", ...)` and `discharge_arc(actor, from, to)` are sent for
 ## each. One step: the damage sets off nothing else (`_discharging`), and is no spell's kill.
 func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: float) -> void:
@@ -992,7 +993,7 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: fl
 		if other_node == victim or not is_instance_valid(other_node):
 			continue
 		var other: int = _row_of_node(other_node)
-		if other == ActorsScript.NONE or _team(other) == team:
+		if other == ActorsScript.NONE or not ActorsScript.is_foe(team, _team(other)):
 			continue
 		if events != null:
 			# Feel shows a burst on each actor zapped and a jagged arc from the struck one.
@@ -1307,9 +1308,14 @@ func _send_burns() -> void:
 
 
 ## Count a heavy hit's slam: an actor knocked fast into a wall (a step ahead of it) takes the
-## damage once. Rows are collected here and hit after the loop, as hits can free rows.
+## damage once. Rows are collected here and hit after the loop, as hits can free rows. A body that
+## nothing moves (a kit actor with no Mover: a prop, props W4) is never knocked into a wall: its
+## knock is never spent, so it would slam into whatever wall stood near, its own footprint too.
 func _check_slam(row: int) -> void:
 	if _slam[row] <= 0:
+		return
+	if _body[row] == BODY_ACTOR and (_nodes[row] as Actor).mover == null:
+		_slam[row] = 0
 		return
 	var speed: float = _knock[row].length()
 	if speed < SLAM_MIN_SPEED:
@@ -1319,7 +1325,7 @@ func _check_slam(row: int) -> void:
 		return
 	var from: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
 	var to: Vector2 = from + _knock[row] / speed * (_hurt_radius[row] + SLAM_REACH)
-	if projectiles.clip_to_walls(from, to) != to:
+	if projectiles.clip_to_walls(from, to, row) != to:
 		_slam_due_node.append(_nodes[row])
 		_slam_due_by.append(_slam_by[row])
 		_slam_due_amount.append(_slam[row])
@@ -1343,7 +1349,7 @@ func _send_slams() -> void:
 
 
 ## Contact: every actor that touches (`_contact_damage`) hurts each actor of another team whose
-## hurt circle its own overlaps, once per CONTACT_COOLDOWN per victim. Hits are queued and sent
+## hurt circle its own overlaps (never a prop of the world's: nobody's foe, `Actors.is_foe`), once per CONTACT_COOLDOWN per victim. Hits are queued and sent
 ## after the loops. The usual crowd (many touchers, a few wizards) is checked directly against
 ## live positions; past CONTACT_DIRECT victims each victim asks the grid what touches it.
 func _touch() -> void:
@@ -1355,7 +1361,9 @@ func _touch() -> void:
 		if _contact_left[row] > 0.0:
 			continue
 		var team: int = _teams[row] if row < team_rows else ActorsScript.NONE
-		if (_toucher_teams & ~_team_bit(team)) == 0 or not _can_hurt(row):
+		# Nobody's foe (the world's props: `Actors.is_foe`, written out, as a call a row costs more)
+		# is touched by nobody.
+		if team == ActorsScript.TEAM_WORLD or (_toucher_teams & ~_team_bit(team)) == 0 or not _can_hurt(row):
 			continue
 		_victims.append(row)
 		_victim_team.append(team)

@@ -65,10 +65,12 @@ var current: int = 0
 var number: int = -1
 
 ## Not state: the compiled staffs' cache (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"_cache"]
+const DERIVED: Array[StringName] = [&"_cache", &"_held_scratch"]
 
 ## Every compiled staff, by "spells id|staff id|cards".
 static var _cache: Dictionary = {}
+## One float32, to round a value as a pool holds it (`_as_held`).
+static var _held_scratch: PackedFloat32Array = PackedFloat32Array([0.0])
 
 ## The card ids of each staff, `slots` long (`&""` is an empty slot), and whether it can cast.
 var _cards: Array = []
@@ -77,6 +79,9 @@ var _mana: PackedFloat32Array = PackedFloat32Array()
 var _has_build: PackedByteArray = PackedByteArray()
 ## True once the start cards were built (the first attach).
 var _built: bool = false
+## True once a staff or its cards changed after the start cards were built (`set_staff`,
+## `replace_staffs`): the caster is no longer as its scene and data made it (`at_rest`, props W2).
+var _edited: bool = false
 ## The plain staff used when `staff` is null.
 var _plain: StaffBase = null
 ## What `_push_place` sent last: the feet, aim and staff on show it was worked out from (INF feet:
@@ -120,6 +125,8 @@ func attach() -> void:
 				for id: Variant in start_cards[at]:
 					cards.append(StringName(str(id)))
 			set_staff(at, cards)
+		# The start cards are how it was made, not an edit.
+		_edited = false
 	else:
 		# Back in the tree with a fresh number: the staffs go in again.
 		for at in staff_count:
@@ -150,12 +157,6 @@ func step(delta: float) -> void:
 	for at in staff_count:
 		var base: StaffBase = staff_of(at)
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
-	if actor.spells != null and actor.combat != null:
-		# A slowed body winds up slower: a chill stretches a wind-up, a freeze holds it
-		# (docs/milestones/cast-timing.md).
-		var pace: float = actor.combat.own_pace(actor, actor.id)
-		if pace < 1.0:
-			actor.spells.hold_winds(number, delta * (1.0 - pace))
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
 		# was sent (performance pass, 2026-10-28).
@@ -179,6 +180,24 @@ func step(delta: float) -> void:
 		if pressed or held:
 			_show(at)
 			cast(at, pressed)
+
+
+## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
+## and every pool full. The staff on show is in the actor's `rest_leaf`.
+func at_rest() -> bool:
+	if _edited:
+		return false
+	for at in staff_count:
+		if _mana[at] != _as_held(max_mana_of(at)):
+			return false
+	return true
+
+
+## `value` as a pool holds it (a float32: `_mana`), so a pool filled to a most it cannot hold
+## exactly still counts as full.
+static func _as_held(value: float) -> float:
+	_held_scratch[0] = value
+	return _held_scratch[0]
 
 
 ## The projectile manager's anchor at the body and Spells' aim from the staff tip.
@@ -349,6 +368,7 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	for slot in slot_count(at):
 		row.append(cards[slot] if slot < cards.size() else &"")
 	_cards[at] = row
+	_edited = true
 	_install(at)
 	staff_built.emit(at)
 	return true
@@ -361,6 +381,7 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 	if new_staffs.is_empty():
 		return
 	var before: int = staff_count
+	_edited = true
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)

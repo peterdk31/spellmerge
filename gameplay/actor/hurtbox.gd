@@ -45,6 +45,12 @@ func is_on() -> bool:
 	return registered
 
 
+## Registered, as a standing actor's is (props W2: its circle follows the actor's size, which its
+## `rest_leaf` holds).
+func at_rest() -> bool:
+	return registered
+
+
 func _register() -> void:
 	if actor.combat == null:
 		return

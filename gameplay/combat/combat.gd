@@ -1275,6 +1275,19 @@ func _tick(row: int, delta: float) -> void:
 				_status_power[at + st] = 0.0
 				if st == ST_CHILL:
 					_chill_stacks[row] = 0
+	# A slowed actor winds up slower: a chill stretches a wind-up, a freeze holds it
+	# (docs/milestones/cast-timing.md). Here, where its statuses are, and not in its body's step:
+	# every slowed caster's wind-ups are held back, stepped or not (a still prop's fuse; props W2).
+	# Its pace after this step's count, as `_pace` reads it, written out; the row is its actor id,
+	# which is its caster number in Spells.
+	if spells != null and _body[row] == BODY_ACTOR:
+		var pace: float = 1.0
+		if _status_left[at + ST_FREEZE] > 0.0:
+			pace = 0.0
+		elif _status_left[at + ST_CHILL] > 0.0:
+			pace = 1.0 - _status_power[at + ST_CHILL]
+		if pace < 1.0:
+			spells.hold_winds(row, delta * (1.0 - pace))
 	if _react_wait[row] != 0.0:
 		_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 

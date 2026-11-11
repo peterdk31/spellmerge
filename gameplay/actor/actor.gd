@@ -42,6 +42,19 @@ extends Node2D
 ## (`ActorController.watch_home`, read only). The tick then moves the body by its `velocity`
 ## (`move`). Tests call `step(delta)` with fixed deltas and move the body themselves.
 ##
+## Still (props W2, docs/milestones/props.md): a body that no controller drives and that has no
+## Mover is still. Nothing it does changes from tick to tick, so the Tick never steps it
+## (`Actors.still`, set when its id opens and at every change of driver, `_tell_driver`): a prop.
+## Hits still land on it (Combat writes its health and statuses), its casts still go (a reaction's,
+## or a possessor's: a possession gives it a driver, and it is stepped while that lasts), and a
+## slowed actor's wind-ups are held back by Combat, not by its step. What only a step does is not
+## done for it: its pools do not refill, and it takes no hit-stop hold or protection.
+##
+## Resting (props W2): the state hash sums up a still body that is as it was made as a few values
+## (`rest_leaf`): its health full, not down, dying or leaving, and every component as made
+## (`ActorComponent.at_rest`, false unless a component says). Only the hash does; a snapshot saves
+## every body whole.
+##
 ## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
 ## along the walls (the room's and the solid shots', the projectile manager's wall grid,
 ## `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
@@ -210,6 +223,31 @@ func _exit_tree() -> void:
 func tick_step(delta: float) -> void:
 	step(delta)
 	move(delta)
+
+
+## True while no controller drives it and it has no Mover (props W2; see the class doc): the Tick
+## does not step it.
+func is_still() -> bool:
+	return controller == null and mover == null
+
+
+## The body as a few values for the state hash while it rests (props W2; see the class doc): still,
+## its health full, not down, dying or leaving, and every component as it was made
+## (`ActorComponent.at_rest`); null otherwise, and the hash walks it member by member. The values
+## are what may differ between two bodies made alike: where it stands and aims, its size, the staff
+## on show, its health and whether hits take any.
+func rest_leaf() -> Variant:
+	if _down or _dying or _leaving or not is_still() or possessed_by != null or phases != null:
+		return null
+	# What a step it took while driven may have left (a possession that ended).
+	if _hold_shown or velocity != Vector2.ZERO or intent.pressed_bits != 0 or intent.held_bits != 0:
+		return null
+	if health != null and health.health != health.max_health:
+		return null
+	for component in _components:
+		if not component.at_rest():
+			return null
+	return [position, aim, size, ticking, health.health if health != null else -1.0, health.invincible if health != null else false, caster.current if caster != null else -1]
 
 
 ## Move the body by `velocity` for `delta` seconds, sliding along the walls (see the class doc); when
@@ -594,6 +632,7 @@ func _open_id() -> void:
 		push_warning("Actor %s: the actor table is full, so this actor has no id." % name)
 		return
 	actors.set_node(id, self)
+	actors.set_still(id, is_still())
 	# The seat whose own body it is (a wizard): the HUD finds it there while it is away.
 	if home_controller != null:
 		actors.set_home(id, home_controller.seat)
@@ -609,3 +648,4 @@ func _close_id() -> void:
 func _tell_driver() -> void:
 	if actors != null and id != ActorsScript.NONE:
 		actors.set_driver(id, team(), seat())
+		actors.set_still(id, is_still())

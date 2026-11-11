@@ -23,8 +23,10 @@ func after_each() -> void:
 	_world.free_all()
 
 
+## An actor that acts (something drives it, so it is stepped: a still body takes no protection;
+## props W2).
 func _body() -> Actor:
-	var body: Actor = _world.actor(Vector2.ZERO, [&"health"])
+	var body: Actor = _world.actor(Vector2.ZERO, [&"health"], Fixture.Scripted.new())
 	body.downable = true
 	body.health.changed.connect(func(health: float, _most: float) -> void: _changes.append(health))
 	body.health.depleted.connect(func(killer: int) -> void: _depleted.append(killer))

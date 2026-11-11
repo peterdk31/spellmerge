@@ -310,12 +310,16 @@ func state_areas() -> Dictionary:
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes
-## its first step next tick).
+## its first step next tick), but the still ones (`Actors.still`: no controller and no Mover).
 func _step_bodies(delta: float) -> void:
 	if actors == null:
 		return
 	var n: int = actors.open_ids(_ids)
+	var still: PackedByteArray = actors.still
 	for i in n:
+		if still[_ids[i]] != 0:
+			# No controller and no Mover: nothing it does changes from tick to tick (props W2).
+			continue
 		var body: Actor = actors.node_of(_ids[i]) as Actor
 		if body != null and body.ticking and body.is_inside_tree() and body.can_process():
 			body.tick_step(delta)

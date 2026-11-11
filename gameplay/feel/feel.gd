@@ -21,6 +21,10 @@ extends Node
 ##   colours that fall and settle (S3, `Spectacle.break_body`; the enemy itself is freed at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
+## Every actor's damage numbers (props W5) are drawn by one child, `damage_number_drawer.gd`: each
+## actor's `DamageNumbers` look tells its hits on the bus (`damage_number_shown`), and the
+## "Damage numbers" setting (`damage_numbers_changed`) hides them.
+##
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
 ## flew. On a character the hit becomes a spray along that way, in ember for an enemy and
 ## in the wizard's own colours for a wizard, a little bigger with more damage. On a wall or
@@ -102,6 +106,7 @@ const BodyLooksScript := preload("res://gameplay/feel/body_looks.gd")
 const FlashTableScript := preload("res://gameplay/feel/flash_table.gd")
 const PartyCameraScript := preload("res://gameplay/feel/party_camera.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const DamageNumberDrawerScript := preload("res://gameplay/feel/damage_number_drawer.gd")
 ## Beams on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
@@ -296,6 +301,8 @@ var registry: RegistryScript = null:
 			_read_flash_kinds()
 		if _spectacle != null:
 			_spectacle.registry = value
+		if _numbers != null:
+			_numbers.registry = value
 ## The projectile manager (typed, so its `impact_*` facts are read as members: every hit and every
 ## shot's end reads them; performance, 2026-11-02).
 var projectiles: ProjectileManagerScript = null:
@@ -395,6 +402,8 @@ var _spectacle: SpectacleScript = null
 var party_camera: PartyCameraScript = PartyCameraScript.new()
 ## The telegraph lanes of casts winding up (`lane` cue parts; docs/milestones/cast-timing.md, T6b).
 var _lanes: LanesScript = null
+## Every actor's damage numbers (`damage_number_drawer.gd`, props W5).
+var _numbers: DamageNumberDrawerScript = null
 ## Its settings, read through Feel (read only; their `set_*` below).
 var mote_cap: int:
 	get:
@@ -623,6 +632,11 @@ func _ready() -> void:
 	# Over the shots and every flash: a telegraph is the brightest thing on screen (docs/STYLE.md).
 	_lanes.z_index = FORM_Z + 2
 	add_child(_lanes)
+	_numbers = DamageNumberDrawerScript.new()
+	_numbers.name = "DamageNumbers"
+	_numbers.events = events
+	_numbers.registry = registry
+	add_child(_numbers)
 	add_cue_part(&"flash", _play_flash, _prepare_flash)
 	add_cue_part(&"lane", _play_lane)
 	var parts: Dictionary = _spectacle.cue_parts()
@@ -743,6 +757,8 @@ func step(real_delta: float) -> void:
 		_lanes.spells = spells
 		_lanes.step()
 	_step_labels(real_delta)
+	if _numbers != null:
+		_numbers.step(real_delta)
 	_step_statuses(real_delta)
 
 
@@ -1970,6 +1986,11 @@ func _on_effect_slots_changed(slots: int) -> void:
 ## The spectacle node.
 func spectacle() -> SpectacleScript:
 	return _spectacle
+
+
+## Every actor's damage numbers (tests).
+func damage_numbers() -> DamageNumberDrawerScript:
+	return _numbers
 
 
 ## The motes (null with the setting off; for tests and the benchmarks).

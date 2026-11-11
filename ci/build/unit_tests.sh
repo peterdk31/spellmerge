@@ -18,7 +18,8 @@
 # - The tests that time the machine (TIMED_TESTS: budgets in wall time) run with the rest; one that
 #   fails is run again alone after, and fails only if it fails alone too.
 # Writes one line per run to <logs dir>/unit-results.txt, "PASS|FAIL <seconds> <test> <K/N or -> <log>",
-# and one log per run (<logs dir>/unit-<name>[-shard-K].log). Exits 1 on a failure.
+# and one log per run (<logs dir>/unit-<path>[-shard-K].log, the test's path with "-" for "/":
+# unit-tests-core-test_loading.log). Exits 1 on a failure.
 set -u
 cd "$(dirname "$0")/../.."
 LOGS="$1"
@@ -55,7 +56,9 @@ ordered() {
 
 run_one() { # run_one <test> <K/N or ->: one run into its own log; prints its results line
   local test="$1" shard="$2" name status=PASS args=()
-  name="unit-$(basename "$test" .gd)"
+  # By its path, so two test files of one name in different folders keep apart.
+  name="unit-${test%.gd}"
+  name="${name//\//-}"
   if [[ "$shard" != - ]]; then
     name+="-shard-${shard%/*}"
     args=(-- "--shard=$shard")

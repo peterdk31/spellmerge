@@ -223,8 +223,8 @@ func test_a_hit_on_an_actor_is_also_sent_to_the_actor_itself() -> void:
 	var imp: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_ENEMIES)
 	var other: Actor = _actor(Vector2(200.0, 0.0), ActorsScript.TEAM_ENEMIES)
 	var heard: Array = []
-	imp.damaged.connect(func(by: int, amount: int) -> void: heard.append([by, amount]))
-	other.damaged.connect(func(by: int, amount: int) -> void: heard.append(["other", by, amount]))
+	imp.damaged.connect(func(by: int, amount: int, _element: StringName) -> void: heard.append([by, amount]))
+	other.damaged.connect(func(by: int, amount: int, _element: StringName) -> void: heard.append(["other", by, amount]))
 	_world.combat.hit(other.id, imp, 7)
 	check_equal(heard, [[other.id, 7]], "once, with the attacker's id and the damage, and only to the actor hit")
 

@@ -136,7 +136,7 @@ func test_a_glance_looks_that_way_with_raised_brows_for_its_time() -> void:
 func test_a_hit_shows_worried_for_a_moment() -> void:
 	var body := _wearer(Face.Style.CHEER)
 	var face := _face(body)
-	body.damaged.emit(0, 5)
+	body.damaged.emit(0, 5, &"")
 	_world.run(1)
 	check_equal(face.mood(), Face.Mood.WORRIED, "a hit is worried")
 	_run(Face.HURT_TIME + 0.25)

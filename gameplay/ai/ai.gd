@@ -178,7 +178,7 @@ func _on_staff_built(_at: int) -> void:
 
 
 ## Someone hurt the actor it drives.
-func _on_damaged(caster: int, _amount: float) -> void:
+func _on_damaged(caster: int, _amount: float, _element: StringName) -> void:
 	brain.hurt_by(caster)
 
 

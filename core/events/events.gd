@@ -26,6 +26,11 @@ extends Node
 ##
 ## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
 const NO_PLAYER: int = -1
+## The kinds of number `damage_number_shown` tells (props W5): a hit, a heal, and a hit that took
+## nothing (an invincible actor). Its sender and its listener both name them from here.
+const NUMBER_HIT: StringName = &"hit"
+const NUMBER_HEAL: StringName = &"heal"
+const NUMBER_SPARED: StringName = &"spared"
 
 # --- Player intent from the HUD (sender: hud) -------------------------------
 
@@ -46,6 +51,8 @@ signal door_vote_requested(player: int, door: int)
 signal effect_slots_changed(slots: int)
 ## Sender: hud. The "Screen shake" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound. Heard by feel, which sets `shake_enabled`.
 signal screen_shake_changed(enabled: bool)
+## Sender: hud. The "Damage numbers" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound (props W5). Heard by feel, which shows or hides every actor's damage numbers. The view's only: it changes nothing in the game.
+signal damage_numbers_changed(on: bool)
 ## Sender: hud. The "Max shots" slider in the pause menu (Settings) moved, or a saved choice was loaded when the menu was bound: this machine's cap on live shots (`ShotCap` in core/settings). Heard by core/sim (the Tick), which keeps it for the next run (`SessionRules.machine()`, online-ready N11); a run playing changes only by `shot_cap_requested`.
 signal projectile_cap_changed(cap: int)
 ## Sender: hud. `player` moved the "Max shots" slider while a run plays: the run's cap on live shots from the next tick on (a command, recorded with the tick; online-ready N11). Heard by core/sim (the Tick), which sets `sim.rules.shot_cap` and hands it to core/projectiles (`set_cap`: the shots in the air end).
@@ -223,6 +230,8 @@ signal possess_ended(caster: int, actor: int)
 signal hit_landed(caster: int, target: Node, amount: float, position: Vector2, kind: StringName, shot: int)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(caster: int, target: Node, amount: float, position: Vector2)
+## Sender: actor (its `DamageNumbers` look, props W5). A hit on the actor `actor` shows its number: `amount` rising `rise` pixels from `position` (world pixels, above its hurt shape) for `seconds`, at `size` times the plain text. `kind` is `NUMBER_HIT` (in the colour of the element `element`, white for `&""`), `NUMBER_HEAL`, or `NUMBER_SPARED` (a hit that took nothing: an invincible actor, the hub). View only; heard by feel, which draws every actor's numbers in one place.
+signal damage_number_shown(actor: int, position: Vector2, amount: float, element: StringName, kind: StringName, rise: float, seconds: float, size: float)
 
 # --- Players ----------------------------------------------------------------
 

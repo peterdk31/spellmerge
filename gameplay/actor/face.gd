@@ -339,5 +339,5 @@ func _on_cast_done(_staff: int, _origin: Vector2, _direction: Vector2) -> void:
 	_pop_left = POP_TIME
 
 
-func _on_damaged(_by: int, _amount: float) -> void:
+func _on_damaged(_by: int, _amount: float, _element: StringName) -> void:
 	show_mood(Mood.WORRIED, HURT_TIME)

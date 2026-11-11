@@ -1,8 +1,8 @@
 # Props: things in the world that stand, block, take hits, react and give off motes
 
-**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1, W2 and W3 done (2026-11-11), W4 next**. It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
+**Status (2026-11-11): approved by the owner** ("approved, merge and start it"), written with the owner in an owner session on 2026-11-10; **W1, W2, W3 and W3b done (2026-11-11), W4 next**. It runs beside the online lobby (the owner, 2026-11-10: "Run beside it"). Asked by the owner after the hub (online lobby L1), on the hub's art: "we need to be able to make a ton of new 'assets' like the stone, with motes coming off almost everything. How could a system like that be made?" Then: "Props can block movement and be hit and props like a barrel will explode if hit by the right element - configurable." On a separate table of props: "This sound like coding 90% of an actor. Why not just use an actor, but maybe make it cheaper by not having a controller attached, which means no movement logic?" On possessing a prop: "Possess would actually be cool. So keep it." On several reactions to one hit: "it should be able to fire several I think. Not really sure though."
 
-The steps are **W1 to W9** (W for the world's things). Each is one PR, in order.
+The steps are **W1 to W9** (W for the world's things), with W3b added after W3 by the owner. Each is one PR, in order.
 
 ## What the players see
 
@@ -151,6 +151,19 @@ Spells' area is flat (within 0.3 ms from 0 to 1,000) and the worst spread tick a
 **Reviewed** (an independent review, 2026-11-11): the walker's part was a hidden mode that a second walk of an area that is no node skipped, the net check's area cap was under a full table of bodies and parts, a PARTED table could leave the hash with no test failing, and a report on a part named a running index; all fixed as above.
 
 **Left:** the walker's cost per area and per element (the next lever for the whole hash: bodies 11 ms and parts 10 ms at 1,000); Combat's references to its bodies (2.8 ms of its 3 ms at 1,000, walked one by one); the net check sends a name and a hash a caster with a build (about 17 bytes a caster a second).
+
+## W3b: the walker's cost per entry (engine, every area)
+
+Added by the owner after W3 (2026-11-11): "If it makes the code more general, then sure, go for it. It should be easy to maintain new features in the future as well." W3 left Combat as the worst tick of the spread hash (2.8 ms at 1,000 props), and the walker's own cost per area and per entry as most of what a resting body and a caster's part cost.
+
+- **A list of references to bodies is one leaf of their actor ids** (`StateWalk._bodies_as_ids`): every REFS list, not Combat's alone (its bodies by row, a zap's due bodies, a carrier's struck lists). An actor id says which body, as `identity` does; a report names the row (`Combat._nodes.ids: [37] 5 vs 6`). A list with anything else in it (a node with no actor id, a freed one) is walked entry by entry, as before.
+- **One leaf call, its path built only when wanted:** `_leaf(path, value, suffix)` and `_leaf_at(path, key, value, suffix)` in place of `_leaf(_join(_index(...)))`, a plain value appended as it is; whether a body's script sums itself up at rest (`rest_leaf`) is asked once a script.
+
+**Done when:** Combat's hash flat in the props (within a millisecond from 0 to 1,000); `test_state_walk`, `test_state_walked`, the determinism tests, `tools/online_pair.sh` and the Linux replays pass.
+
+**Done (2026-11-11).** `prop_cost.gd` at 1,000 props, W3 against W3b back to back: Combat's area 2.90 ms against 0.80 (0.14 at none), the worst tick of a spread hash 4.15 ms against 3.08, the whole hash 35.4 against 30.1 ms (a resting body 11.8 against 10.8 us, a caster's part 12.5 against 10.7 us). The stress run (desktop) is unchanged (whole 40.2 ms, worst spread tick 4.34 ms): its bodies fight, so each is walked member by member (150 us a body).
+
+**Left:** a resting body or a caster's part still costs about 10 us, 5 to 6 of it the walker's handling of a root and of nested arrays (a few calls an entry); what remains is reordering its hottest branches for fractions of a microsecond each, which the owner's rule on maintainable code weighs against. A fighting body's member-by-member walk is the stress run's cost, for the netcode's later steps.
 
 ## W4: a prop in the game (engine)
 

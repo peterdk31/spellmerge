@@ -13,7 +13,8 @@ extends RefCounted
 ##   body a shot is stuck to, the bodies a zap is due on): walked as **who** they point at and never
 ##   entered (`identity`): an actor by its id (a reference is to a live body, so its id says which;
 ##   what a body keeps of one that may be gone is its key, `Actors.key_of`, N5), anything else by
-##   what it is;
+##   what it is; a list of them that holds only bodies (and empty entries) is one leaf of their
+##   actor ids (`_bodies_as_ids`, props W3b);
 ## - `SPARES` (free lists of spare records, each set whole when it is taken: Spells' spare launches),
 ##   walked as their size alone (N3c: their contents cannot change the game, and walking them was a
 ##   fifth of the spells area's hash);
@@ -134,6 +135,8 @@ static var _frozen_hashes: Dictionary[int, int] = {}
 const FROZEN_LEAF: StringName = &"frozen"
 ## Script to whether its objects say when they are idle (`func idle() -> bool`).
 static var _idles: Dictionary[Script, bool] = {}
+## Script to whether its bodies have `rest_leaf` (`_rests_of`).
+static var _rests: Dictionary[Script, bool] = {}
 ## Script to its PARTED members, 1 each in `members` order (empty when it lists none).
 static var _parted: Dictionary[Script, PackedByteArray] = {}
 ## What of an area `walk` and `values` take (`part`): all of it, or the area less its PARTED members;
@@ -142,6 +145,8 @@ const WHOLE: int = -2
 const LESS_PARTED: int = -1
 ## The one leaf of an idle object.
 const IDLE: StringName = &"idle"
+## An empty entry of a REFS array of bodies walked as ids (`_bodies_as_ids`): no actor id is.
+const NO_BODY: int = -1
 ## Script to whether a node of it is walked when its holder owns it (`_walks_into`), for the scripts
 ## not in `also_simulation`.
 static var _enters: Dictionary[Script, bool] = {}
@@ -411,7 +416,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 			# empty slots, only the filled ones are walked, each after its index, as `_ref` does (the
 			# empty slots were most of a hash's leaves: 15,000 of the spells area's 20,000).
 			var empty: int = 0 if items.is_typed() and element != TYPE_OBJECT else items.count(null)
-			_leaf(_join(path, "~"), empty)
+			_leaf(path, empty, "~")
 			if empty == items.size():
 				return
 			var rows: Script = items.get_typed_script() as Script
@@ -423,7 +428,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 				if empty > 0:
 					if item == null:
 						continue
-					_leaf(_join(_index(path, i), "@"), i)
+					_leaf_at(path, i, i, "@")
 				var at: String = _index(path, i) if with_paths else path
 				if typeof(item) == TYPE_OBJECT:
 					_object(at, item, holder)
@@ -432,7 +437,7 @@ func _value(path: String, value: Variant, holder: Object) -> void:
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
 			var keys: Array = sorted_keys(table)
-			_leaf(_join(path, "#"), keys.size())
+			_leaf(path, keys.size(), "#")
 			for key: Variant in keys:
 				var at: String = _index(path, key)
 				_key(at, key)
@@ -456,7 +461,7 @@ func _idle_rows(path: String, items: Array, has_empty: bool, holder: Object) -> 
 		if item == null:
 			continue
 		if has_empty:
-			_leaf(_join(_index(path, i), "@"), i)
+			_leaf_at(path, i, i, "@")
 		if item.call(&"idle"):
 			if _collecting:
 				_values.append(IDLE)
@@ -493,6 +498,13 @@ func _frozen_leaf(path: String, object: Object, script: Script) -> void:
 		_sink.call(path + ".frozen" if with_paths else path, _frozen_hashes[id])
 
 
+## Whether a body of `script` sums itself up at rest (`rest_leaf`), asked once a script.
+static func _rests_of(node: Node, script: Script) -> bool:
+	if not _rests.has(script):
+		_rests[script] = node.has_method(&"rest_leaf")
+	return _rests[script]
+
+
 ## Whether objects of `script` are FROZEN.
 static func _frozen_of(script: Script) -> bool:
 	if not _members.has(script):
@@ -517,27 +529,52 @@ func _ref(path: String, value: Variant) -> void:
 			# body, 100,000 slots) is nearly all empty, and walking every slot in GDScript cost
 			# 136 ms a hash at the 100,000 cap; an empty one costs one engine call.
 			var items: Array = value
-			_leaf(_join(path, "#"), items.size())
+			_leaf(path, items.size(), "#")
 			# (A typed array of arrays, as a carrier's struck lists, holds no null to count.)
 			var may_hold_null: bool = not items.is_typed() or items.get_typed_builtin() == TYPE_OBJECT
 			if may_hold_null and items.count(null) == items.size():
+				return
+			if may_hold_null and _bodies_as_ids(path, items):
 				return
 			for i in items.size():
 				var item: Variant = items[i]
 				if item == null:
 					continue
-				_leaf(_join(_index(path, i), "@"), i)
+				_leaf_at(path, i, i, "@")
 				_ref(_index(path, i), item)
 		TYPE_DICTIONARY:
 			var table: Dictionary = value
 			var keys: Array = sorted_keys(table)
-			_leaf(_join(path, "#"), keys.size())
+			_leaf(path, keys.size(), "#")
 			for key: Variant in keys:
 				var at: String = _index(path, key)
 				_key(at, key)
 				_ref(at, table[key])
 		_:
 			_value(path, value, null)
+
+
+## A REFS array whose every filled entry is a live body (`is_body`: Combat's bodies by row, the
+## bodies a zap is due on): one leaf, the actor id of each entry (NO_BODY for an empty one), which a
+## report names by its index (props W3b: a leaf and a name an entry cost 2.8 us; an actor id says
+## which body, as `identity` does). False, with nothing walked, when an entry is anything else (a
+## freed node, a closed body, another object): then each is walked as before.
+func _bodies_as_ids(path: String, items: Array) -> bool:
+	var ids := PackedInt64Array()
+	ids.resize(items.size())
+	for i in items.size():
+		var item: Variant = items[i]
+		if item == null:
+			ids[i] = NO_BODY
+			continue
+		if not is_instance_valid(item) or not item is Node:
+			return false
+		var id: Variant = (item as Node).get(&"id")
+		if typeof(id) != TYPE_INT or int(id) < 0:
+			return false
+		ids[i] = id
+	_leaf(path, ids, ".ids")
+	return true
 
 
 ## `table`'s keys in an order that is the same on every machine. The engine's `sort` orders
@@ -576,7 +613,7 @@ func _key(at: String, key: Variant) -> void:
 	if typeof(key) == TYPE_OBJECT:
 		_problem(at, "is keyed by an object", "key it by an id (an actor id, a slot), or add it to DERIVED")
 		return
-	_leaf(_join(at, "{}"), key)
+	_leaf(at, key, "{}")
 
 
 ## `skip` marks the root's members left out (`_members_of`): its PARTED ones when the area less them
@@ -602,7 +639,7 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false, s
 		# the checks below apply.
 		_seen[id] = _seen.size()
 		if _idles[script] and bool(object.call(&"idle")):
-			_leaf(_join(path, ".idle"), IDLE)
+			_leaf(path, IDLE, ".idle")
 			return
 		_members_of(path, object, script, skip)
 		return
@@ -643,9 +680,9 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false, s
 		return
 	_seen[id] = _seen.size()
 	if _idles_of(script) and bool(object.call(&"idle")):
-		_leaf(_join(path, ".idle"), IDLE)
+		_leaf(path, IDLE, ".idle")
 		return
-	if root and node != null and node.has_method(&"rest_leaf"):
+	if root and node != null and _rests_of(node, script):
 		# A body at rest, as it was made and with nothing to do (props W2: a standing prop): one
 		# leaf of what may differ between two bodies made alike (`Actor.rest_leaf`).
 		var rest: Variant = node.call(&"rest_leaf")
@@ -653,12 +690,12 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false, s
 			# Each value a leaf of its own, hashed by its bytes as a member is (an array's `hash()`
 			# would take -0.0 for 0.0).
 			var values: Array = rest
-			_leaf(_join(path, ".rest"), values.size())
+			_leaf(path, values.size(), ".rest")
 			for i in values.size():
-				_leaf(_index(path + ".rest", i) if with_paths else path, values[i])
+				_leaf_at(path + ".rest" if with_paths else path, i, values[i])
 			return
 	if node is Node2D:
-		_leaf(_join(path, ".position"), (node as Node2D).position)
+		_leaf(path, (node as Node2D).position, ".position")
 	_members_of(path, object, script, skip)
 	if root and is_body(node):
 		# The simulation nodes added to it in play that no member holds (a possession's puppet).
@@ -690,7 +727,7 @@ func _members_of(path: String, object: Object, script: Script, skip: PackedByteA
 		if how[i] == REF:
 			_ref(at, object.get(name))
 		elif how[i] == SPARE:
-			_leaf(_join(at, "#"), (object.get(name) as Array).size())
+			_leaf(at, (object.get(name) as Array).size(), "#")
 		elif how[i] == PLAIN or how[i] == PACKED:
 			_leaf(at, object.get(name))
 		else:
@@ -707,12 +744,31 @@ func _walks_into(script: Script) -> bool:
 	return enters(script)
 
 
-## Hands one leaf to the sink, or, in the hash's walk (`values`), appends its value.
-func _leaf(path: String, value: Variant) -> void:
+## Hands one leaf to the sink at `path` and `suffix` (".position"), or, in the hash's walk
+## (`values`), appends its value as `SimHash.add_leaf` gives it (a plain one as it is): the path is
+## built only for a sink that wants paths (props W3b: the calls a leaf made were most of the
+## walker's cost per leaf).
+func _leaf(path: String, value: Variant, suffix: String = "") -> void:
 	if _collecting:
-		SimHash.add_leaf(_values, value)
+		if typeof(value) < TYPE_DICTIONARY:
+			_values.append(value)
+		else:
+			SimHash.add_leaf(_values, value)
+	elif with_paths:
+		_sink.call(path + suffix, value)
 	else:
 		_sink.call(path, value)
+
+
+## As `_leaf`, at `path[key]` and `suffix`.
+func _leaf_at(path: String, key: Variant, value: Variant, suffix: String = "") -> void:
+	if _collecting:
+		if typeof(value) < TYPE_DICTIONARY:
+			_values.append(value)
+		else:
+			SimHash.add_leaf(_values, value)
+	else:
+		_sink.call(_index(path, key) + suffix if with_paths else path, value)
 
 
 ## A problem: where, what it holds, and the fix, with where the lists are explained.

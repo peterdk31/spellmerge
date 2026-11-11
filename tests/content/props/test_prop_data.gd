@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Every prop (props W6, docs/milestones/props.md): its data is sound (`PropBase.problems`, with the
 ## names the game knows), its staffs pass the spell validator, a body of it can be made from the
-## shared scene, and every cast its reactions make it can pay from a full pool (a still prop's pools
+## shared scene, and every cast its triggers make it can pay from a full pool (a still prop's pools
 ## never refill). Found by folder (`content/props/<id>/<id>.tres`), so a new prop is checked too; the
 ## test exploding barrel (tests/gameplay/actor/fixtures) stands in for the casts until the first props (W9).
 ##
@@ -46,10 +46,10 @@ func test_the_shared_body_has_every_part_a_prop_needs() -> void:
 	var body: Actor = SCENE.instantiate() as Actor
 	var kinds: Array[String] = []
 	for child in body.get_children():
-		for kind: Script in [Health, Hurtbox, Footprint, Caster, Reactions, ActorController, Mover]:
+		for kind: Script in [Health, Hurtbox, Footprint, Caster, PropStateTriggers, ActorController, Mover]:
 			if is_instance_of(child, kind):
 				kinds.append(kind.get_global_name())
-	check_equal(kinds, ["Health", "Hurtbox", "Footprint", "Caster", "Reactions"] as Array[String], "health, a hurt shape, ground, staffs and reactions; no controller, no Mover")
+	check_equal(kinds, ["Health", "Hurtbox", "Footprint", "Caster", "PropStateTriggers"] as Array[String], "health, a hurt shape, ground, staffs and state triggers; no controller, no Mover")
 	check_equal(body.idle_team, Fixture.ActorsScript.TEAM_WORLD, "the world's")
 	body.free()
 
@@ -60,7 +60,7 @@ func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 	for data in all:
 		var body: Actor = _world.add(PropBody.make(data), Vector2.ZERO)
 		for state in data.states.list:
-			for row in state.reactions:
+			for row in state.triggers:
 				if row.cast <= 0:
 					continue
 				var at: int = row.cast - 1

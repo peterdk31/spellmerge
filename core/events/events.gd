@@ -186,7 +186,7 @@ signal mana_spend_requested(caster: int, staff: int, amount: float)
 signal cast_fizzled(caster: int, staff: int)
 ## Sender: core/spells. A cast of the actor `caster`'s staff `staff` started winding up (docs/milestones/cast-timing.md): its first carrier is the form card `form`, from `origin` along `direction` (the aim follows the caster until it leaves), for `seconds` (a chill or a freeze stretches it; `Spells.is_winding` says when it is over), in its element's `tint` with its packed `look`, under `tag`. `cue` is the staff's own wind-up look (`StaffBase.wind_cue`: a barrel's fuse), `&""` for the card's. Heard by gameplay/feel, which plays `cue`, else the card's `wind_cue` (an enemy's telegraph: only for a caster not on the players' team).
 signal cast_winding(caster: int, staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, cue: StringName)
-## Sender: core/spells. A cast of the actor `caster`'s staff `staff` leaves now: at once for a cast that does not wind up, else as its wind-up ends; sent just before its shots start, so what the caster becomes as its cast leaves is what they meet (props W6: a barrel's fuse burns out, it is rubble, its blast goes off); a cast that then finds no room for any shot (every one inside a wall) was told all the same. Heard by the actor kit (a prop's `Reactions`, for its `cast` reactions).
+## Sender: core/spells. A cast of the actor `caster`'s staff `staff` leaves now: at once for a cast that does not wind up, else as its wind-up ends; sent just before its shots start, so what the caster becomes as its cast leaves is what they meet (props W6: a barrel's fuse burns out, it is rubble, its blast goes off); a cast that then finds no room for any shot (every one inside a wall) was told all the same. Heard by the actor kit (a prop's `PropStateTriggers`, for its `cast` triggers).
 signal cast_left(caster: int, staff: int)
 ## Sender: core/spells. `amount` of the mana of staff `staff` of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, staff: int, amount: float)
@@ -202,7 +202,7 @@ signal discharge_arc(caster: int, from: Vector2, to: Vector2)
 signal damage_dealt(caster: int, target: Node, amount: float, position: Vector2)
 ## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
 signal status_applied(caster: int, target: Node, status_id: StringName)
-## Sender: actor (a prop's `Reactions`, props W6). The prop `actor` entered its state `state` (`PropState.state_id`), by one of its reactions. Heard by nobody in the game yet (its look's, W7; tests).
+## Sender: actor (a prop's `PropStateTriggers`, props W6). The prop `actor` entered its state `state` (`PropState.state_id`), by one of its triggers. Heard by nobody in the game yet (its look's, W7; tests).
 signal prop_state_changed(actor: int, state: StringName)
 ## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
 ## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.

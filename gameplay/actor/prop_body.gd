@@ -3,7 +3,7 @@ extends RefCounted
 ## A prop's body made from its data (props W6, docs/milestones/props.md, "What a prop is made of"):
 ## the data's `scene` (for every prop the one shared scene, content/props/base/prop.tscn: an actor of
 ## the world's team with no controller and no Mover, with Health, Hurtbox, Footprint, Caster and
-## `Reactions`), filled in from its `PropBase` before it is added. A new prop is data and art, no
+## `PropStateTriggers`), filled in from its `PropBase` before it is added. A new prop is data and art, no
 ## scene of its own.
 ##
 ##     var barrel: Actor = PropBody.make(Registry.get_resource(&"props", &"barrel") as PropBase)
@@ -11,7 +11,7 @@ extends RefCounted
 ##     room.add_child(barrel)
 ##
 ## Only the components are written, never the actor's own code: the actor stays the kit's, and what a
-## prop does is its `Reactions`'. A body made again from a snapshot is the scene with its saved state,
+## prop does is its `PropStateTriggers`'. A body made again from a snapshot is the scene with its saved state,
 ## so nothing here runs for it.
 
 
@@ -44,8 +44,8 @@ static func fill(body: Actor, data: PropBase) -> void:
 			hurtbox.size = data.size
 			hurtbox.offset = data.offset
 			hurt_box = data.size if hurtbox.is_box() else Vector2.ZERO
-		elif child is Reactions:
-			(child as Reactions).states = data.states
+		elif child is PropStateTriggers:
+			(child as PropStateTriggers).states = data.states
 	for child in body.get_children():
 		if child is Footprint:
 			_fill_ground(child as Footprint, data, hurt_box)

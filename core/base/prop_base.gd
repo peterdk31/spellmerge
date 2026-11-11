@@ -7,8 +7,8 @@ extends Resource
 ## `PropBody.make` (gameplay/actor), so a new prop is data and art only.
 ##
 ## It is an actor's data the way an `EnemyBase` is, for a body that does not walk: its health and
-## hurt shape, its ground, 1-4 staffs (what its reactions and a possessor cast), and its states (a
-## `PropStates` of their own: what fires when, `PropState`, `PropReaction`).
+## hurt shape, its ground, 1-4 staffs (what its triggers and a possessor cast), and its states (a
+## `PropStates` of their own: what fires when, `PropState`, `PropTrigger`).
 
 ## Unique name of the prop, also its folder name.
 @export var id: StringName = &""
@@ -34,10 +34,10 @@ extends Resource
 @export var footprint_size: Vector2 = Vector2.ZERO
 @export var footprint_offset: Vector2 = Vector2.ZERO
 
-## Its staffs (1-4, as an enemy's: `EnemyBase.staffs`), the cards its reactions and a possessor
-## cast; a reaction names one by number (1-4). A staff's wind-up is a fuse. Empty: it casts nothing.
+## Its staffs (1-4, as an enemy's: `EnemyBase.staffs`), the cards its triggers and a possessor
+## cast; a trigger names one by number (1-4). A staff's wind-up is a fuse. Empty: it casts nothing.
 @export var staffs: Array[StaffCards] = []
-## Its states and their reactions, a file of their own (`<id>_states.tres`; two props may share one).
+## Its states and their triggers, a file of their own (`<id>_states.tres`; two props may share one).
 @export var states: PropStates = null
 
 ## The most staffs a prop holds (the staff buttons), as an enemy.
@@ -63,7 +63,7 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		found.append("%s has no scene (the shared content/props/base/prop.tscn)." % id)
 	if max_health <= 0.0:
 		found.append("%s: max_health is %s; above 0." % [id, max_health])
-	# Numbered from 1, as its reactions name them.
+	# Numbered from 1, as its triggers name them.
 	found.append_array(StaffCards.list_problems(String(id), staffs, MAX_STAFFS, 1))
 	if states == null:
 		found.append("%s has no states." % id)

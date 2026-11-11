@@ -23,9 +23,25 @@ const KNOWN: Array[String] = [
 	"res://art/samples/o_teal/body.svg",
 	"res://art/samples/i_warm/floor.svg",
 ]
-## The palette (docs/STYLE.md), by name in core/base/palette.gd (tests/core/test_palette.gd holds
-## the two alike).
-var _palette: PackedStringArray = Palette.hex_colours()
+## The palette, as docs/STYLE.md lists it. A literal list on purpose: ci/tests/test_styleguide.py
+## holds it to the guide; core/base/palette.gd is the same table by name (tests/core/test_palette.gd).
+const PALETTE: Array[String] = [
+	"#14121f",
+	"#2b2840", "#4a4663", "#7a7694",
+	"#a39fb8", "#d4d0e0", "#f4f1ea",
+	"#8f2d2a", "#e0592f", "#ffa23c",
+	"#b8801f", "#f2c230", "#fff3a6",
+	"#3d2a2e", "#7a4a35", "#b27a4a",
+	"#8a5a44", "#d99a74", "#f5cfa8",
+	"#1f7080", "#4fd6dc", "#c4f6f2",
+	"#4a1450", "#a0309a", "#e08ad8",
+	"#3f6b10", "#b4e82a", "#eeffa6",
+	"#4d3f12", "#a68a2a", "#e3cf6b",
+	"#1d3a6b", "#3b73c9", "#7fc0f0",
+	"#7a2347", "#d9477a", "#f59ab8",
+	"#1f4a3a", "#3f8f4f", "#8fd46a",
+	"#4a2a6b", "#8a4fc4", "#c99af0",
+]
 const OUTLINE: String = "#14121f"
 ## The outline of the soft art direction sample (art/samples/e_soft/): Fire's shadow shade.
 const SOFT_OUTLINE: String = "#8f2d2a"
@@ -34,7 +50,7 @@ const SAMPLE_OUTLINES: Dictionary = {"e_soft": SOFT_OUTLINE}
 ## Icons need a closed outline; vfx may outline in their own shadow shade instead.
 const ICON_ROOT: String = "res://content/spells"
 ## Colours of the new-palette sample (art/samples/i_warm/ and hats_vivid/), allowed there only.
-## They are a proposal; they join the palette (docs/STYLE.md, core/base/palette.gd) only if the owner picks them.
+## They are a proposal; they join PALETTE and docs/STYLE.md only if the owner picks them.
 const SAMPLE_PALETTE_COLOURS: Array[String] = [
 	"#93806e", "#6e5a50", "#4d3c3a",
 	"#1b3a8c", "#3b7bf0", "#8ec8ff",
@@ -266,7 +282,7 @@ func _problems(text: String, extra_colours: Array[String] = []) -> Array[String]
 			elif not RECT_ATTRIBUTES.has(key):
 				problems.append("a rect has the attribute %s" % key)
 		var fill: String = String(values.get("fill", ""))
-		if not _palette.has(fill) and not extra_colours.has(fill):
+		if not PALETTE.has(fill) and not extra_colours.has(fill):
 			problems.append("fill %s is not a palette colour (lower-case #rrggbb)" % fill)
 		var box: Array[int] = []
 		for key in ["x", "y", "width", "height"]:

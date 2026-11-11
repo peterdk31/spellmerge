@@ -198,7 +198,7 @@ class PendingLaunch:
 const REFUSED: float = -1.0
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
-const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit", &"_part"]
+const DERIVED: Array[StringName] = [&"projectiles", &"events", &"registry", &"actors", &"sim", &"_zap_near", &"_strike_bodies", &"_hurt_firing", &"_outer", &"_outer_count", &"_looks", &"_look_drawers", &"_launch_look", &"_skyfall", &"_orbit"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
 const REFS: Array[StringName] = [&"_rec_due_body", &"_jq_target"]
 ## State as its size alone: the spare launch records, each set whole when `_delay` takes it
@@ -270,8 +270,6 @@ var _caster_live: PackedInt32Array = PackedInt32Array()
 ## Every actor id from this one on has nothing in the PARTED tables: one past the highest that ever
 ## had a build (`begin_generation`), so the parts are `state_parts()` of them.
 var _caster_rows: int = 0
-## The part being handed to the hash (`state_part`; reused, read before the next).
-var _part: Array = []
 
 ## actor * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
@@ -1063,12 +1061,14 @@ func _add_live(key: int) -> void:
 
 ## `count` fewer of the generation `key` are alive (none left: its entry goes).
 func _take_live(key: int, count: int) -> void:
-	if count <= 0:
+	var had: int = _generation_live.get(key, 0)
+	var taken: int = mini(count, had)
+	if taken <= 0:
+		_generation_live.erase(key)
 		return
-	var left: int = _generation_live.get(key, 0) - count
-	_caster_live[SpellTag.caster_of(key)] -= count + mini(left, 0)
-	if left > 0:
-		_generation_live[key] = left
+	_caster_live[SpellTag.caster_of(key)] -= taken
+	if had > taken:
+		_generation_live[key] = had - taken
 	else:
 		_generation_live.erase(key)
 
@@ -3402,26 +3402,28 @@ func state_parts() -> int:
 	return _caster_rows
 
 
-## Caster `actor`'s part of the PARTED tables, for the state hash (it is walked as "Spells 7", in
-## the spread hash's part with the body "actor 7"): its four staffs' builds as installed (FROZEN:
-## one leaf each) and the carrier of its last infused cast, and, only while something of its builds
-## is alive (`_caster_live`), each generation it holds, staff by staff in order: the generation, its
-## node count, what is alive of it, and each node's live shots and (for a generation no longer
-## current) its spell. A current generation's spells are its installed build's nodes, set together
-## in `begin_generation` and freed together. Walked by index, never by sorting a table. An id with
-## none of it (a caster gone, its shots ended) is empty. Read it before the next call: the array is
-## reused.
+## Caster `actor`'s part of the PARTED tables, for the state hash (walked as "Spells 7", in the
+## spread hash's part with the body "actor 7"; core/sim/README.md, "The hash"):
+## - its builds as installed, staff by staff (FROZEN: one leaf each), and the carrier of its last
+##   infused cast;
+## - only while something of its builds is alive (`_caster_live`), one entry a generation it holds,
+##   staff by staff in order: `[staff * GENERATIONS + generation, node count, alive of it, live shots
+##   by node, the spells of a build no longer current]`, so a report that parts names a generation.
+## A resting caster needs no more: its only generations are its staffs' current ones, whose spells
+## are its builds' nodes, set and freed together (`parts_problems` checks both). Looked up by key,
+## never by sorting a table. Empty for an id with none of it (a caster gone, its shots ended).
 func state_part(actor: int) -> Array:
-	_part.clear()
 	var base: int = actor * SpellLimits.STAFFS
-	if _caster_live[actor] == 0 and _last_infused[actor] == null and _installed[base] == null and _installed[base + 1] == null and _installed[base + 2] == null and _installed[base + 3] == null:
-		return _part
+	var builds: Array = []
+	var any: bool = _caster_live[actor] > 0 or _last_infused[actor] != null
 	for staff in SpellLimits.STAFFS:
-		_part.append(_installed[base + staff])
-	_part.append(_last_infused[actor])
+		builds.append(_installed[base + staff])
+		any = any or _installed[base + staff] != null
+	if not any:
+		return []
+	var part: Array = [builds, _last_infused[actor]]
 	if _caster_live[actor] == 0:
-		return _part
-	_part.append(_caster_live[actor])
+		return part
 	for staff in SpellLimits.STAFFS:
 		var current: int = _current[base + staff]
 		for generation in SpellLimits.GENERATIONS:
@@ -3429,15 +3431,60 @@ func state_part(actor: int) -> Array:
 			if not _node_counts.has(key):
 				continue
 			var nodes: int = _node_counts[key]
-			_part.append(staff * SpellLimits.GENERATIONS + generation)
-			_part.append(nodes)
-			_part.append(_generation_live.get(key, 0))
+			var live := PackedInt32Array()
+			var spells: Array = []
 			for node in nodes:
 				var tag: int = SpellTag.make(actor, staff, node, generation)
-				_part.append(_live.get(tag, 0))
+				live.append(_live.get(tag, 0))
 				if generation != current:
-					_part.append(_profiles.get(tag))
-	return _part
+					spells.append(_profiles.get(tag))
+			part.append([staff * SpellLimits.GENERATIONS + generation, nodes, _generation_live.get(key, 0), live, spells])
+	return part
+
+
+## What `state_part` stands on, checked (an empty list when it holds): each caster's live count is
+## the sum of its generations' (`_caster_live`); every spell, node count and live count belongs to a
+## generation that is held; a caster with nothing alive holds only its staffs' current generations;
+## and a current generation's spells are its installed build's nodes. A test asks after play (every
+## card's walk, tests/core/test_state_walked.gd), so a new writer of the PARTED tables that breaks
+## one is named, not hashed past. Not for the game: it walks every table.
+func parts_problems() -> PackedStringArray:
+	var out := PackedStringArray()
+	var sums := PackedInt32Array()
+	sums.resize(ACTORS)
+	for key: int in _generation_live:
+		sums[SpellTag.caster_of(key)] += int(_generation_live[key])
+	for actor in ACTORS:
+		if sums[actor] != _caster_live[actor]:
+			out.append("caster %d: live count %d, its generations' %d" % [actor, _caster_live[actor], sums[actor]])
+		if actor >= _caster_rows and (sums[actor] > 0 or _last_infused[actor] != null):
+			out.append("caster %d: has state at or past state_parts() (%d)" % [actor, _caster_rows])
+	for key: int in _node_counts:
+		var actor: int = SpellTag.caster_of(key)
+		var index: int = actor * SpellLimits.STAFFS + SpellTag.staff_of(key)
+		var current: bool = _current[index] == SpellTag.generation_of(key)
+		if actor >= _caster_rows:
+			out.append("caster %d: a generation at or past state_parts() (%d)" % [actor, _caster_rows])
+		if not current and _caster_live[actor] == 0:
+			out.append("caster %d staff %d: an older generation %d held with nothing alive" % [actor, SpellTag.staff_of(key), SpellTag.generation_of(key)])
+		if current:
+			var build: CompiledStaff = _installed[index]
+			if build == null or build.nodes.size() != int(_node_counts[key]):
+				out.append("caster %d staff %d: the current generation's node count is not its build's" % [actor, SpellTag.staff_of(key)])
+				continue
+			for spell in build.nodes:
+				if _profiles.get(SpellTag.make(actor, SpellTag.staff_of(key), spell.node, SpellTag.generation_of(key))) != spell:
+					out.append("caster %d staff %d: a current spell is not its build's node %d" % [actor, SpellTag.staff_of(key), spell.node])
+	for tag: int in _profiles:
+		if not _node_counts.has(SpellTag.generation_key(tag)) or SpellTag.node_of(tag) >= int(_node_counts.get(SpellTag.generation_key(tag), 0)):
+			out.append("tag %d: a spell of no held generation's nodes" % tag)
+	for tag: int in _live:
+		if not _profiles.has(tag) or _caster_live[SpellTag.caster_of(tag)] == 0:
+			out.append("tag %d: live shots of no spell, or of a caster with nothing alive" % tag)
+	for key: int in _generation_live:
+		if not _node_counts.has(key):
+			out.append("generation %d: alive but not held" % key)
+	return out
 
 
 ## Opens the caster `actor` (an actor id a body opened in the actor table, actors G3b): its

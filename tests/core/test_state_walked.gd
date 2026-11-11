@@ -10,6 +10,8 @@ extends "res://tests/support/suite.gd"
 ## - Every card of content/spells, cast in the card rules' world (tests/support/card_rules_world.gd)
 ##   and walked as it casts, flies and lands. New cards and carriers are walked the day they land,
 ##   with no edit here.
+## - An area hashed by parts (PARTED) is asked whether its parts still stand (`parts_problems`) at
+##   every walk.
 
 const SimScenes := preload("res://tests/core/sim_scenes.gd")
 const CardWorld := preload("res://tests/support/card_rules_world.gd")
@@ -128,6 +130,13 @@ func _walk(areas: Dictionary) -> PackedStringArray:
 		walk.walk(String(name), areas[name] as Object, func(_path: String, _value: Variant) -> void: leaves[0] += 1)
 	if leaves[0] == 0:
 		walk.problems.append("the walk reached no state")
+	# An area hashed by parts checks what its parts stand on (PARTED, props W3: Spells' resting
+	# casters skip their tables), so a writer that breaks it is named here, card by card.
+	for name: Variant in areas:
+		var area: Object = areas[name]
+		if area.has_method(&"parts_problems"):
+			for problem: String in area.call(&"parts_problems"):
+				walk.problems.append("%s parts: %s" % [name, problem])
 	return walk.problems
 
 

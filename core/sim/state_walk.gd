@@ -17,10 +17,11 @@ extends RefCounted
 ## - `SPARES` (free lists of spare records, each set whole when it is taken: Spells' spare launches),
 ##   walked as their size alone (N3c: their contents cannot change the game, and walking them was a
 ##   fifth of the spells area's hash);
-## - `PARTED` (tables kept by actor id that grow with the actors: Spells' builds by caster), state
-##   that the hash walks id by id, each id's as a part of its own (`SimHash.Part`, "Spells 7", which
-##   the script hands over with `state_part(id)`), and not with the rest of the area (props W3). A
-##   walk of the area itself, not of its parts, walks them as any member; so does a snapshot.
+## - `PARTED` (tables kept by actor id that grow with the actors: Spells' builds by caster): state,
+##   walked whole by default, and by part when the walk is asked for one (`part`, props W3): the area
+##   less them (LESS_PARTED), or one actor id's share of them (0 and up), which the script hands over
+##   as a value (`state_parts() -> int`, `state_part(id) -> Array`; an empty one for an id with none).
+##   The hash asks for parts (`SimHash.Part`); a snapshot walks the area whole.
 ## A list is a constant `Array[StringName]` named after its kind, or after its kind and `_` and a
 ## name of the script's own (`DERIVED_BEAM`): a script that extends one with a list cannot declare
 ## the same constant again, so it names its own. The lists are read from the script and the scripts
@@ -135,8 +136,10 @@ const FROZEN_LEAF: StringName = &"frozen"
 static var _idles: Dictionary[Script, bool] = {}
 ## Script to its PARTED members, 1 each in `members` order (empty when it lists none).
 static var _parted: Dictionary[Script, PackedByteArray] = {}
-## The root's PARTED members while the area less its parts is walked (`SimHash.Part` -1), else empty.
-var _skip: PackedByteArray = PackedByteArray()
+## What of an area `walk` and `values` take (`part`): all of it, or the area less its PARTED members;
+## an actor id (0 and up) takes that id's part (`state_part`).
+const WHOLE: int = -2
+const LESS_PARTED: int = -1
 ## The one leaf of an idle object.
 const IDLE: StringName = &"idle"
 ## Script to whether a node of it is walked when its holder owns it (`_walks_into`), for the scripts
@@ -145,42 +148,46 @@ static var _enters: Dictionary[Script, bool] = {}
 
 
 ## Walks `object` (an area: a service, an actor table, a body) under the name `area`, handing every
-## leaf to `sink(path, value)` in a fixed order. Problems are added to `problems`.
-func walk(area: String, object: Object, sink: Callable) -> void:
+## leaf to `sink(path, value)` in a fixed order: all of it, or, for an area that lists PARTED, the
+## `part` asked for (WHOLE, LESS_PARTED or an actor id). Problems are added to `problems`.
+func walk(area: String, object: Object, sink: Callable, part: int = WHOLE) -> void:
 	_sink = sink
 	_seen.clear()
-	_root(area, object)
+	_root(area, object, part)
 	_sink = Callable()
 
 
 ## The hash's walk: as `walk`, with every leaf's value (as `SimHash.add_leaf` gives it: a packed or typed
 ## array as its type, size and engine hash) appended to `into`, in the same order. Paths are built
 ## only for the problems' sake (`with_paths`), and are best off.
-func values(area: String, object: Object, into: Array) -> void:
+func values(area: String, object: Object, into: Array, part: int = WHOLE) -> void:
 	_collecting = true
 	_values = into
 	_seen.clear()
-	_root(area, object)
+	_root(area, object, part)
 	_values = []
 	_collecting = false
 
 
-## The area itself, walked as its own holder (a body or a service is the root of its area), or one
-## part of an area (`SimHash.Part`): the area less its PARTED members, or one id's (`state_part`).
-func _root(area: String, object: Object) -> void:
-	if not object is SimHash.Part:
-		_object(area, object, null, true)
-		return
-	var part: SimHash.Part = object
-	if part.id >= 0:
-		_value(area, part.area.call(&"state_part", part.id), part.area)
-		return
-	var script: Script = part.area.get_script() as Script
+## Whether `script` lists PARTED (its objects are walked by part when asked: `part`).
+static func has_parted(script: Script) -> bool:
+	if script == null:
+		return false
 	if not _members.has(script):
 		_plan(script)
-	_skip = _parted[script]
-	_object(area, part.area, null, true)
-	_skip = PackedByteArray()
+	return not _parted[script].is_empty()
+
+
+## The area itself, walked as its own holder (a body or a service is the root of its area): all of
+## it, less its PARTED members, or one actor id's part (`state_part`, a value it hands over).
+func _root(area: String, object: Object, part: int) -> void:
+	var script: Script = object.get_script() as Script
+	if part == WHOLE or not has_parted(script):
+		_object(area, object, null, true)
+	elif part == LESS_PARTED:
+		_object(area, object, null, true, _parted[script])
+	else:
+		_value(area, object.call(&"state_part", part), object)
 
 
 ## Whether `script` is a simulation script (in FOLDERS, not in VIEW_FOLDERS). An inner class has no path of its own and is
@@ -572,7 +579,9 @@ func _key(at: String, key: Variant) -> void:
 	_leaf(_join(at, "{}"), key)
 
 
-func _object(path: String, value: Variant, holder: Object, root: bool = false) -> void:
+## `skip` marks the root's members left out (`_members_of`): its PARTED ones when the area less them
+## is walked.
+func _object(path: String, value: Variant, holder: Object, root: bool = false, skip: PackedByteArray = PackedByteArray()) -> void:
 	if value == null:
 		_leaf(path, null)
 		return
@@ -595,7 +604,7 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 		if _idles[script] and bool(object.call(&"idle")):
 			_leaf(_join(path, ".idle"), IDLE)
 			return
-		_members_of(path, object, script)
+		_members_of(path, object, script, skip)
 		return
 	var node: Node = object as Node
 	if node != null:
@@ -650,12 +659,7 @@ func _object(path: String, value: Variant, holder: Object, root: bool = false) -
 			return
 	if node is Node2D:
 		_leaf(_join(path, ".position"), (node as Node2D).position)
-	if root and not _skip.is_empty():
-		var skip: PackedByteArray = _skip
-		_skip = PackedByteArray()
-		_members_of(path, object, script, skip)
-	else:
-		_members_of(path, object, script)
+	_members_of(path, object, script, skip)
 	if root and is_body(node):
 		# The simulation nodes added to it in play that no member holds (a possession's puppet).
 		for added: Node in added_in_play(node):

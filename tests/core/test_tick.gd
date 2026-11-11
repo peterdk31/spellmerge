@@ -225,6 +225,10 @@ func test_the_state_splits_into_parts_that_cover_it_once() -> void:
 	for name: String in at_once:
 		check_equal(after[name] != at_once[name], name == "Kept 3", "a change of id 3 changes %s's hash: %s" % [name, name == "Kept 3"])
 	check(SimHash.of(kept) != before, "the area alone is hashed whole")
+	# The area less its parts still hashes its other members.
+	kept.shared = 5
+	var shared: Dictionary[String, int] = SimHash.areas(whole)
+	check(shared["Kept"] != after["Kept"] and shared["Kept 3"] == after["Kept 3"], "a member not PARTED changes the area's own hash only")
 
 
 func test_the_bodies_go_by_actor_id_not_by_tree_order() -> void:

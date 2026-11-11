@@ -47,6 +47,11 @@ func test_a_parted_script_hands_its_parts_over() -> void:
 			methods[String(method["name"])] = type_string(int(returned["type"]))
 		check_equal(methods.get("state_parts", ""), "int", "%s lists PARTED: it has state_parts() -> int" % entry["name"])
 		check_equal(methods.get("state_part", ""), "Array", "%s lists PARTED: it has state_part(id) -> Array" % entry["name"])
+		# A PARTED member is state walked by id: in no other list (a REFS one would be entered in its
+		# part, a DERIVED one never hashed).
+		for list: String in ["DERIVED", "VIEW", "REFS", "SPARES"]:
+			for name in StateWalk.listed(script, "PARTED"):
+				check(not StateWalk.listed(script, list).has(name), "%s: %s is PARTED and %s; take it out of one" % [entry["name"], name, list])
 
 
 ## A setting a new run keeps (RUN_KEEPS, core/sim/sim_fresh.gd) is a state member: one in DERIVED or

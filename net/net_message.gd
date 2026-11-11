@@ -50,7 +50,9 @@ const MAX_TICK: int = Replay.MAX_TICKS + 3600
 const MAX_HEADER: int = 512
 const MAX_TICK_BYTES: int = 1 + Replay.SEATS * (2 + InputFrame.MAX_BYTES)
 const MAX_NAME: int = 64
-const MAX_AREAS: int = 2048
+## A check's areas: every actor's body and its part of an area hashed by parts (Spells' casters,
+## props W3, `SimHash.Part`), and the services.
+const MAX_AREAS: int = 2 * preload("res://core/actors/actors.gd").ACTORS + 256
 const MAX_PARTED: int = 16
 ## The longest message there is (a check of MAX_AREAS areas).
 const MAX_BYTES: int = HEAD_BYTES + 6 + MAX_AREAS * (1 + MAX_NAME + 8)

@@ -25,40 +25,38 @@ const BODY_PREFIX: String = "actor "
 
 
 ## A part of an area that keeps state by actor id (props W3): an area whose script lists members in
-## PARTED and has `state_parts() -> int` and `state_part(id) -> Array` (Spells, by caster) is hashed
-## as the area less those members (id -1, under its own name) and one part for each id from 0 to
-## `state_parts()` less one, under its name and the id ("Spells 7"), which the spread hash puts in
-## the part of that actor's body. A caster's state then costs the tick its body is hashed in, and a
-## check that parts names it. Only the hash makes parts (`parted`, `slice`, `areas`): a snapshot
-## and `of` take the area whole.
+## PARTED (`StateWalk.has_parted`; Spells, by caster) is hashed as the area less those members,
+## under its own name, and one part for each actor id that has a share of them (`state_part(id)` not
+## empty, ids 0 to `state_parts()` less one), named after the area and the id ("Spells 7"), which
+## `slice` puts in the part of that actor's body. A caster's state then costs the tick its body is
+## hashed in, and a check that parts names it. `parted`, `slice` and `areas` make the parts; `of`, a
+## walk of the area itself and a snapshot take it whole.
 class Part:
 	extends RefCounted
 	var area: Object = null
-	## The actor id, or -1 for the area less its PARTED members.
-	var id: int = -1
+	## The area's own name ("Spells").
+	var area_name: String = ""
+	## The actor id, or `StateWalk.LESS_PARTED` for the area less its PARTED members.
+	var id: int = StateWalk.LESS_PARTED
 
-	func _init(of: Object, at: int) -> void:
+	func _init(of: Object, named: String, at: int) -> void:
 		area = of
+		area_name = named
 		id = at
 
+	## The name it is hashed under: the area's, or the area's and the id ("Spells 7").
+	func name() -> String:
+		return area_name if id < 0 else "%s %d" % [area_name, id]
 
-## Script to whether its objects have parts (`Part`).
-static var _has_parts: Dictionary[Script, bool] = {}
 
-
-## Whether `object` is an area with parts (`Part`): its script lists PARTED. A body never is (it is
-## one actor's already): `parted` and `slice` do not ask the bodies, by their names.
+## Whether `object` is an area hashed by parts (`Part`): its script lists PARTED. A body is not asked
+## (it is one actor's already): `parted` and `slice` know the bodies by their names.
 static func has_parts(object: Object) -> bool:
-	var script: Script = object.get_script() as Script if object != null else null
-	if script == null:
-		return false
-	if not _has_parts.has(script):
-		_has_parts[script] = not StateWalk.listed(script, "PARTED").is_empty()
-	return _has_parts[script]
+	return object != null and StateWalk.has_parted(object.get_script() as Script)
 
 
-## `named` with each area that has parts (`Part`) as the area less them and then each of its parts
-## ("Spells 7"), in the order given. An area already a `Part` stays as it is.
+## `named` with each area that has parts as the area less them, then each of its parts ("Spells
+## 7"), in the order given. An area already a `Part` stays as it is.
 static func parted(named: Dictionary) -> Dictionary:
 	var any: bool = false
 	for name: Variant in named:
@@ -73,9 +71,8 @@ static func parted(named: Dictionary) -> Dictionary:
 		if String(name).begins_with(BODY_PREFIX) or not has_parts(object):
 			out[name] = object
 			continue
-		out[name] = Part.new(object, -1)
-		for id in int(object.call(&"state_parts")):
-			out["%s %d" % [name, id]] = Part.new(object, id)
+		out[name] = Part.new(object, String(name), StateWalk.LESS_PARTED)
+		_add_parts(out, object, String(name), 0, 1)
 	return out
 
 
@@ -90,8 +87,7 @@ static func slice(named: Dictionary, part: int, slices: int) -> Dictionary:
 		return parted(named)
 	var services: int = 0
 	for name: Variant in named:
-		var object: Object = named[name]
-		if not String(name).begins_with(BODY_PREFIX) and not (object is Part and (object as Part).id >= 0):
+		if not String(name).begins_with(BODY_PREFIX) and not _is_id_part(named[name] as Object):
 			services += 1
 	var out: Dictionary = {}
 	var index: int = 0
@@ -102,33 +98,57 @@ static func slice(named: Dictionary, part: int, slices: int) -> Dictionary:
 		var parts: bool = false
 		if text.begins_with(BODY_PREFIX):
 			at = posmod(int(text.trim_prefix(BODY_PREFIX)), slices)
-		elif object is Part and (object as Part).id >= 0:
+		elif _is_id_part(object):
 			at = posmod((object as Part).id, slices)
 		else:
 			at = floori(float(index) * float(slices) / float(services))
 			index += 1
 			parts = has_parts(object)
 		if at == part:
-			out[name] = Part.new(object, -1) if parts else object
+			out[name] = Part.new(object, text, StateWalk.LESS_PARTED) if parts else object
 		if parts:
 			# Only this slice's parts are made: ids `part`, `part + slices` ...
-			for id in range(part, int(object.call(&"state_parts")), slices):
-				out["%s %d" % [name, id]] = Part.new(object, id)
+			_add_parts(out, object, text, part, slices)
 	return out
 
 
 ## Each area's hash, by name, in the order given (an area with parts as its parts, `parted`).
 ## Problems go to `walk.problems`: a walk of the caller's (with its own settings; paths off is
-## several times faster), or one of its own without paths.
-static func areas(named: Dictionary, walk: StateWalk = null) -> Dictionary[String, int]:
+## several times faster), or one of its own without paths. With `also`, every leaf is handed to
+## `also(area, path, value)` too (the desync report keeps a tick's leaves so).
+static func areas(named: Dictionary, walk: StateWalk = null, also: Callable = Callable()) -> Dictionary[String, int]:
 	if walk == null:
 		walk = StateWalk.new()
 		walk.with_paths = false
 	var out: Dictionary[String, int] = {}
 	var all: Dictionary = parted(named)
 	for name: Variant in all:
-		out[String(name)] = area(walk, String(name), all[name] as Object)
+		var text: String = String(name)
+		var leaves: Callable = Callable()
+		if also.is_valid():
+			leaves = func(path: String, value: Variant) -> void: also.call(text, path, value)
+		out[text] = area(walk, text, all[name] as Object, leaves)
 	return out
+
+
+## What a hashed area is reported as (the benchmarks' costliest areas): an area's parts together
+## ("Spells parts"), anything else by its name.
+static func label(name: String, object: Object) -> String:
+	return "%s parts" % (object as Part).area_name if _is_id_part(object) else name
+
+
+## Adds to `out` the parts of `object` (an area named `area`) for the ids `from`, `from + step` ...
+## that have a share of its PARTED members: an id with an empty part is no area (both machines agree
+## on that; one with a part where the other has none parts the check).
+static func _add_parts(out: Dictionary, object: Object, area: String, from: int, step: int) -> void:
+	for id in range(from, int(object.call(&"state_parts")), step):
+		if not (object.call(&"state_part", id) as Array).is_empty():
+			var part := Part.new(object, area, id)
+			out[part.name()] = part
+
+
+static func _is_id_part(object: Object) -> bool:
+	return object is Part and (object as Part).id >= 0
 
 
 ## One area's hash by `walk` (an area, or one `Part` of one; an area with parts handed whole is
@@ -138,12 +158,17 @@ static func areas(named: Dictionary, walk: StateWalk = null) -> Dictionary[Strin
 ## leaf: the hash of the whole is the same either way.
 static func area(walk: StateWalk, name: String, object: Object, also: Callable = Callable()) -> int:
 	var values: Array = []
+	var of: Object = object
+	var part: int = StateWalk.WHOLE
+	if object is Part:
+		of = (object as Part).area
+		part = (object as Part).id
 	if also.is_valid():
-		walk.walk(name, object, func(path: String, value: Variant) -> void:
+		walk.walk(name, of, func(path: String, value: Variant) -> void:
 			add_leaf(values, value)
-			also.call(path, value))
+			also.call(path, value), part)
 	else:
-		walk.values(name, object, values)
+		walk.values(name, of, values, part)
 	return of_leaves(values)
 
 

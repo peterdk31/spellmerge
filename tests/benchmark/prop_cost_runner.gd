@@ -239,7 +239,7 @@ func _time_hash(count: int) -> void:
 			if name.begins_with(SimHash.BODY_PREFIX):
 				body_total += Time.get_ticks_usec() - area_start
 			else:
-				var key: String = _area_of(name, named[name] as Object)
+				var key: String = SimHash.label(name, named[name] as Object)
 				by_area[key] = by_area.get(key, 0) + Time.get_ticks_usec() - area_start
 		SimHash.whole(hashes)
 		problems = walk.problems
@@ -294,14 +294,6 @@ func _time_snapshot(count: int) -> void:
 	if back != count:
 		_failures.append("props %d: the restore made %d stand-ins again" % [count, back])
 	print("BENCH: props %d: snapshot take avg %.2f ms, %d bodies, %d objects; restore into the same world %.2f ms, with the stand-ins made again %.2f ms" % [count, float(take_total) / SNAPSHOT_PASSES / 1000.0, snapshot.bodies.size(), objects, float(same) / 1000.0, float(made) / 1000.0])
-
-
-## What a hashed area is counted as: an area's parts ("Spells 7", `SimHash.Part`) together as
-## "Spells parts", anything else by its name.
-static func _area_of(name: String, object: Object) -> String:
-	if object is SimHash.Part and (object as SimHash.Part).id >= 0:
-		return name.substr(0, name.rfind(" ")) + " parts"
-	return name
 
 
 ## The objects a snapshot's value holds (`Snapshot.Obj`), counted through its lists and tables:

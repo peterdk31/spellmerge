@@ -20,7 +20,7 @@ func take() -> void:
 		fail("the sandbox did not start")
 		return
 	# Zoom (ring 2): held still on a modifier, then turned a little inside the fan.
-	_hud.call("_on_builder_options_changed", true, 2, true)
+	_hud.call("_on_builder_options_changed", 2, true)
 	if not await _open():
 		return
 	var radial: Node = _hud.call("get_radial", 0)
@@ -32,7 +32,7 @@ func take() -> void:
 	await shot("radial_zoom_locked")
 	await _close()
 	# Kinds: hold (ring 3): resting on the modifiers, half way, then open with a card picked.
-	_hud.call("_on_builder_options_changed", true, 3, true)
+	_hud.call("_on_builder_options_changed", 3, true)
 	if not await _open():
 		return
 	var kinds: RefCounted = radial.get("ring_picker")
@@ -47,7 +47,7 @@ func take() -> void:
 	await shot("radial_kinds_open")
 	await _close()
 	# Kinds: depth (ring 4): half a push on the elements, then pushed out.
-	_hud.call("_on_builder_options_changed", true, 4, true)
+	_hud.call("_on_builder_options_changed", 4, true)
 	if not await _open():
 		return
 	kinds = radial.get("ring_picker")

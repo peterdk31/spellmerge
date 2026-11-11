@@ -12,7 +12,7 @@ extends SceneTree
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
-## Loaded when needed, not preloaded: this scene is also the "Hud" autoload (see test_builder.gd).
+## Loaded when needed, not preloaded: this scene is also the "Hud" autoload (see test_radial_builder.gd).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
@@ -220,7 +220,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_names() == ["Resume", "Sandbox", "Settings"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
-	_check(_names() == ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "BuilderStyle", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
+	_check(_names() == ["ResetDummies", "ArenaEnemy", "ArenaCount", "ArenaSpawn", "ArenaClear", "AIView", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ResetDummies")
 	_press(1, "ArenaClear")
 	_check(_actions == [[1, &"reset_dummies"], [1, &"clear_enemies"]], "the actions go out with the opener's index, got %s" % [_actions])
@@ -285,20 +285,15 @@ func _test_the_sandbox_switches_the_reload() -> void:
 func _test_the_sandbox_switches_the_builder() -> void:
 	_setup(1, true)
 	var options: Array = []
-	_menu().builder_options_changed.connect(func(radial: bool, ring: int, push: bool) -> void: options.append([radial, ring, push]))
+	_menu().builder_options_changed.connect(func(ring: int, push: bool) -> void: options.append([ring, push]))
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Sandbox")
-	_check(_menu().button("BuilderStyle").text.ends_with("Builder: Radial"), "the radial builder by default")
-	_check(_hud.uses_radial(), "and the panels use it")
+	_check(_menu().button("BuilderStyle") == null, "no switch to another builder: the list builder is gone")
 	_check(_menu().button("PutStyle").text.ends_with("Full slot: Push right"), "a full slot pushes right by default")
-	_press(0, "BuilderStyle")
-	_check(_menu().button("BuilderStyle").text.ends_with("Builder: List"), "it flips to the list builder")
-	_check(not _hud.uses_radial(), "and the panels use that")
-	_press(0, "BuilderStyle")
 	_press(0, "RingStyle")
 	_press(0, "PutStyle")
-	_check(options == [[false, 0, true], [true, 0, true], [true, 1, true], [true, 1, false]], "each flip goes out, got %s" % [options])
+	_check(options == [[1, true], [1, false]], "each flip goes out, got %s" % [options])
 	_check(_hud.get_radial(0).layout == RadialScript.Layout.KIND, "the ring shows one kind at a time")
 	_check(_hud.get_radial(0).put == RadialScript.Put.REPLACE, "a full slot is replaced")
 	# The ring styles to try (owner, 2026-10-30), then round to the first again.
@@ -316,8 +311,7 @@ func _test_the_sandbox_switches_the_builder() -> void:
 	_frame()
 	_tap(0, &"back")
 	_frame()
-	_check(_hud.get_radial(0).is_open(), "B opens the radial builder now")
-	_check(not _hud.get_builder(0).is_open(), "not the list one")
+	_check(_hud.get_radial(0).is_open(), "B opens the radial builder")
 	_tap(0, &"back")
 	_frame()
 	_check(not _hud.get_radial(0).is_open(), "B closes it again")

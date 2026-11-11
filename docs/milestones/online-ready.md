@@ -16,7 +16,7 @@ The code already goes a long way:
 - seats are kept apart from actor ids, and only HUD, input and co-op rules take seats;
 - spell scatter, staff spread, dash and teleport seeds hash the actor id and cast count; the AI brain's RNG is seeded;
 - actors step in a fixed order, and areas talk through synchronous `core/` events;
-- the HUD already changes the game only through `*_requested` events (`card_move_requested`, `staff_change_requested`, `sandbox_spawn_requested`, ...), which are commands;
+- the HUD already changes the game only through `*_requested` events (`staff_change_requested`, `sandbox_spawn_requested`, ...), which are commands;
 - headless runs are frame-deterministic on one machine, the clip tests check two runs agree at every frame, and the native kernels match their GDScript byte for byte.
 
 ## What breaks determinism today (the audit, 2026-11-04)

@@ -43,7 +43,8 @@ extends Node
 ##
 ## Each mode's setup (owner, 2026-11-05): a new wizard gets the mode's staffs, start cards and
 ## bag (the cards it may build with, `bag_for_mode`, handed over with `seat_wizard`): Play `dash`
-## and `bolt` (PLAY_BAG, `play_bag`); the sandbox every card.
+## and `bolt` (PLAY_BAG, `play_bag`); the sandbox and the hub every card (the hub's for now, owner
+## 2026-11-11: to try combos online until a better way to come by cards comes).
 ##
 ## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
 ## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
@@ -80,7 +81,7 @@ extends Node
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
 ## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
-## have Play's setup. Its teleporter stone (`RoomBase.start_stone`) is lit while every wizard stands
+## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (`RoomBase.start_stone`) is lit while every wizard stands
 ## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`.
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
 ## the tick's start, every wizard keeping its staffs (`start_run`'s `kept`); that run's end
@@ -1006,11 +1007,11 @@ func start_cards_for_mode() -> Array:
 
 
 ## The bag a new wizard gets in this run's `mode`: every spell card of the registry in the
-## sandbox, `play_bag` in Play.
+## sandbox and the hub, `play_bag` in Play.
 func bag_for_mode() -> Array[StringName]:
 	var out: Array[StringName] = []
 	match mode:
-		MODE_SANDBOX:
+		MODE_SANDBOX, MODE_HUB:
 			if registry != null:
 				for id: StringName in registry.get_ids(&"spells"):
 					if registry.get_resource(&"spells", id) is SpellComponent:

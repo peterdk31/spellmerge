@@ -1,11 +1,10 @@
 extends "res://tests/support/screenshot.gd"
 ## The button glyphs (`glyphs_sheet`), one row per kind of controller (keyboard, keyboard with the mouse, Xbox,
 ## PlayStation, Switch and a plain gamepad) and one column per action (the four staffs, accept,
-## back, alternate, pause), at 2x, with the builder's hint line beside them at 1x for each kind.
+## back, alternate, pause), at 2x.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
-const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 
 const ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause"]
 const PAD_NAMES: Dictionary = {0: "Xbox One Controller", 1: "PS5 Controller", 2: "Nintendo Switch Pro Controller", 3: "Generic Pad"}
@@ -46,11 +45,6 @@ func take() -> void:
 			glyph.show_action(player, action)
 			glyph.position = Vector2(x, 0.0)
 			x += glyph.custom_minimum_size.x + 6.0
-		var hint: HintLineScript = HintLineScript.new()
-		hint.bind(manager)
-		hint.position = Vector2(520.0, 8.0 + ROW_HEIGHT * row)
-		root.add_child(hint)
-		hint.show_hint(player, &"accept", "Use", &"back", "back")
 	await settle()
 	var image: Image = await grab()
 	for manager: Node in [pads, keys, mouse]:

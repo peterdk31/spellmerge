@@ -1,14 +1,14 @@
 extends Control
-## One player's radial staff builder (owner, 2026-10-26), the second builder beside the list
-## one (`builder.gd`); the pause menu's Sandbox page switches between them (`hud/panels`). It
-## fills the player's quarter of the screen, laid out the same in every quarter (the column on
+## One player's radial staff builder (owner, 2026-10-26), the game's one builder (the older list
+## builder was removed, owner 2026-11-11). It fills the player's quarter of the screen, laid out the same in every quarter (the column on
 ## the left, the ring on its right; owner, 2026-10-31, docs/milestones/M2-builder-tree.md), never
 ## pauses the game, and is drawn in code at the view's 1x pixels. While it is open the corner
 ## panel is hidden (`hud/panels`): thin HP and MP bars framed in the player's colour sit on top of
 ## the column instead, so health stays in view during a wave.
 ##
 ## - **The ring:** every card of the bag on a circle, grouped by kind (carriers, modifiers,
-##   infusions, triggers, multicasts) with a coloured arc and a gap between kinds; or, with the
+##   infusions, triggers, multicasts) with a coloured arc and a gap between kinds, each kind A to Z
+##   by the name shown, clockwise from the top (owner, 2026-11-11; `ring_order`); or, with the
 ##   layout `KIND`, one kind at a time, flipped with the d-pad (`kind_prev`, `kind_next`). Any
 ##   number of cards fits: the tiles shrink with the count and, below `ICON_MIN` pixels, become
 ##   plain marks; the card pointed at is always drawn full size. A card the player has several
@@ -1020,9 +1020,10 @@ func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
 	var keep: StringName = pointed_id()
 	_entries.clear()
 	var by_key: Dictionary = {}
+	var ordered: Array[StringName] = ring_order(_bag)
 	# A bag of plain ids: each card at level 1, counted. Levels come with M3's rewards.
 	for kind in KINDS:
-		for id in _bag:
+		for id in ordered:
 			if _spells == null or _spells.component_kind(id) != kind:
 				continue
 			var key: String = "%s@1" % id
@@ -1043,6 +1044,16 @@ func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
 			_pointed = at
 	_refresh_preview()
 	_changed()
+
+
+## `ids` A to Z by the name each card shows (natural order, any case: "Card 2" before "Card 10"),
+## then by id. Only the ring's order: the bag itself stays as the player has it.
+func ring_order(ids: Array[StringName]) -> Array[StringName]:
+	var out: Array[StringName] = ids.duplicate()
+	out.sort_custom(func(a: StringName, b: StringName) -> bool:
+		var by_name: int = _name_of(a).naturalnocasecmp_to(_name_of(b))
+		return by_name < 0 if by_name != 0 else String(a) < String(b))
+	return out
 
 
 func _on_build_refused(player: int, reason: String) -> void:

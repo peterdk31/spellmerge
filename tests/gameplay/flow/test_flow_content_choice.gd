@@ -70,7 +70,7 @@ func test_each_mode_gets_its_own_staffs_as_they_are() -> void:
 
 
 ## Each mode's setup (owner, 2026-11-05): a new wizard's bag is the mode's. Play: dash and bolt;
-## the sandbox: every card.
+## the sandbox and the hub (owner, 2026-11-11): every card, a joiner's too.
 func test_each_mode_gives_its_own_bag() -> void:
 	var registry: Node = root.get_node("Registry")
 	var every: Array[StringName] = []
@@ -80,6 +80,7 @@ func test_each_mode_gives_its_own_bag() -> void:
 	var wanted: Dictionary = {
 		FlowScript.MODE_WAVES: [&"dash", &"bolt"] as Array[StringName],
 		FlowScript.MODE_SANDBOX: every,
+		FlowScript.MODE_HUB: every,
 	}
 	for mode: StringName in wanted:
 		flow.mode = mode
@@ -89,6 +90,11 @@ func test_each_mode_gives_its_own_bag() -> void:
 		check(wizard != null, "%s: a wizard" % mode)
 		if wizard != null:
 			check_equal(PlayerController.of(wizard).bag, wanted[mode], "%s: the wizard's bag" % mode)
+		flow._on_player_joined(1)
+		var joiner := flow.get_wizard(1) as Actor
+		check(joiner != null, "%s: a joiner's wizard" % mode)
+		if joiner != null:
+			check_equal(PlayerController.of(joiner).bag, wanted[mode], "%s: the joiner's bag" % mode)
 		flow.stop_run()
 
 

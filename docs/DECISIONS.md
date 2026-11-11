@@ -3491,3 +3491,8 @@ What it means:
 - **The hash is the protocol's one caller:** it asks an area for an actor's share once, keeps it on the `ActorPart` and hands the walker the value; the walker knows only the BY_ACTOR list (to leave it out). Every BY_ACTOR script must check what its parts leave out (`actor_part_problems`, a test), and the net check's area cap is pinned to the number of such areas by a test.
 - **A body is decided in one place** (`StateWalk.actor_id_of`): `is_body` and the id leaf of a list of bodies both ask it; a freed entry stays in that leaf instead of turning the list back into a walk entry by entry.
 
+## 2026-11-11: the list builder is removed; the radial is the one builder
+
+- **The owner:** "Remove the Menu list spell builder. We are not gonna use that one." It answers the open question in docs/milestones/M2-builder-tree.md ("Whether the list builder gets the tree too, or goes").
+- **Gone with it:** the Sandbox page's "Builder: Radial/List" switch (`builder_options_changed(ring, push)` now), the HUD's `get_builder` and `uses_radial`, and everything only it used: the row window and hint line widgets (`hud/widgets/row_window.gd`, `hint_line.gd`) and the theme's `BuilderButton`, `BuilderButtonFocus`, `BuilderLabel`, `BuilderHint` and `ComplexityBar` (already unused) with their box styles.
+- **The command `card_move_requested` went too** (owner: "Cleanup the card_move_requested"): the list builder was its only sender. The radial sends `staff_change_requested` and `staff_cards_requested`. The input frame's format is now version 3, since the command kinds after it are renumbered (as version 2 did for the horde's); a machine on version 2 and one on 3 refuse each other's frames, and older recordings no longer decode.

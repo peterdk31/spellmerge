@@ -173,3 +173,25 @@ func test_a_few_hundred_cards_one_kind_at_a_time() -> void:
 			check_equal(_radial.pointed_id(), entry["id"], "%s: %s can be picked" % [kind, entry["id"]])
 		_tap(&"kind_next")
 	check_equal(_radial.shown_kind(), RadialScript.KINDS[0], "five flips come back to the carriers")
+
+
+## Each kind's cards stand A to Z by the name shown, clockwise from the top (owner, 2026-11-11),
+## whatever order the bag has them in and whatever their ids: "Card 2" before "Card 10".
+func test_the_ring_is_a_to_z_by_the_names_shown() -> void:
+	_open(12, &"modifier")
+	(_spells.registry.items[FakeCards.id(0)] as SpellComponent).display_name = "zap"
+	var bag: Array[StringName] = FakeCards.ids(12)
+	bag.reverse()
+	_bus.bag_changed.emit(0, bag)
+	var wanted: Array[StringName] = FakeCards.ids(12).slice(1)
+	wanted.append(FakeCards.id(0))
+	var shown: Array[StringName] = []
+	for entry in _radial.ring_entries():
+		shown.append(entry["id"])
+	check_equal(shown, wanted, "Card 2 .. Card 12, then zap")
+	_aim(Vector2.UP)
+	check_equal(_radial.pointed_id(), FakeCards.id(1), "the first by name is at the top")
+	var next: Vector2 = _radial.direction_to(FakeCards.id(2))
+	check(next.x > 0.0 and next.y < 0.0, "the second by name is just clockwise of the top (upper right)")
+	_aim(next)
+	check_equal(_radial.pointed_id(), FakeCards.id(2), "and it is picked there")

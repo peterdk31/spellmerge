@@ -212,12 +212,14 @@ var _live_at: PackedInt32Array = PackedInt32Array()
 # The row of the actor whose home controller has each seat (a wizard body), or NONE.
 var _seat_row: PackedInt32Array = PackedInt32Array()
 
-# The body: health (plain bodies only), its most, the damage of its touch, its hurt circle,
-# its push, and seconds before contact may hurt it again.
+# The body: health (plain bodies only), its most, the damage of its touch, its hurt shape
+# (`HitShape`: a box `_hurt_half` either way of its centre, rounded by `_hurt_radius`; a circle has
+# no box), its push, and seconds before contact may hurt it again.
 var _health: PackedFloat64Array = PackedFloat64Array()
 var _max_health: PackedFloat64Array = PackedFloat64Array()
 var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
+var _hurt_half: PackedVector2Array = PackedVector2Array()
 var _hurt_offset: PackedVector2Array = PackedVector2Array()
 var _knock: PackedVector2Array = PackedVector2Array()
 ## The step (`_steps`) each row was last pulled in (`pull`), so a body newly caught plays PULL_CUE.
@@ -315,6 +317,7 @@ func _init() -> void:
 	_last_by.resize(ACTORS)
 	_last_by.fill(EventsScript.NO_PLAYER)
 	_hurt_radius.resize(ACTORS)
+	_hurt_half.resize(ACTORS)
 	_contact_left.resize(ACTORS)
 	_status_left.resize(ACTORS * STATUS_COUNT)
 	_status_power.resize(ACTORS * STATUS_COUNT)
@@ -423,14 +426,15 @@ func begin_run() -> void:
 
 # --- Bodies ------------------------------------------------------------------
 
-## Make `actor` something that can be hurt (the kit's Hurtbox calls it): its hurt circle
-## (`radius` at `offset` from the feet) is a projectile target every spell can hit, and its touch
+## Make `actor` something that can be hurt (the kit's Hurtbox calls it): its hurt shape
+## (`radius` at `offset` from the feet; with a `half`, a box that far either way, `HitShape`) is a
+## projectile target every spell can hit, and its touch
 ## does `contact_damage` to other teams. `health` is used only by a body without the kit (a kit
 ## Actor's is its Health). Returns the actor id its row is kept under (see the top), or
 ## Actors.NONE when it could not be registered. Registering again resets its numbers.
-func register_actor(actor: Node2D, health: float = 1.0, radius: float = 8.0, contact_damage: int = 0, offset: Vector2 = Vector2.ZERO) -> int:
+func register_actor(actor: Node2D, health: float = 1.0, radius: float = 8.0, contact_damage: int = 0, offset: Vector2 = Vector2.ZERO, half: Vector2 = Vector2.ZERO) -> int:
 	var body: int = BODY_ACTOR if actor is Actor else BODY_PLAIN
-	return _register(actor, body, maxf(health, Health.EMPTY), radius, contact_damage, offset, ActorsScript.NONE, ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY, ActorsScript.NONE)
+	return _register(actor, body, maxf(health, Health.EMPTY), radius, half, contact_damage, offset, ActorsScript.NONE, ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY, ActorsScript.NONE)
 
 
 ## Forget `actor` (an id or its node) without killing it (no event).
@@ -639,7 +643,7 @@ func give_shield(actor: Variant, charges: int, seconds: float, tag: int = 0) -> 
 func _send_barrier(row: int, way: Vector2) -> void:
 	if events != null:
 		var left: float = _shield_left[row]
-		events.barrier_changed.emit(_cast_id(row), _shield[row] if left > 0.0 else 0, left, _shield_tag[row], way, _hurt_radius[row])
+		events.barrier_changed.emit(_cast_id(row), _shield[row] if left > 0.0 else 0, left, _shield_tag[row], way, HitShape.outer_radius(_hurt_half[row], _hurt_radius[row]))
 
 
 ## Hits the barrier on `actor` still blocks; 0 when none.
@@ -1324,7 +1328,8 @@ func _check_slam(row: int) -> void:
 	if projectiles == null:
 		return
 	var from: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
-	var to: Vector2 = from + _knock[row] / speed * (_hurt_radius[row] + SLAM_REACH)
+	var way: Vector2 = _knock[row] / speed
+	var to: Vector2 = from + way * (HitShape.reach_toward(_hurt_half[row], _hurt_radius[row], way) + SLAM_REACH)
 	if projectiles.clip_to_walls(from, to) != to:
 		_slam_due_node.append(_nodes[row])
 		_slam_due_by.append(_slam_by[row])
@@ -1349,7 +1354,7 @@ func _send_slams() -> void:
 
 
 ## Contact: every actor that touches (`_contact_damage`) hurts each actor of another team whose
-## hurt circle its own overlaps (never a prop of the world's: nobody's foe, `Actors.is_foe`), once per CONTACT_COOLDOWN per victim. Hits are queued and sent
+## hurt shape its own overlaps (`_shapes_touch`) (never a prop of the world's: nobody's foe, `Actors.is_foe`), once per CONTACT_COOLDOWN per victim. Hits are queued and sent
 ## after the loops. The usual crowd (many touchers, a few wizards) is checked directly against
 ## live positions; past CONTACT_DIRECT victims each victim asks the grid what touches it.
 func _touch() -> void:
@@ -1370,8 +1375,8 @@ func _touch() -> void:
 	if _victims.is_empty():
 		return
 	if _victims.size() <= CONTACT_DIRECT or projectiles == null:
-		# The victims' hurt circles once (nothing moves while contact is counted), and the box round
-		# them all, a pixel wider: a toucher whose circle stays out of it touches none of them, so
+		# The victims' hurt shapes once (nothing moves while contact is counted), and the box round
+		# them all, a pixel wider: a toucher whose shape stays out of it touches none of them, so
 		# most of a crowd is passed after one look at where it is.
 		var victims: int = _victims.size()
 		_victim_at.resize(victims)
@@ -1382,8 +1387,9 @@ func _touch() -> void:
 			var centre: Vector2 = _position_of(_nodes[victim]) + _hurt_offset[victim]
 			_victim_at[v] = centre
 			var spread: float = _hurt_radius[victim] + 1.0
-			low = low.min(centre - Vector2(spread, spread))
-			high = high.max(centre + Vector2(spread, spread))
+			var box: Vector2 = _hurt_half[victim] + Vector2(spread, spread)
+			low = low.min(centre - box)
+			high = high.max(centre + box)
 		for i in _live.size():
 			var row: int = _live[i]
 			if _contact_damage[row] <= 0:
@@ -1392,7 +1398,8 @@ func _touch() -> void:
 			var body: Node2D = _nodes[row]
 			var at: Vector2 = (body.global_position if body.is_inside_tree() else body.position) + _hurt_offset[row]
 			var own: float = _hurt_radius[row]
-			if at.x + own < low.x or at.y + own < low.y or at.x - own > high.x or at.y - own > high.y:
+			var own_half: Vector2 = _hurt_half[row]
+			if at.x + own + own_half.x < low.x or at.y + own + own_half.y < low.y or at.x - own - own_half.x > high.x or at.y - own - own_half.y > high.y:
 				continue
 			var team: int = _teams[row] if row < team_rows else ActorsScript.NONE
 			for v in victims:
@@ -1400,20 +1407,34 @@ func _touch() -> void:
 				if victim == row or _victim_team[v] == team or _contact_left[victim] > 0.0:
 					continue
 				var reach: float = own + _hurt_radius[victim]
-				if at.distance_squared_to(_victim_at[v]) <= reach * reach:
+				# Two shapes touch when one's centre is within both radii of the box of both halves
+				# (`_shapes_touch`, written out; two circles' halves are none).
+				var halves: Vector2 = own_half + _hurt_half[victim]
+				var apart_sq: float = at.distance_squared_to(_victim_at[v]) if halves == Vector2.ZERO else HitShape.gap_sq(at - _victim_at[v], halves)
+				if apart_sq <= reach * reach:
 					_touched(victim, row)
 		return
 	var near: Array[Node2D] = _take_scratch()
 	for v in _victims.size():
 		var victim: int = _victims[v]
 		var centre: Vector2 = _position_of(_nodes[victim]) + _hurt_offset[victim]
-		var count: int = projectiles.targets_in(centre, _hurt_radius[victim], ProjectileManagerScript.ACTOR_LAYERS, near)
+		# A circle asks the grid exactly; a box asks round its corners, and each one found is checked.
+		var box: bool = _hurt_half[victim] != Vector2.ZERO
+		var count: int = projectiles.targets_in(centre, HitShape.outer_radius(_hurt_half[victim], _hurt_radius[victim]), ProjectileManagerScript.ACTOR_LAYERS, near)
 		for i in count:
 			var row: int = _row_of_node(near[i])
-			if row != ActorsScript.NONE and row != victim and _contact_damage[row] > 0 and _team(row) != _victim_team[v]:
+			if row != ActorsScript.NONE and row != victim and _contact_damage[row] > 0 and _team(row) != _victim_team[v] and (not box or _shapes_touch(victim, row)):
 				_touched(victim, row)
 				break
 	_give_scratch()
+
+
+## True when the hurt shapes of rows `a` and `b` overlap where they stand: two shapes (`HitShape`)
+## overlap when one's centre is within both radii of the box of both halves.
+func _shapes_touch(a: int, b: int) -> bool:
+	var apart: Vector2 = _position_of(_nodes[a]) + _hurt_offset[a] - (_position_of(_nodes[b]) + _hurt_offset[b])
+	var reach: float = _hurt_radius[a] + _hurt_radius[b]
+	return HitShape.gap_sq(apart, _hurt_half[a] + _hurt_half[b]) <= reach * reach
 
 
 ## The toucher `row` touched `victim`: queue the hit and start the victim's wait.
@@ -1442,7 +1463,7 @@ func _send_touches() -> void:
 ## Register `node` as a body of kind `body` (see `register_actor`). Its row is its own actor id;
 ## else `fallback` (an id the caller found for it); else one Combat opens with `team`, `ramp`
 ## and `seat`. Returns the row, or NONE.
-func _register(node: Node2D, body: int, health: float, radius: float, contact: int, offset: Vector2, fallback: int, team: int, ramp: int, seat: int) -> int:
+func _register(node: Node2D, body: int, health: float, radius: float, half: Vector2, contact: int, offset: Vector2, fallback: int, team: int, ramp: int, seat: int) -> int:
 	if node == null or not is_instance_valid(node):
 		return ActorsScript.NONE
 	var row: int = _row_of_node(node)
@@ -1473,6 +1494,7 @@ func _register(node: Node2D, body: int, health: float, radius: float, contact: i
 	_max_health[row] = health
 	_contact_damage[row] = contact
 	_hurt_radius[row] = radius
+	_hurt_half[row] = half.max(Vector2.ZERO)
 	_hurt_offset[row] = offset
 	_clear_state(row)
 	if body == BODY_ACTOR:
@@ -1516,7 +1538,7 @@ func _add_target(row: int) -> void:
 	# Its identity is the actor's key (N5): shots keep it, not the node's instance id.
 	var table: ActorsScript = _table()
 	var key: int = table.key_of(row) if table != null else 0
-	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, owner, _hurt_offset[row], key)
+	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, owner, _hurt_offset[row], key, _hurt_half[row])
 
 
 ## Forget the row: its target, its node and, if Combat opened it, its actor id. O(1).

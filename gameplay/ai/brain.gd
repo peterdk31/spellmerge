@@ -545,7 +545,7 @@ func _perceive_threat() -> void:
 	threat_away = Vector2.ZERO
 	if actor.projectiles == null or (profile.dodge <= 0.0 and not _can_block()):
 		return
-	var radius: float = (actor.hurtbox.radius if actor.hurtbox != null else 8.0) + DODGE_MARGIN
+	var radius: float = (actor.hurtbox.outer_radius() if actor.hurtbox != null else 8.0) + DODGE_MARGIN
 	threat_time = actor.projectiles.threat(actor.global_position + actor.body_offset, radius, actor.team(), actor.id, DODGE_HORIZON)
 	threat_away = actor.projectiles.threat_away
 	if threat_time < 0.0:
@@ -821,7 +821,7 @@ func _press_on(intent: ActorIntent) -> void:
 	if profile.press_on <= 0.0 or target == null:
 		return
 	var now: Vector2 = target.global_position - actor.global_position
-	var touch: float = _target_radius() + (actor.hurtbox.radius if actor.hurtbox != null else 0.0)
+	var touch: float = _target_radius() + (actor.hurtbox.outer_radius() if actor.hurtbox != null else 0.0)
 	if now.length_squared() > touch * touch:
 		intent.move = now.normalized() * profile.press_on
 
@@ -877,14 +877,14 @@ func _roll() -> float:
 
 
 func _target_radius() -> float:
-	return _target_actor.hurtbox.radius if _target_actor != null and _target_actor.hurtbox != null else 0.0
+	return _target_actor.hurtbox.outer_radius() if _target_actor != null and _target_actor.hurtbox != null else 0.0
 
 
 func _radius_of(node: Node2D) -> float:
 	if node == target:
 		return _target_radius()
 	var other: Actor = node as Actor
-	return other.hurtbox.radius if other != null and other.hurtbox != null else 0.0
+	return other.hurtbox.outer_radius() if other != null and other.hurtbox != null else 0.0
 
 
 ## What the plan aims at: `plan_target` while it can be aimed at (let go once it cannot), else

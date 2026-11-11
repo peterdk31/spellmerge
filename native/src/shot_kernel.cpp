@@ -170,6 +170,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(mem_head, "_mem_head", PACKED_INT32_ARRAY) \
 	X(target_pos, "_target_pos", PACKED_VECTOR2_ARRAY) \
 	X(target_radius, "_target_radius", PACKED_FLOAT32_ARRAY) \
+	X(target_half, "_target_half", PACKED_VECTOR2_ARRAY) \
 	X(target_owner, "_target_owner", PACKED_INT32_ARRAY) \
 	X(target_layer, "_target_layer", PACKED_INT32_ARRAY) \
 	X(target_id, "_target_id", PACKED_INT64_ARRAY) \
@@ -197,7 +198,7 @@ constexpr int64_t HANDED_ERROR = -2;
 	X(grid_y, "_grid_y", FLOAT) \
 	X(grid_w, "_grid_w", INT) \
 	X(grid_h, "_grid_h", INT) \
-	X(max_target_radius, "_max_target_radius", FLOAT) \
+	X(max_target_reach, "_max_target_reach", FLOAT) \
 	X(grid_fill, "_grid_fill", INT) \
 	X(mem_step, "_mem_step", INT) \
 	X(work_left, "_work_left", INT) \
@@ -335,12 +336,96 @@ struct Steer {
 	}
 };
 
+// --- Hit shapes (`HitShape`, core/projectiles/hit_shape.gd) ----------------------------------------
+// A target's shape: a box `half` either way of its centre, rounded by its radius; a circle is the box
+// of no size.
+
+// `HitShape.gap_sq`.
+inline double gap_sq(const Vector2 &d, const Vector2 &half) {
+	return (double)vmax(d.abs() - half, Vector2()).length_squared();
+}
+
+// The corner of the box `half` numbered `corner` (`HitShape`'s loops: bit 1 x, bit 2 y).
+inline Vector2 box_corner(const Vector2 &half, int corner) {
+	return Vector2((corner & 1) != 0 ? half.x : -half.x, (corner & 2) != 0 ? half.y : -half.y);
+}
+
+// `HitShape.along`.
+inline double shape_along(const Vector2 &from, const Vector2 &path, double path_sq, const Vector2 &centre, const Vector2 &half) {
+	if (!(path_sq > 0.0)) {
+		return 0.0;
+	}
+	const Vector2 a = from - centre;
+	double enter = 0.0;
+	double leave = 1.0;
+	if ((double)path.x == 0.0) {
+		if (std::fabs((double)a.x) > (double)half.x) {
+			enter = 2.0;
+		}
+	} else {
+		const double x0 = (-(double)half.x - (double)a.x) / (double)path.x;
+		const double x1 = ((double)half.x - (double)a.x) / (double)path.x;
+		enter = maxf(enter, minf(x0, x1));
+		leave = minf(leave, maxf(x0, x1));
+	}
+	if ((double)path.y == 0.0) {
+		if (std::fabs((double)a.y) > (double)half.y) {
+			enter = 2.0;
+		}
+	} else {
+		const double y0 = (-(double)half.y - (double)a.y) / (double)path.y;
+		const double y1 = ((double)half.y - (double)a.y) / (double)path.y;
+		enter = maxf(enter, minf(y0, y1));
+		leave = minf(leave, maxf(y0, y1));
+	}
+	if (enter <= leave) {
+		return enter;
+	}
+	double best = 0.0;
+	double best_sq = gap_sq(a, half);
+	const double end_sq = gap_sq(a + path, half);
+	if (end_sq < best_sq) {
+		best = 1.0;
+		best_sq = end_sq;
+	}
+	for (int corner = 0; corner < 4; corner++) {
+		const Vector2 at = box_corner(half, corner);
+		const double s = clampf((double)(at - a).dot(path) / path_sq, 0.0, 1.0);
+		const double s_sq = gap_sq(a + vmul(path, s), half);
+		if (s_sq < best_sq || (s_sq == best_sq && s < best)) {
+			best = s;
+			best_sq = s_sq;
+		}
+	}
+	return best;
+}
+
+// `HitShape.line_gap_sq`.
+inline double line_gap_sq(const Vector2 &d, const Vector2 &way, const Vector2 &half) {
+	const double way_sq = (double)way.length_squared();
+	if (!(way_sq > 0.0)) {
+		return gap_sq(d, half);
+	}
+	double low = INFINITY;
+	double high = -INFINITY;
+	for (int corner = 0; corner < 4; corner++) {
+		const double side = (double)(box_corner(half, corner) - d).cross(way);
+		low = minf(low, side);
+		high = maxf(high, side);
+	}
+	if (low <= 0.0 && high >= 0.0) {
+		return 0.0;
+	}
+	const double off = minf(std::fabs(low), std::fabs(high));
+	return off * off / way_sq;
+}
+
 // --- The hit pass ------------------------------------------------------------------------------
 
 // Everything `_pass_hits` and `_hit_test` read, for one call.
 struct HitPass {
 	Arr<PackedByteArray> state, motion, wall_cells;
-	Arr<PackedVector2Array> pos, prev, target_pos, cand_point, untested;
+	Arr<PackedVector2Array> pos, prev, target_pos, target_half, cand_point, untested;
 	Arr<PackedInt32Array> flags, layers, actor, mem_head;
 	Arr<PackedFloat32Array> radius, skip_on, skip_near, target_radius, cand_along;
 	// `target_id` finds a target's node (instance ids: equality only); `target_key` is its identity,
@@ -354,7 +439,7 @@ struct HitPass {
 	int64_t work_left = 0, starved_at = 0, mark_stamp = 0, mem_free = 0;
 	bool has_walls = false;
 	Rect2 bounds;
-	double grid_x = 0.0, grid_y = 0.0, max_target_radius = 0.0;
+	double grid_x = 0.0, grid_y = 0.0, max_target_reach = 0.0;
 
 	bool targets_loaded = false;
 	// `_untested`, read only for a deferred shot (`defer`, `scan`).
@@ -395,7 +480,7 @@ struct HitPass {
 		int64_t pick = -1;
 		int64_t seen = 0;
 		// `_query_cells`.
-		const Vector2 pad = vmul(Vector2(1, 1), MAX(within, 0.0) + max_target_radius);
+		const Vector2 pad = vmul(Vector2(1, 1), MAX(within, 0.0) + max_target_reach);
 		const Vector2 low = origin - pad;
 		const Vector2 high = origin + pad;
 		const int64_t x0 = clampi(floori(((double)low.x - (double)bounds.position.x) / GRID_CELL), 0, grid_w - 1);
@@ -415,7 +500,8 @@ struct HitPass {
 							target_mark[t] != stamp) {
 						const Vector2 to_target = target_pos[t] - origin;
 						const double reach = within + (double)target_radius[t];
-						if ((double)to_target.length_squared() <= reach * reach) {
+						const Vector2 box = target_half[t];
+						if ((box == Vector2() ? (double)to_target.length_squared() : gap_sq(to_target, box)) <= reach * reach) {
 							if (keep != 0 && target_key[t] == keep) {
 								return t;
 							}
@@ -503,6 +589,7 @@ struct HitPass {
 		skip_on.load(m, k.skip_on);
 		skip_near.load(m, k.skip_near);
 		target_radius.load(m, k.target_radius);
+		target_half.load(m, k.target_half);
 		cand_along.load(m, k.cand_along);
 		skip_id.load(m, k.skip_id);
 		mem_id.load(m, k.mem_id);
@@ -527,7 +614,7 @@ struct HitPass {
 		mem_free = m->get(k.mem_free);
 		grid_x = m->get(k.grid_x);
 		grid_y = m->get(k.grid_y);
-		max_target_radius = m->get(k.max_target_radius);
+		max_target_reach = m->get(k.max_target_reach);
 	}
 
 	// The counters back to the manager (only what this call could have changed).
@@ -623,8 +710,9 @@ struct HitPass {
 		while (t >= 0) {
 			const Vector2 centre = target_pos[t];
 			const double r = target_radius[t];
-			low = vmin(low, centre - Vector2((real_t)r, (real_t)r));
-			high = vmax(high, centre + Vector2((real_t)r, (real_t)r));
+			const Vector2 reach = target_half[t] + Vector2((real_t)r, (real_t)r);
+			low = vmin(low, centre - reach);
+			high = vmax(high, centre + reach);
 			count += 1;
 			t = target_next[t];
 		}
@@ -719,7 +807,7 @@ struct HitPass {
 		const double rad = radius[slot];
 		const Vector2 lowest = vmin(from, to);
 		const Vector2 highest = vmax(from, to);
-		const Vector2 pad = vmul(Vector2(1, 1), rad + max_target_radius);
+		const Vector2 pad = vmul(Vector2(1, 1), rad + max_target_reach);
 		const Vector2 low = lowest - pad;
 		const Vector2 high = highest + pad;
 		const int64_t x0 = clampi(floori(((double)low.x - grid_x) / GRID_CELL), 0, grid_w - 1);
@@ -766,7 +854,9 @@ struct HitPass {
 				while (t >= 0) {
 					const Vector2 centre = target_pos[t];
 					const double reach = rad + (double)target_radius[t];
-					const double far = half + reach;
+					// A box's corner is no farther from its centre than its two halves (`shape_half`) together.
+					const Vector2 shape_half = target_half[t];
+					const double far = half + reach + (double)shape_half.x + (double)shape_half.y;
 					if ((double)middle.distance_squared_to(centre) > far * far) {
 						t = target_next[t];
 						continue;
@@ -776,13 +866,23 @@ struct HitPass {
 						continue;
 					}
 					double along = 0.0;
-					if (path_sq > 0.0) {
-						along = clampf((double)(centre - from).dot(path) / path_sq, 0.0, 1.0);
-					}
-					const Vector2 closest = from + vmul(path, along);
-					if ((double)closest.distance_squared_to(centre) > reach * reach) {
-						t = target_next[t];
-						continue;
+					Vector2 closest = from;
+					if (shape_half == Vector2()) {
+						if (path_sq > 0.0) {
+							along = clampf((double)(centre - from).dot(path) / path_sq, 0.0, 1.0);
+						}
+						closest = from + vmul(path, along);
+						if ((double)closest.distance_squared_to(centre) > reach * reach) {
+							t = target_next[t];
+							continue;
+						}
+					} else {
+						along = shape_along(from, path, path_sq, centre, shape_half);
+						closest = from + vmul(path, along);
+						if (gap_sq(closest - centre, shape_half) > reach * reach) {
+							t = target_next[t];
+							continue;
+						}
 					}
 					if (target_mark[t] == stamp) {
 						mem_seen[target_entry[t]] = (int32_t)mem_step;
@@ -819,7 +919,8 @@ struct HitPass {
 		}
 		const double reach = (double)radius[slot] + (double)target_radius[t];
 		const Vector2 to_centre = target_pos[t] - start;
-		const double apart_sq = (double)to_centre.length_squared();
+		const Vector2 box = target_half[t];
+		const double apart_sq = box == Vector2() ? (double)to_centre.length_squared() : gap_sq(to_centre, box);
 		if (apart_sq <= reach * reach) {
 			return true;
 		}
@@ -829,11 +930,15 @@ struct HitPass {
 		}
 		const double ahead = (double)to_centre.dot(way);
 		const double within = reach + near;
-		if (ahead <= 0.0 || (double)(to_centre - way).length_squared() > within * within) {
+		const double end_sq = box == Vector2() ? (double)(to_centre - way).length_squared() : gap_sq(to_centre - way, box);
+		if (ahead <= 0.0 || end_sq > within * within) {
 			return false;
 		}
-		// The square of how far the body's centre stands off the shot's line.
-		return apart_sq - ahead * ahead / (double)way.length_squared() <= reach * reach;
+		// The square of how far the body's shape stands off the shot's line.
+		if (box == Vector2()) {
+			return apart_sq - ahead * ahead / (double)way.length_squared() <= reach * reach;
+		}
+		return line_gap_sq(-to_centre, way, box) <= reach * reach;
 	}
 };
 

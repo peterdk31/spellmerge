@@ -7,9 +7,11 @@ extends SceneTree
 ## `test_projectiles_step_exact.gd` holds both to its recording too; this test also covers the
 ## drawing, the threat grid and many more shots (the grid and the hit-work budget both come in).
 ##
-## The scene: walls; enemies that walk and are hit, some owned by an enemy actor; four wizards
-## that walk with their anchors; two props of the world's team (props W4), targets no homing shot
-## picks, that cast now and then (their ground is the walking bodies' alone: shots never see it); bolts, runes and orbits of the four hat ramps and of the enemy
+## The scene: walls; enemies that walk and are hit, some owned by an enemy actor, some hit as boxes
+## (`HitShape`: homing picks them, shots pass their corners); four wizards
+## that walk with their anchors; two props of the world's team (props W4), a long box and a tall
+## rounded one, targets no homing shot picks, that cast now and then from their own body (their
+## ground is the walking bodies' alone: shots never see it); bolts, runes and orbits of the four hat ramps and of the enemy
 ## ramp, with card looks, piercing, bouncing, homing, growing, lingering, returning and ghost shots,
 ## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
@@ -61,10 +63,17 @@ var _batch_seen: PackedInt32Array = PackedInt32Array()
 var _wizards: Array = [[], []]
 var _events: Array[Array] = [[], []]
 var _imp: int = -1
-## The props' actor ids (the world's team), their places and their hurt circles' radius.
+## The props' actor ids (the world's team), their places and their hit shapes: a long box, and a
+## tall one rounded by a radius (`HitShape`).
 var _props: PackedInt32Array = PackedInt32Array()
 const PROP_AT: Array[Vector2] = [Vector2(250.0, 330.0), Vector2(700.0, 220.0)]
-const PROP_RADIUS: float = 17.0
+const PROP_HALF: Array[Vector2] = [Vector2(40.0, 8.0), Vector2(10.0, 24.0)]
+const PROP_RADIUS: Array[float] = [0.0, 3.0]
+## Every BOX_EVERY-th enemy is hit as a box this far either way (rounded by its radius).
+const BOX_EVERY: int = 6
+const ENEMY_HALF: Vector2 = Vector2(9.0, 5.0)
+## Each side's props' bodies.
+var _prop_nodes: Array = [[], []]
 ## Each side's bodies hang under a node of their own, so both keep the same names.
 var _holders: Array[Node] = []
 ## Tail births laid while the tails were off (S5 step 4), and whether a frame hit the most.
@@ -75,6 +84,8 @@ var _tails_capped: bool = false
 var _turned_back: bool = false
 ## Whether a still body circled (5B), so the kernel drew a moving quad.
 var _circled_quad: bool = false
+## The box bodies the native side hit, by name (props and box enemies).
+var _box_hits: Array[String] = []
 
 
 func _initialize() -> void:
@@ -189,11 +200,13 @@ func _test_both_step_alike(threads: int) -> void:
 		for i in 60:
 			var at: Vector2 = Vector2(480.0, 270.0) + Vector2(float(i % 10) * 18.0 - 90.0, float(i / 10) * 18.0 - 45.0)
 			var owner: int = _imp if i % 7 == 0 else EventsScript.NO_PLAYER
-			(_targets[side] as Array).append(_add_body(side, "enemy%d" % i, at, 7.0 + float(i % 4), ManagerScript.LAYER_ENEMY, owner))
+			var half: Vector2 = ENEMY_HALF if i % BOX_EVERY == 3 else Vector2.ZERO
+			(_targets[side] as Array).append(_add_body(side, "enemy%d" % i, at, 7.0 + float(i % 4) if half == Vector2.ZERO else 2.0, ManagerScript.LAYER_ENEMY, owner, half))
 		for seat in 4:
 			(_wizards[side] as Array).append(_add_body(side, "wizard%d" % seat, Vector2(160.0 + float(seat) * 200.0, 440.0), 8.0, ManagerScript.LAYER_PLAYER, seat))
+		(_prop_nodes[side] as Array).clear()
 		for n in _props.size():
-			_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS, ManagerScript.LAYER_ENEMY, _props[n])
+			(_prop_nodes[side] as Array).append(_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS[n], ManagerScript.LAYER_ENEMY, _props[n], PROP_HALF[n]))
 		bus.projectile_hit.connect(_on_hit.bind(side))
 		bus.projectile_expired.connect(_on_expired.bind(side))
 	_check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
@@ -208,6 +221,7 @@ func _test_both_step_alike(threads: int) -> void:
 	_tails_capped = false
 	_turned_back = false
 	_circled_quad = false
+	_box_hits.clear()
 	var queries := RandomNumberGenerator.new()
 	queries.seed = 7
 	for step in STEPS:
@@ -254,6 +268,8 @@ func _test_both_step_alike(threads: int) -> void:
 	_check(_tails_laid > 0 and _tails_capped, "the tails were laid as births (%d), past the most too" % _tails_laid)
 	_check(_turned_back, "a circling shot bounced and went round backwards")
 	_check(_circled_quad, "a still body circled, drawn as its quad")
+	var boxes_hit: int = _box_hits.filter(func(n: String) -> bool: return n.begins_with("prop")).size()
+	_check(boxes_hit > 0 and _box_hits.size() > boxes_hit, "shots hit the boxes, props (%d) and enemies (%d)" % [boxes_hit, _box_hits.size() - boxes_hit])
 
 
 
@@ -326,12 +342,14 @@ func _on_grow_hit(caster: int, target: Node, position: Vector2, tag: int, shot: 
 			_mgrs[side].add_target(node, 60.0)
 
 
-func _add_body(side: int, name: String, at: Vector2, radius: float, layer: int, owner: int) -> Node2D:
+func _add_body(side: int, name: String, at: Vector2, radius: float, layer: int, owner: int, half: Vector2 = Vector2.ZERO) -> Node2D:
 	var node := Node2D.new()
 	node.name = name
 	_holders[side].add_child(node)
 	node.global_position = at
-	_mgrs[side].add_target(node, radius, layer, owner)
+	_mgrs[side].add_target(node, radius, layer, owner, Vector2.ZERO, 0, half)
+	if half != Vector2.ZERO:
+		node.set_meta(&"box", true)
 	return node
 
 
@@ -360,7 +378,8 @@ func _drive(side: int, step: int) -> void:
 		var caster: int = _imp if i % 5 == 4 else (_props[prop] if prop >= 0 else i % 4)
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)
 		if prop >= 0:
-			from = PROP_AT[prop]
+			# From a staff tip just off the prop's box, so its shots aimed back across it pass it.
+			from = PROP_AT[prop] + Vector2(0.0, -(PROP_HALF[prop].y + PROP_RADIUS[prop] + 4.0))
 		var velocity: Vector2 = Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(60.0, 420.0)
 		var kind: int = rng.randi() % 10
 		var slot: int = -1
@@ -397,6 +416,9 @@ func _drive(side: int, step: int) -> void:
 				m.set_form(slot, &"", slot % (SCENE_BODIES + 1))
 		if slot < 0:
 			continue
+		if prop >= 0:
+			# Cast from the prop's own box: spared while on it, or coming back across it.
+			m.exclude(slot, _prop_nodes[side][prop])
 		if slot % 4 == 1:
 			# A card's light (card-looks phase 1b): written into the row's free floats on both sides.
 			m.set_light(slot, 0.25 + 0.25 * float(slot % 7), 0.5 + 0.25 * float(slot % 5))
@@ -444,6 +466,8 @@ func _drive(side: int, step: int) -> void:
 
 func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int, side: int) -> void:
 	_events[side].append("hit %d %s %s %d %d" % [caster, (target as Node).name, var_to_str(position), tag, shot])
+	if side == 1 and target.has_meta(&"box"):
+		_box_hits.append(String(target.name))
 	var m: ManagerScript = _mgrs[side]
 	if tag == 2:
 		# A splitting shot: two children from the hit, which spare the body they burst from until clear

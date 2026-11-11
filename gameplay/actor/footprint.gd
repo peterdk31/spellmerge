@@ -13,9 +13,10 @@ extends ActorComponent
 ##   projectile manager's ground grid (`set_footprint`) while it is in the tree and `solid`
 ##   (`set_solid`: a broken crate's rubble is not, W6), where it stands when it enters.
 ##
-## Nothing else sees it: shots, rays and sight pass over it, and hit the body by its hurt circle
-## as any other (a piercing shot goes on through a prop). The hurt circle is the body's own shape
-## (a tree's canopy), the footprint its feet (the trunk).
+## Nothing else sees it: shots, rays and sight pass over it, and hit the body by its hurt shape
+## as any other (a piercing shot goes on through a prop). The hurt shape is the body's own
+## (a tree's canopy), the footprint its feet (the trunk). The footprint the actor adds itself under
+## a box hurt shape is that box's base (`fit_base`).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
@@ -30,6 +31,10 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## Whether a body that cannot move blocks the bodies that walk (`set_solid`).
 @export var solid: bool = true
 
+## How deep a box's base is, as a share of the box's height (`fit_base`): the ground under a body
+## drawn as its front and top, the bottom half of it.
+const BASE_SHARE: float = 0.5
+
 
 func attach() -> void:
 	_lay()
@@ -38,6 +43,13 @@ func attach() -> void:
 func detach() -> void:
 	if actor.mover == null and actor.projectiles != null and is_instance_valid(actor.projectiles):
 		actor.projectiles.set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)
+
+
+## Stand on the base of a box `box_size` across centred `box_offset` from the feet (a hurt box):
+## as wide, BASE_SHARE as deep, its bottom edge on the box's. Before it is attached.
+func fit_base(box_size: Vector2, box_offset: Vector2) -> void:
+	size = Vector2(box_size.x, box_size.y * BASE_SHARE)
+	offset = Vector2(box_offset.x, box_offset.y + (box_size.y - size.y) * 0.5)
 
 
 ## Block the bodies that walk from now on (`on`), or not.

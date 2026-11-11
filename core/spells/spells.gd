@@ -1552,8 +1552,8 @@ func _cast_as(caster: int, seq: int) -> void:
 ## A one-off homing pick for a card of `actor` (a teleport's target): a target of
 ## another team within `within` pixels of `at`, any way round, picked at random, rolled afresh for
 ## each pick (owner, 2026-11-06: "homing should just always pick a random enemy in range"; it may
-## be the one picked last). Its centre, or INF for none; `projectiles.homing_target_radius` is its
-## hit radius. A flying shot's steering keeps its target (`Projectiles.home_velocity`).
+## be the one picked last). Its centre, or INF for none; `projectiles.homing_target_reach` is how
+## far its hit shape reaches toward `at`. A flying shot's steering keeps its target (`Projectiles.home_velocity`).
 func pick_target(actor: int, at: Vector2, within: float) -> Vector2:
 	_picks += 1
 	return projectiles.homing_point(actor, at, Vector2.RIGHT, PI, ProjectilesScript.ACTOR_LAYERS, within, 0, hash(Vector2i(actor, _picks)))

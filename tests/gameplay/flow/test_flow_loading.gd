@@ -5,7 +5,7 @@ extends "res://tests/support/suite.gd"
 ## starts at once; Sandbox waits the same way; a run stopped while loading starts nothing. The
 ## HUD's screen shows in between. Uses the real autoloads; `Loading` is stepped by hand.
 ##
-## godot --headless --path . --script res://tests/gameplay/flow/test_loading.gd
+## godot --headless --path . --script res://tests/gameplay/flow/test_flow_loading.gd
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")

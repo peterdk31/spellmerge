@@ -123,10 +123,35 @@ func test_a_code_tells_its_own_addresses_from_those_seen_from_outside() -> void:
 	code.add_candidate("0", 0, "candidate:3 1 UDP 1677729535 203.0.113.7 59921 typ srflx raddr 0.0.0.0 rport 0")
 	code.add_candidate("0", 0, "a=candidate:4 1 UDP 8331263 198.51.100.9 3478 typ relay raddr 203.0.113.7 rport 59921")
 	check_equal(code.own_count(), 2, "the host candidates are its own network's, a browser's made-up name too")
-	check_equal(code.seen_at(), PackedStringArray(["203.0.113.7", "198.51.100.9"]), "the others are where it is seen from outside")
+	check_equal(code.seen_at(), PackedStringArray(["203.0.113.7"]), "a STUN server's answer is where it is seen from outside")
+	check_equal(code.relay_count(), 1, "a relay's address is counted apart (one relay's may be every machine's)")
+	code.add_candidate("0", 0, "candidate:5 1 UDP 1845501695 203.0.113.8 61000 typ prflx raddr 192.168.1.20 rport 59921")
+	check_equal(code.seen_at(), PackedStringArray(["203.0.113.7", "203.0.113.8"]), "so is where the other machine saw it")
 	var back := NetCode.new()
 	check_equal(back.read(code.to_text()), "", "read back")
-	check_equal([back.own_count(), back.seen_at()], [2, code.seen_at()], "the same of the code as the other machine reads it")
+	check_equal([back.own_count(), back.seen_at(), back.relay_count()], [2, code.seen_at(), 1], "the same of the code as the other machine reads it")
+
+
+## A machine of many networks fills the code with its own addresses before the relay's come
+## (they come last): the relay's must still get in, or the one address that always works is lost.
+func test_a_full_code_still_takes_a_relays_address() -> void:
+	var code := NetCode.new()
+	code.type = NetCode.OFFER
+	code.sdp = SDP
+	code.add_candidate("0", 0, "candidate:1 1 UDP 1677729535 203.0.113.7 59921 typ srflx raddr 0.0.0.0 rport 0")
+	for at in NetCode.MAX_CANDIDATES - 1:
+		check(code.add_candidate("0", 0, "candidate:2 1 UDP 2114977791 192.168.1.%d 59921 typ host" % (at + 1)), "an own address")
+	check(not code.add_candidate("0", 0, "candidate:3 1 UDP 2114977791 192.168.2.1 59921 typ host"), "full: one more of its own is left out")
+	check(not code.add_candidate("0", 0, "candidate:4 1 UDP 1677729535 203.0.113.8 59921 typ srflx raddr 0.0.0.0 rport 0"), "and one seen from outside")
+	check(code.add_candidate("0", 0, "candidate:5 1 UDP 8331263 198.51.100.9 3478 typ relay raddr 203.0.113.7 rport 59921"), "a relay's is taken")
+	check_equal([code.mids.size(), code.own_count(), code.seen_at().size(), code.relay_count()], [NetCode.MAX_CANDIDATES, NetCode.MAX_CANDIDATES - 2, 1, 1], "in the place of the last of its own; the one from outside stays")
+	var back := NetCode.new()
+	check_equal(back.read(code.to_text()), "", "and the code is still one")
+	check_equal(back.relay_count(), 1, "with the relay in it")
+	var relays := NetCode.new()
+	for at in NetCode.MAX_CANDIDATES:
+		relays.add_candidate("0", 0, "candidate:5 1 UDP 8331263 198.51.100.%d 3478 typ relay raddr 0.0.0.0 rport 0" % (at + 1))
+	check(not relays.add_candidate("0", 0, "candidate:5 1 UDP 8331263 198.51.100.99 3478 typ relay raddr 0.0.0.0 rport 0"), "with no own address to give up, it is left out")
 
 
 func test_changed_and_random_texts_never_pass_as_another_code() -> void:

@@ -7,7 +7,9 @@
 # 2. server/signal/local.js started on a free port (the same rooms as the deployed server, with
 #    Node alone: nothing is installed), and tests/net/signal_runner.gd against it: a host and a
 #    joining machine with the engine's real WebSocket and real WebRTC peers come to hold a link
-#    by a room code (online lobby L2, docs/milestones/online-lobby.md).
+#    by a room code (online lobby L2, docs/milestones/online-lobby.md). The server hands every
+#    join a relay that is no relay (`--fake-relay`): the game must take it, give it to WebRTC
+#    (`--relay=given`) and still link directly.
 #
 # Needs Node 22 or later, the pinned Godot and the WebRTC extension (ci/build/build.sh --quick
 # once). Logs: build/logs/signal/.
@@ -33,7 +35,7 @@ if ! (cd server/signal && node --test) >"$LOG/server-tests.txt" 2>&1; then
 fi
 grep -E '^# (tests|pass|fail) ' "$LOG/server-tests.txt"
 
-node server/signal/local.js 0 >"$LOG/server.txt" 2>&1 &
+node server/signal/local.js 0 --fake-relay >"$LOG/server.txt" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null' EXIT
 url=""
@@ -47,7 +49,7 @@ if [[ -z "$url" ]]; then
   exit 1
 fi
 export XDG_CONFIG_HOME="$TOOLS/xdg/config" XDG_CACHE_HOME="$TOOLS/xdg/cache" XDG_DATA_HOME="$LOG/data"
-"$GODOT" --headless --path . --script res://tests/net/signal_runner.gd -- "--signal=$url" >"$LOG/game.txt" 2>&1 || status=1
+"$GODOT" --headless --path . --script res://tests/net/signal_runner.gd -- "--signal=$url" --relay=given >"$LOG/game.txt" 2>&1 || status=1
 grep -h '^SIGNAL' "$LOG/game.txt"
 grep -q '^SIGNAL OK' "$LOG/game.txt" || status=1
 if [[ "$status" != 0 ]]; then

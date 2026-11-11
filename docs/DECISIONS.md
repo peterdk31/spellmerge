@@ -2,6 +2,19 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-11: a relay for machines with no direct way (online lobby, TURN)
+
+- **Asked:** the owner's tries found a phone on another network never linked; the owner agreed to Cloudflare's TURN service, a narrow exception to the room server's "calls no other server" (exactly one Cloudflare address, `SIGNAL_RELAY_FETCH`), and a better failure message.
+- **One credential a join, shared by its two machines,** drawn when the guest joins and sent to both before they are told of each other, so neither starts its WebRTC peer without it. Cloudflare asks that most credentials drawn are used: one a join is, a credential at each socket's opening would not be. The host keeps the last for a guest that comes without one (past the server's limit): one side's relay is often enough.
+- **Twelve hours a credential:** the relay checks it again while the link lasts, so it must outlive a play session; Cloudflare allows 48.
+- **Cloudflare's answer is rewritten, not passed on:** only TURN addresses by name and port, never 53 (browsers block it), in one fixed form that `NetSignal` reads exactly, as all the server says.
+- **Only a game that asked is sent a relay** (`/room?relay=1`): a build from before relays reads no such message and would give up on every room once the key was set. A relay the game cannot read is dropped, not fatal, for the same reason.
+- **A relay crosses the game as `NetRelay`,** plain typed data: `NetSignal` fills it and only `NetRtc` knows WebRTC's form of it, so a platform's own relays would hand over the same thing. On the server only `turn.js` knows Cloudflare's answer; `rooms.js` takes a plain relay.
+- **Two limits:** twelve a room in the host's socket state (holds over the server's sleep) and thirty a minute in memory (best effort). A full code gives up its last own address for a relay's, which comes last and is the one that always works.
+- **A relay is optional everywhere:** no key, a failed or slow call, or the limit: the join goes on without one. Codes typed by hand never have one.
+- **A relay's addresses are not "seen from outside"** in `NetCode`: one Cloudflare address may be both machines' relay address, which made `why_no_link` say "one network". They are counted apart; a failure with a relay says "not even through the relay".
+- **Found on the way:** the desktop WebRTC extension takes `urls` only as a String or a plain Array; the STUN list was a PackedStringArray, so `initialize` failed in every desktop build that used the real STUN server (the tests use none). It is an Array now, with a test.
+
 ## 2026-11-10: Host and Join: a machine is told its seats, and an online run loads before it starts (netcode spike S4)
 
 - **A machine is told its seats** (`PlayerInput.set_own_seats`), instead of one device joining as a given seat as the plan said. The input layer's own rules (the keyboard takes the first seat, a gamepad the lowest free one, a gamepad takes over from a keyboard seated by a mouse click) then put the client's device on the client's seat and keep every other device out, and the input layer knows nothing of a network. Each machine has one seat in the spike.

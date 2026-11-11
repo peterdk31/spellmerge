@@ -396,6 +396,28 @@ func test_the_host_gone_the_clients_run_ends_and_its_game_goes_on() -> void:
 	check_equal(_client.fight.ticks, ticks_before + 10, "and its game plays on alone")
 
 
+## The host closed without a word (the owner's try of 2026-11-11): its link stays open, nothing
+## comes, and the joining machine must not stand still for good.
+func test_a_host_that_went_silent_ends_the_clients_run_and_its_game_goes_on() -> void:
+	_seat_scripted_players()
+	_link_up()
+	_steps(60)
+	var now: Array[float] = [0.0]
+	(_client.play.session as NetClient).clock = func() -> float: return now[0]
+	# Only the client steps from here: the host is gone, its link still open.
+	for i in NetSession.SILENT_MS * 60 / 1000 + 120:
+		now[0] += 1000.0 / 60.0
+		_client.step()
+	check_equal(_client.play.phase, NetPlayScript.ENDED, "the client takes the host for gone")
+	check(_client.play.note.begins_with("The host left") and _client.play.note.contains("nothing was heard"), "and says so (%s)" % _client.play.note)
+	check(_client.play.session == null and not _client.fight.frames.is_playing(), "its session is gone and the replay ended")
+	check_equal(_client.fight.input.device_of(NetHost.SEAT), InputManagerScript.virtual_device_id(NetHost.SEAT), "its own seat stays where it was")
+	var ticks_before: int = _client.fight.ticks
+	for i in 10:
+		_client.step()
+	check_equal(_client.fight.ticks, ticks_before + 10, "and its game plays on alone")
+
+
 func test_a_failed_check_is_said_once_and_the_run_saved() -> void:
 	_seat_scripted_players()
 	_link_up()

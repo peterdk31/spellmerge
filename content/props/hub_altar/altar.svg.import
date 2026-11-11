@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b5wrsm7er2br5"
-path="res://.godot/imported/stone.svg-85ea869c84214f0bec331667e429d958.ctex"
+uid="uid://bhfnyxwwextnh"
+path="res://.godot/imported/altar.svg-fa1dbd95c2aa24a6f93097bf2fe47605.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/tilesets/hub/stone.svg"
-dest_files=["res://.godot/imported/stone.svg-85ea869c84214f0bec331667e429d958.ctex"]
+source_file="res://content/props/hub_altar/altar.svg"
+dest_files=["res://.godot/imported/altar.svg-fa1dbd95c2aa24a6f93097bf2fe47605.ctex"]
 
 [params]
 

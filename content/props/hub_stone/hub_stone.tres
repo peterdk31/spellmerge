@@ -1,0 +1,59 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="2_scene"]
+[ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone_states.tres" id="3_states"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="4_look"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="5_layer"]
+[ext_resource type="Script" path="res://core/base/mote_source.gd" id="6_motes"]
+[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone.svg" id="7_stone"]
+[ext_resource type="Texture2D" path="res://content/props/hub_stone/stone_lit.svg" id="8_lit"]
+
+[sub_resource type="Resource" id="slab"]
+script = ExtResource("5_layer")
+texture = ExtResource("7_stone")
+offset = Vector2(0, 48)
+drawn = 2
+
+[sub_resource type="Resource" id="unlit_look"]
+script = ExtResource("4_look")
+state_id = &"unlit"
+layers = Array[ExtResource("5_layer")]([SubResource("slab")])
+
+[sub_resource type="Resource" id="rune_glimmer"]
+script = ExtResource("6_motes")
+kind = &"glimmer"
+rate = 24.0
+from = 4
+spread = 60.0
+reach = 3.0
+colours = Array[StringName]([&"ice"])
+
+[sub_resource type="Resource" id="runes"]
+script = ExtResource("5_layer")
+texture = ExtResource("8_lit")
+offset = Vector2(0, 48)
+drawn = 2
+motes = Array[ExtResource("6_motes")]([SubResource("rune_glimmer")])
+
+[sub_resource type="Resource" id="lit_look"]
+script = ExtResource("4_look")
+state_id = &"lit"
+layers = Array[ExtResource("5_layer")]([SubResource("slab"), SubResource("runes")])
+light_reach = 72.0
+light_at = Vector2(0, 0)
+light_flicker = 0.15
+light_layer = 1
+cue = &"stone_lit"
+
+[resource]
+script = ExtResource("1_base")
+id = &"hub_stone"
+display_name = "Teleporter stone"
+scene = ExtResource("2_scene")
+invincible = true
+in_yard = false
+radius = 44.0
+offset = Vector2(0, 0)
+states = ExtResource("3_states")
+looks = Array[ExtResource("4_look")]([SubResource("unlit_look"), SubResource("lit_look")])

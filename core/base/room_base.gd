@@ -19,10 +19,23 @@ extends Resource
 ## Which dummy (an enemy id, content/enemies) stands at each of `dummy_spawns`, in order; the last
 ## one stands at every spawn past the list (`dummy_id`).
 @export var dummy_ids: Array[StringName] = []
+## The props the room stands (props W8, content/props: the hub's teleporter stone and altar), by
+## id, each at the place of the same index in `prop_spawns` (its feet), in room pixels. Empty (the
+## default): none. The scene marks the places too (`PropSpawns`), and a test holds them together.
+@export var prop_ids: Array[StringName] = []
+@export var prop_spawns: PackedVector2Array = PackedVector2Array()
+## The prop yard, in room pixels (props W8: the hub's): a place where every prop the registry knows
+## stands (`PropBase.in_yard`), in rows by id, each in its first state, to try spells on. Empty (the
+## default): none.
+@export var prop_yard: Rect2 = Rect2()
+## Seconds after a yard prop leaves its first state (lit, broken) or goes before a fresh one stands
+## in its place, so testing never runs out of barrels.
+@export_range(0.0, 120.0, 0.5) var prop_yard_return: float = 10.0
 ## The teleporter stone that starts a run, in room pixels (the hub; docs/milestones/
 ## online-lobby.md, L1): it is lit while every wizard in the room stands in it, and then any seat's
-## A starts the run. Empty (the default) in every other room. Its lit look is the scene's nodes in
-## the group STONE_LIT, shown only while it is lit.
+## A starts the run. Empty (the default) in every other room. What shows it is a prop standing in
+## it (`prop_ids`: the hub's `hub_stone`), which enters its state `lit` as it lights and `unlit` as
+## it goes out (props W8), so its look and its cue are the prop's.
 @export var start_stone: Rect2 = Rect2()
 ## The multiplayer altar, in room pixels (the hub; docs/milestones/online-lobby.md, L2): a seat
 ## whose wizard stands in it may open the room to other machines with A (`altar_changed`, the HUD's
@@ -53,9 +66,12 @@ extends Resource
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
 
-## The group of a room scene's nodes that show only while its `start_stone` is lit (Feel shows
-## and hides them, hearing `start_stone_changed`).
-const STONE_LIT: StringName = &"start_stone_lit"
+## The states of a prop standing on the `start_stone` (props W8): lit while every wizard stands
+## on the stone, unlit otherwise.
+const STONE_LIT: StringName = &"lit"
+const STONE_UNLIT: StringName = &"unlit"
+## Pixels between two props in the yard, across and between rows (room to aim at one).
+const YARD_GAP: float = 32.0
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
 ## hundred (the crypt's shadow is 7 %, its light 1.4 %).
@@ -149,6 +165,46 @@ func dummy_id(spawn: int) -> StringName:
 	if dummy_ids.is_empty() or spawn < 0:
 		return &""
 	return dummy_ids[mini(spawn, dummy_ids.size() - 1)]
+
+
+## Where each of `props` stands in the `prop_yard` (its feet, whole pixels), in order: rows filled
+## left to right, YARD_GAP apart (by `PropBase.extent`), each row centred, its props' feet on one
+## line; a prop that does not fit (the yard is full) at Vector2.INF. Empty with no yard.
+func yard_places(props: Array[PropBase]) -> PackedVector2Array:
+	var places := PackedVector2Array()
+	if not prop_yard.has_area():
+		return places
+	places.resize(props.size())
+	places.fill(Vector2.INF)
+	var top: float = prop_yard.position.y
+	var at: int = 0
+	while at < props.size():
+		# A row: as many as fit across.
+		var row_end: int = at
+		var width: float = 0.0
+		var above: float = 0.0
+		var below: float = 0.0
+		while row_end < props.size():
+			var box: Rect2 = props[row_end].extent() if props[row_end] != null else Rect2()
+			var wider: float = width + (YARD_GAP if row_end > at else 0.0) + box.size.x
+			if row_end > at and wider > prop_yard.size.x:
+				break
+			width = wider
+			above = maxf(above, -box.position.y)
+			below = maxf(below, box.end.y)
+			row_end += 1
+		if top + above + below > prop_yard.end.y or width > prop_yard.size.x:
+			break
+		var x: float = prop_yard.position.x + floorf((prop_yard.size.x - width) * 0.5)
+		var feet_y: float = ceilf(top + above)
+		for i in range(at, row_end):
+			var box: Rect2 = props[i].extent() if props[i] != null else Rect2()
+			if props[i] != null:
+				places[i] = Vector2(floorf(x - box.position.x), feet_y)
+			x += box.size.x + YARD_GAP
+		top = feet_y + below + YARD_GAP
+		at = row_end
+	return places
 
 
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and,

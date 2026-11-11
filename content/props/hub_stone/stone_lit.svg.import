@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dspxqr8i1jecv"
-path="res://.godot/imported/stone_lit.svg-c8f15834b7c734987bb94164083118e5.ctex"
+path="res://.godot/imported/stone_lit.svg-849ec031b6cd6f28f038727b2d1ccdf3.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/tilesets/hub/stone_lit.svg"
-dest_files=["res://.godot/imported/stone_lit.svg-c8f15834b7c734987bb94164083118e5.ctex"]
+source_file="res://content/props/hub_stone/stone_lit.svg"
+dest_files=["res://.godot/imported/stone_lit.svg-849ec031b6cd6f28f038727b2d1ccdf3.ctex"]
 
 [params]
 

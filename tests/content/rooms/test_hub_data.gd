@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## The hub room (content/rooms/hub, docs/milestones/online-lobby.md, L1): a large island floating
 ## in the void, the void round it all wall, the teleporter stone in the middle, three dummies
-## together off to one side and the multiplayer altar. The data matches the scene; no scripts; the
-## stone's lit look starts hidden, in the group Feel shows; nothing starts on the stone or in a wall.
+## together off to one side and the multiplayer altar, both props (props W8: content/props/hub_stone,
+## hub_altar), and the prop yard. The data matches the scene; no scripts; the stone's art lies on the
+## stone in both its states; nothing starts on the stone or in a wall; the yard is open floor.
 
 const RoomData := preload("res://content/rooms/hub/hub.tres")
 const RoomScan := preload("res://tests/content/rooms/room_scan.gd")
@@ -50,24 +51,75 @@ func test_the_other_rooms_have_no_stone_and_hurt() -> void:
 func test_spawns_match_the_markers() -> void:
 	check_equal(RoomScan.markers(room_root, "PlayerSpawns"), _room().player_spawns, "player spawns")
 	check_equal(RoomScan.markers(room_root, "DummySpawns"), _room().dummy_spawns, "dummy spawns")
+	check_equal(RoomScan.markers(room_root, "PropSpawns"), _room().prop_spawns, "prop spawns")
+	check_equal(_room().prop_ids.size(), _room().prop_spawns.size(), "a place for every prop")
 
 
 func test_scene_has_no_scripts() -> void:
 	check_equal(RoomScan.scripts_below(room_root), 0, "scripts in the scene")
 
 
-func test_the_stone_art_is_where_the_stone_is() -> void:
-	var stone := room_root.get_node("Stone") as Sprite2D
-	var lit := room_root.get_node("StoneLit") as Sprite2D
-	check_equal(RoomScan.sprite_rect(stone), _room().start_stone, "the stone's art covers the stone")
-	check_equal(RoomScan.sprite_rect(lit), _room().start_stone, "its lit look lies on it")
-	check(lit.is_in_group(RoomBase.STONE_LIT), "its lit look is in the group Feel shows when it lights")
-	check(not lit.visible, "its lit look starts hidden")
-	var in_group: int = 0
-	for node: Node in room_root.find_children("*", "", true, false):
-		if node.is_in_group(RoomBase.STONE_LIT):
-			in_group += 1
-	check_equal(in_group, 1, "only the lit look is in that group")
+## The prop of `id` the room stands, and where its feet are (null and INF when it has none).
+func _prop(id: StringName) -> PropBase:
+	var at: int = _room().prop_ids.find(id)
+	return load("res://content/props/%s/%s.tres" % [id, id]) as PropBase if at >= 0 else null
+
+
+func _prop_at(id: StringName) -> Vector2:
+	var at: int = _room().prop_ids.find(id)
+	return _room().prop_spawns[at] if at >= 0 else Vector2.INF
+
+
+## Where layer `layer` of a prop whose feet are at `feet` is drawn (its bottom middle on the feet,
+## moved by its offset).
+func _layer_rect(layer: PropLayer, feet: Vector2) -> Rect2:
+	var size := Vector2(layer.frame_size())
+	return Rect2(feet + layer.offset - Vector2(size.x * 0.5, size.y), size)
+
+
+## The stone is a prop (props W8) standing on `start_stone`, in the states Flow puts it in, its
+## slab's art on the stone in both, on the floor; walked onto (it blocks nothing and takes no hit),
+## invincible, never in the yard, and its lit look plays the stone's cue.
+func test_the_stone_is_a_prop_on_the_stone() -> void:
+	var stone: PropBase = _prop(&"hub_stone")
+	check(stone != null, "the room stands the hub's stone")
+	if stone == null:
+		return
+	var feet: Vector2 = _prop_at(&"hub_stone")
+	check(_room().start_stone.has_point(feet), "it stands on the stone")
+	check_equal(stone.states.list[0].state_id, RoomBase.STONE_UNLIT, "it starts unlit")
+	check(stone.states.state_at(RoomBase.STONE_LIT) >= 0, "it can be lit")
+	for state in stone.states.list:
+		check(not state.blocks and not state.hittable, "%s: walked onto, never hit" % state.state_id)
+		var look: PropStateLook = stone.look_of(state.state_id)
+		check(look != null, "%s has a look" % state.state_id)
+		if look == null:
+			continue
+		for layer in look.layers:
+			check_equal(_layer_rect(layer, feet), _room().start_stone, "%s: its art lies on the stone" % state.state_id)
+			check_equal(layer.drawn, PropLayer.Drawn.ON_FLOOR, "%s: on the floor" % state.state_id)
+	check(stone.invincible and not stone.in_yard, "invincible, and not in the yard")
+	check_equal(stone.look_of(RoomBase.STONE_LIT).cue, &"stone_lit", "it plays the stone's cue as it lights")
+	check_equal(stone.look_of(RoomBase.STONE_UNLIT).cue, &"", "and none as it goes out")
+
+
+## The yard (props W8): open floor on the island, clear of the walls, the stone, the altar and
+## every spawn, with room round it.
+func test_the_prop_yard_is_open_floor() -> void:
+	var room: RoomBase = _room()
+	var yard: Rect2 = room.prop_yard
+	check(yard.has_area(), "the hub has a prop yard")
+	check(yard.size.x >= 256.0 and yard.size.y >= 96.0, "room for a row of props and to try spells: %s" % yard)
+	check_equal(room.prop_yard_return, 10.0, "a broken prop stands again after 10 s")
+	for wall: Rect2 in RoomScan.wall_rects(room_root):
+		check(not wall.intersects(yard), "clear of the wall %s" % wall)
+	check(not yard.intersects(room.start_stone.grow(32.0)), "clear of the stone")
+	check(not yard.intersects(room.altar.grow(32.0)), "clear of the altar")
+	for spawns: PackedVector2Array in [room.player_spawns, room.joiner_spawns, room.dummy_spawns]:
+		for point: Vector2 in spawns:
+			check(not yard.intersects(_body(point).grow(32.0)), "clear of the spawn %s" % point)
+	for other: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
+		check(not (load(other) as RoomBase).prop_yard.has_area(), "%s has none" % other)
 
 
 func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
@@ -178,8 +230,14 @@ func test_the_dummies_stand_together_away_from_the_stone() -> void:
 
 
 func test_the_altar_stands_on_the_island() -> void:
-	var altar := room_root.get_node("Altar") as Sprite2D
-	var area: Rect2 = RoomScan.sprite_rect(altar)
+	var altar: PropBase = _prop(&"hub_altar")
+	check(altar != null, "the room stands the hub's altar")
+	if altar == null:
+		return
+	check(altar.invincible and not altar.in_yard, "invincible, and not in the yard")
+	for state in altar.states.list:
+		check(not state.blocks and not state.hittable, "%s: walked onto, never hit" % state.state_id)
+	var area: Rect2 = _layer_rect(altar.look_of(altar.states.list[0].state_id).layers[0], _prop_at(&"hub_altar"))
 	check(not area.intersects(_room().start_stone), "the altar is not the stone")
 	check_equal(area, _room().altar, "the altar's art covers the altar (where A opens the room)")
 	for wall: Rect2 in RoomScan.wall_rects(room_root):

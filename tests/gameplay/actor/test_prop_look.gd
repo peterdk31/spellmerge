@@ -195,6 +195,31 @@ func test_a_layer_of_frames_plays_them_on_its_own_clock() -> void:
 	check(not _look(still).is_processing(), "a still look runs nothing")
 
 
+## Each layer at the depth it says (props W8: a slab on the floor, as the hub's stone): among the
+## bodies, over them, on the floor (as the room's floor, under the marks), or not drawn.
+func test_a_layer_is_drawn_where_it_says() -> void:
+	var data: PropBase = EXPLODING_BARREL.duplicate()
+	var look := PropStateLook.new()
+	var depths: Array[PropLayer.Drawn] = [PropLayer.Drawn.ON_FLOOR, PropLayer.Drawn.AMONG_BODIES, PropLayer.Drawn.OVER_BODIES, PropLayer.Drawn.HIDDEN]
+	for drawn in depths:
+		var layer := PropLayer.new()
+		layer.texture = load(ART % "idle") as Texture2D
+		layer.drawn = drawn
+		look.layers.append(layer)
+	data.looks = [look]
+	check(data.look_problems().is_empty(), "a body on the floor is sound: %s" % "\n".join(data.look_problems()))
+	var body: Actor = _barrel(data)
+	var floor_body := body.get_node("Sprite") as Sprite2D
+	check_equal(floor_body.z_index, RoomBase.FLOOR_Z, "the body's own picture on the floor")
+	check(floor_body.visible, "and shown")
+	var sprites: Array[Node] = _look(body).find_children("Layer*", "Sprite2D", false, false)
+	check_equal(sprites.size(), 3, "three sprites of its own")
+	if sprites.size() == 3:
+		check_equal((sprites[0] as Sprite2D).z_index, 0, "among the bodies")
+		check_equal((sprites[1] as Sprite2D).z_index, 1, "over them")
+		check(not (sprites[2] as Sprite2D).visible, "a hidden one not drawn")
+
+
 func test_feels_source_motes_read_a_props_sources() -> void:
 	var body: Actor = _barrel()
 	var sources := SourceMotesScript.new(RampTableScript.new())
@@ -218,7 +243,7 @@ func test_the_problems_of_looks() -> void:
 	odd.state_id = &"nowhere"
 	var masked := PropLayer.new()
 	masked.texture = load(ART % "idle") as Texture2D
-	masked.hidden = true
+	masked.drawn = PropLayer.Drawn.HIDDEN
 	odd.layers = [masked]
 	odd.light_reach = 30.0
 	odd.light_layer = 3

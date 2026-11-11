@@ -1,10 +1,7 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
-[ext_resource type="Texture2D" path="res://art/tilesets/hub/stone.svg" id="3_stone"]
-[ext_resource type="Texture2D" path="res://art/tilesets/hub/stone_lit.svg" id="4_stone_lit"]
-[ext_resource type="Texture2D" path="res://art/tilesets/hub/altar.svg" id="5_altar"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="9_motes"]
 
 [sub_resource type="Resource" id="MoteSource_rim"]
@@ -271,28 +268,6 @@ closed = true
 points = PackedVector2Array(384, 64, 896, 64, 896, 96, 1024, 96, 1024, 128, 1088, 128, 1088, 160, 1120, 160, 1120, 192, 1152, 192, 1152, 256, 1184, 256, 1184, 512, 1152, 512, 1152, 576, 1120, 576, 1120, 608, 1088, 608, 1088, 640, 1024, 640, 1024, 672, 928, 672, 928, 704, 352, 704, 352, 672, 256, 672, 256, 640, 192, 640, 192, 608, 160, 608, 160, 576, 128, 576, 128, 512, 96, 512, 96, 256, 128, 256, 128, 192, 160, 192, 160, 160, 192, 160, 192, 128, 256, 128, 256, 96, 384, 96)
 metadata/mote_source = SubResource("MoteSource_rim")
 
-[node name="Stone" type="Sprite2D" parent="."]
-z_index = -2
-texture_filter = 1
-position = Vector2(592, 336)
-texture = ExtResource("3_stone")
-centered = false
-
-[node name="StoneLit" type="Sprite2D" parent="." groups=["start_stone_lit"]]
-visible = false
-z_index = -2
-texture_filter = 1
-position = Vector2(592, 336)
-texture = ExtResource("4_stone_lit")
-centered = false
-
-[node name="Altar" type="Sprite2D" parent="."]
-z_index = -2
-texture_filter = 1
-position = Vector2(960, 336)
-texture = ExtResource("5_altar")
-centered = false
-
 [node name="PlayerSpawns" type="Node2D" parent="."]
 
 [node name="P1" type="Marker2D" parent="PlayerSpawns"]
@@ -320,6 +295,14 @@ position = Vector2(1028, 464)
 
 [node name="J4" type="Marker2D" parent="JoinerSpawns"]
 position = Vector2(1068, 464)
+
+[node name="PropSpawns" type="Node2D" parent="."]
+
+[node name="Stone" type="Marker2D" parent="PropSpawns"]
+position = Vector2(640, 384)
+
+[node name="Altar" type="Marker2D" parent="PropSpawns"]
+position = Vector2(1008, 384)
 
 [node name="DummySpawns" type="Node2D" parent="."]
 

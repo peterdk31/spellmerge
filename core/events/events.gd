@@ -286,8 +286,9 @@ signal sandbox_changed(on: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
 ## teleporter stone (`RoomBase.start_stone`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
-## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone)
-## and feel (the stone's lit look, `RoomBase.STONE_LIT`).
+## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone).
+## The stone's look is the prop standing on it, which flow puts in its state `lit` or `unlit`
+## (props W8, `RoomBase.STONE_LIT`), so feel needs no word of it.
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
 ## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run of waves from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
 signal hub_changed(in_hub: bool)

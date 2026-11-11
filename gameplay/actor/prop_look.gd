@@ -5,8 +5,8 @@ extends ActorLook
 ## `PropStateTriggers` enters it. A look is data (`PropStateLook`), so this holds no art of its own:
 ##
 ## - **its layers:** the first is the body, the actor's own `Sprite` (which a hit flashes and
-##   squashes, as any body's); the rest are sprites of its own, drawn among the bodies or over them
-##   (`over_bodies`), or not at all (`hidden`: a mask only). Each frame of a layer's picture stands
+##   squashes, as any body's); the rest are sprites of its own. Each is drawn as its `drawn` says:
+##   among the bodies, over them, on the floor (a slab), or not at all (a mask only). Each frame of a layer's picture stands
 ##   with its bottom middle on the feet, moved by its `offset`; a layer of several frames plays them
 ##   on this look's own clock.
 ## - **its motes:** a node in the group `mote_source` for every `MoteSource` of a layer, a mask's
@@ -106,8 +106,15 @@ func _draw_layer(sprite: Sprite2D, layer: PropLayer) -> void:
 	sprite.position = layer.offset + Vector2(0.0, -float(size.y / 2))
 	# An odd side would centre on half a pixel: put the picture back on the pixels.
 	sprite.offset = Vector2(size.x % 2, size.y % 2) * 0.5
-	sprite.z_index = 1 if layer.over_bodies else 0
-	sprite.visible = not layer.hidden
+	match layer.drawn:
+		PropLayer.Drawn.OVER_BODIES:
+			sprite.z_index = 1
+		PropLayer.Drawn.ON_FLOOR:
+			# As the room's floor: under every body and the floor's marks.
+			sprite.z_index = RoomBase.FLOOR_Z
+		_:
+			sprite.z_index = 0
+	sprite.visible = layer.drawn != PropLayer.Drawn.HIDDEN
 
 
 ## A node giving off `source` from the feet, its mask (if any) `sprite`'s art.

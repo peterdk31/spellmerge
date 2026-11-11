@@ -20,6 +20,10 @@ extends Resource
 @export var max_health: float = 10.0
 ## True for a prop no hit hurts (the hub's): hits still land and show, its health stays.
 @export var invincible: bool = false
+## Stood in the hub's prop yard (props W8, `RoomBase.prop_yard`), as every prop is to be tried
+## there; false only for a prop that means something only where a room places it (the hub's own
+## teleporter stone and altar).
+@export var in_yard: bool = true
 
 ## The hurt shape (`Hurtbox`): a circle of `radius`, or a box `size` across, round `offset` from the
 ## feet.
@@ -69,6 +73,17 @@ func look_of(state_id: StringName) -> PropStateLook:
 ## True when its own data sets a footprint (else the kit's default).
 func has_footprint() -> bool:
 	return footprint_radius > 0.0 or (footprint_size.x > 0.0 and footprint_size.y > 0.0)
+
+
+## The box it takes up round its feet, in pixels (the hub's prop yard spaces props by it): its hurt
+## shape and its own footprint together, each where its offset puts it. Its art may reach past it.
+func extent() -> Rect2:
+	var hurt_half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
+	var box := Rect2(offset - hurt_half, hurt_half * 2.0)
+	if has_footprint():
+		var ground_half: Vector2 = footprint_size * 0.5 if footprint_size.x > 0.0 and footprint_size.y > 0.0 else Vector2(footprint_radius, footprint_radius)
+		box = box.merge(Rect2(footprint_offset - ground_half, ground_half * 2.0))
+	return box
 
 
 ## What is wrong with the prop's data, one line each (empty when it is fine): no scene, no states,

@@ -199,33 +199,6 @@
       "prompt": "A 32x32 floor tile for the hub's floating island, very dark: Outline fill with two staggered rows of slabs whose joints are broken lines of Stone shadow, and four lone Stone shadow specks, so the floor reads as faint slabs against the void. Repeats both ways with no seam line. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/tilesets/hub/stone.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (SVG rects written by a small generator from a character grid)",
-      "prompt": "A 96x96 teleporter stone seen from above (transparent background), unlit: a flat round platform of dark carved stone 88 px across, floor-level, with a raised rim shaded as a bevel (outer face Stone light at the top-left and Stone shadow at the bottom-right, inner face the other way round), a 3 px Stone shadow front edge under its lower half, a Stone base top face with a carved outer line, a ring of twelve small abstract carved runes, a thin carved inner ring line and a central sigil (a circle round a four-point star with an Outline core), all carved in Stone shadow, a few worn cracks and a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "art/tilesets/hub/stone_lit.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (SVG rects written by a small generator from a character grid)",
-      "prompt": "A 96x96 overlay drawn exactly over stone.svg when the teleporter stone is lit (transparent background): only the glowing parts, at the same pixels as the stone's carvings: the twelve runes and the sigil's circle and star in Ice base, the thin inner ring line, the star's core and its four tips in Ice light. No glow halo (the game adds light). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "art/tilesets/hub/altar.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (SVG rects written by a small generator from a character grid)",
-      "prompt": "A 96x96 multiplayer altar seen from above (transparent background): a walkable floor-level octagonal dais of dark stone 88 px across, a 3 px raised rim shaded as a bevel (Stone light on the top and left, Stone shadow on the bottom and right, the inner face the other way round), a 3 px Stone shadow step under its front edges, its Stone base surface carved in Stone shadow with double channels from a large centre socket to four smaller sockets and a diamond of carved lines joining them, each socket an Outline ring with an inlaid Ice gem, small carved marks at the corners; at its back edge, standing on the rim's middle, a small Stone pedestal with a dish, and above it a floating Ice crystal with a Bone light glint and four small orbiting specks of Ice and Spark that suggest linking far places. Dark Outline, light from the top-left, no player colours. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
-    },
-    {
       "path": "content/wizard/base/wizard_idle.svg",
       "origin": "ai",
       "author": "Claude",

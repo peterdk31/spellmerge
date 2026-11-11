@@ -188,6 +188,47 @@ func test_the_stone_lights_only_with_every_wizard_on_it() -> void:
 	check_equal(flow.mode, FlowScript.MODE_HUB, "A in the tick a wizard joined starts nothing")
 
 
+## The hub's stone and altar are props (props W8) standing where the room places them; the stone
+## prop lights with the stone and goes out with it, playing its cue once as it lights.
+func test_the_stone_prop_follows_the_stone() -> void:
+	var cues: Array[StringName] = []
+	var hear := func(_caster: int, cue: StringName, _at: Vector2, _dir: Vector2, _size: float, _tint: Color, _look: int) -> void: cues.append(cue)
+	events.connect("cue_shown", hear)
+	_start([0, 1])
+	var ids: Array[StringName] = []
+	var stone_prop: Actor = null
+	for node: Node in flow.room_props():
+		var prop := node as Actor
+		ids.append(prop.prop.id)
+		if prop.prop.id == &"hub_stone":
+			stone_prop = prop
+	check_equal(ids, [&"hub_stone", &"hub_altar"] as Array[StringName], "the stone and the altar stand")
+	check(stone_prop != null and _room().start_stone.has_point(stone_prop.position), "the stone prop on the stone")
+	if stone_prop == null:
+		events.disconnect("cue_shown", hear)
+		return
+	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "dark at the start")
+	_place(0, true)
+	_tick()
+	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "dark with one of two on it")
+	_place(1, true)
+	_tick()
+	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_LIT, "lit with both")
+	_tick()
+	check_equal(cues.count(&"stone_lit"), 1, "its cue once as it lights")
+	_place(1, false)
+	_tick()
+	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "out as one steps off")
+	_place(1, true)
+	_tick()
+	input.add_virtual_device(2)
+	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "out at once under a joiner")
+	check_equal(cues.count(&"stone_lit"), 2, "its cue again as it lit again")
+	events.disconnect("cue_shown", hear)
+	flow.stop_run()
+	check(flow.room_props().is_empty(), "the props go with the hub")
+
+
 func test_a_join_and_a_leave_in_one_tick_put_the_stone_out() -> void:
 	_start([0, 1])
 	_place(0, true)

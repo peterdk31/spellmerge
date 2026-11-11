@@ -37,6 +37,9 @@ extends ActorComponent
 
 ## The state the body is in now, entered by a trigger (not the one it starts in).
 signal entered(state_id: StringName)
+## The body's state was given back by a snapshot (`rebuild_derived`): it is in `state_id`, entered
+## by nothing now (its look follows, with no cue).
+signal restored(state_id: StringName)
 
 ## Moments within moments this deep are not fired (a loop in the data, which `PropStates.problems`
 ## names).
@@ -85,6 +88,12 @@ func attach() -> void:
 func detach() -> void:
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.cast_left.is_connected(_on_cast_left):
 		actor.events.cast_left.disconnect(_on_cast_left)
+
+
+## After a snapshot gave the body its state back (core/sim/README.md, "Snapshots"): its listeners
+## hear which state it is in (`restored`), so a look follows.
+func rebuild_derived() -> void:
+	restored.emit(state_id())
 
 
 ## In the state it starts in, its health as told (props W2: a fresh prop rests).

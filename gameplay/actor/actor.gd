@@ -129,6 +129,10 @@ const REFS: Array[StringName] = [&"controller"]
 
 ## The enemy's numbers, applied to the components in `_ready`. Set before adding the actor.
 var data: EnemyBase = null
+## The prop this body was made from (`PropBody.make`, props W7; null for any other body): its look
+## reads its art from it, and a body made again from a snapshot has it back (content, kept as
+## itself), as an enemy has its `data`.
+var prop: PropBase = null
 
 ## The event bus, Combat, the projectile manager, the spell runtime, the actor table and the game's
 ## time and chance (`Sim`). Only tests set these, before adding the actor; otherwise the autoloads

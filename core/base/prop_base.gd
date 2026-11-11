@@ -82,14 +82,8 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		found.append("%s has no state." % id)
 	if max_health <= 0.0:
 		found.append("%s: max_health is %s; above 0." % [id, max_health])
-	if staffs.size() > MAX_STAFFS:
-		found.append("%s has %d staffs; at most %d." % [id, staffs.size(), MAX_STAFFS])
-	for at in staffs.size():
-		if staffs[at] == null:
-			found.append("%s: staff %d is empty." % [id, at + 1])
-			continue
-		for line: String in staffs[at].problems():
-			found.append("%s: staff %d: %s" % [id, at + 1, line])
+	# Numbered from 1, as its reactions name them.
+	found.append_array(StaffCards.list_problems(String(id), staffs, MAX_STAFFS, 1))
 	var ids := PackedStringArray()
 	for at in states.size():
 		var state: PropState = states[at]

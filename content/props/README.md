@@ -16,7 +16,7 @@ Built in W6 (reactions and states). The look (art layers, mote sources, a light 
 
   | `when` | Fires when | Numbers |
   |---|---|---|
-  | `element_hit` | a hit of that element lands on it (an invincible prop's too) | `element` (empty: a plain hit), `at_least` damage (0: any) |
+  | `element_hit` | a hit of that element (its first) lands on it (an invincible prop's too) | `element` (empty: a plain hit), `at_least` damage (0: any) |
   | `status` | a status is put on it | `status` |
   | `reaction` | one of Combat's reactions between statuses happens on it | `reaction` |
   | `health_below` | a hit takes its health below a share of its most (once: the hit that crosses it) | `share` |
@@ -25,7 +25,8 @@ Built in W6 (reactions and states). The look (art layers, mote sources, a light 
   | `cast` | its staff N's cast leaves (a reaction's or a possessor's, after any wind-up) | `staff` |
 
 - **The rule:** on a moment every reaction of the current state that matches fires, in order; the first of them that names a `then` sets the next state, once, after they all fired. Reactions belong to states, so "only once" is a state change, never a flag. Leaving a state ends the wind-ups it cast (a lit barrel shot apart blows now, and its fuse no more). **Death doesn't free a prop:** its `death` reactions run and a possession of it ends; it is freed only by a `gone` state, and without a death row it stands with its health empty.
-- **A prop's casts pay from its staffs' pools, which never refill** (a still body is never stepped): every cast a reaction makes must fit in a full pool (`tests/content/props/test_prop_data.gd`).
+- **A prop's casts pay from its staffs' pools, which never refill** (a still body is never stepped): the first cast of every staff a reaction casts must fit in a full pool (`tests/content/props/test_prop_data.gd`); a staff cast more than once over a prop's life needs a pool for each.
+- **A reaction's cast is the prop's own:** never a press (it sets off no `on recast`), its wind-up outlasts a possession (a lit barrel possessed still blows; a possessor's own presses end with it), and a `cast` reaction never casts the staff whose cast it hears while that cast leaves.
 - `PropBase.problems()` must be empty: no scene or state, a state named twice, a staff it does not hold, a state, element, status or reaction nobody knows, a number out of range, `entered` reactions that go round for ever.
 - Original names and art only.
 

@@ -63,15 +63,7 @@ func profile_or_fallback() -> AIProfile:
 ## What is wrong with the enemy's data, one line each (empty when it is fine): too many staffs,
 ## a staff entry's problems, a phase without a condition or with too many staffs.
 func problems() -> PackedStringArray:
-	var found := PackedStringArray()
-	if staffs.size() > MAX_STAFFS:
-		found.append("%s has %d staffs; at most %d." % [id, staffs.size(), MAX_STAFFS])
-	for at in staffs.size():
-		if staffs[at] == null:
-			found.append("%s: staff %d is empty." % [id, at])
-			continue
-		for line: String in staffs[at].problems():
-			found.append("%s: staff %d: %s" % [id, at, line])
+	var found: PackedStringArray = StaffCards.list_problems(String(id), staffs, MAX_STAFFS)
 	for at in phases.size():
 		var phase: EnemyPhase = phases[at]
 		if phase == null:

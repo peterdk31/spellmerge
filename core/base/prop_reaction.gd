@@ -11,8 +11,9 @@ extends Resource
 ## What sets it off. Each moment comes with a name and an amount (`heard`); a trigger reads only
 ## the numbers it names.
 enum When {
-	## A hit carrying `element` lands, of at least `at_least` damage (0: any; an invincible prop's
-	## hits count too). `element` empty: a plain hit (no element).
+	## A hit whose element is `element` lands (its first, as `Actor.damaged` names it and its damage
+	## number is coloured), of at least `at_least` damage (0: any; an invincible prop's hits count
+	## too). `element` empty: a plain hit (no element).
 	ELEMENT_HIT,
 	## The status `status` was put on it (a fire pool's burn).
 	STATUS,

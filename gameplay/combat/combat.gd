@@ -1075,11 +1075,9 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 		hit_stop.reaction(by, reaction.reaction_id, _slot)
 		if _tag != 0:
 			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag, _slot)
-	if node is Actor and is_instance_valid(node):
-		# The actor's own listeners (a prop's reactions, props W6) hear it directly, as `damaged`.
-		(node as Actor).reacted.emit(by, reaction.reaction_id)
-	if not _same(row, node):
-		return
+		if not _same(row, node):
+			_tell_reacted(by, node, reaction.reaction_id)
+			return
 	var spell_tag: int = _tag
 	_tag = 0
 	match reaction.effect:
@@ -1099,6 +1097,15 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 		ReactionRow.Effect.SPREAD:
 			_spread(by, row, centre, reaction)
 	_tag = spell_tag
+	_tell_reacted(by, node, reaction.reaction_id)
+
+
+## The reaction `reaction_id` set off by `by` happened on `node`: the actor's own listeners (a prop's
+## reactions, props W6) hear it directly, as `damaged`, once its effect is done (a prop that breaks
+## on it still takes its damage and its burst still reaches the bodies round it).
+func _tell_reacted(by: int, node: Node2D, reaction_id: StringName) -> void:
+	if node is Actor and is_instance_valid(node):
+		(node as Actor).reacted.emit(by, reaction_id)
 
 
 ## BURST: `reaction.damage` to every actor in the circle, the struck one included, and a pull

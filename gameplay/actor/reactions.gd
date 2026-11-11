@@ -16,7 +16,8 @@ extends ActorComponent
 ## the hit itself (`element_hit`), each read against the state it finds.
 ##
 ## **The rule:** on a moment every reaction of the current state that matches fires, in the order
-## listed (`cast`: the prop casts that staff, as itself, along its aim); the first of them that names
+## listed (`cast`: the prop casts that staff, as itself, along its aim: the body's own cast, which
+## outlasts a possession, and never one of a staff whose cast is leaving now); the first of them that names
 ## a `then` sets the next state, once, after they all fired. A moment inside another (a reaction's
 ## cast whose blast sets off this prop again) is read against the state then; once it moved the state
 ## on, the outer moment's reactions stop and its `then` is dropped: that state was left.
@@ -43,7 +44,7 @@ const MAX_DEPTH: int = 16
 
 ## Not state: how deep in moments the component is and how many states it entered, only read within
 ## one moment (scratch).
-const DERIVED: Array[StringName] = [&"_depth", &"_entries"]
+const DERIVED: Array[StringName] = [&"_depth", &"_entries", &"_leaving"]
 
 ## The prop's data (set before the body is ready: `PropBody.make`).
 @export var prop: PropBase = null
@@ -53,6 +54,8 @@ var state: int = 0
 var _health_seen: float = -1.0
 var _depth: int = 0
 var _entries: int = 0
+## The staffs whose casts are leaving now, by bit (`_on_cast_left`).
+var _leaving: int = 0
 
 
 func setup(owner_actor: Actor) -> void:
@@ -134,8 +137,22 @@ func _on_depleted(_killer: int) -> void:
 
 
 func _on_cast_left(caster: int, staff: int) -> void:
-	if caster == actor.caster_number() and caster >= 0:
-		_moment(PropReaction.When.CAST, &"", float(staff + 1))
+	if caster != actor.caster_number() or caster < 0:
+		return
+	# While it leaves, its staff is not cast again by what its leaving sets off (a `cast` row casting
+	# the staff it hears would cast it again before this cast is counted, down to MAX_DEPTH).
+	var was: int = _leaving
+	_leaving |= 1 << staff
+	_moment(PropReaction.When.CAST, &"", float(staff + 1))
+	_leaving = was
+
+
+## A reaction's cast of staff `at`: the body's own, never a press (it detonates no `on recast`), and
+## none of a staff whose cast is leaving now. True if it cast.
+func _cast(at: int) -> bool:
+	if actor.caster == null or _leaving & (1 << at) != 0:
+		return false
+	return actor.caster.cast(at, false, true)
 
 
 ## A moment of `kind` (see the class doc): every reaction of the state it is in that hears it fires,
@@ -157,7 +174,7 @@ func _moment(kind: PropReaction.When, name: StringName, amount: float, before: f
 			break
 		if row == null or not row.heard(kind, name, amount, before):
 			continue
-		if row.cast > 0 and actor.caster != null and actor.caster.cast(row.cast - 1):
+		if row.cast > 0 and _cast(row.cast - 1):
 			cast_bits |= 1 << (row.cast - 1)
 		if next < 0 and row.then != &"":
 			next = prop.state_at(row.then)

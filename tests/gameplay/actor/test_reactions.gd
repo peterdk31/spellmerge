@@ -184,6 +184,70 @@ func test_a_blown_barrel_ends_its_possession() -> void:
 	check_equal(_world.table.team_of(barrel.id), ActorsScript.TEAM_WORLD, "the rubble is the world's")
 
 
+## Regression (review of W6): a change of driver ended every wind-up, so possessing a lit barrel
+## put its fuse out for good and it never blew.
+func test_a_lit_barrel_possessed_still_blows() -> void:
+	var driver := Fixture.Scripted.new()
+	var wizard: Actor = _world.actor(Vector2(-80.0, 0.0), [&"health", &"hurtbox"], driver)
+	var barrel: Actor = _prop(BARREL)
+	_light(barrel)
+	check(barrel.caster.is_winding(FUSE), "lit")
+	check(Possession.begin(wizard, barrel, 0.25) != null, "possessed")
+	check(barrel.caster.is_winding(FUSE), "the fuse is the barrel's own: a new driver does not put it out")
+	_world.run(FUSE_STEPS)
+	check(barrel.possessed_by == null, "the possession ran out")
+	check_equal(_state(barrel), &"broken", "and the fuse blew")
+
+
+func test_a_possessors_own_wind_up_ends_with_its_possession() -> void:
+	var driver := Fixture.Scripted.new()
+	var wizard: Actor = _world.actor(Vector2(-80.0, 0.0), [&"health", &"hurtbox"], driver)
+	var barrel: Actor = _prop(BARREL)
+	var possession: Possession = Possession.begin(wizard, barrel, 30.0)
+	driver.presses.append(FUSE)
+	_world.run(1)
+	check(barrel.caster.is_winding(FUSE), "the driver lit the fuse")
+	possession.end()
+	check(not barrel.caster.is_winding(FUSE), "its cast was the driver's: it ends with the driver (cast timing)")
+
+
+## Regression (review of W6): a `cast` row that casts the staff it hears cast it again before the
+## first cast was counted, sixteen deep.
+func test_a_cast_row_does_not_cast_the_staff_that_is_leaving() -> void:
+	var again: PropReaction = PropReaction.make(PropReaction.When.CAST, 2)
+	again.staff = 2
+	var rows: Array[PropReaction] = [PropReaction.make(PropReaction.When.DEATH, 2), again]
+	var body: Actor = _prop(_made([PropState.make(&"idle", rows)]))
+	_world.combat.hit(ActorsScript.NONE, body, 100.0)
+	check_equal(_blasts(body, BLAST), 1, "one blast, not one a moment deep")
+
+
+## Regression (review of W6): Combat told the body its reaction before the reaction's effect, so a
+## prop that stops being hittable on it left the effect undone.
+func test_a_prop_that_breaks_on_a_reaction_still_takes_it() -> void:
+	var row: ReactionRow = null
+	for candidate: ReactionRow in CombatScript.REACTIONS.rows:
+		if candidate.effect == ReactionRow.Effect.CONSUME and candidate.damage > 0:
+			row = candidate
+			break
+	check(row != null, "a reaction that deals damage")
+	if row == null:
+		return
+	var breaks: PropReaction = PropReaction.make(PropReaction.When.REACTION, 0, &"broken")
+	breaks.reaction = row.reaction_id
+	var data: PropBase = _made([PropState.make(&"idle", [breaks] as Array[PropReaction]), PropState.make(&"broken", [] as Array[PropReaction], false, false)], 1000.0)
+	var body: Actor = _prop(data)
+	check(_world.combat.apply_status(ActorsScript.NONE, body, row.status_id, 3.0, 50.0), "its status")
+	var taken: Array[float] = []
+	body.damaged.connect(func(_by: int, amount: float, _element: StringName) -> void: taken.append(amount))
+	var shooter: Actor = _world.actor(body.global_position + Vector2(-40.0, -8.0), [&"caster"], Fixture.Scripted.new(), [[row.element_id, &"bolt"]])
+	shooter.aim = Vector2.RIGHT
+	check(shooter.caster.cast(0), "a bolt of the element that reacts with it")
+	_world.run(20)
+	check_equal(_state(body), &"broken", "it broke on %s" % row.reaction_id)
+	check(taken.size() >= 2, "the bolt's hit and then the reaction's own damage: %s" % [taken])
+
+
 func test_three_barrels_set_each_other_off() -> void:
 	var first: Actor = _prop(BARREL)
 	var second: Actor = _prop(BARREL, Vector2(20.0, 0.0))

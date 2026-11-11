@@ -81,7 +81,6 @@ static func begin(by_body: Actor, target_body: Actor, length: float) -> Possessi
 	possession.by_id = taker.home_actor.id if is_instance_valid(taker.home_actor) else by_body.id
 	possession.target_id = target_body.id
 	target_body.possessed_by = possession
-	target_body.wake()
 	taker.possessions.append(possession)
 	if taker.possessions.size() == 1:
 		# Its first: the driver moves in, and the body it drove stands.
@@ -138,7 +137,6 @@ func end() -> void:
 	if is_instance_valid(target):
 		if target.possessed_by == self:
 			target.possessed_by = null
-			target.wake()
 		if _look != null:
 			target.remove_look(_look)
 		if can_hold(target):

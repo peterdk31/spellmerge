@@ -78,14 +78,14 @@ func reset(amount: float) -> void:
 	changed.emit(health, max_health)
 
 
-## Unhurtable for `seconds` (at least what is left). Nothing at 0 health.
+## Unhurtable for `seconds` (at least what is left). Nothing at 0 health, and nothing for a still
+## body (props W2, `Actor.is_still`): its step, which counts a protection down, never runs.
 func protect(seconds: float) -> void:
+	if actor != null and actor.is_still():
+		return
 	if health > 0.0:
 		_protect_left = maxf(_protect_left, seconds)
 		protecting = _protect_left > 0.0
-		if actor != null:
-			# Its step counts the protection down.
-			actor.wake()
 
 
 func is_protected() -> bool:

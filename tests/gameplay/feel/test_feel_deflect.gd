@@ -36,8 +36,9 @@ func after_each() -> void:
 	_world.free_all()
 
 
+## An actor that acts (something drives it, so it is stepped: a still body takes no hold; props W2).
 func _body(at: Vector2) -> Actor:
-	return _world.actor(at, [&"health", &"hurtbox"] as Array[StringName])
+	return _world.actor(at, [&"health", &"hurtbox"] as Array[StringName], Fixture.Scripted.new())
 
 
 ## A shot of `caster` at `at` flying left at 100 px/s.

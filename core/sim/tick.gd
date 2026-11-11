@@ -75,7 +75,6 @@ const ACTORS: StringName = &"Actors"
 ## steps joins STEPS.
 signal ticked
 
-
 ## Ticks since the run began (or the game, before any run): the game's clock, `sim.tick`, which is
 ## state (a snapshot restores it, online-ready N10). Read only.
 var count: int:
@@ -84,14 +83,6 @@ var count: int:
 ## The game's time and chance (`sim.gd`, online-ready N3c): the tick (`count`) and the run's seed,
 ## dealt at each run's start. Areas and bodies take it as their `sim` (`Sim.found`).
 var sim: Sim = Sim.new()
-## Check every asleep body each tick (props W2, `_verify_asleep`): on in the tests (the suite sets
-## it on the game's Tick), off in the game, where it would cost what sleeping saves.
-var verify_sleep: bool = false
-## What `verify_sleep` found, one line each (the suite fails a test on any; cleared by the caller).
-var sleep_misses: PackedStringArray = PackedStringArray()
-## Off: asleep bodies are stepped all the same (a test plays a game both ways and compares them;
-## props W2). On in the game.
-var sleep_bodies: bool = true
 ## The services the Tick drives by type. Only tests set these; otherwise the autoloads.
 var events: EventsScript = null
 var frames: FramesScript = null
@@ -319,30 +310,16 @@ func state_areas() -> Dictionary:
 
 
 ## Every actor's body by id: those open when the bodies' turn starts (a body made during it takes
-## its first step next tick).
+## its first step next tick), but the still ones (`Actors.still`: no controller and no Mover).
 func _step_bodies(delta: float) -> void:
 	if actors == null:
 		return
 	var n: int = actors.open_ids(_ids)
-	var asleep: PackedByteArray = actors.asleep
+	var still: PackedByteArray = actors.still
 	for i in n:
-		var id: int = _ids[i]
-		if asleep[id] != 0 and sleep_bodies:
-			# Its last tick left it with nothing to do, and nothing has woken it (props W2).
-			if verify_sleep:
-				_verify_asleep(id)
+		if still[_ids[i]] != 0:
+			# No controller and no Mover: nothing it does changes from tick to tick (props W2).
 			continue
-		var body: Actor = actors.node_of(id) as Actor
+		var body: Actor = actors.node_of(_ids[i]) as Actor
 		if body != null and body.ticking and body.is_inside_tree() and body.can_process():
 			body.tick_step(delta)
-
-
-## Under `verify_sleep`: an asleep body must still be dormant, or something changed it without
-## waking it (`Actor.wake`), and it would miss the steps it now has to take.
-func _verify_asleep(id: int) -> void:
-	var body: Actor = actors.node_of(id) as Actor
-	if body != null and not body.dormant():
-		var miss: String = "Tick: actor %d (%s) is asleep but not dormant: something changed what Actor.dormant reads without calling Actor.wake (props W2, gameplay/actor/actor.gd)" % [id, body.get_path()]
-		push_error(miss)
-		sleep_misses.append(miss)
-		actors.wake(id)

@@ -49,7 +49,7 @@ extends RefCounted
 ## to be started: a dash's homing while no dash homes) is one leaf, `&"idle"`, not its members (N3c:
 ## a carrier keeps one per row, nearly all idle, and they were most of a hash).
 ## A body walked as an area that is at rest (`rest_leaf()` gives an array, not null: an actor that
-## is dormant and still as it was made, a standing prop; props W2) is that array's values, not its
+## is still and as it was made, a standing prop; props W2) is that array's values, not its
 ## members. A snapshot does not use it: it saves every body whole.
 ## Anything else is a **problem**, named by its path and what it holds: a node that is not the
 ## holder's own (a service: DERIVED; another area's body: REFS), a node of a script outside the

@@ -96,28 +96,31 @@ General rules, true of any actor, never "if it is a prop":
 
 **Tests:** `test_state_declared`, `test_state_walked`, `test_determinism` pass; a dormant body woken by a hit steps that tick and the next; a replay with props played twice agrees; W1's numbers again.
 
-**Done (2026-11-11).** What was built differs from the bullets above in two places, both found while building it:
+**Done (2026-11-11).** What was built differs from the bullets above; the first build differed again, and the owner turned it round:
 
-- **Asleep is a cache, with wakes.** Checking `Actor.dormant()` costs as much as the step it saves (4.8 us a body: the body's world position, its staffs, Spells' wind-ups), so it is checked once, after a tick (`tick_step`), and a dormant body is put to sleep in the actor table (`Actors.asleep`); the Tick skips it with one read. What changes what `dormant` reads wakes it (`Actor.wake`): a hold (the table's own), a protection, a mana change, a cast, a new driver, a possession, going down, a look added, a move of the body (its local transform notification). Asleep is never state: an asleep body's tick would change nothing, so a body woken for nothing sleeps again a tick later. A missed wake would change the game, so every suite runs the Tick with `verify_sleep` (each asleep body checked every tick; the test fails on one that is not dormant), and `tests/gameplay/actor/test_sleep_in_game.gd` plays 30 stand-ins blowing each other up in the hub with sleeping on and off and compares every tick's whole-game hash; with the hold's wake taken out, both fail.
-- **A resting body, not `idle()`.** `idle()` means a fresh object's state, and a snapshot makes an idle object again with `new()`, which would lose a body's place and data. So the hash alone sums a body up: `Actor.rest_leaf()` is one value (where it stands and aims, its size, health, `invincible`, ticking, the staff on show) while the body is dormant, whole and every component `at_rest()` (Health full, Hurtbox registered, Contact, Caster unedited with every pool full; false in the base, so a component that does not say is hashed whole). A snapshot still saves every body whole.
-- A body with no Mover never moves (`move()` returns at once), as the training dummy's doc already said.
+- **First built: sleep with wakes.** Checking `dormant()` every tick cost as much as the step it saved (4.8 us a body), so a dormant body was put to sleep and everything that could give it work had to wake it: about nine `wake()` calls in six files, a check in every test for a missed one, and a test playing the game with sleeping on and off. The owner: "This seems like an awful lot of code to have to remember to call exactly at the right times? Think of another solution, please." It was taken out before merging.
+- **Built: still bodies, a rule of the game.** A body that no controller drives and that has no Mover is **still** (`Actor.is_still`), and the Tick never steps it: one read of the actor table's `still`, which the body sets when its id opens and in `_tell_driver`, the one place a driver changes. Nothing has to wake it: a possession gives it a driver, and it is stepped while that lasts. What only a step does is not done for a still body, by rule: its pools do not refill, it takes no hit-stop hold (the table refuses it, and a hold ends when its body becomes still) and no protection (Health refuses it). No body of today's game is still: wizards, enemies, dummies and decoys all have a controller or a Mover.
+- **Slowed wind-ups are Combat's** (the owner: "Move the wind-up slowing into Spells (it sounds like a good general move, but if it is not, dont do it!"). The Caster's step asked Combat for its pace and held its wind-ups back in Spells; Spells is in `core/` and may not call Combat, so Combat, which counts the statuses down, holds every slowed actor's wind-ups back in Spells in its own step (`Spells.hold_winds`), in the same tick and by the same arithmetic. The Caster no longer asks Combat anything, and a still prop's fuse is slowed by a chill too.
+- **A resting body, not `idle()`.** `idle()` means a fresh object's state, and a snapshot makes an idle object again with `new()`, which would lose a body's place and data. So the hash alone sums a body up: `Actor.rest_leaf()` is a few values (where it stands and aims, its size, health, `invincible`, ticking, the staff on show), each hashed by its bytes, while the body is still, whole and every component `at_rest()` (Health full and unprotected, Hurtbox registered, Contact, Caster with its start cards unedited and every pool full, as a float32 holds it). These are questions a component answers about itself, false in the base: one that does not say is hashed whole. A snapshot still saves every body whole.
 
-Numbers (`prop_cost.gd`, headless, the owner's machine; W1's in brackets):
+Numbers (`prop_cost.gd`, headless, the owner's machine, main and W2 run back to back):
 
 | | 300 | 1,000 |
 |---|---|---|
-| Tick, average | 0.74 ms (3.03) | 1.96 ms (10.25) |
-| of it the bodies' step | 0.19 ms (2.28) | 0.33 ms (8.13) |
-| of it Combat and Projectiles | 0.45 ms (0.46) | 1.49 ms (1.57) |
-| State hash, whole | 19 ms (48) | 59 ms (156) |
-| of it the bodies | 5.6 ms (35) | 20 ms (120) |
-| State hash, worst tick of 60 | 10 ms (11) | 28 ms (32) |
+| Tick, average | 0.43 ms (main 1.49) | 1.06 ms (main 4.82) |
+| of it the bodies | 0.10 ms (1.16) | 0.16 ms (4.13) |
+| of it Combat and Projectiles | 0.26 ms (0.24) | 0.86 ms (0.82) |
+| State hash, whole | 10.4 ms (25.0) | 29.3 ms (78.5) |
+| of it the bodies | 3.2 ms (17.8) | 10.5 ms (59.9) |
+| State hash, worst tick of 60 | 5.7 ms (5.4) | 14.6 ms (15.2) |
 
-**Left, by W1's rule and what was found:** Combat's and the projectile manager's 1.5 us a standing target stays (0.45 ms at 300, under the millisecond W1 set). The worst tick of a spread hash is Spells' area, which grows by about 24 us a caster (its installed staffs, compiled spells by tag and node counts, three tables the hash sorts and walks; every enemy pays it too): splitting Spells' hash by caster is online-ready N3c's "left for later", now with a reason: the next step, W3 (the owner, 2026-11-11). Snapshots are unchanged (W1: under half a second to make 1,000 bodies again on a join).
+(W1's numbers were taken on a busier machine: about twice these.)
+
+**Left:** Combat's and the projectile manager's cost for a standing target (under W1's millisecond at 300). The worst tick of a spread hash is Spells' area, which grows by about 14 us a caster here (its installed staffs, compiled spells by tag and node counts; every enemy pays it too): the next step, W3 (the owner, 2026-11-11). Snapshots are unchanged.
 
 ## W3: Spells' hash by caster (engine, every caster)
 
-Added by the owner after W2 (2026-11-11): "the fix for this should be added to the plan as the next step". W2 found Spells' area of the hash growing by about 24 us a caster (every enemy's too): its installed staffs, its compiled spells by tag and its node counts are three tables over every caster, which the hash sorts and walks whole, and Spells is one area, so a spread hash pays all of it in one tick (28 ms at 1,000 props).
+Added by the owner after W2 (2026-11-11): "the fix for this should be added to the plan as the next step". W2 found Spells' area of the hash growing by about 14 to 24 us a caster (every enemy's too): its installed staffs, its compiled spells by tag and its node counts are three tables over every caster, which the hash sorts and walks whole, and Spells is one area, so a spread hash pays all of it in one tick (15 to 28 ms at 1,000 props, by the machine's load).
 
 - **A caster's part of Spells goes with its body.** Spells' per-caster state (what is kept by actor number: installed staffs, wind-ups, the spells by tag of that caster's builds, their node counts) is hashed as a part of its own, `Spells <id>`, which the spread hash (`SimHash.slice`) puts in the same part as that actor's body. Spells' own area keeps only what is no caster's (its carriers, moves, rays). A desync report names the caster.
 - **A caster with nothing live is one value,** as a resting body is: its builds as installed (each a FROZEN compiled staff, already one leaf), nothing winding, no carrier of its alive, no node counted. The tables are walked only for the casters that have something going on.

@@ -157,12 +157,6 @@ func step(delta: float) -> void:
 	for at in staff_count:
 		var base: StaffBase = staff_of(at)
 		_mana[at] = minf(_mana[at] + base.mana_regen * delta, base.max_mana)
-	if actor.spells != null and actor.combat != null:
-		# A slowed body winds up slower: a chill stretches a wind-up, a freeze holds it
-		# (docs/milestones/cast-timing.md).
-		var pace: float = actor.combat.own_pace(actor, actor.id)
-		if pace < 1.0:
-			actor.spells.hold_winds(number, delta * (1.0 - pace))
 	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
 		# Only when the body moved, turned or showed another staff: the systems still hold what
 		# was sent (performance pass, 2026-10-28).
@@ -186,29 +180,6 @@ func step(delta: float) -> void:
 		if pressed or held:
 			_show(at)
 			cast(at, pressed)
-
-
-## True while a step would change nothing (props W2, `Actor.dormant`): every pool full or not
-## filling, no staff winding (a slowed body's wind-up is held back each step), and the place it
-## sent to the systems still the body's own. A downed actor's step clears its place each time, so
-## it never rests.
-func rests() -> bool:
-	if number < 0:
-		return true
-	if actor.is_down():
-		return false
-	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
-		return false
-	for at in staff_count:
-		var base: StaffBase = staff_of(at)
-		var mana: float = _mana[at]
-		# A pool holds float32s: full is the most as one holds it.
-		var most: float = _as_held(base.max_mana)
-		if mana > most or (mana < most and base.mana_regen > 0.0):
-			return false
-		if actor.spells != null and actor.spells.is_winding(number, at):
-			return false
-	return true
 
 
 ## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
@@ -286,8 +257,6 @@ func cast(at: int, pressed: bool = true) -> bool:
 	if spent == SpellsScript.REFUSED:
 		return false
 	_mana[at] = maxf(_mana[at] - spent, 0.0)
-	# A pool to fill and a cast to wind up: its body has steps to take (props W2).
-	actor.wake()
 	cast_done.emit(at, origin, direction)
 	if actor.events != null:
 		actor.events.actor_cast.emit(actor.id, actor)
@@ -308,8 +277,6 @@ func max_mana_of(at: int) -> float:
 func set_mana(at: int, value: float) -> void:
 	if at >= 0 and at < _mana.size():
 		_mana[at] = clampf(value, 0.0, max_mana_of(at))
-		if actor != null:
-			actor.wake()
 
 
 ## Mana a cast of staff `at` may use now: its pool, minus what its sustained cards hold.
@@ -415,7 +382,6 @@ func replace_staffs(new_staffs: Array[StaffBase], new_cards: Array) -> void:
 		return
 	var before: int = staff_count
 	_edited = true
-	actor.wake()
 	staffs = new_staffs.duplicate()
 	staff = staffs[0]
 	staff_count = clampi(staffs.size(), 1, MAX_STAFFS)
@@ -531,7 +497,6 @@ func _on_mana_refund(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = minf(_mana[at] + amount, max_mana_of(at))
-		actor.wake()
 
 
 ## A cast that wound up left (`Spells`, docs/milestones/cast-timing.md): its mana is paid from the
@@ -541,4 +506,3 @@ func _on_mana_spend(caster: int, at: int, amount: float) -> void:
 		return
 	if at >= 0 and at < staff_count:
 		_mana[at] = maxf(_mana[at] - amount, 0.0)
-		actor.wake()

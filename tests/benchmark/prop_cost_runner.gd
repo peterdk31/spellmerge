@@ -15,7 +15,7 @@ extends Node
 ##   world (every body matched), and writing it back with the stand-ins gone (each made again, as
 ##   a machine joining the hub would).
 ## The differences between the counts are what the props cost; W2 runs it again after its changes
-## (a dormant body is not stepped, an untouched one hashes as one value).
+## (a still body is not stepped, an untouched one hashes as a few values).
 ##
 ## Started by `prop_cost.gd`. Prints `PROP COST OK` and quits 0, or `PROP COST FAILED` and 1 (the
 ## hub did not start, a snapshot named problems, or the log has an error).
@@ -161,21 +161,13 @@ func _time_parts(count: int) -> void:
 	var stand_ins: Array[Actor] = []
 	for node in get_tree().get_nodes_in_group(GROUP):
 		stand_ins.append(node as Actor)
-	var parts: Dictionary[String, int] = {"dormant": 0, "caster.rests": 0, "tick_step": 0, "step": 0, "caster.step": 0, "hurtbox.step": 0, "move": 0}
-	var dormant: int = 0
+	var parts: Dictionary[String, int] = {"tick_step": 0, "step": 0, "caster.step": 0, "hurtbox.step": 0, "move": 0}
+	var still: int = 0
 	for body in stand_ins:
-		if body.dormant():
-			dormant += 1
+		if body.actors.is_still(body.id):
+			still += 1
 	for pass_index in PART_PASSES:
 		var start: int = Time.get_ticks_usec()
-		for body in stand_ins:
-			body.dormant()
-		parts["dormant"] += Time.get_ticks_usec() - start
-		start = Time.get_ticks_usec()
-		for body in stand_ins:
-			body.caster.rests()
-		parts["caster.rests"] += Time.get_ticks_usec() - start
-		start = Time.get_ticks_usec()
 		for body in stand_ins:
 			body.tick_step(TickScript.DT)
 		parts["tick_step"] += Time.get_ticks_usec() - start
@@ -198,7 +190,7 @@ func _time_parts(count: int) -> void:
 	var shown: Array[String] = []
 	for key: String in parts:
 		shown.append("%s %.3f ms (%.1f us a body)" % [key, float(parts[key]) / PART_PASSES / 1000.0, float(parts[key]) / PART_PASSES / float(stand_ins.size())])
-	print("BENCH: props %d: %d of %d stand-ins dormant; a pass over the stand-ins: %s" % [count, dormant, stand_ins.size(), ", ".join(shown)])
+	print("BENCH: props %d: %d of %d stand-ins still (the Tick skips them); a pass over the stand-ins, stepped by hand: %s" % [count, still, stand_ins.size(), ", ".join(shown)])
 	_time_areas(count)
 
 

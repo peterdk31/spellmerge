@@ -51,23 +51,13 @@ func _initialize() -> void:
 	if shard.y > 1:
 		names = of_shard(names, shard)
 		label += " (shard %d of %d)" % [shard.x + 1, shard.y]
-	# Every asleep body is checked each tick, and a test fails on one that slept through a change
-	# (props W2: a missed `Actor.wake`).
-	var clock: _SUITE_TICK = root.get_node_or_null(^"Tick") as _SUITE_TICK
-	if clock != null:
-		clock.verify_sleep = true
 	for method_name in names:
 		_current = method_name
 		var started: int = Time.get_ticks_msec()
 		_still_chance()
-		if clock != null:
-			clock.sleep_misses.clear()
 		await before_each()
 		await call(method_name)
 		await after_each()
-		if clock != null:
-			for miss in clock.sleep_misses:
-				check(false, miss)
 		_free_owned()
 		# The slow ones show in the log (a test of seconds is a candidate for shards).
 		print("TEST TIME: %s %d ms" % [method_name, Time.get_ticks_msec() - started])

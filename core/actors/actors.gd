@@ -52,7 +52,7 @@ const RAMP_ENEMY: int = 4
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); the node of each id,
 ## kept by its instance id: a lookup from the id (`node_of`), set again by each body as it opens
 ## (equality only, never an identity: N5).
-const DERIVED: Array[StringName] = [&"_node", &"asleep"]
+const DERIVED: Array[StringName] = [&"_node"]
 
 var _open: PackedByteArray = PackedByteArray()
 var _team: PackedInt32Array = PackedInt32Array()
@@ -79,12 +79,11 @@ var _births: int = 0
 ## it follows the game's time whoever steps the actor. And how many actors rest now.
 var _rest: PackedFloat32Array = PackedFloat32Array()
 var resting_count: int = 0
-## Per actor, 1 while its body is asleep (props W2, docs/milestones/props.md): its last tick left
-## it dormant (`Actor.dormant`: a tick would change nothing), so the Tick skips it with this one read
-## until something wakes it (`wake`). A cache, never state: an asleep body's tick changes nothing, so
-## a body woken for nothing (all of them after a snapshot is restored) only takes one tick to sleep
-## again. Read only; `sleep` and `wake` write it.
-var asleep: PackedByteArray = PackedByteArray()
+## Per actor, 1 while its body is still (props W2, docs/milestones/props.md): no controller drives
+## it and it has no Mover, so nothing it does changes from tick to tick and the Tick never steps it
+## (a prop; a possession gives it a driver, and it is stepped while that lasts). Set by the body when
+## its id opens and whenever its driver changes (`set_still`); state, like its team. Read only.
+var still: PackedByteArray = PackedByteArray()
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -101,7 +100,7 @@ func _init() -> void:
 	_birth.resize(ACTORS)
 	_held.resize(ACTORS)
 	_rest.resize(ACTORS)
-	asleep.resize(ACTORS)
+	still.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
@@ -124,7 +123,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_seat[id] = NONE
 	_home_seat[id] = NONE
 	_node[id] = 0
-	asleep[id] = 0
+	still[id] = 0
 	_births += 1
 	_birth[id] = _births
 	_release_hold(id)
@@ -296,10 +295,11 @@ func node_of(id: int) -> Node:
 ## meanwhile while the rest of the game runs on). The longer of two stops stands. After it the
 ## actor rests for `rest` seconds more of its own steps, and a `plain` hold (a plain hit's) does
 ## not take it while it rests; any other hold (a kill, a reaction, a cue's) always does. Returns
-## false for an actor that is not open, or a plain hold refused. An actor that rests or is held is
+## false for an actor that is not open or still, or a plain hold refused. An actor that rests or is held is
 ## stepped through `spend_hold` (`held_count` or `resting_count` above 0).
 func hold(id: int, seconds: float, rest: float = 0.0, plain: bool = false) -> bool:
-	if not is_open(id) or seconds <= 0.0:
+	if not is_open(id) or seconds <= 0.0 or still[id] != 0:
+		# A still body is never stepped, so it has no steps to stop (props W2).
 		return false
 	if plain and _rest[id] > 0.0:
 		return false
@@ -309,35 +309,20 @@ func hold(id: int, seconds: float, rest: float = 0.0, plain: bool = false) -> bo
 	if _held[id] <= 0.0:
 		held_count += 1
 	_held[id] = maxf(_held[id], seconds)
-	asleep[id] = 0
 	return true
 
 
-## True while `id` is held or still rests after a hold: its step must run to spend it
-## (`Actor.dormant`, props W2).
-func holds(id: int) -> bool:
-	return id >= 0 and id < ACTORS and (_held[id] > 0.0 or _rest[id] > 0.0)
+## Whether the body of `id` is still (`still`): the Tick does not step it.
+func set_still(id: int, on: bool) -> void:
+	if is_open(id):
+		still[id] = 1 if on else 0
+		if on:
+			# A still body takes no steps to spend a hold in.
+			_release_hold(id)
 
 
-## After a snapshot is restored (core/sim/snapshot.gd): every body awake, since the bodies under the
-## ids may be others now, and an awake body with nothing to do sleeps again after its next tick.
-func rebuild_derived() -> void:
-	asleep.fill(0)
-
-
-## The body of `id` had nothing to do at the end of its tick: the Tick skips it from now on, until
-## `wake` (props W2; `asleep`).
-func sleep(id: int) -> void:
-	if id >= 0 and id < ACTORS:
-		asleep[id] = 1
-
-
-## The body of `id` may have something to do again: the Tick steps it from the next tick on, and
-## it sleeps again after a tick that leaves it dormant. Whatever changes what `Actor.dormant` reads
-## calls it (a hold, a protection, a mana change, a cast, a new driver, a move of the body).
-func wake(id: int) -> void:
-	if id >= 0 and id < ACTORS:
-		asleep[id] = 0
+func is_still(id: int) -> bool:
+	return id >= 0 and id < ACTORS and still[id] != 0
 
 
 ## Seconds left of the local stop on `id` (0 when it is not held).
@@ -383,7 +368,7 @@ func _release_hold(id: int) -> void:
 ## Every actor closed and every seat free (a new run, and tests).
 func clear() -> void:
 	_open.fill(0)
-	asleep.fill(0)
+	still.fill(0)
 	_team.fill(NONE)
 	_ramp.fill(NONE)
 	_seat.fill(NONE)

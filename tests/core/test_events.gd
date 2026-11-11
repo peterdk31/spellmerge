@@ -64,6 +64,7 @@ const EVENTS: Dictionary = {
 	&"discharge_arc": [["caster", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
 	&"damage_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
+	&"prop_state_changed": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
 	&"status_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME], ["duration", TYPE_FLOAT], ["strength", TYPE_FLOAT]],
 	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
 	# Staffs (docs/milestones/M2-staffs.md, "Events").
@@ -78,7 +79,8 @@ const EVENTS: Dictionary = {
 	&"mana_refund_requested": [["caster", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"mana_spend_requested": [["caster", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"cast_fizzled": [["caster", TYPE_INT], ["staff", TYPE_INT]],
-	&"cast_winding": [["caster", TYPE_INT], ["staff", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT], ["tag", TYPE_INT]],
+	&"cast_winding": [["caster", TYPE_INT], ["staff", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT], ["tag", TYPE_INT], ["cue", TYPE_STRING_NAME]],
+	&"cast_left": [["caster", TYPE_INT], ["staff", TYPE_INT]],
 	&"mana_reserved": [["player", TYPE_INT], ["staff", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"shot_blocked": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],
 	&"shot_deflected": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["shot", TYPE_INT]],

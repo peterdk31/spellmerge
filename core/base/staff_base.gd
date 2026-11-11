@@ -20,6 +20,10 @@ extends Resource
 ## Seconds every cast of this staff winds up before it leaves, on top of its cards' (an enemy's
 ## telegraph; docs/milestones/cast-timing.md). Not used yet: the wind-up runs from part T2.
 @export var wind_up: float = 0.0
+## The cue a cast of this staff plays while it winds up (`CueBase`, content/cues; props W6: a
+## barrel's fuse), in place of its carrier card's `wind_cue`; empty: the card's (a tree's slam staff
+## winds up with the slam's).
+@export var wind_cue: StringName = &""
 ## Seconds the staff waits after the last cast of its cycle, after that cast's wind-down, before
 ## it starts over (docs/milestones/cast-timing.md).
 @export var cooldown: float = 0.5

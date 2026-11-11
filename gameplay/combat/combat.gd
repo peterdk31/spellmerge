@@ -596,12 +596,20 @@ func _apply_status_row(caster: int, row: int, status_id: StringName, duration: f
 			_chill_stacks[row] = 0
 			_status_left[at + ST_FREEZE] = FREEZE_TIME
 			froze = true
-	if events != null:
-		var node: Node2D = _nodes[row]
-		events.status_applied.emit(caster, node, status_id)
-		if froze:
-			events.status_applied.emit(caster, node, FREEZE)
+	var node: Node2D = _nodes[row]
+	_tell_status(caster, node, status_id)
+	if froze:
+		_tell_status(caster, node, FREEZE)
 	return true
+
+
+## `status_id` from `by` was put on `node`: the bus's `status_applied`, and the actor's own
+## `Actor.status_gained` for its own listeners (a prop's reactions, props W6), as `damaged` is.
+func _tell_status(by: int, node: Node2D, status_id: StringName) -> void:
+	if events != null:
+		events.status_applied.emit(by, node, status_id)
+	if node is Actor and is_instance_valid(node):
+		(node as Actor).status_gained.emit(by, status_id)
 
 
 ## Seconds left of `status_id` (burn, chill, freeze, gust, hex or static) on `actor`; 0 when
@@ -1068,6 +1076,7 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 		if _tag != 0:
 			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag, _slot)
 		if not _same(row, node):
+			_tell_reacted(by, node, reaction.reaction_id)
 			return
 	var spell_tag: int = _tag
 	_tag = 0
@@ -1088,6 +1097,15 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 		ReactionRow.Effect.SPREAD:
 			_spread(by, row, centre, reaction)
 	_tag = spell_tag
+	_tell_reacted(by, node, reaction.reaction_id)
+
+
+## The reaction `reaction_id` set off by `by` happened on `node`: the actor's own listeners (a prop's
+## reactions, props W6) hear it directly, as `damaged`, once its effect is done (a prop that breaks
+## on it still takes its damage and its burst still reaches the bodies round it).
+func _tell_reacted(by: int, node: Node2D, reaction_id: StringName) -> void:
+	if node is Actor and is_instance_valid(node):
+		(node as Actor).reacted.emit(by, reaction_id)
 
 
 ## BURST: `reaction.damage` to every actor in the circle, the struck one included, and a pull
@@ -1124,8 +1142,8 @@ func _extend(by: int, row: int, reaction: ReactionRow) -> void:
 		_status_power[at + ST_CHILL] = 0.0
 		_chill_stacks[row] = 0
 		_status_left[at + ST_FREEZE] += reaction.duration
-		if newly and events != null:
-			events.status_applied.emit(by, _nodes[row], FREEZE)
+		if newly:
+			_tell_status(by, _nodes[row], FREEZE)
 		return
 	_status_left[at + st] += reaction.duration
 	_status_power[at + st] += reaction.strength

@@ -1,0 +1,81 @@
+[gd_resource type="Resource" script_class="PropStates" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_states.gd" id="1_states"]
+[ext_resource type="Script" path="res://core/base/prop_reaction.gd" id="4_reaction"]
+[ext_resource type="Script" path="res://core/base/prop_state.gd" id="5_state"]
+
+[sub_resource type="Resource" id="idle_fire"]
+script = ExtResource("4_reaction")
+element = &"fire"
+then = &"fusing"
+
+[sub_resource type="Resource" id="idle_death"]
+script = ExtResource("4_reaction")
+when = 4
+cast = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="idle_cast2"]
+script = ExtResource("4_reaction")
+when = 6
+staff = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="idle_cast1"]
+script = ExtResource("4_reaction")
+when = 6
+staff = 1
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing_entered"]
+script = ExtResource("4_reaction")
+when = 5
+cast = 1
+
+[sub_resource type="Resource" id="fusing_death"]
+script = ExtResource("4_reaction")
+when = 4
+cast = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing_cast1"]
+script = ExtResource("4_reaction")
+when = 6
+staff = 1
+then = &"broken"
+
+[sub_resource type="Resource" id="fusing_cast2"]
+script = ExtResource("4_reaction")
+when = 6
+staff = 2
+then = &"broken"
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("5_state")
+state_id = &"idle"
+reactions = Array[ExtResource("4_reaction")]([SubResource("idle_fire"), SubResource("idle_death"), SubResource("idle_cast1"), SubResource("idle_cast2")])
+
+[sub_resource type="Resource" id="fusing"]
+script = ExtResource("5_state")
+state_id = &"fusing"
+reactions = Array[ExtResource("4_reaction")]([SubResource("fusing_entered"), SubResource("fusing_death"), SubResource("fusing_cast1"), SubResource("fusing_cast2")])
+
+[sub_resource type="Resource" id="idle"]
+script = ExtResource("5_state")
+state_id = &"idle"
+reactions = Array[ExtResource("4_reaction")]([SubResource("idle_fire"), SubResource("idle_death"), SubResource("idle_cast1"), SubResource("idle_cast2")])
+
+[sub_resource type="Resource" id="fusing"]
+script = ExtResource("5_state")
+state_id = &"fusing"
+reactions = Array[ExtResource("4_reaction")]([SubResource("fusing_entered"), SubResource("fusing_death"), SubResource("fusing_cast1"), SubResource("fusing_cast2")])
+
+[sub_resource type="Resource" id="broken"]
+script = ExtResource("5_state")
+state_id = &"broken"
+blocks = false
+hittable = false
+
+[resource]
+script = ExtResource("1_states")
+list = Array[ExtResource("5_state")]([SubResource("idle"), SubResource("fusing"), SubResource("broken")])

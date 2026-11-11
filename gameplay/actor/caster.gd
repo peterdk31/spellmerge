@@ -77,6 +77,9 @@ var _cards: Array = []
 ## The mana each staff holds now, by button (`mana_of`).
 var _mana: PackedFloat32Array = PackedFloat32Array()
 var _has_build: PackedByteArray = PackedByteArray()
+## The staffs whose last cast was the body's own (`cast`'s `own`), by bit: their wind-ups outlast a
+## change of driver.
+var _own_winds: int = 0
 ## True once the start cards were built (the first attach).
 var _built: bool = false
 ## True once a staff or its cards changed after the start cards were built (`set_staff`,
@@ -185,7 +188,7 @@ func step(delta: float) -> void:
 ## As its scene and data made it (props W2, `ActorComponent.at_rest`): its start cards unchanged
 ## and every pool full. The staff on show is in the actor's `rest_leaf`.
 func at_rest() -> bool:
-	if _edited:
+	if _edited or _own_winds != 0:
 		return false
 	for at in staff_count:
 		if _mana[at] != _as_held(max_mana_of(at)):
@@ -243,10 +246,15 @@ func _origin() -> Vector2:
 ## Cast staff `at` now. Returns true if it cast (or switched its sustained cards off). Does
 ## nothing while the actor is down or for a staff with no build. `pressed`: a new press, not a held
 ## button's repeat, which also sets off the staff's live `on recast` carriers, busy or not
-## (`Spells.press_staff`).
-func cast(at: int, pressed: bool = true) -> bool:
+## (`Spells.press_staff`). `own`: the body's own cast, no driver's (a prop's reaction, props W6): its
+## wind-up goes on when the driver changes (`cancel_winds`).
+func cast(at: int, pressed: bool = true, own: bool = false) -> bool:
 	if actor.is_down() or not has_staff(at):
 		return false
+	if own:
+		_own_winds |= 1 << at
+	else:
+		_own_winds &= ~(1 << at)
 	_push_place_again()
 	var origin: Vector2 = _origin()
 	var direction: Vector2 = actor.aim
@@ -295,10 +303,23 @@ func is_winding(at: int) -> bool:
 	return has_staff(at) and actor.spells.is_winding(number, at)
 
 
-## Every cast this actor winds up leaves no more, for free (its driver changed: `Actor.drive`).
+## Every cast its driver wound up leaves no more, for free (its driver changed: `Actor.drive`); the
+## body's own (`cast`'s `own`: a lit barrel's fuse) go on.
 func cancel_winds() -> void:
-	if actor.spells != null and number >= 0:
+	if actor.spells == null or number < 0:
+		return
+	if _own_winds == 0:
 		actor.spells.cancel_winds(number)
+		return
+	for at in staff_count:
+		if _own_winds & (1 << at) == 0:
+			actor.spells.cancel_wind(number, at)
+
+
+## The cast staff `at` winds up leaves no more, for free (a prop left the state that cast it).
+func cancel_wind(at: int) -> void:
+	if actor.spells != null and number >= 0:
+		actor.spells.cancel_wind(number, at)
 
 
 ## True while staff `at` holds a sustained card on.
@@ -355,6 +376,22 @@ func plan_of(at: int) -> Dictionary:
 ## The form of the carrier staff `at` cast last (`Spells.last_form`), or &"".
 func last_form(at: int) -> StringName:
 	return actor.spells.last_form(number, at) if has_staff(at) else &""
+
+
+## Hold the staffs of `entries` (an enemy's or a prop's data: `StaffCards`, at most 4) from the start,
+## one per button, their cards built when the actor enters play. Before the actor is ready.
+func hold_staffs(entries: Array[StaffCards]) -> void:
+	var held: Array[StaffBase] = []
+	var cards: Array = []
+	for entry: StaffCards in entries.slice(0, MAX_STAFFS):
+		held.append(entry.staff if entry != null else null)
+		cards.append(entry.cards.duplicate() if entry != null else [])
+	if held.is_empty():
+		return
+	staff_count = held.size()
+	staffs = held
+	staff = held[0]
+	start_cards = cards
 
 
 ## Build `cards` (card ids by slot) into staff `at`: cut or padded to the staff's slots, compiled

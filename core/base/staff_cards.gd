@@ -34,3 +34,19 @@ func problems() -> PackedStringArray:
 	if not any:
 		found.append("It has no card.")
 	return found
+
+
+## What is wrong with a body's list of staffs (an enemy's, a prop's), one line each, each line after
+## `owner`: more than `most`, an empty entry, an entry's own problems. Staffs are numbered from
+## `first` (an enemy's from 0, a prop's from 1, as its reactions name them).
+static func list_problems(owner: String, entries: Array[StaffCards], most: int, first: int = 0) -> PackedStringArray:
+	var found := PackedStringArray()
+	if entries.size() > most:
+		found.append("%s has %d staffs; at most %d." % [owner, entries.size(), most])
+	for at in entries.size():
+		if entries[at] == null:
+			found.append("%s: staff %d is empty." % [owner, at + first])
+			continue
+		for line: String in entries[at].problems():
+			found.append("%s: staff %d: %s" % [owner, at + first, line])
+	return found

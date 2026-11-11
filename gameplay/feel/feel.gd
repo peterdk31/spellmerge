@@ -2387,17 +2387,18 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 	play_cue(_form_cues_of(spell_id)[CUE_CAST] as StringName, actor, origin, direction, 0.0, Color.WHITE, 0, ActorsScript.NONE, -1, -1, 0, true, NO_BODY, player)
 
 
-## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): its carrier
-## card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that is not
-## aimed) from the staff tip, its size the wind-up's seconds, on the staff tip as it turns. Only for
-## a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
-func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int) -> void:
+## A cast started winding up (`cast_winding`; docs/milestones/cast-timing.md, T6b): the staff's own
+## wind-up cue when it names one (`staff_cue`, `StaffBase.wind_cue`: a barrel's fuse, props W6), else
+## its carrier card's `wind_cue` (an enemy's telegraph: a lane along the aim, a ring for a cast that
+## is not aimed), from the staff tip, its size the wind-up's seconds, on the staff tip as it turns.
+## Only for a caster not on the players' team: a telegraph warns the players (owner, 2026-11-01).
+func _on_cast_winding(caster: int, _staff: int, form: StringName, origin: Vector2, direction: Vector2, seconds: float, tint: Color, look: int, tag: int, staff_cue: StringName) -> void:
 	if caster < 0 or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
 	var table: ActorsScript = _actor_table()
 	if table == null or table.team_of(caster) == ActorsScript.TEAM_WIZARDS:
 		return
-	var cue: StringName = _form_cues_of(form)[CUE_WIND] as StringName
+	var cue: StringName = staff_cue if staff_cue != &"" else _form_cues_of(form)[CUE_WIND] as StringName
 	if cue == &"":
 		return
 	# Its flashes sit on the staff tip as it turns (the aim follows the caster through the wind-up).

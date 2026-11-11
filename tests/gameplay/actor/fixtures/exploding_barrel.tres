@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="1_base"]
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="2_staff"]
+[ext_resource type="Script" path="res://core/base/staff_cards.gd" id="3_entry"]
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="6_scene"]
+[ext_resource type="Resource" path="res://tests/gameplay/actor/fixtures/exploding_barrel_states.tres" id="7_states"]
+
+[sub_resource type="Resource" id="fuse_staff"]
+script = ExtResource("2_staff")
+display_name = "Exploding barrel's fuse"
+slots = 2
+wind_up = 1.0
+cooldown = 0.0
+max_mana = 100.0
+mana_regen = 0.0
+
+[sub_resource type="Resource" id="blast_staff"]
+script = ExtResource("2_staff")
+display_name = "Exploding barrel's blast"
+slots = 2
+cooldown = 0.0
+max_mana = 100.0
+mana_regen = 0.0
+
+[sub_resource type="Resource" id="fuse"]
+script = ExtResource("3_entry")
+staff = SubResource("fuse_staff")
+cards = Array[StringName]([&"fire", &"blast"])
+
+[sub_resource type="Resource" id="blast"]
+script = ExtResource("3_entry")
+staff = SubResource("blast_staff")
+cards = Array[StringName]([&"fire", &"blast"])
+
+[resource]
+script = ExtResource("1_base")
+id = &"test_exploding_barrel"
+scene = ExtResource("6_scene")
+max_health = 10.0
+radius = 7.0
+offset = Vector2(0, -8)
+footprint_size = Vector2(14, 8)
+footprint_offset = Vector2(0, -2)
+staffs = Array[ExtResource("3_entry")]([SubResource("fuse"), SubResource("blast")])
+states = ExtResource("7_states")

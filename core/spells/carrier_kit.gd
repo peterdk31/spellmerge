@@ -135,8 +135,8 @@ func ring_turn() -> float:
 
 
 ## The point at `angle` on such a ring, stopped short of a wall.
-func ring_point(actor: int, centre: Vector2, radius: float, angle: float) -> Vector2:
-	return SpellRuntime.ring_point(_rt.projectiles, actor, centre, radius, angle)
+func ring_point(centre: Vector2, radius: float, angle: float) -> Vector2:
+	return SpellRuntime.ring_point(_rt.projectiles, centre, radius, angle)
 
 
 ## The live shot casting the launch being fired, or -1 when the caster is the wizard, a point, or
@@ -207,9 +207,9 @@ func staff_spread(tag: int, spell: CompiledSpell) -> float:
 
 
 ## Where a carrier its caster places (a rune, a decoy, a familiar) appears: a step ahead of
-## `origin` along `heading`, never in a wall (but `actor`'s own footprint, which its spells leave).
-func placed_at(spell: CompiledSpell, actor: int, origin: Vector2, heading: Vector2) -> Vector2:
-	return _rt._placed_at(spell, actor, origin, heading)
+## `origin` along `heading`, never in a wall.
+func placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
+	return _rt._placed_at(spell, origin, heading)
 
 
 ## The floor line of what falls now (Skyfall: the fall being cast, or the falling shot casting),

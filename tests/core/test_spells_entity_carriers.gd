@@ -384,7 +384,7 @@ func test_a_decoy_ending_twice_counts_once() -> void:
 
 ## True when the segment `from`-`to` meets a wall.
 func _blocked(from: Vector2, to: Vector2) -> bool:
-	return _mgr.clip_to_walls(from, to, -1) != to
+	return _mgr.clip_to_walls(from, to) != to
 
 
 func test_wall_is_one_solid_row_across_the_aim() -> void:

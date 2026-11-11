@@ -84,7 +84,7 @@ func _move_seconds(spell: CompiledSpell) -> float:
 func _move_body(spell: CompiledSpell, tag: int, actor: int, body: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
 	_dash_homing[body].start(spell, hash(Vector2i(actor, tag)))
 	kit.events.caster_move_requested.emit(body, &"dash", offset, seconds, tag)
-	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset, body))
+	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
 	kit.set_cue_tag(tag)
 	kit.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
 	kit.set_cue_tag(0)

@@ -1,34 +1,34 @@
 class_name Footprint
 extends ActorComponent
-## The ground a body blocks (props W4, docs/milestones/props.md): a rectangle `size` pixels across,
-## its centre `offset` from the feet, laid into the projectile manager's wall grid
-## (`ProjectileManager.set_footprint`) while `blocks` is on and the actor is in the tree. Bodies
-## slide along it and shots and rays end on it as on any wall; the body's own spells leave it.
+## The ground a body stands on (props W4, docs/milestones/props.md): a circle of `radius` round
+## `offset` from its feet, or a box `size` across. Every actor has one: its scene's, or one the
+## actor adds itself as it adds `Phases` (`Actor._find_components`), with the default circle.
 ##
-## It is for a body that does not move (a prop: no Mover, and a body with no Mover never moves,
-## `Actor.move`): it is laid where the body stands when it enters the tree, and taken out when it
-## leaves. A prop's state turns it on and off (`set_blocks`: rubble blocks nothing, W6).
+## One rule, by whether the body can move (owner, 2026-11-11):
+## - **A body that walks** (it has a Mover) slides along the walls as its circle (`Actor.move`,
+##   `ProjectileManager.slide_body`), and lands clear of them as it (a teleport). Bodies that walk
+##   part softly (Combat's push), never by their footprints.
+## - **A body that cannot move** (no Mover: a prop, a training dummy) is solid ground to the bodies
+##   that walk: it lays its footprint, the box when it has a `size`, else the circle, into the
+##   projectile manager's ground grid (`set_footprint`) while it is in the tree and `solid`
+##   (`set_solid`: a broken crate's rubble is not, W6), where it stands when it enters.
 ##
-## A shot that meets it hits the body, because the body's hurt circle covers every cell it can lay
-## (the step is cut at the wall, then tested for hits along what is left of it): `problems()` says
-## when the circle does not, or when the body has a Mover.
+## Nothing else sees it: shots, rays and sight pass over it, and hit the body by its hurt circle
+## as any other (a piercing shot goes on through a prop). The hurt circle is the body's own shape
+## (a tree's canopy), the footprint its feet (the trunk).
 
-const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## Its width and height in pixels. The wall grid's cells (`ProjectileManager.WALL_CELL`) whose
-## centres lie in it are laid: make it at least a cell across.
-@export var size: Vector2 = Vector2(16.0, 16.0)
-## Its centre, from the feet.
+## The circle's radius in pixels: the body against the walls (a wizard 6, a mite 5).
+@export var radius: float = 6.0
+## A box this wide and high in place of the circle, for a body that cannot move (zero: the circle).
+## A body that walks slides as its circle whatever this is.
+@export var size: Vector2 = Vector2.ZERO
+## Its centre, from the feet, where a body that cannot move lays it (a body that walks slides as the
+## circle at its feet).
 @export var offset: Vector2 = Vector2.ZERO
-## Whether it blocks now (`set_blocks`).
-@export var blocks: bool = true
-
-
-func setup(owner_actor: Actor) -> void:
-	super.setup(owner_actor)
-	for problem in problems():
-		push_warning("Footprint of %s: %s" % [owner_actor.name, problem])
+## Whether a body that cannot move blocks the bodies that walk (`set_solid`).
+@export var solid: bool = true
 
 
 func attach() -> void:
@@ -36,57 +36,37 @@ func attach() -> void:
 
 
 func detach() -> void:
-	if actor.projectiles != null and is_instance_valid(actor.projectiles):
-		actor.projectiles.set_footprint(actor.id, Rect2())
+	if actor.mover == null and actor.projectiles != null and is_instance_valid(actor.projectiles):
+		actor.projectiles.set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)
 
 
-## Block from now on (`on`), or block nothing.
-func set_blocks(on: bool) -> void:
-	if on == blocks:
+## Block the bodies that walk from now on (`on`), or not.
+func set_solid(on: bool) -> void:
+	if on == solid:
 		return
-	blocks = on
+	solid = on
 	_lay()
 
 
-## The world rectangle it covers where the body stands now.
-func rect() -> Rect2:
-	return Rect2(actor.global_position + offset - size * 0.5, size)
+## The body grew or shrank by `factor` (`Actor.set_size`): the circle, the box and its place with it.
+func scale_by(factor: float) -> void:
+	radius *= factor
+	size *= factor
+	offset *= factor
+	_lay()
 
 
-## What is laid lives in the projectile manager's footprints, hashed there; nothing here differs
-## between two bodies made alike but `blocks`, which the manager's table shows (props W2's rest).
+## What a body that cannot move lays is the projectile manager's ground, hashed there; nothing here
+## differs between two bodies made alike (props W2's rest).
 func at_rest() -> bool:
 	return true
 
 
-## What is wrong with it on its actor (empty: nothing): a Mover (the body would walk off it), or a
-## hurt circle that does not cover every cell it can lay, so a shot could end on it without hitting
-## the body. A body without a Hurtbox is a wall that takes no hits, which is allowed.
-func problems() -> PackedStringArray:
-	var found := PackedStringArray()
-	if actor == null:
-		return found
-	if actor.mover != null:
-		found.append("its body has a Mover; a footprint is laid where the body stands, for a body that does not move")
-	if size.x < ProjectilesScript.WALL_CELL or size.y < ProjectilesScript.WALL_CELL:
-		found.append("it is %s px, under a cell (%d px) across: it may lay no cell" % [size, ProjectilesScript.WALL_CELL])
-	var hurtbox: Hurtbox = actor.hurtbox
-	if hurtbox != null:
-		var reach: float = farthest_from(hurtbox.offset)
-		if reach > hurtbox.radius:
-			found.append("its cells reach %.1f px from the hurt circle's centre, past its radius %.1f: a shot could end on it without a hit" % [reach, hurtbox.radius])
-	return found
-
-
-## How far from `point` (from the feet) the cells it can lay reach at most: they reach half a cell
-## past the rectangle (a cell whose centre is in it is laid), wherever the body stands.
-func farthest_from(point: Vector2) -> float:
-	var half: Vector2 = size * 0.5 + Vector2.ONE * ProjectilesScript.WALL_CELL * 0.5
-	var away: Vector2 = (offset - point).abs() + half
-	return away.length()
-
-
+## Lay it where the body stands (a body that cannot move, in the tree with an id), or nothing.
 func _lay() -> void:
-	if actor == null or actor.projectiles == null or actor.id == ActorsScript.NONE or not actor.is_inside_tree():
+	if actor == null or actor.mover != null or actor.projectiles == null or actor.id == ActorsScript.NONE or not actor.is_inside_tree():
 		return
-	actor.projectiles.set_footprint(actor.id, rect() if blocks else Rect2())
+	if solid:
+		actor.projectiles.set_footprint(actor.id, actor.global_position + offset, size, radius)
+	else:
+		actor.projectiles.set_footprint(actor.id, Vector2.ZERO, Vector2.ZERO, 0.0)

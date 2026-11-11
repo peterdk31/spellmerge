@@ -15,11 +15,11 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## Time moves by this fixed binary fraction.
 const STEP: float = 0.0625
-## The stand-in prop's footprint, its centre from the feet (its hurt circle's and its hand's too),
-## and the hurt circle's radius: its cells reach |(12, 12)| < 17 px from the centre.
+## The stand-in prop's ground (a box at its feet), its body's centre from the feet (its hurt
+## circle's and its hand's) and the hurt circle's radius.
 const PROP_SIZE: Vector2 = Vector2(16.0, 16.0)
 const PROP_CENTRE: Vector2 = Vector2(0.0, -8.0)
-const PROP_RADIUS: float = 17.0
+const PROP_RADIUS: float = 12.0
 
 
 ## A controller that wants what a test sets: a walk, an aim, staffs pressed once or held.
@@ -125,9 +125,8 @@ func actor(at: Vector2, kinds: Array[StringName], controller: ActorController = 
 
 
 ## A stand-in prop (props W4, docs/milestones/props.md), not yet added: an actor of the world's
-## team with no controller and no Mover, Health 50, a 16 px Footprint and a hurt circle round it that
-## covers it (`Footprint.problems`), and a Caster with `cards` (one row per staff) on `staff` when
-## it has any. Its hand is the footprint's centre, so its spells start inside it.
+## team with no controller and no Mover, Health 50, a 16 px box of ground at its feet, a hurt circle
+## on its body above, and a Caster with `cards` (one row per staff) on `staff` when it has any.
 static func prop_body(cards: Array = [], staff: StaffBase = null) -> Actor:
 	var body := Actor.new()
 	body.name = "Prop"
@@ -142,8 +141,8 @@ static func prop_body(cards: Array = [], staff: StaffBase = null) -> Actor:
 	hurtbox.offset = PROP_CENTRE
 	body.add_child(hurtbox)
 	var footprint := Footprint.new()
+	footprint.name = "Footprint"
 	footprint.size = PROP_SIZE
-	footprint.offset = PROP_CENTRE
 	body.add_child(footprint)
 	if not cards.is_empty():
 		var caster := Caster.new()

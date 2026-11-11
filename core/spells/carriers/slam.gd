@@ -146,7 +146,7 @@ func _slam_step(at: int, delta: float) -> void:
 		_slam_follow(at)
 		if _sl_on[at] == 0 or _sl_age[at] < _sl_wind[at]:
 			return
-		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length, _sl_actor[at])
+		var impact: Vector2 = kit.projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
 		_sl_impact[at] = impact
 		if SpellRuntime.body_of(_sl_caster[at], _sl_actor[at]) == _sl_actor[at]:
 			poses.land_at(tag, impact - _sl_origin[at])

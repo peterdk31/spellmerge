@@ -12,8 +12,9 @@ extends Node2D
 ##
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
-## (Caster), plus any number of looks (ActorLook) and the first ActorController, its
-## `home_controller`. Components reach each other only through the actor, never by node path.
+## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
+## circle when its scene has none, so every actor has one), plus any number of looks (ActorLook)
+## and the first ActorController, its `home_controller`. Components reach each other only through the actor, never by node path.
 ##
 ## Controllers: `controller` is the one driving it now: its home controller, a guest handed over
 ## by `drive` (possess, G9), or none. `release` gives the guest back. A controller drives one actor
@@ -55,7 +56,7 @@ extends Node2D
 ## (`ActorComponent.at_rest`, false unless a component says). Only the hash does; a snapshot saves
 ## every body whole.
 ##
-## The move (online-ready N6): `move(delta)` slides the body, a circle of its Mover's `body_radius`,
+## The move (online-ready N6): `move(delta)` slides the body, its footprint's circle (`wall_radius`),
 ## along the walls (the room's, the solid shots' and the footprints', the projectile manager's
 ## wall grid, `ProjectileManager.slide_body`), the same to the bit on every machine; `velocity` is then what it
 ## moved by over the step, so a body against a wall keeps only its slide. Actors walk through each
@@ -144,6 +145,7 @@ var hurtbox: Hurtbox = null
 var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
+var footprint: Footprint = null
 ## True when something downs the actor at 0 health instead of letting it die (a Downed
 ## component, G7, sets it).
 var downable: bool = false
@@ -267,9 +269,9 @@ func move(delta: float) -> void:
 		velocity = (to - from) / delta
 
 
-## The radius of the body against the walls: its Mover's `body_radius` (0 without a Mover).
+## The radius of the body against the walls: its footprint's circle (`Footprint.radius`).
 func wall_radius() -> float:
-	return mover.body_radius if mover != null else 0.0
+	return footprint.radius if footprint != null else 0.0
 
 
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
@@ -554,11 +556,19 @@ func _find_components() -> void:
 			mover = _first(mover, child) as Mover
 		elif child is Caster:
 			caster = _first(caster, child) as Caster
+		elif child is Footprint:
+			footprint = _first(footprint, child) as Footprint
 		elif child is ActorComponent:
 			# A kind the kit does not name (the wizard's Downed): stepped by nobody, attached too.
 			_components.append(child as ActorComponent)
+	if footprint == null:
+		# Every actor stands on some ground (props W4): one with the default circle when its scene
+		# has none, added as a boss's Phases is (a snapshot makes it again before `_ready`).
+		footprint = Footprint.new()
+		footprint.name = "Footprint"
+		add_child(footprint)
 	# Set up and attached in this order: health first, the caster last (it names the hurtbox).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, caster]
+	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster]
 	var at: int = 0
 	for component in ordered:
 		if component != null:
@@ -612,7 +622,7 @@ func _apply_data() -> void:
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
-## points and circles kept in pixels (hurt circle, body, hand and the Mover's `body_radius`) with
+## points and circles kept in pixels (hurt circle, body, hand and its footprint) with
 ## it. A hurt circle already registered is registered again at its new size.
 func set_size(factor: float) -> void:
 	if factor <= 0.0 or is_equal_approx(factor, size):
@@ -622,8 +632,8 @@ func set_size(factor: float) -> void:
 	scale = Vector2(factor, factor)
 	body_offset *= by
 	hand_offset *= by
-	if mover != null:
-		mover.body_radius *= by
+	if footprint != null:
+		footprint.scale_by(by)
 	if hurtbox != null:
 		hurtbox.radius *= by
 		hurtbox.offset *= by

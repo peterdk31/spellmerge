@@ -561,9 +561,9 @@ func _test_walls_reach_the_projectile_manager() -> void:
 
 
 func _check_arena_walls(projectiles: Node, when: String) -> void:
-	var top: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 100.0), Vector2(100.0, -10.0), -1)
+	var top: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 100.0), Vector2(100.0, -10.0))
 	_check(top.is_equal_approx(Vector2(100.0, 32.0)), "%s: a path up ends on the top border at y 32, got %s" % [when, top])
-	var pillar: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 144.0), Vector2(300.0, 144.0), -1)
+	var pillar: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 144.0), Vector2(300.0, 144.0))
 	_check(pillar.is_equal_approx(Vector2(160.0, 144.0)), "%s: a path right ends on the pillar at x 160, got %s" % [when, pillar])
 
 

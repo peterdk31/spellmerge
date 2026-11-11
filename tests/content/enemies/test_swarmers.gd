@@ -53,7 +53,7 @@ func test_each_is_a_cheap_body_with_a_stray_face() -> void:
 			check(face.style == Face.Style.STRAY or face.style == Face.Style.STRAY_ONE, "%s: a stray's eyes" % data.id)
 			check_equal(face.resting_mood, Face.Mood.ANGRY, "%s: angry at rest" % data.id)
 		# No more nodes than the Cinder Rod's scene: nothing per enemy that a crowd would multiply.
-		check(body.get_child_count() < (own(ImpData.scene.instantiate()) as Node).get_child_count(), "%s: fewer nodes than the Cinder Rod" % data.id)
+		check(_nodes_in_play(body) < _nodes_in_play(own(ImpData.scene.instantiate()) as Node), "%s: fewer nodes than the Cinder Rod" % data.id)
 
 
 func test_the_mite_is_fast_and_fragile_the_husk_slow_and_tough() -> void:
@@ -92,3 +92,12 @@ func test_each_dies_and_sends_enemy_died() -> void:
 			_world.combat.hit(_world.players[0].id, body, bolt)
 		_world.run_all(1)
 		check(died.has(body), "%s: dies to %d bolts and sends enemy_died" % [data.id, hits])
+
+
+## The nodes a body of this scene has in play: its scene's, and the Footprint the actor adds when the
+## scene has none (props W4: every actor stands on one).
+func _nodes_in_play(body: Node) -> int:
+	for child in body.get_children():
+		if child is Footprint:
+			return body.get_child_count()
+	return body.get_child_count() + 1

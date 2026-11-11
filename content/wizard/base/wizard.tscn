@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Texture2D" path="res://content/wizard/staffs/curl/head.svg" id="2_head"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="10_health"]
 [ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="11_hurtbox"]
 [ext_resource type="Script" path="res://gameplay/actor/mover.gd" id="12_mover"]
+[ext_resource type="Script" path="res://gameplay/actor/footprint.gd" id="30_footprint"]
 [ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="13_caster"]
 [ext_resource type="Script" path="res://gameplay/player/downed.gd" id="14_downed"]
 [ext_resource type="Script" path="res://gameplay/player/player.gd" id="15_player"]
@@ -30,7 +31,10 @@ offset = Vector2(0, -12)
 [node name="Mover" type="Node" parent="."]
 script = ExtResource("12_mover")
 speed = 90.0
-body_radius = 6.0
+
+[node name="Footprint" type="Node" parent="."]
+script = ExtResource("30_footprint")
+radius = 6.0
 
 [node name="Caster" type="Node" parent="."]
 script = ExtResource("13_caster")

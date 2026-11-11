@@ -27,7 +27,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 ## A still shot a step ahead along `heading` (`Spells._placed_at`), held still while it arms (a
 ## local stop, `freeze_shot`: its life, its hits and its cards wait).
 func spawn_row(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, lifetime: float) -> int:
-	var slot: int = kit.projectiles.spawn(actor, kit.placed_at(spell, actor, origin, heading), Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
+	var slot: int = kit.projectiles.spawn(actor, kit.placed_at(spell, origin, heading), Vector2.ZERO, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, SpellRuntime.ProjectilesScript.MOTION_STILL)
 	if slot >= 0:
 		kit.projectiles.freeze_shot(slot, SpellLimits.RUNE_ARM)
 	return slot

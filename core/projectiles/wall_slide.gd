@@ -2,7 +2,9 @@ class_name WallSlide
 extends RefCounted
 ## A body's move against the wall grid (online-ready N6, docs/milestones/online-ready.md): a circle
 ## of `radius` moved by `motion` from `from`, sliding along the walls it meets, the same to the bit
-## on every machine. It replaces Godot's `move_and_slide`, whose solver is the engine's and not
+## on every machine. A cell is a wall when it is not 0 in either of two grids over the same cells: the
+## walls (room walls and solid shots, which shots see too) and the ground of the bodies that cannot
+## move (props W4, which only walking bodies see). It replaces Godot's `move_and_slide`, whose solver is the engine's and not
 ## guaranteed the same across platforms and builds. The projectile manager owns the wall grid
 ## (room walls and solid shots, one byte a `cell`-pixel square from `origin`, 0 for open) and asks
 ## this through `ProjectileManager.slide_body`; it knows nothing of the grid's owner.
@@ -64,15 +66,16 @@ static func _native_kernel() -> Object:
 
 
 ## Where a circle of `radius` at `from` ends after moving by `motion` against the wall grid `cells`
-## (`w` by `h` cells of `cell` pixels, its corner at `origin`; a cell is a wall when it is not 0).
-static func slide(cells: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
+## and the ground grid `ground` (each `w` by `h` cells of `cell` pixels, their corner at `origin`; a
+## cell is a wall when it is not 0 in either).
+static func slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
 	if _kernel != null:
-		return _kernel.call(&"slide", cells, w, h, cell, origin, from, motion, radius)
-	return gd_slide(cells, w, h, cell, origin, from, motion, radius)
+		return _kernel.call(&"slide", cells, ground, w, h, cell, origin, from, motion, radius)
+	return gd_slide(cells, ground, w, h, cell, origin, from, motion, radius)
 
 
 ## `slide` in GDScript: the reference the native kernel mirrors, and the fallback without it.
-static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
+static func gd_slide(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, origin: Vector2, from: Vector2, motion: Vector2, radius: float) -> Vector2:
 	var px: float = from.x
 	var py: float = from.y
 	var mx: float = motion.x
@@ -80,7 +83,7 @@ static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin
 	var r: float = maxf(radius, 0.0)
 	var ox: float = origin.x
 	var oy: float = origin.y
-	if cells.size() < w * h or not _near(cells, w, h, cell, ox, oy, minf(px, px + mx) - r, minf(py, py + my) - r, maxf(px, px + mx) + r, maxf(py, py + my) + r):
+	if cells.size() < w * h or ground.size() < w * h or not _near(cells, ground, w, h, cell, ox, oy, minf(px, px + mx) - r, minf(py, py + my) - r, maxf(px, px + mx) + r, maxf(py, py + my) + r):
 		return Vector2(px + mx, py + my)
 	var length: float = sqrt(mx * mx + my * my)
 	var stride: float = clampf(r * 0.5, MIN_STRIDE, cell * 0.5)
@@ -93,14 +96,14 @@ static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin
 		for _i in ITERATIONS:
 			var ix: int = floori((px - ox) / cell)
 			var iy: int = floori((py - oy) / cell)
-			if not _open(cells, w, h, ix, iy):
+			if not _open(cells, ground, w, h, ix, iy):
 				var bx: float = ox + float(ix) * cell
 				var by: float = oy + float(iy) * cell
 				var left: float = px - bx
 				var right: float = bx + cell - px
 				var up: float = py - by
 				var down: float = by + cell - py
-				var side: int = _exit(cells, w, h, ix, iy, left, right, up, down)
+				var side: int = _exit(cells, ground, w, h, ix, iy, left, right, up, down)
 				if side == NO_EXIT:
 					break
 				var out: float = _gap(side, left, right, up, down) + r
@@ -116,7 +119,7 @@ static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin
 			var bny: float = 0.0
 			for cy in range(y0, y1 + 1):
 				for cx in range(x0, x1 + 1):
-					if cells[cy * w + cx] == 0:
+					if cells[cy * w + cx] == 0 and ground[cy * w + cx] == 0:
 						continue
 					var bx0: float = ox + float(cx) * cell
 					var by0: float = oy + float(cy) * cell
@@ -144,7 +147,7 @@ static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin
 						var right: float = bx1 - px
 						var up: float = py - by0
 						var down: float = by1 - py
-						var side: int = _exit(cells, w, h, cx, cy, left, right, up, down)
+						var side: int = _exit(cells, ground, w, h, cx, cy, left, right, up, down)
 						if side == NO_EXIT:
 							continue
 						depth = _gap(side, left, right, up, down) + r
@@ -162,14 +165,14 @@ static func gd_slide(cells: PackedByteArray, w: int, h: int, cell: float, origin
 
 
 ## True when a wall cell lies in the box from (`lx`, `ly`) to (`hx`, `hy`).
-static func _near(cells: PackedByteArray, w: int, h: int, cell: float, ox: float, oy: float, lx: float, ly: float, hx: float, hy: float) -> bool:
+static func _near(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cell: float, ox: float, oy: float, lx: float, ly: float, hx: float, hy: float) -> bool:
 	var x0: int = maxi(floori((lx - ox) / cell), 0)
 	var x1: int = mini(floori((hx - ox) / cell), w - 1)
 	var y0: int = maxi(floori((ly - oy) / cell), 0)
 	var y1: int = mini(floori((hy - oy) / cell), h - 1)
 	for cy in range(y0, y1 + 1):
 		for cx in range(x0, x1 + 1):
-			if cells[cy * w + cx] != 0:
+			if cells[cy * w + cx] != 0 or ground[cy * w + cx] != 0:
 				return true
 	return false
 
@@ -177,19 +180,19 @@ static func _near(cells: PackedByteArray, w: int, h: int, cell: float, ox: float
 ## The side a centre `left`, `right`, `up` and `down` pixels from the sides of the wall cell
 ## (`cx`, `cy`) leaves it by: the nearest that opens onto an open cell (left, right, up, down first
 ## on a tie), or NO_EXIT when every side is a wall.
-static func _exit(cells: PackedByteArray, w: int, h: int, cx: int, cy: int, left: float, right: float, up: float, down: float) -> int:
+static func _exit(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cx: int, cy: int, left: float, right: float, up: float, down: float) -> int:
 	var side: int = NO_EXIT
 	var best: float = INF
-	if _open(cells, w, h, cx - 1, cy) and left < best:
+	if _open(cells, ground, w, h, cx - 1, cy) and left < best:
 		best = left
 		side = LEFT
-	if _open(cells, w, h, cx + 1, cy) and right < best:
+	if _open(cells, ground, w, h, cx + 1, cy) and right < best:
 		best = right
 		side = RIGHT
-	if _open(cells, w, h, cx, cy - 1) and up < best:
+	if _open(cells, ground, w, h, cx, cy - 1) and up < best:
 		best = up
 		side = UP
-	if _open(cells, w, h, cx, cy + 1) and down < best:
+	if _open(cells, ground, w, h, cx, cy + 1) and down < best:
 		side = DOWN
 	return side
 
@@ -215,5 +218,5 @@ static func _way_y(side: int) -> float:
 
 
 ## True when the cell (`cx`, `cy`) is open floor or outside the grid.
-static func _open(cells: PackedByteArray, w: int, h: int, cx: int, cy: int) -> bool:
-	return cx < 0 or cy < 0 or cx >= w or cy >= h or cells[cy * w + cx] == 0
+static func _open(cells: PackedByteArray, ground: PackedByteArray, w: int, h: int, cx: int, cy: int) -> bool:
+	return cx < 0 or cy < 0 or cx >= w or cy >= h or (cells[cy * w + cx] == 0 and ground[cy * w + cx] == 0)

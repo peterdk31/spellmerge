@@ -138,7 +138,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	_pt_zap_at[at] = kit.clock() + (SpellLimits.ZAP_AGAIN if spell.zap_chance > 0.0 else 0.0)
 	_pt_zap_rolls[at] = 0
 	var used: int = 0
-	var mouth_at: Vector2 = kit.placed_at(spell, actor, origin, way)
+	var mouth_at: Vector2 = kit.placed_at(spell, origin, way)
 	var mouth: int = kit.projectiles.open_gate(born, tag, mouth_at, way, spell.radius, true)
 	if mouth >= 0:
 		_pt_gates[at * _pt_stride] = mouth
@@ -147,7 +147,7 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 		# Fanned as a split fans shots, each facing out along its own way (P1).
 		var angle: float = DMath.angle(way) + kit.fan_angle(n, exits, spell) + kit.staff_spread(tag, spell)
 		var face: Vector2 = DMath.from_angle(angle)
-		var exit_at: Vector2 = _clear_of_walls(actor, origin, origin + face * spell.ray_length, spell.radius)
+		var exit_at: Vector2 = _clear_of_walls(origin, origin + face * spell.ray_length, spell.radius)
 		var exit: int = kit.projectiles.open_gate(born, tag, exit_at, face, spell.radius, false)
 		if exit >= 0:
 			_pt_gates[at * _pt_stride + used] = exit
@@ -165,10 +165,9 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 	return 1
 
 
-## Where a gate meant for `to` opens: there, or short of the first wall from `from` (its caster
-## `actor`'s cast, so its own footprint does not count), by `radius`.
-func _clear_of_walls(actor: int, from: Vector2, to: Vector2, radius: float) -> Vector2:
-	var clipped: Vector2 = kit.projectiles.clip_to_walls(from, to, actor)
+## Where a gate meant for `to` opens: there, or short of the first wall from `from`, by `radius`.
+func _clear_of_walls(from: Vector2, to: Vector2, radius: float) -> Vector2:
+	var clipped: Vector2 = kit.projectiles.clip_to_walls(from, to)
 	if clipped.is_equal_approx(to):
 		return to
 	var back: float = minf(radius, from.distance_to(clipped))
@@ -291,7 +290,7 @@ func _out_point(to: int, way: Vector2, radius: float) -> Vector2:
 	var centre: Vector2 = kit.projectiles.gate_position(to)
 	var out_way: Vector2 = way.normalized() if not way.is_zero_approx() else kit.projectiles.gate_face(to)
 	var out: Vector2 = centre + out_way * (kit.projectiles.gate_radius(to) + radius + 1.0)
-	return kit.projectiles.clip_to_walls(centre, out, SpellRuntime.ActorsScript.NONE)
+	return kit.projectiles.clip_to_walls(centre, out)
 
 
 ## The bodies whose middle went into a gate come out of where it leads (P6): from a mouth, its

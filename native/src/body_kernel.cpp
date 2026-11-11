@@ -18,7 +18,7 @@ using namespace godot;
 namespace {
 
 // `WallSlide._near`.
-bool near(const uint8_t *cells, int64_t w, int64_t h, double cell, double ox, double oy, double lx, double ly,
+bool near(const uint8_t *cells, const uint8_t *ground, int64_t w, int64_t h, double cell, double ox, double oy, double lx, double ly,
 		double hx, double hy) {
 	const int64_t x0 = maxi(floori((lx - ox) / cell), 0);
 	const int64_t x1 = mini(floori((hx - ox) / cell), w - 1);
@@ -26,7 +26,7 @@ bool near(const uint8_t *cells, int64_t w, int64_t h, double cell, double ox, do
 	const int64_t y1 = mini(floori((hy - oy) / cell), h - 1);
 	for (int64_t cy = y0; cy <= y1; cy++) {
 		for (int64_t cx = x0; cx <= x1; cx++) {
-			if (cells[cy * w + cx] != 0) {
+			if (cells[cy * w + cx] != 0 || ground[cy * w + cx] != 0) {
 				return true;
 			}
 		}
@@ -35,31 +35,31 @@ bool near(const uint8_t *cells, int64_t w, int64_t h, double cell, double ox, do
 }
 
 // `WallSlide._open`.
-inline bool open(const uint8_t *cells, int64_t w, int64_t h, int64_t cx, int64_t cy) {
-	return cx < 0 || cy < 0 || cx >= w || cy >= h || cells[cy * w + cx] == 0;
+inline bool open(const uint8_t *cells, const uint8_t *ground, int64_t w, int64_t h, int64_t cx, int64_t cy) {
+	return cx < 0 || cy < 0 || cx >= w || cy >= h || (cells[cy * w + cx] == 0 && ground[cy * w + cx] == 0);
 }
 
 // WallSlide's sides.
 constexpr int64_t NO_EXIT = -1, LEFT = 0, RIGHT = 1, UP = 2, DOWN = 3;
 
 // `WallSlide._exit`.
-int64_t exit_side(const uint8_t *cells, int64_t w, int64_t h, int64_t cx, int64_t cy, double left, double right,
+int64_t exit_side(const uint8_t *cells, const uint8_t *ground, int64_t w, int64_t h, int64_t cx, int64_t cy, double left, double right,
 		double up, double down) {
 	int64_t side = NO_EXIT;
 	double best = INFINITY;
-	if (open(cells, w, h, cx - 1, cy) && left < best) {
+	if (open(cells, ground, w, h, cx - 1, cy) && left < best) {
 		best = left;
 		side = LEFT;
 	}
-	if (open(cells, w, h, cx + 1, cy) && right < best) {
+	if (open(cells, ground, w, h, cx + 1, cy) && right < best) {
 		best = right;
 		side = RIGHT;
 	}
-	if (open(cells, w, h, cx, cy - 1) && up < best) {
+	if (open(cells, ground, w, h, cx, cy - 1) && up < best) {
 		best = up;
 		side = UP;
 	}
-	if (open(cells, w, h, cx, cy + 1) && down < best) {
+	if (open(cells, ground, w, h, cx, cy + 1) && down < best) {
 		side = DOWN;
 	}
 	return side;
@@ -83,7 +83,7 @@ bool BodyKernel::configure(const Dictionary &config) {
 	return _ready;
 }
 
-Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t h, double cell,
+Vector2 BodyKernel::slide(const PackedByteArray &cells_array, const PackedByteArray &ground_array, int64_t w, int64_t h, double cell,
 		const Vector2 &origin, const Vector2 &from, const Vector2 &motion, double radius) const {
 	double px = from.x;
 	double py = from.y;
@@ -94,8 +94,9 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t
 	const double oy = origin.y;
 	ERR_FAIL_COND_V_MSG(!_ready, Vector2(px + mx, py + my), "BodyKernel: configure it first");
 	const uint8_t *cells = cells_array.ptr();
-	if (cells_array.size() < w * h ||
-			!near(cells, w, h, cell, ox, oy, minf(px, px + mx) - r, minf(py, py + my) - r, maxf(px, px + mx) + r,
+	const uint8_t *ground = ground_array.ptr();
+	if (cells_array.size() < w * h || ground_array.size() < w * h ||
+			!near(cells, ground, w, h, cell, ox, oy, minf(px, px + mx) - r, minf(py, py + my) - r, maxf(px, px + mx) + r,
 					maxf(py, py + my) + r)) {
 		return Vector2(px + mx, py + my);
 	}
@@ -110,14 +111,14 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t
 		for (int64_t i = 0; i < _iterations; i++) {
 			const int64_t ix = floori((px - ox) / cell);
 			const int64_t iy = floori((py - oy) / cell);
-			if (!open(cells, w, h, ix, iy)) {
+			if (!open(cells, ground, w, h, ix, iy)) {
 				const double bx = ox + (double)ix * cell;
 				const double by = oy + (double)iy * cell;
 				const double left = px - bx;
 				const double right = bx + cell - px;
 				const double up = py - by;
 				const double down = by + cell - py;
-				const int64_t side = exit_side(cells, w, h, ix, iy, left, right, up, down);
+				const int64_t side = exit_side(cells, ground, w, h, ix, iy, left, right, up, down);
 				if (side == NO_EXIT) {
 					break;
 				}
@@ -135,7 +136,7 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t
 			double bny = 0.0;
 			for (int64_t cy = y0; cy <= y1; cy++) {
 				for (int64_t cx = x0; cx <= x1; cx++) {
-					if (cells[cy * w + cx] == 0) {
+					if (cells[cy * w + cx] == 0 && ground[cy * w + cx] == 0) {
 						continue;
 					}
 					const double bx0 = ox + (double)cx * cell;
@@ -164,7 +165,7 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t
 						const double right = bx1 - px;
 						const double up = py - by0;
 						const double down = by1 - py;
-						const int64_t side = exit_side(cells, w, h, cx, cy, left, right, up, down);
+						const int64_t side = exit_side(cells, ground, w, h, cx, cy, left, right, up, down);
 						if (side == NO_EXIT) {
 							continue;
 						}
@@ -191,6 +192,6 @@ Vector2 BodyKernel::slide(const PackedByteArray &cells_array, int64_t w, int64_t
 
 void BodyKernel::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("configure", "config"), &BodyKernel::configure);
-	ClassDB::bind_method(D_METHOD("slide", "cells", "w", "h", "cell", "origin", "from", "motion", "radius"),
+	ClassDB::bind_method(D_METHOD("slide", "cells", "ground", "w", "h", "cell", "origin", "from", "motion", "radius"),
 			&BodyKernel::slide);
 }

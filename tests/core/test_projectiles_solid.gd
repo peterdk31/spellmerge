@@ -70,17 +70,17 @@ func test_a_beam_it_casts_leaves_it() -> void:
 	mgr.ray_cast_by(wall)
 	check_equal(mgr.ray(0, Vector2(200.0, 100.0), Vector2.RIGHT, 100.0), 100.0, "the wall's own ray walks out of it")
 	check_equal(mgr.ray(0, Vector2(200.0, 100.0), Vector2.RIGHT, 100.0), 0.0, "for that ray only")
-	check(mgr.clip_to_walls(Vector2(150.0, 100.0), Vector2(250.0, 100.0), -1) != Vector2(250.0, 100.0), "the wall stands after it")
+	check(mgr.clip_to_walls(Vector2(150.0, 100.0), Vector2(250.0, 100.0)) != Vector2(250.0, 100.0), "the wall stands after it")
 
 
 func test_the_room_walls_stay_when_it_ends() -> void:
 	mgr.set_walls([Rect2(192.0, 0.0, 16.0, 96.0)] as Array[Rect2])
 	_wall(Vector2(200.0, 100.0), 0.2)
-	check(mgr.clip_to_walls(Vector2(150.0, 110.0), Vector2(250.0, 110.0), -1) != Vector2(250.0, 110.0), "the wall stands")
+	check(mgr.clip_to_walls(Vector2(150.0, 110.0), Vector2(250.0, 110.0)) != Vector2(250.0, 110.0), "the wall stands")
 	for i in 20:
 		mgr.step(DT)
-	check_equal(mgr.clip_to_walls(Vector2(150.0, 110.0), Vector2(250.0, 110.0), -1), Vector2(250.0, 110.0), "its row is gone")
-	check(mgr.clip_to_walls(Vector2(150.0, 90.0), Vector2(250.0, 90.0), -1) != Vector2(250.0, 90.0), "the room wall it lay on is still there")
+	check_equal(mgr.clip_to_walls(Vector2(150.0, 110.0), Vector2(250.0, 110.0)), Vector2(250.0, 110.0), "its row is gone")
+	check(mgr.clip_to_walls(Vector2(150.0, 90.0), Vector2(250.0, 90.0)) != Vector2(250.0, 90.0), "the room wall it lay on is still there")
 
 
 func test_it_hits_along_its_row() -> void:

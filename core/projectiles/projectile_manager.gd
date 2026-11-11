@@ -86,14 +86,13 @@ extends Node2D
 ## point, not a circle. The step is cut at the wall first, so a target in front of the wall is still hit by a fast
 ## shot, and one behind it is not. The wall walk is not charged to the work
 ## budget above (its length is capped instead). `wall_hits` counts these ends.
-## `clip_to_walls(from, to, by)` shortens a segment to the first wall.
+## `clip_to_walls(from, to)` shortens a segment to the first wall.
 ##
-## Footprints (props W4, docs/milestones/props.md): `set_footprint(actor, rect)` lays the cells a
-## body blocks (a prop's `Footprint`) into the same grid, so shots end on it, rays stop at it and
-## bodies slide along it as along any wall. Its body's hurt circle covers it, so a shot that meets
-## it hits the body first (the step is cut at the wall, then tested for hits). A body's own spells
-## leave its footprint (its shots, rays and staff tip, as a Wall card's payloads leave its row), and
-## a sweep's line to a body is not hidden by the footprint under it. `spawn` refuses
+## Ground (props W4, docs/milestones/props.md): `set_footprint(actor, centre, size, radius)` lays the
+## ground a body that cannot move stands on (a prop's, a training dummy's: `Footprint`) into a grid
+## of its own over the same cells, which only bodies walking see (`slide_body`, `circle_blocked`):
+## shots, rays and lines of sight pass it, and hit the body as any other, by its hurt circle.
+## `spawn` refuses
 ## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
 ## pool slot and evicts nobody at the cap. Each wall end, and each hit on a
 ## target, also sends `Events.projectile_impact(caster, target, position,
@@ -929,8 +928,7 @@ var _max_target_radius: float = 0.0
 var _grid_stale: bool = false
 
 ## The wall grid over the bounds: one byte per WALL_CELL cell, 0 for open: ROOM_CELL for a room
-## wall, plus one for every solid shot and every footprint lying on it (`set_solid`,
-## `set_footprint`), at most ROOM_CELL - 1 (`_mark_cell`).
+## wall, plus one for every solid shot lying on it (`set_solid`).
 var _wall_w: int = 1
 var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
@@ -939,14 +937,16 @@ var _has_walls: bool = false
 ## it for every shot).
 var _solids: Dictionary = {}
 var _any_solid: bool = false
-## The footprints (`set_footprint`): per actor, the world rectangle its body blocks as its two
-## corners (`[2 * id]` the lowest, `[2 * id + 1]` the highest; the same point for none), laid into
-## the wall grid; and how many are laid (the hot paths ask it first).
-var _footprints: PackedVector2Array = PackedVector2Array()
+## The ground (`set_footprint`): per wall cell, how many footprints lie on it; per actor, its
+## footprint's centre and half its size (a circle: its radius twice, and `_footprint_round` 1;
+## nothing laid: no size); how many are laid (the walk asks it first); and the cells a footprint
+## could not count when it was laid (255 already on them), by actor, so it never takes them out
+## either and the counts stay exact (empty but on a crowded cell).
+var _ground_cells: PackedByteArray = PackedByteArray()
+var _footprint_at: PackedVector2Array = PackedVector2Array()
+var _footprint_half: PackedVector2Array = PackedVector2Array()
+var _footprint_round: PackedByteArray = PackedByteArray()
 var _footprints_laid: int = 0
-## The cells of a footprint that it could not count when it was laid (`ROOM_CELL - 1` things on
-## them already), by actor, so it never takes them out either: the counts stay exact. Empty but
-## for a cell crowded past its count.
 var _footprint_missed: Dictionary = {}
 ## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
 var _ray_caster: int = -1
@@ -1226,7 +1226,9 @@ func _init() -> void:
 	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
-	_footprints.resize(ACTORS * 2)
+	_footprint_at.resize(ACTORS)
+	_footprint_half.resize(ACTORS)
+	_footprint_round.resize(ACTORS)
 	_group_count.resize(GROUPS)
 	_groups.resize(GROUPS)
 	_group_at.resize(GROUPS)
@@ -1765,6 +1767,14 @@ func set_bounds(rect: Rect2) -> void:
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
 	clear_walls()
+	# The ground is laid again in the new grid (footprints keep their place in the world).
+	_ground_cells.resize(_wall_w * _wall_h)
+	_ground_cells.fill(0)
+	_footprint_missed.clear()
+	if _footprints_laid > 0:
+		for actor in ACTORS:
+			if _footprint_laid(actor):
+				_lay_footprint(actor)
 
 
 ## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
@@ -1796,9 +1806,7 @@ func set_walls(rects: Array[Rect2]) -> void:
 		_add_wall(rect)
 
 
-## Remove every wall. A solid shot lays itself again at its next step; the footprints are laid
-## again at once (a body that stands lays its own only when it enters the tree, which may be before
-## its room's walls are set).
+## Remove every wall. A solid shot lays itself again at its next step.
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
@@ -1806,11 +1814,6 @@ func clear_walls() -> void:
 		var solid: Solid = _solids[slot]
 		solid.cells.clear()
 		solid.at = Vector2.INF
-	_footprint_missed.clear()
-	if _footprints_laid > 0:
-		for actor in ACTORS:
-			if _footprint_laid(actor):
-				_lay_footprint(actor)
 
 
 ## Add the rectangle shapes of a body (a room's static body) as walls. The body must
@@ -1903,7 +1906,8 @@ func _lay_solid(slot: int, solid: Solid) -> void:
 			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > reach * reach:
 				continue
 			var cell: int = y * _wall_w + x
-			if _mark_cell(cell, 1):
+			if (_wall_cells[cell] & (ROOM_CELL - 1)) < ROOM_CELL - 1:
+				_wall_cells[cell] += 1
 				solid.cells.append(cell)
 	_has_walls = _has_walls or not solid.cells.is_empty()
 
@@ -1917,20 +1921,7 @@ func _lift_solid(solid: Solid) -> void:
 ## Add `by` (1 or -1) to the count of every cell a solid shot lies on.
 func _mark_solid(solid: Solid, by: int) -> void:
 	for cell in solid.cells:
-		_mark_cell(cell, by)
-
-
-## Add `by` (1 or -1) to the count of things laid on `cell` (solid shots and footprints), never
-## touching the room's mark: the count stays within 0 and ROOM_CELL - 1. Returns whether it
-## counted: past that many things on one cell one more is not counted (a solid shot and a footprint
-## each keep what they counted, so they take out only that).
-func _mark_cell(cell: int, by: int) -> bool:
-	var value: int = _wall_cells[cell]
-	var count: int = (value & (ROOM_CELL - 1)) + by
-	if count < 0 or count >= ROOM_CELL:
-		return false
-	_wall_cells[cell] = (value & ROOM_CELL) | count
-	return true
+		_wall_cells[cell] += by
 
 
 ## The live solid shot that cast the shot in `slot` (a payload of a wall), or null.
@@ -1938,21 +1929,16 @@ func _own_solid(slot: int) -> Solid:
 	return _solid_of(_caster_slot[slot], _caster_seq[slot])
 
 
-## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when its own
-## walls do not count: a wall's payloads leave the wall that cast them, and a body's shots its
-## footprint (props W4). They are lifted while it looks again. Asked only when it met a wall, so a
-## step with none costs nothing.
-func _past_own_walls(slot: int, cut: float) -> float:
-	var own: Solid = _own_solid(slot) if _any_solid else null
-	if own != null:
-		_mark_solid(own, -1)
-	var lifted: bool = _mark_footprints_of(_actor[slot], ActorsScript.NONE, -1)
-	if own != null or lifted:
-		cut = _wall_hit(_prev[slot], _pos[slot])
-	if own != null:
-		_mark_solid(own, 1)
-	if lifted:
-		_mark_footprints_of(_actor[slot], ActorsScript.NONE, 1)
+## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when the
+## wall that cast it does not count: a wall's own payloads leave it (its row is lifted while
+## they look again). Asked only when it met a wall, so a step with none costs nothing.
+func _past_own_solid(slot: int, cut: float) -> float:
+	var own: Solid = _own_solid(slot)
+	if own == null:
+		return cut
+	_mark_solid(own, -1)
+	cut = _wall_hit(_prev[slot], _pos[slot])
+	_mark_solid(own, 1)
 	return cut
 
 
@@ -1982,126 +1968,24 @@ func _drop_solid(slot: int) -> void:
 
 
 ## The point where the segment from `from` to `to` first meets a wall, or `to` when
-## it is clear. If `from` is inside a wall, that is `from`. `by` is whose segment it is (an actor id,
-## or Actors.NONE for nobody's: a gate's): that body's own footprint does not count, as its spells
-## leave it (props W4). No default, so a new caller says whose.
-func clip_to_walls(from: Vector2, to: Vector2, by: int) -> Vector2:
-	var t: float = _wall_hit_sparing(by, ActorsScript.NONE, from, to)
+## it is clear. If `from` is inside a wall, that is `from`.
+func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
+	var t: float = _wall_hit(from, to)
 	if t < 0.0:
 		return to
 	return from.lerp(to, t)
 
 
-## The body of the actor `actor` blocks the world rectangle `rect` from now on (props W4: its
-## `Footprint`), in place of any it blocked before; an empty `rect` blocks nothing. The cells laid
-## are those whose centres lie in it: a footprint under a cell across may lay none, and the cells
-## laid reach at most half a cell past it. Its body's hurt circle should cover that (`Footprint`),
-## so a shot that meets the footprint hits the body. Laid in the wall grid as a solid shot is
-## (`circle_blocked`, `slide_body`, `line_clear` and every shot and ray see it) and laid again when
-## the walls are (`clear_walls`). Ids outside the table are ignored.
-func set_footprint(actor: int, rect: Rect2) -> void:
-	if actor < 0 or actor >= ACTORS:
-		return
-	rect = rect.abs()
-	if _footprint_laid(actor):
-		_mark_footprint(actor, -1)
-		_footprint_missed.erase(actor)
-		_footprints_laid -= 1
-	var blocks: bool = rect.has_area() and rect.is_finite()
-	_footprints[2 * actor] = rect.position if blocks else Vector2.ZERO
-	_footprints[2 * actor + 1] = rect.end if blocks else Vector2.ZERO
-	if blocks:
-		_footprints_laid += 1
-		_lay_footprint(actor)
-
-
-## The rectangle the body of `actor` blocks (`set_footprint`), empty for none.
-func footprint_of(actor: int) -> Rect2:
-	if not _footprint_laid(actor):
-		return Rect2()
-	return Rect2(_footprints[2 * actor], _footprints[2 * actor + 1] - _footprints[2 * actor])
-
-
-## True while the body of `actor` has a footprint laid.
-func _footprint_laid(actor: int) -> bool:
-	if actor < 0 or actor >= ACTORS:
-		return false
-	var low: Vector2 = _footprints[2 * actor]
-	var high: Vector2 = _footprints[2 * actor + 1]
-	return high.x > low.x and high.y > low.y
-
-
-## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
-## rectangle, as the cells from (x, y) up to (not with) (z, w).
-func _footprint_cells(actor: int) -> Vector4i:
-	var low: Vector2 = (_footprints[2 * actor] - _bounds.position) / WALL_CELL
-	var high: Vector2 = (_footprints[2 * actor + 1] - _bounds.position) / WALL_CELL
-	# A cell's centre is at its index and a half: in the rectangle from ceil(low - 0.5) on, up to
-	# (not with) ceil(high - 0.5).
-	return Vector4i(maxi(ceili(low.x - 0.5), 0), maxi(ceili(low.y - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w), mini(ceili(high.y - 0.5), _wall_h))
-
-
-## Lay the footprint of `actor` (newly set, or after the walls were cleared): one more on each of
-## its cells, those it could not count kept apart (`_footprint_missed`).
-func _lay_footprint(actor: int) -> void:
-	var cells: Vector4i = _footprint_cells(actor)
-	var missed := PackedInt32Array()
-	for y in range(cells.y, cells.w):
-		for x in range(cells.x, cells.z):
-			if not _mark_cell(y * _wall_w + x, 1):
-				missed.append(y * _wall_w + x)
-	if not missed.is_empty():
-		_footprint_missed[actor] = missed
-	if cells.z > cells.x and cells.w > cells.y:
-		_has_walls = true
-
-
-## Take the footprint of `actor` out (`by` -1) or put it back (1) on the cells it counted when it
-## was laid.
-func _mark_footprint(actor: int, by: int) -> void:
-	var cells: Vector4i = _footprint_cells(actor)
-	var missed: PackedInt32Array = _footprint_missed.get(actor, PackedInt32Array())
-	for y in range(cells.y, cells.w):
-		for x in range(cells.x, cells.z):
-			var cell: int = y * _wall_w + x
-			if missed.is_empty() or not missed.has(cell):
-				_mark_cell(cell, by)
-
-
-## Lift (`by` -1) or lay again (1) the footprints of the actors `a` and `b` (NONE: none), those
-## that are laid, each once; whether there were any.
-func _mark_footprints_of(a: int, b: int, by: int) -> bool:
-	var any: bool = false
-	if _footprint_laid(a):
-		_mark_footprint(a, by)
-		any = true
-	if b != a and _footprint_laid(b):
-		_mark_footprint(b, by)
-		any = true
-	return any
-
-
-## `_wall_hit` with the footprints of the actors `a` and `b` (NONE: none) not counted: a body's own
-## spells leave its footprint, and a line to a body is not hidden by the footprint under it (props
-## W4). They are lifted only when the path met a wall, so a path that meets none costs nothing more.
-func _wall_hit_sparing(a: int, b: int, from: Vector2, to: Vector2) -> float:
-	var cut: float = _wall_hit(from, to)
-	if cut < 0.0 or _footprints_laid == 0 or not _mark_footprints_of(a, b, -1):
-		return cut
-	cut = _wall_hit(from, to)
-	_mark_footprints_of(a, b, 1)
-	return cut
-
-
-## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall, no
-## solid shot (a Wall card's, whoever cast it) and no footprint, as a shot along it would find. Walks the whole
+## True when nothing in the wall grid lies on the segment from `from` to `to`: no room wall and
+## no solid shot (a Wall card's, whoever cast it), as a shot along it would find. Walks the whole
 ## segment, however long (an AI's line of fire, `gameplay/ai/sight.gd`).
 func line_clear(from: Vector2, to: Vector2) -> bool:
 	return _wall_hit(from, to) < 0.0
 
 
-## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell
-## (checked at the centre and eight points on its rim, each in its 8-pixel cell).
+## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell or
+## the ground of a body that cannot move (checked at the centre and eight points on its rim, each
+## in its 8-pixel cell): where a body could not stand (a teleport checks the body with it).
 func circle_blocked(center: Vector2, radius: float) -> bool:
 	for n in 9:
 		var point: Vector2 = center
@@ -2109,22 +1993,101 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 			point += DMath.from_angle(float(n - 1) * TAU / 8.0) * radius
 		if not _bounds.has_point(point):
 			return true
-		if not _has_walls:
+		if not _has_walls and _footprints_laid == 0:
 			continue
 		var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
 		var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and (_wall_cells[cy * _wall_w + cx] != 0 or _ground_cells[cy * _wall_w + cx] != 0):
 			return true
 	return false
 
 
 ## Where a body (a circle of `radius` at `from`) ends when it moves by `motion`, sliding along the
-## walls it meets: the room's, the solid shots' and the footprints' (online-ready N6: the actors' move, in place of
-## the engine's physics; `WallSlide`).
+## walls it meets, the room's and the solid shots', and the ground of the bodies that cannot move
+## (online-ready N6: the actors' move, in place of the engine's physics; `WallSlide`).
 func slide_body(from: Vector2, motion: Vector2, radius: float) -> Vector2:
-	if not _has_walls:
+	if not _has_walls and _footprints_laid == 0:
 		return from + motion
-	return WallSlide.slide(_wall_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+	return WallSlide.slide(_wall_cells, _ground_cells, _wall_w, _wall_h, WALL_CELL, _bounds.position, from, motion, radius)
+
+
+## The body of the actor `actor` cannot move, and stands on this ground from now on (props W4: its
+## `Footprint`), in place of any before: a box `size` across round `centre`, or with no size a
+## circle of `radius`; neither: none. The cells laid are those whose centres lie in it. Bodies that
+## walk slide along it (`slide_body`) and cannot stand on it (`circle_blocked`); nothing else sees
+## it. Laying the same again changes nothing (a body made again from a snapshot). Ids outside the
+## table are ignored.
+func set_footprint(actor: int, centre: Vector2, size: Vector2, radius: float) -> void:
+	if actor < 0 or actor >= ACTORS:
+		return
+	if _footprint_laid(actor):
+		_mark_footprint(actor, -1)
+		_footprint_missed.erase(actor)
+		_footprints_laid -= 1
+	var is_round: bool = size == Vector2.ZERO
+	var half: Vector2 = Vector2(radius, radius) if is_round else size.abs() * 0.5
+	if not centre.is_finite() or not half.is_finite() or half.x <= 0.0 or half.y <= 0.0:
+		half = Vector2.ZERO
+	_footprint_at[actor] = centre if half != Vector2.ZERO else Vector2.ZERO
+	_footprint_half[actor] = half
+	_footprint_round[actor] = 1 if is_round and half != Vector2.ZERO else 0
+	if half != Vector2.ZERO:
+		_footprints_laid += 1
+		_lay_footprint(actor)
+
+
+## The ground the body of `actor` stands on (`set_footprint`) as the box round it, empty for none.
+func footprint_of(actor: int) -> Rect2:
+	if not _footprint_laid(actor):
+		return Rect2()
+	return Rect2(_footprint_at[actor] - _footprint_half[actor], _footprint_half[actor] * 2.0)
+
+
+## True while the body of `actor` has ground laid.
+func _footprint_laid(actor: int) -> bool:
+	return actor >= 0 and actor < ACTORS and _footprint_half[actor].x > 0.0
+
+
+## Lay the footprint of `actor` (newly set, or in a new grid): one more on each of its cells, those
+## it could not count kept apart (`_footprint_missed`).
+func _lay_footprint(actor: int) -> void:
+	var missed := PackedInt32Array()
+	for cell in _footprint_cells(actor):
+		if _ground_cells[cell] < 255:
+			_ground_cells[cell] += 1
+		else:
+			missed.append(cell)
+	if not missed.is_empty():
+		_footprint_missed[actor] = missed
+
+
+## Take the footprint of `actor` out (`by` -1) or put it back (1) on the cells it counted.
+func _mark_footprint(actor: int, by: int) -> void:
+	var missed: PackedInt32Array = _footprint_missed.get(actor, PackedInt32Array())
+	for cell in _footprint_cells(actor):
+		if missed.is_empty() or not missed.has(cell):
+			_ground_cells[cell] += by
+
+
+## The cells of the footprint of `actor` in the grid as it is now: those whose centres lie in its
+## box, or in its circle. Made each call (a footprint is laid when a body enters or changes, never
+## each step).
+func _footprint_cells(actor: int) -> PackedInt32Array:
+	var cells := PackedInt32Array()
+	var centre: Vector2 = _footprint_at[actor]
+	var half: Vector2 = _footprint_half[actor]
+	var low: Vector2 = (centre - half - _bounds.position) / WALL_CELL
+	var high: Vector2 = (centre + half - _bounds.position) / WALL_CELL
+	# A cell's centre is at its index and a half: in the box from ceil(low - 0.5) on, up to (not
+	# with) ceil(high - 0.5).
+	var is_round: bool = _footprint_round[actor] != 0
+	var radius_sq: float = half.x * half.x
+	for y in range(maxi(ceili(low.y - 0.5), 0), mini(ceili(high.y - 0.5), _wall_h)):
+		for x in range(maxi(ceili(low.x - 0.5), 0), mini(ceili(high.x - 0.5), _wall_w)):
+			if is_round and (_bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL).distance_squared_to(centre) >= radius_sq:
+				continue
+			cells.append(y * _wall_w + x)
+	return cells
 
 
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
@@ -2474,15 +2437,14 @@ func set_anchor(caster: int, position: Vector2) -> void:
 		_anchors[caster] = position
 
 
-## `set_anchor(caster, anchor)` and `clip_to_walls(from, to, caster)` in one call: what every actor's
+## `set_anchor(caster, anchor)` and `clip_to_walls(from, to)` in one call: what every actor's
 ## caster does every step (performance pass, 2026-10-28). Returns the clipped point.
 func place_caster(caster: int, anchor: Vector2, from: Vector2, to: Vector2) -> Vector2:
 	if caster >= 0 and caster < ACTORS and anchor.is_finite():
 		_anchors[caster] = anchor
 	if not _has_walls:
 		return to
-	# Its own footprint does not cut its staff (props W4).
-	var t: float = _wall_hit_sparing(caster, ActorsScript.NONE, from, to)
+	var t: float = _wall_hit(from, to)
 	return to if t < 0.0 else from.lerp(to, t)
 
 
@@ -2572,7 +2534,7 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		return false
 	_threat_step = -1
 	if seconds <= 0.0:
-		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset, _actor[slot]) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
+		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
 		_base[slot] += to - _pos[slot]
 		_pos[slot] = to
 		_prev[slot] = to
@@ -3727,8 +3689,8 @@ func _hit_slot(slot: int, delta: float, limit: Rect2) -> void:
 		_step_solid(slot, _solids[slot])
 	elif _has_walls and (_flags[slot] & F_GHOST) == 0:
 		var cut: float = _wall_hit(_prev[slot], _pos[slot])
-		if cut >= 0.0 and (_any_solid or _footprints_laid > 0):
-			cut = _past_own_walls(slot, cut)
+		if cut >= 0.0 and _any_solid:
+			cut = _past_own_solid(slot, cut)
 		if cut >= 0.0:
 			walled = true
 			_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
@@ -4835,7 +4797,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 						# How far either side of its centre line the body's circle reaches.
 						var width: float = PI if distance <= radius else DMath.asin(radius / distance)
 						var local: float = angle_difference(base, DMath.angle(to)) * turn
-						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit_sparing(caster, _target_owner[t], origin, _target_pos[t]) >= 0.0):
+						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
@@ -4905,8 +4867,6 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	_ray_level(level)
 	if own != null:
 		_mark_solid(own, -1)
-	# And a body's own ray leaves its footprint (props W4).
-	var own_print: bool = _mark_footprints_of(caster, ActorsScript.NONE, -1)
 	# Cut the path at the first wall, or turn there while it has bounces: the rest of the path
 	# is dropped and it goes on, off the wall, for the length the rest had: along `steer`'s path
 	# (a homing beam homes again), else straight.
@@ -4995,8 +4955,6 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		at_piece += 1
 	if own != null:
 		_mark_solid(own, 1)
-	if own_print:
-		_mark_footprints_of(caster, ActorsScript.NONE, 1)
 	var nodes: Array = _ray_nodes[level]
 	var alongs: Array = _ray_along[level]
 	var points: Array = _ray_points[level]

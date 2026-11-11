@@ -1325,7 +1325,7 @@ func _check_slam(row: int) -> void:
 		return
 	var from: Vector2 = _position_of(_nodes[row]) + _hurt_offset[row]
 	var to: Vector2 = from + _knock[row] / speed * (_hurt_radius[row] + SLAM_REACH)
-	if projectiles.clip_to_walls(from, to, row) != to:
+	if projectiles.clip_to_walls(from, to) != to:
 		_slam_due_node.append(_nodes[row])
 		_slam_due_by.append(_slam_by[row])
 		_slam_due_amount.append(_slam[row])

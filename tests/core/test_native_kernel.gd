@@ -8,8 +8,8 @@ extends SceneTree
 ## drawing, the threat grid and many more shots (the grid and the hit-work budget both come in).
 ##
 ## The scene: walls; enemies that walk and are hit, some owned by an enemy actor; four wizards
-## that walk with their anchors; two props of the world's team (props W4), each a target over a
-## footprint in the wall grid, which no homing shot picks and whose own shots leave it; bolts, runes and orbits of the four hat ramps and of the enemy
+## that walk with their anchors; two props of the world's team (props W4), targets no homing shot
+## picks, that cast now and then (their ground is the walking bodies' alone: shots never see it); bolts, runes and orbits of the four hat ramps and of the enemy
 ## ramp, with card looks, piercing, bouncing, homing, growing, lingering, returning and ghost shots,
 ## homing shots that also spiral (the kernel hands those back to their passes), sticky shots,
 ## shots frozen by a local stop, orbits round another shot, and now and then a solid rune (a wall:
@@ -61,12 +61,10 @@ var _batch_seen: PackedInt32Array = PackedInt32Array()
 var _wizards: Array = [[], []]
 var _events: Array[Array] = [[], []]
 var _imp: int = -1
-## The props' actor ids (the world's team), their places and their hurt circles' radius, which
-## covers their footprints (`Footprint.problems`).
+## The props' actor ids (the world's team), their places and their hurt circles' radius.
 var _props: PackedInt32Array = PackedInt32Array()
 const PROP_AT: Array[Vector2] = [Vector2(250.0, 330.0), Vector2(700.0, 220.0)]
 const PROP_RADIUS: float = 17.0
-const PROP_SIZE: Vector2 = Vector2(16.0, 16.0)
 ## Each side's bodies hang under a node of their own, so both keep the same names.
 var _holders: Array[Node] = []
 ## Tail births laid while the tails were off (S5 step 4), and whether a frame hit the most.
@@ -196,7 +194,6 @@ func _test_both_step_alike(threads: int) -> void:
 			(_wizards[side] as Array).append(_add_body(side, "wizard%d" % seat, Vector2(160.0 + float(seat) * 200.0, 440.0), 8.0, ManagerScript.LAYER_PLAYER, seat))
 		for n in _props.size():
 			_add_body(side, "prop%d" % n, PROP_AT[n], PROP_RADIUS, ManagerScript.LAYER_ENEMY, _props[n])
-			mgr.set_footprint(_props[n], Rect2(PROP_AT[n] - PROP_SIZE * 0.5, PROP_SIZE))
 		bus.projectile_hit.connect(_on_hit.bind(side))
 		bus.projectile_expired.connect(_on_expired.bind(side))
 	_check(_mgrs[1].is_native() and not _mgrs[0].is_native(), "one native manager, one GDScript")
@@ -358,7 +355,7 @@ func _drive(side: int, step: int) -> void:
 	if step == 45:
 		m.set_anchor(_imp, Vector2(480.0, 140.0))
 	for i in 40 if step < 100 else 8:
-		# Now and then a prop casts, from inside its footprint (its own shots leave it).
+		# Now and then a prop casts, from its body (its shots spare it until they leave it).
 		var prop: int = (i / 11) % _props.size() if i % 11 == 10 else -1
 		var caster: int = _imp if i % 5 == 4 else (_props[prop] if prop >= 0 else i % 4)
 		var from: Vector2 = Vector2(160.0 + float(i % 4) * 200.0, 420.0) if caster != _imp else Vector2(480.0, 120.0)

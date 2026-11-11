@@ -4,7 +4,8 @@ extends Resource
 ## triggers, and what the body is while in it. A row of `PropStates.list`; it has no `id` field the
 ## registry would read (its name is `state_id`), so it is never taken for content.
 ##
-## PropStateTriggers belong to states, so "only once" is a state change, never a flag: a fusing barrel has no## fire trigger, a broken one none at all. The look of a state (art layers, mote sources, a light
+## Triggers belong to states, so "only once" is a state change, never a flag: a fusing barrel has no
+## fire trigger, a broken one none at all. The look of a state (art layers, mote sources, a light
 ## spot) is W7's.
 
 ## Its name (&"idle", &"lit", &"fusing", &"broken"), unique in its prop; triggers go to it by this.

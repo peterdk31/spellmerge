@@ -67,11 +67,12 @@ func test_every_kind_comes_back_as_written() -> void:
 func test_the_recording_a_client_plays_is_said_by_its_number() -> void:
 	check_equal(_message.decode(NetMessage.of_run(3)), "", "the client plays the host's third recording")
 	check_equal([_message.kind, _message.run], [NetMessage.RUN, 3], "its number")
-	var bytes: PackedByteArray = NetMessage.of_run(2)
-	for none in [0, 1]:
-		bytes[NetMessage.HEAD_BYTES] = none
-		check(_message.decode(bytes) != "", "the first recording needs no saying: %d is refused" % none)
-	check_equal(NetMessage.of_run(0), NetMessage.of_run(2), "and is never written")
+	check_equal(_message.decode(NetMessage.of_run(256 + 7)), "", "past 255 the number goes round again")
+	check_equal(_message.run, 7, "a byte of it")
+	var long: PackedByteArray = NetMessage.of_run(2)
+	long.append(0)
+	long.encode_u32(1, 2)
+	check(_message.decode(long) != "", "a number of two bytes is refused")
 
 
 func test_a_seat_is_asked_for_and_given_only_within_the_four() -> void:

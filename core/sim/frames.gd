@@ -242,11 +242,14 @@ func restart(start: StringName, starter: int) -> void:
 ## The run the game asked for (`restart`) starts: recorded anew, after a replay from a file, or
 ## plainly; a live replay's next recording is its feed's to bring.
 func _begin_anew() -> void:
+	# A live replay's next recording is its feed's to bring (`play_live` then takes this start's
+	# place). Kept meanwhile: with the feed gone before it came, the replay ends and the game
+	# starts the run itself, as after any replay.
+	if is_live():
+		return
 	var start: StringName = _restart[0]
 	var starter: int = _restart[1]
 	_restart = []
-	if is_live():
-		return
 	if is_playing():
 		stop_playing()
 		_send_start(start, starter)
@@ -354,14 +357,20 @@ func _play(tape: ReplayTape) -> bool:
 		return false
 	stop_recording()
 	var seated_before: int = _seated_now()
+	# The feed of a live replay playing the next recording of its run: its local seats' commands
+	# sent in between (a leave pressed just then) are still theirs to send.
+	var kept: int = tape.feed.local_seats if tape.feed != null and _tape != null and _tape.feed == tape.feed else 0
 	# One playing before it gives its devices back first.
 	_release_devices()
 	_tape = tape
+	# The run the game asked for, if it did, is this one.
+	_restart = []
 	_carried.fill(0)
 	_mirror_devices(tape.seated)
 	# The joins just made are the replay's own (a live replay's local seats hear them).
 	for seat in SEATS:
-		_pending[seat].clear()
+		if kept & (1 << seat) == 0:
+			_pending[seat].clear()
 	_seat_changes(seated_before, tape.seated)
 	_send_start(replay.start, replay.starter)
 	return true

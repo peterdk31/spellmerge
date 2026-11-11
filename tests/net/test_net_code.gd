@@ -113,6 +113,22 @@ func test_a_code_that_would_be_refused_is_not_made() -> void:
 	check_equal(code.to_text(), "", "a description too long: no code")
 
 
+func test_a_code_tells_its_own_addresses_from_those_seen_from_outside() -> void:
+	var code := NetCode.new()
+	code.type = NetCode.OFFER
+	code.sdp = SDP
+	check_equal([code.own_count(), code.seen_at()], [0, PackedStringArray()], "no candidate: none of either")
+	code.add_candidate("0", 0, CANDIDATE)
+	code.add_candidate("0", 0, "a=candidate:2 1 UDP 2114977791 0123abcd-4567-89ab-cdef-0123456789ab.local 59922 typ host")
+	code.add_candidate("0", 0, "candidate:3 1 UDP 1677729535 203.0.113.7 59921 typ srflx raddr 0.0.0.0 rport 0")
+	code.add_candidate("0", 0, "a=candidate:4 1 UDP 8331263 198.51.100.9 3478 typ relay raddr 203.0.113.7 rport 59921")
+	check_equal(code.own_count(), 2, "the host candidates are its own network's, a browser's made-up name too")
+	check_equal(code.seen_at(), PackedStringArray(["203.0.113.7", "198.51.100.9"]), "the others are where it is seen from outside")
+	var back := NetCode.new()
+	check_equal(back.read(code.to_text()), "", "read back")
+	check_equal([back.own_count(), back.seen_at()], [2, code.seen_at()], "the same of the code as the other machine reads it")
+
+
 func test_changed_and_random_texts_never_pass_as_another_code() -> void:
 	var good: String = _code().to_text()
 	var alphabet: String = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=.~ \n"

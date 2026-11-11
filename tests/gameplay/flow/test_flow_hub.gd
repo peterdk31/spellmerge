@@ -399,3 +399,27 @@ func test_the_hub_asked_for_in_the_hub_starts_anew() -> void:
 	check_equal(flow.mode, FlowScript.MODE_WAVES, "the hub asked for during a run changes nothing")
 	_stop()
 
+
+## Where the party is, for whoever lets other machines join it: told as it changes, in plain words.
+func test_the_bus_is_told_when_the_party_enters_and_leaves_the_hub() -> void:
+	var told: Array[bool] = []
+	var hear: Callable = func(in_hub: bool) -> void: told.append(in_hub)
+	events.connect("hub_changed", hear)
+	_start([0])
+	_tick()
+	check_equal(told, [true] as Array[bool], "in the hub")
+	_place(0, true)
+	_tick()
+	_press_a(0)
+	_tick()
+	check_equal(told, [true, false] as Array[bool], "the run from the stone: out of it")
+	for wizard in _wizards():
+		wizard.health.take(wizard.health.max_health)
+	flow.step(FlowScript.RESTART_DELAY)
+	from_frames()
+	_tick()
+	check_equal(told, [true, false, true] as Array[bool], "back in the hub after the run")
+	_stop()
+	check_equal(told.back(), false, "the game stopped: not in it")
+	events.disconnect("hub_changed", hear)
+

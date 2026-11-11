@@ -53,6 +53,59 @@ A mote is a single pixel (or a 2x2 chunk) with no game logic that Feel throws wh
 | `ward` | none (the barriers' shells, gameplay/feel/barriers.gd) | a barrier's bubble: standing still on its shell, twinkling white-hot to light; knocked off by a block, it flies out and slows, cooling | a pixel, now and then a hotter one |
 | `rim_ember` | none (named by a `MoteSource`: the hub's island edge, gameplay/feel/source_motes.gd) | given off all along a room's floor edge: rises slowly off it and drifts a little outward, swaying, white-hot at first and cooling through the source's ramps (the hub's: the elements' colours, one a mote) | a pixel with a pixel of tail below it as it rises, flickering hotter now and then (it starts at its ramp's light shade) |
 
+## How to make something in the world give off motes
+
+The owner's rule (2026-11-09): motes are the world's magic building blocks, so almost everything gives some off. There are three ways, by what gives them off:
+
+| What gives them off | How | Where it is described |
+|---|---|---|
+| A thing that stands in the world: a room's art, a prop in one of its states | a **`MoteSource`** on a node (below) | here; `core/base/mote_source.gd` |
+| A still spell's shots (a wall, a pool, a rune) | its card's `look_motes`, a list of `StillMoteSource` | "A still card's own", above |
+| A moment (a hit, a blast, a cast) | a `motes` part of its cue | `core/base/cue_base.gd`, content/cues |
+
+### A `MoteSource`
+
+One stream of one kind of mote, given off all the time while its node is in the tree (`gameplay/feel/source_motes.gd` gives it off; nothing in the game reads it). A minimal one is a kind, a rate and a colour; every other number has a default:
+
+| Field | Default | What it is |
+|---|---|---|
+| `kind` | (none: required) | the mote kind, a file here (`ember`, `dust`, `glimmer`, `rim_ember`, ...) |
+| `rate` | 4 | motes a second from the whole source, at the "Particle amount" setting's Full (the setting thins it as every mote) |
+| `colours` | (none) | palette materials by name (`&"fire"`, `&"ice"`, `&"stone"`: docs/STYLE.md, `core/base/palette.gd`), one a mote at random, each cooling white-hot, light, base, shadow; never a player's colour nor Blight. Empty: the colours of its art (`mote_art`) |
+| `from` | point | where its motes leave from, from its node: `point` (`at`), `line` (`points`, else the node's own `Line2D`; thrown outward, the left of the way the points run), `area` (a box `size` across round `at`), `rim` (an oval `size` across round `at`, thrown out from its middle), `mask` (the lit pixels of its art) |
+| `way`, `spread` | up, 120 degrees | the way a point's, a box's and a mask's motes are thrown, and how far round it |
+| `reach` | 6 px | how far a mote is thrown; its kind's own speed carries it no further |
+| `height` | 0 (its kind's) | how high over where it leaves from a mote shows (an ember over the coals) |
+| `spacing` | 0 (anywhere) | a grid on the world's pixels its places snap to (a row of drips) |
+| `start`, `stop` | 0, 0 (never) | seconds after its node appears that it starts and stops (a broken crate's dust for its first seconds) |
+| `stand`, `life` | off, 1.2 s | a mask only: a mote stands on every lit pixel instead, each cooling round over `life` in its own turn, so carvings twinkle (every pixel is drawn every frame: use it on a few dozen pixels, not a sprite's hundreds) |
+
+**On a room's art** (rooms carry no scripts): any `Node2D` in the group `mote_source`, the resource as its metadata `mote_source`, and for a mask (or its art's colours) the metadata `mote_art`, the path to a `Sprite2D`. The hub's island edge, `content/rooms/hub/hub.tscn`:
+
+```
+[sub_resource type="Resource" id="MoteSource_rim"]
+script = ExtResource("<core/base/mote_source.gd>")
+kind = &"rim_ember"
+rate = 172.8
+from = 1
+colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
+
+[node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
+visible = false
+closed = true
+points = PackedVector2Array(...)
+metadata/mote_source = SubResource("MoteSource_rim")
+```
+
+In code, `MoteSource.put(node, source, art_path)` writes the same, before the node is added. **On a prop**, a source is a layer's (`PropLayer.motes`): content/props/README.md.
+
+**What to know:**
+- A source is read once, at the frame after its node appears, where the node is then: it does not follow a node that moves, nor a mask's sprite as it animates.
+- Only sources within 64 px of the view give off (`VIEW_MARGIN`), so a room of hundreds costs what is on screen.
+- Its motes are of many a frame: in a crowded frame they give way to the hits and the moments first.
+- **Nothing fails silently.** A source that gives off nothing says so once in the log, naming its node (a problem in its data, nowhere to leave from, a kind that is not here), and `tests/content/test_mote_sources.gd` checks every source in every scene under content/ (its data, its kind, its art), found by folder; a prop's are checked with its looks (`tests/content/props/test_prop_data.gd`).
+- **A new kind of place** (`from`) is a value of `MoteSource.From`, a class in `gameplay/feel/mote_places.gd` (`read` once, `pick` each mote) and a line in its `make`; `source_motes.gd` names none of them.
+
 ## Allowed files
 
 `.tres` and `.uid` files. Limit: 1 MB per file.

@@ -12,8 +12,6 @@ const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 const MotePlaces := preload("res://gameplay/feel/mote_places.gd")
 
-const FIRE: PackedColorArray = [Color("f4f1ea"), Color("ffa23c"), Color("e0592f"), Color("8f2d2a")]
-const ICE: PackedColorArray = [Color("f4f1ea"), Color("c4f6f2"), Color("4fd6dc"), Color("1f7080")]
 const STEP: float = 1.0 / 60.0
 
 var table: RampTableScript
@@ -40,7 +38,7 @@ func _look(from: MoteSource.From = MoteSource.From.LINE, rate: float = 40.0) -> 
 	look.kind = &"source_test"
 	look.rate = rate
 	look.from = from
-	look.ramps = [FIRE, ICE]
+	look.colours = [&"fire", &"ice"]
 	return look
 
 
@@ -113,8 +111,8 @@ func test_a_line_gives_off_its_rate_along_it_thrown_outward() -> void:
 	_run(sources, motes, 2.0)
 	var born: int = motes.next_row() - before
 	check(born >= 76 and born <= 84, "about 80 motes in 2 s at 40 a second (%d)" % born)
-	var fire: int = table.source(FIRE)
-	var ice: int = table.source(ICE)
+	var fire: int = table.source(Palette.ramp_of(&"fire"))
+	var ice: int = table.source(Palette.ramp_of(&"ice"))
 	var seen_fire: bool = false
 	var seen_ice: bool = false
 	var outward: int = 0
@@ -129,7 +127,7 @@ func test_a_line_gives_off_its_rate_along_it_thrown_outward() -> void:
 		seen_fire = seen_fire or source == fire
 		seen_ice = seen_ice or source == ice
 	check(outward >= born * 9 / 10, "nearly all fly outward (%d of %d)" % [outward, born])
-	check(seen_fire and seen_ice, "each in one of the source's ramps, both used")
+	check(seen_fire and seen_ice, "each in one of the source's palette materials, both used")
 
 
 func test_a_point_a_box_and_a_rim_give_off_where_they_say() -> void:
@@ -165,7 +163,7 @@ func test_a_point_a_box_and_a_rim_give_off_where_they_say() -> void:
 
 func test_a_mask_gives_off_from_its_lit_pixels_in_its_art_colours() -> void:
 	var look := _look(MoteSource.From.MASK, 60.0)
-	look.ramps = []
+	look.colours = []
 	var holder: Node2D = _mask(look, Vector2(300, 300))
 	var sources := SourceMotesScript.new(table)
 	sources.take(self)
@@ -286,7 +284,7 @@ func test_nothing_without_a_sound_source_or_with_the_particles_off() -> void:
 	sources.take(self)
 	check_equal(sources.source_count(), 0, "a node out of the group is no source")
 	var broken := _look()
-	broken.ramps = []
+	broken.colours = []
 	_node(broken)
 	sources.take(self)
 	check_equal(sources.source_count(), 0, "a source with no colours is left out")
@@ -310,9 +308,12 @@ func test_the_problems_of_a_source() -> void:
 	check(_look().problems(false).is_empty(), "a sound source")
 	var none := MoteSource.new()
 	check(not none.problems(false).is_empty(), "no kind and no colours is a problem")
-	var short := _look()
-	short.ramps = [PackedColorArray([Color.WHITE, Color.BLACK])]
-	check(not short.problems(false).is_empty(), "a ramp of two colours is a problem")
+	var unknown := _look()
+	unknown.colours = [&"teal"]
+	check(not unknown.problems(false).is_empty(), "a colour the palette lacks is a problem")
+	var owned := _look()
+	owned.colours = [&"player_1"]
+	check(not owned.problems(false).is_empty(), "a player's colour is a problem")
 	var flat := _look(MoteSource.From.AREA)
 	check(not flat.problems(false).is_empty(), "a box of no size is a problem")
 	var late := _look()
@@ -320,7 +321,7 @@ func test_the_problems_of_a_source() -> void:
 	late.stop = 1.0
 	check(not late.problems(false).is_empty(), "stopping before it starts is a problem")
 	var bare := _look()
-	bare.ramps = []
+	bare.colours = []
 	check(bare.problems(true).is_empty(), "with art, no ramps is fine (its art's colours)")
 
 

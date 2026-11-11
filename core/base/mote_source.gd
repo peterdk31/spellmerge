@@ -12,7 +12,7 @@ extends Resource
 ##     kind = &"rim_ember"
 ##     rate = 172.8
 ##     from = 1
-##     ramps = Array[PackedColorArray]([PackedColorArray(...), ...])
+##     colours = Array[StringName]([&"fire", &"spark", &"arc", &"ice", &"void"])
 ##
 ##     [node name="Rim" type="Line2D" parent="." groups=["mote_source"]]
 ##     visible = false
@@ -79,10 +79,10 @@ const MOST_LIFE: float = 4.0
 ## it stops (0: never): a broken crate's dust for its first seconds.
 @export_range(0.0, 600.0, 0.05) var start: float = 0.0
 @export_range(0.0, 600.0, 0.05) var stop: float = 0.0
-## The colours it cools through, one ramp a mote at random (each white-hot, light, base, shadow;
-## three shades take the light as the white-hot). Palette colours only (docs/STYLE.md). Empty: the
-## colours of its art (`mote_art`; a mask's, else a point's on it), lightest first.
-@export var ramps: Array[PackedColorArray] = []
+## The palette materials it cools through, by name (docs/STYLE.md, core/base/palette.gd: &"fire",
+## &"ice", &"stone"), one a mote at random: white-hot, then the material's light, base and shadow.
+## Never a player's colour nor Blight. Empty: the colours of its art (`mote_art`), lightest first.
+@export var colours: Array[StringName] = []
 ## MASK only: its motes stand on the lit pixels instead of being given off.
 @export var stand: bool = false
 ## A standing mote's round, white-hot to its last shade, in seconds.
@@ -128,9 +128,18 @@ func problems(has_art: bool = true) -> PackedStringArray:
 		found.append("a mote source has no way to throw")
 	if stop > 0.0 and stop <= start:
 		found.append("a mote source stops at %s s, before it starts at %s s" % [stop, start])
-	if ramps.is_empty() and not has_art:
-		found.append("a mote source has no colours (ramps, or art to take them from)")
-	for i in ramps.size():
-		if ramps[i].size() < 3 or ramps[i].size() > 4:
-			found.append("a mote source's ramp %d has %d colours, not 3 or 4" % [i, ramps[i].size()])
+	if colours.is_empty() and not has_art:
+		found.append("a mote source has no colours (name palette materials, or give it art to take them from)")
+	found.append_array(Palette.world_problems(colours, "a mote source"))
+	return found
+
+
+## The ramps its motes cool through, one a material it names (`Palette.ramp_of`); empty when it
+## names none (its art's colours are the reader's to take).
+func ramps() -> Array[PackedColorArray]:
+	var found: Array[PackedColorArray] = []
+	for material in colours:
+		var ramp: PackedColorArray = Palette.ramp_of(material)
+		if not ramp.is_empty():
+			found.append(ramp)
 	return found

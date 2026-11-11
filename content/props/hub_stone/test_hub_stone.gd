@@ -55,3 +55,15 @@ func test_it_lights_and_goes_out() -> void:
 	check(body.state_triggers.enter(FlowScript.STONE_UNLIT), "out")
 	check_equal(_cues.size(), 1, "no cue going out")
 	check_equal(_in_group(body, MoteSource.GROUP) + _in_group(body, LightSpot.GROUP), 0, "dark again")
+
+
+## Self-contained (props W8b): where it is stood on is its own ground, a 96×96 box round its
+## feet that blocks nothing, and its art lies on it in every state.
+func test_it_is_stood_on_where_its_art_lies() -> void:
+	var ground: Rect2 = STONE.ground_rect()
+	check_equal(ground, Rect2(-48, -48, 96, 96), "a 96 px box round its feet")
+	for state in STONE.states.list:
+		check(not state.blocks, "%s: nobody bumps into it" % state.state_id)
+		for layer in STONE.look_of(state.state_id).layers:
+			var size := Vector2(layer.frame_size())
+			check_equal(Rect2(layer.drawn_at() - size * 0.5, size), ground, "%s: its art on its ground" % state.state_id)

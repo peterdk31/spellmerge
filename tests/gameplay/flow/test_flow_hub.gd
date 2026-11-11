@@ -94,7 +94,7 @@ func _last() -> Vector3i:
 
 ## Put seat `seat`'s wizard on the stone (spread round its centre) or off it, below.
 func _place(seat: int, on: bool) -> void:
-	var centre: Vector2 = _room().places().zone(FlowScript.ZONE_START_STONE).get_center()
+	var centre: Vector2 = FlowScript.area_of(_room(), FlowScript.STONE_PROP).get_center()
 	var wizard := flow.get_wizard(seat)
 	wizard.position = centre + Vector2(-24.0 + 16.0 * seat, 8.0) if on else centre + Vector2(0.0, 160.0)
 
@@ -203,7 +203,7 @@ func test_the_stone_prop_follows_the_stone() -> void:
 		if prop.prop.id == &"hub_stone":
 			stone_prop = prop
 	check_equal(ids, [&"hub_stone", &"hub_altar"] as Array[StringName], "the stone and the altar stand")
-	check(stone_prop != null and _room().places().zone(FlowScript.ZONE_START_STONE).has_point(stone_prop.position), "the stone prop on the stone")
+	check(stone_prop != null and FlowScript.area_of(_room(), FlowScript.STONE_PROP).has_point(stone_prop.position), "the stone prop on the stone")
 	if stone_prop == null:
 		events.disconnect("cue_shown", hear)
 		return
@@ -394,7 +394,7 @@ func test_the_seats_on_the_altar_are_told_as_they_change() -> void:
 	_start([0, 2])
 	_tick()
 	told.clear()
-	var altar: Rect2 = _room().places().zone(FlowScript.ZONE_ALTAR)
+	var altar: Rect2 = FlowScript.area_of(_room(), FlowScript.ALTAR_PROP)
 	flow.get_wizard(2).position = altar.get_center()
 	_tick()
 	_tick()
@@ -481,8 +481,8 @@ func test_a_seat_that_joins_the_hub_appears_beside_the_altar() -> void:
 		input.add_virtual_device(seat)
 		var at: Vector2 = flow.get_wizard(seat).position
 		check_equal(at, room.places().joiner_spawns[seat], "seat %d appears at its joiners' spawn" % seat)
-		check(not room.places().zone(FlowScript.ZONE_ALTAR).has_point(at), "seat %d is not on the altar" % seat)
-		check(at.distance_to(room.places().zone(FlowScript.ZONE_ALTAR).get_center()) < 128.0, "seat %d is beside it (%s)" % [seat, at])
+		check(not FlowScript.area_of(room, FlowScript.ALTAR_PROP).has_point(at), "seat %d is not on the altar" % seat)
+		check(at.distance_to(FlowScript.area_of(room, FlowScript.ALTAR_PROP).get_center()) < 128.0, "seat %d is beside it (%s)" % [seat, at])
 	_tick()
 	check_equal(flow.get(&"_altar_sent"), 0, "nobody stands on the altar")
 	_stop()

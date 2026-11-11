@@ -98,16 +98,7 @@ func _sprite_for(i: int) -> Sprite2D:
 ## `sprite` as `layer` says: its picture's first frame, its bottom middle on the feet moved by its
 ## offset (whole pixels), drawn among the bodies or over them, or hidden.
 func _draw_layer(sprite: Sprite2D, layer: PropLayer) -> void:
-	sprite.texture = layer.texture
-	sprite.hframes = maxi(layer.frames, 1)
-	sprite.frame = 0
-	sprite.centered = true
-	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset.
-	var at: Vector2 = layer.drawn_at()
-	sprite.position = at.floor()
-	sprite.offset = at - at.floor()
-	sprite.z_index = layer.z_index()
-	sprite.visible = layer.drawn != PropLayer.Drawn.HIDDEN
+	layer.dress(sprite)
 
 
 ## A node giving off `source` from the feet, its mask (if any) `sprite`'s art.

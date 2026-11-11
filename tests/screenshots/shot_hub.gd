@@ -63,7 +63,7 @@ func room_spawn() -> Vector2:
 
 func _stone() -> Rect2:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
-	return room.places().zone(FlowScript.ZONE_START_STONE)
+	return FlowScript.area_of(room, FlowScript.STONE_PROP)
 
 
 func _place(seat: int, at: Vector2) -> void:

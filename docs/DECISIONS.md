@@ -2,11 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
-## 2026-11-11: a room is its scene (props W8a)
+## 2026-11-11: a room is its scene; editor scripts; self-contained props (props W8a, W8b)
 
 - **Positions are written once, in the room's scene** (owner: "ideally I would like to be able to edit a room eg. the Hub by hand in the godot editor. This is easy if I can visually see what im moving"): spawns, doors, props, dummies and zones are nodes there, read by `RoomPlaces`; the `.tres` keeps the room's id, scene and rules. Before, every position was in the `.tres` and repeated by markers, with a test holding them together, so moving a thing in the editor did nothing.
 - **Nothing only one room has goes in `RoomBase`** (owner: "Why was base_room edited with eg. beacon (hub specific) code?"): a room marks a zone by name, and what a zone means is the game's (Flow: `start_stone`, `altar`, `prop_yard`; the yard's layout and return in `PropYard`).
-- **A placed body is a stand-in, not the body's own scene:** the prop and enemy scenes hold scripts, which rooms never do, and Flow must make the bodies itself at the run's start in a known order (actor ids, the hash, snapshots). A stand-in is a script-less `Sprite2D` of the first picture with its data as metadata, so the editor shows what stands there; a test holds it to what the game draws. The editor shows no later state, motes or light (`@tool` is banned).
+- **A placed body is a stand-in, not the body's own scene:** the prop and enemy scenes hold game scripts, which rooms never do, and Flow must make the bodies itself at the run's start in a known order (actor ids, the hash, snapshots). First built as one script-less `Sprite2D` scene a prop; once the owner allowed editor scripts the same day, one editor script for all (`PropStandIn`, `EnemyStandIn`, tools/), which draws a prop as the game does in any state, so nothing per prop can drift.
+- **Editor scripts are allowed in tools/ and core/ only** (owner: "@tool (editor scripts) are hereby UNBANNED! ... if there is good reason to keep @tools contained, by all means have them in a folder called tools"): an editor script runs in the editor of whoever opens the project, so it may only be in folders contributors cannot change. tools/ holds the editor helpers; core/ the data classes the editor reads (`PropBase`, `PropStates`, `PropState`, `PropStateLook`, `PropLayer`), whose code a non-tool script would not run in the editor. Editor plugins stay banned.
+- **A prop is self-contained** (owner: "A Props should be 'self-contained' if possible! ... this should be how its done in the future"): what a thing means comes with it, not with the room. The hub's stone and altar are stood on where their own ground is (`PropBase.ground_rect`, Flow's `area_of` by prop id), so moving one in the editor moves all it means; zones are left for places that are no thing (the prop yard).
 
 ## 2026-11-11: a recording's header carries each seat's staffs; joiners arrive beside the altar (online lobby, L2 leftovers)
 

@@ -37,7 +37,7 @@ func test_resource_is_the_hub_where_hits_take_nothing() -> void:
 	check_equal(room.places().dummy_places.size(), 3, "three dummies")
 	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no wave there")
 	check(room.invincible, "hits take nothing in the hub")
-	check(room.places().zone(FlowScript.ZONE_START_STONE).has_area(), "it has a teleporter stone")
+	check(FlowScript.area_of(room, FlowScript.STONE_PROP).has_area(), "it has a teleporter stone")
 	for dummy in room.places().dummies:
 		check_equal(dummy.id, &"training_dummy", "a training dummy")
 	check_equal(room.places().problems(), PackedStringArray(), "every stand-in and zone has its data")
@@ -46,8 +46,8 @@ func test_resource_is_the_hub_where_hits_take_nothing() -> void:
 func test_the_other_rooms_have_no_stone_and_hurt() -> void:
 	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
 		var room: RoomBase = load(path) as RoomBase
-		check(not room.places().zone(FlowScript.ZONE_START_STONE).has_area(), "%s has no stone" % room.id)
-		check(not room.places().zone(FlowScript.ZONE_ALTAR).has_area(), "%s has no altar" % room.id)
+		check(not FlowScript.area_of(room, FlowScript.STONE_PROP).has_area(), "%s has no stone" % room.id)
+		check(not FlowScript.area_of(room, FlowScript.ALTAR_PROP).has_area(), "%s has no altar" % room.id)
 		check(not room.invincible, "%s hurts" % room.id)
 
 
@@ -78,8 +78,8 @@ func _layer_rect(layer: PropLayer, feet: Vector2) -> Rect2:
 	return Rect2(feet + layer.offset - Vector2(size.x * 0.5, size.y), size)
 
 
-## The stone is a prop (props W8) standing on `start_stone`, in the states Flow puts it in, its
-## slab's art on the stone in both, on the floor; walked onto (it blocks nothing and takes no hit),
+## The stone is a prop (props W8), the one Flow lights (`Flow.STONE_PROP`), stood on where its own
+## ground is (W8b), in the states Flow puts it in, its slab's art on its ground in both, on the floor; walked onto (it blocks nothing and takes no hit),
 ## invincible, never in the yard, and its lit look plays the stone's cue.
 func test_the_stone_is_a_prop_on_the_stone() -> void:
 	var stone: PropBase = _prop(&"hub_stone")
@@ -87,7 +87,7 @@ func test_the_stone_is_a_prop_on_the_stone() -> void:
 	if stone == null:
 		return
 	var feet: Vector2 = _prop_at(&"hub_stone")
-	check(_room().places().zone(FlowScript.ZONE_START_STONE).has_point(feet), "it stands on the stone")
+	check(FlowScript.area_of(_room(), FlowScript.STONE_PROP).has_point(feet), "it stands on the stone")
 	check_equal(stone.states.list[0].state_id, FlowScript.STONE_UNLIT, "it starts unlit")
 	check(stone.states.state_at(FlowScript.STONE_LIT) >= 0, "it can be lit")
 	for state in stone.states.list:
@@ -97,7 +97,7 @@ func test_the_stone_is_a_prop_on_the_stone() -> void:
 		if look == null:
 			continue
 		for layer in look.layers:
-			check_equal(_layer_rect(layer, feet), _room().places().zone(FlowScript.ZONE_START_STONE), "%s: its art lies on the stone" % state.state_id)
+			check_equal(_layer_rect(layer, feet), FlowScript.area_of(_room(), FlowScript.STONE_PROP), "%s: its art lies on the stone" % state.state_id)
 			check_equal(layer.drawn, PropLayer.Drawn.ON_FLOOR, "%s: on the floor" % state.state_id)
 	check(stone.invincible and not stone.in_yard, "invincible, and not in the yard")
 	check_equal(stone.look_of(FlowScript.STONE_LIT).cue, &"stone_lit", "it plays the stone's cue as it lights")
@@ -113,8 +113,8 @@ func test_the_prop_yard_is_open_floor() -> void:
 	check(yard.size.x >= 256.0 and yard.size.y >= 96.0, "room for a row of props and to try spells: %s" % yard)
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(yard), "clear of the wall %s" % wall)
-	check(not yard.intersects(room.places().zone(FlowScript.ZONE_START_STONE).grow(32.0)), "clear of the stone")
-	check(not yard.intersects(room.places().zone(FlowScript.ZONE_ALTAR).grow(32.0)), "clear of the altar")
+	check(not yard.intersects(FlowScript.area_of(room, FlowScript.STONE_PROP).grow(32.0)), "clear of the stone")
+	check(not yard.intersects(FlowScript.area_of(room, FlowScript.ALTAR_PROP).grow(32.0)), "clear of the altar")
 	for spawns: PackedVector2Array in [room.places().player_spawns, room.places().joiner_spawns, room.places().dummy_places]:
 		for point: Vector2 in spawns:
 			check(not yard.intersects(_body(point).grow(32.0)), "clear of the spawn %s" % point)
@@ -170,7 +170,7 @@ func test_a_rooms_size_follows_nested_walls() -> void:
 
 func test_nothing_starts_in_a_wall_or_on_the_stone() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
-	var stone: Rect2 = _room().places().zone(FlowScript.ZONE_START_STONE)
+	var stone: Rect2 = FlowScript.area_of(_room(), FlowScript.STONE_PROP)
 	for point: Vector2 in _room().places().player_spawns:
 		check(not stone.intersects(_body(point)), "player spawn %s is off the stone, so a joiner puts it out" % point)
 		for wall: Rect2 in walls:
@@ -221,7 +221,7 @@ func test_the_rim_of_motes_runs_round_the_island() -> void:
 
 func test_the_dummies_stand_together_away_from_the_stone() -> void:
 	var spawns: PackedVector2Array = _room().places().dummy_places
-	var centre: Vector2 = _room().places().zone(FlowScript.ZONE_START_STONE).get_center()
+	var centre: Vector2 = FlowScript.area_of(_room(), FlowScript.STONE_PROP).get_center()
 	for i in spawns.size():
 		check(spawns[i].distance_to(centre) > 200.0, "dummy %s is off to one side" % spawns[i])
 		for j in range(i + 1, spawns.size()):
@@ -238,8 +238,8 @@ func test_the_altar_stands_on_the_island() -> void:
 	for state in altar.states.list:
 		check(not state.blocks and not state.hittable, "%s: walked onto, never hit" % state.state_id)
 	var area: Rect2 = _layer_rect(altar.look_of(altar.states.list[0].state_id).layers[0], _prop_at(&"hub_altar"))
-	check(not area.intersects(_room().places().zone(FlowScript.ZONE_START_STONE)), "the altar is not the stone")
-	check_equal(area, _room().places().zone(FlowScript.ZONE_ALTAR), "the altar's art covers the altar (where A opens the room)")
+	check(not area.intersects(FlowScript.area_of(_room(), FlowScript.STONE_PROP)), "the altar is not the stone")
+	check_equal(area, FlowScript.area_of(_room(), FlowScript.ALTAR_PROP), "the altar's art covers the altar (where A opens the room)")
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(area), "the altar is clear of the wall %s" % wall)
 
@@ -253,9 +253,9 @@ func test_joiners_arrive_beside_the_altar() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	for i in room.places().joiner_spawns.size():
 		var point: Vector2 = room.places().joiner_spawns[i]
-		check(not room.places().zone(FlowScript.ZONE_ALTAR).intersects(_body(point)), "joiner spawn %s is off the altar" % point)
-		check(point.distance_to(room.places().zone(FlowScript.ZONE_ALTAR).get_center()) < 128.0, "joiner spawn %s is beside it" % point)
-		check(not room.places().zone(FlowScript.ZONE_START_STONE).intersects(_body(point)), "joiner spawn %s is off the stone" % point)
+		check(not FlowScript.area_of(room, FlowScript.ALTAR_PROP).intersects(_body(point)), "joiner spawn %s is off the altar" % point)
+		check(point.distance_to(FlowScript.area_of(room, FlowScript.ALTAR_PROP).get_center()) < 128.0, "joiner spawn %s is beside it" % point)
+		check(not FlowScript.area_of(room, FlowScript.STONE_PROP).intersects(_body(point)), "joiner spawn %s is off the stone" % point)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(_body(point)), "joiner spawn %s is clear of the wall %s" % [point, wall])
 		for j in range(i + 1, room.places().joiner_spawns.size()):

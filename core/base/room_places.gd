@@ -4,15 +4,16 @@ extends RefCounted
 ## from its scene, the one place a position is written: a room is edited by hand in the Godot
 ## editor, and what is moved there is what the game reads. `RoomBase.places()` reads it once.
 ##
-## Nothing in a room's scene runs (rooms carry no scripts), so a placed thing is a plain node, its
-## data in metadata, under a node named for what it holds (children in order):
+## A room's scene runs no game code: a placed thing is a stand-in (an editor script, tools/, read for
+## its data only) or a plain node with its data in metadata, under a node named for what it holds
+## (children in order):
 ##
 ## - `PlayerSpawns` (by seat), `EnemySpawns`, `Doors`, `JoinerSpawns` (by seat): `Marker2D`s.
-## - `Props`: each a prop's stand-in (`content/props/<id>/<id>_stand_in.tscn`: a `Sprite2D` drawing
-##   its first picture where the game draws it), `metadata/prop` its `PropBase`; its position is
-##   the prop's feet.
-## - `Dummies`: an enemy standing in the room the same way (`metadata/enemy`, an `EnemyBase`): the
-##   training and shooting dummies.
+## - `Props`: each a prop's stand-in (`PropStandIn`, tools/prop_stand_in.gd: an editor script that
+##   draws the prop as the game does), its field `prop` its `PropBase`; its position is the prop's
+##   feet.
+## - `Dummies`: an enemy standing in the room the same way (`EnemyStandIn`, its field `enemy` an
+##   `EnemyBase`): the training and shooting dummies.
 ## - `Zones`: `ReferenceRect`s (drawn in the editor only) with `metadata/zone` a name. Core knows a
 ##   zone only by its name; what one means is the game's (the hub's `start_stone`, Flow).
 ##
@@ -28,9 +29,9 @@ const DUMMIES: StringName = &"Dummies"
 const ZONES: StringName = &"Zones"
 ## The nodes only the editor shows (`strip`).
 const EDITOR_ONLY: Array[StringName] = [PROPS, DUMMIES, ZONES]
-## The metadata a stand-in's data and a zone's name are under.
-const PROP_META: StringName = &"prop"
-const ENEMY_META: StringName = &"enemy"
+## The field a stand-in holds its data in, and the metadata a zone's name is under.
+const PROP_FIELD: StringName = &"prop"
+const ENEMY_FIELD: StringName = &"enemy"
 const ZONE_META: StringName = &"zone"
 
 ## Where the players start (by seat), enemies may appear, the doors are, and a seat joining the
@@ -61,21 +62,21 @@ static func read(layout: Node) -> RoomPlaces:
 	places.doors = _points(layout, DOORS)
 	places.joiner_spawns = _points(layout, JOINER_SPAWNS)
 	for node in _children(layout, PROPS):
-		var data := _meta(node, PROP_META) as PropBase
+		var data := _field(node, PROP_FIELD) as PropBase
 		if data == null or not node is Node2D:
-			places._problems.append("%s/%s has no prop (metadata/%s, a PropBase): drag a prop's stand-in in." % [PROPS, node.name, PROP_META])
+			places._problems.append("%s/%s has no prop: add a PropStandIn there and pick its prop." % [PROPS, node.name])
 			continue
 		places.props.append(data)
 		places.prop_places.append(at(node as Node2D, layout))
 	for node in _children(layout, DUMMIES):
-		var enemy := _meta(node, ENEMY_META) as EnemyBase
+		var enemy := _field(node, ENEMY_FIELD) as EnemyBase
 		if enemy == null or not node is Node2D:
-			places._problems.append("%s/%s has no enemy (metadata/%s, an EnemyBase): drag an enemy's stand-in in." % [DUMMIES, node.name, ENEMY_META])
+			places._problems.append("%s/%s has no enemy: add an EnemyStandIn there and pick its enemy." % [DUMMIES, node.name])
 			continue
 		places.dummies.append(enemy)
 		places.dummy_places.append(at(node as Node2D, layout))
 	for node in _children(layout, ZONES):
-		var name: StringName = StringName(str(_meta(node, ZONE_META))) if node.has_meta(ZONE_META) else &""
+		var name: StringName = StringName(str(node.get_meta(ZONE_META))) if node.has_meta(ZONE_META) else &""
 		var rect := node as Control
 		if name == &"" or rect == null:
 			places._problems.append("%s/%s is no zone: a ReferenceRect with metadata/%s, its name." % [ZONES, node.name, ZONE_META])
@@ -131,9 +132,9 @@ static func _to_room(node: Node, layout: Node) -> Transform2D:
 	return xf
 
 
-## `node`'s metadata `key`, or null when it has none.
-static func _meta(node: Node, key: StringName) -> Variant:
-	return node.get_meta(key) if node.has_meta(key) else null
+## `node`'s field `name` (a stand-in's data), or null when it has none.
+static func _field(node: Node, name: StringName) -> Variant:
+	return node.get(name) if name in node else null
 
 
 static func _children(layout: Node, holder: StringName) -> Array[Node]:

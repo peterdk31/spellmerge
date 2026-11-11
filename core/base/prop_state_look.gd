@@ -1,3 +1,4 @@
+@tool
 class_name PropStateLook
 extends Resource
 ## What a prop looks like in one of its states (props W7, docs/milestones/props.md, "W7: the look"):

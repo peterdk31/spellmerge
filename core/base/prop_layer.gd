@@ -1,3 +1,4 @@
+@tool
 class_name PropLayer
 extends Resource
 ## One layer of a prop's art in a state (props W7, docs/milestones/props.md, "W7: the look"): a
@@ -49,6 +50,24 @@ func frame_size() -> Vector2i:
 func drawn_at() -> Vector2:
 	var size: Vector2i = frame_size()
 	return offset + Vector2(0.0, -float(size.y / 2)) + Vector2(size.x % 2, size.y % 2) * 0.5
+
+
+## `sprite` showing this layer as the game shows it (its first frame, where `drawn_at` puts it, at
+## `z_index`, hidden when `HIDDEN`): what a prop's look (`PropLook`) and its stand-in in a room's
+## scene (the editor's, tools/prop_stand_in.gd) both draw with, so the editor shows what the game
+## draws.
+func dress(sprite: Sprite2D) -> void:
+	sprite.texture = texture
+	sprite.hframes = maxi(frames, 1)
+	sprite.frame = 0
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset.
+	var at: Vector2 = drawn_at()
+	sprite.position = at.floor()
+	sprite.offset = at - at.floor()
+	sprite.z_index = z_index()
+	sprite.visible = drawn != Drawn.HIDDEN
 
 
 ## The z its picture is drawn at, from its `drawn` (hidden: as among the bodies).

@@ -80,7 +80,7 @@ extends Node
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
 ## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
-## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (the zone ZONE_START_STONE) is lit while every wizard stands
+## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (the prop STONE_PROP, where its ground is) is lit while every wizard stands
 ## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`;
 ## the prop standing on it (the hub's `hub_stone`) enters its state `lit` or `unlit` to match, so
 ## its look and cue are the prop's (props W8).
@@ -93,9 +93,10 @@ extends Node
 ## Rooms (props W8a, docs/milestones/props.md): what is where is the room's scene, read once
 ## (`RoomBase.places()`, `RoomPlaces`): spawns, doors, the props and dummies its scene stands (their
 ## stand-ins are taken out of the room shown, `RoomPlaces.strip`, and real bodies stood there, in
-## the scene's order) and its zones by name. What a zone means is Flow's: ZONE_START_STONE (the
-## teleporter stone, below; the props standing in it enter STONE_LIT or STONE_UNLIT with it),
-## ZONE_ALTAR (the multiplayer altar) and ZONE_PROP_YARD (props W8: every prop of the registry
+## the scene's order) and its zones by name. Some props mean something to Flow wherever a scene
+## stands them, self-contained: STONE_PROP (the teleporter stone, below, stood on where its ground
+## is, entering STONE_LIT or STONE_UNLIT with it) and ALTAR_PROP (the multiplayer altar). A zone
+## means what Flow makes of its name: ZONE_PROP_YARD (props W8: every prop of the registry
 ## that stands in one, `PropBase.in_yard`, in rows by id, `PropYard.places`; one that leaves its
 ## first state or goes is replaced by a fresh one `PropYard.RETURN_SECONDS` later).
 ##
@@ -150,15 +151,18 @@ const SANDBOX_START_CARDS: Array = [
 ## The sandbox room and the hub's (which dummies each stands is its scene's, `RoomPlaces.dummies`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
 const HUB_ROOM_ID: StringName = &"hub"
-## The zones of a room's scene Flow gives a meaning (`RoomPlaces.zone`): the teleporter stone that
-## starts a run (online lobby L1), the multiplayer altar (L2) and the prop yard (props W8).
-const ZONE_START_STONE: StringName = &"start_stone"
-const ZONE_ALTAR: StringName = &"altar"
-const ZONE_PROP_YARD: StringName = &"prop_yard"
-## The states the props standing in ZONE_START_STONE enter as it lights and goes out (the hub's
-## `hub_stone`).
+## The props Flow gives a meaning, self-contained (props W8b: the owner, 2026-11-11, "A Props
+## should be 'self-contained' if possible!"): wherever a room's scene stands one, its ground
+## (`PropBase.ground_rect`) is where standing counts. The teleporter stone that starts a run (online
+## lobby L1; it enters STONE_LIT or STONE_UNLIT as it lights and goes out) and the multiplayer altar
+## (L2).
+const STONE_PROP: StringName = &"hub_stone"
+const ALTAR_PROP: StringName = &"hub_altar"
 const STONE_LIT: StringName = &"lit"
 const STONE_UNLIT: StringName = &"unlit"
+## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
+## the prop yard (props W8).
+const ZONE_PROP_YARD: StringName = &"prop_yard"
 ## The run modes (`mode`): Play's waves, the sandbox, the hub.
 const MODE_WAVES: StringName = &"waves"
 const MODE_SANDBOX: StringName = &"sandbox"
@@ -754,6 +758,20 @@ func is_stone_lit() -> bool:
 	return mode == MODE_HUB and _stone_wizards > 0 and _stone_standing == _stone_wizards
 
 
+## Where standing on the room's prop `prop_id` counts, in room pixels: the ground
+## (`PropBase.ground_rect`) of the first one its scene stands (`RoomPlaces.props`), where it stands.
+## Empty when the room stands none (or it has no ground of its own).
+static func area_of(room: RoomBase, prop_id: StringName) -> Rect2:
+	var places: RoomPlaces = room.places() if room != null else null
+	if places == null:
+		return Rect2()
+	for i in places.props.size():
+		if places.props[i].id == prop_id:
+			var ground: Rect2 = places.props[i].ground_rect()
+			return Rect2(ground.position + places.prop_places[i], ground.size) if ground.has_area() else Rect2()
+	return Rect2()
+
+
 ## Count the wizards on the hub's stone and in the room (none out of the hub) into the state that
 ## decides whether it is lit, put the props standing on it in their state to match (`lit`,
 ## `unlit`: their look and cue are theirs), and send `start_stone_changed` when what was last sent
@@ -764,13 +782,15 @@ func _count_stone() -> void:
 	var at_altar: int = 0
 	if mode == MODE_HUB and state != State.IDLE and _room != null:
 		wizards = _wizard_count()
+		var stone: Rect2 = area_of(_room, STONE_PROP)
+		var altar: Rect2 = area_of(_room, ALTAR_PROP)
 		for wizard: Node2D in _wizards:
 			if not is_instance_valid(wizard):
 				continue
-			if _room.places().zone(ZONE_START_STONE).has_point(wizard.position):
+			if stone.has_point(wizard.position):
 				standing += 1
 			var seat: int = _seat_of(wizard)
-			if seat >= 0 and seat < PLAYER_SLOTS and _room.places().zone(ZONE_ALTAR).has_point(wizard.position):
+			if seat >= 0 and seat < PLAYER_SLOTS and altar.has_point(wizard.position):
 				at_altar |= 1 << seat
 	# Where the party is, for whoever lets other machines join it (net/): told as it changes.
 	var in_hub: bool = mode == MODE_HUB and state != State.IDLE and _room != null
@@ -791,16 +811,13 @@ func _count_stone() -> void:
 	events.start_stone_changed.emit(standing, wizards, is_stone_lit())
 
 
-## The room's props standing on its stone (ZONE_START_STONE) enter STONE_LIT or STONE_UNLIT as it
-## is lit or not (a state they are in already is not entered again; one they lack is not).
+## The room's teleporter stones (STONE_PROP) enter STONE_LIT or STONE_UNLIT as the stone is lit or
+## not (a state they are in already is not entered again).
 func _light_stone_props(lit: bool) -> void:
-	var stone: Rect2 = _room.places().zone(ZONE_START_STONE) if _room != null else Rect2()
-	if not stone.has_area():
-		return
 	var want: StringName = STONE_LIT if lit else STONE_UNLIT
 	for node: Node in _props:
 		var prop := node as Actor if is_instance_valid(node) else null
-		if prop == null or prop.state_triggers == null or not stone.has_point(prop.position):
+		if prop == null or prop.prop == null or prop.prop.id != STONE_PROP or prop.state_triggers == null:
 			continue
 		if prop.state_triggers.state_id() != want:
 			prop.state_triggers.enter(want)

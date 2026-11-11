@@ -55,5 +55,6 @@ invincible = true
 in_yard = false
 radius = 44.0
 offset = Vector2(0, 0)
+footprint_size = Vector2(96, 96)
 states = ExtResource("3_states")
 looks = Array[ExtResource("4_look")]([SubResource("unlit_look"), SubResource("lit_look")])

@@ -134,6 +134,13 @@ ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
 ISSUE_FORM_LABELS = frozenset({"bug", "idea", "copyright"})
 
+# Editor scripts (the owner's decision of 2026-11-11: "@tool (editor scripts) are hereby UNBANNED",
+# kept to the folders contributors cannot change, since an editor script runs in the editor of
+# whoever opens the project): `@tool` is allowed in these folders, which Claude and the owner
+# maintain (BOT_PATHS); editor plugins and the editor's classes stay banned everywhere.
+TOOL_DIRS = ("tools/", "core/")
+_TOOL_ANNOTATION = re.compile(r"^\s*@tool\b")
+
 # The netcode (net/README.md; the owner's exception of 2026-11-10 to the networking ban): the one
 # folder whose scripts may name networking classes, and only the ones the netcode uses (a WebRTC
 # peer and its data channel, and since the online lobby the WebSocket to the room server;
@@ -229,8 +236,9 @@ BANNED_APIS = (
     BannedApi(
         "editor-code",
         _rx(r"^\s*@tool\b|\bEditor(Plugin|Interface|Script|ImportPlugin|ExportPlugin)\b"),
-        "Editor-only code (@tool scripts, editor plugins) runs inside other contributors' editors.",
-        "Remove @tool and editor classes; the game must not need editor plugins.",
+        "Editor code runs inside the editor of whoever opens the project: @tool scripts only in the folders "
+        "Claude and the owner maintain (tools/, core/), editor plugins nowhere.",
+        "Remove @tool and editor classes here; an editor helper belongs in tools/ (the owner's decision of 2026-11-11).",
     ),
     BannedApi(
         "file-access",
@@ -630,6 +638,8 @@ def check_banned_apis(path: str, text: str) -> list[Finding]:
             if api.id == "dynamic-code" and _is_native_instantiate(path, text, m.start()):
                 continue
             if api.id == "network" and path.startswith(NET_DIR) and m.group(0) in NET_CLASSES:
+                continue
+            if api.id == "editor-code" and path.startswith(TOOL_DIRS) and _TOOL_ANNOTATION.match(m.group(0)):
                 continue
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"{api.message} (found `{m.group(0).strip()}`)", api.fix))

@@ -62,7 +62,7 @@ func _test_room() -> void:
 
 
 ## A room's places are read from its scene (props W8a): markers in their holders (through a moved
-## parent), stand-ins with their data, zones by name; a stand-in or zone with no data is a problem,
+## parent), stand-ins (`PropStandIn`) with their data, zones by name; a stand-in or zone with no data is a problem,
 ## and `strip` takes the editor's nodes out.
 func _test_room_places() -> void:
 	var layout := Node2D.new()
@@ -77,10 +77,10 @@ func _test_room_places() -> void:
 	var props := Node2D.new()
 	props.name = "Props"
 	layout.add_child(props)
-	var stand_in := Sprite2D.new()
+	var stand_in := PropStandIn.new()
 	var data := PropBase.new()
 	data.id = &"crate"
-	stand_in.set_meta(&"prop", data)
+	stand_in.prop = data
 	stand_in.position = Vector2(40, 50)
 	props.add_child(stand_in)
 	props.add_child(Sprite2D.new())

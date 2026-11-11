@@ -1,3 +1,4 @@
+@tool
 class_name PropBase
 extends Resource
 ## A prop (props W6, docs/milestones/props.md): a thing in the world that stands, blocks, takes hits
@@ -78,12 +79,25 @@ func has_footprint() -> bool:
 ## The box it takes up round its feet, in pixels (the hub's prop yard spaces props by it): its hurt
 ## shape and its own footprint together, each where its offset puts it. Its art may reach past it.
 func extent() -> Rect2:
-	var hurt_half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
-	var box := Rect2(offset - hurt_half, hurt_half * 2.0)
-	if has_footprint():
-		var ground_half: Vector2 = footprint_size * 0.5 if footprint_size.x > 0.0 and footprint_size.y > 0.0 else Vector2(footprint_radius, footprint_radius)
-		box = box.merge(Rect2(footprint_offset - ground_half, ground_half * 2.0))
-	return box
+	var box: Rect2 = hurt_rect()
+	return box.merge(ground_rect()) if has_footprint() else box
+
+
+## Its hurt shape's box from its feet: a box `size` across, or its circle's bounds, round `offset`.
+func hurt_rect() -> Rect2:
+	var half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
+	return Rect2(offset - half, half * 2.0)
+
+
+## Its ground's box from its feet when its own data sets one (`has_footprint`): a box
+## `footprint_size` across, or its circle's bounds, round `footprint_offset`. Empty when it sets
+## none (the kit fits one as it makes the body, `PropBody`). A self-contained prop's area: the hub's
+## stone is stood on where its ground is (props W8b).
+func ground_rect() -> Rect2:
+	if not has_footprint():
+		return Rect2()
+	var half: Vector2 = footprint_size * 0.5 if footprint_size.x > 0.0 and footprint_size.y > 0.0 else Vector2(footprint_radius, footprint_radius)
+	return Rect2(footprint_offset - half, half * 2.0)
 
 
 ## What is wrong with the prop's data, one line each (empty when it is fine): no scene, no states,

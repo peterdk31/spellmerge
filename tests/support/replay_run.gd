@@ -123,7 +123,7 @@ class StoneWalker:
 
 	func _init(press_at: int) -> void:
 		var room: RoomBase = HUB
-		var to: Vector2 = room.places().zone(FlowScript.ZONE_START_STONE).get_center() - room.places().player_spawns[0]
+		var to: Vector2 = FlowScript.area_of(room, FlowScript.STONE_PROP).get_center() - room.places().player_spawns[0]
 		way = to.normalized()
 		walk = floori((to.length() - 8.0) / STEP)
 		after = press_at + 1

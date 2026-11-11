@@ -28,6 +28,10 @@ extends Resource
 ## whose wizard stands in it may open the room to other machines with A (`altar_changed`, the HUD's
 ## `online_open_requested`). Empty (the default) in every other room.
 @export var altar: Rect2 = Rect2()
+## Where the wizard of a seat that joins while the room is under way appears, by seat, in room pixels
+## (the hub: beside the altar, where a joining machine's wizards arrive; online lobby decision 4).
+## Empty (the default): at the player spawn farthest from the enemies and the other wizards.
+@export var joiner_spawns: PackedVector2Array = PackedVector2Array()
 ## True for a room where wizards take nothing from hits (the hub): a hit still lands (its flash, its
 ## push, its statuses) but takes no health (`Health.invincible`), so nobody is downed there.
 @export var invincible: bool = false

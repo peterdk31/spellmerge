@@ -8,7 +8,7 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 ## Contract
 
-- A room is a `.tscn` scene with tiles from the shared tileset (M1 uses repeated `Sprite2D` tiles; a `TileMapLayer` is welcome once a tileset resource exists), plus a `.tres` describing it on the room base class (`RoomBase`, with the M1 fields `id`, `scene`, `player_spawns`, `enemy_spawns` and `doors`; M3 extends it).
+- A room is a `.tscn` scene with tiles from the shared tileset (M1 uses repeated `Sprite2D` tiles; a `TileMapLayer` is welcome once a tileset resource exists), plus a `.tres` describing it on the room base class (`RoomBase`, with the M1 fields `id`, `scene`, `player_spawns`, `enemy_spawns` and `doors`; M3 extends it). `joiner_spawns` (by seat; the hub's beside its altar) is where a seat that joins the room under way appears; without it, at the player spawn farthest from danger.
 - Rooms are discovered by folder through `core/registry`: put it in its biome's folder, no list to edit.
 - Space for four: the room must be playable and readable with 4 players, with room to dodge and no spot where a player can get stuck.
 - Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators for this arrive when M3 extends the room base class.

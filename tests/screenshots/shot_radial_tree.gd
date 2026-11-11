@@ -29,7 +29,7 @@ func take() -> void:
 	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
 		fail("the sandbox did not start with four wizards")
 		return
-	_hud.call("_on_builder_options_changed", true, 0, true)
+	_hud.call("_on_builder_options_changed", 0, true)
 	events.emit_signal("staff_cards_requested", 0, 1, _typed(NESTED))
 	for index in 3:
 		events.emit_signal("staff_cards_requested", index + 1, 1, _typed(OTHERS[index]))

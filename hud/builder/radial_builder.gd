@@ -1,7 +1,6 @@
 extends Control
-## One player's radial staff builder (owner, 2026-10-26), the second builder beside the list
-## one (`builder.gd`); the pause menu's Sandbox page switches between them (`hud/panels`). It
-## fills the player's quarter of the screen, laid out the same in every quarter (the column on
+## One player's radial staff builder (owner, 2026-10-26), the game's one builder (the older list
+## builder was removed, owner 2026-11-11). It fills the player's quarter of the screen, laid out the same in every quarter (the column on
 ## the left, the ring on its right; owner, 2026-10-31, docs/milestones/M2-builder-tree.md), never
 ## pauses the game, and is drawn in code at the view's 1x pixels. While it is open the corner
 ## panel is hidden (`hud/panels`): thin HP and MP bars framed in the player's colour sit on top of

@@ -65,7 +65,7 @@ func before_each() -> void:
 
 ## One player with a virtual device and a wizard, in a room, with the radial on ring `ring`; open.
 func _open(ring: PauseMenuScript.Ring) -> RadialScript:
-	_hud.call("_on_builder_options_changed", true, ring, true)
+	_hud.call("_on_builder_options_changed", ring, true)
 	_input.add_virtual_device(0)
 	var player := own(_world.wizard(0, Vector2.ZERO, START, _registry.get_resource(&"wizard", &"dev") as StaffBase)) as Actor
 	_players.append(player)

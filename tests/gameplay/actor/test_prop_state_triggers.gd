@@ -435,7 +435,7 @@ func test_a_snapshot_rolls_a_prop_back_to_its_state() -> void:
 	check_equal(snapshot.problems, PackedStringArray(), "taken without problems")
 	_world.combat.hit(ActorsScript.NONE, exploding_barrel, 100.0)
 	check_equal(_state(exploding_barrel), &"broken", "blown since")
-	check_equal(snapshot.restore(_areas(), root, func(body: Node) -> void: _world.add(body as Actor, (body as Actor).position)), PackedStringArray(), "restored without problems")
+	check_equal(snapshot.restore(_areas(), root, _world.prepare), PackedStringArray(), "restored without problems")
 	check(is_instance_valid(exploding_barrel), "restored in place")
 	check_equal(_state(exploding_barrel), &"fusing", "lit again")
 	check(exploding_barrel.hurtbox.registered and exploding_barrel.footprint.solid, "standing again: hit and blocking")

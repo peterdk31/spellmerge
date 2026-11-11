@@ -8,7 +8,10 @@ extends Resource
 ## `id`, so the registry never takes it for content.
 ##
 ## Its first layer is the body: the prop's `Sprite`, which a hit flashes and squashes as any
-## body's; so it is drawn among the bodies, never hidden.
+## body's; so it is drawn among the bodies, never hidden. A mask (`MoteSource.From.MASK`) is read
+## once, as its layer is drawn when the state is entered, so it is never on the body's layer (a hit
+## squashes it) nor on a layer of several frames: a mask is a layer of its own, as
+## `tools/pixel_grid.py` writes one.
 
 ## The state it is the look of (`PropState.state_id`); empty: every state with no look of its own.
 @export var state_id: StringName = &""
@@ -30,8 +33,9 @@ extends Resource
 
 
 ## What is wrong with it, one line each after `owner` (empty when nothing is): no layers, a first
-## layer that is hidden or drawn over the bodies, each layer's problems, a light whose layer is not
-## there or whose numbers are out of range.
+## layer that is hidden or drawn over the bodies, a mask on the body's layer or on one of several
+## frames, each layer's problems, a light whose layer is not there or whose numbers are out of
+## range.
 func problems(owner: String) -> PackedStringArray:
 	var found := PackedStringArray()
 	var name: String = "%s: the look of %s" % [owner, state_id if state_id != &"" else "every state"]
@@ -42,8 +46,15 @@ func problems(owner: String) -> PackedStringArray:
 	for i in layers.size():
 		if layers[i] == null:
 			found.append("%s: layer %d is empty." % [name, i])
-		else:
-			found.append_array(layers[i].problems("%s, layer %d" % [name, i]))
-	if light_reach > 0.0 and light_tint.a <= 0.0 and (light_layer < 0 or light_layer >= layers.size()):
-		found.append("%s: its light takes its colour from layer %d, which it does not have." % [name, light_layer])
+			continue
+		found.append_array(layers[i].problems("%s, layer %d" % [name, i]))
+		if layers[i].has_mask() and (i == 0 or layers[i].frames > 1):
+			found.append("%s, layer %d: a mask is read once, so it is a still layer of its own, never the body's (layer 0) nor one of several frames." % [name, i])
+	if light_reach < 0.0:
+		found.append("%s: light_reach is %s; 0 (none) or more." % [name, light_reach])
+	if light_reach > 0.0:
+		if light_strength < 0.0 or light_strength > 1.0 or light_flicker < 0.0 or light_flicker > 1.0:
+			found.append("%s: light_strength and light_flicker are 0 to 1 (%s, %s)." % [name, light_strength, light_flicker])
+		if light_tint.a <= 0.0 and (light_layer < 0 or light_layer >= layers.size()):
+			found.append("%s: its light takes its colour from layer %d, which it does not have." % [name, light_layer])
 	return found

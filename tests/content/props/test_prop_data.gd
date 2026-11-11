@@ -53,7 +53,7 @@ func test_every_props_look_loads_and_its_masks_are_not_empty() -> void:
 				var layer: PropLayer = look.layers[i]
 				for source in layer.motes:
 					if source.from == MoteSource.From.MASK:
-						check(not RoomBase.pixels_of_art(layer.texture).is_empty(), "%s: the mask of %s's layer %d has lit pixels" % [data.id, look.state_id, i])
+						check(not ArtPixels.pixels_of(layer.texture).is_empty(), "%s: the mask of %s's layer %d has lit pixels" % [data.id, look.state_id, i])
 
 
 func test_the_shared_body_has_every_part_a_prop_needs() -> void:

@@ -55,8 +55,7 @@ func _in_group(body: Actor, group: StringName) -> Array[Node]:
 
 
 func _enter(body: Actor, state: StringName) -> void:
-	var at: int = body.state_triggers.states.state_at(state)
-	body.state_triggers._enter(at, 0)
+	check(body.state_triggers.enter(state), "%s entered" % state)
 
 
 func test_the_exploding_barrels_looks_are_sound() -> void:
@@ -114,6 +113,22 @@ func test_a_look_with_a_cue_plays_it_as_its_state_is_entered() -> void:
 	check_equal(_cues, [[body.id, &"test_crumble"]], "its cue, by the prop")
 
 
+## Two states of one look: entering the second plays its cue and keeps what is shown (its motes'
+## clocks, its light) as it is.
+func test_entering_a_state_of_the_same_look_plays_its_cue_and_keeps_it() -> void:
+	var data: PropBase = EXPLODING_BARREL.duplicate()
+	var every: PropStateLook = data.look_of(&"idle").duplicate()
+	every.state_id = &""
+	every.cue = &"test_flicker"
+	data.looks = [every]
+	var body: Actor = _barrel(data)
+	var sprite := _look(body).get_node("Layer1")
+	_enter(body, &"fusing")
+	check_equal(_cues, [[body.id, &"test_flicker"]], "its cue")
+	check(_look(body).get_node_or_null("Layer1") == sprite, "the same nodes, not made again")
+	check(not body.state_triggers.enter(&"nowhere"), "a state it does not have is not entered")
+
+
 func test_a_snapshot_gives_back_the_look_of_the_state_it_gives_back() -> void:
 	var body: Actor = _barrel()
 	_enter(body, &"fusing")
@@ -122,12 +137,40 @@ func test_a_snapshot_gives_back_the_look_of_the_state_it_gives_back() -> void:
 	_enter(body, &"broken")
 	check_equal(_body_art(body), ART % "broken", "broken since")
 	_cues.clear()
-	check_equal(snapshot.restore(_areas(), root, func(made: Node) -> void: _world.add(made as Actor, (made as Actor).position)), PackedStringArray(), "restored")
+	check_equal(snapshot.restore(_areas(), root, _world.prepare), PackedStringArray(), "restored")
 	check_equal(body.state_triggers.state_id(), &"fusing", "lit again")
 	check_equal(_body_art(body), ART % "fusing", "and it looks lit again")
 	check_equal(_in_group(body, LightSpot.GROUP).size(), 1, "its light back")
 	check_equal(_cues, [], "a state given back plays no cue")
 	check(body.prop == EXPLODING_BARREL, "the body keeps its data as itself")
+
+
+## A body gone since the snapshot is made again from the shared scene and its saved state, as a
+## joining machine makes it: its data, and so its look, come back with it.
+func test_a_body_made_again_from_a_snapshot_has_its_look() -> void:
+	var body: Actor = _barrel()
+	_enter(body, &"fusing")
+	var place: Vector2 = body.position
+	var snapshot := Snapshot.take(_areas(), root)
+	check_equal(snapshot.problems, PackedStringArray(), "taken")
+	_world.actors.erase(body)
+	body.get_parent().remove_child(body)
+	body.free()
+	var made: Array[Actor] = []
+	var problems: PackedStringArray = snapshot.restore(_areas(), root, func(node: Node) -> void:
+		_world.prepare(node)
+		made.append(node as Actor))
+	check_equal(problems, PackedStringArray(), "restored")
+	check_equal(made.size(), 1, "the barrel made again")
+	if made.is_empty():
+		return
+	var again: Actor = made[0]
+	check_equal(again.position, place, "where it stood")
+	check(again.prop == EXPLODING_BARREL, "its data back, as itself")
+	check_equal(again.state_triggers.state_id(), &"fusing", "lit")
+	check_equal(_body_art(again), ART % "fusing", "and it looks lit")
+	check_equal(_in_group(again, LightSpot.GROUP).size(), 1, "its light")
+	check_equal(_cues, [], "no cue")
 
 
 func test_a_layer_of_frames_plays_them_on_its_own_clock() -> void:
@@ -183,6 +226,19 @@ func test_the_problems_of_looks() -> void:
 	var found := "\n".join(data.look_problems())
 	for words: String in ["two looks for nowhere", "which it does not have", "first layer is the body", "layer 3"]:
 		check(found.contains(words), "names %s: %s" % [words, found])
+	var body_mask := PropStateLook.new()
+	var body_layer := PropLayer.new()
+	body_layer.texture = load(ART % "idle") as Texture2D
+	var mask := MoteSource.new()
+	mask.kind = &"spark"
+	mask.from = MoteSource.From.MASK
+	body_layer.motes = [mask]
+	body_mask.layers = [body_layer]
+	body_mask.light_reach = 20.0
+	body_mask.light_strength = 2.0
+	var masked_lines := "\n".join(body_mask.problems("p"))
+	check(masked_lines.contains("never the body's"), "a mask on the body's layer: %s" % masked_lines)
+	check(masked_lines.contains("0 to 1"), "a light out of range: %s" % masked_lines)
 	var bad := PropLayer.new()
 	bad.frames = 3
 	bad.texture = load(ART % "idle") as Texture2D

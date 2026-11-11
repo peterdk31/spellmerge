@@ -487,6 +487,15 @@ func is_leaving() -> bool:
 	return _leaving
 
 
+## After a snapshot gave the body its state back (core/sim/README.md, "Snapshots"): each of its
+## looks shows the body as it is now (`ActorLook.sync`), with no moment played; a still body's look
+## is never stepped, so this is how it catches up.
+func rebuild_derived() -> void:
+	for look in _looks:
+		if is_instance_valid(look):
+			look.sync()
+
+
 ## Step and draw `look` from now on (a look made while the game runs: the possession ring). It
 ## is added as a child.
 func add_look(look: ActorLook) -> void:

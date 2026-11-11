@@ -5,8 +5,8 @@ extends Resource
 ## registry would read (its name is `state_id`), so it is never taken for content.
 ##
 ## Triggers belong to states, so "only once" is a state change, never a flag: a fusing barrel has no
-## fire trigger, a broken one none at all. The look of a state (art layers, mote sources, a light
-## spot) is W7's.
+## fire trigger, a broken one none at all. How a state looks is the prop's, not the state's
+## (`PropBase.looks`, props W7), so props sharing a states file look as each wants.
 
 ## Its name (&"idle", &"lit", &"fusing", &"broken"), unique in its prop; triggers go to it by this.
 @export var state_id: StringName = &""

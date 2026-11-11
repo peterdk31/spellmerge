@@ -15,11 +15,13 @@ extends ActorLook
 ## - **its light:** a marker in the group `light_spot` (core/base/light_spot.gd) where it says, in its
 ##   tint or its layer's art colour; Feel's spell light draws it.
 ## - **its cue,** played on the bus where the body stands as its state is entered (never for the
-##   state it starts in, nor for one a snapshot gave it back: `PropStateTriggers.restored`, which
-##   the look follows with no cue).
+##   state it starts in, nor for one a snapshot gave it back: `sync`, after which it shows the state
+##   with no cue). Entering a state of the same look plays the cue and keeps what is shown.
 ##
-## A still prop is never stepped, so its animated layers run on `_process` (a view's own clock).
-## View only: nothing in the game reads it.
+## The nodes it adds are written by their own schema's writers (`MoteSource.put`, `LightSpot.mark`)
+## and point at its sprites by the paths the tree gives, so it assumes nothing of where they sit.
+## A still prop is never stepped, so its animated layers run on `_process` (the rule in
+## `ActorLook`). View only: nothing in the game reads it.
 
 ## The node the body's own picture is (Feel flashes a hit body's `Sprite`).
 const BODY_SPRITE: StringName = &"Sprite"
@@ -27,7 +29,8 @@ const BODY_SPRITE: StringName = &"Sprite"
 ## The look shown now (null: none), and the nodes made for it.
 var shown: PropStateLook = null
 var _parts: Array[Node] = []
-## The layers' sprites, one a layer (the body's first; null for an empty layer), and how long the look has shown (s, its animations' clock).
+## The layers' sprites, one a layer (the body's first; null for an empty layer), and how long the
+## look has shown (s, its animations' clock).
 var _sprites: Array[Sprite2D] = []
 var _clock: float = 0.0
 
@@ -37,15 +40,27 @@ func setup(owner_actor: Actor) -> void:
 	set_process(false)
 	if actor.state_triggers != null and not actor.state_triggers.entered.is_connected(_on_entered):
 		actor.state_triggers.entered.connect(_on_entered)
-		actor.state_triggers.restored.connect(_on_restored)
-	show_state(actor.state_triggers.state_id() if actor.state_triggers != null else &"", false)
+	sync()
+
+
+## Show the look of the state the body is in now, with no cue (set up, or a snapshot gave the body
+## its state back).
+func sync() -> void:
+	show_state(actor.state_triggers.state_id() if actor != null and actor.state_triggers != null else &"", false)
 
 
 ## Show the look of the state `state_id` (`entered`: it was just entered, so its cue plays).
 func show_state(state_id: StringName, entered: bool) -> void:
 	var look: PropStateLook = actor.prop.look_of(state_id) if actor != null and actor.prop != null else null
-	if look == shown and look != null and not entered:
-		return
+	if look != shown or look == null:
+		_build(look)
+	if entered and look != null and look.cue != &"" and actor.events != null:
+		var size: float = actor.hurtbox.outer_radius() if actor.hurtbox != null else 8.0
+		actor.events.cue_shown.emit(actor.id, look.cue, actor.global_position + actor.body_offset, Vector2.UP, size, Color.WHITE, 0)
+
+
+## What is shown made anew for `look` (null: nothing).
+func _build(look: PropStateLook) -> void:
 	_clear()
 	shown = look
 	if look == null:
@@ -65,9 +80,6 @@ func show_state(state_id: StringName, entered: bool) -> void:
 	if look.light_reach > 0.0:
 		_add_light(look)
 	set_process(_animated())
-	if entered and look.cue != &"" and actor.events != null:
-		var size: float = actor.hurtbox.outer_radius() if actor.hurtbox != null else 8.0
-		actor.events.cue_shown.emit(actor.id, look.cue, actor.global_position + actor.body_offset, Vector2.UP, size, Color.WHITE, 0)
 
 
 ## The sprite of layer `i`: the body's own for the first (when the body has one), else a new one.
@@ -102,9 +114,7 @@ func _draw_layer(sprite: Sprite2D, layer: PropLayer) -> void:
 func _add_motes(source: MoteSource, sprite: Sprite2D, label: String) -> void:
 	var node := Node2D.new()
 	node.name = label
-	node.add_to_group(MoteSource.GROUP)
-	node.set_meta(MoteSource.META, source)
-	node.set_meta(MoteSource.ART, _path_from_child(sprite))
+	MoteSource.put(node, source, _path_from_child(sprite))
 	add_child(node)
 	_parts.append(node)
 
@@ -115,23 +125,17 @@ func _add_light(look: PropStateLook) -> void:
 	var marker := Marker2D.new()
 	marker.name = "Light"
 	marker.position = look.light_at
-	marker.set_meta(LightSpot.REACH, look.light_reach)
-	marker.set_meta(LightSpot.STRENGTH, look.light_strength)
-	marker.set_meta(LightSpot.FLICKER, look.light_flicker)
-	if look.light_tint.a > 0.0:
-		marker.set_meta(LightSpot.TINT, look.light_tint)
-	elif look.light_layer >= 0 and look.light_layer < _sprites.size() and _sprites[look.light_layer] != null:
-		marker.set_meta(LightSpot.ART, _path_from_child(_sprites[look.light_layer]))
-	marker.add_to_group(LightSpot.GROUP)
+	var art := NodePath()
+	if look.light_tint.a <= 0.0 and look.light_layer >= 0 and look.light_layer < _sprites.size() and _sprites[look.light_layer] != null:
+		art = _path_from_child(_sprites[look.light_layer])
+	LightSpot.mark(marker, look.light_reach, look.light_strength, look.light_flicker, look.light_tint, art)
 	add_child(marker)
 	_parts.append(marker)
 
 
-## The path to `sprite` from a child of this look (the body's own sprite is the actor's child).
+## The path to `sprite` from a child of this look, as the tree gives it (the look is in the tree).
 func _path_from_child(sprite: Sprite2D) -> NodePath:
-	if sprite.get_parent() == self:
-		return NodePath("../%s" % sprite.name)
-	return NodePath("../../%s" % sprite.name)
+	return NodePath("../%s" % get_path_to(sprite))
 
 
 ## The nodes of the look shown are taken out, and the body's own picture emptied.
@@ -174,6 +178,3 @@ func _process(delta: float) -> void:
 func _on_entered(state_id: StringName) -> void:
 	show_state(state_id, true)
 
-
-func _on_restored(state_id: StringName) -> void:
-	show_state(state_id, false)

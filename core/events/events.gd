@@ -202,7 +202,7 @@ signal discharge_arc(caster: int, from: Vector2, to: Vector2)
 signal damage_dealt(caster: int, target: Node, amount: float, position: Vector2)
 ## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
 signal status_applied(caster: int, target: Node, status_id: StringName)
-## Sender: actor (a prop's `PropStateTriggers`, props W6). The prop `actor` entered its state `state` (`PropState.state_id`), by one of its triggers. Heard by nobody in the game yet (its look's, W7; tests).
+## Sender: actor (a prop's `PropStateTriggers`, props W6). The prop `actor` entered its state `state` (`PropState.state_id`), by one of its triggers. For other areas: the prop's own look hears its component's `entered` directly, as an actor's parts hear its body. Heard by nobody in the game yet (tests).
 signal prop_state_changed(actor: int, state: StringName)
 ## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
 ## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.

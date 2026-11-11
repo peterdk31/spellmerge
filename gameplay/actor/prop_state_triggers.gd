@@ -37,9 +37,6 @@ extends ActorComponent
 
 ## The state the body is in now, entered by a trigger (not the one it starts in).
 signal entered(state_id: StringName)
-## The body's state was given back by a snapshot (`rebuild_derived`): it is in `state_id`, entered
-## by nothing now (its look follows, with no cue).
-signal restored(state_id: StringName)
 
 ## Moments within moments this deep are not fired (a loop in the data, which `PropStates.problems`
 ## names).
@@ -90,12 +87,6 @@ func detach() -> void:
 		actor.events.cast_left.disconnect(_on_cast_left)
 
 
-## After a snapshot gave the body its state back (core/sim/README.md, "Snapshots"): its listeners
-## hear which state it is in (`restored`), so a look follows.
-func rebuild_derived() -> void:
-	restored.emit(state_id())
-
-
 ## In the state it starts in, its health as told (props W2: a fresh prop rests).
 func at_rest() -> bool:
 	return state == 0 and (actor.health == null or _health_seen == actor.health.health)
@@ -112,6 +103,19 @@ func current() -> PropState:
 func state_id() -> StringName:
 	var now: PropState = current()
 	return now.state_id if now != null else &""
+
+
+## Enter the state `state_id` as a trigger's `then` would (its wind-ups end, its body takes its
+## shape, `entered` is told, its `entered` triggers fire, a `gone` one frees the body): for what
+## sets a prop's state from outside its triggers (the hub's stone lit by Flow, props W8; tests). A
+## change of the game's state, so only from the simulation's step. False for a state it does not
+## have, or a body going.
+func enter(state_id: StringName) -> bool:
+	var at: int = states.state_at(state_id) if states != null else -1
+	if at < 0 or actor == null or actor.is_dying() or actor.is_leaving():
+		return false
+	_enter(at, 0)
+	return true
 
 
 func _hears_casts() -> bool:

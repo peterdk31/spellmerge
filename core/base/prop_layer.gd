@@ -24,6 +24,14 @@ extends Resource
 @export var motes: Array[MoteSource] = []
 
 
+## True when one of its mote sources reads it as a mask.
+func has_mask() -> bool:
+	for source in motes:
+		if source != null and source.from == MoteSource.From.MASK:
+			return true
+	return false
+
+
 ## The size of one frame (zero with no picture).
 func frame_size() -> Vector2i:
 	if texture == null:

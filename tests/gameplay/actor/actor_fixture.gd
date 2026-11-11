@@ -186,6 +186,17 @@ func add(body: Actor, at: Vector2) -> Actor:
 	return body
 
 
+## Ready `body`, made again by a snapshot, for this world (its services, kept with the others): a
+## snapshot's `prepare`, before the snapshot adds it where it was.
+func prepare(body: Node) -> void:
+	var made := body as Actor
+	if made == null:
+		return
+	_wire(made)
+	made.ticking = false
+	actors.append(made)
+
+
 ## `count` steps: every actor, then its body moves by its velocity, then the systems.
 func run(count: int) -> void:
 	for i in count:

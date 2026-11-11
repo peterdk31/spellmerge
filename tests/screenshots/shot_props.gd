@@ -61,6 +61,5 @@ func take() -> void:
 
 ## `body` in its state `state_id`, entered as a trigger enters it (its look follows, its cue plays).
 func _put_in(body: Actor, state_id: StringName) -> void:
-	var triggers: PropStateTriggers = body.state_triggers
-	if triggers != null and triggers.states != null:
-		triggers.call(&"_enter", triggers.states.state_at(state_id), 0)
+	if body.state_triggers != null:
+		body.state_triggers.enter(state_id)

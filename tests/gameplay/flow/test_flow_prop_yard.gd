@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The hub's prop yard (props W8, docs/milestones/props.md, "W8: the hub on props"): Flow stands every
-## prop of the registry that stands in a yard (`PropBase.in_yard`) in the room's zone `prop_yard`, in rows
+## prop of the registry that the game's rules know nothing of (no `PropBase.role`) in the room's zone `prop_yard`, in rows
 ## by id, each in its first state; one that leaves its first state or goes is replaced by a fresh one
 ## `PropYard.RETURN_SECONDS` later, where it stood. The hub's own stone and altar stand
 ## where the room puts them, never in the yard. The registry here is the real content plus two test

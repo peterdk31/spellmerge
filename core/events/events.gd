@@ -204,6 +204,8 @@ signal damage_dealt(caster: int, target: Node, amount: float, position: Vector2)
 signal status_applied(caster: int, target: Node, status_id: StringName)
 ## Sender: actor (a prop's `PropStateTriggers`, props W6). The prop `actor` entered its state `state` (`PropState.state_id`), by one of its triggers. For other areas: the prop's own look hears its component's `entered` directly, as an actor's parts hear its body. Heard by nobody in the game yet (tests).
 signal prop_state_changed(actor: int, state: StringName)
+## Sender: flow (its hub rules, `HubRules`, props W8c). The prop `actor` is asked to enter its state `state` from outside its triggers (the hub's `run_start` stone, lit while every wizard stands on it), during the tick, as a trigger's `then` would. Heard by actor (that prop's `PropStateTriggers`, which enters it at once; a state it lacks, or one it is in, changes nothing). Not a command: the simulation asks itself.
+signal prop_state_requested(actor: int, state: StringName)
 ## Sender: core/spells. A carrier that hits nothing gives `target` a status (a portal's infusion on
 ## the bodies that go through it): Combat applies it as `apply_status` does, with no hit.
 signal status_requested(caster: int, target: Node, status_id: StringName, duration: float, strength: float)
@@ -260,7 +262,7 @@ signal player_left(player: int)
 signal run_started(player_count: int)
 ## Sender: run. The run is over; `victory` is true if the players won.
 signal run_ended(victory: bool)
-## Sender: flow. The room just made, in world pixels (from (0, 0), `RoomBase.size_in`: what its
+## Sender: flow. The room just made, in world pixels (from (0, 0), `RoomPlaces.size`: what its
 ## camera's limits are), sent just before `room_entered`. Heard by coop: the party's view stays
 ## inside it, with no camera read (online-ready N9).
 signal room_laid_out(bounds: Rect2)
@@ -284,15 +286,15 @@ signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
-## teleporter stone (the prop `Flow.STONE_PROP`, where its ground is); `lit` while all of them do (and at least one is there),
+## teleporter stone (a prop of the role `run_start`, where its area is; `HubRules`); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
 ## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone).
 ## The stone's look is the prop standing on it, which flow puts in its state `lit` or `unlit`
-## (props W8, `Flow.STONE_LIT`), so feel needs no word of it.
+## (props W8, `prop_state_requested`), so feel needs no word of it.
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
 ## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run of waves from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
 signal hub_changed(in_hub: bool)
-## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (the prop `Flow.ALTAR_PROP`, where its ground is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
+## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (a prop of the role `party_altar`, where its area is), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)

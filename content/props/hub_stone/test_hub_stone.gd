@@ -6,7 +6,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://content/props/hub_stone/test_hub_stone.gd
 
-const FlowScript := preload("res://gameplay/flow/flow.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const STONE: PropBase = preload("res://content/props/hub_stone/hub_stone.tres")
 
@@ -39,7 +38,7 @@ func test_it_is_walked_onto_and_never_hit() -> void:
 	check(not body.hurtbox.is_on(), "no hit lands on it")
 	check(not body.footprint.solid, "nobody bumps into it")
 	check(body.health.invincible, "invincible all the same")
-	check_equal(body.state_triggers.state_id(), FlowScript.STONE_UNLIT, "dark at first")
+	check_equal(body.state_triggers.state_id(), HubRules.UNLIT, "dark at first")
 	check_equal((body.get_node("Sprite") as Sprite2D).z_index, RoomBase.FLOOR_Z, "on the floor")
 
 
@@ -47,23 +46,24 @@ func test_it_lights_and_goes_out() -> void:
 	var body: Actor = _world.add(PropBody.make(STONE), Vector2(200, 200))
 	check_equal(_in_group(body, MoteSource.GROUP), 0, "dark: no motes")
 	check_equal(_in_group(body, LightSpot.GROUP), 0, "and no light")
-	check(body.state_triggers.enter(FlowScript.STONE_LIT), "lit")
+	check(body.state_triggers.enter(HubRules.LIT), "lit")
 	check_equal(_cues, [&"stone_lit"] as Array[StringName], "the stone's cue")
 	check_equal(_in_group(body, MoteSource.GROUP), 1, "its runes give off glimmers")
 	check_equal(_in_group(body, LightSpot.GROUP), 1, "and light")
 	check(not body.hurtbox.is_on() and not body.footprint.solid, "lit, still walked onto")
-	check(body.state_triggers.enter(FlowScript.STONE_UNLIT), "out")
+	check(body.state_triggers.enter(HubRules.UNLIT), "out")
 	check_equal(_cues.size(), 1, "no cue going out")
 	check_equal(_in_group(body, MoteSource.GROUP) + _in_group(body, LightSpot.GROUP), 0, "dark again")
 
 
-## Self-contained (props W8b): where it is stood on is its own ground, a 96×96 box round its
-## feet that blocks nothing, and its art lies on it in every state.
+## Self-contained (props W8b/W8c): where it is stood on is its own area, a 96×96 box round its
+## feet, apart from any ground that blocks (it has none that blocks), and its art lies on it in
+## every state.
 func test_it_is_stood_on_where_its_art_lies() -> void:
-	var ground: Rect2 = STONE.ground_rect()
+	var ground: Rect2 = STONE.area_rect()
 	check_equal(ground, Rect2(-48, -48, 96, 96), "a 96 px box round its feet")
 	for state in STONE.states.list:
 		check(not state.blocks, "%s: nobody bumps into it" % state.state_id)
 		for layer in STONE.look_of(state.state_id).layers:
 			var size := Vector2(layer.frame_size())
-			check_equal(Rect2(layer.drawn_at() - size * 0.5, size), ground, "%s: its art on its ground" % state.state_id)
+			check_equal(Rect2(layer.drawn_at() - size * 0.5, size), ground, "%s: its art on its area" % state.state_id)

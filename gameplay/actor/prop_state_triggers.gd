@@ -80,11 +80,15 @@ func setup(owner_actor: Actor) -> void:
 func attach() -> void:
 	if _hears_casts() and not actor.events.cast_left.is_connected(_on_cast_left):
 		actor.events.cast_left.connect(_on_cast_left)
+	if actor.events != null and states != null and not actor.events.prop_state_requested.is_connected(_on_state_requested):
+		actor.events.prop_state_requested.connect(_on_state_requested)
 
 
 func detach() -> void:
 	if actor.events != null and is_instance_valid(actor.events) and actor.events.cast_left.is_connected(_on_cast_left):
 		actor.events.cast_left.disconnect(_on_cast_left)
+	if actor.events != null and is_instance_valid(actor.events) and actor.events.prop_state_requested.is_connected(_on_state_requested):
+		actor.events.prop_state_requested.disconnect(_on_state_requested)
 
 
 ## In the state it starts in, its health as told (props W2: a fresh prop rests).
@@ -107,7 +111,7 @@ func state_id() -> StringName:
 
 ## Enter the state `state_id` as a trigger's `then` would (its wind-ups end, its body takes its
 ## shape, `entered` is told, its `entered` triggers fire, a `gone` one frees the body): for what
-## sets a prop's state from outside its triggers (the hub's stone lit by Flow, props W8; tests). A
+## sets a prop's state from outside its triggers (`prop_state_requested`, props W8c; tests). A
 ## change of the game's state, so only from the simulation's step. False for a state it does not
 ## have, or a body going.
 func enter(state_id: StringName) -> bool:
@@ -116,6 +120,13 @@ func enter(state_id: StringName) -> bool:
 		return false
 	_enter(at, 0)
 	return true
+
+
+## `prop_state_requested` (props W8c): this body asked to enter `wanted` from outside its triggers
+## (the hub's rules lighting the stone). A state it is in, or lacks, changes nothing.
+func _on_state_requested(actor_id: int, wanted: StringName) -> void:
+	if actor_id == actor.id and wanted != state_id() and states.state_at(wanted) >= 0:
+		enter(wanted)
 
 
 func _hears_casts() -> bool:

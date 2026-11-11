@@ -83,26 +83,51 @@ func _test_room_places() -> void:
 	stand_in.prop = data
 	stand_in.position = Vector2(40, 50)
 	props.add_child(stand_in)
-	props.add_child(Sprite2D.new())
+	props.add_child(PropStandIn.new())
 	var zones := Node2D.new()
 	zones.name = "Zones"
 	zones.position = Vector2(10, 10)
 	layout.add_child(zones)
-	var rect := ReferenceRect.new()
+	var rect := RoomZone.new()
 	rect.offset_left = 0
 	rect.offset_top = 0
 	rect.offset_right = 30
 	rect.offset_bottom = 20
-	rect.set_meta(&"zone", &"stone")
+	rect.zone_name = &"stone"
 	zones.add_child(rect)
-	zones.add_child(ReferenceRect.new())
+	zones.add_child(RoomZone.new())
 	var places: RoomPlaces = RoomPlaces.read(layout)
 	_check(places.player_spawns == PackedVector2Array([Vector2(101, 5), Vector2(102, 5)]), "spawns through their moved holder: %s" % places.player_spawns)
-	_check(places.props == ([data] as Array[PropBase]) and places.prop_places == PackedVector2Array([Vector2(40, 50)]), "a stand-in's prop where it stands")
+	_check(places.placed == ([data] as Array[Resource]) and places.placed_at == PackedVector2Array([Vector2(40, 50)]), "a stand-in's prop where it stands")
 	_check(places.zone(&"stone") == Rect2(10, 10, 30, 20), "a zone by name: %s" % places.zone(&"stone"))
 	_check(places.problems().size() == 2, "a stand-in with no prop and a zone with no name: %s" % places.problems())
+	# A piece of scene carries its own (props W8c): a placement and spawns deep inside it.
+	var piece := Node2D.new()
+	piece.position = Vector2(200, 0)
+	layout.add_child(piece)
+	var inner := Node2D.new()
+	inner.name = "EnemySpawns"
+	piece.add_child(inner)
+	var marker := Marker2D.new()
+	marker.position = Vector2(3, 4)
+	inner.add_child(marker)
+	var deep := PropStandIn.new()
+	deep.prop = data
+	deep.position = Vector2(10, 10)
+	piece.add_child(deep)
+	places = RoomPlaces.read(layout)
+	_check(places.enemy_spawns == PackedVector2Array([Vector2(203, 4)]), "spawns at any depth: %s" % places.enemy_spawns)
+	_check(places.placed_at == PackedVector2Array([Vector2(40, 50), Vector2(210, 10)]), "placements at any depth, in the tree's order: %s" % places.placed_at)
+	_check(places.placed_of(PropBase).size() == 2 and places.placed_of(EnemyBase).is_empty(), "by kind")
+	# Places are whole translations: a rotated or scaled node on the way is a problem.
+	piece.rotation = 0.5
+	_check(RoomPlaces.read(layout).problems().size() == 3, "a rotated piece is named: %s" % RoomPlaces.read(layout).problems())
+	piece.rotation = 0.0
+	piece.scale = Vector2(2, 2)
+	_check(RoomPlaces.read(layout).problems().size() == 3, "a scaled piece is named")
 	RoomPlaces.strip(layout)
-	_check(layout.get_node_or_null("Props") == null and layout.get_node_or_null("Zones") == null, "the editor's nodes taken out")
+	_check(layout.find_children("*", "RoomPlacement", true, false).is_empty() and not is_instance_valid(deep), "every placement taken out, at any depth")
+	_check(layout.find_children("*", "RoomZone", true, false).is_empty(), "every zone taken out")
 	_check(layout.get_node_or_null("PlayerSpawns") != null, "the spawns kept")
 	layout.free()
 

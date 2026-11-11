@@ -1,10 +1,11 @@
-[gd_scene load_steps=19 format=3]
+[gd_scene load_steps=20 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="9_motes"]
 [ext_resource type="Script" path="res://tools/prop_stand_in.gd" id="10_prop_stand_in"]
 [ext_resource type="Script" path="res://tools/enemy_stand_in.gd" id="11_enemy_stand_in"]
+[ext_resource type="Script" path="res://core/base/room_zone.gd" id="15_zone"]
 [ext_resource type="Resource" path="res://content/props/hub_stone/hub_stone.tres" id="12_stone"]
 [ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="13_altar"]
 [ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="14_dummy"]
@@ -333,6 +334,7 @@ enemy = ExtResource("14_dummy")
 [node name="Zones" type="Node2D" parent="."]
 
 [node name="PropYard" type="ReferenceRect" parent="Zones"]
+script = ExtResource("15_zone")
 offset_left = 320.0
 offset_top = 160.0
 offset_right = 960.0
@@ -340,4 +342,4 @@ offset_bottom = 288.0
 mouse_filter = 2
 border_color = Color(0.95, 0.76, 0.19, 1)
 border_width = 2.0
-metadata/zone = &"prop_yard"
+zone_name = &"prop_yard"

@@ -24,7 +24,7 @@ func test_resource_has_an_id_a_scene_and_six_dummy_spawns() -> void:
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.places().player_spawns.size(), 4, "player spawns")
 	check(room.places().enemy_spawns.size() >= 4, "at least four enemy spawns, for the imp wave")
-	check_equal(room.places().dummy_places.size(), 6, "dummy spawns: the training dummy, the shooting dummy and a group of four")
+	check_equal(room.places().placed_at_of(EnemyBase).size(), 6, "dummy spawns: the training dummy, the shooting dummy and a group of four")
 
 
 ## The dummies its scene stands (props W8a: stand-ins in `Dummies`): the training dummy, the
@@ -32,7 +32,7 @@ func test_resource_has_an_id_a_scene_and_six_dummy_spawns() -> void:
 func test_its_scene_stands_the_dummies() -> void:
 	var places: RoomPlaces = (RoomData as RoomBase).places()
 	var ids: Array[StringName] = []
-	for dummy in places.dummies:
+	for dummy: EnemyBase in places.placed_of(EnemyBase):
 		ids.append(dummy.id)
 	check_equal(ids, [&"training_dummy", &"shooting_dummy", &"training_dummy", &"training_dummy", &"training_dummy", &"training_dummy"] as Array[StringName], "which dummy where")
 	check_equal(places.problems(), PackedStringArray(), "every stand-in has its data")
@@ -54,7 +54,7 @@ func _divider(walls: Array[Rect2]) -> Rect2:
 func test_a_wall_splits_the_dummies_into_two_lanes() -> void:
 	var divider: Rect2 = _divider(RoomScan.wall_rects(room_root))
 	check(divider.size != Vector2.ZERO, "the room has a divider wall")
-	var spawns: PackedVector2Array = (RoomData as RoomBase).places().dummy_places
+	var spawns: PackedVector2Array = (RoomData as RoomBase).places().placed_at_of(EnemyBase)
 	check(spawns[0].x < divider.position.x, "the training dummy is in the left lane")
 	check(spawns[1].x > divider.end.x, "the shooting dummy is in the right lane")
 	check(spawns[0].y < divider.end.y and spawns[1].y < divider.end.y, "both dummies stand beside the divider")
@@ -73,7 +73,7 @@ func test_two_players_start_in_each_lane() -> void:
 
 
 func test_dummies_stand_apart() -> void:
-	var spawns: PackedVector2Array = (RoomData as RoomBase).places().dummy_places
+	var spawns: PackedVector2Array = (RoomData as RoomBase).places().placed_at_of(EnemyBase)
 	for i in spawns.size():
 		for j in range(i + 1, spawns.size()):
 			check(spawns[i].distance_to(spawns[j]) >= DUMMY_RADIUS * 4.0, "dummies %s and %s do not touch" % [spawns[i], spawns[j]])
@@ -82,7 +82,7 @@ func test_dummies_stand_apart() -> void:
 func test_dummy_spawns_are_clear_of_walls() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	check(walls.size() >= 4, "the walls are found")
-	for point: Vector2 in (RoomData as RoomBase).places().dummy_places:
+	for point: Vector2 in (RoomData as RoomBase).places().placed_at_of(EnemyBase):
 		var body := Rect2(point - Vector2.ONE * DUMMY_RADIUS, Vector2.ONE * DUMMY_RADIUS * 2.0)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(body), "dummy spawn %s is clear of the wall %s" % [point, wall])

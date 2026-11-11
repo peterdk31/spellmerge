@@ -69,7 +69,7 @@ func _wizards() -> Array[Actor]:
 func _wanted_ids() -> Array[StringName]:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.SANDBOX_ROOM_ID) as RoomBase
 	var ids: Array[StringName] = []
-	for dummy in room.places().dummies:
+	for dummy: EnemyBase in room.places().placed_of(EnemyBase):
 		ids.append(dummy.id)
 	return ids
 
@@ -102,7 +102,7 @@ func test_the_dummies_stand_at_the_rooms_dummy_spawns() -> void:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.SANDBOX_ROOM_ID) as RoomBase
 	var dummies: Array[Node] = flow.dummies()
 	for i in dummies.size():
-		check_equal((dummies[i] as Node2D).position, room.places().dummy_places[i], "dummy %d stands at its spawn" % i)
+		check_equal((dummies[i] as Node2D).position, room.places().placed_at_of(EnemyBase)[i], "dummy %d stands at its spawn" % i)
 
 
 func test_play_after_the_sandbox_is_the_normal_game() -> void:

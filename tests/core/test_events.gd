@@ -65,6 +65,7 @@ const EVENTS: Dictionary = {
 	&"damage_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
 	&"prop_state_changed": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
+	&"prop_state_requested": [["actor", TYPE_INT], ["state", TYPE_STRING_NAME]],
 	&"status_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME], ["duration", TYPE_FLOAT], ["strength", TYPE_FLOAT]],
 	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["shot", TYPE_INT]],
 	# Staffs (docs/milestones/M2-staffs.md, "Events").

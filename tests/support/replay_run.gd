@@ -29,7 +29,6 @@ extends RefCounted
 ##     await run.play(replay, 0, played)
 ##     # run.problems: what went wrong on the way (a bot that did not join, ...)
 
-const FlowScript := preload("res://gameplay/flow/flow.gd")
 const BotScript := preload("res://tests/bots/bot.gd")
 const FreshGame := preload("res://tests/support/fresh_game.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -123,7 +122,7 @@ class StoneWalker:
 
 	func _init(press_at: int) -> void:
 		var room: RoomBase = HUB
-		var to: Vector2 = FlowScript.area_of(room, FlowScript.STONE_PROP).get_center() - room.places().player_spawns[0]
+		var to: Vector2 = HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).get_center() - room.places().player_spawns[0]
 		way = to.normalized()
 		walk = floori((to.length() - 8.0) / STEP)
 		after = press_at + 1

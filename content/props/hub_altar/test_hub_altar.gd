@@ -30,13 +30,14 @@ func test_it_is_walked_onto_and_never_hit() -> void:
 	check_equal(sprite.z_index, RoomBase.FLOOR_Z, "on the floor")
 
 
-## Self-contained (props W8b): where it is stood on is its own ground, a 96×96 box round its
-## feet that blocks nothing, and its art lies on it in every state.
+## Self-contained (props W8b/W8c): where it is stood on is its own area, a 96×96 box round its
+## feet, apart from any ground that blocks (it has none that blocks), and its art lies on it in
+## every state.
 func test_it_is_stood_on_where_its_art_lies() -> void:
-	var ground: Rect2 = ALTAR.ground_rect()
+	var ground: Rect2 = ALTAR.area_rect()
 	check_equal(ground, Rect2(-48, -48, 96, 96), "a 96 px box round its feet")
 	for state in ALTAR.states.list:
 		check(not state.blocks, "%s: nobody bumps into it" % state.state_id)
 		for layer in ALTAR.look_of(state.state_id).layers:
 			var size := Vector2(layer.frame_size())
-			check_equal(Rect2(layer.drawn_at() - size * 0.5, size), ground, "%s: its art on its ground" % state.state_id)
+			check_equal(Rect2(layer.drawn_at() - size * 0.5, size), ground, "%s: its art on its area" % state.state_id)

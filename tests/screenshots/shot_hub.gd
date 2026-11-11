@@ -6,7 +6,6 @@ extends "res://tests/support/screenshot.gd"
 ## island's south-west edge, its rim of embers rising off it; two players on the stone and two off
 ## it; all four on the lit stone ("A starts the run"), the stone's cue playing.
 
-const FlowScript := preload("res://gameplay/flow/flow.gd")
 const STEP_FRAMES := 3
 
 var _input: Node = null
@@ -63,7 +62,7 @@ func room_spawn() -> Vector2:
 
 func _stone() -> Rect2:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
-	return FlowScript.area_of(room, FlowScript.STONE_PROP)
+	return HubRules.area_of(room.places(), HubRules.ROLE_RUN_START)
 
 
 func _place(seat: int, at: Vector2) -> void:

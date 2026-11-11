@@ -21,10 +21,15 @@ extends Resource
 @export var max_health: float = 10.0
 ## True for a prop no hit hurts (the hub's): hits still land and show, its health stays.
 @export var invincible: bool = false
-## Stood in the hub's prop yard (props W8, `RoomBase.prop_yard`), as every prop is to be tried
-## there; false only for a prop that means something only where a room places it (the hub's own
-## teleporter stone and altar).
-@export var in_yard: bool = true
+## What it is to the game's rules (props W8c; self-contained: a thing says what it is, a room only
+## places it): empty for a prop the rules know nothing of (most; every one of them stands in the
+## hub's prop yard), else a name the rules read (`run_start`: the teleporter stone the hub's rules
+## light and start a run from; `party_altar`: where a seat opens the party to other machines).
+@export var role: StringName = &""
+## Where standing on it counts (props W8c), a box `area_size` across round `area_offset` from its
+## feet, apart from the ground that blocks (`footprint_*`): the stone's slab is stood on. Zero: none.
+@export var area_size: Vector2 = Vector2.ZERO
+@export var area_offset: Vector2 = Vector2.ZERO
 
 ## The hurt shape (`Hurtbox`): a circle of `radius`, or a box `size` across, round `offset` from the
 ## feet.
@@ -89,10 +94,16 @@ func hurt_rect() -> Rect2:
 	return Rect2(offset - half, half * 2.0)
 
 
+## Where standing on it counts, from its feet (`area_size` round `area_offset`); empty when none.
+func area_rect() -> Rect2:
+	if area_size.x <= 0.0 or area_size.y <= 0.0:
+		return Rect2()
+	return Rect2(area_offset - area_size * 0.5, area_size)
+
+
 ## Its ground's box from its feet when its own data sets one (`has_footprint`): a box
 ## `footprint_size` across, or its circle's bounds, round `footprint_offset`. Empty when it sets
-## none (the kit fits one as it makes the body, `PropBody`). A self-contained prop's area: the hub's
-## stone is stood on where its ground is (props W8b).
+## none (the kit fits one as it makes the body, `PropBody`).
 func ground_rect() -> Rect2:
 	if not has_footprint():
 		return Rect2()

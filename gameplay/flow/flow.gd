@@ -80,25 +80,24 @@ extends Node
 ## in the hub room (`hub`), an island in the void where players join and leave as they like (coop's
 ## `player_joined` / `player_left`, at the room's spawns), try their staffs on the room's dummies,
 ## and take nothing from hits (`RoomBase.invincible`: the hit lands, the health stays). Its wizards
-## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (the prop STONE_PROP, where its ground is) is lit while every wizard stands
-## in it: counted each tick and whenever a wizard joins or leaves, and told by `start_stone_changed`;
-## the prop standing on it (the hub's `hub_stone`) enters its state `lit` or `unlit` to match, so
-## its look and cue are the prop's (props W8).
+## have Play's staffs and start cards, and every card in the bag (above). Its teleporter stone (a
+## prop of the role `run_start`, stood on where its area is) is lit while every wizard stands on it:
+## counted each tick and whenever a wizard joins or leaves (`hub`, `HubRules`), told by
+## `start_stone_changed`, the stone asked to enter `lit` or `unlit` to match, so its look and cue
+## are the prop's (props W8).
 ## The command `run_requested` (a seat's A on the lit stone, from the HUD) starts a run of waves at
 ## the tick's start, every wizard keeping its staffs (`start_run`'s `kept`); that run's end
 ## (everyone down) brings everyone back to the hub with nothing of the run, its staffs neither
 ## (owner, 2026-11-10: the hub is the arsenal a run's tools are picked from). A run started by
 ## `play_requested` restarts as before.
 ##
-## Rooms (props W8a, docs/milestones/props.md): what is where is the room's scene, read once
-## (`RoomBase.places()`, `RoomPlaces`): spawns, doors, the props and dummies its scene stands (their
-## stand-ins are taken out of the room shown, `RoomPlaces.strip`, and real bodies stood there, in
-## the scene's order) and its zones by name. Some props mean something to Flow wherever a scene
-## stands them, self-contained: STONE_PROP (the teleporter stone, below, stood on where its ground
-## is, entering STONE_LIT or STONE_UNLIT with it) and ALTAR_PROP (the multiplayer altar). A zone
-## means what Flow makes of its name: ZONE_PROP_YARD (props W8: every prop of the registry
-## that stands in one, `PropBase.in_yard`, in rows by id, `PropYard.places`; one that leaves its
-## first state or goes is replaced by a fresh one `PropYard.RETURN_SECONDS` later).
+## Rooms (props W8a/W8c, docs/milestones/props.md): a run builds its room's layout once
+## (`RoomBase.build()`) and reads what is where from that instance, the one it shows (`RoomPlaces`:
+## spawns, doors, placements, zones, its size). The placements' stand-ins and the zones are taken out
+## (`RoomPlaces.strip`), and the room's contents stand the real bodies (`contents`, `RoomContents`:
+## props and dummies alike, by their data). The zone ZONE_PROP_YARD is the prop yard (`yard`,
+## `PropYard`, props W8). The hub's rules (`hub`, `HubRules`) read the props by what they are
+## (`PropBase.role`), never by id.
 ##
 ## Modes: `mode` says which run this is: MODE_WAVES (Play), MODE_SANDBOX or MODE_HUB (above).
 ##
@@ -125,7 +124,6 @@ const PLAYER_SLOTS: int = 4
 const ROOM_FOLDER: StringName = &"rooms"
 const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
-const PROP_FOLDER: StringName = &"props"
 const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with in Play: A, X, Y, B (owner, 2026-11-05: dash and a bolt).
@@ -151,15 +149,6 @@ const SANDBOX_START_CARDS: Array = [
 ## The sandbox room and the hub's (which dummies each stands is its scene's, `RoomPlaces.dummies`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
 const HUB_ROOM_ID: StringName = &"hub"
-## The props Flow gives a meaning, self-contained (props W8b: the owner, 2026-11-11, "A Props
-## should be 'self-contained' if possible!"): wherever a room's scene stands one, its ground
-## (`PropBase.ground_rect`) is where standing counts. The teleporter stone that starts a run (online
-## lobby L1; it enters STONE_LIT or STONE_UNLIT as it lights and goes out) and the multiplayer altar
-## (L2).
-const STONE_PROP: StringName = &"hub_stone"
-const ALTAR_PROP: StringName = &"hub_altar"
-const STONE_LIT: StringName = &"lit"
-const STONE_UNLIT: StringName = &"unlit"
 ## The zone of a room's scene Flow gives a meaning (`RoomPlaces.zone`; a place that is no thing):
 ## the prop yard (props W8).
 const ZONE_PROP_YARD: StringName = &"prop_yard"
@@ -205,9 +194,9 @@ enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); `sandbox`, worked
 ## out from `mode` (read only).
-const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_stone_sent", &"_altar_sent", &"_hub_sent"]
+const DERIVED: Array[StringName] = [&"events", &"registry", &"frames", &"combat", &"projectiles", &"spells", &"world_parent", &"intro", &"loading", &"world", &"save", &"sandbox", &"_places"]
 ## State as who they point at: other bodies, never entered (core/sim/README.md).
-const REFS: Array[StringName] = [&"_enemies", &"_dummies", &"_wizards", &"_props", &"_yard"]
+const REFS: Array[StringName] = [&"_enemies", &"_wizards"]
 ## Not state: the functions that only make what is drawn (core/sim/README.md, "The line"): the
 ## room's camera.
 const VIEW: Array[StringName] = [&"_add_camera"]
@@ -270,33 +259,19 @@ var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
-## The sandbox's dummies still standing.
-var _dummies: Array[Node] = []
 var _wizards: Array[Node2D] = []
-## The props the room's scene stands (`RoomPlaces.props`) still standing.
-var _props: Array[Node] = []
-## The prop yard (ZONE_PROP_YARD), a slot a prop: who stands there (null while none: it went),
-## which prop, where, and the seconds until a fresh one stands there (-1: none due).
-var _yard: Array[Node] = []
-var _yard_ids: Array[StringName] = []
-var _yard_places: PackedVector2Array = PackedVector2Array()
-var _yard_left: PackedFloat64Array = PackedFloat64Array()
 var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
 var _next_wave_left: float = -1.0
 var _enemy_data: EnemyBase = null
-## The hub's stone: the wizards on it and in the room at the last count (whether it is lit).
-var _stone_standing: int = 0
-var _stone_wizards: int = 0
+## What is where in the room shown (read from the layout built for this run; worked out from it).
+var _places: RoomPlaces = RoomPlaces.new()
+## The bodies its placements stand, its prop yard and the hub's rules (props W8c).
+var contents: RoomContents = RoomContents.new()
+var yard: PropYard = PropYard.new()
+var hub: HubRules = HubRules.new()
 ## True while the run of waves in progress was started from the hub's stone: its end goes back there.
 var _back_to_hub: bool = false
-## What `start_stone_changed` last said, as (standing, wizards): only what is drawn, so a game whose
-## state a snapshot replaced sends the stone's count again (DERIVED). (-1, -1) before any.
-var _stone_sent: Vector2i = Vector2i(-1, -1)
-## The seats last told to stand on the hub's altar (`altar_changed`; -1: nothing sent yet).
-var _altar_sent: int = -1
-## Whether the party was last told to be in the hub (`hub_changed`).
-var _hub_sent: bool = false
 
 
 func _ready() -> void:
@@ -346,8 +321,9 @@ func _ready() -> void:
 func step(delta: float) -> void:
 	if intro != null:
 		intro.step(delta)
-	_forget_gone(_props)
-	_tend_yard(delta)
+	contents.forget_gone()
+	if world != null and state != State.IDLE:
+		yard.tend(delta, world, registry)
 	if mode == MODE_HUB and state == State.RUNNING:
 		_count_stone()
 		return
@@ -417,18 +393,18 @@ func enemies_left() -> int:
 
 ## The dummies of the sandbox or the hub still standing.
 func dummies() -> Array[Node]:
-	return _dummies.duplicate()
+	return contents.of_kind(EnemyBase)
 
 
 ## The props the room's scene stands, still standing (the hub's stone and altar).
 func room_props() -> Array[Node]:
-	return _props.duplicate()
+	return contents.of_kind(PropBase)
 
 
 ## The props standing in the prop yard now, by slot (null for a slot whose prop went and is not
 ## back yet).
 func yard_props() -> Array[Node]:
-	return _yard.duplicate()
+	return yard.bodies()
 
 
 ## The wizard of player `index` in the current world (the actor whose home seat it is), or
@@ -492,8 +468,12 @@ func start_run(requester: int, kept: Array = []) -> bool:
 		push_error("Flow: the Tick autoload is missing, so the run starts on the last run's state.")
 	else:
 		tick.begin_run()
-	var layout: Node = room.scene.instantiate()
-	var size: Vector2 = room.size_in(layout)
+	# Built once: what is where is read from the layout shown (props W8c).
+	var layout: Node = room.build()
+	_places = RoomPlaces.read(layout)
+	for problem in _places.problems():
+		push_warning("Flow: the room '%s': %s" % [room.id, problem])
+	var size: Vector2 = _places.size
 	# The stand-ins and zones are the editor's: the bodies are stood below, by the room's places.
 	RoomPlaces.strip(layout)
 	if projectiles != null:
@@ -504,11 +484,12 @@ func start_run(requester: int, kept: Array = []) -> bool:
 	new_world.add_child(layout)
 	_add_camera(new_world, size)
 	_spawn_players(new_world, room, players, kept)
-	_spawn_props(new_world, room)
+	contents.stand(new_world, _places)
+	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
+	hub.room_started()
 	match mode:
 		MODE_SANDBOX, MODE_HUB:
 			wave = 0
-			_spawn_dummies(new_world, room)
 		_:
 			wave = 1
 			_spawn_wave(new_world, room, enemy_data, wave)
@@ -755,72 +736,13 @@ func _wizard_count() -> int:
 
 ## True while the hub's stone is lit: every wizard of the hub stands on it, and there is one.
 func is_stone_lit() -> bool:
-	return mode == MODE_HUB and _stone_wizards > 0 and _stone_standing == _stone_wizards
+	return mode == MODE_HUB and hub.is_lit()
 
 
-## Where standing on the room's prop `prop_id` counts, in room pixels: the ground
-## (`PropBase.ground_rect`) of the first one its scene stands (`RoomPlaces.props`), where it stands.
-## Empty when the room stands none (or it has no ground of its own).
-static func area_of(room: RoomBase, prop_id: StringName) -> Rect2:
-	var places: RoomPlaces = room.places() if room != null else null
-	if places == null:
-		return Rect2()
-	for i in places.props.size():
-		if places.props[i].id == prop_id:
-			var ground: Rect2 = places.props[i].ground_rect()
-			return Rect2(ground.position + places.prop_places[i], ground.size) if ground.has_area() else Rect2()
-	return Rect2()
-
-
-## Count the wizards on the hub's stone and in the room (none out of the hub) into the state that
-## decides whether it is lit, put the props standing on it in their state to match (`lit`,
-## `unlit`: their look and cue are theirs), and send `start_stone_changed` when what was last sent
-## differs (also after a snapshot restored the state under a game that had sent another count).
+## The hub's rules count the wizards on its stone and altar (none out of the hub), light the stone
+## and tell what changed (`HubRules.count`).
 func _count_stone() -> void:
-	var standing: int = 0
-	var wizards: int = 0
-	var at_altar: int = 0
-	if mode == MODE_HUB and state != State.IDLE and _room != null:
-		wizards = _wizard_count()
-		var stone: Rect2 = area_of(_room, STONE_PROP)
-		var altar: Rect2 = area_of(_room, ALTAR_PROP)
-		for wizard: Node2D in _wizards:
-			if not is_instance_valid(wizard):
-				continue
-			if stone.has_point(wizard.position):
-				standing += 1
-			var seat: int = _seat_of(wizard)
-			if seat >= 0 and seat < PLAYER_SLOTS and altar.has_point(wizard.position):
-				at_altar |= 1 << seat
-	# Where the party is, for whoever lets other machines join it (net/): told as it changes.
-	var in_hub: bool = mode == MODE_HUB and state != State.IDLE and _room != null
-	if in_hub != _hub_sent and events != null:
-		_hub_sent = in_hub
-		events.hub_changed.emit(in_hub)
-	# Who stands on the altar is told to the HUD only (A there opens the room, net/'s to do).
-	if at_altar != _altar_sent and events != null:
-		_altar_sent = at_altar
-		events.altar_changed.emit(at_altar)
-	_stone_standing = standing
-	_stone_wizards = wizards
-	_light_stone_props(is_stone_lit())
-	var now := Vector2i(standing, wizards)
-	if now == _stone_sent or events == null:
-		return
-	_stone_sent = now
-	events.start_stone_changed.emit(standing, wizards, is_stone_lit())
-
-
-## The room's teleporter stones (STONE_PROP) enter STONE_LIT or STONE_UNLIT as the stone is lit or
-## not (a state they are in already is not entered again).
-func _light_stone_props(lit: bool) -> void:
-	var want: StringName = STONE_LIT if lit else STONE_UNLIT
-	for node: Node in _props:
-		var prop := node as Actor if is_instance_valid(node) else null
-		if prop == null or prop.prop == null or prop.prop.id != STONE_PROP or prop.state_triggers == null:
-			continue
-		if prop.state_triggers.state_id() != want:
-			prop.state_triggers.enter(want)
+	hub.count(mode == MODE_HUB and state != State.IDLE and _room != null, _wizards, contents, events)
 
 
 ## A sandbox page's action. Ignored out of the sandbox. It changes the room only, never a
@@ -832,11 +754,7 @@ func _on_sandbox_action_requested(player: int, action: StringName) -> void:
 		ACTION_CLEAR_ENEMIES:
 			clear_sandbox_enemies()
 		ACTION_RESET_DUMMIES:
-			for dummy: Node in _dummies:
-				if is_instance_valid(dummy):
-					_detach(dummy)
-			_dummies.clear()
-			_spawn_dummies(world, _room)
+			contents.stand_again(world, _places, EnemyBase)
 		_:
 			push_warning("Flow: unknown sandbox action '%s'." % action)
 
@@ -881,7 +799,7 @@ func _on_player_joined(player: int) -> void:
 		return
 	if get_wizard(player) != null:
 		return
-	var joiners: PackedVector2Array = _room.places().joiner_spawns
+	var joiners: PackedVector2Array = _places.joiner_spawns
 	var at: Vector2 = joiners[player] if player < joiners.size() else _joiner_spawn(_room, player)
 	_add_wizard(world, _room, player, at)
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
@@ -915,7 +833,7 @@ func _on_player_left(player: int) -> void:
 
 
 func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -> void:
-	_dummies.erase(enemy)
+	contents.forget(enemy)
 	var at: int = _enemies.find(enemy)
 	if at < 0:
 		return
@@ -1041,7 +959,7 @@ func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], kept: A
 ## The player spawn for a mid-run joiner: the one farthest from every enemy and
 ## every wizard already there (the joiner's own slot wins a tie).
 func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
-	var spawns: PackedVector2Array = room.places().player_spawns
+	var spawns: PackedVector2Array = _places.player_spawns
 	var best: Vector2 = spawns[index] if index < spawns.size() else Vector2.ZERO
 	var best_gap: float = -1.0
 	for i in spawns.size():
@@ -1121,8 +1039,8 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 	PlayerScript.seat_wizard(wizard, index, null, staff_cards.duplicate(true), staffs_for_mode(), bag_for_mode())
 	if at != Vector2.INF:
 		wizard.position = at
-	elif index < room.places().player_spawns.size():
-		wizard.position = room.places().player_spawns[index]
+	elif index < _places.player_spawns.size():
+		wizard.position = _places.player_spawns[index]
 	# Its hurtbox registers it with Combat when it enters the tree.
 	parent.add_child(wizard)
 	_wizards.append(wizard)
@@ -1146,7 +1064,7 @@ func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -
 
 ## Add `count` enemies to `_enemies`, placed as a wave of that size is.
 func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int) -> void:
-	var spawns: PackedVector2Array = room.places().enemy_spawns
+	var spawns: PackedVector2Array = _places.enemy_spawns
 	if spawns.is_empty():
 		push_warning("Flow: the room has no enemy spawns, so the wave is empty.")
 		return
@@ -1170,107 +1088,6 @@ func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int)
 		_enemies.append(enemy)
 
 
-## Stand the dummies the room's scene stands (`RoomPlaces.dummies`, each an enemy's data, at its
-## place). One whose scene is no actor is skipped with a warning; the room runs without it.
-func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
-	var places: RoomPlaces = room.places()
-	for i in places.dummies.size():
-		var data: EnemyBase = places.dummies[i]
-		var node: Node = data.scene.instantiate() if data.scene != null else null
-		var dummy := node as Actor
-		if dummy == null:
-			push_warning("Flow: the dummy '%s' is not an actor, so it is skipped." % data.id)
-			if node != null:
-				node.free()
-			continue
-		dummy.data = data
-		dummy.position = places.dummy_places[i]
-		parent.add_child(dummy)
-		_dummies.append(dummy)
-
-
-## Stand the props the room's scene stands (`RoomPlaces.props`, at their places) and fill its prop
-## yard (ZONE_PROP_YARD) with every prop of the registry that stands in one (`PropBase.in_yard`), in
-## id order (`PropYard.places`; one that does not fit is left out with a warning).
-func _spawn_props(parent: Node2D, room: RoomBase) -> void:
-	var places: RoomPlaces = room.places()
-	_props.clear()
-	for i in places.props.size():
-		var body: Actor = _stand_prop(parent, places.props[i], places.prop_places[i])
-		if body != null:
-			_props.append(body)
-	_yard.clear()
-	_yard_ids.clear()
-	_yard_left.clear()
-	_yard_places = PackedVector2Array()
-	var yard: Rect2 = places.zone(ZONE_PROP_YARD)
-	if not yard.has_area() or registry == null:
-		return
-	var kinds: Array[PropBase] = []
-	for resource: Resource in registry.get_all(PROP_FOLDER):
-		var data := resource as PropBase
-		if data != null and data.in_yard and data.scene != null:
-			kinds.append(data)
-	var at: PackedVector2Array = PropYard.places(yard, kinds)
-	for i in kinds.size():
-		if at[i] == Vector2.INF:
-			push_warning("Flow: the prop yard of '%s' is full; '%s' and the props after it do not stand there." % [room.id, kinds[i].id])
-			break
-		_yard_ids.append(kinds[i].id)
-		_yard_places.append(at[i])
-		_yard_left.append(-1.0)
-		_yard.append(_stand_prop(parent, kinds[i], at[i]))
-
-
-## A fresh body of the prop `data` (`PropBody.make`), its feet at `at`, added to `parent`; null
-## (with a warning) when it makes none.
-func _stand_prop(parent: Node2D, data: PropBase, at: Vector2) -> Actor:
-	var body: Actor = PropBody.make(data) if data != null else null
-	if body == null:
-		push_warning("Flow: the prop '%s' has no body, so the room runs without it." % (data.id if data != null else &""))
-		return null
-	body.position = at
-	parent.add_child(body)
-	return body
-
-
-## The yard's props: one that left its first state or went starts its slot's count
-## (`PropYard.RETURN_SECONDS`); when it runs out the slot's body, if any, goes and a fresh one
-## stands. A body going is forgotten in the tick it goes (the yard's state never points at a freed
-## one).
-func _tend_yard(delta: float) -> void:
-	if _yard.is_empty() or world == null or _room == null or state == State.IDLE:
-		return
-	_forget_gone(_yard, true)
-	for i in _yard.size():
-		var prop := _yard[i] as Actor
-		var fresh: bool = prop != null and (prop.state_triggers == null or prop.state_triggers.state == 0)
-		if not fresh and _yard_left[i] < 0.0:
-			_yard_left[i] = PropYard.RETURN_SECONDS
-		if _yard_left[i] < 0.0:
-			continue
-		_yard_left[i] -= delta
-		if _yard_left[i] > 0.0:
-			continue
-		_yard_left[i] = -1.0
-		if prop != null:
-			_detach(prop)
-		_yard[i] = _stand_prop(world, registry.get_resource(PROP_FOLDER, _yard_ids[i]) as PropBase if registry != null else null, _yard_places[i])
-
-
-## The bodies of `list` that went (freed, or dying: freed at the frame's end) are taken out of it,
-## or, with `keep_slots`, left as null in their place.
-func _forget_gone(list: Array[Node], keep_slots: bool = false) -> void:
-	for i in range(list.size() - 1, -1, -1):
-		var body: Node = list[i]
-		if body == null or (is_instance_valid(body) and not (body is Actor and (body as Actor).is_dying())):
-			continue
-		if keep_slots:
-			list[i] = null
-		else:
-			list.remove_at(i)
-
-
 ## Forget the old run: wizards leave `Combat` (the enemies do it themselves when
 ## they leave the tree) and the old world is freed.
 func _clear_run() -> void:
@@ -1280,12 +1097,8 @@ func _clear_run() -> void:
 				combat.unregister_actor(wizard)
 	_wizards.clear()
 	_enemies.clear()
-	_dummies.clear()
-	_props.clear()
-	_yard.clear()
-	_yard_ids.clear()
-	_yard_places.clear()
-	_yard_left.clear()
+	contents.clear()
+	yard.clear()
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null

@@ -1,12 +1,12 @@
 @tool
 class_name PropStandIn
-extends Node2D
+extends RoomPlacement
 ## A prop placed in a room's scene (props W8a/W8b, docs/milestones/props.md; content/rooms/README.md):
-## add one under the scene's `Props` (Add Child Node, "PropStandIn"), pick its `prop` in the
+## add one anywhere in the scene (Add Child Node, "PropStandIn"; the hub keeps them under `Props`), pick its `prop` in the
 ## Inspector and move it where the prop's feet go. In the editor it draws the prop's look in the
 ## state picked in `state` (its first by default) exactly as the game draws it (`PropLayer.dress`,
-## as `PropLook`), with its hurt shape (red) and its ground (cyan) outlined, so what you move is what
-## stands there. The game never shows it: Flow takes `Props` out of the room (`RoomPlaces.strip`)
+## as `PropLook`), with its hurt shape (red), its ground (cyan) and where it is stood on (yellow, its `area`) outlined, so what you move is what
+## stands there. The game never shows it: the game takes every placement out of the room (`RoomPlaces.strip`)
 ## and stands the real prop at its place, from `prop`.
 ##
 ## An editor script (the owner's decision of 2026-11-11), so it lives in tools/: nothing here runs
@@ -33,6 +33,12 @@ extends Node2D
 
 const HURT_COLOUR: Color = Color(0.88, 0.35, 0.18, 0.9)
 const GROUND_COLOUR: Color = Color(0.31, 0.84, 0.86, 0.9)
+const AREA_COLOUR: Color = Color(0.95, 0.76, 0.19, 0.9)
+
+
+## What stands here (`RoomPlacement`).
+func placed() -> Resource:
+	return prop
 
 
 func _ready() -> void:
@@ -90,6 +96,9 @@ func _draw() -> void:
 		draw_arc(prop.offset, prop.radius, 0.0, TAU, 32, HURT_COLOUR, 1.0)
 	if prop.has_footprint():
 		draw_rect(prop.ground_rect(), GROUND_COLOUR, false, 1.0)
+	var area: Rect2 = prop.area_rect()
+	if area.has_area():
+		draw_rect(area, AREA_COLOUR, false, 1.0)
 
 
 ## `state` picked from the prop's own states.

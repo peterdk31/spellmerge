@@ -34,11 +34,11 @@ func test_resource_is_the_hub_where_hits_take_nothing() -> void:
 	check_equal(room.id, &"hub", "the id")
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.places().player_spawns.size(), 4, "player spawns")
-	check_equal(room.places().dummy_places.size(), 3, "three dummies")
+	check_equal(room.places().placed_at_of(EnemyBase).size(), 3, "three dummies")
 	check(room.places().enemy_spawns.is_empty(), "no enemy spawns: no wave there")
 	check(room.invincible, "hits take nothing in the hub")
-	check(FlowScript.area_of(room, FlowScript.STONE_PROP).has_area(), "it has a teleporter stone")
-	for dummy in room.places().dummies:
+	check(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "it has a teleporter stone")
+	for dummy: EnemyBase in room.places().placed_of(EnemyBase):
 		check_equal(dummy.id, &"training_dummy", "a training dummy")
 	check_equal(room.places().problems(), PackedStringArray(), "every stand-in and zone has its data")
 
@@ -46,8 +46,8 @@ func test_resource_is_the_hub_where_hits_take_nothing() -> void:
 func test_the_other_rooms_have_no_stone_and_hurt() -> void:
 	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
 		var room: RoomBase = load(path) as RoomBase
-		check(not FlowScript.area_of(room, FlowScript.STONE_PROP).has_area(), "%s has no stone" % room.id)
-		check(not FlowScript.area_of(room, FlowScript.ALTAR_PROP).has_area(), "%s has no altar" % room.id)
+		check(not HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).has_area(), "%s has no stone" % room.id)
+		check(not HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).has_area(), "%s has no altar" % room.id)
 		check(not room.invincible, "%s hurts" % room.id)
 
 
@@ -57,7 +57,7 @@ func test_scene_has_no_scripts() -> void:
 
 ## The prop of `id` the room stands, and where its feet are (null and INF when it has none).
 func _prop(id: StringName) -> PropBase:
-	for data in _room().places().props:
+	for data: PropBase in _room().places().placed_of(PropBase):
 		if data.id == id:
 			return data
 	return null
@@ -65,9 +65,9 @@ func _prop(id: StringName) -> PropBase:
 
 func _prop_at(id: StringName) -> Vector2:
 	var places: RoomPlaces = _room().places()
-	for i in places.props.size():
-		if places.props[i].id == id:
-			return places.prop_places[i]
+	for i in places.of_kind(PropBase):
+		if (places.placed[i] as PropBase).id == id:
+			return places.placed_at[i]
 	return Vector2.INF
 
 
@@ -87,9 +87,9 @@ func test_the_stone_is_a_prop_on_the_stone() -> void:
 	if stone == null:
 		return
 	var feet: Vector2 = _prop_at(&"hub_stone")
-	check(FlowScript.area_of(_room(), FlowScript.STONE_PROP).has_point(feet), "it stands on the stone")
-	check_equal(stone.states.list[0].state_id, FlowScript.STONE_UNLIT, "it starts unlit")
-	check(stone.states.state_at(FlowScript.STONE_LIT) >= 0, "it can be lit")
+	check(HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START).has_point(feet), "it stands on the stone")
+	check_equal(stone.states.list[0].state_id, HubRules.UNLIT, "it starts unlit")
+	check(stone.states.state_at(HubRules.LIT) >= 0, "it can be lit")
 	for state in stone.states.list:
 		check(not state.blocks and not state.hittable, "%s: walked onto, never hit" % state.state_id)
 		var look: PropStateLook = stone.look_of(state.state_id)
@@ -97,11 +97,11 @@ func test_the_stone_is_a_prop_on_the_stone() -> void:
 		if look == null:
 			continue
 		for layer in look.layers:
-			check_equal(_layer_rect(layer, feet), FlowScript.area_of(_room(), FlowScript.STONE_PROP), "%s: its art lies on the stone" % state.state_id)
+			check_equal(_layer_rect(layer, feet), HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START), "%s: its art lies on the stone" % state.state_id)
 			check_equal(layer.drawn, PropLayer.Drawn.ON_FLOOR, "%s: on the floor" % state.state_id)
-	check(stone.invincible and not stone.in_yard, "invincible, and not in the yard")
-	check_equal(stone.look_of(FlowScript.STONE_LIT).cue, &"stone_lit", "it plays the stone's cue as it lights")
-	check_equal(stone.look_of(FlowScript.STONE_UNLIT).cue, &"", "and none as it goes out")
+	check(stone.invincible and stone.role == HubRules.ROLE_RUN_START, "invincible, the hub's run_start (so never in the yard)")
+	check_equal(stone.look_of(HubRules.LIT).cue, &"stone_lit", "it plays the stone's cue as it lights")
+	check_equal(stone.look_of(HubRules.UNLIT).cue, &"", "and none as it goes out")
 
 
 ## The yard (props W8): open floor on the island, clear of the walls, the stone, the altar and
@@ -113,9 +113,9 @@ func test_the_prop_yard_is_open_floor() -> void:
 	check(yard.size.x >= 256.0 and yard.size.y >= 96.0, "room for a row of props and to try spells: %s" % yard)
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(yard), "clear of the wall %s" % wall)
-	check(not yard.intersects(FlowScript.area_of(room, FlowScript.STONE_PROP).grow(32.0)), "clear of the stone")
-	check(not yard.intersects(FlowScript.area_of(room, FlowScript.ALTAR_PROP).grow(32.0)), "clear of the altar")
-	for spawns: PackedVector2Array in [room.places().player_spawns, room.places().joiner_spawns, room.places().dummy_places]:
+	check(not yard.intersects(HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).grow(32.0)), "clear of the stone")
+	check(not yard.intersects(HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).grow(32.0)), "clear of the altar")
+	for spawns: PackedVector2Array in [room.places().player_spawns, room.places().joiner_spawns, room.places().placed_at_of(EnemyBase)]:
 		for point: Vector2 in spawns:
 			check(not yard.intersects(_body(point).grow(32.0)), "clear of the spawn %s" % point)
 	for other: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
@@ -123,7 +123,7 @@ func test_the_prop_yard_is_open_floor() -> void:
 
 
 func test_the_room_is_large_and_the_void_round_the_island_is_wall() -> void:
-	var size: Vector2 = _room().size_in(room_root)
+	var size: Vector2 = RoomPlaces.read(room_root).size
 	check(size.x >= 1280.0 and size.y >= 800.0, "a large room: %s" % size)
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	var floor_rects: Array[Rect2] = []
@@ -165,17 +165,17 @@ func test_a_rooms_size_follows_nested_walls() -> void:
 	shape.shape = box
 	shape.position = Vector2(32.0, 16.0)
 	body.add_child(shape)
-	check_equal(RoomBase.new().size_in(layout), Vector2(864.0, 582.0), "the wall's far corner, through every parent")
+	check_equal(RoomPlaces.read(layout).size, Vector2(864.0, 582.0), "the wall's far corner, through every parent")
 
 
 func test_nothing_starts_in_a_wall_or_on_the_stone() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
-	var stone: Rect2 = FlowScript.area_of(_room(), FlowScript.STONE_PROP)
+	var stone: Rect2 = HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START)
 	for point: Vector2 in _room().places().player_spawns:
 		check(not stone.intersects(_body(point)), "player spawn %s is off the stone, so a joiner puts it out" % point)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(_body(point)), "player spawn %s is clear of the wall %s" % [point, wall])
-	for point: Vector2 in _room().places().dummy_places:
+	for point: Vector2 in _room().places().placed_at_of(EnemyBase):
 		check(not stone.intersects(_body(point)), "dummy %s is off the stone" % point)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(_body(point)), "dummy %s is clear of the wall %s" % [point, wall])
@@ -220,8 +220,8 @@ func test_the_rim_of_motes_runs_round_the_island() -> void:
 
 
 func test_the_dummies_stand_together_away_from_the_stone() -> void:
-	var spawns: PackedVector2Array = _room().places().dummy_places
-	var centre: Vector2 = FlowScript.area_of(_room(), FlowScript.STONE_PROP).get_center()
+	var spawns: PackedVector2Array = _room().places().placed_at_of(EnemyBase)
+	var centre: Vector2 = HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START).get_center()
 	for i in spawns.size():
 		check(spawns[i].distance_to(centre) > 200.0, "dummy %s is off to one side" % spawns[i])
 		for j in range(i + 1, spawns.size()):
@@ -234,12 +234,12 @@ func test_the_altar_stands_on_the_island() -> void:
 	check(altar != null, "the room stands the hub's altar")
 	if altar == null:
 		return
-	check(altar.invincible and not altar.in_yard, "invincible, and not in the yard")
+	check(altar.invincible and altar.role == HubRules.ROLE_PARTY_ALTAR, "invincible, the hub's party_altar (so never in the yard)")
 	for state in altar.states.list:
 		check(not state.blocks and not state.hittable, "%s: walked onto, never hit" % state.state_id)
 	var area: Rect2 = _layer_rect(altar.look_of(altar.states.list[0].state_id).layers[0], _prop_at(&"hub_altar"))
-	check(not area.intersects(FlowScript.area_of(_room(), FlowScript.STONE_PROP)), "the altar is not the stone")
-	check_equal(area, FlowScript.area_of(_room(), FlowScript.ALTAR_PROP), "the altar's art covers the altar (where A opens the room)")
+	check(not area.intersects(HubRules.area_of(_room().places(), HubRules.ROLE_RUN_START)), "the altar is not the stone")
+	check_equal(area, HubRules.area_of(_room().places(), HubRules.ROLE_PARTY_ALTAR), "the altar's art covers the altar (where A opens the room)")
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(area), "the altar is clear of the wall %s" % wall)
 
@@ -253,9 +253,9 @@ func test_joiners_arrive_beside_the_altar() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	for i in room.places().joiner_spawns.size():
 		var point: Vector2 = room.places().joiner_spawns[i]
-		check(not FlowScript.area_of(room, FlowScript.ALTAR_PROP).intersects(_body(point)), "joiner spawn %s is off the altar" % point)
-		check(point.distance_to(FlowScript.area_of(room, FlowScript.ALTAR_PROP).get_center()) < 128.0, "joiner spawn %s is beside it" % point)
-		check(not FlowScript.area_of(room, FlowScript.STONE_PROP).intersects(_body(point)), "joiner spawn %s is off the stone" % point)
+		check(not HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).intersects(_body(point)), "joiner spawn %s is off the altar" % point)
+		check(point.distance_to(HubRules.area_of(room.places(), HubRules.ROLE_PARTY_ALTAR).get_center()) < 128.0, "joiner spawn %s is beside it" % point)
+		check(not HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).intersects(_body(point)), "joiner spawn %s is off the stone" % point)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(_body(point)), "joiner spawn %s is clear of the wall %s" % [point, wall])
 		for j in range(i + 1, room.places().joiner_spawns.size()):

@@ -3,8 +3,9 @@ extends Resource
 ## What kind of room it is (props W8a, docs/milestones/props.md, "W8a: a room is its scene"): its
 ## id, its scene and the rules over the whole room. Where things are (spawns, doors, props,
 ## dummies, zones) is written in its scene only, edited by hand in the Godot editor, and read by
-## `places()` (`RoomPlaces`); nothing here is one room's own (the hub's stone is a zone of its
-## scene, which Flow gives its meaning). M3 extends it with the biome and the door rules.
+## `RoomPlaces` from the layout it builds (`build()`); nothing here is one room's own (the hub's stone
+## is a self-contained prop placed in its scene). M3 extends it with the biome and the door rules,
+## and with rooms built from pieces.
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
@@ -47,11 +48,19 @@ var _floor: PackedColorArray = PackedColorArray()
 var _places: RoomPlaces = null
 
 
-## What is where in it (`RoomPlaces`: spawns, doors, props, dummies, zones), read once from its
-## scene. Empty with no scene.
+## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.
+## The game builds it once a run and reads what is where from that instance (`RoomPlaces.read`), the
+## one it shows. A generated room (M3) builds its layout from pieces by the run's seeded chance
+## here. Null with no scene.
+func build() -> Node:
+	return scene.instantiate() if scene != null else null
+
+
+## What is where in it (`RoomPlaces`: spawns, doors, placements, zones, its size), read once from a
+## layout of its own, for tests and tools; the game reads the layout it shows.
 func places() -> RoomPlaces:
 	if _places == null:
-		var layout: Node = scene.instantiate() if scene != null else null
+		var layout: Node = build()
 		_places = RoomPlaces.read(layout)
 		if layout != null:
 			layout.free()
@@ -67,7 +76,7 @@ func surface_colors() -> PackedColorArray:
 	if not debris_colors.is_empty():
 		return ArtPixels.three(debris_colors)
 	if _surface.is_empty() and scene != null:
-		_surface = ArtPixels.three(sample_surface(scene.instantiate()))
+		_surface = ArtPixels.three(sample_surface(build()))
 	return _surface
 
 
@@ -79,7 +88,7 @@ func floor_colors() -> PackedColorArray:
 	if not floor_mark_colors.is_empty():
 		return ArtPixels.three(floor_mark_colors)
 	if _floor.is_empty() and scene != null:
-		_floor = ArtPixels.three(sample_floor(scene.instantiate()))
+		_floor = ArtPixels.three(sample_floor(build()))
 	return _floor
 
 
@@ -128,40 +137,3 @@ static func sample_surface(layout: Node) -> PackedColorArray:
 	layout.free()
 	counts.erase(floor_main)
 	return ArtPixels.top_colours(counts)
-
-
-## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and,
-## when `layout` is given, its `Floor` sprite (the whole room, under the walls, in a crypt) and its
-## walls' rectangles (a room whose floor is not one rectangle: the hub's island, the void round it
-## all wall). The room Flow makes is this size (its camera's limits).
-func size_in(layout: Node = null) -> Vector2:
-	var size := Vector2(640.0, 360.0)
-	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null
-	if floor_sprite != null and floor_sprite.texture != null:
-		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
-		size = size.max(floor_sprite.position + extent)
-	if layout != null:
-		for node: Node in layout.find_children("*", "StaticBody2D", true, false):
-			var body := node as StaticBody2D
-			if (body.collision_layer & WALL_LAYER) == 0:
-				continue
-			for child: Node in body.get_children():
-				var shape := child as CollisionShape2D
-				var box := shape.shape as RectangleShape2D if shape != null else null
-				if box == null:
-					continue
-				# The layout is not in the tree yet: its transform is walked by hand.
-				var xf: Transform2D = shape.transform
-				var up: Node = body
-				while up != null and up != layout:
-					if up is Node2D:
-						xf = (up as Node2D).transform * xf
-					up = up.get_parent()
-				var half: Vector2 = box.size * 0.5
-				for corner: Vector2 in [half, -half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]:
-					size = size.max(xf * corner)
-	var at: RoomPlaces = RoomPlaces.read(layout) if layout != null else places()
-	for points: PackedVector2Array in [at.player_spawns, at.enemy_spawns, at.doors]:
-		for point: Vector2 in points:
-			size = size.max(point + Vector2(32.0, 32.0))
-	return size

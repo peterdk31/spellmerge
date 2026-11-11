@@ -1,11 +1,11 @@
 @tool
 class_name EnemyStandIn
-extends Node2D
+extends RoomPlacement
 ## An enemy standing in a room's scene (props W8a/W8b; the training and shooting dummies): add one
-## under the scene's `Dummies` (Add Child Node, "EnemyStandIn"), pick its `enemy` and move it where
+## anywhere in the scene (Add Child Node, "EnemyStandIn"; the hub keeps them under `Dummies`), pick its `enemy` and move it where
 ## it stands. In the editor it shows the enemy's own scene there (its scripts do not run in the
-## editor, so it is its art as placed). The game never shows it: Flow takes `Dummies` out of the
-## room (`RoomPlaces.strip`) and stands the real enemy at its place, from `enemy`.
+## editor, so it is its art as placed). The game never shows it: the game takes every placement out of
+## the room (`RoomPlaces.strip`) and stands the real enemy at its place, from `enemy`.
 ##
 ## An editor script (the owner's decision of 2026-11-11), so it lives in tools/.
 
@@ -14,6 +14,11 @@ extends Node2D
 	set(value):
 		enemy = value
 		_show_in_editor()
+
+
+## What stands here (`RoomPlacement`).
+func placed() -> Resource:
+	return enemy
 
 
 func _ready() -> void:

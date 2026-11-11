@@ -45,11 +45,13 @@ static func sprite_rect(sprite: Sprite2D) -> Rect2:
 	return Rect2(sprite.position, size)
 
 
-## The game scripts in a room's scene: none is allowed. The editor's stand-ins (tools/, props W8b)
-## are not counted: they only hold a stand-in's data, and Flow takes them out before play.
+## The game scripts in a room's scene: none is allowed. Its placements and zones (`RoomPlacement`,
+## `RoomZone`, props W8c) are not counted: editor scripts holding what stands where, taken out
+## before play.
 static func scripts_below(node: Node) -> int:
-	var script := node.get_script() as Script
-	var count: int = 1 if script != null and not script.resource_path.begins_with("res://tools/") else 0
+	if node is RoomPlacement or node is RoomZone:
+		return 0
+	var count: int = 1 if node.get_script() != null else 0
 	for child in node.get_children():
 		count += scripts_below(child)
 	return count

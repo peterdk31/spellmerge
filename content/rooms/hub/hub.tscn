@@ -306,6 +306,20 @@ position = Vector2(672, 528)
 [node name="P4" type="Marker2D" parent="PlayerSpawns"]
 position = Vector2(720, 528)
 
+[node name="JoinerSpawns" type="Node2D" parent="."]
+
+[node name="J1" type="Marker2D" parent="JoinerSpawns"]
+position = Vector2(948, 464)
+
+[node name="J2" type="Marker2D" parent="JoinerSpawns"]
+position = Vector2(988, 464)
+
+[node name="J3" type="Marker2D" parent="JoinerSpawns"]
+position = Vector2(1028, 464)
+
+[node name="J4" type="Marker2D" parent="JoinerSpawns"]
+position = Vector2(1068, 464)
+
 [node name="DummySpawns" type="Node2D" parent="."]
 
 [node name="Dummy1" type="Marker2D" parent="DummySpawns"]

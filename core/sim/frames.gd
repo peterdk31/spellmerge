@@ -52,7 +52,10 @@ extends Node
 ## - **A run's start** (`next_run_seed`, `next_run_rules`; the Tick asks at `begin_run`): the seed
 ##   and rules of the replay on the deck, else a random seed and this machine's rules
 ##   (`SessionRules.machine()`, changed by the "Max shots" setting, `projectile_cap_changed`). Online
-##   (later), the host's come in here too, beside its inputs.
+##   (later), the host's come in here too, beside its inputs. What the run takes along from the play
+##   before it (`next_run_carry`, core/sim/run_carry.gd: each seat's staffs) is the same: the
+##   replay's, else what the game says it would take now (`set_carry_source`); a recording begun
+##   writes the game's into its header, so the machines that play it start with what only this one had.
 ##
 ## - **A run begun anew by the game** (`restart`; online lobby, docs/milestones/online-lobby.md): the
 ##   game itself asks for a run's start (a party back in its hub after a run). It is sent at the
@@ -109,6 +112,9 @@ var _carried: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 ## A run's start the game asked for (`restart`), sent at the next step's start: the start and
 ## the seat it is for (empty: none).
 var _restart: Array = []
+## Says what a run that starts now takes along (`set_carry_source`: returns a RunCarry), or invalid:
+## nothing.
+var _carry_source: Callable = Callable()
 
 
 func _init() -> void:
@@ -175,6 +181,26 @@ func next_run_seed() -> int:
 ## The rules of the run that starts next: the replay's on the deck, else this machine's (a copy).
 func next_run_rules() -> SessionRules:
 	return _tape.run_rules() if _tape != null else SessionRules.machine().copy()
+
+
+## What a run that starts now takes along from the play before it, as the game says it
+## (`source()` returns a RunCarry; Flow gives it): read when a recording begins (its header) and by
+## `next_run_carry` with no replay on the deck. An invalid Callable: nothing.
+func set_carry_source(source: Callable) -> void:
+	_carry_source = source
+
+
+## What the run that starts next takes along (a copy): the replay's on the deck (its header), else
+## what the game says it would take now.
+func next_run_carry() -> RunCarry:
+	if _tape != null:
+		return _tape.replay.carry.copy()
+	return _carry_now()
+
+
+func _carry_now() -> RunCarry:
+	var made: RunCarry = _carry_source.call() as RunCarry if _carry_source.is_valid() else null
+	return made if made != null else RunCarry.new()
 
 
 ## A tick starts: every seat's frame is built (or read from the replay played), recorded, and its
@@ -280,6 +306,7 @@ func record(start: StringName, starter: int, run_seed: int = 0) -> Replay:
 	replay.starter = starter
 	replay.seats = _device_seats()
 	replay.rules = SessionRules.machine().copy()
+	replay.carry = _carry_now()
 	_tape = ReplayTape.recording(replay)
 	_carried.fill(0)
 	_send_start(start, starter)

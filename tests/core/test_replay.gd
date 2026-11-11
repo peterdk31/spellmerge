@@ -1,5 +1,6 @@
 extends "res://tests/support/suite.gd"
-## The replay (core/sim/replay.gd, online-ready N2): its header (with the run's rules since N11) and
+## The replay (core/sim/replay.gd, online-ready N2): its header (with the run's rules since N11, and
+## what the run takes along since the online lobby) and
 ## ticks there and back through bytes and a file in user://replays/, and the strict decoder rejecting
 ## what is not a whole valid replay.
 
@@ -25,6 +26,7 @@ func _made() -> Replay:
 	replay.rules.shot_cap = 750
 	replay.rules.hit_work = 4000
 	replay.rules.fire_shots = 0
+	replay.carry.set_staffs(2, [[&"bolt", &""], [&"dash"]])
 	var frames: Array[InputFrame] = _frames()
 	for tick in 3:
 		frames[0].set_move(Vector2(1.0, 0.0).rotated(tick))
@@ -52,6 +54,7 @@ func test_a_replay_comes_back_from_its_bytes() -> void:
 	check_equal(back.seats, 0b0101, "the seats")
 	check_equal(str(back.rules), str(replay.rules), "the run's rules")
 	check(back.rules.equals(replay.rules), "every rule")
+	check_equal(back.carry.as_kept(), [[], [], [[&"bolt", &""], [&"dash"]], []], "what the run takes along: seat 2's staffs, slot by slot")
 	check_equal(back.tick_count(), 3, "every tick")
 	var a: Array[InputFrame] = _frames()
 	var b: Array[InputFrame] = _frames()
@@ -104,12 +107,35 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	var fires: PackedByteArray = good.duplicate()
 	fires.encode_u32(rules_at + 8, 0x8000_0000)
 	cases["fire shots past the most"] = fires
+	# What is carried: a byte of seats (only seat 2), its staff count, then each staff's card count
+	# and each card's length and letters.
+	var carry_at: int = rules_at + SessionRules.BYTES
+	var carry_bytes := PackedByteArray()
+	_made().carry.encode_into(carry_bytes)
+	var carry_seats: PackedByteArray = good.duplicate()
+	carry_seats[carry_at] = 0x14
+	cases["a carried seat past the four"] = carry_seats
+	var no_staffs: PackedByteArray = good.duplicate()
+	no_staffs[carry_at + 1] = 0
+	cases["a carrying seat with no staff"] = no_staffs
+	var five_staffs: PackedByteArray = good.duplicate()
+	five_staffs[carry_at + 1] = 5
+	cases["five staffs"] = five_staffs
+	var many_cards: PackedByteArray = good.duplicate()
+	many_cards[carry_at + 2] = RunCarry.MAX_CARDS + 1
+	cases["a staff of more cards than slots"] = many_cards
+	var not_id: PackedByteArray = good.duplicate()
+	not_id[carry_at + 4] = 0x2f
+	cases["a carried card that is no id (a slash)"] = not_id
+	var long_id: PackedByteArray = good.duplicate()
+	long_id[carry_at + 3] = 200
+	cases["a carried card longer than the header"] = long_id
 	var ticks: PackedByteArray = good.duplicate()
-	ticks.encode_u32(rules_at + SessionRules.BYTES, 4)
+	ticks.encode_u32(carry_at + carry_bytes.size(), 4)
 	cases["more ticks than it holds"] = ticks
 	var frame_seat: PackedByteArray = good.duplicate()
 	# The first tick: its seats byte, then seat 0's length (2 bytes) and frame; the frame's seat byte.
-	var first: int = rules_at + SessionRules.BYTES + 4
+	var first: int = carry_at + carry_bytes.size() + 4
 	frame_seat[first + 3 + 1] = 1
 	cases["a frame under another seat"] = frame_seat
 	var frame_bad: PackedByteArray = good.duplicate()
@@ -121,7 +147,7 @@ func test_the_decoder_rejects_bad_replays() -> void:
 	for name: String in cases:
 		var replay := Replay.new()
 		check(replay.decode(cases[name]) != "", "%s is rejected" % name)
-		check(replay.tick_count() == 0 and replay.build == "" and replay.rules.equals(SessionRules.defaults()), "%s leaves it empty" % name)
+		check(replay.tick_count() == 0 and replay.build == "" and replay.rules.equals(SessionRules.defaults()) and replay.carry.is_empty(), "%s leaves it empty" % name)
 	check(Replay.from_bytes(good) != null, "the good one is not")
 
 
@@ -148,6 +174,7 @@ func test_a_replay_grows_from_its_header_and_its_ticks_bytes() -> void:
 	check_equal(live.tick_count(), 0, "of no ticks")
 	check(live.build == replay.build and live.content == replay.content and live.run_seed == replay.run_seed and live.seats == replay.seats, "with the whole header")
 	check(live.rules.equals(replay.rules), "and its rules")
+	check(live.carry.equals(replay.carry), "and what the run takes along")
 	for tick in replay.tick_count():
 		check_equal(live.add_tick_bytes(replay.tick_bytes(tick)), "", "tick %d is added" % tick)
 	check_equal(live.to_bytes(), replay.to_bytes(), "the same replay, tick for tick")

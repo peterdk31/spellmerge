@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"hub"
 scene = ExtResource("2_scene")
 player_spawns = PackedVector2Array(560, 528, 608, 528, 672, 528, 720, 528)
+joiner_spawns = PackedVector2Array(948, 464, 988, 464, 1028, 464, 1068, 464)
 dummy_spawns = PackedVector2Array(256, 336, 208, 416, 304, 416)
 dummy_ids = Array[StringName]([&"training_dummy"])
 start_stone = Rect2(592, 336, 96, 96)

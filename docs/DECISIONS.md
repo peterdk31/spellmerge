@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-11: a recording's header carries each seat's staffs; joiners arrive beside the altar (online lobby, L2 leftovers)
+
+- **What a run takes along is in the recording's header** (`RunCarry`, core/sim/run_carry.gd; replay format 5): each seat's staffs as card ids by slot. The hub begun anew for a joining machine lost every wizard's staffs, because a guest plays the recording from its start and only the host had them. Flow tells the frames service what a run starting now would take along (`Frames.set_carry_source`: in the hub each seat's staffs, elsewhere nothing, so the owner's "nothing comes back from a run" holds by the same rule); a recording begun writes it, and a run that starts reads it back (`Frames.next_run_carry`). The frames service knows no staff and Flow knows no recording.
+- **Not as commands in the first tick** (a `staff_cards_requested` per staff): only the simulation knows the staffs, and a simulation that sends itself commands would apply them twice on the machine that records. The header is also what a recording begun between a run's rooms needs (the plan's next step for long sessions).
+- **Read as strictly as a frame:** plain ids, at most four staffs a seat and 64 cards a staff (a staff's slots); anything else rejects the header. An id no card has is a wasted slot to the staff compiler, as in a command.
+- **A seat that joins the hub under way appears beside the altar,** not on it (`RoomBase.joiner_spawns`, by seat): the altar's A opens the room, and A is also the dash, so a joiner standing in it would open a room the first time it dashed. The simulation never knows a seat is another machine's, so the host's own late joiners arrive there too.
+- **A header on the wire may be as long as a header can be** (`NetMessage.MAX_HEADER` = `Replay.MAX_HEADER_BYTES`, about 65 kB with every seat's staffs at their fullest): it was 512 bytes, which four wizards' staffs pass; found in review, before any build had it. A header is sent once a recording.
+- **Joining again after the host left is not done here:** NetPlay would allow it, but no screen in the game leads back to the main menu, where Join online is. It needs a way out of a run first.
+
 ## 2026-11-11: a relay for machines with no direct way (online lobby, TURN)
 
 - **Asked:** the owner's tries found a phone on another network never linked; the owner agreed to Cloudflare's TURN service, a narrow exception to the room server's "calls no other server" (exactly one Cloudflare address, `SIGNAL_RELAY_FETCH`), and a better failure message.

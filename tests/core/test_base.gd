@@ -56,12 +56,55 @@ func _test_enemy() -> void:
 
 func _test_room() -> void:
 	var room := RoomBase.new()
-	room.player_spawns = PackedVector2Array([Vector2(1, 1), Vector2(2, 1), Vector2(1, 2), Vector2(2, 2)])
-	room.enemy_spawns = PackedVector2Array([Vector2(8, 8)])
-	room.doors = PackedVector2Array([Vector2(0, 5)])
-	_check(room.player_spawns.size() == 4, "room holds four player spawns")
-	_check(room.enemy_spawns.size() == 1 and room.doors.size() == 1, "room enemy spawns and doors")
 	_check(room.scene == null, "room scene is empty by default")
+	_check(room.places().player_spawns.is_empty() and room.places().zone(&"anything") == Rect2(), "no scene, no places")
+	_test_room_places()
+
+
+## A room's places are read from its scene (props W8a): markers in their holders (through a moved
+## parent), stand-ins with their data, zones by name; a stand-in or zone with no data is a problem,
+## and `strip` takes the editor's nodes out.
+func _test_room_places() -> void:
+	var layout := Node2D.new()
+	var spawns := Node2D.new()
+	spawns.name = "PlayerSpawns"
+	spawns.position = Vector2(100, 0)
+	layout.add_child(spawns)
+	for x: float in [1.0, 2.0]:
+		var marker := Marker2D.new()
+		marker.position = Vector2(x, 5)
+		spawns.add_child(marker)
+	var props := Node2D.new()
+	props.name = "Props"
+	layout.add_child(props)
+	var stand_in := Sprite2D.new()
+	var data := PropBase.new()
+	data.id = &"crate"
+	stand_in.set_meta(&"prop", data)
+	stand_in.position = Vector2(40, 50)
+	props.add_child(stand_in)
+	props.add_child(Sprite2D.new())
+	var zones := Node2D.new()
+	zones.name = "Zones"
+	zones.position = Vector2(10, 10)
+	layout.add_child(zones)
+	var rect := ReferenceRect.new()
+	rect.offset_left = 0
+	rect.offset_top = 0
+	rect.offset_right = 30
+	rect.offset_bottom = 20
+	rect.set_meta(&"zone", &"stone")
+	zones.add_child(rect)
+	zones.add_child(ReferenceRect.new())
+	var places: RoomPlaces = RoomPlaces.read(layout)
+	_check(places.player_spawns == PackedVector2Array([Vector2(101, 5), Vector2(102, 5)]), "spawns through their moved holder: %s" % places.player_spawns)
+	_check(places.props == ([data] as Array[PropBase]) and places.prop_places == PackedVector2Array([Vector2(40, 50)]), "a stand-in's prop where it stands")
+	_check(places.zone(&"stone") == Rect2(10, 10, 30, 20), "a zone by name: %s" % places.zone(&"stone"))
+	_check(places.problems().size() == 2, "a stand-in with no prop and a zone with no name: %s" % places.problems())
+	RoomPlaces.strip(layout)
+	_check(layout.get_node_or_null("Props") == null and layout.get_node_or_null("Zones") == null, "the editor's nodes taken out")
+	_check(layout.get_node_or_null("PlayerSpawns") != null, "the spawns kept")
+	layout.free()
 
 
 func _test_no_demo_flag() -> void:
@@ -88,18 +131,15 @@ func _test_round_trip() -> void:
 func _test_room_round_trip() -> void:
 	var room := RoomBase.new()
 	room.id = &"start_room"
-	room.player_spawns = PackedVector2Array([Vector2(1, 1), Vector2(2, 1), Vector2(1, 2), Vector2(2, 2)])
-	room.enemy_spawns = PackedVector2Array([Vector2(8, 8), Vector2(9, 8)])
-	room.doors = PackedVector2Array([Vector2(0, 5)])
+	room.invincible = true
+	room.ambient = 0.8
 	var path := "user://test_base_room.tres"
 	_check(ResourceSaver.save(room, path) == OK, "room saves as text")
 	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as RoomBase
 	_check(loaded != null, "room loads back as RoomBase")
 	if loaded != null:
 		_check(loaded.id == &"start_room", "room keeps its id")
-		_check(loaded.player_spawns == room.player_spawns, "room keeps its player spawns")
-		_check(loaded.enemy_spawns == room.enemy_spawns, "room keeps its enemy spawns")
-		_check(loaded.doors == room.doors, "room keeps its doors")
+		_check(loaded.invincible and is_equal_approx(loaded.ambient, 0.8), "room keeps its rules")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 

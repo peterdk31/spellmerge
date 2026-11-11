@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-11-11: a room is its scene (props W8a)
+
+- **Positions are written once, in the room's scene** (owner: "ideally I would like to be able to edit a room eg. the Hub by hand in the godot editor. This is easy if I can visually see what im moving"): spawns, doors, props, dummies and zones are nodes there, read by `RoomPlaces`; the `.tres` keeps the room's id, scene and rules. Before, every position was in the `.tres` and repeated by markers, with a test holding them together, so moving a thing in the editor did nothing.
+- **Nothing only one room has goes in `RoomBase`** (owner: "Why was base_room edited with eg. beacon (hub specific) code?"): a room marks a zone by name, and what a zone means is the game's (Flow: `start_stone`, `altar`, `prop_yard`; the yard's layout and return in `PropYard`).
+- **A placed body is a stand-in, not the body's own scene:** the prop and enemy scenes hold scripts, which rooms never do, and Flow must make the bodies itself at the run's start in a known order (actor ids, the hash, snapshots). A stand-in is a script-less `Sprite2D` of the first picture with its data as metadata, so the editor shows what stands there; a test holds it to what the game draws. The editor shows no later state, motes or light (`@tool` is banned).
+
 ## 2026-11-11: a recording's header carries each seat's staffs; joiners arrive beside the altar (online lobby, L2 leftovers)
 
 - **What a run takes along is in the recording's header** (`RunCarry`, core/sim/run_carry.gd; replay format 5): each seat's staffs as card ids by slot. The hub begun anew for a joining machine lost every wizard's staffs, because a guest plays the recording from its start and only the host had them. Flow tells the frames service what a run starting now would take along (`Frames.set_carry_source`: in the hub each seat's staffs, elsewhere nothing, so the owner's "nothing comes back from a run" holds by the same rule); a recording begun writes it, and a run that starts reads it back (`Frames.next_run_carry`). The frames service knows no staff and Flow knows no recording.

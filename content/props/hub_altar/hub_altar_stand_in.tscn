@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://content/props/hub_altar/altar.svg" id="1_art"]
+[ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar.tres" id="2_data"]
+
+[node name="HubAltar" type="Sprite2D"]
+z_index = -2
+texture_filter = 1
+texture = ExtResource("1_art")
+offset = Vector2(0, 0)
+metadata/prop = ExtResource("2_data")

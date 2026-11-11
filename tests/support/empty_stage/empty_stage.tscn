@@ -10,3 +10,17 @@ offset_right = 704.0
 offset_bottom = 424.0
 mouse_filter = 2
 color = Color(0.0784314, 0.0705882, 0.121569, 1)
+
+[node name="PlayerSpawns" type="Node2D" parent="."]
+
+[node name="Player1" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(616, 344)
+
+[node name="Player2" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(616, 344)
+
+[node name="Player3" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(616, 344)
+
+[node name="Player4" type="Marker2D" parent="PlayerSpawns"]
+position = Vector2(616, 344)

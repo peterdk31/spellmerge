@@ -25,27 +25,27 @@ func test_the_room_has_walls() -> void:
 
 func test_spawns_are_inside_the_room() -> void:
 	var room: RoomBase = RoomData
-	for point in room.player_spawns + room.enemy_spawns:
+	for point in room.places().player_spawns + room.places().enemy_spawns:
 		check(Rect2(Vector2.ZERO, ROOM_SIZE).has_point(point), "spawn %s is inside the room" % point)
 
 
 func test_spawns_are_clear_of_walls() -> void:
 	var room: RoomBase = RoomData
-	for point in room.player_spawns + room.enemy_spawns:
+	for point in room.places().player_spawns + room.places().enemy_spawns:
 		var body: Rect2 = Rect2(point - Vector2.ONE * SPAWN_RADIUS, Vector2.ONE * SPAWN_RADIUS * 2.0)
 		for wall in walls:
 			check(not wall.intersects(body), "spawn %s is clear of the wall %s" % [point, wall])
 
 
 func test_player_spawns_do_not_overlap() -> void:
-	var spawns: PackedVector2Array = (RoomData as RoomBase).player_spawns
+	var spawns: PackedVector2Array = (RoomData as RoomBase).places().player_spawns
 	for i in range(spawns.size()):
 		for j in range(i + 1, spawns.size()):
 			check(spawns[i].distance_to(spawns[j]) >= SPAWN_RADIUS * 2.0, "player spawns %d and %d overlap" % [i, j])
 
 
 func test_doors_lie_on_the_border() -> void:
-	for door in (RoomData as RoomBase).doors:
+	for door in (RoomData as RoomBase).places().doors:
 		var on_border: bool = door.x < TILE or door.y < TILE or door.x > ROOM_SIZE.x - TILE or door.y > ROOM_SIZE.y - TILE
 		check(on_border, "door %s lies on the border" % door)
 
@@ -53,8 +53,8 @@ func test_doors_lie_on_the_border() -> void:
 ## Flood fill on the 32 px grid from the first player spawn.
 func test_every_spawn_can_be_reached() -> void:
 	var room: RoomBase = RoomData
-	var seen: Dictionary = _flood(_cell(room.player_spawns[0]))
-	for point in room.player_spawns + room.enemy_spawns:
+	var seen: Dictionary = _flood(_cell(room.places().player_spawns[0]))
+	for point in room.places().player_spawns + room.places().enemy_spawns:
 		check(seen.has(_cell(point)), "spawn %s can be reached from the first player spawn" % point)
 
 

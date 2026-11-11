@@ -52,7 +52,7 @@ func test_a_wave_in_every_room_restored_plays_on_the_same() -> void:
 	var rooms: Array[StringName] = []
 	for id: StringName in registry.get_ids(&"rooms"):
 		# A room with no enemy spawns holds no wave (the hub: its own test below).
-		if not (registry.get_resource(&"rooms", id) as RoomBase).enemy_spawns.is_empty():
+		if not (registry.get_resource(&"rooms", id) as RoomBase).places().enemy_spawns.is_empty():
 			rooms.append(id)
 	check(rooms.size() >= 2, "it finds the rooms (%d)" % rooms.size())
 	for room in rooms:

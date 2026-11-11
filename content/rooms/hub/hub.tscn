@@ -1,8 +1,11 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/void.svg" id="1_void"]
 [ext_resource type="Texture2D" path="res://art/tilesets/hub/floor.svg" id="2_floor"]
 [ext_resource type="Script" path="res://core/base/mote_source.gd" id="9_motes"]
+[ext_resource type="PackedScene" path="res://content/props/hub_stone/hub_stone_stand_in.tscn" id="10_stone"]
+[ext_resource type="PackedScene" path="res://content/props/hub_altar/hub_altar_stand_in.tscn" id="11_altar"]
+[ext_resource type="PackedScene" path="res://content/enemies/training_dummy/training_dummy_stand_in.tscn" id="12_dummy"]
 
 [sub_resource type="Resource" id="MoteSource_rim"]
 script = ExtResource("9_motes")
@@ -296,21 +299,53 @@ position = Vector2(1028, 464)
 [node name="J4" type="Marker2D" parent="JoinerSpawns"]
 position = Vector2(1068, 464)
 
-[node name="PropSpawns" type="Node2D" parent="."]
+[node name="Props" type="Node2D" parent="."]
 
-[node name="Stone" type="Marker2D" parent="PropSpawns"]
+[node name="Stone" parent="Props" instance=ExtResource("10_stone")]
 position = Vector2(640, 384)
 
-[node name="Altar" type="Marker2D" parent="PropSpawns"]
+[node name="Altar" parent="Props" instance=ExtResource("11_altar")]
 position = Vector2(1008, 384)
 
-[node name="DummySpawns" type="Node2D" parent="."]
+[node name="Dummies" type="Node2D" parent="."]
 
-[node name="Dummy1" type="Marker2D" parent="DummySpawns"]
+[node name="Dummy1" parent="Dummies" instance=ExtResource("12_dummy")]
 position = Vector2(256, 336)
 
-[node name="Dummy2" type="Marker2D" parent="DummySpawns"]
+[node name="Dummy2" parent="Dummies" instance=ExtResource("12_dummy")]
 position = Vector2(208, 416)
 
-[node name="Dummy3" type="Marker2D" parent="DummySpawns"]
+[node name="Dummy3" parent="Dummies" instance=ExtResource("12_dummy")]
 position = Vector2(304, 416)
+
+[node name="Zones" type="Node2D" parent="."]
+
+[node name="StartStone" type="ReferenceRect" parent="Zones"]
+offset_left = 592.0
+offset_top = 336.0
+offset_right = 688.0
+offset_bottom = 432.0
+mouse_filter = 2
+border_color = Color(0.31, 0.84, 0.86, 1)
+border_width = 2.0
+metadata/zone = &"start_stone"
+
+[node name="Altar" type="ReferenceRect" parent="Zones"]
+offset_left = 960.0
+offset_top = 336.0
+offset_right = 1056.0
+offset_bottom = 432.0
+mouse_filter = 2
+border_color = Color(0.63, 0.19, 0.6, 1)
+border_width = 2.0
+metadata/zone = &"altar"
+
+[node name="PropYard" type="ReferenceRect" parent="Zones"]
+offset_left = 320.0
+offset_top = 160.0
+offset_right = 960.0
+offset_bottom = 288.0
+mouse_filter = 2
+border_color = Color(0.95, 0.76, 0.19, 1)
+border_width = 2.0
+metadata/zone = &"prop_yard"

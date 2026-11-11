@@ -43,6 +43,25 @@ func frame_size() -> Vector2i:
 	return Vector2i(texture.get_width() / maxi(frames, 1), texture.get_height())
 
 
+## Where its picture's middle is drawn from the prop's feet: its bottom middle on the feet moved
+## by `offset`, an odd side's half pixel kept so the art lies on whole pixels. What `PropLook` draws
+## and a prop's stand-in in a room scene shows (W8a).
+func drawn_at() -> Vector2:
+	var size: Vector2i = frame_size()
+	return offset + Vector2(0.0, -float(size.y / 2)) + Vector2(size.x % 2, size.y % 2) * 0.5
+
+
+## The z its picture is drawn at, from its `drawn` (hidden: as among the bodies).
+func z_index() -> int:
+	match drawn:
+		Drawn.OVER_BODIES:
+			return 1
+		Drawn.ON_FLOOR:
+			# As the room's floor: under every body and the floor's marks.
+			return RoomBase.FLOOR_Z
+	return 0
+
+
 ## What is wrong with it, one line each after `owner` (empty when nothing is).
 func problems(owner: String) -> PackedStringArray:
 	var found := PackedStringArray()

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
@@ -7,6 +7,8 @@
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/door.svg" id="6_door"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
+[ext_resource type="PackedScene" path="res://content/enemies/training_dummy/training_dummy_stand_in.tscn" id="20_training"]
+[ext_resource type="PackedScene" path="res://content/enemies/shooting_dummy/shooting_dummy_stand_in.tscn" id="21_shooting"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_horizontal"]
 size = Vector2(640, 32)
@@ -265,24 +267,24 @@ position = Vector2(64, 224)
 [node name="Enemy6" type="Marker2D" parent="EnemySpawns"]
 position = Vector2(576, 224)
 
-[node name="DummySpawns" type="Node2D" parent="."]
+[node name="Dummies" type="Node2D" parent="."]
 
-[node name="Training" type="Marker2D" parent="DummySpawns"]
+[node name="Training" parent="Dummies" instance=ExtResource("20_training")]
 position = Vector2(168, 96)
 
-[node name="Shooting" type="Marker2D" parent="DummySpawns"]
+[node name="Shooting" parent="Dummies" instance=ExtResource("21_shooting")]
 position = Vector2(472, 96)
 
-[node name="Group1" type="Marker2D" parent="DummySpawns"]
+[node name="Group1" parent="Dummies" instance=ExtResource("20_training")]
 position = Vector2(88, 136)
 
-[node name="Group2" type="Marker2D" parent="DummySpawns"]
+[node name="Group2" parent="Dummies" instance=ExtResource("20_training")]
 position = Vector2(248, 136)
 
-[node name="Group3" type="Marker2D" parent="DummySpawns"]
+[node name="Group3" parent="Dummies" instance=ExtResource("20_training")]
 position = Vector2(128, 192)
 
-[node name="Group4" type="Marker2D" parent="DummySpawns"]
+[node name="Group4" parent="Dummies" instance=ExtResource("20_training")]
 position = Vector2(208, 192)
 
 [node name="Doors" type="Node2D" parent="."]

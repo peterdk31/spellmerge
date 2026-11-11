@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The hub's prop yard (props W8, docs/milestones/props.md, "W8: the hub on props"): Flow stands every
-## prop of the registry that stands in a yard (`PropBase.in_yard`) in the room's `prop_yard`, in rows
+## prop of the registry that stands in a yard (`PropBase.in_yard`) in the room's zone `prop_yard`, in rows
 ## by id, each in its first state; one that leaves its first state or goes is replaced by a fresh one
-## `RoomBase.prop_yard_return` seconds later, where it stood. The hub's own stone and altar stand
+## `PropYard.RETURN_SECONDS` later, where it stood. The hub's own stone and altar stand
 ## where the room puts them, never in the yard. The registry here is the real content plus two test
 ## exploding barrels (W9 brings the first props of the game's own).
 ##
@@ -54,6 +54,11 @@ func _room() -> RoomBase:
 	return _registry.get_resource(&"rooms", FlowScript.HUB_ROOM_ID) as RoomBase
 
 
+## The hub's yard (its scene's zone).
+func _yard() -> Rect2:
+	return _room().places().zone(FlowScript.ZONE_PROP_YARD)
+
+
 func _ids(bodies: Array[Node]) -> Array[StringName]:
 	var ids: Array[StringName] = []
 	for body in bodies:
@@ -75,11 +80,11 @@ func test_the_yard_stands_every_yard_prop_in_rows_by_id() -> void:
 	var kinds: Array[PropBase] = []
 	for id: StringName in [&"a_barrel", EXPLODING_BARREL.id]:
 		kinds.append(_registry.get_resource(&"props", id) as PropBase)
-	var places: PackedVector2Array = _room().yard_places(kinds)
+	var places: PackedVector2Array = PropYard.places(_yard(), kinds)
 	for i in yard.size():
 		var body := yard[i] as Actor
 		check_equal(body.position, places[i], "%s where the yard puts it" % body.prop.id)
-		check(_room().prop_yard.has_point(body.position), "%s in the yard" % body.prop.id)
+		check(_yard().has_point(body.position), "%s in the yard" % body.prop.id)
 		check_equal(body.state_triggers.state, 0, "%s in its first state" % body.prop.id)
 		check(body.is_inside_tree(), "%s in the world" % body.prop.id)
 	flow.stop_run()
@@ -91,7 +96,7 @@ func test_a_yard_prop_that_leaves_its_first_state_stands_again_fresh() -> void:
 	var first := flow.yard_props()[0] as Actor
 	var place: Vector2 = first.position
 	check(first.state_triggers.enter(&"broken"), "it breaks")
-	_run(_room().prop_yard_return - 0.5)
+	_run(PropYard.RETURN_SECONDS - 0.5)
 	check(flow.yard_props()[0] == first, "the rubble stands for a while")
 	_run(1.0)
 	var fresh := flow.yard_props()[0] as Actor
@@ -102,7 +107,7 @@ func test_a_yard_prop_that_leaves_its_first_state_stands_again_fresh() -> void:
 	check_equal(fresh.state_triggers.state, 0, "in its first state")
 	check(not first.is_inside_tree(), "the rubble is gone")
 	check(flow.yard_props()[1] != null and (flow.yard_props()[1] as Actor).state_triggers.state == 0, "the other one untouched")
-	_run(_room().prop_yard_return + 1.0)
+	_run(PropYard.RETURN_SECONDS + 1.0)
 	check(flow.yard_props()[0] == fresh, "a fresh one stays")
 
 
@@ -112,7 +117,7 @@ func test_a_yard_prop_that_goes_stands_again() -> void:
 	first.die(-1)
 	flow.step(DT)
 	check(flow.yard_props()[1] == null, "forgotten in the tick it went, never left pointing at a freed body")
-	_run(_room().prop_yard_return)
+	_run(PropYard.RETURN_SECONDS)
 	var fresh := flow.yard_props()[1] as Actor
 	check(fresh != null and fresh.prop.id == EXPLODING_BARREL.id, "a fresh one stands again")
 

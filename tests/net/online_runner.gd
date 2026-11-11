@@ -33,6 +33,7 @@ extends Node
 ##     godot --headless --path . -- --online --online-role=host --signal=ws://127.0.0.1:8787/room --ticks=1500
 ##     godot --headless --path . -- --online --online-role=join --signal=ws://127.0.0.1:8787/room
 
+const FlowScript := preload("res://gameplay/flow/flow.gd")
 const NetPlayScript := preload("res://net/net_play.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FramesScript := preload("res://core/sim/frames.gd")
@@ -177,7 +178,7 @@ func _ready_room() -> void:
 	if _input == null or _flow == null or room == null:
 		_finish("the PlayerInput or Flow autoload, or the hub, is missing")
 		return
-	stone = room.start_stone.get_center()
+	stone = room.places().zone(FlowScript.ZONE_START_STONE).get_center()
 	_play.room_handshake_maker = func() -> NetHandshake:
 		var through := NetSignalHandshake.new(_signal)
 		through.rtc_maker = func(relay: NetRelay) -> NetHandshake: return NetRtc.new(PackedStringArray(), relay)

@@ -527,7 +527,7 @@ func _test_nobody_leaves_the_view_while_easing() -> void:
 func _test_joiner_is_protected() -> void:
 	_stop()
 	_start_with(0)
-	var spawns: PackedVector2Array = _flow._room.player_spawns
+	var spawns: PackedVector2Array = _flow._room.places().player_spawns
 	# An enemy stands on slot 1's spawn.
 	var enemy: Node2D = _flow._enemies[0] as Node2D
 	enemy.position = spawns[1]

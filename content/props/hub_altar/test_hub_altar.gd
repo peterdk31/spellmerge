@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The hub's multiplayer altar (props W8, content/props/hub_altar): a dais on the floor that nobody
-## bumps into and no hit lands on, in one state. Standing on it is Flow's (`RoomBase.altar`).
+## bumps into and no hit lands on, in one state. Standing on it is Flow's (the hub's zone `altar`).
 ##
 ## godot --headless --path . --script res://content/props/hub_altar/test_hub_altar.gd
 

@@ -7,14 +7,5 @@
 script = ExtResource("1_base")
 id = &"hub"
 scene = ExtResource("2_scene")
-player_spawns = PackedVector2Array(560, 528, 608, 528, 672, 528, 720, 528)
-joiner_spawns = PackedVector2Array(948, 464, 988, 464, 1028, 464, 1068, 464)
-dummy_spawns = PackedVector2Array(256, 336, 208, 416, 304, 416)
-dummy_ids = Array[StringName]([&"training_dummy"])
-prop_ids = Array[StringName]([&"hub_stone", &"hub_altar"])
-prop_spawns = PackedVector2Array(640, 384, 1008, 384)
-prop_yard = Rect2(320, 160, 640, 128)
-start_stone = Rect2(592, 336, 96, 96)
-altar = Rect2(960, 336, 96, 96)
 invincible = true
 ambient = 0.9

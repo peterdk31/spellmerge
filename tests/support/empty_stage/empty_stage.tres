@@ -7,5 +7,4 @@
 script = ExtResource("1_base")
 id = &"screenshot_empty_stage"
 scene = ExtResource("2_scene")
-player_spawns = PackedVector2Array(616, 344, 616, 344, 616, 344, 616, 344)
 ambient = 0.9

@@ -1,50 +1,15 @@
 class_name RoomBase
 extends Resource
-## The small M1 room: its scene and where things go. M3 extends it with the
-## biome, the required doors and validators.
+## What kind of room it is (props W8a, docs/milestones/props.md, "W8a: a room is its scene"): its
+## id, its scene and the rules over the whole room. Where things are (spawns, doors, props,
+## dummies, zones) is written in its scene only, edited by hand in the Godot editor, and read by
+## `places()` (`RoomPlaces`); nothing here is one room's own (the hub's stone is a zone of its
+## scene, which Flow gives its meaning). M3 extends it with the biome and the door rules.
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
-## The layout scene (tiles only, no scripts).
+## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
-## Where the players start, in room pixels. Index i is player i; four are expected (checked from M3).
-@export var player_spawns: PackedVector2Array = PackedVector2Array()
-## Where enemies may appear, in room pixels.
-@export var enemy_spawns: PackedVector2Array = PackedVector2Array()
-## Door positions, in room pixels.
-@export var doors: PackedVector2Array = PackedVector2Array()
-## Where a room stands dummies, in room pixels (staffs B7: the sandbox; the hub). Empty in every
-## other room.
-@export var dummy_spawns: PackedVector2Array = PackedVector2Array()
-## Which dummy (an enemy id, content/enemies) stands at each of `dummy_spawns`, in order; the last
-## one stands at every spawn past the list (`dummy_id`).
-@export var dummy_ids: Array[StringName] = []
-## The props the room stands (props W8, content/props: the hub's teleporter stone and altar), by
-## id, each at the place of the same index in `prop_spawns` (its feet), in room pixels. Empty (the
-## default): none. The scene marks the places too (`PropSpawns`), and a test holds them together.
-@export var prop_ids: Array[StringName] = []
-@export var prop_spawns: PackedVector2Array = PackedVector2Array()
-## The prop yard, in room pixels (props W8: the hub's): a place where every prop the registry knows
-## stands (`PropBase.in_yard`), in rows by id, each in its first state, to try spells on. Empty (the
-## default): none.
-@export var prop_yard: Rect2 = Rect2()
-## Seconds after a yard prop leaves its first state (lit, broken) or goes before a fresh one stands
-## in its place, so testing never runs out of barrels.
-@export_range(0.0, 120.0, 0.5) var prop_yard_return: float = 10.0
-## The teleporter stone that starts a run, in room pixels (the hub; docs/milestones/
-## online-lobby.md, L1): it is lit while every wizard in the room stands in it, and then any seat's
-## A starts the run. Empty (the default) in every other room. What shows it is a prop standing in
-## it (`prop_ids`: the hub's `hub_stone`), which enters its state `lit` as it lights and `unlit` as
-## it goes out (props W8), so its look and its cue are the prop's.
-@export var start_stone: Rect2 = Rect2()
-## The multiplayer altar, in room pixels (the hub; docs/milestones/online-lobby.md, L2): a seat
-## whose wizard stands in it may open the room to other machines with A (`altar_changed`, the HUD's
-## `online_open_requested`). Empty (the default) in every other room.
-@export var altar: Rect2 = Rect2()
-## Where the wizard of a seat that joins while the room is under way appears, by seat, in room pixels
-## (the hub: beside the altar, where a joining machine's wizards arrive; online lobby decision 4).
-## Empty (the default): at the player spawn farthest from the enemies and the other wizards.
-@export var joiner_spawns: PackedVector2Array = PackedVector2Array()
 ## True for a room where wizards take nothing from hits (the hub): a hit still lands (its flash, its
 ## push, its statuses) but takes no health (`Health.invincible`), so nobody is downed there.
 @export var invincible: bool = false
@@ -66,12 +31,6 @@ extends Resource
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
 
-## The states of a prop standing on the `start_stone` (props W8): lit while every wizard stands
-## on the stone, unlit otherwise.
-const STONE_LIT: StringName = &"lit"
-const STONE_UNLIT: StringName = &"unlit"
-## Pixels between two props in the yard, across and between rows (room to aim at one).
-const YARD_GAP: float = 32.0
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
 ## hundred (the crypt's shadow is 7 %, its light 1.4 %).
@@ -82,9 +41,21 @@ const WALL_LAYER: int = 1
 ## bodies (0), so a mark lies on the floor and never over anyone.
 const FLOOR_Z: int = -2
 
-## `surface_colors()` and `floor_colors()` once worked out (empty until then).
+## `surface_colors()`, `floor_colors()` and `places()` once worked out (empty until then).
 var _surface: PackedColorArray = PackedColorArray()
 var _floor: PackedColorArray = PackedColorArray()
+var _places: RoomPlaces = null
+
+
+## What is where in it (`RoomPlaces`: spawns, doors, props, dummies, zones), read once from its
+## scene. Empty with no scene.
+func places() -> RoomPlaces:
+	if _places == null:
+		var layout: Node = scene.instantiate() if scene != null else null
+		_places = RoomPlaces.read(layout)
+		if layout != null:
+			layout.free()
+	return _places
 
 
 ## The colours its walls shed, lightest first (light, base, shadow; always three, a colour
@@ -159,54 +130,6 @@ static func sample_surface(layout: Node) -> PackedColorArray:
 	return ArtPixels.top_colours(counts)
 
 
-## The dummy that stands at the `spawn`-th of `dummy_spawns`: `dummy_ids` in order, then its last
-## one; `&""` when it names none.
-func dummy_id(spawn: int) -> StringName:
-	if dummy_ids.is_empty() or spawn < 0:
-		return &""
-	return dummy_ids[mini(spawn, dummy_ids.size() - 1)]
-
-
-## Where each of `props` stands in the `prop_yard` (its feet, whole pixels), in order: rows filled
-## left to right, YARD_GAP apart (by `PropBase.extent`), each row centred, its props' feet on one
-## line; a prop that does not fit (the yard is full) at Vector2.INF. Empty with no yard.
-func yard_places(props: Array[PropBase]) -> PackedVector2Array:
-	var places := PackedVector2Array()
-	if not prop_yard.has_area():
-		return places
-	places.resize(props.size())
-	places.fill(Vector2.INF)
-	var top: float = prop_yard.position.y
-	var at: int = 0
-	while at < props.size():
-		# A row: as many as fit across.
-		var row_end: int = at
-		var width: float = 0.0
-		var above: float = 0.0
-		var below: float = 0.0
-		while row_end < props.size():
-			var box: Rect2 = props[row_end].extent() if props[row_end] != null else Rect2()
-			var wider: float = width + (YARD_GAP if row_end > at else 0.0) + box.size.x
-			if row_end > at and wider > prop_yard.size.x:
-				break
-			width = wider
-			above = maxf(above, -box.position.y)
-			below = maxf(below, box.end.y)
-			row_end += 1
-		if top + above + below > prop_yard.end.y or width > prop_yard.size.x:
-			break
-		var x: float = prop_yard.position.x + floorf((prop_yard.size.x - width) * 0.5)
-		var feet_y: float = ceilf(top + above)
-		for i in range(at, row_end):
-			var box: Rect2 = props[i].extent() if props[i] != null else Rect2()
-			if props[i] != null:
-				places[i] = Vector2(floorf(x - box.position.x), feet_y)
-			x += box.size.x + YARD_GAP
-		top = feet_y + below + YARD_GAP
-		at = row_end
-	return places
-
-
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and,
 ## when `layout` is given, its `Floor` sprite (the whole room, under the walls, in a crypt) and its
 ## walls' rectangles (a room whose floor is not one rectangle: the hub's island, the void round it
@@ -237,10 +160,8 @@ func size_in(layout: Node = null) -> Vector2:
 				var half: Vector2 = box.size * 0.5
 				for corner: Vector2 in [half, -half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]:
 					size = size.max(xf * corner)
-	for point: Vector2 in player_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in enemy_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in doors:
-		size = size.max(point + Vector2(32.0, 32.0))
+	var at: RoomPlaces = RoomPlaces.read(layout) if layout != null else places()
+	for points: PackedVector2Array in [at.player_spawns, at.enemy_spawns, at.doors]:
+		for point: Vector2 in points:
+			size = size.max(point + Vector2(32.0, 32.0))
 	return size

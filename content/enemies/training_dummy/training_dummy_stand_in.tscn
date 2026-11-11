@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Texture2D" path="res://content/enemies/training_dummy/idle.svg" id="1_art"]
+[ext_resource type="Resource" path="res://content/enemies/training_dummy/training_dummy.tres" id="2_data"]
+
+[node name="TrainingDummy" type="Sprite2D"]
+texture_filter = 1
+texture = ExtResource("1_art")
+offset = Vector2(0, -14)
+metadata/enemy = ExtResource("2_data")

@@ -284,15 +284,15 @@ signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
 ## Sender: flow. In the hub (online-lobby L1): `standing` of the `wizards` there stand on the
-## teleporter stone (`RoomBase.start_stone`); `lit` while all of them do (and at least one is there),
+## teleporter stone (the room's zone `start_stone`, Flow); `lit` while all of them do (and at least one is there),
 ## when any seat's A starts the run (`run_requested`). Sent as the hub starts and whenever it
 ## changes; (0, 0, false) when the hub is left. Heard by hud (the stone line; A on the lit stone).
 ## The stone's look is the prop standing on it, which flow puts in its state `lit` or `unlit`
-## (props W8, `RoomBase.STONE_LIT`), so feel needs no word of it.
+## (props W8, `Flow.STONE_LIT`), so feel needs no word of it.
 signal start_stone_changed(standing: int, wizards: int, lit: bool)
 ## Sender: flow. The party entered the hub (`in_hub` true: a run in the hub room began) or left it (a run of waves from the stone, the game stopped). Sent when it changes. Heard by net (a machine may join a party only while it is in the hub); the simulation never reads it back.
 signal hub_changed(in_hub: bool)
-## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (`RoomBase.altar`), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
+## Sender: flow. In the hub (online-lobby L2): the seats whose wizards stand on the multiplayer altar (the room's zone `altar`), a bit each; 0 when the hub is left. Sent whenever it changes. Heard by hud (A on the altar asks to open the room, `online_open_requested`).
 signal altar_changed(seats: int)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)

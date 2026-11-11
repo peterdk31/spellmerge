@@ -102,18 +102,11 @@ func _draw_layer(sprite: Sprite2D, layer: PropLayer) -> void:
 	sprite.hframes = maxi(layer.frames, 1)
 	sprite.frame = 0
 	sprite.centered = true
-	var size: Vector2i = layer.frame_size()
-	sprite.position = layer.offset + Vector2(0.0, -float(size.y / 2))
-	# An odd side would centre on half a pixel: put the picture back on the pixels.
-	sprite.offset = Vector2(size.x % 2, size.y % 2) * 0.5
-	match layer.drawn:
-		PropLayer.Drawn.OVER_BODIES:
-			sprite.z_index = 1
-		PropLayer.Drawn.ON_FLOOR:
-			# As the room's floor: under every body and the floor's marks.
-			sprite.z_index = RoomBase.FLOOR_Z
-		_:
-			sprite.z_index = 0
+	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset.
+	var at: Vector2 = layer.drawn_at()
+	sprite.position = at.floor()
+	sprite.offset = at - at.floor()
+	sprite.z_index = layer.z_index()
 	sprite.visible = layer.drawn != PropLayer.Drawn.HIDDEN
 
 

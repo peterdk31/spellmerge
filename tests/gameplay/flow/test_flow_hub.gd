@@ -94,7 +94,7 @@ func _last() -> Vector3i:
 
 ## Put seat `seat`'s wizard on the stone (spread round its centre) or off it, below.
 func _place(seat: int, on: bool) -> void:
-	var centre: Vector2 = _room().start_stone.get_center()
+	var centre: Vector2 = _room().places().zone(FlowScript.ZONE_START_STONE).get_center()
 	var wizard := flow.get_wizard(seat)
 	wizard.position = centre + Vector2(-24.0 + 16.0 * seat, 8.0) if on else centre + Vector2(0.0, 160.0)
 
@@ -203,26 +203,26 @@ func test_the_stone_prop_follows_the_stone() -> void:
 		if prop.prop.id == &"hub_stone":
 			stone_prop = prop
 	check_equal(ids, [&"hub_stone", &"hub_altar"] as Array[StringName], "the stone and the altar stand")
-	check(stone_prop != null and _room().start_stone.has_point(stone_prop.position), "the stone prop on the stone")
+	check(stone_prop != null and _room().places().zone(FlowScript.ZONE_START_STONE).has_point(stone_prop.position), "the stone prop on the stone")
 	if stone_prop == null:
 		events.disconnect("cue_shown", hear)
 		return
-	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "dark at the start")
+	check_equal(stone_prop.state_triggers.state_id(), FlowScript.STONE_UNLIT, "dark at the start")
 	_place(0, true)
 	_tick()
-	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "dark with one of two on it")
+	check_equal(stone_prop.state_triggers.state_id(), FlowScript.STONE_UNLIT, "dark with one of two on it")
 	_place(1, true)
 	_tick()
-	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_LIT, "lit with both")
+	check_equal(stone_prop.state_triggers.state_id(), FlowScript.STONE_LIT, "lit with both")
 	_tick()
 	check_equal(cues.count(&"stone_lit"), 1, "its cue once as it lights")
 	_place(1, false)
 	_tick()
-	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "out as one steps off")
+	check_equal(stone_prop.state_triggers.state_id(), FlowScript.STONE_UNLIT, "out as one steps off")
 	_place(1, true)
 	_tick()
 	input.add_virtual_device(2)
-	check_equal(stone_prop.state_triggers.state_id(), RoomBase.STONE_UNLIT, "out at once under a joiner")
+	check_equal(stone_prop.state_triggers.state_id(), FlowScript.STONE_UNLIT, "out at once under a joiner")
 	check_equal(cues.count(&"stone_lit"), 2, "its cue again as it lit again")
 	events.disconnect("cue_shown", hear)
 	flow.stop_run()
@@ -394,7 +394,7 @@ func test_the_seats_on_the_altar_are_told_as_they_change() -> void:
 	_start([0, 2])
 	_tick()
 	told.clear()
-	var altar: Rect2 = _room().altar
+	var altar: Rect2 = _room().places().zone(FlowScript.ZONE_ALTAR)
 	flow.get_wizard(2).position = altar.get_center()
 	_tick()
 	_tick()
@@ -476,13 +476,13 @@ func _cards(seat: int, staff: int) -> Array[StringName]:
 func test_a_seat_that_joins_the_hub_appears_beside_the_altar() -> void:
 	_start([0])
 	var room: RoomBase = _room()
-	check_equal(flow.get_wizard(0).position, room.player_spawns[0], "the seat the hub began with stands at its spawn")
+	check_equal(flow.get_wizard(0).position, room.places().player_spawns[0], "the seat the hub began with stands at its spawn")
 	for seat: int in [2, 1, 3]:
 		input.add_virtual_device(seat)
 		var at: Vector2 = flow.get_wizard(seat).position
-		check_equal(at, room.joiner_spawns[seat], "seat %d appears at its joiners' spawn" % seat)
-		check(not room.altar.has_point(at), "seat %d is not on the altar" % seat)
-		check(at.distance_to(room.altar.get_center()) < 128.0, "seat %d is beside it (%s)" % [seat, at])
+		check_equal(at, room.places().joiner_spawns[seat], "seat %d appears at its joiners' spawn" % seat)
+		check(not room.places().zone(FlowScript.ZONE_ALTAR).has_point(at), "seat %d is not on the altar" % seat)
+		check(at.distance_to(room.places().zone(FlowScript.ZONE_ALTAR).get_center()) < 128.0, "seat %d is beside it (%s)" % [seat, at])
 	_tick()
 	check_equal(flow.get(&"_altar_sent"), 0, "nobody stands on the altar")
 	_stop()

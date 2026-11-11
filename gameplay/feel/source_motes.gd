@@ -13,6 +13,7 @@ extends RefCounted
 ## View only: nothing in the game reads a source, its dice are its own, and it runs on Feel's clock.
 
 const MotesScript := preload("res://gameplay/feel/mote.gd")
+const MotePlaces := preload("res://gameplay/feel/mote_places.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 
@@ -83,10 +84,13 @@ func watch(tree: SceneTree) -> void:
 	take(tree)
 
 
-## Read every source in `tree` again (null: none), each from now.
+## Read every source in `tree` again (null: none), each from now (a new room: the art read for
+## the last one is let go).
 func take(tree: SceneTree) -> void:
 	_sources.clear()
 	_pending.clear()
+	_art_pixels.clear()
+	_art_colours.clear()
 	if tree == null:
 		return
 	for node: Node in tree.get_nodes_in_group(MoteSource.GROUP):
@@ -227,11 +231,11 @@ func _read_place(source: Source, where: Node2D, art: Sprite2D) -> bool:
 
 ## The world middles of the lit pixels of the frame `art` shows, read once a texture's frame.
 func _mask_points(art: Sprite2D) -> PackedVector2Array:
-	var rect: Rect2i = RoomBase.frame_of(art)
+	var rect: Rect2i = ArtPixels.frame_of(art)
 	var key: Array = [art.texture, rect]
 	var pixels: Variant = _art_pixels.get(key)
 	if pixels == null:
-		pixels = RoomBase.pixels_of_art(art.texture, rect)
+		pixels = ArtPixels.pixels_of(art.texture, rect)
 		_art_pixels[key] = pixels
 	var size := Vector2(rect.size)
 	var corner: Vector2 = art.offset - (size * 0.5 if art.centered else Vector2.ZERO)
@@ -253,11 +257,11 @@ func _sources_of(look: MoteSource, art: Sprite2D) -> PackedInt32Array:
 	for ramp: PackedColorArray in look.ramps:
 		found.append(_table.source(ramp))
 	if found.is_empty() and art != null and art.texture != null:
-		var rect: Rect2i = RoomBase.frame_of(art)
+		var rect: Rect2i = ArtPixels.frame_of(art)
 		var key: Array = [art.texture, rect]
 		var colours: Variant = _art_colours.get(key)
 		if colours == null:
-			colours = RoomBase.colours_of_art(art.texture, rect)
+			colours = ArtPixels.colours_of(art.texture, rect)
 			_art_colours[key] = colours
 		if not (colours as PackedColorArray).is_empty():
 			found.append(_table.source(colours as PackedColorArray))
@@ -271,7 +275,7 @@ func _throw(source: Source, k: int, pool: MotesScript) -> void:
 	var dir: Vector2 = source.way
 	match look.from:
 		MoteSource.From.LINE:
-			var along: float = clampf(MoteSource.on_grid(_rng.randf() * source.length, 0.0, look.spacing), 0.0, source.length)
+			var along: float = clampf(MotePlaces.on_grid(_rng.randf() * source.length, 0.0, look.spacing), 0.0, source.length)
 			# The segment `along` falls in: the last point whose running length is at most it.
 			var i: int = clampi(source.running.bsearch(along, true) - 1, 0, source.points.size() - 2)
 			var a: Vector2 = source.points[i]
@@ -285,7 +289,7 @@ func _throw(source: Source, k: int, pool: MotesScript) -> void:
 			if look.spacing > 0.0:
 				at = (at / look.spacing).round() * look.spacing
 		MoteSource.From.RIM:
-			var off: Vector2 = MoteSource.on_oval(_rng, source.half, look.spacing)
+			var off: Vector2 = MotePlaces.on_oval(_rng, source.half, look.spacing)
 			at += off
 			dir = off.normalized() if not off.is_zero_approx() else source.way
 		MoteSource.From.MASK:

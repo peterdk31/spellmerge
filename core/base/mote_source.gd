@@ -32,8 +32,8 @@ extends Resource
 ## stays there, white-hot and cooling through its ramp over `life` seconds, again and again, so
 ## carvings twinkle as magic rather than lie flat (used sparingly: every pixel is drawn each frame).
 ##
-## The places within an oval are shared with a still card's motes (`StillMoteSource`,
-## gameplay/feel/still_motes.gd): `in_oval`, `on_oval`, `on_grid`.
+## A source is read once, where its node is when it appears (a room's art and a prop stand still):
+## its motes do not follow a node that moves, nor a mask's sprite as it animates or squashes.
 
 ## The group a source's node is in, and the metadata keys of its source and of its mask's art.
 const GROUP: StringName = &"mote_source"
@@ -89,6 +89,16 @@ const MOST_LIFE: float = 4.0
 @export_range(0.1, 4.0, 0.05) var life: float = 1.2
 
 
+## Make `node` give off `source` (in the group, as its META), its art (a mask's; else its colours
+## when it names no ramps) the sprite at `art` from it (empty: none). The one writer of the
+## metadata, as `of` and `art_of` are its readers.
+static func put(node: Node, source: MoteSource, art: NodePath = NodePath()) -> void:
+	node.add_to_group(GROUP)
+	node.set_meta(META, source)
+	if not art.is_empty():
+		node.set_meta(ART, art)
+
+
 ## The source on `node` (its META), or null.
 static func of(node: Node) -> MoteSource:
 	return node.get_meta(META, null) as MoteSource if node != null else null
@@ -124,28 +134,3 @@ func problems(has_art: bool = true) -> PackedStringArray:
 		if ramps[i].size() < 3 or ramps[i].size() > 4:
 			found.append("a mote source's ramp %d has %d colours, not 3 or 4" % [i, ramps[i].size()])
 	return found
-
-
-## A point anywhere in the oval of half-axes `half` round its middle, at most `inside` of the way to
-## its rim (a pool's surface; `rng` the caller's own dice).
-static func in_oval(rng: RandomNumberGenerator, half: Vector2, inside: float = 1.0) -> Vector2:
-	var b: float = rng.randf() * TAU
-	return Vector2(cos(b), sin(b)) * half * sqrt(rng.randf()) * inside
-
-
-## A point on the rim of the oval of half-axes `half` round its middle, in whole pixels; with
-## `spacing`, only at that many pixels apart round it (a rune's ring).
-static func on_oval(rng: RandomNumberGenerator, half: Vector2, spacing: float = 0.0) -> Vector2:
-	var a: float = rng.randf() * TAU
-	if spacing > 0.0:
-		var steps: float = maxf(roundf(TAU * maxf(half.x, half.y) / spacing), 1.0)
-		a = roundf(a / TAU * steps) / steps * TAU
-	return (Vector2(cos(a), sin(a)) * half).round()
-
-
-## `along` (a place on a line `w` from the world's origin along it) put on the world's grid of
-## `spacing` pixels, so pieces of a row and sources side by side line up (0: as it is).
-static func on_grid(along: float, w: float, spacing: float) -> float:
-	if spacing <= 0.0:
-		return along
-	return roundf((w + along) / spacing) * spacing - w

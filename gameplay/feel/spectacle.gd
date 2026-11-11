@@ -382,11 +382,11 @@ func break_body(sprite: Sprite2D, to_world: Transform2D, kind: StringName, share
 	var k: int = pool.kind_index(kind)
 	if source < 0 or k < 0:
 		return
-	var rect: Rect2i = RoomBase.frame_of(sprite)
+	var rect: Rect2i = ArtPixels.frame_of(sprite)
 	var key: Array = [sprite.texture, rect]
 	var pixels: Variant = _art_pixels.get(key)
 	if pixels == null:
-		pixels = RoomBase.pixels_of_art(sprite.texture, rect)
+		pixels = ArtPixels.pixels_of(sprite.texture, rect)
 		_art_pixels[key] = pixels
 	var art: PackedVector2Array = pixels as PackedVector2Array
 	if art.is_empty():
@@ -419,7 +419,7 @@ func broken_at() -> Vector2:
 
 
 ## The ramp table's source for the colours of a body's art (the `sprite` it shows, read once per
-## texture; `RoomBase.colours_of_art`), -1 when it has none (the room's walls' then), or with
+## texture; `ArtPixels.colours_of`), -1 when it has none (the room's walls' then), or with
 ## neither motes nor floor marks to show it.
 func body_source(sprite: Sprite2D) -> int:
 	if pool == null and marks == null:
@@ -428,7 +428,7 @@ func body_source(sprite: Sprite2D) -> int:
 		return -1
 	var colours: Variant = _art_colors.get(sprite.texture)
 	if colours == null:
-		colours = RoomBase.colours_of_art(sprite.texture, RoomBase.frame_of(sprite))
+		colours = ArtPixels.colours_of(sprite.texture, ArtPixels.frame_of(sprite))
 		_art_colors[sprite.texture] = colours
 	return _ramp_table.source(colours as PackedColorArray)
 

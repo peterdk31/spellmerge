@@ -10,6 +10,7 @@ const MotesScript := preload("res://gameplay/feel/mote.gd")
 const SourceMotesScript := preload("res://gameplay/feel/source_motes.gd")
 const RampTableScript := preload("res://gameplay/feel/ramp_table.gd")
 const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
+const MotePlaces := preload("res://gameplay/feel/mote_places.gd")
 
 const FIRE: PackedColorArray = [Color("f4f1ea"), Color("ffa23c"), Color("e0592f"), Color("8f2d2a")]
 const ICE: PackedColorArray = [Color("f4f1ea"), Color("c4f6f2"), Color("4fd6dc"), Color("1f7080")]
@@ -80,9 +81,7 @@ func _mask(look: MoteSource, at: Vector2) -> Node2D:
 	art.texture = ImageTexture.create_from_image(image)
 	holder.add_child(art)
 	var node := Node2D.new()
-	node.add_to_group(MoteSource.GROUP)
-	node.set_meta(MoteSource.META, look)
-	node.set_meta(MoteSource.ART, NodePath("../Art"))
+	MoteSource.put(node, look, NodePath("../Art"))
 	holder.add_child(node)
 	root.add_child(holder)
 	return holder
@@ -175,7 +174,7 @@ func test_a_mask_gives_off_from_its_lit_pixels_in_its_art_colours() -> void:
 	var before: int = motes.next_row()
 	_run(sources, motes, 1.0)
 	var lit: Array[Vector2] = [Vector2(301.5, 301.5), Vector2(302.5, 301.5), Vector2(301.5, 303.5)]
-	var art: int = table.source(RoomBase.colours_of_art((holder.get_node("Art") as Sprite2D).texture))
+	var art: int = table.source(ArtPixels.colours_of((holder.get_node("Art") as Sprite2D).texture))
 	var hits: Dictionary = {}
 	for row in range(before, motes.next_row()):
 		var at: Vector2 = _at(motes, row)
@@ -325,15 +324,15 @@ func test_the_problems_of_a_source() -> void:
 	check(bare.problems(true).is_empty(), "with art, no ramps is fine (its art's colours)")
 
 
-## The places within an oval are shared with a still card's motes (`StillMoteSource`): in it, on its
-## rim, and on the world's grid.
+## The places within an oval (`mote_places.gd`), shared with a still card's motes: in it, on its rim,
+## and on the world's grid.
 func test_the_shared_places_in_an_oval() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 3
 	for i in 200:
-		var inside: Vector2 = MoteSource.in_oval(rng, Vector2(10, 4), 0.9)
+		var inside: Vector2 = MotePlaces.in_oval(rng, Vector2(10, 4), 0.9)
 		check((inside / Vector2(10, 4)).length() <= 0.9001, "in the oval: %s" % inside)
-		var rim: Vector2 = MoteSource.on_oval(rng, Vector2(10, 4), 0.0)
+		var rim: Vector2 = MotePlaces.on_oval(rng, Vector2(10, 4), 0.0)
 		check(rim == rim.round() and absf((rim / Vector2(10, 4)).length() - 1.0) <= 0.3, "on its rim, whole pixels: %s" % rim)
-	check_equal(MoteSource.on_grid(3.0, 10.0, 4.0), 2.0, "on the world's grid of 4: 13 to 12")
-	check_equal(MoteSource.on_grid(3.3, 10.0, 0.0), 3.3, "no spacing: as it is")
+	check_equal(MotePlaces.on_grid(3.0, 10.0, 4.0), 2.0, "on the world's grid of 4: 13 to 12")
+	check_equal(MotePlaces.on_grid(3.3, 10.0, 0.0), 3.3, "no spacing: as it is")

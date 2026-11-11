@@ -15,7 +15,7 @@ extends RefCounted
 ## the walls and the bodies round it in the same steps. Nothing reads it for the game.
 ##
 ## Its colour comes from its art, not from a number: the lightest of the most common colours of
-## the sprite `light_art` names (`RoomBase.colours_of_art`; the first frame of an animated one),
+## the sprite `light_art` names (`ArtPixels.colours_of`; the first frame of an animated one),
 ## so a torch with a blue flame lights blue with no edit. `light_tint` overrides it when the art's
 ## colour reads wrong. A spot does not move once in the tree (room art).
 ##
@@ -62,7 +62,7 @@ static func colour_of(spot: Node) -> Color:
 	if spot.has_meta(TINT):
 		var tint: Color = spot.get_meta(TINT)
 		return Color(tint.r, tint.g, tint.b, 1.0)
-	var colours: PackedColorArray = RoomBase.colours_of_art(art_of(spot))
+	var colours: PackedColorArray = ArtPixels.colours_of(art_of(spot))
 	return colours[0] if not colours.is_empty() else Color.WHITE
 
 

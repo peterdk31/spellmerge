@@ -21,6 +21,7 @@ func _initialize() -> void:
 	_test_sounds()
 	_test_rescan_and_missing_roots()
 	_test_export_suffixes_and_default_sounds()
+	_test_add_a_fixture()
 	if _failures.is_empty():
 		print("TEST OK: core/registry")
 		quit(0)
@@ -56,6 +57,23 @@ func _test_lookup() -> void:
 	_check(registry.get_resource(&"rooms", &"hall") is RoomBase, "hall is a RoomBase")
 	_check(registry.get_folders() == _names([&"enemies", &"rooms", &"spells"]), "folders are found, sorted: %s" % [registry.get_folders()])
 	_check(registry.get_resource(&"enemies", &"spark") == null, "ids are per folder")
+	registry.free()
+
+
+## `add` registers a resource as a scan would (tests: a fixture beside the content): found by id,
+## its id in order, a new folder made; never one with no id or an id the folder holds.
+func _test_add_a_fixture() -> void:
+	var registry: Node = _registry()
+	var blob: EnemyBase = registry.get_resource(&"enemies", &"blob") as EnemyBase
+	var other: EnemyBase = blob.duplicate() as EnemyBase
+	other.id = &"aardvark"
+	_check(registry.add(&"enemies", other), "a new id is added")
+	_check(registry.get_resource(&"enemies", &"aardvark") == other, "and found")
+	_check(registry.get_ids(&"enemies") == _names([&"aardvark", &"blob"]), "in id order: %s" % [registry.get_ids(&"enemies")])
+	_check(not registry.add(&"enemies", other.duplicate()), "an id the folder holds is refused")
+	_check(not registry.add(&"enemies", Resource.new()), "a resource with no id is refused")
+	_check(registry.add(&"props", other), "a new folder")
+	_check(registry.get_folders().has(&"props"), "listed")
 	registry.free()
 
 

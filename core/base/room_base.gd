@@ -1,37 +1,16 @@
 class_name RoomBase
 extends Resource
-## The small M1 room: its scene and where things go. M3 extends it with the
-## biome, the required doors and validators.
+## What kind of room it is (props W8a, docs/milestones/props.md, "W8a: a room is its scene"): its
+## id, its scene and the rules over the whole room. Where things are (spawns, doors, props,
+## dummies, zones) is written in its scene only, edited by hand in the Godot editor, and read by
+## `RoomPlaces` from the layout it builds (`build()`); nothing here is one room's own (the hub's stone
+## is a self-contained prop placed in its scene). M3 extends it with the biome and the door rules,
+## and with rooms built from pieces.
 
 ## Unique name of the room, also its file name; the registry finds it by this.
 @export var id: StringName = &""
-## The layout scene (tiles only, no scripts).
+## The layout scene: its art and walls, and what is where (`RoomPlaces`). No scripts.
 @export var scene: PackedScene
-## Where the players start, in room pixels. Index i is player i; four are expected (checked from M3).
-@export var player_spawns: PackedVector2Array = PackedVector2Array()
-## Where enemies may appear, in room pixels.
-@export var enemy_spawns: PackedVector2Array = PackedVector2Array()
-## Door positions, in room pixels.
-@export var doors: PackedVector2Array = PackedVector2Array()
-## Where a room stands dummies, in room pixels (staffs B7: the sandbox; the hub). Empty in every
-## other room.
-@export var dummy_spawns: PackedVector2Array = PackedVector2Array()
-## Which dummy (an enemy id, content/enemies) stands at each of `dummy_spawns`, in order; the last
-## one stands at every spawn past the list (`dummy_id`).
-@export var dummy_ids: Array[StringName] = []
-## The teleporter stone that starts a run, in room pixels (the hub; docs/milestones/
-## online-lobby.md, L1): it is lit while every wizard in the room stands in it, and then any seat's
-## A starts the run. Empty (the default) in every other room. Its lit look is the scene's nodes in
-## the group STONE_LIT, shown only while it is lit.
-@export var start_stone: Rect2 = Rect2()
-## The multiplayer altar, in room pixels (the hub; docs/milestones/online-lobby.md, L2): a seat
-## whose wizard stands in it may open the room to other machines with A (`altar_changed`, the HUD's
-## `online_open_requested`). Empty (the default) in every other room.
-@export var altar: Rect2 = Rect2()
-## Where the wizard of a seat that joins while the room is under way appears, by seat, in room pixels
-## (the hub: beside the altar, where a joining machine's wizards arrive; online lobby decision 4).
-## Empty (the default): at the player spawn farthest from the enemies and the other wizards.
-@export var joiner_spawns: PackedVector2Array = PackedVector2Array()
 ## True for a room where wizards take nothing from hits (the hub): a hit still lands (its flash, its
 ## push, its statuses) but takes no health (`Health.invincible`), so nobody is downed there.
 @export var invincible: bool = false
@@ -53,9 +32,6 @@ extends Resource
 ## on; at most 1.0 (light only brightens past it).
 @export_range(0.3, 1.0, 0.05) var ambient: float = 1.0
 
-## The group of a room scene's nodes that show only while its `start_stone` is lit (Feel shows
-## and hides them, hearing `start_stone_changed`).
-const STONE_LIT: StringName = &"start_stone_lit"
 ## The share of the most common colour a floor's colour needs to count (a wall's is the art rule's,
 ## `ArtPixels.MIN_SHARE`): a floor is mostly one colour, its seams and highlights a few pixels in a
 ## hundred (the crypt's shadow is 7 %, its light 1.4 %).
@@ -66,9 +42,32 @@ const WALL_LAYER: int = 1
 ## bodies (0), so a mark lies on the floor and never over anyone.
 const FLOOR_Z: int = -2
 
-## `surface_colors()` and `floor_colors()` once worked out (empty until then).
+## `surface_colors()`, `floor_colors()` and `places()` once worked out (empty until then).
 var _surface: PackedColorArray = PackedColorArray()
 var _floor: PackedColorArray = PackedColorArray()
+var _places: RoomPlaces = null
+
+
+## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.
+## The game builds it once a run and reads what is where from that instance (`RoomPlaces.read`), the
+## one it shows. A generated room (M3) overrides it to put pieces together by the run's chance
+## (`sim.chance`, the run's seed among its rules, so a joining machine builds the same); with no
+## `sim` (tests, tools, a colour sample) it builds its default layout. A fixed room is its scene
+## either way. Null with no scene.
+func build(_sim: Sim = null) -> Node:
+	return scene.instantiate() if scene != null else null
+
+
+## What is where in it (`RoomPlaces`: spawns, doors, placements, zones, its size), read once from
+## its default layout (`build()` with no sim), for tests and tools; the game reads the layout it
+## shows.
+func places() -> RoomPlaces:
+	if _places == null:
+		var layout: Node = build()
+		_places = RoomPlaces.read(layout)
+		if layout != null:
+			layout.free()
+	return _places
 
 
 ## The colours its walls shed, lightest first (light, base, shadow; always three, a colour
@@ -80,7 +79,7 @@ func surface_colors() -> PackedColorArray:
 	if not debris_colors.is_empty():
 		return ArtPixels.three(debris_colors)
 	if _surface.is_empty() and scene != null:
-		_surface = ArtPixels.three(sample_surface(scene.instantiate()))
+		_surface = ArtPixels.three(sample_surface(build()))
 	return _surface
 
 
@@ -92,7 +91,7 @@ func floor_colors() -> PackedColorArray:
 	if not floor_mark_colors.is_empty():
 		return ArtPixels.three(floor_mark_colors)
 	if _floor.is_empty() and scene != null:
-		_floor = ArtPixels.three(sample_floor(scene.instantiate()))
+		_floor = ArtPixels.three(sample_floor(build()))
 	return _floor
 
 
@@ -141,50 +140,3 @@ static func sample_surface(layout: Node) -> PackedColorArray:
 	layout.free()
 	counts.erase(floor_main)
 	return ArtPixels.top_colours(counts)
-
-
-## The dummy that stands at the `spawn`-th of `dummy_spawns`: `dummy_ids` in order, then its last
-## one; `&""` when it names none.
-func dummy_id(spawn: int) -> StringName:
-	if dummy_ids.is_empty() or spawn < 0:
-		return &""
-	return dummy_ids[mini(spawn, dummy_ids.size() - 1)]
-
-
-## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, and,
-## when `layout` is given, its `Floor` sprite (the whole room, under the walls, in a crypt) and its
-## walls' rectangles (a room whose floor is not one rectangle: the hub's island, the void round it
-## all wall). The room Flow makes is this size (its camera's limits).
-func size_in(layout: Node = null) -> Vector2:
-	var size := Vector2(640.0, 360.0)
-	var floor_sprite: Sprite2D = layout.get_node_or_null("Floor") as Sprite2D if layout != null else null
-	if floor_sprite != null and floor_sprite.texture != null:
-		var extent: Vector2 = floor_sprite.region_rect.size if floor_sprite.region_enabled else floor_sprite.texture.get_size()
-		size = size.max(floor_sprite.position + extent)
-	if layout != null:
-		for node: Node in layout.find_children("*", "StaticBody2D", true, false):
-			var body := node as StaticBody2D
-			if (body.collision_layer & WALL_LAYER) == 0:
-				continue
-			for child: Node in body.get_children():
-				var shape := child as CollisionShape2D
-				var box := shape.shape as RectangleShape2D if shape != null else null
-				if box == null:
-					continue
-				# The layout is not in the tree yet: its transform is walked by hand.
-				var xf: Transform2D = shape.transform
-				var up: Node = body
-				while up != null and up != layout:
-					if up is Node2D:
-						xf = (up as Node2D).transform * xf
-					up = up.get_parent()
-				var half: Vector2 = box.size * 0.5
-				for corner: Vector2 in [half, -half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]:
-					size = size.max(xf * corner)
-	for point: Vector2 in player_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in enemy_spawns:
-		size = size.max(point + Vector2(32.0, 32.0))
-	for point: Vector2 in doors:
-		size = size.max(point + Vector2(32.0, 32.0))
-	return size

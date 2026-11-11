@@ -177,7 +177,7 @@ func _ready_room() -> void:
 	if _input == null or _flow == null or room == null:
 		_finish("the PlayerInput or Flow autoload, or the hub, is missing")
 		return
-	stone = room.start_stone.get_center()
+	stone = HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).get_center()
 	_play.room_handshake_maker = func() -> NetHandshake:
 		var through := NetSignalHandshake.new(_signal)
 		through.rtc_maker = func(relay: NetRelay) -> NetHandshake: return NetRtc.new(PackedStringArray(), relay)

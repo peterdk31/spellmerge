@@ -1,3 +1,4 @@
+@tool
 class_name PropStateLook
 extends Resource
 ## What a prop looks like in one of its states (props W7, docs/milestones/props.md, "W7: the look"):
@@ -8,7 +9,7 @@ extends Resource
 ## `id`, so the registry never takes it for content.
 ##
 ## Its first layer is the body: the prop's `Sprite`, which a hit flashes and squashes as any
-## body's; so it is drawn among the bodies, never hidden. A mask (`MoteSource.From.MASK`) is read
+## body's; so it is drawn among the bodies or on the floor (a slab), never over them nor hidden. A mask (`MoteSource.From.MASK`) is read
 ## once, as its layer is drawn when the state is entered, so it is never on the body's layer (a hit
 ## squashes it) nor on a layer of several frames: a mask is a layer of its own, as
 ## `tools/pixel_grid.py` writes one.
@@ -41,7 +42,7 @@ func problems(owner: String) -> PackedStringArray:
 	var name: String = "%s: the look of %s" % [owner, state_id if state_id != &"" else "every state"]
 	if layers.is_empty():
 		found.append("%s has no layers." % name)
-	elif layers[0] != null and (layers[0].hidden or layers[0].over_bodies):
+	elif layers[0] != null and layers[0].drawn in [PropLayer.Drawn.HIDDEN, PropLayer.Drawn.OVER_BODIES]:
 		found.append("%s: its first layer is the body; it is neither hidden nor over the bodies." % name)
 	for i in layers.size():
 		if layers[i] == null:

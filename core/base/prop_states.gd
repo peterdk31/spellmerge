@@ -1,3 +1,4 @@
+@tool
 class_name PropStates
 extends Resource
 ## The states a body can be in and their triggers (props W6, docs/milestones/props.md, "Triggers"),

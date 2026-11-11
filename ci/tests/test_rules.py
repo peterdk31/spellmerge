@@ -83,6 +83,14 @@ class BannedApiTest(unittest.TestCase):
         self.assertTrue(banned('ClassDB.instantiate(name)', rules.NATIVE_FILE))
         self.assertTrue(banned(good + 'var x := Expression.new()\n', rules.NATIVE_FILE))
 
+    def test_tool_scripts_only_in_claudes_folders(self) -> None:
+        # The owner's decision of 2026-11-11: @tool is allowed where contributors cannot write.
+        for path in ("tools/prop_stand_in.gd", "core/base/prop_base.gd"):
+            self.assertEqual(banned("@tool\nclass_name X\nextends Node2D\n", path), [], path)
+            self.assertTrue(banned("extends EditorPlugin\n", path), f"an editor plugin in {path}")
+        for path in ("content/props/x/x.gd", "gameplay/actor/x.gd", "hud/x.gd", "net/x.gd", "tests/x.gd"):
+            self.assertTrue(banned("@tool\nextends Node2D\n", path), f"not flagged: {path}")
+
     def test_only_the_netcode_may_name_its_networking_classes(self) -> None:
         link = "var peer := WebRTCPeerConnection.new()\nvar channel: WebRTCDataChannel = null\nvar ws := WebSocketPeer.new()\n"
         self.assertEqual(banned(link, "net/net_webrtc.gd"), [])

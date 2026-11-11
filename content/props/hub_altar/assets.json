@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/props/hub_altar/altar.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a character grid)",
+			"prompt": "A 96x96 multiplayer altar seen from above (transparent background): a walkable floor-level octagonal dais of dark stone 88 px across, a 3 px raised rim shaded as a bevel (Stone light on the top and left, Stone shadow on the bottom and right, the inner face the other way round), a 3 px Stone shadow step under its front edges, its Stone base surface carved in Stone shadow with double channels from a large centre socket to four smaller sockets and a diamond of carved lines joining them, each socket an Outline ring with an inlaid Ice gem, small carved marks at the corners; at its back edge, standing on the rim's middle, a small Stone pedestal with a dish, and above it a floating Ice crystal with a Bone light glint and four small orbiting specks of Ice and Spark that suggest linking far places. Dark Outline, light from the top-left, no player colours. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

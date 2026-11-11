@@ -56,7 +56,7 @@ texture = ExtResource("11_idle")
 [sub_resource type="Resource" id="idle_marks"]
 script = ExtResource("9_layer")
 texture = ExtResource("12_idle_motes")
-hidden = true
+drawn = 3
 motes = Array[ExtResource("10_motes")]([SubResource("idle_mark")])
 
 [sub_resource type="Resource" id="idle_look"]
@@ -90,7 +90,7 @@ motes = Array[ExtResource("10_motes")]([SubResource("fuse_embers")])
 [sub_resource type="Resource" id="fusing_tip"]
 script = ExtResource("9_layer")
 texture = ExtResource("14_fusing_motes")
-hidden = true
+drawn = 3
 motes = Array[ExtResource("10_motes")]([SubResource("fuse_sparks")])
 
 [sub_resource type="Resource" id="fusing_look"]

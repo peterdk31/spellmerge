@@ -1,3 +1,4 @@
+@tool
 class_name PropBase
 extends Resource
 ## A prop (props W6, docs/milestones/props.md): a thing in the world that stands, blocks, takes hits
@@ -20,6 +21,16 @@ extends Resource
 @export var max_health: float = 10.0
 ## True for a prop no hit hurts (the hub's): hits still land and show, its health stays.
 @export var invincible: bool = false
+## What it is to the game's rules (props W8c; self-contained: a thing says what it is, a room only
+## places it): empty for a prop the rules know nothing of (most; every one of them stands in the
+## hub's prop yard), else a name the rules read (`run_start`: the teleporter stone the hub's rules
+## light and start a run from; `party_altar`: where a seat opens the party to other machines).
+## A prop with a role never stands in the yard, so a new role is added with the rule that reads it.
+@export var role: StringName = &""
+## Where standing on it counts (props W8c), a box `area_size` across round `area_offset` from its
+## feet, apart from the ground that blocks (`footprint_*`): the stone's slab is stood on. Zero: none.
+@export var area_size: Vector2 = Vector2.ZERO
+@export var area_offset: Vector2 = Vector2.ZERO
 
 ## The hurt shape (`Hurtbox`): a circle of `radius`, or a box `size` across, round `offset` from the
 ## feet.
@@ -69,6 +80,36 @@ func look_of(state_id: StringName) -> PropStateLook:
 ## True when its own data sets a footprint (else the kit's default).
 func has_footprint() -> bool:
 	return footprint_radius > 0.0 or (footprint_size.x > 0.0 and footprint_size.y > 0.0)
+
+
+## The box it takes up round its feet, in pixels (the hub's prop yard spaces props by it): its hurt
+## shape and its own footprint together, each where its offset puts it. Its art may reach past it.
+func extent() -> Rect2:
+	var box: Rect2 = hurt_rect()
+	return box.merge(ground_rect()) if has_footprint() else box
+
+
+## Its hurt shape's box from its feet: a box `size` across, or its circle's bounds, round `offset`.
+func hurt_rect() -> Rect2:
+	var half: Vector2 = size * 0.5 if size.x > 0.0 and size.y > 0.0 else Vector2(radius, radius)
+	return Rect2(offset - half, half * 2.0)
+
+
+## Where standing on it counts, from its feet (`area_size` round `area_offset`); empty when none.
+func area_rect() -> Rect2:
+	if area_size.x <= 0.0 or area_size.y <= 0.0:
+		return Rect2()
+	return Rect2(area_offset - area_size * 0.5, area_size)
+
+
+## Its ground's box from its feet when its own data sets one (`has_footprint`): a box
+## `footprint_size` across, or its circle's bounds, round `footprint_offset`. Empty when it sets
+## none (the kit fits one as it makes the body, `PropBody`).
+func ground_rect() -> Rect2:
+	if not has_footprint():
+		return Rect2()
+	var half: Vector2 = footprint_size * 0.5 if footprint_size.x > 0.0 and footprint_size.y > 0.0 else Vector2(footprint_radius, footprint_radius)
+	return Rect2(footprint_offset - half, half * 2.0)
 
 
 ## What is wrong with the prop's data, one line each (empty when it is fine): no scene, no states,

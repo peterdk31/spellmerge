@@ -141,6 +141,23 @@ func get_resource(folder: StringName, id: StringName) -> Resource:
 	return found.get(id) as Resource
 
 
+## Register `resource` under its `id` in `folder`, as a scan would have found it there (tests: a
+## fixture beside the content, on a registry of their own). False, and nothing changes, when it has
+## no id or the folder already holds that id.
+func add(folder: StringName, resource: Resource) -> bool:
+	var id: StringName = resource.get("id") if resource != null and "id" in resource else &""
+	var found: Dictionary = _resources.get(folder, {})
+	if id == &"" or found.has(id):
+		return false
+	found[id] = resource
+	_resources[folder] = found
+	var ids: Array[StringName] = get_ids(folder)
+	ids.append(id)
+	ids.sort_custom(_name_less)
+	_ids[folder] = ids
+	return true
+
+
 ## Every id in the folder, sorted. Empty for an unknown folder.
 func get_ids(folder: StringName) -> Array[StringName]:
 	var result: Array[StringName] = []

@@ -93,6 +93,20 @@ func _known() -> Dictionary:
 
 # --- The data -----------------------------------------------------------------
 
+## `prop_state_requested` (props W8c): a prop asked by the bus enters the state, as a trigger's
+## `then` would; a request for another body, a state it lacks or the one it is in changes nothing.
+func test_a_prop_asked_by_the_bus_enters_the_state() -> void:
+	var barrel: Actor = _prop(EXPLODING_BARREL)
+	var other: Actor = _prop(EXPLODING_BARREL, Vector2(200, 0))
+	_world.bus.prop_state_requested.emit(barrel.id, &"broken")
+	check_equal(_state(barrel), &"broken", "asked, it entered")
+	check_equal(_state(other), &"idle", "the other one not")
+	check_equal(_changes, [[barrel.id, &"broken"]], "told once")
+	_world.bus.prop_state_requested.emit(barrel.id, &"broken")
+	_world.bus.prop_state_requested.emit(barrel.id, &"nowhere")
+	check_equal(_changes.size(), 1, "the state it is in, and one it lacks, change nothing")
+
+
 func test_the_exploding_barrel_is_sound() -> void:
 	check_equal(EXPLODING_BARREL.problems(_known()), PackedStringArray(), "the exploding barrel's data is sound")
 

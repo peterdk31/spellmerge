@@ -122,7 +122,7 @@ class StoneWalker:
 
 	func _init(press_at: int) -> void:
 		var room: RoomBase = HUB
-		var to: Vector2 = room.start_stone.get_center() - room.player_spawns[0]
+		var to: Vector2 = HubRules.area_of(room.places(), HubRules.ROLE_RUN_START).get_center() - room.places().player_spawns[0]
 		way = to.normalized()
 		walk = floori((to.length() - 8.0) / STEP)
 		after = press_at + 1

@@ -1,0 +1,22 @@
+{
+	"assets": [
+		{
+			"path": "content/props/hub_stone/stone.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a character grid)",
+			"prompt": "A 96x96 teleporter stone seen from above (transparent background), unlit: a flat round platform of dark carved stone 88 px across, floor-level, with a raised rim shaded as a bevel (outer face Stone light at the top-left and Stone shadow at the bottom-right, inner face the other way round), a 3 px Stone shadow front edge under its lower half, a Stone base top face with a carved outer line, a ring of twelve small abstract carved runes, a thin carved inner ring line and a central sigil (a circle round a four-point star with an Outline core), all carved in Stone shadow, a few worn cracks and a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		},
+		{
+			"path": "content/props/hub_stone/stone_lit.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a character grid)",
+			"prompt": "A 96x96 overlay drawn exactly over stone.svg when the teleporter stone is lit (transparent background): only the glowing parts, at the same pixels as the stone's carvings: the twelve runes and the sigil's circle and star in Ice base, the thin inner ring line, the star's core and its four tips in Ice light. No glow halo (the game adds light). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

@@ -57,12 +57,12 @@ func take() -> void:
 
 func room_spawn() -> Vector2:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
-	return room.player_spawns[0]
+	return room.places().player_spawns[0]
 
 
 func _stone() -> Rect2:
 	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", &"hub") as RoomBase
-	return room.start_stone
+	return HubRules.area_of(room.places(), HubRules.ROLE_RUN_START)
 
 
 func _place(seat: int, at: Vector2) -> void:

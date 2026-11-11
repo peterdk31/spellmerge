@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="PropBase" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://core/base/prop_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="2_scene"]
+[ext_resource type="Resource" path="res://content/props/hub_altar/hub_altar_states.tres" id="3_states"]
+[ext_resource type="Script" path="res://core/base/prop_state_look.gd" id="4_look"]
+[ext_resource type="Script" path="res://core/base/prop_layer.gd" id="5_layer"]
+[ext_resource type="Texture2D" path="res://content/props/hub_altar/altar.svg" id="6_altar"]
+
+[sub_resource type="Resource" id="dais"]
+script = ExtResource("5_layer")
+texture = ExtResource("6_altar")
+offset = Vector2(0, 48)
+drawn = 2
+
+[sub_resource type="Resource" id="look"]
+script = ExtResource("4_look")
+layers = Array[ExtResource("5_layer")]([SubResource("dais")])
+
+[resource]
+script = ExtResource("1_base")
+id = &"hub_altar"
+display_name = "Multiplayer altar"
+scene = ExtResource("2_scene")
+invincible = true
+role = &"party_altar"
+radius = 44.0
+offset = Vector2(0, 0)
+area_size = Vector2(96, 96)
+states = ExtResource("3_states")
+looks = Array[ExtResource("4_look")]([SubResource("look")])

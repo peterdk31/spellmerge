@@ -1,3 +1,4 @@
+@tool
 class_name PropState
 extends Resource
 ## One state of a prop (props W6, docs/milestones/props.md, "What a prop is made of"): its

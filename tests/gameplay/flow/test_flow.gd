@@ -380,10 +380,10 @@ func _test_biggest_wave_stands_on_floor() -> void:
 	var uses: Dictionary = {}
 	for at: int in FlowScript.wave_size(FlowScript.WAVE_MAX):
 		var entry: int = FlowScript.WAVE[at] if at < FlowScript.WAVE.size() else at
-		var spawn: int = entry % room.enemy_spawns.size()
+		var spawn: int = entry % room.places().enemy_spawns.size()
 		var times: int = uses.get(spawn, 0)
 		uses[spawn] = times + 1
-		var position: Vector2 = FlowScript.stacked_position(room.enemy_spawns[spawn], times)
+		var position: Vector2 = FlowScript.stacked_position(room.places().enemy_spawns[spawn], times)
 		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
 		_check(inner.encloses(body), "spawn %d of the biggest wave (%s) is inside the room" % [at, position])
 		for wall in walls:

@@ -1,3 +1,4 @@
+@tool
 class_name PropLayer
 extends Resource
 ## One layer of a prop's art in a state (props W7, docs/milestones/props.md, "W7: the look"): a
@@ -15,10 +16,14 @@ extends Resource
 ## Its frames side by side in `texture`, and how many a second play (0: the first only).
 @export_range(1, 32) var frames: int = 1
 @export_range(0.0, 30.0, 0.5) var fps: float = 0.0
-## Drawn over every body (a tall prop's top: a wizard behind it is hidden by it), else among them.
-@export var over_bodies: bool = false
-## Not drawn: only its motes read it (a mask of mote points, `tools/pixel_grid.py`'s `_motes.svg`).
-@export var hidden: bool = false
+## Where it is drawn (`Drawn`): among the bodies, over them, on the floor, or not at all.
+@export var drawn: Drawn = Drawn.AMONG_BODIES
+
+## Where a layer is drawn: AMONG_BODIES (a barrel), OVER_BODIES (a tall prop's top: a wizard behind
+## it is hidden by it), ON_FLOOR (under every body and the floor's marks, as the room's floor is: a
+## slab walked on, the hub's teleporter stone), HIDDEN (not drawn: only its motes read it, a mask of
+## mote points, `tools/pixel_grid.py`'s `_motes.svg`).
+enum Drawn { AMONG_BODIES, OVER_BODIES, ON_FLOOR, HIDDEN }
 ## What it gives off (`MoteSource`): a mask reads this layer's lit pixels; any other source's
 ## places are from the prop's feet.
 @export var motes: Array[MoteSource] = []
@@ -37,6 +42,43 @@ func frame_size() -> Vector2i:
 	if texture == null:
 		return Vector2i.ZERO
 	return Vector2i(texture.get_width() / maxi(frames, 1), texture.get_height())
+
+
+## Where its picture's middle is drawn from the prop's feet: its bottom middle on the feet moved
+## by `offset`, an odd side's half pixel kept so the art lies on whole pixels. What `PropLook` draws
+## and a prop's stand-in in a room scene shows (W8a).
+func drawn_at() -> Vector2:
+	var size: Vector2i = frame_size()
+	return offset + Vector2(0.0, -float(size.y / 2)) + Vector2(size.x % 2, size.y % 2) * 0.5
+
+
+## `sprite` showing this layer as the game shows it (its first frame, where `drawn_at` puts it, at
+## `z_index`, hidden when `HIDDEN`): what a prop's look (`PropLook`) and its stand-in in a room's
+## scene (the editor's, tools/prop_stand_in.gd) both draw with, so the editor shows what the game
+## draws.
+func dress(sprite: Sprite2D) -> void:
+	sprite.texture = texture
+	sprite.hframes = maxi(frames, 1)
+	sprite.frame = 0
+	sprite.centered = true
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# The node on whole pixels (a hit squashes round it); an odd side's half pixel in its offset.
+	var at: Vector2 = drawn_at()
+	sprite.position = at.floor()
+	sprite.offset = at - at.floor()
+	sprite.z_index = z_index()
+	sprite.visible = drawn != Drawn.HIDDEN
+
+
+## The z its picture is drawn at, from its `drawn` (hidden: as among the bodies).
+func z_index() -> int:
+	match drawn:
+		Drawn.OVER_BODIES:
+			return 1
+		Drawn.ON_FLOOR:
+			# As the room's floor: under every body and the floor's marks.
+			return RoomBase.FLOOR_Z
+	return 0
 
 
 ## What is wrong with it, one line each after `owner` (empty when nothing is).

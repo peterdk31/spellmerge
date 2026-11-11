@@ -14,6 +14,10 @@ const LoopHandshake := preload("res://tests/net/loop_handshake.gd")
 
 const URL: String = "wss://rooms.test/room"
 const ROOM: String = "KQ7RM"
+const RELAY_TEXT: String = '{"t":"relay","urls":["turn:turn.example.net:3478?transport=udp","turns:turn.example.net:443?transport=tcp"],"username":"a1b2:c3","credential":"pa+ss/w=rd"}'
+const RELAY_URLS: PackedStringArray = ["turn:turn.example.net:3478?transport=udp", "turns:turn.example.net:443?transport=tcp"]
+const RELAY_USER: String = "a1b2:c3"
+const RELAY_PASS: String = "pa+ss/w=rd"
 
 var _now: int = 0
 ## The inner handshakes' shared tables: the host's nth guest and the nth joining machine share one.
@@ -21,6 +25,9 @@ var _tables: Array[Dictionary] = []
 var _host_made: int = 0
 var _guest_made: int = 0
 var _inner: Array[LoopHandshake] = []
+## The relay each inner handshake was made with (null: none), the host's and the joining machines', in the order made.
+var _host_relays: Array[NetRelay] = []
+var _guest_relays: Array[NetRelay] = []
 
 
 func before_each() -> void:
@@ -29,6 +36,8 @@ func before_each() -> void:
 	_host_made = 0
 	_guest_made = 0
 	_inner.clear()
+	_host_relays.clear()
+	_guest_relays.clear()
 
 
 func _table(at: int) -> Dictionary:
@@ -40,7 +49,8 @@ func _table(at: int) -> Dictionary:
 func _handshake(socket: FakeSocket, hosting: bool) -> NetSignalHandshake:
 	var made := NetSignalHandshake.new(URL, socket)
 	made.clock = func() -> int: return _now
-	made.rtc_maker = func() -> NetHandshake:
+	made.rtc_maker = func(relay: NetRelay) -> NetHandshake:
+		(_host_relays if hosting else _guest_relays).append(relay)
 		var inner: LoopHandshake
 		if hosting:
 			inner = LoopHandshake.new(_table(_host_made))
@@ -59,6 +69,8 @@ class Relay:
 	var host: FakeSocket = null
 	var guests: Dictionary[int, FakeSocket] = {}
 	var waiting: Array[FakeSocket] = []
+	## Sent to both before a join is told (none: "").
+	var relay_text: String = ""
 
 	func step() -> void:
 		if host != null:
@@ -82,6 +94,9 @@ class Relay:
 				while guests.has(id):
 					id += 1
 				guests[id] = socket
+				if relay_text != "":
+					socket.arrive(relay_text)
+					host.arrive(relay_text)
 				socket.arrive('{"t":"joined"}')
 				host.arrive('{"t":"guest","id":%d}' % id)
 			elif text != "":
@@ -183,7 +198,7 @@ func test_nothing_connects_before_it_is_asked() -> void:
 	made.poll()
 	check_equal([socket.url, made.code(), made.problem()], ["", "", ""], "made and polled: nothing")
 	check_equal(made.offer(), "", "asked")
-	check_equal(socket.url, URL, "the socket goes to the address it was given, and only there")
+	check_equal(socket.url, URL + "?relay=1", "the socket goes to the address it was given, and only there, asking for relays")
 	check_equal(made.offer(), "it has begun already", "once")
 
 
@@ -448,7 +463,7 @@ func test_a_machine_that_cannot_link_fails_at_the_first_guest() -> void:
 	var host := NetSignalHandshake.new(URL, socket)
 	host.clock = func() -> int: return _now
 	# The base handshake links nothing (as a build without WebRTC).
-	host.rtc_maker = func() -> NetHandshake: return NetHandshake.new()
+	host.rtc_maker = func(_relay: NetRelay) -> NetHandshake: return NetHandshake.new()
 	host.offer()
 	socket.accept()
 	host.poll()
@@ -490,3 +505,71 @@ func test_a_joining_machine_hands_its_link_over_once_by_next_link() -> void:
 	check(link != null and link == guest.link(), "the link, as whoever holds several machines asks for it")
 	check(guest.next_link() == null, "once")
 
+
+
+func _is_the_relay(relay: NetRelay) -> bool:
+	return relay != null and relay.urls == RELAY_URLS and relay.username == RELAY_USER and relay.credential == RELAY_PASS
+
+
+func test_a_relay_the_server_hands_over_goes_to_the_inner_handshakes() -> void:
+	var hosted: Array = _hosted()
+	var host: NetSignalHandshake = hosted[0]
+	var relay: Relay = hosted[2]
+	relay.relay_text = RELAY_TEXT
+	var guest: NetSignalHandshake = _joining(relay)[0]
+	_run(relay, [host, guest])
+	check(host.link() != null and guest.link() != null, "both hold a link")
+	check(_host_relays.size() == 1 and _is_the_relay(_host_relays[0]), "the host's inner handshake was given the relay")
+	check(_guest_relays.size() == 1 and _is_the_relay(_guest_relays[0]), "and the guest's")
+	# A join past the server's limit comes with none: the host keeps the last for it.
+	relay.relay_text = ""
+	var second: NetSignalHandshake = _joining(relay)[0]
+	_run(relay, [host, guest, second])
+	check(second.link() != null, "the second guest is linked")
+	check(_host_relays.size() == 2 and _is_the_relay(_host_relays[1]), "the host's second inner handshake with the last relay")
+	check(_guest_relays.size() == 2 and _guest_relays[1] == null, "the second guest's with none")
+
+
+func test_no_relay_from_the_server_means_none_is_given() -> void:
+	var hosted: Array = _hosted()
+	var guest: NetSignalHandshake = _joining(hosted[2])[0]
+	_run(hosted[2], [hosted[0], guest])
+	check(guest.link() != null, "linked")
+	check_equal([_host_relays, _guest_relays], [[null] as Array[NetRelay], [null] as Array[NetRelay]], "each inner handshake with no relay")
+
+
+## The server's form and the game's may drift apart one day: that must cost the relay, not the room.
+func test_a_relay_out_of_form_is_no_relay_and_the_machines_still_link() -> void:
+	var hosted: Array = _hosted()
+	var host: NetSignalHandshake = hosted[0]
+	var relay: Relay = hosted[2]
+	relay.relay_text = '{"t":"relay","urls":["turn:a.b:53?transport=udp"],"username":"u","credential":"p","new":1}'
+	var guest: NetSignalHandshake = _joining(relay)[0]
+	_run(relay, [host, guest])
+	check_equal([host.problem(), guest.problem()], ["", ""], "neither failed")
+	check(host.link() != null and guest.link() != null, "both hold a link")
+	check_equal([_host_relays, _guest_relays], [[null] as Array[NetRelay], [null] as Array[NetRelay]], "with no relay")
+
+
+func test_a_relay_out_of_its_place_ends_the_handshake() -> void:
+	# The host: before its room is given.
+	var socket := FakeSocket.new()
+	var host: NetSignalHandshake = _handshake(socket, true)
+	host.offer()
+	socket.accept()
+	host.poll()
+	socket.arrive(RELAY_TEXT)
+	host.poll()
+	check_equal(host.problem(), "the room server said something that is no message of its", "a relay before the room")
+	# A joining machine: after it was told it is in.
+	var guest_socket := FakeSocket.new()
+	var guest: NetSignalHandshake = _handshake(guest_socket, false)
+	guest.take(ROOM)
+	guest_socket.accept()
+	guest.poll()
+	guest_socket.arrive('{"t":"joined"}')
+	guest.poll()
+	check_equal(guest.problem(), "", "in the room")
+	guest_socket.arrive(RELAY_TEXT)
+	guest.poll()
+	check_equal(guest.problem(), "the room server said something that is no message of its", "a relay after joined")

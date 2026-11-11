@@ -10,6 +10,10 @@ extends NetHandshake
 ##   address as the internet sees it (the public one in STUN unless told otherwise; they see the
 ##   address and nothing of the game), and it talks to the machine whose code was pasted. Nothing
 ##   listens for strangers.
+## - **A relay may be given** (a `NetRelay`: a TURN server and its short-lived credential, from
+##   whoever hands them out): WebRTC then also gathers an address on it and uses it only where the two
+##   machines find no direct way. It sees that the two talk and how much, never what: the channel
+##   is encrypted end to end. Codes typed by hand have none.
 ## - **One code each way:** a machine's code is shown once its candidates are gathered, or
 ##   GATHER_MS after its description was made with what was gathered by then (a STUN server that
 ##   does not answer must not hold the code back for ever). Never with no candidate in it: such a
@@ -19,10 +23,10 @@ extends NetHandshake
 ## - **A pasted code** is read by `NetCode` (strictly) and must be the kind this side expects
 ##   before WebRTC sees any of it; a code refused there changes nothing, so the player may paste
 ##   again. A code WebRTC itself refuses ends the handshake (`problem`): its peer cannot go on.
-## - **A link that is never made says why, as far as the two codes tell** (`why_no_link`): both
-##   machines behind one router, a machine that never learnt its address from outside, or two
-##   networks with no direct way between them (which only a relay gets through), with the count
-##   of each machine's addresses. Never an address itself: the words may be on a shared screen.
+## - **A link that is never made says why, as far as the two codes tell** (`why_no_link`): a relay
+##   that did not get through either, both machines behind one router, a machine that never
+##   learnt its address from outside, or two networks with no direct way between them (which only
+##   a relay gets through), with the count of each machine's addresses. Never an address itself: the words may be on a shared screen.
 ## - **The clock is given** (milliseconds; the engine's unless told), as the sessions' is.
 ##
 ## With `NetRtcLink`, the only script that names the engine's WebRTC classes.
@@ -43,6 +47,7 @@ const LINK_MS: int = 30000
 var clock: Callable = Callable()
 
 var _stun: PackedStringArray
+var _relay: NetRelay
 var _peer: WebRTCPeerConnection = null
 var _channel: WebRTCDataChannel = null
 var _hosting: bool = false
@@ -61,9 +66,11 @@ var _problem: String = ""
 
 
 ## `stun_servers`: the servers asked for this machine's address (none: only machines on one
-## network, or in one process, find each other).
-func _init(stun_servers: PackedStringArray = STUN) -> void:
+## network, or in one process, find each other). `relay`: a relay to link through where there is no
+## direct way, or null.
+func _init(stun_servers: PackedStringArray = STUN, relay: NetRelay = null) -> void:
 	_stun = stun_servers
+	_relay = relay
 
 
 func offer() -> String:
@@ -168,7 +175,9 @@ static func why_no_link(mine: NetCode, theirs: NetCode) -> String:
 	var my_seen: PackedStringArray = mine.seen_at()
 	var their_seen: PackedStringArray = theirs.seen_at()
 	var why: String = "they are on two networks with no direct way between them; only a relay gets through that"
-	if my_seen.is_empty():
+	if mine.relay_count() > 0 or theirs.relay_count() > 0:
+		why = "not even through the relay (a firewall may block it, or the relay is down)"
+	elif my_seen.is_empty():
 		why = "this machine never learnt its address as seen from outside, so only a machine on its own network can reach it (a firewall may be in the way)"
 	elif their_seen.is_empty():
 		why = "the other machine never learnt its address as seen from outside, so only a machine on its own network can reach it (a firewall there may be in the way)"
@@ -177,7 +186,7 @@ static func why_no_link(mine: NetCode, theirs: NetCode) -> String:
 			if their_seen.has(address):
 				why = "both seem to be on one network, where these two do not see each other; use the same browser on both, or the desktop build"
 				break
-	return "%s (addresses: this machine %d own, %d outside; the other %d own, %d outside)" % [why, mine.own_count(), my_seen.size(), theirs.own_count(), their_seen.size()]
+	return "%s (addresses: this machine %d own, %d outside, %d relay; the other %d own, %d outside, %d relay)" % [why, mine.own_count(), my_seen.size(), mine.relay_count(), theirs.own_count(), their_seen.size(), theirs.relay_count()]
 
 
 ## What follows a failure to link: ": " and `why_no_link`, once both codes are there.
@@ -192,8 +201,12 @@ func _begin(hosting: bool) -> String:
 	_hosting = hosting
 	_peer = WebRTCPeerConnection.new()
 	var servers: Array[Dictionary] = []
+	# Each list a plain Array: the desktop extension refuses any other (a PackedStringArray
+	# fails its `initialize`).
 	if not _stun.is_empty():
-		servers.append({"urls": _stun})
+		servers.append({"urls": Array(_stun)})
+	if _relay != null and not _relay.urls.is_empty():
+		servers.append({"urls": Array(_relay.urls), "username": _relay.username, "credential": _relay.credential})
 	if _peer.initialize({"iceServers": servers}) != OK:
 		return _fail("WebRTC did not start")
 	_peer.session_description_created.connect(_on_described)

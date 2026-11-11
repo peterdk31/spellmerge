@@ -180,7 +180,7 @@ func _ready_room() -> void:
 	stone = room.start_stone.get_center()
 	_play.room_handshake_maker = func() -> NetHandshake:
 		var through := NetSignalHandshake.new(_signal)
-		through.rtc_maker = func() -> NetHandshake: return NetRtc.new(PackedStringArray())
+		through.rtc_maker = func(relay: NetRelay) -> NetHandshake: return NetRtc.new(PackedStringArray(), relay)
 		return through
 	_events.start_stone_changed.connect(_on_stone)
 	for player in _players:

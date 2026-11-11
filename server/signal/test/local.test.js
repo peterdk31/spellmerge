@@ -3,11 +3,11 @@
 //
 // The rooms behind real WebSockets (local.js, the server the game is played against on one
 // machine): a room opened and joined, the codes there and back, a code of the longest kind, a
-// refusal's close code, and the room closing with its host.
+// refusal's close code, the room closing with its host, and a relay handed to both.
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { listen } from "../local.js";
+import { FAKE_RELAY, listen } from "../local.js";
 import { LIMITS } from "../rooms.js";
 
 /** A client: what it was sent, in order, awaited one at a time. */
@@ -94,6 +94,29 @@ test("only /room is a socket", async () => {
     await assert.rejects(client(server.port, "/elsewhere").opened);
     const response = await fetch(`http://127.0.0.1:${server.port}/room`);
     assert.equal(response.status, 426);
+  } finally {
+    await server.close();
+  }
+});
+
+test("a join over real sockets with a relay: those that asked in their address are sent it first", async () => {
+  const server = await listen(0, { code: () => "KQ7RM", relay: async () => FAKE_RELAY });
+  try {
+    const host = client(server.port, "/room?relay=1");
+    await host.opened;
+    host.say({ t: "open" });
+    await host.next();
+    const guest = client(server.port, "/room?relay=1");
+    await guest.opened;
+    guest.say({ t: "join", code: "KQ7RM" });
+    const relay = { t: "relay", ...FAKE_RELAY };
+    assert.deepEqual([await guest.next(), await guest.next()], [relay, { t: "joined" }]);
+    assert.deepEqual([await host.next(), await host.next()], [relay, { t: "guest", id: 1 }]);
+    // A game from before relays (plain /room) is sent none.
+    const old = client(server.port);
+    await old.opened;
+    old.say({ t: "join", code: "KQ7RM" });
+    assert.deepEqual(await old.next(), { t: "joined" });
   } finally {
     await server.close();
   }

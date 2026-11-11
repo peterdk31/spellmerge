@@ -8,17 +8,27 @@ extends SceneTree
 ##
 ##     godot --headless --path . --script res://tests/net/signal_runner.gd -- --signal=ws://127.0.0.1:8787/room
 ##
-## Prints `SIGNAL OK` or `SIGNAL FAILED: <why>`, and quits.
+## Prints `SIGNAL OK` or `SIGNAL FAILED: <why>`, and quits. With a relay the server hands over:
+## `--relay=given` also needs each inner handshake to have been given one (local.js
+## `--fake-relay`), `--relay=used` each machine's code to hold an address on it (the deployed
+## server with its TURN key: the credential works). Either way it prints what it saw of the relay.
 
 const PATIENCE_STEPS: int = 1800
 
 var _url: String = ""
+## "", "given" or "used" (above).
+var _want_relay: String = ""
+## Every inner handshake made, and the relay it was given.
+var _rtcs: Array[NetRtc] = []
+var _relays: Array[NetRelay] = []
 
 
 func _initialize() -> void:
 	for argument: String in OS.get_cmdline_user_args():
 		if argument.begins_with("--signal="):
 			_url = argument.trim_prefix("--signal=")
+		elif argument.begins_with("--relay="):
+			_want_relay = argument.trim_prefix("--relay=")
 	await process_frame
 	var why: String = await _play()
 	print("SIGNAL OK" if why == "" else "SIGNAL FAILED: %s" % why)
@@ -27,7 +37,11 @@ func _initialize() -> void:
 
 func _made() -> NetSignalHandshake:
 	var made := NetSignalHandshake.new(_url)
-	made.rtc_maker = func() -> NetHandshake: return NetRtc.new(PackedStringArray())
+	made.rtc_maker = func(relay: NetRelay) -> NetHandshake:
+		var rtc := NetRtc.new(PackedStringArray(), relay)
+		_rtcs.append(rtc)
+		_relays.append(relay)
+		return rtc
 	return made
 
 
@@ -66,8 +80,25 @@ func _play() -> String:
 			continue
 		if stranger.problem() != "no room has the code ZZZZZ":
 			return "the stranger was told: %s" % stranger.problem()
-		return await _talk(host.link(), guest.link())
+		why = await _talk(host.link(), guest.link())
+		return why if why != "" else _relay_seen()
 	return "no link in time (room %s, stranger: %s)" % [host.code(), stranger.problem()]
+
+
+## What was seen of the relay, printed; "" or why it is not what `--relay` wants.
+func _relay_seen() -> String:
+	var given: int = 0
+	var addresses: PackedStringArray = []
+	for at in _rtcs.size():
+		given += 0 if _relays[at] == null else 1
+		var code := NetCode.new()
+		addresses.append(str(code.relay_count()) if code.read(_rtcs[at].code()) == "" else "?")
+	print("SIGNAL relay given to %d of %d; relay addresses in each code: %s" % [given, _rtcs.size(), ", ".join(addresses)])
+	if _want_relay != "" and given != _rtcs.size():
+		return "a relay was wanted and not given to every machine"
+	if _want_relay == "used" and (addresses.has("0") or addresses.has("?")):
+		return "a relay was given but a machine gathered no address on it"
+	return ""
 
 
 ## The two links carry a message each way.

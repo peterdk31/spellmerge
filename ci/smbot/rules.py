@@ -115,8 +115,20 @@ _SIGNAL_IMPORT = re.compile(r"""\bfrom\s*["']([^"']+)["']|\bimport\s*["']([^"']+
 _SIGNAL_BANNED = re.compile(
     r"\beval\s*\(|\bnew\s+Function\b|\bimport\s*\(|\brequire\s*\(|\bprocess\.env\b|\bchild_process\b|"
     r"\bimportScripts\b|\bWebAssembly\b|\bconnect\s*\(|\bglobalThis\b|\bself\s*[.\[]")
-# A call of the global fetch (a method named fetch, as a Worker's own, is not one).
-_SIGNAL_FETCH = re.compile(r"(?<![.\w])(?<!async )fetch\s*\(")
+# Other ways out of the server than fetch (its tests open sockets to the local server).
+_SIGNAL_CALLS_OUT = re.compile(r"\bnew\s+WebSocket\b|\bWebSocket\s*\(|\bRequest\s*\(|\bEventSource\b|\bsendBeacon\b|\bXMLHttpRequest\b")
+# The word fetch anywhere (comments too: they have other words), but a method of that name
+# defined (`async fetch(`, a Worker's own) or called on an object (`.fetch(`). So the global
+# fetch cannot be called, named, kept in a variable or handed on.
+_SIGNAL_FETCH = re.compile(r"\bfetch\b")
+_SIGNAL_FETCH_METHOD = re.compile(r"(?:\basync |\.)fetch\($")
+# The one other server the room server calls (the owner's exception of 2026-11-11,
+# server/signal/README.md, "The relay"): Cloudflare's TURN service, to draw a relay credential
+# for a join. Exactly this call, once, in worker.js; its key id is a Worker secret, so only that
+# part of the address is not written here.
+SIGNAL_RELAY_FILE = SIGNAL_DIR + "worker.js"
+SIGNAL_RELAY_FETCH = ("fetch(`https://rtc.live.cloudflare.com/v1/turn/keys/${encodeURIComponent(env.TURN_KEY_ID)}"
+                      "/credentials/generate-ice-servers`, {")
 ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
 # The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
 # priorities, backlog), and the work queue trusts them, so a form must never set them.
@@ -481,12 +493,21 @@ def check_signal_source(path: str, text: str) -> list[Finding]:
                                     "(its tests also node:test and node:assert/strict). It has no dependencies."))
     banned = list(_SIGNAL_BANNED.finditer(text))
     if not in_tests:
-        banned += list(_SIGNAL_FETCH.finditer(text))
+        banned += list(_SIGNAL_CALLS_OUT.finditer(text))
+        relay_allowed = path == SIGNAL_RELAY_FILE
+        for m in _SIGNAL_FETCH.finditer(text):
+            if _SIGNAL_FETCH_METHOD.search(text[max(0, m.start() - 6):m.end() + 1]):
+                continue
+            if relay_allowed and text.startswith(SIGNAL_RELAY_FETCH, m.start()):
+                relay_allowed = False
+                continue
+            banned.append(m)
     for m in banned:
         findings.append(Finding("signal-source", "error", path, _line_of(text, m.start()),
                                 f"The room server may not do this (found `{m.group(0).strip()}`): it only hands "
                                 "messages between the sockets of one room.",
-                                "Remove it; the server makes no code from text, loads nothing and calls no other server."))
+                                "Remove it; the server makes no code from text, loads nothing and calls no other server "
+                                "(but Cloudflare's TURN service, once, in worker.js: SIGNAL_RELAY_FETCH)."))
     return findings
 
 

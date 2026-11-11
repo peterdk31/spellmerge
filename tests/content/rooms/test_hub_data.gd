@@ -150,7 +150,7 @@ func test_the_rim_of_motes_runs_round_the_island() -> void:
 	if look == null:
 		return
 	check(ResourceLoader.exists("res://content/motes/%s.tres" % look.kind), "its kind %s is a mote kind" % look.kind)
-	check_equal(look.ramps.size(), 5, "five ramps: fire, spark, arc, ice, void")
+	check_equal(look.colours, [&"fire", &"spark", &"arc", &"ice", &"void"] as Array[StringName], "the elements' five materials")
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	var bad: int = 0
 	var points: PackedVector2Array = line.points

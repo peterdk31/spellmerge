@@ -6,9 +6,13 @@ extends RefCounted
 ## the group read when it enters, let go when it leaves; `take` reads them all again), each read
 ## once into its own copy (where it is in the world, its points, its mask's pixels, its colours), so
 ## no node is held and nothing is asked of one each frame. Each frame (`give_off`) a source near the
-## view gives off its rate's share of motes, each in one of its ramps at random, as motes of many a
+## view gives off its rate's share of motes from where its place picks (`mote_places.gd`: one class
+## a kind of place, so this file names none), each in one of its colours at random, as motes of many a
 ## frame (`often`: in a crowded frame they give way to the moments and the hits first), and a
 ## standing mask places a mote on every lit pixel (`placed_motes.gd`), each cooling in its own turn.
+##
+## A source that gives off nothing says why, once, naming its node (a problem in its data, nowhere
+## to leave from, a kind the pool lacks), so a mistake never fails silently.
 ##
 ## View only: nothing in the game reads a source, its dice are its own, and it runs on Feel's clock.
 
@@ -19,8 +23,6 @@ const PlacedMotesScript := preload("res://gameplay/feel/placed_motes.gd")
 
 ## The longest frame it gives off for (s): a frame after a stall gives off no more.
 const LONGEST_FRAME: float = 0.1
-## How far from a line a mote is born, at most, either way (px).
-const JITTER: float = 1.5
 ## How far past the view a source still gives off (px): what flies in from just outside it.
 const VIEW_MARGIN: float = 64.0
 
@@ -29,18 +31,10 @@ const VIEW_MARGIN: float = 64.0
 class Source:
 	var node: int = 0
 	var look: MoteSource = null
-	## Where it is: its node's world transform; the world box it gives off in (for the view).
-	var to_world: Transform2D = Transform2D.IDENTITY
+	## Where its motes leave from (`mote_places.gd`, one class a `MoteSource.From`), and the world
+	## box they fly in (for the view).
+	var place: MotePlaces.Place = null
 	var bounds: Rect2 = Rect2()
-	## POINT, AREA, RIM: its middle and half-size in the world; the way it throws, in the world.
-	var middle: Vector2 = Vector2.ZERO
-	var half: Vector2 = Vector2.ZERO
-	var way: Vector2 = Vector2.UP
-	## LINE: its points in the world and the length up to each (the first 0); MASK: its lit
-	## pixels' middles in the world.
-	var points: PackedVector2Array = PackedVector2Array()
-	var running: PackedFloat32Array = PackedFloat32Array()
-	var length: float = 0.0
 	## Its ramps as the ramp table's sources.
 	var sources: PackedInt32Array = PackedInt32Array()
 	## A standing mask: each pixel's own turn (0 to 1).
@@ -48,6 +42,9 @@ class Source:
 	## Feel's clock when it appeared (below 0: at the next frame), and motes owed (a part of one).
 	var born: float = -1.0
 	var owed: float = 0.0
+	## Where it was read from (for a warning), and whether its missing kind was warned of.
+	var path: NodePath = NodePath()
+	var warned: bool = false
 
 
 var _sources: Array[Source] = []
@@ -118,19 +115,27 @@ func read(node: Node) -> void:
 	if look == null or where == null or not where.is_inside_tree():
 		return
 	var art: Sprite2D = MoteSource.art_of(node)
-	if not look.problems(art != null and art.texture != null).is_empty():
+	var problems: PackedStringArray = look.problems(art != null and art.texture != null)
+	if not problems.is_empty():
+		push_warning("Mote source %s gives off nothing: %s." % [node.get_path(), "; ".join(problems)])
 		return
 	var source := Source.new()
 	source.node = node.get_instance_id()
+	source.path = node.get_path()
 	source.look = look
-	source.to_world = where.global_transform
-	if not _read_place(source, where, art):
+	source.place = MotePlaces.make(look.from)
+	var mask: PackedVector2Array = _mask_points(art) if source.place.wants_mask() and art != null else PackedVector2Array()
+	if not source.place.read(look, where, where.global_transform, mask):
+		push_warning("Mote source %s gives off nothing: it has nowhere to leave from (a line of no length, a mask with no lit pixel)." % source.path)
 		return
+	# What it throws flies a little past where it leaves from.
+	source.bounds = source.place.bounds.grow(look.reach + look.height + MotePlaces.JITTER)
 	source.sources = _sources_of(look, art)
 	if source.sources.is_empty():
+		push_warning("Mote source %s gives off nothing: its art has no colours to take." % source.path)
 		return
 	if look.stand:
-		for i in source.points.size():
+		for i in source.place.spots().size():
 			source.seeds.append(_rng.randf())
 	_sources.append(source)
 
@@ -175,6 +180,9 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: Place
 			continue
 		var k: int = pool.kind_index(look.kind)
 		if k < 0:
+			if not source.warned:
+				source.warned = true
+				push_warning("Mote source %s gives off nothing: '%s' is no mote kind (content/motes)." % [source.path, look.kind])
 			continue
 		if look.stand:
 			if standing:
@@ -186,47 +194,6 @@ func give_off(now: float, pool: MotesScript, view: Rect2 = Rect2(), stand: Place
 			_throw(source, k, pool)
 	if standing:
 		stand.finish()
-
-
-## Where `source` gives off from, read from its node `where` (and its mask's `art`); false when
-## there is nowhere (a line of no length, a mask with no lit pixel).
-func _read_place(source: Source, where: Node2D, art: Sprite2D) -> bool:
-	var look: MoteSource = source.look
-	var to_world: Transform2D = source.to_world
-	var scale: Vector2 = to_world.get_scale().abs()
-	source.way = to_world.basis_xform(look.way).normalized() if not look.way.is_zero_approx() else Vector2.UP
-	source.middle = to_world * look.at
-	source.half = look.size * 0.5 * scale
-	match look.from:
-		MoteSource.From.LINE:
-			var local: PackedVector2Array = look.points
-			var closed: bool = look.closed
-			if local.is_empty() and where is Line2D:
-				local = (where as Line2D).points
-				closed = (where as Line2D).closed
-			for point in local:
-				source.points.append(to_world * point)
-			if closed and source.points.size() > 1:
-				source.points.append(source.points[0])
-			source.running.append(0.0)
-			for i in range(1, source.points.size()):
-				source.length += source.points[i - 1].distance_to(source.points[i])
-				source.running.append(source.length)
-			if source.points.size() < 2 or source.length <= 0.0:
-				return false
-			source.bounds = _box_of(source.points)
-		MoteSource.From.MASK:
-			source.points = _mask_points(art)
-			if source.points.is_empty():
-				return false
-			source.bounds = _box_of(source.points)
-		MoteSource.From.AREA, MoteSource.From.RIM:
-			source.bounds = Rect2(source.middle - source.half, source.half * 2.0)
-		_:
-			source.bounds = Rect2(source.middle, Vector2.ZERO)
-	# What it throws flies a little past where it leaves from.
-	source.bounds = source.bounds.grow(look.reach + look.height + JITTER)
-	return true
 
 
 ## The world middles of the lit pixels of the frame `art` shows, read once a texture's frame.
@@ -254,7 +221,7 @@ func _sources_of(look: MoteSource, art: Sprite2D) -> PackedInt32Array:
 	var found := PackedInt32Array()
 	if _table == null:
 		return found
-	for ramp: PackedColorArray in look.ramps:
+	for ramp: PackedColorArray in look.ramps():
 		found.append(_table.source(ramp))
 	if found.is_empty() and art != null and art.texture != null:
 		var rect: Rect2i = ArtPixels.frame_of(art)
@@ -268,36 +235,15 @@ func _sources_of(look: MoteSource, art: Sprite2D) -> PackedInt32Array:
 	return found
 
 
-## One mote of kind `k` off `source`, into `pool`.
+## One mote of kind `k` off `source`, into `pool`: from where its place picks, in one of its ramps.
 func _throw(source: Source, k: int, pool: MotesScript) -> void:
 	var look: MoteSource = source.look
-	var at: Vector2 = source.middle
-	var dir: Vector2 = source.way
-	match look.from:
-		MoteSource.From.LINE:
-			var along: float = clampf(MotePlaces.on_grid(_rng.randf() * source.length, 0.0, look.spacing), 0.0, source.length)
-			# The segment `along` falls in: the last point whose running length is at most it.
-			var i: int = clampi(source.running.bsearch(along, true) - 1, 0, source.points.size() - 2)
-			var a: Vector2 = source.points[i]
-			var b: Vector2 = source.points[i + 1]
-			var on: Vector2 = (b - a).normalized()
-			# Clockwise on screen: the outside is on the left of the way the points run.
-			dir = Vector2(on.y, -on.x)
-			at = a + on * (along - source.running[i]) + dir * _rng.randf_range(-JITTER, JITTER)
-		MoteSource.From.AREA:
-			at += Vector2(_rng.randf_range(-1.0, 1.0) * source.half.x, _rng.randf_range(-1.0, 1.0) * source.half.y)
-			if look.spacing > 0.0:
-				at = (at / look.spacing).round() * look.spacing
-		MoteSource.From.RIM:
-			var off: Vector2 = MotePlaces.on_oval(_rng, source.half, look.spacing)
-			at += off
-			dir = off.normalized() if not off.is_zero_approx() else source.way
-		MoteSource.From.MASK:
-			at = source.points[_rng.randi() % source.points.size()]
+	var place: MotePlaces.Place = source.place
+	place.pick(_rng, look)
 	var ramp: int = source.sources[_rng.randi() % source.sources.size()]
 	var height: float = look.height if look.height > 0.0 else -1.0
-	var shown: Vector2 = at - Vector2(0.0, look.height) if look.height > 0.0 else at
-	pool.throw_part(k, shown, dir, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
+	var shown: Vector2 = place.at - Vector2(0.0, look.height) if look.height > 0.0 else place.at
+	pool.throw_part(k, shown, place.way, ramp, Color.WHITE, 1, look.reach, look.spread, 1.0, false, true, Vector2.ZERO, 1.0, 0, height)
 	given += 1
 
 
@@ -306,19 +252,13 @@ func _throw(source: Source, k: int, pool: MotesScript) -> void:
 func _stand(source: Source, k: int, since: float, stand: PlacedMotesScript) -> void:
 	var life: float = source.look.life
 	var count: int = source.sources.size()
-	stand.hold(stand.rows + source.points.size())
-	for i in source.points.size():
+	var spots: PackedVector2Array = source.place.spots()
+	stand.hold(stand.rows + spots.size())
+	for i in spots.size():
 		var seed: float = source.seeds[i]
 		var ramp: int = source.sources[mini(floori(seed * count), count - 1)]
-		stand.put(source.points[i], k, ramp, Color.WHITE, fposmod(since + seed * life, life), seed, life)
-	placed += source.points.size()
-
-
-static func _box_of(points: PackedVector2Array) -> Rect2:
-	var box := Rect2(points[0], Vector2.ZERO)
-	for point in points:
-		box = box.expand(point)
-	return box
+		stand.put(spots[i], k, ramp, Color.WHITE, fposmod(since + seed * life, life), seed, life)
+	placed += spots.size()
 
 
 func _on_node_added(node: Node) -> void:

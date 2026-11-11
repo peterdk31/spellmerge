@@ -291,6 +291,8 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if frames != null:
+		frames.set_carry_source(_carry_now)
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -529,14 +531,15 @@ func _start_play(player: int) -> void:
 	_intro_then_run(player)
 
 
-## The intro first on a new save (the run of `mode` starts when it ends), else the run now.
-func _intro_then_run(player: int) -> void:
+## The intro first on a new save (the run of `mode` starts when it ends), else the run now, its
+## seats' wizards with the staffs `kept` (by seat, as `start_run` takes them; the intro keeps none).
+func _intro_then_run(player: int, kept: Array = []) -> void:
 	# Never in a run that is recorded or played back: the intro takes the machine's own time, and
 	# a recording must start the same on the machine that made it and on every one that plays it.
 	if wants_intro() and not (frames != null and (frames.is_recording() or frames.is_playing())):
 		play_intro(player)
 	else:
-		start_run(player)
+		start_run(player, kept)
 
 
 ## True when Play should show the intro first: it is on and this save has not seen it.
@@ -628,20 +631,24 @@ func _start_sandbox(player: int) -> void:
 
 
 func _on_hub_requested(player: int) -> void:
-	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room).
+	# What the hub's wizards take along (the recording's, read before the hub it was made in goes).
+	var kept: Array = frames.next_run_carry().as_kept() if frames != null else []
+	# Asked for in the hub, the hub starts anew (a recording of it begins: net/ opens the room), each
+	# wizard with the staffs it held.
 	if state == State.RUNNING and mode == MODE_HUB:
 		stop_run()
 	if state != State.IDLE:
 		return
-	if not _load_then(_start_hub.bind(player)):
-		_start_hub(player)
+	if not _load_then(_start_hub.bind(player, kept)):
+		_start_hub(player, kept)
 
 
-## The hub, once the work before a room is loaded: after the intro on a new save, as Play's run.
-func _start_hub(player: int) -> void:
+## The hub, once the work before a room is loaded: after the intro on a new save, as Play's run;
+## each seat's wizard with its staffs in `kept` (by seat; a seat with none: the start cards).
+func _start_hub(player: int, kept: Array = []) -> void:
 	mode = MODE_HUB
 	_back_to_hub = false
-	_intro_then_run(player)
+	_intro_then_run(player, kept)
 	if state == State.IDLE:
 		# Nothing started (content missing): idle is MODE_WAVES.
 		mode = MODE_WAVES
@@ -679,6 +686,16 @@ func _staffs_by_seat() -> Array:
 		if seat >= 0 and seat < PLAYER_SLOTS:
 			out[seat] = PlayerScript.staff_cards(wizard as Actor)
 	return out
+
+
+## What a run that starts now takes along (the frames service asks, and writes it into a recording's
+## header; core/sim/run_carry.gd): in the hub, every wizard's staffs, so the hub begun anew for a
+## joining machine keeps them, on every machine; anywhere else nothing, since nothing comes back
+## from a run (owner, 2026-11-10).
+func _carry_now() -> RunCarry:
+	if mode != MODE_HUB or state != State.RUNNING:
+		return RunCarry.new()
+	return RunCarry.of_kept(_staffs_by_seat())
 
 
 ## The wizards in the world now.
@@ -785,14 +802,16 @@ func clear_sandbox_enemies() -> void:
 	_enemies.clear()
 
 
-## Add the wizard of a player who joined mid-run. Ignored while no run is up, and
-## for a slot that already has a wizard.
+## Add the wizard of a player who joined mid-run: at the room's spawn for joiners when it has them
+## (the hub: beside the altar, where a joining machine's wizards arrive), else at the player spawn
+## farthest from danger. Ignored while no run is up, and for a slot that already has a wizard.
 func _on_player_joined(player: int) -> void:
 	if state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
 		return
 	if get_wizard(player) != null:
 		return
-	_add_wizard(world, _room, player, _joiner_spawn(_room, player))
+	var at: Vector2 = _room.joiner_spawns[player] if player < _room.joiner_spawns.size() else _joiner_spawn(_room, player)
+	_add_wizard(world, _room, player, at)
 	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	# In a room where hits take nothing (the hub), a joiner needs no moment of protection.
 	if joiner != null and not _room.invincible:

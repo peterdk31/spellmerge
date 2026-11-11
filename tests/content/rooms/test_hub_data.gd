@@ -183,3 +183,24 @@ func test_the_altar_stands_on_the_island() -> void:
 	check_equal(area, _room().altar, "the altar's art covers the altar (where A opens the room)")
 	for wall: Rect2 in RoomScan.wall_rects(room_root):
 		check(not wall.intersects(area), "the altar is clear of the wall %s" % wall)
+
+
+## A joining machine's wizards arrive beside the altar (online lobby, decision 4): a spawn for each
+## seat, on the island, clear of the walls, the stone, the altar (where A opens the room) and each
+## other.
+func test_joiners_arrive_beside_the_altar() -> void:
+	var room: RoomBase = _room()
+	check_equal(RoomScan.markers(room_root, "JoinerSpawns"), room.joiner_spawns, "the data matches the markers")
+	check_equal(room.joiner_spawns.size(), 4, "one for each seat")
+	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
+	for i in room.joiner_spawns.size():
+		var point: Vector2 = room.joiner_spawns[i]
+		check(not room.altar.intersects(_body(point)), "joiner spawn %s is off the altar" % point)
+		check(point.distance_to(room.altar.get_center()) < 128.0, "joiner spawn %s is beside it" % point)
+		check(not room.start_stone.intersects(_body(point)), "joiner spawn %s is off the stone" % point)
+		for wall: Rect2 in walls:
+			check(not wall.intersects(_body(point)), "joiner spawn %s is clear of the wall %s" % [point, wall])
+		for j in range(i + 1, room.joiner_spawns.size()):
+			check(not _body(point).intersects(_body(room.joiner_spawns[j])), "joiner spawns %s and %s do not overlap" % [point, room.joiner_spawns[j]])
+	for path: String in ["res://content/rooms/crypt/arena_01.tres", "res://content/rooms/crypt/sandbox.tres"]:
+		check((load(path) as RoomBase).joiner_spawns.is_empty(), "%s has none: a joiner comes in away from danger" % path)

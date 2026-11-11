@@ -423,3 +423,83 @@ func test_the_bus_is_told_when_the_party_enters_and_leaves_the_hub() -> void:
 	check_equal(told.back(), false, "the game stopped: not in it")
 	events.disconnect("hub_changed", hear)
 
+
+
+func _cards(seat: int, staff: int) -> Array[StringName]:
+	return (flow.get_wizard(seat) as Actor).caster.cards_of(staff)
+
+
+## A machine joining the party (online lobby, decision 4): a seat that joins the hub under way
+## appears beside the altar, at the hub's spawn for joiners of its seat, not at the room's player
+## spawns, and not on the altar itself (where A opens the room).
+func test_a_seat_that_joins_the_hub_appears_beside_the_altar() -> void:
+	_start([0])
+	var room: RoomBase = _room()
+	check_equal(flow.get_wizard(0).position, room.player_spawns[0], "the seat the hub began with stands at its spawn")
+	for seat: int in [2, 1, 3]:
+		input.add_virtual_device(seat)
+		var at: Vector2 = flow.get_wizard(seat).position
+		check_equal(at, room.joiner_spawns[seat], "seat %d appears at its joiners' spawn" % seat)
+		check(not room.altar.has_point(at), "seat %d is not on the altar" % seat)
+		check(at.distance_to(room.altar.get_center()) < 128.0, "seat %d is beside it (%s)" % [seat, at])
+	_tick()
+	check_equal(flow.get(&"_altar_sent"), 0, "nobody stands on the altar")
+	_stop()
+
+
+## The hub begun anew for a joining machine (net/ records it from its start) keeps every wizard's
+## staffs: what the hub's wizards hold is written into the recording's header, so a machine that
+## plays the recording from its start builds the same staffs. A run's end, recorded anew, takes
+## nothing along (owner, 2026-11-10).
+func test_the_hub_begun_anew_keeps_every_wizards_staffs_in_its_recording() -> void:
+	_start([0, 1])
+	var built: Array[StringName] = [&"bolt", &"dash", &"bolt"]
+	events.emit_signal("staff_cards_requested", 1, 2, built)
+	await commands_applied()
+	var fresh_y: Array[StringName] = _cards(0, 2)
+	var first: Node = flow.get_wizard(1)
+	events.emit_signal("hub_requested", 0)
+	check(flow.get_wizard(1) != first, "the hub began anew")
+	check_equal(_cards(1, 2).slice(0, 3), built, "seat 1 kept the staff it built")
+	check_equal(_cards(0, 2), fresh_y, "seat 0's is as it was")
+	# Recorded: the start is sent by the frames service, after the header is written.
+	var replay: Replay = frames.call(&"record", &"hub_requested", 0) as Replay
+	check_equal((replay.carry.staffs_of(1)[2] as Array).slice(0, 3), built, "the recording's header carries it")
+	check_equal(replay.carry.seats(), 0b0011, "and every wizard's staffs")
+	check_equal(_cards(1, 2).slice(0, 3), built, "the hub begun anew under the recording keeps it")
+	frames.call(&"stop_recording")
+	# A machine that plays the recording from its start, which never had that staff.
+	flow.stop_run()
+	for index in 4:
+		input.leave(index)
+	check(frames.call(&"play", replay), "the recording plays")
+	check_equal(flow.mode, FlowScript.MODE_HUB, "in the hub")
+	check(flow.get_wizard(1) != null and _cards(1, 2).slice(0, 3) == built, "seat 1's wizard holds the staff it built on the machine that recorded")
+	check_equal(_cards(0, 2), fresh_y, "seat 0's as there")
+	frames.call(&"stop_playing")
+	_stop()
+	# A run's end recorded anew: nothing comes back.
+	_start([0, 1])
+	events.emit_signal("staff_cards_requested", 1, 2, built)
+	await commands_applied()
+	var anew: Array[Replay] = []
+	var hear: Callable = func(next: Replay) -> void: anew.append(next)
+	frames.connect(&"recorded_anew", hear)
+	frames.call(&"record", &"hub_requested", 0)
+	_place(0, true)
+	_place(1, true)
+	_tick()
+	_press_a(0)
+	check_equal(flow.mode, FlowScript.MODE_WAVES, "the run from the stone")
+	check_equal(_cards(1, 2).slice(0, 3), built, "with the staff")
+	for wizard in _wizards():
+		wizard.health.take(wizard.health.max_health)
+	flow.step(FlowScript.RESTART_DELAY)
+	from_frames()
+	check_equal(anew.size(), 1, "back in the hub, recorded anew")
+	if anew.size() == 1:
+		check(anew[0].carry.is_empty(), "its header takes nothing along")
+	check_equal(_cards(1, 2), fresh_y, "and seat 1's staff is the hub's own again")
+	frames.disconnect(&"recorded_anew", hear)
+	frames.call(&"stop_recording")
+	_stop()

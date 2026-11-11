@@ -123,8 +123,8 @@ extends Node2D
 ##
 ## Queries: `nearest_target(point, radius, layers, exclude)` and `targets_in(point,
 ## radius, layers, out)` use the same grid as hits, so chain, homing and area effects
-## never loop over every enemy. A target counts when its hit circle overlaps the
-## circle (point, radius). They see the target positions of the start of the latest
+## never loop over every enemy. A target counts when its hit shape (`HitShape`: a circle, or a
+## box for a long body) overlaps the circle (point, radius). They see the target positions of the start of the latest
 ## step (a query after `add_target` and before the next step refreshes the grid
 ## first), so inside a hit handler they are exact for that step.
 ##
@@ -890,10 +890,13 @@ var _owned: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 
 # Targets, one row each.
 var _targets: Array = []
+## Each target's hit shape (`HitShape`): a box `_target_half` either way of its centre, rounded by
+## `_target_radius`; a circle is the box of no size (props, box hurt shapes).
 var _target_radius: PackedFloat32Array = PackedFloat32Array()
+var _target_half: PackedVector2Array = PackedVector2Array()
 var _target_layer: PackedInt32Array = PackedInt32Array()
 var _target_pos: PackedVector2Array = PackedVector2Array()
-## Where each target's hit circle sits, relative to its node (the body, not the feet).
+## Where each target's hit shape is centred, relative to its node (the body, not the feet).
 var _target_offset: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
 ## Each target's identity (online-ready N5): its actor's key (`Actors.key_of`, handed over by Combat),
@@ -912,7 +915,7 @@ var _grid_y: float = 0.0
 var _grid_w: int = 1
 var _grid_h: int = 1
 var _cell_head: PackedInt32Array = PackedInt32Array()
-## How many targets each cell holds, and the box round their hit circles (min x, min y, max x,
+## How many targets each cell holds, and the box round their hit shapes (min x, min y, max x,
 ## max y), so a hit test passes a cell its path cannot touch without a look at each target. Taken
 ## for a cell only when a hit test first reaches it after a filling (`_cell_info`; most cells of a
 ## big room are never tested in a step): valid while `_cell_filled` holds `_grid_fill`.
@@ -922,8 +925,9 @@ var _cell_filled: PackedInt32Array = PackedInt32Array()
 ## Counts the grid's fillings (`_refresh_targets`).
 var _grid_fill: int = 0
 var _target_next: PackedInt32Array = PackedInt32Array()
-## The largest radius of any registered target; sets how far hits are searched.
-var _max_target_radius: float = 0.0
+## The most any registered target's shape reaches from its centre along an axis (`HitShape.axis_reach`);
+## sets how far hits are searched.
+var _max_target_reach: float = 0.0
 ## True when targets were added since the grid was filled (a query refreshes it).
 var _grid_stale: bool = false
 
@@ -1032,7 +1036,7 @@ var _step_index: int = 0
 ## `exclude`), and above 0 while that holds: until a hit test finds the shot clear of that body where its step starts.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_on: PackedFloat32Array = PackedFloat32Array()
-## Per slot: how far off that body's hit circle the shot was cast, when the body is its own caster's
+## Per slot: how far off that body's hit shape the shot was cast, when the body is its own caster's
 ## (the staff tip stands off it; 0 for any other body): within this, coming at the body, it is
 ## still leaving it (`_still_spares`).
 var _skip_near: PackedFloat32Array = PackedFloat32Array()
@@ -2294,26 +2298,29 @@ func _team_of_target(owner: int, layer: int) -> int:
 
 
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
-## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
+## bit mask). Registering twice only updates the shape, layer and owner. A freed target is dropped by itself.
 ## `owner` is the actor whose body it is (or whose decoy), or Events.NO_PLAYER: aim reads it
 ## (homing never picks its own actor's body) and its team (see `_team_of_target`); a hit never
-## asks it. `offset` moves the hit circle from the
+## asks it. Its hit shape (`HitShape`) is a circle of `radius`, or with a `half` a box that far
+## either way of its centre (rounded by `radius`); `offset` moves its centre from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
 ## the sprite does hit. `key` is its identity (`_target_key`): its actor's key (`Actors.key_of`); 0
 ## gives it one of the manager's own (a plain node, in tests). Registered again with a key, it takes it.
-func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO, key: int = 0) -> void:
+func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO, key: int = 0, half: Vector2 = Vector2.ZERO) -> void:
 	if node == null or layer == 0:
 		return
+	half = half.max(Vector2.ZERO)
+	_max_target_reach = maxf(_max_target_reach, HitShape.axis_reach(half, radius))
 	var at: int = _target_row(node)
 	if at >= 0:
 		if key != 0:
 			_target_key[at] = key
 		_target_radius[at] = radius
+		_target_half[at] = half
 		_target_layer[at] = layer
 		_target_owner[at] = owner
 		_target_team[at] = _team_of_target(owner, layer)
 		_target_offset[at] = offset
-		_max_target_radius = maxf(_max_target_radius, radius)
 		return
 	if key == 0:
 		_minted_keys -= 1
@@ -2322,6 +2329,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_id.append(node.get_instance_id())
 	_target_key.append(key)
 	_target_radius.append(radius)
+	_target_half.append(half)
 	_target_layer.append(layer)
 	_target_owner.append(owner)
 	_target_team.append(_team_of_target(owner, layer))
@@ -2329,7 +2337,6 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_offset.append(offset)
 	_target_next.append(-1)
 	_grid_stale = true
-	_max_target_radius = maxf(_max_target_radius, radius)
 
 
 ## Give a registered target a new `owner` (see `add_target`): an enemy that casts a staff
@@ -4367,7 +4374,7 @@ static func turned_toward(velocity: Vector2, want: Vector2, most: float) -> Vect
 ## `homing_target` says which, to hand back as `keep` next step. Allocation-free.
 func home_velocity(caster: int, from: Vector2, velocity: Vector2, turn_rate: float, within: float, delta: float, keep: int, pick_seed: int, layers: int = ACTOR_LAYERS) -> Vector2:
 	homing_target = 0
-	homing_target_radius = 0.0
+	homing_target_reach = 0.0
 	if not (turn_rate > 0.0) or not velocity.is_finite() or velocity.is_zero_approx():
 		return velocity
 	var goal: Vector2 = homing_point(caster, from, velocity, PI, layers, within, keep, pick_seed)
@@ -4401,7 +4408,7 @@ func homing_aim(caster: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## none), for the caller to keep. Allocation-free.
 func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
 	homing_target = 0
-	homing_target_radius = 0.0
+	homing_target_reach = 0.0
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle) or not is_finite(within) or within <= 0.0:
 		return Vector2.INF
 	_query_ready()
@@ -4409,7 +4416,7 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 	if t < 0:
 		return Vector2.INF
 	homing_target = _target_key[t]
-	homing_target_radius = _target_radius[t]
+	homing_target_reach = HitShape.reach_toward(_target_half[t], _target_radius[t], _target_pos[t].direction_to(origin))
 	return _target_pos[t]
 
 
@@ -4434,7 +4441,8 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
-					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
+					var box: Vector2 = _target_half[t]
+					if (to_target.length_squared() if box == Vector2.ZERO else HitShape.gap_sq(to_target, box)) <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(DMath.angle_to(direction, to_target)) <= max_angle)):
 						if keep != 0 and _target_key[t] == keep:
 							return t
 						# Reservoir pick: the n-th target seen replaces the pick one time in n.
@@ -4758,7 +4766,7 @@ func _ray_level(level: int) -> void:
 
 
 ## The bodies a swing's sweep touches (melee I2): every target on `layers` (and ACTOR_LAYERS, as
-## in `ray`) whose hit circle reaches into the wedge round `origin` from `from_angle` to
+## in `ray`) whose hit shape reaches into the wedge round `origin` from `from_angle` to
 ## `to_angle` radians off `direction` (`side` 1 counts clockwise on screen, -1 the other way;
 ## `to_angle` not below `from_angle`), out to `reach` pixels, with no wall between it and
 ## `origin`. Only `exclude` is skipped (the body it is cast from: its caster's own body is hit
@@ -4779,7 +4787,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 	var turn: float = 1.0 if side >= 0 else -1.0
 	var whole: bool = to_angle - from_angle >= TAU
 	var skip: int = _target_row(exclude)
-	var pad: Vector2 = Vector2.ONE * (reach + _max_target_radius)
+	var pad: Vector2 = Vector2.ONE * (reach + _max_target_reach)
 	var x0: int = clampi(floori((origin.x - pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
 	var x1: int = clampi(floori((origin.x + pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
 	var y0: int = clampi(floori((origin.y - pad.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
@@ -4792,19 +4800,33 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 				if (_target_layer[t] & layers) != 0 and t != skip and is_instance_valid(_targets[t]):
 					var to: Vector2 = _target_pos[t] - origin
 					var radius: float = _target_radius[t]
+					var box: Vector2 = _target_half[t]
 					var distance: float = to.length()
-					if distance <= reach + radius:
-						# How far either side of its centre line the body's circle reaches.
-						var width: float = PI if distance <= radius else DMath.asin(radius / distance)
+					# How far `origin` is from the shape's box (a circle's centre).
+					var off: float = HitShape.gap(to, box)
+					if off <= reach + radius:
+						# How far either side of its centre line the body's shape reaches, counted the
+						# sweep's way round: a circle's the same both ways (in doubles), a box's
+						# `HitShape.sides`; all round from on it.
+						var low: float = -PI
+						var high: float = PI
+						if off > radius:
+							if box == Vector2.ZERO:
+								high = DMath.asin(radius / distance)
+								low = -high
+							else:
+								var sides: Vector2 = HitShape.sides(to, box, radius)
+								low = sides.x if turn > 0.0 else -sides.y
+								high = sides.y if turn > 0.0 else -sides.x
 						var local: float = angle_difference(base, DMath.angle(to)) * turn
-						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+						if local + high >= from_angle and local + low <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
 								sweep_points.resize(found * 2)
 								sweep_heads.resize(found * 2)
 							sweep_nodes[found] = _targets[t]
-							sweep_points[found] = origin if whole else origin + way * maxf(distance - radius, 0.0)
+							sweep_points[found] = origin if whole else origin + way * maxf(distance - HitShape.reach_toward(box, radius, way), 0.0)
 							sweep_heads[found] = way if whole else Vector2(-way.y, way.x) * turn
 							found += 1
 				t = _target_next[t]
@@ -4965,7 +4987,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		_query_ready()
 		layers |= ACTOR_LAYERS
 		var wide: float = maxf(width, 0.0)
-		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
+		var pad: Vector2 = Vector2.ONE * (wide + _max_target_reach)
 		var start: float = 0.0
 		# `exclude`, the body it is cast from (the caller found it starts on it), is spared until a
 		# later piece of the path starts off it (as a shot's step does, `exclude`): a beam that
@@ -4976,7 +4998,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			var b: Vector2 = _path[i + 1]
 			if skip_at >= 0 and i > 0:
 				var on: float = wide + _target_radius[skip_at]
-				if a.distance_squared_to(_target_pos[skip_at]) > on * on:
+				if HitShape.gap_sq(a - _target_pos[skip_at], _target_half[skip_at]) > on * on:
 					skip_at = -1
 			var piece: float = a.distance_to(b)
 			if piece <= 0.0:
@@ -4993,10 +5015,16 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 					var t: int = _cell_head[y * _grid_w + x]
 					while t >= 0:
 						if (_target_layer[t] & layers) != 0 and t != skip_at and is_instance_valid(_targets[t]):
-							var along: float = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
+							var box: Vector2 = _target_half[t]
+							var along: float = 0.0
+							if box == Vector2.ZERO:
+								along = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
+							else:
+								var span: Vector2 = b - a
+								along = HitShape.along(a, span, span.length_squared(), _target_pos[t], box) * piece
 							var closest: Vector2 = a + heading * along
 							var touch: float = wide + _target_radius[t]
-							if closest.distance_squared_to(_target_pos[t]) <= touch * touch:
+							if HitShape.gap_sq(closest - _target_pos[t], box) <= touch * touch:
 								found = _ray_keep(nodes, alongs, points, heads, found, wanted, t, start + along, closest, heading)
 						t = _target_next[t]
 			start += piece
@@ -6032,9 +6060,7 @@ func freeze_left_of(slot: int) -> float:
 	return _freeze[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0.0
 
 
-## Keep the shot in `slot` from hitting `node` for `seconds` (a payload must not hit the
-## target that fired it). One target per shot; a later call replaces it.
-## True when the circle (`point`, `radius`) overlaps the hit circle of the registered target
+## True when the circle (`point`, `radius`) overlaps the hit shape of the registered target
 ## `node` where it stands now (its node's place and offset, as each step reads it). False for a
 ## node that is not registered, freed or out of the tree.
 func touches_target(node: Node, point: Vector2, radius: float) -> bool:
@@ -6046,12 +6072,12 @@ func touches_target(node: Node, point: Vector2, radius: float) -> bool:
 	var body: Node2D = _targets[at] as Node2D
 	if body == null or not body.is_inside_tree():
 		return false
-	return point.distance_to(body.global_position + _target_offset[at]) <= _target_radius[at] + radius
+	return HitShape.gap(point - (body.global_position + _target_offset[at]), _target_half[at]) <= _target_radius[at] + radius
 
 
 ## The shot in `slot` does not hit `node` (the body it started on: its caster's own, or the body whose
 ## hit fired it, as a payload; the spell runtime gives every launch one) until it has
-## been clear of it: the first hit test whose step starts with the shot off that body's hit circle
+## been clear of it: the first hit test whose step starts with the shot off that body's hit shape
 ## ends the exclusion (`_still_spares`), and from then on it hits that body as any other (owner,
 ## 2026-11-06: no timer, so a slow shot born on its source can no longer hit it as it crawls out).
 ## A body its own caster owns is the one it was cast from, at the staff tip off that body: how far
@@ -6069,7 +6095,7 @@ func exclude(slot: int, node: Node) -> void:
 		var body: Node2D = _targets[at] as Node2D
 		if body == null or not body.is_inside_tree():
 			return
-		var off: float = _pos[slot].distance_to(body.global_position + _target_offset[at]) - _radius[slot] - _target_radius[at]
+		var off: float = HitShape.gap(_pos[slot] - (body.global_position + _target_offset[at]), _target_half[at]) - _radius[slot] - _target_radius[at]
 		_skip_near[slot] = off if off > 0.0 and is_finite(off) else 0.0
 
 
@@ -6144,12 +6170,14 @@ func target_of_key(key: int) -> Node2D:
 
 
 ## The key (`_target_key`) of the target the last `homing_point`, `homing_aim` or `home_velocity`
-## picked, 0 for none: hand it back as `keep` so a homing thing stays on one target. And that
-## target's hit radius (0 for none), for something that stops at its edge (a teleport).
+## picked, 0 for none: hand it back as `keep` so a homing thing stays on one target. And how far
+## that target's hit shape reaches from its centre toward where the search was made
+## (`HitShape.reach_toward`: a circle's radius; 0 for none), for something that stops at its edge (a
+## teleport).
 var homing_target: int = 0
-var homing_target_radius: float = 0.0
+var homing_target_reach: float = 0.0
 
-## Where the target `nearest_target` last returned is (its hit circle's centre).
+## Where the target `nearest_target` last returned is (its hit shape's centre).
 var nearest_point: Vector2 = Vector2.INF
 
 
@@ -6170,6 +6198,7 @@ func _remove_target_at(at: int) -> void:
 	_target_id[at] = _target_id[last]
 	_target_key[at] = _target_key[last]
 	_target_radius[at] = _target_radius[last]
+	_target_half[at] = _target_half[last]
 	_target_layer[at] = _target_layer[last]
 	_target_owner[at] = _target_owner[last]
 	_target_team[at] = _target_team[last]
@@ -6179,6 +6208,7 @@ func _remove_target_at(at: int) -> void:
 	_target_id.resize(last)
 	_target_key.resize(last)
 	_target_radius.resize(last)
+	_target_half.resize(last)
 	_target_layer.resize(last)
 	_target_owner.resize(last)
 	_target_team.resize(last)
@@ -6234,12 +6264,12 @@ func _refresh_targets() -> void:
 		i += 1
 
 
-## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
+## The nearest target on `layers` whose hit shape overlaps the circle (`point`,
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
 ## just hit, for a chain) and so is `exclude_also`. With a `team` (not NONE), targets of that
 ## team are skipped too, and the world's always: aim at foes only (`Actors.is_foe`: a chain's jump,
 ## an arc's zap, a familiar's cast).
-## The hit circle's centre of the target returned is left in `nearest_point`. Allocation-free.
+## The hit shape's centre of the target returned is left in `nearest_point`. Allocation-free.
 func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null, team: int = ActorsScript.NONE) -> Node2D:
 	nearest_point = Vector2.INF
 	if not point.is_finite() or not is_finite(radius):
@@ -6267,9 +6297,9 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 
 
 ## Fill `out` with the targets on `layers` that are foes of `team` (`Actors.is_foe`: not of `team`,
-## Actors.NONE for none, and never the world's) whose hit circle
-## overlaps the circle (`point`, `radius`), `centres` with where each one's hit circle is and
-## `radii` with how big, in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
+## Actors.NONE for none, and never the world's) whose hit shape
+## overlaps the circle (`point`, `radius`), `centres` with where each one's hit shape is centred and
+## `radii` with how far it reaches from there at most (`HitShape.outer_radius`: a circle's radius), in the same order; return how many (a zap's bodies in reach). Order is the grid's: the same every
 ## run. With a finite `to`, the circles round every point of the line from `point` to `to` (a
 ## beam's zap, a piece of its path at a time); with `keep`, `out` is added to, not cleared, and a
 ## target already in it is not added again. Pass the same arrays each time: nothing is allocated once they have grown.
@@ -6285,19 +6315,19 @@ func targets_near(point: Vector2, radius: float, layers: int, team: int, out: Ar
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				var at: Vector2 = point if end == point else Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
+				var at: Vector2 = point if end == point else _nearest_on_line(t, point, end)
 				if _query_match(t, at, radius, layers, -1) and _target_team[t] != ActorsScript.TEAM_WORLD and (team == ActorsScript.NONE or _target_team[t] != team) and not (keep and out.has(_targets[t])):
 					if centres.size() <= out.size():
 						centres.resize(maxi(out.size() * 2, 8))
 						radii.resize(centres.size())
 					centres[out.size()] = _target_pos[t]
-					radii[out.size()] = _target_radius[t]
+					radii[out.size()] = HitShape.outer_radius(_target_half[t], _target_radius[t])
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()
 
 
-## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps
+## Fill `out` (cleared first) with the targets on `layers` whose hit shape overlaps
 ## the circle (`point`, `radius`), and return how many; with a finite `to`, the circles round
 ## every point of the line from `point` to `to` (a beam's magnet). Pass the same array each time
 ## so nothing is allocated. Order is not defined.
@@ -6312,7 +6342,7 @@ func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D], 
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end), radius, layers, -1):
+				if _query_match(t, _nearest_on_line(t, point, end), radius, layers, -1):
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()
@@ -6334,7 +6364,7 @@ func _target_row(node: Object) -> int:
 
 ## The grid cells (x0, y0, x1, y1) a query circle can reach.
 func _query_cells(point: Vector2, radius: float) -> Vector4i:
-	var pad: Vector2 = Vector2.ONE * (maxf(radius, 0.0) + _max_target_radius)
+	var pad: Vector2 = Vector2.ONE * (maxf(radius, 0.0) + _max_target_reach)
 	var low: Vector2 = point - pad
 	var high: Vector2 = point + pad
 	return Vector4i(
@@ -6344,20 +6374,30 @@ func _query_cells(point: Vector2, radius: float) -> Vector4i:
 		clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1))
 
 
+## The point of the line from `point` to `end` nearest target `t`'s hit shape (`HitShape.along`; a
+## circle's: nearest its centre).
+func _nearest_on_line(t: int, point: Vector2, end: Vector2) -> Vector2:
+	var box: Vector2 = _target_half[t]
+	if box == Vector2.ZERO:
+		return Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end)
+	var path: Vector2 = end - point
+	return point + path * HitShape.along(point, path, path.length_squared(), _target_pos[t], box)
+
+
 func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int) -> bool:
 	# A target freed since the grid was filled is skipped, never returned; `skip` is a row (-1: none).
 	if (_target_layer[t] & layers) == 0 or t == skip or not is_instance_valid(_targets[t]):
 		return false
 	var reach: float = maxf(radius, 0.0) + _target_radius[t]
-	return _target_pos[t].distance_squared_to(point) <= reach * reach
+	return HitShape.gap_sq(point - _target_pos[t], _target_half[t]) <= reach * reach
 
 
 ## Test the path of the shot in `slot` this step against the targets on the grid, and hit every
 ## target it touches that it has not hit since it last left it, nearest first, as long as it
 ## lives (its pierce); returns true when it hit any. One scan finds them all: the shot's
 ## remembered targets are marked first (`_mark_memory`), so the cost is the targets touched plus
-## the ones remembered. The search widens with the largest target radius, so a big target whose
-## centre is cells away is still found. The cells searched are those the path touches, widened
+## the ones remembered. The search widens with the farthest any target's shape reaches
+## (`_max_target_reach`), so a big target whose centre is cells away is still found. The cells searched are those the path touches, widened
 ## by both radii.
 func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
@@ -6376,7 +6416,7 @@ func _hit_test(slot: int) -> bool:
 	var radius: float = _radius[slot]
 	var lowest: Vector2 = from.min(to)
 	var highest: Vector2 = from.max(to)
-	var pad: Vector2 = Vector2.ONE * (radius + _max_target_radius)
+	var pad: Vector2 = Vector2.ONE * (radius + _max_target_reach)
 	var low: Vector2 = lowest - pad
 	var high: Vector2 = highest + pad
 	var x0: int = clampi(floori((low.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
@@ -6431,7 +6471,9 @@ func _hit_test(slot: int) -> bool:
 			while t >= 0:
 				var centre: Vector2 = _target_pos[t]
 				var reach: float = radius + _target_radius[t]
-				var far: float = half + reach
+				# A box's corner is no farther from its centre than its two halves (`shape_half`) together.
+				var shape_half: Vector2 = _target_half[t]
+				var far: float = half + reach + shape_half.x + shape_half.y
 				if middle.distance_squared_to(centre) > far * far:
 					t = _target_next[t]
 					continue
@@ -6439,12 +6481,20 @@ func _hit_test(slot: int) -> bool:
 					t = _target_next[t]
 					continue
 				var along: float = 0.0
-				if path_sq > 0.0:
-					along = clampf((centre - from).dot(path) / path_sq, 0.0, 1.0)
-				var closest: Vector2 = from + path * along
-				if closest.distance_squared_to(centre) > reach * reach:
-					t = _target_next[t]
-					continue
+				var closest: Vector2 = from
+				if shape_half == Vector2.ZERO:
+					if path_sq > 0.0:
+						along = clampf((centre - from).dot(path) / path_sq, 0.0, 1.0)
+					closest = from + path * along
+					if closest.distance_squared_to(centre) > reach * reach:
+						t = _target_next[t]
+						continue
+				else:
+					along = HitShape.along(from, path, path_sq, centre, shape_half)
+					closest = from + path * along
+					if HitShape.gap_sq(closest - centre, shape_half) > reach * reach:
+						t = _target_next[t]
+						continue
 				# A target already hit: the path still touches it, so it stays remembered.
 				if _target_mark[t] == stamp:
 					_mem_seen[_target_entry[t]] = _mem_step
@@ -6462,7 +6512,7 @@ func _hit_test(slot: int) -> bool:
 
 
 ## Whether the shot in `slot`, its step starting at `start` and going `way`, still spares the body
-## it started on (`exclude`): its step starts on that body's hit circle, or, cast from that body
+## it started on (`exclude`): its step starts on that body's hit shape, or, cast from that body
 ## (`_skip_near` off it), it is coming at it, its line going into it, and ends no farther off than it
 ## was cast. A shot cast from a staff tip off its caster's body does not hit that body as it crosses
 ## it on its way out (owner, 2026-11-07: a nova's shot aimed back across the wizard hit them); one
@@ -6473,7 +6523,8 @@ func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
 		return false
 	var reach: float = _radius[slot] + _target_radius[t]
 	var to_centre: Vector2 = _target_pos[t] - start
-	var apart_sq: float = to_centre.length_squared()
+	var box: Vector2 = _target_half[t]
+	var apart_sq: float = to_centre.length_squared() if box == Vector2.ZERO else HitShape.gap_sq(to_centre, box)
 	if apart_sq <= reach * reach:
 		return true
 	var near: float = _skip_near[slot]
@@ -6481,10 +6532,13 @@ func _still_spares(slot: int, start: Vector2, way: Vector2) -> bool:
 		return false
 	var ahead: float = to_centre.dot(way)
 	var within: float = reach + near
-	if ahead <= 0.0 or (to_centre - way).length_squared() > within * within:
+	var end_sq: float = (to_centre - way).length_squared() if box == Vector2.ZERO else HitShape.gap_sq(to_centre - way, box)
+	if ahead <= 0.0 or end_sq > within * within:
 		return false
-	# The square of how far the body's centre stands off the shot's line.
-	return apart_sq - ahead * ahead / way.length_squared() <= reach * reach
+	# The square of how far the body's shape stands off the shot's line.
+	if box == Vector2.ZERO:
+		return apart_sq - ahead * ahead / way.length_squared() <= reach * reach
+	return HitShape.line_gap_sq(-to_centre, way, box) <= reach * reach
 
 
 ## Hit the `found` targets `_hit_test` kept for the shot in `slot` (`_cand_*`), nearest first;
@@ -6504,7 +6558,7 @@ func _hit_candidates(slot: int, found: int) -> bool:
 	return hit
 
 
-## Take the count of `cell` and the box round its targets' hit circles from its chain (see
+## Take the count of `cell` and the box round its targets' hit shapes from its chain (see
 ## `_cell_count`). The positions only change when the grid is filled, so this is what a filling
 ## would have written.
 func _cell_info(cell: int) -> void:
@@ -6519,8 +6573,9 @@ func _cell_info(cell: int) -> void:
 	while t >= 0:
 		var centre: Vector2 = _target_pos[t]
 		var r: float = _target_radius[t]
-		low = low.min(centre - Vector2(r, r))
-		high = high.max(centre + Vector2(r, r))
+		var reach: Vector2 = _target_half[t] + Vector2(r, r)
+		low = low.min(centre - reach)
+		high = high.max(centre + reach)
 		count += 1
 		t = _target_next[t]
 	_cell_count[cell] = count

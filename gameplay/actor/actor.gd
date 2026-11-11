@@ -566,6 +566,9 @@ func _find_components() -> void:
 		# has none, added as a boss's Phases is (a snapshot makes it again before `_ready`).
 		footprint = Footprint.new()
 		footprint.name = "Footprint"
+		# A body hit as a box stands on that box's base (a bench on the ground under it).
+		if hurtbox != null and hurtbox.is_box():
+			footprint.fit_base(hurtbox.size, hurtbox.offset)
 		add_child(footprint)
 	# Set up and attached in this order: health first, the caster last (it names the hurtbox).
 	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster]
@@ -622,8 +625,8 @@ func _apply_data() -> void:
 
 
 ## Make the body `factor` times its drawn size (a boss, a boss's phase): the node scales, and the
-## points and circles kept in pixels (hurt circle, body, hand and its footprint) with
-## it. A hurt circle already registered is registered again at its new size.
+## points and shapes kept in pixels (hurt shape, body, hand and its footprint) with
+## it. A hurt shape already registered is registered again at its new size.
 func set_size(factor: float) -> void:
 	if factor <= 0.0 or is_equal_approx(factor, size):
 		return
@@ -636,6 +639,7 @@ func set_size(factor: float) -> void:
 		footprint.scale_by(by)
 	if hurtbox != null:
 		hurtbox.radius *= by
+		hurtbox.size *= by
 		hurtbox.offset *= by
 		if hurtbox.registered and is_inside_tree():
 			hurtbox.detach()

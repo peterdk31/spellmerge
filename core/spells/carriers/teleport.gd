@@ -35,7 +35,7 @@ func _aim_move(spell: CompiledSpell, _tag: int, actor: int, origin: Vector2, fro
 		if goal.is_finite():
 			if not goal.is_equal_approx(from):
 				way = from.direction_to(goal)
-			distance = maxf(from.distance_to(goal) - kit.projectiles.homing_target_radius - SpellLimits.LAND_CLEARANCE, 0.0)
+			distance = maxf(from.distance_to(goal) - kit.projectiles.homing_target_reach - SpellLimits.LAND_CLEARANCE, 0.0)
 	# Where it leaves shows now, as it is aimed (a teleport is over at once); where it lands shows at
 	# its end point (`carrier_ended`, `CasterMoves.end`).
 	if kit.events != null:

@@ -8,7 +8,7 @@ A change to the radial builder (staffs B8, [M2-staffs.md](M2-staffs.md), "The bu
 
 ## What the player sees
 
-The builder is the radial one (the default). The list builder, reachable from the pause menu's Sandbox page, only loses copy/paste and the cast names (parts T1, T2); nothing else of this design goes into it.
+The builder is the radial one (the default). The list builder, reachable from the pause menu's Sandbox page, only loses copy/paste and the cast names (parts T1, T2); nothing else of this design goes into it. (It was removed on 2026-11-11, owner: the radial is the only builder.)
 
 ### Every quarter alike
 
@@ -81,7 +81,7 @@ One session and one PR each, in this order unless "after" says otherwise. Each k
 
 - A replay at the real moments of a cast, and a small drawing of each carrier's shape on its row (a dot for a bolt, a ring for a nova).
 - A live preview, the staff cast at a dummy in a small separate world: it needs a second, isolated spell runtime per open builder while the game runs, and a performance check first.
-- Whether the list builder gets the tree too, or goes.
+- ~~Whether the list builder gets the tree too, or goes.~~ It went (owner, 2026-11-11).
 
 ## Self-critique against docs/DESIGN.md
 

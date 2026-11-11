@@ -33,11 +33,10 @@ extends ActorController
 ## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
 ##   (the carrier, `Caster.last_form`) and `staff_cast` on every cast (with the cast sound `cast`
 ##   from `core/registry`, nothing on null).
-## - **The builder** (`staff_change_requested`, `card_move_requested`, `staff_cards_requested`,
+## - **The builder** (`staff_change_requested` and `staff_cards_requested`,
 ##   each for this seat only; commands, heard at the tick's start: core/events `listen`) builds the home body's staffs with `Caster.set_staff`, also during a
 ##   possession. A change is refused only when the slot does not exist or the card is not in the
-##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given); `card_move_requested`'s staff
-##   BAG (-1) is the bag.
+##   `bag` (the run mode's, from `seat_wizard`; every card in the registry when none was given).
 ## - **A set bag** (each run mode's, from flow through `seat_wizard`): `set_bag` makes the bag
 ##   exactly that list and sends `bag_changed`. A set bag is never
 ##   overwritten by the first fill, also when it was set before the wizard first drove.
@@ -64,8 +63,6 @@ const INPUT_BUFFER: float = 0.15
 const STAFF_COUNT: int = 4
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
-## `card_move_requested`'s staff for the bag.
-const BAG: int = -1
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md).
 const DERIVED: Array[StringName] = [&"registry", &"frames"]
@@ -212,7 +209,6 @@ func _bind_home(actor: Actor) -> void:
 	if bus != null:
 		# Commands, heard at the tick's start (core/events, online-ready N2).
 		bus.listen(&"staff_change_requested", _on_staff_change_requested)
-		bus.listen(&"card_move_requested", _on_card_move_requested)
 		bus.listen(&"staff_cards_requested", _on_staff_cards_requested)
 		if not _bag_filled:
 			_fill_bag()
@@ -436,38 +432,3 @@ func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -
 	caster.set_staff(at, cards)
 
 
-## A builder asked to move a card: from a slot of one staff to a slot of another (or the same),
-## swapping with what is there; from the bag (`from_staff` BAG, `from_slot` the bag index) it is
-## put in, and to the bag (`to_staff` BAG) the slot is emptied.
-func _on_card_move_requested(player: int, from_staff: int, from_slot: int, to_staff: int, to_slot: int) -> void:
-	if player != seat:
-		return
-	var caster: Caster = _builder_caster()
-	if caster == null:
-		_refuse("There is no such slot.")
-		return
-	var staffs: int = caster.staff_count
-	var from_ok: bool = (from_staff == BAG and from_slot >= 0 and from_slot < bag.size()) or (from_staff >= 0 and from_staff < staffs and from_slot >= 0 and from_slot < caster.slot_count(from_staff))
-	var to_ok: bool = to_staff == BAG or (to_staff >= 0 and to_staff < staffs and to_slot >= 0 and to_slot < caster.slot_count(to_staff))
-	if not from_ok or not to_ok:
-		_refuse("There is no such slot.")
-		return
-	if from_staff == BAG:
-		if to_staff != BAG:
-			_on_staff_change_requested(seat, to_staff, to_slot, bag[from_slot])
-		return
-	if to_staff == BAG:
-		_on_staff_change_requested(seat, from_staff, from_slot, &"")
-		return
-	var source: Array[StringName] = caster.cards_of(from_staff)
-	var moving: StringName = source[from_slot]
-	if from_staff == to_staff:
-		source[from_slot] = source[to_slot]
-		source[to_slot] = moving
-		caster.set_staff(from_staff, source)
-		return
-	var target: Array[StringName] = caster.cards_of(to_staff)
-	source[from_slot] = target[to_slot]
-	target[to_slot] = moving
-	caster.set_staff(from_staff, source)
-	caster.set_staff(to_staff, target)

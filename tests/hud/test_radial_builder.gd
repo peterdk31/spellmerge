@@ -75,8 +75,8 @@ func before_each() -> void:
 	_hud.input = _input
 	_hud.spells = _spells
 	root.add_child(_hud)
-	# The pause menu's Sandbox page picked the radial builder, every card on the ring, push.
-	_hud.call("_on_builder_options_changed", true, 0, true)
+	# The pause menu's Sandbox page picked every card on the ring, push.
+	_hud.call("_on_builder_options_changed", 0, true)
 
 
 ## `count` players with a virtual device and a wizard (the start cards on the dev staff), in a room.
@@ -139,7 +139,6 @@ func test_b_opens_the_radial_on_staff_2_after_its_last_card() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	check(radial.is_open(), "B opens the radial builder")
-	check(not _hud.get_builder(0).is_open(), "not the list builder")
 	check_equal(radial.viewed_staff(), 1, "staff 2 (the fire bolt)")
 	check_equal(radial.marked_slot(), 2, "the marker sits after the last card")
 	check(_input.is_captured(0), "the wizard stands still while building")

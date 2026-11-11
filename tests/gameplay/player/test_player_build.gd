@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the wizard on staffs (staffs A6a; the wizard actor and its seat since actors G7):
-## four staffs on four buttons, the start cards and the bag, `staff_change_requested`,
-## `staff_cards_requested` and `card_move_requested` applied and announced (`staff_changed`) or
+## four staffs on four buttons, the start cards and the bag, `staff_change_requested` and
+## `staff_cards_requested` applied and announced (`staff_changed`) or
 ## refused (`build_refused`), casting through `Spells.cast_staff`, a sustained (`hold`) card
 ## switched off only by a new press, mana held by sustained cards, the anchor a circling shot goes
 ## round (Orbit), and four
@@ -269,21 +269,6 @@ func test_a_request_for_another_player_is_ignored() -> void:
 	_world.bus.staff_change_requested.emit(1, 2, 0, &"bolt")
 	check(not first.caster.has_staff(2), "player 1's staff Y is untouched")
 	check(second.caster.has_staff(2), "player 2's is built")
-
-
-func test_cards_move_and_swap_between_slots_staffs_and_the_bag() -> void:
-	var player := _wizard(0)
-	var caster: Caster = player.caster
-	var bus := _world.bus
-	bus.card_move_requested.emit(0, 1, 0, 1, 1)
-	check_equal(caster.cards_of(1).slice(0, 2), _ids("bolt fire"), "two slots of one staff swap")
-	bus.card_move_requested.emit(0, 1, 0, 2, 3)
-	check_equal(caster.cards_of(2)[3], &"bolt", "a card moves to another staff")
-	check_equal(caster.cards_of(1)[0], &"", "and leaves its slot")
-	bus.card_move_requested.emit(0, PlayerController.BAG, _seat(player).bag.find(&"rune"), 3, 0)
-	check_equal(caster.cards_of(3)[0], &"rune", "a card comes from the bag")
-	bus.card_move_requested.emit(0, 3, 0, PlayerController.BAG, 0)
-	check_equal(caster.cards_of(3)[0], &"", "and goes back")
 
 
 func test_a_whole_staff_request_sets_every_slot_in_one_change() -> void:

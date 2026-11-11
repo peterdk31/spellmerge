@@ -27,8 +27,8 @@ extends RefCounted
 ##     var back: InputFrame = InputFrame.from_bytes(frame.to_bytes())   # null if rejected
 
 ## The format's version, the frame's first byte (2: the horde's commands gone, the kinds after
-## them renumbered).
-const VERSION: int = 2
+## them renumbered; 3: `card_move_requested` gone with the list builder, the same).
+const VERSION: int = 3
 const SEATS: int = 4
 const STAFFS: int = 4
 ## A move axis of 1.0 is this byte.
@@ -59,7 +59,7 @@ const LEAVE: StringName = &"leave"
 ## names); a kind is only ever added at the end.
 const COMMAND_NAMES: Array[StringName] = [
 	JOIN, LEAVE,
-	&"staff_change_requested", &"card_move_requested", &"staff_cards_requested",
+	&"staff_change_requested", &"staff_cards_requested",
 	&"sandbox_action_requested", &"sandbox_spawn_requested",
 	&"reward_pick_requested", &"door_vote_requested",
 	&"shot_cap_requested",
@@ -68,7 +68,7 @@ const COMMAND_NAMES: Array[StringName] = [
 ]
 const COMMAND_SHAPES: PackedStringArray = [
 	"", "",
-	"iis", "iiii", "iS",
+	"iis", "iS",
 	"s", "si",
 	"i", "i",
 	"i",

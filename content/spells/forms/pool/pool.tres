@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
 [ext_resource type="Texture2D" path="res://content/spells/forms/pool/icon.svg" id="2_icon"]
 [ext_resource type="Shader" path="res://content/spells/forms/pool/pool.gdshader" id="3_shader"]
-[ext_resource type="Script" path="res://core/base/still_mote_source.gd" id="9_source"]
+[ext_resource type="Script" path="res://core/base/card_mote_stream.gd" id="9_source"]
 
 [sub_resource type="Resource" id="Mote_1"]
 script = ExtResource("9_source")

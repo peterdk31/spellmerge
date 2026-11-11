@@ -87,28 +87,28 @@ func test_the_still_cards_name_their_streams() -> void:
 	for form: FormBase in [WALL, POOL, RUNE]:
 		check(not form.look_motes.is_empty(), "%s gives off motes" % form.id)
 		check(form.look_problems().is_empty(), "%s: %s" % [form.id, form.look_problems()])
-		for source: StillMoteSource in form.look_motes:
-			check(source.start <= ManagerScript.STILL_START and source.stop <= ManagerScript.STILL_START, "%s's %s start and stop within what its still clock tells" % [form.id, source.kind])
-	check(WALL.look_motes[0].kind == &"seam" and WALL.look_motes[0].from == StillMoteSource.FROM_ROW, "a wall's stream rises off its seam")
-	check(POOL.look_motes[0].kind == &"rising" and POOL.look_motes[0].from == StillMoteSource.FROM_AREA, "a pool's motes rise off its mire")
-	check(RUNE.look_motes.all(func(s: StillMoteSource) -> bool: return s.start >= 1.0), "a rune's only once armed")
+		for stream: CardMoteStream in form.look_motes:
+			check(stream.start <= ManagerScript.STILL_START and stream.stop <= ManagerScript.STILL_START, "%s's %s start and stop within what its still clock tells" % [form.id, stream.kind])
+	check(WALL.look_motes[0].kind == &"seam" and WALL.look_motes[0].from == CardMoteStream.From.ROW, "a wall's stream rises off its seam")
+	check(POOL.look_motes[0].kind == &"rising" and POOL.look_motes[0].from == CardMoteStream.From.AREA, "a pool's motes rise off its mire")
+	check(RUNE.look_motes.all(func(s: CardMoteStream) -> bool: return s.start >= 1.0), "a rune's only once armed")
 	var cards: Array[StringName] = spells.still_mote_cards()
 	check(cards.has(&"wall") and cards.has(&"pool") and cards.has(&"rune"), "Spells names the still cards that give off motes (%s)" % [cards])
 
 
 func test_a_source_that_cannot_give_off_is_reported() -> void:
-	var source := StillMoteSource.new()
-	check(" ".join(source.problems(&"x")).contains("no mote kind"), "a source of no kind")
-	source.kind = &"rising"
-	check(" ".join(source.problems(&"x")).contains("never given off"), "at no rate")
-	source.rate = 500.0
-	check(" ".join(source.problems(&"x")).contains("at most"), "too fast")
-	source.rate = 5.0
-	source.start = 1.0
-	source.stop = 0.5
-	check(" ".join(source.problems(&"x")).contains("before they start"), "stopping before it starts")
-	source.stop = 0.0
-	check(source.problems(&"x").is_empty(), "a good one: %s" % source.problems(&"x"))
+	var stream := CardMoteStream.new()
+	check(" ".join(stream.problems(&"x")).contains("no mote kind"), "a stream of no kind")
+	stream.kind = &"rising"
+	check(" ".join(stream.problems(&"x")).contains("never given off"), "at no rate")
+	stream.rate = 500.0
+	check(" ".join(stream.problems(&"x")).contains("at most"), "too fast")
+	stream.rate = 5.0
+	stream.start = 1.0
+	stream.stop = 0.5
+	check(" ".join(stream.problems(&"x")).contains("before they start"), "stopping before it starts")
+	stream.stop = 0.0
+	check(stream.problems(&"x").is_empty(), "a good one: %s" % stream.problems(&"x"))
 
 
 func test_a_body_first_numbered_at_a_launch_is_shaped_too() -> void:
@@ -127,10 +127,10 @@ func test_motes_on_a_card_that_cannot_give_them_off_are_reported() -> void:
 	var form := FormBase.new()
 	form.id = &"test_form"
 	form.carrier = &"atom"
-	var source := StillMoteSource.new()
-	source.kind = &"rising"
-	source.rate = 10.0
-	form.look_motes = [source] as Array[StillMoteSource]
+	var stream := CardMoteStream.new()
+	stream.kind = &"rising"
+	stream.rate = 10.0
+	form.look_motes = [stream] as Array[CardMoteStream]
 	check(" ".join(form.look_problems()).contains("never given off"), "a flying card's still motes are reported")
 
 

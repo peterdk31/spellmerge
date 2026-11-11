@@ -134,12 +134,12 @@ var _pose_packed: bool = false
 @export var look_light_reach: float = 1.0
 ## The motes its carrier's still shots give off all the time while they stand (the owner,
 ## 2026-11-09: "use motes for everything you can", the world's magic building blocks): one
-## `StillMoteSource` a stream (its kind, rate, where it leaves from in `look_shape`, how high, from
+## `CardMoteStream` a stream (its kind, rate, where it leaves from in `look_shape`, how high, from
 ## when, how far apart), as many as its look needs (a rune's drips and the motes rising off its
 ## ring). Fewer while it comes and as it goes (`look_open`, `look_fade`). Feel gives them off
 ## (`gameplay/feel/still_motes.gd`) in the shot's colours, its infusions in turn, a share of them its
 ## infusions' own kinds. Empty for none.
-@export var look_motes: Array[StillMoteSource] = []
+@export var look_motes: Array[CardMoteStream] = []
 ## The shape of a still card's look, in its hit size as drawn (`ProjectileManager.STILL_HIT` of its
 ## quad): an oval's half width and half depth (a pool, seen at a slant), or a piece's half span of
 ## its row and its seam's depth below its middle (a wall). Its look shader reads it as the uniform
@@ -192,11 +192,11 @@ func look_problems() -> PackedStringArray:
 		found.append("%s: look_shader '%s' is never drawn: its carrier `%s` has no look of its own (Carrier.look_drawer)" % [id, look_shader.resource_path, carrier])
 	if not look_motes.is_empty() and Carriers.exists(carrier) and (Carriers.of(carrier).look_drawer() != Carrier.LOOK_STILL or look_shader == null):
 		found.append("%s: look_motes are never given off: only a still carrier's shots drawn by a look_shader of the card's own give them off" % id)
-	for source: StillMoteSource in look_motes:
-		if source == null:
-			found.append("%s: an empty look mote source" % id)
+	for stream: CardMoteStream in look_motes:
+		if stream == null:
+			found.append("%s: an empty look mote stream" % id)
 		else:
-			found.append_array(source.problems(id))
+			found.append_array(stream.problems(id))
 	if look_shape.x <= 0.0 or look_shape.y < 0.0:
 		found.append("%s: look_shape %s has no size: its width must be above 0 and its depth not below" % [id, look_shape])
 	if look_open < 0.0 or look_fade < 0.0:

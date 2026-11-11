@@ -7,6 +7,13 @@ extends RefCounted
 ## - **Reading the link** (`pump`): at most `max_read` messages a call, each decoded strictly
 ##   (`NetMessage`) and handed to `_take`, which takes only the kinds the other side may send.
 ##   Anything else closes the link, `problem` says why, and nothing more is read from it.
+## - **A machine that went silent** is taken for gone: one that is closed, loses its network or
+##   crashes says no goodbye, and its link stays open for as long as the wire cares to keep it.
+##   Once something was heard, SILENT_MS of this machine's own stepping with nothing read closes
+##   the link (`problem` says so), as any refusal does. Both sides send steadily (the client its
+##   pings and frames, the host its pongs and ticks), so silence is never a quiet moment of the
+##   game. Before the first message nothing is counted (the other machine may still load), and a
+##   stall of this machine's own counts as STALL_MS at most.
 ## - **The checks** (`_check`): after every tick the tick's part of the state is hashed
 ##   (`NetChecks`). The client sends each whole check, the host's guest compares; the first that differs
 ##   is kept on both sides (`parted_tick`, `parted_areas`).
@@ -17,6 +24,11 @@ extends RefCounted
 ##   counters (`stats`), and saves `replay`.
 
 const FramesScript := preload("res://core/sim/frames.gd")
+
+## Nothing read for this long (milliseconds this machine stepped through): the other is gone.
+const SILENT_MS: int = 10000
+## The most one pump adds to the silence: this machine standing still is not the other's silence.
+const STALL_MS: int = 250
 
 var link: NetLink
 var frames: FramesScript
@@ -34,7 +46,15 @@ var parted_areas: PackedStringArray = PackedStringArray()
 ## The most messages read in one `pump`.
 var max_read: int = 64
 
+## The time in milliseconds, for the silence (and a client's pings): a test's own; the engine's
+## clock otherwise.
+var clock: Callable = Callable()
+
 var _message: NetMessage = NetMessage.new()
+## True once a message was read; the silence since the last one, and when it was last counted.
+var _heard: bool = false
+var _silent_ms: float = 0.0
+var _pumped_at: float = -1.0
 
 
 func _init(frames_service: FramesScript, over: NetLink, state_areas: Callable) -> void:
@@ -50,11 +70,13 @@ func pump() -> bool:
 		return false
 	var began: int = Time.get_ticks_usec()
 	var drained: bool = false
+	var read: int = 0
 	for i in max_read:
 		var bytes: PackedByteArray = link.read()
 		if bytes.is_empty():
 			drained = true
 			break
+		read += 1
 		stats.count_read(bytes.size())
 		var why: String = _message.decode(bytes)
 		if why == "":
@@ -62,8 +84,29 @@ func pump() -> bool:
 		if why != "":
 			_refuse(why)
 			break
+	_listen(read > 0)
 	stats.net_usec += Time.get_ticks_usec() - began
-	return drained
+	return drained and problem == ""
+
+
+## The silence is counted (see the top): `heard` when this pump read something.
+func _listen(heard: bool) -> void:
+	var now: float = _now_ms()
+	var passed: float = clampf(now - _pumped_at, 0.0, float(STALL_MS)) if _pumped_at >= 0.0 else 0.0
+	_pumped_at = now
+	if heard:
+		_heard = true
+		_silent_ms = 0.0
+		return
+	if not _heard or problem != "" or not link.is_open():
+		return
+	_silent_ms += passed
+	if _silent_ms >= float(SILENT_MS):
+		_refuse("nothing was heard from the other machine for %d seconds" % (SILENT_MS / 1000))
+
+
+func _now_ms() -> float:
+	return float(clock.call()) if clock.is_valid() else float(Time.get_ticks_msec())
 
 
 ## Call after every tick has stepped.

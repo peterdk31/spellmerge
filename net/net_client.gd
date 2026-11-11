@@ -111,8 +111,6 @@ class Player:
 
 ## The live replay's feed: its pacing (`cushion`), and `closed` once the host is gone.
 var feed: Feed
-## The time in milliseconds, for the pings (a test's own; the engine's clock otherwise).
-var clock: Callable = Callable()
 ## Catching up: the time a step's ticks may take, in microseconds (a test's own; BURST_USEC).
 var burst_usec: int = BURST_USEC
 ## This machine's seats (a bit each): the ones it was made with, or those its devices sit on by
@@ -476,5 +474,4 @@ func _refuse(why: String) -> void:
 
 
 func _now() -> int:
-	var ms: float = float(clock.call()) if clock.is_valid() else float(Time.get_ticks_msec())
-	return int(ms) & 0xffffffff
+	return int(_now_ms()) & 0xffffffff

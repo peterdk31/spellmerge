@@ -240,6 +240,38 @@ func test_the_client_gone_its_seat_leaves_and_the_host_plays_on() -> void:
 	check(_host.is_running() and _guest.is_gone() and not _host.hears_guests(), "the run goes on, the guest gone")
 
 
+## A guest machine that is closed or loses its network says no goodbye: its link stays open.
+func test_a_guest_that_went_silent_is_gone_and_its_seat_leaves() -> void:
+	var now: Array[float] = [0.0]
+	_guest.clock = func() -> float: return now[0]
+	_start()
+	_send(0, _frame(0b0001, 0, Vector2.RIGHT))
+	var ticks: int = NetSession.SILENT_MS * 60 / 1000
+	for i in ticks - 2:
+		now[0] += 1000.0 / 60.0
+		_tick()
+	check(_guest.hears() and _input.is_joined(SEAT), "just under the limit its seat still plays, stood in for")
+	for i in 6:
+		now[0] += 1000.0 / 60.0
+		_tick()
+	check(_guest.problem.begins_with("nothing was heard"), "past it the link is closed, and it says why (%s)" % _guest.problem)
+	check(not _input.is_joined(SEAT) and _guest.is_gone(), "its seat leaves, as a pad pulled out would")
+	check(_host.is_running(), "and the host plays on")
+
+
+func test_a_guest_that_only_pings_is_not_silent() -> void:
+	var now: Array[float] = [0.0]
+	_guest.clock = func() -> float: return now[0]
+	_start()
+	for i in NetSession.SILENT_MS * 60 / 1000 * 2:
+		now[0] += 1000.0 / 60.0
+		if i % 30 == 0:
+			_far.send(NetMessage.of_ping(i))
+		_tick()
+		_drain()
+	check(_guest.hears() and _input.is_joined(SEAT), "a machine that pings is there, whatever its players do")
+
+
 func test_a_ping_is_answered_before_the_run_and_in_it() -> void:
 	_far.send(NetMessage.of_ping(41))
 	_host.pump()

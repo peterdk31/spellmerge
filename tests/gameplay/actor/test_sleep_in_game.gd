@@ -30,7 +30,9 @@ const MOVED: int = 17
 
 
 func after_each() -> void:
-	TickScript.sleep_bodies = true
+	var tick: TickScript = root.get_node_or_null(^"Tick") as TickScript
+	if tick != null:
+		tick.sleep_bodies = true
 
 
 func test_asleep_bodies_play_the_same_game_as_stepped_ones() -> void:
@@ -56,7 +58,6 @@ func test_asleep_bodies_play_the_same_game_as_stepped_ones() -> void:
 ## most stand-ins
 ## asleep at once (counted as skipped: asleep while sleeping is on), and how many were hurt.
 func _play(sleeping: bool) -> Dictionary:
-	TickScript.sleep_bodies = sleeping
 	var tick: TickScript = root.get_node_or_null(^"Tick") as TickScript
 	var flow: Node = root.get_node_or_null(^"Flow")
 	var events: Node = root.get_node_or_null(^"Events")
@@ -65,6 +66,7 @@ func _play(sleeping: bool) -> Dictionary:
 	if tick == null or flow == null or events == null or input == null or frames == null:
 		check(false, "the game's autoloads are missing")
 		return {}
+	tick.sleep_bodies = sleeping
 	var bot := BotScript.new()
 	if not bot.join(0, BotScript.Mode.IDLER, input, flow):
 		check(false, "the bot could not join")

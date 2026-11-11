@@ -75,14 +75,6 @@ const ACTORS: StringName = &"Actors"
 ## steps joins STEPS.
 signal ticked
 
-## Check every asleep body each tick (props W2, `_verify_asleep`): on in the tests, off in the game,
-## where it would cost what sleeping saves.
-static var verify_sleep: bool = false
-## What `verify_sleep` found, one line each (the suite fails a test on any; cleared by the caller).
-static var sleep_misses: PackedStringArray = PackedStringArray()
-## Off: asleep bodies are stepped all the same (a test plays a game both ways and compares them;
-## props W2). On in the game.
-static var sleep_bodies: bool = true
 
 ## Ticks since the run began (or the game, before any run): the game's clock, `sim.tick`, which is
 ## state (a snapshot restores it, online-ready N10). Read only.
@@ -92,6 +84,14 @@ var count: int:
 ## The game's time and chance (`sim.gd`, online-ready N3c): the tick (`count`) and the run's seed,
 ## dealt at each run's start. Areas and bodies take it as their `sim` (`Sim.found`).
 var sim: Sim = Sim.new()
+## Check every asleep body each tick (props W2, `_verify_asleep`): on in the tests (the suite sets
+## it on the game's Tick), off in the game, where it would cost what sleeping saves.
+var verify_sleep: bool = false
+## What `verify_sleep` found, one line each (the suite fails a test on any; cleared by the caller).
+var sleep_misses: PackedStringArray = PackedStringArray()
+## Off: asleep bodies are stepped all the same (a test plays a game both ways and compares them;
+## props W2). On in the game.
+var sleep_bodies: bool = true
 ## The services the Tick drives by type. Only tests set these; otherwise the autoloads.
 var events: EventsScript = null
 var frames: FramesScript = null

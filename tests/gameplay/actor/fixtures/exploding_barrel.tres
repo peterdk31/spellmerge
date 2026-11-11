@@ -4,11 +4,11 @@
 [ext_resource type="Script" path="res://core/base/staff_base.gd" id="2_staff"]
 [ext_resource type="Script" path="res://core/base/staff_cards.gd" id="3_entry"]
 [ext_resource type="PackedScene" path="res://content/props/base/prop.tscn" id="6_scene"]
-[ext_resource type="Resource" path="res://tests/gameplay/actor/fixtures/barrel_states.tres" id="7_states"]
+[ext_resource type="Resource" path="res://tests/gameplay/actor/fixtures/exploding_barrel_states.tres" id="7_states"]
 
 [sub_resource type="Resource" id="fuse_staff"]
 script = ExtResource("2_staff")
-display_name = "Barrel's fuse"
+display_name = "Exploding barrel's fuse"
 slots = 2
 wind_up = 1.0
 cooldown = 0.0
@@ -17,7 +17,7 @@ mana_regen = 0.0
 
 [sub_resource type="Resource" id="blast_staff"]
 script = ExtResource("2_staff")
-display_name = "Barrel's blast"
+display_name = "Exploding barrel's blast"
 slots = 2
 cooldown = 0.0
 max_mana = 100.0
@@ -35,7 +35,7 @@ cards = Array[StringName]([&"fire", &"blast"])
 
 [resource]
 script = ExtResource("1_base")
-id = &"test_barrel"
+id = &"test_exploding_barrel"
 scene = ExtResource("6_scene")
 max_health = 10.0
 radius = 7.0

@@ -1,8 +1,8 @@
 class_name PropStates
 extends Resource
 ## The states a body can be in and their reactions (props W6, docs/milestones/props.md, "Triggers"),
-## as a file of their own (`barrel_states.tres`): a `PropBase` names one, and two props may share one
-## (a small and a big barrel). The `Reactions` component (gameplay/actor) runs it and reads nothing
+## as a file of their own (`exploding_barrel_states.tres`): a `PropBase` names one, and two props may share one
+## (a small and a big exploding barrel). The `Reactions` component (gameplay/actor) runs it and reads nothing
 ## else of the prop, so any actor's data could name one. It has no `id`, so the registry never takes
 ## it for content.
 

@@ -3,14 +3,14 @@ extends "res://tests/support/suite.gd"
 ## names the game knows), its staffs pass the spell validator, a body of it can be made from the
 ## shared scene, and every cast its reactions make it can pay from a full pool (a still prop's pools
 ## never refill). Found by folder (`content/props/<id>/<id>.tres`), so a new prop is checked too; the
-## test barrel (tests/gameplay/actor/fixtures) stands in for the casts until the first props (W9).
+## test exploding barrel (tests/gameplay/actor/fixtures) stands in for the casts until the first props (W9).
 ##
 ## godot --headless --path . --script res://tests/content/props/test_prop_data.gd
 
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
-const BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/barrel.tres")
+const EXPLODING_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
 const SCENE: PackedScene = preload("res://content/props/base/prop.tscn")
 
 var _world: Fixture
@@ -56,7 +56,7 @@ func test_the_shared_body_has_every_part_a_prop_needs() -> void:
 
 func test_every_cast_a_prop_reacts_with_is_paid_from_a_full_pool() -> void:
 	var all: Array[PropBase] = _props()
-	all.append(BARREL)
+	all.append(EXPLODING_BARREL)
 	for data in all:
 		var body: Actor = _world.add(PropBody.make(data), Vector2.ZERO)
 		for state in data.states.list:

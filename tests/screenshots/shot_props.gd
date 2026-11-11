@@ -1,58 +1,29 @@
-extends "res://tests/support/screenshot.gd"
-## Every prop in every state (props W7, docs/milestones/props.md, "W7: the look"): in the arena, a
-## row a prop (the registry's `props`, by id, then the test exploding barrel,
+extends "res://tests/support/empty_stage.gd"
+## Every prop in every state (props W7, docs/milestones/props.md, "W7: the look"): on the empty
+## stage (tests/support/empty_stage.gd), a row a prop (the registry's `props`, by id, then the test exploding barrel,
 ## tests/gameplay/actor/fixtures/exploding_barrel.tres), a column a state, each body made by
 ## `PropBody.make` and put into its state as a trigger would, its look's art, motes and light
 ## showing; each prop's cells as big as its art (a barrel to the hub's 96 px stone). `props` is the
 ## whole sheet a moment later (the motes given off), `props_4x` the first prop close up.
 
 const TEST_BARREL: PropBase = preload("res://tests/gameplay/actor/fixtures/exploding_barrel.tres")
-## Pixels round each prop's art, and the widest a row of the sheet runs (inside the arena's walls).
+## Pixels round each prop's art, and the widest a row of the sheet runs.
 const PAD: float = 12.0
-const ROW_WIDTH: float = 560.0
-## The arena's middle, where the sheet is centred.
-const CENTRE: Vector2 = Vector2(320.0, 192.0)
+const ROW_WIDTH: float = 600.0
+## The screen's middle, where the sheet is centred.
+const CENTRE: Vector2 = SCREEN * 0.5
 
 
 func take() -> void:
-	change_scene_to_file("res://hud/menus/main_menu/main_menu.tscn")
-	await settle()
-	if not need(["PlayerInput", "Flow", "Feel", "Registry"]):
-		return
-	var input: Node = root.get_node("PlayerInput")
-	var flow: Node = root.get_node("Flow")
-	var registry: Node = root.get_node("Registry")
-	input.call("add_virtual_device", 0)
-	# Still training dummies for the wave, so nothing walks across the sheet.
-	var enemy_was: StringName = flow.get("enemy_id_to_play")
-	flow.set("enemy_id_to_play", &"training_dummy")
-	flow.call("start_run", 0)
-	flow.set("enemy_id_to_play", enemy_was)
-	for i in 4:
-		await settle()
-	var wizard: Actor = flow.call("get_wizard", 0) as Actor
-	if wizard == null:
-		fail("no wizard in the arena")
+	if not await open_stage():
 		return
 	var props: Array[PropBase] = []
-	for resource: Resource in registry.call("get_all", &"props"):
+	for resource: Resource in root.get_node("Registry").call("get_all", &"props"):
 		if resource is PropBase:
 			props.append(resource as PropBase)
 	props.append(TEST_BARREL)
-	wizard.global_position = Vector2(600.0, 340.0)
-	# The pillars' art and shade are drawn over a floor slab, the wave's banner over the sheet: hidden
-	# here (only what is drawn).
-	var layout: Node = wizard.get_parent().get_child(0)
-	for node: Node in layout.find_children("Pillar*", "CanvasItem", true, false):
-		(node as CanvasItem).visible = false
-	var shade := layout.get_node_or_null("Shade") as CanvasItem
-	if shade != null:
-		shade.visible = false
-	var hud: Node = root.get_node_or_null("Hud")
-	if hud != null:
-		hud.set("visible", false)
 	# Each prop a block of its states side by side, a cell as big as its biggest art (props differ
-	# from a barrel to the hub's 96 px stone); blocks run in rows across the arena.
+	# from a barrel to the hub's 96 px stone); blocks run in rows across the screen.
 	var cells: Array[Rect2] = []
 	var x: float = 0.0
 	var y: float = 0.0
@@ -76,11 +47,10 @@ func take() -> void:
 			var body: Actor = PropBody.make(data)
 			if body == null:
 				continue
-			wizard.get_parent().add_child(body)
 			var cell := Rect2(sheet.position + cells[i].position + Vector2(cells[i].size.x * float(column), 0.0), cells[i].size)
 			# The art's bottom middle on the cell's (less its padding), the feet where its layer puts them.
 			var bottom := Vector2(cell.get_center().x, cell.end.y - PAD * 0.5)
-			body.global_position = (bottom - _first_offset(data)).round()
+			stand(body, bottom - _first_offset(data))
 			if column > 0:
 				_put_in(body, data.states.list[column].state_id)
 	# The motes given off for a while (under the test barrel's 1 s fuse).
@@ -90,10 +60,7 @@ func take() -> void:
 	await snap(sheet.get_center(), "props", Vector2i(sheet.size * 0.5) + Vector2i(4, 4), 2)
 	var first := Rect2(sheet.position + cells[0].position, Vector2(cells[0].size.x * float(props[0].states.list.size()), cells[0].size.y))
 	await snap(first.get_center(), "props_4x", Vector2i(first.size * 0.5) + Vector2i(2, 2), 4 if first.size.y <= 48.0 else 2)
-	if hud != null:
-		hud.set("visible", true)
-	flow.call("stop_run")
-	await create_timer(0.3).timeout
+	await close_stage()
 
 
 ## The biggest frame of any layer of any of its looks.

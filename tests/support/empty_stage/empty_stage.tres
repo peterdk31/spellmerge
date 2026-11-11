@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="RoomBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/room_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://tests/support/empty_stage/empty_stage.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"screenshot_empty_stage"
+scene = ExtResource("2_scene")
+player_spawns = PackedVector2Array(616, 344, 616, 344, 616, 344, 616, 344)
+ambient = 0.9

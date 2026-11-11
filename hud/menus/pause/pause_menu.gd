@@ -19,7 +19,7 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Tails: On", "Max shots: 6000", "Screen shake: On",
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", "Particles: High", "Floor marks: On", "Spell light: On", "Tails: On", "Max shots: 6000", "Screen shake: On", "Damage numbers: On",
 ##   "Show FPS: Off", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
@@ -52,7 +52,9 @@ extends PanelContainer
 ##   "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
-##   when the menu is bound, so it holds between plays. "Max shots" (owner, 2026-11-02) is a
+##   when the menu is bound, so it holds between plays. "Damage numbers: On" (or Off; props W5)
+##   below it flips the same way: it sends `damage_numbers_changed`, which feel applies to every
+##   actor's numbers, and is saved (`damage_numbers`); only Off is sent again when bound. "Max shots" (owner, 2026-11-02) is a
 ##   slider like "Effect slots" through `ShotCap.STOPS` (core/settings), from the platform's cap
 ##   (`ShotCap.default_cap()`); each move sends `projectile_cap_changed`, which the projectile
 ##   manager applies at once (the shots in the air end), and is saved (`projectile_cap`); a saved
@@ -117,6 +119,8 @@ const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
 const SHAKE_TEXT: String = "Screen shake: %s"
 ## The saved setting that holds the choice.
 const SHAKE_SETTING: StringName = &"screen_shake"
+const NUMBERS_TEXT: String = "Damage numbers: %s"
+const NUMBERS_SETTING: StringName = &"damage_numbers"
 const SHOT_CAP_TEXT: String = "Max shots: %d"
 const SHOT_CAP_SETTING: StringName = &"projectile_cap"
 const MOTE_CAP_TEXT: String = "Particles: %s"
@@ -157,6 +161,8 @@ var reload_on_button: bool = true
 var effect_slots: int = EffectSlots.DEFAULT
 ## The "Screen shake" setting (see the top): on by default.
 var screen_shake: bool = true
+## The "Damage numbers" setting (see the top): on by default.
+var damage_numbers: bool = true
 ## The "Max shots" setting (see the top): the platform's cap by default.
 var shot_cap: int = ShotCap.default_cap()
 ## The "Particles" setting (see the top): the platform's cap by default.
@@ -215,6 +221,7 @@ var ai_view: bool = false
 @onready var _shots: Button = _add(Page.SETTINGS, "ShotCap", SHOT_CAP_TEXT % shot_cap)
 @onready var _shots_bar: HSlider = _add_slider(_shots, 0, ShotCap.STOPS.size() - 1, 1, ShotCap.index_of(shot_cap), SHOT_CAP_TEXT % ShotCap.STOPS[-1])
 @onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
+@onready var _numbers: Button = _add(Page.SETTINGS, "DamageNumbers", NUMBERS_TEXT % "On")
 @onready var _fps: Button = _add(Page.SETTINGS, "ShowFps", FPS_TEXT % "Off")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 
@@ -235,6 +242,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	if save == null:
 		save = SaveFile.new()
 	_load_shake()
+	_load_numbers()
 	_load_shot_cap()
 	_load_mote_cap()
 	_load_mote_density()
@@ -549,6 +557,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_set_tailless_motes(TaillessMotes.STOPS[(TaillessMotes.index_of(tailless_motes) + 1) % TaillessMotes.STOPS.size()])
 	elif control == _shake:
 		_set_shake(not screen_shake)
+	elif control == _numbers:
+		_set_numbers(not damage_numbers)
 	elif control == _fps:
 		_set_fps(not show_fps)
 	elif control == _sandbox_back or control == _settings_back:
@@ -573,6 +583,26 @@ func _load_shake() -> void:
 	_mark_focus()
 	if not screen_shake and _events != null:
 		_events.screen_shake_changed.emit(false)
+
+
+## Read the saved "Damage numbers" choice and show it; feel is told only when it is off (on is
+## feel's own default).
+func _load_numbers() -> void:
+	damage_numbers = bool(save.get_setting(NUMBERS_SETTING, true))
+	_numbers.set_meta(BASE_TEXT_META, NUMBERS_TEXT % ("On" if damage_numbers else "Off"))
+	_mark_focus()
+	if not damage_numbers and _events != null:
+		_events.damage_numbers_changed.emit(false)
+
+
+## Flip the "Damage numbers" switch: show it, save it and tell feel.
+func _set_numbers(on: bool) -> void:
+	damage_numbers = on
+	_numbers.set_meta(BASE_TEXT_META, NUMBERS_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(NUMBERS_SETTING, on)
+	if _events != null:
+		_events.damage_numbers_changed.emit(on)
 
 
 ## Read the saved "Spell light" choice and show it; feel is told only when it is not the default.

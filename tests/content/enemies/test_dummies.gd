@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The sandbox dummies (staffs B7; actors since G6; on the enemy AI like every enemy, enemy AI
 ## AI8). The training dummy (an actor with Health, a Hurtbox, its DummyLook and an AIController
-## with the `post` profile, no staff and no Mover) never dies or moves and shows damage numbers, damage
+## with the `post` profile, no staff and no Mover) never dies or moves and shows damage numbers (every
+## actor's, props W5), damage
 ## per second over the last 5 s, its statuses and reactions; the shooting dummy (an actor driven by
 ## its AIController) stands still and fires slow, telegraphed shots at the nearest wizard (its
 ## staff: `slow · bolt`). Uses the real Combat, Events, Projectiles, Spells and Actors autoloads;
@@ -82,34 +83,20 @@ func test_it_never_moves() -> void:
 	check_equal(dummy.position, Vector2(100.0, 100.0), "knockback, a swap and a pull leave it where it is")
 
 
+## The dummy's numbers are every actor's (props W5): each hit's number in Feel's one drawer.
 func test_damage_numbers_show_each_hit() -> void:
 	var dummy := _training()
+	var numbers: Node = (root.get_node("Feel") as Node).call("damage_numbers")
+	numbers.call("set_shown", false)
+	numbers.call("set_shown", true)
+	check(dummy.damage_numbers != null, "the dummy wears its numbers")
 	combat.call("hit", 0, dummy, 12)
 	combat.call("hit", 1, dummy, 7)
-	check_equal(_look(dummy).shown_numbers(), PackedStringArray(["12", "7"]), "a number per hit")
-	dummy.step(DummyLook.NUMBER_TIME + 0.05)
-	check_equal(_look(dummy).shown_numbers().size(), 0, "numbers fade out")
-	for i in DummyLook.NUMBER_COUNT + 3:
-		combat.call("hit", 0, dummy, 1)
-	check_equal(_look(dummy).shown_numbers().size(), DummyLook.NUMBER_COUNT, "the pool reuses the oldest label")
-
-
-## The numbers are written to their labels once a frame, before it is drawn (performance,
-## 2026-11-02): each new label then shows its hit at the start of its rise, and a label reused
-## within the frame shows its last hit.
-func test_damage_numbers_reach_their_labels_before_the_frame_is_drawn() -> void:
-	var dummy := _training()
-	for i in DummyLook.NUMBER_COUNT + 2:
-		combat.call("hit", 0, dummy, 10 + i)
-	await process_frame
-	var look: DummyLook = _look(dummy)
-	var texts := PackedStringArray()
-	for i in DummyLook.NUMBER_COUNT:
-		var label := look.get_node("Number%d" % (i + 1)) as Label
-		texts.append(label.text)
-		check(label.visible and is_equal_approx(label.modulate.a, 1.0), "label %d shown, not faded yet" % i)
-		check_equal(label.position, DummyLook.NUMBER_START + Vector2(DummyLook.NUMBER_SPREAD * float(i % 3 - 1), 0.0), "label %d at the start of its rise" % i)
-	check_equal(texts, PackedStringArray(["18", "19", "12", "13", "14", "15", "16", "17"]), "each label its last hit's number")
+	numbers.call("step", 0.0)
+	var shown: PackedStringArray = numbers.call("shown_texts")
+	check(shown.has("12") and shown.has("7"), "a number per hit: %s" % [shown])
+	numbers.call("step", dummy.damage_numbers.seconds + 0.05)
+	check_equal(numbers.call("live"), 0, "numbers fade out")
 
 
 func test_dps_covers_the_last_five_seconds() -> void:

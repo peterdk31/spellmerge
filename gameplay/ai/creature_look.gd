@@ -259,6 +259,6 @@ func _on_phase_started(_index: int, phase: EnemyPhase) -> void:
 
 
 ## A hit on the actor shows the hurt pose at once.
-func _on_damaged(_by: int, _amount: float) -> void:
+func _on_damaged(_by: int, _amount: float, _element: StringName) -> void:
 	_hurt_left = HURT_TIME
 	_update_sprite()

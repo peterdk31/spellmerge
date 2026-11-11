@@ -3,7 +3,7 @@ extends SceneTree
 ## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
 ## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake and Show FPS; `back` (B)
+## actions and switches the builder and where the staff rows show the reload; Settings has Fullscreen, Effect slots, Particles, Floor marks, Max shots, Screen shake, Damage numbers and Show FPS; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
 ## open builder; the menu's stop is a reason of its own (online-ready N4). Input goes through the real input manager's virtual devices.
 ##
@@ -32,6 +32,8 @@ var _actions: Array[Array] = []
 var _slots: Array[int] = []
 ## Every `screen_shake_changed` the bus sent, from before the Hud binds.
 var _shakes: Array[bool] = []
+## Every `damage_numbers_changed` the bus sent, from before the Hud binds.
+var _numbers: Array[bool] = []
 ## Every `projectile_cap_changed` the bus sent, from before the Hud binds.
 var _caps: Array[int] = []
 ## Every `shot_cap_requested` the bus sent, as [player, cap] (online-ready N11: the run's cap).
@@ -57,6 +59,7 @@ func _initialize() -> void:
 	_test_the_fullscreen_switch()
 	_test_the_effect_slots_slider()
 	_test_the_screen_shake_switch()
+	_test_the_damage_numbers_switch()
 	_test_the_max_shots_slider()
 	_test_the_particles_slider()
 	_test_the_particle_amount_slider()
@@ -99,6 +102,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
+	_bus.damage_numbers_changed.connect(func(on: bool) -> void: _numbers.append(on))
 	_bus.projectile_cap_changed.connect(func(cap: int) -> void: _caps.append(cap))
 	_bus.shot_cap_requested.connect(func(player: int, cap: int) -> void: _cap_requests.append([player, cap]))
 	_bus.mote_cap_changed.connect(func(cap: int) -> void: _mote_caps.append(cap))
@@ -130,6 +134,7 @@ func _teardown() -> void:
 	_actions.clear()
 	_slots.clear()
 	_shakes.clear()
+	_numbers.clear()
 	_caps.clear()
 	_cap_requests.clear()
 	_mote_caps.clear()
@@ -331,7 +336,7 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "MoteCap", "MoteDensity", "FloorMarks", "SpellLight", "TaillessMotes", "ShotCap", "ScreenShake", "DamageNumbers", "ShowFps", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
@@ -359,6 +364,30 @@ func _test_the_screen_shake_switch() -> void:
 	_setup(1, false, SaveFile.new(SAVE_PATH))
 	_check(not _menu().screen_shake, "a later menu starts with it off")
 	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
+
+
+## Damage numbers (props W5) are on by default and send nothing; accept flips them and tells feel,
+## and the choice is saved: a menu bound to the same save later starts with them off and tells feel.
+func _test_the_damage_numbers_switch() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(_numbers.is_empty(), "nothing is sent while the numbers are on")
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("DamageNumbers").text.ends_with("Damage numbers: On"), "on by default")
+	_press(0, "DamageNumbers")
+	_check(_menu().button("DamageNumbers").text.ends_with("Damage numbers: Off"), "it flips off")
+	_check(_numbers == [false], "and feel is told, got %s" % [_numbers])
+	_check(SaveFile.new(SAVE_PATH).get_setting(&"damage_numbers", true) == false, "the save remembers it")
+	_press(0, "DamageNumbers")
+	_check(_numbers == [false, true] and SaveFile.new(SAVE_PATH).get_setting(&"damage_numbers", false) == true, "and flips back on, saved")
+	_press(0, "DamageNumbers")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	_check(not _menu().damage_numbers, "a later menu starts with them off")
+	_check(_numbers == [false], "and tells feel when the Hud binds, got %s" % [_numbers])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

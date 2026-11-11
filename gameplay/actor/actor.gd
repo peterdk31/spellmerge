@@ -14,7 +14,9 @@ extends Node2D
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
 ## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
 ## circle when its scene has none, so every actor has one), plus any number of looks (ActorLook)
-## and the first ActorController, its `home_controller`. Components reach each other only through the actor, never by node path.
+## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
+## props W5) are a look too, added the same way when its scene has none, so every actor shows its
+## hits; they hear its hits and are never stepped. Components reach each other only through the actor, never by node path.
 ##
 ## Controllers: `controller` is the one driving it now: its home controller, a guest handed over
 ## by `drive` (possess, G9), or none. `release` gives the guest back. A controller drives one actor
@@ -87,16 +89,20 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).
 signal died(killer: int)
 ## Combat hurt this actor: sent with every `damage_dealt` that names it, right after it, for the
-## actor's own components and controller (`by` is the attacker's actor id or -1). Listening here
-## instead of on the bus keeps a hit to this actor's listeners: a bus listener per enemy was
-## called for every hit on anyone (performance pass, 2026-10-28).
-signal damaged(by: int, amount: float)
+## actor's own components and controller (`by` is the attacker's actor id or -1; `element` the
+## hit's first element, `&""` for a plain one). Listening here instead of on the bus keeps a hit to
+## this actor's listeners: a bus listener per enemy was called for every hit on anyone
+## (performance pass, 2026-10-28). An invincible actor's hits are sent too (they take nothing).
+signal damaged(by: int, amount: float, element: StringName)
+## Combat healed this actor by `amount` (what it gained) from the actor `by`: for its own listeners,
+## as `damaged`.
+signal healed(by: int, amount: float)
 
 ## Not state: services, caches and scratch, set up again (core/sim/README.md); its components' list,
 ## found again from its children (`_find_components`; each component is walked as its member).
 const DERIVED: Array[StringName] = [&"events", &"combat", &"projectiles", &"spells", &"actors", &"sim", &"_components"]
 ## Not state: what only the drawing reads and writes (core/sim/README.md).
-const VIEW: Array[StringName] = [&"_looks"]
+const VIEW: Array[StringName] = [&"_looks", &"damage_numbers"]
 ## State as who it points at: the controller driving it now, which may be another body's (a
 ## possessor's, `possession.gd`). Its own controller's state is walked through `home_controller`,
 ## and who drives what is the controller's `driving`.
@@ -146,6 +152,8 @@ var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
 var footprint: Footprint = null
+## Its damage numbers (a look its scene holds, else one it added; see the class doc).
+var damage_numbers: DamageNumbers = null
 ## True when something downs the actor at 0 health instead of letting it die (a Downed
 ## component, G7, sets it).
 var downable: bool = false
@@ -200,6 +208,7 @@ func _ready() -> void:
 		health.depleted.connect(_on_depleted)
 	for look in _looks:
 		look.setup(self)
+	damage_numbers.setup(self)
 	controller = home_controller
 	if home_controller != null:
 		home_controller.home_actor = self
@@ -544,6 +553,10 @@ func _find_components() -> void:
 		if child is ActorController:
 			if home_controller == null:
 				home_controller = child as ActorController
+		elif child is DamageNumbers:
+			# Its own numbers (a boss's bigger ones); a second set is left alone.
+			if damage_numbers == null:
+				damage_numbers = child as DamageNumbers
 		elif child is ActorLook:
 			_looks.append(child as ActorLook)
 		elif child is Health:
@@ -570,6 +583,12 @@ func _find_components() -> void:
 		if hurtbox != null and hurtbox.is_box():
 			footprint.fit_base(hurtbox.size, hurtbox.offset)
 		add_child(footprint)
+	if damage_numbers == null:
+		# Every actor shows its hits (props W5; the owner, 2026-11-10: "Add the damage numbers to
+		# every actor"): the plain numbers when its scene holds none.
+		damage_numbers = DamageNumbers.new()
+		damage_numbers.name = "DamageNumbers"
+		add_child(damage_numbers)
 	# Set up and attached in this order: health first, the caster last (it names the hurtbox).
 	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster]
 	var at: int = 0

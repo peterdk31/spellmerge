@@ -782,7 +782,7 @@ func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float,
 		hit_stop.hit(by, row, kind, _slot)
 		if node is Actor:
 			# The actor's own listeners (its AI's grudge, its look's hurt pose) hear it directly.
-			(node as Actor).damaged.emit(by, amount)
+			(node as Actor).damaged.emit(by, amount, profile.element_id if profile != null else &"")
 		# A burn tick is not a hit: cards that fire on hurt are not set off by it.
 		if not tick:
 			events.actor_hurt.emit(actor, amount, where, _tag, kind)
@@ -847,8 +847,10 @@ func _heal(by: int, row: int, amount: float) -> bool:
 	match _body[row]:
 		BODY_ACTOR:
 			var kit: Actor = node as Actor
-			if kit.health != null:
-				kit.health.heal(amount)
+			var before: float = kit.health.health if kit.health != null else 0.0
+			if kit.health != null and kit.health.heal(amount):
+				# Its own listeners (its damage numbers) hear the health it was given.
+				kit.healed.emit(by, kit.health.health - before)
 		BODY_PLAIN:
 			_health[row] = minf(_health[row] + amount, _max_health[row])
 	var where: Vector2 = _position_of(node)

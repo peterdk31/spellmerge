@@ -22,6 +22,7 @@ const EVENTS: Dictionary = {
 	&"run_requested": [["player", TYPE_INT]],
 	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
+	&"damage_numbers_changed": [["on", TYPE_BOOL]],
 	&"projectile_cap_changed": [["cap", TYPE_INT]],
 	&"shot_cap_requested": [["player", TYPE_INT], ["cap", TYPE_INT]],
 	&"mote_cap_changed": [["cap", TYPE_INT]],
@@ -93,6 +94,7 @@ const EVENTS: Dictionary = {
 	&"possess_ended": [["caster", TYPE_INT], ["actor", TYPE_INT]],
 	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME], ["shot", TYPE_INT]],
 	&"heal_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_FLOAT], ["position", TYPE_VECTOR2]],
+	&"damage_number_shown": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["amount", TYPE_FLOAT], ["element", TYPE_STRING_NAME], ["kind", TYPE_STRING_NAME], ["rise", TYPE_FLOAT], ["seconds", TYPE_FLOAT], ["size", TYPE_FLOAT]],
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
@@ -130,7 +132,7 @@ const EVENTS: Dictionary = {
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_laid_out", &"room_entered", &"view_fitted", &"room_cleared", &"wave_started", &"start_stone_changed", &"altar_changed", &"hub_changed",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"play_load_requested", &"online_changed", &"online_line_changed", &"sandbox_changed", &"ai_view_changed", &"effect_slots_changed", &"screen_shake_changed", &"damage_numbers_changed", &"projectile_cap_changed", &"mote_cap_changed", &"mote_density_changed", &"floor_marks_changed", &"spell_light_changed", &"tailless_motes_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

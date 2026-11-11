@@ -44,6 +44,20 @@ const DEFAULT_STRENGTH: float = 0.7
 const DEFAULT_FLICKER: float = 0.25
 
 
+## Make `node` a light spot (in the group, its numbers as metadata): `tint` when its alpha is above
+## 0, else the colour of the sprite at `art` from it. The one writer of the metadata, as the `*_of`
+## functions are its readers (a room's scene writes the same keys by hand).
+static func mark(node: Node, reach: float, strength: float = DEFAULT_STRENGTH, flicker: float = DEFAULT_FLICKER, tint: Color = Color(0, 0, 0, 0), art: NodePath = NodePath()) -> void:
+	node.set_meta(REACH, reach)
+	node.set_meta(STRENGTH, strength)
+	node.set_meta(FLICKER, flicker)
+	if tint.a > 0.0:
+		node.set_meta(TINT, tint)
+	elif not art.is_empty():
+		node.set_meta(ART, art)
+	node.add_to_group(GROUP)
+
+
 static func reach_of(spot: Node) -> float:
 	return float(spot.get_meta(REACH, DEFAULT_REACH))
 

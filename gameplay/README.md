@@ -51,7 +51,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
 | `status_applied` | `combat` | `feel` (an actor's own components hear its `Actor.status_gained`, and a reaction on it its `Actor.reacted`, which Combat sends with them) |
 | `cast_left` | `core/spells` (a cast leaving, before its shots) | `actor` (a prop's `PropStateTriggers`, for its `cast` triggers) |
-| `prop_state_changed` | `actor` (a prop's `PropStateTriggers`, props W6) | none yet (its look, W7) |
+| `prop_state_changed` | `actor` (a prop's `PropStateTriggers`, props W6) | none yet (tests; a prop's own look hears its component directly) |
 | `enemy_died` | `combat` (every foe of the players, never a prop: `Actors.is_foe`) | `feel`, `flow` |
 | `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |

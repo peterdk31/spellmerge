@@ -30,6 +30,7 @@ static func make(data: PropBase) -> Actor:
 ## Write `data` into the components of `body` (the shared scene, or a body of the same parts),
 ## before it is added: a component it lacks is left out.
 static func fill(body: Actor, data: PropBase) -> void:
+	body.prop = data
 	body.body_offset = data.offset
 	body.hand_offset = data.offset
 	var hurt_box: Vector2 = Vector2.ZERO

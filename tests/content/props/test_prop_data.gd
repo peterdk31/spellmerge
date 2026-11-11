@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/content/props/test_prop_data.gd
 
+const MoteKinds := preload("res://tests/content/mote_kinds.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const PropNames := preload("res://tests/content/props/prop_names.gd")
@@ -40,6 +41,24 @@ func test_every_prop_is_sound() -> void:
 			check_equal(SpellValidator.check_staff(entry.staff).size(), 0, "%s: its staff is valid" % data.id)
 
 
+## Every prop's look loads (props W7): each state has one (`PropBase.problems` names one missing),
+## every layer's picture is there, its motes are a kind content/motes has (as every source in a
+## scene, tests/content/test_mote_sources.gd), and a mask has lit pixels to give off from; the test
+## exploding barrel too.
+func test_every_props_look_loads_and_its_masks_are_not_empty() -> void:
+	var all: Array[PropBase] = _props()
+	all.append(EXPLODING_BARREL)
+	for data in all:
+		check_equal(data.look_problems(), PackedStringArray(), "%s: its looks are sound" % data.id)
+		for look in data.looks:
+			for i in look.layers.size():
+				var layer: PropLayer = look.layers[i]
+				for source in layer.motes:
+					check_equal(MoteKinds.problems(source.kind, "%s: %s, layer %d" % [data.id, look.state_id, i]), PackedStringArray(), "%s: its motes are a kind content/motes has" % data.id)
+					if source.from == MoteSource.From.MASK:
+						check(not ArtPixels.pixels_of(layer.texture).is_empty(), "%s: the mask of %s's layer %d has lit pixels" % [data.id, look.state_id, i])
+
+
 func test_the_shared_body_has_every_part_a_prop_needs() -> void:
 	for data in _props():
 		check(data.scene == SCENE, "%s stands on the shared body" % data.id)
@@ -51,6 +70,8 @@ func test_the_shared_body_has_every_part_a_prop_needs() -> void:
 				kinds.append(kind.get_global_name())
 	check_equal(kinds, ["Health", "Hurtbox", "Footprint", "Caster", "PropStateTriggers"] as Array[String], "health, a hurt shape, ground, staffs and state triggers; no controller, no Mover")
 	check_equal(body.idle_team, Fixture.ActorsScript.TEAM_WORLD, "the world's")
+	check(body.get_node_or_null("Sprite") is Sprite2D, "a Sprite for its looks' first layer (a hit flashes it)")
+	check(body.get_node_or_null("PropLook") is PropLook, "its look")
 	body.free()
 
 

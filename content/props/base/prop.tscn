@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://gameplay/actor/footprint.gd" id="4_footprint"]
 [ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="5_caster"]
 [ext_resource type="Script" path="res://gameplay/actor/prop_state_triggers.gd" id="6_triggers"]
+[ext_resource type="Script" path="res://gameplay/actor/prop_look.gd" id="7_look"]
 
 [node name="Prop" type="Node2D"]
 script = ExtResource("1_actor")
@@ -28,3 +29,9 @@ script = ExtResource("5_caster")
 
 [node name="PropStateTriggers" type="Node" parent="."]
 script = ExtResource("6_triggers")
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture_filter = 1
+
+[node name="PropLook" type="Node2D" parent="."]
+script = ExtResource("7_look")

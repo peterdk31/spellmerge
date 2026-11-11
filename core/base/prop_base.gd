@@ -39,6 +39,10 @@ extends Resource
 @export var staffs: Array[StaffCards] = []
 ## Its states and their triggers, a file of their own (`<id>_states.tres`; two props may share one).
 @export var states: PropStates = null
+## What it looks like in its states (props W7: `PropStateLook`, art layers, motes, a light, a cue),
+## one a state by `state_id`, an empty `state_id` for every state with none of its own. On the prop,
+## not its states, so props sharing a states file look as each wants. View only.
+@export var looks: Array[PropStateLook] = []
 
 ## The most staffs a prop holds (the staff buttons), as an enemy.
 const MAX_STAFFS: int = EnemyBase.MAX_STAFFS
@@ -47,6 +51,19 @@ const MAX_STAFFS: int = EnemyBase.MAX_STAFFS
 ## Its name for people: `display_name`, else its id in words.
 func shown_name() -> String:
 	return display_name if display_name != "" else String(id).replace("_", " ").capitalize()
+
+
+## The look of the state `state_id`: its own, else the one for every state, else null.
+func look_of(state_id: StringName) -> PropStateLook:
+	var every: PropStateLook = null
+	for look in looks:
+		if look == null:
+			continue
+		if look.state_id == state_id:
+			return look
+		if look.state_id == &"" and every == null:
+			every = look
+	return every
 
 
 ## True when its own data sets a footprint (else the kit's default).
@@ -69,4 +86,27 @@ func problems(known: Dictionary = {}) -> PackedStringArray:
 		found.append("%s has no states." % id)
 	else:
 		found.append_array(states.problems(String(id), mini(staffs.size(), MAX_STAFFS), known))
+	found.append_array(look_problems())
+	return found
+
+
+## What is wrong with its looks, one line each (empty when they are fine): a look's own problems, two
+## for one state, one for a state it does not have, and a state with no look at all.
+func look_problems() -> PackedStringArray:
+	var found := PackedStringArray()
+	var seen: Dictionary[StringName, bool] = {}
+	for look in looks:
+		if look == null:
+			found.append("%s: a look is empty." % id)
+			continue
+		if seen.has(look.state_id):
+			found.append("%s: two looks for %s." % [id, look.state_id if look.state_id != &"" else "every state"])
+		seen[look.state_id] = true
+		if look.state_id != &"" and states != null and states.state_at(look.state_id) < 0:
+			found.append("%s: a look for the state '%s', which it does not have." % [id, look.state_id])
+		found.append_array(look.problems(String(id)))
+	if states != null:
+		for state in states.list:
+			if state != null and look_of(state.state_id) == null:
+				found.append("%s: the state '%s' has no look (nor is there one for every state)." % [id, state.state_id])
 	return found

@@ -2,9 +2,12 @@ class_name ActorLook
 extends Node2D
 ## The base of an actor's looks (actors G4, docs/milestones/M2-actors.md, "The components"): the
 ## wizard's (gameplay/player, G7) and a creature's (gameplay/ai, G6). A look reads the actor and
-## draws it; it changes nothing the game plays by. The actor calls `setup` once in its `_ready`
-## and `step` last in every step, after the body's velocity is set; a look has no process
-## callback of its own.
+## draws it; it changes nothing the game plays by. The actor calls `setup` once in its `_ready`,
+## `step` last in every step, after the body's velocity is set, and `sync` after a snapshot gave
+## the body its state back; a look has no process callback of its own. A still body is never
+## stepped (props W2), so the one exception is a look that animates on its own while its body is
+## still (a prop's flickering layer, props W7): it may run `_process`, on the view's clock, only
+## while it animates, and must say `VIEW_ONLY`.
 
 ## The staff animations (`Spells.poses().staff_pose` and the rest: the carrier card's `staff_pose`, played
 ## for the actor's own cast) every look shows the same way through `apply_pose` and `pose_offset`:
@@ -38,6 +41,12 @@ var _pose_stretched: bool = false
 
 func setup(owner_actor: Actor) -> void:
 	actor = owner_actor
+
+
+## Show the actor as it is now, after a snapshot gave it its state back: what the look follows from
+## moments it was told of (a prop's state) is read again, and no moment plays. The base has none.
+func sync() -> void:
+	pass
 
 
 ## Draw the actor as it is after this step (`delta` seconds). The base draws nothing.

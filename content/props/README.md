@@ -4,13 +4,18 @@
 
 Things in the world that stand, block, take hits, react by casting spell cards and give off motes: an exploding barrel's fuse and blast, a crate's rubble, a brazier's embers ([docs/milestones/props.md](../../docs/milestones/props.md), phase W). A prop is an **actor with no controller** (owner, 2026-11-10): health, the hurt shape, statuses, possession and casting are the actor kit's, so nothing in Combat, Spells or possession needs to know it is a prop. If it acts on its own it is an enemy with a statue's look; if it only stands and reacts, it is a prop.
 
-Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light spot) is W7's, the hub's prop yard W8's and the first props (exploding barrel, crate, brazier, crystal, urn) W9's; until then this folder holds only the shared body.
+Built in W6 (states and their triggers; the component and rows were named `Reactions` and `PropReaction` until the owner renamed them, 2026-11-11: Combat has reactions of its own). The look (art layers, mote sources, a light, a cue) is W7's, the hub's prop yard W8's and the first props (exploding barrel, crate, brazier, crystal, urn) W9's; until then this folder holds only the shared body, and the test exploding barrel (`tests/gameplay/actor/fixtures/exploding_barrel.tres`, its art in `fixtures/exploding_barrel/`) is the example.
 
 ## Contract
 
 - **One folder each:** `content/props/<id>/` with `<id>.tres` (a `PropBase`, core/base/prop_base.gd), `<id>_states.tres` (its `PropStates`, below; a prop may name another's instead, a big exploding barrel the small one's), its art, `assets.json` and its own test `test_<id>.gd`. Deleting a prop is deleting its folder. The registry finds it under `props` by `id`.
-- **One shared body:** `base/prop.tscn`, an actor of the world's team (`Actors.TEAM_WORLD`: every team's shots hit it, its shots hit every team) with `Health`, `Hurtbox`, `Footprint`, `Caster` and `PropStateTriggers`, and no controller and no Mover, so it is still (never stepped) and never moves. Every prop's `scene` is it; `PropBody.make(data)` (gameplay/actor) fills it from the data. **No `.gd` and no scene per prop:** a new prop is data and art.
+- **One shared body:** `base/prop.tscn`, an actor of the world's team (`Actors.TEAM_WORLD`: every team's shots hit it, its shots hit every team) with `Health`, `Hurtbox`, `Footprint`, `Caster`, `PropStateTriggers`, a `Sprite` and a `PropLook`, and no controller and no Mover, so it is still (never stepped) and never moves. Every prop's `scene` is it; `PropBody.make(data)` (gameplay/actor) fills it from the data. **No `.gd` and no scene per prop:** a new prop is data and art.
 - **`PropBase`:** `id`, `display_name`, `scene`, `max_health`, `invincible` (the hub's: hits land and show, health stays), the hurt shape (`radius`, or a box `size`, round `offset` from the feet), the ground (`footprint_radius` or `footprint_size`, `footprint_offset`; none: its hurt box's base, else the kit's circle), `staffs` (1–4 `StaffCards`, as an enemy's: what its triggers and a possessor cast; a staff's `wind_up` is a fuse, its `wind_cue` the fuse's look) and `states` (a `PropStates` file).
+- **Its looks (W7):** `PropBase.looks`, one `PropStateLook` a state (`state_id`; an empty one is the look of every state with none of its own; every state needs one). On the prop, not its states, so props sharing a states file look as each wants. A look is:
+  - `layers` (`PropLayer`, drawn in order): a picture (`texture`, its `frames` side by side played `fps` a second), its bottom middle on the feet moved by `offset` (whole pixels), drawn among the bodies or `over_bodies` (a tall prop's top, which hides a wizard behind it), or `hidden` (a mask only), and the `motes` it gives off (`MoteSource`: a point, a line, a box, an oval's rim from the feet, or a mask of this layer's lit pixels; a mask may `stand`, a twinkling mote on every lit pixel; colours by palette name, `colours = [&"fire"]`; every field and its default: content/motes/README.md, "How to make something in the world give off motes"). **The first layer is the body:** the shared scene's `Sprite`, which a hit flashes, so it is neither hidden nor over the bodies. A mask is read once, so it is a still layer of its own (never the body's, nor one of several frames).
+  - a light (`light_reach` above 0: spell light's, as a torch's), from `light_at`, its strength and flicker, in `light_tint` or its `light_layer`'s art colour.
+  - `cue`: played where it stands as the state is entered (not the one it starts in).
+- **Art from a grid:** draw each picture as a grid of characters in `<name>.grid.json` beside it and write its SVGs with `tools/pixel_grid.py` (`<name>.svg`, and `<name>_motes.svg` when the grid marks mote points with `*`: a hidden layer whose mask gives off the motes). Commit the grid and both SVGs; `tools/test_pixel_grid.py` fails when an SVG differs from its grid.
 - **`PropStates`:** `list`, its `PropState`s, the first the one it starts in. A file of its own, so props can share one, and the one thing the `PropStateTriggers` component reads: any actor's data could name one.
 - **`PropState`:** `state_id`, `triggers` (in order), `blocks` (its footprint blocks the bodies that walk), `hittable` (its hurt shape can be hit), `gone` (entering it frees the prop).
 - **`PropTrigger`:** `when` and its numbers, then what it does: `cast` (a staff by number, 1–4; 0 none) and `then` (a state id; empty stays).
@@ -48,13 +53,13 @@ As data: `tests/gameplay/actor/fixtures/exploding_barrel.tres` and its `explodin
 
 ## Allowed files
 
-`.tres`, `.tscn` (saved as text), sprites (`.png` or `.svg`), the prop's `test_<id>.gd`, plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs; load only with literal `res://` paths.
+`.tres`, `.tscn` (saved as text), sprites (`.png` or `.svg`) and their `.grid.json` grids, `assets.json`, the prop's `test_<id>.gd`, plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs; load only with literal `res://` paths.
 
 ## Steps
 
 1. Make `content/props/<id>/` and its `<id>.tres` (a `PropBase` with `scene` the shared `base/prop.tscn`); write its states and triggers in `<id>_states.tres` (start from the exploding barrel above) and name it as its `states`.
 2. Give it staffs of player cards for what it casts.
-3. Add its art to an `assets.json` in its folder (W7 brings the look); commit the `.uid` files Godot creates.
+3. Draw its art as grids and write the SVGs (`tools/pixel_grid.py`), give each state a look in `looks` (its layers, motes, light, cue), list the art in an `assets.json` in its folder, and commit the `.uid` files Godot creates.
 4. Write `test_<id>.gd` for its paths (as `tests/gameplay/actor/test_prop_state_triggers.gd` does the exploding barrel's), run the checks below and open a PR.
 
 ## Validate

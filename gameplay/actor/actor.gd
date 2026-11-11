@@ -129,6 +129,10 @@ const REFS: Array[StringName] = [&"controller"]
 
 ## The enemy's numbers, applied to the components in `_ready`. Set before adding the actor.
 var data: EnemyBase = null
+## The prop this body was made from (`PropBody.make`, props W7; null for any other body): its look
+## reads its art from it, and a body made again from a snapshot has it back (content, kept as
+## itself), as an enemy has its `data`.
+var prop: PropBase = null
 
 ## The event bus, Combat, the projectile manager, the spell runtime, the actor table and the game's
 ## time and chance (`Sim`). Only tests set these, before adding the actor; otherwise the autoloads
@@ -481,6 +485,15 @@ func is_dying() -> bool:
 ## True while it leaves the tree (its `_exit_tree` runs).
 func is_leaving() -> bool:
 	return _leaving
+
+
+## After a snapshot gave the body its state back (core/sim/README.md, "Snapshots"): each of its
+## looks shows the body as it is now (`ActorLook.sync`), with no moment played; a still body's look
+## is never stepped, so this is how it catches up.
+func rebuild_derived() -> void:
+	for look in _looks:
+		if is_instance_valid(look):
+			look.sync()
 
 
 ## Step and draw `look` from now on (a look made while the game runs: the possession ring). It

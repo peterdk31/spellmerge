@@ -229,6 +229,23 @@ func test_the_stone_prop_follows_the_stone() -> void:
 	check(flow.room_props().is_empty(), "the props go with the hub")
 
 
+## The stone follows the rules whenever it is out of step (props W8c, review): knocked out of `lit`
+## while everyone still stands on it, it is asked back at the next count.
+func test_a_stone_out_of_step_is_asked_back() -> void:
+	_start([0])
+	_place(0, true)
+	_tick()
+	var stones: Array[Actor] = flow.contents.with_role(HubRules.ROLE_RUN_START)
+	check_equal(stones.size(), 1, "one stone")
+	if stones.is_empty():
+		return
+	check_equal(stones[0].state_triggers.state_id(), HubRules.LIT, "lit")
+	events.emit_signal("prop_state_requested", stones[0].id, HubRules.UNLIT)
+	check_equal(stones[0].state_triggers.state_id(), HubRules.UNLIT, "knocked out of step")
+	_tick()
+	check_equal(stones[0].state_triggers.state_id(), HubRules.LIT, "asked back at the next count")
+
+
 func test_a_join_and_a_leave_in_one_tick_put_the_stone_out() -> void:
 	_start([0, 1])
 	_place(0, true)

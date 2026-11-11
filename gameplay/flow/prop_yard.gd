@@ -7,6 +7,8 @@ extends RefCounted
 ## The game's rule, not the room's: a room only marks the zone. Flow's state (it holds one), stepped
 ## by Flow (`tend`).
 
+const RegistryScript := preload("res://core/registry/registry.gd")
+
 ## State as who they point at (core/sim/README.md).
 const REFS: Array[StringName] = [&"_bodies"]
 
@@ -25,12 +27,12 @@ var _left: PackedFloat64Array = PackedFloat64Array()
 
 ## Stand every prop of `registry` with no role in `yard` (a room's zone) in `world`, in rows by id
 ## (`places`); one that does not fit is left out with a warning. Empty when `yard` is.
-func fill(world: Node2D, yard: Rect2, registry: Node) -> void:
+func fill(world: Node2D, yard: Rect2, registry: RegistryScript) -> void:
 	clear()
 	if not yard.has_area() or registry == null:
 		return
 	var kinds: Array[PropBase] = []
-	for resource: Resource in registry.call(&"get_all", &"props"):
+	for resource: Resource in registry.get_all(&"props"):
 		var data := resource as PropBase
 		if data != null and data.role == &"" and data.scene != null:
 			kinds.append(data)
@@ -48,13 +50,13 @@ func fill(world: Node2D, yard: Rect2, registry: Node) -> void:
 ## One tick of `delta` seconds: a prop that left its first state or went starts its slot's count;
 ## when it runs out, the slot's body (if any) goes and a fresh one stands. A body that goes is
 ## forgotten in the tick it goes (the yard's state never points at a freed one).
-func tend(delta: float, world: Node2D, registry: Node) -> void:
+func tend(delta: float, world: Node2D, registry: RegistryScript) -> void:
 	for i in _bodies.size():
 		var body: Node = _bodies[i]
 		if body != null and (not is_instance_valid(body) or (body is Actor and (body as Actor).is_dying())):
 			_bodies[i] = null
 		var prop := _bodies[i] as Actor
-		var fresh: bool = prop != null and (prop.state_triggers == null or prop.state_triggers.state == 0)
+		var fresh: bool = prop != null and (prop.state_triggers == null or prop.state_triggers.in_first_state())
 		if not fresh and _left[i] < 0.0:
 			_left[i] = RETURN_SECONDS
 		if _left[i] < 0.0:
@@ -67,7 +69,7 @@ func tend(delta: float, world: Node2D, registry: Node) -> void:
 			if prop.get_parent() != null:
 				prop.get_parent().remove_child(prop)
 			prop.queue_free()
-		var data: PropBase = registry.call(&"get_resource", &"props", _ids[i]) as PropBase if registry != null else null
+		var data: PropBase = registry.get_resource(&"props", _ids[i]) as PropBase if registry != null else null
 		_bodies[i] = _stand(world, data, _places[i])
 
 

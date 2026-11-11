@@ -8,7 +8,8 @@ extends Node2D
 ## the game makes the real body from the data (gameplay/flow/room_contents.gd).
 ##
 ## A kind of placed thing is a class extending this one (tools/: `PropStandIn`, `EnemyStandIn`),
-## which shows it in the editor and says what its data is; nothing else changes for a new kind. An
+## which shows it in the editor and says what its data is; the reader does not change, and the game
+## makes its body by its data's class (`RoomContents.make_body`, one branch a kind of data). An
 ## editor script, so its kinds draw in the editor; nothing of it runs in play but `placed()`.
 
 

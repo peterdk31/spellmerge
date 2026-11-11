@@ -96,6 +96,11 @@ func at_rest() -> bool:
 	return state == 0 and (actor.health == null or _health_seen == actor.health.health)
 
 
+## True while it is in the state it starts in (the first of its states).
+func in_first_state() -> bool:
+	return state == 0
+
+
 ## The state it is in now (null with no data).
 func current() -> PropState:
 	if states == null or state < 0 or state >= states.list.size():

@@ -14,14 +14,15 @@ extends RefCounted
 ##
 ## **Places are whole translations:** a position is the sum of the positions up the tree, never
 ## through a rotation, skew or scale (those go through the engine's trigonometry, which differs
-## between platforms: the game's places must be the same on every machine); a node on the way that
-## has one is one of `problems()`. Placements and zones are the editor's: `strip` takes them out of
+## between platforms: the game's places must be the same on every machine); a place under a node
+## that has one is one of `problems()` (art elsewhere may be mirrored or turned freely). Placements and zones are the editor's: `strip` takes them out of
 ## the room the game shows, where the game stands the real bodies.
 
 const PLAYER_SPAWNS: StringName = &"PlayerSpawns"
 const ENEMY_SPAWNS: StringName = &"EnemySpawns"
 const DOORS: StringName = &"Doors"
 const JOINER_SPAWNS: StringName = &"JoinerSpawns"
+const POINT_HOLDERS: Array[StringName] = [PLAYER_SPAWNS, ENEMY_SPAWNS, DOORS, JOINER_SPAWNS]
 
 ## Where the players start (by seat), enemies may appear, the doors are, and a seat joining the
 ## room under way appears (by seat; empty: the player spawn farthest from danger).
@@ -46,7 +47,7 @@ static func read(layout: Node) -> RoomPlaces:
 	if layout == null:
 		places.size = Vector2(640.0, 360.0)
 		return places
-	places._walk(layout, Vector2.ZERO, "")
+	places._walk(layout, Vector2.ZERO, "", "")
 	places.size = places._size_of(layout)
 	return places
 
@@ -83,7 +84,7 @@ func zone(name: StringName) -> Rect2:
 
 
 ## What is wrong with its layout, one line each (empty when nothing is): a placement with nothing
-## picked, a zone with no name, a rotated, skewed or scaled node on the way to a place.
+## picked, a zone with no name, a place under a rotated, skewed or scaled node.
 func problems() -> PackedStringArray:
 	return _problems
 
@@ -99,16 +100,21 @@ static func strip(layout: Node) -> void:
 			strip(child)
 
 
-## The places under `node`, whose own place is `at` (`path` names it in a problem).
-func _walk(node: Node, at: Vector2, path: String) -> void:
+## The places under `node`, whose own place is `at` (`path` names it in a problem; `bent` names a
+## rotated, skewed or scaled node above it, "" for none: only a place under one is a problem, so
+## art may be mirrored or turned freely).
+func _walk(node: Node, at: Vector2, path: String, bent: String) -> void:
 	for child in node.get_children():
 		var here: Vector2 = at
+		var below: String = bent
 		var named: String = "%s/%s" % [path, child.name] if path != "" else String(child.name)
 		if child is Node2D:
 			var moved := child as Node2D
-			if moved.rotation != 0.0 or moved.skew != 0.0 or moved.scale != Vector2.ONE:
-				_problems.append("%s is rotated, skewed or scaled: places are whole translations; undo it." % named)
+			if below == "" and (moved.rotation != 0.0 or moved.skew != 0.0 or moved.scale != Vector2.ONE):
+				below = named
 			here = at + moved.position
+		if below != "" and (child is RoomPlacement or child is RoomZone or (child is Marker2D and StringName(node.name) in POINT_HOLDERS)):
+			_problems.append("%s lies under %s, which is rotated, skewed or scaled: places are whole translations; undo it." % [named, below])
 		if child is RoomPlacement:
 			var data: Resource = (child as RoomPlacement).placed()
 			if data == null:
@@ -121,8 +127,6 @@ func _walk(node: Node, at: Vector2, path: String) -> void:
 			var zone_node := child as RoomZone
 			if zone_node.zone_name == &"":
 				_problems.append("%s is a zone with no name." % named)
-			elif zone_node.rotation != 0.0 or zone_node.scale != Vector2.ONE:
-				_problems.append("%s is rotated or scaled: places are whole translations; undo it." % named)
 			else:
 				zone_names.append(zone_node.zone_name)
 				zone_rects.append(Rect2(at + Vector2(zone_node.offset_left, zone_node.offset_top), Vector2(zone_node.offset_right - zone_node.offset_left, zone_node.offset_bottom - zone_node.offset_top)))
@@ -137,7 +141,7 @@ func _walk(node: Node, at: Vector2, path: String) -> void:
 					doors.append(here)
 				JOINER_SPAWNS:
 					joiner_spawns.append(here)
-		_walk(child, here, named)
+		_walk(child, here, named, below)
 
 
 ## The room's size in pixels, from (0, 0): at least 640×360, every spawn and door a tile in, its

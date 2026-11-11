@@ -50,14 +50,17 @@ var _places: RoomPlaces = null
 
 ## A new instance of its layout (props W8c): its scene, its placements, zones and spawns in it.
 ## The game builds it once a run and reads what is where from that instance (`RoomPlaces.read`), the
-## one it shows. A generated room (M3) builds its layout from pieces by the run's seeded chance
-## here. Null with no scene.
-func build() -> Node:
+## one it shows. A generated room (M3) overrides it to put pieces together by the run's chance
+## (`sim.chance`, the run's seed among its rules, so a joining machine builds the same); with no
+## `sim` (tests, tools, a colour sample) it builds its default layout. A fixed room is its scene
+## either way. Null with no scene.
+func build(_sim: Sim = null) -> Node:
 	return scene.instantiate() if scene != null else null
 
 
-## What is where in it (`RoomPlaces`: spawns, doors, placements, zones, its size), read once from a
-## layout of its own, for tests and tools; the game reads the layout it shows.
+## What is where in it (`RoomPlaces`: spawns, doors, placements, zones, its size), read once from
+## its default layout (`build()` with no sim), for tests and tools; the game reads the layout it
+## shows.
 func places() -> RoomPlaces:
 	if _places == null:
 		var layout: Node = build()

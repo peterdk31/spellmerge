@@ -26,8 +26,6 @@ const DERIVED: Array[StringName] = [&"_stone_sent", &"_altar_sent", &"_hub_sent"
 ## The wizards on a stone and in the hub at the last count (none out of the hub).
 var standing: int = 0
 var wizards: int = 0
-## Whether the stones were last asked to be lit.
-var _lit: bool = false
 var _stone_sent: Vector2i = Vector2i(-1, -1)
 var _altar_sent: int = -1
 var _hub_sent: bool = false
@@ -51,11 +49,6 @@ static func area_of(places: RoomPlaces, role: StringName) -> Rect2:
 		if data != null and data.role == role:
 			return area_at(data, places.placed_at[i])
 	return Rect2()
-
-
-## A room starts: its stones stand unlit.
-func room_started() -> void:
-	_lit = false
 
 
 ## Count `party` (the wizards, by seat through their controller) on the props of `contents` while
@@ -90,10 +83,12 @@ func count(in_hub: bool, party: Array[Node2D], contents: RoomContents, events: E
 		_altar_sent = at_altar
 		events.altar_changed.emit(at_altar)
 	var lit: bool = is_lit()
-	if lit != _lit:
-		_lit = lit
-		for stone in stones:
-			events.prop_state_requested.emit(stone.id, LIT if lit else UNLIT)
+	# Asked whenever a stone is not in the state wanted (a stone stood again, or one that left it
+	# by its own triggers, follows at once).
+	var want: StringName = LIT if lit else UNLIT
+	for stone in stones:
+		if stone.state_triggers != null and stone.state_triggers.state_id() != want:
+			events.prop_state_requested.emit(stone.id, want)
 	var now := Vector2i(standing, wizards)
 	if now != _stone_sent:
 		_stone_sent = now

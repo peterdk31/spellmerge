@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The hub's teleporter stone (props W8, content/props/hub_stone): a slab on the floor that nobody
-## bumps into and no hit lands on, dark until Flow lights it (`Flow.STONE_LIT` as every wizard
-## stands on it, `STONE_UNLIT` as one steps off); lit, its runes glow, give off glimmers and light,
+## bumps into and no hit lands on, dark until the hub's rules light it (`HubRules.LIT` as every wizard
+## stands on it, `HubRules.UNLIT` as one steps off); lit, its runes glow, give off glimmers and light,
 ## and the stone's cue plays.
 ##
 ## godot --headless --path . --script res://content/props/hub_stone/test_hub_stone.gd

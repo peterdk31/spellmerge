@@ -264,7 +264,9 @@ var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
 var _next_wave_left: float = -1.0
 var _enemy_data: EnemyBase = null
-## What is where in the room shown (read from the layout built for this run; worked out from it).
+## What is where in the room shown (read from the layout built for this run; worked out from it: a
+## joining machine builds the same room by the same `start_run` before a snapshot, so nothing
+## rebuilds it).
 var _places: RoomPlaces = RoomPlaces.new()
 ## The bodies its placements stand, its prop yard and the hub's rules (props W8c).
 var contents: RoomContents = RoomContents.new()
@@ -469,7 +471,7 @@ func start_run(requester: int, kept: Array = []) -> bool:
 	else:
 		tick.begin_run()
 	# Built once: what is where is read from the layout shown (props W8c).
-	var layout: Node = room.build()
+	var layout: Node = room.build(tick.sim if tick != null else null)
 	_places = RoomPlaces.read(layout)
 	for problem in _places.problems():
 		push_warning("Flow: the room '%s': %s" % [room.id, problem])
@@ -486,7 +488,6 @@ func start_run(requester: int, kept: Array = []) -> bool:
 	_spawn_players(new_world, room, players, kept)
 	contents.stand(new_world, _places)
 	yard.fill(new_world, _places.zone(ZONE_PROP_YARD), registry)
-	hub.room_started()
 	match mode:
 		MODE_SANDBOX, MODE_HUB:
 			wave = 0
@@ -1075,14 +1076,9 @@ func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int)
 		var spawn: int = entry % spawns.size()
 		var times: int = uses.get(spawn, 0)
 		uses[spawn] = times + 1
-		var node: Node = data.scene.instantiate()
-		var enemy := node as Actor
+		var enemy := RoomContents.make_body(data) as Actor
 		if enemy == null:
-			push_warning("Flow: the enemy scene's root is not an actor, so it is skipped.")
-			if node != null:
-				node.free()
 			continue
-		enemy.data = data
 		enemy.position = stacked_position(spawns[spawn], times)
 		parent.add_child(enemy)
 		_enemies.append(enemy)

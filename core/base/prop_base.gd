@@ -25,6 +25,7 @@ extends Resource
 ## places it): empty for a prop the rules know nothing of (most; every one of them stands in the
 ## hub's prop yard), else a name the rules read (`run_start`: the teleporter stone the hub's rules
 ## light and start a run from; `party_altar`: where a seat opens the party to other machines).
+## A prop with a role never stands in the yard, so a new role is added with the rule that reads it.
 @export var role: StringName = &""
 ## Where standing on it counts (props W8c), a box `area_size` across round `area_offset` from its
 ## feet, apart from the ground that blocks (`footprint_*`): the stone's slab is stood on. Zero: none.

@@ -119,12 +119,20 @@ func _test_room_places() -> void:
 	_check(places.enemy_spawns == PackedVector2Array([Vector2(203, 4)]), "spawns at any depth: %s" % places.enemy_spawns)
 	_check(places.placed_at == PackedVector2Array([Vector2(40, 50), Vector2(210, 10)]), "placements at any depth, in the tree's order: %s" % places.placed_at)
 	_check(places.placed_of(PropBase).size() == 2 and places.placed_of(EnemyBase).is_empty(), "by kind")
-	# Places are whole translations: a rotated or scaled node on the way is a problem.
+	# Places are whole translations: a place under a rotated or scaled node is a problem (its spawn
+	# and its placement), art with nothing placed under it is not.
 	piece.rotation = 0.5
-	_check(RoomPlaces.read(layout).problems().size() == 3, "a rotated piece is named: %s" % RoomPlaces.read(layout).problems())
+	_check(RoomPlaces.read(layout).problems().size() == 4, "the places under a rotated piece are named: %s" % RoomPlaces.read(layout).problems())
 	piece.rotation = 0.0
-	piece.scale = Vector2(2, 2)
-	_check(RoomPlaces.read(layout).problems().size() == 3, "a scaled piece is named")
+	piece.scale = Vector2(-1, 1)
+	_check(RoomPlaces.read(layout).problems().size() == 4, "and under a mirrored one")
+	piece.scale = Vector2.ONE
+	var art := Sprite2D.new()
+	art.rotation = 1.0
+	art.scale = Vector2(-1, 1)
+	art.add_child(Sprite2D.new())
+	layout.add_child(art)
+	_check(RoomPlaces.read(layout).problems().size() == 2, "turned or mirrored art with no place under it is free: %s" % RoomPlaces.read(layout).problems())
 	RoomPlaces.strip(layout)
 	_check(layout.find_children("*", "RoomPlacement", true, false).is_empty() and not is_instance_valid(deep), "every placement taken out, at any depth")
 	_check(layout.find_children("*", "RoomZone", true, false).is_empty(), "every zone taken out")

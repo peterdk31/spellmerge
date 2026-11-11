@@ -13,7 +13,7 @@ extends Node2D
 ## Components: found once in `_ready` among the children, at most one of each kind, none required:
 ## `health` (Health), `hurtbox` (Hurtbox), `contact` (Contact), `mover` (Mover), `caster`
 ## (Caster), `footprint` (Footprint: the ground it stands on; the actor adds one with the default
-## circle when its scene has none, so every actor has one), `reactions` (Reactions: a prop's states,
+## circle when its scene has none, so every actor has one), `state_triggers` (PropStateTriggers: a prop's states,
 ## props W6; never stepped, it hears its body), plus any number of looks (ActorLook)
 ## and the first ActorController, its `home_controller`. Its `damage_numbers` (DamageNumbers,
 ## props W5) are a look too, added the same way when its scene has none, so every actor shows its
@@ -49,7 +49,7 @@ extends Node2D
 ## Still (props W2, docs/milestones/props.md): a body that no controller drives and that has no
 ## Mover is still. Nothing it does changes from tick to tick, so the Tick never steps it
 ## (`Actors.still`, set when its id opens and at every change of driver, `_tell_driver`): a prop.
-## Hits still land on it (Combat writes its health and statuses), its casts still go (a reaction's,
+## Hits still land on it (Combat writes its health and statuses), its casts still go (a trigger's,
 ## or a possessor's: a possession gives it a driver, and it is stepped while that lasts), and a
 ## slowed actor's wind-ups are held back by Combat, not by its step. What only a step does is not
 ## done for it: its pools do not refill, and it takes no hit-stop hold or protection.
@@ -99,7 +99,7 @@ signal damaged(by: int, amount: float, element: StringName)
 ## as `damaged`.
 signal healed(by: int, amount: float)
 ## Combat put the status `status` on this actor from the actor `by` (with every `status_applied` that
-## names it): for its own listeners, as `damaged` (a prop's reactions, props W6).
+## names it): for its own listeners, as `damaged` (a prop's triggers, props W6).
 signal status_gained(by: int, status: StringName)
 ## One of Combat's reactions between statuses, `reaction` (&"shatter"), happened on this actor, set
 ## off by the actor `by` (with its `reaction_triggered`): for its own listeners, as `damaged`.
@@ -159,12 +159,12 @@ var contact: Contact = null
 var mover: Mover = null
 var caster: Caster = null
 var footprint: Footprint = null
-## A prop's reactions and states (props W6), null for a body that has none.
-var reactions: Reactions = null
+## A prop's states and their triggers (props W6), null for a body that has none.
+var state_triggers: PropStateTriggers = null
 ## Its damage numbers (a look its scene holds, else one it added; see the class doc).
 var damage_numbers: DamageNumbers = null
 ## True when something else takes the actor's 0 health instead of letting it die: a Downed
-## component downs it (G7), Entities ends a decoy, a prop's `Reactions` runs its death reactions
+## component downs it (G7), Entities ends a decoy, a prop's `PropStateTriggers` runs its death triggers
 ## (props W6). Combat then neither frees it nor tells its death.
 var downable: bool = false
 ## The possession holding this actor now (another controller possesses it), or null.
@@ -581,8 +581,8 @@ func _find_components() -> void:
 			caster = _first(caster, child) as Caster
 		elif child is Footprint:
 			footprint = _first(footprint, child) as Footprint
-		elif child is Reactions:
-			reactions = _first(reactions, child) as Reactions
+		elif child is PropStateTriggers:
+			state_triggers = _first(state_triggers, child) as PropStateTriggers
 		elif child is ActorComponent:
 			# A kind the kit does not name (the wizard's Downed): stepped by nobody, attached too.
 			_components.append(child as ActorComponent)
@@ -602,8 +602,8 @@ func _find_components() -> void:
 		damage_numbers.name = "DamageNumbers"
 		add_child(damage_numbers)
 	# Set up and attached in this order: health first, the caster after the hurtbox (it names it),
-	# a prop's reactions last (they shape the hurt shape and footprint, and cast).
-	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, reactions]
+	# a prop's state triggers last (they shape the hurt shape and footprint, and cast).
+	var ordered: Array[ActorComponent] = [health, hurtbox, contact, mover, footprint, caster, state_triggers]
 	var at: int = 0
 	for component in ordered:
 		if component != null:

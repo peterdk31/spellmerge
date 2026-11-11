@@ -1,5 +1,5 @@
 extends RefCounted
-## The names a prop's reactions may use, as `PropBase.problems` takes them (props W6): the elements
+## The names a prop's triggers may use, as `PropBase.problems` takes them (props W6): the elements
 ## (the registry's element cards), Combat's statuses and the reaction table's reactions.
 
 const CombatScript := preload("res://gameplay/combat/combat.gd")

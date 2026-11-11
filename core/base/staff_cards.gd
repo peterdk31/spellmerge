@@ -38,7 +38,7 @@ func problems() -> PackedStringArray:
 
 ## What is wrong with a body's list of staffs (an enemy's, a prop's), one line each, each line after
 ## `owner`: more than `most`, an empty entry, an entry's own problems. Staffs are numbered from
-## `first` (an enemy's from 0, a prop's from 1, as its reactions name them).
+## `first` (an enemy's from 0, a prop's from 1, as its triggers name them).
 static func list_problems(owner: String, entries: Array[StaffCards], most: int, first: int = 0) -> PackedStringArray:
 	var found := PackedStringArray()
 	if entries.size() > most:

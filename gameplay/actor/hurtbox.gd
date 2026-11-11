@@ -86,7 +86,7 @@ func outer_radius() -> float:
 
 ## Registered as it wants to be, as a standing actor's is (props W2: its circle follows the actor's
 ## size, which its `rest_leaf` holds; whether it is `enabled` follows a prop's state, which its
-## `Reactions` holds).
+## `PropStateTriggers` holds).
 func at_rest() -> bool:
 	return registered == _wanted()
 

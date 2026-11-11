@@ -1,8 +1,8 @@
-class_name PropReaction
+class_name PropTrigger
 extends Resource
-## One reaction of a prop's state (props W6, docs/milestones/props.md, "Triggers"): when it fires
+## One trigger of a prop's state (props W6, docs/milestones/props.md, "Triggers"): when it fires
 ## (`when` and its numbers) and what it does then (`cast` one of the prop's staffs, `then` go to
-## another state). A row of `PropState.reactions`; the `Reactions` component (gameplay/actor) fires
+## another state). A row of `PropState.triggers`; the `PropStateTriggers` component (gameplay/actor) fires
 ## it. It has no `id` on purpose, so the registry never takes it for content.
 ##
 ## Pure data, with the one question asked of it (`heard`): the component hands each moment over and
@@ -25,7 +25,7 @@ enum When {
 	DEATH,
 	## Its state was just entered (not the state it starts in).
 	ENTERED,
-	## Its staff `staff` (1-4) cast, by a reaction or by whoever possesses it: as the cast leaves,
+	## Its staff `staff` (1-4) cast, by a trigger or by whoever possesses it: as the cast leaves,
 	## after any wind-up.
 	CAST,
 }
@@ -54,8 +54,8 @@ const WHEN_NAMES: PackedStringArray = ["element_hit", "status", "reaction", "hea
 
 
 ## A row that fires on `when_kind` (`cast` and `then` as given), for tests and code-made props.
-static func make(when_kind: When, cast_staff: int = 0, then_state: StringName = &"") -> PropReaction:
-	var made := PropReaction.new()
+static func make(when_kind: When, cast_staff: int = 0, then_state: StringName = &"") -> PropTrigger:
+	var made := PropTrigger.new()
 	made.when = when_kind
 	made.cast = cast_staff
 	made.then = then_state

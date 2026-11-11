@@ -246,7 +246,7 @@ func _origin() -> Vector2:
 ## Cast staff `at` now. Returns true if it cast (or switched its sustained cards off). Does
 ## nothing while the actor is down or for a staff with no build. `pressed`: a new press, not a held
 ## button's repeat, which also sets off the staff's live `on recast` carriers, busy or not
-## (`Spells.press_staff`). `own`: the body's own cast, no driver's (a prop's reaction, props W6): its
+## (`Spells.press_staff`). `own`: the body's own cast, no driver's (a prop's trigger, props W6): its
 ## wind-up goes on when the driver changes (`cancel_winds`).
 func cast(at: int, pressed: bool = true, own: bool = false) -> bool:
 	if actor.is_down() or not has_staff(at):

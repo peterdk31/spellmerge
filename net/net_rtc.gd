@@ -19,6 +19,10 @@ extends NetHandshake
 ## - **A pasted code** is read by `NetCode` (strictly) and must be the kind this side expects
 ##   before WebRTC sees any of it; a code refused there changes nothing, so the player may paste
 ##   again. A code WebRTC itself refuses ends the handshake (`problem`): its peer cannot go on.
+## - **A link that is never made says why, as far as the two codes tell** (`why_no_link`): both
+##   machines behind one router, a machine that never learnt its address from outside, or two
+##   networks with no direct way between them (which only a relay gets through), with the count
+##   of each machine's addresses. Never an address itself: the words may be on a shared screen.
 ## - **The clock is given** (milliseconds; the engine's unless told), as the sessions' is.
 ##
 ## With `NetRtcLink`, the only script that names the engine's WebRTC classes.
@@ -45,6 +49,8 @@ var _hosting: bool = false
 ## This machine's code as it is gathered, and its text once shown.
 var _mine: NetCode = NetCode.new()
 var _code: String = ""
+## The other machine's code, once taken.
+var _theirs: NetCode = null
 ## When this machine's description was made, and when the other's code was taken (-1: not yet).
 ## The gathering's state was seen done at an earlier poll (its last candidates are in by now).
 var _gathered: bool = false
@@ -101,6 +107,7 @@ func take(code: String) -> String:
 	for at in theirs.mids.size():
 		# One candidate it cannot use is not the end: the others may do.
 		_peer.add_ice_candidate(theirs.mids[at], theirs.indexes[at], theirs.names[at])
+	_theirs = theirs
 	_taken_at = _now()
 	return ""
 
@@ -134,9 +141,9 @@ func poll() -> void:
 		return
 	var state: int = _peer.get_connection_state()
 	if state == WebRTCPeerConnection.STATE_FAILED or state == WebRTCPeerConnection.STATE_CLOSED:
-		_fail("the two machines could not reach each other")
+		_fail("the two machines could not reach each other%s" % _why())
 	elif _hosting and _taken_at >= 0 and _now() - _taken_at >= LINK_MS:
-		_fail("the two machines did not find each other in time")
+		_fail("the two machines did not find each other in time%s" % _why())
 
 
 func link() -> NetLink:
@@ -152,6 +159,30 @@ func close() -> void:
 		_problem = "given up"
 	if _peer != null and _link == null:
 		_peer.close()
+
+
+## Why two machines whose codes were `mine` and `theirs` made no link, as far as the codes tell:
+## the words to say after the failure, with how many addresses each code held (on its own
+## network, and as seen from outside it). No address is named.
+static func why_no_link(mine: NetCode, theirs: NetCode) -> String:
+	var my_seen: PackedStringArray = mine.seen_at()
+	var their_seen: PackedStringArray = theirs.seen_at()
+	var why: String = "they are on two networks with no direct way between them; only a relay gets through that"
+	if my_seen.is_empty():
+		why = "this machine never learnt its address as seen from outside, so only a machine on its own network can reach it (a firewall may be in the way)"
+	elif their_seen.is_empty():
+		why = "the other machine never learnt its address as seen from outside, so only a machine on its own network can reach it (a firewall there may be in the way)"
+	else:
+		for address: String in my_seen:
+			if their_seen.has(address):
+				why = "both seem to be on one network, where these two do not see each other; use the same browser on both, or the desktop build"
+				break
+	return "%s (addresses: this machine %d own, %d outside; the other %d own, %d outside)" % [why, mine.own_count(), my_seen.size(), theirs.own_count(), their_seen.size()]
+
+
+## What follows a failure to link: ": " and `why_no_link`, once both codes are there.
+func _why() -> String:
+	return "" if _theirs == null or _code == "" else ": " + why_no_link(_mine, _theirs)
 
 
 ## The peer and its channel made. "" or why not.
